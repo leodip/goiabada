@@ -6,13 +6,7 @@ import (
 	"crypto/rsa"
 	"net/http"
 
-	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
-
-	"github.com/leodip/goiabada/core/communication"
-
-	"github.com/leodip/goiabada/core/user"
-	"github.com/leodip/goiabada/core/validators"
 )
 
 type HttpHelper interface {
@@ -37,51 +31,13 @@ type AuthHelper interface {
 	RedirToAuthorize(w http.ResponseWriter, r *http.Request, clientIdentifier string, scope string, redirectBack string) error
 }
 
-type OtpSecretGenerator interface {
-	GenerateOTPSecret(email string, appName string) (string, error)
-}
-
-type ProfileValidator interface {
-	ValidateName(name string, nameField string) error
-	ValidateProfile(input *validators.ValidateProfileInput) error
-}
-
-type EmailValidator interface {
-	ValidateEmailAddress(emailAddress string) error
-	ValidateEmailUpdate(input *validators.ValidateEmailInput) error
-}
-
-type EmailSender interface {
-	SendEmail(ctx context.Context, input *communication.SendEmailInput) error
-}
-
-type AddressValidator interface {
-	ValidateAddress(input *validators.ValidateAddressInput) error
-}
-
-type PhoneValidator interface {
-	ValidatePhone(input *validators.ValidatePhoneInput) error
-}
-
-type PasswordValidator interface {
-	ValidatePassword(ctx context.Context, password string) error
-}
-
 type IdentifierValidator interface {
 	ValidateIdentifier(identifier string, enforceMinLength bool) error
-}
-
-type UserCreator interface {
-	CreateUser(input *user.CreateUserInput) (*models.User, error)
 }
 
 type TokenParser interface {
 	DecodeAndValidateTokenString(ctx context.Context, token string, pubKey *rsa.PublicKey, withExpirationCheck bool) (*oauth.JwtToken, error)
 	DecodeAndValidateTokenResponse(ctx context.Context, tokenResponse *oauth.TokenResponse) (*oauth.JwtInfo, error)
-}
-
-type TCPConnectionTester interface {
-	TestTCPConnection(host string, port int) error
 }
 
 type TokenExchanger interface {
