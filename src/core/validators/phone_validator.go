@@ -4,19 +4,15 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/phonecountries"
 )
 
 type PhoneValidator struct {
-	database data.Database
 }
 
-func NewPhoneValidator(database data.Database) *PhoneValidator {
-	return &PhoneValidator{
-		database: database,
-	}
+func NewPhoneValidator() *PhoneValidator {
+	return &PhoneValidator{}
 }
 
 type ValidatePhoneInput struct {
