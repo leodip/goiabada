@@ -180,14 +180,26 @@ func identText(e ast.Expr) string {
 
 // TestNoHandRolledPageOffset holds the real tree to the rule.
 func TestNoHandRolledPageOffset(t *testing.T) {
-	root := testutil.SourceRoot(t)
+	assertNoHandRolledPageOffset(t, testutil.SourceRoot(t), pageOffsetRoot, pageOffsetOwner)
+}
 
-	found, files, err := findHandRolledOffsets(root, pageOffsetRoot, pageOffsetOwner)
-	require.NoError(t, err)
+// assertNoHandRolledPageOffset is the reporting half, taking the root and the scope as parameters
+// and failing through a testutil.Reporter so a rule test can drive it against a fixture tree.
+// Without that seam these lines are reached only by the call above, which walks a tree that has
+// been clean since #305.
+func assertNoHandRolledPageOffset(r testutil.Reporter, root, sub, owner string) {
+	r.Helper()
+
+	found, files, err := findHandRolledOffsets(root, sub, owner)
+	if err != nil {
+		r.Fatalf("walking %s: %v", root, err)
+	}
 	// A root that somehow held no Go files walks nothing and would otherwise
 	// pass, which is the one way a guard like this fails silently in the
 	// direction that matters.
-	require.NotZero(t, files, "walked no Go files under %s/%s", root, pageOffsetRoot)
+	if files == 0 {
+		r.Fatalf("walked no Go files under %s/%s", root, sub)
+	}
 
 	if len(found) == 0 {
 		return
@@ -196,7 +208,7 @@ func TestNoHandRolledPageOffset(t *testing.T) {
 	for _, f := range found {
 		lines = append(lines, f.file+":"+itoa(f.line)+": "+f.text)
 	}
-	t.Fatalf("%d hand-rolled page offset(s) under %s:\n\t%s\n\n"+
+	r.Errorf("%d hand-rolled page offset(s) under %s:\n\t%s\n\n"+
 		"Compute the offset with commondb.PageOffset(page, pageSize) instead. The page number "+
 		"arrives from a \"?page=\" query parameter, and at a page near math.MaxInt this product "+
 		"wraps negative. Nothing below catches that: sqlbuilder drops the OFFSET clause when it "+
@@ -204,7 +216,7 @@ func TestNoHandRolledPageOffset(t *testing.T) {
 		"for, and a dialect override that formats the number into SQL itself gets the engine's "+
 		"refusal and a 500 (#305). PageOffset saturates at the largest offset that fits, which "+
 		"is past the end of any table, so the read returns the empty page it should.",
-		len(found), pageOffsetRoot, strings.Join(lines, "\n\t"))
+		len(found), sub, strings.Join(lines, "\n\t"))
 }
 
 // TestNoHandRolledPageOffset_TheCheckerMatchesTheShapeAndNotTheSpelling is the
@@ -335,4 +347,89 @@ func offsetE(page, pageSize int) int {
 	// And the commuted one is rendered the way it is written, rather than
 	// silently normalised into the other order.
 	assert.Equal(t, "pageSize * (page - 1)", byFile["core/data/sqlitedb/user.go"])
+}
+
+// TestNoHandRolledPageOffset_TheGuardFailsOnArithmetic is the third half. The case above asserts on
+// what findHandRolledOffsets returned; the lines that turn a match into a failure are reached only
+// by TestNoHandRolledPageOffset, which walks a tree that has been clean since #305.
+func TestNoHandRolledPageOffset_TheGuardFailsOnArithmetic(t *testing.T) {
+	root := t.TempDir()
+	writeLintFixture(t, root, "core/data/mysqldb/users.go", `package mysqldb
+
+func window(page, pageSize int) int {
+	return (page - 1) * pageSize
+}
+`)
+
+	report := testutil.RunGuard(func(r testutil.Reporter) {
+		assertNoHandRolledPageOffset(r, root, pageOffsetRoot, pageOffsetOwner)
+	})
+
+	require.True(t, report.Failed(), "hand-rolled offset arithmetic passed the guard")
+	assert.False(t, report.Stopped, "a finding is an Errorf, not a Fatalf")
+	assert.Contains(t, report.Text(), "core/data/mysqldb/users.go:4")
+	assert.Contains(t, report.Text(), "commondb.PageOffset(page, pageSize)")
+	assert.Contains(t, report.Text(), "#305")
+}
+
+// TestNoHandRolledPageOffset_TheGuardPassesTheHelper is the other direction, over the call that
+// replaced the arithmetic.
+func TestNoHandRolledPageOffset_TheGuardPassesTheHelper(t *testing.T) {
+	root := t.TempDir()
+	writeLintFixture(t, root, "core/data/mysqldb/users.go", `package mysqldb
+
+func window(page, pageSize int) int {
+	return commondb.PageOffset(page, pageSize)
+}
+`)
+
+	report := testutil.RunGuard(func(r testutil.Reporter) {
+		assertNoHandRolledPageOffset(r, root, pageOffsetRoot, pageOffsetOwner)
+	})
+
+	assert.False(t, report.Failed(), "a PageOffset call failed the guard: %s", report.Text())
+}
+
+// TestNoHandRolledPageOffset_TheGuardIsFatalOnAnEmptyWalk pins the seam, and this guard's scope
+// makes it the likeliest of the four here to trip it: the walk is one subdirectory, so the Go
+// moving out from under it empties the walk without emptying the repository.
+func TestNoHandRolledPageOffset_TheGuardIsFatalOnAnEmptyWalk(t *testing.T) {
+	root := t.TempDir()
+	writeLintFixture(t, root, "core/data/notes.md", "the queries moved out of here\n")
+	writeLintFixture(t, root, "core/elsewhere/users.go", "package elsewhere\n")
+
+	report := testutil.RunGuard(func(r testutil.Reporter) {
+		assertNoHandRolledPageOffset(r, root, pageOffsetRoot, pageOffsetOwner)
+	})
+
+	require.True(t, report.Stopped, "an empty walk must be fatal rather than a pass")
+	assert.Contains(t, report.Fatal, "walked no Go files under")
+	assert.Contains(t, report.Fatal, pageOffsetRoot, "the fatal names the scope that covered nothing")
+}
+
+// TestNoHandRolledPageOffset_AScopeThatIsNotThereIsFatalToo is the other way this guard's one
+// subdirectory disappears, and it is answered as a walk error rather than as an empty scope. The
+// two are worth telling apart: a directory holding no Go any more is a fact about the tree, and a
+// directory that is not there at all is a scope constant nobody updated.
+func TestNoHandRolledPageOffset_AScopeThatIsNotThereIsFatalToo(t *testing.T) {
+	root := t.TempDir()
+	writeLintFixture(t, root, "core/elsewhere/users.go", "package elsewhere\n")
+
+	report := testutil.RunGuard(func(r testutil.Reporter) {
+		assertNoHandRolledPageOffset(r, root, pageOffsetRoot, pageOffsetOwner)
+	})
+
+	require.True(t, report.Stopped)
+	assert.Contains(t, report.Fatal, "walking ")
+	assert.NotContains(t, report.Fatal, "walked no Go files")
+}
+
+// writeLintFixture writes one file into a fixture tree, creating its directories. The three lint
+// guards in this package share it, and each of their reporting halves is driven through
+// testutil.RunGuard against trees it builds.
+func writeLintFixture(t *testing.T, root, rel, src string) {
+	t.Helper()
+	path := filepath.Join(root, filepath.FromSlash(rel))
+	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
+	require.NoError(t, os.WriteFile(path, []byte(src), 0o644))
 }

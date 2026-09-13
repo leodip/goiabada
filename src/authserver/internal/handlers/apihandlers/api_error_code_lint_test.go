@@ -5,12 +5,17 @@ import (
 	"go/parser"
 	"go/token"
 	"io/fs"
+	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/testutil"
 )
 
@@ -149,10 +154,19 @@ type emittedAPICode struct {
 }
 
 func TestAPIErrorCodes_MatchTheSurvivorTable(t *testing.T) {
-	root := testutil.SourceRoot(t)
+	assertAPIErrorCodes(t, testutil.SourceRoot(t), apiErrorCodeDirs, apiErrorCodeFileFloor, apiErrorCodes)
+}
 
+// apiErrorCodeFileFloor is how many non-test Go files the four directories hold at rest. It is a
+// floor rather than an exact count so ordinary growth does not move it, and it is a parameter
+// rather than a literal so a rule test can pin the refusal itself.
+const apiErrorCodeFileFloor = 60
+
+// findAPIErrorCodes walks dirs under root and returns every error_code written on that surface, the
+// code positions it could not read as a literal, and how many non-test Go files it parsed.
+func findAPIErrorCodes(root string, dirs []string) ([]emittedAPICode, []string, int, error) {
 	var files []string
-	for _, dir := range apiErrorCodeDirs {
+	for _, dir := range dirs {
 		start := filepath.Join(root, filepath.FromSlash(dir))
 		err := filepath.WalkDir(start, func(path string, d fs.DirEntry, err error) error {
 			if err != nil {
@@ -171,14 +185,8 @@ func TestAPIErrorCodes_MatchTheSurvivorTable(t *testing.T) {
 			return nil
 		})
 		if err != nil {
-			t.Fatalf("walking %s: %v", start, err)
+			return nil, nil, 0, errs.Wrapf(err, "walking %s", start)
 		}
-	}
-	// A walk that reached nothing would pass every assertion below, which is the one way a guard
-	// like this fails in the permissive direction.
-	if len(files) < 60 {
-		t.Fatalf("walked only %d non-test Go files under %s; the walk is no longer reaching the "+
-			"API sources", len(files), strings.Join(apiErrorCodeDirs, ", "))
 	}
 
 	fset := token.NewFileSet()
@@ -193,7 +201,7 @@ func TestAPIErrorCodes_MatchTheSurvivorTable(t *testing.T) {
 		}
 		rel, err := filepath.Rel(root, path)
 		if err != nil {
-			t.Fatalf("relating %s to %s: %v", path, root, err)
+			return nil, nil, 0, errs.Wrapf(err, "relating %s to %s", path, root)
 		}
 		rel = filepath.ToSlash(rel)
 		parsed[rel] = f
@@ -210,21 +218,42 @@ func TestAPIErrorCodes_MatchTheSurvivorTable(t *testing.T) {
 		problems = append(problems, probs...)
 	}
 	sort.Strings(problems)
+	return emitted, problems, len(files), nil
+}
+
+// assertAPIErrorCodes is the reporting half, taking the root, the scope, the floor and the table as
+// parameters and failing through a testutil.Reporter so a rule test can drive it against a fixture
+// tree. Without that seam these lines are reached only by the call above, which walks a surface
+// that has matched its table since #279.
+func assertAPIErrorCodes(r testutil.Reporter, root string, dirs []string, floor int, table map[string]string) {
+	r.Helper()
+
+	emitted, problems, files, err := findAPIErrorCodes(root, dirs)
+	if err != nil {
+		r.Fatalf("%v", err)
+	}
+	// A walk that reached nothing would pass every assertion below, which is the one way a guard
+	// like this fails in the permissive direction.
+	if files < floor {
+		r.Fatalf("walked only %d non-test Go files under %s; the walk is no longer reaching the "+
+			"API sources", files, strings.Join(dirs, ", "))
+	}
+
 	for _, p := range problems {
-		t.Errorf("%s", p)
+		r.Errorf("%s", p)
 	}
 
 	seen := map[string]bool{}
 	var unknown []string
 	for _, e := range emitted {
 		seen[e.code] = true
-		if _, ok := apiErrorCodes[e.code]; !ok {
+		if _, ok := table[e.code]; !ok {
 			unknown = append(unknown, e.file+":"+strconv.Itoa(e.line)+": "+e.code)
 		}
 	}
 	sort.Strings(unknown)
 	if len(unknown) > 0 {
-		t.Errorf("%d error_code(s) the API writes are not in the survivor table:\n\t%s\n\n"+
+		r.Errorf("%d error_code(s) the API writes are not in the survivor table:\n\t%s\n\n"+
 			"One code per condition: a rejected value is VALIDATION_ERROR, a body that will not "+
 			"parse is INVALID_REQUEST_BODY, an absent entity is NOT_FOUND. Add an entry to "+
 			"apiErrorCodes only for a code a caller can act on, and say who acts on it (#279 "+
@@ -232,14 +261,14 @@ func TestAPIErrorCodes_MatchTheSurvivorTable(t *testing.T) {
 	}
 
 	var orphaned []string
-	for code := range apiErrorCodes {
+	for code := range table {
 		if !seen[code] {
 			orphaned = append(orphaned, code)
 		}
 	}
 	sort.Strings(orphaned)
 	if len(orphaned) > 0 {
-		t.Errorf("%d survivor-table entr(ies) no longer written anywhere: %s\n\n"+
+		r.Errorf("%d survivor-table entr(ies) no longer written anywhere: %s\n\n"+
 			"Delete them. A table listing codes the API cannot produce documents nothing and "+
 			"stops being read.", len(orphaned), strings.Join(orphaned, ", "))
 	}
@@ -569,4 +598,152 @@ var codes = []string{"USER_NOT_FOUND"}`,
 			}
 		})
 	}
+}
+
+// ---- the reporting half ----------------------------------------------------------------------
+//
+// TestAPIErrorCodes_CollectorRuleTable asserts on what the collector returned for one file at a
+// time. The lines that turn those codes into a failure -- both directions of the table comparison,
+// the unreadable code position, and the file floor -- were reached only by
+// TestAPIErrorCodes_MatchTheSurvivorTable, which walks a surface that has matched its table since
+// #279, so blinding them disables the contract lint with nothing going red.
+
+// apiErrorCodeFixture writes a one-directory surface and returns its root.
+func apiErrorCodeFixture(t *testing.T, files map[string]string) string {
+	t.Helper()
+
+	root := t.TempDir()
+	for rel, src := range files {
+		path := filepath.Join(root, filepath.FromSlash(rel))
+		require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
+		require.NoError(t, os.WriteFile(path, []byte(src), 0o644))
+	}
+	return root
+}
+
+// apiErrorCodeFixtureDirs is the one directory the fixtures below write into.
+var apiErrorCodeFixtureDirs = []string{"authserver/internal/handlers"}
+
+// TestAPIErrorCodes_TheGuardPassesASurfaceThatMatchesItsTable is the clean direction, and it is
+// what keeps each case below from passing for the wrong reason.
+func TestAPIErrorCodes_TheGuardPassesASurfaceThatMatchesItsTable(t *testing.T) {
+	root := apiErrorCodeFixture(t, map[string]string{
+		"authserver/internal/handlers/users.go": `package handlers
+
+func HandleX() { writeJSONError(w, "User not found", "NOT_FOUND", 404) }
+`,
+	})
+
+	report := testutil.RunGuard(func(r testutil.Reporter) {
+		assertAPIErrorCodes(r, root, apiErrorCodeFixtureDirs, 1, map[string]string{
+			"NOT_FOUND": "category: an absent entity, 404.",
+		})
+	})
+
+	assert.False(t, report.Failed(), "a surface matching its table failed the guard: %s", report.Text())
+}
+
+// TestAPIErrorCodes_TheGuardFailsOnACodeOutsideTheTable is the direction that catches a retired
+// spelling coming back, which is how this regresses: a new handler written from an old one.
+func TestAPIErrorCodes_TheGuardFailsOnACodeOutsideTheTable(t *testing.T) {
+	root := apiErrorCodeFixture(t, map[string]string{
+		"authserver/internal/handlers/users.go": `package handlers
+
+func HandleX() { writeJSONError(w, "User not found", "USER_NOT_FOUND", 404) }
+`,
+	})
+
+	report := testutil.RunGuard(func(r testutil.Reporter) {
+		assertAPIErrorCodes(r, root, apiErrorCodeFixtureDirs, 1, map[string]string{
+			"NOT_FOUND": "category: an absent entity, 404.",
+		})
+	})
+
+	require.True(t, report.Failed(), "a code outside the table passed the guard")
+	assert.False(t, report.Stopped, "a finding is an Errorf, not a Fatalf")
+	assert.Contains(t, report.Text(), "authserver/internal/handlers/users.go:3")
+	assert.Contains(t, report.Text(), "USER_NOT_FOUND")
+	assert.Contains(t, report.Text(), "not in the survivor table")
+	assert.Contains(t, report.Text(), "decision 18")
+	// And the entry nothing writes any more is reported alongside it, since both directions run.
+	assert.Contains(t, report.Text(), "no longer written anywhere: NOT_FOUND")
+}
+
+// TestAPIErrorCodes_TheGuardFailsOnATableEntryNothingWrites is the other direction on its own, and
+// it is the one that keeps the table from rotting into a list of codes the API no longer has --
+// which is how a lint stops meaning anything.
+func TestAPIErrorCodes_TheGuardFailsOnATableEntryNothingWrites(t *testing.T) {
+	root := apiErrorCodeFixture(t, map[string]string{
+		"authserver/internal/handlers/users.go": `package handlers
+
+func HandleX() { writeJSONError(w, "User not found", "NOT_FOUND", 404) }
+`,
+	})
+
+	report := testutil.RunGuard(func(r testutil.Reporter) {
+		assertAPIErrorCodes(r, root, apiErrorCodeFixtureDirs, 1, map[string]string{
+			"NOT_FOUND": "category: an absent entity, 404.",
+			"RETIRED":   "nothing writes this any more.",
+		})
+	})
+
+	require.True(t, report.Failed(), "a table entry nothing writes passed the guard")
+	require.Len(t, report.Errors, 1, "the emitted code is in the table, so only one direction fires")
+	assert.Contains(t, report.Text(), "no longer written anywhere: RETIRED")
+	assert.Contains(t, report.Text(), "Delete them")
+}
+
+// TestAPIErrorCodes_TheGuardFailsOnACodePositionItCannotRead holds the first of the two boundaries
+// the file header states. The scan reads a code where a code is written, so a code position that is
+// not a literal is a failure in its own right rather than a site quietly skipped.
+func TestAPIErrorCodes_TheGuardFailsOnACodePositionItCannotRead(t *testing.T) {
+	root := apiErrorCodeFixture(t, map[string]string{
+		"authserver/internal/handlers/users.go": `package handlers
+
+func HandleX(code string) { writeJSONError(w, "User not found", code, 404) }
+`,
+	})
+
+	report := testutil.RunGuard(func(r testutil.Reporter) {
+		assertAPIErrorCodes(r, root, apiErrorCodeFixtureDirs, 1, map[string]string{})
+	})
+
+	require.True(t, report.Failed(), "an unreadable code position passed the guard")
+	assert.Contains(t, report.Text(), "authserver/internal/handlers/users.go:3")
+}
+
+// TestAPIErrorCodes_TheGuardIsFatalBelowTheFileFloor pins this guard's own answer to the empty
+// walk. It is a floor rather than a zero because the surface is four named directories: a walk that
+// reached one of them and not the others would pass every assertion above while checking a quarter
+// of the contract.
+func TestAPIErrorCodes_TheGuardIsFatalBelowTheFileFloor(t *testing.T) {
+	root := apiErrorCodeFixture(t, map[string]string{
+		"authserver/internal/handlers/users.go": `package handlers
+
+func HandleX() { writeJSONError(w, "User not found", "NOT_FOUND", 404) }
+`,
+	})
+
+	report := testutil.RunGuard(func(r testutil.Reporter) {
+		assertAPIErrorCodes(r, root, apiErrorCodeFixtureDirs, 2, map[string]string{
+			"NOT_FOUND": "category: an absent entity, 404.",
+		})
+	})
+
+	require.True(t, report.Stopped, "a walk below the floor must be fatal rather than a pass")
+	assert.Contains(t, report.Fatal, "walked only 1 non-test Go files")
+	assert.Contains(t, report.Fatal, "no longer reaching the API sources")
+}
+
+// TestAPIErrorCodes_TheFileFloorIsBelowTheRealSurface holds the floor to the tree it guards. A
+// constant set above the real count would fail every run; one set far below it would stop being a
+// floor, so the margin is what this pins.
+func TestAPIErrorCodes_TheFileFloorIsBelowTheRealSurface(t *testing.T) {
+	_, _, files, err := findAPIErrorCodes(testutil.SourceRoot(t), apiErrorCodeDirs)
+	require.NoError(t, err)
+
+	assert.GreaterOrEqual(t, files, apiErrorCodeFileFloor)
+	assert.Less(t, apiErrorCodeFileFloor, files*2,
+		"the floor has drifted far below the surface it guards and would no longer catch a walk "+
+			"that lost most of it")
 }

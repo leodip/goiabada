@@ -104,13 +104,25 @@ func findBareBeginTransactionCalls(root string, exempt map[string]bool) ([]bareB
 
 // TestNoBareBeginTransaction holds the real tree to the rule.
 func TestNoBareBeginTransaction(t *testing.T) {
-	root := testutil.SourceRoot(t)
+	assertNoBareBeginTransaction(t, testutil.SourceRoot(t), runInTransactionOwners)
+}
 
-	calls, files, err := findBareBeginTransactionCalls(root, runInTransactionOwners)
-	require.NoError(t, err)
+// assertNoBareBeginTransaction is the reporting half, taking the root as a parameter and failing
+// through a testutil.Reporter so a rule test can drive it against a fixture tree. Without that
+// seam these lines are reached only by the call above, which walks a tree that has been clean
+// since #301, so a defect in them disables the guard with nothing going red.
+func assertNoBareBeginTransaction(r testutil.Reporter, root string, exempt map[string]bool) {
+	r.Helper()
+
+	calls, files, err := findBareBeginTransactionCalls(root, exempt)
+	if err != nil {
+		r.Fatalf("walking %s: %v", root, err)
+	}
 	// A root that somehow held no Go files walks nothing and would otherwise pass, which is the
 	// one way a guard like this fails silently in the direction that matters.
-	require.NotZero(t, files, "walked no Go files under %s", root)
+	if files == 0 {
+		r.Fatalf("walked no Go files under %s", root)
+	}
 
 	if len(calls) == 0 {
 		return
@@ -119,7 +131,7 @@ func TestNoBareBeginTransaction(t *testing.T) {
 	for _, c := range calls {
 		lines = append(lines, c.file+":"+itoa(c.line))
 	}
-	t.Fatalf("%d bare BeginTransaction call(s) outside the helper:\n\t%s\n\n"+
+	r.Errorf("%d bare BeginTransaction call(s) outside the helper:\n\t%s\n\n"+
 		"Open the transaction through Database.RunInTransaction(func(tx *sql.Tx) error) instead. "+
 		"It is the only place a deadlock is answered: the engine aborts one of two transactions "+
 		"that took the same rows in opposite orders, and the helper reruns the body, so a "+
@@ -223,4 +235,66 @@ func itoa(n int) string {
 		n /= 10
 	}
 	return string(b)
+}
+
+// TestNoBareBeginTransaction_TheGuardFailsOnABareCall is the third half, and the one the two above
+// leave out. Both assert on what findBareBeginTransactionCalls returned; the lines that turn a call
+// into a failure are reached only by TestNoBareBeginTransaction, which walks a tree that has been
+// clean since #301, so blinding them disables the guard with nothing going red.
+func TestNoBareBeginTransaction_TheGuardFailsOnABareCall(t *testing.T) {
+	root := t.TempDir()
+	writeLintFixture(t, root, "core/user/local.go", `package user
+
+type db interface{ BeginTransaction() error }
+
+func owner(d db) error {
+	return d.BeginTransaction()
+}
+`)
+
+	report := testutil.RunGuard(func(r testutil.Reporter) {
+		assertNoBareBeginTransaction(r, root, runInTransactionOwners)
+	})
+
+	require.True(t, report.Failed(), "a bare BeginTransaction passed the guard")
+	assert.False(t, report.Stopped, "a finding is an Errorf, not a Fatalf")
+	assert.Contains(t, report.Text(), "core/user/local.go:6")
+	assert.Contains(t, report.Text(), "RunInTransaction")
+	assert.Contains(t, report.Text(), "#301")
+}
+
+// TestNoBareBeginTransaction_TheGuardPassesTheHelper is the other direction, over the shape the
+// rule exists to admit.
+func TestNoBareBeginTransaction_TheGuardPassesTheHelper(t *testing.T) {
+	root := t.TempDir()
+	writeLintFixture(t, root, "core/user/local.go", `package user
+
+import "database/sql"
+
+type db interface {
+	RunInTransaction(fn func(tx *sql.Tx) error) error
+}
+
+func owner(d db) error {
+	return d.RunInTransaction(func(tx *sql.Tx) error { return nil })
+}
+`)
+
+	report := testutil.RunGuard(func(r testutil.Reporter) {
+		assertNoBareBeginTransaction(r, root, runInTransactionOwners)
+	})
+
+	assert.False(t, report.Failed(), "a RunInTransaction call failed the guard: %s", report.Text())
+}
+
+// TestNoBareBeginTransaction_TheGuardIsFatalOnAnEmptyWalk pins the seam the comment inside the
+// guard names. A root holding no Go file reports nothing, which is indistinguishable from a tree
+// that opens every transaction through the helper.
+func TestNoBareBeginTransaction_TheGuardIsFatalOnAnEmptyWalk(t *testing.T) {
+	report := testutil.RunGuard(func(r testutil.Reporter) {
+		assertNoBareBeginTransaction(r, t.TempDir(), runInTransactionOwners)
+	})
+
+	require.True(t, report.Stopped, "an empty walk must be fatal rather than a pass")
+	assert.Contains(t, report.Fatal, "walked no Go files under")
 }
