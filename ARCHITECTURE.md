@@ -109,7 +109,7 @@ A row whose owner is not `kernel` names the issue that moves it. A `kernel` row 
 | `core/phonecountries` | authserver | #345 |
 | `core/ratelimit` | authserver | #336 |
 | `core/rsautil` | authserver | #360 |
-| `core/sessionstore` | split | #334 |
+| `core/sessionstore` | kernel | — |
 | `core/stringutil` | kernel | — |
 | `core/testutil` | kernel | — |
 | `core/timezones` | kernel | — |
@@ -229,8 +229,8 @@ adminconsole/cmd/goiabada-adminconsole -> core/oauth -> core/data -> core/data/<
 ```
 
 `core/data/database.go` imports all four engine packages, so importing `core/data` at all compiles
-every driver. Four of the core packages the admin console imports reach `core/data`: `core/oauth`,
-`core/middleware`, `core/validators` and `core/sessionstore`. Closing one path changes
+every driver. Three of the core packages the admin console imports reach `core/data`: `core/oauth`,
+`core/middleware` and `core/validators`. Closing one path changes
 nothing on its own, which is why the table asserts reachability rather than counting edges.
 
 All five rows say #353 rather than #359, which is worth explaining because the ordering does not
