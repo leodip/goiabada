@@ -194,7 +194,7 @@ of rows is the only measure of how much is left to do.
 | `adminconsole/internal/handlers/adminuserhandlers` | `core/models` | #350 |
 | `adminconsole/internal/middleware` | `core/models` | #350 |
 
-Fourteen rows, and #350 owns nine of them: the admin console's dependency on persistence models is
+Fourteen rows, and #350 owns ten of them: the admin console's dependency on persistence models is
 the single largest piece of the boundary still to close.
 
 ## Foreign modules the admin console must not compile
