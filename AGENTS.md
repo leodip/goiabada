@@ -329,6 +329,21 @@ except that leg, which sets it to 1 for itself. Code whose correctness is a lock
 (`core/ratelimit`, the middleware's in-flight count, the concurrent transactions of #301) is
 covered there and nowhere else; the data and integration tiers do not run under it.
 
+**Guard shape**: every tree-wide guard splits in two, and a new one is written the same way. A
+*finder* walks the tree and returns findings; a *reporting half* turns them into `Errorf` and turns
+a walk that reached nothing into `Fatalf`. The reporting half takes a `testutil.Reporter` --
+`Helper`, `Errorf`, `Fatalf`, the measured surface of `*testing.T`, and an interface rather than a
+`testing.TB` parameter because `testing.TB` cannot be implemented outside the testing package. The
+exported `Assert*` keeps its `*testing.T` and delegates, so no caller moves. Both halves are then
+driven from a rule test: the finder directly, the reporting half through `testutil.RunGuard`, which
+runs it on its own goroutine so a recorded `Fatalf` ends it in `runtime.Goexit` the way the real one
+does. Thirteen guards follow this -- nine in `core/testutil`, plus `core/data`'s begin-transaction,
+benign-sentinel and page-offset lints and the auth server's API error-code lint. Each owes three
+cases: a tree that must fail, a tree that must pass, and the walk that reached nothing. Without the
+last two the first proves nothing, and without the reporting half under test a defect in the five
+lines that report disables the guard across every module with nothing going red -- which is what
+blinding `AssertNoDeadInterfaces` demonstrated on `8883642d` (#333).
+
 **gofmt guard**: every module's unit tier runs `TestGoSourcesAreGofmted`, which holds every Go
 file under `src/` to gofmt's formatting through `core/testutil.AssertGofmted`. The walk is
 repository-wide from each tier because `cmd/goiabada-setup` has no tier of its own. CI's Lint job
