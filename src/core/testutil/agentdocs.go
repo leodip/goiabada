@@ -46,9 +46,16 @@ import (
 func AssertAgentDocs(t *testing.T) {
 	t.Helper()
 
-	findings := checkAgentDocs(filepath.Dir(SourceRoot(t)))
-	for _, f := range findings {
-		t.Error(f)
+	assertAgentDocs(t, filepath.Dir(SourceRoot(t)))
+}
+
+// assertAgentDocs is the reporting half, taking the repository root as a parameter and failing
+// through a Reporter so a rule test can drive it against a fixture tree. See Reporter in guard.go.
+func assertAgentDocs(r Reporter, repoRoot string) {
+	r.Helper()
+
+	for _, f := range checkAgentDocs(repoRoot) {
+		r.Errorf("%s", f)
 	}
 }
 

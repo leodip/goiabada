@@ -41,12 +41,20 @@ type templateFinding struct {
 func WalkHTMLTemplates(t *testing.T, fsys fs.FS, root string, fn func(path, content string)) {
 	t.Helper()
 
+	walkOrFail(t, fsys, root, fn)
+}
+
+// walkOrFail is the reporting half of the walk, failing through a Reporter so a rule test can
+// drive it and the three assertions built on it against a fixture FS. See Reporter in guard.go.
+func walkOrFail(r Reporter, fsys fs.FS, root string, fn func(path, content string)) {
+	r.Helper()
+
 	n, err := walkHTMLTemplates(fsys, root, fn)
 	if err != nil {
-		t.Fatalf("walking templates under %s: %v", root, err)
+		r.Fatalf("walking templates under %s: %v", root, err)
 	}
 	if n == 0 {
-		t.Fatalf("walked no .html files under %s; this guard is checking nothing", root)
+		r.Fatalf("walked no .html files under %s; this guard is checking nothing", root)
 	}
 }
 
@@ -80,9 +88,17 @@ func walkHTMLTemplates(fsys fs.FS, root string, fn func(path, content string)) (
 func AssertTemplatesNoHTMLInTitle(t *testing.T, fsys fs.FS, root string) {
 	t.Helper()
 
-	WalkHTMLTemplates(t, fsys, root, func(path, content string) {
+	assertTemplatesNoHTMLInTitle(t, fsys, root)
+}
+
+// assertTemplatesNoHTMLInTitle is the reporting half, failing through a Reporter so a rule test can drive it
+// against a fixture FS. See Reporter in guard.go.
+func assertTemplatesNoHTMLInTitle(r Reporter, fsys fs.FS, root string) {
+	r.Helper()
+
+	walkOrFail(r, fsys, root, func(path, content string) {
 		for _, f := range findHTMLInTitle(path, content) {
-			t.Errorf("%s: {{define \"title\"}} contains HTML (renders literally in <title>): %q",
+			r.Errorf("%s: {{define \"title\"}} contains HTML (renders literally in <title>): %q",
 				f.path, f.detail)
 		}
 	})
@@ -133,11 +149,19 @@ func findHTMLInTitle(path, content string) []templateFinding {
 func AssertTemplatesNoCsrfField(t *testing.T, fsys fs.FS, root string) {
 	t.Helper()
 
-	WalkHTMLTemplates(t, fsys, root, func(path, content string) {
+	assertTemplatesNoCsrfField(t, fsys, root)
+}
+
+// assertTemplatesNoCsrfField is the reporting half, failing through a Reporter so a rule test can drive it
+// against a fixture FS. See Reporter in guard.go.
+func assertTemplatesNoCsrfField(r Reporter, fsys fs.FS, root string) {
+	r.Helper()
+
+	walkOrFail(r, fsys, root, func(path, content string) {
 		for _, f := range findCsrfField(path, content) {
 			// Lexical, like the scan. It does not predict what the occurrence would render
 			// as: that depends on the context the action sits in, per the note above.
-			t.Errorf(`%s: names csrfField, the spelling #155 deleted when it replaced the CSRF `+
+			r.Errorf(`%s: names csrfField, the spelling #155 deleted when it replaced the CSRF `+
 				`token with an origin check; no handler binds it, so remove the occurrence or `+
 				`update this guard`, f.path)
 		}
@@ -158,9 +182,17 @@ func findCsrfField(path, content string) []templateFinding {
 func AssertTemplatesHtmlLangNotHardcoded(t *testing.T, fsys fs.FS, root string) {
 	t.Helper()
 
-	WalkHTMLTemplates(t, fsys, root, func(path, content string) {
+	assertTemplatesHtmlLangNotHardcoded(t, fsys, root)
+}
+
+// assertTemplatesHtmlLangNotHardcoded is the reporting half, failing through a Reporter so a rule test can drive it
+// against a fixture FS. See Reporter in guard.go.
+func assertTemplatesHtmlLangNotHardcoded(r Reporter, fsys fs.FS, root string) {
+	r.Helper()
+
+	walkOrFail(r, fsys, root, func(path, content string) {
 		for _, f := range findHardcodedHTMLLang(path, content) {
-			t.Errorf(`%s: <html lang="en"> is hardcoded; use lang="{{ Lang $.ctx }}"`, f.path)
+			r.Errorf(`%s: <html lang="en"> is hardcoded; use lang="{{ Lang $.ctx }}"`, f.path)
 		}
 	})
 }

@@ -43,16 +43,22 @@ import (
 func AssertAuditLogContext(t *testing.T, dirs ...string) {
 	t.Helper()
 
-	root := SourceRoot(t)
+	assertAuditLogContext(t, SourceRoot(t), dirs)
+}
+
+// assertAuditLogContext is the reporting half, taking the root as a parameter and failing through
+// a Reporter so a rule test can drive it against a fixture tree. See Reporter in guard.go.
+func assertAuditLogContext(r Reporter, root string, dirs []string) {
+	r.Helper()
 
 	violations, files, err := findAuditLogContextViolations(root, dirs)
 	if err != nil {
-		t.Fatalf("walking %s: %v", root, err)
+		r.Fatalf("walking %s: %v", root, err)
 	}
 	// A scope that held no Go files walks nothing and would otherwise pass, which is the one way
 	// a guard like this fails silently in the direction that matters.
 	if files == 0 {
-		t.Fatalf("walked no non-test Go files in a request-path package under %s (dirs: %s)",
+		r.Fatalf("walked no non-test Go files in a request-path package under %s (dirs: %s)",
 			root, strings.Join(dirs, ", "))
 	}
 	if len(violations) == 0 {
@@ -63,7 +69,7 @@ func AssertAuditLogContext(t *testing.T, dirs ...string) {
 	for _, v := range violations {
 		lines = append(lines, v.file+":"+strconv.Itoa(v.line)+": "+v.what+" -- "+v.fix)
 	}
-	t.Errorf("%d audit context violation(s) in %d non-test file(s) in a request-path package:\n\t%s\n\n"+
+	r.Errorf("%d audit context violation(s) in %d non-test file(s) in a request-path package:\n\t%s\n\n"+
 		"An audit event raised while serving a request carries that request's context, so the "+
 		"installed handler correlates it to the request: pass r.Context(), or the ctx the "+
 		"enclosing function already holds. A Background or TODO context compiles and produces a "+

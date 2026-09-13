@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/leodip/goiabada/core/errs"
 )
 
 // AssertGofmted holds every Go file in the repository to gofmt's canonical
@@ -33,8 +35,37 @@ import (
 func AssertGofmted(t *testing.T) {
 	t.Helper()
 
-	root := SourceRoot(t)
+	assertGofmted(t, SourceRoot(t))
+}
 
+// assertGofmted is the reporting half, taking the root as a parameter and failing
+// through a Reporter so a rule test can drive it against a fixture tree. See
+// Reporter in guard.go for why both halves exist.
+func assertGofmted(r Reporter, root string) {
+	r.Helper()
+
+	unformatted, files, err := findUnformatted(root)
+	if err != nil {
+		r.Fatalf("walking %s: %v", root, err)
+	}
+
+	// A root that somehow held no Go files walks nothing and would otherwise
+	// pass, which is the one way a guard like this fails silently in the
+	// direction that matters.
+	if files == 0 {
+		r.Fatalf("walked no Go files under %s", root)
+	}
+
+	if len(unformatted) > 0 {
+		r.Errorf("%d of %d Go files are not gofmt'd; run `gofmt -w` on them:\n\t%s",
+			len(unformatted), files, strings.Join(unformatted, "\n\t"))
+	}
+}
+
+// findUnformatted walks every Go file under root and returns the ones gofmt would
+// rewrite, relative to root with forward slashes, along with the number of files
+// it was able to read a verdict on.
+func findUnformatted(root string) ([]string, int, error) {
 	var unformatted []string
 	files := 0
 	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
@@ -55,7 +86,8 @@ func AssertGofmted(t *testing.T) {
 		if fErr != nil {
 			// A file that does not parse is a compile error the build tier owns,
 			// and reporting it here as a formatting fault would send the reader
-			// to the wrong place.
+			// to the wrong place. It is not counted either: a file no verdict was
+			// reached on is not evidence the walk is working.
 			return nil
 		}
 		files++
@@ -69,20 +101,9 @@ func AssertGofmted(t *testing.T) {
 		return nil
 	})
 	if err != nil {
-		t.Fatalf("walking %s: %v", root, err)
+		return nil, 0, err
 	}
-
-	// A root that somehow held no Go files walks nothing and would otherwise
-	// pass, which is the one way a guard like this fails silently in the
-	// direction that matters.
-	if files == 0 {
-		t.Fatalf("walked no Go files under %s", root)
-	}
-
-	if len(unformatted) > 0 {
-		t.Errorf("%d of %d Go files are not gofmt'd; run `gofmt -w` on them:\n\t%s",
-			len(unformatted), files, strings.Join(unformatted, "\n\t"))
-	}
+	return unformatted, files, nil
 }
 
 // modules are the four go.mod directories the Lint job loops over, relative to
@@ -108,14 +129,27 @@ func SourceRoot(t *testing.T) string {
 	if err != nil {
 		t.Fatalf("getting the working directory: %v", err)
 	}
+	root, err := sourceRootFrom(dir)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	return root
+}
 
+// sourceRootFrom is the ascent itself, separated so a test can start it somewhere
+// other than the working directory and reach both answers. Its failure is the one
+// SourceRoot turns into a Fatalf, and a guard rooted at the wrong directory is
+// precisely the quiet pass the doc comment above warns about, so the two outcomes
+// are worth pinning rather than assuming.
+func sourceRootFrom(dir string) (string, error) {
 	for {
 		if holdsEveryModule(dir) {
-			return dir
+			return dir, nil
 		}
 		parent := filepath.Dir(dir)
 		if parent == dir {
-			t.Fatalf("no directory above the working directory holds all of %s", strings.Join(modules, ", "))
+			return "", errs.Errorf("no directory above the working directory holds all of %s",
+				strings.Join(modules, ", "))
 		}
 		dir = parent
 	}

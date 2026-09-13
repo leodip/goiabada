@@ -42,30 +42,36 @@ import (
 func AssertArchitecture(t *testing.T) {
 	t.Helper()
 
-	root := SourceRoot(t)
+	assertArchitecture(t, SourceRoot(t))
+}
+
+// assertArchitecture is the reporting half, taking the root as a parameter and failing through a
+// Reporter so a rule test can drive it against a fixture tree. See Reporter in guard.go.
+func assertArchitecture(r Reporter, root string) {
+	r.Helper()
 
 	doc, err := os.ReadFile(filepath.Join(filepath.Dir(root), architectureDoc))
 	if err != nil {
-		t.Fatalf("reading %s: %v", architectureDoc, err)
+		r.Fatalf("reading %s: %v", architectureDoc, err)
 	}
 
 	tables, findings := parseArchitectureDoc(string(doc))
 
 	graph, err := buildImportGraph(root)
 	if err != nil {
-		t.Fatalf("reading the import graph under %s: %v", root, err)
+		r.Fatalf("reading the import graph under %s: %v", root, err)
 	}
 	// A graph that somehow held no packages would satisfy every rule below, which is the one way a
 	// guard like this fails silently in the direction that matters.
 	if len(graph.prod) == 0 {
-		t.Fatalf("found no production Go packages under %s", root)
+		r.Fatalf("found no production Go packages under %s", root)
 	}
 
 	findings = append(findings, checkArchitecture(tables, graph)...)
 
 	sort.Strings(findings)
 	for _, f := range findings {
-		t.Error(f)
+		r.Errorf("%s", f)
 	}
 }
 
