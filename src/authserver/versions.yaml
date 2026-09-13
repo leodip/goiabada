@@ -35,13 +35,13 @@
 # is pinned to a pseudo-version and every upstream commit will show up as an
 # available update.
 tools:
-  go: "1.27.0"
+  go: "1.27.1"
   tailwind: "4.3.3"
-  golangci-lint: "2.13.1"
-  mockery: "3.7.4"
+  golangci-lint: "2.13.2"
+  mockery: "3.8.0"
   staticcheck: "0.8.1"
-  unparam: "0.0.0-20260820064413-a201bf8e0538"
-  govulncheck: "1.7.0"
+  unparam: "0.0.0-20260823230713-2fa3d841b0c8"
+  govulncheck: "1.8.0"
 
 # -----------------------------------------------------------------------------
 # CDN Dependencies
@@ -50,5 +50,5 @@ tools:
 # daisyui:            UI component library for Tailwind
 # humanize-duration:  Human-readable duration formatting (admin console)
 cdn:
-  daisyui: "5.7.21"
-  humanize-duration: "3.34.1"
+  daisyui: "5.7.37"
+  humanize-duration: "3.35.0"
