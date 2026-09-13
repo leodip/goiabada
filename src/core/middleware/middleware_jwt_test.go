@@ -263,6 +263,40 @@ func TestJwtAuthorizationHeaderToContext_PostBodyIgnoredForGetRequest(t *testing
 	mockTokenParser.AssertNotCalled(t, "DecodeAndValidateTokenString")
 }
 
+// A POST that carries the token only in its query is the one request where the two accessors
+// disagree: ParseForm merges the URL query behind the body, so r.FormValue would return the query
+// value here and put a token that has travelled in a request target into the context, while
+// r.PostFormValue returns "" and the request goes on unauthenticated. RFC 6750 section 2.3 says the
+// URI query method "has a high likelihood of being logged", and RFC 9700 section 4.3.2 makes it
+// "Clients MUST NOT pass access tokens in a URI query parameter".
+//
+// The GET case above does not pin this: it is refused by the method check two branches earlier and
+// never reaches the read at all. This is the case that fails if the accessor regresses (#333).
+func TestJwtAuthorizationHeaderToContext_PostQueryTokenIgnored(t *testing.T) {
+	const testSessionName = "test-session"
+	mockTokenParser := new(mock_oauth.TokenParser)
+	mockAuthHelper := new(mock_handler_helpers.AuthHelper)
+
+	middleware := NewMiddlewareJwt(nil, testSessionName, mockTokenParser, mockAuthHelper, stubErrorRenderer{}, nil, "http://localhost:9090", "http://localhost:9091", "", "")
+
+	// A genuine form submission whose body does not carry the token, with the token in the query.
+	req := httptest.NewRequest("POST", "/userinfo?access_token=querytoken", strings.NewReader("other_param=value"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	rr := httptest.NewRecorder()
+
+	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		token := r.Context().Value(constants.ContextKeyBearerToken)
+		assert.Nil(t, token, "Token should not be extracted from the URL query of a POST")
+	})
+
+	handler := middleware.JwtAuthorizationHeaderToContext()(nextHandler)
+	handler.ServeHTTP(rr, req)
+
+	// Token parser should NOT be called for a token that arrived in the request target
+	mockTokenParser.AssertNotCalled(t, "DecodeAndValidateTokenString")
+}
+
 func TestJwtAuthorizationHeaderToContext_PostBodyIgnoredForWrongContentType(t *testing.T) {
 	const testSessionName = "test-session"
 	mockTokenParser := new(mock_oauth.TokenParser)
