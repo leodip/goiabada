@@ -345,6 +345,15 @@ allow is a failure, and so is an exception left standing for an edge that no lon
 issue that removes an edge has to remove its row with it (#332). A new top-level `core` package
 fails the tier until the table says where it belongs.
 
+**Dead-interface guard**: the auth server and admin console unit tiers each run
+`TestHandlers_NoDeadInterfaces` over their own `internal/handlers` package, holding every interface
+it declares to having at least one reference somewhere in that module, production or test, through
+`core/testutil.AssertNoDeadInterfaces`; the core and setup tiers never execute it, because those two
+handler packages are the only call sites. Liveness is `go/types` object identity and not a matching
+spelling — a shadowed name and a same-named type in another package each count as nothing, which is
+how the census behind #333 first read `TCPConnectionTester` as live — and structural satisfaction
+does not count at all, since an interface no code names is what dead means here (#333).
+
 **Schema golden files**: each engine's fully migrated catalog is recorded in
 `src/core/data/<engine>db/schema.golden`, and the data tier compares a freshly migrated database
 against the file for the engine it is running on. A migration therefore has one more step:
