@@ -14,6 +14,7 @@ import (
 	"log/slog"
 
 	"github.com/leodip/goiabada/authserver/internal/server"
+	"github.com/leodip/goiabada/authserver/internal/sessionbackend"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
@@ -229,7 +230,7 @@ func main() {
 	// The backend is scoped to this application's own rows at construction, so no code
 	// path here can name an admin console session however it is composed.
 	sessionStore, err := sessionstore.NewServerSideStore(
-		sessionstore.NewDatabaseBackend(database, constants.AuthServerSessionName),
+		sessionbackend.NewAuthServerBackend(database),
 		constants.SessionKeySessionIdentifier,
 		config.GetAuthServer().IsCookieSecure(),
 		currentKeys,

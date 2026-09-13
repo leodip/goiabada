@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/leodip/goiabada/authserver/internal/sessionbackend"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/sessionstore"
@@ -56,22 +56,6 @@ import (
 // refused what the store had just admitted (final review, round 2, finding 3).
 const maxSessionRequestBytes = sessionstore.MaxSessionWireBytes
 
-// adminConsoleSessions is the only place in this package that names an owner.
-//
-// The owner is what keeps the two applications' sessions apart in a table that holds
-// both, so it is fixed here rather than taken from the request: no exported signature in
-// this package accepts one, which is what makes "the admin console cannot reach an auth
-// server session" a property of the code's shape instead of a check somebody has to
-// remember to write. The identifier is hashed inside the backend, so a caller sends a
-// handle and can never present a digest it did not derive from one.
-//
-// The owner value is the logical session name, which is the same string the store signs
-// its cookies under and does not vary with the deployment's scheme; only the physical
-// cookie name gains a prefix on https.
-func adminConsoleSessions(database data.Database) sessionstore.Backend {
-	return sessionstore.NewDatabaseBackend(database, constants.AdminConsoleSessionName)
-}
-
 // readSessionRequest decodes a bounded JSON body, checks the identifier is present, and answers
 // the 400 itself when either fails, reporting whether the request is usable.
 //
@@ -111,7 +95,7 @@ func writeSessionJSON(w http.ResponseWriter, r *http.Request, body interface{}) 
 // a refused request. Flattening them would sign every administrator out during a database
 // interruption and leave nothing to diagnose it by.
 func HandleAPISessionLoadPost(database data.Database) http.HandlerFunc {
-	backend := adminConsoleSessions(database)
+	backend := sessionbackend.NewAdminConsoleBackend(database)
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req api.SessionLoadRequest
@@ -141,7 +125,7 @@ func HandleAPISessionLoadPost(database data.Database) http.HandlerFunc {
 //
 // No 404: creating names no existing session, so there is nothing here that can be absent.
 func HandleAPISessionCreatePost(database data.Database) http.HandlerFunc {
-	backend := adminConsoleSessions(database)
+	backend := sessionbackend.NewAdminConsoleBackend(database)
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req api.SessionWriteRequest
@@ -165,7 +149,7 @@ func HandleAPISessionCreatePost(database data.Database) http.HandlerFunc {
 // to fail the save rather than put it back, because the request that removed it was most
 // likely rotating the identifier.
 func HandleAPISessionUpdatePost(database data.Database) http.HandlerFunc {
-	backend := adminConsoleSessions(database)
+	backend := sessionbackend.NewAdminConsoleBackend(database)
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req api.SessionWriteRequest
@@ -193,7 +177,7 @@ func HandleAPISessionUpdatePost(database data.Database) http.HandlerFunc {
 // expressed in the deadline: a touch that left it alone would never extend the session and
 // the idle timeout would behave as an absolute one.
 func HandleAPISessionTouchPost(database data.Database) http.HandlerFunc {
-	backend := adminConsoleSessions(database)
+	backend := sessionbackend.NewAdminConsoleBackend(database)
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req api.SessionTouchRequest
@@ -221,7 +205,7 @@ func HandleAPISessionTouchPost(database data.Database) http.HandlerFunc {
 // is the outcome the caller asked for, and answering 404 would make a logout that raced a
 // reap look like a failure.
 func HandleAPISessionDeletePost(database data.Database) http.HandlerFunc {
-	backend := adminConsoleSessions(database)
+	backend := sessionbackend.NewAdminConsoleBackend(database)
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req api.SessionLoadRequest

@@ -241,6 +241,23 @@ func TestAPISessions_AuthServerSessionIsNotFound(t *testing.T) {
 	assert.NotNil(t, survivor, "deleting through the admin console's endpoint must not reach an auth server session")
 }
 
+// TestAPISessions_RealAuthServerSessionIsNotFound crosses both production construction
+// sites: the browser obtains a real auth server session, then the narrowly scoped session
+// endpoint must still be unable to load its identifier.
+func TestAPISessions_RealAuthServerSessionIsNotFound(t *testing.T) {
+	httpClient, _, _, _ := createSessionWithAcrLevel1(t)
+	id := decodeSessionIdentifier(t, requireSessionCookie(t, httpClient))
+
+	accessToken, client := createClientWithGranularScope(t, constants.BrowserSessionsPermissionIdentifier)
+	defer func() {
+		_ = database.DeleteClient(nil, client.Id)
+	}()
+
+	resp := postSession(t, accessToken, "load", api.SessionLoadRequest{Id: id})
+	defer func() { _ = resp.Body.Close() }()
+	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
+}
+
 // TestAPISessions_BadRequests: a body that is not JSON, and one with no identifier, are
 // both refused before anything is looked up.
 //
