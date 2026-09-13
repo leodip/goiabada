@@ -186,9 +186,7 @@ of rows is the only measure of how much is left to do.
 | `core/i18n` | `core/models` | #337 |
 | `core/testutil/fake` | `core/uuidutil` | #360 |
 | `adminconsole/internal/apiclient` | `core/models` | #350 |
-| `adminconsole/internal/handlers` | `core/communication` | #347 |
 | `adminconsole/internal/handlers` | `core/models` | #350 |
-| `adminconsole/internal/handlers` | `core/user` | #346 |
 | `adminconsole/internal/handlers/accounthandlers` | `core/models` | #350 |
 | `adminconsole/internal/handlers/adminclienthandlers` | `core/models` | #350 |
 | `adminconsole/internal/handlers/admingrouphandlers` | `core/models` | #350 |
@@ -196,7 +194,7 @@ of rows is the only measure of how much is left to do.
 | `adminconsole/internal/handlers/adminuserhandlers` | `core/models` | #350 |
 | `adminconsole/internal/middleware` | `core/models` | #350 |
 
-Sixteen rows, and #350 owns nine of them: the admin console's dependency on persistence models is
+Fourteen rows, and #350 owns nine of them: the admin console's dependency on persistence models is
 the single largest piece of the boundary still to close.
 
 ## Foreign modules the admin console must not compile
@@ -231,8 +229,8 @@ adminconsole/cmd/goiabada-adminconsole -> core/oauth -> core/data -> core/data/<
 ```
 
 `core/data/database.go` imports all four engine packages, so importing `core/data` at all compiles
-every driver. Five of the core packages the admin console imports reach `core/data`: `core/oauth`,
-`core/user`, `core/middleware`, `core/validators` and `core/sessionstore`. Closing one path changes
+every driver. Four of the core packages the admin console imports reach `core/data`: `core/oauth`,
+`core/middleware`, `core/validators` and `core/sessionstore`. Closing one path changes
 nothing on its own, which is why the table asserts reachability rather than counting edges.
 
 All five rows say #353 rather than #359, which is worth explaining because the ordering does not
