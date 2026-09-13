@@ -790,3 +790,163 @@ func TestArchitecture_TheRealTreeReachesEveryForeignModuleItDeclares(t *testing.
 		})
 	}
 }
+
+// ---- seam 3: the reporting half -------------------------------------------------------------
+//
+// Everything above runs checkArchitecture and asserts on the findings it returned. The lines that
+// read ARCHITECTURE.md off disk, refuse an empty graph and turn each finding into a failure were
+// reached only by the two server tiers, which walk a tree that satisfies the document by
+// construction.
+
+// architectureFixture writes a miniature repository in the real one's shape: the four modules under
+// a src/ source root, and ARCHITECTURE.md one level above it, which is where the guard looks rather
+// than anywhere it is told. It returns the source root, as SourceRoot would.
+func architectureFixture(t *testing.T, doc string, files map[string]string) string {
+	t.Helper()
+
+	dir := t.TempDir()
+	root := filepath.Join(dir, "src")
+	all := map[string]string{
+		"core/go.mod":               "module example.test/core\n",
+		"authserver/go.mod":         "module example.test/authserver\n",
+		"adminconsole/go.mod":       "module example.test/adminconsole\n",
+		"cmd/goiabada-setup/go.mod": "module example.test/setup\n",
+	}
+	for rel, src := range files {
+		all[rel] = src
+	}
+	for rel, src := range all {
+		path := filepath.Join(root, filepath.FromSlash(rel))
+		require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
+		require.NoError(t, os.WriteFile(path, []byte(src), 0o644))
+	}
+	require.NoError(t, os.WriteFile(filepath.Join(dir, architectureDoc), []byte(doc), 0o644))
+	return root
+}
+
+// architectureDocWith renders a document carrying the three headings the parser needs, with only
+// the ownership table populated. The other two are left as a header and a separator, which is what
+// an empty table looks like to tableUnder.
+func architectureDocWith(ownership ...string) string {
+	var b strings.Builder
+	b.WriteString("# Architecture\n\nProse that mentions | pipes | and is not a row.\n\n")
+	b.WriteString("### Package ownership\n\n| package | owner | moves in |\n|---|---|---|\n")
+	for _, row := range ownership {
+		b.WriteString(row + "\n")
+	}
+	b.WriteString("\n### Temporary exceptions\n\n| from | to | issue |\n|---|---|---|\n")
+	b.WriteString("\n### Foreign modules\n\n| module | why | reachable today | cleared by |\n|---|---|---|---|\n")
+	return b.String()
+}
+
+// TestArchitecture_TheGuardPassesATreeItsTablesDescribe is the clean direction, and it is what keeps
+// every case below from passing for the wrong reason.
+func TestArchitecture_TheGuardPassesATreeItsTablesDescribe(t *testing.T) {
+	root := architectureFixture(t, architectureDocWith("| `core/api` | kernel | — |"), map[string]string{
+		"core/api/api.go": pkg("api"),
+	})
+
+	report := RunGuard(func(r Reporter) { assertArchitecture(r, root) })
+
+	assert.False(t, report.Failed(), "a tree its tables describe failed the guard: %s", report.Text())
+}
+
+// TestArchitecture_TheGuardFailsOnAPackageTheTableDoesNotName drives the reporting half over the
+// rule that makes the document a burn-down list rather than a wish: a new top-level core package
+// fails the tier until the table says where it belongs.
+func TestArchitecture_TheGuardFailsOnAPackageTheTableDoesNotName(t *testing.T) {
+	root := architectureFixture(t, architectureDocWith("| `core/api` | kernel | — |"), map[string]string{
+		"core/api/api.go":      pkg("api"),
+		"core/newcomer/new.go": pkg("newcomer"),
+	})
+
+	report := RunGuard(func(r Reporter) { assertArchitecture(r, root) })
+
+	require.True(t, report.Failed(), "an unowned core package passed the guard")
+	assert.False(t, report.Stopped, "a finding is an Errorf, not a Fatalf")
+	assert.Contains(t, report.Text(), "core/newcomer")
+	assert.Contains(t, report.Text(), "every top-level core package needs one")
+}
+
+// TestArchitecture_TheGuardFailsOnAForbiddenModuleEdge is the rule with no exceptions, and the one
+// a reader is likeliest to meet: core depends on neither process.
+func TestArchitecture_TheGuardFailsOnAForbiddenModuleEdge(t *testing.T) {
+	root := architectureFixture(t, architectureDocWith("| `core/api` | kernel | — |"), map[string]string{
+		"core/api/api.go": pkg("api", "example.test/authserver/internal/handlers"),
+	})
+
+	report := RunGuard(func(r Reporter) { assertArchitecture(r, root) })
+
+	require.True(t, report.Failed(), "a core to authserver edge passed the guard")
+	assert.Contains(t, report.Text(), "core/api")
+	assert.Contains(t, report.Text(), "authserver/internal/handlers")
+}
+
+// TestArchitecture_TheGuardFailsOnAStaleExceptionRow is the direction that makes the tables a
+// burn-down list: an exception left standing for an edge that no longer exists is as much a failure
+// as an edge the tables do not allow, which is what forces the issue removing an edge to remove its
+// row with it (#332).
+func TestArchitecture_TheGuardFailsOnAStaleExceptionRow(t *testing.T) {
+	doc := architectureDocWith("| `core/api` | kernel | — |", "| `core/models` | authserver | #359 |")
+	doc = strings.Replace(doc,
+		"### Temporary exceptions\n\n| from | to | issue |\n|---|---|---|\n",
+		"### Temporary exceptions\n\n| from | to | issue |\n|---|---|---|\n| `core/api` | `core/models` | #350 |\n",
+		1)
+	root := architectureFixture(t, doc, map[string]string{
+		"core/api/api.go":       pkg("api"),
+		"core/models/models.go": pkg("models"),
+	})
+
+	report := RunGuard(func(r Reporter) { assertArchitecture(r, root) })
+
+	require.True(t, report.Failed(), "an exception for an edge nothing carries passed the guard")
+	assert.Contains(t, report.Text(), "core/api")
+	assert.Contains(t, report.Text(), "core/models")
+}
+
+// TestArchitecture_TheGuardIsFatalWithNoArchitectureDoc pins the first of this guard's two seams.
+// It reads its rules from a file rather than from code, so the document being renamed or moved is
+// the way it stops having any rules at all.
+func TestArchitecture_TheGuardIsFatalWithNoArchitectureDoc(t *testing.T) {
+	root := architectureFixture(t, architectureDocWith("| `core/api` | kernel | — |"), map[string]string{
+		"core/api/api.go": pkg("api"),
+	})
+	require.NoError(t, os.Remove(filepath.Join(filepath.Dir(root), architectureDoc)))
+
+	report := RunGuard(func(r Reporter) { assertArchitecture(r, root) })
+
+	require.True(t, report.Stopped, "a missing ARCHITECTURE.md must be fatal rather than a pass")
+	assert.Contains(t, report.Fatal, "reading ARCHITECTURE.md")
+}
+
+// TestArchitecture_TheGuardIsFatalOnAnEmptyGraph pins the second. A graph holding no production
+// package satisfies every rule below it, so a root that resolved somewhere with no Go in it would
+// otherwise read as a tree in perfect order.
+func TestArchitecture_TheGuardIsFatalOnAnEmptyGraph(t *testing.T) {
+	// The four go.mod files and nothing else: the graph builder reads them to resolve import paths,
+	// so a tree without them fails earlier and for a different reason. What is being pinned here is
+	// the tree that resolves and holds no package.
+	root := architectureFixture(t, architectureDocWith(), nil)
+
+	report := RunGuard(func(r Reporter) { assertArchitecture(r, root) })
+
+	require.True(t, report.Stopped, "an empty graph must be fatal rather than a pass")
+	assert.Contains(t, report.Fatal, "found no production Go packages under")
+}
+
+// TestArchitecture_TheGuardIsFatalWithAModuleMissing is the shape that reaches the graph builder
+// first. Requiring all four go.mod files is what lets the builder resolve an import path to a
+// module at all, so one missing is reported as the read that failed rather than as a tree holding
+// no packages.
+func TestArchitecture_TheGuardIsFatalWithAModuleMissing(t *testing.T) {
+	root := architectureFixture(t, architectureDocWith("| `core/api` | kernel | — |"), map[string]string{
+		"core/api/api.go": pkg("api"),
+	})
+	require.NoError(t, os.Remove(filepath.Join(root, "adminconsole", "go.mod")))
+
+	report := RunGuard(func(r Reporter) { assertArchitecture(r, root) })
+
+	require.True(t, report.Stopped)
+	assert.Contains(t, report.Fatal, "reading the import graph under")
+	assert.Contains(t, report.Fatal, "adminconsole/go.mod")
+}

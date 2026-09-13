@@ -242,3 +242,94 @@ type AlsoDeadButNotGuarded interface{ B() }
 	assert.Equal(t, 1, files)
 	assert.Empty(t, deadNames(dead))
 }
+
+// Seam 2: the reporting half. Everything above asserts on what findDeadInterfaces returned, which
+// leaves the roughly ten lines that turn those findings into a failure untested -- and those are
+// the lines whose loss disables the guard in both modules at once. Blinding them is exactly what
+// left the whole core tier green on 8883642d.
+
+// TestNoDeadInterfaces_TheGuardFailsOnADeadInterface drives the reporting half against a tree that
+// holds one, and asserts the reader is told where it is and what to do.
+func TestNoDeadInterfaces_TheGuardFailsOnADeadInterface(t *testing.T) {
+	root := t.TempDir()
+	writeFixture(t, root, "mod/go.mod", "module example.com/mod\n\ngo 1.24\n")
+	writeFixture(t, root, "mod/handlers/interfaces.go", `package handlers
+
+type Abandoned interface{ A() }
+`)
+
+	report := RunGuard(func(r Reporter) {
+		assertNoDeadInterfaces(r, root, []string{"mod/handlers"})
+	})
+
+	require.True(t, report.Failed(), "a tree with a dead interface passed the guard")
+	assert.False(t, report.Stopped, "a dead interface is an Errorf, not a Fatalf")
+	assert.Contains(t, report.Text(), "mod/handlers/interfaces.go:3")
+	assert.Contains(t, report.Text(), "example.com/mod/handlers.Abandoned")
+	assert.Contains(t, report.Text(), "1 interface declaration(s)")
+	assert.Contains(t, report.Text(), "#333")
+}
+
+// TestNoDeadInterfaces_TheGuardPassesALiveOne is the other direction, and it is what keeps the case
+// above from passing for the wrong reason. A harness that called everything a failure would satisfy
+// that assertion on a clean tree too.
+func TestNoDeadInterfaces_TheGuardPassesALiveOne(t *testing.T) {
+	root := t.TempDir()
+	writeFixture(t, root, "mod/go.mod", "module example.com/mod\n\ngo 1.24\n")
+	writeFixture(t, root, "mod/handlers/interfaces.go", `package handlers
+
+type Consumed interface{ A() }
+
+func use(x Consumed) { _ = x }
+`)
+
+	report := RunGuard(func(r Reporter) {
+		assertNoDeadInterfaces(r, root, []string{"mod/handlers"})
+	})
+
+	assert.False(t, report.Failed(), "a referenced interface failed the guard: %s", report.Text())
+}
+
+// TestNoDeadInterfaces_TheGuardIsFatalOnAnEmptyWalk completes the seam the finder test at
+// TestNoDeadInterfaces_AWalkThatReachesNoFilesIsNotAPass could only assert indirectly, through the
+// file count. A dirs argument that no longer names any Go source is the way this guard stops
+// guarding without anything going red, so the empty walk has to be fatal rather than clean.
+func TestNoDeadInterfaces_TheGuardIsFatalOnAnEmptyWalk(t *testing.T) {
+	root := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(root, "mod", "empty"), 0o755))
+
+	report := RunGuard(func(r Reporter) {
+		assertNoDeadInterfaces(r, root, []string{"mod/empty"})
+	})
+
+	require.True(t, report.Stopped, "an empty walk must be fatal rather than a pass")
+	assert.Contains(t, report.Fatal, "walked no Go files under")
+	assert.Contains(t, report.Fatal, "mod/empty", "the fatal names the dirs that covered nothing")
+}
+
+// TestNoDeadInterfaces_TheGuardReportsAnUnresolvedShape holds the other half of the reporting: a
+// shape the walk cannot answer for is an error of its own rather than a silent narrowing.
+func TestNoDeadInterfaces_TheGuardReportsAnUnresolvedShape(t *testing.T) {
+	root := t.TempDir()
+	writeFixture(t, root, "mod/go.mod", "module example.com/mod\n\ngo 1.24\n")
+	writeFixture(t, root, "mod/handlers/interfaces.go", `package handlers
+
+type Shadowed interface{ A() }
+`)
+	writeFixture(t, root, "mod/consumer/consumer.go", `package consumer
+
+import . "example.com/mod/handlers"
+
+func Use(x Shadowed) { _ = x }
+`)
+
+	report := RunGuard(func(r Reporter) {
+		assertNoDeadInterfaces(r, root, []string{"mod/handlers"})
+	})
+
+	require.True(t, report.Failed())
+	assert.Contains(t, report.Text(), "dot import")
+	assert.Contains(t, report.Text(), "mod/consumer/consumer.go")
+	// And the interface is still reported, because the walk genuinely cannot show it referenced.
+	assert.Contains(t, report.Text(), "example.com/mod/handlers.Shadowed")
+}

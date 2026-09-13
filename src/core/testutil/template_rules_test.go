@@ -196,3 +196,84 @@ func TestTemplates_AMissingRootIsAnError(t *testing.T) {
 	require.Error(t, err)
 	assert.Equal(t, 0, n)
 }
+
+// Seam 4: the reporting halves. Everything above asserts on what the three matchers returned and on
+// the count the walk reached, which leaves the lines that turn those into a failure untested across
+// four real call sites -- both servers' template tiers.
+
+// TestTemplates_TheGuardsFailOnATreeThatBreaksEachRule drives all three reporting halves over one
+// fixture that violates all three, so a guard whose report loop has been blinded is caught here
+// rather than trusted. They are one test because the failure they share is the interesting one: the
+// walk is common to all three, and a rule silently reporting through the wrong one of them would
+// otherwise still look like three passes.
+func TestTemplates_TheGuardsFailOnATreeThatBreaksEachRule(t *testing.T) {
+	fsys := fstest.MapFS{
+		"template/page.html": {Data: []byte(`{{define "title"}}<b>Users</b>{{end}}` + "\n" +
+			`<form>{{ csrfField }}</form>`)},
+		"template/layouts/base.html": {Data: []byte(`<html lang="en">`)},
+	}
+
+	title := RunGuard(func(r Reporter) { assertTemplatesNoHTMLInTitle(r, fsys, "template") })
+	require.True(t, title.Failed(), "markup in a title block passed the guard")
+	assert.Contains(t, title.Text(), "template/page.html")
+	assert.Contains(t, title.Text(), "<b>Users</b>")
+	assert.Contains(t, title.Text(), "renders literally in <title>")
+
+	csrf := RunGuard(func(r Reporter) { assertTemplatesNoCsrfField(r, fsys, "template") })
+	require.True(t, csrf.Failed(), "a csrfField occurrence passed the guard")
+	assert.Contains(t, csrf.Text(), "template/page.html")
+	assert.Contains(t, csrf.Text(), "#155")
+
+	lang := RunGuard(func(r Reporter) { assertTemplatesHtmlLangNotHardcoded(r, fsys, "template") })
+	require.True(t, lang.Failed(), "a hardcoded lang attribute passed the guard")
+	assert.Contains(t, lang.Text(), "template/layouts/base.html")
+	assert.Contains(t, lang.Text(), "{{ Lang $.ctx }}")
+}
+
+// TestTemplates_TheGuardsPassACleanTree is the other direction, over a fixture carrying the admitted
+// shape of each rule: a text-only title, no csrfField, and a layout rendering the locale.
+func TestTemplates_TheGuardsPassACleanTree(t *testing.T) {
+	fsys := fstest.MapFS{
+		"template/page.html":         {Data: []byte(`{{define "title"}}Users{{end}}`)},
+		"template/layouts/base.html": {Data: []byte(`<html lang="{{ Lang $.ctx }}">`)},
+	}
+
+	for name, guard := range map[string]func(Reporter, fstest.MapFS, string){
+		"title": func(r Reporter, f fstest.MapFS, root string) { assertTemplatesNoHTMLInTitle(r, f, root) },
+		"csrf":  func(r Reporter, f fstest.MapFS, root string) { assertTemplatesNoCsrfField(r, f, root) },
+		"lang": func(r Reporter, f fstest.MapFS, root string) {
+			assertTemplatesHtmlLangNotHardcoded(r, f, root)
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			report := RunGuard(func(r Reporter) { guard(r, fsys, "template") })
+			assert.False(t, report.Failed(), "a clean tree failed the guard: %s", report.Text())
+		})
+	}
+}
+
+// TestTemplates_AWalkThatReachesNothingFailsEveryGuard completes the seam
+// TestTemplates_AWalkThatReachesNothingIsVisible could only assert through the count. A //go:embed
+// pattern narrowed by a rename leaves a root that exists and holds no page, and every rule passes
+// vacuously over it, so the empty walk has to be the failure.
+func TestTemplates_AWalkThatReachesNothingFailsEveryGuard(t *testing.T) {
+	fsys := fstest.MapFS{"template/readme.txt": {Data: []byte("no pages here")}}
+
+	report := RunGuard(func(r Reporter) { assertTemplatesNoHTMLInTitle(r, fsys, "template") })
+
+	require.True(t, report.Stopped, "an empty walk must be fatal rather than a pass")
+	assert.Contains(t, report.Fatal, "walked no .html files under template")
+	assert.Contains(t, report.Fatal, "checking nothing")
+}
+
+// TestTemplates_AMissingRootIsFatalRatherThanEmpty separates the two ways a walk covers nothing, so
+// an embed that resolves to no directory at all is not reported as a directory holding no pages.
+func TestTemplates_AMissingRootIsFatalRatherThanEmpty(t *testing.T) {
+	fsys := fstest.MapFS{"static/app.css": {Data: []byte("body{}")}}
+
+	report := RunGuard(func(r Reporter) { assertTemplatesNoCsrfField(r, fsys, "template") })
+
+	require.True(t, report.Stopped)
+	assert.Contains(t, report.Fatal, "walking templates under template")
+	assert.NotContains(t, report.Fatal, "walked no .html files")
+}

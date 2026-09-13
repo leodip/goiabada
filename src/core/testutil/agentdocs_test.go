@@ -245,3 +245,60 @@ func insertLine(lines []string, n int, line string) []string {
 	out = append(out, line)
 	return append(out, lines[n-1:]...)
 }
+
+// Seam 2: the reporting half. Every case above asserts on what checkAgentDocs returned, and the two
+// real callers read a repository whose two documents agree, so the loop that turns a finding into a
+// failure was reached by both server tiers and observed failing by neither.
+
+// TestAgentDocs_TheGuardFailsOnADivergedPairOfDocuments drives the reporting half over the defect
+// this guard exists for: AGENTS.md and CLAUDE.md are meant to be the same document, and the way
+// they stop being one is an edit to one of them.
+func TestAgentDocs_TheGuardFailsOnADivergedPairOfDocuments(t *testing.T) {
+	agents := replaceLine(fakeClaudeLines, 6,
+		"The values below are the constants in some other file entirely.")
+	root := writeFakeTree(t, fakeClaudeLines, agents, fakeStatesVar)
+
+	report := RunGuard(func(r Reporter) { assertAgentDocs(r, root) })
+
+	require.True(t, report.Failed(), "two documents that disagree passed the guard")
+	assert.False(t, report.Stopped, "a divergence is an Errorf, not a Fatalf")
+	assert.Contains(t, report.Text(), "line 6")
+}
+
+// TestAgentDocs_TheGuardFailsOnAStateMissingFromTheRoster is the second rule, and the reason the
+// roster is read from the assigned-by table's first column rather than from anywhere the value
+// appears: a state deleted from that table is still spelled twice in the route table below it.
+func TestAgentDocs_TheGuardFailsOnAStateMissingFromTheRoster(t *testing.T) {
+	shortened := deleteLine(fakeClaudeLines, 11)
+	root := writeFakeTree(t, shortened, shortened, fakeStatesVar)
+
+	report := RunGuard(func(r Reporter) { assertAgentDocs(r, root) })
+
+	require.True(t, report.Failed(), "a state with no roster row passed the guard")
+	assert.Contains(t, report.Text(), "level2_otp")
+}
+
+// TestAgentDocs_TheGuardPassesDocumentsThatAgree is the other direction, and it is what keeps the
+// two cases above from passing for the wrong reason.
+func TestAgentDocs_TheGuardPassesDocumentsThatAgree(t *testing.T) {
+	root := writeFakeTree(t, fakeClaudeLines, fakeClaudeLines, fakeStatesVar)
+
+	report := RunGuard(func(r Reporter) { assertAgentDocs(r, root) })
+
+	assert.False(t, report.Failed(), "two documents that agree failed the guard: %s", report.Text())
+}
+
+// TestAgentDocs_TheGuardReportsAnUnreadableDocument covers the shape this guard answers instead of
+// an empty walk. It reads two named files rather than walking a tree, so there is nothing to count
+// and no vacuous pass to refuse: a document that is not there reports itself as a finding, which is
+// what keeps a rename from quietly reducing the guard to zero rules.
+func TestAgentDocs_TheGuardReportsAnUnreadableDocument(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, filepath.Join(root, "CLAUDE.md"), strings.Join(fakeClaudeLines, "\n"))
+	writeFile(t, filepath.Join(root, "src", "core", "oauth", "auth_context.go"), fakeStatesVar)
+
+	report := RunGuard(func(r Reporter) { assertAgentDocs(r, root) })
+
+	require.True(t, report.Failed(), "a missing AGENTS.md passed the guard")
+	assert.Contains(t, report.Text(), "reading AGENTS.md")
+}

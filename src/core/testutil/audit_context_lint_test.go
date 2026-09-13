@@ -171,3 +171,74 @@ func inMock(auditLogger logger) {
 func TestAuditLogContext_TheTreeItself(t *testing.T) {
 	AssertAuditLogContext(t)
 }
+
+// Seam 2: the reporting half. Both cases above assert on what findAuditLogContextViolations
+// returned, and the real callers walk a tree that has been clean since #328, so the lines that turn
+// a violation into a failure were reached by three tiers and observed failing by none.
+
+// TestAuditLogContext_TheGuardFailsOnABackgroundContext drives the reporting half. The message is
+// the whole remedy: what is wrong with a Background context here is not visible at the call site --
+// it compiles, it logs, and the record it produces simply cannot be joined to the request.
+func TestAuditLogContext_TheGuardFailsOnABackgroundContext(t *testing.T) {
+	tree := newFixtureTree(t)
+	tree.write("authserver/internal/handlers/audit.go", `package handlers
+
+import "context"
+
+type logger interface {
+	Log(ctx context.Context, event string, details map[string]interface{})
+}
+
+func raise(auditLogger logger) {
+	auditLogger.Log(context.Background(), "event", nil)
+}
+`)
+
+	report := RunGuard(func(r Reporter) { assertAuditLogContext(r, tree.root, nil) })
+
+	require.True(t, report.Failed(), "a Background context in a request-path package passed the guard")
+	assert.False(t, report.Stopped, "a violation is an Errorf, not a Fatalf")
+	assert.Contains(t, report.Text(), "authserver/internal/handlers/audit.go:10")
+	assert.Contains(t, report.Text(), "context.Background()")
+	assert.Contains(t, report.Text(), "1 audit context violation(s)")
+	assert.Contains(t, report.Text(), "r.Context()")
+	assert.Contains(t, report.Text(), "#328")
+}
+
+// TestAuditLogContext_TheGuardPassesARequestContext is the other direction, over the shape the rule
+// exists to admit.
+func TestAuditLogContext_TheGuardPassesARequestContext(t *testing.T) {
+	tree := newFixtureTree(t)
+	tree.write("authserver/internal/handlers/audit.go", `package handlers
+
+import (
+	"context"
+	"net/http"
+)
+
+type logger interface {
+	Log(ctx context.Context, event string, details map[string]interface{})
+}
+
+func raise(auditLogger logger, r *http.Request) {
+	auditLogger.Log(r.Context(), "event", nil)
+}
+`)
+
+	report := RunGuard(func(r Reporter) { assertAuditLogContext(r, tree.root, nil) })
+
+	assert.False(t, report.Failed(), "a request context failed the guard: %s", report.Text())
+}
+
+// TestAuditLogContext_TheGuardIsFatalOnAnEmptyWalk pins the seam, and this guard's scope makes it
+// the likeliest of the thirteen to trip it: the walk counts only files in a request-path package,
+// so a directory dropping off slogRequestPathDirs empties it without emptying the tree.
+func TestAuditLogContext_TheGuardIsFatalOnAnEmptyWalk(t *testing.T) {
+	tree := newFixtureTree(t)
+	tree.write("core/elsewhere/ok.go", "package elsewhere\n")
+
+	report := RunGuard(func(r Reporter) { assertAuditLogContext(r, tree.root, nil) })
+
+	require.True(t, report.Stopped, "an empty walk must be fatal rather than a pass")
+	assert.Contains(t, report.Fatal, "walked no non-test Go files in a request-path package under")
+}

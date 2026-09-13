@@ -275,3 +275,92 @@ func f(r *request) {
 	require.NoError(t, err)
 	assert.Equal(t, []string{`handlers/authorize.go:5 .FormValue("password")`}, renderReads(asReads))
 }
+
+// Seam 3: the reporting half. Everything above asserts on what findCredentialQueryReads returned,
+// which leaves the lines that turn those reads into a failure untested. This is the guard where
+// that matters most: it is the sole enforcement of CLAUDE.md pattern 5, which exists to stop a
+// bearer token or a password reaching a proxy log, and blinding its report loop (ranging over
+// reads[:0]) survived its own rule test.
+
+// TestNoCredentialQueryFallback_TheGuardFailsOnAMergedRead drives the reporting half and holds the
+// message to naming the file, the line, the shape found, the replacement, and why it matters. The
+// message is the whole remedy here -- a reader who is told only "line 4 is wrong" reaches for the
+// nearest edit rather than the right one.
+func TestNoCredentialQueryFallback_TheGuardFailsOnAMergedRead(t *testing.T) {
+	root := t.TempDir()
+
+	writeFixture(t, root, "handlers/login.go", `package handlers
+
+func f(r *request) {
+	_ = r.FormValue("password")
+}
+`)
+
+	report := RunGuard(func(rep Reporter) {
+		assertNoCredentialQueryFallback(rep, root, []string{`"password"`}, []string{"handlers"})
+	})
+
+	require.True(t, report.Failed(), "a merged-form credential read passed the guard")
+	assert.False(t, report.Stopped, "a finding is an Errorf, not a Fatalf")
+	assert.Contains(t, report.Text(), "handlers/login.go:4")
+	assert.Contains(t, report.Text(), `"password"`)
+	assert.Contains(t, report.Text(), ".FormValue")
+	assert.Contains(t, report.Text(), "use .PostFormValue")
+	assert.Contains(t, report.Text(), "#202")
+}
+
+// TestNoCredentialQueryFallback_TheGuardPassesABodyOnlyRead is the other direction: the admitted
+// shape must survive the reporting half untouched.
+func TestNoCredentialQueryFallback_TheGuardPassesABodyOnlyRead(t *testing.T) {
+	root := t.TempDir()
+
+	writeFixture(t, root, "handlers/login.go", `package handlers
+
+func f(r *request) {
+	_ = r.PostFormValue("password")
+}
+`)
+
+	report := RunGuard(func(rep Reporter) {
+		assertNoCredentialQueryFallback(rep, root, []string{`"password"`}, []string{"handlers"})
+	})
+
+	assert.False(t, report.Failed(), "a body-only read failed the guard: %s", report.Text())
+}
+
+// TestNoCredentialQueryFallback_ADirectoryThatCoveredNothingIsAnError is this guard's own answer to
+// the empty walk, and it is deliberately not the one the other twelve give. Each named directory is
+// a floor reported separately, so a tree renamed out from under one of three call sites fails here
+// naming that directory, rather than shrinking the guard to the two that still resolve.
+func TestNoCredentialQueryFallback_ADirectoryThatCoveredNothingIsAnError(t *testing.T) {
+	root := t.TempDir()
+
+	writeFixture(t, root, "handlers/login.go", "package handlers\n")
+	writeFixture(t, root, "middleware/mw_test.go", "package middleware\n")
+
+	report := RunGuard(func(rep Reporter) {
+		assertNoCredentialQueryFallback(rep, root, []string{`"password"`},
+			[]string{"handlers", "middleware"})
+	})
+
+	require.True(t, report.Failed())
+	assert.False(t, report.Stopped,
+		"a named directory that covered nothing is an Errorf, so every other directory is still reported")
+	require.Len(t, report.Errors, 1)
+	assert.Contains(t, report.Text(), "walked no non-test Go files under middleware")
+	assert.NotContains(t, report.Text(), "under handlers")
+}
+
+// TestNoCredentialQueryFallback_NoDirectoriesAndAnEmptyRootIsFatal is the other arm of the same
+// decision. With no directory named there is no floor to report against, so the only honest answer
+// is to stop.
+func TestNoCredentialQueryFallback_NoDirectoriesAndAnEmptyRootIsFatal(t *testing.T) {
+	root := t.TempDir()
+
+	report := RunGuard(func(rep Reporter) {
+		assertNoCredentialQueryFallback(rep, root, []string{`"password"`}, nil)
+	})
+
+	require.True(t, report.Stopped, "an unnamed walk that covered nothing must be fatal")
+	assert.Contains(t, report.Fatal, "walked no non-test Go files under")
+}
