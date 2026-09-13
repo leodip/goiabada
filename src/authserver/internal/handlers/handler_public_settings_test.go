@@ -114,7 +114,6 @@ func TestPublicSettings_MissingSettingsRowDoesNotPanic(t *testing.T) {
 // failingResponseWriter fails every write, so the encode error path is reachable.
 type failingResponseWriter struct {
 	header http.Header
-	code   int
 }
 
 func (f *failingResponseWriter) Header() http.Header {
@@ -128,9 +127,9 @@ func (f *failingResponseWriter) Write([]byte) (int, error) {
 	return 0, errors.New("connection reset")
 }
 
-func (f *failingResponseWriter) WriteHeader(statusCode int) {
-	f.code = statusCode
-}
+// WriteHeader discards the status: the case this writer serves asserts that the encode failure
+// does not panic, and nothing reads the status back off it.
+func (f *failingResponseWriter) WriteHeader(int) {}
 
 func TestPublicSettings_EncodeFailure(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
