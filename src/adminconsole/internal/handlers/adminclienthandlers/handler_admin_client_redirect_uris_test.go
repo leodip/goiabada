@@ -50,9 +50,8 @@ func (s *stubApiClient) GetSettingsGeneral(accessToken string) (*api.SettingsGen
 // the bind correctly, which is what these cases are for.
 type stubHttpHelper struct {
 	handlers.HttpHelper
-	bind     map[string]interface{}
-	err      error
-	notFound bool
+	bind map[string]interface{}
+	err  error
 }
 
 func (s *stubHttpHelper) RenderTemplate(w http.ResponseWriter, r *http.Request, layoutName string,
@@ -67,7 +66,6 @@ func (s *stubHttpHelper) InternalServerError(w http.ResponseWriter, r *http.Requ
 }
 
 func (s *stubHttpHelper) NotFound(w http.ResponseWriter, r *http.Request) {
-	s.notFound = true
 	w.WriteHeader(http.StatusNotFound)
 }
 

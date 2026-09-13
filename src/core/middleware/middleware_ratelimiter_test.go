@@ -1952,6 +1952,10 @@ func TestRateLimiter_EveryTierLogsUnderAConventionalKey(t *testing.T) {
 // census keyed by name would report three where there are four, so an invalid key would be
 // overwritten by the conformant one declared after it and the count would still be right.
 func TestCollectTierKeyFields_ReachesEveryContainerKind(t *testing.T) {
+	// Every field here is a container kind the walk must reach, read by reflection and never by
+	// selector, so a field deleted for looking unused is a kind this test quietly stops covering.
+	//
+	//nolint:unused // reflection fixture, read by the walk under test, never by selector
 	type holder struct {
 		direct       tier
 		behind       *tier
@@ -2051,6 +2055,11 @@ type foundTier struct {
 // tier would be recorded by nothing. With it, a tier reached twice -- as a field and through a
 // pointer to that field, or as a slice element and through a pointer to that element -- is
 // recorded once, which is what the count beside it claims to be counting.
+//
+// Being a map key is also why no field here is ever read by selector: the map's own equality reads
+// all three, so dropping one for looking unused would silently merge two distinct visits into one.
+//
+//nolint:unused // map key, read whole by the map's equality, never by selector
 type visitedValue struct {
 	address  uintptr
 	holder   reflect.Type

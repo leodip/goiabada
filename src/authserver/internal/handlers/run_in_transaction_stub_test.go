@@ -16,8 +16,6 @@ import (
 type runInTransactionStub struct {
 	// bodyErr is what the body returned, nil when it asked to commit.
 	bodyErr error
-	// bodyRan reports whether the body was invoked at all.
-	bodyRan bool
 }
 
 // expectRunInTransaction registers one RunInTransaction call that runs the body on tx and
@@ -37,7 +35,6 @@ func expectRunInTransactionThenFail(db *mocks_data.Database, tx *sql.Tx, commitE
 		for _, n := range note {
 			n("begin")
 		}
-		stub.bodyRan = true
 		stub.bodyErr = fn(tx)
 		if stub.bodyErr != nil {
 			for _, n := range note {

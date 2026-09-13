@@ -3,14 +3,12 @@ package validators
 import (
 	"testing"
 
-	mocks_data "github.com/leodip/goiabada/core/data/mocks"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestValidateAddress(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
-	validator := NewAddressValidator(mockDB)
+	validator := NewAddressValidator()
 
 	tests := []struct {
 		name         string

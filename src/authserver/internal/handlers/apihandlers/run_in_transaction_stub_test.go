@@ -15,7 +15,6 @@ import (
 // the helper rolls back.
 type runInTransactionStub struct {
 	bodyErr error
-	bodyRan bool
 }
 
 // expectRunInTransaction registers one RunInTransaction call that runs the body on tx and
@@ -35,7 +34,6 @@ func expectRunInTransactionThenFail(database *mocks_data.Database, tx *sql.Tx, c
 		for _, n := range note {
 			n("begin")
 		}
-		stub.bodyRan = true
 		stub.bodyErr = fn(tx)
 		if stub.bodyErr != nil {
 			for _, n := range note {

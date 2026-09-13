@@ -58,7 +58,6 @@ type crossUserBrowser struct {
 	clientSecret string
 	redirectUri  *models.RedirectURI
 	userA        *models.User
-	passwordA    string
 	userB        *models.User
 	passwordB    string
 	// sessionA is S_A as it stood before B arrived, read back from the database.
@@ -152,7 +151,6 @@ func createCrossUserBrowser(t *testing.T, defaultAcrLevel enums.AcrLevel,
 		clientSecret: clientSecret,
 		redirectUri:  redirectUri,
 		userA:        userA,
-		passwordA:    passwordA,
 		userB:        userB,
 		passwordB:    passwordB,
 	}
