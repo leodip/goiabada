@@ -1,4 +1,4 @@
-package sessionstore
+package apiclient
 
 import (
 	"bytes"
@@ -12,6 +12,7 @@ import (
 
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/sessionstore"
 )
 
 const (
@@ -35,9 +36,8 @@ const (
 
 // TokenSource supplies the bearer token the session endpoint is behind.
 //
-// Declared here and implemented by the caller, so this package holds no knowledge of any
-// module's credentials and a test can drive the backend with a source that returns a
-// constant.
+// Kept as an interface so the backend holds no knowledge of this module's credentials and
+// a test can drive it with a source that returns a constant.
 //
 // Invalidate is what makes a 401 recoverable: the endpoint answers one when the cached
 // token has expired or been revoked, and the backend's answer is to drop the cached token
@@ -60,12 +60,12 @@ type httpBackend struct {
 	tokens  TokenSource
 }
 
-// NewHTTPBackend returns a Backend that reaches the session endpoint at baseURL.
+// NewSessionBackend returns a sessionstore.Backend that reaches the session endpoint at baseURL.
 //
 // No owner parameter, matching the database backend: the endpoint's handlers hard-wire
 // the admin console's owner and accept no other, so there is nothing here a caller could
 // name an auth server session with however this is composed.
-func NewHTTPBackend(baseURL string, tokens TokenSource) Backend {
+func NewSessionBackend(baseURL string, tokens TokenSource) sessionstore.Backend {
 	return &httpBackend{
 		baseURL: strings.TrimSuffix(baseURL, "/"),
 		client:  &http.Client{Timeout: httpBackendTimeout},
@@ -73,13 +73,13 @@ func NewHTTPBackend(baseURL string, tokens TokenSource) Backend {
 	}
 }
 
-func (b *httpBackend) Load(ctx context.Context, id string) (*Record, error) {
+func (b *httpBackend) Load(ctx context.Context, id string) (*sessionstore.Record, error) {
 	var response api.SessionLoadResponse
 	if err := b.post(ctx, "load", api.SessionLoadRequest{Id: id}, &response); err != nil {
 		return nil, err
 	}
 
-	return &Record{
+	return &sessionstore.Record{
 		Data:         []byte(response.Data),
 		LastAccessed: response.LastAccessed,
 		ExpiresAt:    response.ExpiresAt,
@@ -252,12 +252,12 @@ func (e *transportError) Unwrap() error { return e.err }
 // inside a JSON envelope: capping the whole body at the blob's own ceiling would truncate
 // a maximal session's response before it decoded, which is a failure at exactly the size
 // the store admits (final review, round 2, finding 3).
-const maxSessionResponseBytes = MaxSessionWireBytes
+const maxSessionResponseBytes = sessionstore.MaxSessionWireBytes
 
 func decodeSessionResponse(operation string, status int, body []byte, out interface{}) error {
 	switch {
 	case status == http.StatusNotFound:
-		return ErrNotFound
+		return sessionstore.ErrNotFound
 	case status < 200 || status > 299:
 		return errs.Errorf(
 			"the browser session endpoint answered %d to %s", status, operation)

@@ -148,7 +148,7 @@ func main() {
 	)
 
 	sessionStore, err := sessionstore.NewServerSideStore(
-		sessionstore.NewHTTPBackend(config.GetAuthServer().GetEffectiveBaseURL(), tokenSource),
+		apiclient.NewSessionBackend(config.GetAuthServer().GetEffectiveBaseURL(), tokenSource),
 		constants.SessionKeyJwt,
 		config.GetAdminConsole().IsCookieSecure(),
 		currentKeys,
