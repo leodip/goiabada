@@ -32,6 +32,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/core/testutil"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -162,13 +163,25 @@ func benignSentinelName(arg ast.Expr) (string, bool) {
 
 // TestNoErrorsIsOnABenignMigratorSentinel holds the real tree to the rule.
 func TestNoErrorsIsOnABenignMigratorSentinel(t *testing.T) {
-	root := testutil.SourceRoot(t)
+	assertNoErrorsIsOnBenignSentinels(t, testutil.SourceRoot(t))
+}
+
+// assertNoErrorsIsOnBenignSentinels is the reporting half, taking the root as a parameter and
+// failing through a testutil.Reporter so a rule test can drive it against a fixture tree. Without
+// that seam these lines are reached only by the call above, which walks a tree that has been clean
+// since #268.
+func assertNoErrorsIsOnBenignSentinels(r testutil.Reporter, root string) {
+	r.Helper()
 
 	found, files, err := findErrorsIsOnBenignSentinels(root)
-	require.NoError(t, err)
+	if err != nil {
+		r.Fatalf("walking %s: %v", root, err)
+	}
 	// A root that somehow held no Go files walks nothing and would otherwise pass, which is the
 	// one way a guard like this fails silently in the direction that matters.
-	require.NotZero(t, files, "walked no Go files under %s", root)
+	if files == 0 {
+		r.Fatalf("walked no Go files under %s", root)
+	}
 
 	if len(found) == 0 {
 		return
@@ -177,7 +190,7 @@ func TestNoErrorsIsOnABenignMigratorSentinel(t *testing.T) {
 	for _, f := range found {
 		lines = append(lines, f.file+":"+itoa(f.line)+" ("+f.sentinel+")")
 	}
-	t.Fatalf("%d errors.Is call(s) on a benign migrator sentinel:\n\t%s\n\n"+
+	r.Errorf("%d errors.Is call(s) on a benign migrator sentinel:\n\t%s\n\n"+
 		"Use migrator.IsNoChange or migrator.IsNilVersion instead. The runner JOINS a failed "+
 		"unlock, or a failed connection close, onto whatever the operation returned, so the "+
 		"sentinel arrives inside an error that also carries a real failure. errors.Is finds it "+
@@ -333,4 +346,71 @@ func assertNoChange(err error) bool { return errors.Is(err, migrator.ErrNoChange
 		"core/data/mysqldb/db.go ErrNoChange",
 		"core/data/postgresdb/db.go ErrNoChange",
 	}, seen, "both sentinels under every spelling of both errors packages, and nothing from the test file")
+}
+
+// TestNoErrorsIsOnABenignMigratorSentinel_TheGuardFailsOnAMatch is the third half. The two above
+// assert on what findErrorsIsOnBenignSentinels returned; the lines that turn a match into a failure
+// are reached only by TestNoErrorsIsOnABenignMigratorSentinel, which walks a tree that has been
+// clean since #268.
+func TestNoErrorsIsOnABenignMigratorSentinel_TheGuardFailsOnAMatch(t *testing.T) {
+	root := t.TempDir()
+	writeLintFixture(t, root, "core/data/mysqldb/migrate.go", `package mysqldb
+
+import (
+	"errors"
+
+	"github.com/leodip/goiabada/core/data/migrator"
+)
+
+func migrate(m *migrator.Migrator) error {
+	if err := m.Up(); err != nil && !errors.Is(err, migrator.ErrNoChange) {
+		return err
+	}
+	return nil
+}
+`)
+
+	report := testutil.RunGuard(func(r testutil.Reporter) {
+		assertNoErrorsIsOnBenignSentinels(r, root)
+	})
+
+	require.True(t, report.Failed(), "an errors.Is on a benign sentinel passed the guard")
+	assert.False(t, report.Stopped, "a finding is an Errorf, not a Fatalf")
+	assert.Contains(t, report.Text(), "core/data/mysqldb/migrate.go:10")
+	assert.Contains(t, report.Text(), "ErrNoChange")
+	assert.Contains(t, report.Text(), "migrator.IsNoChange")
+	assert.Contains(t, report.Text(), "#268")
+}
+
+// TestNoErrorsIsOnABenignMigratorSentinel_TheGuardPassesTheHelper is the other direction, over the
+// call the rule exists to send readers to.
+func TestNoErrorsIsOnABenignMigratorSentinel_TheGuardPassesTheHelper(t *testing.T) {
+	root := t.TempDir()
+	writeLintFixture(t, root, "core/data/mysqldb/migrate.go", `package mysqldb
+
+import "github.com/leodip/goiabada/core/data/migrator"
+
+func migrate(m *migrator.Migrator) error {
+	if err := m.Up(); err != nil && !migrator.IsNoChange(err) {
+		return err
+	}
+	return nil
+}
+`)
+
+	report := testutil.RunGuard(func(r testutil.Reporter) {
+		assertNoErrorsIsOnBenignSentinels(r, root)
+	})
+
+	assert.False(t, report.Failed(), "an IsNoChange call failed the guard: %s", report.Text())
+}
+
+// TestNoErrorsIsOnABenignMigratorSentinel_TheGuardIsFatalOnAnEmptyWalk pins the seam.
+func TestNoErrorsIsOnABenignMigratorSentinel_TheGuardIsFatalOnAnEmptyWalk(t *testing.T) {
+	report := testutil.RunGuard(func(r testutil.Reporter) {
+		assertNoErrorsIsOnBenignSentinels(r, t.TempDir())
+	})
+
+	require.True(t, report.Stopped, "an empty walk must be fatal rather than a pass")
+	assert.Contains(t, report.Fatal, "walked no Go files under")
 }
