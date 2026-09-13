@@ -402,3 +402,74 @@ func describe(uses []legacyErrorUse) []string {
 	}
 	return out
 }
+
+// Seam 2: the reporting half. Everything above asserts on what findLegacyErrorUses returned, and
+// TestNoLegacyErrors_TheTreeItself walks a tree that has been clean since #279, so the lines that
+// turn a use into a failure were reached by three module tiers and observed failing by none.
+
+// TestNoLegacyErrors_TheGuardFailsOnALegacyConstruction drives the reporting half and holds the
+// message to naming the site and the replacement, including the sentinel carve-out, since a reader
+// told only that line 5 is wrong will reach for errs.New in the one place it must not go.
+func TestNoLegacyErrors_TheGuardFailsOnALegacyConstruction(t *testing.T) {
+	root := t.TempDir()
+	writeFixture(t, root, "core/caught/stdlib.go", `package caught
+
+import "errors"
+
+func stdlibNew() error { return errors.New("x") }
+`)
+
+	report := RunGuard(func(r Reporter) { assertNoLegacyErrors(r, root, nil) })
+
+	require.True(t, report.Failed(), "a stdlib errors.New passed the guard")
+	assert.False(t, report.Stopped, "a finding is an Errorf, not a Fatalf")
+	assert.Contains(t, report.Text(), "core/caught/stdlib.go:5")
+	assert.Contains(t, report.Text(), "stdlib errors.New")
+	assert.Contains(t, report.Text(), "1 legacy error construction(s) in 1 non-test file(s)")
+	assert.Contains(t, report.Text(), "core/errs")
+	assert.Contains(t, report.Text(), "sentinel")
+	assert.Contains(t, report.Text(), "#279")
+}
+
+// TestNoLegacyErrors_TheGuardPassesAnErrsConstruction is the other direction, over the shape the
+// rule exists to admit.
+func TestNoLegacyErrors_TheGuardPassesAnErrsConstruction(t *testing.T) {
+	root := t.TempDir()
+	writeFixture(t, root, "core/passed/ok.go", `package passed
+
+import "github.com/leodip/goiabada/core/errs"
+
+func viaErrs() error { return errs.New("x") }
+`)
+
+	report := RunGuard(func(r Reporter) { assertNoLegacyErrors(r, root, nil) })
+
+	assert.False(t, report.Failed(), "an errs construction failed the guard: %s", report.Text())
+}
+
+// TestNoLegacyErrors_TheGuardIsFatalOnAnEmptyWalk pins the seam. This guard is unscoped at all
+// three of its call sites, so the way it dies is a root that resolves to somewhere with no Go in
+// it -- which reports nothing and is indistinguishable from a tree that is clean.
+func TestNoLegacyErrors_TheGuardIsFatalOnAnEmptyWalk(t *testing.T) {
+	root := t.TempDir()
+
+	report := RunGuard(func(r Reporter) { assertNoLegacyErrors(r, root, nil) })
+
+	require.True(t, report.Stopped, "an empty walk must be fatal rather than a pass")
+	assert.Contains(t, report.Fatal, "walked no non-test Go files under")
+}
+
+// TestNoLegacyErrors_TheGuardIsFatalWhenANamedDirectoryHoldsNothing is the scoped arm of the same
+// seam, and the fatal names the directories so a subtree renamed out from under a caller is
+// legible rather than a bare "nothing found".
+func TestNoLegacyErrors_TheGuardIsFatalWhenANamedDirectoryHoldsNothing(t *testing.T) {
+	root := t.TempDir()
+	writeFixture(t, root, "core/elsewhere/ok.go", "package elsewhere\n")
+	writeFixture(t, root, "core/emptied/notes.md", "the Go moved out of here\n")
+
+	report := RunGuard(func(r Reporter) { assertNoLegacyErrors(r, root, []string{"core/emptied"}) })
+
+	require.True(t, report.Stopped)
+	assert.Contains(t, report.Fatal, "dirs: core/emptied",
+		"the fatal names the scope that covered nothing, not just the root")
+}

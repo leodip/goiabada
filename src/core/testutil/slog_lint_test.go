@@ -604,3 +604,85 @@ func assertDeclaredOnce(t *testing.T, root, scope, name string) {
 	}
 	assert.Equal(t, 1, declared, "declared exactly once in its scope")
 }
+
+// Seam 2: the reporting half. Everything above asserts on what findSlogViolations returned, and
+// TestSlogConvention_TheTreeItself walks a tree that has been clean since #320, so the lines that
+// turn a violation into a failure were reached by three module tiers and observed failing by none.
+
+// TestSlogConvention_TheGuardFailsOnARefusedMessage drives the reporting half and holds the message
+// to carrying the convention itself. This one is long on purpose: the rules it names are the ones
+// sloglint cannot express, so the failure is the only place a reader is told them.
+func TestSlogConvention_TheGuardFailsOnARefusedMessage(t *testing.T) {
+	tree := newFixtureTree(t)
+	tree.writeGolangci(golangciWithForwarders())
+	tree.write("core/caught/opener.go", `package caught
+
+import "log/slog"
+
+func opener() {
+	slog.Error("failed to load the client")
+}
+`)
+
+	report := RunGuard(func(r Reporter) { assertSlogConvention(r, tree.root, nil) })
+
+	require.True(t, report.Failed(), "a refused message opener passed the guard")
+	assert.False(t, report.Stopped, "a violation is an Errorf, not a Fatalf")
+	assert.Contains(t, report.Text(), "core/caught/opener.go:6")
+	assert.Contains(t, report.Text(), "1 slog convention violation(s) in 1 non-test file(s)")
+	assert.Contains(t, report.Text(), "unable to")
+	assert.Contains(t, report.Text(), "#320")
+}
+
+// TestSlogConvention_TheGuardPassesAConformingRecord is the other direction, over a message the
+// convention admits: lowercase, no refused opener, and the one verb it chose.
+func TestSlogConvention_TheGuardPassesAConformingRecord(t *testing.T) {
+	tree := newFixtureTree(t)
+	tree.writeGolangci(golangciWithForwarders())
+	tree.write("core/passed/opener.go", `package passed
+
+import "log/slog"
+
+func opener() {
+	slog.Warn("unable to load the client", "client_id", 1)
+}
+`)
+
+	report := RunGuard(func(r Reporter) { assertSlogConvention(r, tree.root, nil) })
+
+	assert.False(t, report.Failed(), "a conforming record failed the guard: %s", report.Text())
+}
+
+// TestSlogConvention_TheGuardIsFatalOnAnEmptyWalk pins the seam this guard shares with the others.
+func TestSlogConvention_TheGuardIsFatalOnAnEmptyWalk(t *testing.T) {
+	tree := newFixtureTree(t)
+	tree.writeGolangci(golangciWithForwarders())
+
+	report := RunGuard(func(r Reporter) { assertSlogConvention(r, tree.root, nil) })
+
+	require.True(t, report.Stopped, "an empty walk must be fatal rather than a pass")
+	assert.Contains(t, report.Fatal, "walked no non-test Go files under")
+}
+
+// TestSlogConvention_AMissingGolangciConfigIsReportedThroughTheGuard is this guard's extra
+// dependency, and the one the other twelve do not have. Rule 4 compares the spread-site table
+// against sloglint's custom-funcs, so a configuration file that moved leaves that rule with nothing
+// to read. It is reported as a violation rather than raised as a walk error on purpose: the file
+// being absent is a fact about the repository the reader can act on, and phrasing it as "walking
+// failed" would send them to look for a broken tree instead.
+func TestSlogConvention_AMissingGolangciConfigIsReportedThroughTheGuard(t *testing.T) {
+	tree := newFixtureTree(t)
+	tree.write("core/passed/ok.go", `package passed
+
+import "log/slog"
+
+func ok() { slog.Warn("unable to load the client") }
+`)
+
+	report := RunGuard(func(r Reporter) { assertSlogConvention(r, tree.root, nil) })
+
+	require.True(t, report.Failed(), "a missing .golangci.yml passed the guard")
+	assert.False(t, report.Stopped)
+	assert.Contains(t, report.Text(), "no golangci-lint configuration beside the source root")
+	assert.Contains(t, report.Text(), "custom-funcs")
+}
