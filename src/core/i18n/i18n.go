@@ -7,13 +7,13 @@
 //     by GOIABADA_I18N_OVERRIDES_DIR (override files win on conflict).
 //   - MiddlewareLocale runs early in every request chain (before identity
 //     is established) and attaches a tentative localizer based on
-//     ?ui_locales, the in-flight AuthContext.UILocales (authserver only),
+//     ?ui_locales, in-flight UI locales (authserver only),
 //     Accept-Language, then English.
 //   - User-locale refinement runs once identity is known. Adminconsole
 //     uses MiddlewareLocaleFromJWT (route-level, after JWT validation);
-//     authserver uses the per-handler RefineLocalizerWithUser helper. Both
+//     authserver uses the per-handler RefineLocalizerWithUserLocale helper. Both
 //     skip the refinement when the request carries explicit locale intent
-//     (?ui_locales or AuthContext.UILocales).
+//     (?ui_locales or in-flight UI locales).
 //   - T and Localizer read the localizer off context.Context.
 package i18n
 

@@ -177,7 +177,7 @@ func HandleAuthPwdPost(
 
 		displayInfo := getClientDisplayInfo(r.Context(), database, client)
 
-		// renderError closes over r so a subsequent r = i18n.RefineLocalizerWithUser
+		// renderError closes over r so a subsequent locale refinement
 		// is picked up by the closure on its next invocation.
 		renderError := func(le *i18n.LocalizedError) {
 			bind := map[string]interface{}{
@@ -253,8 +253,8 @@ func HandleAuthPwdPost(
 
 		// Password verified — surfacing user-specific errors (account disabled,
 		// downstream flow messages) in user.Locale is now safe and correct.
-		// Skipped when explicit ?ui_locales / AuthContext.UILocales is in play.
-		r = i18n.RefineLocalizerWithUser(r, user)
+		// Skipped when explicit request or in-flight UI locales are in play.
+		r = i18n.RefineLocalizerWithUserLocale(r, user.Locale)
 
 		// Deliberately not a credential failure: the password was right, so there is
 		// nothing here for the rate limiter to bound. The same holds for the missing-email

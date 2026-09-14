@@ -7,16 +7,14 @@ import (
 	"strings"
 
 	"github.com/leodip/goiabada/core/constants"
-	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
 )
 
-// AuthContextReader matches the subset of *handlerhelpers.AuthHelper that
-// MiddlewareLocale needs to look up an in-flight authorize transaction.
-// Adminconsole passes nil because it has no AuthContext concept (identity
-// comes from JWT, handled separately by MiddlewareLocaleFromJWT).
-type AuthContextReader interface {
-	GetAuthContext(r *http.Request) (*oauth.AuthContext, error)
+// UILocalesReader supplies locale preferences from an in-flight authorize
+// transaction. Adminconsole passes nil because it has no such transaction
+// state (identity comes from JWT, handled separately by MiddlewareLocaleFromJWT).
+type UILocalesReader interface {
+	UILocales(r *http.Request) []string
 }
 
 const (
@@ -63,27 +61,27 @@ func SanitizeUILocales(raw string) []string {
 
 // MiddlewareLocale returns the global locale-resolution middleware. It
 // runs early in the request chain (before identity is established) and
-// attaches a tentative localizer to the request context. authHelper may
-// be nil (adminconsole), in which case the AuthContext step is skipped.
+// attaches a tentative localizer to the request context. uiLocalesReader may
+// be nil (adminconsole), in which case the in-flight UI-locales step is skipped.
 //
 // Resolution order:
 //
 //  1. ?ui_locales= query parameter on the current request (no form parsing).
-//  2. AuthContext.UILocales (authserver flows in progress).
+//  2. UI locales from an authserver flow in progress.
 //  3. Accept-Language header.
 //  4. English fallback.
 //
 // When the source is (1) or (2) the localizer is marked as carrying
-// "explicit intent" — RefineLocalizerWithUser and MiddlewareLocaleFromJWT
+// "explicit intent" — RefineLocalizerWithUserLocale and MiddlewareLocaleFromJWT
 // honor that mark by skipping their override. This prevents user-locale
 // refinement from clobbering an explicit per-request preference.
 //
 // Runs even if LoadBundle hasn't been called — in that case it becomes a
 // no-op and Localizer falls back to a synthetic English localizer.
-func MiddlewareLocale(authHelper AuthContextReader) func(http.Handler) http.Handler {
+func MiddlewareLocale(uiLocalesReader UILocalesReader) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ctx := resolveLocale(r.Context(), r, authHelper)
+			ctx := resolveLocale(r.Context(), r, uiLocalesReader)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
@@ -107,7 +105,7 @@ func ResolveRequestLocale(ctx context.Context, r *http.Request) context.Context 
 	return resolveLocale(ctx, r, nil)
 }
 
-func resolveLocale(ctx context.Context, r *http.Request, authHelper AuthContextReader) context.Context {
+func resolveLocale(ctx context.Context, r *http.Request, uiLocalesReader UILocalesReader) context.Context {
 	bundle := defaultBundle
 	if bundle == nil {
 		return ctx
@@ -122,12 +120,12 @@ func resolveLocale(ctx context.Context, r *http.Request, authHelper AuthContextR
 		}
 	}
 
-	// (2) AuthContext.UILocales — authserver flows in progress.
+	// (2) UI locales from an authserver flow in progress.
 	// sessionstore.Get caches the loaded session on the request, so this is
 	// effectively a map lookup, not a fresh load.
-	if authHelper != nil {
-		if ac, err := authHelper.GetAuthContext(r); err == nil && ac != nil && len(ac.UILocales) > 0 {
-			return attachLocale(ctx, bundle.localizerFor(ac.UILocales), ac.UILocales[0], true)
+	if uiLocalesReader != nil {
+		if tags := uiLocalesReader.UILocales(r); len(tags) > 0 {
+			return attachLocale(ctx, bundle.localizerFor(tags), tags[0], true)
 		}
 	}
 
@@ -186,51 +184,42 @@ func localeClaimFromJwt(ctx context.Context) string {
 	return strings.TrimSpace(jwtInfo.IdToken.GetStringClaim("locale"))
 }
 
-// RefineLocalizerWithUser is the authserver per-handler refinement helper.
-// It returns a NEW *http.Request with an updated context. Go contexts are
-// immutable: dropping the return value silently leaves the localizer
-// unchanged.
+// RefineLocalizerWithUserLocale is the authserver per-handler refinement helper.
+// It returns a NEW *http.Request when the locale changes. Go contexts are
+// immutable: dropping the return value silently leaves the localizer unchanged.
 //
 // Canonical use:
 //
-//	r = i18n.RefineLocalizerWithUser(r, user)
+//	r = i18n.RefineLocalizerWithUserLocale(r, user.Locale)
 //	// every downstream call (rendering, redirects, error helpers) MUST
 //	// use the returned r.
 //
 // The override is suppressed when explicit request intent is present
-// (current ?ui_locales or in-flight AuthContext.UILocales) — this is the
-// rule that prevents user-locale refinement from clobbering an RP's stated
-// ui_locales the moment the user authenticates inside the multi-step flow.
-func RefineLocalizerWithUser(r *http.Request, user *models.User) *http.Request {
-	return r.WithContext(RefineLocalizerContext(r.Context(), user))
-}
-
-// RefineLocalizerContext is the context-shaped form of RefineLocalizerWithUser
-// for code paths that already have a bare context.Context (background workers,
-// tests). Same override-suppression rule applies.
-func RefineLocalizerContext(ctx context.Context, user *models.User) context.Context {
-	if user == nil {
-		return ctx
-	}
-	locale := strings.TrimSpace(user.Locale)
+// (current ?ui_locales or UI locales from an in-flight authorize flow) — this
+// prevents user-locale refinement from clobbering an RP's stated ui_locales
+// when the user authenticates inside the multi-step flow.
+func RefineLocalizerWithUserLocale(r *http.Request, locale string) *http.Request {
+	locale = strings.TrimSpace(locale)
 	if locale == "" {
-		return ctx
+		return r
 	}
+	ctx := r.Context()
 	if hasExplicitIntent(ctx) {
-		return ctx
+		return r
 	}
 	bundle := defaultBundle
 	if bundle == nil {
-		return ctx
+		return r
 	}
-	return attachLocale(ctx, bundle.localizerFor([]string{locale}), locale, false)
+	ctx = attachLocale(ctx, bundle.localizerFor([]string{locale}), locale, false)
+	return r.WithContext(ctx)
 }
 
 // RefineLocalizerWithUILocales is used by handler_authorize.go after
 // capturing a form-body ui_locales (which the global locale middleware
 // cannot see — it only reads the query string to avoid consuming the POST
 // body). Returns a new *http.Request. The same return-value-must-be-assigned
-// rule from RefineLocalizerWithUser applies.
+// rule from RefineLocalizerWithUserLocale applies.
 func RefineLocalizerWithUILocales(r *http.Request, uiLocales []string) *http.Request {
 	if len(uiLocales) == 0 {
 		return r
