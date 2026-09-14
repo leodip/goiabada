@@ -21,24 +21,24 @@ import (
 	"time"
 
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
+	"github.com/leodip/goiabada/authserver/internal/ratelimit"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/handlerhelpers"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
-	"github.com/leodip/goiabada/core/ratelimit"
 	"github.com/leodip/goiabada/core/testutil"
 )
 
 // testTemplateFS is the smallest tree RenderTemplate needs: a layout that includes the
 // three blocks the real one includes, and the error page the browser rejection renders.
 //
-// The real templates live in the authserver module, which depends on core, so core's tests
-// cannot reach them. What stands in here is only their shape. What is genuinely under test
-// is the middleware's half (the layout and template it names, the bind keys it fills) plus
-// the half RenderTemplate itself owns and a stub renderer would fake: the Content-Type it
-// sets and the status it takes from _httpStatus.
+// This focused fixture avoids coupling middleware behaviour to unrelated markup changes.
+// What stands in here is only the templates' shape. What is genuinely under test is the
+// middleware's half (the layout and template it names, the bind keys it fills) plus the half
+// RenderTemplate itself owns and a stub renderer would fake: the Content-Type it sets and the
+// status it takes from _httpStatus.
 var testTemplateFS = fstest.MapFS{
 	"layouts/no_menu_layout.html": &fstest.MapFile{Data: []byte(
 		`<!DOCTYPE html><html><head><title>{{template "title" .}}</title>{{template "head" .}}</head>` +
@@ -1740,8 +1740,8 @@ func TestRejection_APIClass(t *testing.T) {
 	if body.ErrorCode != "TOO_MANY_REQUESTS" {
 		t.Errorf(`error_code = %q, want "TOO_MANY_REQUESTS"`, body.ErrorCode)
 	}
-	if body.ErrorDescription == "" {
-		t.Error("error_description is empty")
+	if body.ErrorDescription != "Too many requests. Please wait and try again later." {
+		t.Errorf("error_description = %q, want the standard rate-limit message", body.ErrorDescription)
 	}
 }
 

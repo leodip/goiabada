@@ -4,7 +4,6 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"strings"
 	"testing"
 
@@ -21,9 +20,9 @@ import (
 // Level is the one rule in that decision the lint cannot hold: it is not decidable from the text
 // of a call, so nothing stops somebody raising a handled refusal to Error or lowering a server
 // fault to Warn one site at a time until the level means nothing. What holds it is a case per
-// site: a rate limiter doing its job, a CSRF refusal and the request log. The settings and CORS
-// records live with their middleware in authserver; the invalid-issuer clear is pinned at Warn
-// beside its own case in middleware_jwt_test.go.
+// site: a CSRF refusal and the request log. The authserver middleware records live with their
+// middleware; the invalid-issuer clear is pinned at Warn beside its own case in
+// middleware_jwt_test.go.
 //
 // Each case also asserts request_id, which is decision 2 measured end to end rather than by
 // reading the call site: the attribute is on the record because chi's RequestID ran ahead of the
@@ -45,45 +44,6 @@ func theOneRecord(t *testing.T, logged *testutil.SlogCapture) testutil.CapturedR
 	records := logged.Records()
 	require.Len(t, records, 1)
 	return records[0]
-}
-
-// A limiter doing its job is an expected event. Error here and an auth server under any kind of
-// scripted traffic has an error log made entirely of successful defences.
-func TestSlogConvention_RateLimitTripIsWarnAndJoinsTheRequest(t *testing.T) {
-	const ipBudget = 30
-	const ip = "198.51.100.9:5000"
-
-	m := newTestMiddleware(nil, true)
-
-	run := func(email string) *httptest.ResponseRecorder {
-		form := url.Values{"email": {email}}
-		req := limiterRequest(http.MethodPost, "/auth/pwd", strings.NewReader(form.Encode()))
-		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-		req.RemoteAddr = ip
-		rr := httptest.NewRecorder()
-		// Through chi's RequestID, as the real chain mounts it, so the id the trip record
-		// carries is one this test did not put there.
-		chimiddleware.RequestID(m.LimitPwd(http.HandlerFunc(
-			func(w http.ResponseWriter, _ *http.Request) {
-				w.WriteHeader(http.StatusTeapot)
-			}))).ServeHTTP(rr, req)
-		return rr
-	}
-
-	// Spend the budget before capturing, so the capture holds the trip and nothing else.
-	for i := 0; i < ipBudget; i++ {
-		require.Equal(t, http.StatusTeapot, run("user@example.com").Code)
-	}
-
-	logged := testutil.CaptureSlog(t)
-	require.Equal(t, http.StatusTooManyRequests, run("last@example.com").Code)
-
-	record := theOneRecord(t, logged)
-	assert.Equal(t, slog.LevelWarn, record.Level)
-	assert.Equal(t, "rate limit reached", record.Message)
-	assert.Equal(t, "pwd_ip", record.Attrs["limiter"])
-	assert.Equal(t, "198.51.100.9", record.Attrs["ip"])
-	requestIdOf(t, record)
 }
 
 // The refusal's message is a literal now, and the sentence explainCsrfFailure builds is an

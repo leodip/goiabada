@@ -3,7 +3,7 @@ package handlers
 import (
 	"net/http"
 
-	core_middleware "github.com/leodip/goiabada/core/middleware"
+	"github.com/leodip/goiabada/authserver/internal/middleware"
 )
 
 // noCredentialFailures stands in for the rate limiter in every case that is not about it.
@@ -33,6 +33,6 @@ func (rateLimitTestRenderer) RenderTemplate(w http.ResponseWriter, r *http.Reque
 // newTestRateLimiter builds a live, enabled limiter for the cases that exercise a handler
 // through it. A nil audit logger is the supported shape: the limiter skips the audit write
 // and still emits its warning line and its rejection.
-func newTestRateLimiter(authHelper core_middleware.AuthHelper) *core_middleware.RateLimiterMiddleware {
-	return core_middleware.NewRateLimiterMiddleware(authHelper, rateLimitTestRenderer{}, nil, true)
+func newTestRateLimiter(authHelper middleware.AuthHelper) *middleware.RateLimiterMiddleware {
+	return middleware.NewRateLimiterMiddleware(authHelper, rateLimitTestRenderer{}, nil, true)
 }

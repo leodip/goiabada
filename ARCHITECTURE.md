@@ -99,7 +99,7 @@ A row whose owner is not `kernel` names the issue that moves it. A `kernel` row 
 | `core/imaging` | authserver | #348 |
 | `core/locales` | kernel | — |
 | `core/logging` | kernel | — |
-| `core/middleware` | split | #336 |
+| `core/middleware` | kernel | — |
 | `core/mocks` | kernel | — |
 | `core/models` | authserver | #359 |
 | `core/oauth` | split | #338 |
@@ -107,7 +107,6 @@ A row whose owner is not `kernel` names the issue that moves it. A `kernel` row 
 | `core/oidc` | authserver | #360 |
 | `core/otp` | authserver | #348 |
 | `core/phonecountries` | authserver | #345 |
-| `core/ratelimit` | authserver | #336 |
 | `core/rsautil` | authserver | #360 |
 | `core/sessionstore` | kernel | — |
 | `core/stringutil` | kernel | — |
@@ -184,6 +183,7 @@ of rows is the only measure of how much is left to do.
 | `core/handlerhelpers` | `core/hashutil` | #360 |
 | `core/handlerhelpers` | `core/models` | #337 |
 | `core/i18n` | `core/models` | #337 |
+| `core/middleware` | `core/models` | #337 |
 | `core/testutil/fake` | `core/uuidutil` | #360 |
 | `adminconsole/internal/apiclient` | `core/models` | #350 |
 | `adminconsole/internal/handlers` | `core/models` | #350 |
@@ -194,7 +194,7 @@ of rows is the only measure of how much is left to do.
 | `adminconsole/internal/handlers/adminuserhandlers` | `core/models` | #350 |
 | `adminconsole/internal/middleware` | `core/models` | #350 |
 
-Fourteen rows, and #350 owns ten of them: the admin console's dependency on persistence models is
+Fifteen rows, and #350 owns ten of them: the admin console's dependency on persistence models is
 the single largest piece of the boundary still to close.
 
 ## Foreign modules the admin console must not compile

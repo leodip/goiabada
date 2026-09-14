@@ -25,7 +25,7 @@ import (
 )
 
 // TestInitRoutes_LimitersAreRegisteredOnTheProductionRoutes makes the claim neither the
-// limiter table in src/core/middleware nor the handler seams can make: that every limiter
+// limiter table in authserver/internal/middleware nor the handler seams can make: that every limiter
 // is mounted on the route it is meant to protect.
 //
 // Both of those tiers compose a limiter around a handler by hand, which is exactly the

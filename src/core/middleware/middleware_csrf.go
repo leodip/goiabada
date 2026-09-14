@@ -122,8 +122,8 @@ var csrfConditionalExemptions = map[string]func(*http.Request) bool{
 // where the origin check would otherwise have rejected it on the headers alone. That is inherent
 // to decision 9 rather than introduced by reading the body: the same origin need only move the hint
 // into the query to reach the handler, which parses the body itself to honour ui_locales. Go bounds
-// the parse the same way it bounds every other form endpoint here, and middleware_ratelimiter and
-// middleware_jwt already parse forms on this side of the chain.
+// the parse the same way it bounds every other form endpoint here, and middleware_jwt already
+// parses forms on this side of the chain.
 func logoutIdTokenHintPresent(r *http.Request) bool {
 	if r.Method != http.MethodPost {
 		return false

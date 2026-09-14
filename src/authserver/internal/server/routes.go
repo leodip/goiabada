@@ -64,7 +64,7 @@ func (s *Server) initRoutes(root chi.Router) {
 	authHeaderToContext := middlewareJwt.JwtAuthorizationHeaderToContext()
 
 	authServerConfig := config.GetAuthServer()
-	rateLimiter := core_middleware.NewRateLimiterMiddleware(
+	rateLimiter := middleware.NewRateLimiterMiddleware(
 		authHelper,
 		httpHelper,
 		auditLogger,

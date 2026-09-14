@@ -259,12 +259,11 @@ func LogInternalServerError(r *http.Request, err error, attrs ...any) string {
 	return ""
 }
 `)
-	tree.write("core/middleware/builders.go", `package middleware
+	tree.write("authserver/internal/middleware/ratelimiter.go", `package middleware
 
 import (
 	"context"
 	"log/slog"
-	"net/http"
 )
 
 type limiter struct{}
@@ -276,6 +275,15 @@ func (m *limiter) reportTrip(ctx context.Context, keyField, key string) {
 	}
 	slog.WarnContext(ctx, "rate limit reached", attrs...)
 }
+`)
+	tree.write("core/middleware/builders.go", `package middleware
+
+import (
+	"log/slog"
+	"net/http"
+)
+
+type limiter struct{}
 
 func MiddlewareRequestLogger() func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
@@ -409,7 +417,7 @@ func tagged() { slog.SetDefault(slog.Default()); slog.Info("failed to x") }
 
 	violations, files, err := findSlogViolations(tree.root, tree.golangci, nil)
 	require.NoError(t, err)
-	assert.Equal(t, 25, files, "every non-exempt fixture is walked")
+	assert.Equal(t, 26, files, "every non-exempt fixture is walked")
 
 	got := make([]string, 0, len(violations))
 	for _, v := range violations {

@@ -11,7 +11,7 @@ import (
 
 func TestMain(m *testing.M) {
 	config.Init()
-	// The rate limiter renders a localized error page on a 429, so without a loaded
+	// The CSRF and JWT middleware render localized error pages, so without a loaded
 	// bundle i18n.T falls back to echoing the key and the body assertions would pass
 	// against the key rather than against the message.
 	if _, err := i18n.LoadBundle(); err != nil {

@@ -12,11 +12,11 @@ import (
 	"time"
 
 	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
+	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
 	"github.com/leodip/goiabada/core/encryption"
-	core_middleware "github.com/leodip/goiabada/core/middleware"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -78,7 +78,7 @@ func newVerificationEnv(t *testing.T) *verificationEnv {
 	database.On("UpdateUser", (*sql.Tx)(nil), user).Return(nil).Maybe()
 	auditLogger.On("Log", mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
 
-	rateLimiter := core_middleware.NewRateLimiterMiddleware(nil, unusedRenderer{t}, nil, true)
+	rateLimiter := middleware.NewRateLimiterMiddleware(nil, unusedRenderer{t}, nil, true)
 	handler := HandleAPIAccountEmailVerificationPost(database, auditLogger, rateLimiter)
 
 	return &verificationEnv{
@@ -120,7 +120,7 @@ func (e *verificationEnv) post(t *testing.T, submitted string) *httptest.Respons
 }
 
 // TestHandleAPIAccountEmailVerificationPost_SpendsTheLimiterBudgetOnFailuresOnly is seam 2
-// for the email verification check. The budget itself is pinned at seam 1 in core/middleware;
+// for the email verification check. The budget itself is pinned at seam 1 in authserver/internal/middleware;
 // what is new here is the wiring, that a wrong code reaches the counter at all and that a
 // right one does not.
 func TestHandleAPIAccountEmailVerificationPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {

@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -85,6 +86,47 @@ func TestSlogConvention_CorsConfigurationFailureIsError(t *testing.T) {
 	assert.Contains(t, err.Error(), "the database is unreachable")
 	assert.NotContains(t, record.Attrs, "request_id",
 		"CORS runs before RequestID in the production chain")
+}
+
+// A limiter doing its job is an expected event. Error here and an auth server under any kind of
+// scripted traffic has an error log made entirely of successful defences.
+func TestSlogConvention_RateLimitTripIsWarnAndJoinsTheRequest(t *testing.T) {
+	const ipBudget = 30
+	const ip = "198.51.100.9:5000"
+
+	m := newTestMiddleware(nil, true)
+
+	run := func(email string) *httptest.ResponseRecorder {
+		form := url.Values{"email": {email}}
+		req := limiterRequest(http.MethodPost, "/auth/pwd", strings.NewReader(form.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.RemoteAddr = ip
+		rr := httptest.NewRecorder()
+		// Through chi's RequestID, as the real chain mounts it, so the id the trip record
+		// carries is one this test did not put there.
+		chimiddleware.RequestID(m.LimitPwd(http.HandlerFunc(
+			func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(http.StatusTeapot)
+			}))).ServeHTTP(rr, req)
+		return rr
+	}
+
+	// Spend the budget before capturing, so the capture holds the trip and nothing else.
+	for i := 0; i < ipBudget; i++ {
+		require.Equal(t, http.StatusTeapot, run("user@example.com").Code)
+	}
+
+	logged := testutil.CaptureSlog(t)
+	require.Equal(t, http.StatusTooManyRequests, run("last@example.com").Code)
+
+	record := requireOneRecord(t, logged)
+	assert.Equal(t, slog.LevelWarn, record.Level)
+	assert.Equal(t, "rate limit reached", record.Message)
+	assert.Equal(t, "pwd_ip", record.Attrs["limiter"])
+	assert.Equal(t, "198.51.100.9", record.Attrs["ip"])
+	requestId, isString := record.Attrs["request_id"].(string)
+	require.True(t, isString, "the record must carry the request id injected from its context")
+	require.NotEmpty(t, requestId)
 }
 
 func requireOneRecord(t *testing.T, logged *testutil.SlogCapture) testutil.CapturedRecord {

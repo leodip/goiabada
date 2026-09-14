@@ -11,13 +11,13 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/sessionstore"
 
+	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/i18n"
-	core_middleware "github.com/leodip/goiabada/core/middleware"
 	"github.com/leodip/goiabada/core/models"
 )
 
@@ -179,7 +179,7 @@ func renderResetPasswordCodeInvalid(httpHelper HttpHelper, w http.ResponseWriter
 func auditFailedResetPasswordCode(auditLogger AuditLogger, r *http.Request, userId int64, reason string) {
 	const maxAuditedValueLength = 100
 
-	clientIP := core_middleware.GetClientIPFromRequest(r)
+	clientIP := middleware.GetClientIPFromRequest(r)
 	if len(clientIP) > maxAuditedValueLength {
 		clientIP = clientIP[:maxAuditedValueLength]
 	}

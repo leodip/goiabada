@@ -34,10 +34,8 @@ type HTTPClient interface {
 }
 
 // ServerErrorRenderer answers a request this middleware cannot complete with the
-// localized server-error page, logging the cause against the request id. Declared
-// here for the reason ErrorRenderer in middleware_ratelimiter.go is: the concrete
-// type lives in a module that depends on core, so core can only name the shape it
-// needs. *handlerhelpers.HttpHelper satisfies it.
+// localized server-error page, logging the cause against the request id. The middleware
+// declares only the shape it needs rather than depending on the handler helper that satisfies it.
 //
 // Every site below used to answer with http.Error and the Go error text, which put
 // an internal detail in front of the administrator in English while the log, which

@@ -1746,7 +1746,7 @@ func TestHandleTokenPost_SupersededRefreshTokenIsSurfaced(t *testing.T) {
 // context, so a handler invoked on a bare request has nothing to convert and
 // RecordCredentialFailure is a no-op. A case written that way passes while proving nothing.
 //
-// The budgets and keys are pinned at seam 1 in core/middleware. What is new here is the
+// The budgets and keys are pinned at seam 1 in authserver/internal/middleware. What is new here is the
 // predicate: which of the validator's failures is a guess against an account, and which is
 // not. Charging one of the others would let a caller spend an account's budget, shared with
 // the browser password form, without ever guessing a password (#219).

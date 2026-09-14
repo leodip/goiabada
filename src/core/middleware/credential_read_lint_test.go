@@ -26,14 +26,9 @@ import (
 // r.FormValue accepts exactly that request, because ParseForm merges the URL query behind the body,
 // so the accessor is the whole of the difference between honouring those sentences and not.
 //
-// The list is one name because one name qualifies. The other form reads under core are deliberately
-// absent, each for its own reason:
+// The list is one name because one name qualifies. The other form read under core is deliberately
+// absent for its own reason:
 //
-//   - middleware_ratelimiter.go reads "email" with r.FormValue and "username" with r.PostFormValue
-//     as account keys. An account name is not a credential, and the limiter and the handler it
-//     protects must keep reading it the same way or a variant buys a fresh bucket (#219).
-//   - middleware_ratelimiter.go reads "grant_type" to decide whether the request is the ROPC one.
-//     It selects a branch and authenticates nothing.
 //   - handlerhelpers/http_helper.go reads a key its caller supplies, for the query-or-body lookup
 //     RP-initiated logout needs (#109). It owns no credential policy, so a name listed here would
 //     be enforced there by accident rather than by decision.

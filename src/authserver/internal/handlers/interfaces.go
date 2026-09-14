@@ -131,7 +131,7 @@ type AuditLogger interface {
 // A handler names no bucket and no key: the limiter chose those before the handler ran, and
 // a handler that derived them again would be free to disagree with the limiter about which
 // account the request is, which is exactly how the per-account tiers came to be worth
-// nothing (#219). *core_middleware.RateLimiterMiddleware satisfies it, and the call is a
+// nothing (#219). *middleware.RateLimiterMiddleware satisfies it, and the call is a
 // no-op on a request that carries no reservation.
 type CredentialFailureRecorder interface {
 	RecordCredentialFailure(r *http.Request)

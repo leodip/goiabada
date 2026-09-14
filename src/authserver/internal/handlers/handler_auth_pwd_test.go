@@ -900,7 +900,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 // request context, so a handler invoked on a bare request has nothing to convert and
 // RecordCredentialFailure is a no-op. A case written that way passes while proving nothing.
 //
-// The budgets themselves are pinned at seam 1 in core/middleware. What is new here is the
+// The budgets themselves are pinned at seam 1 in authserver/internal/middleware. What is new here is the
 // wiring: that a wrong password reaches the counter at all, and that a right one does not.
 func TestHandleAuthPwdPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 	const tightBudget = 10 // failures per 15 minutes per (account, client block)

@@ -30,11 +30,9 @@ import (
 // as unguarded by anything else. Naming them means a rename or a move that empties either one fails
 // here instead of shrinking the walk in silence.
 //
-// The rate limiter is not one of them. It lives in src/core/middleware, outside the walk of this
-// file and of its admin console twin, and its own .FormValue("email") account keys are deliberately
-// absent from the list below: an email address is not a credential, and the limiter and the handler
-// it protects must keep reading the account name the same way or a case variant buys a fresh bucket
-// (#219).
+// The rate limiter is inside this walk. Its "email" and "username" account keys are deliberately
+// absent from the list below: an account name is not a credential, and the limiter and the handler
+// it protects must keep reading it the same way or a case variant buys a fresh bucket (#219).
 func TestHandlers_NoCredentialQueryFallback(t *testing.T) {
 	// The ten credential-bearing names, as quoted literals. A value under any of them
 	// authenticates, authorizes or configures on its own.
