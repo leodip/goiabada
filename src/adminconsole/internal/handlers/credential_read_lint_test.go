@@ -30,10 +30,8 @@ import (
 // authorization endpoint to accept both GET and POST, so there that name has a lawful query source.
 //
 // The walk is this module's internal/ tree, so a credential read that appeared in src/core would be
-// seen by neither this file nor its authserver twin. No such read exists today: the only .FormValue
-// reads in core are the rate limiter's own "email" and "username" account keys, which are
-// deliberately absent from the list below because they are not credentials and because the limiter
-// and the handler it protects must keep reading the account name the same way (#219).
+// seen by neither this file nor its authserver twin. No such merged-form credential read exists
+// today; the auth server's own walk covers its rate limiter account keys.
 //
 // handlers and middleware are named again beneath that tree as coverage floors. They are the two
 // trees in this module whose code is handed an *http.Request: handlers holds every credential read

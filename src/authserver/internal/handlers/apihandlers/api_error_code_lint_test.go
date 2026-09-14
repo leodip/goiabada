@@ -44,7 +44,7 @@ import (
 //
 // Two boundaries, stated rather than discovered later:
 //
-//   - The scan is lexical over four directories and it reads a code where a code is written, not
+//   - The scan is lexical over three directories and it reads a code where a code is written, not
 //     where one might be computed. A code position that is not a string literal is therefore a
 //     failure in its own right, except inside the handful of primitives whose whole job is to pass
 //     a caller's code through; those are named in apiErrorCodeForwarders. That is what step 4 of
@@ -108,18 +108,16 @@ var apiErrorCodes = map[string]string{
 	// Written outside a handler, by something in front of one.
 	"INTERNAL_SERVER_ERROR": "category: every 500 on this surface, decision 7.",
 	"METHOD_NOT_ALLOWED":    "405 from the public-settings endpoint, which answers JSON refusals since decision 17.",
-	"TOO_MANY_REQUESTS":     "429 from core's rate limiter: the caller waits and retries.",
+	"TOO_MANY_REQUESTS":     "429 from the auth server's rate limiter: the caller waits and retries.",
 }
 
-// apiErrorCodeDirs are the four directories that write this envelope, relative to the source root.
-// authserver/internal/handlers covers apihandlers and handler_public_settings.go; the two
-// middleware directories write it without going through a helper, the rate limiter because it lives
-// in core and cannot see the authserver's unexported writer.
+// apiErrorCodeDirs are the three directories that write this envelope, relative to the source root.
+// authserver/internal/handlers covers apihandlers and handler_public_settings.go; middleware uses
+// the same apiresponse writer as the handlers.
 var apiErrorCodeDirs = []string{
 	"authserver/internal/handlers",
 	"authserver/internal/apiresponse",
 	"authserver/internal/middleware",
-	"core/middleware",
 }
 
 // apiErrorCodeArg maps a call that writes an error code to the argument index the code is in.
@@ -157,7 +155,7 @@ func TestAPIErrorCodes_MatchTheSurvivorTable(t *testing.T) {
 	assertAPIErrorCodes(t, testutil.SourceRoot(t), apiErrorCodeDirs, apiErrorCodeFileFloor, apiErrorCodes)
 }
 
-// apiErrorCodeFileFloor is how many non-test Go files the four directories hold at rest. It is a
+// apiErrorCodeFileFloor is how many non-test Go files the three directories hold at rest. It is a
 // floor rather than an exact count so ordinary growth does not move it, and it is a parameter
 // rather than a literal so a rule test can pin the refusal itself.
 const apiErrorCodeFileFloor = 60

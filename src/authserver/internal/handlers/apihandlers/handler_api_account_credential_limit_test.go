@@ -11,11 +11,11 @@ import (
 	"time"
 
 	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
+	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/core/constants"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/hashutil"
-	core_middleware "github.com/leodip/goiabada/core/middleware"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/validators"
 	"github.com/stretchr/testify/assert"
@@ -71,7 +71,7 @@ func newCredentialEnv(t *testing.T) *credentialEnv {
 	database.On("GetUserBySubject", (*sql.Tx)(nil), credentialSubject).Return(user, nil).Maybe()
 	auditLogger.On("Log", mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
 
-	rateLimiter := core_middleware.NewRateLimiterMiddleware(nil, unusedRenderer{t}, nil, true)
+	rateLimiter := middleware.NewRateLimiterMiddleware(nil, unusedRenderer{t}, nil, true)
 
 	return &credentialEnv{
 		password: rateLimiter.LimitAccountPassword(
@@ -128,7 +128,7 @@ func (e *credentialEnv) putOTP(t *testing.T, password, code string) *httptest.Re
 }
 
 // TestAccountCredentialBudget_SharedAcrossPasswordAndOTP is seam 2 for decision 10's one
-// bucket. The budget itself is pinned at seam 1 in core/middleware; what is new here is that
+// bucket. The budget itself is pinned at seam 1 in authserver/internal/middleware; what is new here is that
 // both handlers reach that one bucket, and that only the password check does.
 func TestAccountCredentialBudget_SharedAcrossPasswordAndOTP(t *testing.T) {
 	const budget = 5 // password failures per 15 minutes per token subject

@@ -16,29 +16,29 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/authserver/internal/apiresponse"
+	"github.com/leodip/goiabada/authserver/internal/ratelimit"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/oauth"
-	"github.com/leodip/goiabada/core/ratelimit"
 )
 
 type AuthHelper interface {
 	GetAuthContext(r *http.Request) (*oauth.AuthContext, error)
 }
 
-// ErrorRenderer renders an HTML error page. Declared here rather than imported for the
-// reason AuthHelper is: the concrete type lives in a module that depends on core, so core
-// can only name the shape it needs. *handlerhelpers.HttpHelper satisfies it.
+// ErrorRenderer renders an HTML error page. The middleware declares only the shape it
+// needs rather than depending on the handler helper that satisfies it.
 type ErrorRenderer interface {
 	RenderTemplate(w http.ResponseWriter, r *http.Request, layoutName string, templateName string,
 		data map[string]interface{}) error
 }
 
-// AuditLogger records a security event. Same reasoning as ErrorRenderer: the concrete
-// logger lives in the authserver module. The context is first and carries the request's id, so
-// the trip this audits joins the warning beside it and the request's own log line; the shape is
-// kept identical to handlers.AuditLogger, which the same concrete logger satisfies (#328).
+// AuditLogger records a security event. The middleware declares only the shape it needs
+// rather than depending on the audit implementation that satisfies it. The context is first and
+// carries the request's id, so the trip this audits joins the warning beside it and the request's
+// own log line; the shape is kept identical to handlers.AuditLogger, which the same concrete
+// logger satisfies (#328).
 type AuditLogger interface {
 	Log(ctx context.Context, auditEvent string, details map[string]interface{})
 }
@@ -488,16 +488,8 @@ func (m *RateLimiterMiddleware) reject(w http.ResponseWriter, r *http.Request, c
 	}
 
 	if class == rejectAPI {
-		// The same envelope every other refusal on these routes writes, so a caller
-		// already switching on error_code needs no new shape. The envelope type lives in
-		// core/api; the helper that writes it is unexported in the authserver module, so
-		// this builds it directly rather than reaching for a function core cannot see.
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusTooManyRequests)
-		_ = json.NewEncoder(w).Encode(api.ErrorResponse{
-			ErrorCode:        "TOO_MANY_REQUESTS",
-			ErrorDescription: "Too many requests. Please wait and try again later.",
-		})
+		apiresponse.WriteError(w, "Too many requests. Please wait and try again later.",
+			"TOO_MANY_REQUESTS", http.StatusTooManyRequests)
 		return
 	}
 

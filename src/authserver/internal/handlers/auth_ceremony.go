@@ -5,9 +5,9 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/i18n"
-	core_middleware "github.com/leodip/goiabada/core/middleware"
 	"github.com/leodip/goiabada/core/oauth"
 )
 
@@ -63,7 +63,7 @@ func rejectCeremonyMismatch(httpHelper HttpHelper, auditLogger AuditLogger, w ht
 	// Truncated for the same reason auditFailedResetPasswordCode truncates it:
 	// MiddlewareRealIP resolves the IP from a forwarded header in a proxied deployment, so
 	// this is a sink for a value that originates outside the process.
-	clientIP := core_middleware.GetClientIPFromRequest(r)
+	clientIP := middleware.GetClientIPFromRequest(r)
 	if len(clientIP) > maxAuditedValueLength {
 		clientIP = clientIP[:maxAuditedValueLength]
 	}
