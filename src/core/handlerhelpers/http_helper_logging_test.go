@@ -1,7 +1,6 @@
 package handlerhelpers
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -13,11 +12,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/mocks"
-	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -71,12 +68,6 @@ func loggedErrorOf(t *testing.T, record testutil.CapturedRecord) (error, bool) {
 func errorRouter(handle http.HandlerFunc) *chi.Mux {
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
-	r.Use(func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ctx := context.WithValue(r.Context(), constants.ContextKeySettings, &models.Settings{})
-			next.ServeHTTP(w, r.WithContext(ctx))
-		})
-	})
 	r.Get("/", handle)
 	return r
 }
@@ -87,7 +78,7 @@ func errorPageHelper() *HttpHelper {
 			"layouts/no_menu_layout.html": "<html>{{template \"content\" .}}</html>",
 			"error.html":                  "{{define \"content\"}}Error: {{.requestId}}{{end}}",
 		},
-	})
+	}, stubSettingsReader{})
 }
 
 func notFoundPageHelper() *HttpHelper {
@@ -97,7 +88,7 @@ func notFoundPageHelper() *HttpHelper {
 			"not_found.html":              "{{define \"content\"}}Not found{{end}}",
 			"error.html":                  "{{define \"content\"}}Error: {{.requestId}}{{end}}",
 		},
-	})
+	}, stubSettingsReader{})
 }
 
 // Decision 11's other half, and the half no status assertion can see. The console reaches NotFound
@@ -245,7 +236,7 @@ func TestInternalServerError_KeepsTheOriginsSingleStack(t *testing.T) {
 
 func TestJsonError_LogsOnceOnTheGenericBranch(t *testing.T) {
 	logs := testutil.CaptureSlog(t)
-	httpHelper := NewHttpHelper(&mocks.TestFS{})
+	httpHelper := NewHttpHelper(&mocks.TestFS{}, stubSettingsReader{})
 
 	router := errorRouter(func(w http.ResponseWriter, r *http.Request) {
 		httpHelper.JsonError(w, r, errs.New("not a wire error"))
@@ -283,7 +274,7 @@ func TestJsonError_LogsOnceOnTheGenericBranch(t *testing.T) {
 // status and the code and never looked at the record (#279 decisions 9 and 12).
 func TestJsonError_ADetailWithNoStatusIsA500ThatStillLogsAndCorrelates(t *testing.T) {
 	logs := testutil.CaptureSlog(t)
-	httpHelper := NewHttpHelper(&mocks.TestFS{})
+	httpHelper := NewHttpHelper(&mocks.TestFS{}, stubSettingsReader{})
 
 	router := errorRouter(func(w http.ResponseWriter, r *http.Request) {
 		httpHelper.JsonError(w, r, customerrors.NewErrorDetail("server_error", "The operation failed."))
@@ -323,7 +314,7 @@ func TestJsonError_ADetailWithNoStatusIsA500ThatStillLogsAndCorrelates(t *testin
 // row exists to catch.
 func TestJsonError_AnExplicit500DetailIsNotLoggedTwice(t *testing.T) {
 	logs := testutil.CaptureSlog(t)
-	httpHelper := NewHttpHelper(&mocks.TestFS{})
+	httpHelper := NewHttpHelper(&mocks.TestFS{}, stubSettingsReader{})
 
 	detail := customerrors.NewErrorDetailWithHttpStatusCode("server_error",
 		"An unexpected server error has occurred. Request Id: already-in-the-sentence",
@@ -351,7 +342,7 @@ func TestJsonError_AnExplicit500DetailIsNotLoggedTwice(t *testing.T) {
 // of to the client.
 func TestJsonError_ReadsAWrappedErrorDetail(t *testing.T) {
 	logs := testutil.CaptureSlog(t)
-	httpHelper := NewHttpHelper(&mocks.TestFS{})
+	httpHelper := NewHttpHelper(&mocks.TestFS{}, stubSettingsReader{})
 
 	detail := customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
 		"The redirect URI is not registered.", http.StatusBadRequest)
@@ -378,7 +369,7 @@ func TestJsonError_ReadsAWrappedErrorDetail(t *testing.T) {
 // RFC 6749 section 5.2 a bare assertion would have dropped in silence: the status would have become
 // 500 and the header simply would not be written.
 func TestJsonError_ReadsAWrappedErrorDetailsWWWAuthenticate(t *testing.T) {
-	httpHelper := NewHttpHelper(&mocks.TestFS{})
+	httpHelper := NewHttpHelper(&mocks.TestFS{}, stubSettingsReader{})
 
 	detail := customerrors.NewErrorDetailWithHttpStatusCodeAndWWWAuthenticate("invalid_token",
 		"The access token is invalid.", http.StatusUnauthorized, "Bearer error=\"invalid_token\"")

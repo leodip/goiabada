@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
+	adminmiddleware "github.com/leodip/goiabada/adminconsole/internal/middleware"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/handlerhelpers"
 	"github.com/leodip/goiabada/core/mocks"
@@ -48,7 +49,7 @@ func permissionRecords(t *testing.T, client apiclient.ApiClient, query string) (
 
 	capture := testutil.CaptureSlog(t)
 
-	httpHelper := handlerhelpers.NewHttpHelper(&mocks.TestFS{})
+	httpHelper := handlerhelpers.NewHttpHelper(&mocks.TestFS{}, adminmiddleware.SettingsReader{})
 
 	router := chi.NewRouter()
 	router.Use(middleware.RequestID)

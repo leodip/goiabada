@@ -2,6 +2,7 @@ package handlerhelpers
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -17,17 +18,28 @@ import (
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
-	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
 )
 
-type HttpHelper struct {
-	templateFS fs.FS
+type LayoutSettings struct {
+	AppName     string
+	UITheme     string
+	SMTPEnabled bool
 }
 
-func NewHttpHelper(templateFS fs.FS) *HttpHelper {
+type SettingsReader interface {
+	LayoutSettings(ctx context.Context) LayoutSettings
+}
+
+type HttpHelper struct {
+	templateFS fs.FS
+	settings   SettingsReader
+}
+
+func NewHttpHelper(templateFS fs.FS, settings SettingsReader) *HttpHelper {
 	return &HttpHelper{
 		templateFS: templateFS,
+		settings:   settings,
 	}
 }
 
@@ -127,7 +139,7 @@ func (h *HttpHelper) RenderTemplate(w http.ResponseWriter, r *http.Request, layo
 func (h *HttpHelper) RenderTemplateToBuffer(r *http.Request, layoutName string, templateName string,
 	data map[string]interface{}) (*bytes.Buffer, error) {
 
-	settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
+	settings := h.settings.LayoutSettings(r.Context())
 	data["appName"] = settings.AppName
 	data["uiTheme"] = settings.UITheme
 	data["urlPath"] = r.URL.Path

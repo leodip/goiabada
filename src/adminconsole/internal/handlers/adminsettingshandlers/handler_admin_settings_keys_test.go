@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
+	adminmiddleware "github.com/leodip/goiabada/adminconsole/internal/middleware"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/handlerhelpers"
 	"github.com/leodip/goiabada/core/oauth"
@@ -92,7 +93,7 @@ func TestHandleAdminSettingsKeysRotatePost_APIErrorReachesTheBrowser(t *testing.
 			// templateFS is nil because JsonError renders no template. This is the real
 			// helper rather than a mock so the assertions below are on the bytes the
 			// browser receives.
-			httpHelper := handlerhelpers.NewHttpHelper(nil)
+			httpHelper := handlerhelpers.NewHttpHelper(nil, adminmiddleware.SettingsReader{})
 
 			req := httptest.NewRequest(http.MethodPost, "/admin/settings/keys/rotate", nil)
 			req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeyJwtInfo,
@@ -125,7 +126,7 @@ func TestHandleAdminSettingsKeysRotatePost_APIErrorReachesTheBrowser(t *testing.
 // failure path through a different helper cannot alter what a successful rotation answers.
 func TestHandleAdminSettingsKeysRotatePost_SuccessIsUnchanged(t *testing.T) {
 
-	httpHelper := handlerhelpers.NewHttpHelper(nil)
+	httpHelper := handlerhelpers.NewHttpHelper(nil, adminmiddleware.SettingsReader{})
 
 	req := httptest.NewRequest(http.MethodPost, "/admin/settings/keys/rotate", nil)
 	req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeyJwtInfo,

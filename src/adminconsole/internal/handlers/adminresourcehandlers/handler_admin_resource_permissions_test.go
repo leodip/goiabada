@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	adminmiddleware "github.com/leodip/goiabada/adminconsole/internal/middleware"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/handlerhelpers"
@@ -41,7 +42,7 @@ func validatePermissionResponse(t *testing.T, identifier string, description str
 	rec := httptest.NewRecorder()
 
 	handler := HandleAdminResourceValidatePermissionPost(
-		handlerhelpers.NewHttpHelper(nil),
+		handlerhelpers.NewHttpHelper(nil, adminmiddleware.SettingsReader{}),
 		validators.NewIdentifierValidator(),
 	)
 	handler.ServeHTTP(rec, req)
@@ -145,7 +146,7 @@ func TestValidatePermissionPost_AWrappedRefusalStillReachesTheForm(t *testing.T)
 			rec := httptest.NewRecorder()
 
 			handler := HandleAdminResourceValidatePermissionPost(
-				handlerhelpers.NewHttpHelper(nil),
+				handlerhelpers.NewHttpHelper(nil, adminmiddleware.SettingsReader{}),
 				&wrappingIdentifierValidator{err: testCase.err},
 			)
 			handler.ServeHTTP(rec, req)

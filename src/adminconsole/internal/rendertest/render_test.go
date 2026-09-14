@@ -21,6 +21,7 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/handlers/adminclienthandlers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers/adminsettingshandlers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers/adminuserhandlers"
+	adminmiddleware "github.com/leodip/goiabada/adminconsole/internal/middleware"
 	"github.com/leodip/goiabada/adminconsole/internal/pagination"
 	web "github.com/leodip/goiabada/adminconsole/web"
 	"github.com/leodip/goiabada/core/api"
@@ -53,7 +54,7 @@ func render(t *testing.T, page string, bind map[string]interface{}) string {
 	req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings, settings))
 	req = i18n.RefineLocalizerWithUILocales(req, []string{"pt-BR"})
 
-	h := handlerhelpers.NewHttpHelper(web.TemplateFS())
+	h := handlerhelpers.NewHttpHelper(web.TemplateFS(), adminmiddleware.SettingsReader{})
 	buf, err := h.RenderTemplateToBuffer(req, "/layouts/menu_layout.html", page, bind)
 	require.NoErrorf(t, err, "render %s in pt-BR (template referenced data the bind lacks?)", page)
 
@@ -81,7 +82,7 @@ func TestRender_NotFoundPage(t *testing.T) {
 	req = i18n.RefineLocalizerWithUILocales(req, []string{"pt-BR"})
 
 	w := httptest.NewRecorder()
-	handlerhelpers.NewHttpHelper(web.TemplateFS()).NotFound(w, req)
+	handlerhelpers.NewHttpHelper(web.TemplateFS(), adminmiddleware.SettingsReader{}).NotFound(w, req)
 
 	res := w.Result()
 	defer func() { _ = res.Body.Close() }()

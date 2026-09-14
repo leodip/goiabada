@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
+	adminmiddleware "github.com/leodip/goiabada/adminconsole/internal/middleware"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/handlerhelpers"
@@ -121,7 +122,7 @@ func TestResourcePermissionsPost_ForwardsTheApisStatus(t *testing.T) {
 			router := chi.NewRouter()
 			router.Post("/admin/resources/{resourceId}/permissions",
 				HandleAdminResourcePermissionsPost(
-					handlerhelpers.NewHttpHelper(nil),
+					handlerhelpers.NewHttpHelper(nil, adminmiddleware.SettingsReader{}),
 					nil,
 					&savePermissionsApiClient{
 						resource:  &models.Resource{Id: 3},

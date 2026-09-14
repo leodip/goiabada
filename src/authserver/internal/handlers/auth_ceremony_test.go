@@ -8,6 +8,7 @@ import (
 
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
+	authmiddleware "github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/handlerhelpers"
 	mocks_handlerhelpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
@@ -153,7 +154,7 @@ func TestRejectAuthStateMismatch(t *testing.T) {
 				"layouts/no_menu_layout.html": `<html>{{template "content" .}}</html>`,
 				"auth_error.html":             `{{define "content"}}<h1>{{.title}}</h1><p>{{.error}}</p>{{end}}`,
 			},
-		})
+		}, authmiddleware.SettingsReader{})
 
 		rejectAuthStateMismatch(httpHelper, rr, req,
 			oauth.AuthStateLevel1Password, oauth.AuthStateLevel1PasswordCompleted)
@@ -178,7 +179,7 @@ func TestRejectAuthStateMismatch(t *testing.T) {
 				"layouts/no_menu_layout.html": `<html>{{template "content" .}}</html>`,
 				"auth_error.html":             `{{define "content"}}{{.title}}{{end}}`,
 			},
-		})
+		}, authmiddleware.SettingsReader{})
 
 		rejectAuthStateMismatch(httpHelper, rr, req,
 			oauth.AuthStateRequiresConsent, oauth.AuthStateInitial)
