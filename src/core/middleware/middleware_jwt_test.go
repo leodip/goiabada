@@ -37,11 +37,8 @@ func (m *mockHTTPClient) Do(req *http.Request) (*http.Response, error) {
 }
 
 func TestJwtAuthorizationHeaderToContext_ValidBearerToken(t *testing.T) {
-	const testSessionName = "test-session"
 	mockTokenParser := new(mock_oauth.TokenParser)
-	mockAuthHelper := new(mock_handler_helpers.AuthHelper)
-
-	middleware := NewMiddlewareJwt(nil, testSessionName, mockTokenParser, mockAuthHelper, stubErrorRenderer{}, nil, "http://localhost:9090", "http://localhost:9091", "", "")
+	middleware := NewMiddlewareBearerToken(mockTokenParser)
 
 	expectedToken := &oauth.JwtToken{
 		TokenBase64: "validtoken",
@@ -72,11 +69,8 @@ func TestJwtAuthorizationHeaderToContext_ValidBearerToken(t *testing.T) {
 }
 
 func TestJwtAuthorizationHeaderToContext_InvalidBearerToken(t *testing.T) {
-	const testSessionName = "test-session"
 	mockTokenParser := new(mock_oauth.TokenParser)
-	mockAuthHelper := new(mock_handler_helpers.AuthHelper)
-
-	middleware := NewMiddlewareJwt(nil, testSessionName, mockTokenParser, mockAuthHelper, stubErrorRenderer{}, nil, "http://localhost:9090", "http://localhost:9091", "", "")
+	middleware := NewMiddlewareBearerToken(mockTokenParser)
 
 	mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "invalidtoken", mock.Anything, true).
 		Return(nil, assert.AnError)
@@ -98,11 +92,8 @@ func TestJwtAuthorizationHeaderToContext_InvalidBearerToken(t *testing.T) {
 }
 
 func TestJwtAuthorizationHeaderToContext_NoBearerToken(t *testing.T) {
-	const testSessionName = "test-session"
 	mockTokenParser := new(mock_oauth.TokenParser)
-	mockAuthHelper := new(mock_handler_helpers.AuthHelper)
-
-	middleware := NewMiddlewareJwt(nil, testSessionName, mockTokenParser, mockAuthHelper, stubErrorRenderer{}, nil, "http://localhost:9090", "http://localhost:9091", "", "")
+	middleware := NewMiddlewareBearerToken(mockTokenParser)
 
 	req := httptest.NewRequest("GET", "/", nil)
 
@@ -118,11 +109,8 @@ func TestJwtAuthorizationHeaderToContext_NoBearerToken(t *testing.T) {
 }
 
 func TestJwtAuthorizationHeaderToContext_InvalidAuthorizationHeader(t *testing.T) {
-	const testSessionName = "test-session"
 	mockTokenParser := new(mock_oauth.TokenParser)
-	mockAuthHelper := new(mock_handler_helpers.AuthHelper)
-
-	middleware := NewMiddlewareJwt(nil, testSessionName, mockTokenParser, mockAuthHelper, stubErrorRenderer{}, nil, "http://localhost:9090", "http://localhost:9091", "", "")
+	middleware := NewMiddlewareBearerToken(mockTokenParser)
 
 	req := httptest.NewRequest("GET", "/", nil)
 	req.Header.Set("Authorization", "NotBearer token")
@@ -141,11 +129,8 @@ func TestJwtAuthorizationHeaderToContext_InvalidAuthorizationHeader(t *testing.T
 // Tests for POST body access_token extraction (OIDC Core 1.0 Section 5.3.1)
 
 func TestJwtAuthorizationHeaderToContext_ValidPostBodyToken(t *testing.T) {
-	const testSessionName = "test-session"
 	mockTokenParser := new(mock_oauth.TokenParser)
-	mockAuthHelper := new(mock_handler_helpers.AuthHelper)
-
-	middleware := NewMiddlewareJwt(nil, testSessionName, mockTokenParser, mockAuthHelper, stubErrorRenderer{}, nil, "http://localhost:9090", "http://localhost:9091", "", "")
+	middleware := NewMiddlewareBearerToken(mockTokenParser)
 
 	expectedToken := &oauth.JwtToken{
 		TokenBase64: "validposttoken",
@@ -176,11 +161,8 @@ func TestJwtAuthorizationHeaderToContext_ValidPostBodyToken(t *testing.T) {
 }
 
 func TestJwtAuthorizationHeaderToContext_InvalidPostBodyToken(t *testing.T) {
-	const testSessionName = "test-session"
 	mockTokenParser := new(mock_oauth.TokenParser)
-	mockAuthHelper := new(mock_handler_helpers.AuthHelper)
-
-	middleware := NewMiddlewareJwt(nil, testSessionName, mockTokenParser, mockAuthHelper, stubErrorRenderer{}, nil, "http://localhost:9090", "http://localhost:9091", "", "")
+	middleware := NewMiddlewareBearerToken(mockTokenParser)
 
 	mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "invalidposttoken", mock.Anything, true).
 		Return(nil, assert.AnError)
@@ -202,11 +184,8 @@ func TestJwtAuthorizationHeaderToContext_InvalidPostBodyToken(t *testing.T) {
 }
 
 func TestJwtAuthorizationHeaderToContext_HeaderTakesPrecedenceOverPostBody(t *testing.T) {
-	const testSessionName = "test-session"
 	mockTokenParser := new(mock_oauth.TokenParser)
-	mockAuthHelper := new(mock_handler_helpers.AuthHelper)
-
-	middleware := NewMiddlewareJwt(nil, testSessionName, mockTokenParser, mockAuthHelper, stubErrorRenderer{}, nil, "http://localhost:9090", "http://localhost:9091", "", "")
+	middleware := NewMiddlewareBearerToken(mockTokenParser)
 
 	expectedToken := &oauth.JwtToken{
 		TokenBase64: "headertoken",
@@ -239,11 +218,8 @@ func TestJwtAuthorizationHeaderToContext_HeaderTakesPrecedenceOverPostBody(t *te
 }
 
 func TestJwtAuthorizationHeaderToContext_PostBodyIgnoredForGetRequest(t *testing.T) {
-	const testSessionName = "test-session"
 	mockTokenParser := new(mock_oauth.TokenParser)
-	mockAuthHelper := new(mock_handler_helpers.AuthHelper)
-
-	middleware := NewMiddlewareJwt(nil, testSessionName, mockTokenParser, mockAuthHelper, stubErrorRenderer{}, nil, "http://localhost:9090", "http://localhost:9091", "", "")
+	middleware := NewMiddlewareBearerToken(mockTokenParser)
 
 	// GET request with access_token in query string should NOT extract the token
 	req := httptest.NewRequest("GET", "/userinfo?access_token=gettoken", nil)
@@ -273,11 +249,8 @@ func TestJwtAuthorizationHeaderToContext_PostBodyIgnoredForGetRequest(t *testing
 // The GET case above does not pin this: it is refused by the method check two branches earlier and
 // never reaches the read at all. This is the case that fails if the accessor regresses (#333).
 func TestJwtAuthorizationHeaderToContext_PostQueryTokenIgnored(t *testing.T) {
-	const testSessionName = "test-session"
 	mockTokenParser := new(mock_oauth.TokenParser)
-	mockAuthHelper := new(mock_handler_helpers.AuthHelper)
-
-	middleware := NewMiddlewareJwt(nil, testSessionName, mockTokenParser, mockAuthHelper, stubErrorRenderer{}, nil, "http://localhost:9090", "http://localhost:9091", "", "")
+	middleware := NewMiddlewareBearerToken(mockTokenParser)
 
 	// A genuine form submission whose body does not carry the token, with the token in the query.
 	req := httptest.NewRequest("POST", "/userinfo?access_token=querytoken", strings.NewReader("other_param=value"))
@@ -298,11 +271,8 @@ func TestJwtAuthorizationHeaderToContext_PostQueryTokenIgnored(t *testing.T) {
 }
 
 func TestJwtAuthorizationHeaderToContext_PostBodyIgnoredForWrongContentType(t *testing.T) {
-	const testSessionName = "test-session"
 	mockTokenParser := new(mock_oauth.TokenParser)
-	mockAuthHelper := new(mock_handler_helpers.AuthHelper)
-
-	middleware := NewMiddlewareJwt(nil, testSessionName, mockTokenParser, mockAuthHelper, stubErrorRenderer{}, nil, "http://localhost:9090", "http://localhost:9091", "", "")
+	middleware := NewMiddlewareBearerToken(mockTokenParser)
 
 	req := httptest.NewRequest("POST", "/userinfo", strings.NewReader("access_token=jsontoken"))
 	req.Header.Set("Content-Type", "application/json")
@@ -322,11 +292,8 @@ func TestJwtAuthorizationHeaderToContext_PostBodyIgnoredForWrongContentType(t *t
 }
 
 func TestJwtAuthorizationHeaderToContext_PostBodyEmptyAccessToken(t *testing.T) {
-	const testSessionName = "test-session"
 	mockTokenParser := new(mock_oauth.TokenParser)
-	mockAuthHelper := new(mock_handler_helpers.AuthHelper)
-
-	middleware := NewMiddlewareJwt(nil, testSessionName, mockTokenParser, mockAuthHelper, stubErrorRenderer{}, nil, "http://localhost:9090", "http://localhost:9091", "", "")
+	middleware := NewMiddlewareBearerToken(mockTokenParser)
 
 	req := httptest.NewRequest("POST", "/userinfo", strings.NewReader("access_token="))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -346,11 +313,8 @@ func TestJwtAuthorizationHeaderToContext_PostBodyEmptyAccessToken(t *testing.T) 
 }
 
 func TestJwtAuthorizationHeaderToContext_PostBodyNoAccessTokenParameter(t *testing.T) {
-	const testSessionName = "test-session"
 	mockTokenParser := new(mock_oauth.TokenParser)
-	mockAuthHelper := new(mock_handler_helpers.AuthHelper)
-
-	middleware := NewMiddlewareJwt(nil, testSessionName, mockTokenParser, mockAuthHelper, stubErrorRenderer{}, nil, "http://localhost:9090", "http://localhost:9091", "", "")
+	middleware := NewMiddlewareBearerToken(mockTokenParser)
 
 	req := httptest.NewRequest("POST", "/userinfo", strings.NewReader("other_param=value"))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -370,11 +334,8 @@ func TestJwtAuthorizationHeaderToContext_PostBodyNoAccessTokenParameter(t *testi
 }
 
 func TestJwtAuthorizationHeaderToContext_PostBodyContentTypeWithCharset(t *testing.T) {
-	const testSessionName = "test-session"
 	mockTokenParser := new(mock_oauth.TokenParser)
-	mockAuthHelper := new(mock_handler_helpers.AuthHelper)
-
-	middleware := NewMiddlewareJwt(nil, testSessionName, mockTokenParser, mockAuthHelper, stubErrorRenderer{}, nil, "http://localhost:9090", "http://localhost:9091", "", "")
+	middleware := NewMiddlewareBearerToken(mockTokenParser)
 
 	expectedToken := &oauth.JwtToken{
 		TokenBase64: "charsettoken",
@@ -403,11 +364,8 @@ func TestJwtAuthorizationHeaderToContext_PostBodyContentTypeWithCharset(t *testi
 }
 
 func TestJwtAuthorizationHeaderToContext_PostBodyWithOtherParameters(t *testing.T) {
-	const testSessionName = "test-session"
 	mockTokenParser := new(mock_oauth.TokenParser)
-	mockAuthHelper := new(mock_handler_helpers.AuthHelper)
-
-	middleware := NewMiddlewareJwt(nil, testSessionName, mockTokenParser, mockAuthHelper, stubErrorRenderer{}, nil, "http://localhost:9090", "http://localhost:9091", "", "")
+	middleware := NewMiddlewareBearerToken(mockTokenParser)
 
 	expectedToken := &oauth.JwtToken{
 		TokenBase64: "tokenwithotherparams",
@@ -436,11 +394,8 @@ func TestJwtAuthorizationHeaderToContext_PostBodyWithOtherParameters(t *testing.
 }
 
 func TestJwtAuthorizationHeaderToContext_EmptyBearerTokenInHeader(t *testing.T) {
-	const testSessionName = "test-session"
 	mockTokenParser := new(mock_oauth.TokenParser)
-	mockAuthHelper := new(mock_handler_helpers.AuthHelper)
-
-	middleware := NewMiddlewareJwt(nil, testSessionName, mockTokenParser, mockAuthHelper, stubErrorRenderer{}, nil, "http://localhost:9090", "http://localhost:9091", "", "")
+	middleware := NewMiddlewareBearerToken(mockTokenParser)
 
 	expectedToken := &oauth.JwtToken{
 		TokenBase64: "fallbacktoken",
@@ -471,11 +426,8 @@ func TestJwtAuthorizationHeaderToContext_EmptyBearerTokenInHeader(t *testing.T) 
 }
 
 func TestJwtAuthorizationHeaderToContext_PutRequestIgnoresPostBody(t *testing.T) {
-	const testSessionName = "test-session"
 	mockTokenParser := new(mock_oauth.TokenParser)
-	mockAuthHelper := new(mock_handler_helpers.AuthHelper)
-
-	middleware := NewMiddlewareJwt(nil, testSessionName, mockTokenParser, mockAuthHelper, stubErrorRenderer{}, nil, "http://localhost:9090", "http://localhost:9091", "", "")
+	middleware := NewMiddlewareBearerToken(mockTokenParser)
 
 	// PUT request should NOT extract token from body
 	req := httptest.NewRequest("PUT", "/userinfo", strings.NewReader("access_token=puttoken"))

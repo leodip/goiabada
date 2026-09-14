@@ -51,6 +51,15 @@ type ServerErrorRenderer interface {
 	InternalServerError(w http.ResponseWriter, r *http.Request, err error)
 }
 
+type MiddlewareBearerToken struct {
+	tokenParser tokenParser
+}
+
+// NewMiddlewareBearerToken constructs middleware that extracts bearer tokens from requests.
+func NewMiddlewareBearerToken(tokenParser tokenParser) *MiddlewareBearerToken {
+	return &MiddlewareBearerToken{tokenParser: tokenParser}
+}
+
 type MiddlewareJwt struct {
 	sessionStore      sessionstore.Store
 	sessionName       string
@@ -96,7 +105,7 @@ func NewMiddlewareJwt(
 // or from the POST body (access_token parameter) and stores it in the context.
 // Per RFC 6750, the Authorization header takes precedence over the POST body.
 // POST body token extraction is supported per OIDC Core 1.0 Section 5.3.1 for the UserInfo endpoint.
-func (m *MiddlewareJwt) JwtAuthorizationHeaderToContext() func(http.Handler) http.Handler {
+func (m *MiddlewareBearerToken) JwtAuthorizationHeaderToContext() func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()

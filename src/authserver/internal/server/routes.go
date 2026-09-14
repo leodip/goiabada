@@ -1,8 +1,6 @@
 package server
 
 import (
-	"net/http"
-
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
@@ -49,19 +47,8 @@ func (s *Server) initRoutes(root chi.Router) {
 	httpHelper := handlerhelpers.NewHttpHelper(s.templateFS, middleware.SettingsReader{})
 	authHelper := handlerhelpers.NewAuthHelper(s.sessionStore, constants.AuthServerSessionName, s.baseURL, s.adminConsoleBaseURL)
 
-	middlewareJwt := core_middleware.NewMiddlewareJwt(
-		s.sessionStore,
-		constants.AuthServerSessionName,
-		tokenParser,
-		authHelper,
-		httpHelper,
-		&http.Client{},
-		s.baseURL,
-		s.adminConsoleBaseURL,
-		"",
-		"",
-	)
-	authHeaderToContext := middlewareJwt.JwtAuthorizationHeaderToContext()
+	middlewareBearerToken := core_middleware.NewMiddlewareBearerToken(tokenParser)
+	authHeaderToContext := middlewareBearerToken.JwtAuthorizationHeaderToContext()
 
 	authServerConfig := config.GetAuthServer()
 	rateLimiter := middleware.NewRateLimiterMiddleware(
