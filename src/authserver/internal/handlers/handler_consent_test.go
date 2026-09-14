@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
+	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
@@ -134,7 +135,7 @@ func TestBuildScopeInfoArray(t *testing.T) {
 func TestHandleConsentGet(t *testing.T) {
 	t.Run("Error when getting AuthContext", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 
 		handler := HandleConsentGet(httpHelper, authHelper, database)
@@ -157,7 +158,7 @@ func TestHandleConsentGet(t *testing.T) {
 
 	t.Run("Unexpected AuthState", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 
 		handler := HandleConsentGet(httpHelper, authHelper, database)
@@ -180,7 +181,7 @@ func TestHandleConsentGet(t *testing.T) {
 
 	t.Run("User not found", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 
 		handler := HandleConsentGet(httpHelper, authHelper, database)
@@ -209,7 +210,7 @@ func TestHandleConsentGet(t *testing.T) {
 
 	t.Run("Client not found", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 
 		handler := HandleConsentGet(httpHelper, authHelper, database)
@@ -242,7 +243,7 @@ func TestHandleConsentGet(t *testing.T) {
 
 	t.Run("Successful consent page rendering", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 
 		handler := HandleConsentGet(httpHelper, authHelper, database)
@@ -299,7 +300,7 @@ func TestHandleConsentGet(t *testing.T) {
 
 	t.Run("Fully consented scopes, redirect to issue", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 
 		handler := HandleConsentGet(httpHelper, authHelper, database)
@@ -348,7 +349,7 @@ func TestHandleConsentGet(t *testing.T) {
 
 	t.Run("Partial consent, render consent page", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 
 		handler := HandleConsentGet(httpHelper, authHelper, database)
@@ -407,7 +408,7 @@ func TestHandleConsentGet(t *testing.T) {
 	// because the value has to be THIS ceremony's (#79 seam 4).
 	t.Run("The render names the ceremony", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 
 		handler := HandleConsentGet(httpHelper, authHelper, database)
@@ -451,7 +452,7 @@ func TestHandleConsentGet(t *testing.T) {
 func TestHandleConsentPost(t *testing.T) {
 	t.Run("Error when getting AuthContext", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
@@ -477,7 +478,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 	t.Run("Unexpected AuthState", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
@@ -571,7 +572,7 @@ func TestHandleConsentPost(t *testing.T) {
 		for _, tc := range staleCases {
 			t.Run(tc.name, func(t *testing.T) {
 				httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-				authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+				authHelper := mocks_handlers.NewAuthHelper(t)
 				database := mocks_data.NewDatabase(t)
 				auditLogger := mocks_audit.NewAuditLogger(t)
 
@@ -628,7 +629,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 	t.Run("User cancels consent", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		auditLogger := mocks_audit.NewAuditLogger(t)
@@ -677,7 +678,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 	t.Run("User cancels consent, failing clear - server_error to the client", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		auditLogger := mocks_audit.NewAuditLogger(t)
@@ -724,7 +725,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 	t.Run("User cancels consent, failing clear and an unusable form_post template - last-resort 500", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		auditLogger := mocks_audit.NewAuditLogger(t)
@@ -781,7 +782,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 	t.Run("User cancels consent, unusable form_post template - 500 when the refusal itself cannot be sent", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		auditLogger := mocks_audit.NewAuditLogger(t)
@@ -832,7 +833,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 	t.Run("User provides consent", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
@@ -894,7 +895,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 	t.Run("Partial consent given", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
@@ -966,7 +967,7 @@ func TestHandleConsentPost(t *testing.T) {
 	// it (#241 decision 3).
 	t.Run("A ticked scope the user no longer holds is not recorded", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
@@ -1054,7 +1055,7 @@ func TestHandleConsentPost(t *testing.T) {
 	// context save, so a call reaching any of them fails the case. That absence IS the assertion.
 	t.Run("The filter failing closed records nothing", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		permissionChecker := mocks_user.NewPermissionChecker(t)
@@ -1109,7 +1110,7 @@ func TestHandleConsentPost(t *testing.T) {
 	// emptied, which is not. Both are access_denied and the descriptions are what tell them apart.
 	t.Run("A selection the filter empties is refused, and says so differently", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		auditLogger := mocks_audit.NewAuditLogger(t)
@@ -1184,7 +1185,7 @@ func TestHandleConsentPost(t *testing.T) {
 	// and each of the two 500s deleted.
 	t.Run("A selection the filter empties, failing clear - server_error to the client", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		auditLogger := mocks_audit.NewAuditLogger(t)
@@ -1249,7 +1250,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 	t.Run("A selection the filter empties, failing clear and an unusable form_post template - last-resort 500", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		auditLogger := mocks_audit.NewAuditLogger(t)
@@ -1319,7 +1320,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 	t.Run("A selection the filter empties, unusable form_post template - 500 when the refusal itself cannot be sent", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		auditLogger := mocks_audit.NewAuditLogger(t)
@@ -1384,7 +1385,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 	t.Run("No consent given", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		auditLogger := mocks_audit.NewAuditLogger(t)
@@ -1438,7 +1439,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 	t.Run("No consent given, failing clear - server_error to the client", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		auditLogger := mocks_audit.NewAuditLogger(t)
@@ -1482,7 +1483,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 	t.Run("No consent given, failing clear and an unusable form_post template - last-resort 500", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		auditLogger := mocks_audit.NewAuditLogger(t)
@@ -1530,7 +1531,7 @@ func TestHandleConsentPost(t *testing.T) {
 
 	t.Run("No consent given, unusable form_post template - 500 when the refusal itself cannot be sent", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		auditLogger := mocks_audit.NewAuditLogger(t)
@@ -1797,7 +1798,7 @@ func TestHandleConsentPost(t *testing.T) {
 		for _, tc := range cases {
 			t.Run(tc.name, func(t *testing.T) {
 				httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-				authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+				authHelper := mocks_handlers.NewAuthHelper(t)
 				database := mocks_data.NewDatabase(t)
 				auditLogger := mocks_audit.NewAuditLogger(t)
 
@@ -1915,7 +1916,7 @@ func TestHandleConsentPost(t *testing.T) {
 	// what the now-deleted consent.Scope = "" blanking used to ensure (#79).
 	t.Run("Existing consent is replaced, not appended to", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 

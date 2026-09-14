@@ -226,6 +226,7 @@ var slogSpreadSites = []slogSpreadSite{
 // that the context is the request's, which is AssertAuditLogContext's rule over this same list.
 var slogRequestPathDirs = []string{
 	"authserver/internal/audit",
+	"authserver/internal/handlerhelpers",
 	"authserver/internal/handlers",
 	"authserver/internal/middleware",
 	"authserver/internal/apiresponse",

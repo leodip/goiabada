@@ -11,10 +11,10 @@ import (
 	"testing"
 
 	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
+	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
-	mocks_handlerhelpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -224,7 +224,7 @@ func TestUpdateClientNotOwningAuthenticationMode_AFailedAcquisitionDoesNotWrite(
 func TestHandleAPIClientAuthenticationPut_ClassifiesTheFlipAgainstTheRow(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_audit.NewAuditLogger(t)
-	authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+	authHelper := mocks_handlers.NewAuthHelper(t)
 
 	// The snapshot the handler works from: already public.
 	database.On("GetClientById", (*sql.Tx)(nil), int64(7)).
@@ -274,7 +274,7 @@ func TestHandleAPIClientAuthenticationPut_ClassifiesTheFlipAgainstTheRow(t *test
 func TestHandleAPIClientAuthenticationPut_AFailedClassificationRevokesNothingAndSavesNothing(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_audit.NewAuditLogger(t)
-	authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+	authHelper := mocks_handlers.NewAuthHelper(t)
 
 	database.On("GetClientById", (*sql.Tx)(nil), int64(7)).
 		Return(&models.Client{Id: 7, IsPublic: false, ClientSecretEncrypted: []byte("secret")}, nil).Once()
@@ -304,7 +304,7 @@ func TestHandleAPIClientAuthenticationPut_AFailedClassificationRevokesNothingAnd
 func TestHandleAPIClientAuthenticationPut_ASaveOfAnAlreadyPublicClientRevokesNothing(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_audit.NewAuditLogger(t)
-	authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+	authHelper := mocks_handlers.NewAuthHelper(t)
 
 	database.On("GetClientById", (*sql.Tx)(nil), int64(7)).
 		Return(&models.Client{Id: 7, IsPublic: true}, nil).Once()
@@ -375,7 +375,7 @@ func webOriginsPutRequest(t *testing.T, id string, origins []string) *http.Reque
 func TestHandleAPIClientWebOriginsPut_SavesInOneTransactionUnderTheRowAcquisition(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_audit.NewAuditLogger(t)
-	authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+	authHelper := mocks_handlers.NewAuthHelper(t)
 
 	client := &models.Client{Id: 7, AuthorizationCodeEnabled: false}
 	database.On("GetClientById", (*sql.Tx)(nil), int64(7)).Return(client, nil).Once()
@@ -424,7 +424,7 @@ func TestHandleAPIClientWebOriginsPut_SavesInOneTransactionUnderTheRowAcquisitio
 func TestHandleAPIClientWebOriginsPut_AFailedWriteCommitsNothing(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_audit.NewAuditLogger(t)
-	authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+	authHelper := mocks_handlers.NewAuthHelper(t)
 
 	database.On("GetClientById", (*sql.Tx)(nil), int64(7)).
 		Return(&models.Client{Id: 7, AuthorizationCodeEnabled: true}, nil).Once()
@@ -461,7 +461,7 @@ func TestHandleAPIClientWebOriginsPut_AFailedWriteCommitsNothing(t *testing.T) {
 func TestHandleAPIClientWebOriginsPut_AFailedLoadIsAnsweredAsALoadFailure(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_audit.NewAuditLogger(t)
-	authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+	authHelper := mocks_handlers.NewAuthHelper(t)
 
 	database.On("GetClientById", (*sql.Tx)(nil), int64(7)).
 		Return(&models.Client{Id: 7, AuthorizationCodeEnabled: true}, nil).Once()
@@ -496,7 +496,7 @@ func TestHandleAPIClientWebOriginsPut_AFailedLoadIsAnsweredAsALoadFailure(t *tes
 func TestHandleAPIClientWebOriginsPut_ARerunAttemptAnswersOnce(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_audit.NewAuditLogger(t)
-	authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+	authHelper := mocks_handlers.NewAuthHelper(t)
 
 	client := &models.Client{Id: 7, AuthorizationCodeEnabled: true}
 	database.On("GetClientById", (*sql.Tx)(nil), int64(7)).Return(client, nil).Once()
@@ -545,7 +545,7 @@ func TestHandleAPIClientWebOriginsPut_ARerunAttemptAnswersOnce(t *testing.T) {
 func TestHandleAPIClientWebOriginsPut_AnExhaustedRetryIsOneFiveHundred(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_audit.NewAuditLogger(t)
-	authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+	authHelper := mocks_handlers.NewAuthHelper(t)
 
 	database.On("GetClientById", (*sql.Tx)(nil), int64(7)).
 		Return(&models.Client{Id: 7, AuthorizationCodeEnabled: true}, nil).Once()
@@ -573,7 +573,7 @@ func TestHandleAPIClientWebOriginsPut_AnExhaustedRetryIsOneFiveHundred(t *testin
 func TestHandleAPIClientWebOriginsPut_AnOverlongOriginIsRefusedNotStored(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_audit.NewAuditLogger(t)
-	authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+	authHelper := mocks_handlers.NewAuthHelper(t)
 
 	database.On("GetClientById", (*sql.Tx)(nil), int64(7)).
 		Return(&models.Client{Id: 7, AuthorizationCodeEnabled: true}, nil).Once()

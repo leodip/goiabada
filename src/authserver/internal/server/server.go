@@ -17,13 +17,13 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	authhandlerhelpers "github.com/leodip/goiabada/authserver/internal/handlerhelpers"
 	authserver_middleware "github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/workers"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/errs"
-	"github.com/leodip/goiabada/core/handlerhelpers"
 	"github.com/leodip/goiabada/core/i18n"
 	custom_middleware "github.com/leodip/goiabada/core/middleware"
 )
@@ -309,7 +309,7 @@ func (s *Server) initMiddleware() chi.Router {
 	// AuthHelper. User-locale refinement happens per-handler in authserver
 	// (RefineLocalizerWithUser), since identity is established at handler
 	// scope rather than at middleware scope.
-	i18nAuthHelper := handlerhelpers.NewAuthHelper(s.sessionStore, constants.AuthServerSessionName, s.baseURL, s.adminConsoleBaseURL)
+	i18nAuthHelper := authhandlerhelpers.NewAuthHelper(s.sessionStore, constants.AuthServerSessionName)
 
 	app := s.router.With(
 		// Adds settings to the request context

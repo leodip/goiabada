@@ -27,7 +27,7 @@ func TestGetAuthContext(t *testing.T) {
 
 	t.Run("Success", func(t *testing.T) {
 		mockStore := mocks_sessionstore.NewStore(t)
-		helper := NewAuthHelper(mockStore, testSessionName, "http://localhost:9091", "http://localhost:9090")
+		helper := NewAuthHelper(mockStore, testSessionName)
 
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		sess := sessionstore.NewSession(mockStore, testSessionName)
@@ -46,7 +46,7 @@ func TestGetAuthContext(t *testing.T) {
 
 	t.Run("SessionError", func(t *testing.T) {
 		mockStore := mocks_sessionstore.NewStore(t)
-		helper := NewAuthHelper(mockStore, testSessionName, "http://localhost:9091", "http://localhost:9090")
+		helper := NewAuthHelper(mockStore, testSessionName)
 
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		mockStore.On("Get", req, testSessionName).Return(nil, assert.AnError)
@@ -60,7 +60,7 @@ func TestGetAuthContext(t *testing.T) {
 
 	t.Run("NoAuthContext", func(t *testing.T) {
 		mockStore := mocks_sessionstore.NewStore(t)
-		helper := NewAuthHelper(mockStore, testSessionName, "http://localhost:9091", "http://localhost:9090")
+		helper := NewAuthHelper(mockStore, testSessionName)
 
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		sess := sessionstore.NewSession(mockStore, testSessionName)
@@ -76,7 +76,7 @@ func TestGetAuthContext(t *testing.T) {
 
 	t.Run("UnmarshalError", func(t *testing.T) {
 		mockStore := mocks_sessionstore.NewStore(t)
-		helper := NewAuthHelper(mockStore, testSessionName, "http://localhost:9091", "http://localhost:9090")
+		helper := NewAuthHelper(mockStore, testSessionName)
 
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		sess := sessionstore.NewSession(mockStore, testSessionName)
@@ -94,7 +94,7 @@ func TestGetAuthContext(t *testing.T) {
 
 func TestGetLoggedInSubject(t *testing.T) {
 	const testSessionName = "test-session"
-	helper := NewAuthHelper(nil, testSessionName, "http://localhost:9091", "http://localhost:9090")
+	helper := NewAuthHelper(nil, testSessionName)
 
 	t.Run("Success", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -166,7 +166,7 @@ func TestSaveAuthContext(t *testing.T) {
 
 	t.Run("Success", func(t *testing.T) {
 		mockStore := mocks_sessionstore.NewStore(t)
-		helper := NewAuthHelper(mockStore, testSessionName, "http://localhost:9091", "http://localhost:9090")
+		helper := NewAuthHelper(mockStore, testSessionName)
 
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		w := httptest.NewRecorder()
@@ -185,7 +185,7 @@ func TestSaveAuthContext(t *testing.T) {
 
 	t.Run("SessionError", func(t *testing.T) {
 		mockStore := mocks_sessionstore.NewStore(t)
-		helper := NewAuthHelper(mockStore, testSessionName, "http://localhost:9091", "http://localhost:9090")
+		helper := NewAuthHelper(mockStore, testSessionName)
 
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		w := httptest.NewRecorder()
@@ -201,7 +201,7 @@ func TestSaveAuthContext(t *testing.T) {
 
 	t.Run("SaveError", func(t *testing.T) {
 		mockStore := mocks_sessionstore.NewStore(t)
-		helper := NewAuthHelper(mockStore, testSessionName, "http://localhost:9091", "http://localhost:9090")
+		helper := NewAuthHelper(mockStore, testSessionName)
 
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		w := httptest.NewRecorder()
@@ -252,7 +252,7 @@ func newRealStoreAuthHelper(t *testing.T) (*AuthHelper, *sessionstore.ServerSide
 		panic(err)
 	}
 
-	return NewAuthHelper(store, realStoreSessionName, realStoreBaseURL, realStoreBaseURL), store
+	return NewAuthHelper(store, realStoreSessionName), store
 }
 
 // requireSessionDecoded proves the session the browser holds on req decoded successfully, and must
@@ -325,7 +325,7 @@ func TestClearAuthContext(t *testing.T) {
 
 	t.Run("Success", func(t *testing.T) {
 		mockStore := mocks_sessionstore.NewStore(t)
-		helper := NewAuthHelper(mockStore, testSessionName, "http://localhost:9091", "http://localhost:9090")
+		helper := NewAuthHelper(mockStore, testSessionName)
 
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		w := httptest.NewRecorder()
@@ -344,7 +344,7 @@ func TestClearAuthContext(t *testing.T) {
 
 	t.Run("SessionError", func(t *testing.T) {
 		mockStore := mocks_sessionstore.NewStore(t)
-		helper := NewAuthHelper(mockStore, testSessionName, "http://localhost:9091", "http://localhost:9090")
+		helper := NewAuthHelper(mockStore, testSessionName)
 
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		w := httptest.NewRecorder()
@@ -359,7 +359,7 @@ func TestClearAuthContext(t *testing.T) {
 
 	t.Run("SaveError", func(t *testing.T) {
 		mockStore := mocks_sessionstore.NewStore(t)
-		helper := NewAuthHelper(mockStore, testSessionName, "http://localhost:9091", "http://localhost:9090")
+		helper := NewAuthHelper(mockStore, testSessionName)
 
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		w := httptest.NewRecorder()
@@ -503,4 +503,58 @@ func TestClearAuthContext(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, oauth.AuthStateReadyToIssueCode, authContext.AuthState)
 	})
+}
+
+func TestRegenerateSession_StoreWithoutRegeneratorIsNoOp(t *testing.T) {
+	mockStore := mocks_sessionstore.NewStore(t)
+	helper := NewAuthHelper(mockStore, "test-session")
+
+	err := helper.RegenerateSession(
+		httptest.NewRecorder(),
+		httptest.NewRequest(http.MethodPost, "/", nil),
+	)
+
+	require.NoError(t, err)
+	mockStore.AssertExpectations(t)
+}
+
+func TestUILocales(t *testing.T) {
+	const testSessionName = "test-session"
+
+	tests := []struct {
+		name        string
+		authContext *oauth.AuthContext
+		want        []string
+	}{
+		{
+			name:        "StoredTags",
+			authContext: &oauth.AuthContext{UILocales: []string{"pt-BR", "es"}},
+			want:        []string{"pt-BR", "es"},
+		},
+		{
+			name: "MissingContext",
+		},
+		{
+			name:        "EmptyTags",
+			authContext: &oauth.AuthContext{UILocales: []string{}},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockStore := mocks_sessionstore.NewStore(t)
+			helper := NewAuthHelper(mockStore, testSessionName)
+			req := httptest.NewRequest(http.MethodGet, "/", nil)
+			sess := sessionstore.NewSession(mockStore, testSessionName)
+			if tt.authContext != nil {
+				jsonData, err := json.Marshal(tt.authContext)
+				require.NoError(t, err)
+				sess.Values[constants.SessionKeyAuthContext] = string(jsonData)
+			}
+			mockStore.On("Get", req, testSessionName).Return(sess, nil)
+
+			assert.Equal(t, tt.want, helper.UILocales(req))
+			mockStore.AssertExpectations(t)
+		})
+	}
 }

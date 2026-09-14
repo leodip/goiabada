@@ -10,10 +10,10 @@ import (
 
 	"github.com/go-chi/chi/v5/middleware"
 	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
+	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/core/constants"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
 	"github.com/leodip/goiabada/core/enums"
-	mocks_handlerhelpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/testutil"
 	"github.com/stretchr/testify/assert"
@@ -70,7 +70,7 @@ func rotateRequest() *http.Request {
 func TestHandleAPISettingsKeysRotatePost_Success(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_audit.NewAuditLogger(t)
-	authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+	authHelper := mocks_handlers.NewAuthHelper(t)
 
 	const subject = "the-admin"
 
@@ -113,7 +113,7 @@ func TestHandleAPISettingsKeysRotatePost_Success(t *testing.T) {
 func TestHandleAPISettingsKeysRotatePost_RotationInProgress(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_audit.NewAuditLogger(t)
-	authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+	authHelper := mocks_handlers.NewAuthHelper(t)
 
 	stub := stubRotateRead(database, []models.KeyPair{
 		signingKey(2, enums.KeyStateCurrent),
@@ -146,7 +146,7 @@ func TestHandleAPISettingsKeysRotatePost_RotationInProgress(t *testing.T) {
 func TestHandleAPISettingsKeysRotatePost_KeySetIncomplete(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_audit.NewAuditLogger(t)
-	authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+	authHelper := mocks_handlers.NewAuthHelper(t)
 
 	stub := stubRotateRead(database, []models.KeyPair{
 		signingKey(1, enums.KeyStatePrevious),
@@ -187,7 +187,7 @@ func TestHandleAPISettingsKeysRotatePost_KeySetIncomplete(t *testing.T) {
 func TestHandleAPISettingsKeysRotatePost_InternalError(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_audit.NewAuditLogger(t)
-	authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+	authHelper := mocks_handlers.NewAuthHelper(t)
 
 	expectRunInTransaction(database, rotateTx)
 	database.On("GetAllSigningKeys", rotateTx).

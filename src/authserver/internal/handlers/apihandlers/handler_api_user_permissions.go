@@ -11,7 +11,6 @@ import (
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/errs"
-	"github.com/leodip/goiabada/core/handlerhelpers"
 	"github.com/leodip/goiabada/core/models"
 )
 
@@ -70,7 +69,7 @@ func HandleAPIUserPermissionsGet(
 
 func HandleAPIUserPermissionsPut(
 	database data.Database,
-	authHelper *handlerhelpers.AuthHelper,
+	authHelper handlers.AuthHelper,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

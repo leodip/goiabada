@@ -13,6 +13,7 @@ import (
 	"time"
 
 	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
+	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
 	mocks_handlerhelpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
 	mocks_oauth "github.com/leodip/goiabada/core/oauth/mocks"
@@ -40,7 +41,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		tokenParser := mocks_oauth.NewTokenParser(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
@@ -77,7 +78,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 	t.Run("Hintless GET carries the confirming POST's fields and never the hint", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		tokenParser := mocks_oauth.NewTokenParser(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
@@ -132,7 +133,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 			t.Run(tc.name, func(t *testing.T) {
 				httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 				httpSession := mocks_sessionstore.NewStore(t)
-				authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+				authHelper := mocks_handlers.NewAuthHelper(t)
 				database := mocks_data.NewDatabase(t)
 				tokenParser := mocks_oauth.NewTokenParser(t)
 				auditLogger := mocks_audit.NewAuditLogger(t)
@@ -167,7 +168,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 	t.Run("Hintless GET honours ui_locales", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		tokenParser := mocks_oauth.NewTokenParser(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
@@ -196,7 +197,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 	t.Run("A confirmed hint with no post_logout_redirect_uri still logs the user out", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		tokenParser := mocks_oauth.NewTokenParser(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
@@ -235,7 +236,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 	t.Run("A confirmed hint tears down per client and redirects", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		tokenParser := mocks_oauth.NewTokenParser(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
@@ -276,7 +277,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 	t.Run("A confirmed hint whose target is unregistered is declined, and the logout still happens", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		tokenParser := mocks_oauth.NewTokenParser(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
@@ -315,7 +316,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 	t.Run("A confirmed hint with no browser session tears down the session its sid names", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		tokenParser := mocks_oauth.NewTokenParser(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
@@ -346,7 +347,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 	t.Run("An expired hint whose session is still live is honoured in full", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		tokenParser := mocks_oauth.NewTokenParser(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
@@ -383,7 +384,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 	t.Run("A database fault while judging an expired hint is a 500", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		tokenParser := mocks_oauth.NewTokenParser(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
@@ -427,7 +428,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 	t.Run("A rejected hint reaches the consent page without its client_id", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		tokenParser := mocks_oauth.NewTokenParser(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
@@ -588,7 +589,7 @@ func TestHandleExistingSessionOnLogout(t *testing.T) {
 		r := &http.Request{}
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, "test-session").
 			Return(nil, errors.New("lookup exploded"))
@@ -605,7 +606,7 @@ func TestHandleExistingSessionOnLogout(t *testing.T) {
 		r := &http.Request{}
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, "test-session").Return(nil, nil)
 
@@ -627,7 +628,7 @@ func TestHandleExistingSessionOnLogout(t *testing.T) {
 		}
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 
 		userSession := &models.UserSession{
 			Id:     1,
@@ -674,7 +675,7 @@ func TestHandleExistingSessionOnLogout(t *testing.T) {
 		}
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 
 		userSession := &models.UserSession{
 			Id:     1,
@@ -716,7 +717,7 @@ func TestHandleExistingSessionOnLogout(t *testing.T) {
 		}
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 
 		userSession := &models.UserSession{
 			Id:     1,
@@ -849,7 +850,7 @@ func stubRegisteredURI(database *mocks_data.Database, client *models.Client, uri
 func stubPerClientTeardown(
 	database *mocks_data.Database,
 	auditLogger *mocks_audit.AuditLogger,
-	authHelper *mocks_handlerhelpers.AuthHelper,
+	authHelper *mocks_handlers.AuthHelper,
 	client *models.Client,
 	sessionIdentifier string,
 ) {
@@ -952,7 +953,7 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 	t.Run("Deletes the whole session and lands on the signed-out page", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		tokenParser := mocks_oauth.NewTokenParser(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
@@ -1003,7 +1004,7 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 	t.Run("client_id plus a registered URI redirects, with exactly one state and no sid", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		tokenParser := mocks_oauth.NewTokenParser(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
@@ -1304,7 +1305,7 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 			t.Run(tc.name, func(t *testing.T) {
 				httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 				httpSession := mocks_sessionstore.NewStore(t)
-				authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+				authHelper := mocks_handlers.NewAuthHelper(t)
 				database := mocks_data.NewDatabase(t)
 				tokenParser := mocks_oauth.NewTokenParser(t)
 				auditLogger := mocks_audit.NewAuditLogger(t)
@@ -1388,7 +1389,7 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 			t.Run(tc.name, func(t *testing.T) {
 				httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 				httpSession := mocks_sessionstore.NewStore(t)
-				authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+				authHelper := mocks_handlers.NewAuthHelper(t)
 				database := mocks_data.NewDatabase(t)
 				tokenParser := mocks_oauth.NewTokenParser(t)
 				auditLogger := mocks_audit.NewAuditLogger(t)
@@ -1444,7 +1445,7 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 			t.Run(tc.name, func(t *testing.T) {
 				httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 				httpSession := mocks_sessionstore.NewStore(t)
-				authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+				authHelper := mocks_handlers.NewAuthHelper(t)
 				database := mocks_data.NewDatabase(t)
 				tokenParser := mocks_oauth.NewTokenParser(t)
 				auditLogger := mocks_audit.NewAuditLogger(t)
@@ -1488,7 +1489,7 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 	t.Run("ui_locales in the body only renders the signed-out page in that locale", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		tokenParser := mocks_oauth.NewTokenParser(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
@@ -1524,7 +1525,7 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 	t.Run("ui_locales in the body only reaches a hinted POST's render", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		tokenParser := mocks_oauth.NewTokenParser(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
@@ -1571,7 +1572,7 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 	t.Run("A POST whose hint is rejected is sent to the GET binding", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		tokenParser := mocks_oauth.NewTokenParser(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
@@ -1636,7 +1637,7 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 			t.Run(tc.name, func(t *testing.T) {
 				httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 				httpSession := mocks_sessionstore.NewStore(t)
-				authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+				authHelper := mocks_handlers.NewAuthHelper(t)
 				database := mocks_data.NewDatabase(t)
 				tokenParser := mocks_oauth.NewTokenParser(t)
 				auditLogger := mocks_audit.NewAuditLogger(t)
@@ -1671,7 +1672,7 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 	t.Run("Session store error", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		tokenParser := mocks_oauth.NewTokenParser(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
@@ -1706,7 +1707,7 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 	t.Run("Session save error", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		tokenParser := mocks_oauth.NewTokenParser(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
