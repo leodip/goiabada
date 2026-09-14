@@ -15,10 +15,22 @@ import (
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/mocks"
-	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+type stubSettingsReader struct {
+	settings LayoutSettings
+	panic    bool
+}
+
+func (s stubSettingsReader) LayoutSettings(context.Context) LayoutSettings {
+	if s.panic {
+		panic("settings are absent")
+	}
+	return s.settings
+}
 
 // assertNoStore requires the two cache header fields every rendered page carries. Read off
 // http.Response.Header, which is the snapshot the client receives, rather than the recorder's
@@ -37,17 +49,10 @@ func TestInternalServerError(t *testing.T) {
 			"error.html":                  "{{define \"content\"}}Error: {{.requestId}}{{end}}",
 		},
 	}
-	httpHelper := NewHttpHelper(templateFS)
+	httpHelper := NewHttpHelper(templateFS, stubSettingsReader{})
 
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
-	r.Use(func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ctx := r.Context()
-			ctx = context.WithValue(ctx, constants.ContextKeySettings, &models.Settings{})
-			next.ServeHTTP(w, r.WithContext(ctx))
-		})
-	})
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		httpHelper.InternalServerError(w, r, errors.New("test error"))
 	})
@@ -90,16 +95,10 @@ func TestNotFound(t *testing.T) {
 			"layouts/no_menu_layout.html": "<html>{{template \"content\" .}}</html>",
 			"not_found.html":              "{{define \"content\"}}Not found{{end}}",
 		},
-	})
+	}, stubSettingsReader{})
 
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
-	r.Use(func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ctx := context.WithValue(r.Context(), constants.ContextKeySettings, &models.Settings{})
-			next.ServeHTTP(w, r.WithContext(ctx))
-		})
-	})
 	r.Get("/admin/clients/{clientId}/settings", func(w http.ResponseWriter, r *http.Request) {
 		httpHelper.NotFound(w, r)
 	})
@@ -131,16 +130,10 @@ func TestNotFound_RenderFailureAnswers500(t *testing.T) {
 			"layouts/no_menu_layout.html": "<html>{{template \"content\" .}}</html>",
 			"error.html":                  "{{define \"content\"}}Error: {{.requestId}}{{end}}",
 		},
-	})
+	}, stubSettingsReader{})
 
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
-	r.Use(func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ctx := context.WithValue(r.Context(), constants.ContextKeySettings, &models.Settings{})
-			next.ServeHTTP(w, r.WithContext(ctx))
-		})
-	})
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		httpHelper.NotFound(w, r)
 	})
@@ -162,15 +155,11 @@ func TestRenderTemplate(t *testing.T) {
 			"page.html":           "{{define \"content\"}}Hello, {{.Name}}! Status: {{._httpStatus}}{{end}}",
 		},
 	}
-	httpHelper := NewHttpHelper(templateFS)
+	httpHelper := NewHttpHelper(templateFS, stubSettingsReader{})
 
 	t.Run("Without _httpStatus", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/", nil)
 		w := httptest.NewRecorder()
-
-		ctx := req.Context()
-		ctx = context.WithValue(ctx, constants.ContextKeySettings, &models.Settings{AppName: "TestApp", UITheme: "light"})
-		req = req.WithContext(ctx)
 
 		data := map[string]interface{}{
 			"Name": "John",
@@ -192,10 +181,6 @@ func TestRenderTemplate(t *testing.T) {
 	t.Run("With _httpStatus", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/", nil)
 		w := httptest.NewRecorder()
-
-		ctx := req.Context()
-		ctx = context.WithValue(ctx, constants.ContextKeySettings, &models.Settings{AppName: "TestApp", UITheme: "light"})
-		req = req.WithContext(ctx)
 
 		data := map[string]interface{}{
 			"Name":        "Jane",
@@ -222,14 +207,10 @@ func TestRenderTemplate(t *testing.T) {
 	// response this function never wrote a body for (#247).
 	t.Run("A failed render writes no headers at all", func(t *testing.T) {
 		emptyFS := &mocks.TestFS{FileContents: map[string]string{}}
-		failing := NewHttpHelper(emptyFS)
+		failing := NewHttpHelper(emptyFS, stubSettingsReader{})
 
 		req := httptest.NewRequest("GET", "/", nil)
 		w := httptest.NewRecorder()
-
-		ctx := req.Context()
-		ctx = context.WithValue(ctx, constants.ContextKeySettings, &models.Settings{AppName: "TestApp", UITheme: "light"})
-		req = req.WithContext(ctx)
 
 		err := failing.RenderTemplate(w, req, "layouts/layout.html", "page.html", map[string]interface{}{})
 
@@ -251,14 +232,10 @@ func TestRenderTemplateToBuffer(t *testing.T) {
 			"page.html":           "{{define \"content\"}}Hello, {{if .loggedInUser}}{{.loggedInUser.Username}}{{else}}Guest{{end}}!{{end}}",
 		},
 	}
-	httpHelper := NewHttpHelper(templateFS)
+	httpHelper := NewHttpHelper(templateFS, stubSettingsReader{})
 
 	t.Run("Without ID Token", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/", nil)
-		ctx := req.Context()
-		ctx = context.WithValue(ctx, constants.ContextKeySettings, &models.Settings{AppName: "TestApp", UITheme: "light"})
-		req = req.WithContext(ctx)
-
 		data := map[string]interface{}{}
 
 		buf, err := httpHelper.RenderTemplateToBuffer(req, "layouts/layout.html", "page.html", data)
@@ -271,7 +248,6 @@ func TestRenderTemplateToBuffer(t *testing.T) {
 	t.Run("With ID Token", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/", nil)
 		ctx := req.Context()
-		ctx = context.WithValue(ctx, constants.ContextKeySettings, &models.Settings{AppName: "TestApp", UITheme: "light"})
 
 		// Mock JwtInfo with ID Token
 		jwtInfo := oauth.JwtInfo{
@@ -294,11 +270,38 @@ func TestRenderTemplateToBuffer(t *testing.T) {
 		// With ID token containing "name" claim, it should render that name
 		assert.Contains(t, buf.String(), "Hello, Guest!")
 	})
+
+	t.Run("Layout settings reach the template", func(t *testing.T) {
+		templateFS := &mocks.TestFS{FileContents: map[string]string{
+			"layouts/layout.html": "<html>{{template \"content\" .}}</html>",
+			"page.html":           "{{define \"content\"}}{{.appName}}|{{.uiTheme}}|{{.smtpEnabled}}{{end}}",
+		}}
+		httpHelper := NewHttpHelper(templateFS, stubSettingsReader{settings: LayoutSettings{
+			AppName:     "sentinel app",
+			UITheme:     "sentinel theme",
+			SMTPEnabled: true,
+		}})
+
+		buf, err := httpHelper.RenderTemplateToBuffer(
+			httptest.NewRequest("GET", "/", nil), "layouts/layout.html", "page.html", map[string]interface{}{})
+
+		require.NoError(t, err)
+		assert.Equal(t, "<html>sentinel app|sentinel theme|true</html>", buf.String())
+	})
+
+	t.Run("A settings reader panic is propagated", func(t *testing.T) {
+		httpHelper := NewHttpHelper(templateFS, stubSettingsReader{panic: true})
+
+		require.Panics(t, func() {
+			_, _ = httpHelper.RenderTemplateToBuffer(
+				httptest.NewRequest("GET", "/", nil), "layouts/layout.html", "page.html", map[string]interface{}{})
+		})
+	})
 }
 
 func TestJsonError(t *testing.T) {
 	templateFS := &mocks.TestFS{}
-	httpHelper := NewHttpHelper(templateFS)
+	httpHelper := NewHttpHelper(templateFS, stubSettingsReader{})
 
 	req := httptest.NewRequest("GET", "/", nil)
 	w := httptest.NewRecorder()
@@ -323,7 +326,7 @@ func TestJsonError(t *testing.T) {
 
 func TestEncodeJson(t *testing.T) {
 	templateFS := &mocks.TestFS{}
-	httpHelper := NewHttpHelper(templateFS)
+	httpHelper := NewHttpHelper(templateFS, stubSettingsReader{})
 
 	req := httptest.NewRequest("GET", "/", nil)
 	w := httptest.NewRecorder()
@@ -343,7 +346,7 @@ func TestEncodeJson(t *testing.T) {
 
 func TestGetFromUrlQueryOrFormPost(t *testing.T) {
 	templateFS := &mocks.TestFS{}
-	httpHelper := NewHttpHelper(templateFS)
+	httpHelper := NewHttpHelper(templateFS, stubSettingsReader{})
 
 	t.Run("Get from URL query", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/?key=value", nil)
@@ -363,7 +366,7 @@ func TestGetFromUrlQueryOrFormPost(t *testing.T) {
 
 func TestLookupFromUrlQueryOrFormPost(t *testing.T) {
 	templateFS := &mocks.TestFS{}
-	httpHelper := NewHttpHelper(templateFS)
+	httpHelper := NewHttpHelper(templateFS, stubSettingsReader{})
 
 	// postForm builds a form-encoded POST, optionally with a query string of its own.
 	postForm := func(target string, body string) *http.Request {

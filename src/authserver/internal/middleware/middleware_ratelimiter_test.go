@@ -97,7 +97,7 @@ func newTestMiddleware(authHelper AuthHelper, enabled bool) *RateLimiterMiddlewa
 
 func newAuditedTestMiddleware(authHelper AuthHelper, enabled bool) (*RateLimiterMiddleware, *stubAuditLogger) {
 	audit := &stubAuditLogger{}
-	return NewRateLimiterMiddleware(authHelper, handlerhelpers.NewHttpHelper(testTemplateFS), audit, enabled), audit
+	return NewRateLimiterMiddleware(authHelper, handlerhelpers.NewHttpHelper(testTemplateFS, SettingsReader{}), audit, enabled), audit
 }
 
 // limiterRequest builds the request a limited route actually receives. Settings are on the

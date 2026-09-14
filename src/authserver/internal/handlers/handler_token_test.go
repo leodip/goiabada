@@ -18,6 +18,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
+	authmiddleware "github.com/leodip/goiabada/authserver/internal/middleware"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
 	mocks_handlerhelpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
 	mocks_oauth "github.com/leodip/goiabada/core/oauth/mocks"
@@ -1952,7 +1953,7 @@ func TestJsonErrorConformed_GenericErrorCarriesNoForbiddenByte(t *testing.T) {
 	r := requestWithAdoptedRequestId(t, "caller\U0001F4A3id\"x\\yаб")
 	rec := httptest.NewRecorder()
 
-	jsonErrorConformed(handlerhelpers.NewHttpHelper(nil), rec, r, errors.New("malformed form body"))
+	jsonErrorConformed(handlerhelpers.NewHttpHelper(nil, authmiddleware.SettingsReader{}), rec, r, errors.New("malformed form body"))
 
 	assert.Equal(t, http.StatusInternalServerError, rec.Code)
 	assert.Equal(t, "application/json", rec.Header().Get("Content-Type"))
@@ -1984,10 +1985,10 @@ func TestJsonErrorConformed_GenericDescriptionMatchesSharedWriter(t *testing.T) 
 	err := errors.New("something the token endpoint did not expect")
 
 	fromSharedWriter := httptest.NewRecorder()
-	handlerhelpers.NewHttpHelper(nil).JsonError(fromSharedWriter, r, err)
+	handlerhelpers.NewHttpHelper(nil, authmiddleware.SettingsReader{}).JsonError(fromSharedWriter, r, err)
 
 	fromBoundary := httptest.NewRecorder()
-	jsonErrorConformed(handlerhelpers.NewHttpHelper(nil), fromBoundary, r, err)
+	jsonErrorConformed(handlerhelpers.NewHttpHelper(nil, authmiddleware.SettingsReader{}), fromBoundary, r, err)
 
 	assert.Equal(t, fromSharedWriter.Body.String(), fromBoundary.Body.String(),
 		"the boundary's generic answer must be byte-identical to the shared writer's; "+

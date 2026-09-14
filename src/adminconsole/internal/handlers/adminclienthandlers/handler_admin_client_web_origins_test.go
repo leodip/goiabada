@@ -11,6 +11,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
+	adminmiddleware "github.com/leodip/goiabada/adminconsole/internal/middleware"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/handlerhelpers"
@@ -187,7 +188,7 @@ func TestHandleAdminClientWebOriginsPost_APIRefusalReachesTheBrowser(t *testing.
 
 			// The real helper rather than a mock, so the assertions are on the bytes the
 			// browser receives. templateFS is nil because JsonError renders no template.
-			httpHelper := handlerhelpers.NewHttpHelper(nil)
+			httpHelper := handlerhelpers.NewHttpHelper(nil, adminmiddleware.SettingsReader{})
 
 			body := `{"clientId":1,"webOrigins":["https://[2001:db8::1]"]}`
 			req := httptest.NewRequest(http.MethodPost, "/admin/clients/1/web-origins",
