@@ -38,9 +38,8 @@ type Server struct {
 	templateFS fs.FS
 
 	// Config fields
-	baseURL             string
-	adminConsoleBaseURL string
-	setCookieSecure     bool
+	baseURL         string
+	setCookieSecure bool
 }
 
 func NewServer(router *chi.Mux, database data.Database, sessionStore sessionstore.Store) *Server {
@@ -52,9 +51,8 @@ func NewServer(router *chi.Mux, database data.Database, sessionStore sessionstor
 		worker:       workers.NewWorker(database),
 
 		// Config fields
-		baseURL:             config.GetAuthServer().BaseURL,
-		adminConsoleBaseURL: config.GetAdminConsole().BaseURL,
-		setCookieSecure:     config.GetAuthServer().IsCookieSecure(),
+		baseURL:         config.GetAuthServer().BaseURL,
+		setCookieSecure: config.GetAuthServer().IsCookieSecure(),
 	}
 
 	if envVar := config.GetAuthServer().StaticDir; len(envVar) == 0 {
