@@ -10,6 +10,11 @@ import (
 
 type SettingsReader struct{}
 
+func (SettingsReader) Issuer(ctx context.Context) string {
+	settings := ctx.Value(constants.ContextKeySettings).(*models.Settings)
+	return settings.Issuer
+}
+
 func (SettingsReader) LayoutSettings(ctx context.Context) handlerhelpers.LayoutSettings {
 	settings := ctx.Value(constants.ContextKeySettings).(*models.Settings)
 	return handlerhelpers.LayoutSettings{

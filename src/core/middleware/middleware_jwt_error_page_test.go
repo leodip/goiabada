@@ -9,14 +9,13 @@ import (
 
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/i18n"
-	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	mock_handler_helpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
+	mock_middleware "github.com/leodip/goiabada/core/middleware/mocks"
 	mock_oauth "github.com/leodip/goiabada/core/oauth/mocks"
 	mock_sessionstore "github.com/leodip/goiabada/core/sessionstore/mocks"
 )
@@ -66,7 +65,7 @@ func TestMiddlewareJwt_ServerErrorsRenderThePageAndKeepTheCauseOutOfTheResponse(
 				store.On("Get", mock.Anything, sessionName).Return(nil, assert.AnError)
 
 				m := NewMiddlewareJwt(store, sessionName, new(mock_oauth.TokenParser),
-					new(mock_handler_helpers.AuthHelper), rec, nil,
+					stubIssuerReader{issuer: "https://this-deployment.example"}, new(mock_middleware.AuthHelper), rec, nil,
 					"http://localhost:9090", "http://localhost:9091", "", "")
 
 				return m.JwtSessionHandler()(mustNotRun(t)), httptest.NewRequest(http.MethodGet, "/", nil)
@@ -82,7 +81,7 @@ func TestMiddlewareJwt_ServerErrorsRenderThePageAndKeepTheCauseOutOfTheResponse(
 				}, nil)
 
 				m := NewMiddlewareJwt(store, sessionName, new(mock_oauth.TokenParser),
-					new(mock_handler_helpers.AuthHelper), rec, nil,
+					stubIssuerReader{issuer: "https://this-deployment.example"}, new(mock_middleware.AuthHelper), rec, nil,
 					"http://localhost:9090", "http://localhost:9091", "", "")
 
 				return m.JwtSessionHandler()(mustNotRun(t)), httptest.NewRequest(http.MethodGet, "/", nil)
@@ -107,7 +106,7 @@ func TestMiddlewareJwt_ServerErrorsRenderThePageAndKeepTheCauseOutOfTheResponse(
 					Return(nil, assert.AnError)
 
 				m := NewMiddlewareJwt(store, sessionName, parser,
-					new(mock_handler_helpers.AuthHelper), rec, nil,
+					stubIssuerReader{issuer: "https://this-deployment.example"}, new(mock_middleware.AuthHelper), rec, nil,
 					"http://localhost:9090", "http://localhost:9091", "", "")
 
 				return m.JwtSessionHandler()(mustNotRun(t)), httptest.NewRequest(http.MethodGet, "/", nil)
@@ -139,12 +138,10 @@ func TestMiddlewareJwt_ServerErrorsRenderThePageAndKeepTheCauseOutOfTheResponse(
 					}, nil)
 
 				m := NewMiddlewareJwt(store, sessionName, parser,
-					new(mock_handler_helpers.AuthHelper), rec, nil,
+					stubIssuerReader{issuer: "https://this-deployment.example"}, new(mock_middleware.AuthHelper), rec, nil,
 					"http://localhost:9090", "http://localhost:9091", "", "")
 
 				req := httptest.NewRequest(http.MethodGet, "/", nil)
-				req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings,
-					&models.Settings{Issuer: "https://this-deployment.example"}))
 
 				return m.JwtSessionHandler()(mustNotRun(t)), req
 			},
@@ -154,7 +151,7 @@ func TestMiddlewareJwt_ServerErrorsRenderThePageAndKeepTheCauseOutOfTheResponse(
 			wantCause: "unable to cast the context value to JwtInfo",
 			build: func(t *testing.T, rec *recordingErrorRenderer) (http.Handler, *http.Request) {
 				m := NewMiddlewareJwt(new(mock_sessionstore.Store), sessionName,
-					new(mock_oauth.TokenParser), new(mock_handler_helpers.AuthHelper), rec, nil,
+					new(mock_oauth.TokenParser), stubIssuerReader{issuer: "https://this-deployment.example"}, new(mock_middleware.AuthHelper), rec, nil,
 					"http://localhost:9090", "http://localhost:9091", "", "")
 
 				req := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -170,7 +167,7 @@ func TestMiddlewareJwt_ServerErrorsRenderThePageAndKeepTheCauseOutOfTheResponse(
 			build: func(t *testing.T, rec *recordingErrorRenderer) (http.Handler, *http.Request) {
 				jwtInfo := oauth.JwtInfo{}
 
-				helper := new(mock_handler_helpers.AuthHelper)
+				helper := new(mock_middleware.AuthHelper)
 				helper.On("IsAuthorizedToAccessResource", jwtInfo, []string{"required:scope"}).Return(false)
 				helper.On("IsAuthenticated", jwtInfo).Return(false)
 				helper.On("RedirToAuthorize", mock.Anything, mock.Anything,
@@ -178,7 +175,7 @@ func TestMiddlewareJwt_ServerErrorsRenderThePageAndKeepTheCauseOutOfTheResponse(
 					mock.AnythingOfType("string")).Return(assert.AnError)
 
 				m := NewMiddlewareJwt(new(mock_sessionstore.Store), sessionName,
-					new(mock_oauth.TokenParser), helper, rec, nil,
+					new(mock_oauth.TokenParser), stubIssuerReader{issuer: "https://this-deployment.example"}, helper, rec, nil,
 					"http://localhost:9090", "http://localhost:9091",
 					constants.AdminConsoleClientIdentifier, "")
 

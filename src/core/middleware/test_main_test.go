@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"net/http"
 	"os"
 	"testing"
@@ -28,6 +29,14 @@ func TestMain(m *testing.M) {
 // started rendering a page. Stateless on purpose, so one value is safe to share
 // across every construction in this package; a test that needs to see the error
 // itself declares a recording renderer of its own.
+type stubIssuerReader struct {
+	issuer string
+}
+
+func (s stubIssuerReader) Issuer(context.Context) string {
+	return s.issuer
+}
+
 type stubErrorRenderer struct{}
 
 func (stubErrorRenderer) InternalServerError(w http.ResponseWriter, r *http.Request, _ error) {
