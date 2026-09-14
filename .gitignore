@@ -19,9 +19,6 @@
 tmp/
 .devdata/
 
-# Agent review mailbox (throwaway ping-pong between Claude Code and Codex)
-.review/
-
 # Go workspace file
 go.work
 
@@ -428,25 +425,19 @@ src/todo.txt
 .playwright-mcp/
 
 
-# Working documents. /leo-spec and /leo-run write agreement documents under
-# docs/issue-<n>-<slug>/, and design and planning documents live here too. All
-# of it is the working memory of a piece of work, deliberately not pushed: the
-# pull request body carries the narrative, the filed issues carry the
-# follow-ups, and the code comments carry the reasoning that constrains future
-# edits. A plan left in the repo after it has been executed invites drift from
-# the thing it describes, and a reader finding both has no way to tell which is
-# true. Anything already pushed stays in git history.
+# /docs/ and .review/ were excluded here until 2026-09-14. Both held the working
+# memory of a piece of work -- the agreement /leo-spec writes, and the mailbox,
+# state and transcript of the run that executes it -- and both have moved out of
+# the repository entirely, into one untracked folder per issue under $LEO_WORK_DIR.
+# Nothing writes either path now, so there is nothing left to ignore.
 #
-# The leading slash anchors the rule to the repository root, and it has to stay.
-# A bare `docs/` has no slash of its own, so git applies it at every directory
-# level: it also excluded site/src/content/docs/, the entire content tree of the
-# documentation site, which made every new page silently unstageable (issue
-# #191).
-#
-# To track something here later, change this to `/docs/*` and add a negation:
-# git does not descend into an excluded directory, so `!/docs/keep.md` has no
-# effect while the directory itself is excluded.
-/docs/
+# Two things learned here that are worth keeping, should anything be excluded at
+# the root again. A root rule needs its leading slash: a bare `docs/` has no slash
+# of its own, so git applies it at every directory level, and it also excluded
+# site/src/content/docs/ -- the whole content tree of the documentation site --
+# which made every new page silently unstageable (issue #191). And an excluded
+# directory cannot be re-entered: git does not descend into one, so `!/docs/keep.md`
+# has no effect unless the rule itself is written as `/docs/*`.
 
 # Build outputs of the setup wizard. cmd/goiabada-setup is a `main` package, so
 # a plain `go build ./...` inside it writes to
