@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/core/customerrors"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
 	mocks_handlerhelpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
@@ -33,7 +34,7 @@ func TestSlogConvention_AHandlerRecordCarriesTheRequestIdWithoutNamingIt(t *test
 	logs := testutil.CaptureSlog(t)
 
 	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-	authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+	authHelper := mocks_handlers.NewAuthHelper(t)
 	database := mocks_data.NewDatabase(t)
 
 	// The missing auth context is the shortest path from a request to a record: no database,

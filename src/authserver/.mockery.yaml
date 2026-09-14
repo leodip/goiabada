@@ -42,8 +42,8 @@ packages:
           pkgname: "mocks_communication"
       AuthHelper:
         config:
-          dir: "../core/handlerhelpers/mocks"
-          pkgname: "mocks_handler_helpers"
+          dir: "./internal/handlers/mocks"
+          pkgname: "mocks_handlers"
       HttpHelper:
         config:
           dir: "../core/handlerhelpers/mocks"

@@ -23,6 +23,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
+	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/web"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
 	mocks_handlerhelpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
@@ -64,7 +65,7 @@ func armIssueGate(database *mocks_data.Database, userSessionManager *mocks_user.
 func TestHandleIssueGet(t *testing.T) {
 	t.Run("Error when getting GetAuthContext", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
 		codeIssuer := mocks_oauth.NewCodeIssuer(t)
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
@@ -95,7 +96,7 @@ func TestHandleIssueGet(t *testing.T) {
 
 	t.Run("Unexpected AuthState", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
 		codeIssuer := mocks_oauth.NewCodeIssuer(t)
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
@@ -128,7 +129,7 @@ func TestHandleIssueGet(t *testing.T) {
 
 	t.Run("Successfully issues a code", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
 		codeIssuer := mocks_oauth.NewCodeIssuer(t)
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
@@ -220,7 +221,7 @@ func TestHandleIssueGet(t *testing.T) {
 	// forbids UI cannot be sent to a password form.
 	t.Run("No session identifier in the context, restarts level 1", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
 		codeIssuer := mocks_oauth.NewCodeIssuer(t)
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
@@ -277,7 +278,7 @@ func TestHandleIssueGet(t *testing.T) {
 
 	t.Run("Session identifier resolves to no session, restarts level 1", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
 		codeIssuer := mocks_oauth.NewCodeIssuer(t)
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
@@ -327,7 +328,7 @@ func TestHandleIssueGet(t *testing.T) {
 
 	t.Run("No session and prompt=none, returns login_required to the client", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
 		codeIssuer := mocks_oauth.NewCodeIssuer(t)
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
@@ -401,7 +402,7 @@ func TestHandleIssueGet(t *testing.T) {
 
 	t.Run("No session and prompt=none, failing clear - server_error to the client", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
 		codeIssuer := mocks_oauth.NewCodeIssuer(t)
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
@@ -461,7 +462,7 @@ func TestHandleIssueGet(t *testing.T) {
 
 	t.Run("No session and prompt=none, failing clear and an unusable form_post template - last-resort 500", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		codeIssuer := mocks_oauth.NewCodeIssuer(t)
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
@@ -520,7 +521,7 @@ func TestHandleIssueGet(t *testing.T) {
 
 	t.Run("No session and prompt=none, unusable form_post template - 500 when the refusal itself cannot be sent", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		codeIssuer := mocks_oauth.NewCodeIssuer(t)
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
@@ -578,7 +579,7 @@ func TestHandleIssueGet(t *testing.T) {
 
 	t.Run("Session lookup fails", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
 		codeIssuer := mocks_oauth.NewCodeIssuer(t)
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
@@ -625,7 +626,7 @@ func TestHandleIssueGet(t *testing.T) {
 
 	t.Run("The commit fails, so no code reaches the client", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
 		codeIssuer := mocks_oauth.NewCodeIssuer(t)
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
@@ -732,7 +733,7 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 	// takes these rows the other way round is answered by the helper rerunning this body (#301).
 	t.Run("The transaction is the acquisition then the insert, and nothing else", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
 		codeIssuer := mocks_oauth.NewCodeIssuer(t)
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
@@ -790,7 +791,7 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 
 	t.Run("The row is gone, so the ceremony restarts at level 1 and nothing is inserted", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
 		codeIssuer := mocks_oauth.NewCodeIssuer(t)
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
@@ -867,7 +868,7 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 	// wrong with this server, the application the browser was signing in to no longer exists.
 	t.Run("The client is gone, so the ceremony restarts at level 1 and nothing is inserted", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
 		codeIssuer := mocks_oauth.NewCodeIssuer(t)
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
@@ -932,7 +933,7 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 	// this one condition rather than a blanket softening of the insert's errors.
 	t.Run("An ordinary insert failure is still a 500", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
 		codeIssuer := mocks_oauth.NewCodeIssuer(t)
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
@@ -974,7 +975,7 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 
 	t.Run("The row is gone and the ceremony is silent, so the client is answered login_required", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
 		codeIssuer := mocks_oauth.NewCodeIssuer(t)
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
@@ -1055,7 +1056,7 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 		for _, tc := range cases {
 			t.Run(tc.name, func(t *testing.T) {
 				httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-				authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+				authHelper := mocks_handlers.NewAuthHelper(t)
 				templateFS := &mocks_test.TestFS{}
 				codeIssuer := mocks_oauth.NewCodeIssuer(t)
 				tokenIssuer := mocks_oauth.NewTokenIssuer(t)
@@ -1142,7 +1143,7 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 	for _, family := range issuanceFamilies {
 		t.Run("Foreign ambient session restarts level 1: "+family.name, func(t *testing.T) {
 			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-			authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+			authHelper := mocks_handlers.NewAuthHelper(t)
 			templateFS := &mocks_test.TestFS{}
 			codeIssuer := mocks_oauth.NewCodeIssuer(t)
 			tokenIssuer := mocks_oauth.NewTokenIssuer(t)
@@ -1228,7 +1229,7 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 	for _, family := range promptNoneFamilies {
 		t.Run("Foreign ambient session and prompt=none returns login_required: "+family.name, func(t *testing.T) {
 			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-			authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+			authHelper := mocks_handlers.NewAuthHelper(t)
 			templateFS := &mocks_test.TestFS{}
 			codeIssuer := mocks_oauth.NewCodeIssuer(t)
 			tokenIssuer := mocks_oauth.NewTokenIssuer(t)
@@ -1296,7 +1297,7 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 	// ceremony's own, which is what the whole change is careful not to break.
 	t.Run("Own ambient session still issues implicit tokens carrying its identifier", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
 		codeIssuer := mocks_oauth.NewCodeIssuer(t)
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
@@ -1378,7 +1379,7 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 func TestHandleIssueGet_ImplicitAmbientSessionVanished(t *testing.T) {
 	t.Run("Implicit request whose session row has vanished restarts level 1", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
 		codeIssuer := mocks_oauth.NewCodeIssuer(t)
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
@@ -1438,7 +1439,7 @@ func TestHandleIssueGet_ImplicitAmbientSessionVanished(t *testing.T) {
 
 	t.Run("Implicit request whose session row has vanished and prompt=none returns login_required", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
 		codeIssuer := mocks_oauth.NewCodeIssuer(t)
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
@@ -1673,7 +1674,7 @@ func TestIsImplicitFlow(t *testing.T) {
 func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 	t.Run("Implicit flow with token response type", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
 		codeIssuer := mocks_oauth.NewCodeIssuer(t)
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
@@ -1766,7 +1767,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 
 	t.Run("Implicit flow with id_token response type", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
 		codeIssuer := mocks_oauth.NewCodeIssuer(t)
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
@@ -1850,7 +1851,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 
 	t.Run("Implicit flow with id_token token response type", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
 		codeIssuer := mocks_oauth.NewCodeIssuer(t)
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
@@ -1939,7 +1940,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 
 	t.Run("Implicit flow uses consented scope when available", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
 		codeIssuer := mocks_oauth.NewCodeIssuer(t)
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
@@ -2004,7 +2005,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 	// the withheld page and never names a client on it.
 	t.Run("Implicit flow, the client vanished - the redirect is withheld rather than emitted", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
 		codeIssuer := mocks_oauth.NewCodeIssuer(t)
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
@@ -2059,7 +2060,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 
 	t.Run("Implicit flow error - user not found", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
 		codeIssuer := mocks_oauth.NewCodeIssuer(t)
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
@@ -2104,7 +2105,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 
 	t.Run("Implicit flow error - token generation fails", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
 		codeIssuer := mocks_oauth.NewCodeIssuer(t)
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
@@ -2388,7 +2389,7 @@ func TestIssueImplicitTokens(t *testing.T) {
 func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 	t.Run("Implicit flow error - database error on client lookup", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
 		codeIssuer := mocks_oauth.NewCodeIssuer(t)
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
@@ -2431,7 +2432,7 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 
 	t.Run("Implicit flow error - database error on user lookup", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
 		codeIssuer := mocks_oauth.NewCodeIssuer(t)
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
@@ -2477,7 +2478,7 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 
 	t.Run("Implicit flow error - clear auth context fails", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
 		codeIssuer := mocks_oauth.NewCodeIssuer(t)
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
@@ -3287,7 +3288,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 
 	t.Run("IdTokenHintSub set matching user - issues code successfully", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
 		codeIssuer := mocks_oauth.NewCodeIssuer(t)
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
@@ -3370,7 +3371,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 
 	t.Run("IdTokenHintSub set different user - returns login_required", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
 		codeIssuer := mocks_oauth.NewCodeIssuer(t)
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
@@ -3452,7 +3453,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 
 	t.Run("IdTokenHintSub set different user, failing clear - server_error to the client", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
 		codeIssuer := mocks_oauth.NewCodeIssuer(t)
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
@@ -3520,7 +3521,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 
 	t.Run("IdTokenHintSub set different user, failing clear and an unusable form_post template - last-resort 500", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		codeIssuer := mocks_oauth.NewCodeIssuer(t)
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
@@ -3593,7 +3594,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 
 	t.Run("IdTokenHintSub set different user, unusable form_post template - 500 when the refusal itself cannot be sent", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		codeIssuer := mocks_oauth.NewCodeIssuer(t)
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
@@ -3661,7 +3662,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 
 	t.Run("IdTokenHintSub empty - proceeds normally without check", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
 		codeIssuer := mocks_oauth.NewCodeIssuer(t)
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
@@ -3738,7 +3739,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 
 	t.Run("End-to-end: prompt=login with mismatched id_token_hint - blocks at issuance", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
 		codeIssuer := mocks_oauth.NewCodeIssuer(t)
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
@@ -3887,7 +3888,7 @@ func TestHandleIssueGet_RedirectURIRecheck(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-			authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+			authHelper := mocks_handlers.NewAuthHelper(t)
 			templateFS := &mocks_test.TestFS{}
 			codeIssuer := mocks_oauth.NewCodeIssuer(t)
 			tokenIssuer := mocks_oauth.NewTokenIssuer(t)
@@ -3986,7 +3987,7 @@ func TestHandleIssueGet_RedirectURIRecheck(t *testing.T) {
 // It needs its ordering stated or it reads as a duplicate of the row above and gets tidied away.
 func TestHandleIssueGet_RedirectURIRecheckOutranksTheIdTokenHintRefusal(t *testing.T) {
 	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-	authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+	authHelper := mocks_handlers.NewAuthHelper(t)
 	templateFS := &mocks_test.TestFS{}
 	codeIssuer := mocks_oauth.NewCodeIssuer(t)
 	tokenIssuer := mocks_oauth.NewTokenIssuer(t)
@@ -4059,7 +4060,7 @@ func TestHandleIssueGet_ExpiredAmbientSession(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-			authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+			authHelper := mocks_handlers.NewAuthHelper(t)
 			templateFS := &mocks_test.TestFS{}
 			codeIssuer := mocks_oauth.NewCodeIssuer(t)
 			tokenIssuer := mocks_oauth.NewTokenIssuer(t)
@@ -4210,7 +4211,7 @@ func TestHandleIssueGet_ScopeRefilter(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-			authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+			authHelper := mocks_handlers.NewAuthHelper(t)
 			templateFS := &mocks_test.TestFS{}
 			codeIssuer := mocks_oauth.NewCodeIssuer(t)
 			tokenIssuer := mocks_oauth.NewTokenIssuer(t)
@@ -4366,7 +4367,7 @@ func TestHandleIssueGet_TheLiveChecksFailClosedOnAStorageError(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-			authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+			authHelper := mocks_handlers.NewAuthHelper(t)
 			templateFS := &mocks_test.TestFS{}
 			codeIssuer := mocks_oauth.NewCodeIssuer(t)
 			tokenIssuer := mocks_oauth.NewTokenIssuer(t)
@@ -4441,7 +4442,7 @@ func TestHandleIssueGet_TheLiveChecksFailClosedOnAStorageError(t *testing.T) {
 func TestHandleIssueGet_RedirectURIRefusalSurvivesItsOwnFailures(t *testing.T) {
 	t.Run("failing clear - the refusal is still rendered and nothing is emitted", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
 		codeIssuer := mocks_oauth.NewCodeIssuer(t)
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
@@ -4511,7 +4512,7 @@ func TestHandleIssueGet_RedirectURIRefusalSurvivesItsOwnFailures(t *testing.T) {
 
 	t.Run("an unrenderable page - 500 when the refusal itself cannot be shown", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
 		codeIssuer := mocks_oauth.NewCodeIssuer(t)
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
@@ -4584,7 +4585,7 @@ func TestHandleIssueGet_ScopeRefusalSurvivesItsOwnFailures(t *testing.T) {
 	// the condition all three cases share. The response mode and the clear's answer are what each
 	// case varies.
 	armEmptiedScope := func(t *testing.T, responseMode string, database *mocks_data.Database,
-		authHelper *mocks_handlerhelpers.AuthHelper, auditLogger *mocks_audit.AuditLogger,
+		authHelper *mocks_handlers.AuthHelper, auditLogger *mocks_audit.AuditLogger,
 		userSessionManager *mocks_user.UserSessionManager,
 		permissionChecker *mocks_user.PermissionChecker,
 		req *http.Request) *oauth.AuthContext {
@@ -4630,7 +4631,7 @@ func TestHandleIssueGet_ScopeRefusalSurvivesItsOwnFailures(t *testing.T) {
 
 	t.Run("failing clear - server_error to the client", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
 		codeIssuer := mocks_oauth.NewCodeIssuer(t)
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
@@ -4675,7 +4676,7 @@ func TestHandleIssueGet_ScopeRefusalSurvivesItsOwnFailures(t *testing.T) {
 
 	t.Run("failing clear and an unusable form_post template - last-resort 500", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		codeIssuer := mocks_oauth.NewCodeIssuer(t)
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
@@ -4721,7 +4722,7 @@ func TestHandleIssueGet_ScopeRefusalSurvivesItsOwnFailures(t *testing.T) {
 
 	t.Run("unusable form_post template - 500 when the refusal itself cannot be sent", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
 		codeIssuer := mocks_oauth.NewCodeIssuer(t)
 		tokenIssuer := mocks_oauth.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)

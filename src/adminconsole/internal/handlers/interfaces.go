@@ -22,13 +22,7 @@ type HttpHelper interface {
 }
 
 type AuthHelper interface {
-	GetAuthContext(r *http.Request) (*oauth.AuthContext, error)
-	SaveAuthContext(w http.ResponseWriter, r *http.Request, authContext *oauth.AuthContext) error
-	ClearAuthContext(w http.ResponseWriter, r *http.Request) error
-	GetLoggedInSubject(r *http.Request) string
 	IsAuthenticated(jwtInfo oauth.JwtInfo) bool
-	IsAuthorizedToAccessResource(jwtInfo oauth.JwtInfo, scopesAnyOf []string) bool
-	RedirToAuthorize(w http.ResponseWriter, r *http.Request, clientIdentifier string, scope string, redirectBack string) error
 }
 
 type IdentifierValidator interface {

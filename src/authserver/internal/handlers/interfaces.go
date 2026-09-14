@@ -34,9 +34,6 @@ type AuthHelper interface {
 	SaveAuthContext(w http.ResponseWriter, r *http.Request, authContext *oauth.AuthContext) error
 	ClearAuthContext(w http.ResponseWriter, r *http.Request) error
 	GetLoggedInSubject(r *http.Request) string
-	IsAuthenticated(jwtInfo oauth.JwtInfo) bool
-	IsAuthorizedToAccessResource(jwtInfo oauth.JwtInfo, scopesAnyOf []string) bool
-	RedirToAuthorize(w http.ResponseWriter, r *http.Request, clientIdentifier string, scope string, redirectBack string) error
 	// RegenerateSession replaces the browser session's identifier without losing its
 	// contents, which is what a server-side session store must do at every privilege
 	// change to match a cookie store's structural immunity to session fixation (#266).

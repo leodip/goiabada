@@ -3,6 +3,7 @@ package server
 import (
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/audit"
+	authhandlerhelpers "github.com/leodip/goiabada/authserver/internal/handlerhelpers"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers"
 	"github.com/leodip/goiabada/authserver/internal/handlers/apihandlers"
@@ -45,7 +46,7 @@ func (s *Server) initRoutes(root chi.Router) {
 	emailSender := communication.NewEmailSender()
 
 	httpHelper := handlerhelpers.NewHttpHelper(s.templateFS, middleware.SettingsReader{})
-	authHelper := handlerhelpers.NewAuthHelper(s.sessionStore, constants.AuthServerSessionName, s.baseURL, s.adminConsoleBaseURL)
+	authHelper := authhandlerhelpers.NewAuthHelper(s.sessionStore, constants.AuthServerSessionName)
 
 	middlewareBearerToken := core_middleware.NewMiddlewareBearerToken(tokenParser)
 	authHeaderToContext := middlewareBearerToken.JwtAuthorizationHeaderToContext()

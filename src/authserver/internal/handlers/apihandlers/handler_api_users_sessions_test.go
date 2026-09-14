@@ -8,9 +8,9 @@ import (
 	"testing"
 
 	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
+	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/core/constants"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
-	mocks_handlerhelpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -66,7 +66,7 @@ func adminSessionDeleteRequest(sessionId string) *http.Request {
 func TestHandleAPIUserSessionDelete_TerminatesAndAuditsBothEvents(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_audit.NewAuditLogger(t)
-	authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+	authHelper := mocks_handlers.NewAuthHelper(t)
 
 	const subject = "the-admin"
 	userSession := &models.UserSession{Id: 100, SessionIdentifier: "sid-terminated", UserId: 42}
@@ -128,7 +128,7 @@ func TestHandleAPIUserSessionDelete_TerminatesAndAuditsBothEvents(t *testing.T) 
 func TestHandleAPIUserSessionDelete_TerminationFailureIsA500(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_audit.NewAuditLogger(t)
-	authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+	authHelper := mocks_handlers.NewAuthHelper(t)
 
 	userSession := &models.UserSession{Id: 100, SessionIdentifier: "sid-terminated", UserId: 42}
 
@@ -157,7 +157,7 @@ func TestHandleAPIUserSessionDelete_TerminationFailureIsA500(t *testing.T) {
 func TestHandleAPIUserSessionDelete_NotFoundDoesNotTerminate(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_audit.NewAuditLogger(t)
-	authHelper := mocks_handlerhelpers.NewAuthHelper(t)
+	authHelper := mocks_handlers.NewAuthHelper(t)
 
 	database.On("GetUserSessionById", (*sql.Tx)(nil), int64(999)).Return(nil, nil).Once()
 

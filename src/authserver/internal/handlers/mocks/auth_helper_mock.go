@@ -4,7 +4,7 @@
 
 //go:build !production
 
-package mocks_handler_helpers
+package mocks_handlers
 
 import (
 	"net/http"
@@ -19,10 +19,19 @@ func NewAuthHelper(t interface {
 	mock.TestingT
 	Cleanup(func())
 }) *AuthHelper {
+	if helper, ok := t.(interface{ Helper() }); ok {
+		helper.Helper()
+	}
+
 	mock := &AuthHelper{}
 	mock.Mock.Test(t)
 
-	t.Cleanup(func() { mock.AssertExpectations(t) })
+	t.Cleanup(func() {
+		if helper, ok := t.(interface{ Helper() }); ok {
+			helper.Helper()
+		}
+		mock.AssertExpectations(t)
+	})
 
 	return mock
 }
@@ -206,189 +215,6 @@ func (_c *AuthHelper_GetLoggedInSubject_Call) Return(s string) *AuthHelper_GetLo
 }
 
 func (_c *AuthHelper_GetLoggedInSubject_Call) RunAndReturn(run func(r *http.Request) string) *AuthHelper_GetLoggedInSubject_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// IsAuthenticated provides a mock function for the type AuthHelper
-func (_mock *AuthHelper) IsAuthenticated(jwtInfo oauth.JwtInfo) bool {
-	ret := _mock.Called(jwtInfo)
-
-	if len(ret) == 0 {
-		panic("no return value specified for IsAuthenticated")
-	}
-
-	var r0 bool
-	if returnFunc, ok := ret.Get(0).(func(oauth.JwtInfo) bool); ok {
-		r0 = returnFunc(jwtInfo)
-	} else {
-		r0 = ret.Get(0).(bool)
-	}
-	return r0
-}
-
-// AuthHelper_IsAuthenticated_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'IsAuthenticated'
-type AuthHelper_IsAuthenticated_Call struct {
-	*mock.Call
-}
-
-// IsAuthenticated is a helper method to define mock.On call
-//   - jwtInfo oauth.JwtInfo
-func (_e *AuthHelper_Expecter) IsAuthenticated(jwtInfo any) *AuthHelper_IsAuthenticated_Call {
-	return &AuthHelper_IsAuthenticated_Call{Call: _e.mock.On("IsAuthenticated", jwtInfo)}
-}
-
-func (_c *AuthHelper_IsAuthenticated_Call) Run(run func(jwtInfo oauth.JwtInfo)) *AuthHelper_IsAuthenticated_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 oauth.JwtInfo
-		if args[0] != nil {
-			arg0 = args[0].(oauth.JwtInfo)
-		}
-		run(
-			arg0,
-		)
-	})
-	return _c
-}
-
-func (_c *AuthHelper_IsAuthenticated_Call) Return(b bool) *AuthHelper_IsAuthenticated_Call {
-	_c.Call.Return(b)
-	return _c
-}
-
-func (_c *AuthHelper_IsAuthenticated_Call) RunAndReturn(run func(jwtInfo oauth.JwtInfo) bool) *AuthHelper_IsAuthenticated_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// IsAuthorizedToAccessResource provides a mock function for the type AuthHelper
-func (_mock *AuthHelper) IsAuthorizedToAccessResource(jwtInfo oauth.JwtInfo, scopesAnyOf []string) bool {
-	ret := _mock.Called(jwtInfo, scopesAnyOf)
-
-	if len(ret) == 0 {
-		panic("no return value specified for IsAuthorizedToAccessResource")
-	}
-
-	var r0 bool
-	if returnFunc, ok := ret.Get(0).(func(oauth.JwtInfo, []string) bool); ok {
-		r0 = returnFunc(jwtInfo, scopesAnyOf)
-	} else {
-		r0 = ret.Get(0).(bool)
-	}
-	return r0
-}
-
-// AuthHelper_IsAuthorizedToAccessResource_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'IsAuthorizedToAccessResource'
-type AuthHelper_IsAuthorizedToAccessResource_Call struct {
-	*mock.Call
-}
-
-// IsAuthorizedToAccessResource is a helper method to define mock.On call
-//   - jwtInfo oauth.JwtInfo
-//   - scopesAnyOf []string
-func (_e *AuthHelper_Expecter) IsAuthorizedToAccessResource(jwtInfo any, scopesAnyOf any) *AuthHelper_IsAuthorizedToAccessResource_Call {
-	return &AuthHelper_IsAuthorizedToAccessResource_Call{Call: _e.mock.On("IsAuthorizedToAccessResource", jwtInfo, scopesAnyOf)}
-}
-
-func (_c *AuthHelper_IsAuthorizedToAccessResource_Call) Run(run func(jwtInfo oauth.JwtInfo, scopesAnyOf []string)) *AuthHelper_IsAuthorizedToAccessResource_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 oauth.JwtInfo
-		if args[0] != nil {
-			arg0 = args[0].(oauth.JwtInfo)
-		}
-		var arg1 []string
-		if args[1] != nil {
-			arg1 = args[1].([]string)
-		}
-		run(
-			arg0,
-			arg1,
-		)
-	})
-	return _c
-}
-
-func (_c *AuthHelper_IsAuthorizedToAccessResource_Call) Return(b bool) *AuthHelper_IsAuthorizedToAccessResource_Call {
-	_c.Call.Return(b)
-	return _c
-}
-
-func (_c *AuthHelper_IsAuthorizedToAccessResource_Call) RunAndReturn(run func(jwtInfo oauth.JwtInfo, scopesAnyOf []string) bool) *AuthHelper_IsAuthorizedToAccessResource_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// RedirToAuthorize provides a mock function for the type AuthHelper
-func (_mock *AuthHelper) RedirToAuthorize(w http.ResponseWriter, r *http.Request, clientIdentifier string, scope string, redirectBack string) error {
-	ret := _mock.Called(w, r, clientIdentifier, scope, redirectBack)
-
-	if len(ret) == 0 {
-		panic("no return value specified for RedirToAuthorize")
-	}
-
-	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(http.ResponseWriter, *http.Request, string, string, string) error); ok {
-		r0 = returnFunc(w, r, clientIdentifier, scope, redirectBack)
-	} else {
-		r0 = ret.Error(0)
-	}
-	return r0
-}
-
-// AuthHelper_RedirToAuthorize_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RedirToAuthorize'
-type AuthHelper_RedirToAuthorize_Call struct {
-	*mock.Call
-}
-
-// RedirToAuthorize is a helper method to define mock.On call
-//   - w http.ResponseWriter
-//   - r *http.Request
-//   - clientIdentifier string
-//   - scope string
-//   - redirectBack string
-func (_e *AuthHelper_Expecter) RedirToAuthorize(w any, r any, clientIdentifier any, scope any, redirectBack any) *AuthHelper_RedirToAuthorize_Call {
-	return &AuthHelper_RedirToAuthorize_Call{Call: _e.mock.On("RedirToAuthorize", w, r, clientIdentifier, scope, redirectBack)}
-}
-
-func (_c *AuthHelper_RedirToAuthorize_Call) Run(run func(w http.ResponseWriter, r *http.Request, clientIdentifier string, scope string, redirectBack string)) *AuthHelper_RedirToAuthorize_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 http.ResponseWriter
-		if args[0] != nil {
-			arg0 = args[0].(http.ResponseWriter)
-		}
-		var arg1 *http.Request
-		if args[1] != nil {
-			arg1 = args[1].(*http.Request)
-		}
-		var arg2 string
-		if args[2] != nil {
-			arg2 = args[2].(string)
-		}
-		var arg3 string
-		if args[3] != nil {
-			arg3 = args[3].(string)
-		}
-		var arg4 string
-		if args[4] != nil {
-			arg4 = args[4].(string)
-		}
-		run(
-			arg0,
-			arg1,
-			arg2,
-			arg3,
-			arg4,
-		)
-	})
-	return _c
-}
-
-func (_c *AuthHelper_RedirToAuthorize_Call) Return(err error) *AuthHelper_RedirToAuthorize_Call {
-	_c.Call.Return(err)
-	return _c
-}
-
-func (_c *AuthHelper_RedirToAuthorize_Call) RunAndReturn(run func(w http.ResponseWriter, r *http.Request, clientIdentifier string, scope string, redirectBack string) error) *AuthHelper_RedirToAuthorize_Call {
 	_c.Call.Return(run)
 	return _c
 }
