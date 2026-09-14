@@ -42,6 +42,7 @@ func (s *Server) initRoutes(root chi.Router) {
 		s.sessionStore,
 		constants.AdminConsoleSessionName,
 		tokenParser,
+		middleware.SettingsReader{},
 		authHelper,
 		httpHelper,
 		&http.Client{},

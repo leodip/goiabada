@@ -27,8 +27,32 @@ func TestSettingsReader_LayoutSettings(t *testing.T) {
 	}, settings)
 }
 
-func TestSettingsReader_LayoutSettingsPanicsWithoutSettings(t *testing.T) {
-	require.Panics(t, func() {
-		SettingsReader{}.LayoutSettings(context.Background())
+func TestSettingsReader_Issuer(t *testing.T) {
+	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &models.Settings{
+		Issuer: "https://sentinel.example",
 	})
+
+	assert.Equal(t, "https://sentinel.example", SettingsReader{}.Issuer(ctx))
+}
+
+func TestSettingsReader_PanicsWithoutSettings(t *testing.T) {
+	tests := []struct {
+		name string
+		read func()
+	}{
+		{
+			name: "issuer",
+			read: func() { SettingsReader{}.Issuer(context.Background()) },
+		},
+		{
+			name: "layout settings",
+			read: func() { SettingsReader{}.LayoutSettings(context.Background()) },
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Panics(t, tt.read)
+		})
+	}
 }

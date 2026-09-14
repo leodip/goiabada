@@ -13,7 +13,6 @@ import (
 
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/errs"
-	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
 )
@@ -23,7 +22,11 @@ type tokenParser interface {
 	DecodeAndValidateTokenString(ctx context.Context, token string, pubKey *rsa.PublicKey, withExpirationCheck bool) (*oauth.JwtToken, error)
 }
 
-type authHelper interface {
+type issuerReader interface {
+	Issuer(ctx context.Context) string
+}
+
+type AuthHelper interface {
 	RedirToAuthorize(w http.ResponseWriter, r *http.Request, clientIdentifier string, scope string, redirectBack string) error
 	IsAuthorizedToAccessResource(jwtInfo oauth.JwtInfo, scopesAnyOf []string) bool
 	IsAuthenticated(jwtInfo oauth.JwtInfo) bool
@@ -64,7 +67,8 @@ type MiddlewareJwt struct {
 	sessionStore      sessionstore.Store
 	sessionName       string
 	tokenParser       tokenParser
-	authHelper        authHelper
+	issuerReader      issuerReader
+	authHelper        AuthHelper
 	errorRenderer     ServerErrorRenderer
 	httpClient        HTTPClient
 	authServerBaseURL string
@@ -79,7 +83,8 @@ func NewMiddlewareJwt(
 	sessionStore sessionstore.Store,
 	sessionName string,
 	tokenParser tokenParser,
-	authHelper authHelper,
+	issuerReader issuerReader,
+	authHelper AuthHelper,
 	errorRenderer ServerErrorRenderer,
 	httpClient HTTPClient,
 	authServerBaseURL string,
@@ -91,6 +96,7 @@ func NewMiddlewareJwt(
 		sessionStore:      sessionStore,
 		sessionName:       sessionName,
 		tokenParser:       tokenParser,
+		issuerReader:      issuerReader,
 		authHelper:        authHelper,
 		errorRenderer:     errorRenderer,
 		httpClient:        httpClient,
@@ -185,12 +191,12 @@ func (m *MiddlewareJwt) JwtSessionHandler() func(http.Handler) http.Handler {
 				tokenResponse = sess.Values[constants.SessionKeyJwt].(oauth.TokenResponse)
 				jwtInfo, err := m.tokenParser.DecodeAndValidateTokenResponse(r.Context(), &tokenResponse)
 				if err == nil {
-					settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
+					issuer := m.issuerReader.Issuer(r.Context())
 
 					// Check if any token has an invalid issuer
-					hasInvalidIssuer := (jwtInfo.IdToken != nil && !jwtInfo.IdToken.IsIssuerValid(settings.Issuer)) ||
-						(jwtInfo.AccessToken != nil && !jwtInfo.AccessToken.IsIssuerValid(settings.Issuer)) ||
-						(jwtInfo.RefreshToken != nil && !jwtInfo.RefreshToken.IsIssuerValid(settings.Issuer))
+					hasInvalidIssuer := (jwtInfo.IdToken != nil && !jwtInfo.IdToken.IsIssuerValid(issuer)) ||
+						(jwtInfo.AccessToken != nil && !jwtInfo.AccessToken.IsIssuerValid(issuer)) ||
+						(jwtInfo.RefreshToken != nil && !jwtInfo.RefreshToken.IsIssuerValid(issuer))
 
 					if hasInvalidIssuer {
 
