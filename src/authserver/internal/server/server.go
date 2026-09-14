@@ -301,11 +301,11 @@ func (s *Server) initMiddleware() chi.Router {
 	// Everything below is on the application branch, not the root.
 
 	// Global locale middleware: resolves a tentative localizer from
-	// ?ui_locales, AuthContext.UILocales (in-flight authorize flow),
+	// ?ui_locales, UI locales from an in-flight authorize flow,
 	// Accept-Language, or English. Must run AFTER MiddlewareSessionIdentifier
-	// so the session is decoded — the middleware reads AuthContext via the
-	// AuthHelper. User-locale refinement happens per-handler in authserver
-	// (RefineLocalizerWithUser), since identity is established at handler
+	// so the session is decoded — the reader gets UI locales from session-backed
+	// authorize state. User-locale refinement happens per-handler in authserver
+	// (RefineLocalizerWithUserLocale), since identity is established at handler
 	// scope rather than at middleware scope.
 	i18nAuthHelper := authhandlerhelpers.NewAuthHelper(s.sessionStore, constants.AuthServerSessionName)
 

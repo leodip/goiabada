@@ -262,11 +262,10 @@ func (s *Server) initMiddleware() chi.Router {
 		// administrator whose browser asks for pt-BR was told in English that
 		// their auth server needs upgrading. Nothing here depends on that
 		// ordering being the other way round: i18n.resolveLocale reads
-		// ?ui_locales, the AuthContext (nil in this module) and Accept-Language,
-		// and touches no settings, no session and no database. The authserver's
-		// copy of this chain does resolve locale last, but for a reason that
-		// does not carry over: it passes a real AuthHelper, so its locale
-		// middleware has to run after the session is decoded.
+		// ?ui_locales, an optional UI-locales reader (nil in this module), and
+		// Accept-Language, and touches no settings, no session and no database.
+		// The authserver's copy of this chain does resolve locale last because
+		// its reader needs the session to be decoded first.
 		i18n.MiddlewareLocale(nil),
 
 		// Adds settings to the request context (fetched from cache, not database)

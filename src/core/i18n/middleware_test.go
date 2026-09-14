@@ -9,7 +9,6 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/leodip/goiabada/core/constants"
-	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -23,14 +22,12 @@ func newJwtInfoWithLocale(locale string) oauth.JwtInfo {
 	}
 }
 
-// stubAuthCtxReader returns the configured AuthContext (or err).
-type stubAuthCtxReader struct {
-	ac  *oauth.AuthContext
-	err error
+type stubUILocalesReader struct {
+	locales []string
 }
 
-func (s *stubAuthCtxReader) GetAuthContext(_ *http.Request) (*oauth.AuthContext, error) {
-	return s.ac, s.err
+func (s *stubUILocalesReader) UILocales(_ *http.Request) []string {
+	return s.locales
 }
 
 func TestSanitizeUILocales(t *testing.T) {
@@ -94,8 +91,8 @@ func TestMiddlewareLocale_QueryParamWins(t *testing.T) {
 	assert.Equal(t, "Entrar", seen)
 }
 
-func TestMiddlewareLocale_AuthContextWinsOverHeader(t *testing.T) {
-	mw := MiddlewareLocale(&stubAuthCtxReader{ac: &oauth.AuthContext{UILocales: []string{"pt-BR"}}})
+func TestMiddlewareLocale_UILocalesReaderWinsOverHeader(t *testing.T) {
+	mw := MiddlewareLocale(&stubUILocalesReader{locales: []string{"pt-BR"}})
 	req := httptest.NewRequest("GET", "/auth/pwd", nil)
 	req.Header.Set("Accept-Language", "fr-FR")
 	rr := httptest.NewRecorder()
@@ -108,8 +105,22 @@ func TestMiddlewareLocale_AuthContextWinsOverHeader(t *testing.T) {
 	assert.Equal(t, "Entrar", seen)
 }
 
+func TestMiddlewareLocale_EmptyUILocalesFallsBackToHeader(t *testing.T) {
+	mw := MiddlewareLocale(&stubUILocalesReader{})
+	req := httptest.NewRequest("GET", "/auth/pwd", nil)
+	req.Header.Set("Accept-Language", "pt-BR")
+	rr := httptest.NewRecorder()
+
+	var seen string
+	mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		seen = T(r.Context(), "auth.pwd.title")
+		assert.False(t, hasExplicitIntent(r.Context()))
+	})).ServeHTTP(rr, req)
+	assert.Equal(t, "Entrar", seen)
+}
+
 func TestMiddlewareLocale_AcceptLanguageFallback(t *testing.T) {
-	// No query, no AuthContext, just Accept-Language. pt-BR should resolve.
+	// No query or in-flight UI locales, just Accept-Language. pt-BR should resolve.
 	mw := MiddlewareLocale(nil)
 	req := httptest.NewRequest("GET", "/auth/pwd", nil)
 	req.Header.Set("Accept-Language", "pt-BR,en;q=0.9")
@@ -153,9 +164,8 @@ func TestMiddlewareLocale_DoesNotConsumePostBody(t *testing.T) {
 	})).ServeHTTP(rr, req)
 }
 
-func TestRefineLocalizerWithUser_ReturnsNewRequest(t *testing.T) {
+func TestRefineLocalizerWithUserLocale_ReturnsNewRequest(t *testing.T) {
 	req := httptest.NewRequest("GET", "/", nil)
-	user := &models.User{Locale: "pt-BR"}
 
 	// Apply the global locale middleware first so the request has a
 	// baseline localizer.
@@ -165,14 +175,14 @@ func TestRefineLocalizerWithUser_ReturnsNewRequest(t *testing.T) {
 		inner = r
 	})).ServeHTTP(httptest.NewRecorder(), req)
 
-	refined := RefineLocalizerWithUser(inner, user)
-	assert.NotSame(t, inner, refined, "RefineLocalizerWithUser must return a new *http.Request")
+	refined := RefineLocalizerWithUserLocale(inner, "pt-BR")
+	assert.NotSame(t, inner, refined, "RefineLocalizerWithUserLocale must return a new *http.Request")
 	assert.Equal(t, "Entrar", T(refined.Context(), "auth.pwd.title"))
 	// Original context untouched.
 	assert.Equal(t, "Login", T(inner.Context(), "auth.pwd.title"))
 }
 
-func TestRefineLocalizerWithUser_NoOpWhenLocaleEmpty(t *testing.T) {
+func TestRefineLocalizerWithUserLocale_NoOpWhenLocaleEmpty(t *testing.T) {
 	req := httptest.NewRequest("GET", "/", nil)
 	mw := MiddlewareLocale(nil)
 	var inner *http.Request
@@ -180,14 +190,14 @@ func TestRefineLocalizerWithUser_NoOpWhenLocaleEmpty(t *testing.T) {
 		inner = r
 	})).ServeHTTP(httptest.NewRecorder(), req)
 
-	user := &models.User{Locale: ""}
-	refined := RefineLocalizerWithUser(inner, user)
+	refined := RefineLocalizerWithUserLocale(inner, "")
+	assert.Same(t, inner, refined)
 	assert.Equal(t, "Login", T(refined.Context(), "auth.pwd.title"))
 }
 
-func TestRefineLocalizerWithUser_SkipsWhenExplicitIntent(t *testing.T) {
+func TestRefineLocalizerWithUserLocale_SkipsWhenExplicitIntent(t *testing.T) {
 	// Explicit ?ui_locales=pt-BR should suppress the user-locale override.
-	// The assertion below is that "Entrar" (pt-BR) wins over user.Locale="en".
+	// The assertion below is that "Entrar" (pt-BR) wins over the stored locale "en".
 	req := httptest.NewRequest("GET", "/auth/pwd?ui_locales=pt-BR", nil)
 	mw := MiddlewareLocale(nil)
 	var inner *http.Request
@@ -197,11 +207,10 @@ func TestRefineLocalizerWithUser_SkipsWhenExplicitIntent(t *testing.T) {
 
 	require.True(t, hasExplicitIntent(inner.Context()))
 
-	// User.Locale = "en", but explicit pt-BR should win.
-	user := &models.User{Locale: "en"}
-	refined := RefineLocalizerWithUser(inner, user)
+	// The stored locale is "en", but explicit pt-BR should win.
+	refined := RefineLocalizerWithUserLocale(inner, "en")
 	assert.Equal(t, "Entrar", T(refined.Context(), "auth.pwd.title"),
-		"explicit intent (?ui_locales=pt-BR) must not be overridden by User.Locale")
+		"explicit intent (?ui_locales=pt-BR) must not be overridden by the stored locale")
 }
 
 func TestRefineLocalizerWithUILocales_RoundTrip(t *testing.T) {

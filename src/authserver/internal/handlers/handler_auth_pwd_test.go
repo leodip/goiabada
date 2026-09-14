@@ -790,7 +790,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 			})
 
 		// mock.Anything for the request: handler_auth_pwd.go calls
-		// i18n.RefineLocalizerWithUser after password verifies, which returns
+		// i18n.RefineLocalizerWithUserLocale after password verifies, which returns
 		// a fresh *http.Request, so the pointer no longer matches `req`.
 		authHelper.On("SaveAuthContext", rr, mock.Anything, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
 			return ac.UserId == 1 &&
@@ -876,7 +876,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 			return details["userId"] == int64(2)
 		})).Return()
 
-		// mock.Anything for the request: i18n.RefineLocalizerWithUser fires
+		// mock.Anything for the request: i18n.RefineLocalizerWithUserLocale fires
 		// after password verifies and returns a fresh request, so renderError
 		// renders against the refined request, not the original `req` pointer.
 		httpHelper.On("RenderTemplate", rr, mock.Anything, "/layouts/auth_layout.html", "/auth_pwd.html", mock.MatchedBy(func(data map[string]interface{}) bool {
