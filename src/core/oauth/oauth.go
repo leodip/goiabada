@@ -1,8 +1,16 @@
 // Package oauth is the OAuth2/OIDC surface both processes share: the value types that
 // cross the wire or a session (TokenResponse, JwtInfo, JwtToken, Jwk, Jwks), the client
-// side of the protocol (the JWKS token parser and the code-for-token exchanger), and the
-// PKCE challenge helper. It reaches no database and no persistence type, which is what
-// lets the admin console link it without linking a driver.
+// side of the protocol (the JWKS token parser and the code-for-token exchanger), the
+// PKCE challenge helper and the response_type parser. It reaches no database and no
+// persistence type, which is what lets the admin console link it without linking a
+// driver.
+//
+// ParseResponseType sits here although only the auth server calls it directly.
+// core/validators calls it as well, and the admin console links core/validators for
+// unrelated helpers, so on the provider side this one dependency-free file drags
+// core/oauthprovider -- and through it core/data and all four drivers -- into the admin
+// console's binary. What belongs here is decided by what each binary ends up containing
+// rather than by which process names the symbol (#338).
 //
 // Provider-side issuance -- authorization codes, tokens and signing keys -- is
 // core/oauthprovider (#338).

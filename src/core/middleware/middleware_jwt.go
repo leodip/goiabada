@@ -306,14 +306,27 @@ func (m *MiddlewareJwt) refreshToken(
 		return false, errs.Errorf("error parsing refresh token response: %v", err)
 	}
 
-	sess, err := m.sessionStore.Get(r, m.sessionName)
+	// The refresh is not done when the call returns; it is done when the new token is written
+	// down. The auth server has already revoked the old one, so a read or a write refused
+	// because the browser went away leaves the administrator holding a dead token -- the very
+	// outcome the detached context above exists to prevent, arriving two lines later instead.
+	// ServerSideStore hands the request's own context to its backend, so the store has to be
+	// given a request carrying the detached context rather than the browser's. The deadline
+	// set above covers the call and these two writes together.
+	//
+	// The sign-in callback deliberately does not do this: there the session being built is the
+	// one the browser will never receive a cookie for, so persisting it past the browser's
+	// departure leaves an authenticated row nobody can reach (#338).
+	detachedReq := r.WithContext(ctx)
+
+	sess, err := m.sessionStore.Get(detachedReq, m.sessionName)
 	if err != nil {
 		return false, errs.Errorf("unable to get session: %v", err)
 	}
 
 	// Update the session with the new token response
 	sess.Values[constants.SessionKeyJwt] = newTokenResponse
-	err = m.sessionStore.Save(r, w, sess)
+	err = m.sessionStore.Save(detachedReq, w, sess)
 	if err != nil {
 		return false, errs.Errorf("unable to save the session: %v", err)
 	}

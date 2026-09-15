@@ -95,7 +95,16 @@ func HandleAuthCallbackPost(
 		// the read loses the only copy of what it issued. WithoutCancel keeps the request's
 		// values, so request_id still reaches every record below, and drops only its
 		// cancellation; context.Background() would drop the request id with it. The deadline
-		// is what bounds this instead (#338).
+		// is what bounds this instead.
+		//
+		// The detachment covers this one call and stops there. Validating the tokens and
+		// writing the session below stay on the browser's own request deliberately: finishing
+		// a sign-in for a browser that has gone leaves a row holding an administrator's tokens
+		// under a cookie that can never be delivered, and the burned code buys nothing either
+		// way. So a browser that leaves here still has to sign in again -- what the detachment
+		// prevents is the exchange being abandoned in flight, not the sign-in failing. The
+		// refresh in core/middleware carries its detached context further than this, because
+		// there a session already exists and holds the token being replaced (#338).
 		ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), oauth.TokenExchangeTimeout)
 		defer cancel()
 

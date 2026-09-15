@@ -15,6 +15,7 @@ import (
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/oauthprovider"
 	"github.com/leodip/goiabada/core/testutil"
 	"github.com/leodip/goiabada/core/testutil/fake"
@@ -1665,7 +1666,7 @@ func TestIsImplicitFlow(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := oauthprovider.ParseResponseType(tt.responseType).IsImplicitFlow()
+			result := oauth.ParseResponseType(tt.responseType).IsImplicitFlow()
 			assert.Equal(t, tt.expected, result, "IsImplicitFlow(%q) = %v, want %v", tt.responseType, result, tt.expected)
 		})
 	}
@@ -2601,7 +2602,7 @@ func TestIsImplicitFlow_EdgeCases(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := oauthprovider.ParseResponseType(tt.responseType).IsImplicitFlow()
+			result := oauth.ParseResponseType(tt.responseType).IsImplicitFlow()
 			assert.Equal(t, tt.expected, result, "IsImplicitFlow(%q) = %v, want %v", tt.responseType, result, tt.expected)
 		})
 	}

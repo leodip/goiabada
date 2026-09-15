@@ -45,18 +45,23 @@ func (e *contextRecordingExchanger) ExchangeCodeForTokens(ctx context.Context, c
 	return nil, errs.New("the auth server refused the code")
 }
 
-// Decision 12, the authorization_code half. The code the auth server just
-// redirected back with is single use and already burned by the time it answers,
-// so a browser that goes away between the redirect and the exchange must not
-// take the exchange with it -- the tokens it issued would be the only copy and
-// the administrator would be signed out of a session the auth server thinks
-// exists.
+// The code the auth server just redirected back with is single use and already
+// burned by the time it answers, so a browser that goes away between the redirect
+// and the exchange must not take the exchange with it: the call would be abandoned
+// with the code spent and the answer unread.
 //
 // The inbound request here is already cancelled, which is exactly that. What the
 // handler hands the exchanger has to be live anyway, and bounded by the ten
 // seconds that replaces the cancellation. Passing r.Context() straight through
 // is the one-token change this case exists to catch, and every other case in
 // this package stays green under it.
+//
+// The exchange is the whole of what this claims. Nothing after it is detached
+// here, so a sign-in whose browser has gone still fails at the token validation
+// or the session write that follow; persisting it instead would leave a row of
+// administrator tokens under an undeliverable cookie. The refresh in
+// core/middleware is the opposite case and carries its detached context through
+// its save (#338).
 func TestHandleAuthCallbackPost_DetachesTheExchangeFromTheBrowsersContext(t *testing.T) {
 	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 	httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).Return()
