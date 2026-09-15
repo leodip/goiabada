@@ -90,7 +90,13 @@ func main() {
 	}
 	slog.Info("i18n catalogs loaded")
 
-	// gob registration
+	// The admin console keeps the token response in its session, and session.Values is a
+	// map[interface{}]interface{}, so gob has to be told the concrete type before it can
+	// decode one back. This registration is live: handler_auth_callback.go writes the value
+	// and core/middleware reads it. The auth server had the same two lines and encoded no
+	// such value, so they went with #338; the name this call registers is pinned by
+	// TestTokenResponse_GobSessionIdentity in core/oauth, because it is written into every
+	// session in flight and an administrator whose session cannot be decoded is signed out.
 	gob.Register(oauth.TokenResponse{})
 
 	now := time.Now()
