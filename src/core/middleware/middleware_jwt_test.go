@@ -22,7 +22,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	mock_middleware "github.com/leodip/goiabada/core/middleware/mocks"
-	mock_oauth "github.com/leodip/goiabada/core/oauth/mocks"
 	mock_sessionstore "github.com/leodip/goiabada/core/sessionstore/mocks"
 )
 
@@ -37,7 +36,7 @@ func (m *mockHTTPClient) Do(req *http.Request) (*http.Response, error) {
 }
 
 func TestJwtAuthorizationHeaderToContext_ValidBearerToken(t *testing.T) {
-	mockTokenParser := new(mock_oauth.TokenParser)
+	mockTokenParser := new(mock_middleware.TokenParser)
 	middleware := NewMiddlewareBearerToken(mockTokenParser)
 
 	expectedToken := &oauth.JwtToken{
@@ -69,7 +68,7 @@ func TestJwtAuthorizationHeaderToContext_ValidBearerToken(t *testing.T) {
 }
 
 func TestJwtAuthorizationHeaderToContext_InvalidBearerToken(t *testing.T) {
-	mockTokenParser := new(mock_oauth.TokenParser)
+	mockTokenParser := new(mock_middleware.TokenParser)
 	middleware := NewMiddlewareBearerToken(mockTokenParser)
 
 	mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "invalidtoken", mock.Anything, true).
@@ -92,7 +91,7 @@ func TestJwtAuthorizationHeaderToContext_InvalidBearerToken(t *testing.T) {
 }
 
 func TestJwtAuthorizationHeaderToContext_NoBearerToken(t *testing.T) {
-	mockTokenParser := new(mock_oauth.TokenParser)
+	mockTokenParser := new(mock_middleware.TokenParser)
 	middleware := NewMiddlewareBearerToken(mockTokenParser)
 
 	req := httptest.NewRequest("GET", "/", nil)
@@ -109,7 +108,7 @@ func TestJwtAuthorizationHeaderToContext_NoBearerToken(t *testing.T) {
 }
 
 func TestJwtAuthorizationHeaderToContext_InvalidAuthorizationHeader(t *testing.T) {
-	mockTokenParser := new(mock_oauth.TokenParser)
+	mockTokenParser := new(mock_middleware.TokenParser)
 	middleware := NewMiddlewareBearerToken(mockTokenParser)
 
 	req := httptest.NewRequest("GET", "/", nil)
@@ -129,7 +128,7 @@ func TestJwtAuthorizationHeaderToContext_InvalidAuthorizationHeader(t *testing.T
 // Tests for POST body access_token extraction (OIDC Core 1.0 Section 5.3.1)
 
 func TestJwtAuthorizationHeaderToContext_ValidPostBodyToken(t *testing.T) {
-	mockTokenParser := new(mock_oauth.TokenParser)
+	mockTokenParser := new(mock_middleware.TokenParser)
 	middleware := NewMiddlewareBearerToken(mockTokenParser)
 
 	expectedToken := &oauth.JwtToken{
@@ -161,7 +160,7 @@ func TestJwtAuthorizationHeaderToContext_ValidPostBodyToken(t *testing.T) {
 }
 
 func TestJwtAuthorizationHeaderToContext_InvalidPostBodyToken(t *testing.T) {
-	mockTokenParser := new(mock_oauth.TokenParser)
+	mockTokenParser := new(mock_middleware.TokenParser)
 	middleware := NewMiddlewareBearerToken(mockTokenParser)
 
 	mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "invalidposttoken", mock.Anything, true).
@@ -184,7 +183,7 @@ func TestJwtAuthorizationHeaderToContext_InvalidPostBodyToken(t *testing.T) {
 }
 
 func TestJwtAuthorizationHeaderToContext_HeaderTakesPrecedenceOverPostBody(t *testing.T) {
-	mockTokenParser := new(mock_oauth.TokenParser)
+	mockTokenParser := new(mock_middleware.TokenParser)
 	middleware := NewMiddlewareBearerToken(mockTokenParser)
 
 	expectedToken := &oauth.JwtToken{
@@ -218,7 +217,7 @@ func TestJwtAuthorizationHeaderToContext_HeaderTakesPrecedenceOverPostBody(t *te
 }
 
 func TestJwtAuthorizationHeaderToContext_PostBodyIgnoredForGetRequest(t *testing.T) {
-	mockTokenParser := new(mock_oauth.TokenParser)
+	mockTokenParser := new(mock_middleware.TokenParser)
 	middleware := NewMiddlewareBearerToken(mockTokenParser)
 
 	// GET request with access_token in query string should NOT extract the token
@@ -249,7 +248,7 @@ func TestJwtAuthorizationHeaderToContext_PostBodyIgnoredForGetRequest(t *testing
 // The GET case above does not pin this: it is refused by the method check two branches earlier and
 // never reaches the read at all. This is the case that fails if the accessor regresses (#333).
 func TestJwtAuthorizationHeaderToContext_PostQueryTokenIgnored(t *testing.T) {
-	mockTokenParser := new(mock_oauth.TokenParser)
+	mockTokenParser := new(mock_middleware.TokenParser)
 	middleware := NewMiddlewareBearerToken(mockTokenParser)
 
 	// A genuine form submission whose body does not carry the token, with the token in the query.
@@ -271,7 +270,7 @@ func TestJwtAuthorizationHeaderToContext_PostQueryTokenIgnored(t *testing.T) {
 }
 
 func TestJwtAuthorizationHeaderToContext_PostBodyIgnoredForWrongContentType(t *testing.T) {
-	mockTokenParser := new(mock_oauth.TokenParser)
+	mockTokenParser := new(mock_middleware.TokenParser)
 	middleware := NewMiddlewareBearerToken(mockTokenParser)
 
 	req := httptest.NewRequest("POST", "/userinfo", strings.NewReader("access_token=jsontoken"))
@@ -292,7 +291,7 @@ func TestJwtAuthorizationHeaderToContext_PostBodyIgnoredForWrongContentType(t *t
 }
 
 func TestJwtAuthorizationHeaderToContext_PostBodyEmptyAccessToken(t *testing.T) {
-	mockTokenParser := new(mock_oauth.TokenParser)
+	mockTokenParser := new(mock_middleware.TokenParser)
 	middleware := NewMiddlewareBearerToken(mockTokenParser)
 
 	req := httptest.NewRequest("POST", "/userinfo", strings.NewReader("access_token="))
@@ -313,7 +312,7 @@ func TestJwtAuthorizationHeaderToContext_PostBodyEmptyAccessToken(t *testing.T) 
 }
 
 func TestJwtAuthorizationHeaderToContext_PostBodyNoAccessTokenParameter(t *testing.T) {
-	mockTokenParser := new(mock_oauth.TokenParser)
+	mockTokenParser := new(mock_middleware.TokenParser)
 	middleware := NewMiddlewareBearerToken(mockTokenParser)
 
 	req := httptest.NewRequest("POST", "/userinfo", strings.NewReader("other_param=value"))
@@ -334,7 +333,7 @@ func TestJwtAuthorizationHeaderToContext_PostBodyNoAccessTokenParameter(t *testi
 }
 
 func TestJwtAuthorizationHeaderToContext_PostBodyContentTypeWithCharset(t *testing.T) {
-	mockTokenParser := new(mock_oauth.TokenParser)
+	mockTokenParser := new(mock_middleware.TokenParser)
 	middleware := NewMiddlewareBearerToken(mockTokenParser)
 
 	expectedToken := &oauth.JwtToken{
@@ -364,7 +363,7 @@ func TestJwtAuthorizationHeaderToContext_PostBodyContentTypeWithCharset(t *testi
 }
 
 func TestJwtAuthorizationHeaderToContext_PostBodyWithOtherParameters(t *testing.T) {
-	mockTokenParser := new(mock_oauth.TokenParser)
+	mockTokenParser := new(mock_middleware.TokenParser)
 	middleware := NewMiddlewareBearerToken(mockTokenParser)
 
 	expectedToken := &oauth.JwtToken{
@@ -394,7 +393,7 @@ func TestJwtAuthorizationHeaderToContext_PostBodyWithOtherParameters(t *testing.
 }
 
 func TestJwtAuthorizationHeaderToContext_EmptyBearerTokenInHeader(t *testing.T) {
-	mockTokenParser := new(mock_oauth.TokenParser)
+	mockTokenParser := new(mock_middleware.TokenParser)
 	middleware := NewMiddlewareBearerToken(mockTokenParser)
 
 	expectedToken := &oauth.JwtToken{
@@ -426,7 +425,7 @@ func TestJwtAuthorizationHeaderToContext_EmptyBearerTokenInHeader(t *testing.T) 
 }
 
 func TestJwtAuthorizationHeaderToContext_PutRequestIgnoresPostBody(t *testing.T) {
-	mockTokenParser := new(mock_oauth.TokenParser)
+	mockTokenParser := new(mock_middleware.TokenParser)
 	middleware := NewMiddlewareBearerToken(mockTokenParser)
 
 	// PUT request should NOT extract token from body
@@ -449,7 +448,7 @@ func TestJwtAuthorizationHeaderToContext_PutRequestIgnoresPostBody(t *testing.T)
 
 func TestJwtSessionHandler_ValidSession(t *testing.T) {
 	const testSessionName = "test-session"
-	mockTokenParser := new(mock_oauth.TokenParser)
+	mockTokenParser := new(mock_middleware.TokenParser)
 	mockAuthHelper := new(mock_middleware.AuthHelper)
 	mockSessionStore := new(mock_sessionstore.Store)
 
@@ -506,7 +505,7 @@ func TestJwtSessionHandler_ValidSession(t *testing.T) {
 
 func TestJwtSessionHandler_InvalidSession(t *testing.T) {
 	const testSessionName = "test-session"
-	mockTokenParser := new(mock_oauth.TokenParser)
+	mockTokenParser := new(mock_middleware.TokenParser)
 	mockAuthHelper := new(mock_middleware.AuthHelper)
 	mockSessionStore := new(mock_sessionstore.Store)
 
@@ -530,7 +529,7 @@ func TestJwtSessionHandler_InvalidSession(t *testing.T) {
 
 func TestJwtSessionHandler_NoJwtInSession(t *testing.T) {
 	const testSessionName = "test-session"
-	mockTokenParser := new(mock_oauth.TokenParser)
+	mockTokenParser := new(mock_middleware.TokenParser)
 	mockAuthHelper := new(mock_middleware.AuthHelper)
 	mockSessionStore := new(mock_sessionstore.Store)
 
@@ -558,7 +557,7 @@ func TestJwtSessionHandler_NoJwtInSession(t *testing.T) {
 
 func TestJwtSessionHandler_InvalidTokenInSession(t *testing.T) {
 	const testSessionName = "test-session"
-	mockTokenParser := new(mock_oauth.TokenParser)
+	mockTokenParser := new(mock_middleware.TokenParser)
 	mockAuthHelper := new(mock_middleware.AuthHelper)
 	mockSessionStore := new(mock_sessionstore.Store)
 
@@ -625,7 +624,7 @@ func TestJwtSessionHandler_InvalidIssuer(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			const testSessionName = "test-session"
-			mockTokenParser := new(mock_oauth.TokenParser)
+			mockTokenParser := new(mock_middleware.TokenParser)
 			mockAuthHelper := new(mock_middleware.AuthHelper)
 			mockSessionStore := new(mock_sessionstore.Store)
 
@@ -694,7 +693,7 @@ func TestJwtSessionHandler_InvalidIssuer(t *testing.T) {
 
 func TestJwtSessionHandler_ValidRefreshToken(t *testing.T) {
 	const testSessionName = "test-session"
-	mockTokenParser := new(mock_oauth.TokenParser)
+	mockTokenParser := new(mock_middleware.TokenParser)
 	mockAuthHelper := new(mock_middleware.AuthHelper)
 	mockSessionStore := new(mock_sessionstore.Store)
 	mockHTTPClient := &mockHTTPClient{}
@@ -775,7 +774,7 @@ func TestJwtSessionHandler_ValidRefreshToken(t *testing.T) {
 
 func TestRefreshToken_Success(t *testing.T) {
 	const testSessionName = "test-session"
-	mockTokenParser := new(mock_oauth.TokenParser)
+	mockTokenParser := new(mock_middleware.TokenParser)
 	mockAuthHelper := new(mock_middleware.AuthHelper)
 	mockSessionStore := new(mock_sessionstore.Store)
 	mockHTTPClient := &mockHTTPClient{}
@@ -826,7 +825,7 @@ func TestRefreshToken_Success(t *testing.T) {
 
 func TestRefreshToken_NoRefreshToken(t *testing.T) {
 	const testSessionName = "test-session"
-	mockTokenParser := new(mock_oauth.TokenParser)
+	mockTokenParser := new(mock_middleware.TokenParser)
 	mockAuthHelper := new(mock_middleware.AuthHelper)
 	mockSessionStore := new(mock_sessionstore.Store)
 	mockHTTPClient := &mockHTTPClient{}
@@ -858,7 +857,7 @@ func TestRefreshToken_NoRefreshToken(t *testing.T) {
 // which needs no panic harness: a panic in a test is a failed test.
 func TestRefreshToken_NilHTTPClientFailsClosed(t *testing.T) {
 	const testSessionName = "test-session"
-	mockTokenParser := new(mock_oauth.TokenParser)
+	mockTokenParser := new(mock_middleware.TokenParser)
 	mockAuthHelper := new(mock_middleware.AuthHelper)
 	mockSessionStore := new(mock_sessionstore.Store)
 
@@ -883,7 +882,7 @@ func TestRefreshToken_NilHTTPClientFailsClosed(t *testing.T) {
 
 func TestRefreshToken_InvalidResponse(t *testing.T) {
 	const testSessionName = "test-session"
-	mockTokenParser := new(mock_oauth.TokenParser)
+	mockTokenParser := new(mock_middleware.TokenParser)
 	mockAuthHelper := new(mock_middleware.AuthHelper)
 	mockSessionStore := new(mock_sessionstore.Store)
 	mockHTTPClient := &mockHTTPClient{}
@@ -916,7 +915,7 @@ func TestRefreshToken_InvalidResponse(t *testing.T) {
 
 func TestRequiresScope_Authorized(t *testing.T) {
 	const testSessionName = "test-session"
-	mockTokenParser := new(mock_oauth.TokenParser)
+	mockTokenParser := new(mock_middleware.TokenParser)
 	mockAuthHelper := new(mock_middleware.AuthHelper)
 	mockSessionStore := new(mock_sessionstore.Store)
 
@@ -949,7 +948,7 @@ func TestRequiresScope_Authorized(t *testing.T) {
 
 func TestRequiresScope_Unauthorized(t *testing.T) {
 	const testSessionName = "test-session"
-	mockTokenParser := new(mock_oauth.TokenParser)
+	mockTokenParser := new(mock_middleware.TokenParser)
 	mockAuthHelper := new(mock_middleware.AuthHelper)
 	mockSessionStore := new(mock_sessionstore.Store)
 
@@ -987,7 +986,7 @@ func TestRequiresScope_Unauthorized(t *testing.T) {
 // identity, and the argument here is what reaches RedirToAuthorize (#285).
 func TestRequiresScope_Unauthenticated(t *testing.T) {
 	const testSessionName = "test-session"
-	mockTokenParser := new(mock_oauth.TokenParser)
+	mockTokenParser := new(mock_middleware.TokenParser)
 	mockAuthHelper := new(mock_middleware.AuthHelper)
 	mockSessionStore := new(mock_sessionstore.Store)
 
@@ -1017,7 +1016,7 @@ func TestRequiresScope_Unauthenticated(t *testing.T) {
 
 func TestRequiresScope_NoJwtInfo(t *testing.T) {
 	const testSessionName = "test-session"
-	mockTokenParser := new(mock_oauth.TokenParser)
+	mockTokenParser := new(mock_middleware.TokenParser)
 	mockAuthHelper := new(mock_middleware.AuthHelper)
 	mockSessionStore := new(mock_sessionstore.Store)
 
@@ -1042,7 +1041,7 @@ func TestRequiresScope_NoJwtInfo(t *testing.T) {
 
 func TestRequiresScope_RedirectError(t *testing.T) {
 	const testSessionName = "test-session"
-	mockTokenParser := new(mock_oauth.TokenParser)
+	mockTokenParser := new(mock_middleware.TokenParser)
 	mockAuthHelper := new(mock_middleware.AuthHelper)
 	mockSessionStore := new(mock_sessionstore.Store)
 
@@ -1253,7 +1252,7 @@ func oversizedRefreshResponse() *countingRefreshBody {
 
 func TestRefreshToken_ReadsAtMostTheCap(t *testing.T) {
 	const testSessionName = "test-session"
-	mockTokenParser := new(mock_oauth.TokenParser)
+	mockTokenParser := new(mock_middleware.TokenParser)
 	mockAuthHelper := new(mock_middleware.AuthHelper)
 	mockSessionStore := new(mock_sessionstore.Store)
 	mockHTTPClient := &mockHTTPClient{}
@@ -1334,7 +1333,7 @@ func TestJwtSessionHandler_RefreshesOnACancelledRequestContext(t *testing.T) {
 
 	transport := &recordingTransport{inner: http.DefaultTransport}
 
-	mockTokenParser := new(mock_oauth.TokenParser)
+	mockTokenParser := new(mock_middleware.TokenParser)
 	mockAuthHelper := new(mock_middleware.AuthHelper)
 	mockSessionStore := new(mock_sessionstore.Store)
 
