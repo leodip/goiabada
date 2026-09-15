@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"sort"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/leodip/goiabada/core/constants"
@@ -1211,4 +1212,178 @@ func TestBuildScopeString_SpecialCharacters(t *testing.T) {
 	for _, scope := range expectedScopes {
 		assert.Contains(t, resultParts, scope, "Result should contain scope: "+scope)
 	}
+}
+
+// =============================================================================
+// The refresh grant's bounds, goal 9 of #338.
+//
+// refreshToken is the third of the three reads the admin console makes of the
+// auth server, and it is a separate io.ReadAll that neither core/oauth case can
+// observe. It is also one of the two grants decision 12 detaches from the
+// browser's context, and that one is observable only here.
+// =============================================================================
+
+// countingRefreshBody serves a fixed body and records how much was read. Finite
+// and larger than the cap: an unbounded read consumes all of it and parses
+// cleanly, a bounded one stops at the cap and hands json.Unmarshal a truncated
+// object, so both the count and the outcome flip when the cap goes.
+type countingRefreshBody struct {
+	remaining []byte
+	read      int64
+}
+
+func (b *countingRefreshBody) Read(p []byte) (int, error) {
+	if len(b.remaining) == 0 {
+		return 0, io.EOF
+	}
+	n := copy(p, b.remaining)
+	b.remaining = b.remaining[n:]
+	b.read += int64(n)
+	return n, nil
+}
+
+func (b *countingRefreshBody) Close() error { return nil }
+
+func oversizedRefreshResponse() *countingRefreshBody {
+	prefix := `{"access_token":"newaccesstoken","refresh_token":"newrefreshtoken","scope":"`
+	suffix := `"}`
+	padding := oauth.MaxTokenResponseBytes + 1024 - len(prefix) - len(suffix)
+	return &countingRefreshBody{remaining: []byte(prefix + strings.Repeat("x", padding) + suffix)}
+}
+
+func TestRefreshToken_ReadsAtMostTheCap(t *testing.T) {
+	const testSessionName = "test-session"
+	mockTokenParser := new(mock_oauth.TokenParser)
+	mockAuthHelper := new(mock_middleware.AuthHelper)
+	mockSessionStore := new(mock_sessionstore.Store)
+	mockHTTPClient := &mockHTTPClient{}
+
+	middleware := NewMiddlewareJwt(mockSessionStore, testSessionName, mockTokenParser,
+		stubIssuerReader{issuer: "https://example.com"}, mockAuthHelper, stubErrorRenderer{},
+		mockHTTPClient, "http://localhost:9090", "http://localhost:9091", "admin-console-client", "secret123")
+
+	req := httptest.NewRequest("GET", "/", nil)
+	rr := httptest.NewRecorder()
+
+	body := oversizedRefreshResponse()
+	mockHTTPClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
+		StatusCode: http.StatusOK,
+		Body:       body,
+	}, nil)
+
+	refreshed, err := middleware.refreshToken(rr, req, &oauth.TokenResponse{
+		AccessToken:  "oldaccesstoken",
+		RefreshToken: "oldrefreshtoken",
+	})
+
+	assert.False(t, refreshed)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "error parsing refresh token response",
+		"the answer reaches json.Unmarshal truncated rather than being refused outright")
+	assert.Equal(t, int64(oauth.MaxTokenResponseBytes), body.read,
+		"exactly the cap is read from a peer answering with more than it")
+
+	// The session is reached only after the parse succeeds, so an oversized
+	// answer never becomes the administrator's session.
+	mockSessionStore.AssertNotCalled(t, "Save", mock.Anything, mock.Anything, mock.Anything)
+	mockHTTPClient.AssertExpectations(t)
+}
+
+// recordingTransport reports what the outbound request's context looked like at
+// the moment it was handed to the transport. That context is the only place
+// decision 12 is observable: a plain r.Context() here is already cancelled and
+// the round trip never leaves the process.
+type recordingTransport struct {
+	inner       http.RoundTripper
+	mu          sync.Mutex
+	hadDeadline bool
+	ctxErr      error
+}
+
+func (rt *recordingTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+	rt.mu.Lock()
+	_, rt.hadDeadline = r.Context().Deadline()
+	rt.ctxErr = r.Context().Err()
+	rt.mu.Unlock()
+	return rt.inner.RoundTrip(r)
+}
+
+// Decision 12, the refresh_token half. refresh_token is single use: the auth
+// server revokes the old token as part of issuing the new one, so a refresh
+// abandoned because the browser went away leaves the console holding a revoked
+// token and signs the administrator out on their next page load. The inbound
+// request here is already cancelled, which is exactly that situation, and the
+// refresh has to complete anyway.
+//
+// A real httptest.Server rather than a mock client, because a cancelled context
+// is refused by the transport and not by anything above it: a double that
+// ignores the context would pass this with r.Context() restored.
+func TestJwtSessionHandler_RefreshesOnACancelledRequestContext(t *testing.T) {
+	const testSessionName = "test-session"
+
+	authServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = r.ParseForm()
+		if r.URL.Path != "/auth/token" || r.PostFormValue("grant_type") != "refresh_token" {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"access_token":"newaccesstoken","refresh_token":"newrefreshtoken"}`))
+	}))
+	defer authServer.Close()
+
+	transport := &recordingTransport{inner: http.DefaultTransport}
+
+	mockTokenParser := new(mock_oauth.TokenParser)
+	mockAuthHelper := new(mock_middleware.AuthHelper)
+	mockSessionStore := new(mock_sessionstore.Store)
+
+	middleware := NewMiddlewareJwt(mockSessionStore, testSessionName, mockTokenParser,
+		stubIssuerReader{issuer: "https://example.com"}, mockAuthHelper, stubErrorRenderer{},
+		&http.Client{Transport: transport}, authServer.URL, "http://localhost:9091",
+		"admin-console-client", "secret123")
+
+	session := &sessionstore.Session{
+		Values: map[string]any{
+			constants.SessionKeyJwt: oauth.TokenResponse{
+				AccessToken:  "oldaccesstoken",
+				RefreshToken: "oldrefreshtoken",
+			},
+		},
+	}
+	mockSessionStore.On("Get", mock.Anything, testSessionName).Return(session, nil)
+	mockSessionStore.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+
+	// The expired access token is what sends the middleware down the refresh path.
+	mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "oldaccesstoken",
+		mock.Anything, true).Return(nil, errors.New("token is expired"))
+	mockTokenParser.On("DecodeAndValidateTokenResponse", mock.Anything, mock.Anything).
+		Return(&oauth.JwtInfo{}, nil)
+
+	// The browser has gone: the inbound request's context is already done before
+	// the handler runs.
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	req := httptest.NewRequest("GET", "/", nil).WithContext(ctx)
+	rr := httptest.NewRecorder()
+
+	var reached bool
+	middleware.JwtSessionHandler()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		reached = true
+		w.WriteHeader(http.StatusOK)
+	})).ServeHTTP(rr, req)
+
+	assert.True(t, reached, "the chain continues")
+
+	newTokenResponse, ok := session.Values[constants.SessionKeyJwt].(oauth.TokenResponse)
+	require.True(t, ok, "the refresh completed and its result reached the session")
+	assert.Equal(t, "newaccesstoken", newTokenResponse.AccessToken)
+	assert.Equal(t, "newrefreshtoken", newTokenResponse.RefreshToken)
+
+	transport.mu.Lock()
+	defer transport.mu.Unlock()
+	assert.NoError(t, transport.ctxErr,
+		"the outbound request runs on a context detached from the browser's")
+	assert.True(t, transport.hadDeadline,
+		"detached, but not unbounded: the deadline is what replaces the cancellation")
 }

@@ -11,6 +11,25 @@ package oauth
 import (
 	"crypto/sha256"
 	"encoding/base64"
+	"time"
+)
+
+// TokenExchangeTimeout bounds one call the admin console makes to the auth server, and
+// MaxTokenResponseBytes bounds how much of the answer is read. Both take the values the
+// admin console already applies to the same endpoint: SessionTokenSource in
+// adminconsole/internal/apiclient/session_client.go performs a client_credentials exchange
+// against /auth/token with exactly this timeout and this limit, and its sibling
+// session_backend.go writes down the reason for the ten seconds -- a lookup on the request
+// path of every page has to become an error quickly rather than holding the browser open.
+// Three calls doing the same thing against the same endpoint must not carry three different
+// numbers.
+//
+// Neither is configuration. A new environment variable is a name the product has to keep,
+// and nothing here needs tuning per deployment: a deployment where these bite was already
+// failing at session_backend.go (#338).
+const (
+	TokenExchangeTimeout  = 10 * time.Second
+	MaxTokenResponseBytes = 1 << 20
 )
 
 func GeneratePKCECodeChallenge(codeVerifier string) string {

@@ -30,8 +30,8 @@ import (
 // 500; it exists so the handler stops before it needs a token response to parse.
 type failingExchanger struct{}
 
-func (failingExchanger) ExchangeCodeForTokens(code, redirectURI, clientId, clientSecret,
-	codeVerifier, tokenEndpoint string) (*oauth.TokenResponse, error) {
+func (failingExchanger) ExchangeCodeForTokens(_ context.Context, code, redirectURI, clientId,
+	clientSecret, codeVerifier, tokenEndpoint string) (*oauth.TokenResponse, error) {
 	return nil, errs.New("the auth server refused the code")
 }
 

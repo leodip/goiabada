@@ -5,6 +5,7 @@ import (
 	"crypto/rsa"
 	"encoding/base64"
 	"encoding/json"
+	"io"
 	"log/slog"
 	"math/big"
 	"net/http"
@@ -29,7 +30,7 @@ type JWKSTokenParser struct {
 // reachable base URL for the auth server (InternalBaseURL if set, otherwise BaseURL).
 func NewJWKSTokenParser(baseURL string, httpClient *http.Client) *JWKSTokenParser {
 	if httpClient == nil {
-		httpClient = &http.Client{}
+		httpClient = &http.Client{Timeout: TokenExchangeTimeout}
 	}
 	return &JWKSTokenParser{
 		jwksURL:    strings.TrimRight(baseURL, "/") + "/certs",
@@ -139,8 +140,12 @@ func (tp *JWKSTokenParser) refreshJwks(ctx context.Context) error {
 		slog.ErrorContext(ctx, "unable to fetch the jwks document", "status", resp.StatusCode)
 		return errs.New("failed to fetch JWKS")
 	}
+	// Bounded like the other two reads the admin console makes of the auth server. The
+	// request keeps its own context rather than a detached one: fetching /certs is an
+	// idempotent read of a document the server holds no state for, so abandoning it when
+	// the browser goes away loses nothing (#338).
 	var jwks Jwks
-	if err := json.NewDecoder(resp.Body).Decode(&jwks); err != nil {
+	if err := json.NewDecoder(io.LimitReader(resp.Body, MaxTokenResponseBytes)).Decode(&jwks); err != nil {
 		return err
 	}
 	tp.mu.Lock()

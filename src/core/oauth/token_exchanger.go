@@ -1,6 +1,7 @@
 package oauth
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -10,13 +11,23 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 )
 
-type TokenExchanger struct{}
+type TokenExchanger struct {
+	httpClient *http.Client
+}
 
-func NewTokenExchanger() *TokenExchanger {
-	return &TokenExchanger{}
+// NewTokenExchanger creates the client half of the authorization-code exchange. A nil
+// client gets one carrying TokenExchangeTimeout, so the deadline holds however the
+// composition root wires this; the caller passes its own so all three calls the admin
+// console makes to the auth server share one configured client (#338).
+func NewTokenExchanger(httpClient *http.Client) *TokenExchanger {
+	if httpClient == nil {
+		httpClient = &http.Client{Timeout: TokenExchangeTimeout}
+	}
+	return &TokenExchanger{httpClient: httpClient}
 }
 
 func (te *TokenExchanger) ExchangeCodeForTokens(
+	ctx context.Context,
 	code, redirectURI, clientId, clientSecret, codeVerifier, tokenEndpoint string,
 ) (*TokenResponse, error) {
 	data := url.Values{}
@@ -27,21 +38,23 @@ func (te *TokenExchanger) ExchangeCodeForTokens(
 	data.Set("client_secret", clientSecret) // Add client secret to form data
 	data.Set("code_verifier", codeVerifier)
 
-	req, err := http.NewRequest("POST", tokenEndpoint, strings.NewReader(data.Encode()))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, tokenEndpoint, strings.NewReader(data.Encode()))
 	if err != nil {
 		return nil, errs.Errorf("error creating request: %v", err)
 	}
 
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	resp, err := te.httpClient.Do(req)
 	if err != nil {
 		return nil, errs.Errorf("error sending request: %v", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	body, err := io.ReadAll(resp.Body)
+	// Bounded: the peer is the auth server, but a peer that answers with an endless body
+	// would otherwise be read into memory until the process dies. Cut rather than refused,
+	// which makes an oversized answer a parse failure here and a 500 to the administrator.
+	body, err := io.ReadAll(io.LimitReader(resp.Body, MaxTokenResponseBytes))
 	if err != nil {
 		return nil, errs.Errorf("error reading response: %v", err)
 	}

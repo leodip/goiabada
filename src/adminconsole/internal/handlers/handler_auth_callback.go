@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -8,6 +9,7 @@ import (
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
@@ -88,7 +90,16 @@ func HandleAuthCallbackPost(
 		clientID := constants.AdminConsoleClientIdentifier
 		clientSecret := config.GetAdminConsole().OAuthClientSecret
 
-		tokenResponse, err := tokenExchanger.ExchangeCodeForTokens(code, redirectURI, clientID,
+		// The browser may be gone; the auth server is not. authorization_code is single use,
+		// so the server has already burned the code by the time it answers, and abandoning
+		// the read loses the only copy of what it issued. WithoutCancel keeps the request's
+		// values, so request_id still reaches every record below, and drops only its
+		// cancellation; context.Background() would drop the request id with it. The deadline
+		// is what bounds this instead (#338).
+		ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), oauth.TokenExchangeTimeout)
+		defer cancel()
+
+		tokenResponse, err := tokenExchanger.ExchangeCodeForTokens(ctx, code, redirectURI, clientID,
 			clientSecret, codeVerifier, baseUrl+"/auth/token")
 		if err != nil {
 			httpHelper.InternalServerError(w, r, errs.Wrap(err, "could not exchange code for tokens"))

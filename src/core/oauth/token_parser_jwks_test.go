@@ -1,14 +1,17 @@
 package oauth
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"encoding/base64"
 	"encoding/json"
+	"io"
 	"math/big"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -16,6 +19,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestJWKSTokenParserRejectsNonRS256Token(t *testing.T) {
@@ -713,4 +717,58 @@ func TestGetPublicKeyFromCache(t *testing.T) {
 
 		assert.Nil(t, tp.getPublicKeyFromCache("key-1"))
 	})
+}
+
+// =============================================================================
+// The JWKS read bound, goal 9 of #338.
+//
+// refreshJwks is the third of the admin console's three reads of the auth
+// server and the only one that decodes straight off the body rather than
+// reading it first, so neither the exchanger's cases nor the middleware's
+// observe it. The counting body from token_exchanger_bounds_test.go is the same
+// seam seen through the parser's own injected client.
+// =============================================================================
+
+// oversizedJwks is a valid JWKS document padded past the cap by one key's
+// modulus. Valid matters for the same reason as oversizedTokenResponse: without
+// the cap it decodes cleanly, so the case fails on both the count and the
+// outcome when the cap goes.
+func oversizedJwks(t *testing.T) *countingBody {
+	t.Helper()
+	prefix := `{"keys":[{"kty":"RSA","kid":"key-1","alg":"RS256","use":"sig","e":"AQAB","n":"`
+	suffix := `"}]}`
+	padding := MaxTokenResponseBytes + 1024 - len(prefix) - len(suffix)
+	return &countingBody{remaining: []byte(prefix + strings.Repeat("x", padding) + suffix)}
+}
+
+func TestRefreshJwks_ReadsAtMostTheCap(t *testing.T) {
+	body := oversizedJwks(t)
+
+	tp := NewJWKSTokenParser("https://auth.example.com",
+		clientReturning(http.StatusOK, body))
+
+	err := tp.refreshJwks(context.Background())
+
+	require.Error(t, err, "the document reaches the decoder truncated and fails to parse")
+	assert.Equal(t, int64(MaxTokenResponseBytes), body.read.Load(),
+		"exactly the cap is read from a peer answering with more than it")
+	assert.Empty(t, tp.cachedJwks.Keys, "nothing is cached from a document that did not decode")
+}
+
+// The benign member of the class: a document under the cap still decodes, so the
+// case above cannot be read as "large JWKS documents are refused".
+func TestRefreshJwks_AcceptsADocumentUnderTheCap(t *testing.T) {
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+
+	encoded, err := json.Marshal(Jwks{Keys: []Jwk{jwkFromPublicKey("key-1", &key.PublicKey)}})
+	require.NoError(t, err)
+	require.Less(t, len(encoded), MaxTokenResponseBytes)
+
+	tp := NewJWKSTokenParser("https://auth.example.com",
+		clientReturning(http.StatusOK, io.NopCloser(bytes.NewReader(encoded))))
+
+	require.NoError(t, tp.refreshJwks(context.Background()))
+	require.Len(t, tp.cachedJwks.Keys, 1)
+	assert.Equal(t, "key-1", tp.cachedJwks.Keys[0].Kid)
 }
