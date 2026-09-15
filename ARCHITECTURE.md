@@ -13,9 +13,10 @@ it becomes a cycle, so it is the kind of rule that decays silently. This reposit
 that lesson once about prose: `AssertAgentDocs` exists because the state machine documented in
 `CLAUDE.md` had moved underneath the description while every test stayed green (#252).
 
-The refactor that these rules were written for is the 29-issue Core Refactor epic. Its full
+The refactor that these rules were written for is the 16-issue Core Refactor epic. Its full
 checklist lives in [#332](https://github.com/leodip/goiabada/issues/332); every `moves in` and
-`cleared by` cell below names one of its issues.
+`cleared by` cell below names one of its issues. The epic was cut into 29 issues originally and
+regrouped into 16 on 2025-09-15, so a cell naming an issue outside that checklist is stale.
 
 ## Module graph
 
@@ -83,10 +84,10 @@ A row whose owner is not `kernel` names the issue that moves it. A `kernel` row 
 |---|---|---|
 | `core/api` | kernel | — |
 | `core/auditlog` | authserver | #359 |
-| `core/cmd` | authserver | #358 |
-| `core/communication` | authserver | #347 |
+| `core/cmd` | authserver | #354 |
+| `core/communication` | authserver | #346 |
 | `core/config` | split | #351 |
-| `core/constants` | split | #352 |
+| `core/constants` | split | #351 |
 | `core/countries` | kernel | — |
 | `core/customerrors` | kernel | — |
 | `core/data` | authserver | #359 |
@@ -96,24 +97,24 @@ A row whose owner is not `kernel` names the issue that moves it. A `kernel` row 
 | `core/handlerhelpers` | kernel | — |
 | `core/hashutil` | authserver | #360 |
 | `core/i18n` | kernel | — |
-| `core/imaging` | authserver | #348 |
+| `core/imaging` | authserver | #346 |
 | `core/locales` | kernel | — |
 | `core/logging` | kernel | — |
 | `core/middleware` | kernel | — |
 | `core/mocks` | kernel | — |
 | `core/models` | authserver | #359 |
 | `core/oauth` | kernel | — |
-| `core/oauthdb` | authserver | #340 |
+| `core/oauthdb` | authserver | #339 |
 | `core/oauthprovider` | authserver | #339 |
 | `core/oidc` | authserver | #360 |
-| `core/otp` | authserver | #348 |
-| `core/phonecountries` | authserver | #345 |
+| `core/otp` | authserver | #346 |
+| `core/phonecountries` | authserver | #344 |
 | `core/rsautil` | authserver | #360 |
 | `core/sessionstore` | kernel | — |
 | `core/stringutil` | kernel | — |
 | `core/testutil` | kernel | — |
 | `core/timezones` | kernel | — |
-| `core/uithemes` | authserver | #348 |
+| `core/uithemes` | authserver | #346 |
 | `core/urlutil` | authserver | #360 |
 | `core/user` | authserver | #346 |
 | `core/useragent` | authserver | #346 |
@@ -130,13 +131,15 @@ Notes on rows that are not self-evident:
   They are still held to the kernel rule: `core/testutil/fake` imports `core/uuidutil` today, and
   that is an exception below rather than a waiver, because #360 moves `uuidutil` and the edge has to
   be noticed then.
-- `core/api` stays, but only as declarations. The model-aware `ToResponse` mapping leaves in #349
-  and the model-typed fields leave in #350; what remains is the wire contract the admin console
-  decodes.
+- `core/api` stays, but only as declarations. The model-aware `ToResponse` mapping and the
+  model-typed fields both leave in #350; what remains is the wire contract the admin console
+  decodes. The mapping was once #349's alone, but moving it without the fields — and without the
+  reverse `ToUser()`/`ToGroup()` methods the admin console's `apiclient` calls 32 times — would have
+  left every exception row below standing, so the two are one issue.
 - `core/oauth` is the largest split. The admin console is an OAuth client: it needs token response
   values, PKCE and JWT/JWKS validation. It does not issue codes or tokens and does not rotate
-  signing keys. #338 drew that line: the provider half is `core/oauthprovider`, which #339,
-  #341, #342 and #343 carry to the auth server.
+  signing keys. #338 drew that line: the provider half is `core/oauthprovider`, which #339 carries
+  to the auth server whole.
 
 ## Rules
 
@@ -234,16 +237,16 @@ every driver. One of the core packages the admin console imports reaches `core/d
 `core/validators`. #338 closed the other, `core/oauth`, and the rows stayed `yes`, which is why the
 table asserts reachability rather than counting edges.
 
-All five rows say #353 rather than #359, which is worth explaining because the ordering does not
-suggest it. `core/data/database.go` is the only production file in `core` that imports an engine
+All five rows say #353 rather than #354 or #359, which is worth explaining because the ordering
+does not suggest it. `core/data/database.go` is the only production file in `core` that imports an engine
 package — every other importer is an auth-server test — so it is the single cut point, and #353
 point 7 already requires that `core/data` stop importing the four engines. The drivers therefore
-leave the admin console's binary at 22/29, six issues before the persistence packages themselves
+leave the admin console's binary at 13/16, two issues before the persistence packages themselves
 move. #353 reads like a staging step, so the effect is easy to miss; the guard will not miss it,
 because these rows go stale the moment it lands.
 
 `github.com/pquerna/otp` is listed at `no` deliberately. It is not reachable now, `core/otp` moves
-to the auth server in #348, and the row states that it must not arrive in the meantime.
+to the auth server in #346, and the row states that it must not arrive in the meantime.
 
 The table is a declared list, not a discovery mechanism: it asserts these modules and says nothing
 about a dependency nobody has written a row for. Closing that would mean an allowlist of every
