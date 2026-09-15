@@ -13,8 +13,8 @@ import (
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/handlerhelpers"
 	core_middleware "github.com/leodip/goiabada/core/middleware"
-	"github.com/leodip/goiabada/core/oauth"
 	oauthdb "github.com/leodip/goiabada/core/oauthdb"
+	"github.com/leodip/goiabada/core/oauthprovider"
 	"github.com/leodip/goiabada/core/otp"
 	"github.com/leodip/goiabada/core/user"
 	"github.com/leodip/goiabada/core/validators"
@@ -38,10 +38,10 @@ func (s *Server) initRoutes(root chi.Router) {
 	phoneValidator := validators.NewPhoneValidator()
 	identifierValidator := validators.NewIdentifierValidator()
 
-	codeIssuer := oauth.NewCodeIssuer(s.database)
+	codeIssuer := oauthprovider.NewCodeIssuer(s.database)
 	userSessionManager := user.NewUserSessionManager(s.sessionStore, constants.AuthServerSessionName, s.database)
 	otpSecretGenerator := otp.NewOTPSecretGenerator()
-	tokenIssuer := oauth.NewTokenIssuer(s.database, s.baseURL)
+	tokenIssuer := oauthprovider.NewTokenIssuer(s.database, s.baseURL)
 	userCreator := user.NewUserCreator(s.database)
 	emailSender := communication.NewEmailSender()
 

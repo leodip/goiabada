@@ -18,6 +18,7 @@ import (
 	"github.com/leodip/goiabada/core/mocks"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/oauthprovider"
 	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/leodip/goiabada/core/validators"
 	"github.com/stretchr/testify/assert"
@@ -96,8 +97,8 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
-			return ac.AuthState == oauth.AuthStateInitial &&
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
+			return ac.AuthState == oauthprovider.AuthStateInitial &&
 				ac.ClientId == "test-client" &&
 				ac.RedirectURI == "https://example.com" &&
 				ac.ResponseType == "code" &&
@@ -138,8 +139,8 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
 
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
-			return ac.AuthState == oauth.AuthStateLevel1ExistingSession &&
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
+			return ac.AuthState == oauthprovider.AuthStateLevel1ExistingSession &&
 				ac.UserId == 123 &&
 				ac.AcrLevel == userSession.AcrLevel &&
 				ac.AuthMethods == userSession.AuthMethods &&
@@ -185,8 +186,8 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
-			return ac.AuthState == oauth.AuthStateInitial &&
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
+			return ac.AuthState == oauthprovider.AuthStateInitial &&
 				ac.ClientId == "test-client" &&
 				ac.RedirectURI == "https://example.com" &&
 				ac.ResponseType == "code" &&
@@ -214,8 +215,8 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		userSessionManager.On("HasValidUserSession", mock.Anything, (*models.UserSession)(nil), mock.AnythingOfType("*int")).Return(false)
 
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
-			return ac.AuthState == oauth.AuthStateRequiresLevel1
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
+			return ac.AuthState == oauthprovider.AuthStateRequiresLevel1
 		})).Return(nil)
 
 		handler.ServeHTTP(rr, req)
@@ -248,8 +249,8 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
-			return ac.AuthState == oauth.AuthStateInitial &&
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
+			return ac.AuthState == oauthprovider.AuthStateInitial &&
 				ac.ClientId == "invalid-client" &&
 				ac.RedirectURI == "https://example.com" &&
 				ac.ResponseType == "code" &&
@@ -305,7 +306,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		authHelper.On("SaveAuthContext", rr, req, mock.AnythingOfType("*oauth.AuthContext")).Return(nil)
+		authHelper.On("SaveAuthContext", rr, req, mock.AnythingOfType("*oauthprovider.AuthContext")).Return(nil)
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
 
 		// _httpStatus is what RenderTemplate turns into the response code, so it is asserted here
@@ -369,7 +370,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		authHelper.On("SaveAuthContext", rr, req, mock.AnythingOfType("*oauth.AuthContext")).Return(nil)
+		authHelper.On("SaveAuthContext", rr, req, mock.AnythingOfType("*oauthprovider.AuthContext")).Return(nil)
 		authHelper.On("ClearAuthContext", rr, req).Return(nil)
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*validators.ValidateUnsupportedRequestParametersInput")).Return(nil)
@@ -423,8 +424,8 @@ func TestHandleAuthorizeGet(t *testing.T) {
 			assert.NoError(t, err)
 			rr := httptest.NewRecorder()
 
-			var saved *oauth.AuthContext
-			authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
+			var saved *oauthprovider.AuthContext
+			authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
 				saved = ac
 				return true
 			})).Return(nil).Once()
@@ -475,8 +476,8 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
-			return ac.AuthState == oauth.AuthStateInitial &&
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
+			return ac.AuthState == oauthprovider.AuthStateInitial &&
 				ac.ClientId == "test-client" &&
 				ac.RedirectURI == "https://example.com" &&
 				ac.ResponseType == "invalid" &&
@@ -534,8 +535,8 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
-			return ac.AuthState == oauth.AuthStateInitial &&
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
+			return ac.AuthState == oauthprovider.AuthStateInitial &&
 				ac.ClientId == "test-client" &&
 				ac.RedirectURI == "https://example.com" &&
 				ac.ResponseType == "code" &&
@@ -602,7 +603,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		authHelper.On("SaveAuthContext", rr, req, mock.AnythingOfType("*oauth.AuthContext")).Return(nil)
+		authHelper.On("SaveAuthContext", rr, req, mock.AnythingOfType("*oauthprovider.AuthContext")).Return(nil)
 
 		// A failed clear writes no cookie, so the browser keeps the auth context whatever the
 		// handler does next. The client is still owed its error response, and server_error is
@@ -670,7 +671,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		authHelper.On("SaveAuthContext", rr, req, mock.AnythingOfType("*oauth.AuthContext")).Return(nil)
+		authHelper.On("SaveAuthContext", rr, req, mock.AnythingOfType("*oauthprovider.AuthContext")).Return(nil)
 		authHelper.On("ClearAuthContext", rr, req).Return(errors.New("the session store is unreachable"))
 
 		// The clear failed and the server_error response the client is owed cannot be built
@@ -734,7 +735,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		authHelper.On("SaveAuthContext", rr, req, mock.AnythingOfType("*oauth.AuthContext")).Return(nil)
+		authHelper.On("SaveAuthContext", rr, req, mock.AnythingOfType("*oauthprovider.AuthContext")).Return(nil)
 
 		// The other half of the same family: here the clear succeeds and it is the ordinary
 		// refusal that cannot be committed. This is the closure's second and pre-existing 500,
@@ -791,8 +792,8 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
-			return ac.AuthState == oauth.AuthStateInitial &&
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
+			return ac.AuthState == oauthprovider.AuthStateInitial &&
 				ac.ClientId == "test-client" &&
 				ac.RedirectURI == "https://example.com" &&
 				ac.ResponseType == "code" &&
@@ -863,7 +864,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		authHelper.On("SaveAuthContext", rr, req, mock.AnythingOfType("*oauth.AuthContext")).Return(customerrors.ErrNoAuthContext)
+		authHelper.On("SaveAuthContext", rr, req, mock.AnythingOfType("*oauthprovider.AuthContext")).Return(customerrors.ErrNoAuthContext)
 
 		// Expect the InternalServerError call
 		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
@@ -899,8 +900,8 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
-			return ac.AuthState == oauth.AuthStateInitial &&
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
+			return ac.AuthState == oauthprovider.AuthStateInitial &&
 				ac.ClientId == "test-client" &&
 				ac.RedirectURI == "https://example.com" &&
 				ac.ResponseType == "code" &&
@@ -937,8 +938,8 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
 
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
-			return ac.AuthState == oauth.AuthStateLevel1ExistingSession &&
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
+			return ac.AuthState == oauthprovider.AuthStateLevel1ExistingSession &&
 				ac.UserId == 123 &&
 				ac.ClientId == "test-client" &&
 				ac.RedirectURI == "https://example.com" &&
@@ -989,8 +990,8 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
-			return ac.AuthState == oauth.AuthStateInitial &&
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
+			return ac.AuthState == oauthprovider.AuthStateInitial &&
 				ac.ClientId == "test-client" &&
 				ac.RedirectURI == "https://example.com" &&
 				ac.ResponseType == "code" &&
@@ -1015,8 +1016,8 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		database.On("UserSessionLoadUser", mock.Anything, (*models.UserSession)(nil)).Return(nil)
 		userSessionManager.On("HasValidUserSession", mock.Anything, (*models.UserSession)(nil), mock.AnythingOfType("*int")).Return(false)
 
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
-			return ac.AuthState == oauth.AuthStateRequiresLevel1
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
+			return ac.AuthState == oauthprovider.AuthStateRequiresLevel1
 		})).Return(nil)
 
 		handler.ServeHTTP(rr, req)
@@ -1064,8 +1065,8 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
-			return ac.AuthState == oauth.AuthStateInitial &&
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
+			return ac.AuthState == oauthprovider.AuthStateInitial &&
 				ac.ClientId == "test-client" &&
 				ac.RedirectURI == "https://example.com" &&
 				ac.ResponseType == "invalid" &&
@@ -1131,15 +1132,15 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		hasUILocales := func(ac *oauth.AuthContext) bool {
+		hasUILocales := func(ac *oauthprovider.AuthContext) bool {
 			return len(ac.UILocales) == 2 && ac.UILocales[0] == "pt-BR" && ac.UILocales[1] == "es"
 		}
 
 		// First save: AuthContext just constructed; UILocales must be captured here.
 		// The request pointer changes after RefineLocalizerWithUILocales, so we use
 		// mock.Anything for the request slot.
-		authHelper.On("SaveAuthContext", rr, mock.Anything, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
-			return ac.AuthState == oauth.AuthStateInitial && hasUILocales(ac)
+		authHelper.On("SaveAuthContext", rr, mock.Anything, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
+			return ac.AuthState == oauthprovider.AuthStateInitial && hasUILocales(ac)
 		})).Return(nil)
 
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.Anything).Return(nil)
@@ -1154,7 +1155,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		// Second save: AuthState advances after id_token_hint validation —
 		// UILocales must still be present (preserved across saves).
-		authHelper.On("SaveAuthContext", rr, mock.Anything, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
+		authHelper.On("SaveAuthContext", rr, mock.Anything, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
 			return hasUILocales(ac)
 		})).Return(nil)
 
@@ -1207,12 +1208,12 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		hasUILocales := func(ac *oauth.AuthContext) bool {
+		hasUILocales := func(ac *oauthprovider.AuthContext) bool {
 			return len(ac.UILocales) == 2 && ac.UILocales[0] == "pt-BR" && ac.UILocales[1] == "es"
 		}
 
-		authHelper.On("SaveAuthContext", rr, mock.Anything, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
-			return ac.AuthState == oauth.AuthStateInitial && hasUILocales(ac)
+		authHelper.On("SaveAuthContext", rr, mock.Anything, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
+			return ac.AuthState == oauthprovider.AuthStateInitial && hasUILocales(ac)
 		})).Return(nil)
 
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.Anything).Return(nil)
@@ -1225,7 +1226,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authorizeValidator.On("ValidateScopes", "openid").Return(nil)
 		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
 
-		authHelper.On("SaveAuthContext", rr, mock.Anything, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
+		authHelper.On("SaveAuthContext", rr, mock.Anything, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
 			return hasUILocales(ac)
 		})).Return(nil)
 
@@ -1300,7 +1301,7 @@ func testRedirectError(code string, description string, responseMode string, red
 // function that quietly dropped it would pass every other test in this package. It is pure, so a
 // table here is the cheapest place to say it must not (#108).
 func TestRedirectErrorFromAuthContext(t *testing.T) {
-	authContext := &oauth.AuthContext{
+	authContext := &oauthprovider.AuthContext{
 		ResponseMode: "form_post",
 		RedirectURI:  "https://example.com/callback",
 		State:        "test-state",
@@ -2253,8 +2254,8 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
-			return ac.AuthState == oauth.AuthStateInitial &&
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
+			return ac.AuthState == oauthprovider.AuthStateInitial &&
 				ac.ClientId == "test-client" &&
 				ac.RedirectURI == "https://example.com" &&
 				ac.ResponseType == "token" &&
@@ -2286,8 +2287,8 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 
 		userSessionManager.On("HasValidUserSession", mock.Anything, (*models.UserSession)(nil), mock.AnythingOfType("*int")).Return(false)
 
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
-			return ac.AuthState == oauth.AuthStateRequiresLevel1
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
+			return ac.AuthState == oauthprovider.AuthStateRequiresLevel1
 		})).Return(nil)
 
 		handler.ServeHTTP(rr, req)
@@ -2327,8 +2328,8 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
-			return ac.AuthState == oauth.AuthStateInitial &&
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
+			return ac.AuthState == oauthprovider.AuthStateInitial &&
 				ac.ResponseType == "id_token token"
 		})).Return(nil)
 
@@ -2356,8 +2357,8 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 
 		userSessionManager.On("HasValidUserSession", mock.Anything, (*models.UserSession)(nil), mock.AnythingOfType("*int")).Return(false)
 
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
-			return ac.AuthState == oauth.AuthStateRequiresLevel1
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
+			return ac.AuthState == oauthprovider.AuthStateRequiresLevel1
 		})).Return(nil)
 
 		handler.ServeHTTP(rr, req)
@@ -2397,8 +2398,8 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
-			return ac.AuthState == oauth.AuthStateInitial && ac.ResponseType == "token"
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
+			return ac.AuthState == oauthprovider.AuthStateInitial && ac.ResponseType == "token"
 		})).Return(nil)
 
 		authHelper.On("ClearAuthContext", rr, req).Return(nil)
@@ -2460,8 +2461,8 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
-			return ac.AuthState == oauth.AuthStateInitial && ac.ResponseType == "token"
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
+			return ac.AuthState == oauthprovider.AuthStateInitial && ac.ResponseType == "token"
 		})).Return(nil)
 
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
@@ -2489,8 +2490,8 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 
 		userSessionManager.On("HasValidUserSession", mock.Anything, (*models.UserSession)(nil), mock.AnythingOfType("*int")).Return(false)
 
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
-			return ac.AuthState == oauth.AuthStateRequiresLevel1
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
+			return ac.AuthState == oauthprovider.AuthStateRequiresLevel1
 		})).Return(nil)
 
 		handler.ServeHTTP(rr, req)
@@ -2533,8 +2534,8 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
-			return ac.AuthState == oauth.AuthStateInitial && ac.ClientId == "test-client"
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
+			return ac.AuthState == oauthprovider.AuthStateInitial && ac.ClientId == "test-client"
 		})).Return(nil)
 
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
@@ -2596,8 +2597,8 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
-			return ac.AuthState == oauth.AuthStateInitial && ac.ClientId == "test-client"
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
+			return ac.AuthState == oauthprovider.AuthStateInitial && ac.ClientId == "test-client"
 		})).Return(nil)
 
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
@@ -2666,8 +2667,8 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
-			return ac.AuthState == oauth.AuthStateInitial && ac.ClientId == "test-client"
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
+			return ac.AuthState == oauthprovider.AuthStateInitial && ac.ClientId == "test-client"
 		})).Return(nil)
 
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
@@ -2736,8 +2737,8 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
-			return ac.AuthState == oauth.AuthStateInitial && ac.ClientId == "test-client"
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
+			return ac.AuthState == oauthprovider.AuthStateInitial && ac.ClientId == "test-client"
 		})).Return(nil)
 
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
@@ -2763,7 +2764,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		}
 		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "expired-jwt-token", mock.Anything, false).Return(expiredToken, nil)
 
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
 			return ac.IdTokenHintSub == userSubject
 		})).Return(nil)
 
@@ -2783,8 +2784,8 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 
 		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
 
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
-			return ac.AuthState == oauth.AuthStateLevel1ExistingSession && ac.UserId == 123
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
+			return ac.AuthState == oauthprovider.AuthStateLevel1ExistingSession && ac.UserId == 123
 		})).Return(nil)
 
 		handler.ServeHTTP(rr, req)
@@ -2828,8 +2829,8 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
-			return ac.AuthState == oauth.AuthStateInitial && ac.ClientId == "test-client"
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
+			return ac.AuthState == oauthprovider.AuthStateInitial && ac.ClientId == "test-client"
 		})).Return(nil)
 
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
@@ -2855,7 +2856,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		}
 		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "valid-jwt-token", mock.Anything, false).Return(validToken, nil)
 
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
 			return ac.IdTokenHintSub == userSubject
 		})).Return(nil)
 
@@ -2875,8 +2876,8 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 
 		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
 
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
-			return ac.AuthState == oauth.AuthStateLevel1ExistingSession && ac.UserId == 123
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
+			return ac.AuthState == oauthprovider.AuthStateLevel1ExistingSession && ac.UserId == 123
 		})).Return(nil)
 
 		handler.ServeHTTP(rr, req)
@@ -2922,8 +2923,8 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
-			return ac.AuthState == oauth.AuthStateInitial && ac.ClientId == "test-client"
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
+			return ac.AuthState == oauthprovider.AuthStateInitial && ac.ClientId == "test-client"
 		})).Return(nil)
 
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
@@ -2949,7 +2950,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		}
 		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "different-user-jwt", mock.Anything, false).Return(differentUserToken, nil)
 
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
 			return ac.IdTokenHintSub == hintSubject
 		})).Return(nil)
 
@@ -2969,8 +2970,8 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 
 		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
 
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
-			return ac.AuthState == oauth.AuthStateRequiresLevel1
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
+			return ac.AuthState == oauthprovider.AuthStateRequiresLevel1
 		})).Return(nil)
 
 		handler.ServeHTTP(rr, req)
@@ -3013,8 +3014,8 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
-			return ac.AuthState == oauth.AuthStateInitial && ac.ClientId == "test-client"
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
+			return ac.AuthState == oauthprovider.AuthStateInitial && ac.ClientId == "test-client"
 		})).Return(nil)
 
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
@@ -3040,12 +3041,12 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		}
 		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "valid-jwt-token", mock.Anything, false).Return(validToken, nil)
 
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
 			return ac.IdTokenHintSub == userSubject && ac.Prompt == "none"
 		})).Return(nil)
 		// The silent-issue path sets the AuthContext again just before code issuance; this
 		// is the assertion that it inherits the session's generation and not the user's.
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
 			return ac.UserId == 789 && ac.AuthStateGeneration == 7
 		})).Return(nil)
 
@@ -3080,8 +3081,8 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 			return details["userId"] == int64(789) && details["clientId"] == int64(1)
 		})).Return()
 
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
-			return ac.AuthState == oauth.AuthStateReadyToIssueCode
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
+			return ac.AuthState == oauthprovider.AuthStateReadyToIssueCode
 		})).Return(nil)
 
 		handler.ServeHTTP(rr, req)
@@ -3129,8 +3130,8 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
-			return ac.AuthState == oauth.AuthStateInitial && ac.ClientId == "test-client"
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
+			return ac.AuthState == oauthprovider.AuthStateInitial && ac.ClientId == "test-client"
 		})).Return(nil)
 
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
@@ -3156,7 +3157,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		}
 		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "different-user-jwt", mock.Anything, false).Return(differentUserToken, nil)
 
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
 			return ac.IdTokenHintSub == hintSubject && ac.Prompt == "none"
 		})).Return(nil)
 
@@ -3231,7 +3232,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		authHelper.On("SaveAuthContext", rr, req, mock.AnythingOfType("*oauth.AuthContext")).Return(nil)
+		authHelper.On("SaveAuthContext", rr, req, mock.AnythingOfType("*oauthprovider.AuthContext")).Return(nil)
 
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*validators.ValidateUnsupportedRequestParametersInput")).Return(nil)
@@ -3333,7 +3334,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		authHelper.On("SaveAuthContext", rr, req, mock.AnythingOfType("*oauth.AuthContext")).Return(nil)
+		authHelper.On("SaveAuthContext", rr, req, mock.AnythingOfType("*oauthprovider.AuthContext")).Return(nil)
 
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*validators.ValidateUnsupportedRequestParametersInput")).Return(nil)
@@ -3427,7 +3428,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		authHelper.On("SaveAuthContext", rr, req, mock.AnythingOfType("*oauth.AuthContext")).Return(nil)
+		authHelper.On("SaveAuthContext", rr, req, mock.AnythingOfType("*oauthprovider.AuthContext")).Return(nil)
 
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*validators.ValidateUnsupportedRequestParametersInput")).Return(nil)
@@ -3512,7 +3513,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		authHelper.On("SaveAuthContext", rr, req, mock.AnythingOfType("*oauth.AuthContext")).Return(nil)
+		authHelper.On("SaveAuthContext", rr, req, mock.AnythingOfType("*oauthprovider.AuthContext")).Return(nil)
 		authHelper.On("ClearAuthContext", rr, req).Return(nil)
 
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
@@ -3562,7 +3563,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		authHelper.On("SaveAuthContext", rr, req, mock.AnythingOfType("*oauth.AuthContext")).Return(nil)
+		authHelper.On("SaveAuthContext", rr, req, mock.AnythingOfType("*oauthprovider.AuthContext")).Return(nil)
 		authHelper.On("ClearAuthContext", rr, req).Return(nil)
 
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
@@ -3611,7 +3612,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		authHelper.On("SaveAuthContext", rr, req, mock.AnythingOfType("*oauth.AuthContext")).Return(nil)
+		authHelper.On("SaveAuthContext", rr, req, mock.AnythingOfType("*oauthprovider.AuthContext")).Return(nil)
 		authHelper.On("ClearAuthContext", rr, req).Return(nil)
 
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
@@ -3800,7 +3801,7 @@ func TestHandleAuthorizeGet_AuthenticateBeforeRedirect_RoutingTable(t *testing.T
 				&models.Settings{}))
 			rr := httptest.NewRecorder()
 
-			authHelper.On("SaveAuthContext", rr, req, mock.AnythingOfType("*oauth.AuthContext")).Return(nil)
+			authHelper.On("SaveAuthContext", rr, req, mock.AnythingOfType("*oauthprovider.AuthContext")).Return(nil)
 
 			authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything,
 				mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
@@ -3919,7 +3920,7 @@ func TestHandleAuthorizeGet_SessionLookupIsLazyAndFailsClosed(t *testing.T) {
 				&models.Settings{}))
 			rr := httptest.NewRecorder()
 
-			authHelper.On("SaveAuthContext", rr, req, mock.AnythingOfType("*oauth.AuthContext")).Return(nil)
+			authHelper.On("SaveAuthContext", rr, req, mock.AnythingOfType("*oauthprovider.AuthContext")).Return(nil)
 			authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything,
 				mock.AnythingOfType("*validators.ValidateClientAndRedirectURIInput")).Return(nil)
 			database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(
@@ -4001,15 +4002,15 @@ func TestHandleAuthorizeGet_ParkedDescriptionIsConformed(t *testing.T) {
 	rr := httptest.NewRecorder()
 
 	// The first save carries no parked error; the second is the deferral.
-	authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
+	authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
 		return ac.DeferredErrorCode == ""
 	})).Return(nil).Once()
 
 	var parked string
-	authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
+	authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
 		return ac.DeferredErrorCode == "invalid_scope"
 	})).Run(func(args mock.Arguments) {
-		parked = args.Get(2).(*oauth.AuthContext).DeferredErrorDescription
+		parked = args.Get(2).(*oauthprovider.AuthContext).DeferredErrorDescription
 	}).Return(nil).Once()
 
 	authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything,
@@ -4114,7 +4115,7 @@ func TestHandleAuthorizeGet_RegistrationReadDisagreesWithItself(t *testing.T) {
 				&models.Settings{}))
 			rr := httptest.NewRecorder()
 
-			authHelper.On("SaveAuthContext", rr, req, mock.AnythingOfType("*oauth.AuthContext")).Return(nil)
+			authHelper.On("SaveAuthContext", rr, req, mock.AnythingOfType("*oauthprovider.AuthContext")).Return(nil)
 			authHelper.On("ClearAuthContext", rr, req).Return(nil)
 
 			authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything,

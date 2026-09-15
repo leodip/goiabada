@@ -4,13 +4,13 @@
 
 //go:build !production
 
-package mocks_oauth
+package mocks_oauthprovider
 
 import (
 	"database/sql"
 
 	"github.com/leodip/goiabada/core/models"
-	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/oauthprovider"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -42,7 +42,7 @@ func (_m *CodeIssuer) EXPECT() *CodeIssuer_Expecter {
 }
 
 // CreateAuthCode provides a mock function for the type CodeIssuer
-func (_mock *CodeIssuer) CreateAuthCode(tx *sql.Tx, input *oauth.CreateCodeInput) (*models.Code, error) {
+func (_mock *CodeIssuer) CreateAuthCode(tx *sql.Tx, input *oauthprovider.CreateCodeInput) (*models.Code, error) {
 	ret := _mock.Called(tx, input)
 
 	if len(ret) == 0 {
@@ -51,17 +51,17 @@ func (_mock *CodeIssuer) CreateAuthCode(tx *sql.Tx, input *oauth.CreateCodeInput
 
 	var r0 *models.Code
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, *oauth.CreateCodeInput) (*models.Code, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, *oauthprovider.CreateCodeInput) (*models.Code, error)); ok {
 		return returnFunc(tx, input)
 	}
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, *oauth.CreateCodeInput) *models.Code); ok {
+	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, *oauthprovider.CreateCodeInput) *models.Code); ok {
 		r0 = returnFunc(tx, input)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*models.Code)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(*sql.Tx, *oauth.CreateCodeInput) error); ok {
+	if returnFunc, ok := ret.Get(1).(func(*sql.Tx, *oauthprovider.CreateCodeInput) error); ok {
 		r1 = returnFunc(tx, input)
 	} else {
 		r1 = ret.Error(1)
@@ -76,20 +76,20 @@ type CodeIssuer_CreateAuthCode_Call struct {
 
 // CreateAuthCode is a helper method to define mock.On call
 //   - tx *sql.Tx
-//   - input *oauth.CreateCodeInput
+//   - input *oauthprovider.CreateCodeInput
 func (_e *CodeIssuer_Expecter) CreateAuthCode(tx any, input any) *CodeIssuer_CreateAuthCode_Call {
 	return &CodeIssuer_CreateAuthCode_Call{Call: _e.mock.On("CreateAuthCode", tx, input)}
 }
 
-func (_c *CodeIssuer_CreateAuthCode_Call) Run(run func(tx *sql.Tx, input *oauth.CreateCodeInput)) *CodeIssuer_CreateAuthCode_Call {
+func (_c *CodeIssuer_CreateAuthCode_Call) Run(run func(tx *sql.Tx, input *oauthprovider.CreateCodeInput)) *CodeIssuer_CreateAuthCode_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 *sql.Tx
 		if args[0] != nil {
 			arg0 = args[0].(*sql.Tx)
 		}
-		var arg1 *oauth.CreateCodeInput
+		var arg1 *oauthprovider.CreateCodeInput
 		if args[1] != nil {
-			arg1 = args[1].(*oauth.CreateCodeInput)
+			arg1 = args[1].(*oauthprovider.CreateCodeInput)
 		}
 		run(
 			arg0,
@@ -104,7 +104,7 @@ func (_c *CodeIssuer_CreateAuthCode_Call) Return(code *models.Code, err error) *
 	return _c
 }
 
-func (_c *CodeIssuer_CreateAuthCode_Call) RunAndReturn(run func(tx *sql.Tx, input *oauth.CreateCodeInput) (*models.Code, error)) *CodeIssuer_CreateAuthCode_Call {
+func (_c *CodeIssuer_CreateAuthCode_Call) RunAndReturn(run func(tx *sql.Tx, input *oauthprovider.CreateCodeInput) (*models.Code, error)) *CodeIssuer_CreateAuthCode_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -18,7 +18,7 @@ import (
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/oauthprovider"
 	"github.com/leodip/goiabada/core/urlutil"
 )
 
@@ -46,7 +46,7 @@ func HandleIssueGet(
 			return
 		}
 
-		requiredState := oauth.AuthStateReadyToIssueCode
+		requiredState := oauthprovider.AuthStateReadyToIssueCode
 		if authContext.AuthState != requiredState {
 			rejectAuthStateMismatch(httpHelper, w, r, requiredState, authContext.AuthState)
 			return
@@ -263,7 +263,7 @@ func HandleIssueGet(
 		// this handler above it. The later backstops cannot cover that: a third-party
 		// resource server validating an already-signed token has no way to compare the
 		// session's owner against the token's subject (#133).
-		isImplicitFlow := oauth.ParseResponseType(authContext.ResponseType).IsImplicitFlow()
+		isImplicitFlow := oauthprovider.ParseResponseType(authContext.ResponseType).IsImplicitFlow()
 
 		// nil for the requested max age, and that is decision 1 rather than an omission. max_age
 		// bounds the age of the AUTHENTICATION, which this ceremony already satisfied at
@@ -415,7 +415,7 @@ func HandleIssueGet(
 
 		// Authorization Code Flow
 
-		createCodeInput := &oauth.CreateCodeInput{
+		createCodeInput := &oauthprovider.CreateCodeInput{
 			AuthContext:       *authContext,
 			SessionIdentifier: sessionIdentifier,
 		}
@@ -483,7 +483,7 @@ func HandleIssueGet(
 				// re-reads the registration on its way out and withholds the redirect, so a deleted
 				// client is told on an interstitial rather than by a redirect to an address nobody
 				// owns any more (#248 part 5).
-				if errors.Is(err, oauth.ErrIssuingClientGone) {
+				if errors.Is(err, oauthprovider.ErrIssuingClientGone) {
 					slog.WarnContext(r.Context(), "the client this ceremony is issuing for no longer exists, refusing to issue a code",
 						"client_identifier", authContext.ClientId,
 						"session_identifier", sessionIdentifier)
@@ -577,7 +577,7 @@ func refuseIssuanceUnusableSession(
 	w http.ResponseWriter,
 	r *http.Request,
 	shape sessionRefusalShape,
-	authContext *oauth.AuthContext,
+	authContext *oauthprovider.AuthContext,
 	issuingClient *models.Client,
 	ambientSession *models.UserSession,
 	sessionIdentifier string,
@@ -680,7 +680,7 @@ func refuseIssuanceUnusableSession(
 		slog.WarnContext(r.Context(), "the session backing this ceremony is gone, restarting level 1 instead of issuing a code",
 			"session_identifier", sessionIdentifier)
 	}
-	authContext.AuthState = oauth.AuthStateRequiresLevel1
+	authContext.AuthState = oauthprovider.AuthStateRequiresLevel1
 	err := authHelper.SaveAuthContext(w, r, authContext)
 	if err != nil {
 		httpHelper.InternalServerError(w, r, err)
@@ -698,7 +698,7 @@ func refuseIssuanceUnusableSession(
 func handleImplicitFlow(
 	w http.ResponseWriter,
 	r *http.Request,
-	authContext *oauth.AuthContext,
+	authContext *oauthprovider.AuthContext,
 	sessionIdentifier string,
 	client *models.Client,
 	user *models.User,
@@ -707,7 +707,7 @@ func handleImplicitFlow(
 	auditLogger AuditLogger,
 ) error {
 	// Determine what tokens to issue based on response_type
-	rtInfo := oauth.ParseResponseType(authContext.ResponseType)
+	rtInfo := oauthprovider.ParseResponseType(authContext.ResponseType)
 	issueAccessToken := rtInfo.HasToken
 	issueIdToken := rtInfo.HasIdToken
 
@@ -725,7 +725,7 @@ func handleImplicitFlow(
 	}
 
 	// Generate tokens
-	implicitInput := &oauth.ImplicitGrantInput{
+	implicitInput := &oauthprovider.ImplicitGrantInput{
 		Client:            client,
 		User:              user,
 		Scope:             scope,
@@ -770,7 +770,7 @@ func issueImplicitTokens(
 	r *http.Request,
 	redirectURI string,
 	state string,
-	tokenResponse *oauth.ImplicitGrantResponse,
+	tokenResponse *oauthprovider.ImplicitGrantResponse,
 ) error {
 	// Gate 4, the last resort. This flow hands over access and ID tokens rather than a code, so a
 	// redirect URI that resolves to a host the operator never registered exfiltrates credentials

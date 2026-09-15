@@ -26,12 +26,12 @@ packages:
           pkgname: "mocks_validator"
       CodeIssuer:
         config:
-          dir: "../core/oauth/mocks"
-          pkgname: "mocks_oauth"
+          dir: "../core/oauthprovider/mocks"
+          pkgname: "mocks_oauthprovider"
       TokenIssuer:
         config:
-          dir: "../core/oauth/mocks"
-          pkgname: "mocks_oauth"
+          dir: "../core/oauthprovider/mocks"
+          pkgname: "mocks_oauthprovider"
       TokenParser:
         config:
           dir: "../core/oauth/mocks"

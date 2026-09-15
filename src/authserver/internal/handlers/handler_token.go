@@ -19,6 +19,7 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/oauthprovider"
 	"github.com/leodip/goiabada/core/validators"
 )
 
@@ -503,7 +504,7 @@ func HandleTokenPost(
 			// Check if this is an ROPC refresh token (no CodeEntity) or auth code flow token
 			if validateResult.CodeEntity == nil {
 				// ROPC refresh token - use dedicated ROPC refresh flow
-				ropcInput := &oauth.GenerateTokenForRefreshROPCInput{
+				ropcInput := &oauthprovider.GenerateTokenForRefreshROPCInput{
 					RefreshToken:     validateResult.RefreshToken,
 					ScopeRequested:   input.Scope,
 					RefreshTokenInfo: validateResult.RefreshTokenInfo,
@@ -523,7 +524,7 @@ func HandleTokenPost(
 				})
 			} else {
 				// Auth code flow refresh token
-				refreshInput := &oauth.GenerateTokenForRefreshInput{
+				refreshInput := &oauthprovider.GenerateTokenForRefreshInput{
 					Code:             validateResult.CodeEntity,
 					ScopeRequested:   input.Scope,
 					RefreshToken:     validateResult.RefreshToken,
@@ -576,7 +577,7 @@ func HandleTokenPost(
 			// user carry another user's session identifier in its ID token whenever the
 			// browser was logged in as somebody else. ROPC is a direct credential exchange
 			// with no session of its own (#106).
-			ropcInput := &oauth.ROPCGrantInput{
+			ropcInput := &oauthprovider.ROPCGrantInput{
 				Client: validateResult.Client,
 				User:   validateResult.User,
 				Scope:  validateResult.Scope,
@@ -798,7 +799,7 @@ var scopeWhitespaceRegex = regexp.MustCompile(`\s+`)
 // normalizeScope canonicalizes a raw `scope` form value: trim, collapse internal whitespace runs
 // to single spaces, and drop duplicates preserving first-occurrence order.
 //
-// This is the same operation AuthContext.SetScope (core/oauth/auth_context.go) already applies on
+// This is the same operation AuthContext.SetScope (core/oauthprovider/auth_context.go) already applies on
 // the authorize path, so with this in place all four of the codebase's scope-handling sites agree.
 //
 // What motivates it: the token endpoint used to collapse whitespace onto a LOCAL copy and never

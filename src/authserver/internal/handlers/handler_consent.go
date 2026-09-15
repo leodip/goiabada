@@ -18,7 +18,7 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/oauthprovider"
 	"github.com/leodip/goiabada/core/oidc"
 )
 
@@ -75,7 +75,7 @@ func HandleConsentGet(
 			return
 		}
 
-		requiredState := oauth.AuthStateRequiresConsent
+		requiredState := oauthprovider.AuthStateRequiresConsent
 		if authContext.AuthState != requiredState {
 			rejectAuthStateMismatch(httpHelper, w, r, requiredState, authContext.AuthState)
 			return
@@ -159,7 +159,7 @@ func HandleConsentGet(
 			return
 		} else {
 			// consent is done, ready to issue code
-			authContext.AuthState = oauth.AuthStateReadyToIssueCode
+			authContext.AuthState = oauthprovider.AuthStateReadyToIssueCode
 			err = authHelper.SaveAuthContext(w, r, authContext)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
@@ -204,7 +204,7 @@ func HandleConsentPost(
 			return
 		}
 
-		requiredState := oauth.AuthStateRequiresConsent
+		requiredState := oauthprovider.AuthStateRequiresConsent
 		if authContext.AuthState != requiredState {
 			rejectAuthStateMismatch(httpHelper, w, r, requiredState, authContext.AuthState)
 			return
@@ -406,7 +406,7 @@ func HandleConsentPost(
 				})
 
 				// consent is done, ready to issue code
-				authContext.AuthState = oauth.AuthStateReadyToIssueCode
+				authContext.AuthState = oauthprovider.AuthStateReadyToIssueCode
 				err = authHelper.SaveAuthContext(w, r, authContext)
 				if err != nil {
 					httpHelper.InternalServerError(w, r, err)

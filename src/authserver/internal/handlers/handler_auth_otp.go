@@ -14,7 +14,7 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/oauthprovider"
 	"github.com/leodip/goiabada/core/otp"
 )
 
@@ -39,7 +39,7 @@ func HandleAuthOtpGet(
 			return
 		}
 
-		requiredState := oauth.AuthStateLevel2OTP
+		requiredState := oauthprovider.AuthStateLevel2OTP
 		if authContext.AuthState != requiredState {
 			rejectAuthStateMismatch(httpHelper, w, r, requiredState, authContext.AuthState)
 			return
@@ -206,7 +206,7 @@ func HandleAuthOtpPost(
 			return
 		}
 
-		requiredState := oauth.AuthStateLevel2OTP
+		requiredState := oauthprovider.AuthStateLevel2OTP
 		if authContext.AuthState != requiredState {
 			rejectAuthStateMismatch(httpHelper, w, r, requiredState, authContext.AuthState)
 			return
@@ -431,7 +431,7 @@ func HandleAuthOtpPost(
 		// session that was ended mid-flight (#129 decision 15).
 		utcNow := time.Now().UTC()
 		authContext.AuthenticatedAt = &utcNow
-		authContext.AuthState = oauth.AuthStateAuthenticationCompleted
+		authContext.AuthState = oauthprovider.AuthStateAuthenticationCompleted
 		// The enrolment key has done its work: this ceremony has just proved the user holds
 		// the authenticator, and nothing downstream reads the field. Leaving it set carries a
 		// spent credential through /auth/completed, /auth/consent and /auth/issue, and leaves

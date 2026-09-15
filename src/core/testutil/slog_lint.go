@@ -239,6 +239,7 @@ var slogRequestPathDirs = []string{
 	"core/validators",
 	"core/oauth",
 	"core/oauthdb",
+	"core/oauthprovider",
 	"core/handlerhelpers",
 	"core/sessionstore",
 }

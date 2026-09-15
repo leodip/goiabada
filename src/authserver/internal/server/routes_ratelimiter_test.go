@@ -19,6 +19,7 @@ import (
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/oauthprovider"
 	"github.com/leodip/goiabada/core/otp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -212,8 +213,8 @@ func otpCeremonyCookie(t *testing.T, s *Server) *http.Cookie {
 	sess, err := s.sessionStore.Get(r, constants.AuthServerSessionName)
 	assert.NoError(t, err)
 
-	authContext, err := json.Marshal(oauth.AuthContext{
-		AuthState:  oauth.AuthStateLevel2OTP,
+	authContext, err := json.Marshal(oauthprovider.AuthContext{
+		AuthState:  oauthprovider.AuthStateLevel2OTP,
 		CeremonyId: routesTestCeremonyId,
 		UserId:     1,
 		ClientId:   routesTestClientId,

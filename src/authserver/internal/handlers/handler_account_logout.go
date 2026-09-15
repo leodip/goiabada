@@ -205,7 +205,7 @@ type hintClassification struct {
 
 // nonIdTokenTypValues are the "typ" claim values Goiabada stamps on tokens that are NOT ID Tokens:
 // enums.TokenTypeBearer on access tokens, and the two refresh-token markers "Offline" and "Refresh",
-// which are unexported constants in src/core/oauth/token_issuer.go. generateIdTokenCore emits no typ
+// which are unexported constants in src/core/oauthprovider/token_issuer.go. generateIdTokenCore emits no typ
 // at all, and neither does the short-lived hint HandleAPIAccountLogoutRequestPost mints, so this
 // rejects nothing an RP can legitimately present.
 //

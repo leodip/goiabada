@@ -30,7 +30,7 @@ var fakeClaudeLines = []string{
 	"## Authentication Flow (Authorization Code)", // 3
 	"",                                // 4
 	"### Auth States (State Machine)", // 5
-	"The values below are the constants in `src/core/oauth/auth_context.go`.", // 6
+	"The values below are the constants in `src/core/oauthprovider/auth_context.go`.", // 6
 	"",                               // 7
 	"| State | Assigned by | When |", // 8
 	"|---|---|---|",                  // 9
@@ -127,7 +127,7 @@ func TestAgentDocs_TheRuleTable(t *testing.T) {
 			states: fakeStatesVar,
 			want: []string{
 				"CLAUDE.md and AGENTS.md differ at line 6; they are co-maintained copies and must be identical\n" +
-					"\tCLAUDE.md: The values below are the constants in `src/core/oauth/auth_context.go`.\n" +
+					"\tCLAUDE.md: The values below are the constants in `src/core/oauthprovider/auth_context.go`.\n" +
 					"\tAGENTS.md: The values below are the constants, probably.",
 			},
 		},
@@ -138,7 +138,7 @@ func TestAgentDocs_TheRuleTable(t *testing.T) {
 			states: fakeStatesVar,
 			want: []string{
 				"CLAUDE.md and AGENTS.md differ at line 6; they are co-maintained copies and must be identical\n" +
-					"\tCLAUDE.md: The values below are the constants in `src/core/oauth/auth_context.go`.\n" +
+					"\tCLAUDE.md: The values below are the constants in `src/core/oauthprovider/auth_context.go`.\n" +
 					"\tAGENTS.md: <end of file>",
 			},
 		},
@@ -147,7 +147,7 @@ func TestAgentDocs_TheRuleTable(t *testing.T) {
 			claude: fakeClaudeLines,
 			states: fakeStatesExtra,
 			want: []string{
-				`state "requires_consent" is declared in src/core/oauth/auth_context.go but has no row in the "### Auth States (State Machine)" section of CLAUDE.md`,
+				`state "requires_consent" is declared in src/core/oauthprovider/auth_context.go but has no row in the "### Auth States (State Machine)" section of CLAUDE.md`,
 			},
 		},
 		{
@@ -158,7 +158,7 @@ func TestAgentDocs_TheRuleTable(t *testing.T) {
 			claude: deleteLine(fakeClaudeLines, 11),
 			states: fakeStatesVar,
 			want: []string{
-				`state "level2_otp" is declared in src/core/oauth/auth_context.go but has no row in the "### Auth States (State Machine)" section of CLAUDE.md`,
+				`state "level2_otp" is declared in src/core/oauthprovider/auth_context.go but has no row in the "### Auth States (State Machine)" section of CLAUDE.md`,
 			},
 		},
 		{
@@ -166,14 +166,14 @@ func TestAgentDocs_TheRuleTable(t *testing.T) {
 			claude: insertLine(fakeClaudeLines, 14, "| `level2_otp_completed` | nobody | dead |"),
 			states: fakeStatesVar,
 			want: []string{
-				`the "### Auth States (State Machine)" section of CLAUDE.md has a row for state "level2_otp_completed", which src/core/oauth/auth_context.go does not declare`,
+				`the "### Auth States (State Machine)" section of CLAUDE.md has a row for state "level2_otp_completed", which src/core/oauthprovider/auth_context.go does not declare`,
 			},
 		},
 		{
 			name:   "a declaration block with no AuthState names fails rather than passing vacuously",
 			claude: fakeClaudeLines,
 			states: fakeStatesNone,
-			want:   []string{"src/core/oauth/auth_context.go declares no AuthState* string constants"},
+			want:   []string{"src/core/oauthprovider/auth_context.go declares no AuthState* string constants"},
 		},
 		{
 			name:   "a missing heading fails",
@@ -202,7 +202,7 @@ func TestAgentDocs_TheRuleTable(t *testing.T) {
 func TestAgentDocs_AMissingAgentsFileFails(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, filepath.Join(root, "CLAUDE.md"), strings.Join(fakeClaudeLines, "\n"))
-	writeFile(t, filepath.Join(root, "src", "core", "oauth", "auth_context.go"), fakeStatesVar)
+	writeFile(t, filepath.Join(root, "src", "core", "oauthprovider", "auth_context.go"), fakeStatesVar)
 
 	findings := checkAgentDocs(root)
 
@@ -216,7 +216,7 @@ func writeFakeTree(t *testing.T, claude, agents []string, states string) string 
 	root := t.TempDir()
 	writeFile(t, filepath.Join(root, "CLAUDE.md"), strings.Join(claude, "\n"))
 	writeFile(t, filepath.Join(root, "AGENTS.md"), strings.Join(agents, "\n"))
-	writeFile(t, filepath.Join(root, "src", "core", "oauth", "auth_context.go"), states)
+	writeFile(t, filepath.Join(root, "src", "core", "oauthprovider", "auth_context.go"), states)
 	return root
 }
 
@@ -295,7 +295,7 @@ func TestAgentDocs_TheGuardPassesDocumentsThatAgree(t *testing.T) {
 func TestAgentDocs_TheGuardReportsAnUnreadableDocument(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, filepath.Join(root, "CLAUDE.md"), strings.Join(fakeClaudeLines, "\n"))
-	writeFile(t, filepath.Join(root, "src", "core", "oauth", "auth_context.go"), fakeStatesVar)
+	writeFile(t, filepath.Join(root, "src", "core", "oauthprovider", "auth_context.go"), fakeStatesVar)
 
 	report := RunGuard(func(r Reporter) { assertAgentDocs(r, root) })
 

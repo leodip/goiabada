@@ -17,7 +17,7 @@ import (
 // AssertAgentDocs holds CLAUDE.md and AGENTS.md to two rules: the two files are
 // byte-identical, and the roster of states in CLAUDE.md's "Auth States (State
 // Machine)" section is exactly the set of AuthState* string constants declared
-// in src/core/oauth/auth_context.go.
+// in src/core/oauthprovider/auth_context.go.
 //
 // Both rules exist because the two files are prose about code, and prose about
 // code is the one thing in this repository nothing else checks. The ceremony's
@@ -92,15 +92,15 @@ func checkAgentDocs(root string) []string {
 		findings = append(findings, firstDifference(string(claude), string(agents)))
 	}
 
-	declared, declErr := declaredAuthStates(filepath.Join(root, "src", "core", "oauth", "auth_context.go"))
+	declared, declErr := declaredAuthStates(filepath.Join(root, "src", "core", "oauthprovider", "auth_context.go"))
 	switch {
 	case declErr != nil:
-		findings = append(findings, fmt.Sprintf("reading src/core/oauth/auth_context.go: %v", declErr))
+		findings = append(findings, fmt.Sprintf("reading src/core/oauthprovider/auth_context.go: %v", declErr))
 	case len(declared) == 0:
 		// A parse that finds nothing would otherwise make every roster check
 		// pass vacuously, which is the one direction a guard like this fails in
 		// silently.
-		findings = append(findings, "src/core/oauth/auth_context.go declares no AuthState* string constants")
+		findings = append(findings, "src/core/oauthprovider/auth_context.go declares no AuthState* string constants")
 	}
 
 	if claudeErr != nil || declErr != nil || len(declared) == 0 {
@@ -131,12 +131,12 @@ func checkAgentDocs(root string) []string {
 
 	for _, state := range missing {
 		findings = append(findings, fmt.Sprintf(
-			"state %q is declared in src/core/oauth/auth_context.go but has no row in the %q section of CLAUDE.md",
+			"state %q is declared in src/core/oauthprovider/auth_context.go but has no row in the %q section of CLAUDE.md",
 			state, agentDocsHeading))
 	}
 	for _, state := range unknown {
 		findings = append(findings, fmt.Sprintf(
-			"the %q section of CLAUDE.md has a row for state %q, which src/core/oauth/auth_context.go does not declare",
+			"the %q section of CLAUDE.md has a row for state %q, which src/core/oauthprovider/auth_context.go does not declare",
 			agentDocsHeading, state))
 	}
 

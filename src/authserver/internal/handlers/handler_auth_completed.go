@@ -13,7 +13,7 @@ import (
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/oauthprovider"
 	"github.com/leodip/goiabada/core/oidc"
 	"github.com/leodip/goiabada/core/user"
 )
@@ -41,7 +41,7 @@ func HandleAuthCompletedGet(
 			return
 		}
 
-		requiredState := oauth.AuthStateAuthenticationCompleted
+		requiredState := oauthprovider.AuthStateAuthenticationCompleted
 		if authContext.AuthState != requiredState {
 			rejectAuthStateMismatch(httpHelper, w, r, requiredState, authContext.AuthState)
 			return
@@ -220,7 +220,7 @@ func HandleAuthCompletedGet(
 			// from the session it reused, and while it goes straight to /auth/issue and
 			// never arrives here, it would be stopped rather than let through if it ever did.
 			if !authContext.Level1AuthCompleted {
-				authContext.AuthState = oauth.AuthStateRequiresLevel1
+				authContext.AuthState = oauthprovider.AuthStateRequiresLevel1
 				err = authHelper.SaveAuthContext(w, r, authContext)
 				if err != nil {
 					httpHelper.InternalServerError(w, r, err)
@@ -429,7 +429,7 @@ func HandleAuthCompletedGet(
 
 		// Handle prompt=consent: force consent screen regardless of existing consent or client settings
 		if authContext.HasPromptValue("consent") {
-			authContext.AuthState = oauth.AuthStateRequiresConsent
+			authContext.AuthState = oauthprovider.AuthStateRequiresConsent
 			err = authHelper.SaveAuthContext(w, r, authContext)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
@@ -441,7 +441,7 @@ func HandleAuthCompletedGet(
 
 		// we must redirect to consent if the client requires it or if there's an offline_access scope
 		if client.ConsentRequired || authContext.HasScope(oidc.OfflineAccessScope) {
-			authContext.AuthState = oauth.AuthStateRequiresConsent
+			authContext.AuthState = oauthprovider.AuthStateRequiresConsent
 
 			err = authHelper.SaveAuthContext(w, r, authContext)
 			if err != nil {
@@ -453,7 +453,7 @@ func HandleAuthCompletedGet(
 		}
 
 		// if there's no need for consent, we're ready to issue the code
-		authContext.AuthState = oauth.AuthStateReadyToIssueCode
+		authContext.AuthState = oauthprovider.AuthStateReadyToIssueCode
 		err = authHelper.SaveAuthContext(w, r, authContext)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)

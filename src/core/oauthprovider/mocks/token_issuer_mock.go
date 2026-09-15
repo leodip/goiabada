@@ -4,13 +4,14 @@
 
 //go:build !production
 
-package mocks_oauth
+package mocks_oauthprovider
 
 import (
 	"context"
 
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/oauthprovider"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -184,26 +185,26 @@ func (_c *TokenIssuer_GenerateTokenResponseForClientCred_Call) RunAndReturn(run 
 }
 
 // GenerateTokenResponseForImplicit provides a mock function for the type TokenIssuer
-func (_mock *TokenIssuer) GenerateTokenResponseForImplicit(ctx context.Context, input *oauth.ImplicitGrantInput, issueAccessToken bool, issueIdToken bool) (*oauth.ImplicitGrantResponse, error) {
+func (_mock *TokenIssuer) GenerateTokenResponseForImplicit(ctx context.Context, input *oauthprovider.ImplicitGrantInput, issueAccessToken bool, issueIdToken bool) (*oauthprovider.ImplicitGrantResponse, error) {
 	ret := _mock.Called(ctx, input, issueAccessToken, issueIdToken)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GenerateTokenResponseForImplicit")
 	}
 
-	var r0 *oauth.ImplicitGrantResponse
+	var r0 *oauthprovider.ImplicitGrantResponse
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *oauth.ImplicitGrantInput, bool, bool) (*oauth.ImplicitGrantResponse, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *oauthprovider.ImplicitGrantInput, bool, bool) (*oauthprovider.ImplicitGrantResponse, error)); ok {
 		return returnFunc(ctx, input, issueAccessToken, issueIdToken)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *oauth.ImplicitGrantInput, bool, bool) *oauth.ImplicitGrantResponse); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *oauthprovider.ImplicitGrantInput, bool, bool) *oauthprovider.ImplicitGrantResponse); ok {
 		r0 = returnFunc(ctx, input, issueAccessToken, issueIdToken)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*oauth.ImplicitGrantResponse)
+			r0 = ret.Get(0).(*oauthprovider.ImplicitGrantResponse)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, *oauth.ImplicitGrantInput, bool, bool) error); ok {
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *oauthprovider.ImplicitGrantInput, bool, bool) error); ok {
 		r1 = returnFunc(ctx, input, issueAccessToken, issueIdToken)
 	} else {
 		r1 = ret.Error(1)
@@ -218,22 +219,22 @@ type TokenIssuer_GenerateTokenResponseForImplicit_Call struct {
 
 // GenerateTokenResponseForImplicit is a helper method to define mock.On call
 //   - ctx context.Context
-//   - input *oauth.ImplicitGrantInput
+//   - input *oauthprovider.ImplicitGrantInput
 //   - issueAccessToken bool
 //   - issueIdToken bool
 func (_e *TokenIssuer_Expecter) GenerateTokenResponseForImplicit(ctx any, input any, issueAccessToken any, issueIdToken any) *TokenIssuer_GenerateTokenResponseForImplicit_Call {
 	return &TokenIssuer_GenerateTokenResponseForImplicit_Call{Call: _e.mock.On("GenerateTokenResponseForImplicit", ctx, input, issueAccessToken, issueIdToken)}
 }
 
-func (_c *TokenIssuer_GenerateTokenResponseForImplicit_Call) Run(run func(ctx context.Context, input *oauth.ImplicitGrantInput, issueAccessToken bool, issueIdToken bool)) *TokenIssuer_GenerateTokenResponseForImplicit_Call {
+func (_c *TokenIssuer_GenerateTokenResponseForImplicit_Call) Run(run func(ctx context.Context, input *oauthprovider.ImplicitGrantInput, issueAccessToken bool, issueIdToken bool)) *TokenIssuer_GenerateTokenResponseForImplicit_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
 			arg0 = args[0].(context.Context)
 		}
-		var arg1 *oauth.ImplicitGrantInput
+		var arg1 *oauthprovider.ImplicitGrantInput
 		if args[1] != nil {
-			arg1 = args[1].(*oauth.ImplicitGrantInput)
+			arg1 = args[1].(*oauthprovider.ImplicitGrantInput)
 		}
 		var arg2 bool
 		if args[2] != nil {
@@ -253,37 +254,37 @@ func (_c *TokenIssuer_GenerateTokenResponseForImplicit_Call) Run(run func(ctx co
 	return _c
 }
 
-func (_c *TokenIssuer_GenerateTokenResponseForImplicit_Call) Return(implicitGrantResponse *oauth.ImplicitGrantResponse, err error) *TokenIssuer_GenerateTokenResponseForImplicit_Call {
+func (_c *TokenIssuer_GenerateTokenResponseForImplicit_Call) Return(implicitGrantResponse *oauthprovider.ImplicitGrantResponse, err error) *TokenIssuer_GenerateTokenResponseForImplicit_Call {
 	_c.Call.Return(implicitGrantResponse, err)
 	return _c
 }
 
-func (_c *TokenIssuer_GenerateTokenResponseForImplicit_Call) RunAndReturn(run func(ctx context.Context, input *oauth.ImplicitGrantInput, issueAccessToken bool, issueIdToken bool) (*oauth.ImplicitGrantResponse, error)) *TokenIssuer_GenerateTokenResponseForImplicit_Call {
+func (_c *TokenIssuer_GenerateTokenResponseForImplicit_Call) RunAndReturn(run func(ctx context.Context, input *oauthprovider.ImplicitGrantInput, issueAccessToken bool, issueIdToken bool) (*oauthprovider.ImplicitGrantResponse, error)) *TokenIssuer_GenerateTokenResponseForImplicit_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // GenerateTokenResponseForROPC provides a mock function for the type TokenIssuer
-func (_mock *TokenIssuer) GenerateTokenResponseForROPC(ctx context.Context, input *oauth.ROPCGrantInput) (*oauth.ROPCGrantResponse, error) {
+func (_mock *TokenIssuer) GenerateTokenResponseForROPC(ctx context.Context, input *oauthprovider.ROPCGrantInput) (*oauthprovider.ROPCGrantResponse, error) {
 	ret := _mock.Called(ctx, input)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GenerateTokenResponseForROPC")
 	}
 
-	var r0 *oauth.ROPCGrantResponse
+	var r0 *oauthprovider.ROPCGrantResponse
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *oauth.ROPCGrantInput) (*oauth.ROPCGrantResponse, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *oauthprovider.ROPCGrantInput) (*oauthprovider.ROPCGrantResponse, error)); ok {
 		return returnFunc(ctx, input)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *oauth.ROPCGrantInput) *oauth.ROPCGrantResponse); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *oauthprovider.ROPCGrantInput) *oauthprovider.ROPCGrantResponse); ok {
 		r0 = returnFunc(ctx, input)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*oauth.ROPCGrantResponse)
+			r0 = ret.Get(0).(*oauthprovider.ROPCGrantResponse)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, *oauth.ROPCGrantInput) error); ok {
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *oauthprovider.ROPCGrantInput) error); ok {
 		r1 = returnFunc(ctx, input)
 	} else {
 		r1 = ret.Error(1)
@@ -298,20 +299,20 @@ type TokenIssuer_GenerateTokenResponseForROPC_Call struct {
 
 // GenerateTokenResponseForROPC is a helper method to define mock.On call
 //   - ctx context.Context
-//   - input *oauth.ROPCGrantInput
+//   - input *oauthprovider.ROPCGrantInput
 func (_e *TokenIssuer_Expecter) GenerateTokenResponseForROPC(ctx any, input any) *TokenIssuer_GenerateTokenResponseForROPC_Call {
 	return &TokenIssuer_GenerateTokenResponseForROPC_Call{Call: _e.mock.On("GenerateTokenResponseForROPC", ctx, input)}
 }
 
-func (_c *TokenIssuer_GenerateTokenResponseForROPC_Call) Run(run func(ctx context.Context, input *oauth.ROPCGrantInput)) *TokenIssuer_GenerateTokenResponseForROPC_Call {
+func (_c *TokenIssuer_GenerateTokenResponseForROPC_Call) Run(run func(ctx context.Context, input *oauthprovider.ROPCGrantInput)) *TokenIssuer_GenerateTokenResponseForROPC_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
 			arg0 = args[0].(context.Context)
 		}
-		var arg1 *oauth.ROPCGrantInput
+		var arg1 *oauthprovider.ROPCGrantInput
 		if args[1] != nil {
-			arg1 = args[1].(*oauth.ROPCGrantInput)
+			arg1 = args[1].(*oauthprovider.ROPCGrantInput)
 		}
 		run(
 			arg0,
@@ -321,18 +322,18 @@ func (_c *TokenIssuer_GenerateTokenResponseForROPC_Call) Run(run func(ctx contex
 	return _c
 }
 
-func (_c *TokenIssuer_GenerateTokenResponseForROPC_Call) Return(rOPCGrantResponse *oauth.ROPCGrantResponse, err error) *TokenIssuer_GenerateTokenResponseForROPC_Call {
+func (_c *TokenIssuer_GenerateTokenResponseForROPC_Call) Return(rOPCGrantResponse *oauthprovider.ROPCGrantResponse, err error) *TokenIssuer_GenerateTokenResponseForROPC_Call {
 	_c.Call.Return(rOPCGrantResponse, err)
 	return _c
 }
 
-func (_c *TokenIssuer_GenerateTokenResponseForROPC_Call) RunAndReturn(run func(ctx context.Context, input *oauth.ROPCGrantInput) (*oauth.ROPCGrantResponse, error)) *TokenIssuer_GenerateTokenResponseForROPC_Call {
+func (_c *TokenIssuer_GenerateTokenResponseForROPC_Call) RunAndReturn(run func(ctx context.Context, input *oauthprovider.ROPCGrantInput) (*oauthprovider.ROPCGrantResponse, error)) *TokenIssuer_GenerateTokenResponseForROPC_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // GenerateTokenResponseForRefresh provides a mock function for the type TokenIssuer
-func (_mock *TokenIssuer) GenerateTokenResponseForRefresh(ctx context.Context, input *oauth.GenerateTokenForRefreshInput) (*oauth.TokenResponse, error) {
+func (_mock *TokenIssuer) GenerateTokenResponseForRefresh(ctx context.Context, input *oauthprovider.GenerateTokenForRefreshInput) (*oauth.TokenResponse, error) {
 	ret := _mock.Called(ctx, input)
 
 	if len(ret) == 0 {
@@ -341,17 +342,17 @@ func (_mock *TokenIssuer) GenerateTokenResponseForRefresh(ctx context.Context, i
 
 	var r0 *oauth.TokenResponse
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *oauth.GenerateTokenForRefreshInput) (*oauth.TokenResponse, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *oauthprovider.GenerateTokenForRefreshInput) (*oauth.TokenResponse, error)); ok {
 		return returnFunc(ctx, input)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *oauth.GenerateTokenForRefreshInput) *oauth.TokenResponse); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *oauthprovider.GenerateTokenForRefreshInput) *oauth.TokenResponse); ok {
 		r0 = returnFunc(ctx, input)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*oauth.TokenResponse)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, *oauth.GenerateTokenForRefreshInput) error); ok {
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *oauthprovider.GenerateTokenForRefreshInput) error); ok {
 		r1 = returnFunc(ctx, input)
 	} else {
 		r1 = ret.Error(1)
@@ -366,20 +367,20 @@ type TokenIssuer_GenerateTokenResponseForRefresh_Call struct {
 
 // GenerateTokenResponseForRefresh is a helper method to define mock.On call
 //   - ctx context.Context
-//   - input *oauth.GenerateTokenForRefreshInput
+//   - input *oauthprovider.GenerateTokenForRefreshInput
 func (_e *TokenIssuer_Expecter) GenerateTokenResponseForRefresh(ctx any, input any) *TokenIssuer_GenerateTokenResponseForRefresh_Call {
 	return &TokenIssuer_GenerateTokenResponseForRefresh_Call{Call: _e.mock.On("GenerateTokenResponseForRefresh", ctx, input)}
 }
 
-func (_c *TokenIssuer_GenerateTokenResponseForRefresh_Call) Run(run func(ctx context.Context, input *oauth.GenerateTokenForRefreshInput)) *TokenIssuer_GenerateTokenResponseForRefresh_Call {
+func (_c *TokenIssuer_GenerateTokenResponseForRefresh_Call) Run(run func(ctx context.Context, input *oauthprovider.GenerateTokenForRefreshInput)) *TokenIssuer_GenerateTokenResponseForRefresh_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
 			arg0 = args[0].(context.Context)
 		}
-		var arg1 *oauth.GenerateTokenForRefreshInput
+		var arg1 *oauthprovider.GenerateTokenForRefreshInput
 		if args[1] != nil {
-			arg1 = args[1].(*oauth.GenerateTokenForRefreshInput)
+			arg1 = args[1].(*oauthprovider.GenerateTokenForRefreshInput)
 		}
 		run(
 			arg0,
@@ -394,13 +395,13 @@ func (_c *TokenIssuer_GenerateTokenResponseForRefresh_Call) Return(tokenResponse
 	return _c
 }
 
-func (_c *TokenIssuer_GenerateTokenResponseForRefresh_Call) RunAndReturn(run func(ctx context.Context, input *oauth.GenerateTokenForRefreshInput) (*oauth.TokenResponse, error)) *TokenIssuer_GenerateTokenResponseForRefresh_Call {
+func (_c *TokenIssuer_GenerateTokenResponseForRefresh_Call) RunAndReturn(run func(ctx context.Context, input *oauthprovider.GenerateTokenForRefreshInput) (*oauth.TokenResponse, error)) *TokenIssuer_GenerateTokenResponseForRefresh_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // GenerateTokenResponseForRefreshROPC provides a mock function for the type TokenIssuer
-func (_mock *TokenIssuer) GenerateTokenResponseForRefreshROPC(ctx context.Context, input *oauth.GenerateTokenForRefreshROPCInput) (*oauth.TokenResponse, error) {
+func (_mock *TokenIssuer) GenerateTokenResponseForRefreshROPC(ctx context.Context, input *oauthprovider.GenerateTokenForRefreshROPCInput) (*oauth.TokenResponse, error) {
 	ret := _mock.Called(ctx, input)
 
 	if len(ret) == 0 {
@@ -409,17 +410,17 @@ func (_mock *TokenIssuer) GenerateTokenResponseForRefreshROPC(ctx context.Contex
 
 	var r0 *oauth.TokenResponse
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *oauth.GenerateTokenForRefreshROPCInput) (*oauth.TokenResponse, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *oauthprovider.GenerateTokenForRefreshROPCInput) (*oauth.TokenResponse, error)); ok {
 		return returnFunc(ctx, input)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *oauth.GenerateTokenForRefreshROPCInput) *oauth.TokenResponse); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *oauthprovider.GenerateTokenForRefreshROPCInput) *oauth.TokenResponse); ok {
 		r0 = returnFunc(ctx, input)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*oauth.TokenResponse)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, *oauth.GenerateTokenForRefreshROPCInput) error); ok {
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *oauthprovider.GenerateTokenForRefreshROPCInput) error); ok {
 		r1 = returnFunc(ctx, input)
 	} else {
 		r1 = ret.Error(1)
@@ -434,20 +435,20 @@ type TokenIssuer_GenerateTokenResponseForRefreshROPC_Call struct {
 
 // GenerateTokenResponseForRefreshROPC is a helper method to define mock.On call
 //   - ctx context.Context
-//   - input *oauth.GenerateTokenForRefreshROPCInput
+//   - input *oauthprovider.GenerateTokenForRefreshROPCInput
 func (_e *TokenIssuer_Expecter) GenerateTokenResponseForRefreshROPC(ctx any, input any) *TokenIssuer_GenerateTokenResponseForRefreshROPC_Call {
 	return &TokenIssuer_GenerateTokenResponseForRefreshROPC_Call{Call: _e.mock.On("GenerateTokenResponseForRefreshROPC", ctx, input)}
 }
 
-func (_c *TokenIssuer_GenerateTokenResponseForRefreshROPC_Call) Run(run func(ctx context.Context, input *oauth.GenerateTokenForRefreshROPCInput)) *TokenIssuer_GenerateTokenResponseForRefreshROPC_Call {
+func (_c *TokenIssuer_GenerateTokenResponseForRefreshROPC_Call) Run(run func(ctx context.Context, input *oauthprovider.GenerateTokenForRefreshROPCInput)) *TokenIssuer_GenerateTokenResponseForRefreshROPC_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
 			arg0 = args[0].(context.Context)
 		}
-		var arg1 *oauth.GenerateTokenForRefreshROPCInput
+		var arg1 *oauthprovider.GenerateTokenForRefreshROPCInput
 		if args[1] != nil {
-			arg1 = args[1].(*oauth.GenerateTokenForRefreshROPCInput)
+			arg1 = args[1].(*oauthprovider.GenerateTokenForRefreshROPCInput)
 		}
 		run(
 			arg0,
@@ -462,7 +463,7 @@ func (_c *TokenIssuer_GenerateTokenResponseForRefreshROPC_Call) Return(tokenResp
 	return _c
 }
 
-func (_c *TokenIssuer_GenerateTokenResponseForRefreshROPC_Call) RunAndReturn(run func(ctx context.Context, input *oauth.GenerateTokenForRefreshROPCInput) (*oauth.TokenResponse, error)) *TokenIssuer_GenerateTokenResponseForRefreshROPC_Call {
+func (_c *TokenIssuer_GenerateTokenResponseForRefreshROPC_Call) RunAndReturn(run func(ctx context.Context, input *oauthprovider.GenerateTokenForRefreshROPCInput) (*oauth.TokenResponse, error)) *TokenIssuer_GenerateTokenResponseForRefreshROPC_Call {
 	_c.Call.Return(run)
 	return _c
 }

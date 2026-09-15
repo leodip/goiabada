@@ -102,8 +102,9 @@ A row whose owner is not `kernel` names the issue that moves it. A `kernel` row 
 | `core/middleware` | kernel | — |
 | `core/mocks` | kernel | — |
 | `core/models` | authserver | #359 |
-| `core/oauth` | split | #338 |
+| `core/oauth` | kernel | — |
 | `core/oauthdb` | authserver | #340 |
+| `core/oauthprovider` | authserver | #339 |
 | `core/oidc` | authserver | #360 |
 | `core/otp` | authserver | #348 |
 | `core/phonecountries` | authserver | #345 |
@@ -134,7 +135,8 @@ Notes on rows that are not self-evident:
   decodes.
 - `core/oauth` is the largest split. The admin console is an OAuth client: it needs token response
   values, PKCE and JWT/JWKS validation. It does not issue codes or tokens and does not rotate
-  signing keys. #338 draws that line; #339, #341, #342 and #343 carry the provider half away.
+  signing keys. #338 drew that line: the provider half is `core/oauthprovider`, which #339,
+  #341, #342 and #343 carry to the auth server.
 
 ## Rules
 
@@ -181,6 +183,7 @@ of rows is the only measure of how much is left to do.
 | `core/api` | `core/models` | #350 |
 | `core/customerrors` | `core/models` | #350 |
 | `core/handlerhelpers` | `core/hashutil` | #360 |
+| `core/oauth` | `core/hashutil` | #360 |
 | `core/testutil/fake` | `core/uuidutil` | #360 |
 | `adminconsole/internal/apiclient` | `core/models` | #350 |
 | `adminconsole/internal/handlers` | `core/models` | #350 |
@@ -191,7 +194,7 @@ of rows is the only measure of how much is left to do.
 | `adminconsole/internal/handlers/adminuserhandlers` | `core/models` | #350 |
 | `adminconsole/internal/middleware` | `core/models` | #350 |
 
-Twelve rows, and #350 owns ten of them: the admin console's dependency on persistence models is
+Thirteen rows, and #350 owns ten of them: the admin console's dependency on persistence models is
 the single largest piece of the boundary still to close.
 
 ## Foreign modules the admin console must not compile
@@ -223,13 +226,13 @@ then.
 Every driver arrives the same way, through one edge:
 
 ```
-adminconsole/cmd/goiabada-adminconsole -> core/oauth -> core/data -> core/data/<engine> -> driver
+adminconsole/cmd/goiabada-adminconsole -> core/validators -> core/data -> core/data/<engine> -> driver
 ```
 
 `core/data/database.go` imports all four engine packages, so importing `core/data` at all compiles
-every driver. Two of the core packages the admin console imports reach `core/data`: `core/oauth`
-and `core/validators`. Closing one path changes nothing on its own, which is why the table asserts
-reachability rather than counting edges.
+every driver. One of the core packages the admin console imports reaches `core/data`:
+`core/validators`. #338 closed the other, `core/oauth`, and the rows stayed `yes`, which is why the
+table asserts reachability rather than counting edges.
 
 All five rows say #353 rather than #359, which is worth explaining because the ordering does not
 suggest it. `core/data/database.go` is the only production file in `core` that imports an engine

@@ -25,7 +25,7 @@ import (
 // the rotate endpoint had no unit coverage at all, which is how five unsynchronised writes survived
 // since v0.7.
 //
-// What it owns is the mapping from oauth.SigningKeyRotator's outcomes to a status, an error code and
+// What it owns is the mapping from oauthprovider.SigningKeyRotator's outcomes to a status, an error code and
 // an audit entry. Deliberately nothing about storage: the rotator's own tests own what reaches the
 // key_pairs table, and asserting rows from here would be a side channel that passes with the mapping
 // broken.

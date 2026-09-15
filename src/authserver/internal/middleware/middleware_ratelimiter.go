@@ -21,10 +21,11 @@ import (
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/oauthprovider"
 )
 
 type AuthHelper interface {
-	GetAuthContext(r *http.Request) (*oauth.AuthContext, error)
+	GetAuthContext(r *http.Request) (*oauthprovider.AuthContext, error)
 }
 
 // ErrorRenderer renders an HTML error page. The middleware declares only the shape it
