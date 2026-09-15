@@ -210,9 +210,10 @@ var slogSpreadSites = []slogSpreadSite{
 // request runs through, so that every record written there is one an operator will filter by
 // request_id after a user reports a refusal. Both servers' handlers and middleware, the
 // authserver's API response writers and the admin console's client of the auth server's API, the
-// audit path's two packages, and the core packages the handlers call into on a request: the shared
-// middleware, the validators, token and code issuance, the token parsers, the handler helpers and
-// the session store.
+// audit path's two packages, the authserver packages a ceremony runs through -- the ceremony
+// context, code and token issuance, and the signing keys (#339) -- and the core packages the
+// handlers call into on a request: the shared middleware, the validators, the client-side token
+// parser, the handler helpers and the session store.
 //
 // Left out on purpose, each a ceiling recorded in the PR of #320 rather than a site this rule
 // admits: core/data, whose transaction and statement records run under RunInTransaction with no
@@ -241,7 +242,6 @@ var slogRequestPathDirs = []string{
 	"core/middleware",
 	"core/validators",
 	"core/oauth",
-	"core/oauthdb",
 	"core/handlerhelpers",
 	"core/sessionstore",
 }
