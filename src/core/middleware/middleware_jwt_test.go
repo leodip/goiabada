@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/oauth"
@@ -1296,12 +1297,13 @@ type recordingTransport struct {
 	inner       http.RoundTripper
 	mu          sync.Mutex
 	hadDeadline bool
+	deadline    time.Time
 	ctxErr      error
 }
 
 func (rt *recordingTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 	rt.mu.Lock()
-	_, rt.hadDeadline = r.Context().Deadline()
+	rt.deadline, rt.hadDeadline = r.Context().Deadline()
 	rt.ctxErr = r.Context().Err()
 	rt.mu.Unlock()
 	return rt.inner.RoundTrip(r)
@@ -1383,6 +1385,14 @@ func TestJwtSessionHandler_RefreshesOnACancelledRequestContext(t *testing.T) {
 	defer transport.mu.Unlock()
 	assert.NoError(t, transport.ctxErr,
 		"the outbound request runs on a context detached from the browser's")
-	assert.True(t, transport.hadDeadline,
+	require.True(t, transport.hadDeadline,
 		"detached, but not unbounded: the deadline is what replaces the cancellation")
+	// And it is the ten seconds decision 11 chose, not merely some deadline: recording only
+	// that one exists leaves dividing the production value by ten green, and the value is the
+	// whole of what bounds a peer that accepts the connection and never answers. The tolerance
+	// covers the round trip against the local server, which is milliseconds (#338).
+	assert.LessOrEqual(t, time.Until(transport.deadline), oauth.TokenExchangeTimeout,
+		"bounded by TokenExchangeTimeout")
+	assert.Greater(t, time.Until(transport.deadline), oauth.TokenExchangeTimeout-time.Second,
+		"and by that value rather than by something shorter")
 }

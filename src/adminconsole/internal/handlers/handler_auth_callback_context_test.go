@@ -88,6 +88,11 @@ func TestHandleAuthCallbackPost_DetachesTheExchangeFromTheBrowsersContext(t *tes
 	require.True(t, exchanger.hasLimit, "detached, but not unbounded")
 	assert.LessOrEqual(t, time.Until(exchanger.deadline), oauth.TokenExchangeTimeout,
 		"bounded by TokenExchangeTimeout, which is what replaces the cancellation")
-	assert.Greater(t, time.Until(exchanger.deadline), oauth.TokenExchangeTimeout-time.Minute,
-		"and by that rather than by something far shorter")
+	// The tolerance is what the handler spends between taking the deadline and calling the
+	// exchanger, which is a few microseconds; a second is generous for a loaded machine and
+	// still refuses any value that is not the ten seconds decision 11 chose. Subtracting a
+	// minute from a ten second constant was the earlier form, and a negative lower bound
+	// asserts nothing (#338).
+	assert.Greater(t, time.Until(exchanger.deadline), oauth.TokenExchangeTimeout-time.Second,
+		"and by that value rather than by something shorter")
 }
