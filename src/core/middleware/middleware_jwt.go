@@ -254,8 +254,19 @@ func (m *MiddlewareJwt) refreshToken(
 	data.Set("client_id", clientID)
 	data.Set("client_secret", clientSecret)
 
+	// The browser may be gone; the auth server is not. refresh_token is single use, so the
+	// server revokes the old token as part of issuing the new one, and abandoning the read
+	// loses the only copy of what it issued -- the administrator would then hold a revoked
+	// token and be signed out on their next page load. WithoutCancel keeps the request's
+	// values, so request_id still reaches every record below, and drops only its
+	// cancellation; context.Background() would drop the request id with it. The deadline is
+	// what bounds this instead (#338).
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), oauth.TokenExchangeTimeout)
+	defer cancel()
+
 	// Create the HTTP request
-	req, err := http.NewRequest("POST", m.authServerBaseURL+"/auth/token", strings.NewReader(data.Encode()))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, m.authServerBaseURL+"/auth/token",
+		strings.NewReader(data.Encode()))
 	if err != nil {
 		return false, errs.Errorf("error creating refresh token request: %v", err)
 	}
@@ -276,8 +287,10 @@ func (m *MiddlewareJwt) refreshToken(
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	// Read the response
-	body, err := io.ReadAll(resp.Body)
+	// Read the response, bounded: a peer answering with an endless body would otherwise be
+	// read into memory until the process dies. Cut rather than refused, so an oversized
+	// answer fails to parse below and the caller clears the session and carries on.
+	body, err := io.ReadAll(io.LimitReader(resp.Body, oauth.MaxTokenResponseBytes))
 	if err != nil {
 		return false, errs.Errorf("error reading refresh token response: %v", err)
 	}

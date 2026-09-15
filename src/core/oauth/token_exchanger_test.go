@@ -1,6 +1,7 @@
 package oauth
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -23,8 +24,10 @@ import (
 // intended one (#338).
 //
 // The seam is the tokenEndpoint argument, which is an httptest.Server here,
-// the same shape newJwksServer uses above. It cannot be the HTTP client:
-// ExchangeCodeForTokens builds its own.
+// the same shape newJwksServer uses above. These cases pass a nil client and so
+// take the configured default; the injected-client seam below them, in
+// token_exchanger_bounds_test.go, is where the read bound and the deadline are
+// observed instead.
 // =============================================================================
 
 // recordedRequest is what the fake token endpoint saw.
@@ -86,7 +89,8 @@ func newTokenEndpoint(t *testing.T, status int, body string) (string, *requestRe
 func TestExchangeCodeForTokens_PostsTheFormTheTokenEndpointExpects(t *testing.T) {
 	endpoint, recorder := newTokenEndpoint(t, http.StatusOK, `{}`)
 
-	_, err := NewTokenExchanger().ExchangeCodeForTokens(
+	_, err := NewTokenExchanger(nil).ExchangeCodeForTokens(
+		context.Background(),
 		"the-code",
 		"https://console.example.com/auth/callback",
 		"the-client-id",
@@ -134,7 +138,8 @@ func TestExchangeCodeForTokens_DecodesEveryTokenResponseField(t *testing.T) {
 		"scope": "openid email profile"
 	}`)
 
-	tokenResponse, err := NewTokenExchanger().ExchangeCodeForTokens(
+	tokenResponse, err := NewTokenExchanger(nil).ExchangeCodeForTokens(
+		context.Background(),
 		"c", "r", "ci", "cs", "cv", endpoint,
 	)
 	require.NoError(t, err)
@@ -156,7 +161,8 @@ func TestExchangeCodeForTokens_DecodesEveryTokenResponseField(t *testing.T) {
 func TestExchangeCodeForTokens_AcceptsAnEmptyJSONObject(t *testing.T) {
 	endpoint, _ := newTokenEndpoint(t, http.StatusOK, `{}`)
 
-	tokenResponse, err := NewTokenExchanger().ExchangeCodeForTokens(
+	tokenResponse, err := NewTokenExchanger(nil).ExchangeCodeForTokens(
+		context.Background(),
 		"c", "r", "ci", "cs", "cv", endpoint,
 	)
 
@@ -181,8 +187,8 @@ func TestExchangeCodeForTokens_RejectsAnEmptyBody(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			endpoint, _ := newTokenEndpoint(t, http.StatusOK, tc.body)
 
-			tokenResponse, err := NewTokenExchanger().ExchangeCodeForTokens(
-				"c", "r", "ci", "cs", "cv", endpoint,
+			tokenResponse, err := NewTokenExchanger(nil).ExchangeCodeForTokens(
+				context.Background(), "c", "r", "ci", "cs", "cv", endpoint,
 			)
 
 			require.Error(t, err)
@@ -199,7 +205,8 @@ func TestExchangeCodeForTokens_ReturnsTheBodyOfANon200(t *testing.T) {
 	endpoint, _ := newTokenEndpoint(t, http.StatusBadRequest,
 		`{"error":"invalid_grant","error_description":"the code has expired"}`)
 
-	tokenResponse, err := NewTokenExchanger().ExchangeCodeForTokens(
+	tokenResponse, err := NewTokenExchanger(nil).ExchangeCodeForTokens(
+		context.Background(),
 		"c", "r", "ci", "cs", "cv", endpoint,
 	)
 
@@ -217,7 +224,8 @@ func TestExchangeCodeForTokens_ErrorsWhenTheEndpointIsUnreachable(t *testing.T) 
 	endpoint := server.URL
 	server.Close()
 
-	tokenResponse, err := NewTokenExchanger().ExchangeCodeForTokens(
+	tokenResponse, err := NewTokenExchanger(nil).ExchangeCodeForTokens(
+		context.Background(),
 		"c", "r", "ci", "cs", "cv", endpoint,
 	)
 

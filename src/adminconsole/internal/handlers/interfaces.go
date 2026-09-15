@@ -35,5 +35,6 @@ type TokenParser interface {
 }
 
 type TokenExchanger interface {
-	ExchangeCodeForTokens(code, redirectURI, clientId, clientSecret, codeVerifier, tokenEndpoint string) (*oauth.TokenResponse, error)
+	ExchangeCodeForTokens(ctx context.Context, code, redirectURI, clientId, clientSecret,
+		codeVerifier, tokenEndpoint string) (*oauth.TokenResponse, error)
 }
