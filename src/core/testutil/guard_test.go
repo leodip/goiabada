@@ -10,7 +10,7 @@ import (
 
 // The real Reporter is *testing.T, and the whole harness rests on that staying true. A method
 // added to Reporter that *testing.T does not carry would be caught here at compile time rather
-// than at the thirteen call sites.
+// than at the fourteen call sites.
 var _ Reporter = (*testing.T)(nil)
 
 // TestRunGuard_RecordsEveryErrorfInOrder covers the ordinary path: a guard that reports findings

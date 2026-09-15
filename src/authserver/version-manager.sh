@@ -556,6 +556,34 @@ cmd_update() {
     fi
 
     # -------------------------------------------------------------------------
+    # Generated mock header
+    # -------------------------------------------------------------------------
+    # src/mockery-header.txt is inlined verbatim into the header of every
+    # generated mock, through template-data.boilerplate-file in the two
+    # .mockery.yaml files, so a clone can read which generator wrote the tree
+    # rather than having to run one to find out.
+    #
+    # Writing it here is what keeps that line the pin instead of a literal
+    # somebody remembered to change. It does not carry itself into the mocks:
+    # regenerating does that, which is why this is the one target of `update`
+    # whose application needs a second command. Both halves are checked --
+    # every module's unit tier holds the mocks to this file and this file to
+    # versions.yaml, and generate-mocks.sh refuses a mockery that is not the
+    # pin, so the stamped version is the generator that ran (#338).
+    echo -e "\n${BOLD}Generated Mocks${NC}"
+
+    if [ -f "$BASE_DIR/src/mockery-header.txt" ]; then
+        # Generator version: mockery vX.Y.Z
+        if update_file "$BASE_DIR/src/mockery-header.txt" \
+            "s|mockery v[0-9.]*|mockery v${MOCKERY_VERSION}|g" \
+            "mockery header"; then
+            ((success_count++))
+        else
+            ((fail_count++))
+        fi
+    fi
+
+    # -------------------------------------------------------------------------
     # Production Dockerfiles
     # -------------------------------------------------------------------------
     echo -e "\n${BOLD}Production Dockerfiles${NC}"
@@ -652,8 +680,10 @@ cmd_update() {
     echo ""
     print_info "Next steps:"
     echo "  1. Review changes: git diff"
-    echo "  2. Run tests: make test-ci"
-    echo "  3. Commit changes"
+    echo "  2. If tools.mockery changed, rebuild the dev container and run ./generate-mocks.sh:"
+    echo "     the header above is written here, but only the generator carries it into the mocks"
+    echo "  3. Run tests: make test-ci"
+    echo "  4. Commit changes"
 }
 
 # =============================================================================
