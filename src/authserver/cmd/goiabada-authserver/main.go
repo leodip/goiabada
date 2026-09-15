@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/gob"
 	"os"
 	"os/signal"
 	"syscall"
@@ -21,7 +20,6 @@ import (
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/logging"
-	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/leodip/goiabada/core/timezones"
 )
@@ -98,9 +96,6 @@ func main() {
 		os.Exit(1)
 	}
 	slog.Info("i18n catalogs loaded")
-
-	// gob registration
-	gob.Register(oauth.TokenResponse{})
 
 	now := time.Now()
 	slog.Info("process clock",
