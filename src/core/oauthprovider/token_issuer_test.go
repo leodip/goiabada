@@ -1,4 +1,4 @@
-package oauth
+package oauthprovider
 
 import (
 	"context"
@@ -16,6 +16,7 @@ import (
 
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/leodip/goiabada/core/uuidutil"
 	"github.com/stretchr/testify/assert"
@@ -2097,7 +2098,7 @@ func TestGenerateTokenResponseForRefresh(t *testing.T) {
 		Scope:                "openid profile resource1:read",
 	}
 
-	refreshTokenInfo := &JwtToken{
+	refreshTokenInfo := &oauth.JwtToken{
 		Claims: jwt.MapClaims{
 			"jti":    "existing-jti",
 			"scope":  "openid profile resource1:read",
@@ -2310,7 +2311,7 @@ func TestGenerateTokenResponseForRefresh_Offline_NoIdToken(t *testing.T) {
 		AuthStateGeneration: 7,
 	}
 
-	refreshTokenInfo := &JwtToken{
+	refreshTokenInfo := &oauth.JwtToken{
 		Claims: jwt.MapClaims{
 			"jti":    "existing-jti-offline",
 			"scope":  "openid profile offline_access",

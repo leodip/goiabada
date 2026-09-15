@@ -9,7 +9,7 @@ import (
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/oauthprovider"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
@@ -52,8 +52,8 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/auth/level2", nil)
 		rr := httptest.NewRecorder()
 
-		authContext := &oauth.AuthContext{
-			AuthState: oauth.AuthStateInitial,
+		authContext := &oauthprovider.AuthContext{
+			AuthState: oauthprovider.AuthStateInitial,
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -75,8 +75,8 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/auth/level2", nil)
 		rr := httptest.NewRecorder()
 
-		authContext := &oauth.AuthContext{
-			AuthState: oauth.AuthStateRequiresLevel2,
+		authContext := &oauthprovider.AuthContext{
+			AuthState: oauthprovider.AuthStateRequiresLevel2,
 			ClientId:  "test-client",
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
@@ -104,8 +104,8 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/auth/level2", nil)
 		rr := httptest.NewRecorder()
 
-		authContext := &oauth.AuthContext{
-			AuthState: oauth.AuthStateRequiresLevel2,
+		authContext := &oauthprovider.AuthContext{
+			AuthState: oauthprovider.AuthStateRequiresLevel2,
 			ClientId:  "test-client",
 			UserId:    1,
 		}
@@ -125,8 +125,8 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		}
 		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
 
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
-			return ac.AuthState == oauth.AuthStateLevel2OTP &&
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
+			return ac.AuthState == oauthprovider.AuthStateLevel2OTP &&
 				ac.OtpConfigGeneration != nil && *ac.OtpConfigGeneration == 4
 		})).Return(nil)
 
@@ -150,8 +150,8 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/auth/level2", nil)
 		rr := httptest.NewRecorder()
 
-		authContext := &oauth.AuthContext{
-			AuthState: oauth.AuthStateRequiresLevel2,
+		authContext := &oauthprovider.AuthContext{
+			AuthState: oauthprovider.AuthStateRequiresLevel2,
 			ClientId:  "test-client",
 			UserId:    1,
 		}
@@ -176,8 +176,8 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		// answer with, so this ceremony must discharge the obligation. Without the capture
 		// here every session of such a user stays permanently behind and handlePromptNone
 		// answers interaction_required for the rest of each session's life (#242 decision 3).
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
-			return ac.AuthState == oauth.AuthStateAuthenticationCompleted &&
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
+			return ac.AuthState == oauthprovider.AuthStateAuthenticationCompleted &&
 				ac.OtpConfigGeneration != nil && *ac.OtpConfigGeneration == 4
 		})).Return(nil)
 
@@ -201,8 +201,8 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/auth/level2", nil)
 		rr := httptest.NewRecorder()
 
-		authContext := &oauth.AuthContext{
-			AuthState: oauth.AuthStateRequiresLevel2,
+		authContext := &oauthprovider.AuthContext{
+			AuthState: oauthprovider.AuthStateRequiresLevel2,
 			ClientId:  "test-client",
 			UserId:    1,
 		}
@@ -221,8 +221,8 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		}
 		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
 
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauth.AuthContext) bool {
-			return ac.AuthState == oauth.AuthStateLevel2OTP &&
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
+			return ac.AuthState == oauthprovider.AuthStateLevel2OTP &&
 				ac.OtpConfigGeneration != nil && *ac.OtpConfigGeneration == 4
 		})).Return(nil)
 
@@ -251,8 +251,8 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/auth/level2", nil)
 		rr := httptest.NewRecorder()
 
-		authContext := &oauth.AuthContext{
-			AuthState: oauth.AuthStateRequiresLevel2,
+		authContext := &oauthprovider.AuthContext{
+			AuthState: oauthprovider.AuthStateRequiresLevel2,
 			ClientId:  "test-client",
 			UserId:    1,
 		}
@@ -293,8 +293,8 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/auth/level2", nil)
 		rr := httptest.NewRecorder()
 
-		authContext := &oauth.AuthContext{
-			AuthState: oauth.AuthStateRequiresLevel2,
+		authContext := &oauthprovider.AuthContext{
+			AuthState: oauthprovider.AuthStateRequiresLevel2,
 			ClientId:  "test-client",
 			UserId:    1,
 		}

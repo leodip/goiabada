@@ -1,4 +1,4 @@
-package oauth
+package oauthprovider
 
 import (
 	"context"
@@ -16,6 +16,7 @@ import (
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/oidc"
 	"github.com/leodip/goiabada/core/uuidutil"
 
@@ -38,7 +39,7 @@ type GenerateTokenForRefreshInput struct {
 	Code             *models.Code
 	ScopeRequested   string
 	RefreshToken     *models.RefreshToken
-	RefreshTokenInfo *JwtToken
+	RefreshTokenInfo *oauth.JwtToken
 }
 
 // TokenGenerationInput contains all data needed to generate access/id tokens
@@ -87,11 +88,11 @@ type TokenGenerationInput struct {
 type GenerateTokenForRefreshROPCInput struct {
 	RefreshToken     *models.RefreshToken
 	ScopeRequested   string
-	RefreshTokenInfo *JwtToken
+	RefreshTokenInfo *oauth.JwtToken
 }
 
 func (t *TokenIssuer) GenerateTokenResponseForAuthCode(ctx context.Context,
-	code *models.Code) (*TokenResponse, error) {
+	code *models.Code) (*oauth.TokenResponse, error) {
 
 	settings := ctx.Value(constants.ContextKeySettings).(*models.Settings)
 
@@ -105,7 +106,7 @@ func (t *TokenIssuer) GenerateTokenResponseForAuthCode(ctx context.Context,
 		tokenExpirationInSeconds = code.Client.TokenExpirationInSeconds
 	}
 
-	var tokenResponse = TokenResponse{
+	var tokenResponse = oauth.TokenResponse{
 		TokenType: enums.TokenTypeBearer.String(),
 		ExpiresIn: int64(tokenExpirationInSeconds),
 	}
@@ -376,11 +377,11 @@ func (t *TokenIssuer) getRefreshTokenMaxLifetime(refreshTokenType string, now ti
 }
 
 func (t *TokenIssuer) GenerateTokenResponseForClientCred(ctx context.Context, client *models.Client,
-	scope string) (*TokenResponse, error) {
+	scope string) (*oauth.TokenResponse, error) {
 
 	settings := ctx.Value(constants.ContextKeySettings).(*models.Settings)
 
-	var tokenResponse = TokenResponse{
+	var tokenResponse = oauth.TokenResponse{
 		TokenType: "Bearer",
 		ExpiresIn: int64(settings.TokenExpirationInSeconds),
 		Scope:     scope,
@@ -443,7 +444,7 @@ func (t *TokenIssuer) GenerateTokenResponseForClientCred(ctx context.Context, cl
 	return &tokenResponse, nil
 }
 
-func (t *TokenIssuer) GenerateTokenResponseForRefresh(ctx context.Context, input *GenerateTokenForRefreshInput) (*TokenResponse, error) {
+func (t *TokenIssuer) GenerateTokenResponseForRefresh(ctx context.Context, input *GenerateTokenForRefreshInput) (*oauth.TokenResponse, error) {
 
 	settings := ctx.Value(constants.ContextKeySettings).(*models.Settings)
 
@@ -462,7 +463,7 @@ func (t *TokenIssuer) GenerateTokenResponseForRefresh(ctx context.Context, input
 		tokenExpirationInSeconds = input.Code.Client.TokenExpirationInSeconds
 	}
 
-	var tokenResponse = TokenResponse{
+	var tokenResponse = oauth.TokenResponse{
 		TokenType: enums.TokenTypeBearer.String(),
 		ExpiresIn: int64(tokenExpirationInSeconds),
 	}
@@ -536,7 +537,7 @@ func (t *TokenIssuer) GenerateTokenResponseForRefresh(ctx context.Context, input
 
 // GenerateTokenResponseForRefreshROPC generates new tokens for an ROPC refresh token.
 // Unlike auth code flow, ROPC tokens have UserId and ClientId directly on the RefreshToken.
-func (t *TokenIssuer) GenerateTokenResponseForRefreshROPC(ctx context.Context, input *GenerateTokenForRefreshROPCInput) (*TokenResponse, error) {
+func (t *TokenIssuer) GenerateTokenResponseForRefreshROPC(ctx context.Context, input *GenerateTokenForRefreshROPCInput) (*oauth.TokenResponse, error) {
 
 	settings := ctx.Value(constants.ContextKeySettings).(*models.Settings)
 
@@ -561,7 +562,7 @@ func (t *TokenIssuer) GenerateTokenResponseForRefreshROPC(ctx context.Context, i
 		tokenExpirationInSeconds = input.RefreshToken.Client.TokenExpirationInSeconds
 	}
 
-	var tokenResponse = TokenResponse{
+	var tokenResponse = oauth.TokenResponse{
 		TokenType: enums.TokenTypeBearer.String(),
 		ExpiresIn: int64(tokenExpirationInSeconds),
 	}

@@ -7,12 +7,12 @@ import (
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/oauthprovider"
 )
 
 // This is seam 1 at the data tier, on all four engines: the rotator's composition against
 // real SQL rather than against a mock's idea of it. The unit tests in
-// core/oauth/signing_key_rotator_test.go own which calls are made in which order and what
+// core/oauthprovider/signing_key_rotator_test.go own which calls are made in which order and what
 // happens on every refusal; only this one can say the resulting statements are accepted by
 // mysql, postgres, mssql and sqlite and leave the key set the rotation claims.
 //
@@ -39,7 +39,7 @@ func seedOneKeyPerState(t *testing.T) (previous, current, next *models.KeyPair) 
 func TestSigningKeyRotator_Rotate_MovesEveryKeyOneStep(t *testing.T) {
 	previous, current, next := seedOneKeyPerState(t)
 
-	if err := oauth.NewSigningKeyRotator(database).Rotate(); err != nil {
+	if err := oauthprovider.NewSigningKeyRotator(database).Rotate(); err != nil {
 		t.Fatalf("Rotate failed: %v", err)
 	}
 
@@ -138,11 +138,11 @@ func TestSigningKeyRotator_Rotate_RefusesWithNoNextKeyAndKeepsThePrevious(t *tes
 	previous, current, _ := seedOneKeyPerState(t)
 	clearKeyPairState(t, enums.KeyStateNext.String())
 
-	err := oauth.NewSigningKeyRotator(database).Rotate()
+	err := oauthprovider.NewSigningKeyRotator(database).Rotate()
 	if err == nil {
 		t.Fatal("Expected the rotation to be refused")
 	}
-	if !errors.Is(err, oauth.ErrKeySetIncomplete) {
+	if !errors.Is(err, oauthprovider.ErrKeySetIncomplete) {
 		t.Fatalf("Expected ErrKeySetIncomplete, got %v", err)
 	}
 

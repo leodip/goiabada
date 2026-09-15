@@ -16,6 +16,7 @@ import (
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/oauthprovider"
 	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/leodip/goiabada/core/testutil"
 	"github.com/stretchr/testify/assert"
@@ -31,7 +32,7 @@ func TestGetAuthContext(t *testing.T) {
 
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		sess := sessionstore.NewSession(mockStore, testSessionName)
-		authContext := &oauth.AuthContext{ClientId: "test-client"}
+		authContext := &oauthprovider.AuthContext{ClientId: "test-client"}
 		jsonData, _ := json.Marshal(authContext)
 		sess.Values[constants.SessionKeyAuthContext] = string(jsonData)
 
@@ -171,7 +172,7 @@ func TestSaveAuthContext(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		w := httptest.NewRecorder()
 		sess := sessionstore.NewSession(mockStore, testSessionName)
-		authContext := &oauth.AuthContext{ClientId: "test-client"}
+		authContext := &oauthprovider.AuthContext{ClientId: "test-client"}
 
 		mockStore.On("Get", req, testSessionName).Return(sess, nil)
 		mockStore.On("Save", req, w, sess).Return(nil)
@@ -189,7 +190,7 @@ func TestSaveAuthContext(t *testing.T) {
 
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		w := httptest.NewRecorder()
-		authContext := &oauth.AuthContext{ClientId: "test-client"}
+		authContext := &oauthprovider.AuthContext{ClientId: "test-client"}
 
 		mockStore.On("Get", req, testSessionName).Return(nil, assert.AnError)
 
@@ -206,7 +207,7 @@ func TestSaveAuthContext(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		w := httptest.NewRecorder()
 		sess := sessionstore.NewSession(mockStore, testSessionName)
-		authContext := &oauth.AuthContext{ClientId: "test-client"}
+		authContext := &oauthprovider.AuthContext{ClientId: "test-client"}
 
 		mockStore.On("Get", req, testSessionName).Return(sess, nil)
 		mockStore.On("Save", req, w, sess).Return(assert.AnError)
@@ -305,13 +306,13 @@ func replayThroughJar(t *testing.T, res *http.Response, extra []*http.Cookie) *h
 // several cookies, which is what the RealStore cases used to be built around. It stays large for
 // the opposite reason now: one cookie whatever the payload is the property #266 exists to
 // establish, and a fixture that fits comfortably would not test it.
-func largeAuthContext() *oauth.AuthContext {
+func largeAuthContext() *oauthprovider.AuthContext {
 	long := ""
 	for i := 0; i < 400; i++ {
 		long += "scope" + string(rune('a'+i%26)) + ":permission "
 	}
-	return &oauth.AuthContext{
-		AuthState:   oauth.AuthStateReadyToIssueCode,
+	return &oauthprovider.AuthContext{
+		AuthState:   oauthprovider.AuthStateReadyToIssueCode,
 		ClientId:    "test-client",
 		UserId:      123,
 		RedirectURI: "https://example.com/callback",
@@ -501,7 +502,7 @@ func TestClearAuthContext(t *testing.T) {
 
 		authContext, err := helper.GetAuthContext(replayThroughJar(t, rr.Result(), nil))
 		require.NoError(t, err)
-		assert.Equal(t, oauth.AuthStateReadyToIssueCode, authContext.AuthState)
+		assert.Equal(t, oauthprovider.AuthStateReadyToIssueCode, authContext.AuthState)
 	})
 }
 
@@ -523,12 +524,12 @@ func TestUILocales(t *testing.T) {
 
 	tests := []struct {
 		name        string
-		authContext *oauth.AuthContext
+		authContext *oauthprovider.AuthContext
 		want        []string
 	}{
 		{
 			name:        "StoredTags",
-			authContext: &oauth.AuthContext{UILocales: []string{"pt-BR", "es"}},
+			authContext: &oauthprovider.AuthContext{UILocales: []string{"pt-BR", "es"}},
 			want:        []string{"pt-BR", "es"},
 		},
 		{
@@ -536,7 +537,7 @@ func TestUILocales(t *testing.T) {
 		},
 		{
 			name:        "EmptyTags",
-			authContext: &oauth.AuthContext{UILocales: []string{}},
+			authContext: &oauthprovider.AuthContext{UILocales: []string{}},
 		},
 	}
 
