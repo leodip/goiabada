@@ -104,7 +104,6 @@ A row whose owner is not `kernel` names the issue that moves it. A `kernel` row 
 | `core/mocks` | kernel | — |
 | `core/models` | authserver | #359 |
 | `core/oauth` | kernel | — |
-| `core/oauthdb` | authserver | #339 |
 | `core/oidc` | authserver | #360 |
 | `core/otp` | authserver | #346 |
 | `core/phonecountries` | authserver | #344 |
