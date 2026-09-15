@@ -20,9 +20,9 @@ import (
 
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
+	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
 	mocks_handlerhelpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
-	mocks_oauthprovider "github.com/leodip/goiabada/core/oauthprovider/mocks"
 	mocks_users "github.com/leodip/goiabada/core/user/mocks"
 	mocks_validators "github.com/leodip/goiabada/core/validators/mocks"
 )
@@ -47,7 +47,7 @@ func wrappedTokenRequest(t *testing.T, failure error) (
 	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 	userSessionManager := mocks_users.NewUserSessionManager(t)
 	database := mocks_data.NewDatabase(t)
-	tokenIssuer := mocks_oauthprovider.NewTokenIssuer(t)
+	tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 	tokenValidator := mocks_validators.NewTokenValidator(t)
 	auditLogger := mocks_audit.NewAuditLogger(t)
 

@@ -61,7 +61,7 @@ Primary flow for web/mobile apps. User authenticates via browser, receives code,
 - Endpoint: `GET /auth/authorize` → `POST /auth/token` (grant_type=authorization_code)
 - PKCE: always required for a public client; otherwise configurable globally (`Settings.PKCERequired`) or per-client (`Client.PKCERequired`)
 - Supports `response_type=code` with optional `code_challenge` + `code_challenge_method`
-- Implementation: `handler_authorize.go`, `handler_token.go`, `oauthprovider/code_issuer.go`
+- Implementation: `handler_authorize.go`, `handler_token.go`, `issuance/code_issuer.go`
 
 ### Client Credentials
 Server-to-server auth. No user context, client authenticates directly for access token.
@@ -75,7 +75,7 @@ Exchange refresh token for new access/refresh tokens. Works with auth code and R
 - Endpoint: `POST /auth/token` (grant_type=refresh_token)
 - Offline tokens: Configurable idle timeout and max lifetime per client/globally
 - Revocation: Old refresh token revoked on use, new one issued
-- Implementation: `handler_token.go` case "refresh_token", `oauthprovider/token_issuer.go`
+- Implementation: `handler_token.go` case "refresh_token", `issuance/token_issuer.go`
 
 ### Implicit Flow (Deprecated)
 Legacy flow returning tokens directly in redirect URI fragment. **Deprecated in OAuth 2.1.**
@@ -112,7 +112,7 @@ Defined in `src/core/enums/enums.go`:
 Target ACR determined by: `acr_values` param in authorize request → falls back to `Client.DefaultAcrLevel`
 
 ### Auth States (State Machine)
-The values below are the string constants declared in `src/core/oauthprovider/auth_context.go`, and
+The values below are the string constants declared in `src/authserver/internal/ceremony/auth_context.go`, and
 `AssertAgentDocs` in `core/testutil/agentdocs.go` holds this section's roster to them: a state
 declared there with no row here, or a row here naming no constant, fails every module's unit tier.
 There is no single order: a ceremony's path depends on the target ACR, the session, and `prompt`.

@@ -231,6 +231,8 @@ var slogRequestPathDirs = []string{
 	"authserver/internal/middleware",
 	"authserver/internal/apiresponse",
 	"authserver/internal/sessionbackend",
+	"authserver/internal/ceremony",
+	"authserver/internal/issuance",
 	"adminconsole/internal/handlers",
 	"adminconsole/internal/middleware",
 	"adminconsole/internal/apiclient",

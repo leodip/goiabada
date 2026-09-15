@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
@@ -21,7 +22,6 @@ import (
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
-	"github.com/leodip/goiabada/core/oauthprovider"
 	"github.com/leodip/goiabada/core/oidc"
 	"github.com/leodip/goiabada/core/stringutil"
 	"github.com/leodip/goiabada/core/urlutil"
@@ -98,8 +98,8 @@ func HandleAuthorizeGet(
 		// request that replaced it (#79).
 		ceremonyId := stringutil.GenerateSecurityRandomString(ceremonyIdLength)
 
-		authContext := oauthprovider.AuthContext{
-			AuthState:                     oauthprovider.AuthStateInitial,
+		authContext := ceremony.AuthContext{
+			AuthState:                     ceremony.AuthStateInitial,
 			CeremonyId:                    ceremonyId,
 			ClientId:                      r.FormValue("client_id"),
 			RedirectURI:                   r.FormValue("redirect_uri"),
@@ -393,7 +393,7 @@ func HandleAuthorizeGet(
 			authContext.DeferredErrorCode = validationError.GetCode()
 			authContext.DeferredErrorDescription =
 				customerrors.ConformErrorDescription(validationError.GetDescription())
-			authContext.AuthState = oauthprovider.AuthStateRequiresLevel1
+			authContext.AuthState = ceremony.AuthStateRequiresLevel1
 
 			err := authHelper.SaveAuthContext(w, r, &authContext)
 			if err != nil {
@@ -515,7 +515,7 @@ func HandleAuthorizeGet(
 
 		// Handle prompt=login: force re-authentication, skip session entirely
 		if authContext.HasPromptValue("login") {
-			authContext.AuthState = oauthprovider.AuthStateRequiresLevel1
+			authContext.AuthState = ceremony.AuthStateRequiresLevel1
 			err = authHelper.SaveAuthContext(w, r, &authContext)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
@@ -550,7 +550,7 @@ func HandleAuthorizeGet(
 			// If hint identifies a different user, force re-authentication instead of SSO
 			if authContext.IdTokenHintSub != "" && userSession.User.Subject != authContext.IdTokenHintSub {
 				// Treat as no valid session — force re-authentication
-				authContext.AuthState = oauthprovider.AuthStateRequiresLevel1
+				authContext.AuthState = ceremony.AuthStateRequiresLevel1
 				err = authHelper.SaveAuthContext(w, r, &authContext)
 				if err != nil {
 					httpHelper.InternalServerError(w, r, err)
@@ -587,7 +587,7 @@ func HandleAuthorizeGet(
 			// the password handler, and reading the user's current generation here would
 			// launder an old session into a newer generation (#106 decision 11(d)).
 			authContext.AuthStateGeneration = userSession.AuthStateGeneration
-			authContext.AuthState = oauthprovider.AuthStateLevel1ExistingSession
+			authContext.AuthState = ceremony.AuthStateLevel1ExistingSession
 			err = authHelper.SaveAuthContext(w, r, &authContext)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
@@ -598,7 +598,7 @@ func HandleAuthorizeGet(
 		}
 
 		// no valid session, requires level 1 auth
-		authContext.AuthState = oauthprovider.AuthStateRequiresLevel1
+		authContext.AuthState = ceremony.AuthStateRequiresLevel1
 		err = authHelper.SaveAuthContext(w, r, &authContext)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
@@ -612,7 +612,7 @@ func HandleAuthorizeGet(
 // It performs all necessary checks without displaying any UI and either:
 // - Returns an error to the client if silent auth is not possible
 // - Issues a code silently if all conditions are met
-func handlePromptNone(w http.ResponseWriter, r *http.Request, httpHelper HttpHelper, authHelper AuthHelper, userSessionManager UserSessionManager, database data.Database, templateFS fs.FS, auditLogger AuditLogger, permissionChecker PermissionChecker, authContext *oauthprovider.AuthContext, client *models.Client, sessionIdentifier string) {
+func handlePromptNone(w http.ResponseWriter, r *http.Request, httpHelper HttpHelper, authHelper AuthHelper, userSessionManager UserSessionManager, database data.Database, templateFS fs.FS, auditLogger AuditLogger, permissionChecker PermissionChecker, authContext *ceremony.AuthContext, client *models.Client, sessionIdentifier string) {
 	// Helper to clear the auth context and then redirect with error. The clear-then-answer
 	// sequence and its server_error fallback live in answerClientWithError, which derives that
 	// fallback from the input handed to it, so this path keeps answering from the stored ceremony
@@ -796,7 +796,7 @@ func handlePromptNone(w http.ResponseWriter, r *http.Request, httpHelper HttpHel
 	})
 
 	// Ready to issue code
-	authContext.AuthState = oauthprovider.AuthStateReadyToIssueCode
+	authContext.AuthState = ceremony.AuthStateReadyToIssueCode
 	err = authHelper.SaveAuthContext(w, r, authContext)
 	if err != nil {
 		httpHelper.InternalServerError(w, r, err)
@@ -850,7 +850,7 @@ type redirectErrorInput struct {
 // come from the stored ceremony, which is where fourteen of the sixteen take them from. The two
 // inside HandleAuthorizeGet's own closure run before the context holds the validated values and
 // read the request instead.
-func redirectErrorFromAuthContext(authContext *oauthprovider.AuthContext, client *models.Client,
+func redirectErrorFromAuthContext(authContext *ceremony.AuthContext, client *models.Client,
 	code string, description string) redirectErrorInput {
 
 	return redirectErrorInput{

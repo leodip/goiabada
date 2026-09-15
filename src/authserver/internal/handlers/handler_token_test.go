@@ -18,18 +18,18 @@ import (
 	"github.com/stretchr/testify/require"
 
 	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
+	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	authmiddleware "github.com/leodip/goiabada/authserver/internal/middleware"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
 	mocks_handlerhelpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
-	mocks_oauthprovider "github.com/leodip/goiabada/core/oauthprovider/mocks"
 	mocks_users "github.com/leodip/goiabada/core/user/mocks"
 	mocks_validators "github.com/leodip/goiabada/core/validators/mocks"
 
+	"github.com/leodip/goiabada/authserver/internal/issuance"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
-	"github.com/leodip/goiabada/core/oauthprovider"
 	"github.com/leodip/goiabada/core/validators"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -40,7 +40,7 @@ func TestHandleTokenPost(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		userSessionManager := mocks_users.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
-		tokenIssuer := mocks_oauthprovider.NewTokenIssuer(t)
+		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		tokenValidator := mocks_validators.NewTokenValidator(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
@@ -69,7 +69,7 @@ func TestHandleTokenPost(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		userSessionManager := mocks_users.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
-		tokenIssuer := mocks_oauthprovider.NewTokenIssuer(t)
+		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		tokenValidator := mocks_validators.NewTokenValidator(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
@@ -97,7 +97,7 @@ func TestHandleTokenPost(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		userSessionManager := mocks_users.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
-		tokenIssuer := mocks_oauthprovider.NewTokenIssuer(t)
+		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		tokenValidator := mocks_validators.NewTokenValidator(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
@@ -139,7 +139,7 @@ func TestHandleTokenPost(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		userSessionManager := mocks_users.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
-		tokenIssuer := mocks_oauthprovider.NewTokenIssuer(t)
+		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		tokenValidator := mocks_validators.NewTokenValidator(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
@@ -181,7 +181,7 @@ func TestHandleTokenPost(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		userSessionManager := mocks_users.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
-		tokenIssuer := mocks_oauthprovider.NewTokenIssuer(t)
+		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		tokenValidator := mocks_validators.NewTokenValidator(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
@@ -232,7 +232,7 @@ func TestHandleTokenPost(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		userSessionManager := mocks_users.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
-		tokenIssuer := mocks_oauthprovider.NewTokenIssuer(t)
+		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		tokenValidator := mocks_validators.NewTokenValidator(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
@@ -282,7 +282,7 @@ func TestHandleTokenPost(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		userSessionManager := mocks_users.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
-		tokenIssuer := mocks_oauthprovider.NewTokenIssuer(t)
+		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		tokenValidator := mocks_validators.NewTokenValidator(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
@@ -320,7 +320,7 @@ func TestHandleTokenPost(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		userSessionManager := mocks_users.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
-		tokenIssuer := mocks_oauthprovider.NewTokenIssuer(t)
+		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		tokenValidator := mocks_validators.NewTokenValidator(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
@@ -360,7 +360,7 @@ func TestHandleTokenPost(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		userSessionManager := mocks_users.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
-		tokenIssuer := mocks_oauthprovider.NewTokenIssuer(t)
+		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		tokenValidator := mocks_validators.NewTokenValidator(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
@@ -387,7 +387,7 @@ func TestHandleTokenPost(t *testing.T) {
 		database.On("MarkRefreshTokenAsRevoked", (*sql.Tx)(nil), int64(1)).
 			Return(true, nil)
 
-		tokenIssuer.On("GenerateTokenResponseForRefresh", req.Context(), mock.AnythingOfType("*oauthprovider.GenerateTokenForRefreshInput")).
+		tokenIssuer.On("GenerateTokenResponseForRefresh", req.Context(), mock.AnythingOfType("*issuance.GenerateTokenForRefreshInput")).
 			Return(nil, customerrors.NewErrorDetailWithHttpStatusCode("server_error", "Failed to generate token", http.StatusInternalServerError))
 
 		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
@@ -406,7 +406,7 @@ func TestHandleTokenPost(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		userSessionManager := mocks_users.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
-		tokenIssuer := mocks_oauthprovider.NewTokenIssuer(t)
+		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		tokenValidator := mocks_validators.NewTokenValidator(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
@@ -454,7 +454,7 @@ func TestHandleTokenPost(t *testing.T) {
 			TokenType:    "Bearer",
 			ExpiresIn:    3600,
 		}
-		tokenIssuer.On("GenerateTokenResponseForRefresh", req.Context(), mock.AnythingOfType("*oauthprovider.GenerateTokenForRefreshInput")).
+		tokenIssuer.On("GenerateTokenResponseForRefresh", req.Context(), mock.AnythingOfType("*issuance.GenerateTokenForRefreshInput")).
 			Return(mockTokenResponse, nil)
 
 		mockUserSession := &models.UserSession{
@@ -492,7 +492,7 @@ func TestHandleTokenPost(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		userSessionManager := mocks_users.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
-		tokenIssuer := mocks_oauthprovider.NewTokenIssuer(t)
+		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		tokenValidator := mocks_validators.NewTokenValidator(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
@@ -537,7 +537,7 @@ func TestHandleTokenPost(t *testing.T) {
 			TokenType:    "Bearer",
 			ExpiresIn:    3600,
 		}
-		tokenIssuer.On("GenerateTokenResponseForRefresh", req.Context(), mock.AnythingOfType("*oauthprovider.GenerateTokenForRefreshInput")).
+		tokenIssuer.On("GenerateTokenResponseForRefresh", req.Context(), mock.AnythingOfType("*issuance.GenerateTokenForRefreshInput")).
 			Return(mockTokenResponse, nil)
 
 		auditLogger.On("Log", mock.Anything, constants.AuditTokenIssuedRefreshTokenResponse, mock.MatchedBy(func(details map[string]interface{}) bool {
@@ -565,7 +565,7 @@ func TestHandleTokenPost(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		userSessionManager := mocks_users.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
-		tokenIssuer := mocks_oauthprovider.NewTokenIssuer(t)
+		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		tokenValidator := mocks_validators.NewTokenValidator(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
@@ -870,7 +870,7 @@ func TestHandleTokenPost_AuthCodeReuse_RevokeFailureReturns500(t *testing.T) {
 	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 	userSessionManager := mocks_users.NewUserSessionManager(t)
 	database := mocks_data.NewDatabase(t)
-	tokenIssuer := mocks_oauthprovider.NewTokenIssuer(t)
+	tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 	tokenValidator := mocks_validators.NewTokenValidator(t)
 	auditLogger := mocks_audit.NewAuditLogger(t)
 
@@ -932,7 +932,7 @@ func TestHandleTokenPost_AuthCodeReuse_BeginTransactionFailureReturns500(t *test
 	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 	userSessionManager := mocks_users.NewUserSessionManager(t)
 	database := mocks_data.NewDatabase(t)
-	tokenIssuer := mocks_oauthprovider.NewTokenIssuer(t)
+	tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 	tokenValidator := mocks_validators.NewTokenValidator(t)
 	auditLogger := mocks_audit.NewAuditLogger(t)
 
@@ -983,7 +983,7 @@ func TestHandleTokenPost_AuthCode_ConcurrentDoubleSpendLoses(t *testing.T) {
 	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 	userSessionManager := mocks_users.NewUserSessionManager(t)
 	database := mocks_data.NewDatabase(t)
-	tokenIssuer := mocks_oauthprovider.NewTokenIssuer(t)
+	tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 	tokenValidator := mocks_validators.NewTokenValidator(t)
 	auditLogger := mocks_audit.NewAuditLogger(t)
 
@@ -1045,7 +1045,7 @@ func TestHandleTokenPost_Refresh_ConcurrentDoubleSpendLoses(t *testing.T) {
 	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 	userSessionManager := mocks_users.NewUserSessionManager(t)
 	database := mocks_data.NewDatabase(t)
-	tokenIssuer := mocks_oauthprovider.NewTokenIssuer(t)
+	tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 	tokenValidator := mocks_validators.NewTokenValidator(t)
 	auditLogger := mocks_audit.NewAuditLogger(t)
 
@@ -1161,7 +1161,7 @@ func TestHandleTokenPost_Refresh_Replay_AuditsContainment(t *testing.T) {
 			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 			userSessionManager := mocks_users.NewUserSessionManager(t)
 			database := mocks_data.NewDatabase(t)
-			tokenIssuer := mocks_oauthprovider.NewTokenIssuer(t)
+			tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 			tokenValidator := mocks_validators.NewTokenValidator(t)
 			auditLogger := mocks_audit.NewAuditLogger(t)
 
@@ -1223,7 +1223,7 @@ func TestHandleTokenPost_Refresh_Replay_ContainmentErrorReturns500(t *testing.T)
 	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 	userSessionManager := mocks_users.NewUserSessionManager(t)
 	database := mocks_data.NewDatabase(t)
-	tokenIssuer := mocks_oauthprovider.NewTokenIssuer(t)
+	tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 	tokenValidator := mocks_validators.NewTokenValidator(t)
 	auditLogger := mocks_audit.NewAuditLogger(t)
 
@@ -1428,7 +1428,7 @@ func TestHandleTokenPost_ScopeNormalizationWiring(t *testing.T) {
 			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 			userSessionManager := mocks_users.NewUserSessionManager(t)
 			database := mocks_data.NewDatabase(t)
-			tokenIssuer := mocks_oauthprovider.NewTokenIssuer(t)
+			tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 			tokenValidator := mocks_validators.NewTokenValidator(t)
 			auditLogger := mocks_audit.NewAuditLogger(t)
 
@@ -1499,12 +1499,12 @@ func TestHandleTokenPost_ScopeNormalizationWiring(t *testing.T) {
 // grant type, and that there is exactly one call site.
 func TestHandleTokenPost_ScopeDenialAudit(t *testing.T) {
 	newHandler := func(t *testing.T) (*mocks_handlerhelpers.HttpHelper, *mocks_validators.TokenValidator,
-		*mocks_oauthprovider.TokenIssuer, *mocks_audit.AuditLogger, http.HandlerFunc) {
+		*mocks_handlers.TokenIssuer, *mocks_audit.AuditLogger, http.HandlerFunc) {
 		t.Helper()
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		userSessionManager := mocks_users.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
-		tokenIssuer := mocks_oauthprovider.NewTokenIssuer(t)
+		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		tokenValidator := mocks_validators.NewTokenValidator(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		return httpHelper, tokenValidator, tokenIssuer, auditLogger,
@@ -1657,7 +1657,7 @@ func TestHandleTokenPost_ROPC_IgnoresBrowserSession(t *testing.T) {
 	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 	userSessionManager := mocks_users.NewUserSessionManager(t)
 	database := mocks_data.NewDatabase(t)
-	tokenIssuer := mocks_oauthprovider.NewTokenIssuer(t)
+	tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 	tokenValidator := mocks_validators.NewTokenValidator(t)
 	auditLogger := mocks_audit.NewAuditLogger(t)
 	handler := HandleTokenPost(httpHelper, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
@@ -1679,10 +1679,10 @@ func TestHandleTokenPost_ROPC_IgnoresBrowserSession(t *testing.T) {
 		mock.AnythingOfType("*validators.ValidateTokenRequestInput")).
 		Return(&validators.ValidateTokenRequestResult{Client: client, User: user, Scope: "openid"}, nil)
 
-	var captured *oauthprovider.ROPCGrantInput
+	var captured *issuance.ROPCGrantInput
 	tokenIssuer.On("GenerateTokenResponseForROPC", mock.Anything, mock.Anything).
-		Run(func(args mock.Arguments) { captured = args.Get(1).(*oauthprovider.ROPCGrantInput) }).
-		Return(&oauthprovider.ROPCGrantResponse{AccessToken: "at", TokenType: "Bearer"}, nil)
+		Run(func(args mock.Arguments) { captured = args.Get(1).(*issuance.ROPCGrantInput) }).
+		Return(&issuance.ROPCGrantResponse{AccessToken: "at", TokenType: "Bearer"}, nil)
 
 	auditLogger.On("Log", mock.Anything, constants.AuditTokenIssuedROPCResponse, mock.Anything).Return()
 	httpHelper.On("EncodeJson", rr, mock.Anything, mock.Anything).Return()
@@ -1710,7 +1710,7 @@ func TestHandleTokenPost_SupersededRefreshTokenIsSurfaced(t *testing.T) {
 	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 	userSessionManager := mocks_users.NewUserSessionManager(t)
 	database := mocks_data.NewDatabase(t)
-	tokenIssuer := mocks_oauthprovider.NewTokenIssuer(t)
+	tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 	tokenValidator := mocks_validators.NewTokenValidator(t)
 	auditLogger := mocks_audit.NewAuditLogger(t)
 
@@ -1762,7 +1762,7 @@ func TestHandleTokenPost_ROPC_SpendsTheLimiterBudgetOnInvalidGrantOnly(t *testin
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		userSessionManager := mocks_users.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
-		tokenIssuer := mocks_oauthprovider.NewTokenIssuer(t)
+		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		tokenValidator := mocks_validators.NewTokenValidator(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
@@ -1776,7 +1776,7 @@ func TestHandleTokenPost_ROPC_SpendsTheLimiterBudgetOnInvalidGrantOnly(t *testin
 			tokenValidator.On("ValidateTokenRequest", mock.Anything, mock.Anything).
 				Return(&validators.ValidateTokenRequestResult{Client: client, User: user, Scope: "openid"}, nil)
 			tokenIssuer.On("GenerateTokenResponseForROPC", mock.Anything, mock.Anything).
-				Return(&oauthprovider.ROPCGrantResponse{AccessToken: "at", TokenType: "Bearer"}, nil)
+				Return(&issuance.ROPCGrantResponse{AccessToken: "at", TokenType: "Bearer"}, nil)
 			httpHelper.On("EncodeJson", mock.Anything, mock.Anything, mock.Anything).Return()
 		}
 		auditLogger.On("Log", mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
@@ -2094,7 +2094,7 @@ func TestHandleTokenPost_Refresh_FlowGate(t *testing.T) {
 			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 			userSessionManager := mocks_users.NewUserSessionManager(t)
 			database := mocks_data.NewDatabase(t)
-			tokenIssuer := mocks_oauthprovider.NewTokenIssuer(t)
+			tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 			tokenValidator := mocks_validators.NewTokenValidator(t)
 			auditLogger := mocks_audit.NewAuditLogger(t)
 
@@ -2221,7 +2221,7 @@ func TestHandleTokenPost_Refresh_ContainmentPrecedesFlowGate(t *testing.T) {
 			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 			userSessionManager := mocks_users.NewUserSessionManager(t)
 			database := mocks_data.NewDatabase(t)
-			tokenIssuer := mocks_oauthprovider.NewTokenIssuer(t)
+			tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 			tokenValidator := mocks_validators.NewTokenValidator(t)
 			auditLogger := mocks_audit.NewAuditLogger(t)
 
@@ -2287,7 +2287,7 @@ func TestHandleTokenPost_RedemptionRegistrationRefusalAudit(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		userSessionManager := mocks_users.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
-		tokenIssuer := mocks_oauthprovider.NewTokenIssuer(t)
+		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		tokenValidator := mocks_validators.NewTokenValidator(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		return httpHelper, tokenValidator, auditLogger,

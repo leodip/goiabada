@@ -11,12 +11,13 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/ceremony"
+	"github.com/leodip/goiabada/authserver/internal/issuance"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
-	"github.com/leodip/goiabada/core/oauthprovider"
 	"github.com/leodip/goiabada/core/testutil"
 	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
@@ -29,7 +30,6 @@ import (
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
 	mocks_handlerhelpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
 	mocks_test "github.com/leodip/goiabada/core/mocks"
-	mocks_oauthprovider "github.com/leodip/goiabada/core/oauthprovider/mocks"
 	mocks_user "github.com/leodip/goiabada/core/user/mocks"
 )
 
@@ -68,8 +68,8 @@ func TestHandleIssueGet(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
-		codeIssuer := mocks_oauthprovider.NewCodeIssuer(t)
-		tokenIssuer := mocks_oauthprovider.NewTokenIssuer(t)
+		codeIssuer := mocks_handlers.NewCodeIssuer(t)
+		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
@@ -99,8 +99,8 @@ func TestHandleIssueGet(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
-		codeIssuer := mocks_oauthprovider.NewCodeIssuer(t)
-		tokenIssuer := mocks_oauthprovider.NewTokenIssuer(t)
+		codeIssuer := mocks_handlers.NewCodeIssuer(t)
+		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
@@ -113,8 +113,8 @@ func TestHandleIssueGet(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		authContext := &oauthprovider.AuthContext{
-			AuthState: oauthprovider.AuthStateInitial, // Unexpected state
+		authContext := &ceremony.AuthContext{
+			AuthState: ceremony.AuthStateInitial, // Unexpected state
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -132,8 +132,8 @@ func TestHandleIssueGet(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
-		codeIssuer := mocks_oauthprovider.NewCodeIssuer(t)
-		tokenIssuer := mocks_oauthprovider.NewTokenIssuer(t)
+		codeIssuer := mocks_handlers.NewCodeIssuer(t)
+		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
@@ -150,8 +150,8 @@ func TestHandleIssueGet(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		// Mock auth context - note: ResponseType "code" means authorization code flow, not implicit
-		authContext := &oauthprovider.AuthContext{
-			AuthState:    oauthprovider.AuthStateReadyToIssueCode,
+		authContext := &ceremony.AuthContext{
+			AuthState:    ceremony.AuthStateReadyToIssueCode,
 			Scope:        "openid profile",
 			ClientId:     "test-client",
 			UserId:       123,
@@ -171,7 +171,7 @@ func TestHandleIssueGet(t *testing.T) {
 			RedirectURI: "https://example.com/callback",
 			State:       "test-state",
 		}
-		codeIssuer.On("CreateAuthCode", issuanceTx, mock.MatchedBy(func(input *oauthprovider.CreateCodeInput) bool {
+		codeIssuer.On("CreateAuthCode", issuanceTx, mock.MatchedBy(func(input *issuance.CreateCodeInput) bool {
 			return reflect.DeepEqual(input.AuthContext, *authContext) &&
 				input.SessionIdentifier == liveSessionIdentifier
 		})).Return(mockCode, nil)
@@ -214,7 +214,7 @@ func TestHandleIssueGet(t *testing.T) {
 	// sweeps.
 	//
 	// "No code created" is enforced rather than asserted in the refusal rows below: the strict
-	// mocks_oauthprovider.CodeIssuer carries no CreateAuthCode expectation, so reaching it fails the
+	// mocks_handlers.CodeIssuer carries no CreateAuthCode expectation, so reaching it fails the
 	// case on its own, and the audit logger is not stubbed either.
 	//
 	// Two outcomes, one predicate. An interactive ceremony restarts level 1 (decision 6), and
@@ -224,8 +224,8 @@ func TestHandleIssueGet(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
-		codeIssuer := mocks_oauthprovider.NewCodeIssuer(t)
-		tokenIssuer := mocks_oauthprovider.NewTokenIssuer(t)
+		codeIssuer := mocks_handlers.NewCodeIssuer(t)
+		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
@@ -243,8 +243,8 @@ func TestHandleIssueGet(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		authContext := &oauthprovider.AuthContext{
-			AuthState:    oauthprovider.AuthStateReadyToIssueCode,
+		authContext := &ceremony.AuthContext{
+			AuthState:    ceremony.AuthStateReadyToIssueCode,
 			Scope:        "openid profile",
 			ClientId:     "test-client",
 			UserId:       123,
@@ -254,10 +254,10 @@ func TestHandleIssueGet(t *testing.T) {
 		}
 		authHelper.On("GetAuthContext", req).Return(authContext, nil)
 
-		var savedAuthContext *oauthprovider.AuthContext
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
+		var savedAuthContext *ceremony.AuthContext
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			savedAuthContext = ac
-			return ac.AuthState == oauthprovider.AuthStateRequiresLevel1
+			return ac.AuthState == ceremony.AuthStateRequiresLevel1
 		})).Return(nil)
 
 		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
@@ -267,7 +267,7 @@ func TestHandleIssueGet(t *testing.T) {
 		assert.Equal(t, http.StatusFound, rr.Code)
 		assert.Contains(t, rr.Header().Get("Location"), "/auth/level1")
 		assert.NotNil(t, savedAuthContext)
-		assert.Equal(t, oauthprovider.AuthStateRequiresLevel1, savedAuthContext.AuthState)
+		assert.Equal(t, ceremony.AuthStateRequiresLevel1, savedAuthContext.AuthState)
 
 		// No lookup either: with nothing to resolve there is no question to ask the database.
 		database.AssertNotCalled(t, "GetUserSessionBySessionIdentifier")
@@ -281,8 +281,8 @@ func TestHandleIssueGet(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
-		codeIssuer := mocks_oauthprovider.NewCodeIssuer(t)
-		tokenIssuer := mocks_oauthprovider.NewTokenIssuer(t)
+		codeIssuer := mocks_handlers.NewCodeIssuer(t)
+		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
@@ -297,8 +297,8 @@ func TestHandleIssueGet(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		authContext := &oauthprovider.AuthContext{
-			AuthState:    oauthprovider.AuthStateReadyToIssueCode,
+		authContext := &ceremony.AuthContext{
+			AuthState:    ceremony.AuthStateReadyToIssueCode,
 			Scope:        "openid profile",
 			ClientId:     "test-client",
 			UserId:       123,
@@ -310,8 +310,8 @@ func TestHandleIssueGet(t *testing.T) {
 
 		database.On("GetUserSessionBySessionIdentifier", (*sql.Tx)(nil), liveSessionIdentifier).Return(nil, nil)
 
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
-			return ac.AuthState == oauthprovider.AuthStateRequiresLevel1
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+			return ac.AuthState == ceremony.AuthStateRequiresLevel1
 		})).Return(nil)
 
 		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
@@ -331,8 +331,8 @@ func TestHandleIssueGet(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
-		codeIssuer := mocks_oauthprovider.NewCodeIssuer(t)
-		tokenIssuer := mocks_oauthprovider.NewTokenIssuer(t)
+		codeIssuer := mocks_handlers.NewCodeIssuer(t)
+		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		auditLogger := mocks_audit.NewAuditLogger(t)
@@ -350,8 +350,8 @@ func TestHandleIssueGet(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		authContext := &oauthprovider.AuthContext{
-			AuthState:    oauthprovider.AuthStateReadyToIssueCode,
+		authContext := &ceremony.AuthContext{
+			AuthState:    ceremony.AuthStateReadyToIssueCode,
 			Scope:        "openid profile",
 			ClientId:     "test-client",
 			UserId:       123,
@@ -405,8 +405,8 @@ func TestHandleIssueGet(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
-		codeIssuer := mocks_oauthprovider.NewCodeIssuer(t)
-		tokenIssuer := mocks_oauthprovider.NewTokenIssuer(t)
+		codeIssuer := mocks_handlers.NewCodeIssuer(t)
+		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		auditLogger := mocks_audit.NewAuditLogger(t)
@@ -420,8 +420,8 @@ func TestHandleIssueGet(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		authContext := &oauthprovider.AuthContext{
-			AuthState:    oauthprovider.AuthStateReadyToIssueCode,
+		authContext := &ceremony.AuthContext{
+			AuthState:    ceremony.AuthStateReadyToIssueCode,
 			Scope:        "openid profile",
 			ClientId:     "test-client",
 			UserId:       123,
@@ -464,8 +464,8 @@ func TestHandleIssueGet(t *testing.T) {
 	t.Run("No session and prompt=none, failing clear and an unusable form_post template - last-resort 500", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
-		codeIssuer := mocks_oauthprovider.NewCodeIssuer(t)
-		tokenIssuer := mocks_oauthprovider.NewTokenIssuer(t)
+		codeIssuer := mocks_handlers.NewCodeIssuer(t)
+		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		auditLogger := mocks_audit.NewAuditLogger(t)
@@ -487,8 +487,8 @@ func TestHandleIssueGet(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		authContext := &oauthprovider.AuthContext{
-			AuthState:    oauthprovider.AuthStateReadyToIssueCode,
+		authContext := &ceremony.AuthContext{
+			AuthState:    ceremony.AuthStateReadyToIssueCode,
 			Scope:        "openid profile",
 			ClientId:     "test-client",
 			UserId:       123,
@@ -523,8 +523,8 @@ func TestHandleIssueGet(t *testing.T) {
 	t.Run("No session and prompt=none, unusable form_post template - 500 when the refusal itself cannot be sent", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
-		codeIssuer := mocks_oauthprovider.NewCodeIssuer(t)
-		tokenIssuer := mocks_oauthprovider.NewTokenIssuer(t)
+		codeIssuer := mocks_handlers.NewCodeIssuer(t)
+		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		auditLogger := mocks_audit.NewAuditLogger(t)
@@ -544,8 +544,8 @@ func TestHandleIssueGet(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		authContext := &oauthprovider.AuthContext{
-			AuthState:    oauthprovider.AuthStateReadyToIssueCode,
+		authContext := &ceremony.AuthContext{
+			AuthState:    ceremony.AuthStateReadyToIssueCode,
 			Scope:        "openid profile",
 			ClientId:     "test-client",
 			UserId:       123,
@@ -582,8 +582,8 @@ func TestHandleIssueGet(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
-		codeIssuer := mocks_oauthprovider.NewCodeIssuer(t)
-		tokenIssuer := mocks_oauthprovider.NewTokenIssuer(t)
+		codeIssuer := mocks_handlers.NewCodeIssuer(t)
+		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
@@ -595,8 +595,8 @@ func TestHandleIssueGet(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		authContext := &oauthprovider.AuthContext{
-			AuthState:    oauthprovider.AuthStateReadyToIssueCode,
+		authContext := &ceremony.AuthContext{
+			AuthState:    ceremony.AuthStateReadyToIssueCode,
 			Scope:        "openid profile",
 			ClientId:     "test-client",
 			UserId:       123,
@@ -629,8 +629,8 @@ func TestHandleIssueGet(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
-		codeIssuer := mocks_oauthprovider.NewCodeIssuer(t)
-		tokenIssuer := mocks_oauthprovider.NewTokenIssuer(t)
+		codeIssuer := mocks_handlers.NewCodeIssuer(t)
+		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
@@ -642,8 +642,8 @@ func TestHandleIssueGet(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		authContext := &oauthprovider.AuthContext{
-			AuthState:    oauthprovider.AuthStateReadyToIssueCode,
+		authContext := &ceremony.AuthContext{
+			AuthState:    ceremony.AuthStateReadyToIssueCode,
 			Scope:        "openid profile",
 			ClientId:     "test-client",
 			UserId:       123,
@@ -705,14 +705,14 @@ func TestHandleIssueGet(t *testing.T) {
 // ordered by hand on all four engines.
 //
 // "No code created" is enforced rather than asserted in every refusal below: the strict
-// mocks_oauthprovider.CodeIssuer carries no CreateAuthCode expectation, so reaching it fails the case on
+// mocks_handlers.CodeIssuer carries no CreateAuthCode expectation, so reaching it fails the case on
 // its own, and so does an unexpected CommitTransaction.
 func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 	// The ceremony every case here runs: a live, owned, valid session, so the liveness read
 	// above the dispatch passes and the acquisition is the only thing left that can refuse.
-	issuanceAuthContext := func(prompt string) *oauthprovider.AuthContext {
-		return &oauthprovider.AuthContext{
-			AuthState:    oauthprovider.AuthStateReadyToIssueCode,
+	issuanceAuthContext := func(prompt string) *ceremony.AuthContext {
+		return &ceremony.AuthContext{
+			AuthState:    ceremony.AuthStateReadyToIssueCode,
 			Scope:        "openid profile",
 			ClientId:     "test-client",
 			UserId:       123,
@@ -736,8 +736,8 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
-		codeIssuer := mocks_oauthprovider.NewCodeIssuer(t)
-		tokenIssuer := mocks_oauthprovider.NewTokenIssuer(t)
+		codeIssuer := mocks_handlers.NewCodeIssuer(t)
+		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
@@ -794,8 +794,8 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
-		codeIssuer := mocks_oauthprovider.NewCodeIssuer(t)
-		tokenIssuer := mocks_oauthprovider.NewTokenIssuer(t)
+		codeIssuer := mocks_handlers.NewCodeIssuer(t)
+		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
@@ -823,12 +823,12 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 		})
 		database.On("AcquireUserSessionRow", issuanceTx, liveSessionIdentifier).Return(false, nil).Once()
 
-		var savedAuthContext *oauthprovider.AuthContext
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
-			return ac.AuthState == oauthprovider.AuthStateRequiresLevel1
+		var savedAuthContext *ceremony.AuthContext
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+			return ac.AuthState == ceremony.AuthStateRequiresLevel1
 		})).Run(func(args mock.Arguments) {
 			order = append(order, "save")
-			savedAuthContext = args.Get(2).(*oauthprovider.AuthContext)
+			savedAuthContext = args.Get(2).(*ceremony.AuthContext)
 		}).Return(nil)
 
 		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
@@ -841,7 +841,7 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 		assert.Contains(t, rr.Header().Get("Location"), "/auth/level1")
 		assert.NotContains(t, rr.Header().Get("Location"), "code=")
 		require.NotNil(t, savedAuthContext)
-		assert.Equal(t, oauthprovider.AuthStateRequiresLevel1, savedAuthContext.AuthState)
+		assert.Equal(t, ceremony.AuthStateRequiresLevel1, savedAuthContext.AuthState)
 
 		require.GreaterOrEqual(t, len(order), 2)
 		assert.Equal(t, "rollback", order[0],
@@ -871,8 +871,8 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
-		codeIssuer := mocks_oauthprovider.NewCodeIssuer(t)
-		tokenIssuer := mocks_oauthprovider.NewTokenIssuer(t)
+		codeIssuer := mocks_handlers.NewCodeIssuer(t)
+		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
@@ -898,10 +898,10 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 		})
 		database.On("AcquireUserSessionRow", issuanceTx, liveSessionIdentifier).Return(true, nil).Once()
 		codeIssuer.On("CreateAuthCode", issuanceTx, mock.Anything).
-			Return(nil, errs.WithStack(oauthprovider.ErrIssuingClientGone)).Once()
+			Return(nil, errs.WithStack(issuance.ErrIssuingClientGone)).Once()
 
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
-			return ac.AuthState == oauthprovider.AuthStateRequiresLevel1
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+			return ac.AuthState == ceremony.AuthStateRequiresLevel1
 		})).Run(func(mock.Arguments) { order = append(order, "save") }).Return(nil)
 
 		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
@@ -936,8 +936,8 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
-		codeIssuer := mocks_oauthprovider.NewCodeIssuer(t)
-		tokenIssuer := mocks_oauthprovider.NewTokenIssuer(t)
+		codeIssuer := mocks_handlers.NewCodeIssuer(t)
+		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
@@ -978,8 +978,8 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
-		codeIssuer := mocks_oauthprovider.NewCodeIssuer(t)
-		tokenIssuer := mocks_oauthprovider.NewTokenIssuer(t)
+		codeIssuer := mocks_handlers.NewCodeIssuer(t)
+		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		auditLogger := mocks_audit.NewAuditLogger(t)
@@ -1059,8 +1059,8 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 				httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 				authHelper := mocks_handlers.NewAuthHelper(t)
 				templateFS := &mocks_test.TestFS{}
-				codeIssuer := mocks_oauthprovider.NewCodeIssuer(t)
-				tokenIssuer := mocks_oauthprovider.NewTokenIssuer(t)
+				codeIssuer := mocks_handlers.NewCodeIssuer(t)
+				tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 				database := mocks_data.NewDatabase(t)
 				auditLogger := mocks_audit.NewAuditLogger(t)
 				userSessionManager := mocks_user.NewUserSessionManager(t)
@@ -1146,8 +1146,8 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 			authHelper := mocks_handlers.NewAuthHelper(t)
 			templateFS := &mocks_test.TestFS{}
-			codeIssuer := mocks_oauthprovider.NewCodeIssuer(t)
-			tokenIssuer := mocks_oauthprovider.NewTokenIssuer(t)
+			codeIssuer := mocks_handlers.NewCodeIssuer(t)
+			tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 			database := mocks_data.NewDatabase(t)
 			auditLogger := mocks_audit.NewAuditLogger(t)
 			userSessionManager := mocks_user.NewUserSessionManager(t)
@@ -1159,8 +1159,8 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 			req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 			rr := httptest.NewRecorder()
 
-			authContext := &oauthprovider.AuthContext{
-				AuthState:    oauthprovider.AuthStateReadyToIssueCode,
+			authContext := &ceremony.AuthContext{
+				AuthState:    ceremony.AuthStateReadyToIssueCode,
 				Scope:        "openid profile",
 				ClientId:     "test-client",
 				UserId:       123,
@@ -1175,10 +1175,10 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 			// belongs to someone else.
 			stubLiveSession(database, foreignSessionUserId)
 
-			var savedAuthContext *oauthprovider.AuthContext
-			authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
+			var savedAuthContext *ceremony.AuthContext
+			authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 				savedAuthContext = ac
-				return ac.AuthState == oauthprovider.AuthStateRequiresLevel1
+				return ac.AuthState == ceremony.AuthStateRequiresLevel1
 			})).Return(nil)
 
 			armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
@@ -1188,7 +1188,7 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 			assert.Equal(t, http.StatusFound, rr.Code)
 			assert.Contains(t, rr.Header().Get("Location"), "/auth/level1")
 			assert.NotNil(t, savedAuthContext)
-			assert.Equal(t, oauthprovider.AuthStateRequiresLevel1, savedAuthContext.AuthState)
+			assert.Equal(t, ceremony.AuthStateRequiresLevel1, savedAuthContext.AuthState)
 
 			// Nothing may be handed to the client on the way past.
 			location := rr.Header().Get("Location")
@@ -1232,8 +1232,8 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 			authHelper := mocks_handlers.NewAuthHelper(t)
 			templateFS := &mocks_test.TestFS{}
-			codeIssuer := mocks_oauthprovider.NewCodeIssuer(t)
-			tokenIssuer := mocks_oauthprovider.NewTokenIssuer(t)
+			codeIssuer := mocks_handlers.NewCodeIssuer(t)
+			tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 			database := mocks_data.NewDatabase(t)
 			stubRegisteredRedirectURI(database, "https://example.com/callback")
 			auditLogger := mocks_audit.NewAuditLogger(t)
@@ -1246,8 +1246,8 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 			req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 			rr := httptest.NewRecorder()
 
-			authContext := &oauthprovider.AuthContext{
-				AuthState:    oauthprovider.AuthStateReadyToIssueCode,
+			authContext := &ceremony.AuthContext{
+				AuthState:    ceremony.AuthStateReadyToIssueCode,
 				Scope:        "openid profile",
 				ClientId:     "test-client",
 				UserId:       123,
@@ -1300,8 +1300,8 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
-		codeIssuer := mocks_oauthprovider.NewCodeIssuer(t)
-		tokenIssuer := mocks_oauthprovider.NewTokenIssuer(t)
+		codeIssuer := mocks_handlers.NewCodeIssuer(t)
+		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
@@ -1312,8 +1312,8 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 		rr := httptest.NewRecorder()
 
-		authContext := &oauthprovider.AuthContext{
-			AuthState:    oauthprovider.AuthStateReadyToIssueCode,
+		authContext := &ceremony.AuthContext{
+			AuthState:    ceremony.AuthStateReadyToIssueCode,
 			ClientId:     "test-client",
 			UserId:       123,
 			ResponseMode: "fragment",
@@ -1332,9 +1332,9 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 		database.On("GetUserById", mock.Anything, int64(123)).
 			Return(&models.User{Id: 123, Subject: "11111111-1111-1111-1111-111111111111", Enabled: true}, nil)
 
-		tokenIssuer.On("GenerateTokenResponseForImplicit", mock.Anything, mock.MatchedBy(func(input *oauthprovider.ImplicitGrantInput) bool {
+		tokenIssuer.On("GenerateTokenResponseForImplicit", mock.Anything, mock.MatchedBy(func(input *issuance.ImplicitGrantInput) bool {
 			return input.User.Id == int64(123) && input.SessionIdentifier == liveSessionIdentifier
-		}), true, false).Return(&oauthprovider.ImplicitGrantResponse{
+		}), true, false).Return(&issuance.ImplicitGrantResponse{
 			AccessToken: "access-token-123",
 			TokenType:   "Bearer",
 			ExpiresIn:   3600,
@@ -1382,8 +1382,8 @@ func TestHandleIssueGet_ImplicitAmbientSessionVanished(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
-		codeIssuer := mocks_oauthprovider.NewCodeIssuer(t)
-		tokenIssuer := mocks_oauthprovider.NewTokenIssuer(t)
+		codeIssuer := mocks_handlers.NewCodeIssuer(t)
+		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
@@ -1395,8 +1395,8 @@ func TestHandleIssueGet_ImplicitAmbientSessionVanished(t *testing.T) {
 		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 		rr := httptest.NewRecorder()
 
-		authContext := &oauthprovider.AuthContext{
-			AuthState:    oauthprovider.AuthStateReadyToIssueCode,
+		authContext := &ceremony.AuthContext{
+			AuthState:    ceremony.AuthStateReadyToIssueCode,
 			Scope:        "openid profile",
 			ClientId:     "test-client",
 			UserId:       123,
@@ -1410,10 +1410,10 @@ func TestHandleIssueGet_ImplicitAmbientSessionVanished(t *testing.T) {
 		// not apply here, and OwnsSession(nil) is false.
 		database.On("GetUserSessionBySessionIdentifier", (*sql.Tx)(nil), liveSessionIdentifier).Return(nil, nil)
 
-		var savedAuthContext *oauthprovider.AuthContext
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
+		var savedAuthContext *ceremony.AuthContext
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			savedAuthContext = ac
-			return ac.AuthState == oauthprovider.AuthStateRequiresLevel1
+			return ac.AuthState == ceremony.AuthStateRequiresLevel1
 		})).Return(nil)
 
 		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
@@ -1426,7 +1426,7 @@ func TestHandleIssueGet_ImplicitAmbientSessionVanished(t *testing.T) {
 		assert.NotContains(t, location, "access_token=")
 		assert.NotContains(t, location, "id_token=")
 		assert.NotNil(t, savedAuthContext)
-		assert.Equal(t, oauthprovider.AuthStateRequiresLevel1, savedAuthContext.AuthState)
+		assert.Equal(t, ceremony.AuthStateRequiresLevel1, savedAuthContext.AuthState)
 
 		tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForImplicit")
 		// No owner to name, so this takes #129's line rather than decision 7's.
@@ -1442,8 +1442,8 @@ func TestHandleIssueGet_ImplicitAmbientSessionVanished(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
-		codeIssuer := mocks_oauthprovider.NewCodeIssuer(t)
-		tokenIssuer := mocks_oauthprovider.NewTokenIssuer(t)
+		codeIssuer := mocks_handlers.NewCodeIssuer(t)
+		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		auditLogger := mocks_audit.NewAuditLogger(t)
@@ -1456,8 +1456,8 @@ func TestHandleIssueGet_ImplicitAmbientSessionVanished(t *testing.T) {
 		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 		rr := httptest.NewRecorder()
 
-		authContext := &oauthprovider.AuthContext{
-			AuthState:    oauthprovider.AuthStateReadyToIssueCode,
+		authContext := &ceremony.AuthContext{
+			AuthState:    ceremony.AuthStateReadyToIssueCode,
 			Scope:        "openid profile",
 			ClientId:     "test-client",
 			UserId:       123,
@@ -1677,8 +1677,8 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
-		codeIssuer := mocks_oauthprovider.NewCodeIssuer(t)
-		tokenIssuer := mocks_oauthprovider.NewTokenIssuer(t)
+		codeIssuer := mocks_handlers.NewCodeIssuer(t)
+		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
@@ -1691,8 +1691,8 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		authContext := &oauthprovider.AuthContext{
-			AuthState:    oauthprovider.AuthStateReadyToIssueCode,
+		authContext := &ceremony.AuthContext{
+			AuthState:    ceremony.AuthStateReadyToIssueCode,
 			ClientId:     "test-client",
 			UserId:       123,
 			ResponseMode: "fragment",
@@ -1728,13 +1728,13 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		database.On("GetUserById", mock.Anything, int64(123)).Return(mockUser, nil)
 
 		// Mock token generation
-		tokenResponse := &oauthprovider.ImplicitGrantResponse{
+		tokenResponse := &issuance.ImplicitGrantResponse{
 			AccessToken: "access-token-123",
 			TokenType:   "Bearer",
 			ExpiresIn:   3600,
 			Scope:       "openid",
 		}
-		tokenIssuer.On("GenerateTokenResponseForImplicit", mock.Anything, mock.MatchedBy(func(input *oauthprovider.ImplicitGrantInput) bool {
+		tokenIssuer.On("GenerateTokenResponseForImplicit", mock.Anything, mock.MatchedBy(func(input *issuance.ImplicitGrantInput) bool {
 			return input.Client.Id == int64(1) && input.User.Id == int64(123) && input.Scope == "openid" &&
 				input.AuthStateGeneration == 7
 		}), true, false).Return(tokenResponse, nil)
@@ -1770,8 +1770,8 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
-		codeIssuer := mocks_oauthprovider.NewCodeIssuer(t)
-		tokenIssuer := mocks_oauthprovider.NewTokenIssuer(t)
+		codeIssuer := mocks_handlers.NewCodeIssuer(t)
+		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
@@ -1784,8 +1784,8 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		authContext := &oauthprovider.AuthContext{
-			AuthState:    oauthprovider.AuthStateReadyToIssueCode,
+		authContext := &ceremony.AuthContext{
+			AuthState:    ceremony.AuthStateReadyToIssueCode,
 			ClientId:     "test-client",
 			UserId:       123,
 			ResponseMode: "fragment",
@@ -1818,11 +1818,11 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		}
 		database.On("GetUserById", mock.Anything, int64(123)).Return(mockUser, nil)
 
-		tokenResponse := &oauthprovider.ImplicitGrantResponse{
+		tokenResponse := &issuance.ImplicitGrantResponse{
 			IdToken: "id-token-123",
 			Scope:   "openid",
 		}
-		tokenIssuer.On("GenerateTokenResponseForImplicit", mock.Anything, mock.MatchedBy(func(input *oauthprovider.ImplicitGrantInput) bool {
+		tokenIssuer.On("GenerateTokenResponseForImplicit", mock.Anything, mock.MatchedBy(func(input *issuance.ImplicitGrantInput) bool {
 			return input.Client.Id == int64(1) && input.User.Id == int64(123) && input.Nonce == "test-nonce"
 		}), false, true).Return(tokenResponse, nil)
 
@@ -1854,8 +1854,8 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
-		codeIssuer := mocks_oauthprovider.NewCodeIssuer(t)
-		tokenIssuer := mocks_oauthprovider.NewTokenIssuer(t)
+		codeIssuer := mocks_handlers.NewCodeIssuer(t)
+		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
@@ -1868,8 +1868,8 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		authContext := &oauthprovider.AuthContext{
-			AuthState:    oauthprovider.AuthStateReadyToIssueCode,
+		authContext := &ceremony.AuthContext{
+			AuthState:    ceremony.AuthStateReadyToIssueCode,
 			ClientId:     "test-client",
 			UserId:       123,
 			ResponseMode: "fragment",
@@ -1902,14 +1902,14 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		}
 		database.On("GetUserById", mock.Anything, int64(123)).Return(mockUser, nil)
 
-		tokenResponse := &oauthprovider.ImplicitGrantResponse{
+		tokenResponse := &issuance.ImplicitGrantResponse{
 			AccessToken: "access-token-123",
 			TokenType:   "Bearer",
 			ExpiresIn:   3600,
 			IdToken:     "id-token-123",
 			Scope:       "openid",
 		}
-		tokenIssuer.On("GenerateTokenResponseForImplicit", mock.Anything, mock.MatchedBy(func(input *oauthprovider.ImplicitGrantInput) bool {
+		tokenIssuer.On("GenerateTokenResponseForImplicit", mock.Anything, mock.MatchedBy(func(input *issuance.ImplicitGrantInput) bool {
 			return input.Client.Id == int64(1) && input.User.Id == int64(123)
 		}), true, true).Return(tokenResponse, nil)
 
@@ -1943,8 +1943,8 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
-		codeIssuer := mocks_oauthprovider.NewCodeIssuer(t)
-		tokenIssuer := mocks_oauthprovider.NewTokenIssuer(t)
+		codeIssuer := mocks_handlers.NewCodeIssuer(t)
+		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
@@ -1957,8 +1957,8 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		authContext := &oauthprovider.AuthContext{
-			AuthState:      oauthprovider.AuthStateReadyToIssueCode,
+		authContext := &ceremony.AuthContext{
+			AuthState:      ceremony.AuthStateReadyToIssueCode,
 			ClientId:       "test-client",
 			UserId:         123,
 			ResponseType:   "token",
@@ -1975,13 +1975,13 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		mockUser := &models.User{Id: 123, Subject: "11111111-1111-1111-1111-111111111111"}
 		database.On("GetUserById", mock.Anything, int64(123)).Return(mockUser, nil)
 
-		tokenResponse := &oauthprovider.ImplicitGrantResponse{
+		tokenResponse := &issuance.ImplicitGrantResponse{
 			AccessToken: "access-token-123",
 			TokenType:   "Bearer",
 			ExpiresIn:   3600,
 			Scope:       "openid profile",
 		}
-		tokenIssuer.On("GenerateTokenResponseForImplicit", mock.Anything, mock.MatchedBy(func(input *oauthprovider.ImplicitGrantInput) bool {
+		tokenIssuer.On("GenerateTokenResponseForImplicit", mock.Anything, mock.MatchedBy(func(input *issuance.ImplicitGrantInput) bool {
 			return input.Scope == "openid profile" // Should use consented scope
 		}), true, false).Return(tokenResponse, nil)
 
@@ -2008,8 +2008,8 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
-		codeIssuer := mocks_oauthprovider.NewCodeIssuer(t)
-		tokenIssuer := mocks_oauthprovider.NewTokenIssuer(t)
+		codeIssuer := mocks_handlers.NewCodeIssuer(t)
+		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
@@ -2022,8 +2022,8 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		authContext := &oauthprovider.AuthContext{
-			AuthState:    oauthprovider.AuthStateReadyToIssueCode,
+		authContext := &ceremony.AuthContext{
+			AuthState:    ceremony.AuthStateReadyToIssueCode,
 			Scope:        "openid profile",
 			ClientId:     "unknown-client",
 			UserId:       123,
@@ -2063,8 +2063,8 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
-		codeIssuer := mocks_oauthprovider.NewCodeIssuer(t)
-		tokenIssuer := mocks_oauthprovider.NewTokenIssuer(t)
+		codeIssuer := mocks_handlers.NewCodeIssuer(t)
+		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
@@ -2077,8 +2077,8 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		authContext := &oauthprovider.AuthContext{
-			AuthState:    oauthprovider.AuthStateReadyToIssueCode,
+		authContext := &ceremony.AuthContext{
+			AuthState:    ceremony.AuthStateReadyToIssueCode,
 			Scope:        "openid profile",
 			ClientId:     "test-client",
 			UserId:       999,
@@ -2108,8 +2108,8 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
-		codeIssuer := mocks_oauthprovider.NewCodeIssuer(t)
-		tokenIssuer := mocks_oauthprovider.NewTokenIssuer(t)
+		codeIssuer := mocks_handlers.NewCodeIssuer(t)
+		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
@@ -2122,8 +2122,8 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		authContext := &oauthprovider.AuthContext{
-			AuthState:    oauthprovider.AuthStateReadyToIssueCode,
+		authContext := &ceremony.AuthContext{
+			AuthState:    ceremony.AuthStateReadyToIssueCode,
 			ClientId:     "test-client",
 			UserId:       123,
 			ResponseType: "token",
@@ -2159,7 +2159,7 @@ func TestIssueImplicitTokens(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/auth/issue", nil)
 
-		tokenResponse := &oauthprovider.ImplicitGrantResponse{
+		tokenResponse := &issuance.ImplicitGrantResponse{
 			AccessToken: "access-token-123",
 			TokenType:   "Bearer",
 			ExpiresIn:   3600,
@@ -2184,7 +2184,7 @@ func TestIssueImplicitTokens(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/auth/issue", nil)
 
-		tokenResponse := &oauthprovider.ImplicitGrantResponse{
+		tokenResponse := &issuance.ImplicitGrantResponse{
 			IdToken: "id-token-123",
 			Scope:   "openid",
 		}
@@ -2207,7 +2207,7 @@ func TestIssueImplicitTokens(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/auth/issue", nil)
 
-		tokenResponse := &oauthprovider.ImplicitGrantResponse{
+		tokenResponse := &issuance.ImplicitGrantResponse{
 			AccessToken: "access-token-123",
 			TokenType:   "Bearer",
 			ExpiresIn:   3600,
@@ -2232,7 +2232,7 @@ func TestIssueImplicitTokens(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/auth/issue", nil)
 
-		tokenResponse := &oauthprovider.ImplicitGrantResponse{
+		tokenResponse := &issuance.ImplicitGrantResponse{
 			AccessToken: "access-token-123",
 			TokenType:   "Bearer",
 			ExpiresIn:   3600,
@@ -2259,7 +2259,7 @@ func TestIssueImplicitTokens(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/auth/issue", nil)
 
-		tokenResponse := &oauthprovider.ImplicitGrantResponse{
+		tokenResponse := &issuance.ImplicitGrantResponse{
 			AccessToken: "access-token-123",
 			TokenType:   "Bearer",
 			ExpiresIn:   3600,
@@ -2280,7 +2280,7 @@ func TestIssueImplicitTokens(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/auth/issue", nil)
 
-		tokenResponse := &oauthprovider.ImplicitGrantResponse{
+		tokenResponse := &issuance.ImplicitGrantResponse{
 			AccessToken: "access-token-123",
 			TokenType:   "Bearer",
 			ExpiresIn:   3600,
@@ -2301,7 +2301,7 @@ func TestIssueImplicitTokens(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/auth/issue", nil)
 
-		tokenResponse := &oauthprovider.ImplicitGrantResponse{
+		tokenResponse := &issuance.ImplicitGrantResponse{
 			AccessToken: "access-token-123",
 			TokenType:   "Bearer",
 			ExpiresIn:   3600,
@@ -2318,7 +2318,7 @@ func TestIssueImplicitTokens(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/auth/issue", nil)
 
-		tokenResponse := &oauthprovider.ImplicitGrantResponse{
+		tokenResponse := &issuance.ImplicitGrantResponse{
 			AccessToken: "access-token-123",
 			TokenType:   "Bearer",
 			ExpiresIn:   3600,
@@ -2369,7 +2369,7 @@ func TestIssueImplicitTokens(t *testing.T) {
 				w := httptest.NewRecorder()
 				r := httptest.NewRequest("GET", "/auth/issue", nil)
 
-				tokenResponse := &oauthprovider.ImplicitGrantResponse{
+				tokenResponse := &issuance.ImplicitGrantResponse{
 					AccessToken: "access-token-123",
 					TokenType:   "Bearer",
 					ExpiresIn:   3600,
@@ -2392,8 +2392,8 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
-		codeIssuer := mocks_oauthprovider.NewCodeIssuer(t)
-		tokenIssuer := mocks_oauthprovider.NewTokenIssuer(t)
+		codeIssuer := mocks_handlers.NewCodeIssuer(t)
+		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
@@ -2406,8 +2406,8 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		authContext := &oauthprovider.AuthContext{
-			AuthState:    oauthprovider.AuthStateReadyToIssueCode,
+		authContext := &ceremony.AuthContext{
+			AuthState:    ceremony.AuthStateReadyToIssueCode,
 			Scope:        "openid profile",
 			ClientId:     "test-client",
 			UserId:       123,
@@ -2435,8 +2435,8 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
-		codeIssuer := mocks_oauthprovider.NewCodeIssuer(t)
-		tokenIssuer := mocks_oauthprovider.NewTokenIssuer(t)
+		codeIssuer := mocks_handlers.NewCodeIssuer(t)
+		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
@@ -2449,8 +2449,8 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		authContext := &oauthprovider.AuthContext{
-			AuthState:    oauthprovider.AuthStateReadyToIssueCode,
+		authContext := &ceremony.AuthContext{
+			AuthState:    ceremony.AuthStateReadyToIssueCode,
 			Scope:        "openid profile",
 			ClientId:     "test-client",
 			UserId:       123,
@@ -2481,8 +2481,8 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
-		codeIssuer := mocks_oauthprovider.NewCodeIssuer(t)
-		tokenIssuer := mocks_oauthprovider.NewTokenIssuer(t)
+		codeIssuer := mocks_handlers.NewCodeIssuer(t)
+		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
@@ -2495,8 +2495,8 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		authContext := &oauthprovider.AuthContext{
-			AuthState:    oauthprovider.AuthStateReadyToIssueCode,
+		authContext := &ceremony.AuthContext{
+			AuthState:    ceremony.AuthStateReadyToIssueCode,
 			ClientId:     "test-client",
 			UserId:       123,
 			ResponseType: "token",
@@ -2511,7 +2511,7 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 		mockUser := &models.User{Id: 123, Subject: "11111111-1111-1111-1111-111111111111"}
 		database.On("GetUserById", mock.Anything, int64(123)).Return(mockUser, nil)
 
-		tokenResponse := &oauthprovider.ImplicitGrantResponse{
+		tokenResponse := &issuance.ImplicitGrantResponse{
 			AccessToken: "access-token-123",
 			TokenType:   "Bearer",
 			ExpiresIn:   3600,
@@ -3291,8 +3291,8 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
-		codeIssuer := mocks_oauthprovider.NewCodeIssuer(t)
-		tokenIssuer := mocks_oauthprovider.NewTokenIssuer(t)
+		codeIssuer := mocks_handlers.NewCodeIssuer(t)
+		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
@@ -3307,8 +3307,8 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 
 		// Create authContext with IdTokenHintSub matching the user's subject
 		userSubject := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
-		authContext := &oauthprovider.AuthContext{
-			AuthState:      oauthprovider.AuthStateReadyToIssueCode,
+		authContext := &ceremony.AuthContext{
+			AuthState:      ceremony.AuthStateReadyToIssueCode,
 			Scope:          "openid profile",
 			ClientId:       "test-client",
 			UserId:         1,
@@ -3339,7 +3339,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 			RedirectURI: "https://example.com/callback",
 			State:       "test-state",
 		}
-		codeIssuer.On("CreateAuthCode", mock.Anything, mock.MatchedBy(func(input *oauthprovider.CreateCodeInput) bool {
+		codeIssuer.On("CreateAuthCode", mock.Anything, mock.MatchedBy(func(input *issuance.CreateCodeInput) bool {
 			return reflect.DeepEqual(input.AuthContext, *authContext)
 		})).Return(mockCode, nil)
 
@@ -3374,8 +3374,8 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
-		codeIssuer := mocks_oauthprovider.NewCodeIssuer(t)
-		tokenIssuer := mocks_oauthprovider.NewTokenIssuer(t)
+		codeIssuer := mocks_handlers.NewCodeIssuer(t)
+		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		auditLogger := mocks_audit.NewAuditLogger(t)
@@ -3392,8 +3392,8 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		// Create authContext with IdTokenHintSub for user A
 		userASubject := "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
 		userBSubject := "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
-		authContext := &oauthprovider.AuthContext{
-			AuthState:      oauthprovider.AuthStateReadyToIssueCode,
+		authContext := &ceremony.AuthContext{
+			AuthState:      ceremony.AuthStateReadyToIssueCode,
 			Scope:          "openid profile",
 			ClientId:       "test-client",
 			UserId:         1,
@@ -3456,8 +3456,8 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
-		codeIssuer := mocks_oauthprovider.NewCodeIssuer(t)
-		tokenIssuer := mocks_oauthprovider.NewTokenIssuer(t)
+		codeIssuer := mocks_handlers.NewCodeIssuer(t)
+		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		auditLogger := mocks_audit.NewAuditLogger(t)
@@ -3473,8 +3473,8 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 
 		userASubject := "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
 		userBSubject := "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
-		authContext := &oauthprovider.AuthContext{
-			AuthState:      oauthprovider.AuthStateReadyToIssueCode,
+		authContext := &ceremony.AuthContext{
+			AuthState:      ceremony.AuthStateReadyToIssueCode,
 			Scope:          "openid profile",
 			ClientId:       "test-client",
 			UserId:         1,
@@ -3523,8 +3523,8 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 	t.Run("IdTokenHintSub set different user, failing clear and an unusable form_post template - last-resort 500", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
-		codeIssuer := mocks_oauthprovider.NewCodeIssuer(t)
-		tokenIssuer := mocks_oauthprovider.NewTokenIssuer(t)
+		codeIssuer := mocks_handlers.NewCodeIssuer(t)
+		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		auditLogger := mocks_audit.NewAuditLogger(t)
@@ -3550,8 +3550,8 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 
 		userASubject := "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
 		userBSubject := "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
-		authContext := &oauthprovider.AuthContext{
-			AuthState:      oauthprovider.AuthStateReadyToIssueCode,
+		authContext := &ceremony.AuthContext{
+			AuthState:      ceremony.AuthStateReadyToIssueCode,
 			Scope:          "openid profile",
 			ClientId:       "test-client",
 			UserId:         1,
@@ -3596,8 +3596,8 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 	t.Run("IdTokenHintSub set different user, unusable form_post template - 500 when the refusal itself cannot be sent", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
-		codeIssuer := mocks_oauthprovider.NewCodeIssuer(t)
-		tokenIssuer := mocks_oauthprovider.NewTokenIssuer(t)
+		codeIssuer := mocks_handlers.NewCodeIssuer(t)
+		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		auditLogger := mocks_audit.NewAuditLogger(t)
@@ -3619,8 +3619,8 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 
 		userASubject := "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
 		userBSubject := "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
-		authContext := &oauthprovider.AuthContext{
-			AuthState:      oauthprovider.AuthStateReadyToIssueCode,
+		authContext := &ceremony.AuthContext{
+			AuthState:      ceremony.AuthStateReadyToIssueCode,
 			Scope:          "openid profile",
 			ClientId:       "test-client",
 			UserId:         1,
@@ -3665,8 +3665,8 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
-		codeIssuer := mocks_oauthprovider.NewCodeIssuer(t)
-		tokenIssuer := mocks_oauthprovider.NewTokenIssuer(t)
+		codeIssuer := mocks_handlers.NewCodeIssuer(t)
+		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
@@ -3680,8 +3680,8 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		// Create authContext with empty IdTokenHintSub (no hint provided)
-		authContext := &oauthprovider.AuthContext{
-			AuthState:      oauthprovider.AuthStateReadyToIssueCode,
+		authContext := &ceremony.AuthContext{
+			AuthState:      ceremony.AuthStateReadyToIssueCode,
 			Scope:          "openid profile",
 			ClientId:       "test-client",
 			UserId:         1,
@@ -3705,7 +3705,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 			RedirectURI: "https://example.com/callback",
 			State:       "test-state",
 		}
-		codeIssuer.On("CreateAuthCode", mock.Anything, mock.MatchedBy(func(input *oauthprovider.CreateCodeInput) bool {
+		codeIssuer.On("CreateAuthCode", mock.Anything, mock.MatchedBy(func(input *issuance.CreateCodeInput) bool {
 			return reflect.DeepEqual(input.AuthContext, *authContext)
 		})).Return(mockCode, nil)
 
@@ -3742,8 +3742,8 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
-		codeIssuer := mocks_oauthprovider.NewCodeIssuer(t)
-		tokenIssuer := mocks_oauthprovider.NewTokenIssuer(t)
+		codeIssuer := mocks_handlers.NewCodeIssuer(t)
+		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		auditLogger := mocks_audit.NewAuditLogger(t)
@@ -3760,12 +3760,12 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		userASubject := "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
 		userBSubject := "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
 
-		var savedAuthContext *oauthprovider.AuthContext
+		var savedAuthContext *ceremony.AuthContext
 
 		authHelper.On("GetAuthContext", req).Run(func(args mock.Arguments) {
 			stubClientProvenanceLookup(database)
-			savedAuthContext = &oauthprovider.AuthContext{
-				AuthState:      oauthprovider.AuthStateReadyToIssueCode,
+			savedAuthContext = &ceremony.AuthContext{
+				AuthState:      ceremony.AuthStateReadyToIssueCode,
 				Scope:          "openid profile",
 				ClientId:       "test-client",
 				UserId:         99,
@@ -3776,7 +3776,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 				IdTokenHintSub: userASubject,
 				Prompt:         "login",
 			}
-		}).Return(func(r *http.Request) *oauthprovider.AuthContext {
+		}).Return(func(r *http.Request) *ceremony.AuthContext {
 			return savedAuthContext
 		}, nil)
 
@@ -3891,8 +3891,8 @@ func TestHandleIssueGet_RedirectURIRecheck(t *testing.T) {
 			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 			authHelper := mocks_handlers.NewAuthHelper(t)
 			templateFS := &mocks_test.TestFS{}
-			codeIssuer := mocks_oauthprovider.NewCodeIssuer(t)
-			tokenIssuer := mocks_oauthprovider.NewTokenIssuer(t)
+			codeIssuer := mocks_handlers.NewCodeIssuer(t)
+			tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 			database := mocks_data.NewDatabase(t)
 			auditLogger := mocks_audit.NewAuditLogger(t)
 			userSessionManager := mocks_user.NewUserSessionManager(t)
@@ -3903,8 +3903,8 @@ func TestHandleIssueGet_RedirectURIRecheck(t *testing.T) {
 			req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 			rr := httptest.NewRecorder()
 
-			authContext := &oauthprovider.AuthContext{
-				AuthState:    oauthprovider.AuthStateReadyToIssueCode,
+			authContext := &ceremony.AuthContext{
+				AuthState:    ceremony.AuthStateReadyToIssueCode,
 				Scope:        "openid profile",
 				ClientId:     "test-client",
 				UserId:       123,
@@ -3990,8 +3990,8 @@ func TestHandleIssueGet_RedirectURIRecheckOutranksTheIdTokenHintRefusal(t *testi
 	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 	authHelper := mocks_handlers.NewAuthHelper(t)
 	templateFS := &mocks_test.TestFS{}
-	codeIssuer := mocks_oauthprovider.NewCodeIssuer(t)
-	tokenIssuer := mocks_oauthprovider.NewTokenIssuer(t)
+	codeIssuer := mocks_handlers.NewCodeIssuer(t)
+	tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_audit.NewAuditLogger(t)
 	userSessionManager := mocks_user.NewUserSessionManager(t)
@@ -4004,8 +4004,8 @@ func TestHandleIssueGet_RedirectURIRecheckOutranksTheIdTokenHintRefusal(t *testi
 
 	// The hint names user A; the ceremony authenticated user B. On its own that is answered with
 	// login_required AT THE CLIENT'S REDIRECT URI.
-	authContext := &oauthprovider.AuthContext{
-		AuthState:      oauthprovider.AuthStateReadyToIssueCode,
+	authContext := &ceremony.AuthContext{
+		AuthState:      ceremony.AuthStateReadyToIssueCode,
 		Scope:          "openid profile",
 		ClientId:       "test-client",
 		UserId:         99,
@@ -4063,8 +4063,8 @@ func TestHandleIssueGet_ExpiredAmbientSession(t *testing.T) {
 			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 			authHelper := mocks_handlers.NewAuthHelper(t)
 			templateFS := &mocks_test.TestFS{}
-			codeIssuer := mocks_oauthprovider.NewCodeIssuer(t)
-			tokenIssuer := mocks_oauthprovider.NewTokenIssuer(t)
+			codeIssuer := mocks_handlers.NewCodeIssuer(t)
+			tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 			database := mocks_data.NewDatabase(t)
 			if tc.silent {
 				// Only the silent row answers the client, and only an answer to the client
@@ -4082,8 +4082,8 @@ func TestHandleIssueGet_ExpiredAmbientSession(t *testing.T) {
 			req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 			rr := httptest.NewRecorder()
 
-			authContext := &oauthprovider.AuthContext{
-				AuthState:    oauthprovider.AuthStateReadyToIssueCode,
+			authContext := &ceremony.AuthContext{
+				AuthState:    ceremony.AuthStateReadyToIssueCode,
 				Scope:        "openid profile",
 				ClientId:     "test-client",
 				UserId:       123,
@@ -4121,8 +4121,8 @@ func TestHandleIssueGet_ExpiredAmbientSession(t *testing.T) {
 			if tc.silent {
 				authHelper.On("ClearAuthContext", rr, req).Return(nil)
 			} else {
-				authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
-					return ac.AuthState == oauthprovider.AuthStateRequiresLevel1
+				authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+					return ac.AuthState == ceremony.AuthStateRequiresLevel1
 				})).Return(nil)
 			}
 
@@ -4214,8 +4214,8 @@ func TestHandleIssueGet_ScopeRefilter(t *testing.T) {
 			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 			authHelper := mocks_handlers.NewAuthHelper(t)
 			templateFS := &mocks_test.TestFS{}
-			codeIssuer := mocks_oauthprovider.NewCodeIssuer(t)
-			tokenIssuer := mocks_oauthprovider.NewTokenIssuer(t)
+			codeIssuer := mocks_handlers.NewCodeIssuer(t)
+			tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 			database := mocks_data.NewDatabase(t)
 			if !tc.wantIssued {
 				// The rows that issue nothing refuse to the client, and only an answer to the
@@ -4232,8 +4232,8 @@ func TestHandleIssueGet_ScopeRefilter(t *testing.T) {
 			req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 			rr := httptest.NewRecorder()
 
-			authContext := &oauthprovider.AuthContext{
-				AuthState:      oauthprovider.AuthStateReadyToIssueCode,
+			authContext := &ceremony.AuthContext{
+				AuthState:      ceremony.AuthStateReadyToIssueCode,
 				Scope:          tc.scope,
 				ConsentedScope: tc.consentedScope,
 				ClientId:       "test-client",
@@ -4270,7 +4270,7 @@ func TestHandleIssueGet_ScopeRefilter(t *testing.T) {
 			authHelper.On("ClearAuthContext", rr, req).Return(nil)
 
 			if tc.wantIssued {
-				codeIssuer.On("CreateAuthCode", mock.Anything, mock.MatchedBy(func(input *oauthprovider.CreateCodeInput) bool {
+				codeIssuer.On("CreateAuthCode", mock.Anything, mock.MatchedBy(func(input *issuance.CreateCodeInput) bool {
 					return input.AuthContext.Scope == tc.wantScope &&
 						input.AuthContext.ConsentedScope == tc.wantConsented
 				})).Return(&models.Code{Id: 1, Code: "test-code", ClientId: 1,
@@ -4370,8 +4370,8 @@ func TestHandleIssueGet_TheLiveChecksFailClosedOnAStorageError(t *testing.T) {
 			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 			authHelper := mocks_handlers.NewAuthHelper(t)
 			templateFS := &mocks_test.TestFS{}
-			codeIssuer := mocks_oauthprovider.NewCodeIssuer(t)
-			tokenIssuer := mocks_oauthprovider.NewTokenIssuer(t)
+			codeIssuer := mocks_handlers.NewCodeIssuer(t)
+			tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 			database := mocks_data.NewDatabase(t)
 			auditLogger := mocks_audit.NewAuditLogger(t)
 			userSessionManager := mocks_user.NewUserSessionManager(t)
@@ -4383,8 +4383,8 @@ func TestHandleIssueGet_TheLiveChecksFailClosedOnAStorageError(t *testing.T) {
 			req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 			rr := httptest.NewRecorder()
 
-			authContext := &oauthprovider.AuthContext{
-				AuthState:    oauthprovider.AuthStateReadyToIssueCode,
+			authContext := &ceremony.AuthContext{
+				AuthState:    ceremony.AuthStateReadyToIssueCode,
 				Scope:        "openid profile",
 				ClientId:     "test-client",
 				UserId:       123,
@@ -4445,8 +4445,8 @@ func TestHandleIssueGet_RedirectURIRefusalSurvivesItsOwnFailures(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
-		codeIssuer := mocks_oauthprovider.NewCodeIssuer(t)
-		tokenIssuer := mocks_oauthprovider.NewTokenIssuer(t)
+		codeIssuer := mocks_handlers.NewCodeIssuer(t)
+		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
@@ -4458,8 +4458,8 @@ func TestHandleIssueGet_RedirectURIRefusalSurvivesItsOwnFailures(t *testing.T) {
 		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 		rr := httptest.NewRecorder()
 
-		authContext := &oauthprovider.AuthContext{
-			AuthState:    oauthprovider.AuthStateReadyToIssueCode,
+		authContext := &ceremony.AuthContext{
+			AuthState:    ceremony.AuthStateReadyToIssueCode,
 			Scope:        "openid profile",
 			ClientId:     "test-client",
 			UserId:       123,
@@ -4515,8 +4515,8 @@ func TestHandleIssueGet_RedirectURIRefusalSurvivesItsOwnFailures(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
-		codeIssuer := mocks_oauthprovider.NewCodeIssuer(t)
-		tokenIssuer := mocks_oauthprovider.NewTokenIssuer(t)
+		codeIssuer := mocks_handlers.NewCodeIssuer(t)
+		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
@@ -4528,8 +4528,8 @@ func TestHandleIssueGet_RedirectURIRefusalSurvivesItsOwnFailures(t *testing.T) {
 		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 		rr := httptest.NewRecorder()
 
-		authContext := &oauthprovider.AuthContext{
-			AuthState:    oauthprovider.AuthStateReadyToIssueCode,
+		authContext := &ceremony.AuthContext{
+			AuthState:    ceremony.AuthStateReadyToIssueCode,
 			Scope:        "openid profile",
 			ClientId:     "test-client",
 			UserId:       123,
@@ -4589,12 +4589,12 @@ func TestHandleIssueGet_ScopeRefusalSurvivesItsOwnFailures(t *testing.T) {
 		authHelper *mocks_handlers.AuthHelper, auditLogger *mocks_audit.AuditLogger,
 		userSessionManager *mocks_user.UserSessionManager,
 		permissionChecker *mocks_user.PermissionChecker,
-		req *http.Request) *oauthprovider.AuthContext {
+		req *http.Request) *ceremony.AuthContext {
 
 		t.Helper()
 
-		authContext := &oauthprovider.AuthContext{
-			AuthState:      oauthprovider.AuthStateReadyToIssueCode,
+		authContext := &ceremony.AuthContext{
+			AuthState:      ceremony.AuthStateReadyToIssueCode,
 			Scope:          "backend:read backend:write",
 			ConsentedScope: "backend:read",
 			ClientId:       "test-client",
@@ -4634,8 +4634,8 @@ func TestHandleIssueGet_ScopeRefusalSurvivesItsOwnFailures(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
-		codeIssuer := mocks_oauthprovider.NewCodeIssuer(t)
-		tokenIssuer := mocks_oauthprovider.NewTokenIssuer(t)
+		codeIssuer := mocks_handlers.NewCodeIssuer(t)
+		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
@@ -4678,8 +4678,8 @@ func TestHandleIssueGet_ScopeRefusalSurvivesItsOwnFailures(t *testing.T) {
 	t.Run("failing clear and an unusable form_post template - last-resort 500", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
-		codeIssuer := mocks_oauthprovider.NewCodeIssuer(t)
-		tokenIssuer := mocks_oauthprovider.NewTokenIssuer(t)
+		codeIssuer := mocks_handlers.NewCodeIssuer(t)
+		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)
@@ -4724,8 +4724,8 @@ func TestHandleIssueGet_ScopeRefusalSurvivesItsOwnFailures(t *testing.T) {
 	t.Run("unusable form_post template - 500 when the refusal itself cannot be sent", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
-		codeIssuer := mocks_oauthprovider.NewCodeIssuer(t)
-		tokenIssuer := mocks_oauthprovider.NewTokenIssuer(t)
+		codeIssuer := mocks_handlers.NewCodeIssuer(t)
+		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		userSessionManager := mocks_user.NewUserSessionManager(t)

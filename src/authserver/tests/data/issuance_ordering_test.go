@@ -4,10 +4,11 @@ import (
 	"database/sql"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
+	"github.com/leodip/goiabada/authserver/internal/issuance"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/leodip/goiabada/core/oauthprovider"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -24,8 +25,8 @@ type issuanceOutcome struct {
 // the insert run on the transaction production runs them on, rather than through a bare
 // CreateCode.
 func mintCode(db data.Database, tx *sql.Tx, client *models.Client, user *models.User, sessionIdentifier string) (*models.Code, error) {
-	return oauthprovider.NewCodeIssuer(db).CreateAuthCode(tx, &oauthprovider.CreateCodeInput{
-		AuthContext: oauthprovider.AuthContext{
+	return issuance.NewCodeIssuer(db).CreateAuthCode(tx, &issuance.CreateCodeInput{
+		AuthContext: ceremony.AuthContext{
 			ClientId:    client.ClientIdentifier,
 			UserId:      user.Id,
 			RedirectURI: "https://example.com/callback",

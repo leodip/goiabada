@@ -5,10 +5,10 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/i18n"
-	"github.com/leodip/goiabada/core/oauthprovider"
 )
 
 // ceremonyIdField is the hidden form field naming the authorization ceremony, and its name is
@@ -56,7 +56,7 @@ func ceremonyMatches(contextCeremonyId string, submitted string) bool {
 // Mirrors rejectResetPassword: audit, then render, at http.StatusBadRequest because a
 // submission was genuinely refused.
 func rejectCeremonyMismatch(httpHelper HttpHelper, auditLogger AuditLogger, w http.ResponseWriter,
-	r *http.Request, authContext *oauthprovider.AuthContext) {
+	r *http.Request, authContext *ceremony.AuthContext) {
 
 	const maxAuditedValueLength = 100
 

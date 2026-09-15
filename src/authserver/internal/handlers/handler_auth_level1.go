@@ -8,13 +8,13 @@ import (
 	"net/http"
 	"slices"
 
+	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/errs"
-	"github.com/leodip/goiabada/core/oauthprovider"
 )
 
 func HandleAuthLevel1Get(
@@ -35,7 +35,7 @@ func HandleAuthLevel1Get(
 			return
 		}
 
-		requiredState := oauthprovider.AuthStateRequiresLevel1
+		requiredState := ceremony.AuthStateRequiresLevel1
 		if authContext.AuthState != requiredState {
 			rejectAuthStateMismatch(httpHelper, w, r, requiredState, authContext.AuthState)
 			return
@@ -44,7 +44,7 @@ func HandleAuthLevel1Get(
 		// here we'll select what type of level1 auth we'll use (pwd, pin, magic_link)
 		// today we only support pwd, other types will be added in the future
 
-		authContext.AuthState = oauthprovider.AuthStateLevel1Password
+		authContext.AuthState = ceremony.AuthStateLevel1Password
 		err = authHelper.SaveAuthContext(w, r, authContext)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
@@ -75,7 +75,7 @@ func HandleAuthLevel1CompletedGet(
 			return
 		}
 
-		requiredStates := []string{oauthprovider.AuthStateLevel1PasswordCompleted, oauthprovider.AuthStateLevel1ExistingSession}
+		requiredStates := []string{ceremony.AuthStateLevel1PasswordCompleted, ceremony.AuthStateLevel1ExistingSession}
 		if !slices.Contains(requiredStates, authContext.AuthState) {
 			errorMsg := fmt.Sprintf("authContext.AuthState '%s' does not match any required state", authContext.AuthState)
 			httpHelper.InternalServerError(w, r, errs.New(errorMsg))
@@ -185,7 +185,7 @@ func HandleAuthLevel1CompletedGet(
 
 		if shouldRedirectToLevel2 {
 			// We need to redirect to level 2
-			authContext.AuthState = oauthprovider.AuthStateRequiresLevel2
+			authContext.AuthState = ceremony.AuthStateRequiresLevel2
 			err = authHelper.SaveAuthContext(w, r, authContext)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
@@ -195,7 +195,7 @@ func HandleAuthLevel1CompletedGet(
 			return
 		} else {
 			// Auth is completed
-			authContext.AuthState = oauthprovider.AuthStateAuthenticationCompleted
+			authContext.AuthState = ceremony.AuthStateAuthenticationCompleted
 			err = authHelper.SaveAuthContext(w, r, authContext)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)

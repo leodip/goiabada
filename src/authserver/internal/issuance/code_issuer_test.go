@@ -1,4 +1,4 @@
-package oauthprovider
+package issuance
 
 import (
 	"errors"
@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
 	"github.com/leodip/goiabada/core/enums"
 
@@ -52,7 +53,7 @@ func TestCreateAuthCode(t *testing.T) {
 	mockDB.On("CreateCode", mock.Anything, mock.AnythingOfType("*models.Code")).Return(nil)
 
 	input := &CreateCodeInput{
-		AuthContext: AuthContext{
+		AuthContext: ceremony.AuthContext{
 			ClientId:            "test-client",
 			UserId:              123,
 			ConsentedScope:      "openid profile",
@@ -145,7 +146,7 @@ func TestCreateAuthCode_BoundsTheUserAgent(t *testing.T) {
 				}).Return(nil)
 
 			_, err := codeIssuer.CreateAuthCode(nil, &CreateCodeInput{
-				AuthContext: AuthContext{
+				AuthContext: ceremony.AuthContext{
 					ClientId:       "test-client",
 					UserId:         123,
 					ConsentedScope: "openid",
@@ -182,7 +183,7 @@ func TestCreateAuthCode_DefaultResponseMode(t *testing.T) {
 	mockDB.On("CreateCode", mock.Anything, mock.AnythingOfType("*models.Code")).Return(nil)
 
 	input := &CreateCodeInput{
-		AuthContext: AuthContext{
+		AuthContext: ceremony.AuthContext{
 			ClientId: "test-client",
 			UserId:   123,
 			// ResponseMode is intentionally left empty
@@ -240,7 +241,7 @@ func TestCreateAuthCode_ScopeHandling(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			input := &CreateCodeInput{
-				AuthContext: AuthContext{
+				AuthContext: ceremony.AuthContext{
 					ClientId:       "test-client",
 					UserId:         123,
 					ConsentedScope: tc.consentedScope,
@@ -273,7 +274,7 @@ func TestCreateAuthCode_DatabaseError(t *testing.T) {
 	mockDB.On("CreateCode", mock.Anything, mock.AnythingOfType("*models.Code")).Return(errors.New("database error"))
 
 	input := &CreateCodeInput{
-		AuthContext: AuthContext{
+		AuthContext: ceremony.AuthContext{
 			ClientId: "test-client",
 			UserId:   123,
 		},
@@ -311,7 +312,7 @@ func TestCreateAuthCode_RefusesAMissingClient(t *testing.T) {
 		Return((*models.Client)(nil), nil)
 
 	code, err := codeIssuer.CreateAuthCode(nil, &CreateCodeInput{
-		AuthContext:       AuthContext{ClientId: "deleted-client", UserId: 123},
+		AuthContext:       ceremony.AuthContext{ClientId: "deleted-client", UserId: 123},
 		SessionIdentifier: "session123",
 	})
 
