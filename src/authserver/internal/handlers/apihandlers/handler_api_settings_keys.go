@@ -9,12 +9,12 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
+	"github.com/leodip/goiabada/authserver/internal/signingkeys"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/errs"
-	"github.com/leodip/goiabada/core/oauthprovider"
 )
 
 // HandleAPISettingsKeysGet - GET /api/v1/admin/settings/keys
@@ -76,7 +76,7 @@ func HandleAPISettingsKeysGet(
 
 // HandleAPISettingsKeysRotatePost - POST /api/v1/admin/settings/keys/rotate
 //
-// The transition itself lives in oauthprovider.SigningKeyRotator, which takes it as one transaction.
+// The transition itself lives in signingkeys.SigningKeyRotator, which takes it as one transaction.
 // This used to be five unsynchronised writes here, and the delete of the previous key ran
 // before the check that a next key even existed, so a rotation that was about to be refused
 // had already destroyed the key still signing live tokens (#251).
@@ -86,7 +86,7 @@ func HandleAPISettingsKeysRotatePost(
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 
-	rotator := oauthprovider.NewSigningKeyRotator(database)
+	rotator := signingkeys.NewSigningKeyRotator(database)
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		err := rotator.Rotate()
@@ -101,7 +101,7 @@ func HandleAPISettingsKeysRotatePost(
 
 			writeJSON(w, r, http.StatusOK, api.SuccessResponse{Success: true})
 
-		case errors.Is(err, oauthprovider.ErrRotationInProgress):
+		case errors.Is(err, signingkeys.ErrRotationInProgress):
 			// 409 rather than 200: this call rotated nothing. Reporting success would have the
 			// admin console announce one rotation twice, and would invite a caller to believe
 			// it holds a key it never created. Retrying is wrong for the same reason, which is
@@ -109,7 +109,7 @@ func HandleAPISettingsKeysRotatePost(
 			writeJSONError(w, "Another key rotation is in progress", "ROTATION_IN_PROGRESS",
 				http.StatusConflict)
 
-		case errors.Is(err, oauthprovider.ErrKeySetIncomplete):
+		case errors.Is(err, signingkeys.ErrKeySetIncomplete):
 			// A 500 that keeps its own error_code, because the console routes on it and the
 			// OpenAPI text names it: the generic writer would flatten it to
 			// INTERNAL_SERVER_ERROR. It still owes what every other 500 here writes, one

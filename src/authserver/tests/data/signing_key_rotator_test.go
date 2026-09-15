@@ -4,17 +4,18 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/signingkeys"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/leodip/goiabada/core/oauthprovider"
 )
 
 // This is seam 1 at the data tier, on all four engines: the rotator's composition against
 // real SQL rather than against a mock's idea of it. The unit tests in
-// core/oauthprovider/signing_key_rotator_test.go own which calls are made in which order and what
-// happens on every refusal; only this one can say the resulting statements are accepted by
-// mysql, postgres, mssql and sqlite and leave the key set the rotation claims.
+// authserver/internal/signingkeys/signing_key_rotator_test.go own which calls are made in
+// which order and what happens on every refusal; only this one can say the resulting
+// statements are accepted by mysql, postgres, mssql and sqlite and leave the key set the
+// rotation claims.
 //
 // The concurrency property is deliberately not asserted here. The replacement key is
 // generated before the transaction opens and a 4096-bit generation takes about 300ms with
@@ -39,7 +40,7 @@ func seedOneKeyPerState(t *testing.T) (previous, current, next *models.KeyPair) 
 func TestSigningKeyRotator_Rotate_MovesEveryKeyOneStep(t *testing.T) {
 	previous, current, next := seedOneKeyPerState(t)
 
-	if err := oauthprovider.NewSigningKeyRotator(database).Rotate(); err != nil {
+	if err := signingkeys.NewSigningKeyRotator(database).Rotate(); err != nil {
 		t.Fatalf("Rotate failed: %v", err)
 	}
 
@@ -138,11 +139,11 @@ func TestSigningKeyRotator_Rotate_RefusesWithNoNextKeyAndKeepsThePrevious(t *tes
 	previous, current, _ := seedOneKeyPerState(t)
 	clearKeyPairState(t, enums.KeyStateNext.String())
 
-	err := oauthprovider.NewSigningKeyRotator(database).Rotate()
+	err := signingkeys.NewSigningKeyRotator(database).Rotate()
 	if err == nil {
 		t.Fatal("Expected the rotation to be refused")
 	}
-	if !errors.Is(err, oauthprovider.ErrKeySetIncomplete) {
+	if !errors.Is(err, signingkeys.ErrKeySetIncomplete) {
 		t.Fatalf("Expected ErrKeySetIncomplete, got %v", err)
 	}
 

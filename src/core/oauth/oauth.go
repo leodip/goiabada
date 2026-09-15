@@ -7,13 +7,13 @@
 //
 // ParseResponseType sits here although only the auth server calls it directly.
 // core/validators calls it as well, and the admin console links core/validators for
-// unrelated helpers, so on the provider side this one dependency-free file drags
-// core/oauthprovider -- and through it core/data and all four drivers -- into the admin
-// console's binary. What belongs here is decided by what each binary ends up containing
-// rather than by which process names the symbol (#338).
-//
-// Provider-side issuance -- authorization codes, tokens and signing keys -- is
-// core/oauthprovider (#338).
+// unrelated helpers, so moving this one dependency-free file to the provider side would
+// drag core/data and all four drivers into the admin console's binary. Since #339 put
+// code and token issuance and key rotation under authserver/internal, that edge is not
+// merely expensive but refused: core may not import the auth server at all, and
+// ARCHITECTURE.md's module direction rule fails the tier that tries. What belongs here is
+// decided by what each binary ends up containing rather than by which process names the
+// symbol (#338, #339).
 package oauth
 
 import (

@@ -25,7 +25,6 @@ repository root. It is enforced rather than descriptive: see **Architecture guar
 - `models/` - All domain models (Client, User, Permission, Group, etc.)
 - `data/` - Database interface + implementations (commondb/, mysqldb/, postgresdb/, sqlitedb/, mssqldb/)
 - `oauth/` - Shared OAuth/OIDC client surface: JWT/JWKS parsing, token exchange, PKCE, response_type parsing
-- `oauthprovider/` - Provider-side issuance: codes, tokens, key rotation, ceremony context
 - `validators/` - Input validation (authorize, token, email, password, etc.)
 - `config/` - Configuration from environment variables
 - `constants/` - Audit event names, resource identifiers
@@ -34,6 +33,7 @@ repository root. It is enforced rather than descriptive: see **Architecture guar
 - `internal/handlers/` - HTTP handlers (auth flows, token, userinfo, DCR)
 - `internal/handlers/accounthandlers/` - User self-service handlers
 - `internal/handlers/apihandlers/` - Admin API handlers
+- `internal/{ceremony,issuance,signingkeys}/` - Provider-side issuance: codes, tokens, key rotation, ceremony context
 - `internal/server/routes.go` - All route definitions
 - `web/template/` - HTML templates
 - `tests/integration/` - Integration tests
@@ -308,8 +308,8 @@ Three test types:
 
 1. **Unit Tests** - Throughout codebase alongside source files (`*_test.go`)
    - Handler tests: `src/authserver/internal/handlers/*_test.go`
-   - Core logic tests: `src/core/oauth/*_test.go`, `src/core/oauthprovider/*_test.go`,
-     `src/core/validators/*_test.go`
+   - Provider tests: `src/authserver/internal/{ceremony,issuance,signingkeys}/*_test.go`
+   - Core logic tests: `src/core/oauth/*_test.go`, `src/core/validators/*_test.go`
 
 2. **Data Tests** - Database layer tests in `src/authserver/tests/data/`
    - Tests all CRUD operations for each model   

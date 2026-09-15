@@ -233,6 +233,7 @@ var slogRequestPathDirs = []string{
 	"authserver/internal/sessionbackend",
 	"authserver/internal/ceremony",
 	"authserver/internal/issuance",
+	"authserver/internal/signingkeys",
 	"adminconsole/internal/handlers",
 	"adminconsole/internal/middleware",
 	"adminconsole/internal/apiclient",
@@ -241,7 +242,6 @@ var slogRequestPathDirs = []string{
 	"core/validators",
 	"core/oauth",
 	"core/oauthdb",
-	"core/oauthprovider",
 	"core/handlerhelpers",
 	"core/sessionstore",
 }
