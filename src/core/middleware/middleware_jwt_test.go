@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
@@ -1299,12 +1300,14 @@ type recordingTransport struct {
 	hadDeadline bool
 	deadline    time.Time
 	ctxErr      error
+	requestID   string
 }
 
 func (rt *recordingTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 	rt.mu.Lock()
 	rt.deadline, rt.hadDeadline = r.Context().Deadline()
 	rt.ctxErr = r.Context().Err()
+	rt.requestID = chimiddleware.GetReqID(r.Context())
 	rt.mu.Unlock()
 	return rt.inner.RoundTrip(r)
 }
@@ -1361,14 +1364,19 @@ func TestJwtSessionHandler_RefreshesOnACancelledRequestContext(t *testing.T) {
 	}
 	// The context each store call was handed, captured at the call: the handler cancels
 	// the detached context on its way out, so reading it afterwards would show it done
-	// whatever was passed.
+	// whatever was passed. Get runs twice -- once on the browser's own request at the top
+	// of the handler, then again on the detached one inside the refresh -- so these hold
+	// the last call, and the deadline assertion below is what proves which one that was.
 	var getCtxErr, saveCtxErr error
-	var saveDeadline time.Time
-	var saveHadDeadline bool
+	var getDeadline, saveDeadline time.Time
+	var getHadDeadline, saveHadDeadline bool
+	var getRequestID, saveRequestID string
 	mockSessionStore.On("Get", mock.Anything, testSessionName).Return(session, nil).
 		Run(func(args mock.Arguments) {
 			if req, ok := args.Get(0).(*http.Request); ok {
 				getCtxErr = req.Context().Err()
+				getDeadline, getHadDeadline = req.Context().Deadline()
+				getRequestID = chimiddleware.GetReqID(req.Context())
 			}
 		})
 	mockSessionStore.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(nil).
@@ -1376,6 +1384,7 @@ func TestJwtSessionHandler_RefreshesOnACancelledRequestContext(t *testing.T) {
 			if req, ok := args.Get(0).(*http.Request); ok {
 				saveCtxErr = req.Context().Err()
 				saveDeadline, saveHadDeadline = req.Context().Deadline()
+				saveRequestID = chimiddleware.GetReqID(req.Context())
 			}
 		})
 
@@ -1386,8 +1395,14 @@ func TestJwtSessionHandler_RefreshesOnACancelledRequestContext(t *testing.T) {
 		Return(&oauth.JwtInfo{}, nil)
 
 	// The browser has gone: the inbound request's context is already done before
-	// the handler runs.
-	ctx, cancel := context.WithCancel(context.Background())
+	// the handler runs. It carries a request id, which is the value the detachment is
+	// required to keep: chi's RequestID middleware puts one on every inbound request in
+	// both servers, and the installed slog handler lifts it off the context onto every
+	// record. context.Background() would drop it, which is the whole reason decision 12
+	// chose WithoutCancel over it.
+	const wantRequestID = "the-inbound-request-id"
+	ctx, cancel := context.WithCancel(
+		context.WithValue(context.Background(), chimiddleware.RequestIDKey, wantRequestID))
 	cancel()
 	req := httptest.NewRequest("GET", "/", nil).WithContext(ctx)
 	rr := httptest.NewRecorder()
@@ -1428,8 +1443,24 @@ func TestJwtSessionHandler_RefreshesOnACancelledRequestContext(t *testing.T) {
 		"the session read after the refresh runs on the detached context too")
 	assert.NoError(t, saveCtxErr,
 		"and so does the save that records the new token")
-	require.True(t, saveHadDeadline,
-		"still bounded: the save shares the call's deadline rather than running unbounded")
-	assert.LessOrEqual(t, time.Until(saveDeadline), oauth.TokenExchangeTimeout,
-		"and it is the same deadline, not a fresh one")
+	require.True(t, getHadDeadline, "the session read is bounded")
+	require.True(t, saveHadDeadline, "and so is the save")
+
+	// One budget, not three. Decision 14-b bounds the call and the write that records its
+	// result as a single operation, so the store calls have to observe the same absolute
+	// deadline the transport did -- not merely some deadline under ten seconds. Minting a
+	// fresh ten second context after the token response satisfies every assertion above
+	// and stretches the operation to nearly twenty, which is what these two refuse (#338).
+	assert.True(t, transport.deadline.Equal(getDeadline),
+		"the session read runs on the deadline the token call was given, not a fresh one")
+	assert.True(t, transport.deadline.Equal(saveDeadline),
+		"and so does the save: one deadline covers the call and the write together")
+
+	// The request id is the value WithoutCancel exists to keep. Every record these three
+	// write is correlated by it, so context.Background() here would silence the refresh in
+	// the operator's log exactly when it is being asked what happened to a session.
+	assert.Equal(t, wantRequestID, transport.requestID,
+		"the detached call keeps the request's values: request_id still reaches its records")
+	assert.Equal(t, wantRequestID, getRequestID, "and the session read keeps them")
+	assert.Equal(t, wantRequestID, saveRequestID, "and so does the save")
 }
