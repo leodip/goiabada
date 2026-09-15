@@ -12,6 +12,7 @@ import (
 	"time"
 
 	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
+	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
@@ -19,7 +20,6 @@ import (
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/leodip/goiabada/core/oauthprovider"
 	"github.com/leodip/goiabada/core/otp"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
@@ -108,8 +108,8 @@ func TestHandleAuthOtpGet(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/auth/otp", nil)
 		rr := httptest.NewRecorder()
 
-		authContext := &oauthprovider.AuthContext{
-			AuthState: oauthprovider.AuthStateInitial,
+		authContext := &ceremony.AuthContext{
+			AuthState: ceremony.AuthStateInitial,
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -135,15 +135,15 @@ func TestHandleAuthOtpGet(t *testing.T) {
 		// The stale pair is what this case is about as much as the render is: a ceremony that
 		// reached /auth/otp before the user enrolled somewhere else carries a seed that is now
 		// dead, and HandleAuthOtpPost picks its error template by whether one is present.
-		authContext := &oauthprovider.AuthContext{
-			AuthState:  oauthprovider.AuthStateLevel2OTP,
+		authContext := &ceremony.AuthContext{
+			AuthState:  ceremony.AuthStateLevel2OTP,
 			CeremonyId: testCeremonyId,
 			UserId:     1,
 			ClientId:   "test-client",
 			OTPKeyURL:  otpTestKeyURL("STALESECRETSTALE"),
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.OTPKeyURL == ""
 		})).Return(nil)
 
@@ -223,8 +223,8 @@ func TestHandleAuthOtpGet(t *testing.T) {
 		ctx := context.WithValue(req.Context(), constants.ContextKeySettings, settings)
 		req = req.WithContext(ctx)
 
-		authContext := &oauthprovider.AuthContext{
-			AuthState:  oauthprovider.AuthStateLevel2OTP,
+		authContext := &ceremony.AuthContext{
+			AuthState:  ceremony.AuthStateLevel2OTP,
 			CeremonyId: testCeremonyId,
 			UserId:     1,
 			ClientId:   "test-client",
@@ -235,7 +235,7 @@ func TestHandleAuthOtpGet(t *testing.T) {
 		generatedKeyURL := otpTestKeyURL("JBSWY3DPEHPK3PXP")
 		wantImage := otpTestRenderedQR(t, generatedKeyURL)
 
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.OTPKeyURL == generatedKeyURL
 		})).Return(nil)
 
@@ -333,15 +333,15 @@ func TestHandleAuthOtpGet(t *testing.T) {
 		req = req.WithContext(ctx)
 
 		firstRenderKeyURL := otpTestKeyURL("FIRSTRENDERSECRET")
-		authContext := &oauthprovider.AuthContext{
-			AuthState:  oauthprovider.AuthStateLevel2OTP,
+		authContext := &ceremony.AuthContext{
+			AuthState:  ceremony.AuthStateLevel2OTP,
 			CeremonyId: testCeremonyId,
 			UserId:     1,
 			ClientId:   "test-client",
 			OTPKeyURL:  firstRenderKeyURL,
 		}
 		authHelper.On("GetAuthContext", req).Return(authContext, nil)
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.OTPKeyURL == firstRenderKeyURL
 		})).Return(nil)
 
@@ -461,8 +461,8 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
-		authContext := &oauthprovider.AuthContext{
-			AuthState:  oauthprovider.AuthStateInitial,
+		authContext := &ceremony.AuthContext{
+			AuthState:  ceremony.AuthStateInitial,
 			CeremonyId: testCeremonyId,
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
@@ -498,25 +498,25 @@ func TestHandleAuthOtpPost(t *testing.T) {
 				// The defect's own shape: the OTP prompt of the request that was replaced.
 				name: "a different ceremony's id", stored: testCeremonyId,
 				submitted: "another-ceremony-0123456789abcde",
-				authState: oauthprovider.AuthStateLevel2OTP,
+				authState: ceremony.AuthStateLevel2OTP,
 			},
 			{
 				// A hand-built body, or a template that lost the hidden input.
 				name: "no ceremony field at all", stored: testCeremonyId,
-				submitted: "", authState: oauthprovider.AuthStateLevel2OTP,
+				submitted: "", authState: ceremony.AuthStateLevel2OTP,
 			},
 			{
 				// The upgrade case: an auth context written before this change carries no id, so
 				// the ceremony is refused once and the user starts again.
 				name: "an auth context from before the ceremony id existed", stored: "",
-				submitted: "", authState: oauthprovider.AuthStateLevel2OTP,
+				submitted: "", authState: ceremony.AuthStateLevel2OTP,
 			},
 			{
 				// The check runs before the AuthState check, so the replaced ceremony's state
 				// produces the 400 mismatch page rather than a 500 naming an internal invariant.
 				name: "a replaced ceremony that has moved on", stored: testCeremonyId,
 				submitted: "another-ceremony-0123456789abcde",
-				authState: oauthprovider.AuthStateRequiresConsent,
+				authState: ceremony.AuthStateRequiresConsent,
 			},
 			{
 				// The id has to come from the body. Both templates this handler serves post to
@@ -525,7 +525,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 				// at all would pass the gate (#79).
 				name: "the current id in the query alone", stored: testCeremonyId,
 				submitted: testCeremonyId, inQuery: true,
-				authState: oauthprovider.AuthStateLevel2OTP,
+				authState: ceremony.AuthStateLevel2OTP,
 			},
 		}
 
@@ -552,7 +552,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 				req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 				rr := httptest.NewRecorder()
 
-				authContext := &oauthprovider.AuthContext{
+				authContext := &ceremony.AuthContext{
 					AuthState:  tc.authState,
 					CeremonyId: tc.stored,
 					UserId:     1,
@@ -592,8 +592,8 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
-		authContext := &oauthprovider.AuthContext{
-			AuthState:  oauthprovider.AuthStateLevel2OTP,
+		authContext := &ceremony.AuthContext{
+			AuthState:  ceremony.AuthStateLevel2OTP,
 			CeremonyId: testCeremonyId,
 			UserId:     1,
 		}
@@ -628,8 +628,8 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
-		authContext := &oauthprovider.AuthContext{
-			AuthState:  oauthprovider.AuthStateLevel2OTP,
+		authContext := &ceremony.AuthContext{
+			AuthState:  ceremony.AuthStateLevel2OTP,
 			CeremonyId: testCeremonyId,
 			UserId:     1,
 			ClientId:   "test-client",
@@ -675,8 +675,8 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
-		authContext := &oauthprovider.AuthContext{
-			AuthState:  oauthprovider.AuthStateLevel2OTP,
+		authContext := &ceremony.AuthContext{
+			AuthState:  ceremony.AuthStateLevel2OTP,
 			CeremonyId: testCeremonyId,
 			UserId:     1,
 			ClientId:   "test-client",
@@ -735,8 +735,8 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
-		authContext := &oauthprovider.AuthContext{
-			AuthState:  oauthprovider.AuthStateLevel2OTP,
+		authContext := &ceremony.AuthContext{
+			AuthState:  ceremony.AuthStateLevel2OTP,
 			CeremonyId: testCeremonyId,
 			UserId:     1,
 			ClientId:   "test-client",
@@ -791,8 +791,8 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
-		authContext := &oauthprovider.AuthContext{
-			AuthState:  oauthprovider.AuthStateLevel2OTP,
+		authContext := &ceremony.AuthContext{
+			AuthState:  ceremony.AuthStateLevel2OTP,
 			CeremonyId: testCeremonyId,
 			UserId:     1,
 			ClientId:   "test-client",
@@ -848,8 +848,8 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
-		authContext := &oauthprovider.AuthContext{
-			AuthState:  oauthprovider.AuthStateLevel2OTP,
+		authContext := &ceremony.AuthContext{
+			AuthState:  ceremony.AuthStateLevel2OTP,
 			CeremonyId: testCeremonyId,
 			UserId:     1,
 			ClientId:   "test-client",
@@ -904,8 +904,8 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
-		authContext := &oauthprovider.AuthContext{
-			AuthState:  oauthprovider.AuthStateLevel2OTP,
+		authContext := &ceremony.AuthContext{
+			AuthState:  ceremony.AuthStateLevel2OTP,
 			CeremonyId: testCeremonyId,
 			UserId:     1,
 			ClientId:   "test-client",
@@ -966,8 +966,8 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
-		authContext := &oauthprovider.AuthContext{
-			AuthState:  oauthprovider.AuthStateLevel2OTP,
+		authContext := &ceremony.AuthContext{
+			AuthState:  ceremony.AuthStateLevel2OTP,
 			CeremonyId: testCeremonyId,
 			UserId:     1,
 			ClientId:   "test-client",
@@ -1009,8 +1009,8 @@ func TestHandleAuthOtpPost(t *testing.T) {
 					"rotation must run before the auth context recording the OTP is saved")
 			})
 
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
-			return ac.AuthState == oauthprovider.AuthStateAuthenticationCompleted &&
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+			return ac.AuthState == ceremony.AuthStateAuthenticationCompleted &&
 				ac.AuthMethods == enums.AuthMethodOTP.String() &&
 				ac.AuthenticatedAt != nil && !ac.AuthenticatedAt.IsZero() &&
 				// OTP is level 2 and must not claim level 1: a ceremony can reach here by
@@ -1055,8 +1055,8 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
-		authContext := &oauthprovider.AuthContext{
-			AuthState:  oauthprovider.AuthStateLevel2OTP,
+		authContext := &ceremony.AuthContext{
+			AuthState:  ceremony.AuthStateLevel2OTP,
 			CeremonyId: testCeremonyId,
 			UserId:     1,
 			ClientId:   "test-client",
@@ -1113,8 +1113,8 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		authHelper.On("RegenerateSession", rr, req).Return(nil).Once().
 			Run(func(mock.Arguments) { calls = append(calls, "rotate") })
 
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
-			return ac.AuthState == oauthprovider.AuthStateAuthenticationCompleted &&
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+			return ac.AuthState == ceremony.AuthStateAuthenticationCompleted &&
 				ac.AuthMethods == enums.AuthMethodOTP.String() &&
 				ac.AuthenticatedAt != nil && !ac.AuthenticatedAt.IsZero() &&
 				// The value the increment returned, not the pre-enrollment value /auth/level2
@@ -1182,8 +1182,8 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
-		authContext := &oauthprovider.AuthContext{
-			AuthState:  oauthprovider.AuthStateLevel2OTP,
+		authContext := &ceremony.AuthContext{
+			AuthState:  ceremony.AuthStateLevel2OTP,
 			CeremonyId: testCeremonyId,
 			UserId:     1,
 			ClientId:   "test-client",
@@ -1259,8 +1259,8 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
-		authContext := &oauthprovider.AuthContext{
-			AuthState:  oauthprovider.AuthStateLevel2OTP,
+		authContext := &ceremony.AuthContext{
+			AuthState:  ceremony.AuthStateLevel2OTP,
 			CeremonyId: testCeremonyId,
 			UserId:     1,
 			ClientId:   "test-client",
@@ -1330,8 +1330,8 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
-		authContext := &oauthprovider.AuthContext{
-			AuthState:  oauthprovider.AuthStateLevel2OTP,
+		authContext := &ceremony.AuthContext{
+			AuthState:  ceremony.AuthStateLevel2OTP,
 			CeremonyId: testCeremonyId,
 			UserId:     1,
 			ClientId:   "test-client",
@@ -1417,8 +1417,8 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
-		authContext := &oauthprovider.AuthContext{
-			AuthState:  oauthprovider.AuthStateLevel2OTP,
+		authContext := &ceremony.AuthContext{
+			AuthState:  ceremony.AuthStateLevel2OTP,
 			CeremonyId: testCeremonyId,
 			UserId:     1,
 			ClientId:   "test-client",
@@ -1479,8 +1479,8 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
-		authContext := &oauthprovider.AuthContext{
-			AuthState:  oauthprovider.AuthStateLevel2OTP,
+		authContext := &ceremony.AuthContext{
+			AuthState:  ceremony.AuthStateLevel2OTP,
 			CeremonyId: testCeremonyId,
 			UserId:     1,
 			ClientId:   "test-client",
@@ -1531,14 +1531,14 @@ func TestHandleAuthOtpPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 	// carrying. consumed is TryConsumeUserOTPStep's answer, and false is a step that has
 	// already been spent. The two flags together select one of the four credential-rejection
 	// branches, each of which is its own recording call site.
-	newHandler := func(t *testing.T, enrolled bool, consumed bool) (http.Handler, *oauthprovider.AuthContext) {
+	newHandler := func(t *testing.T, enrolled bool, consumed bool) (http.Handler, *ceremony.AuthContext) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		authContext := &oauthprovider.AuthContext{
-			AuthState:  oauthprovider.AuthStateLevel2OTP,
+		authContext := &ceremony.AuthContext{
+			AuthState:  ceremony.AuthStateLevel2OTP,
 			CeremonyId: testCeremonyId,
 			UserId:     1,
 			ClientId:   "test-client",
@@ -1664,7 +1664,7 @@ func TestHandleAuthOtpPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 		for i := 0; i < budget*3; i++ {
 			otpCode, err := totp.GenerateCode(key.Secret(), time.Now())
 			assert.Nil(t, err)
-			authContext.AuthState = oauthprovider.AuthStateLevel2OTP
+			authContext.AuthState = ceremony.AuthStateLevel2OTP
 			assert.Equal(t, http.StatusFound, post(handler, otpCode), "verification %d should succeed", i+1)
 		}
 	})

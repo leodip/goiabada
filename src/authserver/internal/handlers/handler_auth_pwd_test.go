@@ -9,13 +9,13 @@ import (
 	"testing"
 
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
+	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/leodip/goiabada/core/oauthprovider"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
@@ -63,8 +63,8 @@ func TestHandleAuthPwdGet(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		authContext := &oauthprovider.AuthContext{
-			AuthState: oauthprovider.AuthStateInitial,
+		authContext := &ceremony.AuthContext{
+			AuthState: ceremony.AuthStateInitial,
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -88,8 +88,8 @@ func TestHandleAuthPwdGet(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		authContext := &oauthprovider.AuthContext{
-			AuthState:  oauthprovider.AuthStateLevel1Password,
+		authContext := &ceremony.AuthContext{
+			AuthState:  ceremony.AuthStateLevel1Password,
 			CeremonyId: testCeremonyId,
 			ClientId:   "my-app",
 		}
@@ -151,8 +151,8 @@ func TestHandleAuthPwdGet(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		authContext := &oauthprovider.AuthContext{
-			AuthState: oauthprovider.AuthStateLevel1Password,
+		authContext := &ceremony.AuthContext{
+			AuthState: ceremony.AuthStateLevel1Password,
 			ClientId:  "another-app",
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
@@ -205,8 +205,8 @@ func TestHandleAuthPwdGet(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		authContext := &oauthprovider.AuthContext{
-			AuthState:  oauthprovider.AuthStateLevel1Password,
+		authContext := &ceremony.AuthContext{
+			AuthState:  ceremony.AuthStateLevel1Password,
 			CeremonyId: testCeremonyId,
 			ClientId:   "my-app",
 		}
@@ -278,8 +278,8 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
-		authContext := &oauthprovider.AuthContext{
-			AuthState:  oauthprovider.AuthStateInitial,
+		authContext := &ceremony.AuthContext{
+			AuthState:  ceremony.AuthStateInitial,
 			CeremonyId: testCeremonyId,
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
@@ -318,26 +318,26 @@ func TestHandleAuthPwdPost(t *testing.T) {
 				// The defect's own shape: the password screen of the request that was replaced.
 				name: "a different ceremony's id", stored: testCeremonyId,
 				submitted: "another-ceremony-0123456789abcde",
-				authState: oauthprovider.AuthStateLevel1Password,
+				authState: ceremony.AuthStateLevel1Password,
 			},
 			{
 				// A hand-built body, or a template that lost the hidden input.
 				name: "no ceremony field at all", stored: testCeremonyId,
-				submitted: "", authState: oauthprovider.AuthStateLevel1Password,
+				submitted: "", authState: ceremony.AuthStateLevel1Password,
 			},
 			{
 				// The upgrade case: an auth context written before this change carries no id, so
 				// the ceremony is refused once and the user starts again. Refused rather than
 				// matched against an empty submission, which is the fail-closed direction.
 				name: "an auth context from before the ceremony id existed", stored: "",
-				submitted: "", authState: oauthprovider.AuthStateLevel1Password,
+				submitted: "", authState: ceremony.AuthStateLevel1Password,
 			},
 			{
 				// The check runs before the AuthState check, so the replaced ceremony's state
 				// produces the 400 mismatch page rather than a 500 naming an internal invariant.
 				name: "a replaced ceremony that has moved on", stored: testCeremonyId,
 				submitted: "another-ceremony-0123456789abcde",
-				authState: oauthprovider.AuthStateRequiresConsent,
+				authState: ceremony.AuthStateRequiresConsent,
 			},
 			{
 				// The id has to come from the body. This form posts to action="", so reading it
@@ -346,7 +346,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 				// (#79).
 				name: "the current id in the query alone", stored: testCeremonyId,
 				submitted: testCeremonyId, inQuery: true,
-				authState: oauthprovider.AuthStateLevel1Password,
+				authState: ceremony.AuthStateLevel1Password,
 			},
 		}
 
@@ -374,7 +374,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 				req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 				rr := httptest.NewRecorder()
 
-				authContext := &oauthprovider.AuthContext{
+				authContext := &ceremony.AuthContext{
 					AuthState:  tc.authState,
 					CeremonyId: tc.stored,
 					ClientId:   "test-client",
@@ -412,8 +412,8 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
-		authContext := &oauthprovider.AuthContext{
-			AuthState:  oauthprovider.AuthStateLevel1Password,
+		authContext := &ceremony.AuthContext{
+			AuthState:  ceremony.AuthStateLevel1Password,
 			CeremonyId: testCeremonyId,
 			ClientId:   "my-app",
 		}
@@ -462,8 +462,8 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
-		authContext := &oauthprovider.AuthContext{
-			AuthState:  oauthprovider.AuthStateLevel1Password,
+		authContext := &ceremony.AuthContext{
+			AuthState:  ceremony.AuthStateLevel1Password,
 			CeremonyId: testCeremonyId,
 			ClientId:   "test-client",
 		}
@@ -519,8 +519,8 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
-		authContext := &oauthprovider.AuthContext{
-			AuthState:  oauthprovider.AuthStateLevel1Password,
+		authContext := &ceremony.AuthContext{
+			AuthState:  ceremony.AuthStateLevel1Password,
 			CeremonyId: testCeremonyId,
 			ClientId:   "test-client",
 		}
@@ -566,8 +566,8 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
-		authContext := &oauthprovider.AuthContext{
-			AuthState:  oauthprovider.AuthStateLevel1Password,
+		authContext := &ceremony.AuthContext{
+			AuthState:  ceremony.AuthStateLevel1Password,
 			CeremonyId: testCeremonyId,
 			ClientId:   "test-client",
 		}
@@ -638,8 +638,8 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
-		authContext := &oauthprovider.AuthContext{
-			AuthState:  oauthprovider.AuthStateLevel1Password,
+		authContext := &ceremony.AuthContext{
+			AuthState:  ceremony.AuthStateLevel1Password,
 			CeremonyId: testCeremonyId,
 			ClientId:   "test-client",
 		}
@@ -692,8 +692,8 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
-		authContext := &oauthprovider.AuthContext{
-			AuthState:  oauthprovider.AuthStateLevel1Password,
+		authContext := &ceremony.AuthContext{
+			AuthState:  ceremony.AuthStateLevel1Password,
 			CeremonyId: testCeremonyId,
 			ClientId:   "test-client",
 		}
@@ -738,8 +738,8 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
-		authContext := &oauthprovider.AuthContext{
-			AuthState:  oauthprovider.AuthStateLevel1Password,
+		authContext := &ceremony.AuthContext{
+			AuthState:  ceremony.AuthStateLevel1Password,
 			CeremonyId: testCeremonyId,
 			ClientId:   "test-client",
 		}
@@ -792,9 +792,9 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		// mock.Anything for the request: handler_auth_pwd.go calls
 		// i18n.RefineLocalizerWithUserLocale after password verifies, which returns
 		// a fresh *http.Request, so the pointer no longer matches `req`.
-		authHelper.On("SaveAuthContext", rr, mock.Anything, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
+		authHelper.On("SaveAuthContext", rr, mock.Anything, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.UserId == 1 &&
-				ac.AuthState == oauthprovider.AuthStateLevel1PasswordCompleted &&
+				ac.AuthState == ceremony.AuthStateLevel1PasswordCompleted &&
 				ac.AuthMethods == enums.AuthMethodPassword.String() &&
 				ac.AuthenticatedAt != nil && !ac.AuthenticatedAt.IsZero() &&
 				// This handler is the only writer of Level1AuthCompleted, so this is the
@@ -846,8 +846,8 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
-		authContext := &oauthprovider.AuthContext{
-			AuthState:  oauthprovider.AuthStateLevel1Password,
+		authContext := &ceremony.AuthContext{
+			AuthState:  ceremony.AuthStateLevel1Password,
 			CeremonyId: testCeremonyId,
 			ClientId:   "test-client",
 		}
@@ -921,14 +921,14 @@ func TestHandleAuthPwdPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 	//
 	// account is what GetUserByEmail answers with. A nil one is the address that names no
 	// account, which is its own rejection branch with its own recording call.
-	newHandler := func(t *testing.T, account *models.User) (http.Handler, *mocks_data.Database, *oauthprovider.AuthContext) {
+	newHandler := func(t *testing.T, account *models.User) (http.Handler, *mocks_data.Database, *ceremony.AuthContext) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		authContext := &oauthprovider.AuthContext{
-			AuthState:  oauthprovider.AuthStateLevel1Password,
+		authContext := &ceremony.AuthContext{
+			AuthState:  ceremony.AuthStateLevel1Password,
 			CeremonyId: testCeremonyId,
 			ClientId:   "test-client",
 		}
@@ -995,7 +995,7 @@ func TestHandleAuthPwdPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 		// Well past the budget. A tier that counted every request would refuse the 11th,
 		// which is an account locked out of its own login by using it.
 		for i := 0; i < tightBudget*2; i++ {
-			authContext.AuthState = oauthprovider.AuthStateLevel1Password
+			authContext.AuthState = ceremony.AuthStateLevel1Password
 			assert.Equal(t, http.StatusFound, post(handler, password),
 				"sign-in %d should succeed", i+1)
 		}

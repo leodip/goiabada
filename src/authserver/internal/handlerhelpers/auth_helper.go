@@ -5,11 +5,11 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
-	"github.com/leodip/goiabada/core/oauthprovider"
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
@@ -25,7 +25,7 @@ func NewAuthHelper(sessionStore sessionstore.Store, sessionName string) *AuthHel
 	}
 }
 
-func (s *AuthHelper) GetAuthContext(r *http.Request) (*oauthprovider.AuthContext, error) {
+func (s *AuthHelper) GetAuthContext(r *http.Request) (*ceremony.AuthContext, error) {
 	sess, err := s.sessionStore.Get(r, s.sessionName)
 	if err != nil {
 		return nil, err
@@ -35,7 +35,7 @@ func (s *AuthHelper) GetAuthContext(r *http.Request) (*oauthprovider.AuthContext
 		return nil, customerrors.ErrNoAuthContext
 	}
 
-	var authContext oauthprovider.AuthContext
+	var authContext ceremony.AuthContext
 	err = json.Unmarshal([]byte(jsonData), &authContext)
 	if err != nil {
 		return nil, err
@@ -65,7 +65,7 @@ func (s *AuthHelper) GetLoggedInSubject(r *http.Request) string {
 	return ""
 }
 
-func (s *AuthHelper) SaveAuthContext(w http.ResponseWriter, r *http.Request, authContext *oauthprovider.AuthContext) error {
+func (s *AuthHelper) SaveAuthContext(w http.ResponseWriter, r *http.Request, authContext *ceremony.AuthContext) error {
 
 	sess, err := s.sessionStore.Get(r, s.sessionName)
 	if err != nil {

@@ -12,7 +12,7 @@ package mocks_handlers
 import (
 	"net/http"
 
-	"github.com/leodip/goiabada/core/oauthprovider"
+	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -110,23 +110,23 @@ func (_c *AuthHelper_ClearAuthContext_Call) RunAndReturn(run func(w http.Respons
 }
 
 // GetAuthContext provides a mock function for the type AuthHelper
-func (_mock *AuthHelper) GetAuthContext(r *http.Request) (*oauthprovider.AuthContext, error) {
+func (_mock *AuthHelper) GetAuthContext(r *http.Request) (*ceremony.AuthContext, error) {
 	ret := _mock.Called(r)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetAuthContext")
 	}
 
-	var r0 *oauthprovider.AuthContext
+	var r0 *ceremony.AuthContext
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(*http.Request) (*oauthprovider.AuthContext, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(*http.Request) (*ceremony.AuthContext, error)); ok {
 		return returnFunc(r)
 	}
-	if returnFunc, ok := ret.Get(0).(func(*http.Request) *oauthprovider.AuthContext); ok {
+	if returnFunc, ok := ret.Get(0).(func(*http.Request) *ceremony.AuthContext); ok {
 		r0 = returnFunc(r)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*oauthprovider.AuthContext)
+			r0 = ret.Get(0).(*ceremony.AuthContext)
 		}
 	}
 	if returnFunc, ok := ret.Get(1).(func(*http.Request) error); ok {
@@ -161,12 +161,12 @@ func (_c *AuthHelper_GetAuthContext_Call) Run(run func(r *http.Request)) *AuthHe
 	return _c
 }
 
-func (_c *AuthHelper_GetAuthContext_Call) Return(authContext *oauthprovider.AuthContext, err error) *AuthHelper_GetAuthContext_Call {
+func (_c *AuthHelper_GetAuthContext_Call) Return(authContext *ceremony.AuthContext, err error) *AuthHelper_GetAuthContext_Call {
 	_c.Call.Return(authContext, err)
 	return _c
 }
 
-func (_c *AuthHelper_GetAuthContext_Call) RunAndReturn(run func(r *http.Request) (*oauthprovider.AuthContext, error)) *AuthHelper_GetAuthContext_Call {
+func (_c *AuthHelper_GetAuthContext_Call) RunAndReturn(run func(r *http.Request) (*ceremony.AuthContext, error)) *AuthHelper_GetAuthContext_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -280,7 +280,7 @@ func (_c *AuthHelper_RegenerateSession_Call) RunAndReturn(run func(w http.Respon
 }
 
 // SaveAuthContext provides a mock function for the type AuthHelper
-func (_mock *AuthHelper) SaveAuthContext(w http.ResponseWriter, r *http.Request, authContext *oauthprovider.AuthContext) error {
+func (_mock *AuthHelper) SaveAuthContext(w http.ResponseWriter, r *http.Request, authContext *ceremony.AuthContext) error {
 	ret := _mock.Called(w, r, authContext)
 
 	if len(ret) == 0 {
@@ -288,7 +288,7 @@ func (_mock *AuthHelper) SaveAuthContext(w http.ResponseWriter, r *http.Request,
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(http.ResponseWriter, *http.Request, *oauthprovider.AuthContext) error); ok {
+	if returnFunc, ok := ret.Get(0).(func(http.ResponseWriter, *http.Request, *ceremony.AuthContext) error); ok {
 		r0 = returnFunc(w, r, authContext)
 	} else {
 		r0 = ret.Error(0)
@@ -304,12 +304,12 @@ type AuthHelper_SaveAuthContext_Call struct {
 // SaveAuthContext is a helper method to define mock.On call
 //   - w http.ResponseWriter
 //   - r *http.Request
-//   - authContext *oauthprovider.AuthContext
+//   - authContext *ceremony.AuthContext
 func (_e *AuthHelper_Expecter) SaveAuthContext(w any, r any, authContext any) *AuthHelper_SaveAuthContext_Call {
 	return &AuthHelper_SaveAuthContext_Call{Call: _e.mock.On("SaveAuthContext", w, r, authContext)}
 }
 
-func (_c *AuthHelper_SaveAuthContext_Call) Run(run func(w http.ResponseWriter, r *http.Request, authContext *oauthprovider.AuthContext)) *AuthHelper_SaveAuthContext_Call {
+func (_c *AuthHelper_SaveAuthContext_Call) Run(run func(w http.ResponseWriter, r *http.Request, authContext *ceremony.AuthContext)) *AuthHelper_SaveAuthContext_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 http.ResponseWriter
 		if args[0] != nil {
@@ -319,9 +319,9 @@ func (_c *AuthHelper_SaveAuthContext_Call) Run(run func(w http.ResponseWriter, r
 		if args[1] != nil {
 			arg1 = args[1].(*http.Request)
 		}
-		var arg2 *oauthprovider.AuthContext
+		var arg2 *ceremony.AuthContext
 		if args[2] != nil {
-			arg2 = args[2].(*oauthprovider.AuthContext)
+			arg2 = args[2].(*ceremony.AuthContext)
 		}
 		run(
 			arg0,
@@ -337,7 +337,7 @@ func (_c *AuthHelper_SaveAuthContext_Call) Return(err error) *AuthHelper_SaveAut
 	return _c
 }
 
-func (_c *AuthHelper_SaveAuthContext_Call) RunAndReturn(run func(w http.ResponseWriter, r *http.Request, authContext *oauthprovider.AuthContext) error) *AuthHelper_SaveAuthContext_Call {
+func (_c *AuthHelper_SaveAuthContext_Call) RunAndReturn(run func(w http.ResponseWriter, r *http.Request, authContext *ceremony.AuthContext) error) *AuthHelper_SaveAuthContext_Call {
 	_c.Call.Return(run)
 	return _c
 }

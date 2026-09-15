@@ -21,6 +21,7 @@ import (
 	"time"
 
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
+	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/ratelimit"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
@@ -28,7 +29,6 @@ import (
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
-	"github.com/leodip/goiabada/core/oauthprovider"
 	"github.com/leodip/goiabada/core/testutil"
 )
 
@@ -147,12 +147,12 @@ type stubAuthHelper struct {
 	err error
 }
 
-func (s stubAuthHelper) GetAuthContext(r *http.Request) (*oauthprovider.AuthContext, error) {
+func (s stubAuthHelper) GetAuthContext(r *http.Request) (*ceremony.AuthContext, error) {
 	if s.err != nil {
 		return nil, s.err
 	}
 	userId, _ := strconv.ParseInt(r.URL.Query().Get("userId"), 10, 64)
-	return &oauthprovider.AuthContext{UserId: userId}, nil
+	return &ceremony.AuthContext{UserId: userId}, nil
 }
 
 // TestGetClientIPFromRequest verifies the rate-limit key is derived from

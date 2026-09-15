@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
@@ -14,7 +15,6 @@ import (
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/mocks"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/leodip/goiabada/core/oauthprovider"
 	mocks_user "github.com/leodip/goiabada/core/user/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -59,8 +59,8 @@ func TestHandleAuthLevel1Get(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		authContext := &oauthprovider.AuthContext{
-			AuthState: oauthprovider.AuthStateInitial, // This is an unexpected state
+		authContext := &ceremony.AuthContext{
+			AuthState: ceremony.AuthStateInitial, // This is an unexpected state
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -83,13 +83,13 @@ func TestHandleAuthLevel1Get(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		authContext := &oauthprovider.AuthContext{
-			AuthState: oauthprovider.AuthStateRequiresLevel1,
+		authContext := &ceremony.AuthContext{
+			AuthState: ceremony.AuthStateRequiresLevel1,
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
-			return ac.AuthState == oauthprovider.AuthStateLevel1Password
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+			return ac.AuthState == ceremony.AuthStateLevel1Password
 		})).Return(nil)
 
 		handler.ServeHTTP(rr, req)
@@ -141,8 +141,8 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		authContext := &oauthprovider.AuthContext{
-			AuthState: oauthprovider.AuthStateInitial,
+		authContext := &ceremony.AuthContext{
+			AuthState: ceremony.AuthStateInitial,
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -169,8 +169,8 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		authContext := &oauthprovider.AuthContext{
-			AuthState: oauthprovider.AuthStateLevel1PasswordCompleted,
+		authContext := &ceremony.AuthContext{
+			AuthState: ceremony.AuthStateLevel1PasswordCompleted,
 			ClientId:  "test-client",
 			UserId:    1,
 		}
@@ -197,8 +197,8 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 
 		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
 
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
-			return ac.AuthState == oauthprovider.AuthStateRequiresLevel2
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+			return ac.AuthState == ceremony.AuthStateRequiresLevel2
 		})).Return(nil)
 
 		handler.ServeHTTP(rr, req)
@@ -225,8 +225,8 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		authContext := &oauthprovider.AuthContext{
-			AuthState: oauthprovider.AuthStateLevel1PasswordCompleted,
+		authContext := &ceremony.AuthContext{
+			AuthState: ceremony.AuthStateLevel1PasswordCompleted,
 			ClientId:  "test-client",
 			UserId:    1,
 		}
@@ -253,8 +253,8 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 
 		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
 
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
-			return ac.AuthState == oauthprovider.AuthStateAuthenticationCompleted
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+			return ac.AuthState == ceremony.AuthStateAuthenticationCompleted
 		})).Return(nil)
 
 		handler.ServeHTTP(rr, req)
@@ -279,8 +279,8 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/auth/level1/completed", nil)
 		rr := httptest.NewRecorder()
 
-		authContext := &oauthprovider.AuthContext{
-			AuthState: oauthprovider.AuthStateLevel1PasswordCompleted,
+		authContext := &ceremony.AuthContext{
+			AuthState: ceremony.AuthStateLevel1PasswordCompleted,
 			ClientId:  "test-client",
 			UserId:    1,
 		}
@@ -307,8 +307,8 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 
 		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(false)
 
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
-			return ac.AuthState == oauthprovider.AuthStateAuthenticationCompleted
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+			return ac.AuthState == ceremony.AuthStateAuthenticationCompleted
 		})).Return(nil)
 
 		handler.ServeHTTP(rr, req)
@@ -337,8 +337,8 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/auth/level1/completed", nil)
 		rr := httptest.NewRecorder()
 
-		authContext := &oauthprovider.AuthContext{
-			AuthState: oauthprovider.AuthStateLevel1PasswordCompleted,
+		authContext := &ceremony.AuthContext{
+			AuthState: ceremony.AuthStateLevel1PasswordCompleted,
 			ClientId:  "test-client",
 			UserId:    1,
 		}
@@ -369,8 +369,8 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 
 		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
 
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
-			return ac.AuthState == oauthprovider.AuthStateRequiresLevel2
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+			return ac.AuthState == ceremony.AuthStateRequiresLevel2
 		})).Return(nil)
 
 		handler.ServeHTTP(rr, req)
@@ -482,8 +482,8 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 				req, _ := http.NewRequest("GET", "/auth/level1/completed", nil)
 				rr := httptest.NewRecorder()
 
-				authContext := &oauthprovider.AuthContext{
-					AuthState: oauthprovider.AuthStateLevel1PasswordCompleted,
+				authContext := &ceremony.AuthContext{
+					AuthState: ceremony.AuthStateLevel1PasswordCompleted,
 					ClientId:  "test-client",
 					UserId:    1,
 				}
@@ -519,12 +519,12 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 
 				userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
 
-				expectedAuthState := oauthprovider.AuthStateAuthenticationCompleted
+				expectedAuthState := ceremony.AuthStateAuthenticationCompleted
 				if tt.expectedRedirect == "/auth/level2" {
-					expectedAuthState = oauthprovider.AuthStateRequiresLevel2
+					expectedAuthState = ceremony.AuthStateRequiresLevel2
 				}
 
-				authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
+				authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 					return ac.AuthState == expectedAuthState
 				})).Return(nil)
 
@@ -608,8 +608,8 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 				req, _ := http.NewRequest("GET", "/auth/level1/completed", nil)
 				rr := httptest.NewRecorder()
 
-				authContext := &oauthprovider.AuthContext{
-					AuthState: oauthprovider.AuthStateLevel1PasswordCompleted,
+				authContext := &ceremony.AuthContext{
+					AuthState: ceremony.AuthStateLevel1PasswordCompleted,
 					ClientId:  "test-client",
 					UserId:    2,
 				}
@@ -645,12 +645,12 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 
 				userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
 
-				expectedAuthState := oauthprovider.AuthStateAuthenticationCompleted
+				expectedAuthState := ceremony.AuthStateAuthenticationCompleted
 				if tt.expectedRedirect == "/auth/level2" {
-					expectedAuthState = oauthprovider.AuthStateRequiresLevel2
+					expectedAuthState = ceremony.AuthStateRequiresLevel2
 				}
 
-				authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
+				authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 					return ac.AuthState == expectedAuthState
 				})).Return(nil)
 
@@ -678,8 +678,8 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 // response OIDC Core 3.1.2.2 with 3.1.2.6 says it MUST receive, just later.
 func TestHandleAuthLevel1CompletedGet_DeliversADeferredError(t *testing.T) {
 
-	newParkedContext := func(state string) *oauthprovider.AuthContext {
-		return &oauthprovider.AuthContext{
+	newParkedContext := func(state string) *ceremony.AuthContext {
+		return &ceremony.AuthContext{
 			AuthState:                state,
 			ClientId:                 "test-client",
 			RedirectURI:              "https://legit.example/cb",
@@ -696,8 +696,8 @@ func TestHandleAuthLevel1CompletedGet_DeliversADeferredError(t *testing.T) {
 	// does not turn on which one it is and a later change to the shortcut must not silently strand
 	// a parked error.
 	for _, state := range []string{
-		oauthprovider.AuthStateLevel1PasswordCompleted,
-		oauthprovider.AuthStateLevel1ExistingSession,
+		ceremony.AuthStateLevel1PasswordCompleted,
+		ceremony.AuthStateLevel1ExistingSession,
 	} {
 		t.Run("answers the client on "+state, func(t *testing.T) {
 			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
@@ -752,7 +752,7 @@ func TestHandleAuthLevel1CompletedGet_DeliversADeferredError(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		authHelper.On("GetAuthContext", mock.Anything).Return(
-			newParkedContext(oauthprovider.AuthStateLevel1PasswordCompleted), nil)
+			newParkedContext(ceremony.AuthStateLevel1PasswordCompleted), nil)
 		authHelper.On("ClearAuthContext", rr, req).Return(assert.AnError)
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(
 			&models.Client{Id: 1, ClientIdentifier: "test-client"}, nil)
@@ -794,7 +794,7 @@ func TestHandleAuthLevel1CompletedGet_DeliversADeferredError(t *testing.T) {
 		req := httptest.NewRequest("GET", "/auth/level1completed", nil)
 		rr := httptest.NewRecorder()
 
-		authContext := newParkedContext(oauthprovider.AuthStateLevel1PasswordCompleted)
+		authContext := newParkedContext(ceremony.AuthStateLevel1PasswordCompleted)
 		authContext.ResponseMode = "form_post"
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 		authHelper.On("ClearAuthContext", rr, req).Return(nil)
@@ -823,7 +823,7 @@ func TestHandleAuthLevel1CompletedGet_DeliversADeferredError(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		authHelper.On("GetAuthContext", mock.Anything).Return(
-			newParkedContext(oauthprovider.AuthStateLevel1PasswordCompleted), nil)
+			newParkedContext(ceremony.AuthStateLevel1PasswordCompleted), nil)
 		authHelper.On("ClearAuthContext", rr, req).Return(nil)
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(
 			&models.Client{Id: 1, ClientIdentifier: "test-client", CreatedViaDCR: true}, nil)
@@ -853,8 +853,8 @@ func TestHandleAuthLevel1CompletedGet_DeliversADeferredError(t *testing.T) {
 		req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySessionIdentifier, "sess-1"))
 		rr := httptest.NewRecorder()
 
-		authContext := &oauthprovider.AuthContext{
-			AuthState: oauthprovider.AuthStateLevel1PasswordCompleted,
+		authContext := &ceremony.AuthContext{
+			AuthState: ceremony.AuthStateLevel1PasswordCompleted,
 			ClientId:  "test-client",
 			UserId:    1,
 		}
@@ -864,8 +864,8 @@ func TestHandleAuthLevel1CompletedGet_DeliversADeferredError(t *testing.T) {
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(
 			&models.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: enums.AcrLevel1}, nil)
 		userSessionManager.On("HasValidUserSession", mock.Anything, mock.Anything, mock.Anything).Return(false)
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
-			return ac.AuthState == oauthprovider.AuthStateAuthenticationCompleted
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+			return ac.AuthState == ceremony.AuthStateAuthenticationCompleted
 		})).Return(nil)
 
 		handler.ServeHTTP(rr, req)

@@ -12,6 +12,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/web"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
@@ -19,7 +20,6 @@ import (
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
-	"github.com/leodip/goiabada/core/oauthprovider"
 	"github.com/leodip/goiabada/core/otp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -213,8 +213,8 @@ func otpCeremonyCookie(t *testing.T, s *Server) *http.Cookie {
 	sess, err := s.sessionStore.Get(r, constants.AuthServerSessionName)
 	assert.NoError(t, err)
 
-	authContext, err := json.Marshal(oauthprovider.AuthContext{
-		AuthState:  oauthprovider.AuthStateLevel2OTP,
+	authContext, err := json.Marshal(ceremony.AuthContext{
+		AuthState:  ceremony.AuthStateLevel2OTP,
 		CeremonyId: routesTestCeremonyId,
 		UserId:     1,
 		ClientId:   routesTestClientId,

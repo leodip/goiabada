@@ -5,12 +5,12 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/errs"
-	"github.com/leodip/goiabada/core/oauthprovider"
 )
 
 func HandleAuthLevel2Get(
@@ -32,7 +32,7 @@ func HandleAuthLevel2Get(
 			return
 		}
 
-		requiredState := oauthprovider.AuthStateRequiresLevel2
+		requiredState := ceremony.AuthStateRequiresLevel2
 		if authContext.AuthState != requiredState {
 			rejectAuthStateMismatch(httpHelper, w, r, requiredState, authContext.AuthState)
 			return
@@ -89,7 +89,7 @@ func HandleAuthLevel2Get(
 			// optional
 			// if user has OTP enabled, we'll ask for it
 			if user.OTPEnabled {
-				authContext.AuthState = oauthprovider.AuthStateLevel2OTP
+				authContext.AuthState = ceremony.AuthStateLevel2OTP
 				err = authHelper.SaveAuthContext(w, r, authContext)
 				if err != nil {
 					httpHelper.InternalServerError(w, r, err)
@@ -98,7 +98,7 @@ func HandleAuthLevel2Get(
 				http.Redirect(w, r, config.GetAuthServer().BaseURL+"/auth/otp", http.StatusFound)
 			} else {
 				// user without OTP, we'll skip it
-				authContext.AuthState = oauthprovider.AuthStateAuthenticationCompleted
+				authContext.AuthState = ceremony.AuthStateAuthenticationCompleted
 				err = authHelper.SaveAuthContext(w, r, authContext)
 				if err != nil {
 					httpHelper.InternalServerError(w, r, err)
@@ -108,7 +108,7 @@ func HandleAuthLevel2Get(
 			}
 		case enums.AcrLevel2Mandatory:
 			// OTP is mandatory
-			authContext.AuthState = oauthprovider.AuthStateLevel2OTP
+			authContext.AuthState = ceremony.AuthStateLevel2OTP
 			err = authHelper.SaveAuthContext(w, r, authContext)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)

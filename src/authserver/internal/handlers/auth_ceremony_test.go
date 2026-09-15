@@ -8,6 +8,7 @@ import (
 
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
+	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	authmiddleware "github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/handlerhelpers"
@@ -15,7 +16,6 @@ import (
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/mocks"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/leodip/goiabada/core/oauthprovider"
 	"github.com/leodip/goiabada/core/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -157,7 +157,7 @@ func TestRejectAuthStateMismatch(t *testing.T) {
 		}, authmiddleware.SettingsReader{})
 
 		rejectAuthStateMismatch(httpHelper, rr, req,
-			oauthprovider.AuthStateLevel1Password, oauthprovider.AuthStateLevel1PasswordCompleted)
+			ceremony.AuthStateLevel1Password, ceremony.AuthStateLevel1PasswordCompleted)
 
 		assert.Equal(t, http.StatusBadRequest, rr.Code,
 			"a stale tab is a client's mistake, not a server fault")
@@ -182,14 +182,14 @@ func TestRejectAuthStateMismatch(t *testing.T) {
 		}, authmiddleware.SettingsReader{})
 
 		rejectAuthStateMismatch(httpHelper, rr, req,
-			oauthprovider.AuthStateRequiresConsent, oauthprovider.AuthStateInitial)
+			ceremony.AuthStateRequiresConsent, ceremony.AuthStateInitial)
 
 		output := logged.Text()
 		// Both states, because the pair is the whole diagnosis: neither alone says which step
 		// the browser asked for and which one the ceremony is on.
 		assert.Contains(t, output, "level=WARN")
-		assert.Contains(t, output, "required_state="+oauthprovider.AuthStateRequiresConsent)
-		assert.Contains(t, output, "actual_state="+oauthprovider.AuthStateInitial)
+		assert.Contains(t, output, "required_state="+ceremony.AuthStateRequiresConsent)
+		assert.Contains(t, output, "actual_state="+ceremony.AuthStateInitial)
 		assert.NotContains(t, output, "level=ERROR",
 			"the Back button must not page whoever watches error-level lines")
 	})
@@ -230,9 +230,9 @@ func TestRejectCeremonyMismatch_AuditsUnderTheRequestsContext(t *testing.T) {
 	httpHelper.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html", "/auth_error.html",
 		mock.Anything).Return(nil).Once()
 
-	rejectCeremonyMismatch(httpHelper, auditLogger, rr, req, &oauthprovider.AuthContext{
+	rejectCeremonyMismatch(httpHelper, auditLogger, rr, req, &ceremony.AuthContext{
 		ClientId:  "test-client",
-		AuthState: oauthprovider.AuthStateLevel1Password,
+		AuthState: ceremony.AuthStateLevel1Password,
 	})
 
 	auditLogger.AssertExpectations(t)

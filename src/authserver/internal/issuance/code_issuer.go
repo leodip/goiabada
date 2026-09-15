@@ -1,4 +1,4 @@
-package oauthprovider
+package issuance
 
 import (
 	"database/sql"
@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/hashutil"
@@ -33,14 +34,8 @@ type CodeIssuer struct {
 	database data.Database
 }
 
-// CreateCodeInput embeds AuthContext, so the two issues that move them are coupled and
-// cannot land independently. #339 moves AuthContext into the authserver module; #341
-// leaves CodeIssuer in core. Landing #339 on its own therefore puts a core package on an
-// authserver import, which the module direction rule refuses in production and test files
-// alike, so the tier goes red the moment AuthContext moves. Either land them together, or
-// break the embedding into explicit fields first.
 type CreateCodeInput struct {
-	AuthContext
+	ceremony.AuthContext
 	SessionIdentifier string
 }
 

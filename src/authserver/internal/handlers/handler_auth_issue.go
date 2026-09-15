@@ -12,6 +12,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/ceremony"
+	"github.com/leodip/goiabada/authserver/internal/issuance"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
@@ -19,7 +21,6 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
-	"github.com/leodip/goiabada/core/oauthprovider"
 	"github.com/leodip/goiabada/core/urlutil"
 )
 
@@ -47,7 +48,7 @@ func HandleIssueGet(
 			return
 		}
 
-		requiredState := oauthprovider.AuthStateReadyToIssueCode
+		requiredState := ceremony.AuthStateReadyToIssueCode
 		if authContext.AuthState != requiredState {
 			rejectAuthStateMismatch(httpHelper, w, r, requiredState, authContext.AuthState)
 			return
@@ -416,7 +417,7 @@ func HandleIssueGet(
 
 		// Authorization Code Flow
 
-		createCodeInput := &oauthprovider.CreateCodeInput{
+		createCodeInput := &issuance.CreateCodeInput{
 			AuthContext:       *authContext,
 			SessionIdentifier: sessionIdentifier,
 		}
@@ -484,7 +485,7 @@ func HandleIssueGet(
 				// re-reads the registration on its way out and withholds the redirect, so a deleted
 				// client is told on an interstitial rather than by a redirect to an address nobody
 				// owns any more (#248 part 5).
-				if errors.Is(err, oauthprovider.ErrIssuingClientGone) {
+				if errors.Is(err, issuance.ErrIssuingClientGone) {
 					slog.WarnContext(r.Context(), "the client this ceremony is issuing for no longer exists, refusing to issue a code",
 						"client_identifier", authContext.ClientId,
 						"session_identifier", sessionIdentifier)
@@ -578,7 +579,7 @@ func refuseIssuanceUnusableSession(
 	w http.ResponseWriter,
 	r *http.Request,
 	shape sessionRefusalShape,
-	authContext *oauthprovider.AuthContext,
+	authContext *ceremony.AuthContext,
 	issuingClient *models.Client,
 	ambientSession *models.UserSession,
 	sessionIdentifier string,
@@ -681,7 +682,7 @@ func refuseIssuanceUnusableSession(
 		slog.WarnContext(r.Context(), "the session backing this ceremony is gone, restarting level 1 instead of issuing a code",
 			"session_identifier", sessionIdentifier)
 	}
-	authContext.AuthState = oauthprovider.AuthStateRequiresLevel1
+	authContext.AuthState = ceremony.AuthStateRequiresLevel1
 	err := authHelper.SaveAuthContext(w, r, authContext)
 	if err != nil {
 		httpHelper.InternalServerError(w, r, err)
@@ -699,7 +700,7 @@ func refuseIssuanceUnusableSession(
 func handleImplicitFlow(
 	w http.ResponseWriter,
 	r *http.Request,
-	authContext *oauthprovider.AuthContext,
+	authContext *ceremony.AuthContext,
 	sessionIdentifier string,
 	client *models.Client,
 	user *models.User,
@@ -726,7 +727,7 @@ func handleImplicitFlow(
 	}
 
 	// Generate tokens
-	implicitInput := &oauthprovider.ImplicitGrantInput{
+	implicitInput := &issuance.ImplicitGrantInput{
 		Client:            client,
 		User:              user,
 		Scope:             scope,
@@ -771,7 +772,7 @@ func issueImplicitTokens(
 	r *http.Request,
 	redirectURI string,
 	state string,
-	tokenResponse *oauthprovider.ImplicitGrantResponse,
+	tokenResponse *issuance.ImplicitGrantResponse,
 ) error {
 	// Gate 4, the last resort. This flow hands over access and ID tokens rather than a code, so a
 	// redirect URI that resolves to a host the operator never registered exfiltrates credentials

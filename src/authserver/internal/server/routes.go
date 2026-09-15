@@ -7,6 +7,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers"
 	"github.com/leodip/goiabada/authserver/internal/handlers/apihandlers"
+	"github.com/leodip/goiabada/authserver/internal/issuance"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/core/communication"
 	"github.com/leodip/goiabada/core/config"
@@ -14,7 +15,6 @@ import (
 	"github.com/leodip/goiabada/core/handlerhelpers"
 	core_middleware "github.com/leodip/goiabada/core/middleware"
 	oauthdb "github.com/leodip/goiabada/core/oauthdb"
-	"github.com/leodip/goiabada/core/oauthprovider"
 	"github.com/leodip/goiabada/core/otp"
 	"github.com/leodip/goiabada/core/user"
 	"github.com/leodip/goiabada/core/validators"
@@ -38,10 +38,10 @@ func (s *Server) initRoutes(root chi.Router) {
 	phoneValidator := validators.NewPhoneValidator()
 	identifierValidator := validators.NewIdentifierValidator()
 
-	codeIssuer := oauthprovider.NewCodeIssuer(s.database)
+	codeIssuer := issuance.NewCodeIssuer(s.database)
 	userSessionManager := user.NewUserSessionManager(s.sessionStore, constants.AuthServerSessionName, s.database)
 	otpSecretGenerator := otp.NewOTPSecretGenerator()
-	tokenIssuer := oauthprovider.NewTokenIssuer(s.database, s.baseURL)
+	tokenIssuer := issuance.NewTokenIssuer(s.database, s.baseURL)
 	userCreator := user.NewUserCreator(s.database)
 	emailSender := communication.NewEmailSender()
 

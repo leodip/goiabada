@@ -1,4 +1,4 @@
-package oauthprovider
+package ceremony
 
 import (
 	"regexp"

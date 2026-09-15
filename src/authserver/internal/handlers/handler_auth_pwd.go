@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
@@ -16,7 +17,6 @@ import (
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/leodip/goiabada/core/oauthprovider"
 )
 
 func HandleAuthPwdGet(
@@ -39,7 +39,7 @@ func HandleAuthPwdGet(
 			return
 		}
 
-		requiredState := oauthprovider.AuthStateLevel1Password
+		requiredState := ceremony.AuthStateLevel1Password
 		if authContext.AuthState != requiredState {
 			rejectAuthStateMismatch(httpHelper, w, r, requiredState, authContext.AuthState)
 			return
@@ -141,7 +141,7 @@ func HandleAuthPwdPost(
 			return
 		}
 
-		requiredState := oauthprovider.AuthStateLevel1Password
+		requiredState := ceremony.AuthStateLevel1Password
 		if authContext.AuthState != requiredState {
 			rejectAuthStateMismatch(httpHelper, w, r, requiredState, authContext.AuthState)
 			return
@@ -298,7 +298,7 @@ func HandleAuthPwdPost(
 		// handler also sets AuthenticatedAt, and level 2 alone must not stand in for level 1
 		// at the gate in handler_auth_completed (#129 decisions 6 and 15).
 		authContext.Level1AuthCompleted = true
-		authContext.AuthState = oauthprovider.AuthStateLevel1PasswordCompleted
+		authContext.AuthState = ceremony.AuthStateLevel1PasswordCompleted
 
 		// Rotate the browser session's identifier here, the instant a credential is
 		// accepted, and not only at /auth/completed where the user session is minted.

@@ -11,11 +11,11 @@ import (
 	"time"
 
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
+	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/leodip/goiabada/core/oauthprovider"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
@@ -43,8 +43,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		// SSO reuse: AuthenticatedAt is nil (not set by password handler)
-		authContext := &oauthprovider.AuthContext{
-			AuthState: oauthprovider.AuthStateAuthenticationCompleted,
+		authContext := &ceremony.AuthContext{
+			AuthState: ceremony.AuthStateAuthenticationCompleted,
 			ClientId:  "test-client",
 			UserId:    1,
 			Scope:     "openid profile",
@@ -93,8 +93,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", "openid profile", user).Return("openid profile", nil)
 
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
-			return ac.AuthState == oauthprovider.AuthStateReadyToIssueCode &&
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+			return ac.AuthState == ceremony.AuthStateReadyToIssueCode &&
 				ac.AuthenticatedAt != nil && ac.AuthenticatedAt.Equal(sessionAuthTime)
 		})).Return(nil)
 
@@ -187,8 +187,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		// session: prompt=login and an id_token_hint naming someone else both arrive here
 		// in exactly this shape.
 		pwdAuthTime := time.Now().UTC()
-		authContext := &oauthprovider.AuthContext{
-			AuthState:           oauthprovider.AuthStateAuthenticationCompleted,
+		authContext := &ceremony.AuthContext{
+			AuthState:           ceremony.AuthStateAuthenticationCompleted,
 			ClientId:            "test-client",
 			UserId:              2,
 			Scope:               "openid profile",
@@ -291,8 +291,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		// level1, the target, rather than the maximum taken with the other user's
 		// level2_mandatory. This is the assertion the higher ambient ACR above exists for.
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
-			return ac.AuthState == oauthprovider.AuthStateReadyToIssueCode &&
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+			return ac.AuthState == ceremony.AuthStateReadyToIssueCode &&
 				ac.AcrLevel == enums.AcrLevel1.String() &&
 				ac.AuthenticatedAt != nil && ac.AuthenticatedAt.Equal(newAuthTime)
 		})).Return(nil)
@@ -371,8 +371,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		pwdAuthTime := time.Now().UTC()
-		authContext := &oauthprovider.AuthContext{
-			AuthState:           oauthprovider.AuthStateAuthenticationCompleted,
+		authContext := &ceremony.AuthContext{
+			AuthState:           ceremony.AuthStateAuthenticationCompleted,
 			ClientId:            "test-client",
 			UserId:              2,
 			Scope:               "openid profile",
@@ -437,8 +437,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", "openid profile", user).Return("openid profile", nil)
 
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
-			return ac.AuthState == oauthprovider.AuthStateReadyToIssueCode &&
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+			return ac.AuthState == ceremony.AuthStateReadyToIssueCode &&
 				ac.AcrLevel == enums.AcrLevel1.String() &&
 				ac.AuthenticatedAt != nil && ac.AuthenticatedAt.Equal(newAuthTime)
 		})).Return(nil)
@@ -475,8 +475,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		pwdAuthTime := time.Now().UTC()
-		authContext := &oauthprovider.AuthContext{
-			AuthState:           oauthprovider.AuthStateAuthenticationCompleted,
+		authContext := &ceremony.AuthContext{
+			AuthState:           ceremony.AuthStateAuthenticationCompleted,
 			ClientId:            "test-client",
 			UserId:              1,
 			Scope:               "openid profile",
@@ -538,8 +538,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		// The same-user half of decision 3: the expired row's level2_mandatory does not raise
 		// the acr of a token bound to the level1 session this ceremony just created.
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
-			return ac.AuthState == oauthprovider.AuthStateReadyToIssueCode &&
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+			return ac.AuthState == ceremony.AuthStateReadyToIssueCode &&
 				ac.AcrLevel == enums.AcrLevel1.String() &&
 				ac.AuthenticatedAt != nil && ac.AuthenticatedAt.Equal(newAuthTime)
 		})).Return(nil)
@@ -583,8 +583,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		pwdAuthTime := time.Now().UTC()
-		authContext := &oauthprovider.AuthContext{
-			AuthState:           oauthprovider.AuthStateAuthenticationCompleted,
+		authContext := &ceremony.AuthContext{
+			AuthState:           ceremony.AuthStateAuthenticationCompleted,
 			ClientId:            "test-client",
 			UserId:              2,
 			Scope:               "openid profile",
@@ -692,8 +692,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		pwdAuthTime := time.Now().UTC()
-		authContext := &oauthprovider.AuthContext{
-			AuthState:           oauthprovider.AuthStateAuthenticationCompleted,
+		authContext := &ceremony.AuthContext{
+			AuthState:           ceremony.AuthStateAuthenticationCompleted,
 			ClientId:            "test-client",
 			UserId:              2,
 			Scope:               "openid profile",
@@ -806,8 +806,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		// are two different times whenever the browser pauses, and only an old capture can tell
 		// the two apart. "now" would pass against either behaviour (#252 decision 8).
 		pwdAuthTime := time.Now().UTC().Add(-90 * time.Minute)
-		authContext := &oauthprovider.AuthContext{
-			AuthState:       oauthprovider.AuthStateAuthenticationCompleted,
+		authContext := &ceremony.AuthContext{
+			AuthState:       ceremony.AuthStateAuthenticationCompleted,
 			ClientId:        "test-client",
 			UserId:          1,
 			Scope:           "openid profile",
@@ -866,8 +866,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		// And the context carries that same instant onward, which is what /auth/issue stamps
 		// onto the code and the token issuer then signs as auth_time.
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
-			return ac.AuthState == oauthprovider.AuthStateReadyToIssueCode &&
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+			return ac.AuthState == ceremony.AuthStateReadyToIssueCode &&
 				ac.AuthenticatedAt != nil && ac.AuthenticatedAt.Equal(pwdAuthTime)
 		})).Return(nil)
 
@@ -908,8 +908,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		// Non-nil but zero, which is what an AuthContext round-tripped through the cookie
 		// yields for an absent RFC 3339 timestamp.
 		var zeroAuthenticatedAt time.Time
-		authContext := &oauthprovider.AuthContext{
-			AuthState:       oauthprovider.AuthStateAuthenticationCompleted,
+		authContext := &ceremony.AuthContext{
+			AuthState:       ceremony.AuthStateAuthenticationCompleted,
 			ClientId:        "test-client",
 			UserId:          1,
 			Scope:           "openid profile",
@@ -961,8 +961,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", "openid profile", user).Return("openid profile", nil)
 
 		// The session's existing AuthTime is carried forward rather than replaced.
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
-			return ac.AuthState == oauthprovider.AuthStateReadyToIssueCode &&
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+			return ac.AuthState == ceremony.AuthStateReadyToIssueCode &&
 				ac.AuthenticatedAt != nil && ac.AuthenticatedAt.Equal(sessionAuthTime)
 		})).Return(nil)
 
@@ -1001,8 +1001,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		// the handler forwards the captured credential instant rather than reading the clock:
 		// with "now" the assertion would pass against either behaviour (#252 decision 8).
 		pwdAuthTime := time.Now().UTC().Add(-90 * time.Minute)
-		authContext := &oauthprovider.AuthContext{
-			AuthState:   oauthprovider.AuthStateAuthenticationCompleted,
+		authContext := &ceremony.AuthContext{
+			AuthState:   ceremony.AuthStateAuthenticationCompleted,
 			ClientId:    "test-client",
 			UserId:      1,
 			Scope:       "openid profile",
@@ -1059,8 +1059,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", "openid profile", user).Return("openid profile", nil)
 
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
-			return ac.AuthState == oauthprovider.AuthStateReadyToIssueCode &&
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+			return ac.AuthState == ceremony.AuthStateReadyToIssueCode &&
 				ac.AuthenticatedAt != nil && ac.AuthenticatedAt.Equal(sessionAuthTime)
 		})).Return(nil)
 
@@ -1103,8 +1103,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		// 4 rather than 0, so the assertion below cannot also pass against a hard-coded zero.
 		captured := int64(4)
-		authContext := &oauthprovider.AuthContext{
-			AuthState:           oauthprovider.AuthStateAuthenticationCompleted,
+		authContext := &ceremony.AuthContext{
+			AuthState:           ceremony.AuthStateAuthenticationCompleted,
 			ClientId:            "test-client",
 			UserId:              1,
 			Scope:               "openid profile",
@@ -1161,8 +1161,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", "openid profile", user).Return("openid profile", nil)
 
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
-			return ac.AuthState == oauthprovider.AuthStateReadyToIssueCode
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+			return ac.AuthState == ceremony.AuthStateReadyToIssueCode
 		})).Return(nil)
 
 		handler.ServeHTTP(rr, req)
@@ -1199,8 +1199,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		captured := int64(4)
-		authContext := &oauthprovider.AuthContext{
-			AuthState:           oauthprovider.AuthStateAuthenticationCompleted,
+		authContext := &ceremony.AuthContext{
+			AuthState:           ceremony.AuthStateAuthenticationCompleted,
 			ClientId:            "test-client",
 			UserId:              1,
 			Scope:               "openid profile",
@@ -1253,8 +1253,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", "openid profile", user).Return("openid profile", nil)
 
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
-			return ac.AuthState == oauthprovider.AuthStateReadyToIssueCode
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+			return ac.AuthState == ceremony.AuthStateReadyToIssueCode
 		})).Return(nil)
 
 		handler.ServeHTTP(rr, req)
@@ -1291,8 +1291,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		rr := httptest.NewRecorder()
 
-		authContext := &oauthprovider.AuthContext{
-			AuthState:   oauthprovider.AuthStateAuthenticationCompleted,
+		authContext := &ceremony.AuthContext{
+			AuthState:   ceremony.AuthStateAuthenticationCompleted,
 			ClientId:    "test-client",
 			UserId:      1,
 			Scope:       "openid profile",
@@ -1344,8 +1344,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", "openid profile", user).Return("openid profile", nil)
 
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
-			return ac.AuthState == oauthprovider.AuthStateReadyToIssueCode
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+			return ac.AuthState == ceremony.AuthStateReadyToIssueCode
 		})).Return(nil)
 
 		handler.ServeHTTP(rr, req)
@@ -1381,8 +1381,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		captured := int64(4)
 		pwdAuthTime := time.Now().UTC()
-		authContext := &oauthprovider.AuthContext{
-			AuthState:           oauthprovider.AuthStateAuthenticationCompleted,
+		authContext := &ceremony.AuthContext{
+			AuthState:           ceremony.AuthStateAuthenticationCompleted,
 			ClientId:            "test-client",
 			UserId:              1,
 			Scope:               "openid profile",
@@ -1432,8 +1432,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", "openid profile", user).Return("openid profile", nil)
 
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
-			return ac.AuthState == oauthprovider.AuthStateReadyToIssueCode
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+			return ac.AuthState == ceremony.AuthStateReadyToIssueCode
 		})).Return(nil)
 
 		handler.ServeHTTP(rr, req)
@@ -1496,8 +1496,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		rr := httptest.NewRecorder()
 
-		authContext := &oauthprovider.AuthContext{
-			AuthState: oauthprovider.AuthStateInitial,
+		authContext := &ceremony.AuthContext{
+			AuthState: ceremony.AuthStateInitial,
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
@@ -1523,8 +1523,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		rr := httptest.NewRecorder()
 
-		authContext := &oauthprovider.AuthContext{
-			AuthState: oauthprovider.AuthStateAuthenticationCompleted,
+		authContext := &ceremony.AuthContext{
+			AuthState: ceremony.AuthStateAuthenticationCompleted,
 			ClientId:  "test-client",
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
@@ -1564,8 +1564,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		// SSO reuse: AuthenticatedAt is nil
-		authContext := &oauthprovider.AuthContext{
-			AuthState:    oauthprovider.AuthStateAuthenticationCompleted,
+		authContext := &ceremony.AuthContext{
+			AuthState:    ceremony.AuthStateAuthenticationCompleted,
 			ClientId:     "test-client",
 			UserId:       1,
 			Scope:        "openid profile",
@@ -1664,8 +1664,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		rr := httptest.NewRecorder()
 
-		authContext := &oauthprovider.AuthContext{
-			AuthState:    oauthprovider.AuthStateAuthenticationCompleted,
+		authContext := &ceremony.AuthContext{
+			AuthState:    ceremony.AuthStateAuthenticationCompleted,
 			ClientId:     "test-client",
 			UserId:       1,
 			Scope:        "openid profile",
@@ -1758,8 +1758,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		rr := httptest.NewRecorder()
 
-		authContext := &oauthprovider.AuthContext{
-			AuthState:    oauthprovider.AuthStateAuthenticationCompleted,
+		authContext := &ceremony.AuthContext{
+			AuthState:    ceremony.AuthStateAuthenticationCompleted,
 			ClientId:     "test-client",
 			UserId:       1,
 			Scope:        "openid profile",
@@ -1848,8 +1848,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		rr := httptest.NewRecorder()
 
-		authContext := &oauthprovider.AuthContext{
-			AuthState:    oauthprovider.AuthStateAuthenticationCompleted,
+		authContext := &ceremony.AuthContext{
+			AuthState:    ceremony.AuthStateAuthenticationCompleted,
 			ClientId:     "test-client",
 			UserId:       1,
 			Scope:        "openid profile",
@@ -1932,8 +1932,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		// SSO reuse: AuthenticatedAt is nil
-		authContext := &oauthprovider.AuthContext{
-			AuthState:    oauthprovider.AuthStateAuthenticationCompleted,
+		authContext := &ceremony.AuthContext{
+			AuthState:    ceremony.AuthStateAuthenticationCompleted,
 			ClientId:     "test-client",
 			UserId:       1,
 			Scope:        "openid profile",
@@ -2030,8 +2030,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		rr := httptest.NewRecorder()
 
-		authContext := &oauthprovider.AuthContext{
-			AuthState:    oauthprovider.AuthStateAuthenticationCompleted,
+		authContext := &ceremony.AuthContext{
+			AuthState:    ceremony.AuthStateAuthenticationCompleted,
 			ClientId:     "test-client",
 			UserId:       1,
 			Scope:        "openid profile",
@@ -2117,8 +2117,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		rr := httptest.NewRecorder()
 
-		authContext := &oauthprovider.AuthContext{
-			AuthState:    oauthprovider.AuthStateAuthenticationCompleted,
+		authContext := &ceremony.AuthContext{
+			AuthState:    ceremony.AuthStateAuthenticationCompleted,
 			ClientId:     "test-client",
 			UserId:       1,
 			Scope:        "openid profile",
@@ -2202,8 +2202,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
 		rr := httptest.NewRecorder()
 
-		authContext := &oauthprovider.AuthContext{
-			AuthState:    oauthprovider.AuthStateAuthenticationCompleted,
+		authContext := &ceremony.AuthContext{
+			AuthState:    ceremony.AuthStateAuthenticationCompleted,
 			ClientId:     "test-client",
 			UserId:       1,
 			Scope:        "openid profile",
@@ -2287,8 +2287,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		// Positive control for the #129 gate, as in the subtest above.
 		pwdAuthTime := time.Now().UTC()
-		authContext := &oauthprovider.AuthContext{
-			AuthState:   oauthprovider.AuthStateAuthenticationCompleted,
+		authContext := &ceremony.AuthContext{
+			AuthState:   ceremony.AuthStateAuthenticationCompleted,
 			ClientId:    "test-client",
 			UserId:      1,
 			Scope:       "openid profile",
@@ -2342,8 +2342,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", "openid profile", user).Return("openid profile", nil)
 
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
-			return ac.AuthState == oauthprovider.AuthStateRequiresConsent &&
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+			return ac.AuthState == ceremony.AuthStateRequiresConsent &&
 				ac.AuthenticatedAt != nil && ac.AuthenticatedAt.Equal(sessionAuthTime)
 		})).Return(nil)
 
@@ -2376,8 +2376,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		// Positive control for the #129 gate, as in the two subtests above.
 		pwdAuthTime := time.Now().UTC()
-		authContext := &oauthprovider.AuthContext{
-			AuthState:   oauthprovider.AuthStateAuthenticationCompleted,
+		authContext := &ceremony.AuthContext{
+			AuthState:   ceremony.AuthStateAuthenticationCompleted,
 			ClientId:    "test-client",
 			UserId:      1,
 			Scope:       "openid profile offline_access",
@@ -2430,8 +2430,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", "openid profile offline_access", user).Return("openid profile offline_access", nil)
 
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
-			return ac.AuthState == oauthprovider.AuthStateRequiresConsent &&
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+			return ac.AuthState == ceremony.AuthStateRequiresConsent &&
 				ac.AuthenticatedAt != nil && ac.AuthenticatedAt.Equal(sessionAuthTime)
 		})).Return(nil)
 
@@ -2479,8 +2479,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		// generation onto the context and never reached the password handler, so both
 		// AuthenticatedAt and Level1AuthCompleted are unset. The session was then ended
 		// mid-flight.
-		authContext := &oauthprovider.AuthContext{
-			AuthState:           oauthprovider.AuthStateAuthenticationCompleted,
+		authContext := &ceremony.AuthContext{
+			AuthState:           ceremony.AuthStateAuthenticationCompleted,
 			ClientId:            "test-client",
 			UserId:              1,
 			Scope:               "openid profile",
@@ -2512,8 +2512,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		userSessionManager.On("HasValidUserSession", mock.Anything, (*models.UserSession)(nil), mock.AnythingOfType("*int")).Return(false)
 
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
-			return ac.AuthState == oauthprovider.AuthStateRequiresLevel1
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+			return ac.AuthState == ceremony.AuthStateRequiresLevel1
 		})).Return(nil)
 
 		handler.ServeHTTP(rr, req)
@@ -2548,8 +2548,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		// code, but no password was ever entered, so Level1AuthCompleted stays false. A gate
 		// reading userReallyAuthenticated recreates the session here; this gate must not.
 		otpAuthTime := time.Now().UTC()
-		authContext := &oauthprovider.AuthContext{
-			AuthState:           oauthprovider.AuthStateAuthenticationCompleted,
+		authContext := &ceremony.AuthContext{
+			AuthState:           ceremony.AuthStateAuthenticationCompleted,
 			ClientId:            "test-client",
 			UserId:              1,
 			Scope:               "openid profile",
@@ -2581,8 +2581,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		userSessionManager.On("HasValidUserSession", mock.Anything, (*models.UserSession)(nil), mock.AnythingOfType("*int")).Return(false)
 
-		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *oauthprovider.AuthContext) bool {
-			return ac.AuthState == oauthprovider.AuthStateRequiresLevel1
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+			return ac.AuthState == ceremony.AuthStateRequiresLevel1
 		})).Return(nil)
 
 		handler.ServeHTTP(rr, req)
