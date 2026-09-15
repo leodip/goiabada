@@ -1,4 +1,4 @@
-package oauthprovider
+package signingkeys
 
 import (
 	"database/sql"

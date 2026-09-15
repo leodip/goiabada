@@ -105,7 +105,6 @@ A row whose owner is not `kernel` names the issue that moves it. A `kernel` row 
 | `core/models` | authserver | #359 |
 | `core/oauth` | kernel | — |
 | `core/oauthdb` | authserver | #339 |
-| `core/oauthprovider` | authserver | #339 |
 | `core/oidc` | authserver | #360 |
 | `core/otp` | authserver | #346 |
 | `core/phonecountries` | authserver | #344 |
@@ -138,8 +137,8 @@ Notes on rows that are not self-evident:
   left every exception row below standing, so the two are one issue.
 - `core/oauth` is the largest split. The admin console is an OAuth client: it needs token response
   values, PKCE and JWT/JWKS validation. It does not issue codes or tokens and does not rotate
-  signing keys. #338 drew that line: the provider half is `core/oauthprovider`, which #339 carries
-  to the auth server whole.
+  signing keys. #338 drew that line: the provider half was `core/oauthprovider`, which #339 carried
+  to the auth server whole, as `authserver/internal/ceremony`, `issuance` and `signingkeys`.
 
 ## Rules
 
