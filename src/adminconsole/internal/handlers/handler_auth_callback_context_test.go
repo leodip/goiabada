@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
@@ -31,10 +32,11 @@ import (
 // cancelled leaks its timer until it fires -- and means the context is already
 // done by the time the handler has returned and the assertions run.
 type contextRecordingExchanger struct {
-	called   bool
-	ctxErr   error
-	deadline time.Time
-	hasLimit bool
+	called    bool
+	ctxErr    error
+	deadline  time.Time
+	hasLimit  bool
+	requestID string
 }
 
 func (e *contextRecordingExchanger) ExchangeCodeForTokens(ctx context.Context, code, redirectURI,
@@ -42,6 +44,7 @@ func (e *contextRecordingExchanger) ExchangeCodeForTokens(ctx context.Context, c
 	e.called = true
 	e.ctxErr = ctx.Err()
 	e.deadline, e.hasLimit = ctx.Deadline()
+	e.requestID = chimiddleware.GetReqID(ctx)
 	return nil, errs.New("the auth server refused the code")
 }
 
@@ -78,7 +81,13 @@ func TestHandleAuthCallbackPost_DetachesTheExchangeFromTheBrowsersContext(t *tes
 	req := httptest.NewRequest(http.MethodPost, "/auth/callback", strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	ctx, cancel := context.WithCancel(req.Context())
+	// The inbound context carries a request id, which is the value the detachment is
+	// required to keep: chi's RequestID middleware puts one on every inbound request and
+	// the installed slog handler lifts it off the context onto every record, so
+	// context.Background() here would silence this exchange in the operator's log.
+	const wantRequestID = "the-inbound-request-id"
+	ctx, cancel := context.WithCancel(
+		context.WithValue(req.Context(), chimiddleware.RequestIDKey, wantRequestID))
 	cancel()
 	req = req.WithContext(ctx)
 
@@ -100,4 +109,11 @@ func TestHandleAuthCallbackPost_DetachesTheExchangeFromTheBrowsersContext(t *tes
 	// asserts nothing (#338).
 	assert.Greater(t, time.Until(exchanger.deadline), oauth.TokenExchangeTimeout-time.Second,
 		"and by that value rather than by something shorter")
+
+	// Detached from the cancellation and from nothing else. WithoutCancel keeps the
+	// request's values where context.Background() would drop them, and the request id is
+	// the one this tree reads back: every record the exchange writes is correlated by it
+	// (#338).
+	assert.Equal(t, wantRequestID, exchanger.requestID,
+		"the detached exchange keeps the request's values, so request_id still reaches its records")
 }
