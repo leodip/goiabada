@@ -1309,16 +1309,23 @@ func (rt *recordingTransport) RoundTrip(r *http.Request) (*http.Response, error)
 	return rt.inner.RoundTrip(r)
 }
 
-// Decision 12, the refresh_token half. refresh_token is single use: the auth
-// server revokes the old token as part of issuing the new one, so a refresh
-// abandoned because the browser went away leaves the console holding a revoked
-// token and signs the administrator out on their next page load. The inbound
-// request here is already cancelled, which is exactly that situation, and the
-// refresh has to complete anyway.
+// refresh_token is single use: the auth server revokes the old token as part of
+// issuing the new one, so a refresh abandoned because the browser went away leaves
+// the console holding a revoked token and signs the administrator out on their next
+// page load. The inbound request here is already cancelled, which is exactly that
+// situation, and the refresh has to complete anyway.
+//
+// Completing means the new token is written down, not merely received, so the
+// session read and write that follow the call are asserted here too: the real
+// ServerSideStore passes the request's context straight to its backend and refuses
+// both on a cancelled one, which would leave the administrator holding the revoked
+// token with the replacement fetched and dropped. The store double cannot show that
+// by failing -- it saves whatever the context says -- so the case reads the context
+// the store was handed instead.
 //
 // A real httptest.Server rather than a mock client, because a cancelled context
 // is refused by the transport and not by anything above it: a double that
-// ignores the context would pass this with r.Context() restored.
+// ignores the context would pass this with r.Context() restored (#338).
 func TestJwtSessionHandler_RefreshesOnACancelledRequestContext(t *testing.T) {
 	const testSessionName = "test-session"
 
@@ -1352,8 +1359,25 @@ func TestJwtSessionHandler_RefreshesOnACancelledRequestContext(t *testing.T) {
 			},
 		},
 	}
-	mockSessionStore.On("Get", mock.Anything, testSessionName).Return(session, nil)
-	mockSessionStore.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	// The context each store call was handed, captured at the call: the handler cancels
+	// the detached context on its way out, so reading it afterwards would show it done
+	// whatever was passed.
+	var getCtxErr, saveCtxErr error
+	var saveDeadline time.Time
+	var saveHadDeadline bool
+	mockSessionStore.On("Get", mock.Anything, testSessionName).Return(session, nil).
+		Run(func(args mock.Arguments) {
+			if req, ok := args.Get(0).(*http.Request); ok {
+				getCtxErr = req.Context().Err()
+			}
+		})
+	mockSessionStore.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(nil).
+		Run(func(args mock.Arguments) {
+			if req, ok := args.Get(0).(*http.Request); ok {
+				saveCtxErr = req.Context().Err()
+				saveDeadline, saveHadDeadline = req.Context().Deadline()
+			}
+		})
 
 	// The expired access token is what sends the middleware down the refresh path.
 	mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "oldaccesstoken",
@@ -1395,4 +1419,17 @@ func TestJwtSessionHandler_RefreshesOnACancelledRequestContext(t *testing.T) {
 		"bounded by TokenExchangeTimeout")
 	assert.Greater(t, time.Until(transport.deadline), oauth.TokenExchangeTimeout-time.Second,
 		"and by that value rather than by something shorter")
+
+	// And the writing half. Receiving the token is not the point; recording it is, and the
+	// store is the only thing that does. Handing it the browser's request leaves these two
+	// calls refused by any store that honours the context, with the old token already
+	// revoked by the auth server.
+	assert.NoError(t, getCtxErr,
+		"the session read after the refresh runs on the detached context too")
+	assert.NoError(t, saveCtxErr,
+		"and so does the save that records the new token")
+	require.True(t, saveHadDeadline,
+		"still bounded: the save shares the call's deadline rather than running unbounded")
+	assert.LessOrEqual(t, time.Until(saveDeadline), oauth.TokenExchangeTimeout,
+		"and it is the same deadline, not a fresh one")
 }

@@ -1,4 +1,4 @@
-package oauthprovider
+package oauth
 
 import "strings"
 

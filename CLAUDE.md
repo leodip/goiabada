@@ -24,7 +24,7 @@ repository root. It is enforced rather than descriptive: see **Architecture guar
 ### Core (`src/core/`)
 - `models/` - All domain models (Client, User, Permission, Group, etc.)
 - `data/` - Database interface + implementations (commondb/, mysqldb/, postgresdb/, sqlitedb/, mssqldb/)
-- `oauth/` - Shared OAuth/OIDC client surface: JWT/JWKS parsing, token exchange, PKCE
+- `oauth/` - Shared OAuth/OIDC client surface: JWT/JWKS parsing, token exchange, PKCE, response_type parsing
 - `oauthprovider/` - Provider-side issuance: codes, tokens, key rotation, ceremony context
 - `validators/` - Input validation (authorize, token, email, password, etc.)
 - `config/` - Configuration from environment variables

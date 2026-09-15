@@ -18,6 +18,7 @@ import (
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/oauthprovider"
 	"github.com/leodip/goiabada/core/urlutil"
 )
@@ -263,7 +264,7 @@ func HandleIssueGet(
 		// this handler above it. The later backstops cannot cover that: a third-party
 		// resource server validating an already-signed token has no way to compare the
 		// session's owner against the token's subject (#133).
-		isImplicitFlow := oauthprovider.ParseResponseType(authContext.ResponseType).IsImplicitFlow()
+		isImplicitFlow := oauth.ParseResponseType(authContext.ResponseType).IsImplicitFlow()
 
 		// nil for the requested max age, and that is decision 1 rather than an omission. max_age
 		// bounds the age of the AUTHENTICATION, which this ceremony already satisfied at
@@ -707,7 +708,7 @@ func handleImplicitFlow(
 	auditLogger AuditLogger,
 ) error {
 	// Determine what tokens to issue based on response_type
-	rtInfo := oauthprovider.ParseResponseType(authContext.ResponseType)
+	rtInfo := oauth.ParseResponseType(authContext.ResponseType)
 	issueAccessToken := rtInfo.HasToken
 	issueIdToken := rtInfo.HasIdToken
 

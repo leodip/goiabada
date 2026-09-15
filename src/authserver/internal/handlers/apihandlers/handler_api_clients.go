@@ -854,7 +854,7 @@ func HandleAPIClientRedirectURIsPut(
 		// (#250).
 		//
 		// These two flags are the complete enumeration of redirect-based flows here:
-		// oauthprovider.ResponseTypeInfo.IsImplicitFlow treats any response type containing "code" as not
+		// oauth.ResponseTypeInfo.IsImplicitFlow treats any response type containing "code" as not
 		// implicit, so nothing outside the pair can produce a redirect.
 		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
 		if !client.AuthorizationCodeEnabled && !client.IsImplicitGrantEnabled(settings.ImplicitFlowEnabled) {
