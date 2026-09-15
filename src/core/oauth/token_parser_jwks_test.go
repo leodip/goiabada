@@ -150,7 +150,13 @@ func TestNewJWKSTokenParser_BuildsCertsURL(t *testing.T) {
 
 func TestNewJWKSTokenParser_DefaultsHttpClient(t *testing.T) {
 	tp := NewJWKSTokenParser("https://auth.example.com", nil)
-	assert.NotNil(t, tp.httpClient)
+	require.NotNil(t, tp.httpClient)
+	// The value, not merely a client: a nil client used to mean an unbounded one, and
+	// asserting non-nil alone leaves restoring `&http.Client{}` green. This is the same
+	// guarantee TestNewTokenExchanger_DefaultsANilClientToTheConfiguredTimeout pins for
+	// the exchanger's own nil arm (#338).
+	assert.Equal(t, TokenExchangeTimeout, tp.httpClient.Timeout,
+		"a nil client gets the deadline rather than no deadline")
 
 	custom := &http.Client{Timeout: time.Second}
 	tp = NewJWKSTokenParser("https://auth.example.com", custom)
