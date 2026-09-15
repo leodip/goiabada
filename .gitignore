@@ -426,9 +426,9 @@ src/todo.txt
 
 
 # /docs/ and .review/ were excluded here until 2026-09-14. Both held the working
-# memory of a piece of work -- the agreement /leo-spec writes, and the mailbox,
+# memory of a piece of work -- the agreement /gbd-spec writes, and the mailbox,
 # state and transcript of the run that executes it -- and both have moved out of
-# the repository entirely, into one untracked folder per issue under $LEO_WORK_DIR.
+# the repository entirely, into one untracked folder per issue under $GBD_WORK_DIR.
 # Nothing writes either path now, so there is nothing left to ignore.
 #
 # Two things learned here that are worth keeping, should anything be excluded at
