@@ -339,7 +339,7 @@ a walk that reached nothing into `Fatalf`. The reporting half takes a `testutil.
 exported `Assert*` keeps its `*testing.T` and delegates, so no caller moves. Both halves are then
 driven from a rule test: the finder directly, the reporting half through `testutil.RunGuard`, which
 runs it on its own goroutine so a recorded `Fatalf` ends it in `runtime.Goexit` the way the real one
-does. Thirteen guards follow this -- nine in `core/testutil`, plus `core/data`'s begin-transaction,
+does. Fourteen guards follow this -- ten in `core/testutil`, plus `core/data`'s begin-transaction,
 benign-sentinel and page-offset lints and the auth server's API error-code lint. Each owes three
 cases: a tree that must fail, a tree that must pass, and the walk that reached nothing. Without the
 last two the first proves nothing, and without the reporting half under test a defect in the five
@@ -377,10 +377,28 @@ against the file for the engine it is running on. A migration therefore has one 
 `cd src/core && go run ./cmd/schemadump` inside the dev container, which regenerates all four
 files at once, and commit them. Skip it and CI goes red on every database job.
 
+**Generated mocks**: the `*_mock.go` files are written by mockery, at the version `versions.yaml`
+pins as `tools.mockery`, and committed. Regenerate with `src/authserver/generate-mocks.sh` inside
+the dev container, which refuses to run on any other version rather than stamp one that did not
+produce the output. Each generated file opens with `src/mockery-header.txt`, inlined by
+`template-data.boilerplate-file` in the two `.mockery.yaml` files and written from the pin by
+`./version-manager.sh update`, so a clone reads which generator wrote the tree instead of having to
+install one to find out. That is checked in both halves, because they catch different things: every
+module's unit tier runs `TestGeneratedMocksArePinned`, which holds the pin, the header and every
+generated file to each other through `core/testutil.AssertGeneratedMocksArePinned` and needs no
+generator; the lint tier and CI's Lint job run the generator itself and fail on a tree it changed,
+which is the only thing that catches an interface newly named in a config. Keying on mockery's own
+`Code generated ... DO NOT EDIT` marker rather than on the filename is what leaves
+`core/mocks/test_fs_mock.go`, which is hand-written, and the countries and timezones tables, which
+have generators of their own, out of it (#338).
+
 **Lint tier**: `./run-tests.sh --type lint` runs golangci-lint over the four modules with the
-command CI's Lint job uses, and `all` includes it. It fails rather than skips when the binary is
+command CI's Lint job uses, then regenerates the Tailwind CSS and the mocks and fails if either
+differs from what is committed; `all` includes it. It fails rather than skips when a binary is
 missing, and refuses `--race`. It is where `sloglint` holds most of the logging convention
-(pattern 8), which is why it is a tier of the script and not CI-only (#320).
+(pattern 8), which is why it is a tier of the script and not CI-only (#320). The two regeneration
+checks are here because each was CI-only and nothing local could see it: a template class that
+never reached `main.css` (#328) and sixteen mocks stale against their own pin (#338).
 
 **Migration source rules**: the core tier runs `TestMigrationSource_TheFourCommittedDirectories`
 in `src/core/data`, which holds the four `migrations/` directories to the rules decidable from the

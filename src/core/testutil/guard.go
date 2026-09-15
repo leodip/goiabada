@@ -32,7 +32,7 @@ import (
 // It is an interface rather than a testing.TB parameter because testing.TB cannot be implemented
 // outside the testing package -- it carries an unexported method precisely to prevent it -- so
 // there is no recording fake that satisfies it. It is exported rather than internal because four
-// of the thirteen guards live outside this package, in the _test.go files of core/data and of the
+// of the fourteen guards live outside this package, in the _test.go files of core/data and of the
 // auth server's apihandlers, and they report through the same harness.
 //
 // *testing.T satisfies it, so no exported guard signature changes and no caller moves.

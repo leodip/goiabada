@@ -231,7 +231,7 @@ func raise(auditLogger logger, r *http.Request) {
 }
 
 // TestAuditLogContext_TheGuardIsFatalOnAnEmptyWalk pins the seam, and this guard's scope makes it
-// the likeliest of the thirteen to trip it: the walk counts only files in a request-path package,
+// the likeliest of the fourteen to trip it: the walk counts only files in a request-path package,
 // so a directory dropping off slogRequestPathDirs empties it without emptying the tree.
 func TestAuditLogContext_TheGuardIsFatalOnAnEmptyWalk(t *testing.T) {
 	tree := newFixtureTree(t)

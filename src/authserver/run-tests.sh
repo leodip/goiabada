@@ -565,6 +565,51 @@ if should_run_lint; then
     fi
     gha_endgroup
     gha_summary_row "Generated CSS" "-" "pass" "$(fmt_duration $((SECONDS - start)))"
+
+    # The committed mocks are what the pinned mockery produces, checked by running it.
+    # The same property as CI's "Generated mocks are committed" step, and here for the
+    # reason the CSS check above is: that step is CI-only, and #338 is what being unable
+    # to see it locally costs. Sixteen committed mocks predated the versions.yaml pin, so
+    # generate-mocks.sh was not idempotent against its own tree and a change that
+    # regenerated for its own reasons collected sixteen files belonging to nobody.
+    #
+    # Every module's unit tier already holds each mock's header to the pin, through
+    # testutil.AssertGeneratedMocksArePinned, which needs no generator. This is the other
+    # half: an interface added to a .mockery.yaml that nobody generated, or a mock edited
+    # in its body, both of which leave the header right and the file wrong.
+    #
+    # Digests before and after rather than git: git cannot run in here, since a worktree's
+    # .git names the main checkout by host path. Comparing digests also means no snapshot
+    # and no restoring trap -- there is one EXIT trap already, and a second would replace
+    # it. A passing run writes nothing, because the generator produced the bytes that were
+    # already there; a failing one leaves the regenerated files in the tree on purpose,
+    # since reviewing and committing them is the whole of the fix.
+    log="$LOG_DIR/00-lint-mocks.log"
+    echo "Checking the generated mocks are committed... (log: $log)"
+    start=$SECONDS
+    gha_group "Generated mocks"
+    mocks_digest() { ( cd .. && find . -name '*_mock.go' -type f | sort | xargs sha256sum ); }
+    if ! (
+        mocks_digest > "$LOG_DIR/mocks-before.sha256"
+        ./generate-mocks.sh > "$LOG_DIR/mocks-generate.log" 2>&1 || {
+            echo "generate-mocks.sh failed; see $LOG_DIR/mocks-generate.log"
+            tail -20 "$LOG_DIR/mocks-generate.log"
+            exit 1
+        }
+        mocks_digest > "$LOG_DIR/mocks-after.sha256"
+        # The digests carry the path, so this names files added and removed as well as
+        # files rewritten, which is what an interface appearing in a config looks like.
+        if ! diff -u "$LOG_DIR/mocks-before.sha256" "$LOG_DIR/mocks-after.sha256"; then
+            echo "the committed mocks are not what the pinned mockery produces; the files above"
+            echo "have just been regenerated in your tree -- review with git diff and commit them"
+            exit 1
+        fi
+    ) 2>&1 | tee "$log"; then
+        gha_summary_row "Generated mocks" "-" "FAIL" "$(fmt_duration $((SECONDS - start)))"
+        fail_with "Generated mocks" "$log"
+    fi
+    gha_endgroup
+    gha_summary_row "Generated mocks" "-" "pass" "$(fmt_duration $((SECONDS - start)))"
 fi
 
 if should_run_internal; then

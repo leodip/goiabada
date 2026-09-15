@@ -10,8 +10,13 @@ structname: "{{.InterfaceName}}"
 template: testify
 # Emits "//go:build !production" in every generated mock, keeping testify out of
 # production builds (see build/Dockerfile-*, which build with -tags=production).
+#
+# boilerplate-file names the same file authserver/.mockery.yaml does, spelled
+# relative to this module because the path resolves against mockery's working
+# directory. See that file for what it is for (#338).
 template-data:
   mock-build-tags: "!production"
+  boilerplate-file: "../mockery-header.txt"
 packages:
   # Database interface
   github.com/leodip/goiabada/core/data:
