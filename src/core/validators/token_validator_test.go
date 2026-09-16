@@ -5174,6 +5174,86 @@ func TestValidateTokenRequest_ROPC_ResourcePermission_UserLacksPermission(t *tes
 	assert.Equal(t, 400, customErr.GetHttpStatusCode())
 }
 
+// The two rejections ROPC reaches before the user's own permissions are consulted: a resource that
+// does not exist, and a permission that does not exist on a resource that does. Each description is
+// asserted in full rather than by substring, because ROPC's wording is not the authorize endpoint's
+// for the same outcome - "is not recognized ... doesn't grant" here against "is invalid ... does not
+// have" there - and the shared resolver behind all three sites (#124) returns an outcome precisely
+// so each site keeps its own text. A resolver that grew a message would show up here first.
+func TestValidateTokenRequest_ROPC_ResourcePermission_ResolutionFailures(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		scope    string
+		setup    func(*mocks_data.Database)
+		wantDesc string
+	}{
+		{
+			name:  "unknown resource",
+			scope: "openid nope-api:read",
+			setup: func(mockDB *mocks_data.Database) {
+				mockDB.On("GetResourceByResourceIdentifier", mock.Anything, "nope-api").Return(nil, nil).Once()
+			},
+			wantDesc: "Invalid scope: 'nope-api:read'. Could not find a resource with identifier 'nope-api'.",
+		},
+		{
+			name:  "permission does not exist on the requested resource",
+			scope: "openid api:delete",
+			setup: func(mockDB *mocks_data.Database) {
+				mockDB.On("GetResourceByResourceIdentifier", mock.Anything, "api").
+					Return(&models.Resource{Id: 1, ResourceIdentifier: "api"}, nil).Once()
+				mockDB.On("GetPermissionsByResourceId", mock.Anything, int64(1)).
+					Return([]models.Permission{{Id: 1, PermissionIdentifier: "read", ResourceId: 1}}, nil).Once()
+			},
+			wantDesc: "Scope 'api:delete' is not recognized. The resource identified by 'api' doesn't grant the 'delete' permission.",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			mockDB := mocks_data.NewDatabase(t)
+			validator := NewTokenValidator(mockDB, mocks_oauth.NewTokenParser(t), mocks_user.NewPermissionChecker(t))
+
+			settings := &models.Settings{ResourceOwnerPasswordCredentialsEnabled: true}
+			ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+
+			passwordHash, _ := hashutil.HashPassword("correctpassword")
+			user := &models.User{
+				Id:           1,
+				Email:        "user@example.com",
+				PasswordHash: passwordHash,
+				Enabled:      true,
+			}
+
+			ropcEnabled := true
+			client := &models.Client{
+				ClientIdentifier:                        "ropc-client",
+				Enabled:                                 true,
+				IsPublic:                                true,
+				ResourceOwnerPasswordCredentialsEnabled: &ropcEnabled,
+			}
+
+			mockDB.On("GetClientByClientIdentifier", mock.Anything, "ropc-client").Return(client, nil).Once()
+			mockDB.On("GetUserByEmail", mock.Anything, "user@example.com").Return(user, nil).Once()
+			mockDB.On("UserLoadPermissions", mock.Anything, user).Return(nil).Once()
+			mockDB.On("UserLoadGroups", mock.Anything, user).Return(nil).Once()
+			tc.setup(mockDB)
+
+			result, err := validator.ValidateTokenRequest(ctx, &ValidateTokenRequestInput{
+				GrantType: "password",
+				ClientId:  "ropc-client",
+				Username:  "user@example.com",
+				Password:  "correctpassword",
+				Scope:     tc.scope,
+			})
+
+			assert.Nil(t, result)
+			customErr, ok := err.(*customerrors.ErrorDetail)
+			require.True(t, ok, "expected an ErrorDetail, got %v", err)
+			assert.Equal(t, "invalid_scope", customErr.GetCode())
+			assert.Equal(t, tc.wantDesc, customErr.GetDescription())
+			assert.Equal(t, 400, customErr.GetHttpStatusCode())
+		})
+	}
+}
+
 // TestValidateTokenRequest_RefreshToken_ROPC_InjectedUserInfoScope covers the ROPC refresh defect
 // fixed alongside #104: generateAccessTokenCore appends authserver:userinfo to any token carrying
 // an OIDC scope, and the refresh path used to re-check that appended scope against the user's

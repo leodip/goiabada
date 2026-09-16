@@ -2,6 +2,7 @@ package validators
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -95,6 +96,46 @@ func TestValidateScopes(t *testing.T) {
 				customErr := err.(*customerrors.ErrorDetail)
 				assert.Equal(t, tt.expectedError, customErr.GetDescription())
 			}
+		})
+	}
+}
+
+// A database failure while resolving a scope must propagate as an error (a 500), not be swallowed
+// into an invalid_scope denial: the two are indistinguishable to a client reading only the status
+// code, and a swallowed error would deny a legitimate authorization request for the duration of a
+// database fault. The token endpoint's client credentials arm pins the same property; this is the
+// authorize endpoint's, and both now run through one resolver (#124).
+func TestValidateScopes_DatabaseFailurePropagates(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		setup func(*mocks_data.Database)
+	}{
+		{
+			name: "GetResourceByResourceIdentifier error propagates",
+			setup: func(mockDB *mocks_data.Database) {
+				mockDB.On("GetResourceByResourceIdentifier", mock.Anything, "billing-api").
+					Return(nil, errors.New("database is down"))
+			},
+		},
+		{
+			name: "GetPermissionsByResourceId error propagates",
+			setup: func(mockDB *mocks_data.Database) {
+				mockDB.On("GetResourceByResourceIdentifier", mock.Anything, "billing-api").
+					Return(&models.Resource{Id: 1, ResourceIdentifier: "billing-api"}, nil)
+				mockDB.On("GetPermissionsByResourceId", mock.Anything, int64(1)).
+					Return(nil, errors.New("database is down"))
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			mockDB := mocks_data.NewDatabase(t)
+			tc.setup(mockDB)
+
+			err := NewAuthorizeValidator(mockDB).ValidateScopes("billing-api:read")
+
+			assert.EqualError(t, err, "database is down")
+			_, isErrorDetail := err.(*customerrors.ErrorDetail)
+			assert.False(t, isErrorDetail, "a database failure must not be reported as an OAuth error")
 		})
 	}
 }

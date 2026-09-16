@@ -82,39 +82,26 @@ func (val *AuthorizeValidator) ValidateScopes(scope string) error {
 				http.StatusBadRequest)
 		}
 
-		parts := strings.Split(scopeStr, ":")
-		if len(parts) != 2 {
+		// The rejection wording below is this endpoint's own and differs from the token
+		// endpoint's for the same outcome; both are asserted verbatim by the integration suite,
+		// so the shared resolver hands back an outcome and never a message (#124).
+		resolution, err := resolveScope(val.database, scopeStr)
+		if err != nil {
+			return err
+		}
+
+		switch resolution.Outcome {
+		case scopeMalformed:
 			return customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope",
 				fmt.Sprintf("Invalid scope format: '%v'. Scopes must adhere to the resource-identifier:permission-identifier format. For instance: backend-service:create-product.", scopeStr),
 				http.StatusBadRequest)
-		}
-
-		res, err := val.database.GetResourceByResourceIdentifier(nil, parts[0])
-		if err != nil {
-			return err
-		}
-		if res == nil {
+		case scopeResourceUnknown:
 			return customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope",
-				fmt.Sprintf("Invalid scope: '%v'. Could not find a resource with identifier '%v'.", scopeStr, parts[0]),
+				fmt.Sprintf("Invalid scope: '%v'. Could not find a resource with identifier '%v'.", scopeStr, resolution.ResourceIdentifier),
 				http.StatusBadRequest)
-		}
-
-		permissions, err := val.database.GetPermissionsByResourceId(nil, res.Id)
-		if err != nil {
-			return err
-		}
-
-		permissionExists := false
-		for _, perm := range permissions {
-			if perm.PermissionIdentifier == parts[1] {
-				permissionExists = true
-				break
-			}
-		}
-
-		if !permissionExists {
+		case scopePermissionUnknown:
 			return customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope",
-				fmt.Sprintf("Scope '%v' is invalid. The resource identified by '%v' does not have a permission with identifier '%v'.", scopeStr, parts[0], parts[1]),
+				fmt.Sprintf("Scope '%v' is invalid. The resource identified by '%v' does not have a permission with identifier '%v'.", scopeStr, resolution.ResourceIdentifier, resolution.PermissionIdentifier),
 				http.StatusBadRequest)
 		}
 	}
