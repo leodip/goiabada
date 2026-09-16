@@ -97,10 +97,16 @@ var sleep = time.Sleep
 // THE RULE. When the engine aborts the transaction as a deadlock victim, from inside fn or at
 // the commit, the whole body is rerun, up to three attempts with a short pause before the
 // second and third, and only the last such error surfaces, wrapped. Nothing else is rerun: any
-// other error fn returns, or any other commit failure, is returned unchanged after one attempt.
+// other error fn returns, or any other commit failure, is returned after one attempt -- fn's
+// unchanged, and the commit's tagged as below.
 // A commit that fails for a reason other than a deadlock has an outcome the client cannot know,
 // since the server may have committed before the failure reached it, and replaying it would
-// apply the body twice.
+// apply the body twice. That error is tagged with ErrIndeterminateCommit, which is what makes
+// the sentence above something a caller can act on rather than only read: a caller whose
+// committed rows are reachable only through a step AFTER the commit tells that case from a body
+// failure with errors.Is and reconciles, keyed on a name it minted outside the transaction.
+// StartNewUserSession is the one such caller today; the sentinel's own documentation carries
+// the rule.
 //
 // WHY IT HOLDS. No order in which transactions take their rows is imposed anywhere in the
 // repository, so two transactions on the same account can take the same rows in opposite orders
@@ -171,7 +177,21 @@ func (d *CommonDatabase) runTransactionOnce(fn func(tx *sql.Tx) error) error {
 	}
 
 	committing = true
-	return d.CommitTransaction(tx)
+	commitErr := d.CommitTransaction(tx)
+	if commitErr != nil && !d.deadlock(commitErr) {
+		// The tag, and the one place it is applied. A commit that failed for a reason the
+		// engine did not declare has an outcome nobody can read off the error, so it leaves
+		// here saying so, and a caller that owes a reconciliation asks errors.Is instead of
+		// reading the sentence. The driver's error stays unwrappable underneath, and the
+		// wrapped error already carries the origin's stack, so errs.Errorf adds none.
+		//
+		// A deadlock is excluded because it is the opposite case: the engine declared the
+		// abort, so the rollback is known, and the loop above reruns it. Tagging it would
+		// also survive into the exhausted-attempts error, which would then claim an
+		// ambiguity that three declared rollbacks do not have.
+		return errs.Errorf("%w: %w", ErrIndeterminateCommit, commitErr)
+	}
+	return commitErr
 }
 
 // deadlock consults the dialect's classifier, treating none as "nothing is a deadlock".

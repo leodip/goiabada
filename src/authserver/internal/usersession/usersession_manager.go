@@ -3,6 +3,7 @@ package usersession
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -146,6 +147,10 @@ func (u *UserSessionManager) StartNewUserSession(w http.ResponseWriter, r *http.
 	// committed session row that no cookie named, sometimes having already deleted the session the
 	// browser did have (#198). Only the browser-store write below is left after the commit, and it
 	// is compensated rather than prevented: see abandonUserSession.
+	//
+	// The commit itself is the remaining exposure, and it is the helper's rather than this
+	// ceremony's: a commit that fails for a reason the engine did not declare may have landed
+	// anyway. That case arrives tagged and is reconciled just below, by reconcileAmbiguousCommit.
 	err = u.database.RunInTransaction(func(tx *sql.Tx) error {
 		if err := u.database.CreateUserSession(tx, userSession); err != nil {
 			return err
@@ -188,6 +193,19 @@ func (u *UserSessionManager) StartNewUserSession(w http.ResponseWriter, r *http.
 		return nil
 	})
 	if err != nil {
+		// The fifth window, and the one that is not a step of this function at all. When the
+		// commit itself fails for a reason the engine did not declare, the server may have
+		// committed before the failure reached us: the row, its client association and the
+		// sweep's deletions are possibly all in the database, while the identifier below was
+		// never written into the browser session. That is #198's shape reached through
+		// RunInTransaction's own contract rather than through a step of this ceremony, and it
+		// is reconciled rather than prevented, for the same reason the browser-store write is.
+		//
+		// Every other failure here is known to have rolled back -- a body error, a refused
+		// BeginTransaction, three declared deadlocks -- so it costs no read.
+		if errors.Is(err, data.ErrIndeterminateCommit) {
+			return nil, u.reconcileAmbiguousCommit(userSession.SessionIdentifier, err)
+		}
 		return nil, err
 	}
 
@@ -229,7 +247,9 @@ func (u *UserSessionManager) StartNewUserSession(w http.ResponseWriter, r *http.
 // store write that was to bind it to a cookie failed, and returns cause unchanged: the ceremony
 // failed for that reason and the caller must be told that one, not what this cleanup did.
 //
-// It is the compensation for the single step that cannot join the transaction. RunInTransaction
+// It is the compensation for the single STEP that cannot join the transaction, and
+// reconcileAmbiguousCommit below is the compensation for the commit that cannot say whether it
+// happened; the two differ in what names the row, which that one's comment carries. RunInTransaction
 // reruns its body when the engine aborts it as a deadlock victim, and a rerun of Regenerate or
 // Save would write Set-Cookie twice, so the browser-store write stays after the commit. Without
 // this, the row stayed: no browser held a cookie naming it, nothing was ever issued against it,
@@ -248,6 +268,43 @@ func (u *UserSessionManager) abandonUserSession(userSession *models.UserSession,
 	if err := u.database.DeleteUserSession(nil, userSession.Id); err != nil {
 		return errs.Join(cause, errs.Wrap(err,
 			"unable to delete the user session left behind by a failed browser session write"))
+	}
+	return cause
+}
+
+// reconcileAmbiguousCommit deletes the session row when an indeterminate commit turns out to have
+// landed, and returns cause unchanged either way, exactly as abandonUserSession does: the ceremony
+// failed for that reason, the request still answers 500, and this is invisible to the client.
+//
+// It keys on the SESSION IDENTIFIER and not on userSession.Id, which is the whole difference
+// between the two compensations and not a stylistic one. Id comes from LastInsertId() inside the
+// transaction, so after a commit whose outcome nobody can read it is not a reliable name for a row:
+// it may name nothing, and on an engine that reuses rowids it may by then name another session
+// altogether, which would make this cleanup sign someone else out. The identifier is a UUID minted
+// before the transaction opened, so a row carrying it can only be this ceremony's, and a read that
+// finds none is the commit reporting, after the fact, that it did not land.
+//
+// The read is attempted once, over a connection that has just failed, and a failure is joined onto
+// cause rather than retried. Trying harder buys little: the pool discards a broken connection, so
+// one retry is the same question asked twice, and the row's own idle timeout is the backstop that
+// existed before any of this. What the join buys is the record saying the row may have survived.
+//
+// ceiling: the same-device sweep commits with the row, so this cannot bring back the sessions it
+// superseded. That is abandonUserSession's ceiling, reached through the second door, and it is the
+// same answer -- the user signs in again (#198).
+func (u *UserSessionManager) reconcileAmbiguousCommit(sessionIdentifier string, cause error) error {
+	committed, err := u.database.GetUserSessionBySessionIdentifier(nil, sessionIdentifier)
+	if err != nil {
+		return errs.Join(cause, errs.Wrap(err,
+			"unable to establish whether a commit of unknown outcome left a user session row behind"))
+	}
+	if committed == nil {
+		return cause
+	}
+
+	if err := u.database.DeleteUserSession(nil, committed.Id); err != nil {
+		return errs.Join(cause, errs.Wrap(err,
+			"unable to delete the user session left behind by a commit of unknown outcome"))
 	}
 	return cause
 }
