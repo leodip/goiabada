@@ -4,8 +4,8 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/leodip/goiabada/authserver/internal/phonecountries"
 	"github.com/leodip/goiabada/core/i18n"
-	"github.com/leodip/goiabada/core/phonecountries"
 )
 
 type PhoneValidator struct {

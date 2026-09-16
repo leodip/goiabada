@@ -106,7 +106,6 @@ A row whose owner is not `kernel` names the issue that moves it. A `kernel` row 
 | `core/oauth` | kernel | — |
 | `core/oidc` | authserver | #360 |
 | `core/otp` | authserver | #346 |
-| `core/phonecountries` | authserver | #344 |
 | `core/rsautil` | authserver | #360 |
 | `core/sessionstore` | kernel | — |
 | `core/stringutil` | kernel | — |
