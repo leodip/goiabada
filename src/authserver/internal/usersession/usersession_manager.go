@@ -125,12 +125,28 @@ func (u *UserSessionManager) StartNewUserSession(w http.ResponseWriter, r *http.
 		ClientId:     clientId,
 	})
 
-	// The session row and its association land in one transaction, opened through
-	// RunInTransaction so a deadlock reruns the body (#301). The body is safe to rerun: the id
-	// CreateUserSession assigns is reassigned by the next attempt, and the association loop
-	// ranges by value, so nothing an attempt wrote onto a copy is read by the attempt after it.
-	// The same-device sweep and the cookie write below run only after the commit.
-	err := u.database.RunInTransaction(func(tx *sql.Tx) error {
+	// The browser session is read before anything is written. It is a memoised per-request read
+	// that /auth/completed has already resolved by this point, so it consults no backend and
+	// writes nothing here; taking it first is what makes an unreadable cookie a refusal with an
+	// empty database rather than one leaving a session row behind (#198).
+	sess, err := u.sessionStore.Get(r, u.sessionName)
+	if err != nil {
+		return nil, errs.Wrap(err, "unable to get the session")
+	}
+
+	// The session row, its client associations, the read of this user's other sessions and the
+	// same-device sweep below are one transaction, opened through RunInTransaction so a deadlock
+	// reruns the body (#301). The body is safe to rerun: the id CreateUserSession assigns is
+	// reassigned by the next attempt, the association loop ranges by value, so nothing an attempt
+	// wrote onto a copy is read by the attempt after it, and the identifier the sweep excludes
+	// itself by is minted above rather than inside, so it survives a rerun. A rolled-back attempt
+	// undoes its own deletions and the attempt after it re-reads.
+	//
+	// The sweep is in here rather than after the commit because a failure between the two left a
+	// committed session row that no cookie named, sometimes having already deleted the session the
+	// browser did have (#198). Only the browser-store write below is left after the commit, and it
+	// is compensated rather than prevented: see abandonUserSession.
+	err = u.database.RunInTransaction(func(tx *sql.Tx) error {
 		if err := u.database.CreateUserSession(tx, userSession); err != nil {
 			return err
 		}
@@ -141,44 +157,38 @@ func (u *UserSessionManager) StartNewUserSession(w http.ResponseWriter, r *http.
 				return err
 			}
 		}
+
+		allUserSessions, err := u.database.GetUserSessionsByUserId(tx, userId)
+		if err != nil {
+			return err
+		}
+
+		// Delete this user's other sessions from the same device: same raw User-Agent header,
+		// same address. Nothing here reads DeviceName, DeviceType or DeviceOS, which are a
+		// parser's guess at a browser name and now display only. Keying on them meant a coarser
+		// label collapsed two machines behind one address into one device, and a change of parser
+		// or of label format silently changed which sessions superseded which. The header is
+		// compared as sent, bounded by useragent.Bound on both sides, so the comparison is between
+		// two values cut at the same point (#281).
+		//
+		// Two consequences of pre-upgrade rows carrying an empty header, both accepted rather than
+		// worked around: a login that sends a header does not match one, so a legacy row survives
+		// this login and expires on its own by idle timeout or max lifetime; and a client that
+		// sends no header matches every legacy row on its address, which is how a header-less
+		// client is treated today in any case.
+		for _, us := range allUserSessions {
+			if us.SessionIdentifier != userSession.SessionIdentifier &&
+				us.UserAgent == userSession.UserAgent &&
+				us.IpAddress == ipWithoutPort {
+				if err := u.database.DeleteUserSession(tx, us.Id); err != nil {
+					return err
+				}
+			}
+		}
 		return nil
 	})
 	if err != nil {
 		return nil, err
-	}
-
-	allUserSessions, err := u.database.GetUserSessionsByUserId(nil, userId)
-	if err != nil {
-		return nil, err
-	}
-
-	// Delete this user's other sessions from the same device: same raw User-Agent header, same
-	// address. Nothing here reads DeviceName, DeviceType or DeviceOS, which are a parser's guess
-	// at a browser name and now display only. Keying on them meant a coarser label collapsed two
-	// machines behind one address into one device, and a change of parser or of label format
-	// silently changed which sessions superseded which. The header is compared as sent, bounded
-	// by useragent.Bound on both sides, so the comparison is between two values cut at the same
-	// point (#281).
-	//
-	// Two consequences of pre-upgrade rows carrying an empty header, both accepted rather than
-	// worked around: a login that sends a header does not match one, so a legacy row survives
-	// this login and expires on its own by idle timeout or max lifetime; and a client that sends
-	// no header matches every legacy row on its address, which is how a header-less client is
-	// treated today in any case.
-	for _, us := range allUserSessions {
-		if us.SessionIdentifier != userSession.SessionIdentifier &&
-			us.UserAgent == userSession.UserAgent &&
-			us.IpAddress == ipWithoutPort {
-			err = u.database.DeleteUserSession(nil, us.Id)
-			if err != nil {
-				return nil, err
-			}
-		}
-	}
-
-	sess, err := u.sessionStore.Get(r, u.sessionName)
-	if err != nil {
-		return nil, errs.Wrap(err, "unable to get the session")
 	}
 
 	sess.Values[constants.SessionKeySessionIdentifier] = userSession.SessionIdentifier
@@ -202,17 +212,44 @@ func (u *UserSessionManager) StartNewUserSession(w http.ResponseWriter, r *http.
 	// changes no outcome an attacker could use.
 	if regenerator, ok := u.sessionStore.(sessionstore.Regenerator); ok {
 		if err := regenerator.Regenerate(w, r, sess); err != nil {
-			return nil, errs.Wrap(err, "unable to rotate the browser session identifier")
+			return nil, u.abandonUserSession(userSession, errs.Wrap(err, "unable to rotate the browser session identifier"))
 		}
 		return userSession, nil
 	}
 
 	err = u.sessionStore.Save(r, w, sess)
 	if err != nil {
-		return nil, err
+		return nil, u.abandonUserSession(userSession, err)
 	}
 
 	return userSession, nil
+}
+
+// abandonUserSession deletes the session row the transaction above committed, after the browser
+// store write that was to bind it to a cookie failed, and returns cause unchanged: the ceremony
+// failed for that reason and the caller must be told that one, not what this cleanup did.
+//
+// It is the compensation for the single step that cannot join the transaction. RunInTransaction
+// reruns its body when the engine aborts it as a deadlock victim, and a rerun of Regenerate or
+// Save would write Set-Cookie twice, so the browser-store write stays after the commit. Without
+// this, the row stayed: no browser held a cookie naming it, nothing was ever issued against it,
+// and it sat in the admin console's session list until its own idle timeout expired (#198).
+//
+// A cleanup that fails in turn is joined onto cause rather than replacing it, so errors.Is still
+// finds the original and the record still says the row survived.
+//
+// ceiling: the same-device sweep commits with the row, so undoing the row here cannot bring back
+// the sessions it superseded, and a user whose cookie write fails is left with neither the session
+// this ceremony created nor the one it replaced -- they sign in again. Closing that needs the
+// browser-store write staged inside the transaction, which it cannot be while a rerun can double
+// the Set-Cookie. Revisit if the store gains a two-phase write that can be prepared before the
+// commit and completed after it (#198).
+func (u *UserSessionManager) abandonUserSession(userSession *models.UserSession, cause error) error {
+	if err := u.database.DeleteUserSession(nil, userSession.Id); err != nil {
+		return errs.Join(cause, errs.Wrap(err,
+			"unable to delete the user session left behind by a failed browser session write"))
+	}
+	return cause
 }
 
 // BumpUserSession updates an existing session's last accessed time and client list.
