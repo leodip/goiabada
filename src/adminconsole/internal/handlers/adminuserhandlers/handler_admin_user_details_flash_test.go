@@ -10,9 +10,9 @@ import (
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
+	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	mocks_handler_helpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
-	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
@@ -31,8 +31,8 @@ type flashStubApiClient struct {
 	apiclient.ApiClient
 }
 
-func (flashStubApiClient) GetUserById(accessToken string, id int64) (*models.User, error) {
-	return &models.User{Id: id, Email: "someone@example.com"}, nil
+func (flashStubApiClient) GetUserById(accessToken string, id int64) (*api.UserResponse, error) {
+	return &api.UserResponse{Id: id, Email: "someone@example.com"}, nil
 }
 
 // newFlashTestStore is a real store over an in-memory backend, because a flash is only

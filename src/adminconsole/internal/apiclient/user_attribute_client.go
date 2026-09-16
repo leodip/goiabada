@@ -9,10 +9,9 @@ import (
 
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
-	"github.com/leodip/goiabada/core/models"
 )
 
-func (c *AuthServerClient) GetUserAttributesByUserId(accessToken string, userId int64) ([]models.UserAttribute, error) {
+func (c *AuthServerClient) GetUserAttributesByUserId(accessToken string, userId int64) ([]api.UserAttributeResponse, error) {
 	fullURL := c.baseURL + "/api/v1/admin/users/" + strconv.FormatInt(userId, 10) + "/attributes"
 
 	req, err := http.NewRequest("GET", fullURL, nil)
@@ -43,18 +42,10 @@ func (c *AuthServerClient) GetUserAttributesByUserId(accessToken string, userId 
 		return nil, errs.Errorf("failed to decode response: %w", err)
 	}
 
-	// Convert responses back to models.UserAttribute
-	attributes := make([]models.UserAttribute, len(response.Attributes))
-	for i, attrResp := range response.Attributes {
-		if attr := attrResp.ToUserAttribute(); attr != nil {
-			attributes[i] = *attr
-		}
-	}
-
-	return attributes, nil
+	return response.Attributes, nil
 }
 
-func (c *AuthServerClient) GetUserAttributeById(accessToken string, attributeId int64) (*models.UserAttribute, error) {
+func (c *AuthServerClient) GetUserAttributeById(accessToken string, attributeId int64) (*api.UserAttributeResponse, error) {
 	fullURL := c.baseURL + "/api/v1/admin/user-attributes/" + strconv.FormatInt(attributeId, 10)
 
 	req, err := http.NewRequest("GET", fullURL, nil)
@@ -85,10 +76,10 @@ func (c *AuthServerClient) GetUserAttributeById(accessToken string, attributeId 
 		return nil, errs.Errorf("failed to decode response: %w", err)
 	}
 
-	return response.Attribute.ToUserAttribute(), nil
+	return &response.Attribute, nil
 }
 
-func (c *AuthServerClient) CreateUserAttribute(accessToken string, request *api.CreateUserAttributeRequest) (*models.UserAttribute, error) {
+func (c *AuthServerClient) CreateUserAttribute(accessToken string, request *api.CreateUserAttributeRequest) (*api.UserAttributeResponse, error) {
 	fullURL := c.baseURL + "/api/v1/admin/user-attributes"
 
 	jsonData, err := json.Marshal(request)
@@ -124,10 +115,10 @@ func (c *AuthServerClient) CreateUserAttribute(accessToken string, request *api.
 		return nil, errs.Errorf("failed to decode response: %w", err)
 	}
 
-	return response.Attribute.ToUserAttribute(), nil
+	return &response.Attribute, nil
 }
 
-func (c *AuthServerClient) UpdateUserAttribute(accessToken string, attributeId int64, request *api.UpdateUserAttributeRequest) (*models.UserAttribute, error) {
+func (c *AuthServerClient) UpdateUserAttribute(accessToken string, attributeId int64, request *api.UpdateUserAttributeRequest) (*api.UserAttributeResponse, error) {
 	fullURL := c.baseURL + "/api/v1/admin/user-attributes/" + strconv.FormatInt(attributeId, 10)
 
 	jsonData, err := json.Marshal(request)
@@ -163,7 +154,7 @@ func (c *AuthServerClient) UpdateUserAttribute(accessToken string, attributeId i
 		return nil, errs.Errorf("failed to decode response: %w", err)
 	}
 
-	return response.Attribute.ToUserAttribute(), nil
+	return &response.Attribute, nil
 }
 
 func (c *AuthServerClient) DeleteUserAttribute(accessToken string, attributeId int64) error {

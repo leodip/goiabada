@@ -334,14 +334,14 @@ func TestSessionTokenSource_ARefusalNamesTheClientAndTheRemedy(t *testing.T) {
 	})
 }
 
-// GetUserSession is the one console hop that decodes a session rather than forwarding it: every
-// other page passes api.EnhancedUserSessionResponse values straight through, while this one
-// rebuilds a models.UserSession field by field. A field left out of that literal is invisible to
-// the compiler and to every page test, because the zero value of a string is a legal header.
+// GetUserSession used to rebuild a models.UserSession field by field, and a field left out of that
+// literal was invisible to the compiler and to every page test, because the zero value of a string
+// is a legal header. It forwards the decoded response now (#350), which removes the literal but
+// not the exposure below it.
 //
-// So the raw header is asserted at the wire, from a body the test wrote, which is also what pins
-// the decoded key: the client unmarshals into api.GetUserSessionResponse, so a json tag renamed
-// in core would show up here as an empty string rather than as a compile error (#281 decision 6).
+// So the raw header is asserted at the wire, from a body the test wrote, which is what pins the
+// decoded key: the client unmarshals into api.GetUserSessionResponse, so a json tag renamed in
+// core would show up here as an empty string rather than as a compile error (#281 decision 6).
 func TestAuthServerClient_GetUserSessionCopiesTheRawUserAgent(t *testing.T) {
 	const (
 		sessionIdentifier = "a-session-identifier"

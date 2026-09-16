@@ -1,7 +1,6 @@
 package accounthandlers
 
 import (
-	"database/sql"
 	"net/http"
 	"strconv"
 	"strings"
@@ -155,10 +154,10 @@ func HandleAccountProfilePost(
 				if len(request.DateOfBirth) > 0 {
 					layout := "2006-01-02"
 					if parsed, err := time.Parse(layout, request.DateOfBirth); err == nil {
-						user.BirthDate = sql.NullTime{Time: parsed, Valid: true}
+						user.BirthDate = &parsed
 					}
 				} else {
-					user.BirthDate = sql.NullTime{Valid: false}
+					user.BirthDate = nil
 				}
 
 				bind := map[string]interface{}{

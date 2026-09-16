@@ -252,7 +252,7 @@ func (c *AuthServerClient) DeleteGroup(accessToken string, groupId int64) error 
 	return nil
 }
 
-func (c *AuthServerClient) GetUserGroups(accessToken string, userId int64) (*models.User, []models.Group, error) {
+func (c *AuthServerClient) GetUserGroups(accessToken string, userId int64) (*api.UserResponse, []models.Group, error) {
 	fullURL := fmt.Sprintf("%s/api/v1/admin/users/%d/groups", c.baseURL, userId)
 
 	req, err := http.NewRequest("GET", fullURL, nil)
@@ -282,7 +282,7 @@ func (c *AuthServerClient) GetUserGroups(accessToken string, userId int64) (*mod
 		return nil, nil, errs.Errorf("failed to unmarshal response: %w", err)
 	}
 
-	user := apiResp.User.ToUser()
+	user := &apiResp.User
 	groups := make([]models.Group, len(apiResp.Groups))
 	for i, groupResp := range apiResp.Groups {
 		group := models.Group{
@@ -306,7 +306,7 @@ func (c *AuthServerClient) GetUserGroups(accessToken string, userId int64) (*mod
 	return user, groups, nil
 }
 
-func (c *AuthServerClient) GetGroupMembers(accessToken string, groupId int64, page, size int) ([]models.User, int, error) {
+func (c *AuthServerClient) GetGroupMembers(accessToken string, groupId int64, page, size int) ([]api.UserResponse, int, error) {
 
 	fullURL := fmt.Sprintf("%s/api/v1/admin/groups/%d/members?page=%d&size=%d", c.baseURL, groupId, page, size)
 
@@ -337,14 +337,7 @@ func (c *AuthServerClient) GetGroupMembers(accessToken string, groupId int64, pa
 		return nil, 0, errs.Errorf("failed to unmarshal response: %w", err)
 	}
 
-	members := make([]models.User, len(apiResp.Members))
-	for i, memberResp := range apiResp.Members {
-		if user := memberResp.ToUser(); user != nil {
-			members[i] = *user
-		}
-	}
-
-	return members, apiResp.Total, nil
+	return apiResp.Members, apiResp.Total, nil
 }
 
 func (c *AuthServerClient) AddUserToGroup(accessToken string, groupId int64, userId int64) error {
@@ -483,7 +476,7 @@ func (c *AuthServerClient) SearchGroupsWithPermissionAnnotation(accessToken stri
 	return apiResp.Groups, apiResp.Total, nil
 }
 
-func (c *AuthServerClient) UpdateUserGroups(accessToken string, userId int64, request *api.UpdateUserGroupsRequest) (*models.User, []models.Group, error) {
+func (c *AuthServerClient) UpdateUserGroups(accessToken string, userId int64, request *api.UpdateUserGroupsRequest) (*api.UserResponse, []models.Group, error) {
 	fullURL := fmt.Sprintf("%s/api/v1/admin/users/%d/groups", c.baseURL, userId)
 
 	reqBody, err := json.Marshal(request)
@@ -519,7 +512,7 @@ func (c *AuthServerClient) UpdateUserGroups(accessToken string, userId int64, re
 		return nil, nil, errs.Errorf("failed to unmarshal response: %w", err)
 	}
 
-	user := apiResp.User.ToUser()
+	user := &apiResp.User
 	groups := make([]models.Group, len(apiResp.Groups))
 	for i, groupResp := range apiResp.Groups {
 		group := models.Group{

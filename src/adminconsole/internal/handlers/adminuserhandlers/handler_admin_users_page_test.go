@@ -12,8 +12,8 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/adminconsole/internal/pagination"
+	"github.com/leodip/goiabada/core/api"
 	mocks_handler_helpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
-	"github.com/leodip/goiabada/core/models"
 )
 
 // The user list is one of the five admin lists that page, and the five used to
@@ -39,7 +39,7 @@ type usersPagingApiClient struct {
 }
 
 func (c *usersPagingApiClient) SearchUsersPaginated(accessToken, query string,
-	page, pageSize int) ([]models.User, int, error) {
+	page, pageSize int) ([]api.UserResponse, int, error) {
 
 	c.asked = append(c.asked, page)
 	return usersOnPage(c.total, page, pageSize), c.total, nil
@@ -53,7 +53,7 @@ func (c *usersPagingApiClient) SearchUsersPaginated(accessToken, query string,
 // "OFFSET (page-1)*size" going negative, which the auth server answers 500 to.
 // Returning no rows here is the more forgiving of the two, so a test that
 // passes has not leaned on the stub being kind.
-func usersOnPage(total, page, pageSize int) []models.User {
+func usersOnPage(total, page, pageSize int) []api.UserResponse {
 	start := (page - 1) * pageSize
 	if start < 0 || start >= total {
 		return nil
@@ -62,9 +62,9 @@ func usersOnPage(total, page, pageSize int) []models.User {
 	if end > total {
 		end = total
 	}
-	users := make([]models.User, 0, end-start)
+	users := make([]api.UserResponse, 0, end-start)
 	for i := start; i < end; i++ {
-		users = append(users, models.User{Id: int64(i + 1)})
+		users = append(users, api.UserResponse{Id: int64(i + 1)})
 	}
 	return users
 }
@@ -249,7 +249,7 @@ type queryRecordingApiClient struct {
 }
 
 func (c *queryRecordingApiClient) SearchUsersPaginated(accessToken, query string,
-	page, pageSize int) ([]models.User, int, error) {
+	page, pageSize int) ([]api.UserResponse, int, error) {
 
 	c.queries = append(c.queries, query)
 	c.tokens = append(c.tokens, accessToken)

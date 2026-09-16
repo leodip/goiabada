@@ -125,8 +125,8 @@ Notes on rows that are not self-evident:
 - `core/api` stays, but only as declarations. The model-aware `ToResponse` mapping and the
   model-typed fields both leave in #350; what remains is the wire contract the admin console
   decodes. The mapping was once #349's alone, but moving it without the fields — and without the
-  reverse `ToUser()`/`ToGroup()` methods the admin console's `apiclient` calls 32 times — would have
-  left every exception row below standing, so the two are one issue.
+  reverse `ToUser()`/`ToGroup()` methods the admin console's `apiclient` called at 32 sites — would
+  have left every exception row below standing, so the two are one issue.
 - `core/validators` is kernel on the second half of the membership test rather than the first. One
   of the two files it holds after #344 exports `ValidateNoAngleBrackets`, which fifteen sites in the
   auth server call and the admin console never does. It stays because it is a four-line wrapper over
@@ -188,12 +188,11 @@ of rows is the only measure of how much is left to do.
 | `adminconsole/internal/handlers` | `core/models` | #350 |
 | `adminconsole/internal/handlers/accounthandlers` | `core/models` | #350 |
 | `adminconsole/internal/handlers/adminclienthandlers` | `core/models` | #350 |
-| `adminconsole/internal/handlers/admingrouphandlers` | `core/models` | #350 |
 | `adminconsole/internal/handlers/adminresourcehandlers` | `core/models` | #350 |
 | `adminconsole/internal/handlers/adminuserhandlers` | `core/models` | #350 |
 | `adminconsole/internal/middleware` | `core/models` | #350 |
 
-Thirteen rows, and #350 owns ten of them: the admin console's dependency on persistence models is
+Twelve rows, and #350 owns nine of them: the admin console's dependency on persistence models is
 the single largest piece of the boundary still to close.
 
 ## Foreign modules the admin console must not compile

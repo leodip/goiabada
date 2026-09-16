@@ -12,17 +12,16 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/core/api"
 	mocks_handler_helpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
-	"github.com/leodip/goiabada/core/models"
 )
 
 // userSessionsApiClient answers the two reads this page performs and nothing else.
 type userSessionsApiClient struct {
 	apiclient.ApiClient
-	user     *models.User
+	user     *api.UserResponse
 	sessions []api.EnhancedUserSessionResponse
 }
 
-func (c *userSessionsApiClient) GetUserById(accessToken string, userId int64) (*models.User, error) {
+func (c *userSessionsApiClient) GetUserById(accessToken string, userId int64) (*api.UserResponse, error) {
 	return c.user, nil
 }
 
@@ -42,7 +41,7 @@ func TestHandleAdminUserSessionsGet_BindsTheRawUserAgent(t *testing.T) {
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_users_sessions.html").Maybe()
 
 	apiClient := &userSessionsApiClient{
-		user: &models.User{Id: 7},
+		user: &api.UserResponse{Id: 7},
 		sessions: []api.EnhancedUserSessionResponse{
 			{Id: 1, DeviceName: "Safari 17", DeviceType: "Desktop", DeviceOS: "macOS", UserAgent: header},
 		},

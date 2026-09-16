@@ -11,6 +11,7 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/adminconsole/internal/pagination"
+	"github.com/leodip/goiabada/core/api"
 	mocks_handler_helpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
 	"github.com/leodip/goiabada/core/models"
 )
@@ -35,7 +36,7 @@ func (c *membersPagingApiClient) GetGroupById(accessToken string, groupId int64)
 }
 
 func (c *membersPagingApiClient) GetGroupMembers(accessToken string, groupId int64,
-	page, size int) ([]models.User, int, error) {
+	page, size int) ([]api.UserResponse, int, error) {
 
 	c.asked = append(c.asked, page)
 	return membersOnPage(c.total, page, size), c.total, nil
@@ -44,7 +45,7 @@ func (c *membersPagingApiClient) GetGroupMembers(accessToken string, groupId int
 // membersOnPage is the slice of a list of total members that page holds, each
 // member's Id being its 1-based position in the whole list. The start < 0 arm
 // stands for the negative SQL offset a real API cannot serve.
-func membersOnPage(total, page, pageSize int) []models.User {
+func membersOnPage(total, page, pageSize int) []api.UserResponse {
 	start := (page - 1) * pageSize
 	if start < 0 || start >= total {
 		return nil
@@ -53,9 +54,9 @@ func membersOnPage(total, page, pageSize int) []models.User {
 	if end > total {
 		end = total
 	}
-	users := make([]models.User, 0, end-start)
+	users := make([]api.UserResponse, 0, end-start)
 	for i := start; i < end; i++ {
-		users = append(users, models.User{Id: int64(i + 1)})
+		users = append(users, api.UserResponse{Id: int64(i + 1)})
 	}
 	return users
 }

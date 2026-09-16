@@ -1,7 +1,7 @@
 package adminresourcehandlers
 
 import (
-	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/core/api"
 )
 
 type GroupInfo struct {
@@ -22,7 +22,7 @@ type UsersWithPermissionPageResult struct {
 	Page     int
 	PageSize int
 	Total    int
-	Users    []models.User
+	Users    []api.UserResponse
 }
 
 type Permission struct {

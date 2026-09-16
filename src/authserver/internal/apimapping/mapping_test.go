@@ -150,27 +150,8 @@ func TestToClientResponse_EmitsClientSecretOnceHandlerSetsIt(t *testing.T) {
 	assert.Contains(t, string(marshalled), `"clientSecret":"decrypted-by-handler"`)
 }
 
-// ToUser rebuilds a models.User from the DTO, and by design cannot restore the
-// secrets the DTO never carried. Pinning that keeps the asymmetry explicit: a
-// round-tripped user is not safe to persist over an existing row.
-func TestUserResponse_ToUser_LeavesSecretsEmpty(t *testing.T) {
-	resp := ToUserResponse(&models.User{
-		Id:           1,
-		Email:        "user@example.com",
-		PasswordHash: "SENTINEL-password-hash",
-		OTPSecret:    "SENTINEL-otp-secret-plaintext",
-	})
-
-	roundTripped := resp.ToUser()
-
-	assert.Equal(t, "user@example.com", roundTripped.Email)
-	assert.Equal(t, "", roundTripped.PasswordHash)
-	assert.Equal(t, "", roundTripped.OTPSecret)
-	assert.Nil(t, roundTripped.OTPSecretEncrypted)
-}
-
 // =============================================================================
-// ToUserResponse / ToUser field mapping
+// ToUserResponse field mapping
 // =============================================================================
 
 func TestToUserResponse_MapsAllFields(t *testing.T) {
@@ -265,33 +246,6 @@ func TestToUserResponse_InvalidNullTimesBecomeNil(t *testing.T) {
 	assert.Nil(t, resp.BirthDate)
 }
 
-func TestUserResponse_ToUser_RoundTripsTimes(t *testing.T) {
-	createdAt := time.Date(2024, 1, 2, 3, 4, 5, 0, time.UTC)
-	birthDate := time.Date(1990, 5, 15, 0, 0, 0, 0, time.UTC)
-
-	original := &models.User{
-		Id:         9,
-		Email:      "rt@example.com",
-		CreatedAt:  sql.NullTime{Time: createdAt, Valid: true},
-		BirthDate:  sql.NullTime{Time: birthDate, Valid: true},
-		Attributes: []models.UserAttribute{{Id: 1, Key: "k", Value: "v"}},
-	}
-
-	roundTripped := ToUserResponse(original).ToUser()
-
-	assert.Equal(t, int64(9), roundTripped.Id)
-	assert.Equal(t, "rt@example.com", roundTripped.Email)
-	assert.True(t, roundTripped.CreatedAt.Valid)
-	assert.Equal(t, createdAt, roundTripped.CreatedAt.Time)
-	assert.True(t, roundTripped.BirthDate.Valid)
-	assert.Equal(t, birthDate, roundTripped.BirthDate.Time)
-	assert.False(t, roundTripped.UpdatedAt.Valid, "an absent time must stay invalid")
-	// The fixture still loads one attribute, and the round trip no longer carries it: UserResponse
-	// declares no attributes field, so ToUser has nothing to rebuild from. GET
-	// /users/{id}/attributes is where a consumer reads them (#350).
-	assert.Empty(t, roundTripped.Attributes)
-}
-
 // api.UserResponse.Subject was a 16-byte named type until #278, reaching JSON through that
 // type's MarshalText and coming back through UnmarshalText. It is a plain string now, and the
 // claim that made the swap safe is that no byte on the wire moved: the field is still the
@@ -310,8 +264,6 @@ func TestUserResponse_SubjectIsABareCanonicalString(t *testing.T) {
 	var decoded api.UserResponse
 	assert.NoError(t, json.Unmarshal(encoded, &decoded))
 	assert.Equal(t, subject, decoded.Subject, "the wire form must round-trip unchanged")
-	assert.Equal(t, subject, decoded.ToUser().Subject,
-		"and reach a model unchanged, which is the adminconsole's path back")
 }
 
 func TestToUserResponses_MapsEachUserDistinctly(t *testing.T) {
@@ -353,10 +305,6 @@ func TestMappers_NilInputReturnsNil(t *testing.T) {
 	assert.Nil(t, ToResourceResponses(nil))
 	assert.Nil(t, ToClientResponse(nil))
 
-	var nilUserResp *api.UserResponse
-	assert.Nil(t, nilUserResp.ToUser())
-	var nilAttrResp *api.UserAttributeResponse
-	assert.Nil(t, nilAttrResp.ToUserAttribute())
 	var nilGroupResp *api.GroupResponse
 	assert.Nil(t, nilGroupResp.ToGroup())
 	var nilGroupAttrResp *api.GroupAttributeResponse
@@ -717,14 +665,6 @@ func TestToUserAttributeResponse_RoundTrip(t *testing.T) {
 	assert.Equal(t, int64(42), resp.UserId)
 	assert.Equal(t, &createdAt, resp.CreatedAt)
 	assert.Equal(t, &updatedAt, resp.UpdatedAt)
-
-	roundTripped := resp.ToUserAttribute()
-	assert.Equal(t, original.Id, roundTripped.Id)
-	assert.Equal(t, original.Key, roundTripped.Key)
-	assert.Equal(t, original.Value, roundTripped.Value)
-	assert.Equal(t, original.UserId, roundTripped.UserId)
-	assert.True(t, roundTripped.CreatedAt.Valid)
-	assert.Equal(t, createdAt, roundTripped.CreatedAt.Time)
 }
 
 func TestToUserAttributeResponses_MapsEachAttributeDistinctly(t *testing.T) {
@@ -902,22 +842,18 @@ func TestMappers_CopyCreatedAtAndUpdatedAt(t *testing.T) {
 	})
 
 	t.Run("user attribute", func(t *testing.T) {
-		back := ToUserAttributeResponse(&models.UserAttribute{
+		resp := ToUserAttributeResponse(&models.UserAttribute{
 			Id: 1, CreatedAt: valid, UpdatedAt: validUpdated,
-		}).ToUserAttribute()
-		assert.True(t, back.CreatedAt.Valid)
-		assert.True(t, back.UpdatedAt.Valid)
-		assert.Equal(t, updatedAt, back.UpdatedAt.Time)
+		})
+		assert.Equal(t, &createdAt, resp.CreatedAt)
+		assert.Equal(t, &updatedAt, resp.UpdatedAt)
 	})
 
-	t.Run("user round trip", func(t *testing.T) {
-		back := ToUserResponse(&models.User{
-			Id: 1, CreatedAt: valid, UpdatedAt: validUpdated,
-		}).ToUser()
-		assert.True(t, back.CreatedAt.Valid)
-		assert.True(t, back.UpdatedAt.Valid)
-		assert.Equal(t, updatedAt, back.UpdatedAt.Time)
-		assert.False(t, back.BirthDate.Valid, "an absent birth date must stay invalid")
+	t.Run("user", func(t *testing.T) {
+		resp := ToUserResponse(&models.User{Id: 1, CreatedAt: valid, UpdatedAt: validUpdated})
+		assert.Equal(t, &createdAt, resp.CreatedAt)
+		assert.Equal(t, &updatedAt, resp.UpdatedAt)
+		assert.Nil(t, resp.BirthDate, "an absent birth date reaches the wire as null")
 	})
 
 	t.Run("client", func(t *testing.T) {

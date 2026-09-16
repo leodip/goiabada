@@ -88,7 +88,7 @@ func HandleAdminClientUserSessionsGet(
 			}
 			if user != nil {
 				usi.UserEmail = user.Email
-				usi.UserFullName = user.GetFullName()
+				usi.UserFullName = handlers.UserFullName(user)
 			}
 			if es.SessionIdentifier == sessionIdentifier {
 				usi.IsCurrent = true

@@ -1,6 +1,6 @@
 package adminuserhandlers
 
-import "github.com/leodip/goiabada/core/models"
+import "github.com/leodip/goiabada/core/api"
 
 type Address struct {
 	AddressLine1      string
@@ -45,7 +45,7 @@ type SessionInfo struct {
 }
 
 type PageResult struct {
-	Users    []models.User
+	Users    []api.UserResponse
 	Total    int
 	Query    string
 	Page     int

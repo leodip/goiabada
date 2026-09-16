@@ -16,7 +16,6 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/core/api"
 	mocks_handler_helpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
-	"github.com/leodip/goiabada/core/models"
 )
 
 // This file did not exist before #247. The package carried only its TestMain, and the console's OTP
@@ -45,7 +44,7 @@ const (
 type stubApiClient struct {
 	apiclient.ApiClient
 
-	profile *models.User
+	profile *api.UserResponse
 
 	enrollment    *api.AccountOTPEnrollmentResponse
 	enrollmentErr error
@@ -55,7 +54,7 @@ type stubApiClient struct {
 	updateReq *api.UpdateAccountOTPRequest
 }
 
-func (s *stubApiClient) GetAccountProfile(accessToken string) (*models.User, error) {
+func (s *stubApiClient) GetAccountProfile(accessToken string) (*api.UserResponse, error) {
 	return s.profile, nil
 }
 
@@ -68,7 +67,7 @@ func (s *stubApiClient) GetAccountOTPEnrollment(accessToken string) (*api.Accoun
 }
 
 func (s *stubApiClient) UpdateAccountOTP(accessToken string,
-	request *api.UpdateAccountOTPRequest) (*models.User, error) {
+	request *api.UpdateAccountOTPRequest) (*api.UserResponse, error) {
 
 	s.updateReq = request
 	if s.updateErr != nil {
@@ -79,7 +78,7 @@ func (s *stubApiClient) UpdateAccountOTP(accessToken string,
 
 func newStubApiClient(otpEnabled bool) *stubApiClient {
 	return &stubApiClient{
-		profile: &models.User{Id: 7, OTPEnabled: otpEnabled},
+		profile: &api.UserResponse{Id: 7, OTPEnabled: otpEnabled},
 		enrollment: &api.AccountOTPEnrollmentResponse{
 			Base64Image: testBase64Image,
 			SecretKey:   testSecretKey,

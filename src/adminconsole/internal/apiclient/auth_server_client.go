@@ -9,43 +9,43 @@ import (
 )
 
 type ApiClient interface {
-	SearchUsersPaginated(accessToken, query string, page, pageSize int) ([]models.User, int, error)
-	GetUserById(accessToken string, userId int64) (*models.User, error)
-	UpdateUserEnabled(accessToken string, userId int64, enabled bool) (*models.User, error)
-	UpdateUserProfile(accessToken string, userId int64, request *api.UpdateUserProfileRequest) (*models.User, error)
-	UpdateUserAddress(accessToken string, userId int64, request *api.UpdateUserAddressRequest) (*models.User, error)
-	UpdateUserEmail(accessToken string, userId int64, request *api.UpdateUserEmailRequest) (*models.User, error)
-	UpdateUserPhone(accessToken string, userId int64, request *api.UpdateUserPhoneRequest) (*models.User, error)
-	UpdateUserPassword(accessToken string, userId int64, request *api.UpdateUserPasswordRequest) (*models.User, error)
-	UpdateUserOTP(accessToken string, userId int64, request *api.UpdateUserOTPRequest) (*models.User, error)
-	CreateUserAdmin(accessToken string, request *api.CreateUserAdminRequest) (*models.User, error)
+	SearchUsersPaginated(accessToken, query string, page, pageSize int) ([]api.UserResponse, int, error)
+	GetUserById(accessToken string, userId int64) (*api.UserResponse, error)
+	UpdateUserEnabled(accessToken string, userId int64, enabled bool) (*api.UserResponse, error)
+	UpdateUserProfile(accessToken string, userId int64, request *api.UpdateUserProfileRequest) (*api.UserResponse, error)
+	UpdateUserAddress(accessToken string, userId int64, request *api.UpdateUserAddressRequest) (*api.UserResponse, error)
+	UpdateUserEmail(accessToken string, userId int64, request *api.UpdateUserEmailRequest) (*api.UserResponse, error)
+	UpdateUserPhone(accessToken string, userId int64, request *api.UpdateUserPhoneRequest) (*api.UserResponse, error)
+	UpdateUserPassword(accessToken string, userId int64, request *api.UpdateUserPasswordRequest) (*api.UserResponse, error)
+	UpdateUserOTP(accessToken string, userId int64, request *api.UpdateUserOTPRequest) (*api.UserResponse, error)
+	CreateUserAdmin(accessToken string, request *api.CreateUserAdminRequest) (*api.UserResponse, error)
 	DeleteUser(accessToken string, userId int64) error
 	GetUserProfilePicture(accessToken string, userId int64) (*ProfilePictureInfo, error)
-	GetUserAttributesByUserId(accessToken string, userId int64) ([]models.UserAttribute, error)
-	GetUserAttributeById(accessToken string, attributeId int64) (*models.UserAttribute, error)
-	CreateUserAttribute(accessToken string, request *api.CreateUserAttributeRequest) (*models.UserAttribute, error)
-	UpdateUserAttribute(accessToken string, attributeId int64, request *api.UpdateUserAttributeRequest) (*models.UserAttribute, error)
+	GetUserAttributesByUserId(accessToken string, userId int64) ([]api.UserAttributeResponse, error)
+	GetUserAttributeById(accessToken string, attributeId int64) (*api.UserAttributeResponse, error)
+	CreateUserAttribute(accessToken string, request *api.CreateUserAttributeRequest) (*api.UserAttributeResponse, error)
+	UpdateUserAttribute(accessToken string, attributeId int64, request *api.UpdateUserAttributeRequest) (*api.UserAttributeResponse, error)
 	DeleteUserAttribute(accessToken string, attributeId int64) error
 	GetUserSessionsByUserId(accessToken string, userId int64) ([]api.EnhancedUserSessionResponse, error)
 	DeleteUserSessionById(accessToken string, sessionId int64) error
 	GetClientSessionsByClientId(accessToken string, clientId int64, page, size int) ([]api.EnhancedUserSessionResponse, error)
-	GetUserSession(accessToken string, sessionIdentifier string) (*models.UserSession, error)
+	GetUserSession(accessToken string, sessionIdentifier string) (*api.UserSessionResponse, error)
 	GetAccountSessions(accessToken string) ([]api.EnhancedUserSessionResponse, error)
 	DeleteAccountSession(accessToken string, sessionId int64) error
-	GetUserConsents(accessToken string, userId int64) ([]models.UserConsent, error)
+	GetUserConsents(accessToken string, userId int64) ([]api.UserConsentResponse, error)
 	DeleteUserConsent(accessToken string, consentId int64) error
 	GetAllGroups(accessToken string) ([]models.Group, error)
 	CreateGroup(accessToken string, request *api.CreateGroupRequest) (*models.Group, error)
 	GetGroupById(accessToken string, groupId int64) (*models.Group, int, error)
 	UpdateGroup(accessToken string, groupId int64, request *api.UpdateGroupRequest) (*models.Group, error)
 	DeleteGroup(accessToken string, groupId int64) error
-	GetUserGroups(accessToken string, userId int64) (*models.User, []models.Group, error)
-	UpdateUserGroups(accessToken string, userId int64, request *api.UpdateUserGroupsRequest) (*models.User, []models.Group, error)
-	GetGroupMembers(accessToken string, groupId int64, page, size int) ([]models.User, int, error)
+	GetUserGroups(accessToken string, userId int64) (*api.UserResponse, []models.Group, error)
+	UpdateUserGroups(accessToken string, userId int64, request *api.UpdateUserGroupsRequest) (*api.UserResponse, []models.Group, error)
+	GetGroupMembers(accessToken string, groupId int64, page, size int) ([]api.UserResponse, int, error)
 	AddUserToGroup(accessToken string, groupId int64, userId int64) error
 	RemoveUserFromGroup(accessToken string, groupId int64, userId int64) error
 	SearchUsersWithGroupAnnotation(accessToken, query string, groupId int64, page, size int) ([]api.UserWithGroupMembershipResponse, int, error)
-	GetUserPermissions(accessToken string, userId int64) (*models.User, []models.Permission, error)
+	GetUserPermissions(accessToken string, userId int64) (*api.UserResponse, []models.Permission, error)
 	UpdateUserPermissions(accessToken string, userId int64, request *api.UpdateUserPermissionsRequest) error
 	GetGroupPermissions(accessToken string, groupId int64) (*models.Group, []models.Permission, error)
 	UpdateGroupPermissions(accessToken string, groupId int64, request *api.UpdateGroupPermissionsRequest) error
@@ -76,7 +76,7 @@ type ApiClient interface {
 	UpdateClientTokens(accessToken string, clientId int64, request *api.UpdateClientTokensRequest) (*api.ClientResponse, error)
 	SearchGroupsWithPermissionAnnotation(accessToken string, permissionId int64, page, size int) ([]api.GroupWithPermissionResponse, int, error)
 	// Users with permission
-	GetUsersByPermission(accessToken string, permissionId int64, page, size int) ([]models.User, int, error)
+	GetUsersByPermission(accessToken string, permissionId int64, page, size int) ([]api.UserResponse, int, error)
 	// Users search annotated with permission flag
 	SearchUsersWithPermissionAnnotation(accessToken string, permissionId int64, query string, page, size int) ([]api.UserWithPermissionResponse, int, error)
 	// Settings - General
@@ -104,19 +104,19 @@ type ApiClient interface {
 	UpdateSettingsAuditLogs(accessToken string, request *api.UpdateSettingsAuditLogsRequest) (*api.SettingsAuditLogsResponse, error)
 	GetAuditLogsPaginated(accessToken string, page, pageSize int, auditEvent string, requestId string) (*api.GetAuditLogsResponse, error)
 	// Account (self-service)
-	GetAccountProfile(accessToken string) (*models.User, error)
-	UpdateAccountProfile(accessToken string, request *api.UpdateUserProfileRequest) (*models.User, error)
-	UpdateAccountEmail(accessToken string, request *api.UpdateAccountEmailRequest) (*models.User, error)
-	UpdateAccountPhone(accessToken string, request *api.UpdateAccountPhoneRequest) (*models.User, error)
-	UpdateAccountAddress(accessToken string, request *api.UpdateUserAddressRequest) (*models.User, error)
-	UpdateAccountPassword(accessToken string, request *api.UpdateAccountPasswordRequest) (*models.User, error)
+	GetAccountProfile(accessToken string) (*api.UserResponse, error)
+	UpdateAccountProfile(accessToken string, request *api.UpdateUserProfileRequest) (*api.UserResponse, error)
+	UpdateAccountEmail(accessToken string, request *api.UpdateAccountEmailRequest) (*api.UserResponse, error)
+	UpdateAccountPhone(accessToken string, request *api.UpdateAccountPhoneRequest) (*api.UserResponse, error)
+	UpdateAccountAddress(accessToken string, request *api.UpdateUserAddressRequest) (*api.UserResponse, error)
+	UpdateAccountPassword(accessToken string, request *api.UpdateAccountPasswordRequest) (*api.UserResponse, error)
 	SendAccountEmailVerification(accessToken string) (*api.AccountEmailVerificationSendResponse, error)
-	VerifyAccountEmail(accessToken string, request *api.VerifyAccountEmailRequest) (*models.User, error)
+	VerifyAccountEmail(accessToken string, request *api.VerifyAccountEmailRequest) (*api.UserResponse, error)
 	// Account - OTP
 	GetAccountOTPEnrollment(accessToken string) (*api.AccountOTPEnrollmentResponse, error)
-	UpdateAccountOTP(accessToken string, request *api.UpdateAccountOTPRequest) (*models.User, error)
+	UpdateAccountOTP(accessToken string, request *api.UpdateAccountOTPRequest) (*api.UserResponse, error)
 	// Account - Consents
-	GetAccountConsents(accessToken string) ([]models.UserConsent, error)
+	GetAccountConsents(accessToken string) ([]api.UserConsentResponse, error)
 	RevokeAccountConsent(accessToken string, consentId int64) error
 	CreateAccountLogoutRequest(accessToken string, request *api.AccountLogoutRequest) (*api.AccountLogoutFormPostResponse, *api.AccountLogoutRedirectResponse, error)
 	// Account - Profile Picture

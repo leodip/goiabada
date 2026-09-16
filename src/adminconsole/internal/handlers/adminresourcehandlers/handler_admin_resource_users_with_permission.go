@@ -99,7 +99,7 @@ func HandleAdminResourceUsersWithPermissionGet(
 		pageInt := pagination.ParsePage(r.URL.Query().Get("page"))
 
 		const pageSize = 10
-		var usersWithPermission []models.User
+		var usersWithPermission []api.UserResponse
 		var total int
 		if selectedPermission > 0 {
 			usersWithPermission, total, err = apiClient.GetUsersByPermission(accessToken, selectedPermission, pageInt, pageSize)
