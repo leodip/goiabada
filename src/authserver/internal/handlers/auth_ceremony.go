@@ -33,8 +33,8 @@ const ceremonyIdLength = 32
 // authorization again.
 //
 // Constant time, like forgotPasswordCodeMatches and the client secret comparison in
-// validators.ValidateTokenRequest. Not because this value is guessed at, but because a plain
-// comparison stopping at the first differing byte is the kind of thing that is cheap to avoid
+// protocolvalidation.ValidateTokenRequest. Not because this value is guessed at, but because a
+// plain comparison stopping at the first differing byte is the kind of thing that is cheap to avoid
 // and expensive to notice later.
 func ceremonyMatches(contextCeremonyId string, submitted string) bool {
 	if contextCeremonyId == "" {

@@ -22,8 +22,8 @@ import (
 // presents an OS-assigned port at authorization time.
 //
 // The unit tests for this behaviour exercise a pure function (core/urlutil) and a mocked
-// database (core/validators), so neither shows an ephemeral-port callback actually
-// completing. This does (#41).
+// database (authserver/internal/protocolvalidation), so neither shows an ephemeral-port
+// callback actually completing. This does (#41).
 func TestToken_AuthCode_LoopbackEphemeralPort(t *testing.T) {
 	clientSecret := fake.LetterN(32)
 	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)

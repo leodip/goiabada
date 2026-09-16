@@ -16,7 +16,7 @@ import (
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/user"
 
-	"github.com/leodip/goiabada/core/validators"
+	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 )
 
 type HttpHelper interface {
@@ -63,10 +63,10 @@ type TokenIssuer interface {
 
 type AuthorizeValidator interface {
 	ValidateScopes(scope string) error
-	ValidateClientAndRedirectURI(ctx context.Context, input *validators.ValidateClientAndRedirectURIInput) error
-	ValidateRequest(input *validators.ValidateRequestInput) error
+	ValidateClientAndRedirectURI(ctx context.Context, input *protocolvalidation.ValidateClientAndRedirectURIInput) error
+	ValidateRequest(input *protocolvalidation.ValidateRequestInput) error
 	ValidatePrompt(prompt string) (string, error)
-	ValidateUnsupportedRequestParameters(input *validators.ValidateUnsupportedRequestParametersInput) error
+	ValidateUnsupportedRequestParameters(input *protocolvalidation.ValidateUnsupportedRequestParametersInput) error
 }
 
 type CodeIssuer interface {
@@ -90,7 +90,7 @@ type UserSessionManager interface {
 }
 
 type TokenValidator interface {
-	ValidateTokenRequest(ctx context.Context, input *validators.ValidateTokenRequestInput) (*validators.ValidateTokenRequestResult, error)
+	ValidateTokenRequest(ctx context.Context, input *protocolvalidation.ValidateTokenRequestInput) (*protocolvalidation.ValidateTokenRequestResult, error)
 }
 
 type UserCreator interface {

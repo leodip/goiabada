@@ -15,8 +15,9 @@ func TestMain(m *testing.M) {
 	// All five tables here assert the sentence beside the code, which is what pins the English
 	// catalog to what the user reads (#230).
 	//
-	// No data cipher: none of these five validators encrypts. core/validators keeps one for
-	// token_validator_test.go, which does.
+	// No data cipher: none of these five validators encrypts. The one validator that does,
+	// token_validator.go, has a TestMain of its own in
+	// authserver/internal/protocolvalidation, which keeps the cipher (#344).
 	if _, err := i18n.LoadBundle(); err != nil {
 		fmt.Fprintf(os.Stderr, "i18n.LoadBundle in TestMain: %v\n", err)
 		os.Exit(1)

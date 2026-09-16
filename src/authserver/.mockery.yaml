@@ -19,8 +19,8 @@ packages:
     interfaces:
       AuthorizeValidator:
         config:
-          dir: "../core/validators/mocks"
-          pkgname: "mocks_validator"
+          dir: "./internal/protocolvalidation/mocks"
+          pkgname: "mocks_protocolvalidation"
       EmailValidator:
         config:
           dir: "./internal/accountvalidation/mocks"
@@ -31,8 +31,8 @@ packages:
           pkgname: "mocks_accountvalidation"
       TokenValidator:
         config:
-          dir: "../core/validators/mocks"
-          pkgname: "mocks_validator"
+          dir: "./internal/protocolvalidation/mocks"
+          pkgname: "mocks_protocolvalidation"
       CodeIssuer:
         config:
           dir: "./internal/handlers/mocks"

@@ -94,7 +94,7 @@ func isForgotPasswordCodeExpired(user *models.User) bool {
 
 // forgotPasswordCodeMatches compares a supplied reset code against the stored one
 // in constant time, the same way client secrets are compared in
-// validators.ValidateTokenRequest. A plain string comparison stops at the first
+// protocolvalidation.ValidateTokenRequest. A plain string comparison stops at the first
 // differing byte, which in principle leaks how much of a guessed code was right.
 //
 // Still the authority even though the row is now found by an unsalted SHA-256 of the same
