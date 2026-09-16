@@ -12,7 +12,6 @@ import (
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/errs"
-	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
 )
@@ -62,7 +61,7 @@ func HandleAdminResourceGroupsWithPermissionGet(
 
 		// filter out the userinfo permission if the resource is authserver
 		if resource.ResourceIdentifier == constants.AuthServerResourceIdentifier {
-			permissions = slices.DeleteFunc(permissions, func(p models.Permission) bool {
+			permissions = slices.DeleteFunc(permissions, func(p api.PermissionResponse) bool {
 				return p.PermissionIdentifier == constants.UserinfoPermissionIdentifier
 			})
 		}
@@ -198,7 +197,7 @@ func HandleAdminResourceGroupsWithPermissionGet(
 			"resourceId":                   resource.Id,
 			"resourceIdentifier":           resource.ResourceIdentifier,
 			"description":                  resource.Description,
-			"isSystemLevelResource":        resource.IsSystemLevelResource(),
+			"isSystemLevelResource":        resource.IsSystemLevelResource,
 			"permissions":                  permissions,
 			"selectedPermission":           selectedPermission,
 			"selectedPermissionIdentifier": selectedPermissionIdentifier,
@@ -292,7 +291,7 @@ func HandleAdminResourceGroupsWithPermissionAddPermissionPost(
 
 		// filter out the userinfo permission if the resource is authserver
 		if resource.ResourceIdentifier == constants.AuthServerResourceIdentifier {
-			permissions = slices.DeleteFunc(permissions, func(p models.Permission) bool {
+			permissions = slices.DeleteFunc(permissions, func(p api.PermissionResponse) bool {
 				return p.PermissionIdentifier == constants.UserinfoPermissionIdentifier
 			})
 		}
@@ -421,7 +420,7 @@ func HandleAdminResourceGroupsWithPermissionRemovePermissionPost(
 		}
 
 		// filter out the userinfo permission if the resource is authserver
-		filteredPermissions := []models.Permission{}
+		filteredPermissions := []api.PermissionResponse{}
 		for idx, permission := range permissions {
 			if permission.Resource.ResourceIdentifier == constants.AuthServerResourceIdentifier {
 				if permission.PermissionIdentifier != constants.UserinfoPermissionIdentifier {

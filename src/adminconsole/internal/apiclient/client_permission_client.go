@@ -9,11 +9,10 @@ import (
 
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
-	"github.com/leodip/goiabada/core/models"
 )
 
 // GetClientPermissions retrieves client and its permissions
-func (c *AuthServerClient) GetClientPermissions(accessToken string, clientId int64) (*api.ClientResponse, []models.Permission, error) {
+func (c *AuthServerClient) GetClientPermissions(accessToken string, clientId int64) (*api.ClientResponse, []api.PermissionResponse, error) {
 	fullURL := c.baseURL + "/api/v1/admin/clients/" + strconv.FormatInt(clientId, 10) + "/permissions"
 
 	req, err := http.NewRequest("GET", fullURL, nil)
@@ -42,23 +41,7 @@ func (c *AuthServerClient) GetClientPermissions(accessToken string, clientId int
 		return nil, nil, errs.Errorf("failed to unmarshal response: %w", err)
 	}
 
-	// Map permissions
-	permissions := make([]models.Permission, len(apiResp.Permissions))
-	for i, permResp := range apiResp.Permissions {
-		permissions[i] = models.Permission{
-			Id:                   permResp.Id,
-			PermissionIdentifier: permResp.PermissionIdentifier,
-			Description:          permResp.Description,
-			ResourceId:           permResp.ResourceId,
-			Resource: models.Resource{
-				Id:                 permResp.Resource.Id,
-				ResourceIdentifier: permResp.Resource.ResourceIdentifier,
-				Description:        permResp.Resource.Description,
-			},
-		}
-	}
-
-	return &apiResp.Client, permissions, nil
+	return &apiResp.Client, apiResp.Permissions, nil
 }
 
 // UpdateClientPermissions replaces the set of permissions assigned to a client.

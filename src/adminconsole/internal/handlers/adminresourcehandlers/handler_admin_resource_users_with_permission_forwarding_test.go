@@ -13,9 +13,9 @@ import (
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
+	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/customerrors"
 	mocks_handler_helpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
-	"github.com/leodip/goiabada/core/models"
 )
 
 // Decision 13 on an AJAX preflight read, which is where the console's own sweep left the shape it
@@ -36,7 +36,7 @@ type usersWithPermissionApiClient struct {
 	err error
 }
 
-func (c *usersWithPermissionApiClient) GetResourceById(accessToken string, resourceId int64) (*models.Resource, error) {
+func (c *usersWithPermissionApiClient) GetResourceById(accessToken string, resourceId int64) (*api.ResourceResponse, error) {
 	return nil, c.err
 }
 

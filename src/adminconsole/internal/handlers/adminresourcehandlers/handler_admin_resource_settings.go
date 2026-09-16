@@ -68,7 +68,7 @@ func HandleAdminResourceSettingsGet(
 			"resourceId":            resource.Id,
 			"resourceIdentifier":    resource.ResourceIdentifier,
 			"description":           resource.Description,
-			"isSystemLevelResource": resource.IsSystemLevelResource(),
+			"isSystemLevelResource": resource.IsSystemLevelResource,
 			"savedSuccessfully":     savedSuccessfully,
 		}
 
@@ -112,7 +112,7 @@ func HandleAdminResourceSettingsPost(
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
-		isSystemLevelResource := resource.IsSystemLevelResource()
+		isSystemLevelResource := resource.IsSystemLevelResource
 
 		resourceIdentifier := r.FormValue("resourceIdentifier")
 		description := r.FormValue("description")

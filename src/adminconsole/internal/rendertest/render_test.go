@@ -831,3 +831,51 @@ func TestRender_AdminGroupAttributes(t *testing.T) {
 		assert.Contains(t, out, "Nenhum atributo associado ao grupo.")
 	})
 }
+
+// The two resource pages, which hold this change's last two families: admin_resources.html ranges
+// over the resource DTOs the API client now hands back untouched, and admin_resources_permissions
+// pushes each permission DTO into a JavaScript array by field. Both used to read a models.Resource
+// and a models.Permission that the API client rebuilt column by column. This is the only seam that
+// catches a template naming a field the DTO does not carry, which is the whole reason the package
+// exists (#350).
+func TestRender_AdminResourcesList(t *testing.T) {
+	bind := map[string]interface{}{
+		"resources": []api.ResourceResponse{
+			{Id: 1, ResourceIdentifier: "authserver", Description: "Servidor de autenticação",
+				IsSystemLevelResource: true},
+			{Id: 2, ResourceIdentifier: "faturamento", Description: ""},
+		},
+	}
+
+	out := render(t, "/admin_resources.html", bind)
+
+	assert.Contains(t, out, "authserver")
+	assert.Contains(t, out, "Servidor de autenticação")
+	assert.Contains(t, out, "/admin/resources/2/settings",
+		"the row's links are built from the DTO's Id")
+}
+
+func TestRender_AdminResourcePermissions(t *testing.T) {
+	bind := map[string]interface{}{
+		"resourceId":                   2,
+		"resourceIdentifier":           "faturamento",
+		"resourceDescription":          "Faturamento",
+		"isSystemLevelResource":        false,
+		"builtInPermissionIdentifiers": []string{},
+		"savedSuccessfully":            false,
+		"permissions": []api.PermissionResponse{
+			{Id: 9, PermissionIdentifier: "ler", Description: "Ler faturas", ResourceId: 2,
+				Resource: api.ResourceResponse{Id: 2, ResourceIdentifier: "faturamento"}},
+		},
+	}
+
+	out := render(t, "/admin_resources_permissions.html", bind)
+
+	// The page bootstraps its editor from a JavaScript array built out of the DTO's fields, so a
+	// renamed or missing field arrives as an empty string rather than as a template error.
+	assert.Contains(t, out, `"permissionIdentifier": "ler"`)
+	assert.Contains(t, out, `"description": "Ler faturas"`)
+	// html/template pads a number interpolated into a script with spaces, so the id is asserted in
+	// the form the browser actually receives rather than the form the template reads.
+	assert.Contains(t, out, `"id":  9 `)
+}

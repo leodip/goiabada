@@ -94,12 +94,12 @@
                         permissionsSelect.innerHTML = "";
                         permissionsSelect.options[permissionsSelect.options.length] = new Option("{{ T $.ctx "adminconsole.admin_groups.permissions.select_permission" }}", "");
                         result.Permissions.forEach((permission) => {
-                            let name = permission.PermissionIdentifier;
-                            if(permission.Description.length > 0) {
-                                name += " (" + permission.Description + ")";
+                            let name = permission.permissionIdentifier;
+                            if(permission.description.length > 0) {
+                                name += " (" + permission.description + ")";
                             }
-                            opt = new Option(name, permission.Id);
-                            opt.setAttribute('data-permissionidentifier', permission.PermissionIdentifier);
+                            opt = new Option(name, permission.id);
+                            opt.setAttribute('data-permissionidentifier', permission.permissionIdentifier);
                             permissionsSelect.options[permissionsSelect.options.length] = opt;
                         });
                     }

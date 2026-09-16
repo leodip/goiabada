@@ -1,7 +1,7 @@
 package handlers
 
-import "github.com/leodip/goiabada/core/models"
+import "github.com/leodip/goiabada/core/api"
 
 type GetPermissionsResult struct {
-	Permissions []models.Permission
+	Permissions []api.PermissionResponse
 }

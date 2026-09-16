@@ -5,9 +5,9 @@ import (
 	"strconv"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
+	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/errs"
-	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
 )
 
@@ -26,7 +26,7 @@ func HandleAdminGetPermissionsGet(
 		accessToken := jwtInfo.TokenResponse.AccessToken
 
 		result := GetPermissionsResult{
-			Permissions: []models.Permission{}, // Initialize with empty slice to avoid null
+			Permissions: []api.PermissionResponse{}, // Initialize with empty slice to avoid null
 		}
 
 		resourceIdStr := r.URL.Query().Get("resourceId")
@@ -51,7 +51,7 @@ func HandleAdminGetPermissionsGet(
 
 		// Ensure permissions is never nil
 		if permissions == nil {
-			permissions = []models.Permission{}
+			permissions = []api.PermissionResponse{}
 		}
 
 		result.Permissions = permissions
