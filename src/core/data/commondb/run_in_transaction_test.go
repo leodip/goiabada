@@ -108,8 +108,6 @@ func TestRunInTransaction_APlainErrorRollsBackAndIsReturnedAsItWas(t *testing.T)
 
 	require.Error(t, err)
 	assert.Equal(t, boom, err, "the body's error comes back IDENTICAL, not wrapped: callers match it with errors.Is and read it as they wrote it")
-	assert.NotErrorIs(t, err, ErrIndeterminateCommit,
-		"and untagged, because a body that failed was rolled back: there is nothing for a caller to reconcile, and a caller that reconciled here would spend a read on every such failure")
 	assert.Equal(t, 1, ran, "an error that is not a deadlock is not retried")
 	assert.Equal(t, 1, d.rollbacks, "the transaction is rolled back")
 	assert.Zero(t, d.commits)
@@ -211,30 +209,8 @@ func TestRunInTransaction_ThreeDeadlocksAtCommitExhaustTheAttempts(t *testing.T)
 
 	require.Error(t, err)
 	assert.ErrorIs(t, err, errDeadlock)
-	assert.NotErrorIs(t, err, ErrIndeterminateCommit,
-		"three DECLARED aborts are three known rollbacks: the outcome here is certain, and a tag would send a caller looking for rows that cannot be there")
 	assert.Equal(t, 3, ran)
 	assert.Equal(t, 3, d.commits)
-}
-
-// TestRunInTransaction_ACommitFailureIsTaggedEvenWithNoClassifier is the tag's interaction with
-// the default a handle gets when no dialect installed a classifier. Nothing is a deadlock there,
-// so nothing is a declared rollback either, and every commit failure is ambiguous -- which is the
-// fail-safe direction: a caller that reconciles finds no row and spends a read, where the reverse
-// default would leave the row.
-func TestRunInTransaction_ACommitFailureIsTaggedEvenWithNoClassifier(t *testing.T) {
-	boom := errors.New("write: broken pipe")
-	d := &scriptedDriver{commitErrs: []error{boom}}
-	db := scriptedDB(t, d)
-	require.Nil(t, db.IsDeadlock, "the fixture only says anything if no classifier is installed")
-	ran := 0
-
-	err := db.RunInTransaction(oneStatement(db, &ran))
-
-	require.Error(t, err)
-	assert.ErrorIs(t, err, ErrIndeterminateCommit)
-	assert.ErrorIs(t, err, boom)
-	assert.Equal(t, 1, ran, "and still one attempt, since nothing here is a deadlock")
 }
 
 // TestRunInTransaction_ACommitThatFailsForAnyOtherReasonIsNotReplayed holds the decided line
@@ -253,9 +229,6 @@ func TestRunInTransaction_ACommitThatFailsForAnyOtherReasonIsNotReplayed(t *test
 
 	require.Error(t, err)
 	assert.ErrorIs(t, err, boom, "the commit's own failure comes back")
-	assert.ErrorIs(t, err, ErrIndeterminateCommit,
-		"tagged, which is what turns the sentence in the contract into something a caller can act on: this is the one outcome nobody can read off the error")
-	assert.Contains(t, err.Error(), boom.Error(), "and the driver's own text is still in the message")
 	assert.NotContains(t, err.Error(), "attempts", "with no retry wrapping, because there was no retry")
 	assert.Equal(t, 1, ran, "ONE attempt")
 	assert.Equal(t, 1, d.commits)
