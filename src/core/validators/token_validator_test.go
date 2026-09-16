@@ -6868,3 +6868,109 @@ func TestValidateTokenRequest_AuthorizationCode_RedirectURIStillRegistered(t *te
 		assert.Equal(t, "Invalid code_verifier (PKCE).", customErr.GetDescription())
 	})
 }
+
+// TestValidateTokenRequest_RefreshToken_SubjectResolvesToNoUser covers #123: GetUserBySubject
+// answers (nil, nil) for a subject that names no row, and the permission re-check dereferences
+// user.Id, so the process panicked.
+//
+// The two rows pin the PLACEMENT of the refusal, not merely its existence. The dereference sits
+// inside a branch skipped for OIDC scopes, offline_access and the injected userinfo scope, so a
+// check written at the dereference passes the resource-scope row and fails the OIDC-only one: that
+// refresh would be accepted, minting a fresh access token for a subject that resolves to nothing.
+// Only a check above the loop satisfies both.
+//
+// Both rows assert a plain error rather than a *customerrors.ErrorDetail, which is the 500 of
+// decision 8a. No supported operation can produce such a token (DeleteUser removes the user's
+// refresh tokens in the same transaction, and the authorization-code ones go by CASCADE), so this
+// is an internal inconsistency rather than anything the client did, and this arm already answers
+// its other signed-but-impossible states the same way.
+func TestValidateTokenRequest_RefreshToken_SubjectResolvesToNoUser(t *testing.T) {
+	testCases := []struct {
+		name string
+		// storedScope is RefreshToken.Scope, which for a ROPC token is what the validator re-checks.
+		storedScope string
+	}{
+		{
+			// Never reaches the dereference: IsIdTokenScope skips the permission re-check
+			// entirely. Today this arm would succeed, so it is the row that fails if the refusal
+			// is written at the panic site instead of above the loop.
+			name:        "an OIDC-only scope never reaches the dereference and is still refused",
+			storedScope: "openid",
+		},
+		{
+			// The panic path #123 reports: a resource scope takes the branch that reads user.Id.
+			// No UserHasScopePermission expectation is registered, and mocks_user.NewPermissionChecker(t)
+			// fails on an unexpected call, so this also proves the refusal happens before the loop.
+			name:        "a resource scope is refused before the permission re-check",
+			storedScope: "billing-api:read",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			mockDB := mocks_data.NewDatabase(t)
+			mockTokenParser := mocks_oauth.NewTokenParser(t)
+			mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+
+			validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+			ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &models.Settings{})
+
+			input := &ValidateTokenRequestInput{
+				GrantType:    "refresh_token",
+				ClientId:     "ropc_client",
+				RefreshToken: "ropc_refresh_token",
+			}
+
+			client := &models.Client{
+				Id:                       1,
+				ClientIdentifier:         "ropc_client",
+				Enabled:                  true,
+				AuthorizationCodeEnabled: true,
+				IsPublic:                 true,
+			}
+
+			refreshTokenJwt := &oauth.JwtToken{
+				Claims: jwt.MapClaims{
+					"jti":                         "ropc_jti",
+					"typ":                         "Offline",
+					"sub":                         "orphaned_subject",
+					"offline_access_max_lifetime": float64(time.Now().UTC().Add(24 * time.Hour).Unix()),
+				},
+			}
+
+			// CodeId invalid marks this a ROPC token, which is what makes the validator read
+			// RefreshToken.Scope and skip the consent check.
+			refreshToken := &models.RefreshToken{
+				RefreshTokenJti: "ropc_jti",
+				CodeId:          sql.NullInt64{Valid: false},
+				UserId:          sql.NullInt64{Int64: 7, Valid: true},
+				ClientId:        sql.NullInt64{Int64: 1, Valid: true},
+				Scope:           tc.storedScope,
+				User:            models.User{Id: 7, Enabled: true},
+				Client:          *client,
+			}
+
+			mockDB.On("GetClientByClientIdentifier", mock.Anything, "ropc_client").Return(client, nil)
+			mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "ropc_refresh_token", (*rsa.PublicKey)(nil), true).
+				Return(refreshTokenJwt, nil)
+			mockDB.On("GetRefreshTokenByJti", mock.Anything, "ropc_jti").Return(refreshToken, nil)
+			mockDB.On("RefreshTokenLoadUser", mock.Anything, refreshToken).Return(nil)
+			mockDB.On("RefreshTokenLoadClient", mock.Anything, refreshToken).Return(nil)
+
+			// The row the whole test is about: a signed, live refresh token whose sub names nothing.
+			mockDB.On("GetUserBySubject", mock.Anything, "orphaned_subject").Return(nil, nil)
+
+			result, err := validator.ValidateTokenRequest(ctx, input)
+
+			assert.Nil(t, result)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "subject not found: orphaned_subject")
+
+			// A 500, not a 400: an ErrorDetail here would mean the server told the client its
+			// request was bad when the tokens and the users table disagree.
+			var detail *customerrors.ErrorDetail
+			assert.False(t, errors.As(err, &detail),
+				"expected a plain error carrying a 500, got a client-facing ErrorDetail: %v", err)
+		})
+	}
+}
