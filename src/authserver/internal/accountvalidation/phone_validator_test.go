@@ -1,4 +1,4 @@
-package validators
+package accountvalidation
 
 import (
 	"testing"

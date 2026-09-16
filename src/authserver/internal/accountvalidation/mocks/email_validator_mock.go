@@ -7,10 +7,10 @@
 
 //go:build !production
 
-package mocks_validator
+package mocks_accountvalidation
 
 import (
-	"github.com/leodip/goiabada/core/validators"
+	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -102,7 +102,7 @@ func (_c *EmailValidator_ValidateEmailAddress_Call) RunAndReturn(run func(emailA
 }
 
 // ValidateEmailUpdate provides a mock function for the type EmailValidator
-func (_mock *EmailValidator) ValidateEmailUpdate(input *validators.ValidateEmailInput) error {
+func (_mock *EmailValidator) ValidateEmailUpdate(input *accountvalidation.ValidateEmailInput) error {
 	ret := _mock.Called(input)
 
 	if len(ret) == 0 {
@@ -110,7 +110,7 @@ func (_mock *EmailValidator) ValidateEmailUpdate(input *validators.ValidateEmail
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(*validators.ValidateEmailInput) error); ok {
+	if returnFunc, ok := ret.Get(0).(func(*accountvalidation.ValidateEmailInput) error); ok {
 		r0 = returnFunc(input)
 	} else {
 		r0 = ret.Error(0)
@@ -124,16 +124,16 @@ type EmailValidator_ValidateEmailUpdate_Call struct {
 }
 
 // ValidateEmailUpdate is a helper method to define mock.On call
-//   - input *validators.ValidateEmailInput
+//   - input *accountvalidation.ValidateEmailInput
 func (_e *EmailValidator_Expecter) ValidateEmailUpdate(input any) *EmailValidator_ValidateEmailUpdate_Call {
 	return &EmailValidator_ValidateEmailUpdate_Call{Call: _e.mock.On("ValidateEmailUpdate", input)}
 }
 
-func (_c *EmailValidator_ValidateEmailUpdate_Call) Run(run func(input *validators.ValidateEmailInput)) *EmailValidator_ValidateEmailUpdate_Call {
+func (_c *EmailValidator_ValidateEmailUpdate_Call) Run(run func(input *accountvalidation.ValidateEmailInput)) *EmailValidator_ValidateEmailUpdate_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *validators.ValidateEmailInput
+		var arg0 *accountvalidation.ValidateEmailInput
 		if args[0] != nil {
-			arg0 = args[0].(*validators.ValidateEmailInput)
+			arg0 = args[0].(*accountvalidation.ValidateEmailInput)
 		}
 		run(
 			arg0,
@@ -147,7 +147,7 @@ func (_c *EmailValidator_ValidateEmailUpdate_Call) Return(err error) *EmailValid
 	return _c
 }
 
-func (_c *EmailValidator_ValidateEmailUpdate_Call) RunAndReturn(run func(input *validators.ValidateEmailInput) error) *EmailValidator_ValidateEmailUpdate_Call {
+func (_c *EmailValidator_ValidateEmailUpdate_Call) RunAndReturn(run func(input *accountvalidation.ValidateEmailInput) error) *EmailValidator_ValidateEmailUpdate_Call {
 	_c.Call.Return(run)
 	return _c
 }

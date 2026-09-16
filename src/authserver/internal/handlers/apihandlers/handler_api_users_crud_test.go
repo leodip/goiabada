@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	mocks_communication "github.com/leodip/goiabada/core/communication/mocks"
@@ -23,7 +24,6 @@ import (
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/models"
 	mocks_users "github.com/leodip/goiabada/core/user/mocks"
-	"github.com/leodip/goiabada/core/validators"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -209,7 +209,7 @@ func TestHandleAPIUserPasswordPut_RevokesEverything(t *testing.T) {
 
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_audit.NewAuditLogger(t)
-	passwordValidator := validators.NewPasswordValidator()
+	passwordValidator := accountvalidation.NewPasswordValidator()
 
 	database.On("GetUserById", (*sql.Tx)(nil), userId).Return(&models.User{Id: userId}, nil).Once()
 
@@ -328,9 +328,9 @@ func TestHandleAPIUserCreatePost_StoresResetCodeHash(t *testing.T) {
 	emailSender := mocks_communication.NewEmailSender(t)
 
 	handler := HandleAPIUserCreatePost(httpHelper, database, userCreator,
-		validators.NewEmailValidator(database),
-		validators.NewProfileValidator(database),
-		validators.NewPasswordValidator(),
+		accountvalidation.NewEmailValidator(database),
+		accountvalidation.NewProfileValidator(database),
+		accountvalidation.NewPasswordValidator(),
 		auditLogger, emailSender)
 
 	body, err := json.Marshal(map[string]interface{}{
@@ -409,9 +409,9 @@ func TestHandleAPIUserCreatePost_LostRaceOnTheEmailAnswers409(t *testing.T) {
 	emailSender := mocks_communication.NewEmailSender(t)
 
 	handler := HandleAPIUserCreatePost(httpHelper, database, userCreator,
-		validators.NewEmailValidator(database),
-		validators.NewProfileValidator(database),
-		validators.NewPasswordValidator(),
+		accountvalidation.NewEmailValidator(database),
+		accountvalidation.NewProfileValidator(database),
+		accountvalidation.NewPasswordValidator(),
 		auditLogger, emailSender)
 
 	body, err := json.Marshal(map[string]interface{}{
@@ -464,9 +464,9 @@ func TestHandleAPIUserCreatePost_AnyOtherCreateFailureAnswers500(t *testing.T) {
 	emailSender := mocks_communication.NewEmailSender(t)
 
 	handler := HandleAPIUserCreatePost(httpHelper, database, userCreator,
-		validators.NewEmailValidator(database),
-		validators.NewProfileValidator(database),
-		validators.NewPasswordValidator(),
+		accountvalidation.NewEmailValidator(database),
+		accountvalidation.NewProfileValidator(database),
+		accountvalidation.NewPasswordValidator(),
 		auditLogger, emailSender)
 
 	body, err := json.Marshal(map[string]interface{}{

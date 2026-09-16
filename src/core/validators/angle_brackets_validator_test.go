@@ -7,6 +7,31 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// assertLocalizedError asserts that err is an *i18n.LocalizedError carrying the
+// expected code and rendering the expected English sentence.
+//
+// The sentence is asserted as well as the code because a code assertion alone
+// passes whatever the catalog happens to say: rewording an entry to describe a
+// different rule leaves every such test green while the user reads the wrong
+// instruction. Rewording validator.password.uppercase_required to ask for a
+// lowercase character survived the whole suite before this landed (#230).
+//
+// accountvalidation carries a second declaration of this helper, for the five
+// validators that moved to the auth server in #344. Two small declarations, one
+// per package, rather than an exported testing helper in core that production
+// code would link: the packages are in different modules now, and core may not
+// import the auth server at all.
+func assertLocalizedError(t *testing.T, err error, expectedCode string, expectedMessage string) {
+	t.Helper()
+	assert.Error(t, err)
+	locErr, ok := err.(*i18n.LocalizedError)
+	assert.True(t, ok, "expected *i18n.LocalizedError, got %T", err)
+	if ok {
+		assert.Equal(t, expectedCode, locErr.Code)
+		assert.Equal(t, expectedMessage, locErr.EnglishFallback())
+	}
+}
+
 // =============================================================================
 // Tests for ContainsAngleBrackets and ValidateNoAngleBrackets
 //

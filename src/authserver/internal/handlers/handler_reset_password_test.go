@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	mocks_accountvalidation "github.com/leodip/goiabada/authserver/internal/accountvalidation/mocks"
 	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
 	"github.com/leodip/goiabada/core/constants"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
@@ -24,7 +25,6 @@ import (
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/models"
 	mocks_sessionstore "github.com/leodip/goiabada/core/sessionstore/mocks"
-	mocks_validators "github.com/leodip/goiabada/core/validators/mocks"
 )
 
 // The address httptest.NewRequest gives every request, which is what the audit entry now
@@ -746,25 +746,25 @@ func TestHandleResetPasswordPost_PasswordFieldRejections(t *testing.T) {
 		// back, which is whatever the body submitted. Empty only where the body submitted
 		// none.
 		wantEchoedContinuationId string
-		arrange                  func(passwordValidator *mocks_validators.PasswordValidator)
+		arrange                  func(passwordValidator *mocks_accountvalidation.PasswordValidator)
 	}{
 		{
 			name:     "empty password",
 			password: "", passwordConfirmation: "",
 			wantEchoedContinuationId: continuationId,
-			arrange:                  func(passwordValidator *mocks_validators.PasswordValidator) {},
+			arrange:                  func(passwordValidator *mocks_accountvalidation.PasswordValidator) {},
 		},
 		{
 			name:     "confirmation mismatch",
 			password: "Str0ngP4ss!", passwordConfirmation: "Different1!",
 			wantEchoedContinuationId: continuationId,
-			arrange:                  func(passwordValidator *mocks_validators.PasswordValidator) {},
+			arrange:                  func(passwordValidator *mocks_accountvalidation.PasswordValidator) {},
 		},
 		{
 			name:     "the validator refuses the password",
 			password: "weak", passwordConfirmation: "weak",
 			wantEchoedContinuationId: continuationId,
-			arrange: func(passwordValidator *mocks_validators.PasswordValidator) {
+			arrange: func(passwordValidator *mocks_accountvalidation.PasswordValidator) {
 				passwordValidator.On("ValidatePassword", mock.Anything, "weak").
 					Return(errors.New("too weak")).Once()
 			},
@@ -778,7 +778,7 @@ func TestHandleResetPasswordPost_PasswordFieldRejections(t *testing.T) {
 			password: "Str0ngP4ss!", passwordConfirmation: "Str0ngP4ss!",
 			build:                    postResetWithCredentialsInQuery,
 			wantEchoedContinuationId: continuationId,
-			arrange:                  func(passwordValidator *mocks_validators.PasswordValidator) {},
+			arrange:                  func(passwordValidator *mocks_accountvalidation.PasswordValidator) {},
 		},
 		{
 			// The confirmation alone in the query, matching the password in the body,
@@ -791,7 +791,7 @@ func TestHandleResetPasswordPost_PasswordFieldRejections(t *testing.T) {
 			password: "Str0ngP4ss!", passwordConfirmation: "Str0ngP4ss!",
 			build:                    postResetWithConfirmationInQuery,
 			wantEchoedContinuationId: continuationId,
-			arrange:                  func(passwordValidator *mocks_validators.PasswordValidator) {},
+			arrange:                  func(passwordValidator *mocks_accountvalidation.PasswordValidator) {},
 		},
 		{
 			// The continuation id alone in the query, none in the body, pinning the
@@ -802,7 +802,7 @@ func TestHandleResetPasswordPost_PasswordFieldRejections(t *testing.T) {
 			password: "", passwordConfirmation: "",
 			build:                    postResetWithContinuationInQuery,
 			wantEchoedContinuationId: "",
-			arrange:                  func(passwordValidator *mocks_validators.PasswordValidator) {},
+			arrange:                  func(passwordValidator *mocks_accountvalidation.PasswordValidator) {},
 		},
 	}
 
@@ -810,7 +810,7 @@ func TestHandleResetPasswordPost_PasswordFieldRejections(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 			database := mocks_data.NewDatabase(t)
-			passwordValidator := mocks_validators.NewPasswordValidator(t)
+			passwordValidator := mocks_accountvalidation.NewPasswordValidator(t)
 			auditLogger := mocks_audit.NewAuditLogger(t)
 			store := newMarkerTestStore()
 
@@ -950,7 +950,7 @@ func TestHandleResetPasswordPost_MarkerRejectionsDoNotChangeThePassword(t *testi
 		t.Run(tc.name, func(t *testing.T) {
 			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 			database := mocks_data.NewDatabase(t)
-			passwordValidator := mocks_validators.NewPasswordValidator(t)
+			passwordValidator := mocks_accountvalidation.NewPasswordValidator(t)
 			auditLogger := mocks_audit.NewAuditLogger(t)
 			store := newMarkerTestStore()
 
@@ -973,7 +973,7 @@ func TestHandleResetPasswordPost_MarkerRejectionsDoNotChangeThePassword(t *testi
 func TestHandleResetPasswordPost_HappyPath(t *testing.T) {
 	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 	database := mocks_data.NewDatabase(t)
-	passwordValidator := mocks_validators.NewPasswordValidator(t)
+	passwordValidator := mocks_accountvalidation.NewPasswordValidator(t)
 	auditLogger := mocks_audit.NewAuditLogger(t)
 	store := newMarkerTestStore()
 
@@ -1041,7 +1041,7 @@ func TestHandleResetPasswordPost_HappyPath(t *testing.T) {
 func TestHandleResetPasswordPost_ClaimLost(t *testing.T) {
 	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 	database := mocks_data.NewDatabase(t)
-	passwordValidator := mocks_validators.NewPasswordValidator(t)
+	passwordValidator := mocks_accountvalidation.NewPasswordValidator(t)
 	auditLogger := mocks_audit.NewAuditLogger(t)
 	store := newMarkerTestStore()
 
@@ -1083,7 +1083,7 @@ func TestHandleResetPasswordPost_ClaimLost(t *testing.T) {
 func TestHandleResetPasswordPost_ClaimFails(t *testing.T) {
 	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 	database := mocks_data.NewDatabase(t)
-	passwordValidator := mocks_validators.NewPasswordValidator(t)
+	passwordValidator := mocks_accountvalidation.NewPasswordValidator(t)
 	auditLogger := mocks_audit.NewAuditLogger(t)
 	store := newMarkerTestStore()
 
@@ -1200,7 +1200,7 @@ func TestHandleResetPasswordPost_TransactionFailureHandling(t *testing.T) {
 		t.Run(tc.label, func(t *testing.T) {
 			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 			database := mocks_data.NewDatabase(t)
-			passwordValidator := mocks_validators.NewPasswordValidator(t)
+			passwordValidator := mocks_accountvalidation.NewPasswordValidator(t)
 			auditLogger := mocks_audit.NewAuditLogger(t)
 			store := newMarkerTestStore()
 
@@ -1384,7 +1384,7 @@ func TestResetPassword_LinkFailuresAreIndistinguishable(t *testing.T) {
 			setup: func(t *testing.T) (*map[string]interface{}, func()) {
 				httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 				database := mocks_data.NewDatabase(t)
-				passwordValidator := mocks_validators.NewPasswordValidator(t)
+				passwordValidator := mocks_accountvalidation.NewPasswordValidator(t)
 				auditLogger := mocks_audit.NewAuditLogger(t)
 				store := newMarkerTestStore()
 				passwordValidator.On("ValidatePassword", mock.Anything, newPassword).Return(nil).Once()
@@ -1402,7 +1402,7 @@ func TestResetPassword_LinkFailuresAreIndistinguishable(t *testing.T) {
 			setup: func(t *testing.T) (*map[string]interface{}, func()) {
 				httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 				database := mocks_data.NewDatabase(t)
-				passwordValidator := mocks_validators.NewPasswordValidator(t)
+				passwordValidator := mocks_accountvalidation.NewPasswordValidator(t)
 				auditLogger := mocks_audit.NewAuditLogger(t)
 				store := newMarkerTestStore()
 				passwordValidator.On("ValidatePassword", mock.Anything, newPassword).Return(nil).Once()
@@ -1423,7 +1423,7 @@ func TestResetPassword_LinkFailuresAreIndistinguishable(t *testing.T) {
 			setup: func(t *testing.T) (*map[string]interface{}, func()) {
 				httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 				database := mocks_data.NewDatabase(t)
-				passwordValidator := mocks_validators.NewPasswordValidator(t)
+				passwordValidator := mocks_accountvalidation.NewPasswordValidator(t)
 				auditLogger := mocks_audit.NewAuditLogger(t)
 				store := newMarkerTestStore()
 				passwordValidator.On("ValidatePassword", mock.Anything, newPassword).Return(nil).Once()
@@ -1445,7 +1445,7 @@ func TestResetPassword_LinkFailuresAreIndistinguishable(t *testing.T) {
 			setup: func(t *testing.T) (*map[string]interface{}, func()) {
 				httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 				database := mocks_data.NewDatabase(t)
-				passwordValidator := mocks_validators.NewPasswordValidator(t)
+				passwordValidator := mocks_accountvalidation.NewPasswordValidator(t)
 				auditLogger := mocks_audit.NewAuditLogger(t)
 				store := newMarkerTestStore()
 				passwordValidator.On("ValidatePassword", mock.Anything, newPassword).Return(nil).Once()

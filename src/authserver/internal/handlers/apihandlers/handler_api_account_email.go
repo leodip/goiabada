@@ -6,18 +6,18 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
-	"github.com/leodip/goiabada/core/validators"
 )
 
 // HandleAPIAccountEmailPut - PUT /api/v1/account/email
 func HandleAPIAccountEmailPut(
 	database data.Database,
-	emailValidator *validators.EmailValidator,
+	emailValidator *accountvalidation.EmailValidator,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

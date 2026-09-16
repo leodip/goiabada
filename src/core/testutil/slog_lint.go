@@ -211,9 +211,15 @@ var slogSpreadSites = []slogSpreadSite{
 // request_id after a user reports a refusal. Both servers' handlers and middleware, the
 // authserver's API response writers and the admin console's client of the auth server's API, the
 // audit path's two packages, the authserver packages a ceremony runs through -- the ceremony
-// context, code and token issuance, and the signing keys (#339) -- and the core packages the
-// handlers call into on a request: the shared middleware, the validators, the client-side token
-// parser, the handler helpers and the session store.
+// context, code and token issuance, and the signing keys (#339) -- the account validators the API
+// handlers call on a request (#344) -- and the core packages the handlers call into on a request:
+// the shared middleware, the validators that stayed there, the client-side token parser, the
+// handler helpers and the session store.
+//
+// authserver/internal/accountvalidation carries no record today, which is the same reason every
+// other quiet directory here is listed rather than left out: the rule is what refuses a plain
+// slog.Warn written beside a validator later, and a directory absent from this list costs coverage
+// silently, since the walk only fails when it reaches no files at all.
 //
 // Left out on purpose, each a ceiling recorded in the PR of #320 rather than a site this rule
 // admits: core/data, whose transaction and statement records run under RunInTransaction with no
@@ -235,6 +241,7 @@ var slogRequestPathDirs = []string{
 	"authserver/internal/ceremony",
 	"authserver/internal/issuance",
 	"authserver/internal/signingkeys",
+	"authserver/internal/accountvalidation",
 	"adminconsole/internal/handlers",
 	"adminconsole/internal/middleware",
 	"adminconsole/internal/apiclient",

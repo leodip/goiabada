@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/core/constants"
@@ -17,7 +18,6 @@ import (
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/leodip/goiabada/core/validators"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -75,7 +75,7 @@ func newCredentialEnv(t *testing.T) *credentialEnv {
 
 	return &credentialEnv{
 		password: rateLimiter.LimitAccountPassword(
-			HandleAPIAccountPasswordPut(database, validators.NewPasswordValidator(), auditLogger, rateLimiter)),
+			HandleAPIAccountPasswordPut(database, accountvalidation.NewPasswordValidator(), auditLogger, rateLimiter)),
 		otp: rateLimiter.LimitAccountPassword(
 			HandleAPIAccountOTPPut(database, auditLogger, rateLimiter)),
 		database: database,
