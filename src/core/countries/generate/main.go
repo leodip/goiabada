@@ -59,8 +59,11 @@ const (
 	expectedGeneratedCount = expectedUpstreamCount + 1
 
 	// maxCallingCodes bounds a country's calling codes. It mirrors the runtime
-	// cap in phonecountries.Get (src/core/phonecountries/phone_countries.go),
-	// which panics above 5 — so the generator must reject it first.
+	// cap in phonecountries.Get
+	// (src/authserver/internal/phonecountries/phone_countries.go), which panics
+	// above 5 — so the generator must reject it first. That package is in
+	// another module now, so nothing compiles the two together: this constant is
+	// all that holds them, and moving one means moving the other by hand (#344).
 	maxCallingCodes = 5
 )
 
