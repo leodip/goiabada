@@ -200,9 +200,9 @@ the single largest piece of the boundary still to close.
 
 The admin console is a web UI that talks to the auth server over HTTP. It opens no database, sends
 no mail and generates no TOTP codes, so the libraries that do those things have no business in its
-binary. `adminconsole/go.mod` still lists all four database drivers as indirect dependencies, and
-will until `core` stops requiring them, but a `go.mod` line is what the module graph permits rather
-than what the linker pulls in. What matters is the import closure, and #344 emptied it of them.
+binary. `adminconsole/go.mod` no longer requires them at all, tidied in #346, but a `go.mod` line
+is what the module graph permits rather than what the linker pulls in. What matters is the import
+closure, and #344 emptied it of them.
 
 This is the concrete harm the epic exists to fix, and it is measurable, so the guard measures it.
 `reachable today` is asserted against the real transitive import closure of the admin console's
