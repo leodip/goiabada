@@ -12,16 +12,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func assertLocalizedCode(t *testing.T, err error, expectedCode string) {
-	t.Helper()
-	assert.Error(t, err)
-	locErr, ok := err.(*i18n.LocalizedError)
-	assert.True(t, ok, "expected *i18n.LocalizedError, got %T", err)
-	if ok {
-		assert.Equal(t, expectedCode, locErr.Code)
-	}
-}
-
 func TestPasswordValidator_ValidatePassword(t *testing.T) {
 	validator := NewPasswordValidator()
 
@@ -37,12 +27,14 @@ func TestPasswordValidator_ValidatePassword(t *testing.T) {
 
 		t.Run("TooShort", func(t *testing.T) {
 			err := validator.ValidatePassword(ctx, "12345")
-			assertLocalizedCode(t, err, i18n.ErrCodePasswordTooShort)
+			assertLocalizedError(t, err, i18n.ErrCodePasswordTooShort,
+				"The minimum length for the password is 6 characters")
 		})
 
 		t.Run("TooLong", func(t *testing.T) {
 			err := validator.ValidatePassword(ctx, strings.Repeat("a", 65))
-			assertLocalizedCode(t, err, i18n.ErrCodePasswordTooLong)
+			assertLocalizedError(t, err, i18n.ErrCodePasswordTooLong,
+				"The maximum length for the password is 64 characters")
 		})
 	})
 
@@ -58,17 +50,20 @@ func TestPasswordValidator_ValidatePassword(t *testing.T) {
 
 		t.Run("MissingUppercase", func(t *testing.T) {
 			err := validator.ValidatePassword(ctx, "passw0rd")
-			assertLocalizedCode(t, err, i18n.ErrCodePasswordUppercaseRequired)
+			assertLocalizedError(t, err, i18n.ErrCodePasswordUppercaseRequired,
+				"As per our policy, an uppercase character is required in the password.")
 		})
 
 		t.Run("MissingLowercase", func(t *testing.T) {
 			err := validator.ValidatePassword(ctx, "PASSW0RD")
-			assertLocalizedCode(t, err, i18n.ErrCodePasswordLowercaseRequired)
+			assertLocalizedError(t, err, i18n.ErrCodePasswordLowercaseRequired,
+				"As per our policy, a lowercase character is required in the password.")
 		})
 
 		t.Run("MissingNumber", func(t *testing.T) {
 			err := validator.ValidatePassword(ctx, "Password")
-			assertLocalizedCode(t, err, i18n.ErrCodePasswordNumberRequired)
+			assertLocalizedError(t, err, i18n.ErrCodePasswordNumberRequired,
+				"As per our policy, your password must contain a numerical digit.")
 		})
 	})
 
@@ -84,12 +79,14 @@ func TestPasswordValidator_ValidatePassword(t *testing.T) {
 
 		t.Run("MissingSpecialChar", func(t *testing.T) {
 			err := validator.ValidatePassword(ctx, "Passw0rd123")
-			assertLocalizedCode(t, err, i18n.ErrCodePasswordSpecialCharRequired)
+			assertLocalizedError(t, err, i18n.ErrCodePasswordSpecialCharRequired,
+				"As per our policy, a special character/symbol is required in the password.")
 		})
 
 		t.Run("TooShort", func(t *testing.T) {
 			err := validator.ValidatePassword(ctx, "P@ss1")
-			assertLocalizedCode(t, err, i18n.ErrCodePasswordTooShort)
+			assertLocalizedError(t, err, i18n.ErrCodePasswordTooShort,
+				"The minimum length for the password is 10 characters")
 		})
 	})
 }

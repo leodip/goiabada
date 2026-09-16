@@ -16,16 +16,52 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-// assertLocalizedErrorCode asserts that err is an *i18n.LocalizedError carrying
-// the expected code, matching the convention in email_validator_test.go.
-func assertLocalizedErrorCode(t *testing.T, err error, expectedCode string) {
+// assertLocalizedError asserts that err is an *i18n.LocalizedError carrying the
+// expected code and rendering the expected English sentence.
+//
+// The sentence is asserted as well as the code because a code assertion alone
+// passes whatever the catalog happens to say: rewording an entry to describe a
+// different rule leaves every such test green while the user reads the wrong
+// instruction. Rewording validator.password.uppercase_required to ask for a
+// lowercase character survived the whole suite before this landed (#230).
+func assertLocalizedError(t *testing.T, err error, expectedCode string, expectedMessage string) {
 	t.Helper()
 	assert.Error(t, err)
 	locErr, ok := err.(*i18n.LocalizedError)
 	assert.True(t, ok, "expected *i18n.LocalizedError, got %T", err)
 	if ok {
 		assert.Equal(t, expectedCode, locErr.Code)
+		assert.Equal(t, expectedMessage, locErr.EnglishFallback())
 	}
+}
+
+// The English sentence each validator.profile.* code renders, transcribed from
+// src/core/i18n/catalogs/active.en.toml. The tables below are keyed by code and
+// carry many rows per code, so the sentence is stated once here rather than
+// repeated on every row; a code reaching a table without an entry here asserts
+// against the empty string and fails.
+//
+// validator.profile.website_too_long is absent deliberately: it is the one
+// profile message carrying an argument, so its sentence is asserted at the call
+// site that knows the limit.
+var profileErrorMessages = map[string]string{
+	i18n.ErrCodeProfileGivenNameInvalid: "Please enter a valid given name. It should contain only letters, " +
+		"spaces, hyphens, and apostrophes and be between 2 and 48 characters in length.",
+	i18n.ErrCodeProfileMiddleNameInvalid: "Please enter a valid middle name. It should contain only letters, " +
+		"spaces, hyphens, and apostrophes and be between 2 and 48 characters in length.",
+	i18n.ErrCodeProfileFamilyNameInvalid: "Please enter a valid family name. It should contain only letters, " +
+		"spaces, hyphens, and apostrophes and be between 2 and 48 characters in length.",
+	i18n.ErrCodeProfileUsernameInvalid: "Usernames must start with a letter and consist only of letters, " +
+		"numbers, and underscores. They must be between 2 and 24 characters long.",
+	i18n.ErrCodeProfileNicknameInvalid: "Nicknames must start with a letter and consist only of letters, " +
+		"numbers, and underscores. They must be between 2 and 24 characters long.",
+	i18n.ErrCodeProfileUsernameTaken:    "Sorry, this username is already taken.",
+	i18n.ErrCodeProfileWebsiteInvalid:   "Please enter a valid website URL.",
+	i18n.ErrCodeProfileGenderInvalid:    "Gender is invalid.",
+	i18n.ErrCodeProfileDobInvalidFormat: "The date of birth is invalid. Please use the format YYYY-MM-DD.",
+	i18n.ErrCodeProfileDobInFuture:      "The date of birth can't be in the future.",
+	i18n.ErrCodeProfileZoneInfoInvalid:  "The zone info is invalid.",
+	i18n.ErrCodeProfileLocaleInvalid:    "The locale is invalid.",
 }
 
 // =============================================================================
@@ -91,7 +127,8 @@ func TestValidateName_RejectsWhitespaceOnlyAndControlCharacters(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			err := validator.ValidateName(tc.value, i18n.ErrCodeProfileGivenNameInvalid)
 
-			assertLocalizedErrorCode(t, err, i18n.ErrCodeProfileGivenNameInvalid)
+			assertLocalizedError(t, err, i18n.ErrCodeProfileGivenNameInvalid,
+				profileErrorMessages[i18n.ErrCodeProfileGivenNameInvalid])
 		})
 	}
 }
@@ -177,7 +214,8 @@ func TestValidateName_Rejected(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			err := validator.ValidateName(tc.value, i18n.ErrCodeProfileGivenNameInvalid)
 
-			assertLocalizedErrorCode(t, err, i18n.ErrCodeProfileGivenNameInvalid)
+			assertLocalizedError(t, err, i18n.ErrCodeProfileGivenNameInvalid,
+				profileErrorMessages[i18n.ErrCodeProfileGivenNameInvalid])
 		})
 	}
 }
@@ -197,7 +235,7 @@ func TestValidateName_ReturnsTheCallerSuppliedCode(t *testing.T) {
 		t.Run(code, func(t *testing.T) {
 			err := validator.ValidateName("J", code)
 
-			assertLocalizedErrorCode(t, err, code)
+			assertLocalizedError(t, err, code, profileErrorMessages[code])
 		})
 	}
 }
@@ -268,7 +306,7 @@ func TestValidateProfile_UsernameFormat(t *testing.T) {
 				assert.NoError(t, err)
 				return
 			}
-			assertLocalizedErrorCode(t, err, tc.expectedCode)
+			assertLocalizedError(t, err, tc.expectedCode, profileErrorMessages[tc.expectedCode])
 		})
 	}
 }
@@ -290,7 +328,8 @@ func TestValidateProfile_UsernameTakenByAnotherUser(t *testing.T) {
 		Subject:  subject,
 	})
 
-	assertLocalizedErrorCode(t, err, i18n.ErrCodeProfileUsernameTaken)
+	assertLocalizedError(t, err, i18n.ErrCodeProfileUsernameTaken,
+		profileErrorMessages[i18n.ErrCodeProfileUsernameTaken])
 }
 
 // Keeping your own username must not be reported as taken.
@@ -386,7 +425,7 @@ func TestValidateProfile_NameFieldsReportTheirOwnCode(t *testing.T) {
 
 			err := validator.ValidateProfile(&tc.input)
 
-			assertLocalizedErrorCode(t, err, tc.expectedCode)
+			assertLocalizedError(t, err, tc.expectedCode, profileErrorMessages[tc.expectedCode])
 		})
 	}
 }
@@ -402,7 +441,8 @@ func TestValidateProfile_NameFieldsAreCheckedInOrder(t *testing.T) {
 		FamilyName: "Doe_",
 	})
 
-	assertLocalizedErrorCode(t, err, i18n.ErrCodeProfileGivenNameInvalid)
+	assertLocalizedError(t, err, i18n.ErrCodeProfileGivenNameInvalid,
+		profileErrorMessages[i18n.ErrCodeProfileGivenNameInvalid])
 }
 
 func TestValidateProfile_ValidNamesPass(t *testing.T) {
@@ -449,7 +489,7 @@ func TestValidateProfile_Nickname(t *testing.T) {
 				assert.NoError(t, err)
 				return
 			}
-			assertLocalizedErrorCode(t, err, tc.expectedCode)
+			assertLocalizedError(t, err, tc.expectedCode, profileErrorMessages[tc.expectedCode])
 		})
 	}
 }
@@ -486,7 +526,7 @@ func TestValidateProfile_Website(t *testing.T) {
 				assert.NoError(t, err)
 				return
 			}
-			assertLocalizedErrorCode(t, err, tc.expectedCode)
+			assertLocalizedError(t, err, tc.expectedCode, profileErrorMessages[tc.expectedCode])
 		})
 	}
 }
@@ -502,7 +542,8 @@ func TestValidateProfile_WebsiteTooLong(t *testing.T) {
 
 	err := validator.ValidateProfile(&ValidateProfileInput{Website: longWebsite})
 
-	assertLocalizedErrorCode(t, err, i18n.ErrCodeProfileWebsiteTooLong)
+	assertLocalizedError(t, err, i18n.ErrCodeProfileWebsiteTooLong,
+		"Please ensure the website URL is no longer than 96 characters.")
 
 	locErr, ok := err.(*i18n.LocalizedError)
 	assert.True(t, ok)
@@ -554,7 +595,7 @@ func TestValidateProfile_Gender(t *testing.T) {
 				assert.NoError(t, err)
 				return
 			}
-			assertLocalizedErrorCode(t, err, tc.expectedCode)
+			assertLocalizedError(t, err, tc.expectedCode, profileErrorMessages[tc.expectedCode])
 		})
 	}
 }
@@ -592,7 +633,7 @@ func TestValidateProfile_DateOfBirthFormat(t *testing.T) {
 				assert.NoError(t, err)
 				return
 			}
-			assertLocalizedErrorCode(t, err, tc.expectedCode)
+			assertLocalizedError(t, err, tc.expectedCode, profileErrorMessages[tc.expectedCode])
 		})
 	}
 }
@@ -613,7 +654,8 @@ func TestValidateProfile_DateOfBirthInTheFuture(t *testing.T) {
 
 	err := validator.ValidateProfile(&ValidateProfileInput{DateOfBirth: dayAfterTomorrow})
 
-	assertLocalizedErrorCode(t, err, i18n.ErrCodeProfileDobInFuture)
+	assertLocalizedError(t, err, i18n.ErrCodeProfileDobInFuture,
+		profileErrorMessages[i18n.ErrCodeProfileDobInFuture])
 }
 
 // The tolerance boundary, expressed as offsets from the UTC date, so it holds at every
@@ -644,7 +686,8 @@ func TestValidateProfile_DateOfBirthTimezoneToleranceBoundary(t *testing.T) {
 			err := validator.ValidateProfile(&ValidateProfileInput{DateOfBirth: date})
 
 			if tc.wantReject {
-				assertLocalizedErrorCode(t, err, i18n.ErrCodeProfileDobInFuture)
+				assertLocalizedError(t, err, i18n.ErrCodeProfileDobInFuture,
+					profileErrorMessages[i18n.ErrCodeProfileDobInFuture])
 				return
 			}
 			assert.NoError(t, err)
@@ -727,7 +770,8 @@ func TestValidateProfile_ZoneInfo(t *testing.T) {
 			t.Run(zone, func(t *testing.T) {
 				err := validator.ValidateProfile(&ValidateProfileInput{ZoneInfo: zone})
 
-				assertLocalizedErrorCode(t, err, i18n.ErrCodeProfileZoneInfoInvalid)
+				assertLocalizedError(t, err, i18n.ErrCodeProfileZoneInfoInvalid,
+					profileErrorMessages[i18n.ErrCodeProfileZoneInfoInvalid])
 			})
 		}
 	})
@@ -753,7 +797,8 @@ func TestValidateProfile_Locale(t *testing.T) {
 			t.Run(locale, func(t *testing.T) {
 				err := validator.ValidateProfile(&ValidateProfileInput{Locale: locale})
 
-				assertLocalizedErrorCode(t, err, i18n.ErrCodeProfileLocaleInvalid)
+				assertLocalizedError(t, err, i18n.ErrCodeProfileLocaleInvalid,
+					profileErrorMessages[i18n.ErrCodeProfileLocaleInvalid])
 			})
 		}
 	})

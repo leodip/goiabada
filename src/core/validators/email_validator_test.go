@@ -13,6 +13,20 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
+// The English sentence each validator.email.* code renders, transcribed from
+// src/core/i18n/catalogs/active.en.toml. Stated once per code because the
+// tables below carry many rows per code; a code reaching a table without an
+// entry here asserts against the empty string and fails. The one argument in
+// the group, the 60-character cap, is fixed in the validator, so the rendered
+// sentence is constant.
+var emailErrorMessages = map[string]string{
+	i18n.ErrCodeEmailRequired:             "Please enter an email address.",
+	i18n.ErrCodeEmailInvalidFormat:        "Please enter a valid email address.",
+	i18n.ErrCodeEmailTooLong:              "The email address cannot exceed a maximum length of 60 characters.",
+	i18n.ErrCodeEmailConfirmationMismatch: "The email and email confirmation entries must be identical.",
+	i18n.ErrCodeEmailAlreadyRegistered:    "Apologies, but this email address is already registered.",
+}
+
 func TestValidateEmailAddress(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	validator := NewEmailValidator(mockDB)
@@ -46,6 +60,7 @@ func TestValidateEmailAddress(t *testing.T) {
 				assert.True(t, ok, "expected *i18n.LocalizedError, got %T", err)
 				if ok {
 					assert.Equal(t, tt.expectedCode, locErr.Code)
+					assert.Equal(t, emailErrorMessages[tt.expectedCode], locErr.EnglishFallback())
 				}
 			}
 		})
@@ -136,6 +151,7 @@ func TestValidateEmailUpdate(t *testing.T) {
 				assert.True(t, ok, "expected *i18n.LocalizedError, got %T", err)
 				if ok {
 					assert.Equal(t, tt.expectedCode, locErr.Code)
+					assert.Equal(t, emailErrorMessages[tt.expectedCode], locErr.EnglishFallback())
 					if tt.expectedArgs != nil {
 						assert.Equal(t, tt.expectedArgs, locErr.Args)
 					}
@@ -213,7 +229,8 @@ func TestValidateEmailChange_AddressTakenByAnotherUser(t *testing.T) {
 
 	err := validator.ValidateEmailChange("taken@example.com", subject)
 
-	assertLocalizedErrorCode(t, err, i18n.ErrCodeEmailAlreadyRegistered)
+	assertLocalizedError(t, err, i18n.ErrCodeEmailAlreadyRegistered,
+		emailErrorMessages[i18n.ErrCodeEmailAlreadyRegistered])
 }
 
 // Presence, format and length are all checked before any database lookup, so
@@ -242,7 +259,7 @@ func TestValidateEmailChange_RejectedBeforeAnyLookup(t *testing.T) {
 
 			err := validator.ValidateEmailChange(tc.email, fake.UUID())
 
-			assertLocalizedErrorCode(t, err, tc.expectedCode)
+			assertLocalizedError(t, err, tc.expectedCode, emailErrorMessages[tc.expectedCode])
 		})
 	}
 }
@@ -255,7 +272,8 @@ func TestValidateEmailChange_TooLong(t *testing.T) {
 
 	err := validator.ValidateEmailChange(email, fake.UUID())
 
-	assertLocalizedErrorCode(t, err, i18n.ErrCodeEmailTooLong)
+	assertLocalizedError(t, err, i18n.ErrCodeEmailTooLong,
+		emailErrorMessages[i18n.ErrCodeEmailTooLong])
 
 	locErr, ok := err.(*i18n.LocalizedError)
 	assert.True(t, ok)
