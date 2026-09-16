@@ -1,7 +1,6 @@
 package admingrouphandlers
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -12,11 +11,10 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
+	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/constants"
 	mocks_handler_helpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/leodip/goiabada/core/oauth"
 )
 
 // Decision 11 at a form that submits through the API, and the row that makes it worth its own test:
@@ -91,12 +89,11 @@ func TestGroupAttributesAddPost_TellsTheApisStatusesApart(t *testing.T) {
 			var renderedError any
 			switch testCase.want {
 			case answerRenderForm:
-				httpHelper.On("RenderTemplate", mock.Anything, mock.Anything, mock.Anything,
-					mock.Anything, mock.Anything).
+				handlertest.ExpectRender(httpHelper, mock.Anything, mock.Anything).
 					Run(func(args mock.Arguments) {
 						bind, _ := args.Get(4).(map[string]interface{})
 						renderedError = bind["error"]
-					}).Return(nil).Once()
+					}).Once()
 			case answerNotFound:
 				httpHelper.On("NotFound", mock.Anything, mock.Anything).Return().Once()
 			case answer500:
@@ -104,11 +101,11 @@ func TestGroupAttributesAddPost_TellsTheApisStatusesApart(t *testing.T) {
 					Return().Once()
 			}
 
-			req := httptest.NewRequest(http.MethodPost, "/admin/groups/7/attributes/add",
-				strings.NewReader("attributeKey=k&attributeValue=v"))
-			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-			req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeyJwtInfo,
-				oauth.JwtInfo{TokenResponse: oauth.TokenResponse{AccessToken: "an-access-token"}}))
+			req := handlertest.Request(http.MethodPost, "/admin/groups/7/attributes/add",
+				handlertest.WithAccessToken(),
+				handlertest.WithBody(strings.NewReader("attributeKey=k&attributeValue=v")),
+				handlertest.WithContentType("application/x-www-form-urlencoded"),
+			)
 
 			router := chi.NewRouter()
 			router.Post("/admin/groups/{groupId}/attributes/add",

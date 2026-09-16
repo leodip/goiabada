@@ -1,7 +1,6 @@
 package adminresourcehandlers
 
 import (
-	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -13,11 +12,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/core/customerrors"
 	mocks_handler_helpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/leodip/goiabada/core/oauth"
 )
 
 // Decision 13 on an AJAX preflight read, which is where the console's own sweep left the shape it
@@ -91,10 +89,9 @@ func TestResourceUsersWithPermissionRemovePost_ForwardsTheApisStatusAsJson(t *te
 					captured, _ = args.Get(2).(error)
 				}).Return().Once()
 
-			req := httptest.NewRequest(http.MethodPost,
-				"/admin/resources/3/users-with-permission/9/permissions/5/remove", nil)
-			req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeyJwtInfo,
-				oauth.JwtInfo{TokenResponse: oauth.TokenResponse{AccessToken: "an-access-token"}}))
+			req := handlertest.Request(http.MethodPost,
+				"/admin/resources/3/users-with-permission/9/permissions/5/remove",
+				handlertest.WithAccessToken())
 
 			router := chi.NewRouter()
 			router.Post("/admin/resources/{resourceId}/users-with-permission/{userId}/permissions/{permissionId}/remove",

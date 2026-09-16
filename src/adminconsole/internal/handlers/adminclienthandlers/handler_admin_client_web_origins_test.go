@@ -2,23 +2,21 @@ package adminclienthandlers
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
 	"testing"
 
-	"github.com/go-chi/chi/v5"
-	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
-	adminmiddleware "github.com/leodip/goiabada/adminconsole/internal/middleware"
-	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/constants"
-	"github.com/leodip/goiabada/core/handlerhelpers"
-	"github.com/leodip/goiabada/core/models"
-	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
+	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
+	adminmiddleware "github.com/leodip/goiabada/adminconsole/internal/middleware"
+	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/core/handlerhelpers"
+	"github.com/leodip/goiabada/core/models"
 )
 
 // stubAllClientsApiClient answers both reads the Web Origins page performs. It is separate from
@@ -85,13 +83,10 @@ func TestHandleAdminClientWebOriginsGet_AssemblesTheServerWideList(t *testing.T)
 		},
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/admin/clients/7/web-origins", nil)
-	rctx := chi.NewRouteContext()
-	rctx.URLParams.Add("clientId", "7")
-	ctx := context.WithValue(req.Context(), chi.RouteCtxKey, rctx)
-	ctx = context.WithValue(ctx, constants.ContextKeyJwtInfo,
-		oauth.JwtInfo{TokenResponse: oauth.TokenResponse{AccessToken: "an-access-token"}})
-	req = req.WithContext(ctx)
+	req := handlertest.Request(http.MethodGet, "/admin/clients/7/web-origins",
+		handlertest.WithAccessToken(),
+		handlertest.WithRouteParam("clientId", "7"),
+	)
 
 	httpSession := newTestSessionStore()
 
@@ -191,10 +186,10 @@ func TestHandleAdminClientWebOriginsPost_APIRefusalReachesTheBrowser(t *testing.
 			httpHelper := handlerhelpers.NewHttpHelper(nil, adminmiddleware.SettingsReader{})
 
 			body := `{"clientId":1,"webOrigins":["https://[2001:db8::1]"]}`
-			req := httptest.NewRequest(http.MethodPost, "/admin/clients/1/web-origins",
-				bytes.NewBufferString(body))
-			req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeyJwtInfo,
-				oauth.JwtInfo{TokenResponse: oauth.TokenResponse{AccessToken: "an-access-token"}}))
+			req := handlertest.Request(http.MethodPost, "/admin/clients/1/web-origins",
+				handlertest.WithAccessToken(),
+				handlertest.WithBody(bytes.NewBufferString(body)),
+			)
 
 			rec := httptest.NewRecorder()
 

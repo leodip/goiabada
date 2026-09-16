@@ -1,7 +1,6 @@
 package adminuserhandlers
 
 import (
-	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -14,11 +13,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/core/customerrors"
 	mocks_handler_helpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/leodip/goiabada/core/oauth"
 )
 
 // Decision 11 answered for an AJAX request, at this handler group's seam. Stage 8 gave the page
@@ -144,11 +142,11 @@ func TestUserAttributesRemove_StaleOrMalformedUrlAnswers404AsJson(t *testing.T) 
 					captured, _ = args.Get(2).(error)
 				}).Return().Once()
 
-			req := httptest.NewRequest(http.MethodPost, testCase.target, nil)
+			var opts []handlertest.Option
 			if testCase.withJwt {
-				req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeyJwtInfo,
-					oauth.JwtInfo{TokenResponse: oauth.TokenResponse{AccessToken: "an-access-token"}}))
+				opts = append(opts, handlertest.WithAccessToken())
 			}
+			req := handlertest.Request(http.MethodPost, testCase.target, opts...)
 
 			apiClient := &attributesApiClient{
 				user:       testCase.user,
@@ -207,10 +205,10 @@ func TestUserConsents_MalformedBodyAnswers400AsJson(t *testing.T) {
 					captured, _ = args.Get(2).(error)
 				}).Return().Once()
 
-			req := httptest.NewRequest(http.MethodPost, "/admin/users/42/consents",
-				strings.NewReader(testCase.body))
-			req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeyJwtInfo,
-				oauth.JwtInfo{TokenResponse: oauth.TokenResponse{AccessToken: "an-access-token"}}))
+			req := handlertest.Request(http.MethodPost, "/admin/users/42/consents",
+				handlertest.WithAccessToken(),
+				handlertest.WithBody(strings.NewReader(testCase.body)),
+			)
 
 			router := chi.NewRouter()
 			router.Post("/admin/users/{userId}/consents",

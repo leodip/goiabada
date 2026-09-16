@@ -1,25 +1,23 @@
 package adminresourcehandlers
 
 import (
-	"context"
 	"math"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
 	"testing"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
+	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/adminconsole/internal/pagination"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	mocks_handler_helpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
@@ -154,23 +152,12 @@ func render(t *testing.T, handler http.HandlerFunc, template, rawPage string,
 	if rawPage != "" {
 		target += "?page=" + rawPage
 	}
-	req := httptest.NewRequest(http.MethodGet, target, nil)
+	req := handlertest.Request(http.MethodGet, target,
+		handlertest.WithAccessToken(), handlertest.WithRouteParam("resourceId", "7"))
 
-	routeCtx := chi.NewRouteContext()
-	routeCtx.URLParams.Add("resourceId", "7")
-	ctx := context.WithValue(req.Context(), chi.RouteCtxKey, routeCtx)
-	ctx = context.WithValue(ctx, constants.ContextKeyJwtInfo,
-		oauth.JwtInfo{TokenResponse: oauth.TokenResponse{AccessToken: "an-access-token"}})
+	handler.ServeHTTP(httptest.NewRecorder(), req)
 
-	handler.ServeHTTP(httptest.NewRecorder(), req.WithContext(ctx))
-
-	var bind map[string]interface{}
-	for _, call := range httpHelper.Calls {
-		if call.Method == "RenderTemplate" {
-			bind = call.Arguments.Get(4).(map[string]interface{})
-		}
-	}
-	require.NotNil(t, bind, "the handler rendered nothing for ?page=%q", rawPage)
+	bind := handlertest.Bind(t, httpHelper, "for ?page=%q", rawPage)
 	return bind
 }
 
@@ -180,12 +167,8 @@ func newHelper(t *testing.T) *mocks_handler_helpers.HttpHelper {
 	t.Helper()
 
 	httpHelper := mocks_handler_helpers.NewHttpHelper(t)
-	httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).
-		Run(func(args mock.Arguments) {
-			t.Errorf("the handler answered 500: %v", args.Get(2))
-		}).Maybe()
-	httpHelper.On("RenderTemplate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-		Return(nil).Maybe()
+	handlertest.RefuseInternalServerError(t, httpHelper)
+	handlertest.ExpectRender(httpHelper, mock.Anything, mock.Anything).Maybe()
 	return httpHelper
 }
 

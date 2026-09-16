@@ -2,7 +2,6 @@ package adminresourcehandlers
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -13,12 +12,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
+	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	adminmiddleware "github.com/leodip/goiabada/adminconsole/internal/middleware"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/handlerhelpers"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/leodip/goiabada/core/oauth"
 )
 
 // Decision 13 on the save itself, which is where the console's own sweep stopped one guard short.
@@ -114,9 +112,10 @@ func TestResourcePermissionsPost_ForwardsTheApisStatus(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			req := httptest.NewRequest(http.MethodPost, "/admin/resources/3/permissions", bytes.NewReader(body))
-			req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeyJwtInfo,
-				oauth.JwtInfo{TokenResponse: oauth.TokenResponse{AccessToken: "an-access-token"}}))
+			req := handlertest.Request(http.MethodPost, "/admin/resources/3/permissions",
+				handlertest.WithAccessToken(),
+				handlertest.WithBody(bytes.NewReader(body)),
+			)
 			rec := httptest.NewRecorder()
 
 			router := chi.NewRouter()

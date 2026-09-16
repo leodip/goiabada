@@ -1,7 +1,6 @@
 package adminuserhandlers
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -11,11 +10,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
+	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/adminconsole/internal/pagination"
-	"github.com/leodip/goiabada/core/constants"
 	mocks_handler_helpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/leodip/goiabada/core/oauth"
 )
 
 // The user list is one of the five admin lists that page, and the five used to
@@ -82,21 +80,14 @@ func renderUsers(t *testing.T, rawPage string, total int) (map[string]interface{
 	t.Helper()
 
 	httpHelper := mocks_handler_helpers.NewHttpHelper(t)
-	httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).
-		Run(func(args mock.Arguments) {
-			t.Errorf("the handler answered 500: %v", args.Get(2))
-		}).Maybe()
-	httpHelper.On("RenderTemplate", mock.Anything, mock.Anything,
-		"/layouts/menu_layout.html", "/admin_users.html", mock.Anything).
-		Return(nil).Maybe()
+	handlertest.RefuseInternalServerError(t, httpHelper)
+	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_users.html").Maybe()
 
 	target := "/admin/users"
 	if rawPage != "" {
 		target += "?page=" + rawPage
 	}
-	req := httptest.NewRequest(http.MethodGet, target, nil)
-	req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeyJwtInfo,
-		oauth.JwtInfo{TokenResponse: oauth.TokenResponse{AccessToken: "an-access-token"}}))
+	req := handlertest.Request(http.MethodGet, target, handlertest.WithAccessToken())
 
 	apiClient := &usersPagingApiClient{total: total}
 
@@ -105,13 +96,7 @@ func renderUsers(t *testing.T, rawPage string, total int) (map[string]interface{
 	// sends.
 	HandleAdminUsersGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
 
-	var bind map[string]interface{}
-	for _, call := range httpHelper.Calls {
-		if call.Method == "RenderTemplate" {
-			bind = call.Arguments.Get(4).(map[string]interface{})
-		}
-	}
-	require.NotNil(t, bind, "the handler rendered nothing for ?page=%q", rawPage)
+	bind := handlertest.Bind(t, httpHelper, "for ?page=%q", rawPage)
 	return bind, apiClient.asked
 }
 
@@ -241,16 +226,12 @@ func currentPage(t *testing.T, p *pagination.Paginator) int {
 // the bar and the search field still said otherwise.
 func TestHandleAdminUsersGet_ASearchIsCarriedIntoTheSecondQuery(t *testing.T) {
 	httpHelper := mocks_handler_helpers.NewHttpHelper(t)
-	httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).
-		Run(func(args mock.Arguments) { t.Errorf("the handler answered 500: %v", args.Get(2)) }).Maybe()
-	httpHelper.On("RenderTemplate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-		Return(nil).Maybe()
+	handlertest.RefuseInternalServerError(t, httpHelper)
+	handlertest.ExpectRender(httpHelper, mock.Anything, mock.Anything).Maybe()
 
 	apiClient := &queryRecordingApiClient{total: 25}
 
-	req := httptest.NewRequest(http.MethodGet, "/admin/users?page=99&query=ana", nil)
-	req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeyJwtInfo,
-		oauth.JwtInfo{TokenResponse: oauth.TokenResponse{AccessToken: "an-access-token"}}))
+	req := handlertest.Request(http.MethodGet, "/admin/users?page=99&query=ana", handlertest.WithAccessToken())
 
 	HandleAdminUsersGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
 

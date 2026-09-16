@@ -2,7 +2,6 @@ package adminclienthandlers
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -12,14 +11,12 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
+	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	adminmiddleware "github.com/leodip/goiabada/adminconsole/internal/middleware"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/handlerhelpers"
-	"github.com/leodip/goiabada/core/oauth"
 )
 
 // stubApiClient embeds apiclient.ApiClient so its hundred-odd other methods come for free
@@ -132,10 +129,10 @@ func TestHandleAdminClientRedirectURIsPost_APIErrorReachesTheBrowser(t *testing.
 			httpHelper := handlerhelpers.NewHttpHelper(nil, adminmiddleware.SettingsReader{})
 
 			body := `{"clientId":1,"redirectURIs":["https:///evil.example/cb"]}`
-			req := httptest.NewRequest(http.MethodPost, "/admin/clients/1/redirect-uris",
-				bytes.NewBufferString(body))
-			req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeyJwtInfo,
-				oauth.JwtInfo{TokenResponse: oauth.TokenResponse{AccessToken: "an-access-token"}}))
+			req := handlertest.Request(http.MethodPost, "/admin/clients/1/redirect-uris",
+				handlertest.WithAccessToken(),
+				handlertest.WithBody(bytes.NewBufferString(body)),
+			)
 
 			rec := httptest.NewRecorder()
 
@@ -218,13 +215,10 @@ func TestHandleAdminClientRedirectURIsGet_ResolvesRedirectFlows(t *testing.T) {
 				settings: &api.SettingsGeneralResponse{ImplicitFlowEnabled: tc.globalImplicit},
 			}
 
-			req := httptest.NewRequest(http.MethodGet, "/admin/clients/7/redirect-uris", nil)
-			rctx := chi.NewRouteContext()
-			rctx.URLParams.Add("clientId", "7")
-			ctx := context.WithValue(req.Context(), chi.RouteCtxKey, rctx)
-			ctx = context.WithValue(ctx, constants.ContextKeyJwtInfo,
-				oauth.JwtInfo{TokenResponse: oauth.TokenResponse{AccessToken: "an-access-token"}})
-			req = req.WithContext(ctx)
+			req := handlertest.Request(http.MethodGet, "/admin/clients/7/redirect-uris",
+				handlertest.WithAccessToken(),
+				handlertest.WithRouteParam("clientId", "7"),
+			)
 
 			httpSession := newTestSessionStore()
 

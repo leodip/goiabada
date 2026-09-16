@@ -1,7 +1,6 @@
 package admingrouphandlers
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -10,10 +9,9 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	mocks_handler_helpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/leodip/goiabada/core/oauth"
 )
 
 // Decision 11 at this handler group's seam. Every one of these rows answered the 500 page before
@@ -115,11 +113,11 @@ func TestGroup_StaleOrMalformedUrlAnswers404(t *testing.T) {
 					Return().Once()
 			}
 
-			req := httptest.NewRequest(http.MethodGet, testCase.target, nil)
+			var opts []handlertest.Option
 			if testCase.withJwt {
-				req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeyJwtInfo,
-					oauth.JwtInfo{TokenResponse: oauth.TokenResponse{AccessToken: "an-access-token"}}))
+				opts = append(opts, handlertest.WithAccessToken())
 			}
+			req := handlertest.Request(http.MethodGet, testCase.target, opts...)
 
 			apiClient := &notFoundGroupApiClient{entity: testCase.entity, err: testCase.apiErr}
 			handler := HandleAdminGroupAttributesGet(httpHelper, apiClient)

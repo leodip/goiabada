@@ -1,22 +1,18 @@
 package admingrouphandlers
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
+	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/adminconsole/internal/pagination"
-	"github.com/leodip/goiabada/core/constants"
 	mocks_handler_helpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/leodip/goiabada/core/oauth"
 )
 
 // The group members list is one of the three admin lists that answered 500 to a
@@ -68,36 +64,20 @@ func renderMembers(t *testing.T, rawPage string, total int) (map[string]interfac
 	t.Helper()
 
 	httpHelper := mocks_handler_helpers.NewHttpHelper(t)
-	httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).
-		Run(func(args mock.Arguments) {
-			t.Errorf("the handler answered 500: %v", args.Get(2))
-		}).Maybe()
-	httpHelper.On("RenderTemplate", mock.Anything, mock.Anything,
-		"/layouts/menu_layout.html", "/admin_groups_members.html", mock.Anything).
-		Return(nil).Maybe()
+	handlertest.RefuseInternalServerError(t, httpHelper)
+	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_groups_members.html").Maybe()
 
 	target := "/admin/groups/3/members"
 	if rawPage != "" {
 		target += "?page=" + rawPage
 	}
-	req := httptest.NewRequest(http.MethodGet, target, nil)
-
-	routeCtx := chi.NewRouteContext()
-	routeCtx.URLParams.Add("groupId", "3")
-	ctx := context.WithValue(req.Context(), chi.RouteCtxKey, routeCtx)
-	ctx = context.WithValue(ctx, constants.ContextKeyJwtInfo,
-		oauth.JwtInfo{TokenResponse: oauth.TokenResponse{AccessToken: "an-access-token"}})
+	req := handlertest.Request(http.MethodGet, target,
+		handlertest.WithAccessToken(), handlertest.WithRouteParam("groupId", "3"))
 
 	apiClient := &membersPagingApiClient{total: total}
-	HandleAdminGroupMembersGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req.WithContext(ctx))
+	HandleAdminGroupMembersGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
 
-	var bind map[string]interface{}
-	for _, call := range httpHelper.Calls {
-		if call.Method == "RenderTemplate" {
-			bind = call.Arguments.Get(4).(map[string]interface{})
-		}
-	}
-	require.NotNil(t, bind, "the handler rendered nothing for ?page=%q", rawPage)
+	bind := handlertest.Bind(t, httpHelper, "for ?page=%q", rawPage)
 	return bind, apiClient.asked
 }
 

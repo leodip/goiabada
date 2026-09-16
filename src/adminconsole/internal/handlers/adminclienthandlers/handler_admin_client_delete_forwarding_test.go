@@ -1,7 +1,6 @@
 package adminclienthandlers
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -10,11 +9,10 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
+	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/constants"
 	mocks_handler_helpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/leodip/goiabada/core/oauth"
 )
 
 // Decision 11 on a page that reads its entity through the API rather than through the database.
@@ -75,9 +73,7 @@ func TestClientDeleteGet_ForwardsTheApisStatus(t *testing.T) {
 					Return().Once()
 			}
 
-			req := httptest.NewRequest(http.MethodGet, "/admin/clients/42/delete", nil)
-			req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeyJwtInfo,
-				oauth.JwtInfo{TokenResponse: oauth.TokenResponse{AccessToken: "an-access-token"}}))
+			req := handlertest.Request(http.MethodGet, "/admin/clients/42/delete", handlertest.WithAccessToken())
 
 			router := chi.NewRouter()
 			router.Get("/admin/clients/{clientId}/delete",
