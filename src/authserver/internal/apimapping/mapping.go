@@ -42,9 +42,6 @@ func ToUserResponse(user *models.User) *api.UserResponse {
 		AddressPostalCode:             user.AddressPostalCode,
 		AddressCountry:                user.AddressCountry,
 		OTPEnabled:                    user.OTPEnabled,
-		Groups:                        user.Groups,
-		Permissions:                   user.Permissions,
-		Attributes:                    ToUserAttributeResponses(user.Attributes),
 	}
 
 	if user.CreatedAt.Valid {
@@ -276,9 +273,10 @@ func ToResourceResponse(resource *models.Resource) *api.ResourceResponse {
 		return nil
 	}
 	return &api.ResourceResponse{
-		Id:                 resource.Id,
-		ResourceIdentifier: resource.ResourceIdentifier,
-		Description:        resource.Description,
+		Id:                    resource.Id,
+		ResourceIdentifier:    resource.ResourceIdentifier,
+		Description:           resource.Description,
+		IsSystemLevelResource: resource.IsSystemLevelResource(),
 	}
 }
 
@@ -335,6 +333,48 @@ func ToGroupAttributeResponses(attrs []models.GroupAttribute) []api.GroupAttribu
 	return responses
 }
 
+// toRedirectURIResponses and toWebOriginResponses are unexported because ToClientResponse is their
+// only caller: these two shapes reach the wire nested inside a client and nowhere else.
+//
+// Both preserve nil rather than returning an empty slice, because a client loaded without its
+// collections puts "redirectURIs":null on the wire and a client loaded with an empty one puts [],
+// and a consumer has to tell "not loaded" from "none" (#350).
+func toRedirectURIResponses(uris []models.RedirectURI) []api.RedirectURIResponse {
+	if uris == nil {
+		return nil
+	}
+	responses := make([]api.RedirectURIResponse, len(uris))
+	for i, uri := range uris {
+		responses[i] = api.RedirectURIResponse{
+			Id:       uri.Id,
+			URI:      uri.URI,
+			ClientId: uri.ClientId,
+		}
+		if uri.CreatedAt.Valid {
+			responses[i].CreatedAt = &uris[i].CreatedAt.Time
+		}
+	}
+	return responses
+}
+
+func toWebOriginResponses(origins []models.WebOrigin) []api.WebOriginResponse {
+	if origins == nil {
+		return nil
+	}
+	responses := make([]api.WebOriginResponse, len(origins))
+	for i, origin := range origins {
+		responses[i] = api.WebOriginResponse{
+			Id:       origin.Id,
+			Origin:   origin.Origin,
+			ClientId: origin.ClientId,
+		}
+		if origin.CreatedAt.Valid {
+			responses[i].CreatedAt = &origins[i].CreatedAt.Time
+		}
+	}
+	return responses
+}
+
 func ToClientResponse(client *models.Client) *api.ClientResponse {
 	if client == nil {
 		return nil
@@ -366,8 +406,8 @@ func ToClientResponse(client *models.Client) *api.ClientResponse {
 		IncludeOpenIDConnectClaimsInAccessToken: client.IncludeOpenIDConnectClaimsInAccessToken,
 		IncludeOpenIDConnectClaimsInIdToken:     client.IncludeOpenIDConnectClaimsInIdToken,
 		DefaultAcrLevel:                         string(client.DefaultAcrLevel),
-		RedirectURIs:                            client.RedirectURIs,
-		WebOrigins:                              client.WebOrigins,
+		RedirectURIs:                            toRedirectURIResponses(client.RedirectURIs),
+		WebOrigins:                              toWebOriginResponses(client.WebOrigins),
 	}
 
 	if client.CreatedAt.Valid {

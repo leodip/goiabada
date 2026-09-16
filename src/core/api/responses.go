@@ -8,38 +8,35 @@ import (
 )
 
 type UserResponse struct {
-	Id                            int64                   `json:"id"`
-	CreatedAt                     *time.Time              `json:"createdAt"`
-	UpdatedAt                     *time.Time              `json:"updatedAt"`
-	Enabled                       bool                    `json:"enabled"`
-	Subject                       string                  `json:"subject"`
-	Username                      string                  `json:"username"`
-	GivenName                     string                  `json:"givenName"`
-	MiddleName                    string                  `json:"middleName"`
-	FamilyName                    string                  `json:"familyName"`
-	Nickname                      string                  `json:"nickname"`
-	Website                       string                  `json:"website"`
-	Gender                        string                  `json:"gender"`
-	Email                         string                  `json:"email"`
-	EmailVerified                 bool                    `json:"emailVerified"`
-	ZoneInfoCountryName           string                  `json:"zoneInfoCountryName"`
-	ZoneInfo                      string                  `json:"zoneInfo"`
-	Locale                        string                  `json:"locale"`
-	BirthDate                     *time.Time              `json:"birthDate"`
-	PhoneNumberCountryUniqueId    string                  `json:"phoneNumberCountryUniqueId"`
-	PhoneNumberCountryCallingCode string                  `json:"phoneNumberCountryCallingCode"`
-	PhoneNumber                   string                  `json:"phoneNumber"`
-	PhoneNumberVerified           bool                    `json:"phoneNumberVerified"`
-	AddressLine1                  string                  `json:"addressLine1"`
-	AddressLine2                  string                  `json:"addressLine2"`
-	AddressLocality               string                  `json:"addressLocality"`
-	AddressRegion                 string                  `json:"addressRegion"`
-	AddressPostalCode             string                  `json:"addressPostalCode"`
-	AddressCountry                string                  `json:"addressCountry"`
-	OTPEnabled                    bool                    `json:"otpEnabled"`
-	Groups                        []models.Group          `json:"groups"`
-	Permissions                   []models.Permission     `json:"permissions"`
-	Attributes                    []UserAttributeResponse `json:"attributes"`
+	Id                            int64      `json:"id"`
+	CreatedAt                     *time.Time `json:"createdAt"`
+	UpdatedAt                     *time.Time `json:"updatedAt"`
+	Enabled                       bool       `json:"enabled"`
+	Subject                       string     `json:"subject"`
+	Username                      string     `json:"username"`
+	GivenName                     string     `json:"givenName"`
+	MiddleName                    string     `json:"middleName"`
+	FamilyName                    string     `json:"familyName"`
+	Nickname                      string     `json:"nickname"`
+	Website                       string     `json:"website"`
+	Gender                        string     `json:"gender"`
+	Email                         string     `json:"email"`
+	EmailVerified                 bool       `json:"emailVerified"`
+	ZoneInfoCountryName           string     `json:"zoneInfoCountryName"`
+	ZoneInfo                      string     `json:"zoneInfo"`
+	Locale                        string     `json:"locale"`
+	BirthDate                     *time.Time `json:"birthDate"`
+	PhoneNumberCountryUniqueId    string     `json:"phoneNumberCountryUniqueId"`
+	PhoneNumberCountryCallingCode string     `json:"phoneNumberCountryCallingCode"`
+	PhoneNumber                   string     `json:"phoneNumber"`
+	PhoneNumberVerified           bool       `json:"phoneNumberVerified"`
+	AddressLine1                  string     `json:"addressLine1"`
+	AddressLine2                  string     `json:"addressLine2"`
+	AddressLocality               string     `json:"addressLocality"`
+	AddressRegion                 string     `json:"addressRegion"`
+	AddressPostalCode             string     `json:"addressPostalCode"`
+	AddressCountry                string     `json:"addressCountry"`
+	OTPEnabled                    bool       `json:"otpEnabled"`
 }
 
 func (resp *UserResponse) ToUser() *models.User {
@@ -74,8 +71,6 @@ func (resp *UserResponse) ToUser() *models.User {
 		AddressPostalCode:             resp.AddressPostalCode,
 		AddressCountry:                resp.AddressCountry,
 		OTPEnabled:                    resp.OTPEnabled,
-		Groups:                        resp.Groups,
-		Permissions:                   resp.Permissions,
 	}
 
 	if resp.CreatedAt != nil {
@@ -86,15 +81,6 @@ func (resp *UserResponse) ToUser() *models.User {
 	}
 	if resp.BirthDate != nil {
 		user.BirthDate = sql.NullTime{Time: *resp.BirthDate, Valid: true}
-	}
-
-	if resp.Attributes != nil {
-		user.Attributes = make([]models.UserAttribute, len(resp.Attributes))
-		for i, attrResp := range resp.Attributes {
-			if attr := attrResp.ToUserAttribute(); attr != nil {
-				user.Attributes[i] = *attr
-			}
-		}
 	}
 
 	return user
@@ -436,6 +422,12 @@ type ResourceResponse struct {
 	Id                 int64  `json:"id"`
 	ResourceIdentifier string `json:"resourceIdentifier"`
 	Description        string `json:"description"`
+	// IsSystemLevelResource travels because the API enforces it and a consumer has to mirror it:
+	// the resource handlers refuse a rename and a delete on a system-level resource, and the admin
+	// console disables those controls to match. It is on the wire rather than recomputed by each
+	// consumer, the way IsSystemLevelClient already is, because a local copy of the rule can
+	// disagree with the server's and offer a control the API then answers 403 to (#350).
+	IsSystemLevelResource bool `json:"isSystemLevelResource"`
 }
 
 type GetUserPermissionsResponse struct {
@@ -603,6 +595,32 @@ type UpdateGroupAttributeResponse struct {
 	Attribute GroupAttributeResponse `json:"attribute"`
 }
 
+// RedirectURIResponse is a client's redirect URI as this API publishes it.
+//
+// It exists because ClientResponse used to carry models.RedirectURI directly. That is a
+// persistence row: it declares no json tags, so its keys reached the wire in Go's own spelling
+// ("Id", "URI", "ClientId") inside a body whose every other key is lowerCamelCase, and its
+// sql.NullTime CreatedAt arrived as {"Time":"0001-01-01T00:00:00Z","Valid":false} where a NULL
+// column should read null. No released openapi.yaml has ever described that shape; every published
+// contract declares the lowerCamelCase keys below, so a client generated from one was broken on
+// exactly this position until it moved here. Adding a field to the persistence row must no longer
+// change the wire (#350).
+type RedirectURIResponse struct {
+	Id        int64      `json:"id"`
+	CreatedAt *time.Time `json:"createdAt"`
+	URI       string     `json:"uri"`
+	ClientId  int64      `json:"clientId"`
+}
+
+// WebOriginResponse is a client's allowed web origin as this API publishes it, and is here for the
+// same reason as RedirectURIResponse above (#350).
+type WebOriginResponse struct {
+	Id        int64      `json:"id"`
+	CreatedAt *time.Time `json:"createdAt"`
+	Origin    string     `json:"origin"`
+	ClientId  int64      `json:"clientId"`
+}
+
 type ClientResponse struct {
 	Id               int64      `json:"id"`
 	CreatedAt        *time.Time `json:"createdAt"`
@@ -634,15 +652,15 @@ type ClientResponse struct {
 	// ResourceOwnerPasswordCredentialsEnabled: nil = use global setting, true = enabled, false = disabled
 	// RFC 6749 Section 4.3
 	// SECURITY NOTE: ROPC is deprecated in OAuth 2.1 due to credential exposure risks
-	ResourceOwnerPasswordCredentialsEnabled *bool                `json:"resourceOwnerPasswordCredentialsEnabled"`
-	TokenExpirationInSeconds                int                  `json:"tokenExpirationInSeconds"`
-	RefreshTokenOfflineIdleTimeoutInSeconds int                  `json:"refreshTokenOfflineIdleTimeoutInSeconds"`
-	RefreshTokenOfflineMaxLifetimeInSeconds int                  `json:"refreshTokenOfflineMaxLifetimeInSeconds"`
-	IncludeOpenIDConnectClaimsInAccessToken string               `json:"includeOpenIDConnectClaimsInAccessToken"`
-	IncludeOpenIDConnectClaimsInIdToken     string               `json:"includeOpenIDConnectClaimsInIdToken"`
-	DefaultAcrLevel                         string               `json:"defaultAcrLevel"`
-	RedirectURIs                            []models.RedirectURI `json:"redirectURIs"`
-	WebOrigins                              []models.WebOrigin   `json:"webOrigins"`
+	ResourceOwnerPasswordCredentialsEnabled *bool                 `json:"resourceOwnerPasswordCredentialsEnabled"`
+	TokenExpirationInSeconds                int                   `json:"tokenExpirationInSeconds"`
+	RefreshTokenOfflineIdleTimeoutInSeconds int                   `json:"refreshTokenOfflineIdleTimeoutInSeconds"`
+	RefreshTokenOfflineMaxLifetimeInSeconds int                   `json:"refreshTokenOfflineMaxLifetimeInSeconds"`
+	IncludeOpenIDConnectClaimsInAccessToken string                `json:"includeOpenIDConnectClaimsInAccessToken"`
+	IncludeOpenIDConnectClaimsInIdToken     string                `json:"includeOpenIDConnectClaimsInIdToken"`
+	DefaultAcrLevel                         string                `json:"defaultAcrLevel"`
+	RedirectURIs                            []RedirectURIResponse `json:"redirectURIs"`
+	WebOrigins                              []WebOriginResponse   `json:"webOrigins"`
 }
 
 // AccountLogoutFormPostResponse instructs the client to POST to the OP's

@@ -245,7 +245,7 @@ GET /api/v1/admin/users/search?query=john&page=1&size=10
 GET /api/v1/admin/users/{id}
 ```
 
-Returns complete user details including groups, permissions, and attributes.
+Returns the user's own fields: profile, email, phone, address and OTP state. Groups, permissions and attributes are not included; each is served by its own endpoint, documented below: `GET /api/v1/admin/users/{id}/groups`, `/permissions` and `/attributes`.
 
 #### Create user
 

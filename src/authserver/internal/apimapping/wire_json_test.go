@@ -25,15 +25,14 @@ import (
 // type swapped or a nil slice that starts marshalling as [] instead of null all
 // fail here, naming the family they moved.
 //
-// These literals record the bytes as they are today, capitalised nested keys
-// and {"Time":...,"Valid":...} objects included. Several of those shapes are
-// defects: models.Group, models.Permission, models.RedirectURI and
-// models.WebOrigin carry no json tags, so they reach the wire in Go's
-// declaration spelling inside a body whose every other key is lowerCamelCase,
-// and a sql.NullTime that is NULL in the database arrives as a two-field object
-// rather than as null. #350 replaces them with DTOs. Writing the defect down
-// first is what makes that replacement a diff a reviewer reads, and what stops
-// any other change moving a shape by accident (#350).
+// These literals were first written against the bytes as they were, capitalised
+// nested keys and {"Time":...,"Valid":...} objects included, so that replacing
+// those shapes would be a diff a reviewer reads rather than a claim. That
+// replacement has now happened: models.Group and models.Permission left
+// UserResponse entirely, and models.RedirectURI and models.WebOrigin became
+// api.RedirectURIResponse and api.WebOriginResponse, lowerCamelCase with a
+// *time.Time that is null when the column is NULL. What the literals do from
+// here is stop any other change moving a shape by accident (#350).
 //
 // There is no decode half here, unlike session_wire_test.go: a mapper is
 // one-way, and the response types the admin console decodes are round-tripped
@@ -73,37 +72,25 @@ func runWireCases(t *testing.T, cases []wireCase) {
 }
 
 // -----------------------------------------------------------------------------
-// The untagged nested models, named once
+// The nested shapes, named once
 //
-// Each of these four is a persistence model reaching the wire through a field
-// of a response type, which is the whole of what #350 is about. Naming them
-// here means the stage that replaces one edits one constant.
+// These two are the last persistence models that reached the wire through a
+// field of a response type, and they no longer do: each is an api DTO now, with
+// lowerCamelCase keys and a *time.Time that is null rather than
+// {"Time":"0001-01-01T00:00:00Z","Valid":false} when the column is NULL. The
+// four shapes that used to sit beside them here -- models.Group,
+// models.Permission and its nested models.Resource, and the NullTime object
+// itself -- have no position on the wire left to pin: UserResponse carries
+// neither collection (#350).
 // -----------------------------------------------------------------------------
 
 const (
-	// wireNullTimeJSON is what a NULL sql.NullTime column becomes on the wire
-	// through an untagged model field: an object, never null.
-	wireNullTimeJSON = `{"Time":"0001-01-01T00:00:00Z","Valid":false}`
+	wireRedirectURIJSON = `{"id":1,"createdAt":"2026-09-16T10:00:00Z",` +
+		`"uri":"https://app.example/cb","clientId":3}`
 
-	wireCreatedJSON = `{"Time":"2026-09-16T10:00:00Z","Valid":true}`
-	wireUpdatedJSON = `{"Time":"2026-09-16T11:00:00Z","Valid":true}`
-
-	wireGroupModelJSON = `{"Id":2,"CreatedAt":` + wireCreatedJSON + `,"UpdatedAt":` + wireUpdatedJSON +
-		`,"GroupIdentifier":"admins","Description":"administrators","Attributes":null,"Permissions":null,` +
-		`"IncludeInIdToken":true,"IncludeInAccessToken":false,"MemberCount":3}`
-
-	wireResourceModelJSON = `{"Id":9,"CreatedAt":` + wireCreatedJSON + `,"UpdatedAt":` + wireNullTimeJSON +
-		`,"ResourceIdentifier":"backend-svc","Description":"the backend service"}`
-
-	wirePermissionModelJSON = `{"Id":5,"CreatedAt":` + wireCreatedJSON + `,"UpdatedAt":` + wireUpdatedJSON +
-		`,"PermissionIdentifier":"read-all","Description":"read everything","ResourceId":9,"Resource":` +
-		wireResourceModelJSON + `}`
-
-	wireRedirectURIModelJSON = `{"Id":1,"CreatedAt":` + wireCreatedJSON +
-		`,"URI":"https://app.example/cb","ClientId":3}`
-
-	wireWebOriginModelJSON = `{"Id":2,"CreatedAt":` + wireNullTimeJSON +
-		`,"Origin":"https://app.example","ClientId":3}`
+	// The one nested NULL timestamp in this file, and the whole of what the
+	// {"Time":...,"Valid":...} object became.
+	wireWebOriginJSON = `{"id":2,"createdAt":null,"origin":"https://app.example","clientId":3}`
 )
 
 func wireGroupModel() models.Group {
@@ -195,9 +182,9 @@ func wireUserModel() *models.User {
 }
 
 // wirePopulatedUserJSON is ToUserResponse over wireUserModel with one group, one
-// permission and one attribute loaded. The three collection keys at the end are
-// the ones #350 decision 11 removes; the nested objects inside the first two are
-// the untagged models named above.
+// permission and one attribute loaded on the model. It ends at otpEnabled: the
+// three collection keys that used to follow are gone, and the fixture keeps
+// loading all three so that this literal is what says so (#350).
 const wirePopulatedUserJSON = `{"id":7,"createdAt":"2026-09-16T10:00:00Z","updatedAt":"2026-09-16T11:00:00Z",` +
 	`"enabled":true,"subject":"3b9f1a2c-0000-4000-8000-000000000001","username":"alice","givenName":"Alice",` +
 	`"middleName":"Q","familyName":"Smith","nickname":"al","website":"https://alice.example","gender":"female",` +
@@ -206,22 +193,18 @@ const wirePopulatedUserJSON = `{"id":7,"createdAt":"2026-09-16T10:00:00Z","updat
 	`"phoneNumberCountryUniqueId":"BRA_55","phoneNumberCountryCallingCode":"55","phoneNumber":"11 99999-0000",` +
 	`"phoneNumberVerified":true,"addressLine1":"Rua Um, 100","addressLine2":"apto 2",` +
 	`"addressLocality":"Sao Paulo","addressRegion":"SP","addressPostalCode":"01000-000","addressCountry":"BRA",` +
-	`"otpEnabled":true,"groups":[` + wireGroupModelJSON + `],"permissions":[` + wirePermissionModelJSON + `],` +
-	`"attributes":[` + wireUserAttributeJSON + `]}`
+	`"otpEnabled":true}`
 
 // wireBareUserFields is ToUserResponse over a models.User carrying nothing but
-// its id, with no braces and with the three collection keys left to the caller:
-// those are the only part of the shape the empty-slice and nil-slice rows
-// disagree about. Brace-free so the annotated wrappers further down can show
-// how an embedded UserResponse flattens into its container.
-func wireBareUserFields(groups, permissions, attributes string) string {
+// its id, with no braces: brace-free so the annotated wrappers further down can
+// show how an embedded UserResponse flattens into its container.
+func wireBareUserFields() string {
 	return `"id":7,"createdAt":null,"updatedAt":null,"enabled":false,"subject":"","username":"",` +
 		`"givenName":"","middleName":"","familyName":"","nickname":"","website":"","gender":"","email":"",` +
 		`"emailVerified":false,"zoneInfoCountryName":"","zoneInfo":"","locale":"","birthDate":null,` +
 		`"phoneNumberCountryUniqueId":"","phoneNumberCountryCallingCode":"","phoneNumber":"",` +
 		`"phoneNumberVerified":false,"addressLine1":"","addressLine2":"","addressLocality":"",` +
-		`"addressRegion":"","addressPostalCode":"","addressCountry":"","otpEnabled":false,` +
-		`"groups":` + groups + `,"permissions":` + permissions + `,"attributes":` + attributes
+		`"addressRegion":"","addressPostalCode":"","addressCountry":"","otpEnabled":false`
 }
 
 func TestWireJSON_UserFamily(t *testing.T) {
@@ -241,22 +224,25 @@ func TestWireJSON_UserFamily(t *testing.T) {
 
 	runWireCases(t, []wireCase{
 		{
-			name:    "populated, with the untagged nested group and permission",
+			name:    "populated, with every collection loaded on the model",
 			value:   ToUserResponse(populated),
 			literal: wirePopulatedUserJSON,
 		},
 		{
-			// A user loaded without its collections, which is 20 of the 23
-			// ToUserResponse call sites: every timestamp is NULL and every
-			// collection is absent, so the three keys read null.
-			name:    "nil collections and NULL timestamps",
+			// A user loaded without its collections, which was 20 of the 23
+			// ToUserResponse call sites: every timestamp is NULL.
+			name:    "NULL timestamps",
 			value:   ToUserResponse(&models.User{Id: 7}),
-			literal: "{" + wireBareUserFields("null", "null", "null") + "}",
+			literal: "{" + wireBareUserFields() + "}",
 		},
 		{
-			name:    "empty collections marshal as [], not null",
+			// The empty-slice and nil-slice spellings used to be the only thing
+			// the two rows above disagreed about. They agree byte for byte now,
+			// which is the same fact from the other side: what a handler loaded
+			// onto the model cannot reach this body (#350).
+			name:    "empty collections are the same bytes as none at all",
 			value:   ToUserResponse(empty),
-			literal: "{" + wireBareUserFields("[]", "[]", "[]") + "}",
+			literal: "{" + wireBareUserFields() + "}",
 		},
 		{
 			name:    "UserAttributeResponse",
@@ -272,6 +258,50 @@ func TestWireJSON_UserFamily(t *testing.T) {
 				`"includeInIdToken":false,"includeInAccessToken":false,"userId":7}`,
 		},
 	})
+}
+
+// TestWireJSON_UserResponseOmitsTheNestedCollections says in key names what the
+// user family's literals say in bytes: groups, permissions and attributes are
+// absent from a user body, not present and null.
+//
+// The three used to be fields of UserResponse and were wrong in three different
+// ways. groups and permissions were populated at exactly three of the 23
+// ToUserResponse call sites, all of them responses that already carried the same
+// rows beside them as GroupResponse and PermissionResponse -- so GET
+// /users/{id}/groups marshalled one group twice in one body, in two spellings,
+// and the two copies disagreed, because the sibling got the member counts the
+// handler had queried and the nested copy got the raw model's zero. attributes
+// had no loader at all: the only handler that reads them writes
+// GetUserAttributesResponse. In the other 20 responses all three were null.
+//
+// Re-adding any of them would fail the literals above too, but it would fail
+// them as an unexplained byte diff. This is the row that names what is missing
+// and why, and the three endpoints that serve the data instead (#350).
+func TestWireJSON_UserResponseOmitsTheNestedCollections(t *testing.T) {
+	loaded := wireUserModel()
+	loaded.Groups = []models.Group{wireGroupModel()}
+	loaded.Permissions = []models.Permission{wirePermissionModel()}
+	loaded.Attributes = []models.UserAttribute{wireUserAttributeModel()}
+
+	encoded, err := json.Marshal(ToUserResponse(loaded))
+	require.NoError(t, err)
+
+	var body map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(encoded, &body))
+
+	for key, served := range map[string]string{
+		"groups":      "GET /api/v1/admin/users/{id}/groups",
+		"permissions": "GET /api/v1/admin/users/{id}/permissions",
+		"attributes":  "GET /api/v1/admin/users/{id}/attributes",
+	} {
+		_, present := body[key]
+		assert.False(t, present, "a user body must not carry %q at all, not even as null: %s is "+
+			"what serves it", key, served)
+	}
+
+	// The scalars are still there, so an empty body cannot be what passed the loop above.
+	assert.Contains(t, body, "id")
+	assert.Contains(t, body, "otpEnabled")
 }
 
 func TestWireJSON_UserSessionFamily(t *testing.T) {
@@ -459,7 +489,8 @@ func TestWireJSON_PermissionAndResourceFamilies(t *testing.T) {
 	permission := wirePermissionModel()
 	resource := wireResourceModel()
 
-	const resourceJSON = `{"id":9,"resourceIdentifier":"backend-svc","description":"the backend service"}`
+	const resourceJSON = `{"id":9,"resourceIdentifier":"backend-svc","description":"the backend service",` +
+		`"isSystemLevelResource":false}`
 
 	runWireCases(t, []wireCase{
 		{
@@ -477,17 +508,19 @@ func TestWireJSON_PermissionAndResourceFamilies(t *testing.T) {
 			literal: resourceJSON,
 		},
 		{
-			// The auth server's own resource. The admin console asks
-			// models.Resource.IsSystemLevelResource() about this one today,
-			// because the answer is on no response; #350 decision 10 puts it
-			// on this shape, where the row below is what will show it.
+			// The auth server's own resource. The admin console used to ask
+			// models.Resource.IsSystemLevelResource() about this one, because
+			// the answer was on no response. It is on this shape now, and the
+			// pair of rows -- false above, true here -- is what says the mapper
+			// asks the model rather than writing a constant (#350).
 			name: "ResourceResponse for the system-level resource",
 			value: ToResourceResponse(&models.Resource{
 				Id:                 1,
 				ResourceIdentifier: constants.AuthServerResourceIdentifier,
 				Description:        "Goiabada auth server",
 			}),
-			literal: `{"id":1,"resourceIdentifier":"authserver","description":"Goiabada auth server"}`,
+			literal: `{"id":1,"resourceIdentifier":"authserver","description":"Goiabada auth server",` +
+				`"isSystemLevelResource":true}`,
 		},
 	})
 }
@@ -528,8 +561,8 @@ func TestWireJSON_ClientFamily(t *testing.T) {
 			URI:       "https://app.example/cb",
 			ClientId:  3,
 		}},
-		// CreatedAt left NULL on purpose: it is the nested column that reaches
-		// the wire as a two-field object rather than as null.
+		// CreatedAt left NULL on purpose: it is the nested column that used to
+		// reach the wire as a two-field object and now reads null.
 		WebOrigins: []models.WebOrigin{{
 			Id:       2,
 			Origin:   "https://app.example",
@@ -569,12 +602,12 @@ func TestWireJSON_ClientFamily(t *testing.T) {
 			// clientSecret is absent, not empty: the mapper never sets it and the
 			// tag is omitempty, so only the detail handler that decrypts it puts
 			// it on the wire.
-			name:  "populated, with the untagged redirect URIs and web origins",
+			name:  "populated, with the nested redirect URI and web origin DTOs",
 			value: ToClientResponse(client),
 			literal: `{"id":3,"createdAt":"2026-09-16T10:00:00Z","updatedAt":"2026-09-16T11:00:00Z",` +
 				clientScalars("web-app", false) +
-				`,"redirectURIs":[` + wireRedirectURIModelJSON + `],"webOrigins":[` +
-				wireWebOriginModelJSON + `]}`,
+				`,"redirectURIs":[` + wireRedirectURIJSON + `],"webOrigins":[` +
+				wireWebOriginJSON + `]}`,
 		},
 		{
 			name:  "nil collections, and a system-level client",
@@ -617,7 +650,7 @@ func TestWireJSON_ListMapperNilShapes(t *testing.T) {
 // no mapped family and no part of #350 touches it.
 func TestWireJSON_PaginatedWrappers(t *testing.T) {
 	bareUser := ToUserResponse(&models.User{Id: 7})
-	bareUserFields := wireBareUserFields("null", "null", "null")
+	bareUserFields := wireBareUserFields()
 
 	group := wireGroupModel()
 

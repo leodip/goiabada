@@ -245,10 +245,10 @@ func TestToUserResponse_MapsAllFields(t *testing.T) {
 	assert.Equal(t, "01000-000", resp.AddressPostalCode)
 	assert.Equal(t, "BR", resp.AddressCountry)
 	assert.True(t, resp.OTPEnabled)
-	assert.Equal(t, user.Groups, resp.Groups)
-	assert.Equal(t, user.Permissions, resp.Permissions)
-	assert.Len(t, resp.Attributes, 1)
-	assert.Equal(t, "k", resp.Attributes[0].Key)
+	// The fixture above loads Groups, Permissions and Attributes on the model on purpose: none of
+	// the three is a field of UserResponse any more, so what is pinned here is that a loaded
+	// collection changes nothing about the response. wire_json_test.go owns the same fact as
+	// bytes, naming the three keys it refuses to find (#350).
 }
 
 // Invalid sql.NullTime values must become nil pointers rather than the zero time.
@@ -286,8 +286,10 @@ func TestUserResponse_ToUser_RoundTripsTimes(t *testing.T) {
 	assert.True(t, roundTripped.BirthDate.Valid)
 	assert.Equal(t, birthDate, roundTripped.BirthDate.Time)
 	assert.False(t, roundTripped.UpdatedAt.Valid, "an absent time must stay invalid")
-	assert.Len(t, roundTripped.Attributes, 1)
-	assert.Equal(t, "k", roundTripped.Attributes[0].Key)
+	// The fixture still loads one attribute, and the round trip no longer carries it: UserResponse
+	// declares no attributes field, so ToUser has nothing to rebuild from. GET
+	// /users/{id}/attributes is where a consumer reads them (#350).
+	assert.Empty(t, roundTripped.Attributes)
 }
 
 // api.UserResponse.Subject was a 16-byte named type until #278, reaching JSON through that
@@ -828,8 +830,8 @@ func TestToClientResponse_MapsFields(t *testing.T) {
 	assert.Equal(t, 300, resp.TokenExpirationInSeconds)
 	assert.Equal(t, 3600, resp.RefreshTokenOfflineIdleTimeoutInSeconds)
 	assert.Equal(t, 86400, resp.RefreshTokenOfflineMaxLifetimeInSeconds)
-	assert.Equal(t, client.RedirectURIs, resp.RedirectURIs)
-	assert.Equal(t, client.WebOrigins, resp.WebOrigins)
+	assert.Equal(t, []api.RedirectURIResponse{{Id: 1, URI: "https://app.example.com/cb"}}, resp.RedirectURIs)
+	assert.Equal(t, []api.WebOriginResponse{{Id: 1, Origin: "https://app.example.com"}}, resp.WebOrigins)
 	assert.Equal(t, client.IsSystemLevelClient(), resp.IsSystemLevelClient)
 }
 

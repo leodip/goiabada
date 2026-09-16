@@ -16,7 +16,6 @@ import (
 	adminmiddleware "github.com/leodip/goiabada/adminconsole/internal/middleware"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/handlerhelpers"
-	"github.com/leodip/goiabada/core/models"
 )
 
 // stubAllClientsApiClient answers both reads the Web Origins page performs. It is separate from
@@ -57,7 +56,7 @@ func TestHandleAdminClientWebOriginsGet_AssemblesTheServerWideList(t *testing.T)
 			client: &api.ClientResponse{
 				Id:               7,
 				ClientIdentifier: "this-app",
-				WebOrigins: []models.WebOrigin{
+				WebOrigins: []api.WebOriginResponse{
 					{Id: 2, ClientId: 7, Origin: "https://mine-b.example.com"},
 					{Id: 1, ClientId: 7, Origin: "https://mine-a.example.com"},
 				},
@@ -67,7 +66,7 @@ func TestHandleAdminClientWebOriginsGet_AssemblesTheServerWideList(t *testing.T)
 			{
 				Id:               7,
 				ClientIdentifier: "this-app",
-				WebOrigins: []models.WebOrigin{
+				WebOrigins: []api.WebOriginResponse{
 					{Id: 2, ClientId: 7, Origin: "https://mine-b.example.com"},
 					{Id: 1, ClientId: 7, Origin: "https://mine-a.example.com"},
 				},
@@ -75,7 +74,7 @@ func TestHandleAdminClientWebOriginsGet_AssemblesTheServerWideList(t *testing.T)
 			{
 				Id:               9,
 				ClientIdentifier: "another-app",
-				WebOrigins: []models.WebOrigin{
+				WebOrigins: []api.WebOriginResponse{
 					{Id: 3, ClientId: 9, Origin: "https://theirs.example.com"},
 				},
 			},
