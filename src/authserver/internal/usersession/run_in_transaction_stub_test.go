@@ -7,6 +7,14 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
+// txSentinel is the transaction the stub hands the body. It is non-nil and the mock database
+// never dereferences it, which is the whole of what it has to be: an expectation written against
+// txSentinel matches a call the body made and no call made before or after the transaction, where
+// the manager passes nil. A nil here -- which is what the BeginTransaction stubs this replaced
+// handed over, and what this file handed over until #198 -- makes those two indistinguishable, so
+// a sweep moved back outside the transaction would pass on call count alone.
+var txSentinel = &sql.Tx{}
+
 // runInTransactionStub is what the mock database answers RunInTransaction with in this package.
 // It hands the body the transaction and returns what the body returned, which is the helper's
 // behaviour on a body that does not deadlock. The commit on nil and the rollback on an error are
@@ -18,21 +26,19 @@ type runInTransactionStub struct {
 	bodyErr error
 }
 
-// expectRunInTransaction registers one RunInTransaction call that runs the body on tx and
-// returns its error. Every session-manager test in this package hands the body a nil
-// transaction, as the BeginTransaction stubs it replaces did: the manager only ever passes it
-// back to the database, and the mock does not inspect it.
-func expectRunInTransaction(db *mocks_data.Database, tx *sql.Tx) *runInTransactionStub {
-	return expectRunInTransactionThenFail(db, tx, nil)
+// expectRunInTransaction registers one RunInTransaction call that runs the body on txSentinel
+// and returns its error.
+func expectRunInTransaction(db *mocks_data.Database) *runInTransactionStub {
+	return expectRunInTransactionThenFail(db, nil)
 }
 
 // expectRunInTransactionThenFail is the commit-failure shape: the body runs and returns nil,
 // and the helper then reports commitErr, as it does when the engine refuses the commit. With a
 // nil commitErr it is expectRunInTransaction.
-func expectRunInTransactionThenFail(db *mocks_data.Database, tx *sql.Tx, commitErr error) *runInTransactionStub {
+func expectRunInTransactionThenFail(db *mocks_data.Database, commitErr error) *runInTransactionStub {
 	stub := &runInTransactionStub{}
 	db.EXPECT().RunInTransaction(mock.Anything).RunAndReturn(func(fn func(tx *sql.Tx) error) error {
-		stub.bodyErr = fn(tx)
+		stub.bodyErr = fn(txSentinel)
 		if stub.bodyErr != nil {
 			return stub.bodyErr
 		}

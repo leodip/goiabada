@@ -42,7 +42,7 @@ func TestUserCreator_CreateUser_WritesTheUserAndItsAccountPermissionInOneTransac
 	expectAccountPermissionLookup(db, accountPermissions())
 
 	var calls []string
-	stub := expectRunInTransaction(db, nil)
+	stub := expectRunInTransaction(db)
 	db.On("CreateUser", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		created := args.Get(1).(*models.User)
 		created.Id = 77 // stand in for the generated primary key
@@ -82,7 +82,7 @@ func TestUserCreator_CreateUser_AFailedUserInsertReachesTheHelperAndWritesNoPerm
 	expectAccountPermissionLookup(db, accountPermissions())
 
 	boom := errors.New("the engine refused the insert")
-	stub := expectRunInTransaction(db, nil)
+	stub := expectRunInTransaction(db)
 	db.On("CreateUser", mock.Anything, mock.Anything).Return(boom).Once()
 
 	user, err := NewUserCreator(db).CreateUser(&CreateUserInput{Email: "ada@example.com"})
