@@ -212,7 +212,8 @@ var slogSpreadSites = []slogSpreadSite{
 // authserver's API response writers and the admin console's client of the auth server's API, the
 // audit path's two packages, the authserver packages a ceremony runs through -- the ceremony
 // context, code and token issuance, and the signing keys (#339) -- the two validator packages the
-// handlers call on a request (#344) -- and the core packages the handlers call into on a request:
+// handlers call on a request (#344) -- the eight application service and leaf packages that
+// followed them out of core (#346) -- and the core packages the handlers call into on a request:
 // the shared middleware, the identifier and angle-bracket validators that stayed there, the
 // client-side token parser, the handler helpers and the session store.
 //
@@ -245,6 +246,14 @@ var slogRequestPathDirs = []string{
 	"authserver/internal/signingkeys",
 	"authserver/internal/accountvalidation",
 	"authserver/internal/protocolvalidation",
+	"authserver/internal/permissions",
+	"authserver/internal/usercreation",
+	"authserver/internal/usersession",
+	"authserver/internal/useragent",
+	"authserver/internal/emaildelivery",
+	"authserver/internal/otp",
+	"authserver/internal/imaging",
+	"authserver/internal/uithemes",
 	"adminconsole/internal/handlers",
 	"adminconsole/internal/middleware",
 	"adminconsole/internal/apiclient",
