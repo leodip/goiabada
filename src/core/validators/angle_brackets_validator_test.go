@@ -63,29 +63,37 @@ func TestAngleBrackets_Refused(t *testing.T) {
 
 			err := ValidateNoAngleBrackets(tc.value, i18n.ErrCodeDescriptionAngleBrackets)
 
-			assertLocalizedErrorCode(t, err, i18n.ErrCodeDescriptionAngleBrackets)
+			assertLocalizedError(t, err, i18n.ErrCodeDescriptionAngleBrackets,
+				"The description cannot contain the characters < or >.")
 		})
 	}
 }
 
 // The caller chooses the error code so the localized message names the right
-// field. ValidateNoAngleBrackets must return whichever code it was given.
+// field. ValidateNoAngleBrackets must return whichever code it was given, and
+// each code must name its own field: the seven sentences differ only in the
+// noun, so a catalog entry copied from its neighbour and left unedited is the
+// mistake this table exists to catch. The messages are transcribed from
+// src/core/i18n/catalogs/active.en.toml (#230).
 func TestValidateNoAngleBrackets_ReturnsTheCallerSuppliedCode(t *testing.T) {
-	codes := []string{
-		i18n.ErrCodeDescriptionAngleBrackets,
-		i18n.ErrCodeDisplayNameAngleBrackets,
-		i18n.ErrCodeAttributeValueAngleBrackets,
-		i18n.ErrCodeAddressAngleBrackets,
-		i18n.ErrCodeSettingsAppNameAngleBrackets,
-		i18n.ErrCodeSettingsIssuerAngleBrackets,
-		i18n.ErrCodeSettingsSmtpFromNameAngleBrackets,
+	testCases := []struct {
+		code    string
+		message string
+	}{
+		{i18n.ErrCodeDescriptionAngleBrackets, "The description cannot contain the characters < or >."},
+		{i18n.ErrCodeDisplayNameAngleBrackets, "The display name cannot contain the characters < or >."},
+		{i18n.ErrCodeAttributeValueAngleBrackets, "The attribute value cannot contain the characters < or >."},
+		{i18n.ErrCodeAddressAngleBrackets, "Address fields cannot contain the characters < or >."},
+		{i18n.ErrCodeSettingsAppNameAngleBrackets, "The application name cannot contain the characters < or >."},
+		{i18n.ErrCodeSettingsIssuerAngleBrackets, "The issuer cannot contain the characters < or >."},
+		{i18n.ErrCodeSettingsSmtpFromNameAngleBrackets, "The from name cannot contain the characters < or >."},
 	}
 
-	for _, code := range codes {
-		t.Run(code, func(t *testing.T) {
-			err := ValidateNoAngleBrackets("<b>x</b>", code)
+	for _, tc := range testCases {
+		t.Run(tc.code, func(t *testing.T) {
+			err := ValidateNoAngleBrackets("<b>x</b>", tc.code)
 
-			assertLocalizedErrorCode(t, err, code)
+			assertLocalizedError(t, err, tc.code, tc.message)
 		})
 	}
 }
