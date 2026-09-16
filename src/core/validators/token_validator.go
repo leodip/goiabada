@@ -860,6 +860,22 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 			return nil, err
 		}
 
+		// GetUserBySubject answers (nil, nil) for a subject that names no row, and user.Id is
+		// dereferenced by the permission re-check further down, so an unresolvable sub panicked the
+		// process. The refusal belongs here rather than at the dereference: that branch is skipped
+		// for an OIDC scope, offline_access and the injected userinfo scope, so a check placed
+		// there would refuse a resource-scope refresh and let an openid-only one succeed against a
+		// subject that names no user.
+		//
+		// A 500 rather than invalid_grant, because no supported operation can produce such a token:
+		// DeleteUser deletes the user's refresh tokens in the same transaction, and the
+		// authorization-code ones go with codes.user_id CASCADE. So this is a disagreement between
+		// the tokens and the users table, which is the operator's to see, and it is what this arm
+		// already answers for its other signed-but-impossible states (#123).
+		if user == nil {
+			return nil, errs.Errorf("subject not found: %v", sub)
+		}
+
 		// For ROPC tokens, skip consent check (ROPC bypasses consent - user providing credentials = implicit consent)
 		// For auth code flow tokens, check consent if required. Both the lookup arguments and the consent
 		// scope list are loop-invariant, so fetch and split the consent once here instead of on every
