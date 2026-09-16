@@ -53,7 +53,7 @@ func HandleAdminGroupAttributesEditGet(
 		}
 
 		// Get group via API
-		group, _, err := apiClient.GetGroupById(jwtInfo.TokenResponse.AccessToken, groupId)
+		group, err := apiClient.GetGroupById(jwtInfo.TokenResponse.AccessToken, groupId)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -126,7 +126,7 @@ func HandleAdminGroupAttributesEditPost(
 		}
 
 		// Get group via API for the redirect and error rendering
-		group, _, err := apiClient.GetGroupById(jwtInfo.TokenResponse.AccessToken, groupId)
+		group, err := apiClient.GetGroupById(jwtInfo.TokenResponse.AccessToken, groupId)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return

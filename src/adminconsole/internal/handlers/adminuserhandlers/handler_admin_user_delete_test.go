@@ -12,7 +12,6 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/core/api"
 	mocks_handler_helpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
-	"github.com/leodip/goiabada/core/models"
 )
 
 // deleteUserApiClient answers the two reads the confirmation page performs, and records the
@@ -20,7 +19,7 @@ import (
 type deleteUserApiClient struct {
 	apiclient.ApiClient
 	user       *api.UserResponse
-	groups     []models.Group
+	groups     []api.GroupResponse
 	askedGroup []int64
 }
 
@@ -29,7 +28,7 @@ func (c *deleteUserApiClient) GetUserById(accessToken string, userId int64) (*ap
 }
 
 func (c *deleteUserApiClient) GetUserGroups(accessToken string,
-	userId int64) (*api.UserResponse, []models.Group, error) {
+	userId int64) (*api.UserResponse, []api.GroupResponse, error) {
 
 	c.askedGroup = append(c.askedGroup, userId)
 	return c.user, c.groups, nil
@@ -58,7 +57,7 @@ func renderUserDelete(t *testing.T, client *deleteUserApiClient) map[string]inte
 func TestHandleAdminUserDeleteGet_BindsTheMembershipsTheDeletionWillDiscard(t *testing.T) {
 	client := &deleteUserApiClient{
 		user: &api.UserResponse{Id: 7, Email: "someone@example.com"},
-		groups: []models.Group{
+		groups: []api.GroupResponse{
 			{Id: 2, GroupIdentifier: "admins"},
 			{Id: 3, GroupIdentifier: "site-viewers"},
 		},
@@ -69,7 +68,7 @@ func TestHandleAdminUserDeleteGet_BindsTheMembershipsTheDeletionWillDiscard(t *t
 	assert.Equal(t, []int64{7}, client.askedGroup,
 		"the page has to ask for the memberships; nothing else on this response carries them")
 
-	groups, ok := bind["groups"].([]models.Group)
+	groups, ok := bind["groups"].([]api.GroupResponse)
 	require.True(t, ok, "the bind carries no groups at all")
 	require.Len(t, groups, 2)
 	assert.Equal(t, "admins", groups[0].GroupIdentifier)
@@ -81,7 +80,7 @@ func TestHandleAdminUserDeleteGet_BindsTheMembershipsTheDeletionWillDiscard(t *t
 func TestHandleAdminUserDeleteGet_AUserInNoGroupsBindsNone(t *testing.T) {
 	bind := renderUserDelete(t, &deleteUserApiClient{user: &api.UserResponse{Id: 7}})
 
-	groups, ok := bind["groups"].([]models.Group)
+	groups, ok := bind["groups"].([]api.GroupResponse)
 	require.True(t, ok, "the bind carries no groups key")
 	assert.Empty(t, groups)
 }

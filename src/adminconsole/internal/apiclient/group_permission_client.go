@@ -12,7 +12,7 @@ import (
 	"github.com/leodip/goiabada/core/models"
 )
 
-func (c *AuthServerClient) GetGroupPermissions(accessToken string, groupId int64) (*models.Group, []models.Permission, error) {
+func (c *AuthServerClient) GetGroupPermissions(accessToken string, groupId int64) (*api.GroupResponse, []models.Permission, error) {
 	fullURL := fmt.Sprintf("%s/api/v1/admin/groups/%d/permissions", c.baseURL, groupId)
 
 	req, err := http.NewRequest("GET", fullURL, nil)
@@ -42,7 +42,6 @@ func (c *AuthServerClient) GetGroupPermissions(accessToken string, groupId int64
 		return nil, nil, errs.Errorf("failed to unmarshal response: %w", err)
 	}
 
-	group := apiResp.Group.ToGroup()
 	permissions := make([]models.Permission, len(apiResp.Permissions))
 	for i, permResp := range apiResp.Permissions {
 		permissions[i] = models.Permission{
@@ -58,7 +57,7 @@ func (c *AuthServerClient) GetGroupPermissions(accessToken string, groupId int64
 		}
 	}
 
-	return group, permissions, nil
+	return &apiResp.Group, permissions, nil
 }
 
 func (c *AuthServerClient) UpdateGroupPermissions(accessToken string, groupId int64, request *api.UpdateGroupPermissionsRequest) error {

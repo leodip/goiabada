@@ -34,20 +34,20 @@ type ApiClient interface {
 	DeleteAccountSession(accessToken string, sessionId int64) error
 	GetUserConsents(accessToken string, userId int64) ([]api.UserConsentResponse, error)
 	DeleteUserConsent(accessToken string, consentId int64) error
-	GetAllGroups(accessToken string) ([]models.Group, error)
-	CreateGroup(accessToken string, request *api.CreateGroupRequest) (*models.Group, error)
-	GetGroupById(accessToken string, groupId int64) (*models.Group, int, error)
-	UpdateGroup(accessToken string, groupId int64, request *api.UpdateGroupRequest) (*models.Group, error)
+	GetAllGroups(accessToken string) ([]api.GroupResponse, error)
+	CreateGroup(accessToken string, request *api.CreateGroupRequest) (*api.GroupResponse, error)
+	GetGroupById(accessToken string, groupId int64) (*api.GroupResponse, error)
+	UpdateGroup(accessToken string, groupId int64, request *api.UpdateGroupRequest) (*api.GroupResponse, error)
 	DeleteGroup(accessToken string, groupId int64) error
-	GetUserGroups(accessToken string, userId int64) (*api.UserResponse, []models.Group, error)
-	UpdateUserGroups(accessToken string, userId int64, request *api.UpdateUserGroupsRequest) (*api.UserResponse, []models.Group, error)
+	GetUserGroups(accessToken string, userId int64) (*api.UserResponse, []api.GroupResponse, error)
+	UpdateUserGroups(accessToken string, userId int64, request *api.UpdateUserGroupsRequest) (*api.UserResponse, []api.GroupResponse, error)
 	GetGroupMembers(accessToken string, groupId int64, page, size int) ([]api.UserResponse, int, error)
 	AddUserToGroup(accessToken string, groupId int64, userId int64) error
 	RemoveUserFromGroup(accessToken string, groupId int64, userId int64) error
 	SearchUsersWithGroupAnnotation(accessToken, query string, groupId int64, page, size int) ([]api.UserWithGroupMembershipResponse, int, error)
 	GetUserPermissions(accessToken string, userId int64) (*api.UserResponse, []models.Permission, error)
 	UpdateUserPermissions(accessToken string, userId int64, request *api.UpdateUserPermissionsRequest) error
-	GetGroupPermissions(accessToken string, groupId int64) (*models.Group, []models.Permission, error)
+	GetGroupPermissions(accessToken string, groupId int64) (*api.GroupResponse, []models.Permission, error)
 	UpdateGroupPermissions(accessToken string, groupId int64, request *api.UpdateGroupPermissionsRequest) error
 	GetAllResources(accessToken string) ([]models.Resource, error)
 	GetResourceById(accessToken string, resourceId int64) (*models.Resource, error)
@@ -57,10 +57,10 @@ type ApiClient interface {
 	UpdateResourcePermissions(accessToken string, resourceId int64, request *api.UpdateResourcePermissionsRequest) error
 	CreateResource(accessToken string, request *api.CreateResourceRequest) (*models.Resource, error)
 	GetPhoneCountries(accessToken string) ([]api.PhoneCountryResponse, error)
-	GetGroupAttributesByGroupId(accessToken string, groupId int64) ([]models.GroupAttribute, error)
-	GetGroupAttributeById(accessToken string, attributeId int64) (*models.GroupAttribute, error)
-	CreateGroupAttribute(accessToken string, request *api.CreateGroupAttributeRequest) (*models.GroupAttribute, error)
-	UpdateGroupAttribute(accessToken string, attributeId int64, request *api.UpdateGroupAttributeRequest) (*models.GroupAttribute, error)
+	GetGroupAttributesByGroupId(accessToken string, groupId int64) ([]api.GroupAttributeResponse, error)
+	GetGroupAttributeById(accessToken string, attributeId int64) (*api.GroupAttributeResponse, error)
+	CreateGroupAttribute(accessToken string, request *api.CreateGroupAttributeRequest) (*api.GroupAttributeResponse, error)
+	UpdateGroupAttribute(accessToken string, attributeId int64, request *api.UpdateGroupAttributeRequest) (*api.GroupAttributeResponse, error)
 	DeleteGroupAttribute(accessToken string, attributeId int64) error
 	GetAllClients(accessToken string) ([]api.ClientResponse, error)
 	GetClientById(accessToken string, clientId int64) (*api.ClientResponse, error)

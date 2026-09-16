@@ -725,7 +725,7 @@ func TestRender_AdminUserDelete(t *testing.T) {
 			Email: "jane@example.com", CreatedAt: &createdAt,
 		},
 		"userFullName": "Jane Q Doe",
-		"groups": []models.Group{
+		"groups": []api.GroupResponse{
 			{Id: 2, GroupIdentifier: "admins"},
 			{Id: 3, GroupIdentifier: "site-viewers"},
 		},
@@ -745,11 +745,89 @@ func TestRender_AdminUserDeleteWithNoGroups(t *testing.T) {
 	out := render(t, "/admin_users_delete.html", map[string]interface{}{
 		"user":         &api.UserResponse{Id: 7, Email: "jane@example.com"},
 		"userFullName": "",
-		"groups":       []models.Group{},
+		"groups":       []api.GroupResponse{},
 		"page":         "1",
 		"query":        "",
 	})
 
 	assert.Contains(t, out, "jane@example.com")
 	assert.Contains(t, out, "(nenhum)", "a user in no groups still gets the row's none arm")
+}
+
+// Seam 4 for the group family (#350): the three group pages whose templates read the fields the
+// apiclient used to rebuild into a models.Group. This is the only seam that catches a template
+// naming a field the DTO does not carry, because it runs the real template FS, funcmap and layout.
+//
+// The list is the page that reads the most of the response: five columns, of which two are the
+// booleans that decide which token a membership reaches and one is the member count.
+func TestRender_AdminGroups(t *testing.T) {
+	out := render(t, "/admin_groups.html", map[string]interface{}{
+		"groups": []api.GroupResponse{
+			{Id: 2, GroupIdentifier: "admins", Description: "Administradores",
+				IncludeInIdToken: true, IncludeInAccessToken: false, MemberCount: 17},
+			{Id: 3, GroupIdentifier: "site-viewers", MemberCount: 0},
+		},
+	})
+
+	assert.Contains(t, out, "admins")
+	assert.Contains(t, out, "Administradores")
+	assert.Contains(t, out, "site-viewers")
+	assert.Regexp(t, `<td>\s*17\s*</td>`, out,
+		"the member count column is what GetGroupById's second return used to carry")
+
+	// The two token columns, both arms: "Sim" for the id token on the first row and "Não" for its
+	// access token. A row that rendered neither would still contain both words, from the other
+	// row, so the count is what tells them apart: three noes (one per row for access token, plus
+	// the second row's id token) and one yes.
+	assert.Equal(t, 1, strings.Count(out, ">Sim<"))
+	assert.Equal(t, 3, strings.Count(out, ">Não<"))
+}
+
+// The delete confirmation, whose member count comes off the response now rather than from a second
+// return value the apiclient answered beside the group.
+func TestRender_AdminGroupDelete(t *testing.T) {
+	out := render(t, "/admin_groups_delete.html", map[string]interface{}{
+		"group":        &api.GroupResponse{Id: 2, GroupIdentifier: "admins", Description: "Administradores"},
+		"countOfUsers": 17,
+	})
+
+	assert.Contains(t, out, "admins")
+	assert.Contains(t, out, "Administradores")
+	assert.Contains(t, out, "Quantidade de membros")
+	assert.Regexp(t, `<td class="">17 <a`, out,
+		"the count the administrator is about to orphan has to be on the page")
+}
+
+// The attributes page, both arms: a group with attributes and a group with none. The empty arm is
+// the one a decode that answered an empty slice for a populated group would land on silently.
+func TestRender_AdminGroupAttributes(t *testing.T) {
+	t.Run("with attributes", func(t *testing.T) {
+		out := render(t, "/admin_groups_attributes.html", map[string]interface{}{
+			"groupId":         int64(2),
+			"groupIdentifier": "admins",
+			"description":     "Administradores",
+			"attributes": []api.GroupAttributeResponse{
+				{Id: 7, Key: "tier", Value: "gold", GroupId: 2, IncludeInIdToken: true},
+				{Id: 8, Key: "region", Value: "br", GroupId: 2, IncludeInAccessToken: true},
+			},
+		})
+
+		assert.Contains(t, out, "admins")
+		assert.Contains(t, out, "tier")
+		assert.Contains(t, out, "gold")
+		assert.Contains(t, out, "region")
+		assert.NotContains(t, out, "Nenhum atributo associado ao grupo.",
+			"with two attributes listed, the empty arm must not also render")
+	})
+
+	t.Run("with none", func(t *testing.T) {
+		out := render(t, "/admin_groups_attributes.html", map[string]interface{}{
+			"groupId":         int64(2),
+			"groupIdentifier": "admins",
+			"description":     "Administradores",
+			"attributes":      []api.GroupAttributeResponse{},
+		})
+
+		assert.Contains(t, out, "Nenhum atributo associado ao grupo.")
+	})
 }

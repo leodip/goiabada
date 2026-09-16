@@ -55,12 +55,21 @@ const userBodyFields = `
 
 func serves(t *testing.T, body string) (*AuthServerClient, func() (string, string)) {
 	t.Helper()
+	return servesStatus(t, http.StatusOK, body)
+}
+
+// servesStatus is serves with the status named, for the creating methods: each of those treats
+// anything but 201 as an API error, so a 200 here would exercise the error path instead of the
+// decode the case is about.
+func servesStatus(t *testing.T, status int, body string) (*AuthServerClient, func() (string, string)) {
+	t.Helper()
 
 	var gotPath, gotAuthorization string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotPath = r.URL.Path
 		gotAuthorization = r.Header.Get("Authorization")
 		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(status)
 		_, _ = w.Write([]byte(body))
 	}))
 	t.Cleanup(server.Close)

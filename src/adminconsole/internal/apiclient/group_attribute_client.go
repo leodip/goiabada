@@ -9,10 +9,9 @@ import (
 
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
-	"github.com/leodip/goiabada/core/models"
 )
 
-func (c *AuthServerClient) GetGroupAttributesByGroupId(accessToken string, groupId int64) ([]models.GroupAttribute, error) {
+func (c *AuthServerClient) GetGroupAttributesByGroupId(accessToken string, groupId int64) ([]api.GroupAttributeResponse, error) {
 	fullURL := c.baseURL + "/api/v1/admin/groups/" + strconv.FormatInt(groupId, 10) + "/attributes"
 
 	req, err := http.NewRequest("GET", fullURL, nil)
@@ -43,18 +42,10 @@ func (c *AuthServerClient) GetGroupAttributesByGroupId(accessToken string, group
 		return nil, errs.Errorf("failed to decode response: %w", err)
 	}
 
-	// Convert responses back to models.GroupAttribute
-	attributes := make([]models.GroupAttribute, len(response.Attributes))
-	for i, attrResp := range response.Attributes {
-		if attr := attrResp.ToGroupAttribute(); attr != nil {
-			attributes[i] = *attr
-		}
-	}
-
-	return attributes, nil
+	return response.Attributes, nil
 }
 
-func (c *AuthServerClient) GetGroupAttributeById(accessToken string, attributeId int64) (*models.GroupAttribute, error) {
+func (c *AuthServerClient) GetGroupAttributeById(accessToken string, attributeId int64) (*api.GroupAttributeResponse, error) {
 	fullURL := c.baseURL + "/api/v1/admin/group-attributes/" + strconv.FormatInt(attributeId, 10)
 
 	req, err := http.NewRequest("GET", fullURL, nil)
@@ -85,10 +76,10 @@ func (c *AuthServerClient) GetGroupAttributeById(accessToken string, attributeId
 		return nil, errs.Errorf("failed to decode response: %w", err)
 	}
 
-	return response.Attribute.ToGroupAttribute(), nil
+	return &response.Attribute, nil
 }
 
-func (c *AuthServerClient) CreateGroupAttribute(accessToken string, request *api.CreateGroupAttributeRequest) (*models.GroupAttribute, error) {
+func (c *AuthServerClient) CreateGroupAttribute(accessToken string, request *api.CreateGroupAttributeRequest) (*api.GroupAttributeResponse, error) {
 	reqBody, err := json.Marshal(request)
 	if err != nil {
 		return nil, errs.Errorf("failed to marshal request: %w", err)
@@ -124,10 +115,10 @@ func (c *AuthServerClient) CreateGroupAttribute(accessToken string, request *api
 		return nil, errs.Errorf("failed to decode response: %w", err)
 	}
 
-	return response.Attribute.ToGroupAttribute(), nil
+	return &response.Attribute, nil
 }
 
-func (c *AuthServerClient) UpdateGroupAttribute(accessToken string, attributeId int64, request *api.UpdateGroupAttributeRequest) (*models.GroupAttribute, error) {
+func (c *AuthServerClient) UpdateGroupAttribute(accessToken string, attributeId int64, request *api.UpdateGroupAttributeRequest) (*api.GroupAttributeResponse, error) {
 	reqBody, err := json.Marshal(request)
 	if err != nil {
 		return nil, errs.Errorf("failed to marshal request: %w", err)
@@ -163,7 +154,7 @@ func (c *AuthServerClient) UpdateGroupAttribute(accessToken string, attributeId 
 		return nil, errs.Errorf("failed to decode response: %w", err)
 	}
 
-	return response.Attribute.ToGroupAttribute(), nil
+	return &response.Attribute, nil
 }
 
 func (c *AuthServerClient) DeleteGroupAttribute(accessToken string, attributeId int64) error {

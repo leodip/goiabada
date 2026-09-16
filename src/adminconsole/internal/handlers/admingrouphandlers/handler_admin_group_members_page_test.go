@@ -13,7 +13,6 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/pagination"
 	"github.com/leodip/goiabada/core/api"
 	mocks_handler_helpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
-	"github.com/leodip/goiabada/core/models"
 )
 
 // The group members list is one of the three admin lists that answered 500 to a
@@ -31,8 +30,8 @@ type membersPagingApiClient struct {
 	asked []int
 }
 
-func (c *membersPagingApiClient) GetGroupById(accessToken string, groupId int64) (*models.Group, int, error) {
-	return &models.Group{Id: groupId, GroupIdentifier: "some-group"}, 0, nil
+func (c *membersPagingApiClient) GetGroupById(accessToken string, groupId int64) (*api.GroupResponse, error) {
+	return &api.GroupResponse{Id: groupId, GroupIdentifier: "some-group"}, nil
 }
 
 func (c *membersPagingApiClient) GetGroupMembers(accessToken string, groupId int64,

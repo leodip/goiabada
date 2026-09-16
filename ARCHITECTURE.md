@@ -179,7 +179,6 @@ of rows is the only measure of how much is left to do.
 
 | from | to | issue |
 |---|---|---|
-| `core/api` | `core/models` | #350 |
 | `core/customerrors` | `core/models` | #350 |
 | `core/handlerhelpers` | `core/hashutil` | #360 |
 | `core/oauth` | `core/hashutil` | #360 |
@@ -192,7 +191,7 @@ of rows is the only measure of how much is left to do.
 | `adminconsole/internal/handlers/adminuserhandlers` | `core/models` | #350 |
 | `adminconsole/internal/middleware` | `core/models` | #350 |
 
-Twelve rows, and #350 owns nine of them: the admin console's dependency on persistence models is
+Eleven rows, and #350 owns eight of them: the admin console's dependency on persistence models is
 the single largest piece of the boundary still to close.
 
 ## Foreign modules the admin console must not compile

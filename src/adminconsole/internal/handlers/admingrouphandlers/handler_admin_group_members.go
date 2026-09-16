@@ -41,7 +41,7 @@ func HandleAdminGroupMembersGet(
 		}
 
 		// Get group details
-		group, _, err := apiClient.GetGroupById(jwtInfo.TokenResponse.AccessToken, id)
+		group, err := apiClient.GetGroupById(jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return

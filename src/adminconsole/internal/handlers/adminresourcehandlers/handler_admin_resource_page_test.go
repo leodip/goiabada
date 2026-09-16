@@ -58,10 +58,10 @@ func (c *resourcePagingApiClient) GetPermissionsByResource(accessToken string, r
 }
 
 // GetAllGroups is the whole list, unpaginated: the handler slices it itself.
-func (c *resourcePagingApiClient) GetAllGroups(accessToken string) ([]models.Group, error) {
-	groups := make([]models.Group, 0, c.total)
+func (c *resourcePagingApiClient) GetAllGroups(accessToken string) ([]api.GroupResponse, error) {
+	groups := make([]api.GroupResponse, 0, c.total)
 	for i := 0; i < c.total; i++ {
-		groups = append(groups, models.Group{Id: int64(i + 1), GroupIdentifier: "g" + strconv.Itoa(i+1)})
+		groups = append(groups, api.GroupResponse{Id: int64(i + 1), GroupIdentifier: "g" + strconv.Itoa(i+1)})
 	}
 	return groups, nil
 }
