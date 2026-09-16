@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/issuance"
 	"github.com/leodip/goiabada/core/communication"
@@ -103,7 +104,7 @@ type TokenParser interface {
 
 type EmailValidator interface {
 	ValidateEmailAddress(emailAddress string) error
-	ValidateEmailUpdate(input *validators.ValidateEmailInput) error
+	ValidateEmailUpdate(input *accountvalidation.ValidateEmailInput) error
 }
 
 type PasswordValidator interface {

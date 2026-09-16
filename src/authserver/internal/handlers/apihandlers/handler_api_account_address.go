@@ -5,18 +5,18 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
-	"github.com/leodip/goiabada/core/validators"
 )
 
 // HandleAPIAccountAddressPut - PUT /api/v1/account/address
 func HandleAPIAccountAddressPut(
 	database data.Database,
-	addressValidator *validators.AddressValidator,
+	addressValidator *accountvalidation.AddressValidator,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -52,7 +52,7 @@ func HandleAPIAccountAddressPut(
 		}
 
 		// Validate address input
-		input := &validators.ValidateAddressInput{
+		input := &accountvalidation.ValidateAddressInput{
 			AddressLine1:      strings.TrimSpace(req.AddressLine1),
 			AddressLine2:      strings.TrimSpace(req.AddressLine2),
 			AddressLocality:   strings.TrimSpace(req.AddressLocality),

@@ -10,13 +10,13 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
 	"github.com/leodip/goiabada/core/constants"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/leodip/goiabada/core/validators"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -69,7 +69,7 @@ func accountPasswordRequest(t *testing.T, claims map[string]interface{}, current
 func TestHandleAPIAccountPasswordPut_PreservesTheCallersSession(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_audit.NewAuditLogger(t)
-	passwordValidator := validators.NewPasswordValidator()
+	passwordValidator := accountvalidation.NewPasswordValidator()
 
 	const currentPassword = "0ldP4ss!word"
 	const newPassword = "N3wP4ss!word"
@@ -160,7 +160,7 @@ func TestHandleAPIAccountPasswordPut_PreservesTheCallersSession(t *testing.T) {
 func TestHandleAPIAccountPasswordPut_SidlessBearerRevokesEverything(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_audit.NewAuditLogger(t)
-	passwordValidator := validators.NewPasswordValidator()
+	passwordValidator := accountvalidation.NewPasswordValidator()
 
 	const currentPassword = "0ldP4ss!word"
 	const newPassword = "N3wP4ss!word"
@@ -210,7 +210,7 @@ func TestHandleAPIAccountPasswordPut_SidlessBearerRevokesEverything(t *testing.T
 func TestHandleAPIAccountPasswordPut_RevocationFailureIsA500(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_audit.NewAuditLogger(t)
-	passwordValidator := validators.NewPasswordValidator()
+	passwordValidator := accountvalidation.NewPasswordValidator()
 
 	const currentPassword = "0ldP4ss!word"
 	currentHash, err := hashutil.HashPassword(currentPassword)

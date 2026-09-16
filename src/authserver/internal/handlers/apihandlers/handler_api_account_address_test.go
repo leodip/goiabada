@@ -12,13 +12,13 @@ import (
 	"testing"
 
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/testutil"
-	"github.com/leodip/goiabada/core/validators"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -52,7 +52,7 @@ func TestHandleAPIAccountAddressPut_ADatabaseFailureIsOneLoggedFiveHundred(t *te
 		Return(nil, errors.New("the database is down")).Once()
 
 	rr := httptest.NewRecorder()
-	handler := HandleAPIAccountAddressPut(database, validators.NewAddressValidator(), auditLogger)
+	handler := HandleAPIAccountAddressPut(database, accountvalidation.NewAddressValidator(), auditLogger)
 
 	capture := testutil.CaptureSlog(t)
 
@@ -88,7 +88,7 @@ func TestHandleAPIAccountAddressPut_ASuccessWritesTheWholeBody(t *testing.T) {
 	auditLogger.On("Log", mock.Anything, constants.AuditUpdatedOwnAddress, mock.Anything).Return().Once()
 
 	rr := httptest.NewRecorder()
-	handler := HandleAPIAccountAddressPut(database, validators.NewAddressValidator(), auditLogger)
+	handler := HandleAPIAccountAddressPut(database, accountvalidation.NewAddressValidator(), auditLogger)
 
 	capture := testutil.CaptureSlog(t)
 

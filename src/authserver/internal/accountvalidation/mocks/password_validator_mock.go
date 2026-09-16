@@ -7,7 +7,7 @@
 
 //go:build !production
 
-package mocks_validator
+package mocks_accountvalidation
 
 import (
 	"context"

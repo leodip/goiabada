@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/core/api"
@@ -23,7 +24,6 @@ import (
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/stringutil"
 	"github.com/leodip/goiabada/core/user"
-	"github.com/leodip/goiabada/core/validators"
 )
 
 // HandleAPIUserGet - GET /api/v1/admin/users/{id}
@@ -71,7 +71,7 @@ func HandleAPIUserGet(
 // HandleAPIUserPasswordPut - PUT /api/v1/admin/users/{id}/password
 func HandleAPIUserPasswordPut(
 	database data.Database,
-	passwordValidator *validators.PasswordValidator,
+	passwordValidator *accountvalidation.PasswordValidator,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -262,9 +262,9 @@ func HandleAPIUserCreatePost(
 	httpHelper handlers.HttpHelper,
 	database data.Database,
 	userCreator handlers.UserCreator,
-	emailValidator *validators.EmailValidator,
-	profileValidator *validators.ProfileValidator,
-	passwordValidator *validators.PasswordValidator,
+	emailValidator *accountvalidation.EmailValidator,
+	profileValidator *accountvalidation.ProfileValidator,
+	passwordValidator *accountvalidation.PasswordValidator,
 	auditLogger handlers.AuditLogger,
 	emailSender handlers.EmailSender,
 ) http.HandlerFunc {

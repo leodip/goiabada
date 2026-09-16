@@ -8,13 +8,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/enums"
-	"github.com/leodip/goiabada/core/validators"
 )
 
 // HandleAPIAccountProfileGet - GET /api/v1/account/profile
@@ -53,7 +53,7 @@ func HandleAPIAccountProfileGet(
 // HandleAPIAccountProfilePut - PUT /api/v1/account/profile
 func HandleAPIAccountProfilePut(
 	database data.Database,
-	profileValidator *validators.ProfileValidator,
+	profileValidator *accountvalidation.ProfileValidator,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -89,7 +89,7 @@ func HandleAPIAccountProfilePut(
 		}
 
 		// Validate profile data
-		input := &validators.ValidateProfileInput{
+		input := &accountvalidation.ValidateProfileInput{
 			Username:            strings.TrimSpace(req.Username),
 			GivenName:           strings.TrimSpace(req.GivenName),
 			MiddleName:          strings.TrimSpace(req.MiddleName),

@@ -9,7 +9,6 @@ import (
 
 	"github.com/leodip/goiabada/core/urlutil"
 	"github.com/leodip/goiabada/core/uuidutil"
-	"github.com/leodip/goiabada/core/validators"
 )
 
 // draws is how many times each property below is exercised. Every generator here
@@ -125,11 +124,13 @@ func TestPassword_PanicsBelowFour(t *testing.T) {
 	_ = Password(3)
 }
 
-// TestEmail checks the address against the validator the handlers apply rather
-// than against a regex copied here. ValidateEmailAddress reads no database, so a
-// nil one is enough to construct the validator.
+// TestEmail checks the shape this generator promises. The cross-check that every
+// draw is accepted by the validator the handlers apply still exists and is still
+// run against the real validator rather than a regex copied here — it lives in
+// TestValidateEmailAddress_AcceptsEveryGeneratedAddress, in the package that owns
+// the rule, since #344 moved the email validator to the auth server and core may
+// not import it.
 func TestEmail(t *testing.T) {
-	val := validators.NewEmailValidator(nil)
 	for i := 0; i < draws; i++ {
 		got := Email()
 		if len(got) != 24 {
@@ -137,9 +138,6 @@ func TestEmail(t *testing.T) {
 		}
 		if got != strings.ToLower(got) {
 			t.Fatalf("Email(): %q is not lowercase", got)
-		}
-		if err := val.ValidateEmailAddress(got); err != nil {
-			t.Fatalf("Email(): %q rejected by the validator: %v", got, err)
 		}
 	}
 }

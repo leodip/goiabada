@@ -1,4 +1,4 @@
-package validators
+package accountvalidation
 
 import (
 	"strings"
@@ -64,6 +64,28 @@ func TestValidateEmailAddress(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// TestValidateEmailAddress_AcceptsEveryGeneratedAddress is the cross-check that
+// used to live in core/testutil/fake's own test, where it constructed this
+// validator directly. Core may not import the auth server, so #344 inverted it
+// rather than dropping it or copying the pattern into core: the property is the
+// same, proven against the real validator, and it now sits in the package that
+// owns the rule.
+//
+// It is worth keeping on either side. fake.Email() feeds the handler tests, so a
+// generator that drifted into a shape this validator refuses would surface as
+// unexplained failures a long way from the cause.
+//
+// ValidateEmailAddress reads no database, so a nil one is enough.
+func TestValidateEmailAddress_AcceptsEveryGeneratedAddress(t *testing.T) {
+	validator := NewEmailValidator(nil)
+	for i := 0; i < 1000; i++ {
+		got := fake.Email()
+		if err := validator.ValidateEmailAddress(got); err != nil {
+			t.Fatalf("fake.Email(): %q rejected by the validator: %v", got, err)
+		}
 	}
 }
 

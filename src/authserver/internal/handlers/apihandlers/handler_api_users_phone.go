@@ -7,13 +7,13 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/phonecountries"
-	"github.com/leodip/goiabada/core/validators"
 )
 
 // HandleAPIPhoneCountriesGet - GET /api/v1/admin/phone-countries
@@ -48,7 +48,7 @@ func HandleAPIPhoneCountriesGet() http.HandlerFunc {
 // HandleAPIUserPhonePut - PUT /api/v1/admin/users/{id}/phone
 func HandleAPIUserPhonePut(
 	database data.Database,
-	phoneValidator *validators.PhoneValidator,
+	phoneValidator *accountvalidation.PhoneValidator,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -87,7 +87,7 @@ func HandleAPIUserPhonePut(
 		}
 
 		// Validate phone data
-		input := &validators.ValidatePhoneInput{
+		input := &accountvalidation.ValidatePhoneInput{
 			PhoneCountryUniqueId: req.PhoneCountryUniqueId,
 			PhoneNumber:          strings.TrimSpace(req.PhoneNumber),
 		}

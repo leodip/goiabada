@@ -8,18 +8,18 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
-	"github.com/leodip/goiabada/core/validators"
 )
 
 // HandleAPIUserEmailPut - PUT /api/v1/admin/users/{id}/email
 func HandleAPIUserEmailPut(
 	database data.Database,
-	emailValidator *validators.EmailValidator,
+	emailValidator *accountvalidation.EmailValidator,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -58,7 +58,7 @@ func HandleAPIUserEmailPut(
 		}
 
 		// Validate email data
-		input := &validators.ValidateEmailInput{
+		input := &accountvalidation.ValidateEmailInput{
 			Email:             strings.ToLower(strings.TrimSpace(req.Email)),
 			EmailConfirmation: strings.ToLower(strings.TrimSpace(req.Email)),
 			Subject:           user.Subject,

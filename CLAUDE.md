@@ -25,7 +25,7 @@ repository root. It is enforced rather than descriptive: see **Architecture guar
 - `models/` - All domain models (Client, User, Permission, Group, etc.)
 - `data/` - Database interface + implementations (commondb/, mysqldb/, postgresdb/, sqlitedb/, mssqldb/)
 - `oauth/` - Shared OAuth/OIDC client surface: JWT/JWKS parsing, token exchange, PKCE, response_type parsing
-- `validators/` - Input validation (authorize, token, email, password, etc.)
+- `validators/` - Input validation (authorize, token, identifiers, angle brackets). The account validators — email, password, profile, address, phone — live in `authserver/internal/accountvalidation` (#344)
 - `config/` - Configuration from environment variables
 - `constants/` - Audit event names, resource identifiers
 

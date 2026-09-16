@@ -23,12 +23,12 @@ packages:
           pkgname: "mocks_validator"
       EmailValidator:
         config:
-          dir: "../core/validators/mocks"
-          pkgname: "mocks_validator"
+          dir: "./internal/accountvalidation/mocks"
+          pkgname: "mocks_accountvalidation"
       PasswordValidator:
         config:
-          dir: "../core/validators/mocks"
-          pkgname: "mocks_validator"
+          dir: "./internal/accountvalidation/mocks"
+          pkgname: "mocks_accountvalidation"
       TokenValidator:
         config:
           dir: "../core/validators/mocks"

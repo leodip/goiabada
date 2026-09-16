@@ -2,6 +2,7 @@ package server
 
 import (
 	"github.com/go-chi/chi/v5"
+	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	authhandlerhelpers "github.com/leodip/goiabada/authserver/internal/handlerhelpers"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
@@ -31,11 +32,11 @@ func (s *Server) initRoutes(root chi.Router) {
 	tokenParser := signingkeys.NewTokenParser(s.database)
 	permissionChecker := user.NewPermissionChecker(s.database)
 	tokenValidator := validators.NewTokenValidator(s.database, tokenParser, permissionChecker)
-	emailValidator := validators.NewEmailValidator(s.database)
-	passwordValidator := validators.NewPasswordValidator()
-	profileValidator := validators.NewProfileValidator(s.database)
-	addressValidator := validators.NewAddressValidator()
-	phoneValidator := validators.NewPhoneValidator()
+	emailValidator := accountvalidation.NewEmailValidator(s.database)
+	passwordValidator := accountvalidation.NewPasswordValidator()
+	profileValidator := accountvalidation.NewProfileValidator(s.database)
+	addressValidator := accountvalidation.NewAddressValidator()
+	phoneValidator := accountvalidation.NewPhoneValidator()
 	identifierValidator := validators.NewIdentifierValidator()
 
 	codeIssuer := issuance.NewCodeIssuer(s.database)
