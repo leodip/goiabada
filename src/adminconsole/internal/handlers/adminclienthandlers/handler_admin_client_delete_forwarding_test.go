@@ -12,7 +12,6 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/core/api"
 	mocks_handler_helpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
-	"github.com/leodip/goiabada/core/models"
 )
 
 // Decision 11 on a page that reads its entity through the API rather than through the database.
@@ -31,7 +30,7 @@ type deleteClientApiClient struct {
 	err error
 }
 
-func (c *deleteClientApiClient) GetClientPermissions(accessToken string, clientId int64) (*api.ClientResponse, []models.Permission, error) {
+func (c *deleteClientApiClient) GetClientPermissions(accessToken string, clientId int64) (*api.ClientResponse, []api.PermissionResponse, error) {
 	if c.err != nil {
 		return nil, nil, c.err
 	}

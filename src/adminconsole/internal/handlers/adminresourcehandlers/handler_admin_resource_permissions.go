@@ -89,7 +89,7 @@ func HandleAdminResourcePermissionsGet(
 			"resourceId":                   resource.Id,
 			"resourceIdentifier":           resource.ResourceIdentifier,
 			"resourceDescription":          resource.Description,
-			"isSystemLevelResource":        resource.IsSystemLevelResource(),
+			"isSystemLevelResource":        resource.IsSystemLevelResource,
 			"builtInPermissionIdentifiers": builtInPermissionIdentifiers,
 			"savedSuccessfully":            savedSuccessfully,
 			"permissions":                  permissions,

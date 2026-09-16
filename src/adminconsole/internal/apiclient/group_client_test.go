@@ -143,9 +143,8 @@ func TestAuthServerClient_CreateAndUpdateGroupReturnTheSavedGroup(t *testing.T) 
 	})
 }
 
-// The one method this change half-converts: the group half is the response now and the permission
-// half is still rebuilt into models.Permission, until the permission family moves. Both are read
-// here, so a change to either side that drops the other is caught.
+// Both halves are the wire response now, the group family's and the permission family's. Both are
+// read here, so a change to either side that drops the other is caught.
 func TestAuthServerClient_GetGroupPermissionsReturnsTheGroupBesideThePermissions(t *testing.T) {
 	client, recorded := serves(t, `{"group":{`+groupBodyFields+`},"permissions":[{"id":9,`+
 		`"permissionIdentifier":"read","description":"Read","resourceId":2,`+

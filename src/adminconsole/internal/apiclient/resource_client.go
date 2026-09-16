@@ -9,11 +9,10 @@ import (
 
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
-	"github.com/leodip/goiabada/core/models"
 )
 
 // CreateResource creates a new resource via the auth server admin API
-func (c *AuthServerClient) CreateResource(accessToken string, request *api.CreateResourceRequest) (*models.Resource, error) {
+func (c *AuthServerClient) CreateResource(accessToken string, request *api.CreateResourceRequest) (*api.ResourceResponse, error) {
 	url := fmt.Sprintf("%s/api/v1/admin/resources", c.baseURL)
 
 	body, err := json.Marshal(request)
@@ -49,17 +48,11 @@ func (c *AuthServerClient) CreateResource(accessToken string, request *api.Creat
 		return nil, errs.Errorf("failed to parse response: %w", err)
 	}
 
-	resource := &models.Resource{
-		Id:                 apiResp.Resource.Id,
-		ResourceIdentifier: apiResp.Resource.ResourceIdentifier,
-		Description:        apiResp.Resource.Description,
-	}
-
-	return resource, nil
+	return &apiResp.Resource, nil
 }
 
 // GetResourceById retrieves a single resource by ID via the auth server admin API
-func (c *AuthServerClient) GetResourceById(accessToken string, resourceId int64) (*models.Resource, error) {
+func (c *AuthServerClient) GetResourceById(accessToken string, resourceId int64) (*api.ResourceResponse, error) {
 	url := fmt.Sprintf("%s/api/v1/admin/resources/%d", c.baseURL, resourceId)
 
 	req, err := http.NewRequest("GET", url, nil)
@@ -89,16 +82,11 @@ func (c *AuthServerClient) GetResourceById(accessToken string, resourceId int64)
 		return nil, errs.Errorf("failed to parse response: %w", err)
 	}
 
-	resource := &models.Resource{
-		Id:                 apiResp.Resource.Id,
-		ResourceIdentifier: apiResp.Resource.ResourceIdentifier,
-		Description:        apiResp.Resource.Description,
-	}
-	return resource, nil
+	return &apiResp.Resource, nil
 }
 
 // UpdateResource updates an existing resource via the auth server admin API
-func (c *AuthServerClient) UpdateResource(accessToken string, resourceId int64, request *api.UpdateResourceRequest) (*models.Resource, error) {
+func (c *AuthServerClient) UpdateResource(accessToken string, resourceId int64, request *api.UpdateResourceRequest) (*api.ResourceResponse, error) {
 	url := fmt.Sprintf("%s/api/v1/admin/resources/%d", c.baseURL, resourceId)
 
 	body, err := json.Marshal(request)
@@ -133,12 +121,7 @@ func (c *AuthServerClient) UpdateResource(accessToken string, resourceId int64, 
 		return nil, errs.Errorf("failed to parse response: %w", err)
 	}
 
-	resource := &models.Resource{
-		Id:                 apiResp.Resource.Id,
-		ResourceIdentifier: apiResp.Resource.ResourceIdentifier,
-		Description:        apiResp.Resource.Description,
-	}
-	return resource, nil
+	return &apiResp.Resource, nil
 }
 
 // DeleteResource deletes a resource via the auth server admin API

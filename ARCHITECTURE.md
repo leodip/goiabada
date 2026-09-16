@@ -183,16 +183,12 @@ of rows is the only measure of how much is left to do.
 | `core/handlerhelpers` | `core/hashutil` | #360 |
 | `core/oauth` | `core/hashutil` | #360 |
 | `core/testutil/fake` | `core/uuidutil` | #360 |
-| `adminconsole/internal/apiclient` | `core/models` | #350 |
-| `adminconsole/internal/handlers` | `core/models` | #350 |
 | `adminconsole/internal/handlers/accounthandlers` | `core/models` | #350 |
-| `adminconsole/internal/handlers/adminclienthandlers` | `core/models` | #350 |
-| `adminconsole/internal/handlers/adminresourcehandlers` | `core/models` | #350 |
 | `adminconsole/internal/handlers/adminuserhandlers` | `core/models` | #350 |
 | `adminconsole/internal/middleware` | `core/models` | #350 |
 
-Eleven rows, and #350 owns eight of them: the admin console's dependency on persistence models is
-the single largest piece of the boundary still to close.
+Seven rows, and #350 owns four of them: what is left of the admin console's dependency on
+persistence models is the settings carrier and the one field in `core/customerrors`.
 
 ## Foreign modules the admin console must not compile
 

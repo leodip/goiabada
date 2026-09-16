@@ -8,10 +8,10 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
+	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/errs"
-	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
 )
 
@@ -62,7 +62,7 @@ func HandleAdminClientDeleteGet(
 			IsSystemLevelClient      bool
 			AuthorizationCodeEnabled bool
 			ClientCredentialsEnabled bool
-			Permissions              []models.Permission
+			Permissions              []api.PermissionResponse
 		}{
 			Id:                       client.Id,
 			ClientIdentifier:         client.ClientIdentifier,

@@ -10,11 +10,10 @@ import (
 
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
-	"github.com/leodip/goiabada/core/models"
 )
 
 // GetUserPermissions retrieves user permissions from the auth server
-func (c *AuthServerClient) GetUserPermissions(accessToken string, userId int64) (*api.UserResponse, []models.Permission, error) {
+func (c *AuthServerClient) GetUserPermissions(accessToken string, userId int64) (*api.UserResponse, []api.PermissionResponse, error) {
 	url := fmt.Sprintf("%s/api/v1/admin/users/%d/permissions", c.baseURL, userId)
 
 	req, err := http.NewRequest("GET", url, nil)
@@ -46,23 +45,7 @@ func (c *AuthServerClient) GetUserPermissions(accessToken string, userId int64) 
 		return nil, nil, errs.Errorf("failed to parse response: %w", err)
 	}
 
-	user := &apiResp.User
-	permissions := make([]models.Permission, len(apiResp.Permissions))
-	for i, permResp := range apiResp.Permissions {
-		permissions[i] = models.Permission{
-			Id:                   permResp.Id,
-			PermissionIdentifier: permResp.PermissionIdentifier,
-			Description:          permResp.Description,
-			ResourceId:           permResp.ResourceId,
-			Resource: models.Resource{
-				Id:                 permResp.Resource.Id,
-				ResourceIdentifier: permResp.Resource.ResourceIdentifier,
-				Description:        permResp.Resource.Description,
-			},
-		}
-	}
-
-	return user, permissions, nil
+	return &apiResp.User, apiResp.Permissions, nil
 }
 
 // UpdateUserPermissions updates user permissions via the auth server
@@ -102,7 +85,7 @@ func (c *AuthServerClient) UpdateUserPermissions(accessToken string, userId int6
 }
 
 // GetAllResources retrieves all resources from the auth server
-func (c *AuthServerClient) GetAllResources(accessToken string) ([]models.Resource, error) {
+func (c *AuthServerClient) GetAllResources(accessToken string) ([]api.ResourceResponse, error) {
 	url := fmt.Sprintf("%s/api/v1/admin/resources", c.baseURL)
 
 	req, err := http.NewRequest("GET", url, nil)
@@ -134,20 +117,11 @@ func (c *AuthServerClient) GetAllResources(accessToken string) ([]models.Resourc
 		return nil, errs.Errorf("failed to parse response: %w", err)
 	}
 
-	resources := make([]models.Resource, len(apiResp.Resources))
-	for i, resourceResp := range apiResp.Resources {
-		resources[i] = models.Resource{
-			Id:                 resourceResp.Id,
-			ResourceIdentifier: resourceResp.ResourceIdentifier,
-			Description:        resourceResp.Description,
-		}
-	}
-
-	return resources, nil
+	return apiResp.Resources, nil
 }
 
 // GetPermissionsByResource retrieves permissions for a specific resource from the auth server
-func (c *AuthServerClient) GetPermissionsByResource(accessToken string, resourceId int64) ([]models.Permission, error) {
+func (c *AuthServerClient) GetPermissionsByResource(accessToken string, resourceId int64) ([]api.PermissionResponse, error) {
 	url := fmt.Sprintf("%s/api/v1/admin/resources/%d/permissions", c.baseURL, resourceId)
 
 	req, err := http.NewRequest("GET", url, nil)
@@ -179,22 +153,7 @@ func (c *AuthServerClient) GetPermissionsByResource(accessToken string, resource
 		return nil, errs.Errorf("failed to parse response: %w", err)
 	}
 
-	permissions := make([]models.Permission, len(apiResp.Permissions))
-	for i, permResp := range apiResp.Permissions {
-		permissions[i] = models.Permission{
-			Id:                   permResp.Id,
-			PermissionIdentifier: permResp.PermissionIdentifier,
-			Description:          permResp.Description,
-			ResourceId:           permResp.ResourceId,
-			Resource: models.Resource{
-				Id:                 permResp.Resource.Id,
-				ResourceIdentifier: permResp.Resource.ResourceIdentifier,
-				Description:        permResp.Resource.Description,
-			},
-		}
-	}
-
-	return permissions, nil
+	return apiResp.Permissions, nil
 }
 
 // UpdateResourcePermissions replaces the full set of permission definitions for a resource

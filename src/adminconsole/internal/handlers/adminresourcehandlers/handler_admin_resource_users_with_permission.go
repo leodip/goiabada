@@ -13,7 +13,6 @@ import (
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/errs"
-	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
 )
@@ -60,7 +59,7 @@ func HandleAdminResourceUsersWithPermissionGet(
 		}
 		// filter out the userinfo permission if the resource is authserver
 		if resource.ResourceIdentifier == constants.AuthServerResourceIdentifier {
-			permissions = slices.DeleteFunc(permissions, func(p models.Permission) bool {
+			permissions = slices.DeleteFunc(permissions, func(p api.PermissionResponse) bool {
 				return p.PermissionIdentifier == constants.UserinfoPermissionIdentifier
 			})
 		}
@@ -153,7 +152,7 @@ func HandleAdminResourceUsersWithPermissionGet(
 			"resourceId":                   resource.Id,
 			"resourceIdentifier":           resource.ResourceIdentifier,
 			"description":                  resource.Description,
-			"isSystemLevelResource":        resource.IsSystemLevelResource(),
+			"isSystemLevelResource":        resource.IsSystemLevelResource,
 			"permissions":                  permissions,
 			"selectedPermission":           selectedPermission,
 			"selectedPermissionIdentifier": selectedPermissionIdentifier,
@@ -241,7 +240,7 @@ func HandleAdminResourceUsersWithPermissionRemovePermissionPost(
 		}
 		// filter out the userinfo permission if the resource is authserver
 		if resource.ResourceIdentifier == constants.AuthServerResourceIdentifier {
-			permissions = slices.DeleteFunc(permissions, func(p models.Permission) bool {
+			permissions = slices.DeleteFunc(permissions, func(p api.PermissionResponse) bool {
 				return p.PermissionIdentifier == constants.UserinfoPermissionIdentifier
 			})
 		}
@@ -328,7 +327,7 @@ func HandleAdminResourceUsersWithPermissionAddGet(
 		}
 		// filter out the userinfo permission if the resource is authserver
 		if resource.ResourceIdentifier == constants.AuthServerResourceIdentifier {
-			permissions = slices.DeleteFunc(permissions, func(p models.Permission) bool {
+			permissions = slices.DeleteFunc(permissions, func(p api.PermissionResponse) bool {
 				return p.PermissionIdentifier == constants.UserinfoPermissionIdentifier
 			})
 		}
@@ -371,7 +370,7 @@ func HandleAdminResourceUsersWithPermissionAddGet(
 			"resourceId":                   resource.Id,
 			"resourceIdentifier":           resource.ResourceIdentifier,
 			"description":                  resource.Description,
-			"isSystemLevelResource":        resource.IsSystemLevelResource(),
+			"isSystemLevelResource":        resource.IsSystemLevelResource,
 			"permissions":                  permissions,
 			"selectedPermission":           selectedPermission,
 			"selectedPermissionIdentifier": selectedPermissionIdentifier,
@@ -428,7 +427,7 @@ func HandleAdminResourceUsersWithPermissionSearchGet(
 		}
 		// filter out the userinfo permission if the resource is authserver
 		if resource.ResourceIdentifier == constants.AuthServerResourceIdentifier {
-			permissions = slices.DeleteFunc(permissions, func(p models.Permission) bool {
+			permissions = slices.DeleteFunc(permissions, func(p api.PermissionResponse) bool {
 				return p.PermissionIdentifier == constants.UserinfoPermissionIdentifier
 			})
 		}
@@ -561,7 +560,7 @@ func HandleAdminResourceUsersWithPermissionAddPermissionPost(
 		// filter out the userinfo permission if the resource is authserver
 		if resource.ResourceIdentifier == constants.AuthServerResourceIdentifier {
 			// build filtered list similar to groups handler to be safe
-			filtered := []models.Permission{}
+			filtered := []api.PermissionResponse{}
 			for _, p := range permissions {
 				if p.Resource.ResourceIdentifier == constants.AuthServerResourceIdentifier {
 					if p.PermissionIdentifier != constants.UserinfoPermissionIdentifier {

@@ -5,7 +5,6 @@ import (
 	"net/http"
 
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/models"
 )
 
 type ApiClient interface {
@@ -45,17 +44,17 @@ type ApiClient interface {
 	AddUserToGroup(accessToken string, groupId int64, userId int64) error
 	RemoveUserFromGroup(accessToken string, groupId int64, userId int64) error
 	SearchUsersWithGroupAnnotation(accessToken, query string, groupId int64, page, size int) ([]api.UserWithGroupMembershipResponse, int, error)
-	GetUserPermissions(accessToken string, userId int64) (*api.UserResponse, []models.Permission, error)
+	GetUserPermissions(accessToken string, userId int64) (*api.UserResponse, []api.PermissionResponse, error)
 	UpdateUserPermissions(accessToken string, userId int64, request *api.UpdateUserPermissionsRequest) error
-	GetGroupPermissions(accessToken string, groupId int64) (*api.GroupResponse, []models.Permission, error)
+	GetGroupPermissions(accessToken string, groupId int64) (*api.GroupResponse, []api.PermissionResponse, error)
 	UpdateGroupPermissions(accessToken string, groupId int64, request *api.UpdateGroupPermissionsRequest) error
-	GetAllResources(accessToken string) ([]models.Resource, error)
-	GetResourceById(accessToken string, resourceId int64) (*models.Resource, error)
-	UpdateResource(accessToken string, resourceId int64, request *api.UpdateResourceRequest) (*models.Resource, error)
+	GetAllResources(accessToken string) ([]api.ResourceResponse, error)
+	GetResourceById(accessToken string, resourceId int64) (*api.ResourceResponse, error)
+	UpdateResource(accessToken string, resourceId int64, request *api.UpdateResourceRequest) (*api.ResourceResponse, error)
 	DeleteResource(accessToken string, resourceId int64) error
-	GetPermissionsByResource(accessToken string, resourceId int64) ([]models.Permission, error)
+	GetPermissionsByResource(accessToken string, resourceId int64) ([]api.PermissionResponse, error)
 	UpdateResourcePermissions(accessToken string, resourceId int64, request *api.UpdateResourcePermissionsRequest) error
-	CreateResource(accessToken string, request *api.CreateResourceRequest) (*models.Resource, error)
+	CreateResource(accessToken string, request *api.CreateResourceRequest) (*api.ResourceResponse, error)
 	GetPhoneCountries(accessToken string) ([]api.PhoneCountryResponse, error)
 	GetGroupAttributesByGroupId(accessToken string, groupId int64) ([]api.GroupAttributeResponse, error)
 	GetGroupAttributeById(accessToken string, attributeId int64) (*api.GroupAttributeResponse, error)
@@ -71,7 +70,7 @@ type ApiClient interface {
 	DeleteClient(accessToken string, clientId int64) error
 	UpdateClientRedirectURIs(accessToken string, clientId int64, request *api.UpdateClientRedirectURIsRequest) (*api.ClientResponse, error)
 	UpdateClientWebOrigins(accessToken string, clientId int64, request *api.UpdateClientWebOriginsRequest) (*api.ClientResponse, error)
-	GetClientPermissions(accessToken string, clientId int64) (*api.ClientResponse, []models.Permission, error)
+	GetClientPermissions(accessToken string, clientId int64) (*api.ClientResponse, []api.PermissionResponse, error)
 	UpdateClientPermissions(accessToken string, clientId int64, request *api.UpdateClientPermissionsRequest) error
 	UpdateClientTokens(accessToken string, clientId int64, request *api.UpdateClientTokensRequest) (*api.ClientResponse, error)
 	SearchGroupsWithPermissionAnnotation(accessToken string, permissionId int64, page, size int) ([]api.GroupWithPermissionResponse, int, error)

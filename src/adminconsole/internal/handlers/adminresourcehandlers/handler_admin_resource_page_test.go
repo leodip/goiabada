@@ -17,7 +17,6 @@ import (
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	mocks_handler_helpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
-	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
@@ -44,16 +43,16 @@ type resourcePagingApiClient struct {
 
 	// permissions is what the resource has; empty is the arm that paginates in
 	// the handler.
-	permissions []models.Permission
+	permissions []api.PermissionResponse
 	total       int
 	asked       []int
 }
 
-func (c *resourcePagingApiClient) GetResourceById(accessToken string, resourceId int64) (*models.Resource, error) {
-	return &models.Resource{Id: resourceId, ResourceIdentifier: "some-resource"}, nil
+func (c *resourcePagingApiClient) GetResourceById(accessToken string, resourceId int64) (*api.ResourceResponse, error) {
+	return &api.ResourceResponse{Id: resourceId, ResourceIdentifier: "some-resource"}, nil
 }
 
-func (c *resourcePagingApiClient) GetPermissionsByResource(accessToken string, resourceId int64) ([]models.Permission, error) {
+func (c *resourcePagingApiClient) GetPermissionsByResource(accessToken string, resourceId int64) ([]api.PermissionResponse, error) {
 	return c.permissions, nil
 }
 
@@ -117,8 +116,8 @@ func window(total, page, pageSize int) (start, end int, ok bool) {
 
 // aPermission is the one permission a resource has in the cases that exercise
 // the API-backed arm.
-func aPermission() []models.Permission {
-	return []models.Permission{{Id: 42, PermissionIdentifier: "manage"}}
+func aPermission() []api.PermissionResponse {
+	return []api.PermissionResponse{{Id: 42, PermissionIdentifier: "manage"}}
 }
 
 // testStore is a real session store over an in-memory backend, because both

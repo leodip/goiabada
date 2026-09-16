@@ -15,10 +15,10 @@ import (
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	adminmiddleware "github.com/leodip/goiabada/adminconsole/internal/middleware"
+	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/handlerhelpers"
 	"github.com/leodip/goiabada/core/mocks"
-	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/testutil"
 )
@@ -34,11 +34,11 @@ import (
 
 type permissionsByResourceClient struct {
 	apiclient.ApiClient
-	permissions []models.Permission
+	permissions []api.PermissionResponse
 	err         error
 }
 
-func (c *permissionsByResourceClient) GetPermissionsByResource(accessToken string, resourceId int64) ([]models.Permission, error) {
+func (c *permissionsByResourceClient) GetPermissionsByResource(accessToken string, resourceId int64) ([]api.PermissionResponse, error) {
 	return c.permissions, c.err
 }
 
@@ -138,12 +138,21 @@ func TestAdminGetPermissions_AMissingResourceStillAnswers404(t *testing.T) {
 }
 
 // The success path, so the rows above cannot be satisfied by a handler that fails everything.
+//
+// The literal is also this endpoint's wire shape, and it moved. The array used to hold
+// models.Permission, which declares no json tags, so its members reached the console's own scripts
+// as "PermissionIdentifier"; they are api.PermissionResponse now and arrive lowerCamelCase. The
+// three scripts that read this body moved with it (#350). The outer "Permissions" key did not: it
+// belongs to GetPermissionsResult, a console-local view type rather than part of the auth server's
+// contract, and both halves are asserted here so neither can drift unnoticed.
 func TestAdminGetPermissions_ReturnsThePermissions(t *testing.T) {
-	client := &permissionsByResourceClient{permissions: []models.Permission{{Id: 3, PermissionIdentifier: "read"}}}
+	client := &permissionsByResourceClient{permissions: []api.PermissionResponse{{Id: 3, PermissionIdentifier: "read"}}}
 
 	recorder, errorLines := permissionRecords(t, client, "resourceId=7")
 
 	assert.Equal(t, http.StatusOK, recorder.Code)
 	assert.Empty(t, errorLines)
-	assert.Contains(t, recorder.Body.String(), "\"PermissionIdentifier\":\"read\"")
+	assert.JSONEq(t, `{"Permissions":[{"id":3,"permissionIdentifier":"read","description":"",`+
+		`"resourceId":0,"resource":{"id":0,"resourceIdentifier":"","description":"",`+
+		`"isSystemLevelResource":false}}]}`, recorder.Body.String())
 }

@@ -16,7 +16,6 @@ import (
 	adminmiddleware "github.com/leodip/goiabada/adminconsole/internal/middleware"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/handlerhelpers"
-	"github.com/leodip/goiabada/core/models"
 )
 
 // Decision 13 on the save itself, which is where the console's own sweep stopped one guard short.
@@ -36,11 +35,11 @@ import (
 // JsonError path carrying a status.
 type savePermissionsApiClient struct {
 	apiclient.ApiClient
-	resource  *models.Resource
+	resource  *api.ResourceResponse
 	updateErr error
 }
 
-func (c *savePermissionsApiClient) GetResourceById(accessToken string, resourceId int64) (*models.Resource, error) {
+func (c *savePermissionsApiClient) GetResourceById(accessToken string, resourceId int64) (*api.ResourceResponse, error) {
 	return c.resource, nil
 }
 
@@ -124,7 +123,7 @@ func TestResourcePermissionsPost_ForwardsTheApisStatus(t *testing.T) {
 					handlerhelpers.NewHttpHelper(nil, adminmiddleware.SettingsReader{}),
 					nil,
 					&savePermissionsApiClient{
-						resource:  &models.Resource{Id: 3},
+						resource:  &api.ResourceResponse{Id: 3},
 						updateErr: testCase.updateErr,
 					}))
 			router.ServeHTTP(rec, req)

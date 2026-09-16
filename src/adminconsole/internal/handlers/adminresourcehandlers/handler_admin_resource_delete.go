@@ -53,7 +53,7 @@ func HandleAdminResourceDeleteGet(
 		bind := map[string]interface{}{
 			"resource":              resource,
 			"permissions":           permissions,
-			"isSystemLevelResource": resource.IsSystemLevelResource(),
+			"isSystemLevelResource": resource.IsSystemLevelResource,
 		}
 
 		err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_resources_delete.html", bind)
@@ -105,7 +105,7 @@ func HandleAdminResourceDeletePost(
 			bind := map[string]interface{}{
 				"resource":              resource,
 				"permissions":           permissions,
-				"isSystemLevelResource": resource.IsSystemLevelResource(),
+				"isSystemLevelResource": resource.IsSystemLevelResource,
 				"error":                 message,
 			}
 
@@ -116,7 +116,7 @@ func HandleAdminResourceDeletePost(
 		}
 
 		// System-level resource protection: block deletion
-		if resource.IsSystemLevelResource() {
+		if resource.IsSystemLevelResource {
 			renderError("System-level resources cannot be deleted.")
 			return
 		}
