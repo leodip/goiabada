@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/leodip/goiabada/core/communication"
+	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/hashutil"
@@ -103,7 +103,7 @@ func HandleForgotPasswordPost(
 				return
 			}
 
-			input := &communication.SendEmailInput{
+			input := &emaildelivery.SendEmailInput{
 				To:       user.Email,
 				Subject:  i18n.T(emailReq.Context(), "email.forgot_password.subject"),
 				HtmlBody: buf.String(),

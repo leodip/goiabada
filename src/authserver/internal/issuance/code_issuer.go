@@ -8,12 +8,12 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
+	"github.com/leodip/goiabada/authserver/internal/useragent"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/stringutil"
-	"github.com/leodip/goiabada/core/useragent"
 	"github.com/leodip/goiabada/core/uuidutil"
 )
 

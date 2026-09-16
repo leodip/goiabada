@@ -7,11 +7,11 @@
 
 //go:build !production
 
-package mocks_user
+package mocks_handlers
 
 import (
+	"github.com/leodip/goiabada/authserver/internal/usercreation"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/leodip/goiabada/core/user"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -52,7 +52,7 @@ func (_m *UserCreator) EXPECT() *UserCreator_Expecter {
 }
 
 // CreateUser provides a mock function for the type UserCreator
-func (_mock *UserCreator) CreateUser(input *user.CreateUserInput) (*models.User, error) {
+func (_mock *UserCreator) CreateUser(input *usercreation.CreateUserInput) (*models.User, error) {
 	ret := _mock.Called(input)
 
 	if len(ret) == 0 {
@@ -61,17 +61,17 @@ func (_mock *UserCreator) CreateUser(input *user.CreateUserInput) (*models.User,
 
 	var r0 *models.User
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(*user.CreateUserInput) (*models.User, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(*usercreation.CreateUserInput) (*models.User, error)); ok {
 		return returnFunc(input)
 	}
-	if returnFunc, ok := ret.Get(0).(func(*user.CreateUserInput) *models.User); ok {
+	if returnFunc, ok := ret.Get(0).(func(*usercreation.CreateUserInput) *models.User); ok {
 		r0 = returnFunc(input)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*models.User)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(*user.CreateUserInput) error); ok {
+	if returnFunc, ok := ret.Get(1).(func(*usercreation.CreateUserInput) error); ok {
 		r1 = returnFunc(input)
 	} else {
 		r1 = ret.Error(1)
@@ -85,16 +85,16 @@ type UserCreator_CreateUser_Call struct {
 }
 
 // CreateUser is a helper method to define mock.On call
-//   - input *user.CreateUserInput
+//   - input *usercreation.CreateUserInput
 func (_e *UserCreator_Expecter) CreateUser(input any) *UserCreator_CreateUser_Call {
 	return &UserCreator_CreateUser_Call{Call: _e.mock.On("CreateUser", input)}
 }
 
-func (_c *UserCreator_CreateUser_Call) Run(run func(input *user.CreateUserInput)) *UserCreator_CreateUser_Call {
+func (_c *UserCreator_CreateUser_Call) Run(run func(input *usercreation.CreateUserInput)) *UserCreator_CreateUser_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *user.CreateUserInput
+		var arg0 *usercreation.CreateUserInput
 		if args[0] != nil {
-			arg0 = args[0].(*user.CreateUserInput)
+			arg0 = args[0].(*usercreation.CreateUserInput)
 		}
 		run(
 			arg0,
@@ -103,12 +103,12 @@ func (_c *UserCreator_CreateUser_Call) Run(run func(input *user.CreateUserInput)
 	return _c
 }
 
-func (_c *UserCreator_CreateUser_Call) Return(user1 *models.User, err error) *UserCreator_CreateUser_Call {
-	_c.Call.Return(user1, err)
+func (_c *UserCreator_CreateUser_Call) Return(user *models.User, err error) *UserCreator_CreateUser_Call {
+	_c.Call.Return(user, err)
 	return _c
 }
 
-func (_c *UserCreator_CreateUser_Call) RunAndReturn(run func(input *user.CreateUserInput) (*models.User, error)) *UserCreator_CreateUser_Call {
+func (_c *UserCreator_CreateUser_Call) RunAndReturn(run func(input *usercreation.CreateUserInput) (*models.User, error)) *UserCreator_CreateUser_Call {
 	_c.Call.Return(run)
 	return _c
 }

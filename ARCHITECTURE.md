@@ -85,7 +85,6 @@ A row whose owner is not `kernel` names the issue that moves it. A `kernel` row 
 | `core/api` | kernel | — |
 | `core/auditlog` | authserver | #359 |
 | `core/cmd` | authserver | #354 |
-| `core/communication` | authserver | #346 |
 | `core/config` | split | #351 |
 | `core/constants` | split | #351 |
 | `core/countries` | kernel | — |
@@ -97,7 +96,6 @@ A row whose owner is not `kernel` names the issue that moves it. A `kernel` row 
 | `core/handlerhelpers` | kernel | — |
 | `core/hashutil` | authserver | #360 |
 | `core/i18n` | kernel | — |
-| `core/imaging` | authserver | #346 |
 | `core/locales` | kernel | — |
 | `core/logging` | kernel | — |
 | `core/middleware` | kernel | — |
@@ -105,16 +103,12 @@ A row whose owner is not `kernel` names the issue that moves it. A `kernel` row 
 | `core/models` | authserver | #359 |
 | `core/oauth` | kernel | — |
 | `core/oidc` | authserver | #360 |
-| `core/otp` | authserver | #346 |
 | `core/rsautil` | authserver | #360 |
 | `core/sessionstore` | kernel | — |
 | `core/stringutil` | kernel | — |
 | `core/testutil` | kernel | — |
 | `core/timezones` | kernel | — |
-| `core/uithemes` | authserver | #346 |
 | `core/urlutil` | authserver | #360 |
-| `core/user` | authserver | #346 |
-| `core/useragent` | authserver | #346 |
 | `core/uuidutil` | authserver | #360 |
 | `core/validators` | kernel | — |
 
@@ -253,8 +247,8 @@ expected to leave at 13/16 and left at 9/16, because severing the one edge that 
 does the same job from the other end. Which is why `reachable today` is asserted against the real
 closure and not derived from an argument about which issue owns the cut.
 
-`github.com/pquerna/otp` is listed at `no` deliberately. It is not reachable now, `core/otp` moves
-to the auth server in #346, and the row states that it must not arrive in the meantime.
+`github.com/pquerna/otp` is listed at `no` deliberately. It is not reachable now, it never will be
+now that `otp` is the auth server's (#346), and the row states that it must not arrive.
 
 The table is a declared list, not a discovery mechanism: it asserts these modules and says nothing
 about a dependency nobody has written a row for. Closing that would mean an allowlist of every

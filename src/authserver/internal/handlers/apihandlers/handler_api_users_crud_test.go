@@ -13,7 +13,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
-	mocks_communication "github.com/leodip/goiabada/core/communication/mocks"
+	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
@@ -23,7 +23,6 @@ import (
 	mocks_handlerhelpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/models"
-	mocks_users "github.com/leodip/goiabada/core/user/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -323,9 +322,9 @@ func TestHandleAPIUserOTPPut_DisableCommitsBothWritesAtomically(t *testing.T) {
 func TestHandleAPIUserCreatePost_StoresResetCodeHash(t *testing.T) {
 	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 	database := mocks_data.NewDatabase(t)
-	userCreator := mocks_users.NewUserCreator(t)
+	userCreator := mocks_handlers.NewUserCreator(t)
 	auditLogger := mocks_audit.NewAuditLogger(t)
-	emailSender := mocks_communication.NewEmailSender(t)
+	emailSender := mocks_handlers.NewEmailSender(t)
 
 	handler := HandleAPIUserCreatePost(httpHelper, database, userCreator,
 		accountvalidation.NewEmailValidator(database),
@@ -404,9 +403,9 @@ func TestHandleAPIUserCreatePost_StoresResetCodeHash(t *testing.T) {
 func TestHandleAPIUserCreatePost_LostRaceOnTheEmailAnswers409(t *testing.T) {
 	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 	database := mocks_data.NewDatabase(t)
-	userCreator := mocks_users.NewUserCreator(t)
+	userCreator := mocks_handlers.NewUserCreator(t)
 	auditLogger := mocks_audit.NewAuditLogger(t)
-	emailSender := mocks_communication.NewEmailSender(t)
+	emailSender := mocks_handlers.NewEmailSender(t)
 
 	handler := HandleAPIUserCreatePost(httpHelper, database, userCreator,
 		accountvalidation.NewEmailValidator(database),
@@ -459,9 +458,9 @@ func TestHandleAPIUserCreatePost_LostRaceOnTheEmailAnswers409(t *testing.T) {
 func TestHandleAPIUserCreatePost_AnyOtherCreateFailureAnswers500(t *testing.T) {
 	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 	database := mocks_data.NewDatabase(t)
-	userCreator := mocks_users.NewUserCreator(t)
+	userCreator := mocks_handlers.NewUserCreator(t)
 	auditLogger := mocks_audit.NewAuditLogger(t)
-	emailSender := mocks_communication.NewEmailSender(t)
+	emailSender := mocks_handlers.NewEmailSender(t)
 
 	handler := HandleAPIUserCreatePost(httpHelper, database, userCreator,
 		accountvalidation.NewEmailValidator(database),

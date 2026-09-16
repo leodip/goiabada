@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/communication"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/encryption"
@@ -252,7 +252,7 @@ func HandleAPISettingsEmailSendTestPost(
 
 		// Construct simple plain content via core communication interface
 		simpleBody := "This is a test email from Goiabada. Today is " + time.Now().Format("January 2, 2006 at 3:04pm (MST)") + "."
-		input := &communication.SendEmailInput{
+		input := &emaildelivery.SendEmailInput{
 			To:       req.To,
 			Subject:  "Test email",
 			HtmlBody: simpleBody,

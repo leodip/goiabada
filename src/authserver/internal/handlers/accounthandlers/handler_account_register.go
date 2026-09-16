@@ -7,8 +7,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
-	"github.com/leodip/goiabada/core/communication"
+	"github.com/leodip/goiabada/authserver/internal/usercreation"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
@@ -19,7 +20,6 @@ import (
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/stringutil"
-	core_user "github.com/leodip/goiabada/core/user"
 )
 
 func HandleAccountRegisterGet(
@@ -220,7 +220,7 @@ func HandleAccountRegisterPost(
 				return
 			}
 
-			input := &communication.SendEmailInput{
+			input := &emaildelivery.SendEmailInput{
 				To:       email,
 				Subject:  i18n.T(emailReq.Context(), "email.register_activate.subject"),
 				HtmlBody: buf.String(),
@@ -246,7 +246,7 @@ func HandleAccountRegisterPost(
 				return
 			}
 
-			_, err = userCreator.CreateUser(&core_user.CreateUserInput{
+			_, err = userCreator.CreateUser(&usercreation.CreateUserInput{
 				Email:         email,
 				EmailVerified: false,
 				PasswordHash:  passwordHash,
@@ -273,7 +273,7 @@ func HandleAccountRegisterPost(
 					return
 				}
 
-				input := &communication.SendEmailInput{
+				input := &emaildelivery.SendEmailInput{
 					To:       email,
 					Subject:  i18n.T(emailReq.Context(), "email.register_confirmation.subject"),
 					HtmlBody: buf.String(),

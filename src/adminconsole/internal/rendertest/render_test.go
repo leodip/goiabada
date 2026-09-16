@@ -494,10 +494,10 @@ func TestRender_SessionPagesTooltipTheRawUserAgent(t *testing.T) {
 // says it arrives there as text.
 //
 // A label is derived from Sec-CH-UA and Sec-CH-UA-Platform, whose values UA-CH requires a
-// server to accept arbitrarily (core/useragent pins that premise), so any user can put markup
-// in their own session's label by completing a login with hand-written headers. On these two
-// pages the End Session button hands that label to endSessionClick, which builds a message
-// showModalDialog assigns to innerHTML. html/template escapes the label for the JavaScript
+// server to accept arbitrarily (authserver/internal/useragent pins that premise), so any user
+// can put markup in their own session's label by completing a login with hand-written headers.
+// On these two pages the End Session button hands that label to endSessionClick, which builds a
+// message showModalDialog assigns to innerHTML. html/template escapes the label for the JavaScript
 // string literal in the onclick attribute and stops there, so the concatenation is where the
 // escaping has to happen, and only rendered HTML can see whether it does (#281).
 //

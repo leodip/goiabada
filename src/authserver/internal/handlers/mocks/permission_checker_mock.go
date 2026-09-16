@@ -7,7 +7,7 @@
 
 //go:build !production
 
-package mocks_user
+package mocks_handlers
 
 import (
 	"github.com/leodip/goiabada/core/models"

@@ -21,7 +21,6 @@ import (
 	"github.com/leodip/goiabada/core/i18n"
 	mocks_test "github.com/leodip/goiabada/core/mocks"
 	"github.com/leodip/goiabada/core/models"
-	mocks_user "github.com/leodip/goiabada/core/user/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -33,7 +32,7 @@ import (
 // it ticks keeps asserting against its own selection instead of one the stub invented. The cases
 // that never reach the approval branch are given a bare mock with no expectation at all, which is
 // what says the filter is not consulted on a cancel, a stale ceremony or a rejected body (#241).
-func stubUserHoldsEveryScope(permissionChecker *mocks_user.PermissionChecker) {
+func stubUserHoldsEveryScope(permissionChecker *mocks_handlers.PermissionChecker) {
 	permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, mock.Anything).
 		Return(func(scope string, user *models.User) string { return scope }, nil)
 }
@@ -456,7 +455,7 @@ func TestHandleConsentPost(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		permissionChecker := mocks_user.NewPermissionChecker(t)
+		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger, permissionChecker)
 
@@ -482,7 +481,7 @@ func TestHandleConsentPost(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		permissionChecker := mocks_user.NewPermissionChecker(t)
+		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger, permissionChecker)
 
@@ -576,7 +575,7 @@ func TestHandleConsentPost(t *testing.T) {
 				database := mocks_data.NewDatabase(t)
 				auditLogger := mocks_audit.NewAuditLogger(t)
 
-				permissionChecker := mocks_user.NewPermissionChecker(t)
+				permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 				handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger, permissionChecker)
 
@@ -634,7 +633,7 @@ func TestHandleConsentPost(t *testing.T) {
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		permissionChecker := mocks_user.NewPermissionChecker(t)
+		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger, permissionChecker)
 
@@ -683,7 +682,7 @@ func TestHandleConsentPost(t *testing.T) {
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		permissionChecker := mocks_user.NewPermissionChecker(t)
+		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger, permissionChecker)
 
@@ -740,7 +739,7 @@ func TestHandleConsentPost(t *testing.T) {
 			},
 		}
 
-		permissionChecker := mocks_user.NewPermissionChecker(t)
+		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		handler := HandleConsentPost(httpHelper, authHelper, database, templateFS, auditLogger, permissionChecker)
 
@@ -793,7 +792,7 @@ func TestHandleConsentPost(t *testing.T) {
 			},
 		}
 
-		permissionChecker := mocks_user.NewPermissionChecker(t)
+		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		handler := HandleConsentPost(httpHelper, authHelper, database, templateFS, auditLogger, permissionChecker)
 
@@ -837,7 +836,7 @@ func TestHandleConsentPost(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		permissionChecker := mocks_user.NewPermissionChecker(t)
+		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger, permissionChecker)
 
@@ -899,7 +898,7 @@ func TestHandleConsentPost(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		permissionChecker := mocks_user.NewPermissionChecker(t)
+		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger, permissionChecker)
 
@@ -971,7 +970,7 @@ func TestHandleConsentPost(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		permissionChecker := mocks_user.NewPermissionChecker(t)
+		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger, permissionChecker)
 
@@ -1058,7 +1057,7 @@ func TestHandleConsentPost(t *testing.T) {
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
-		permissionChecker := mocks_user.NewPermissionChecker(t)
+		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger, permissionChecker)
 
@@ -1115,7 +1114,7 @@ func TestHandleConsentPost(t *testing.T) {
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		permissionChecker := mocks_user.NewPermissionChecker(t)
+		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger, permissionChecker)
 
@@ -1190,7 +1189,7 @@ func TestHandleConsentPost(t *testing.T) {
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		permissionChecker := mocks_user.NewPermissionChecker(t)
+		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger, permissionChecker)
 
@@ -1265,7 +1264,7 @@ func TestHandleConsentPost(t *testing.T) {
 			},
 		}
 
-		permissionChecker := mocks_user.NewPermissionChecker(t)
+		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		handler := HandleConsentPost(httpHelper, authHelper, database, templateFS, auditLogger, permissionChecker)
 
@@ -1331,7 +1330,7 @@ func TestHandleConsentPost(t *testing.T) {
 			},
 		}
 
-		permissionChecker := mocks_user.NewPermissionChecker(t)
+		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		handler := HandleConsentPost(httpHelper, authHelper, database, templateFS, auditLogger, permissionChecker)
 
@@ -1390,7 +1389,7 @@ func TestHandleConsentPost(t *testing.T) {
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		permissionChecker := mocks_user.NewPermissionChecker(t)
+		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger, permissionChecker)
 
@@ -1444,7 +1443,7 @@ func TestHandleConsentPost(t *testing.T) {
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		permissionChecker := mocks_user.NewPermissionChecker(t)
+		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger, permissionChecker)
 
@@ -1494,7 +1493,7 @@ func TestHandleConsentPost(t *testing.T) {
 			},
 		}
 
-		permissionChecker := mocks_user.NewPermissionChecker(t)
+		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		handler := HandleConsentPost(httpHelper, authHelper, database, templateFS, auditLogger, permissionChecker)
 
@@ -1542,7 +1541,7 @@ func TestHandleConsentPost(t *testing.T) {
 			},
 		}
 
-		permissionChecker := mocks_user.NewPermissionChecker(t)
+		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		handler := HandleConsentPost(httpHelper, authHelper, database, templateFS, auditLogger, permissionChecker)
 
@@ -1802,7 +1801,7 @@ func TestHandleConsentPost(t *testing.T) {
 				database := mocks_data.NewDatabase(t)
 				auditLogger := mocks_audit.NewAuditLogger(t)
 
-				permissionChecker := mocks_user.NewPermissionChecker(t)
+				permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 				handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger, permissionChecker)
 
@@ -1920,7 +1919,7 @@ func TestHandleConsentPost(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		permissionChecker := mocks_user.NewPermissionChecker(t)
+		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		handler := HandleConsentPost(httpHelper, authHelper, database, nil, auditLogger, permissionChecker)
 

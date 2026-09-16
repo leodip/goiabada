@@ -16,7 +16,6 @@ import (
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
 	mocks_handlerhelpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
-	mocks_oauth "github.com/leodip/goiabada/core/oauth/mocks"
 	mocks_sessionstore "github.com/leodip/goiabada/core/sessionstore/mocks"
 
 	"github.com/leodip/goiabada/core/constants"
@@ -43,7 +42,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 		httpSession := mocks_sessionstore.NewStore(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
-		tokenParser := mocks_oauth.NewTokenParser(t)
+		tokenParser := mocks_handlers.NewTokenParser(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		handler := HandleAccountLogoutGet(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
 
@@ -80,7 +79,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 		httpSession := mocks_sessionstore.NewStore(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
-		tokenParser := mocks_oauth.NewTokenParser(t)
+		tokenParser := mocks_handlers.NewTokenParser(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		handler := HandleAccountLogoutGet(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
 
@@ -135,7 +134,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 				httpSession := mocks_sessionstore.NewStore(t)
 				authHelper := mocks_handlers.NewAuthHelper(t)
 				database := mocks_data.NewDatabase(t)
-				tokenParser := mocks_oauth.NewTokenParser(t)
+				tokenParser := mocks_handlers.NewTokenParser(t)
 				auditLogger := mocks_audit.NewAuditLogger(t)
 				handler := HandleAccountLogoutGet(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
 
@@ -170,7 +169,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 		httpSession := mocks_sessionstore.NewStore(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
-		tokenParser := mocks_oauth.NewTokenParser(t)
+		tokenParser := mocks_handlers.NewTokenParser(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		handler := HandleAccountLogoutGet(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
 
@@ -199,7 +198,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 		httpSession := mocks_sessionstore.NewStore(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
-		tokenParser := mocks_oauth.NewTokenParser(t)
+		tokenParser := mocks_handlers.NewTokenParser(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleAccountLogoutGet(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
@@ -238,7 +237,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 		httpSession := mocks_sessionstore.NewStore(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
-		tokenParser := mocks_oauth.NewTokenParser(t)
+		tokenParser := mocks_handlers.NewTokenParser(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleAccountLogoutGet(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
@@ -279,7 +278,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 		httpSession := mocks_sessionstore.NewStore(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
-		tokenParser := mocks_oauth.NewTokenParser(t)
+		tokenParser := mocks_handlers.NewTokenParser(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleAccountLogoutGet(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
@@ -318,7 +317,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 		httpSession := mocks_sessionstore.NewStore(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
-		tokenParser := mocks_oauth.NewTokenParser(t)
+		tokenParser := mocks_handlers.NewTokenParser(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleAccountLogoutGet(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
@@ -349,7 +348,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 		httpSession := mocks_sessionstore.NewStore(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
-		tokenParser := mocks_oauth.NewTokenParser(t)
+		tokenParser := mocks_handlers.NewTokenParser(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleAccountLogoutGet(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
@@ -386,7 +385,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 		httpSession := mocks_sessionstore.NewStore(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
-		tokenParser := mocks_oauth.NewTokenParser(t)
+		tokenParser := mocks_handlers.NewTokenParser(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleAccountLogoutGet(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
@@ -430,7 +429,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 		httpSession := mocks_sessionstore.NewStore(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
-		tokenParser := mocks_oauth.NewTokenParser(t)
+		tokenParser := mocks_handlers.NewTokenParser(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleAccountLogoutGet(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
@@ -818,7 +817,7 @@ func hintedRequest(t *testing.T, method string, form url.Values, sessionIdentifi
 func stubConfirmedHint(
 	httpHelper *mocks_handlerhelpers.HttpHelper,
 	database *mocks_data.Database,
-	tokenParser *mocks_oauth.TokenParser,
+	tokenParser *mocks_handlers.TokenParser,
 	claims map[string]interface{},
 ) *models.Client {
 	client := &models.Client{Id: 11, ClientIdentifier: hintedClientId}
@@ -955,7 +954,7 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 		httpSession := mocks_sessionstore.NewStore(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
-		tokenParser := mocks_oauth.NewTokenParser(t)
+		tokenParser := mocks_handlers.NewTokenParser(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleAccountLogoutPost(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
@@ -1006,7 +1005,7 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 		httpSession := mocks_sessionstore.NewStore(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
-		tokenParser := mocks_oauth.NewTokenParser(t)
+		tokenParser := mocks_handlers.NewTokenParser(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleAccountLogoutPost(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
@@ -1307,7 +1306,7 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 				httpSession := mocks_sessionstore.NewStore(t)
 				authHelper := mocks_handlers.NewAuthHelper(t)
 				database := mocks_data.NewDatabase(t)
-				tokenParser := mocks_oauth.NewTokenParser(t)
+				tokenParser := mocks_handlers.NewTokenParser(t)
 				auditLogger := mocks_audit.NewAuditLogger(t)
 
 				handler := HandleAccountLogoutPost(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
@@ -1391,7 +1390,7 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 				httpSession := mocks_sessionstore.NewStore(t)
 				authHelper := mocks_handlers.NewAuthHelper(t)
 				database := mocks_data.NewDatabase(t)
-				tokenParser := mocks_oauth.NewTokenParser(t)
+				tokenParser := mocks_handlers.NewTokenParser(t)
 				auditLogger := mocks_audit.NewAuditLogger(t)
 
 				handler := HandleAccountLogoutPost(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
@@ -1447,7 +1446,7 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 				httpSession := mocks_sessionstore.NewStore(t)
 				authHelper := mocks_handlers.NewAuthHelper(t)
 				database := mocks_data.NewDatabase(t)
-				tokenParser := mocks_oauth.NewTokenParser(t)
+				tokenParser := mocks_handlers.NewTokenParser(t)
 				auditLogger := mocks_audit.NewAuditLogger(t)
 
 				handler := HandleAccountLogoutPost(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
@@ -1491,7 +1490,7 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 		httpSession := mocks_sessionstore.NewStore(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
-		tokenParser := mocks_oauth.NewTokenParser(t)
+		tokenParser := mocks_handlers.NewTokenParser(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleAccountLogoutPost(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
@@ -1527,7 +1526,7 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 		httpSession := mocks_sessionstore.NewStore(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
-		tokenParser := mocks_oauth.NewTokenParser(t)
+		tokenParser := mocks_handlers.NewTokenParser(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleAccountLogoutPost(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
@@ -1574,7 +1573,7 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 		httpSession := mocks_sessionstore.NewStore(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
-		tokenParser := mocks_oauth.NewTokenParser(t)
+		tokenParser := mocks_handlers.NewTokenParser(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleAccountLogoutPost(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
@@ -1639,7 +1638,7 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 				httpSession := mocks_sessionstore.NewStore(t)
 				authHelper := mocks_handlers.NewAuthHelper(t)
 				database := mocks_data.NewDatabase(t)
-				tokenParser := mocks_oauth.NewTokenParser(t)
+				tokenParser := mocks_handlers.NewTokenParser(t)
 				auditLogger := mocks_audit.NewAuditLogger(t)
 
 				handler := HandleAccountLogoutPost(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
@@ -1674,7 +1673,7 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 		httpSession := mocks_sessionstore.NewStore(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
-		tokenParser := mocks_oauth.NewTokenParser(t)
+		tokenParser := mocks_handlers.NewTokenParser(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleAccountLogoutPost(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
@@ -1709,7 +1708,7 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 		httpSession := mocks_sessionstore.NewStore(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
-		tokenParser := mocks_oauth.NewTokenParser(t)
+		tokenParser := mocks_handlers.NewTokenParser(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleAccountLogoutPost(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
@@ -2467,7 +2466,7 @@ func TestClassifyIdTokenHint(t *testing.T) {
 			logs := testutil.CaptureSlog(t)
 			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 			database := mocks_data.NewDatabase(t)
-			tokenParser := mocks_oauth.NewTokenParser(t)
+			tokenParser := mocks_handlers.NewTokenParser(t)
 
 			req, err := http.NewRequest("GET", "/auth/logout", nil)
 			assert.NoError(t, err)

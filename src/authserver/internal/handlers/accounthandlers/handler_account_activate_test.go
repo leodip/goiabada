@@ -16,6 +16,8 @@ import (
 
 	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
+	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+	"github.com/leodip/goiabada/authserver/internal/usercreation"
 	"github.com/leodip/goiabada/core/constants"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
 	"github.com/leodip/goiabada/core/encryption"
@@ -23,8 +25,6 @@ import (
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/sessionstore"
-	"github.com/leodip/goiabada/core/user"
-	mocks_users "github.com/leodip/goiabada/core/user/mocks"
 )
 
 // The activation flow's state machine, at seam 3.
@@ -204,7 +204,7 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 	t.Run("a valid code marks the session and redirects to a clean URL", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		database := mocks_data.NewDatabase(t)
-		userCreator := mocks_users.NewUserCreator(t)
+		userCreator := mocks_handlers.NewUserCreator(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		store := newMarkerTestStore()
 
@@ -244,7 +244,7 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 	t.Run("a code matching no row is refused", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		database := mocks_data.NewDatabase(t)
-		userCreator := mocks_users.NewUserCreator(t)
+		userCreator := mocks_handlers.NewUserCreator(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		store := newMarkerTestStore()
 
@@ -264,7 +264,7 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 	t.Run("a hash hit whose stored code does not match is refused", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		database := mocks_data.NewDatabase(t)
-		userCreator := mocks_users.NewUserCreator(t)
+		userCreator := mocks_handlers.NewUserCreator(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		store := newMarkerTestStore()
 
@@ -299,7 +299,7 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 	t.Run("a second link followed while one is in flight is refused", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		database := mocks_data.NewDatabase(t)
-		userCreator := mocks_users.NewUserCreator(t)
+		userCreator := mocks_handlers.NewUserCreator(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		store := newMarkerTestStore()
 
@@ -342,7 +342,7 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 	t.Run("a link followed while a reset continuation is in flight is refused", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		database := mocks_data.NewDatabase(t)
-		userCreator := mocks_users.NewUserCreator(t)
+		userCreator := mocks_handlers.NewUserCreator(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		store := newMarkerTestStore()
 
@@ -376,7 +376,7 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 	t.Run("an expired code deletes the pending registration and asks for another", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		database := mocks_data.NewDatabase(t)
-		userCreator := mocks_users.NewUserCreator(t)
+		userCreator := mocks_handlers.NewUserCreator(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		store := newMarkerTestStore()
 
@@ -407,7 +407,7 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 			t.Run(tc.name, func(t *testing.T) {
 				httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 				database := mocks_data.NewDatabase(t)
-				userCreator := mocks_users.NewUserCreator(t)
+				userCreator := mocks_handlers.NewUserCreator(t)
 				auditLogger := mocks_audit.NewAuditLogger(t)
 				store := newMarkerTestStore()
 
@@ -445,7 +445,7 @@ func TestHandleAccountActivateGet_Clean(t *testing.T) {
 	t.Run("the marker completes the activation", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		database := mocks_data.NewDatabase(t)
-		userCreator := mocks_users.NewUserCreator(t)
+		userCreator := mocks_handlers.NewUserCreator(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		store := newMarkerTestStore()
 
@@ -453,7 +453,7 @@ func TestHandleAccountActivateGet_Clean(t *testing.T) {
 		database.On("GetPreRegistrationByVerificationCodeHash", (*sql.Tx)(nil), codeHash).Return(preReg, nil).Once()
 
 		createdUser := &models.User{Id: 3, Email: activateTestEmail}
-		userCreator.On("CreateUser", &user.CreateUserInput{
+		userCreator.On("CreateUser", &usercreation.CreateUserInput{
 			Email:         activateTestEmail,
 			EmailVerified: true,
 			PasswordHash:  "password_hash",
@@ -532,7 +532,7 @@ func TestHandleAccountActivateGet_Clean(t *testing.T) {
 			t.Run(tc.name, func(t *testing.T) {
 				httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 				database := mocks_data.NewDatabase(t)
-				userCreator := mocks_users.NewUserCreator(t)
+				userCreator := mocks_handlers.NewUserCreator(t)
 				auditLogger := mocks_audit.NewAuditLogger(t)
 				store := newMarkerTestStore()
 

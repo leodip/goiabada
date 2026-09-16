@@ -43,12 +43,12 @@ packages:
           pkgname: "mocks_handlers"
       TokenParser:
         config:
-          dir: "../core/oauth/mocks"
-          pkgname: "mocks_oauth"
+          dir: "./internal/handlers/mocks"
+          pkgname: "mocks_handlers"
       EmailSender:
         config:
-          dir: "../core/communication/mocks"
-          pkgname: "mocks_communication"
+          dir: "./internal/handlers/mocks"
+          pkgname: "mocks_handlers"
       AuthHelper:
         config:
           dir: "./internal/handlers/mocks"
@@ -63,17 +63,17 @@ packages:
           pkgname: "mocks_audit"
       PermissionChecker:
         config:
-          dir: "../core/user/mocks"
-          pkgname: "mocks_user"
+          dir: "./internal/handlers/mocks"
+          pkgname: "mocks_handlers"
       UserCreator:
         config:
-          dir: "../core/user/mocks"
-          pkgname: "mocks_user"
+          dir: "./internal/handlers/mocks"
+          pkgname: "mocks_handlers"
       UserSessionManager:
         config:
-          dir: "../core/user/mocks"
-          pkgname: "mocks_user"
+          dir: "./internal/handlers/mocks"
+          pkgname: "mocks_handlers"
       OtpSecretGenerator:
         config:
-          dir: "../core/otp/mocks"
-          pkgname: "mocks_otp"
+          dir: "./internal/handlers/mocks"
+          pkgname: "mocks_handlers"

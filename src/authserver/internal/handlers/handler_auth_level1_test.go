@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
+	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
@@ -15,11 +16,9 @@ import (
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/mocks"
 	"github.com/leodip/goiabada/core/models"
-	mocks_user "github.com/leodip/goiabada/core/user/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
-	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	mocks_handlerhelpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
 )
 
@@ -106,7 +105,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 	t.Run("Error when getting GetAuthContext", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
-		userSessionManager := mocks_user.NewUserSessionManager(t)
+		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 
 		handler := HandleAuthLevel1CompletedGet(httpHelper, authHelper, userSessionManager, database, nil)
@@ -131,7 +130,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 	t.Run("Unexpected AuthState", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
-		userSessionManager := mocks_user.NewUserSessionManager(t)
+		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 
 		handler := HandleAuthLevel1CompletedGet(httpHelper, authHelper, userSessionManager, database, nil)
@@ -159,7 +158,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 	t.Run("Successful flow, redirect to level2", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
-		userSessionManager := mocks_user.NewUserSessionManager(t)
+		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 
 		handler := HandleAuthLevel1CompletedGet(httpHelper, authHelper, userSessionManager, database, nil)
@@ -215,7 +214,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 	t.Run("Successful flow, redirect to completed", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
-		userSessionManager := mocks_user.NewUserSessionManager(t)
+		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 
 		handler := HandleAuthLevel1CompletedGet(httpHelper, authHelper, userSessionManager, database, nil)
@@ -271,7 +270,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 	t.Run("No session, auth completed", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
-		userSessionManager := mocks_user.NewUserSessionManager(t)
+		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 
 		handler := HandleAuthLevel1CompletedGet(httpHelper, authHelper, userSessionManager, database, nil)
@@ -329,7 +328,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 	t.Run("OTP config generation has moved since the session answered", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
-		userSessionManager := mocks_user.NewUserSessionManager(t)
+		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 
 		handler := HandleAuthLevel1CompletedGet(httpHelper, authHelper, userSessionManager, database, nil)
@@ -474,7 +473,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 			t.Run(tt.name, func(t *testing.T) {
 				httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 				authHelper := mocks_handlers.NewAuthHelper(t)
-				userSessionManager := mocks_user.NewUserSessionManager(t)
+				userSessionManager := mocks_handlers.NewUserSessionManager(t)
 				database := mocks_data.NewDatabase(t)
 
 				handler := HandleAuthLevel1CompletedGet(httpHelper, authHelper, userSessionManager, database, nil)
@@ -600,7 +599,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 			t.Run(tt.name, func(t *testing.T) {
 				httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 				authHelper := mocks_handlers.NewAuthHelper(t)
-				userSessionManager := mocks_user.NewUserSessionManager(t)
+				userSessionManager := mocks_handlers.NewUserSessionManager(t)
 				database := mocks_data.NewDatabase(t)
 
 				handler := HandleAuthLevel1CompletedGet(httpHelper, authHelper, userSessionManager, database, nil)
@@ -702,7 +701,7 @@ func TestHandleAuthLevel1CompletedGet_DeliversADeferredError(t *testing.T) {
 		t.Run("answers the client on "+state, func(t *testing.T) {
 			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 			authHelper := mocks_handlers.NewAuthHelper(t)
-			userSessionManager := mocks_user.NewUserSessionManager(t)
+			userSessionManager := mocks_handlers.NewUserSessionManager(t)
 			database := mocks_data.NewDatabase(t)
 
 			handler := HandleAuthLevel1CompletedGet(httpHelper, authHelper, userSessionManager, database, nil)
@@ -743,7 +742,7 @@ func TestHandleAuthLevel1CompletedGet_DeliversADeferredError(t *testing.T) {
 	t.Run("a failing clear still answers the client, with server_error", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
-		userSessionManager := mocks_user.NewUserSessionManager(t)
+		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 
 		handler := HandleAuthLevel1CompletedGet(httpHelper, authHelper, userSessionManager, database, nil)
@@ -776,7 +775,7 @@ func TestHandleAuthLevel1CompletedGet_DeliversADeferredError(t *testing.T) {
 	t.Run("an unusable form_post template answers 500", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
-		userSessionManager := mocks_user.NewUserSessionManager(t)
+		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 
 		// Deliberately malformed, an unclosed action, so template.ParseFS fails. form_post is the
@@ -814,7 +813,7 @@ func TestHandleAuthLevel1CompletedGet_DeliversADeferredError(t *testing.T) {
 	t.Run("a self-registered client gets the refusal page, not the redirect", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
-		userSessionManager := mocks_user.NewUserSessionManager(t)
+		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 
 		handler := HandleAuthLevel1CompletedGet(httpHelper, authHelper, userSessionManager, database, nil)
@@ -844,7 +843,7 @@ func TestHandleAuthLevel1CompletedGet_DeliversADeferredError(t *testing.T) {
 	t.Run("no parked error leaves today's step-up decision alone", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
-		userSessionManager := mocks_user.NewUserSessionManager(t)
+		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 
 		handler := HandleAuthLevel1CompletedGet(httpHelper, authHelper, userSessionManager, database, nil)

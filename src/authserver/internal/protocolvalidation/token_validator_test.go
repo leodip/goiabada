@@ -21,9 +21,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
-	mocks_oauth "github.com/leodip/goiabada/core/oauth/mocks"
-	mocks_user "github.com/leodip/goiabada/core/user/mocks"
 )
 
 // expectRedirectURIStillRegistered arms the registration read #241 added at the very end of the
@@ -46,8 +45,8 @@ func expectRedirectURIStillRegistered(mockDB *mocks_data.Database, uri string) {
 
 func TestValidateTokenRequest(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := mocks_oauth.NewTokenParser(t)
-	mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+	mockTokenParser := mocks_handlers.NewTokenParser(t)
+	mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -123,8 +122,8 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 	t.Run("Authorization code flow not enabled", func(t *testing.T) {
 
 		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_oauth.NewTokenParser(t)
-		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+		mockTokenParser := mocks_handlers.NewTokenParser(t)
+		mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -158,8 +157,8 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 	t.Run("Missing code parameter", func(t *testing.T) {
 
 		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_oauth.NewTokenParser(t)
-		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+		mockTokenParser := mocks_handlers.NewTokenParser(t)
+		mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -194,8 +193,8 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 	t.Run("Missing redirect_uri parameter", func(t *testing.T) {
 
 		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_oauth.NewTokenParser(t)
-		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+		mockTokenParser := mocks_handlers.NewTokenParser(t)
+		mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -231,8 +230,8 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 	t.Run("Missing code_verifier parameter when PKCE was used", func(t *testing.T) {
 		// Now that PKCE is optional, code_verifier is only required if code_challenge was stored
 		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_oauth.NewTokenParser(t)
-		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+		mockTokenParser := mocks_handlers.NewTokenParser(t)
+		mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -289,8 +288,8 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 
 	t.Run("Invalid code", func(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_oauth.NewTokenParser(t)
-		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+		mockTokenParser := mocks_handlers.NewTokenParser(t)
+		mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -330,8 +329,8 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 
 	t.Run("Mismatched redirect URI", func(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_oauth.NewTokenParser(t)
-		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+		mockTokenParser := mocks_handlers.NewTokenParser(t)
+		mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -374,8 +373,8 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 
 	t.Run("Mismatched client_id", func(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_oauth.NewTokenParser(t)
-		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+		mockTokenParser := mocks_handlers.NewTokenParser(t)
+		mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -423,8 +422,8 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 
 	t.Run("Disabled user", func(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_oauth.NewTokenParser(t)
-		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+		mockTokenParser := mocks_handlers.NewTokenParser(t)
+		mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -475,8 +474,8 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 
 	t.Run("Expired code", func(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_oauth.NewTokenParser(t)
-		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+		mockTokenParser := mocks_handlers.NewTokenParser(t)
+		mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -531,8 +530,8 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 
 	t.Run("Invalid PKCE code verifier", func(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_oauth.NewTokenParser(t)
-		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+		mockTokenParser := mocks_handlers.NewTokenParser(t)
+		mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -588,8 +587,8 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 
 	t.Run("Missing client secret for non-public client", func(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_oauth.NewTokenParser(t)
-		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+		mockTokenParser := mocks_handlers.NewTokenParser(t)
+		mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -648,8 +647,8 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 
 	t.Run("Client authentication failed for non-public client", func(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_oauth.NewTokenParser(t)
-		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+		mockTokenParser := mocks_handlers.NewTokenParser(t)
+		mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -714,8 +713,8 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 
 	t.Run("Public client with unnecessary client secret", func(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_oauth.NewTokenParser(t)
-		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+		mockTokenParser := mocks_handlers.NewTokenParser(t)
+		mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -774,8 +773,8 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 
 	t.Run("Valid non-expired code", func(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_oauth.NewTokenParser(t)
-		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+		mockTokenParser := mocks_handlers.NewTokenParser(t)
+		mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -828,8 +827,8 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 
 	t.Run("Public client with valid code verifier", func(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_oauth.NewTokenParser(t)
-		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+		mockTokenParser := mocks_handlers.NewTokenParser(t)
+		mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -929,8 +928,8 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 
 	t.Run("Reuse with correct credentials returns AuthCodeReusedError sentinel (public client + PKCE)", func(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_oauth.NewTokenParser(t)
-		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+		mockTokenParser := mocks_handlers.NewTokenParser(t)
+		mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -978,8 +977,8 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 
 	t.Run("Reuse with correct credentials returns sentinel (confidential client + correct secret)", func(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_oauth.NewTokenParser(t)
-		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+		mockTokenParser := mocks_handlers.NewTokenParser(t)
+		mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -1026,8 +1025,8 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 
 	t.Run("Reuse with disabled user still returns sentinel (User.Enabled gated on !wasReused)", func(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_oauth.NewTokenParser(t)
-		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+		mockTokenParser := mocks_handlers.NewTokenParser(t)
+		mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -1067,8 +1066,8 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 
 	t.Run("Reuse with wrong client_id does NOT produce sentinel", func(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_oauth.NewTokenParser(t)
-		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+		mockTokenParser := mocks_handlers.NewTokenParser(t)
+		mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -1120,8 +1119,8 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 
 	t.Run("Reuse with wrong redirect_uri does NOT produce sentinel", func(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_oauth.NewTokenParser(t)
-		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+		mockTokenParser := mocks_handlers.NewTokenParser(t)
+		mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -1162,8 +1161,8 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 
 	t.Run("Reuse with confidential client and missing client_secret does NOT produce sentinel", func(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_oauth.NewTokenParser(t)
-		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+		mockTokenParser := mocks_handlers.NewTokenParser(t)
+		mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -1210,8 +1209,8 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 
 	t.Run("Reuse with confidential client and wrong client_secret does NOT produce sentinel", func(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_oauth.NewTokenParser(t)
-		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+		mockTokenParser := mocks_handlers.NewTokenParser(t)
+		mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -1258,8 +1257,8 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 
 	t.Run("Reuse with wrong PKCE code_verifier does NOT produce sentinel", func(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_oauth.NewTokenParser(t)
-		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+		mockTokenParser := mocks_handlers.NewTokenParser(t)
+		mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -1302,8 +1301,8 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 
 	t.Run("Code-not-found (truly unknown) returns plain invalid_grant, not sentinel", func(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_oauth.NewTokenParser(t)
-		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+		mockTokenParser := mocks_handlers.NewTokenParser(t)
+		mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -1343,8 +1342,8 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 
 func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := mocks_oauth.NewTokenParser(t)
-	mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+	mockTokenParser := mocks_handlers.NewTokenParser(t)
+	mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -1434,8 +1433,8 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 
 	t.Run("Valid client credentials request", func(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_oauth.NewTokenParser(t)
-		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+		mockTokenParser := mocks_handlers.NewTokenParser(t)
+		mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -1480,8 +1479,8 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 
 	t.Run("Invalid client secret", func(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_oauth.NewTokenParser(t)
-		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+		mockTokenParser := mocks_handlers.NewTokenParser(t)
+		mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -1519,8 +1518,8 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 
 	t.Run("Valid scope", func(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_oauth.NewTokenParser(t)
-		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+		mockTokenParser := mocks_handlers.NewTokenParser(t)
+		mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -1567,8 +1566,8 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 
 	t.Run("Invalid scope format", func(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_oauth.NewTokenParser(t)
-		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+		mockTokenParser := mocks_handlers.NewTokenParser(t)
+		mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -1609,8 +1608,8 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 
 	t.Run("Scope not granted to client", func(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_oauth.NewTokenParser(t)
-		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+		mockTokenParser := mocks_handlers.NewTokenParser(t)
+		mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -1654,8 +1653,8 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 
 	t.Run("ID token scope in client credentials", func(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_oauth.NewTokenParser(t)
-		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+		mockTokenParser := mocks_handlers.NewTokenParser(t)
+		mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -1696,8 +1695,8 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 
 	t.Run("Non-existent resource in scope", func(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_oauth.NewTokenParser(t)
-		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+		mockTokenParser := mocks_handlers.NewTokenParser(t)
+		mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -1739,8 +1738,8 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 
 	t.Run("Non-existent permission in scope", func(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_oauth.NewTokenParser(t)
-		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+		mockTokenParser := mocks_handlers.NewTokenParser(t)
+		mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -1783,8 +1782,8 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 
 	t.Run("Multiple valid scopes", func(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_oauth.NewTokenParser(t)
-		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+		mockTokenParser := mocks_handlers.NewTokenParser(t)
+		mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -1884,7 +1883,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		t.Helper()
 
 		mockDB := mocks_data.NewDatabase(t)
-		validator := NewTokenValidator(mockDB, mocks_oauth.NewTokenParser(t), mocks_user.NewPermissionChecker(t))
+		validator := NewTokenValidator(mockDB, mocks_handlers.NewTokenParser(t), mocks_handlers.NewPermissionChecker(t))
 
 		client := &models.Client{
 			ClientIdentifier:         "cc_client",
@@ -2141,7 +2140,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			mockDB := mocks_data.NewDatabase(t)
-			validator := NewTokenValidator(mockDB, mocks_oauth.NewTokenParser(t), mocks_user.NewPermissionChecker(t))
+			validator := NewTokenValidator(mockDB, mocks_handlers.NewTokenParser(t), mocks_handlers.NewPermissionChecker(t))
 
 			client := &models.Client{
 				ClientIdentifier:         "cc_client",
@@ -2187,8 +2186,8 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		const grantUserId = int64(7)
 
 		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_oauth.NewTokenParser(t)
-		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+		mockTokenParser := mocks_handlers.NewTokenParser(t)
+		mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -2259,8 +2258,8 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 	t.Run("Missing client secret for confidential client", func(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_oauth.NewTokenParser(t)
-		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+		mockTokenParser := mocks_handlers.NewTokenParser(t)
+		mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -2297,8 +2296,8 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 	t.Run("Incorrect client secret for confidential client", func(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_oauth.NewTokenParser(t)
-		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+		mockTokenParser := mocks_handlers.NewTokenParser(t)
+		mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -2339,8 +2338,8 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 	t.Run("Missing refresh token", func(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_oauth.NewTokenParser(t)
-		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+		mockTokenParser := mocks_handlers.NewTokenParser(t)
+		mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -2375,8 +2374,8 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 	t.Run("Invalid refresh token", func(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_oauth.NewTokenParser(t)
-		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+		mockTokenParser := mocks_handlers.NewTokenParser(t)
+		mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -2413,8 +2412,8 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 	t.Run("Refresh token without JTI claim", func(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_oauth.NewTokenParser(t)
-		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+		mockTokenParser := mocks_handlers.NewTokenParser(t)
+		mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -2450,8 +2449,8 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 	t.Run("Refresh token not found in database", func(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_oauth.NewTokenParser(t)
-		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+		mockTokenParser := mocks_handlers.NewTokenParser(t)
+		mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -2503,8 +2502,8 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 	t.Run("Refresh token with mismatched client", func(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_oauth.NewTokenParser(t)
-		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+		mockTokenParser := mocks_handlers.NewTokenParser(t)
+		mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -2565,8 +2564,8 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 	t.Run("Refresh token for disabled user", func(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_oauth.NewTokenParser(t)
-		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+		mockTokenParser := mocks_handlers.NewTokenParser(t)
+		mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -2628,8 +2627,8 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 	t.Run("Refresh token with nil session", func(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_oauth.NewTokenParser(t)
-		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+		mockTokenParser := mocks_handlers.NewTokenParser(t)
+		mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -2698,8 +2697,8 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 	t.Run("Refresh token with invalid session", func(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_oauth.NewTokenParser(t)
-		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+		mockTokenParser := mocks_handlers.NewTokenParser(t)
+		mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -2775,8 +2774,8 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 	t.Run("Expired offline refresh token", func(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_oauth.NewTokenParser(t)
-		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+		mockTokenParser := mocks_handlers.NewTokenParser(t)
+		mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -2842,8 +2841,8 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 	t.Run("Offline refresh token without max lifetime claim", func(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_oauth.NewTokenParser(t)
-		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+		mockTokenParser := mocks_handlers.NewTokenParser(t)
+		mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -2904,8 +2903,8 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 	t.Run("Refresh token with invalid typ claim", func(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_oauth.NewTokenParser(t)
-		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+		mockTokenParser := mocks_handlers.NewTokenParser(t)
+		mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -2965,8 +2964,8 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 	t.Run("Refresh token with scope not in original grant", func(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_oauth.NewTokenParser(t)
-		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+		mockTokenParser := mocks_handlers.NewTokenParser(t)
+		mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -3045,8 +3044,8 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 	t.Run("Valid offline refresh token", func(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_oauth.NewTokenParser(t)
-		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+		mockTokenParser := mocks_handlers.NewTokenParser(t)
+		mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -3121,8 +3120,8 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 	t.Run("Consent is looked up once for a multi-scope refresh", func(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_oauth.NewTokenParser(t)
-		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+		mockTokenParser := mocks_handlers.NewTokenParser(t)
+		mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -3197,8 +3196,8 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 	t.Run("Valid refresh token with reduced scope", func(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_oauth.NewTokenParser(t)
-		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+		mockTokenParser := mocks_handlers.NewTokenParser(t)
+		mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -3278,8 +3277,8 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 	t.Run("Refresh token with revoked consent", func(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_oauth.NewTokenParser(t)
-		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+		mockTokenParser := mocks_handlers.NewTokenParser(t)
+		mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -3361,8 +3360,8 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 	t.Run("Refresh token with a scope missing from the consent", func(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_oauth.NewTokenParser(t)
-		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+		mockTokenParser := mocks_handlers.NewTokenParser(t)
+		mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -3451,8 +3450,8 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 	t.Run("Refresh token with revoked user permission", func(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_oauth.NewTokenParser(t)
-		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+		mockTokenParser := mocks_handlers.NewTokenParser(t)
+		mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -3545,8 +3544,8 @@ func TestValidateTokenRequest_PKCE_NoPKCEUsed_NoVerifierProvided_Success(t *test
 	// now refused a challenge-less code, which is what the _PublicClient_Fails
 	// counterpart below asserts.
 	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := mocks_oauth.NewTokenParser(t)
-	mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+	mockTokenParser := mocks_handlers.NewTokenParser(t)
+	mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -3612,8 +3611,8 @@ func TestValidateTokenRequest_PKCE_NoPKCEUsed_VerifierProvided_Fails(t *testing.
 	// client presenting a challenge-less code is now refused above this guard, so a public
 	// fixture would pass on the wrong refusal and stop covering the downgrade guard at all.
 	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := mocks_oauth.NewTokenParser(t)
-	mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+	mockTokenParser := mocks_handlers.NewTokenParser(t)
+	mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -3677,8 +3676,8 @@ func TestValidateTokenRequest_PKCE_PKCEUsed_ValidVerifier_Success(t *testing.T) 
 	// When PKCE was used during authorization and a valid code_verifier is provided,
 	// the token request should succeed
 	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := mocks_oauth.NewTokenParser(t)
-	mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+	mockTokenParser := mocks_handlers.NewTokenParser(t)
+	mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -3737,8 +3736,8 @@ func TestValidateTokenRequest_PKCE_PKCEUsed_NoVerifier_Fails(t *testing.T) {
 	// When PKCE was used during authorization but no code_verifier is provided,
 	// this should fail
 	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := mocks_oauth.NewTokenParser(t)
-	mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+	mockTokenParser := mocks_handlers.NewTokenParser(t)
+	mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -3797,8 +3796,8 @@ func TestValidateTokenRequest_PKCE_PKCEUsed_WrongVerifier_Fails(t *testing.T) {
 	// When PKCE was used during authorization but wrong code_verifier is provided,
 	// this should fail
 	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := mocks_oauth.NewTokenParser(t)
-	mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+	mockTokenParser := mocks_handlers.NewTokenParser(t)
+	mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -3863,8 +3862,8 @@ func TestValidateTokenRequest_PKCE_EmptyStringCodeChallenge_TreatedAsNoPKCE(t *t
 	// Confidential for the same reason as the test above (#245): treating empty as no PKCE
 	// still means success for a client that authenticates, and refusal for one that does not.
 	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := mocks_oauth.NewTokenParser(t)
-	mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+	mockTokenParser := mocks_handlers.NewTokenParser(t)
+	mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -3935,8 +3934,8 @@ func publicClientChallengelessCode(t *testing.T, storedChallenge sql.NullString,
 	t.Helper()
 
 	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := mocks_oauth.NewTokenParser(t)
-	mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+	mockTokenParser := mocks_handlers.NewTokenParser(t)
+	mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &models.Settings{})
@@ -4019,8 +4018,8 @@ func publicClientChallengelessRefresh(t *testing.T, storedChallenge sql.NullStri
 	const grantUserId = int64(7)
 
 	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := mocks_oauth.NewTokenParser(t)
-	mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+	mockTokenParser := mocks_handlers.NewTokenParser(t)
+	mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &models.Settings{
@@ -4133,8 +4132,8 @@ func TestValidateTokenRequest_RefreshToken_PublicClientWithSecret_Fails(t *testi
 	// Decision 11's symmetry, the refresh_token arm. The authorization_code arm has always
 	// refused a superfluous secret from a public client; this arm used to ignore it.
 	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := mocks_oauth.NewTokenParser(t)
-	mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+	mockTokenParser := mocks_handlers.NewTokenParser(t)
+	mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &models.Settings{})
@@ -4172,8 +4171,8 @@ func TestValidateTokenRequest_RefreshToken_PublicClientWithSecret_Fails(t *testi
 
 func TestValidateTokenRequest_ROPC_Success(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := mocks_oauth.NewTokenParser(t)
-	mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+	mockTokenParser := mocks_handlers.NewTokenParser(t)
+	mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -4224,8 +4223,8 @@ func TestValidateTokenRequest_ROPC_Success(t *testing.T) {
 
 func TestValidateTokenRequest_ROPC_GlobalDisabled(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := mocks_oauth.NewTokenParser(t)
-	mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+	mockTokenParser := mocks_handlers.NewTokenParser(t)
+	mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -4262,8 +4261,8 @@ func TestValidateTokenRequest_ROPC_GlobalDisabled(t *testing.T) {
 
 func TestValidateTokenRequest_ROPC_ClientOverrideEnabled(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := mocks_oauth.NewTokenParser(t)
-	mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+	mockTokenParser := mocks_handlers.NewTokenParser(t)
+	mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -4312,8 +4311,8 @@ func TestValidateTokenRequest_ROPC_ClientOverrideEnabled(t *testing.T) {
 
 func TestValidateTokenRequest_ROPC_ClientOverrideDisabled(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := mocks_oauth.NewTokenParser(t)
-	mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+	mockTokenParser := mocks_handlers.NewTokenParser(t)
+	mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -4349,8 +4348,8 @@ func TestValidateTokenRequest_ROPC_ClientOverrideDisabled(t *testing.T) {
 
 func TestValidateTokenRequest_ROPC_MissingUsername(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := mocks_oauth.NewTokenParser(t)
-	mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+	mockTokenParser := mocks_handlers.NewTokenParser(t)
+	mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -4389,8 +4388,8 @@ func TestValidateTokenRequest_ROPC_MissingUsername(t *testing.T) {
 
 func TestValidateTokenRequest_ROPC_MissingPassword(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := mocks_oauth.NewTokenParser(t)
-	mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+	mockTokenParser := mocks_handlers.NewTokenParser(t)
+	mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -4431,8 +4430,8 @@ func TestValidateTokenRequest_ROPC_PublicClientWithSecret_Fails(t *testing.T) {
 	// Decision 11's symmetry, the password arm. Its own branch, independent of the
 	// refresh_token arm's, so neutralising one leaves the other proving itself (#245).
 	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := mocks_oauth.NewTokenParser(t)
-	mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+	mockTokenParser := mocks_handlers.NewTokenParser(t)
+	mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -4475,8 +4474,8 @@ func TestValidateTokenRequest_ROPC_PublicClientWithSecret_Fails(t *testing.T) {
 
 func TestValidateTokenRequest_ROPC_UserNotFound(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := mocks_oauth.NewTokenParser(t)
-	mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+	mockTokenParser := mocks_handlers.NewTokenParser(t)
+	mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -4525,8 +4524,8 @@ func TestValidateTokenRequest_ROPC_UserNotFound(t *testing.T) {
 // lookup is called with "  Bob@Example.com  " and no expectation matches.
 func TestValidateTokenRequest_ROPC_UsernameNormalizedForLookup(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := mocks_oauth.NewTokenParser(t)
-	mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+	mockTokenParser := mocks_handlers.NewTokenParser(t)
+	mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -4570,8 +4569,8 @@ func TestValidateTokenRequest_ROPC_UsernameNormalizedForLookup(t *testing.T) {
 // would silently stop counting a whole class of guess (#219 decision 7).
 func TestValidateTokenRequest_ROPC_WhitespaceOnlyUsernameIsInvalidGrant(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := mocks_oauth.NewTokenParser(t)
-	mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+	mockTokenParser := mocks_handlers.NewTokenParser(t)
+	mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -4609,8 +4608,8 @@ func TestValidateTokenRequest_ROPC_WhitespaceOnlyUsernameIsInvalidGrant(t *testi
 
 func TestValidateTokenRequest_ROPC_InvalidPassword(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := mocks_oauth.NewTokenParser(t)
-	mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+	mockTokenParser := mocks_handlers.NewTokenParser(t)
+	mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -4658,8 +4657,8 @@ func TestValidateTokenRequest_ROPC_InvalidPassword(t *testing.T) {
 
 func TestValidateTokenRequest_ROPC_UserDisabled(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := mocks_oauth.NewTokenParser(t)
-	mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+	mockTokenParser := mocks_handlers.NewTokenParser(t)
+	mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -4707,8 +4706,8 @@ func TestValidateTokenRequest_ROPC_UserDisabled(t *testing.T) {
 
 func TestValidateTokenRequest_ROPC_UserWith2FA(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := mocks_oauth.NewTokenParser(t)
-	mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+	mockTokenParser := mocks_handlers.NewTokenParser(t)
+	mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -4757,8 +4756,8 @@ func TestValidateTokenRequest_ROPC_UserWith2FA(t *testing.T) {
 
 func TestValidateTokenRequest_ROPC_ConfidentialClient_MissingSecret(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := mocks_oauth.NewTokenParser(t)
-	mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+	mockTokenParser := mocks_handlers.NewTokenParser(t)
+	mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -4799,8 +4798,8 @@ func TestValidateTokenRequest_ROPC_ConfidentialClient_MissingSecret(t *testing.T
 
 func TestValidateTokenRequest_ROPC_ConfidentialClient_InvalidSecret(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := mocks_oauth.NewTokenParser(t)
-	mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+	mockTokenParser := mocks_handlers.NewTokenParser(t)
+	mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -4843,8 +4842,8 @@ func TestValidateTokenRequest_ROPC_ConfidentialClient_InvalidSecret(t *testing.T
 
 func TestValidateTokenRequest_ROPC_ConfidentialClient_Success(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := mocks_oauth.NewTokenParser(t)
-	mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+	mockTokenParser := mocks_handlers.NewTokenParser(t)
+	mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -4899,8 +4898,8 @@ func TestValidateTokenRequest_ROPC_ConfidentialClient_Success(t *testing.T) {
 
 func TestValidateTokenRequest_ROPC_EmptyScope_DefaultsToOpenId(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := mocks_oauth.NewTokenParser(t)
-	mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+	mockTokenParser := mocks_handlers.NewTokenParser(t)
+	mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -4948,8 +4947,8 @@ func TestValidateTokenRequest_ROPC_EmptyScope_DefaultsToOpenId(t *testing.T) {
 
 func TestValidateTokenRequest_ROPC_WithOfflineAccess(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := mocks_oauth.NewTokenParser(t)
-	mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+	mockTokenParser := mocks_handlers.NewTokenParser(t)
+	mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -4997,8 +4996,8 @@ func TestValidateTokenRequest_ROPC_WithOfflineAccess(t *testing.T) {
 
 func TestValidateTokenRequest_ROPC_InvalidScopeFormat(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := mocks_oauth.NewTokenParser(t)
-	mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+	mockTokenParser := mocks_handlers.NewTokenParser(t)
+	mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -5050,8 +5049,8 @@ func TestValidateTokenRequest_ROPC_InvalidScopeFormat(t *testing.T) {
 
 func TestValidateTokenRequest_ROPC_ResourcePermission_Success(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := mocks_oauth.NewTokenParser(t)
-	mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+	mockTokenParser := mocks_handlers.NewTokenParser(t)
+	mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -5111,8 +5110,8 @@ func TestValidateTokenRequest_ROPC_ResourcePermission_Success(t *testing.T) {
 
 func TestValidateTokenRequest_ROPC_ResourcePermission_UserLacksPermission(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := mocks_oauth.NewTokenParser(t)
-	mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+	mockTokenParser := mocks_handlers.NewTokenParser(t)
+	mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
@@ -5209,7 +5208,7 @@ func TestValidateTokenRequest_ROPC_ResourcePermission_ResolutionFailures(t *test
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			mockDB := mocks_data.NewDatabase(t)
-			validator := NewTokenValidator(mockDB, mocks_oauth.NewTokenParser(t), mocks_user.NewPermissionChecker(t))
+			validator := NewTokenValidator(mockDB, mocks_handlers.NewTokenParser(t), mocks_handlers.NewPermissionChecker(t))
 
 			settings := &models.Settings{ResourceOwnerPasswordCredentialsEnabled: true}
 			ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
@@ -5318,8 +5317,8 @@ func TestValidateTokenRequest_RefreshToken_ROPC_InjectedUserInfoScope(t *testing
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			mockDB := mocks_data.NewDatabase(t)
-			mockTokenParser := mocks_oauth.NewTokenParser(t)
-			mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+			mockTokenParser := mocks_handlers.NewTokenParser(t)
+			mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 			validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 			ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &models.Settings{})
@@ -5372,7 +5371,7 @@ func TestValidateTokenRequest_RefreshToken_ROPC_InjectedUserInfoScope(t *testing
 			mockDB.On("GetUserBySubject", mock.Anything, "ropc_user_subject").Return(&user, nil)
 
 			// The user holds nothing. In the accepted case the scope must never be looked up at
-			// all, so no UserHasScopePermission expectation is registered: mocks_user.NewPermissionChecker(t)
+			// all, so no UserHasScopePermission expectation is registered: mocks_handlers.NewPermissionChecker(t)
 			// fails the test if an unexpected call is made, which is what proves the skip happened.
 			if !tc.wantAccepted {
 				mockPermissionChecker.On("UserHasScopePermission", int64(7), userInfoScope).Return(false, nil)
@@ -5453,7 +5452,7 @@ func TestValidateTokenRequest_ClientCredentials_NoScopeGiven(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			mockDB := mocks_data.NewDatabase(t)
-			validator := NewTokenValidator(mockDB, mocks_oauth.NewTokenParser(t), mocks_user.NewPermissionChecker(t))
+			validator := NewTokenValidator(mockDB, mocks_handlers.NewTokenParser(t), mocks_handlers.NewPermissionChecker(t))
 			ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &models.Settings{})
 
 			clientSecretEncrypted, _ := encryption.EncryptData("valid_secret")
@@ -5525,8 +5524,8 @@ func TestValidateTokenRequest_AuthStateGeneration(t *testing.T) {
 		} {
 			t.Run(tc.name, func(t *testing.T) {
 				mockDB := mocks_data.NewDatabase(t)
-				mockTokenParser := mocks_oauth.NewTokenParser(t)
-				mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+				mockTokenParser := mocks_handlers.NewTokenParser(t)
+				mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 				validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 				ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &models.Settings{})
 
@@ -5605,8 +5604,8 @@ func TestValidateTokenRequest_AuthStateGeneration(t *testing.T) {
 		} {
 			t.Run(tc.name, func(t *testing.T) {
 				mockDB := mocks_data.NewDatabase(t)
-				mockTokenParser := mocks_oauth.NewTokenParser(t)
-				mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+				mockTokenParser := mocks_handlers.NewTokenParser(t)
+				mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 				validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 				ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &models.Settings{
 					UserSessionIdleTimeoutInSeconds: 3600,
@@ -5692,8 +5691,8 @@ func TestValidateTokenRequest_AuthStateGeneration(t *testing.T) {
 		} {
 			t.Run(tc.name, func(t *testing.T) {
 				mockDB := mocks_data.NewDatabase(t)
-				mockTokenParser := mocks_oauth.NewTokenParser(t)
-				mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+				mockTokenParser := mocks_handlers.NewTokenParser(t)
+				mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 				validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 				ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &models.Settings{})
 
@@ -5773,8 +5772,8 @@ func TestValidateTokenRequest_AuthStateGeneration(t *testing.T) {
 // the protocol stopped accepting it. The horizon is bounded and protocol-defined instead.
 func TestValidateTokenRequest_RefreshToken_ExpiryPrecedesTheLookup(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	mockTokenParser := mocks_oauth.NewTokenParser(t)
-	mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+	mockTokenParser := mocks_handlers.NewTokenParser(t)
+	mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 	settings := &models.Settings{}
@@ -5832,10 +5831,10 @@ func TestValidateTokenRequest_RefreshToken_ExpiryPrecedesTheLookup(t *testing.T)
 // Two positive controls, one per grant type, because a check that rejected everything would
 // satisfy every negative row here.
 func TestValidateTokenRequest_RevokedCode(t *testing.T) {
-	newValidator := func(t *testing.T) (*TokenValidator, *mocks_data.Database, *mocks_oauth.TokenParser) {
+	newValidator := func(t *testing.T) (*TokenValidator, *mocks_data.Database, *mocks_handlers.TokenParser) {
 		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_oauth.NewTokenParser(t)
-		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+		mockTokenParser := mocks_handlers.NewTokenParser(t)
+		mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 		return NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker), mockDB, mockTokenParser
 	}
 
@@ -6314,8 +6313,8 @@ func TestValidateTokenRequest_RefreshToken_SessionOwnership(t *testing.T) {
 		t.Helper()
 
 		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_oauth.NewTokenParser(t)
-		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+		mockTokenParser := mocks_handlers.NewTokenParser(t)
+		mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{
@@ -6449,8 +6448,8 @@ func TestValidateTokenRequest_AuthorizationCode_SessionOwnership(t *testing.T) {
 		t.Helper()
 
 		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_oauth.NewTokenParser(t)
-		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+		mockTokenParser := mocks_handlers.NewTokenParser(t)
+		mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &models.Settings{})
@@ -6598,8 +6597,8 @@ func TestValidateTokenRequest_OfflineRefreshToken_SessionOwnership(t *testing.T)
 		t.Helper()
 
 		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_oauth.NewTokenParser(t)
-		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+		mockTokenParser := mocks_handlers.NewTokenParser(t)
+		mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &models.Settings{})
@@ -6770,8 +6769,8 @@ func TestValidateTokenRequest_AuthorizationCode_RedirectURIStillRegistered(t *te
 		t.Helper()
 
 		mockDB := mocks_data.NewDatabase(t)
-		mockTokenParser := mocks_oauth.NewTokenParser(t)
-		mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+		mockTokenParser := mocks_handlers.NewTokenParser(t)
+		mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &models.Settings{})
@@ -6979,7 +6978,7 @@ func TestValidateTokenRequest_RefreshToken_SubjectResolvesToNoUser(t *testing.T)
 		},
 		{
 			// The panic path #123 reports: a resource scope takes the branch that reads user.Id.
-			// No UserHasScopePermission expectation is registered, and mocks_user.NewPermissionChecker(t)
+			// No UserHasScopePermission expectation is registered, and mocks_handlers.NewPermissionChecker(t)
 			// fails on an unexpected call, so this also proves the refusal happens before the loop.
 			name:        "a resource scope is refused before the permission re-check",
 			storedScope: "billing-api:read",
@@ -6989,8 +6988,8 @@ func TestValidateTokenRequest_RefreshToken_SubjectResolvesToNoUser(t *testing.T)
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			mockDB := mocks_data.NewDatabase(t)
-			mockTokenParser := mocks_oauth.NewTokenParser(t)
-			mockPermissionChecker := mocks_user.NewPermissionChecker(t)
+			mockTokenParser := mocks_handlers.NewTokenParser(t)
+			mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 			validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 			ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &models.Settings{})

@@ -12,13 +12,12 @@ import (
 
 	mocks_accountvalidation "github.com/leodip/goiabada/authserver/internal/accountvalidation/mocks"
 	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
-	mocks_communication "github.com/leodip/goiabada/core/communication/mocks"
+	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+	"github.com/leodip/goiabada/authserver/internal/usercreation"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
 	mocks_handlerhelpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
-	"github.com/leodip/goiabada/core/user"
-	mocks_users "github.com/leodip/goiabada/core/user/mocks"
 
-	"github.com/leodip/goiabada/core/communication"
+	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
@@ -81,10 +80,10 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 	t.Run("No email and email is required", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		database := mocks_data.NewDatabase(t)
-		userCreator := mocks_users.NewUserCreator(t)
+		userCreator := mocks_handlers.NewUserCreator(t)
 		emailValidator := mocks_accountvalidation.NewEmailValidator(t)
 		passwordValidator := mocks_accountvalidation.NewPasswordValidator(t)
-		emailSender := mocks_communication.NewEmailSender(t)
+		emailSender := mocks_handlers.NewEmailSender(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleAccountRegisterPost(httpHelper, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger)
@@ -112,10 +111,10 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 	t.Run("Invalid email given", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		database := mocks_data.NewDatabase(t)
-		userCreator := mocks_users.NewUserCreator(t)
+		userCreator := mocks_handlers.NewUserCreator(t)
 		emailValidator := mocks_accountvalidation.NewEmailValidator(t)
 		passwordValidator := mocks_accountvalidation.NewPasswordValidator(t)
-		emailSender := mocks_communication.NewEmailSender(t)
+		emailSender := mocks_handlers.NewEmailSender(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleAccountRegisterPost(httpHelper, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger)
@@ -147,10 +146,10 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 	t.Run("Email is already registered", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		database := mocks_data.NewDatabase(t)
-		userCreator := mocks_users.NewUserCreator(t)
+		userCreator := mocks_handlers.NewUserCreator(t)
 		emailValidator := mocks_accountvalidation.NewEmailValidator(t)
 		passwordValidator := mocks_accountvalidation.NewPasswordValidator(t)
-		emailSender := mocks_communication.NewEmailSender(t)
+		emailSender := mocks_handlers.NewEmailSender(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleAccountRegisterPost(httpHelper, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger)
@@ -183,10 +182,10 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 	t.Run("Pre registration already exists", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		database := mocks_data.NewDatabase(t)
-		userCreator := mocks_users.NewUserCreator(t)
+		userCreator := mocks_handlers.NewUserCreator(t)
 		emailValidator := mocks_accountvalidation.NewEmailValidator(t)
 		passwordValidator := mocks_accountvalidation.NewPasswordValidator(t)
-		emailSender := mocks_communication.NewEmailSender(t)
+		emailSender := mocks_handlers.NewEmailSender(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleAccountRegisterPost(httpHelper, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger)
@@ -220,10 +219,10 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 	t.Run("Password not given", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		database := mocks_data.NewDatabase(t)
-		userCreator := mocks_users.NewUserCreator(t)
+		userCreator := mocks_handlers.NewUserCreator(t)
 		emailValidator := mocks_accountvalidation.NewEmailValidator(t)
 		passwordValidator := mocks_accountvalidation.NewPasswordValidator(t)
-		emailSender := mocks_communication.NewEmailSender(t)
+		emailSender := mocks_handlers.NewEmailSender(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleAccountRegisterPost(httpHelper, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger)
@@ -264,10 +263,10 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 	t.Run("Password in the query alone", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		database := mocks_data.NewDatabase(t)
-		userCreator := mocks_users.NewUserCreator(t)
+		userCreator := mocks_handlers.NewUserCreator(t)
 		emailValidator := mocks_accountvalidation.NewEmailValidator(t)
 		passwordValidator := mocks_accountvalidation.NewPasswordValidator(t)
-		emailSender := mocks_communication.NewEmailSender(t)
+		emailSender := mocks_handlers.NewEmailSender(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleAccountRegisterPost(httpHelper, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger)
@@ -317,10 +316,10 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 	t.Run("Password confirmation in the query alone", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		database := mocks_data.NewDatabase(t)
-		userCreator := mocks_users.NewUserCreator(t)
+		userCreator := mocks_handlers.NewUserCreator(t)
 		emailValidator := mocks_accountvalidation.NewEmailValidator(t)
 		passwordValidator := mocks_accountvalidation.NewPasswordValidator(t)
-		emailSender := mocks_communication.NewEmailSender(t)
+		emailSender := mocks_handlers.NewEmailSender(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleAccountRegisterPost(httpHelper, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger)
@@ -362,10 +361,10 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 	t.Run("Password confirmation is required", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		database := mocks_data.NewDatabase(t)
-		userCreator := mocks_users.NewUserCreator(t)
+		userCreator := mocks_handlers.NewUserCreator(t)
 		emailValidator := mocks_accountvalidation.NewEmailValidator(t)
 		passwordValidator := mocks_accountvalidation.NewPasswordValidator(t)
-		emailSender := mocks_communication.NewEmailSender(t)
+		emailSender := mocks_handlers.NewEmailSender(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleAccountRegisterPost(httpHelper, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger)
@@ -400,10 +399,10 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 	t.Run("Password confirmation does not match", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		database := mocks_data.NewDatabase(t)
-		userCreator := mocks_users.NewUserCreator(t)
+		userCreator := mocks_handlers.NewUserCreator(t)
 		emailValidator := mocks_accountvalidation.NewEmailValidator(t)
 		passwordValidator := mocks_accountvalidation.NewPasswordValidator(t)
-		emailSender := mocks_communication.NewEmailSender(t)
+		emailSender := mocks_handlers.NewEmailSender(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleAccountRegisterPost(httpHelper, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger)
@@ -439,10 +438,10 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 	t.Run("ValidatePassword fails", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		database := mocks_data.NewDatabase(t)
-		userCreator := mocks_users.NewUserCreator(t)
+		userCreator := mocks_handlers.NewUserCreator(t)
 		emailValidator := mocks_accountvalidation.NewEmailValidator(t)
 		passwordValidator := mocks_accountvalidation.NewPasswordValidator(t)
-		emailSender := mocks_communication.NewEmailSender(t)
+		emailSender := mocks_handlers.NewEmailSender(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleAccountRegisterPost(httpHelper, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger)
@@ -479,10 +478,10 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 	t.Run("Self registration is disabled", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		database := mocks_data.NewDatabase(t)
-		userCreator := mocks_users.NewUserCreator(t)
+		userCreator := mocks_handlers.NewUserCreator(t)
 		emailValidator := mocks_accountvalidation.NewEmailValidator(t)
 		passwordValidator := mocks_accountvalidation.NewPasswordValidator(t)
-		emailSender := mocks_communication.NewEmailSender(t)
+		emailSender := mocks_handlers.NewEmailSender(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleAccountRegisterPost(httpHelper, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger)
@@ -524,10 +523,10 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 	t.Run("SMTP enabled and requires email verification", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		database := mocks_data.NewDatabase(t)
-		userCreator := mocks_users.NewUserCreator(t)
+		userCreator := mocks_handlers.NewUserCreator(t)
 		emailValidator := mocks_accountvalidation.NewEmailValidator(t)
 		passwordValidator := mocks_accountvalidation.NewPasswordValidator(t)
-		emailSender := mocks_communication.NewEmailSender(t)
+		emailSender := mocks_handlers.NewEmailSender(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleAccountRegisterPost(httpHelper, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger)
@@ -595,7 +594,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 			return link == expectedLink
 		})).Return(bytes.NewBuffer([]byte("email content")), nil)
 
-		emailSender.On("SendEmail", mock.Anything, mock.MatchedBy(func(input *communication.SendEmailInput) bool {
+		emailSender.On("SendEmail", mock.Anything, mock.MatchedBy(func(input *emaildelivery.SendEmailInput) bool {
 			return input.To == "test@example.com" && input.Subject == "Activate your account"
 		})).Return(nil)
 
@@ -616,10 +615,10 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 	t.Run("Direct registration without email verification", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		database := mocks_data.NewDatabase(t)
-		userCreator := mocks_users.NewUserCreator(t)
+		userCreator := mocks_handlers.NewUserCreator(t)
 		emailValidator := mocks_accountvalidation.NewEmailValidator(t)
 		passwordValidator := mocks_accountvalidation.NewPasswordValidator(t)
-		emailSender := mocks_communication.NewEmailSender(t)
+		emailSender := mocks_handlers.NewEmailSender(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleAccountRegisterPost(httpHelper, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger)
@@ -645,7 +644,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 		database.On("GetPreRegistrationByEmail", mock.Anything, "test@example.com").Return(nil, nil)
 		passwordValidator.On("ValidatePassword", mock.Anything, "password123").Return(nil)
 
-		userCreator.On("CreateUser", mock.MatchedBy(func(input *user.CreateUserInput) bool {
+		userCreator.On("CreateUser", mock.MatchedBy(func(input *usercreation.CreateUserInput) bool {
 			return input.Email == "test@example.com" && !input.EmailVerified
 		})).Return(&models.User{}, nil)
 
@@ -678,10 +677,10 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 	t.Run("SMTP enabled but does not require email verification", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		database := mocks_data.NewDatabase(t)
-		userCreator := mocks_users.NewUserCreator(t)
+		userCreator := mocks_handlers.NewUserCreator(t)
 		emailValidator := mocks_accountvalidation.NewEmailValidator(t)
 		passwordValidator := mocks_accountvalidation.NewPasswordValidator(t)
-		emailSender := mocks_communication.NewEmailSender(t)
+		emailSender := mocks_handlers.NewEmailSender(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
 		handler := HandleAccountRegisterPost(httpHelper, database, userCreator, emailValidator, passwordValidator, emailSender, auditLogger)
@@ -708,7 +707,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 		database.On("GetPreRegistrationByEmail", mock.Anything, "test@example.com").Return(nil, nil)
 		passwordValidator.On("ValidatePassword", mock.Anything, "password123").Return(nil)
 
-		userCreator.On("CreateUser", mock.MatchedBy(func(input *user.CreateUserInput) bool {
+		userCreator.On("CreateUser", mock.MatchedBy(func(input *usercreation.CreateUserInput) bool {
 			return input.Email == "test@example.com" && !input.EmailVerified
 		})).Return(&models.User{}, nil)
 
@@ -721,7 +720,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 			return ok && link == config.GetAdminConsole().BaseURL+"/account/profile"
 		})).Return(bytes.NewBuffer([]byte("email content")), nil)
 
-		emailSender.On("SendEmail", mock.Anything, mock.MatchedBy(func(input *communication.SendEmailInput) bool {
+		emailSender.On("SendEmail", mock.Anything, mock.MatchedBy(func(input *emaildelivery.SendEmailInput) bool {
 			return input.To == "test@example.com" && input.Subject == "Welcome!"
 		})).Return(nil)
 
@@ -777,10 +776,10 @@ func TestHandleAccountRegisterPost_AWrappedRefusalStillRedrawsTheForm(t *testing
 		t.Run(testCase.name, func(t *testing.T) {
 			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 			database := mocks_data.NewDatabase(t)
-			userCreator := mocks_users.NewUserCreator(t)
+			userCreator := mocks_handlers.NewUserCreator(t)
 			emailValidator := mocks_accountvalidation.NewEmailValidator(t)
 			passwordValidator := mocks_accountvalidation.NewPasswordValidator(t)
-			emailSender := mocks_communication.NewEmailSender(t)
+			emailSender := mocks_handlers.NewEmailSender(t)
 			auditLogger := mocks_audit.NewAuditLogger(t)
 
 			handler := HandleAccountRegisterPost(httpHelper, database, userCreator, emailValidator,

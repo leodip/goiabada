@@ -1,4 +1,4 @@
-package communication
+package emaildelivery
 
 // An in-process SMTP server for the EmailSender table. It exists because the dev container's
 // mailpit offers exactly one shape -- no encryption, no authentication -- so the three encryption

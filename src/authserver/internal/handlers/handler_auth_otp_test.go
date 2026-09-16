@@ -13,6 +13,7 @@ import (
 
 	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
+	"github.com/leodip/goiabada/authserver/internal/otp"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
@@ -20,7 +21,6 @@ import (
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/leodip/goiabada/core/otp"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -28,7 +28,6 @@ import (
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
 	mocks_handlerhelpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
-	mocks_otp "github.com/leodip/goiabada/core/otp/mocks"
 )
 
 // otpTestAESKey is a fixed 32-byte AES key used to exercise the encrypted OTP
@@ -77,7 +76,7 @@ func TestHandleAuthOtpGet(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
-		otpSecretGenerator := mocks_otp.NewOtpSecretGenerator(t)
+		otpSecretGenerator := mocks_handlers.NewOtpSecretGenerator(t)
 
 		handler := HandleAuthOtpGet(httpHelper, authHelper, database, otpSecretGenerator)
 
@@ -101,7 +100,7 @@ func TestHandleAuthOtpGet(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
-		otpSecretGenerator := mocks_otp.NewOtpSecretGenerator(t)
+		otpSecretGenerator := mocks_handlers.NewOtpSecretGenerator(t)
 
 		handler := HandleAuthOtpGet(httpHelper, authHelper, database, otpSecretGenerator)
 
@@ -125,7 +124,7 @@ func TestHandleAuthOtpGet(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
-		otpSecretGenerator := mocks_otp.NewOtpSecretGenerator(t)
+		otpSecretGenerator := mocks_handlers.NewOtpSecretGenerator(t)
 
 		handler := HandleAuthOtpGet(httpHelper, authHelper, database, otpSecretGenerator)
 
@@ -210,7 +209,7 @@ func TestHandleAuthOtpGet(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
-		otpSecretGenerator := mocks_otp.NewOtpSecretGenerator(t)
+		otpSecretGenerator := mocks_handlers.NewOtpSecretGenerator(t)
 
 		handler := HandleAuthOtpGet(httpHelper, authHelper, database, otpSecretGenerator)
 
@@ -319,7 +318,7 @@ func TestHandleAuthOtpGet(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
-		otpSecretGenerator := mocks_otp.NewOtpSecretGenerator(t)
+		otpSecretGenerator := mocks_handlers.NewOtpSecretGenerator(t)
 
 		handler := HandleAuthOtpGet(httpHelper, authHelper, database, otpSecretGenerator)
 
