@@ -14,7 +14,6 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/core/api"
 	mocks_handler_helpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
-	"github.com/leodip/goiabada/core/models"
 )
 
 // Decision 11 at a form that submits through the API, and the row that makes it worth its own test:
@@ -34,11 +33,11 @@ type attributesAddApiClient struct {
 	err error
 }
 
-func (c *attributesAddApiClient) GetGroupById(accessToken string, groupId int64) (*models.Group, int, error) {
-	return &models.Group{Id: groupId, GroupIdentifier: "some-group"}, 0, nil
+func (c *attributesAddApiClient) GetGroupById(accessToken string, groupId int64) (*api.GroupResponse, error) {
+	return &api.GroupResponse{Id: groupId, GroupIdentifier: "some-group"}, nil
 }
 
-func (c *attributesAddApiClient) CreateGroupAttribute(accessToken string, request *api.CreateGroupAttributeRequest) (*models.GroupAttribute, error) {
+func (c *attributesAddApiClient) CreateGroupAttribute(accessToken string, request *api.CreateGroupAttributeRequest) (*api.GroupAttributeResponse, error) {
 	return nil, c.err
 }
 

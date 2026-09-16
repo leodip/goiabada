@@ -1,10 +1,7 @@
 package api
 
 import (
-	"database/sql"
 	"time"
-
-	"github.com/leodip/goiabada/core/models"
 )
 
 type UserResponse struct {
@@ -273,30 +270,6 @@ type GroupResponse struct {
 	MemberCount          int        `json:"memberCount"`
 }
 
-func (resp *GroupResponse) ToGroup() *models.Group {
-	if resp == nil {
-		return nil
-	}
-
-	group := &models.Group{
-		Id:                   resp.Id,
-		GroupIdentifier:      resp.GroupIdentifier,
-		Description:          resp.Description,
-		IncludeInIdToken:     resp.IncludeInIdToken,
-		IncludeInAccessToken: resp.IncludeInAccessToken,
-		MemberCount:          resp.MemberCount,
-	}
-
-	if resp.CreatedAt != nil {
-		group.CreatedAt = sql.NullTime{Time: *resp.CreatedAt, Valid: true}
-	}
-	if resp.UpdatedAt != nil {
-		group.UpdatedAt = sql.NullTime{Time: *resp.UpdatedAt, Valid: true}
-	}
-
-	return group
-}
-
 type GetGroupsResponse struct {
 	Groups []GroupResponse `json:"groups"`
 }
@@ -482,30 +455,6 @@ type GroupAttributeResponse struct {
 	IncludeInIdToken     bool       `json:"includeInIdToken"`
 	IncludeInAccessToken bool       `json:"includeInAccessToken"`
 	GroupId              int64      `json:"groupId"`
-}
-
-func (resp *GroupAttributeResponse) ToGroupAttribute() *models.GroupAttribute {
-	if resp == nil {
-		return nil
-	}
-
-	attr := &models.GroupAttribute{
-		Id:                   resp.Id,
-		Key:                  resp.Key,
-		Value:                resp.Value,
-		IncludeInIdToken:     resp.IncludeInIdToken,
-		IncludeInAccessToken: resp.IncludeInAccessToken,
-		GroupId:              resp.GroupId,
-	}
-
-	if resp.CreatedAt != nil {
-		attr.CreatedAt = sql.NullTime{Time: *resp.CreatedAt, Valid: true}
-	}
-	if resp.UpdatedAt != nil {
-		attr.UpdatedAt = sql.NullTime{Time: *resp.UpdatedAt, Valid: true}
-	}
-
-	return attr
 }
 
 type GetGroupAttributesResponse struct {

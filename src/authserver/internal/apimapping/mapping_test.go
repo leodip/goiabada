@@ -304,11 +304,6 @@ func TestMappers_NilInputReturnsNil(t *testing.T) {
 	assert.Nil(t, ToResourceResponse(nil))
 	assert.Nil(t, ToResourceResponses(nil))
 	assert.Nil(t, ToClientResponse(nil))
-
-	var nilGroupResp *api.GroupResponse
-	assert.Nil(t, nilGroupResp.ToGroup())
-	var nilGroupAttrResp *api.GroupAttributeResponse
-	assert.Nil(t, nilGroupAttrResp.ToGroupAttribute())
 }
 
 // The group and client list mappers return an empty slice rather than nil, so
@@ -571,7 +566,10 @@ func TestToGroupResponses_EmptySliceYieldsEmptySlice(t *testing.T) {
 	assert.Equal(t, []api.GroupResponse{}, ToGroupResponses([]models.Group{}, nil))
 }
 
-func TestGroupResponse_ToGroup_RoundTrip(t *testing.T) {
+// A group that has never been updated: the NULL reaches the wire as an absent updatedAt rather
+// than as a zero time, which is the difference between the console printing nothing and printing
+// "01 Jan 0001" (#350).
+func TestToGroupResponse_LeavesAnAbsentUpdatedAtNil(t *testing.T) {
 	createdAt := time.Date(2024, 6, 1, 0, 0, 0, 0, time.UTC)
 
 	original := &models.Group{
@@ -583,17 +581,16 @@ func TestGroupResponse_ToGroup_RoundTrip(t *testing.T) {
 		CreatedAt:            sql.NullTime{Time: createdAt, Valid: true},
 	}
 
-	roundTripped := ToGroupResponse(original, 5).ToGroup()
+	resp := ToGroupResponse(original, 5)
 
-	assert.Equal(t, int64(4), roundTripped.Id)
-	assert.Equal(t, "admins", roundTripped.GroupIdentifier)
-	assert.Equal(t, "Administrators", roundTripped.Description)
-	assert.True(t, roundTripped.IncludeInIdToken)
-	assert.True(t, roundTripped.IncludeInAccessToken)
-	assert.Equal(t, 5, roundTripped.MemberCount)
-	assert.True(t, roundTripped.CreatedAt.Valid)
-	assert.Equal(t, createdAt, roundTripped.CreatedAt.Time)
-	assert.False(t, roundTripped.UpdatedAt.Valid)
+	assert.Equal(t, int64(4), resp.Id)
+	assert.Equal(t, "admins", resp.GroupIdentifier)
+	assert.Equal(t, "Administrators", resp.Description)
+	assert.True(t, resp.IncludeInIdToken)
+	assert.True(t, resp.IncludeInAccessToken)
+	assert.Equal(t, 5, resp.MemberCount)
+	assert.Equal(t, &createdAt, resp.CreatedAt)
+	assert.Nil(t, resp.UpdatedAt)
 }
 
 func TestToPermissionResponse_IncludesNestedResource(t *testing.T) {
@@ -642,7 +639,7 @@ func TestToResourceResponses_MapsEachResourceDistinctly(t *testing.T) {
 	assert.Equal(t, "svc-b", responses[1].ResourceIdentifier)
 }
 
-func TestToUserAttributeResponse_RoundTrip(t *testing.T) {
+func TestToUserAttributeResponse_MapsFieldsAndTimestamps(t *testing.T) {
 	createdAt := time.Date(2024, 7, 1, 0, 0, 0, 0, time.UTC)
 	updatedAt := time.Date(2024, 7, 2, 0, 0, 0, 0, time.UTC)
 
@@ -678,7 +675,7 @@ func TestToUserAttributeResponses_MapsEachAttributeDistinctly(t *testing.T) {
 	assert.Equal(t, "b", responses[1].Key)
 }
 
-func TestToGroupAttributeResponse_RoundTrip(t *testing.T) {
+func TestToGroupAttributeResponse_MapsFieldsAndTimestamps(t *testing.T) {
 	createdAt := time.Date(2024, 8, 1, 0, 0, 0, 0, time.UTC)
 
 	original := &models.GroupAttribute{
@@ -696,15 +693,10 @@ func TestToGroupAttributeResponse_RoundTrip(t *testing.T) {
 	assert.Equal(t, "gold", resp.Value)
 	assert.Equal(t, int64(9), resp.GroupId)
 	assert.Equal(t, &createdAt, resp.CreatedAt)
+	assert.Equal(t, int64(3), resp.Id)
+	assert.True(t, resp.IncludeInIdToken)
+	assert.True(t, resp.IncludeInAccessToken)
 	assert.Nil(t, resp.UpdatedAt)
-
-	roundTripped := resp.ToGroupAttribute()
-	assert.Equal(t, original.Id, roundTripped.Id)
-	assert.Equal(t, original.Key, roundTripped.Key)
-	assert.Equal(t, original.Value, roundTripped.Value)
-	assert.Equal(t, original.GroupId, roundTripped.GroupId)
-	assert.True(t, roundTripped.CreatedAt.Valid)
-	assert.False(t, roundTripped.UpdatedAt.Valid)
 }
 
 func TestToGroupAttributeResponses_MapsEachAttributeDistinctly(t *testing.T) {
@@ -821,11 +813,6 @@ func TestMappers_CopyCreatedAtAndUpdatedAt(t *testing.T) {
 		resp := ToGroupResponse(&models.Group{Id: 1, CreatedAt: valid, UpdatedAt: validUpdated}, 0)
 		assert.Equal(t, &createdAt, resp.CreatedAt)
 		assert.Equal(t, &updatedAt, resp.UpdatedAt)
-
-		back := resp.ToGroup()
-		assert.True(t, back.CreatedAt.Valid)
-		assert.True(t, back.UpdatedAt.Valid)
-		assert.Equal(t, updatedAt, back.UpdatedAt.Time)
 	})
 
 	t.Run("group attribute", func(t *testing.T) {
@@ -834,11 +821,6 @@ func TestMappers_CopyCreatedAtAndUpdatedAt(t *testing.T) {
 		})
 		assert.Equal(t, &createdAt, resp.CreatedAt)
 		assert.Equal(t, &updatedAt, resp.UpdatedAt)
-
-		back := resp.ToGroupAttribute()
-		assert.True(t, back.CreatedAt.Valid)
-		assert.True(t, back.UpdatedAt.Valid)
-		assert.Equal(t, updatedAt, back.UpdatedAt.Time)
 	})
 
 	t.Run("user attribute", func(t *testing.T) {

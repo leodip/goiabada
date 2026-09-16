@@ -10,8 +10,8 @@ import (
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
+	"github.com/leodip/goiabada/core/api"
 	mocks_handler_helpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
-	"github.com/leodip/goiabada/core/models"
 )
 
 // Decision 11 at this handler group's seam. Every one of these rows answered the 500 page before
@@ -29,19 +29,19 @@ import (
 // zero value.
 type notFoundGroupApiClient struct {
 	apiclient.ApiClient
-	entity *models.Group
+	entity *api.GroupResponse
 	err    error
 }
 
-func (c *notFoundGroupApiClient) GetGroupById(accessToken string, id int64) (*models.Group, int, error) {
-	return c.entity, 0, c.err
+func (c *notFoundGroupApiClient) GetGroupById(accessToken string, id int64) (*api.GroupResponse, error) {
+	return c.entity, c.err
 }
 
 func TestGroup_StaleOrMalformedUrlAnswers404(t *testing.T) {
 	const routePattern = "/admin/groups/{groupId}/attributes"
 
 	// present, gone and broken stand for the three answers the API can give this handler.
-	present := &models.Group{Id: 42}
+	present := &api.GroupResponse{Id: 42}
 	gone := &apiclient.APIError{Code: "NOT_FOUND", Message: "Group not found", StatusCode: http.StatusNotFound}
 	broken := &apiclient.APIError{Code: "INTERNAL_SERVER_ERROR", Message: "the database is on fire", StatusCode: http.StatusInternalServerError}
 
@@ -52,7 +52,7 @@ func TestGroup_StaleOrMalformedUrlAnswers404(t *testing.T) {
 		target       string
 		routed       bool
 		withJwt      bool
-		entity       *models.Group
+		entity       *api.GroupResponse
 		apiErr       error
 		wantNotFound bool
 	}{

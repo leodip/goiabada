@@ -2,7 +2,6 @@ package apiclient
 
 import (
 	"bytes"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -11,10 +10,9 @@ import (
 
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
-	"github.com/leodip/goiabada/core/models"
 )
 
-func (c *AuthServerClient) GetAllGroups(accessToken string) ([]models.Group, error) {
+func (c *AuthServerClient) GetAllGroups(accessToken string) ([]api.GroupResponse, error) {
 	fullURL := fmt.Sprintf("%s/api/v1/admin/groups", c.baseURL)
 
 	req, err := http.NewRequest("GET", fullURL, nil)
@@ -44,31 +42,10 @@ func (c *AuthServerClient) GetAllGroups(accessToken string) ([]models.Group, err
 		return nil, errs.Errorf("failed to unmarshal response: %w", err)
 	}
 
-	groups := make([]models.Group, len(apiResp.Groups))
-	for i, groupResp := range apiResp.Groups {
-		group := models.Group{
-			Id:                   groupResp.Id,
-			GroupIdentifier:      groupResp.GroupIdentifier,
-			Description:          groupResp.Description,
-			IncludeInIdToken:     groupResp.IncludeInIdToken,
-			IncludeInAccessToken: groupResp.IncludeInAccessToken,
-			MemberCount:          groupResp.MemberCount,
-		}
-
-		if groupResp.CreatedAt != nil {
-			group.CreatedAt = sql.NullTime{Time: *groupResp.CreatedAt, Valid: true}
-		}
-		if groupResp.UpdatedAt != nil {
-			group.UpdatedAt = sql.NullTime{Time: *groupResp.UpdatedAt, Valid: true}
-		}
-
-		groups[i] = group
-	}
-
-	return groups, nil
+	return apiResp.Groups, nil
 }
 
-func (c *AuthServerClient) CreateGroup(accessToken string, request *api.CreateGroupRequest) (*models.Group, error) {
+func (c *AuthServerClient) CreateGroup(accessToken string, request *api.CreateGroupRequest) (*api.GroupResponse, error) {
 	fullURL := fmt.Sprintf("%s/api/v1/admin/groups", c.baseURL)
 	reqBody, err := json.Marshal(request)
 	if err != nil {
@@ -103,74 +80,46 @@ func (c *AuthServerClient) CreateGroup(accessToken string, request *api.CreateGr
 		return nil, errs.Errorf("failed to unmarshal response: %w", err)
 	}
 
-	// Convert response to model
-	group := models.Group{
-		Id:                   createResp.Group.Id,
-		GroupIdentifier:      createResp.Group.GroupIdentifier,
-		Description:          createResp.Group.Description,
-		IncludeInIdToken:     createResp.Group.IncludeInIdToken,
-		IncludeInAccessToken: createResp.Group.IncludeInAccessToken,
-	}
-
-	if createResp.Group.CreatedAt != nil {
-		group.CreatedAt = sql.NullTime{Time: *createResp.Group.CreatedAt, Valid: true}
-	}
-	if createResp.Group.UpdatedAt != nil {
-		group.UpdatedAt = sql.NullTime{Time: *createResp.Group.UpdatedAt, Valid: true}
-	}
-
-	return &group, nil
+	return &createResp.Group, nil
 }
 
-func (c *AuthServerClient) GetGroupById(accessToken string, groupId int64) (*models.Group, int, error) {
+// The member count used to be a second return value, because the models.Group this rebuilt did
+// not carry one. api.GroupResponse does, filled by the same handler from the same query, so the
+// delete page reads it off the response like every other field (#350).
+func (c *AuthServerClient) GetGroupById(accessToken string, groupId int64) (*api.GroupResponse, error) {
 	fullURL := fmt.Sprintf("%s/api/v1/admin/groups/%d", c.baseURL, groupId)
 
 	req, err := http.NewRequest("GET", fullURL, nil)
 	if err != nil {
-		return nil, 0, errs.Errorf("failed to create request: %w", err)
+		return nil, errs.Errorf("failed to create request: %w", err)
 	}
 
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, 0, errs.Errorf("failed to make request: %w", err)
+		return nil, errs.Errorf("failed to make request: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, 0, errs.Errorf("failed to read response body: %w", err)
+		return nil, errs.Errorf("failed to read response body: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, 0, parseAPIError(resp, respBody)
+		return nil, parseAPIError(resp, respBody)
 	}
 
 	var getResp api.GetGroupResponse
 	if err := json.Unmarshal(respBody, &getResp); err != nil {
-		return nil, 0, errs.Errorf("failed to decode response: %w", err)
+		return nil, errs.Errorf("failed to decode response: %w", err)
 	}
 
-	group := models.Group{
-		Id:                   getResp.Group.Id,
-		GroupIdentifier:      getResp.Group.GroupIdentifier,
-		Description:          getResp.Group.Description,
-		IncludeInIdToken:     getResp.Group.IncludeInIdToken,
-		IncludeInAccessToken: getResp.Group.IncludeInAccessToken,
-	}
-
-	if getResp.Group.CreatedAt != nil {
-		group.CreatedAt = sql.NullTime{Time: *getResp.Group.CreatedAt, Valid: true}
-	}
-	if getResp.Group.UpdatedAt != nil {
-		group.UpdatedAt = sql.NullTime{Time: *getResp.Group.UpdatedAt, Valid: true}
-	}
-
-	return &group, getResp.Group.MemberCount, nil
+	return &getResp.Group, nil
 }
 
-func (c *AuthServerClient) UpdateGroup(accessToken string, groupId int64, request *api.UpdateGroupRequest) (*models.Group, error) {
+func (c *AuthServerClient) UpdateGroup(accessToken string, groupId int64, request *api.UpdateGroupRequest) (*api.GroupResponse, error) {
 	fullURL := fmt.Sprintf("%s/api/v1/admin/groups/%d", c.baseURL, groupId)
 
 	jsonData, err := json.Marshal(request)
@@ -206,22 +155,7 @@ func (c *AuthServerClient) UpdateGroup(accessToken string, groupId int64, reques
 		return nil, errs.Errorf("failed to decode response: %w", err)
 	}
 
-	group := models.Group{
-		Id:                   updateResp.Group.Id,
-		GroupIdentifier:      updateResp.Group.GroupIdentifier,
-		Description:          updateResp.Group.Description,
-		IncludeInIdToken:     updateResp.Group.IncludeInIdToken,
-		IncludeInAccessToken: updateResp.Group.IncludeInAccessToken,
-	}
-
-	if updateResp.Group.CreatedAt != nil {
-		group.CreatedAt = sql.NullTime{Time: *updateResp.Group.CreatedAt, Valid: true}
-	}
-	if updateResp.Group.UpdatedAt != nil {
-		group.UpdatedAt = sql.NullTime{Time: *updateResp.Group.UpdatedAt, Valid: true}
-	}
-
-	return &group, nil
+	return &updateResp.Group, nil
 }
 
 func (c *AuthServerClient) DeleteGroup(accessToken string, groupId int64) error {
@@ -252,7 +186,7 @@ func (c *AuthServerClient) DeleteGroup(accessToken string, groupId int64) error 
 	return nil
 }
 
-func (c *AuthServerClient) GetUserGroups(accessToken string, userId int64) (*api.UserResponse, []models.Group, error) {
+func (c *AuthServerClient) GetUserGroups(accessToken string, userId int64) (*api.UserResponse, []api.GroupResponse, error) {
 	fullURL := fmt.Sprintf("%s/api/v1/admin/users/%d/groups", c.baseURL, userId)
 
 	req, err := http.NewRequest("GET", fullURL, nil)
@@ -282,28 +216,7 @@ func (c *AuthServerClient) GetUserGroups(accessToken string, userId int64) (*api
 		return nil, nil, errs.Errorf("failed to unmarshal response: %w", err)
 	}
 
-	user := &apiResp.User
-	groups := make([]models.Group, len(apiResp.Groups))
-	for i, groupResp := range apiResp.Groups {
-		group := models.Group{
-			Id:                   groupResp.Id,
-			GroupIdentifier:      groupResp.GroupIdentifier,
-			Description:          groupResp.Description,
-			IncludeInIdToken:     groupResp.IncludeInIdToken,
-			IncludeInAccessToken: groupResp.IncludeInAccessToken,
-		}
-
-		if groupResp.CreatedAt != nil {
-			group.CreatedAt = sql.NullTime{Time: *groupResp.CreatedAt, Valid: true}
-		}
-		if groupResp.UpdatedAt != nil {
-			group.UpdatedAt = sql.NullTime{Time: *groupResp.UpdatedAt, Valid: true}
-		}
-
-		groups[i] = group
-	}
-
-	return user, groups, nil
+	return &apiResp.User, apiResp.Groups, nil
 }
 
 func (c *AuthServerClient) GetGroupMembers(accessToken string, groupId int64, page, size int) ([]api.UserResponse, int, error) {
@@ -476,7 +389,7 @@ func (c *AuthServerClient) SearchGroupsWithPermissionAnnotation(accessToken stri
 	return apiResp.Groups, apiResp.Total, nil
 }
 
-func (c *AuthServerClient) UpdateUserGroups(accessToken string, userId int64, request *api.UpdateUserGroupsRequest) (*api.UserResponse, []models.Group, error) {
+func (c *AuthServerClient) UpdateUserGroups(accessToken string, userId int64, request *api.UpdateUserGroupsRequest) (*api.UserResponse, []api.GroupResponse, error) {
 	fullURL := fmt.Sprintf("%s/api/v1/admin/users/%d/groups", c.baseURL, userId)
 
 	reqBody, err := json.Marshal(request)
@@ -512,26 +425,5 @@ func (c *AuthServerClient) UpdateUserGroups(accessToken string, userId int64, re
 		return nil, nil, errs.Errorf("failed to unmarshal response: %w", err)
 	}
 
-	user := &apiResp.User
-	groups := make([]models.Group, len(apiResp.Groups))
-	for i, groupResp := range apiResp.Groups {
-		group := models.Group{
-			Id:                   groupResp.Id,
-			GroupIdentifier:      groupResp.GroupIdentifier,
-			Description:          groupResp.Description,
-			IncludeInIdToken:     groupResp.IncludeInIdToken,
-			IncludeInAccessToken: groupResp.IncludeInAccessToken,
-		}
-
-		if groupResp.CreatedAt != nil {
-			group.CreatedAt = sql.NullTime{Time: *groupResp.CreatedAt, Valid: true}
-		}
-		if groupResp.UpdatedAt != nil {
-			group.UpdatedAt = sql.NullTime{Time: *groupResp.UpdatedAt, Valid: true}
-		}
-
-		groups[i] = group
-	}
-
-	return user, groups, nil
+	return &apiResp.User, apiResp.Groups, nil
 }

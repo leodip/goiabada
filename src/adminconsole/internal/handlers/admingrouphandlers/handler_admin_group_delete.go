@@ -39,7 +39,7 @@ func HandleAdminGroupDeleteGet(
 			return
 		}
 
-		group, memberCount, err := apiClient.GetGroupById(jwtInfo.TokenResponse.AccessToken, id)
+		group, err := apiClient.GetGroupById(jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -49,7 +49,7 @@ func HandleAdminGroupDeleteGet(
 			return
 		}
 
-		countOfUsers := memberCount
+		countOfUsers := group.MemberCount
 
 		bind := map[string]interface{}{
 			"group":        group,
@@ -90,7 +90,7 @@ func HandleAdminGroupDeletePost(
 			return
 		}
 
-		group, memberCount, err := apiClient.GetGroupById(jwtInfo.TokenResponse.AccessToken, id)
+		group, err := apiClient.GetGroupById(jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -100,7 +100,7 @@ func HandleAdminGroupDeletePost(
 			return
 		}
 
-		countOfUsers := memberCount
+		countOfUsers := group.MemberCount
 
 		renderError := func(message string) {
 			bind := map[string]interface{}{

@@ -39,7 +39,7 @@ func HandleAdminGroupAttributesGet(
 		}
 
 		// Get group via API
-		group, _, err := apiClient.GetGroupById(jwtInfo.TokenResponse.AccessToken, id)
+		group, err := apiClient.GetGroupById(jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
