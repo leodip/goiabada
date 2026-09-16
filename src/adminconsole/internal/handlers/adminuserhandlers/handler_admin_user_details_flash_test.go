@@ -1,21 +1,18 @@
 package adminuserhandlers
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
+	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/core/constants"
 	mocks_handler_helpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
@@ -62,14 +59,8 @@ func newFlashTestStore() *sessionstore.ServerSideStore {
 // detailsRequest builds the GET the handler expects: the userId route parameter chi would
 // have matched, and the access token it reads out of the request context.
 func detailsRequest() *http.Request {
-	req := httptest.NewRequest(http.MethodGet, "/admin/users/7/details", nil)
-
-	routeCtx := chi.NewRouteContext()
-	routeCtx.URLParams.Add("userId", "7")
-	ctx := context.WithValue(req.Context(), chi.RouteCtxKey, routeCtx)
-	ctx = context.WithValue(ctx, constants.ContextKeyJwtInfo,
-		oauth.JwtInfo{TokenResponse: oauth.TokenResponse{AccessToken: "an-access-token"}})
-	return req.WithContext(ctx)
+	return handlertest.Request(http.MethodGet, "/admin/users/7/details",
+		handlertest.WithAccessToken(), handlertest.WithRouteParam("userId", "7"))
 }
 
 // flashInSession puts the named flashes into a stored session and returns the cookie that
@@ -99,9 +90,7 @@ func renderDetails(t *testing.T, store *sessionstore.ServerSideStore,
 	t.Helper()
 
 	httpHelper := mocks_handler_helpers.NewHttpHelper(t)
-	httpHelper.On("RenderTemplate", mock.Anything, mock.Anything,
-		"/layouts/menu_layout.html", "/admin_users_details.html", mock.Anything).
-		Return(nil).Once()
+	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_users_details.html").Once()
 
 	req := detailsRequest()
 	if cookie != nil {
@@ -111,13 +100,7 @@ func renderDetails(t *testing.T, store *sessionstore.ServerSideStore,
 
 	HandleAdminUserDetailsGet(httpHelper, store, flashStubApiClient{}).ServeHTTP(rec, req)
 
-	var bind map[string]interface{}
-	for _, call := range httpHelper.Calls {
-		if call.Method == "RenderTemplate" {
-			bind = call.Arguments.Get(4).(map[string]interface{})
-		}
-	}
-	require.NotNil(t, bind, "the handler rendered nothing")
+	bind := handlertest.Bind(t, httpHelper)
 	return bind, rec
 }
 

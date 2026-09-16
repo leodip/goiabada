@@ -1,7 +1,6 @@
 package adminsettingshandlers
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -13,11 +12,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
+	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/adminconsole/internal/pagination"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/constants"
 	mocks_handler_helpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
-	"github.com/leodip/goiabada/core/oauth"
 )
 
 // The audit log viewer is the fifth paginated admin list and the only one whose
@@ -78,32 +76,20 @@ func renderAuditLogs(t *testing.T, rawPage string, total int) (map[string]interf
 	t.Helper()
 
 	httpHelper := mocks_handler_helpers.NewHttpHelper(t)
-	httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).
-		Run(func(args mock.Arguments) {
-			t.Errorf("the handler answered 500: %v", args.Get(2))
-		}).Maybe()
-	httpHelper.On("RenderTemplate", mock.Anything, mock.Anything,
-		"/layouts/menu_layout.html", "/admin_settings_audit_log_viewer.html", mock.Anything).
-		Return(nil).Maybe()
+	handlertest.RefuseInternalServerError(t, httpHelper)
+	handlertest.ExpectRender(httpHelper,
+		"/layouts/menu_layout.html", "/admin_settings_audit_log_viewer.html").Maybe()
 
 	target := "/admin/settings/audit-logs"
 	if rawPage != "" {
 		target += "?page=" + rawPage
 	}
-	req := httptest.NewRequest(http.MethodGet, target, nil)
-	req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeyJwtInfo,
-		oauth.JwtInfo{TokenResponse: oauth.TokenResponse{AccessToken: "an-access-token"}}))
+	req := handlertest.Request(http.MethodGet, target, handlertest.WithAccessToken())
 
 	apiClient := &auditPagingApiClient{total: total}
 	HandleAdminSettingsAuditLogViewerGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
 
-	var bind map[string]interface{}
-	for _, call := range httpHelper.Calls {
-		if call.Method == "RenderTemplate" {
-			bind = call.Arguments.Get(4).(map[string]interface{})
-		}
-	}
-	require.NotNil(t, bind, "the handler rendered nothing for ?page=%q", rawPage)
+	bind := handlertest.Bind(t, httpHelper, "for ?page=%q", rawPage)
 	return bind, apiClient
 }
 
@@ -187,16 +173,14 @@ func TestHandleAdminSettingsAuditLogViewerGet_PageQueryParameter(t *testing.T) {
 // unfiltered log while the filter dropdown still named an event.
 func TestHandleAdminSettingsAuditLogViewerGet_TheEventFilterSurvivesTheSecondQuery(t *testing.T) {
 	httpHelper := mocks_handler_helpers.NewHttpHelper(t)
-	httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).
-		Run(func(args mock.Arguments) { t.Errorf("the handler answered 500: %v", args.Get(2)) }).Maybe()
-	httpHelper.On("RenderTemplate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-		Return(nil).Maybe()
+	handlertest.RefuseInternalServerError(t, httpHelper)
+	handlertest.ExpectRender(httpHelper, mock.Anything, mock.Anything).Maybe()
 
 	apiClient := &auditPagingApiClient{total: 50}
 
-	req := httptest.NewRequest(http.MethodGet, "/admin/settings/audit-logs?page=99&auditEvent=UserAuthSuccess", nil)
-	req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeyJwtInfo,
-		oauth.JwtInfo{TokenResponse: oauth.TokenResponse{AccessToken: "an-access-token"}}))
+	req := handlertest.Request(http.MethodGet, "/admin/settings/audit-logs?page=99&auditEvent=UserAuthSuccess",
+		handlertest.WithAccessToken(),
+	)
 
 	HandleAdminSettingsAuditLogViewerGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
 
@@ -240,26 +224,18 @@ func renderAuditLogsWithQuery(t *testing.T, rawQuery string, total int) (map[str
 	t.Helper()
 
 	httpHelper := mocks_handler_helpers.NewHttpHelper(t)
-	httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).
-		Run(func(args mock.Arguments) { t.Errorf("the handler answered 500: %v", args.Get(2)) }).Maybe()
-	httpHelper.On("RenderTemplate", mock.Anything, mock.Anything,
-		"/layouts/menu_layout.html", "/admin_settings_audit_log_viewer.html", mock.Anything).
-		Return(nil).Maybe()
+	handlertest.RefuseInternalServerError(t, httpHelper)
+	handlertest.ExpectRender(httpHelper,
+		"/layouts/menu_layout.html", "/admin_settings_audit_log_viewer.html").Maybe()
 
-	req := httptest.NewRequest(http.MethodGet, "/admin/settings/audit-log-viewer?"+rawQuery, nil)
-	req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeyJwtInfo,
-		oauth.JwtInfo{TokenResponse: oauth.TokenResponse{AccessToken: "an-access-token"}}))
+	req := handlertest.Request(http.MethodGet, "/admin/settings/audit-log-viewer?"+rawQuery,
+		handlertest.WithAccessToken(),
+	)
 
 	apiClient := &auditPagingApiClient{total: total}
 	HandleAdminSettingsAuditLogViewerGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
 
-	var bind map[string]interface{}
-	for _, call := range httpHelper.Calls {
-		if call.Method == "RenderTemplate" {
-			bind = call.Arguments.Get(4).(map[string]interface{})
-		}
-	}
-	require.NotNil(t, bind, "the handler rendered nothing for ?%s", rawQuery)
+	bind := handlertest.Bind(t, httpHelper, "for ?%s", rawQuery)
 	return bind, apiClient
 }
 

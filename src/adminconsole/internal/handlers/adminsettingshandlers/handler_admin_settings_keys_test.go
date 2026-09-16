@@ -1,7 +1,6 @@
 package adminsettingshandlers
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -11,10 +10,9 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
+	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	adminmiddleware "github.com/leodip/goiabada/adminconsole/internal/middleware"
-	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/handlerhelpers"
-	"github.com/leodip/goiabada/core/oauth"
 )
 
 // stubApiClient embeds apiclient.ApiClient so its hundred-odd other methods come for free
@@ -95,9 +93,9 @@ func TestHandleAdminSettingsKeysRotatePost_APIErrorReachesTheBrowser(t *testing.
 			// browser receives.
 			httpHelper := handlerhelpers.NewHttpHelper(nil, adminmiddleware.SettingsReader{})
 
-			req := httptest.NewRequest(http.MethodPost, "/admin/settings/keys/rotate", nil)
-			req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeyJwtInfo,
-				oauth.JwtInfo{TokenResponse: oauth.TokenResponse{AccessToken: "an-access-token"}}))
+			req := handlertest.Request(http.MethodPost, "/admin/settings/keys/rotate",
+				handlertest.WithAccessToken(),
+			)
 
 			rec := httptest.NewRecorder()
 
@@ -128,9 +126,7 @@ func TestHandleAdminSettingsKeysRotatePost_SuccessIsUnchanged(t *testing.T) {
 
 	httpHelper := handlerhelpers.NewHttpHelper(nil, adminmiddleware.SettingsReader{})
 
-	req := httptest.NewRequest(http.MethodPost, "/admin/settings/keys/rotate", nil)
-	req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeyJwtInfo,
-		oauth.JwtInfo{TokenResponse: oauth.TokenResponse{AccessToken: "an-access-token"}}))
+	req := handlertest.Request(http.MethodPost, "/admin/settings/keys/rotate", handlertest.WithAccessToken())
 
 	rec := httptest.NewRecorder()
 

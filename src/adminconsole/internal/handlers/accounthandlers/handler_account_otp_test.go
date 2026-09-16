@@ -1,7 +1,6 @@
 package accounthandlers
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -14,11 +13,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
+	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/constants"
 	mocks_handler_helpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/leodip/goiabada/core/oauth"
 )
 
 // This file did not exist before #247. The package carried only its TestMain, and the console's OTP
@@ -36,7 +34,6 @@ import (
 // which a mocked RenderTemplate cannot see; that lives in adminconsole/internal/rendertest.
 
 const (
-	testAccessToken = "an-access-token"
 	testBase64Image = "aW1hZ2UtYnl0ZXM="
 	testSecretKey   = "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ"
 	accountOTPPath  = "/account/otp"
@@ -93,10 +90,8 @@ func newStubApiClient(otpEnabled bool) *stubApiClient {
 // otpPostRequest builds a submission carrying the access token the handler reads out of the request
 // context, without which it answers 500 before reaching anything these cases are about.
 func otpPostRequest(form url.Values) *http.Request {
-	req := httptest.NewRequest(http.MethodPost, accountOTPPath, strings.NewReader(form.Encode()))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	return req.WithContext(context.WithValue(req.Context(), constants.ContextKeyJwtInfo,
-		oauth.JwtInfo{TokenResponse: oauth.TokenResponse{AccessToken: testAccessToken}}))
+	return handlertest.Request(http.MethodPost, accountOTPPath,
+		handlertest.WithAccessToken(), handlertest.WithForm(form))
 }
 
 // mustJSON is how the cases assert on the wire form rather than on the struct. The struct no longer
@@ -107,18 +102,6 @@ func mustJSON(t *testing.T, v interface{}) string {
 	encoded, err := json.Marshal(v)
 	require.NoError(t, err)
 	return string(encoded)
-}
-
-// bindOf captures the map the handler renders with, which is what these cases assert on.
-func bindOf(t *testing.T, httpHelper *mocks_handler_helpers.HttpHelper) map[string]interface{} {
-	t.Helper()
-	for _, call := range httpHelper.Calls {
-		if call.Method == "RenderTemplate" {
-			return call.Arguments.Get(4).(map[string]interface{})
-		}
-	}
-	t.Fatal("the handler rendered nothing")
-	return nil
 }
 
 func apiError(code string) error {
@@ -162,8 +145,7 @@ func TestHandleAccountOtpPost_EveryEnrollmentRerenderCarriesTheQRAndTheSeed(t *t
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			httpHelper := mocks_handler_helpers.NewHttpHelper(t)
-			httpHelper.On("RenderTemplate", mock.Anything, mock.Anything,
-				"/layouts/menu_layout.html", "/account_otp.html", mock.Anything).Return(nil).Once()
+			handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/account_otp.html").Once()
 
 			client := newStubApiClient(false)
 			client.updateErr = tc.updateErr
@@ -171,7 +153,7 @@ func TestHandleAccountOtpPost_EveryEnrollmentRerenderCarriesTheQRAndTheSeed(t *t
 			rr := httptest.NewRecorder()
 			HandleAccountOtpPost(httpHelper, client).ServeHTTP(rr, otpPostRequest(tc.form))
 
-			bind := bindOf(t, httpHelper)
+			bind := handlertest.Bind(t, httpHelper)
 			assert.Equal(t, testBase64Image, bind["base64Image"],
 				"an enrolment form with no QR code cannot be enrolled from")
 			assert.Equal(t, testSecretKey, bind["secretKey"])
@@ -215,8 +197,7 @@ func TestHandleAccountOtpPost_AlreadyEnabledReloadsRatherThanRedrawing(t *testin
 // a user who has OTP enabled is refused by the API.
 func TestHandleAccountOtpPost_DisableErrorFetchesNoEnrollment(t *testing.T) {
 	httpHelper := mocks_handler_helpers.NewHttpHelper(t)
-	httpHelper.On("RenderTemplate", mock.Anything, mock.Anything,
-		"/layouts/menu_layout.html", "/account_otp.html", mock.Anything).Return(nil).Once()
+	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/account_otp.html").Once()
 
 	client := newStubApiClient(true)
 	client.updateErr = apiError("AUTHENTICATION_FAILED")
@@ -225,7 +206,7 @@ func TestHandleAccountOtpPost_DisableErrorFetchesNoEnrollment(t *testing.T) {
 	HandleAccountOtpPost(httpHelper, client).ServeHTTP(rr,
 		otpPostRequest(url.Values{"password": {"wrong"}}))
 
-	bind := bindOf(t, httpHelper)
+	bind := handlertest.Bind(t, httpHelper)
 	assert.Equal(t, true, bind["otpEnabled"])
 	assert.NotContains(t, bind, "base64Image")
 	assert.NotContains(t, bind, "secretKey")

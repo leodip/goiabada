@@ -1,7 +1,6 @@
 package adminclienthandlers
 
 import (
-	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -13,11 +12,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
+	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
 	mocks_handler_helpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
-	"github.com/leodip/goiabada/core/oauth"
 )
 
 // #225 at a handler's seam, rather than at HandleAPIErrorJson's. api_error_helper_test.go owns what
@@ -99,10 +97,10 @@ func TestClientPermissionsPost_ForwardsTheApisAnswer(t *testing.T) {
 					captured, _ = args.Get(2).(error)
 				}).Return().Once()
 
-			req := httptest.NewRequest(http.MethodPost, "/admin/clients/1/permissions",
-				strings.NewReader("{\"clientId\": 1, \"assignedPermissionsIds\": [7]}"))
-			req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeyJwtInfo,
-				oauth.JwtInfo{TokenResponse: oauth.TokenResponse{AccessToken: "an-access-token"}}))
+			req := handlertest.Request(http.MethodPost, "/admin/clients/1/permissions",
+				handlertest.WithAccessToken(),
+				handlertest.WithBody(strings.NewReader("{\"clientId\": 1, \"assignedPermissionsIds\": [7]}")),
+			)
 
 			handler := HandleAdminClientPermissionsPost(httpHelper, nil,
 				&permissionsApiClient{err: testCase.apiErr})
@@ -141,10 +139,10 @@ func TestClientPermissionsPost_MalformedBodyAnswers400(t *testing.T) {
 			captured, _ = args.Get(2).(error)
 		}).Return().Once()
 
-	req := httptest.NewRequest(http.MethodPost, "/admin/clients/1/permissions",
-		strings.NewReader("{this is not json"))
-	req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeyJwtInfo,
-		oauth.JwtInfo{TokenResponse: oauth.TokenResponse{AccessToken: "an-access-token"}}))
+	req := handlertest.Request(http.MethodPost, "/admin/clients/1/permissions",
+		handlertest.WithAccessToken(),
+		handlertest.WithBody(strings.NewReader("{this is not json")),
+	)
 
 	handler := HandleAdminClientPermissionsPost(httpHelper, nil, &permissionsApiClient{})
 	handler.ServeHTTP(httptest.NewRecorder(), req)

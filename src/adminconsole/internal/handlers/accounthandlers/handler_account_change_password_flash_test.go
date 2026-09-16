@@ -1,23 +1,20 @@
 package accounthandlers
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
+	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	mocks_handler_helpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
@@ -68,12 +65,6 @@ func newFlashTestStore() *sessionstore.ServerSideStore {
 	return store
 }
 
-// withJwtInfo puts the access token the handlers read out of the request context in place.
-func withJwtInfo(req *http.Request) *http.Request {
-	return req.WithContext(context.WithValue(req.Context(), constants.ContextKeyJwtInfo,
-		oauth.JwtInfo{TokenResponse: oauth.TokenResponse{AccessToken: testAccessToken}}))
-}
-
 // cookieJar is a browser's cookie jar: it keeps what a response set and keeps carrying it
 // until a later response replaces it.
 //
@@ -119,9 +110,8 @@ func TestHandleAccountChangePassword_TheNoticeShowsOnceAndThenStops(t *testing.T
 		"newPassword":             {"N3w!word"},
 		"newPasswordConfirmation": {"N3w!word"},
 	}
-	postReq := withJwtInfo(httptest.NewRequest(http.MethodPost, "/account/change-password",
-		strings.NewReader(form.Encode())))
-	postReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	postReq := handlertest.Request(http.MethodPost, "/account/change-password",
+		handlertest.WithAccessToken(), handlertest.WithForm(form))
 	postRec := httptest.NewRecorder()
 
 	HandleAccountChangePasswordPost(postHelper, store, flashStubApiClient{}).
@@ -136,31 +126,28 @@ func TestHandleAccountChangePassword_TheNoticeShowsOnceAndThenStops(t *testing.T
 
 	// The first GET: the notice is there.
 	firstHelper := mocks_handler_helpers.NewHttpHelper(t)
-	firstHelper.On("RenderTemplate", mock.Anything, mock.Anything,
-		"/layouts/menu_layout.html", "/account_change_password.html", mock.Anything).
-		Return(nil).Once()
+	handlertest.ExpectRender(firstHelper, "/layouts/menu_layout.html", "/account_change_password.html").Once()
 	firstRec := httptest.NewRecorder()
-	firstReq := jar.send(withJwtInfo(
-		httptest.NewRequest(http.MethodGet, "/account/change-password", nil)))
+	firstReq := jar.send(handlertest.Request(http.MethodGet, "/account/change-password",
+		handlertest.WithAccessToken()))
 
 	HandleAccountChangePasswordGet(firstHelper, store, nil).ServeHTTP(firstRec, firstReq)
 	jar.keep(firstRec)
 
-	assert.Equal(t, true, bindOf(t, firstHelper)["savedSuccessfully"],
+	assert.Equal(t, true, handlertest.Bind(t, firstHelper)["savedSuccessfully"],
 		"the notice the POST flashed must reach the page that renders it")
 
 	// The second GET: it is gone, and gone because the first GET saved the consumption.
 	secondHelper := mocks_handler_helpers.NewHttpHelper(t)
-	secondHelper.On("RenderTemplate", mock.Anything, mock.Anything,
-		"/layouts/menu_layout.html", "/account_change_password.html", mock.Anything).
-		Return(nil).Once()
-	secondReq := jar.send(withJwtInfo(
-		httptest.NewRequest(http.MethodGet, "/account/change-password", nil)))
+	handlertest.ExpectRender(secondHelper,
+		"/layouts/menu_layout.html", "/account_change_password.html").Once()
+	secondReq := jar.send(handlertest.Request(http.MethodGet, "/account/change-password",
+		handlertest.WithAccessToken()))
 
 	HandleAccountChangePasswordGet(secondHelper, store, nil).
 		ServeHTTP(httptest.NewRecorder(), secondReq)
 
-	assert.Equal(t, false, bindOf(t, secondHelper)["savedSuccessfully"],
+	assert.Equal(t, false, handlertest.Bind(t, secondHelper)["savedSuccessfully"],
 		"a reload must not show the notice again")
 }
 
@@ -168,14 +155,12 @@ func TestHandleAccountChangePassword_TheNoticeShowsOnceAndThenStops(t *testing.T
 // case above is satisfied by a handler that binds true unconditionally.
 func TestHandleAccountChangePasswordGet_NoFlashIsNoNotice(t *testing.T) {
 	httpHelper := mocks_handler_helpers.NewHttpHelper(t)
-	httpHelper.On("RenderTemplate", mock.Anything, mock.Anything,
-		"/layouts/menu_layout.html", "/account_change_password.html", mock.Anything).
-		Return(nil).Once()
+	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/account_change_password.html").Once()
 
-	req := withJwtInfo(httptest.NewRequest(http.MethodGet, "/account/change-password", nil))
+	req := handlertest.Request(http.MethodGet, "/account/change-password", handlertest.WithAccessToken())
 
 	HandleAccountChangePasswordGet(httpHelper, newFlashTestStore(), nil).
 		ServeHTTP(httptest.NewRecorder(), req)
 
-	assert.Equal(t, false, bindOf(t, httpHelper)["savedSuccessfully"])
+	assert.Equal(t, false, handlertest.Bind(t, httpHelper)["savedSuccessfully"])
 }

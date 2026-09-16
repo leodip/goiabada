@@ -2,8 +2,8 @@ package accounthandlers
 
 import (
 	"bytes"
-	"context"
 	"errors"
+	"io"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -15,10 +15,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/core/customerrors"
 	mocks_handler_helpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
-	"github.com/leodip/goiabada/core/oauth"
 )
 
 // The upload handlers wrote their own JSON error bodies until #279, and every row here was
@@ -121,19 +120,18 @@ func TestAccountProfilePicturePost_AnswersThroughTheSharedJsonWriters(t *testing
 					captured, _ = args.Get(2).(error)
 				}).Return().Once()
 
-			var req *http.Request
-			if testCase.rawBody != "" {
-				req = httptest.NewRequest(http.MethodPost, "/account/picture", strings.NewReader(testCase.rawBody))
-				req.Header.Set("Content-Type", testCase.contentType)
-			} else {
-				body, contentType := multipartPicture(t, testCase.fieldName)
-				req = httptest.NewRequest(http.MethodPost, "/account/picture", body)
-				req.Header.Set("Content-Type", contentType)
+			body, contentType := io.Reader(strings.NewReader(testCase.rawBody)), testCase.contentType
+			if testCase.rawBody == "" {
+				body, contentType = multipartPicture(t, testCase.fieldName)
+			}
+			opts := []handlertest.Option{
+				handlertest.WithBody(body),
+				handlertest.WithContentType(contentType),
 			}
 			if testCase.withJwt {
-				req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeyJwtInfo,
-					oauth.JwtInfo{TokenResponse: oauth.TokenResponse{AccessToken: "an-access-token"}}))
+				opts = append(opts, handlertest.WithAccessToken())
 			}
+			req := handlertest.Request(http.MethodPost, "/account/picture", opts...)
 
 			handler := HandleAccountProfilePicturePost(httpHelper, &pictureApiClient{err: testCase.apiErr})
 			handler.ServeHTTP(httptest.NewRecorder(), req)
@@ -191,11 +189,11 @@ func TestAccountProfilePictureDelete_AnswersThroughTheSharedJsonWriters(t *testi
 					captured, _ = args.Get(2).(error)
 				}).Return().Once()
 
-			req := httptest.NewRequest(http.MethodDelete, "/account/picture", nil)
+			var opts []handlertest.Option
 			if testCase.withJwt {
-				req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeyJwtInfo,
-					oauth.JwtInfo{TokenResponse: oauth.TokenResponse{AccessToken: "an-access-token"}}))
+				opts = append(opts, handlertest.WithAccessToken())
 			}
+			req := handlertest.Request(http.MethodDelete, "/account/picture", opts...)
 
 			handler := HandleAccountProfilePictureDelete(httpHelper, &pictureApiClient{err: testCase.apiErr})
 			handler.ServeHTTP(httptest.NewRecorder(), req)
