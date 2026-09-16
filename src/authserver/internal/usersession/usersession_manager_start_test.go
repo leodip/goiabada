@@ -1,4 +1,4 @@
-package user
+package usersession
 
 import (
 	"database/sql"
@@ -9,11 +9,11 @@ import (
 	"time"
 
 	"errors"
+	"github.com/leodip/goiabada/authserver/internal/useragent"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/sessionstore"
-	"github.com/leodip/goiabada/core/useragent"
 	"github.com/leodip/goiabada/core/uuidutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"

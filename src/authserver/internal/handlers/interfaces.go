@@ -10,11 +10,11 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
+	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	"github.com/leodip/goiabada/authserver/internal/issuance"
-	"github.com/leodip/goiabada/core/communication"
+	"github.com/leodip/goiabada/authserver/internal/usercreation"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
-	"github.com/leodip/goiabada/core/user"
 
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 )
@@ -94,7 +94,7 @@ type TokenValidator interface {
 }
 
 type UserCreator interface {
-	CreateUser(input *user.CreateUserInput) (*models.User, error)
+	CreateUser(input *usercreation.CreateUserInput) (*models.User, error)
 }
 
 type TokenParser interface {
@@ -112,7 +112,7 @@ type PasswordValidator interface {
 }
 
 type EmailSender interface {
-	SendEmail(ctx context.Context, input *communication.SendEmailInput) error
+	SendEmail(ctx context.Context, input *emaildelivery.SendEmailInput) error
 }
 
 // AuditLogger records one security event. The context is first because every audit event raised

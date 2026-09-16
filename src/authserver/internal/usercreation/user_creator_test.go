@@ -1,4 +1,4 @@
-package user
+package usercreation
 
 import (
 	"database/sql"

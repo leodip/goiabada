@@ -9,11 +9,11 @@ import (
 	"strings"
 	"testing"
 
-	mocks_communication "github.com/leodip/goiabada/core/communication/mocks"
+	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
 	mocks_handlerhelpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
 
-	"github.com/leodip/goiabada/core/communication"
+	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/hashutil"
@@ -85,7 +85,7 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 	t.Run("Email not given", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		database := mocks_data.NewDatabase(t)
-		emailSender := mocks_communication.NewEmailSender(t)
+		emailSender := mocks_handlers.NewEmailSender(t)
 
 		handler := HandleForgotPasswordPost(httpHelper, database, emailSender)
 
@@ -118,7 +118,7 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 	t.Run("User not found", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		database := mocks_data.NewDatabase(t)
-		emailSender := mocks_communication.NewEmailSender(t)
+		emailSender := mocks_handlers.NewEmailSender(t)
 
 		handler := HandleForgotPasswordPost(httpHelper, database, emailSender)
 
@@ -159,7 +159,7 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 	t.Run("Success path, email is sent", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		database := mocks_data.NewDatabase(t)
-		emailSender := mocks_communication.NewEmailSender(t)
+		emailSender := mocks_handlers.NewEmailSender(t)
 
 		handler := HandleForgotPasswordPost(httpHelper, database, emailSender)
 
@@ -197,7 +197,7 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 				emailedLink, _ = args.Get(3).(map[string]interface{})["link"].(string)
 			}).Return(&bytes.Buffer{}, nil)
 
-		emailSender.On("SendEmail", mock.Anything, mock.MatchedBy(func(input *communication.SendEmailInput) bool {
+		emailSender.On("SendEmail", mock.Anything, mock.MatchedBy(func(input *emaildelivery.SendEmailInput) bool {
 			return input.To == "existing@example.com" && input.Subject == "Password reset"
 		})).Return(nil)
 

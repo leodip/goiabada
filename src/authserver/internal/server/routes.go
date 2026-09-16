@@ -4,21 +4,23 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/audit"
+	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	authhandlerhelpers "github.com/leodip/goiabada/authserver/internal/handlerhelpers"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers"
 	"github.com/leodip/goiabada/authserver/internal/handlers/apihandlers"
 	"github.com/leodip/goiabada/authserver/internal/issuance"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
+	"github.com/leodip/goiabada/authserver/internal/otp"
+	"github.com/leodip/goiabada/authserver/internal/permissions"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 	"github.com/leodip/goiabada/authserver/internal/signingkeys"
-	"github.com/leodip/goiabada/core/communication"
+	"github.com/leodip/goiabada/authserver/internal/usercreation"
+	"github.com/leodip/goiabada/authserver/internal/usersession"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/handlerhelpers"
 	core_middleware "github.com/leodip/goiabada/core/middleware"
-	"github.com/leodip/goiabada/core/otp"
-	"github.com/leodip/goiabada/core/user"
 	"github.com/leodip/goiabada/core/validators"
 )
 
@@ -31,7 +33,7 @@ func (s *Server) initRoutes(root chi.Router) {
 	auditLogger := audit.NewAuditLogger(s.database)
 	authorizeValidator := protocolvalidation.NewAuthorizeValidator(s.database)
 	tokenParser := signingkeys.NewTokenParser(s.database)
-	permissionChecker := user.NewPermissionChecker(s.database)
+	permissionChecker := permissions.NewPermissionChecker(s.database)
 	tokenValidator := protocolvalidation.NewTokenValidator(s.database, tokenParser, permissionChecker)
 	emailValidator := accountvalidation.NewEmailValidator(s.database)
 	passwordValidator := accountvalidation.NewPasswordValidator()
@@ -41,11 +43,11 @@ func (s *Server) initRoutes(root chi.Router) {
 	identifierValidator := validators.NewIdentifierValidator()
 
 	codeIssuer := issuance.NewCodeIssuer(s.database)
-	userSessionManager := user.NewUserSessionManager(s.sessionStore, constants.AuthServerSessionName, s.database)
+	userSessionManager := usersession.NewUserSessionManager(s.sessionStore, constants.AuthServerSessionName, s.database)
 	otpSecretGenerator := otp.NewOTPSecretGenerator()
 	tokenIssuer := issuance.NewTokenIssuer(s.database, s.baseURL)
-	userCreator := user.NewUserCreator(s.database)
-	emailSender := communication.NewEmailSender()
+	userCreator := usercreation.NewUserCreator(s.database)
+	emailSender := emaildelivery.NewEmailSender()
 
 	httpHelper := handlerhelpers.NewHttpHelper(s.templateFS, middleware.SettingsReader{})
 	authHelper := authhandlerhelpers.NewAuthHelper(s.sessionStore, constants.AuthServerSessionName)

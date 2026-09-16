@@ -386,16 +386,14 @@ jobs:
           done
           exit $rc
 
+  # No services: TestSendEmail left with core/communication in #346, and it was
+  # the only test here that reached one -- no mailpit helper in core/testutil
+  # has a caller inside core any more.
   unit-core:
     name: Unit / core
     needs: versions
     runs-on: ubuntu-latest
     container: golang:${{ needs.versions.outputs.go }}-bookworm
-    services:
-      # core's TestSendEmail talks to a real SMTP server. Verified by running
-      # the tier without it, where that is the only test that fails.
-      mailpit:
-        image: axllent/mailpit
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup-test-container
@@ -405,14 +403,16 @@ jobs:
         working-directory: src/authserver
         run: ./run-tests.sh --type core --no-build
 
-  # No services: verified by running this tier with every service unreachable,
-  # where it still passes (with Go's test cache defeated, so the tests really
-  # ran).
   unit-authserver:
     name: Unit / authserver
     needs: versions
     runs-on: ubuntu-latest
     container: golang:${{ needs.versions.outputs.go }}-bookworm
+    services:
+      # emaildelivery's TestSendEmail talks to a real SMTP server. Verified by
+      # running the tier without it, where that is the only test that fails.
+      mailpit:
+        image: axllent/mailpit
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup-test-container
@@ -422,7 +422,7 @@ jobs:
         working-directory: src/authserver
         run: ./run-tests.sh --type internal --no-build
 
-  # No services, verified the same way as Unit / authserver.
+  # No services: verified by running this tier with every service unreachable.
   unit-adminconsole:
     name: Unit / adminconsole
     needs: versions
@@ -471,7 +471,7 @@ jobs:
   # nothing is installed for it; run-tests.sh sets CGO_ENABLED=1 for the leg
   # regardless, so the same flag works in the dev container, which pins it to
   # 0 for ordinary builds. Mailpit is here for the same reason as in Unit /
-  # core. The data and integration tiers do not run under the detector (#276,
+  # authserver. The data and integration tiers do not run under the detector (#276,
   # section 9 of the closing log).
   unit-race:
     name: Unit / race

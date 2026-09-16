@@ -13,14 +13,14 @@ import (
 	"time"
 
 	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
+	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+	"github.com/leodip/goiabada/authserver/internal/otp"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/leodip/goiabada/core/otp"
-	mocks_otp "github.com/leodip/goiabada/core/otp/mocks"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -511,7 +511,7 @@ func decodeEnrollment(t *testing.T, rr *httptest.ResponseRecorder) api.AccountOT
 // unexpected call.
 func TestHandleAPIAccountOTPEnrollmentGet_LivePendingIsReturnedUnchanged(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	generator := mocks_otp.NewOtpSecretGenerator(t)
+	generator := mocks_handlers.NewOtpSecretGenerator(t)
 
 	const subject = "enrolling-subject"
 	user := otpTestUser(t, "P4ss!word")
@@ -538,7 +538,7 @@ func TestHandleAPIAccountOTPEnrollmentGet_LivePendingIsReturnedUnchanged(t *test
 // decision 12's expiry an abandoned seed would sit on the user row with nothing to sweep it.
 func TestHandleAPIAccountOTPEnrollmentGet_ExpiredPendingIsReplaced(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	generator := mocks_otp.NewOtpSecretGenerator(t)
+	generator := mocks_handlers.NewOtpSecretGenerator(t)
 
 	const subject = "enrolling-subject"
 	user := otpTestUser(t, "P4ss!word")
@@ -578,7 +578,7 @@ func TestHandleAPIAccountOTPEnrollmentGet_ExpiredPendingIsReplaced(t *testing.T)
 // give the user a code the PUT can never accept.
 func TestHandleAPIAccountOTPEnrollmentGet_LostRaceAnswersWithTheStoredSeed(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	generator := mocks_otp.NewOtpSecretGenerator(t)
+	generator := mocks_handlers.NewOtpSecretGenerator(t)
 
 	const subject = "enrolling-subject"
 	loser := otpTestUser(t, "P4ss!word")
@@ -611,7 +611,7 @@ func TestHandleAPIAccountOTPEnrollmentGet_LostRaceAnswersWithTheStoredSeed(t *te
 // 500 and not a seed. Enrollment is over for them.
 func TestHandleAPIAccountOTPEnrollmentGet_LostRaceToACompletedEnrollment(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	generator := mocks_otp.NewOtpSecretGenerator(t)
+	generator := mocks_handlers.NewOtpSecretGenerator(t)
 
 	const subject = "enrolling-subject"
 	user := otpTestUser(t, "P4ss!word")

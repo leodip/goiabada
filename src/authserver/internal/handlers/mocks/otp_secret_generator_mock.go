@@ -7,7 +7,7 @@
 
 //go:build !production
 
-package mocks_otp
+package mocks_handlers
 
 import (
 	mock "github.com/stretchr/testify/mock"

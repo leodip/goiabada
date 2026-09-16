@@ -486,7 +486,7 @@ configure_database() {
 
 # ---- module test runs (no DB matrix) ----------------------------------------
 # -count=1 defeats Go's test result cache, matching what run_tests already does
-# for the data and integration tiers. It is not optional here: core's
+# for the data and integration tiers. It is not optional here: emaildelivery's
 # TestSendEmail talks to a real SMTP server at mailpit:1025, and Go's cache
 # keys on source and flags but has no notion of whether a network service is
 # reachable. Without this, an earlier successful run makes `go test -v ./...`

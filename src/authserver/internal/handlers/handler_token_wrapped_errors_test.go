@@ -24,7 +24,6 @@ import (
 	mocks_protocolvalidation "github.com/leodip/goiabada/authserver/internal/protocolvalidation/mocks"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
 	mocks_handlerhelpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
-	mocks_users "github.com/leodip/goiabada/core/user/mocks"
 )
 
 // Seam 5 at the token endpoint, which routes on two of the four wire types and used to read only
@@ -45,7 +44,7 @@ func wrappedTokenRequest(t *testing.T, failure error) (
 	t.Helper()
 
 	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-	userSessionManager := mocks_users.NewUserSessionManager(t)
+	userSessionManager := mocks_handlers.NewUserSessionManager(t)
 	database := mocks_data.NewDatabase(t)
 	tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 	tokenValidator := mocks_protocolvalidation.NewTokenValidator(t)

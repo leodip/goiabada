@@ -7,7 +7,7 @@
 
 //go:build !production
 
-package mocks_oauth
+package mocks_handlers
 
 import (
 	"context"

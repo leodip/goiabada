@@ -34,7 +34,7 @@ linters:
       # check is silent on exactly the shape #333 was filed about. It had hidden
       # four production fields: the unread `database` on AddressValidator and on
       # PhoneValidator, UserSessionManager's `codeIssuer` -- which was the whole
-      # of the production core/user -> core/oauth edge -- and SettingsCache's
+      # of the production usersession -> core/oauth edge -- and SettingsCache's
       # `lastFetchErr`. All four are gone; this setting is what stops the fifth.
       # A field that is genuinely consumed whole rather than by selector, a
       # reflection fixture or a struct compared against a positional literal,

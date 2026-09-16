@@ -9,13 +9,13 @@ import (
 	"github.com/leodip/goiabada/core/sessionstore"
 
 	"github.com/leodip/goiabada/authserver/internal/handlers"
+	"github.com/leodip/goiabada/authserver/internal/usercreation"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/models"
-	"github.com/leodip/goiabada/core/user"
 )
 
 // verificationCodeLifetime bounds how long an activation code stays usable after
@@ -208,7 +208,7 @@ func handleActivationCleanHop(httpHelper handlers.HttpHelper, httpSession sessio
 		return
 	}
 
-	createdUser, err := userCreator.CreateUser(&user.CreateUserInput{
+	createdUser, err := userCreator.CreateUser(&usercreation.CreateUserInput{
 		Email:         preRegistration.Email,
 		EmailVerified: true,
 		PasswordHash:  preRegistration.PasswordHash,

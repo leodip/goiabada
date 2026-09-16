@@ -11,10 +11,11 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
+	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
+	"github.com/leodip/goiabada/authserver/internal/usercreation"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/communication"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/encryption"
@@ -23,7 +24,6 @@ import (
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/stringutil"
-	"github.com/leodip/goiabada/core/user"
 )
 
 // HandleAPIUserGet - GET /api/v1/admin/users/{id}
@@ -362,7 +362,7 @@ func HandleAPIUserCreatePost(
 		req.FamilyName = strings.TrimSpace(req.FamilyName)
 
 		// Create user using UserCreator
-		createdUser, err := userCreator.CreateUser(&user.CreateUserInput{
+		createdUser, err := userCreator.CreateUser(&usercreation.CreateUserInput{
 			Email:         req.Email,
 			EmailVerified: req.EmailVerified,
 			PasswordHash:  passwordHash,
@@ -454,7 +454,7 @@ func HandleAPIUserCreatePost(
 				return
 			}
 
-			input := &communication.SendEmailInput{
+			input := &emaildelivery.SendEmailInput{
 				To:       createdUser.Email,
 				Subject:  i18n.T(emailReq.Context(), "email.newuser_set_password.subject", map[string]any{"appName": settings.AppName}),
 				HtmlBody: buf.String(),

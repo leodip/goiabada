@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
+	"github.com/leodip/goiabada/authserver/internal/usersession"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
@@ -15,7 +16,6 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oidc"
-	"github.com/leodip/goiabada/core/user"
 )
 
 func HandleAuthCompletedGet(
@@ -117,7 +117,7 @@ func HandleAuthCompletedGet(
 			// arm below, inside StartNewUserSession. What this buys is the other half of
 			// OWASP's "regenerate on any privilege level change", and this server's ACR
 			// levels are privilege levels by construction (#266 decision 6).
-			if user.WillRaisePrivilege(userSession, authContext.AuthMethods, targetAcrLevel.String()) {
+			if usersession.WillRaisePrivilege(userSession, authContext.AuthMethods, targetAcrLevel.String()) {
 				if err := authHelper.RegenerateSession(w, r); err != nil {
 					httpHelper.InternalServerError(w, r, err)
 					return

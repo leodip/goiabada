@@ -23,7 +23,6 @@ import (
 	mocks_protocolvalidation "github.com/leodip/goiabada/authserver/internal/protocolvalidation/mocks"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
 	mocks_handlerhelpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
-	mocks_users "github.com/leodip/goiabada/core/user/mocks"
 
 	"github.com/leodip/goiabada/authserver/internal/issuance"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
@@ -38,7 +37,7 @@ import (
 func TestHandleTokenPost(t *testing.T) {
 	t.Run("ParseForm gives error", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		userSessionManager := mocks_users.NewUserSessionManager(t)
+		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		tokenValidator := mocks_protocolvalidation.NewTokenValidator(t)
@@ -67,7 +66,7 @@ func TestHandleTokenPost(t *testing.T) {
 
 	t.Run("ValidateTokenRequest gives error", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		userSessionManager := mocks_users.NewUserSessionManager(t)
+		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		tokenValidator := mocks_protocolvalidation.NewTokenValidator(t)
@@ -95,7 +94,7 @@ func TestHandleTokenPost(t *testing.T) {
 
 	t.Run("Authorization_code GenerateTokenResponseForAuthCode gives error", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		userSessionManager := mocks_users.NewUserSessionManager(t)
+		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		tokenValidator := mocks_protocolvalidation.NewTokenValidator(t)
@@ -137,7 +136,7 @@ func TestHandleTokenPost(t *testing.T) {
 
 	t.Run("Authorization_code MarkCodeAsUsed gives error", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		userSessionManager := mocks_users.NewUserSessionManager(t)
+		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		tokenValidator := mocks_protocolvalidation.NewTokenValidator(t)
@@ -179,7 +178,7 @@ func TestHandleTokenPost(t *testing.T) {
 
 	t.Run("Authorization_code successful flow", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		userSessionManager := mocks_users.NewUserSessionManager(t)
+		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		tokenValidator := mocks_protocolvalidation.NewTokenValidator(t)
@@ -230,7 +229,7 @@ func TestHandleTokenPost(t *testing.T) {
 
 	t.Run("Client_credentials successful flow", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		userSessionManager := mocks_users.NewUserSessionManager(t)
+		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		tokenValidator := mocks_protocolvalidation.NewTokenValidator(t)
@@ -280,7 +279,7 @@ func TestHandleTokenPost(t *testing.T) {
 
 	t.Run("Refresh_token and token is revoked", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		userSessionManager := mocks_users.NewUserSessionManager(t)
+		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		tokenValidator := mocks_protocolvalidation.NewTokenValidator(t)
@@ -318,7 +317,7 @@ func TestHandleTokenPost(t *testing.T) {
 
 	t.Run("Refresh_token MarkRefreshTokenAsRevoked gives error", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		userSessionManager := mocks_users.NewUserSessionManager(t)
+		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		tokenValidator := mocks_protocolvalidation.NewTokenValidator(t)
@@ -358,7 +357,7 @@ func TestHandleTokenPost(t *testing.T) {
 
 	t.Run("Refresh_token GenerateTokenResponseForRefresh gives error", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		userSessionManager := mocks_users.NewUserSessionManager(t)
+		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		tokenValidator := mocks_protocolvalidation.NewTokenValidator(t)
@@ -404,7 +403,7 @@ func TestHandleTokenPost(t *testing.T) {
 
 	t.Run("Refresh_token with SessionIdentifier bumps user session", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		userSessionManager := mocks_users.NewUserSessionManager(t)
+		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		tokenValidator := mocks_protocolvalidation.NewTokenValidator(t)
@@ -490,7 +489,7 @@ func TestHandleTokenPost(t *testing.T) {
 
 	t.Run("Refresh_token success path without session", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		userSessionManager := mocks_users.NewUserSessionManager(t)
+		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		tokenValidator := mocks_protocolvalidation.NewTokenValidator(t)
@@ -563,7 +562,7 @@ func TestHandleTokenPost(t *testing.T) {
 
 	t.Run("Unsupported_grant_type", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		userSessionManager := mocks_users.NewUserSessionManager(t)
+		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		tokenValidator := mocks_protocolvalidation.NewTokenValidator(t)
@@ -868,7 +867,7 @@ func TestExtractClientCredentials(t *testing.T) {
 // It must also skip the audit log, which fires only after a successful commit.
 func TestHandleTokenPost_AuthCodeReuse_RevokeFailureReturns500(t *testing.T) {
 	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-	userSessionManager := mocks_users.NewUserSessionManager(t)
+	userSessionManager := mocks_handlers.NewUserSessionManager(t)
 	database := mocks_data.NewDatabase(t)
 	tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 	tokenValidator := mocks_protocolvalidation.NewTokenValidator(t)
@@ -930,7 +929,7 @@ func TestHandleTokenPost_AuthCodeReuse_RevokeFailureReturns500(t *testing.T) {
 // must still surface a 500 and skip both the audit log and the JsonError.
 func TestHandleTokenPost_AuthCodeReuse_BeginTransactionFailureReturns500(t *testing.T) {
 	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-	userSessionManager := mocks_users.NewUserSessionManager(t)
+	userSessionManager := mocks_handlers.NewUserSessionManager(t)
 	database := mocks_data.NewDatabase(t)
 	tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 	tokenValidator := mocks_protocolvalidation.NewTokenValidator(t)
@@ -981,7 +980,7 @@ func TestHandleTokenPost_AuthCodeReuse_BeginTransactionFailureReturns500(t *test
 // path (covered by the integration CodeReuse_* tests).
 func TestHandleTokenPost_AuthCode_ConcurrentDoubleSpendLoses(t *testing.T) {
 	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-	userSessionManager := mocks_users.NewUserSessionManager(t)
+	userSessionManager := mocks_handlers.NewUserSessionManager(t)
 	database := mocks_data.NewDatabase(t)
 	tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 	tokenValidator := mocks_protocolvalidation.NewTokenValidator(t)
@@ -1043,7 +1042,7 @@ func TestHandleTokenPost_AuthCode_ConcurrentDoubleSpendLoses(t *testing.T) {
 // sibling for the other branch is the already-revoked subtest inside TestHandleTokenPost.
 func TestHandleTokenPost_Refresh_ConcurrentDoubleSpendLoses(t *testing.T) {
 	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-	userSessionManager := mocks_users.NewUserSessionManager(t)
+	userSessionManager := mocks_handlers.NewUserSessionManager(t)
 	database := mocks_data.NewDatabase(t)
 	tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 	tokenValidator := mocks_protocolvalidation.NewTokenValidator(t)
@@ -1159,7 +1158,7 @@ func TestHandleTokenPost_Refresh_Replay_AuditsContainment(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-			userSessionManager := mocks_users.NewUserSessionManager(t)
+			userSessionManager := mocks_handlers.NewUserSessionManager(t)
 			database := mocks_data.NewDatabase(t)
 			tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 			tokenValidator := mocks_protocolvalidation.NewTokenValidator(t)
@@ -1221,7 +1220,7 @@ func TestHandleTokenPost_Refresh_Replay_AuditsContainment(t *testing.T) {
 // contract is that it records members actually revoked, and a failure revoked none.
 func TestHandleTokenPost_Refresh_Replay_ContainmentErrorReturns500(t *testing.T) {
 	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-	userSessionManager := mocks_users.NewUserSessionManager(t)
+	userSessionManager := mocks_handlers.NewUserSessionManager(t)
 	database := mocks_data.NewDatabase(t)
 	tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 	tokenValidator := mocks_protocolvalidation.NewTokenValidator(t)
@@ -1426,7 +1425,7 @@ func TestHandleTokenPost_ScopeNormalizationWiring(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-			userSessionManager := mocks_users.NewUserSessionManager(t)
+			userSessionManager := mocks_handlers.NewUserSessionManager(t)
 			database := mocks_data.NewDatabase(t)
 			tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 			tokenValidator := mocks_protocolvalidation.NewTokenValidator(t)
@@ -1502,7 +1501,7 @@ func TestHandleTokenPost_ScopeDenialAudit(t *testing.T) {
 		*mocks_handlers.TokenIssuer, *mocks_audit.AuditLogger, http.HandlerFunc) {
 		t.Helper()
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		userSessionManager := mocks_users.NewUserSessionManager(t)
+		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		tokenValidator := mocks_protocolvalidation.NewTokenValidator(t)
@@ -1655,7 +1654,7 @@ func TestHandleTokenPost_ScopeDenialAudit(t *testing.T) {
 // absent (#106).
 func TestHandleTokenPost_ROPC_IgnoresBrowserSession(t *testing.T) {
 	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-	userSessionManager := mocks_users.NewUserSessionManager(t)
+	userSessionManager := mocks_handlers.NewUserSessionManager(t)
 	database := mocks_data.NewDatabase(t)
 	tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 	tokenValidator := mocks_protocolvalidation.NewTokenValidator(t)
@@ -1708,7 +1707,7 @@ func TestHandleTokenPost_ROPC_IgnoresBrowserSession(t *testing.T) {
 // be recorded as either. Stage 5 adds the event that does cover this.
 func TestHandleTokenPost_SupersededRefreshTokenIsSurfaced(t *testing.T) {
 	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-	userSessionManager := mocks_users.NewUserSessionManager(t)
+	userSessionManager := mocks_handlers.NewUserSessionManager(t)
 	database := mocks_data.NewDatabase(t)
 	tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 	tokenValidator := mocks_protocolvalidation.NewTokenValidator(t)
@@ -1760,7 +1759,7 @@ func TestHandleTokenPost_ROPC_SpendsTheLimiterBudgetOnInvalidGrantOnly(t *testin
 	// is what ValidateTokenRequest answers every time; nil means the grant succeeds.
 	newHandler := func(t *testing.T, failure error) (http.Handler, *mocks_audit.AuditLogger) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		userSessionManager := mocks_users.NewUserSessionManager(t)
+		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		tokenValidator := mocks_protocolvalidation.NewTokenValidator(t)
@@ -2092,7 +2091,7 @@ func TestHandleTokenPost_Refresh_FlowGate(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-			userSessionManager := mocks_users.NewUserSessionManager(t)
+			userSessionManager := mocks_handlers.NewUserSessionManager(t)
 			database := mocks_data.NewDatabase(t)
 			tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 			tokenValidator := mocks_protocolvalidation.NewTokenValidator(t)
@@ -2219,7 +2218,7 @@ func TestHandleTokenPost_Refresh_ContainmentPrecedesFlowGate(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-			userSessionManager := mocks_users.NewUserSessionManager(t)
+			userSessionManager := mocks_handlers.NewUserSessionManager(t)
 			database := mocks_data.NewDatabase(t)
 			tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 			tokenValidator := mocks_protocolvalidation.NewTokenValidator(t)
@@ -2285,7 +2284,7 @@ func TestHandleTokenPost_RedemptionRegistrationRefusalAudit(t *testing.T) {
 		*mocks_audit.AuditLogger, http.HandlerFunc) {
 		t.Helper()
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		userSessionManager := mocks_users.NewUserSessionManager(t)
+		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		tokenValidator := mocks_protocolvalidation.NewTokenValidator(t)
