@@ -536,6 +536,14 @@ type Database interface {
 // spell it data.ErrUniqueViolation, which is the name they already have an import for (#279).
 var ErrUniqueViolation = commondb.ErrUniqueViolation
 
+// ErrIndeterminateCommit is the sentinel RunInTransaction reports when a commit failed for a
+// reason the engine did not declare, leaving nobody able to say whether the body's rows are in
+// the database. Its documentation is on the declaration.
+//
+// It is an alias for the same import-direction reason ErrUniqueViolation above it is, and callers
+// spell it data.ErrIndeterminateCommit.
+var ErrIndeterminateCommit = commondb.ErrIndeterminateCommit
+
 // MigratorProvider is the one thing a caller needs beyond Database to step a schema by hand: a
 // migrator built over this engine's embedded migration set. All four concrete engine types have
 // the method already, and it stays off the Database interface deliberately, so the generated

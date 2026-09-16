@@ -2,6 +2,7 @@ package usersession
 
 import (
 	"database/sql"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -11,6 +12,7 @@ import (
 	"errors"
 	"github.com/leodip/goiabada/authserver/internal/useragent"
 	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/sessionstore"
@@ -101,10 +103,18 @@ func (m *startSessionMocks) expectStoreRead() {
 //
 // The returned pointer receives the session that was handed to CreateUserSession.
 func (m *startSessionMocks) expectPersistThroughCommit(userId int64, existingSessions []models.UserSession) **models.UserSession {
+	return m.expectPersistThenCommit(userId, existingSessions, nil)
+}
+
+// expectPersistThenCommit is expectPersistThroughCommit with the commit's own answer left open, so
+// a case can play the one failure the body cannot produce: a commit that reports an error after
+// every statement in it succeeded. With a nil commitErr it IS expectPersistThroughCommit, which is
+// why that one delegates here rather than repeating the sequence.
+func (m *startSessionMocks) expectPersistThenCommit(userId int64, existingSessions []models.UserSession, commitErr error) **models.UserSession {
 	captured := new(*models.UserSession)
 
 	m.expectStoreRead()
-	expectRunInTransaction(m.db)
+	expectRunInTransactionThenFail(m.db, commitErr)
 	m.db.On("CreateUserSession", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		created := args.Get(1).(*models.UserSession)
 		created.Id = 99 // stand in for the generated primary key
@@ -522,7 +532,12 @@ func TestStartNewUserSession_ErrorsPropagate(t *testing.T) {
 			},
 		},
 		{
-			name: "the commit fails",
+			// An UNTAGGED commit failure, which is what a caller sees when the engine declared
+			// the abort or the body is the thing that failed: the outcome is known, so nothing
+			// is reconciled. The strict mock is handed no GetUserSessionBySessionIdentifier and
+			// no DeleteUserSession, and that absence is the assertion -- a reconciliation on
+			// every failure would spend a read on the ones that certainly rolled back.
+			name: "the commit fails for a reason that is not ambiguous",
 			setup: func(m *startSessionMocks) func(*testing.T) {
 				m.expectStoreRead()
 				expectRunInTransactionThenFail(m.db, dbErr)
@@ -728,6 +743,124 @@ func TestStartNewUserSession_AFailedCompensationKeepsTheOriginalError(t *testing
 	assert.ErrorIs(t, err, saveErr, "the original failure must survive a failed cleanup")
 	assert.ErrorIs(t, err, deleteErr, "the cleanup failure must not be dropped")
 	assert.Contains(t, err.Error(), "unable to delete the user session left behind by a failed browser session write")
+}
+
+// -----------------------------------------------------------------------------
+// The fifth window: a commit whose outcome nobody can read
+//
+// RunInTransaction's contract says a commit that fails for a reason the engine did not
+// declare may have landed anyway, and tags that error with data.ErrIndeterminateCommit.
+// When it lands, the row, its client association and the sweep's deletions are all
+// committed while the browser never receives the identifier -- #198's shape, arriving
+// through the helper's contract rather than through a step of this ceremony.
+//
+// So it is reconciled: read whether the row is there, delete it if it is, and answer the
+// caller with the reason the ceremony failed either way. Every case below fails the same
+// underlying way and differs only in what the reconciliation finds.
+// -----------------------------------------------------------------------------
+
+// indeterminateCommit is what RunInTransaction hands back when the commit failed for a reason the
+// engine did not declare. It is built here exactly as commondb builds it, tagging the driver's
+// error rather than replacing it, so these cases match against the real sentinel and would notice
+// a tag that stopped carrying its cause.
+func indeterminateCommit(cause error) error {
+	return fmt.Errorf("%w: %w", data.ErrIndeterminateCommit, cause)
+}
+
+// The commit landed after all. The row is found and deleted, and the deletion carries a nil
+// transaction, which is what says it is not part of the one whose fate is in question.
+//
+// The row it deletes is named by the READ, not by userSession.Id, and the fixture makes the two
+// differ -- the insert reported 99, the row that is actually there is 4242 -- because that is the
+// whole reason this compensation keys on the identifier. LastInsertId() was answered on a
+// connection whose work may have vanished; on an engine that reuses rowids, 99 could by now be
+// another user's session, and deleting it would sign a stranger out.
+func TestStartNewUserSession_DeletesTheRowAnAmbiguousCommitLeftBehind(t *testing.T) {
+	m := newStartSessionMocks(t)
+	commitErr := errors.New("write: broken pipe")
+
+	captured := m.expectPersistThenCommit(123, nil, indeterminateCommit(commitErr))
+
+	var readIdentifier string
+	m.db.On("GetUserSessionBySessionIdentifier", (*sql.Tx)(nil), mock.Anything).Run(func(args mock.Arguments) {
+		readIdentifier = args.String(1)
+	}).Return(&models.UserSession{Id: 4242}, nil).Once()
+	m.db.On("DeleteUserSession", (*sql.Tx)(nil), int64(4242)).Return(nil).Once()
+
+	result, err := m.manager.StartNewUserSession(
+		httptest.NewRecorder(), newSessionRequest("192.168.1.50:54321", chromeUserAgent),
+		123, 7, "pwd", enums.AcrLevel1.String(), 0, nil, someCredentialInstant())
+
+	assert.Nil(t, result, "no session may be returned alongside an error")
+	assert.ErrorIs(t, err, commitErr, "the caller must be told why the ceremony failed, not what the cleanup did")
+	assert.Equal(t, (*captured).SessionIdentifier, readIdentifier,
+		"the reconciliation must ask for the identifier this ceremony minted before the transaction opened")
+	assert.Equal(t, int64(99), (*captured).Id,
+		"the fixture is only worth anything while the two names differ: LastInsertId() said 99 and the delete above went to 4242, so a compensation keyed on the id would have addressed the wrong row")
+}
+
+// The commit did not land. The read finds nothing, which is the commit reporting after the fact
+// that it rolled back, and there is nothing to undo. The strict database mock is handed no
+// DeleteUserSession at all, and that absence is the assertion: a compensation that deleted on a
+// nil row would be deleting by an id it has no reason to trust.
+func TestStartNewUserSession_AnAmbiguousCommitThatDidNotLandDeletesNothing(t *testing.T) {
+	m := newStartSessionMocks(t)
+	commitErr := errors.New("write: broken pipe")
+
+	m.expectPersistThenCommit(123, nil, indeterminateCommit(commitErr))
+	m.db.On("GetUserSessionBySessionIdentifier", (*sql.Tx)(nil), mock.Anything).Return(nil, nil).Once()
+
+	result, err := m.manager.StartNewUserSession(
+		httptest.NewRecorder(), newSessionRequest("192.168.1.50:54321", chromeUserAgent),
+		123, 7, "pwd", enums.AcrLevel1.String(), 0, nil, someCredentialInstant())
+
+	assert.Nil(t, result)
+	assert.ErrorIs(t, err, commitErr, "and the caller still answers for the commit that failed")
+}
+
+// The reconciliation runs over a connection that has just failed, so it can fail in turn. It is
+// attempted once and not retried, and its failure rides alongside the original rather than
+// replacing it, so errors.Is still finds the reason the ceremony failed and the record still says
+// the row's fate is unknown.
+func TestStartNewUserSession_AFailedReconciliationReadKeepsTheOriginalError(t *testing.T) {
+	m := newStartSessionMocks(t)
+	commitErr := errors.New("write: broken pipe")
+	readErr := errors.New("database is down")
+
+	m.expectPersistThenCommit(123, nil, indeterminateCommit(commitErr))
+	m.db.On("GetUserSessionBySessionIdentifier", (*sql.Tx)(nil), mock.Anything).Return(nil, readErr).Once()
+
+	result, err := m.manager.StartNewUserSession(
+		httptest.NewRecorder(), newSessionRequest("192.168.1.50:54321", chromeUserAgent),
+		123, 7, "pwd", enums.AcrLevel1.String(), 0, nil, someCredentialInstant())
+
+	assert.Nil(t, result)
+	assert.ErrorIs(t, err, commitErr, "the original failure must survive a failed reconciliation")
+	assert.ErrorIs(t, err, readErr, "the reconciliation failure must not be dropped")
+	assert.Contains(t, err.Error(), "unable to establish whether a commit of unknown outcome left a user session row behind")
+}
+
+// The same property one call further in: the row was found and the delete failed. The message
+// names this door rather than the browser-store one, so the record says which compensation gave
+// up on which row.
+func TestStartNewUserSession_AFailedReconciliationDeleteKeepsTheOriginalError(t *testing.T) {
+	m := newStartSessionMocks(t)
+	commitErr := errors.New("write: broken pipe")
+	deleteErr := errors.New("database is down")
+
+	m.expectPersistThenCommit(123, nil, indeterminateCommit(commitErr))
+	m.db.On("GetUserSessionBySessionIdentifier", (*sql.Tx)(nil), mock.Anything).
+		Return(&models.UserSession{Id: 4242}, nil).Once()
+	m.db.On("DeleteUserSession", (*sql.Tx)(nil), int64(4242)).Return(deleteErr).Once()
+
+	result, err := m.manager.StartNewUserSession(
+		httptest.NewRecorder(), newSessionRequest("192.168.1.50:54321", chromeUserAgent),
+		123, 7, "pwd", enums.AcrLevel1.String(), 0, nil, someCredentialInstant())
+
+	assert.Nil(t, result)
+	assert.ErrorIs(t, err, commitErr, "the original failure must survive a failed cleanup")
+	assert.ErrorIs(t, err, deleteErr, "the cleanup failure must not be dropped")
+	assert.Contains(t, err.Error(), "unable to delete the user session left behind by a commit of unknown outcome")
 }
 
 // A failure to read the cookie session is wrapped with context, since the raw
