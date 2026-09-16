@@ -859,14 +859,15 @@ func TestOpenAPI_EveryRefResolves(t *testing.T) {
 // A schema that no operation reaches is not this test's subject: TestOpenAPI_EveryRefResolves
 // owns reachability, and this one owns content.
 //
-// SOME SHAPES ON THE WIRE ARE NOT core/api STRUCTS, and exempting them was a hole rather than
-// a limit. Four nested schemas were waved through here on the true observation that no
-// core/api type declares them, and all four turned out to be incomplete against the
-// core/models type they really serialize: fifteen fields the API emits on every one of these
-// responses had no entry in the contract, and adding a bogus property to one left this whole
-// tier green (#245, final review finding 3). So a schema backed by a core/models type is
-// paired through schemaModelNames and checked exactly, the same way and to the same standard
-// as a core/api one. What stays exempt is only what no Go type declares at all.
+// SOME SHAPES ON THE WIRE WERE NOT core/api STRUCTS, and exempting them was a hole rather
+// than a limit. Four nested schemas were waved through here on the true observation that no
+// core/api type declared them, and all four turned out to be incomplete against the
+// core/models type they really serialized: fifteen fields the API emitted on every one of
+// these responses had no entry in the contract, and adding a bogus property to one left this
+// whole tier green (#245, final review finding 3). They were paired to core/models here until
+// #350 replaced every model-typed response field with a DTO, at which point the pairing had
+// nothing left to reach: a core/api struct now checks each surviving one. What stays exempt is
+// only what no Go type declares at all.
 
 // schemaStructNames pairs a component schema with the src/core/api struct it describes where
 // the two are deliberately named differently. An entry pairs rather than exempts, so the
@@ -881,6 +882,14 @@ var schemaStructNames = map[string]string{
 	// counterpart it has to be told apart from inside the server. Both names are right where
 	// they are.
 	"CreateUserRequest": "CreateUserAdminRequest",
+
+	// These two published schema names predate the Go types behind them by several releases.
+	// #350 gave each position a DTO -- api.RedirectURIResponse and api.WebOriginResponse --
+	// rather than serializing the persistence row, and the Go names carry the Response suffix
+	// every other response type here does. Renaming the schemas to match would break every
+	// client already generated against them, for nothing.
+	"RedirectURI": "RedirectURIResponse",
+	"WebOrigin":   "WebOriginResponse",
 }
 
 // schemasWithNoAPIStruct is one half of the exemption, in the shape knownUndocumentedRoutes
@@ -894,33 +903,6 @@ var schemasWithNoAPIStruct = map[string]string{
 	"ClientLogoUploadResponse":     "handler_api_client_logo.go builds this body as a map literal; no Go type declares it",
 	"ProfilePictureInfoResponse":   "the profile picture handlers build this body as a map literal; no Go type declares it",
 	"ProfilePictureUploadResponse": "the profile picture handlers build this body as a map literal; no Go type declares it",
-
-	// A standard-library shape, not a Goiabada one. Every timestamp on the model-backed
-	// schemas is a database/sql NullTime, which carries no JSON tags and no MarshalJSON, so
-	// it reaches the wire as its own two exported fields. Declaring it once and referencing
-	// it is what stops those two fields being written out six times.
-	"NullTime": "database/sql.NullTime as encoding/json writes it; no Goiabada type declares it",
-}
-
-// schemaModelNames pairs a component schema with the src/core/models type it serializes. These
-// are the shapes an API response embeds directly rather than converting: api.UserResponse
-// carries []models.Group and []models.Permission, and api.ClientResponse carries
-// []models.RedirectURI and []models.WebOrigin, so those model types ARE the wire contract at
-// those positions.
-//
-// None of them carries a json: tag, which is why their properties are capitalised where the
-// rest of this document is not. That is a fact about the wire, not a style choice, and the
-// schemas say so in their own descriptions.
-//
-// Exact, like the maps above: both ends must exist, and a schema here must not also have a
-// core/api struct of its own name, because then which one it describes is a guess.
-var schemaModelNames = map[string]string{
-	"GroupBasic":          "Group",
-	"GroupAttributeBasic": "GroupAttribute",
-	"PermissionBasic":     "Permission",
-	"ResourceBasic":       "Resource",
-	"RedirectURI":         "RedirectURI",
-	"WebOrigin":           "WebOrigin",
 }
 
 // apiStructsWithNoSchema is the other half. A struct here is a shape the server can write or
@@ -945,7 +927,6 @@ var apiStructsWithNoSchema = map[string]string{
 func TestOpenAPI_SchemaPropertiesMatchTheAPIStructs(t *testing.T) {
 	schemas := specSchemaProperties(t)
 	structs := structFields(t, filepath.Join("..", "..", "..", "core", "api"), 100)
-	models := structFields(t, filepath.Join("..", "..", "..", "core", "models"), 20)
 
 	// Pair first. A schema is checked against the struct of its own name unless an alias says
 	// otherwise.
@@ -961,51 +942,6 @@ func TestOpenAPI_SchemaPropertiesMatchTheAPIStructs(t *testing.T) {
 		}
 		pairedStruct[schema] = name
 		pairedSchema[name] = schema
-	}
-
-	// The model-backed shapes, checked to the same standard. They are a separate map rather
-	// than a second pass over the same one because the two packages mean different things: a
-	// core/api type is a shape written for this API, and a core/models type is a database row
-	// that an API response happens to serialize whole.
-	pairedModel := map[string]string{} // schema name -> models type name
-	for schema, model := range schemaModelNames {
-		if _, exists := schemas[schema]; !exists {
-			t.Errorf("schemaModelNames pairs %s with models.%s, but openapi.yaml defines no "+
-				"such schema", schema, model)
-			continue
-		}
-		if _, exists := models[model]; !exists {
-			t.Errorf("schemaModelNames pairs %s with models.%s, but src/core/models declares "+
-				"no such type", schema, model)
-			continue
-		}
-		if _, ambiguous := structs[schema]; ambiguous {
-			t.Errorf("schemaModelNames pairs %s with models.%s, but api.%s also exists, so "+
-				"which one the schema describes is a guess", schema, model, schema)
-			continue
-		}
-		pairedModel[schema] = model
-	}
-
-	// Both directions, exactly, for each one. A field the response really carries must be in
-	// the contract, and a property the contract promises must be one the type really
-	// marshals.
-	for _, schema := range sortedKeys(pairedModel) {
-		model := pairedModel[schema]
-		for _, field := range sortedKeys(models[model]) {
-			if schemas[schema][field] {
-				continue
-			}
-			t.Errorf("models.%s marshals %q, which the %s schema does not declare: a client "+
-				"generated from openapi.yaml has no field for it", model, field, schema)
-		}
-		for _, prop := range sortedKeys(schemas[schema]) {
-			if _, marshalled := models[model][prop]; marshalled {
-				continue
-			}
-			t.Errorf("the %s schema declares %q, which models.%s does not marshal: the spec "+
-				"is promising a field that cannot arrive", schema, prop, model)
-		}
 	}
 
 	// The forward direction, and the one that matters to a caller: a field the API really
@@ -1039,14 +975,11 @@ func TestOpenAPI_SchemaPropertiesMatchTheAPIStructs(t *testing.T) {
 		if _, paired := pairedStruct[schema]; paired {
 			continue
 		}
-		if _, paired := pairedModel[schema]; paired {
-			continue
-		}
 		if _, allowed := schemasWithNoAPIStruct[schema]; allowed {
 			continue
 		}
 		t.Errorf("the %s schema has no Go type checking its properties. Give it a struct in "+
-			"src/core/api, pair it in schemaStructNames or schemaModelNames, or record why in "+
+			"src/core/api, pair it in schemaStructNames, or record why in "+
 			"schemasWithNoAPIStruct", schema)
 	}
 	for _, structName := range sortedKeys(structs) {
@@ -1073,10 +1006,6 @@ func TestOpenAPI_SchemaPropertiesMatchTheAPIStructs(t *testing.T) {
 		if structName, paired := pairedStruct[schema]; paired {
 			t.Errorf("schemasWithNoAPIStruct exempts %s, but api.%s now pairs with it; delete "+
 				"the entry so its properties are checked", schema, structName)
-		}
-		if model, paired := pairedModel[schema]; paired {
-			t.Errorf("schemasWithNoAPIStruct exempts %s, but models.%s now pairs with it; "+
-				"delete the entry so its properties are checked", schema, model)
 		}
 	}
 	for _, structName := range sortedKeys(apiStructsWithNoSchema) {
@@ -1115,13 +1044,11 @@ func TestOpenAPI_SchemaPropertiesMatchTheAPIStructs(t *testing.T) {
 }
 
 // structFields reads one Go package directory and returns, per struct, the JSON names it
-// marshals. It is called for src/core/api and for src/core/models, which are the two packages
-// whose types reach this API's wire.
+// marshals. src/core/api is the only package it is called for: since #350 that package is the
+// whole of what reaches this API's wire.
 //
 // Every struct type declaration is read, not only those carrying json tags, so a struct that
-// has none is visible to the pairing above rather than silently absent from it. That matters
-// more for core/models than for core/api: no type in core/models carries a json tag at all,
-// which is exactly why its fields arrive capitalised.
+// has none is visible to the pairing above rather than silently absent from it.
 //
 // Embedding is flattened transitively: an embedded struct's fields marshal as though declared
 // on the outer one, which is the Go side of the spec's allOf.
@@ -1130,7 +1057,6 @@ func TestOpenAPI_SchemaPropertiesMatchTheAPIStructs(t *testing.T) {
 // relative to src/authserver/internal/server, and a floor: the smallest number of struct
 // declarations the package can honestly contain. A parse that quietly stopped matching would
 // return nothing, every loop above would run over it, and the failure would look like a pass.
-// The floor is per package because the two are nothing like the same size.
 // goField is one marshalled field of a Go struct. The name it takes on the wire is the map key;
 // what is recorded here is the one further fact the contract turns on, whether encoding/json may
 // leave the field out. A field WITHOUT omitempty is written on every response, whatever its value.
@@ -1408,7 +1334,6 @@ func TestOpenAPI_ResponseRequirednessMatchesOmitempty(t *testing.T) {
 	_ = requestOnly // named for the reader: request schemas are not this test's subject
 
 	structs := structFields(t, filepath.Join("..", "..", "..", "core", "api"), 100)
-	models := structFields(t, filepath.Join("..", "..", "..", "core", "models"), 20)
 
 	for _, schema := range sortedKeys(responseOnly) {
 		required := resolveSchemaRequired(t, doc.Components.Schemas, schema, map[string]bool{})
@@ -1439,16 +1364,12 @@ func TestOpenAPI_ResponseRequirednessMatchesOmitempty(t *testing.T) {
 		// Everything else is paired to a Go type the same way the test above pairs it.
 		var fields map[string]goField
 		var source string
-		if model, paired := schemaModelNames[schema]; paired {
-			fields, source = models[model], "models."+model
-		} else {
-			structName := schema
-			if alias, aliased := schemaStructNames[schema]; aliased {
-				structName = alias
-			}
-			if f, exists := structs[structName]; exists {
-				fields, source = f, "api."+structName
-			}
+		structName := schema
+		if alias, aliased := schemaStructNames[schema]; aliased {
+			structName = alias
+		}
+		if f, exists := structs[structName]; exists {
+			fields, source = f, "api."+structName
 		}
 		if fields == nil {
 			t.Errorf("response schema %s is paired to no Go type and has no entry in "+

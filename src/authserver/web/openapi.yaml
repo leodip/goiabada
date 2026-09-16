@@ -3736,18 +3736,6 @@ components:
           description: ISO 3166-1 alpha-2 country code (e.g. US, BR), or empty string.
         otpEnabled:
           type: boolean
-        groups:
-          type: array
-          items:
-            $ref: '#/components/schemas/GroupBasic'
-        permissions:
-          type: array
-          items:
-            $ref: '#/components/schemas/PermissionBasic'
-        attributes:
-          type: array
-          items:
-            $ref: '#/components/schemas/UserAttributeResponse'
       required:
         - id
         - createdAt
@@ -3778,172 +3766,6 @@ components:
         - addressPostalCode
         - addressCountry
         - otpEnabled
-        - groups
-        - permissions
-        - attributes
-
-    NullTime:
-      type: object
-      description: |
-        A `database/sql` NullTime as encoding/json writes it, which is how every timestamp
-        on the model-backed shapes below arrives. It is an object rather than a string or a
-        null: the Go type carries no JSON tags and no MarshalJSON, so both fields keep their
-        exported names, and when Valid is false Time still carries the zero instant
-        `0001-01-01T00:00:00Z` rather than being absent.
-      properties:
-        Time:
-          type: string
-          format: date-time
-        Valid:
-          type: boolean
-      required:
-        - Time
-        - Valid
-
-    GroupBasic:
-      type: object
-      description: |
-        The `groups` entries of UserResponse. Backed by the Go type `models.Group`, which
-        carries no JSON tags, so the wire names are its exported field names and are
-        capitalised where the rest of this API is not.
-
-        Every field below is always present. Attributes and Permissions are loaded per
-        endpoint and arrive as null where the handler did not load them, rather than being
-        omitted, and MemberCount is 0 for the same reason.
-      properties:
-        Id:
-          type: integer
-          format: int64
-        CreatedAt:
-          $ref: '#/components/schemas/NullTime'
-        UpdatedAt:
-          $ref: '#/components/schemas/NullTime'
-        GroupIdentifier:
-          type: string
-        Description:
-          type: string
-        Attributes:
-          type: array
-          nullable: true
-          items:
-            $ref: '#/components/schemas/GroupAttributeBasic'
-        Permissions:
-          type: array
-          nullable: true
-          items:
-            $ref: '#/components/schemas/PermissionBasic'
-        IncludeInIdToken:
-          type: boolean
-        IncludeInAccessToken:
-          type: boolean
-        MemberCount:
-          type: integer
-      required:
-        - Id
-        - CreatedAt
-        - UpdatedAt
-        - GroupIdentifier
-        - Description
-        - Attributes
-        - Permissions
-        - IncludeInIdToken
-        - IncludeInAccessToken
-        - MemberCount
-
-    GroupAttributeBasic:
-      type: object
-      description: |
-        The `Attributes` entries of GroupBasic. Backed by the Go type
-        `models.GroupAttribute`, which carries no JSON tags, so the wire names are its
-        exported field names.
-      properties:
-        Id:
-          type: integer
-          format: int64
-        CreatedAt:
-          $ref: '#/components/schemas/NullTime'
-        UpdatedAt:
-          $ref: '#/components/schemas/NullTime'
-        Key:
-          type: string
-        Value:
-          type: string
-        IncludeInIdToken:
-          type: boolean
-        IncludeInAccessToken:
-          type: boolean
-        GroupId:
-          type: integer
-          format: int64
-      required:
-        - Id
-        - CreatedAt
-        - UpdatedAt
-        - Key
-        - Value
-        - IncludeInIdToken
-        - IncludeInAccessToken
-        - GroupId
-
-    PermissionBasic:
-      type: object
-      description: |
-        The `permissions` entries of UserResponse, and the `Permissions` entries of
-        GroupBasic. Backed by the Go type `models.Permission`, which carries no JSON tags,
-        so the wire names are its exported field names and are capitalised where the rest of
-        this API is not.
-
-        Resource is always present. It is the zero resource, not null, where the handler did
-        not load it, because the Go field is a struct rather than a pointer.
-      properties:
-        Id:
-          type: integer
-          format: int64
-        CreatedAt:
-          $ref: '#/components/schemas/NullTime'
-        UpdatedAt:
-          $ref: '#/components/schemas/NullTime'
-        PermissionIdentifier:
-          type: string
-        Description:
-          type: string
-        ResourceId:
-          type: integer
-          format: int64
-        Resource:
-          $ref: '#/components/schemas/ResourceBasic'
-      required:
-        - Id
-        - CreatedAt
-        - UpdatedAt
-        - PermissionIdentifier
-        - Description
-        - ResourceId
-        - Resource
-
-    ResourceBasic:
-      type: object
-      description: |
-        The `Resource` of PermissionBasic. Backed by the Go type `models.Resource`, which
-        carries no JSON tags, so the wire names are its exported field names.
-      properties:
-        Id:
-          type: integer
-          format: int64
-        CreatedAt:
-          $ref: '#/components/schemas/NullTime'
-        UpdatedAt:
-          $ref: '#/components/schemas/NullTime'
-        ResourceIdentifier:
-          type: string
-        Description:
-          type: string
-      required:
-        - Id
-        - CreatedAt
-        - UpdatedAt
-        - ResourceIdentifier
-        - Description
 
     SearchUsersResponse:
       type: object
@@ -4773,10 +4595,17 @@ components:
           type: string
         description:
           type: string
+        isSystemLevelResource:
+          type: boolean
+          description: |
+            True for a resource this server owns and enforces as system level: rename and
+            delete are refused on it with 403. A consumer should disable those controls
+            rather than recompute the rule.
       required:
         - id
         - resourceIdentifier
         - description
+        - isSystemLevelResource
 
     PermissionResponse:
       type: object
@@ -4937,48 +4766,55 @@ components:
     RedirectURI:
       type: object
       description: |
-        The `redirectURIs` entries of ClientResponse. Backed by the Go type
-        `models.RedirectURI`, which carries no JSON tags, so the wire names are its exported
-        field names and are capitalised where the rest of this API is not.
+        The `redirectURIs` entries of ClientResponse.
+
+        The schema name is unchanged, but the shape below is not what releases up to and
+        including v1.6.0 put on the wire: this position carried the persistence row directly,
+        so its keys arrived capitalised and its `createdAt` arrived as a two-field
+        `{"Time":...,"Valid":...}` object. The keys below are the ones every published
+        contract has always declared.
       properties:
-        Id:
+        id:
           type: integer
           format: int64
-        CreatedAt:
-          $ref: '#/components/schemas/NullTime'
-        URI:
+        createdAt:
           type: string
-        ClientId:
+          format: date-time
+          nullable: true
+        uri:
+          type: string
+        clientId:
           type: integer
           format: int64
       required:
-        - Id
-        - CreatedAt
-        - URI
-        - ClientId
+        - id
+        - createdAt
+        - uri
+        - clientId
 
     WebOrigin:
       type: object
       description: |
-        The `webOrigins` entries of ClientResponse. Backed by the Go type `models.WebOrigin`,
-        which carries no JSON tags, so the wire names are its exported field names and are
-        capitalised where the rest of this API is not.
+        The `webOrigins` entries of ClientResponse. Its keys moved in the same release and for
+        the same reason as RedirectURI above.
       properties:
-        Id:
+        id:
           type: integer
           format: int64
-        CreatedAt:
-          $ref: '#/components/schemas/NullTime'
-        Origin:
+        createdAt:
           type: string
-        ClientId:
+          format: date-time
+          nullable: true
+        origin:
+          type: string
+        clientId:
           type: integer
           format: int64
       required:
-        - Id
-        - CreatedAt
-        - Origin
-        - ClientId
+        - id
+        - createdAt
+        - origin
+        - clientId
 
     ClientResponse:
       type: object
