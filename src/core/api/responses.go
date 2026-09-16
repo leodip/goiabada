@@ -42,71 +42,6 @@ type UserResponse struct {
 	Attributes                    []UserAttributeResponse `json:"attributes"`
 }
 
-func ToUserResponse(user *models.User) *UserResponse {
-	if user == nil {
-		return nil
-	}
-
-	resp := &UserResponse{
-		Id:                            user.Id,
-		Enabled:                       user.Enabled,
-		Subject:                       user.Subject,
-		Username:                      user.Username,
-		GivenName:                     user.GivenName,
-		MiddleName:                    user.MiddleName,
-		FamilyName:                    user.FamilyName,
-		Nickname:                      user.Nickname,
-		Website:                       user.Website,
-		Gender:                        user.Gender,
-		Email:                         user.Email,
-		EmailVerified:                 user.EmailVerified,
-		ZoneInfoCountryName:           user.ZoneInfoCountryName,
-		ZoneInfo:                      user.ZoneInfo,
-		Locale:                        user.Locale,
-		PhoneNumberCountryUniqueId:    user.PhoneNumberCountryUniqueId,
-		PhoneNumberCountryCallingCode: user.PhoneNumberCountryCallingCode,
-		PhoneNumber:                   user.PhoneNumber,
-		PhoneNumberVerified:           user.PhoneNumberVerified,
-		AddressLine1:                  user.AddressLine1,
-		AddressLine2:                  user.AddressLine2,
-		AddressLocality:               user.AddressLocality,
-		AddressRegion:                 user.AddressRegion,
-		AddressPostalCode:             user.AddressPostalCode,
-		AddressCountry:                user.AddressCountry,
-		OTPEnabled:                    user.OTPEnabled,
-		Groups:                        user.Groups,
-		Permissions:                   user.Permissions,
-		Attributes:                    ToUserAttributeResponses(user.Attributes),
-	}
-
-	if user.CreatedAt.Valid {
-		resp.CreatedAt = &user.CreatedAt.Time
-	}
-	if user.UpdatedAt.Valid {
-		resp.UpdatedAt = &user.UpdatedAt.Time
-	}
-	if user.BirthDate.Valid {
-		resp.BirthDate = &user.BirthDate.Time
-	}
-
-	return resp
-}
-
-func ToUserResponses(users []models.User) []UserResponse {
-	if users == nil {
-		return nil
-	}
-
-	responses := make([]UserResponse, len(users))
-	for i, user := range users {
-		resp := ToUserResponse(&user)
-		if resp != nil {
-			responses[i] = *resp
-		}
-	}
-	return responses
-}
-
 func (resp *UserResponse) ToUser() *models.User {
 	if resp == nil {
 		return nil
@@ -174,45 +109,6 @@ type UserAttributeResponse struct {
 	IncludeInIdToken     bool       `json:"includeInIdToken"`
 	IncludeInAccessToken bool       `json:"includeInAccessToken"`
 	UserId               int64      `json:"userId"`
-}
-
-func ToUserAttributeResponse(attr *models.UserAttribute) *UserAttributeResponse {
-	if attr == nil {
-		return nil
-	}
-
-	resp := &UserAttributeResponse{
-		Id:                   attr.Id,
-		Key:                  attr.Key,
-		Value:                attr.Value,
-		IncludeInIdToken:     attr.IncludeInIdToken,
-		IncludeInAccessToken: attr.IncludeInAccessToken,
-		UserId:               attr.UserId,
-	}
-
-	if attr.CreatedAt.Valid {
-		resp.CreatedAt = &attr.CreatedAt.Time
-	}
-	if attr.UpdatedAt.Valid {
-		resp.UpdatedAt = &attr.UpdatedAt.Time
-	}
-
-	return resp
-}
-
-func ToUserAttributeResponses(attrs []models.UserAttribute) []UserAttributeResponse {
-	if attrs == nil {
-		return nil
-	}
-
-	responses := make([]UserAttributeResponse, len(attrs))
-	for i, attr := range attrs {
-		resp := ToUserAttributeResponse(&attr)
-		if resp != nil {
-			responses[i] = *resp
-		}
-	}
-	return responses
 }
 
 func (resp *UserAttributeResponse) ToUserAttribute() *models.UserAttribute {
@@ -431,43 +327,6 @@ type UserSessionResponse struct {
 	UserId    int64  `json:"userId"`
 }
 
-func ToUserSessionResponse(session *models.UserSession) *UserSessionResponse {
-	if session == nil {
-		return nil
-	}
-
-	resp := &UserSessionResponse{
-		Id:                session.Id,
-		SessionIdentifier: session.SessionIdentifier,
-		AuthMethods:       session.AuthMethods,
-		AcrLevel:          session.AcrLevel,
-		IpAddress:         session.IpAddress,
-		DeviceName:        session.DeviceName,
-		DeviceType:        session.DeviceType,
-		DeviceOS:          session.DeviceOS,
-		UserAgent:         session.UserAgent,
-		UserId:            session.UserId,
-	}
-
-	if session.CreatedAt.Valid {
-		resp.CreatedAt = &session.CreatedAt.Time
-	}
-	if session.UpdatedAt.Valid {
-		resp.UpdatedAt = &session.UpdatedAt.Time
-	}
-	if !session.Started.IsZero() {
-		resp.Started = &session.Started
-	}
-	if !session.LastAccessed.IsZero() {
-		resp.LastAccessed = &session.LastAccessed
-	}
-	if !session.AuthTime.IsZero() {
-		resp.AuthTime = &session.AuthTime
-	}
-
-	return resp
-}
-
 type GetUserSessionResponse struct {
 	Session UserSessionResponse `json:"session"`
 }
@@ -484,52 +343,6 @@ type UserConsentResponse struct {
 	ClientDescription string     `json:"clientDescription"`
 }
 
-func ToUserConsentResponse(consent *models.UserConsent) *UserConsentResponse {
-	if consent == nil {
-		return nil
-	}
-
-	resp := &UserConsentResponse{
-		Id:       consent.Id,
-		ClientId: consent.ClientId,
-		UserId:   consent.UserId,
-		Scope:    consent.Scope,
-	}
-
-	if consent.CreatedAt.Valid {
-		resp.CreatedAt = &consent.CreatedAt.Time
-	}
-	if consent.UpdatedAt.Valid {
-		resp.UpdatedAt = &consent.UpdatedAt.Time
-	}
-	if consent.GrantedAt.Valid {
-		resp.GrantedAt = &consent.GrantedAt.Time
-	}
-
-	// Include client information if loaded
-	if consent.Client.Id != 0 {
-		resp.ClientIdentifier = consent.Client.ClientIdentifier
-		resp.ClientDescription = consent.Client.Description
-	}
-
-	return resp
-}
-
-func ToUserConsentResponses(consents []models.UserConsent) []UserConsentResponse {
-	if consents == nil {
-		return nil
-	}
-
-	responses := make([]UserConsentResponse, len(consents))
-	for i, consent := range consents {
-		resp := ToUserConsentResponse(&consent)
-		if resp != nil {
-			responses[i] = *resp
-		}
-	}
-	return responses
-}
-
 type GetUserConsentsResponse struct {
 	Consents []UserConsentResponse `json:"consents"`
 }
@@ -543,53 +356,6 @@ type GroupResponse struct {
 	IncludeInIdToken     bool       `json:"includeInIdToken"`
 	IncludeInAccessToken bool       `json:"includeInAccessToken"`
 	MemberCount          int        `json:"memberCount"`
-}
-
-func ToGroupResponse(group *models.Group, memberCount int) *GroupResponse {
-	if group == nil {
-		return nil
-	}
-
-	resp := &GroupResponse{
-		Id:                   group.Id,
-		GroupIdentifier:      group.GroupIdentifier,
-		Description:          group.Description,
-		IncludeInIdToken:     group.IncludeInIdToken,
-		IncludeInAccessToken: group.IncludeInAccessToken,
-		MemberCount:          memberCount,
-	}
-
-	if group.CreatedAt.Valid {
-		resp.CreatedAt = &group.CreatedAt.Time
-	}
-	if group.UpdatedAt.Valid {
-		resp.UpdatedAt = &group.UpdatedAt.Time
-	}
-
-	return resp
-}
-
-func ToGroupResponses(groups []models.Group, memberCounts map[int64]int) []GroupResponse {
-	if groups == nil {
-		return []GroupResponse{}
-	}
-
-	if len(groups) == 0 {
-		return []GroupResponse{}
-	}
-
-	responses := make([]GroupResponse, 0, len(groups))
-	for _, group := range groups {
-		memberCount := 0
-		if memberCounts != nil {
-			memberCount = memberCounts[group.Id]
-		}
-		resp := ToGroupResponse(&group, memberCount)
-		if resp != nil {
-			responses = append(responses, *resp)
-		}
-	}
-	return responses
 }
 
 func (resp *GroupResponse) ToGroup() *models.Group {
@@ -670,58 +436,6 @@ type ResourceResponse struct {
 	Id                 int64  `json:"id"`
 	ResourceIdentifier string `json:"resourceIdentifier"`
 	Description        string `json:"description"`
-}
-
-func ToPermissionResponse(perm *models.Permission) *PermissionResponse {
-	if perm == nil {
-		return nil
-	}
-	return &PermissionResponse{
-		Id:                   perm.Id,
-		PermissionIdentifier: perm.PermissionIdentifier,
-		Description:          perm.Description,
-		ResourceId:           perm.ResourceId,
-		Resource:             *ToResourceResponse(&perm.Resource),
-	}
-}
-
-func ToPermissionResponses(perms []models.Permission) []PermissionResponse {
-	if perms == nil {
-		return nil
-	}
-	responses := make([]PermissionResponse, len(perms))
-	for i, perm := range perms {
-		resp := ToPermissionResponse(&perm)
-		if resp != nil {
-			responses[i] = *resp
-		}
-	}
-	return responses
-}
-
-func ToResourceResponse(resource *models.Resource) *ResourceResponse {
-	if resource == nil {
-		return nil
-	}
-	return &ResourceResponse{
-		Id:                 resource.Id,
-		ResourceIdentifier: resource.ResourceIdentifier,
-		Description:        resource.Description,
-	}
-}
-
-func ToResourceResponses(resources []models.Resource) []ResourceResponse {
-	if resources == nil {
-		return nil
-	}
-	responses := make([]ResourceResponse, len(resources))
-	for i, resource := range resources {
-		resp := ToResourceResponse(&resource)
-		if resp != nil {
-			responses[i] = *resp
-		}
-	}
-	return responses
 }
 
 type GetUserPermissionsResponse struct {
@@ -849,45 +563,6 @@ type GroupAttributeResponse struct {
 	GroupId              int64      `json:"groupId"`
 }
 
-func ToGroupAttributeResponse(attr *models.GroupAttribute) *GroupAttributeResponse {
-	if attr == nil {
-		return nil
-	}
-
-	resp := &GroupAttributeResponse{
-		Id:                   attr.Id,
-		Key:                  attr.Key,
-		Value:                attr.Value,
-		IncludeInIdToken:     attr.IncludeInIdToken,
-		IncludeInAccessToken: attr.IncludeInAccessToken,
-		GroupId:              attr.GroupId,
-	}
-
-	if attr.CreatedAt.Valid {
-		resp.CreatedAt = &attr.CreatedAt.Time
-	}
-	if attr.UpdatedAt.Valid {
-		resp.UpdatedAt = &attr.UpdatedAt.Time
-	}
-
-	return resp
-}
-
-func ToGroupAttributeResponses(attrs []models.GroupAttribute) []GroupAttributeResponse {
-	if attrs == nil {
-		return nil
-	}
-
-	responses := make([]GroupAttributeResponse, len(attrs))
-	for i, attr := range attrs {
-		resp := ToGroupAttributeResponse(&attr)
-		if resp != nil {
-			responses[i] = *resp
-		}
-	}
-	return responses
-}
-
 func (resp *GroupAttributeResponse) ToGroupAttribute() *models.GroupAttribute {
 	if resp == nil {
 		return nil
@@ -968,73 +643,6 @@ type ClientResponse struct {
 	DefaultAcrLevel                         string               `json:"defaultAcrLevel"`
 	RedirectURIs                            []models.RedirectURI `json:"redirectURIs"`
 	WebOrigins                              []models.WebOrigin   `json:"webOrigins"`
-}
-
-func ToClientResponse(client *models.Client) *ClientResponse {
-	if client == nil {
-		return nil
-	}
-
-	resp := &ClientResponse{
-		Id:                                      client.Id,
-		ClientIdentifier:                        client.ClientIdentifier,
-		Description:                             client.Description,
-		WebsiteURL:                              client.WebsiteURL,
-		DisplayName:                             client.DisplayName,
-		Enabled:                                 client.Enabled,
-		ConsentRequired:                         client.ConsentRequired,
-		CreatedViaDCR:                           client.CreatedViaDCR,
-		ShowLogo:                                client.ShowLogo,
-		ShowDisplayName:                         client.ShowDisplayName,
-		ShowDescription:                         client.ShowDescription,
-		ShowWebsiteURL:                          client.ShowWebsiteURL,
-		IsPublic:                                client.IsPublic,
-		IsSystemLevelClient:                     client.IsSystemLevelClient(),
-		AuthorizationCodeEnabled:                client.AuthorizationCodeEnabled,
-		ClientCredentialsEnabled:                client.ClientCredentialsEnabled,
-		PKCERequired:                            client.PKCERequired,
-		ImplicitGrantEnabled:                    client.ImplicitGrantEnabled,
-		ResourceOwnerPasswordCredentialsEnabled: client.ResourceOwnerPasswordCredentialsEnabled,
-		TokenExpirationInSeconds:                client.TokenExpirationInSeconds,
-		RefreshTokenOfflineIdleTimeoutInSeconds: client.RefreshTokenOfflineIdleTimeoutInSeconds,
-		RefreshTokenOfflineMaxLifetimeInSeconds: client.RefreshTokenOfflineMaxLifetimeInSeconds,
-		IncludeOpenIDConnectClaimsInAccessToken: client.IncludeOpenIDConnectClaimsInAccessToken,
-		IncludeOpenIDConnectClaimsInIdToken:     client.IncludeOpenIDConnectClaimsInIdToken,
-		DefaultAcrLevel:                         string(client.DefaultAcrLevel),
-		RedirectURIs:                            client.RedirectURIs,
-		WebOrigins:                              client.WebOrigins,
-	}
-
-	if client.CreatedAt.Valid {
-		resp.CreatedAt = &client.CreatedAt.Time
-	}
-	if client.UpdatedAt.Valid {
-		resp.UpdatedAt = &client.UpdatedAt.Time
-	}
-
-	// Client secret should be set directly by the handler after decryption
-	// We don't decrypt here since we don't have access to settings
-
-	return resp
-}
-
-func ToClientResponses(clients []models.Client) []ClientResponse {
-	if clients == nil {
-		return []ClientResponse{}
-	}
-
-	if len(clients) == 0 {
-		return []ClientResponse{}
-	}
-
-	responses := make([]ClientResponse, 0, len(clients))
-	for _, client := range clients {
-		resp := ToClientResponse(&client)
-		if resp != nil {
-			responses = append(responses, *resp)
-		}
-	}
-	return responses
 }
 
 // AccountLogoutFormPostResponse instructs the client to POST to the OP's

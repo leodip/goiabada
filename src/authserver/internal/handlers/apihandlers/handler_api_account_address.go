@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
+	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/core/api"
@@ -85,7 +86,7 @@ func HandleAPIAccountAddressPut(
 		})
 
 		// Response
-		resp := api.UpdateUserResponse{User: *api.ToUserResponse(user)}
+		resp := api.UpdateUserResponse{User: *apimapping.ToUserResponse(user)}
 		writeJSON(w, r, http.StatusOK, resp)
 	}
 }

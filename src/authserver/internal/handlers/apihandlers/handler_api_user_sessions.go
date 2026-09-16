@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/data"
 )
@@ -36,7 +37,7 @@ func HandleAPIUserSessionGet(
 
 		// Create response
 		response := api.GetUserSessionResponse{
-			Session: *api.ToUserSessionResponse(userSession),
+			Session: *apimapping.ToUserSessionResponse(userSession),
 		}
 
 		// Set content type and encode response

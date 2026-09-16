@@ -11,6 +11,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
+	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
@@ -60,7 +61,7 @@ func HandleAPIUserGet(
 
 		// Create response
 		response := api.GetUserResponse{
-			User: *api.ToUserResponse(user),
+			User: *apimapping.ToUserResponse(user),
 		}
 
 		// Set content type and encode response
@@ -167,7 +168,7 @@ func HandleAPIUserPasswordPut(
 
 		// Create response
 		response := api.UpdateUserResponse{
-			User: *api.ToUserResponse(updatedUser),
+			User: *apimapping.ToUserResponse(updatedUser),
 		}
 
 		// Set content type and encode response
@@ -249,7 +250,7 @@ func HandleAPIUserOTPPut(
 
 		// Create response
 		response := api.UpdateUserResponse{
-			User: *api.ToUserResponse(updatedUser),
+			User: *apimapping.ToUserResponse(updatedUser),
 		}
 
 		// Set content type and encode response
@@ -468,7 +469,7 @@ func HandleAPIUserCreatePost(
 
 		// Create response
 		response := api.CreateUserResponse{
-			User: *api.ToUserResponse(createdUser),
+			User: *apimapping.ToUserResponse(createdUser),
 		}
 
 		// Set content type and encode response
@@ -613,7 +614,7 @@ func HandleAPIUserEnabledPut(
 
 		// Create response
 		response := api.UpdateUserResponse{
-			User: *api.ToUserResponse(updatedUser),
+			User: *apimapping.ToUserResponse(updatedUser),
 		}
 
 		// Set content type and encode response

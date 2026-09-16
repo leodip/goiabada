@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	srvhandlers "github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
@@ -63,7 +64,7 @@ func HandleAPIPermissionsByResourceGet(
 		}
 
 		response := api.GetPermissionsByResourceResponse{
-			Permissions: api.ToPermissionResponses(permissions),
+			Permissions: apimapping.ToPermissionResponses(permissions),
 		}
 
 		writeJSON(w, r, http.StatusOK, response)

@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
@@ -65,8 +66,8 @@ func HandleAPIGroupPermissionsGet(
 		}
 
 		response := api.GetGroupPermissionsResponse{
-			Group:       *api.ToGroupResponse(group, memberCount),
-			Permissions: api.ToPermissionResponses(group.Permissions),
+			Group:       *apimapping.ToGroupResponse(group, memberCount),
+			Permissions: apimapping.ToPermissionResponses(group.Permissions),
 		}
 
 		writeJSON(w, r, http.StatusOK, response)

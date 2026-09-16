@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
@@ -61,8 +62,8 @@ func HandleAPIUserGroupsGet(
 		}
 
 		response := api.GetUserGroupsResponse{
-			User:   *api.ToUserResponse(user),
-			Groups: api.ToGroupResponses(user.Groups, memberCounts),
+			User:   *apimapping.ToUserResponse(user),
+			Groups: apimapping.ToGroupResponses(user.Groups, memberCounts),
 		}
 
 		writeJSON(w, r, http.StatusOK, response)
@@ -204,8 +205,8 @@ func HandleAPIUserGroupsPut(
 		}
 
 		response := api.GetUserGroupsResponse{
-			User:   *api.ToUserResponse(user),
-			Groups: api.ToGroupResponses(user.Groups, memberCounts),
+			User:   *apimapping.ToUserResponse(user),
+			Groups: apimapping.ToGroupResponses(user.Groups, memberCounts),
 		}
 
 		writeJSON(w, r, http.StatusOK, response)

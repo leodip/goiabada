@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
@@ -40,7 +41,7 @@ func HandleAPIGroupsGet(
 			memberCounts[group.Id] = count
 		}
 
-		groupResponses := api.ToGroupResponses(groups, memberCounts)
+		groupResponses := apimapping.ToGroupResponses(groups, memberCounts)
 
 		// Ensure we never return a nil slice - always return at least an empty slice
 		if groupResponses == nil {
@@ -130,7 +131,7 @@ func HandleAPIGroupCreatePost(
 
 		// Return created group
 		response := api.CreateGroupResponse{
-			Group: *api.ToGroupResponse(group, 0), // New group has 0 members
+			Group: *apimapping.ToGroupResponse(group, 0), // New group has 0 members
 		}
 
 		writeJSON(w, r, http.StatusCreated, response)
@@ -173,7 +174,7 @@ func HandleAPIGroupGet(
 		}
 
 		response := api.GetGroupResponse{
-			Group: *api.ToGroupResponse(group, memberCount),
+			Group: *apimapping.ToGroupResponse(group, memberCount),
 		}
 
 		writeJSON(w, r, http.StatusOK, response)
@@ -282,7 +283,7 @@ func HandleAPIGroupUpdatePut(
 
 		// Return updated group
 		response := api.UpdateGroupResponse{
-			Group: *api.ToGroupResponse(group, memberCount),
+			Group: *apimapping.ToGroupResponse(group, memberCount),
 		}
 
 		writeJSON(w, r, http.StatusOK, response)

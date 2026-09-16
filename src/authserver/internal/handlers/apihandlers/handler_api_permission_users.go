@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
@@ -72,7 +73,7 @@ func HandleAPIPermissionUsersGet(
 		}
 
 		resp := api.GetUsersByPermissionResponse{
-			Users: api.ToUserResponses(users),
+			Users: apimapping.ToUserResponses(users),
 			Total: total,
 			Page:  page,
 			Size:  size,
