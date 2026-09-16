@@ -34,7 +34,7 @@
                 </tr>
                 <tr>
                     <td class="w-52">{{ T $.ctx "adminconsole.admin_users.delete.field.full_name" }}</td>
-                    <td>{{.user.GetFullName}}</td>
+                    <td>{{.userFullName}}</td>
                 </tr>
                 <tr>
                     <td class="w-52">{{ T $.ctx "adminconsole.admin_users.delete.field.email" }}</td>
@@ -46,14 +46,14 @@
                 </tr>
                 <tr>
                     <td class="w-52">{{ T $.ctx "adminconsole.admin_users.delete.field.created_at" }}</td>
-                    <td>{{.user.CreatedAt.Time.Format "02 Jan 2006 15:04:05 MST"}}</td>
+                    <td>{{if .user.CreatedAt}}{{.user.CreatedAt.Format "02 Jan 2006 15:04:05 MST"}}{{end}}</td>
                 </tr>
                 <tr>
                     <td class="w-52">{{ T $.ctx "adminconsole.admin_users.delete.field.member_of_groups" }}</td>
                     <td>
                         <ul>
-                            {{if .user.Groups}}
-                                {{range .user.Groups}}
+                            {{if .groups}}
+                                {{range .groups}}
                                     <li>
                                         <span class="font-mono">{{.GroupIdentifier}}</span>
                                     </li>

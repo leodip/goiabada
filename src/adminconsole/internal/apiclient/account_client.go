@@ -2,7 +2,6 @@ package apiclient
 
 import (
 	"bytes"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -11,7 +10,6 @@ import (
 
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
-	"github.com/leodip/goiabada/core/models"
 )
 
 // ProfilePictureUploadResponse represents the response from uploading a profile picture
@@ -21,7 +19,7 @@ type ProfilePictureUploadResponse struct {
 }
 
 // GetAccountProfile retrieves the current user's profile
-func (c *AuthServerClient) GetAccountProfile(accessToken string) (*models.User, error) {
+func (c *AuthServerClient) GetAccountProfile(accessToken string) (*api.UserResponse, error) {
 	fullURL := c.baseURL + "/api/v1/account/profile"
 
 	req, err := http.NewRequest("GET", fullURL, nil)
@@ -52,11 +50,11 @@ func (c *AuthServerClient) GetAccountProfile(accessToken string) (*models.User, 
 		return nil, errs.Errorf("failed to decode response: %w", err)
 	}
 
-	return response.User.ToUser(), nil
+	return &response.User, nil
 }
 
 // UpdateAccountProfile updates the current user's profile
-func (c *AuthServerClient) UpdateAccountProfile(accessToken string, request *api.UpdateUserProfileRequest) (*models.User, error) {
+func (c *AuthServerClient) UpdateAccountProfile(accessToken string, request *api.UpdateUserProfileRequest) (*api.UserResponse, error) {
 	fullURL := c.baseURL + "/api/v1/account/profile"
 
 	jsonData, err := json.Marshal(request)
@@ -92,11 +90,11 @@ func (c *AuthServerClient) UpdateAccountProfile(accessToken string, request *api
 		return nil, errs.Errorf("failed to decode response: %w", err)
 	}
 
-	return response.User.ToUser(), nil
+	return &response.User, nil
 }
 
 // UpdateAccountEmail updates the current user's email
-func (c *AuthServerClient) UpdateAccountEmail(accessToken string, request *api.UpdateAccountEmailRequest) (*models.User, error) {
+func (c *AuthServerClient) UpdateAccountEmail(accessToken string, request *api.UpdateAccountEmailRequest) (*api.UserResponse, error) {
 	fullURL := c.baseURL + "/api/v1/account/email"
 
 	jsonData, err := json.Marshal(request)
@@ -132,11 +130,11 @@ func (c *AuthServerClient) UpdateAccountEmail(accessToken string, request *api.U
 		return nil, errs.Errorf("failed to decode response: %w", err)
 	}
 
-	return response.User.ToUser(), nil
+	return &response.User, nil
 }
 
 // UpdateAccountPhone updates the current user's phone
-func (c *AuthServerClient) UpdateAccountPhone(accessToken string, request *api.UpdateAccountPhoneRequest) (*models.User, error) {
+func (c *AuthServerClient) UpdateAccountPhone(accessToken string, request *api.UpdateAccountPhoneRequest) (*api.UserResponse, error) {
 	fullURL := c.baseURL + "/api/v1/account/phone"
 
 	jsonData, err := json.Marshal(request)
@@ -172,11 +170,11 @@ func (c *AuthServerClient) UpdateAccountPhone(accessToken string, request *api.U
 		return nil, errs.Errorf("failed to decode response: %w", err)
 	}
 
-	return response.User.ToUser(), nil
+	return &response.User, nil
 }
 
 // UpdateAccountAddress updates the current user's address
-func (c *AuthServerClient) UpdateAccountAddress(accessToken string, request *api.UpdateUserAddressRequest) (*models.User, error) {
+func (c *AuthServerClient) UpdateAccountAddress(accessToken string, request *api.UpdateUserAddressRequest) (*api.UserResponse, error) {
 	fullURL := c.baseURL + "/api/v1/account/address"
 
 	jsonData, err := json.Marshal(request)
@@ -212,11 +210,11 @@ func (c *AuthServerClient) UpdateAccountAddress(accessToken string, request *api
 		return nil, errs.Errorf("failed to decode response: %w", err)
 	}
 
-	return response.User.ToUser(), nil
+	return &response.User, nil
 }
 
 // UpdateAccountPassword changes the current user's password
-func (c *AuthServerClient) UpdateAccountPassword(accessToken string, request *api.UpdateAccountPasswordRequest) (*models.User, error) {
+func (c *AuthServerClient) UpdateAccountPassword(accessToken string, request *api.UpdateAccountPasswordRequest) (*api.UserResponse, error) {
 	fullURL := c.baseURL + "/api/v1/account/password"
 
 	jsonData, err := json.Marshal(request)
@@ -252,7 +250,7 @@ func (c *AuthServerClient) UpdateAccountPassword(accessToken string, request *ap
 		return nil, errs.Errorf("failed to decode response: %w", err)
 	}
 
-	return response.User.ToUser(), nil
+	return &response.User, nil
 }
 
 // SendAccountEmailVerification triggers sending a verification code to the user's email
@@ -290,7 +288,7 @@ func (c *AuthServerClient) SendAccountEmailVerification(accessToken string) (*ap
 }
 
 // VerifyAccountEmail sends the verification code to confirm the user's email
-func (c *AuthServerClient) VerifyAccountEmail(accessToken string, request *api.VerifyAccountEmailRequest) (*models.User, error) {
+func (c *AuthServerClient) VerifyAccountEmail(accessToken string, request *api.VerifyAccountEmailRequest) (*api.UserResponse, error) {
 	fullURL := c.baseURL + "/api/v1/account/email/verification"
 
 	jsonData, err := json.Marshal(request)
@@ -325,7 +323,7 @@ func (c *AuthServerClient) VerifyAccountEmail(accessToken string, request *api.V
 		return nil, errs.Errorf("failed to decode response: %w", err)
 	}
 
-	return response.User.ToUser(), nil
+	return &response.User, nil
 }
 
 // GetAccountOTPEnrollment generates an OTP enrollment secret and QR for current user
@@ -363,7 +361,7 @@ func (c *AuthServerClient) GetAccountOTPEnrollment(accessToken string) (*api.Acc
 }
 
 // UpdateAccountOTP enables or disables OTP for the current user
-func (c *AuthServerClient) UpdateAccountOTP(accessToken string, request *api.UpdateAccountOTPRequest) (*models.User, error) {
+func (c *AuthServerClient) UpdateAccountOTP(accessToken string, request *api.UpdateAccountOTPRequest) (*api.UserResponse, error) {
 	fullURL := c.baseURL + "/api/v1/account/otp"
 
 	jsonData, err := json.Marshal(request)
@@ -399,7 +397,7 @@ func (c *AuthServerClient) UpdateAccountOTP(accessToken string, request *api.Upd
 		return nil, errs.Errorf("failed to decode response: %w", err)
 	}
 
-	return response.User.ToUser(), nil
+	return &response.User, nil
 }
 
 // CreateAccountLogoutRequest asks the auth server to prepare a logout operation.
@@ -450,7 +448,7 @@ func (c *AuthServerClient) CreateAccountLogoutRequest(accessToken string, reques
 }
 
 // GetAccountConsents retrieves the current user's consents
-func (c *AuthServerClient) GetAccountConsents(accessToken string) ([]models.UserConsent, error) {
+func (c *AuthServerClient) GetAccountConsents(accessToken string) ([]api.UserConsentResponse, error) {
 	fullURL := c.baseURL + "/api/v1/account/consents"
 
 	req, err := http.NewRequest("GET", fullURL, nil)
@@ -480,28 +478,7 @@ func (c *AuthServerClient) GetAccountConsents(accessToken string) ([]models.User
 		return nil, errs.Errorf("failed to decode response: %w", err)
 	}
 
-	consents := make([]models.UserConsent, len(response.Consents))
-	for i, cResp := range response.Consents {
-		consent := models.UserConsent{
-			Id:       cResp.Id,
-			ClientId: cResp.ClientId,
-			UserId:   cResp.UserId,
-			Scope:    cResp.Scope,
-		}
-		if cResp.CreatedAt != nil {
-			consent.CreatedAt = sql.NullTime{Time: *cResp.CreatedAt, Valid: true}
-		}
-		if cResp.UpdatedAt != nil {
-			consent.UpdatedAt = sql.NullTime{Time: *cResp.UpdatedAt, Valid: true}
-		}
-		if cResp.GrantedAt != nil {
-			consent.GrantedAt = sql.NullTime{Time: *cResp.GrantedAt, Valid: true}
-		}
-		consent.Client = models.Client{Id: cResp.ClientId, ClientIdentifier: cResp.ClientIdentifier, Description: cResp.ClientDescription}
-		consents[i] = consent
-	}
-
-	return consents, nil
+	return response.Consents, nil
 }
 
 // RevokeAccountConsent deletes a consent for the current user

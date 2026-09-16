@@ -9,10 +9,9 @@ import (
 
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
-	"github.com/leodip/goiabada/core/models"
 )
 
-func (c *AuthServerClient) UpdateUserPhone(accessToken string, userId int64, request *api.UpdateUserPhoneRequest) (*models.User, error) {
+func (c *AuthServerClient) UpdateUserPhone(accessToken string, userId int64, request *api.UpdateUserPhoneRequest) (*api.UserResponse, error) {
 	fullURL := c.baseURL + "/api/v1/admin/users/" + strconv.FormatInt(userId, 10) + "/phone"
 
 	jsonData, err := json.Marshal(request)
@@ -48,7 +47,7 @@ func (c *AuthServerClient) UpdateUserPhone(accessToken string, userId int64, req
 		return nil, errs.Errorf("failed to decode response: %w", err)
 	}
 
-	return response.User.ToUser(), nil
+	return &response.User, nil
 }
 
 func (c *AuthServerClient) GetPhoneCountries(accessToken string) ([]api.PhoneCountryResponse, error) {

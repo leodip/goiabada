@@ -14,9 +14,9 @@ import (
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
+	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/customerrors"
 	mocks_handler_helpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
-	"github.com/leodip/goiabada/core/models"
 )
 
 // Decision 11 answered for an AJAX request, at this handler group's seam. Stage 8 gave the page
@@ -34,16 +34,16 @@ import (
 // reaching for anything else panics rather than returning a helpful zero value.
 type attributesApiClient struct {
 	apiclient.ApiClient
-	user       *models.User
+	user       *api.UserResponse
 	userErr    error
-	attributes []models.UserAttribute
+	attributes []api.UserAttributeResponse
 }
 
-func (c *attributesApiClient) GetUserById(accessToken string, userId int64) (*models.User, error) {
+func (c *attributesApiClient) GetUserById(accessToken string, userId int64) (*api.UserResponse, error) {
 	return c.user, c.userErr
 }
 
-func (c *attributesApiClient) GetUserAttributesByUserId(accessToken string, userId int64) ([]models.UserAttribute, error) {
+func (c *attributesApiClient) GetUserAttributesByUserId(accessToken string, userId int64) ([]api.UserAttributeResponse, error) {
 	return c.attributes, nil
 }
 
@@ -54,10 +54,10 @@ func (c *attributesApiClient) DeleteUserAttribute(accessToken string, attributeI
 func TestUserAttributesRemove_StaleOrMalformedUrlAnswers404AsJson(t *testing.T) {
 	const routePattern = "/admin/users/{userId}/attributes/{attributeId}/remove"
 
-	present := &models.User{Id: 42}
+	present := &api.UserResponse{Id: 42}
 	gone := &apiclient.APIError{Code: "NOT_FOUND", Message: "User not found", StatusCode: http.StatusNotFound}
 	broken := &apiclient.APIError{Code: "INTERNAL_SERVER_ERROR", Message: "the database is on fire", StatusCode: http.StatusInternalServerError}
-	attributes := []models.UserAttribute{{Id: 7}}
+	attributes := []api.UserAttributeResponse{{Id: 7}}
 
 	testCases := []struct {
 		name string
@@ -66,9 +66,9 @@ func TestUserAttributesRemove_StaleOrMalformedUrlAnswers404AsJson(t *testing.T) 
 		target     string
 		routed     bool
 		withJwt    bool
-		user       *models.User
+		user       *api.UserResponse
 		userErr    error
-		attributes []models.UserAttribute
+		attributes []api.UserAttributeResponse
 		// wantStatus is the HTTP status the handler must choose; 0 means it must take JsonError's
 		// generic 500 arm instead, with a bare error rather than an *ErrorDetail.
 		wantStatus int
@@ -114,7 +114,7 @@ func TestUserAttributesRemove_StaleOrMalformedUrlAnswers404AsJson(t *testing.T) 
 			routed:     true,
 			withJwt:    true,
 			user:       present,
-			attributes: []models.UserAttribute{{Id: 99}},
+			attributes: []api.UserAttributeResponse{{Id: 99}},
 			wantStatus: http.StatusNotFound,
 		},
 		{
@@ -212,7 +212,7 @@ func TestUserConsents_MalformedBodyAnswers400AsJson(t *testing.T) {
 
 			router := chi.NewRouter()
 			router.Post("/admin/users/{userId}/consents",
-				HandleAdminUserConsentsPost(httpHelper, &attributesApiClient{user: &models.User{Id: 42}}))
+				HandleAdminUserConsentsPost(httpHelper, &attributesApiClient{user: &api.UserResponse{Id: 42}}))
 			router.ServeHTTP(httptest.NewRecorder(), req)
 
 			httpHelper.AssertExpectations(t)

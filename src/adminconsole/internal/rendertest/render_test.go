@@ -16,6 +16,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/leodip/goiabada/adminconsole/internal/handlers/accounthandlers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers/adminclienthandlers"
@@ -123,7 +124,7 @@ func TestRender_AccountPhone(t *testing.T) {
 
 func TestRender_AccountAddress(t *testing.T) {
 	bind := map[string]interface{}{
-		"user": &models.User{},
+		"user": &api.UserResponse{},
 		"address": map[string]interface{}{
 			"AddressLine": "", "AddressLocality": "", "AddressRegion": "",
 			"AddressPostalCode": "", "AddressCountry": "BR",
@@ -138,7 +139,7 @@ func TestRender_AccountAddress(t *testing.T) {
 
 func TestRender_AccountProfile(t *testing.T) {
 	bind := map[string]interface{}{
-		"user":              &models.User{},
+		"user":              &api.UserResponse{},
 		"timezones":         timezones.Get(),
 		"locales":           locales.Get(),
 		"savedSuccessfully": false,
@@ -337,7 +338,7 @@ func TestRender_AdminUsersPaginator(t *testing.T) {
 	out := render(t, "/admin_users.html", map[string]interface{}{
 		"pageResult": adminuserhandlers.PageResult{
 			// Subject is left empty: the row only has to render.
-			Users:    []models.User{{Id: 1, Username: "alice", Email: "alice@example.com"}},
+			Users:    []api.UserResponse{{Id: 1, Username: "alice", Email: "alice@example.com"}},
 			Total:    73,
 			Query:    "",
 			Page:     4,
@@ -451,7 +452,7 @@ func TestRender_SessionPagesTooltipTheRawUserAgent(t *testing.T) {
 			name: "admin user",
 			page: "/admin_users_sessions.html",
 			bind: map[string]interface{}{
-				"user": &models.User{Id: 7, Email: "someone@example.com"},
+				"user": &api.UserResponse{Id: 7, Email: "someone@example.com"},
 				"sessions": []adminuserhandlers.SessionInfo{{
 					UserSessionId: 1, DeviceName: "Chrome 120", DeviceType: "Desktop",
 					DeviceOS: "Linux", UserAgent: header,
@@ -532,7 +533,7 @@ func TestRender_SessionPagesEscapeTheDeviceLabelIntoTheModal(t *testing.T) {
 			name: "admin user",
 			page: "/admin_users_sessions.html",
 			bind: map[string]interface{}{
-				"user": &models.User{Id: 7, Email: "someone@example.com"},
+				"user": &api.UserResponse{Id: 7, Email: "someone@example.com"},
 				"sessions": []adminuserhandlers.SessionInfo{{
 					UserSessionId: 1, DeviceName: markup, DeviceType: "Desktop",
 					DeviceOS: "Linux", UserAgent: "curl/8.5.0",
@@ -622,7 +623,7 @@ func TestRender_SessionPagesPassEveryArgumentEndSessionClickDeclares(t *testing.
 			name: "admin user",
 			page: "/admin_users_sessions.html",
 			bind: map[string]interface{}{
-				"user": &models.User{Id: 7, Email: "someone@example.com"},
+				"user": &api.UserResponse{Id: 7, Email: "someone@example.com"},
 				"sessions": []adminuserhandlers.SessionInfo{{
 					UserSessionId: 1, DeviceName: "Chrome 120", DeviceType: "Desktop",
 					DeviceOS: "Linux", UserAgent: "curl/8.5.0", IsCurrent: true,
@@ -663,4 +664,92 @@ func TestRender_SessionPagesPassEveryArgumentEndSessionClickDeclares(t *testing.
 				"%s: the current session must pass true last, got (%s)", tc.page, call[1])
 		})
 	}
+}
+
+// The two admin user pages that read a timestamp and a full name off the bind. Neither was covered
+// here before #350, and between them they carry every template edit the user family's move made:
+// the created-at and last-updated cells, which read a *time.Time where they read a sql.NullTime's
+// two fields; the full-name cell, which reads a value the handler assembles where it called a
+// method on the model; and the delete page's memberships list, which now ranges over groups the
+// handler loaded instead of a field the API never filled.
+//
+// A page that renders is the whole claim: RenderTemplateToBuffer fails on a field the bind lacks,
+// which is the bug this package exists for and the one a DTO swap is most likely to reach.
+func TestRender_AdminUserDetails(t *testing.T) {
+	createdAt := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
+	updatedAt := time.Date(2026, 3, 4, 5, 6, 7, 0, time.UTC)
+
+	out := render(t, "/admin_users_details.html", map[string]interface{}{
+		"user": &api.UserResponse{
+			Id: 7, Subject: "3f2a1c4e-5b6d-4e8f-9a0b-1c2d3e4f5a6b", Username: "jdoe",
+			Email: "jane@example.com", Enabled: true,
+			CreatedAt: &createdAt, UpdatedAt: &updatedAt,
+		},
+		"userFullName":      "Jane Q Doe",
+		"page":              "1",
+		"query":             "",
+		"savedSuccessfully": false,
+		"userCreated":       false,
+	})
+
+	assert.Contains(t, out, "jane@example.com")
+	assert.Contains(t, out, "Jane Q Doe")
+	assert.Contains(t, out, "02 Jan 2026 03:04:05 UTC", "the created-at cell renders from the *time.Time")
+	assert.Contains(t, out, "04 Mar 2026 05:06:07 UTC", "and so does the last-updated cell")
+}
+
+// A user whose timestamps are absent renders an empty cell rather than the year 1: the guard in
+// front of each Format call is what stops a nil pointer ending the page in a 500.
+func TestRender_AdminUserDetailsWithNoTimestamps(t *testing.T) {
+	out := render(t, "/admin_users_details.html", map[string]interface{}{
+		"user":              &api.UserResponse{Id: 7, Email: "jane@example.com"},
+		"userFullName":      "",
+		"page":              "1",
+		"query":             "",
+		"savedSuccessfully": false,
+		"userCreated":       false,
+	})
+
+	assert.NotContains(t, out, "0001", "an absent timestamp must render as nothing, not as the zero time")
+}
+
+// The delete confirmation, which is the one page in this change whose output moves for a real
+// user: the memberships row listed "none" for everybody before, and lists what deleting the user
+// will discard now (#350, deferred decision 1).
+func TestRender_AdminUserDelete(t *testing.T) {
+	createdAt := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
+
+	out := render(t, "/admin_users_delete.html", map[string]interface{}{
+		"user": &api.UserResponse{
+			Id: 7, Subject: "3f2a1c4e-5b6d-4e8f-9a0b-1c2d3e4f5a6b", Username: "jdoe",
+			Email: "jane@example.com", CreatedAt: &createdAt,
+		},
+		"userFullName": "Jane Q Doe",
+		"groups": []models.Group{
+			{Id: 2, GroupIdentifier: "admins"},
+			{Id: 3, GroupIdentifier: "site-viewers"},
+		},
+		"page":  "1",
+		"query": "",
+	})
+
+	assert.Contains(t, out, "Jane Q Doe")
+	assert.Contains(t, out, "02 Jan 2026 03:04:05 UTC")
+	assert.Contains(t, out, "admins", "the memberships the deletion discards have to be on the page")
+	assert.Contains(t, out, "site-viewers")
+	assert.NotContains(t, out, "(nenhum)", "with two groups listed, the none arm must not also render")
+}
+
+// The none arm, which is what every user saw before the fix and what a user in no groups sees now.
+func TestRender_AdminUserDeleteWithNoGroups(t *testing.T) {
+	out := render(t, "/admin_users_delete.html", map[string]interface{}{
+		"user":         &api.UserResponse{Id: 7, Email: "jane@example.com"},
+		"userFullName": "",
+		"groups":       []models.Group{},
+		"page":         "1",
+		"query":        "",
+	})
+
+	assert.Contains(t, out, "jane@example.com")
+	assert.Contains(t, out, "(nenhum)", "a user in no groups still gets the row's none arm")
 }

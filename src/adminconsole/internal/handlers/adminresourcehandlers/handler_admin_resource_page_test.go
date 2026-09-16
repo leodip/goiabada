@@ -85,7 +85,7 @@ func (c *resourcePagingApiClient) SearchGroupsWithPermissionAnnotation(accessTok
 }
 
 func (c *resourcePagingApiClient) GetUsersByPermission(accessToken string,
-	permissionId int64, page, size int) ([]models.User, int, error) {
+	permissionId int64, page, size int) ([]api.UserResponse, int, error) {
 
 	c.asked = append(c.asked, page)
 
@@ -93,9 +93,9 @@ func (c *resourcePagingApiClient) GetUsersByPermission(accessToken string,
 	if !ok {
 		return nil, c.total, nil
 	}
-	users := make([]models.User, 0, end-start)
+	users := make([]api.UserResponse, 0, end-start)
 	for i := start; i < end; i++ {
-		users = append(users, models.User{Id: int64(i + 1)})
+		users = append(users, api.UserResponse{Id: int64(i + 1)})
 	}
 	return users, c.total, nil
 }

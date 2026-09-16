@@ -10,8 +10,8 @@ import (
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
+	"github.com/leodip/goiabada/core/api"
 	mocks_handler_helpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
-	"github.com/leodip/goiabada/core/models"
 )
 
 // Decision 11 at this handler group's seam. Every one of these rows answered the 500 page before
@@ -29,11 +29,11 @@ import (
 // zero value.
 type notFoundUserApiClient struct {
 	apiclient.ApiClient
-	entity *models.User
+	entity *api.UserResponse
 	err    error
 }
 
-func (c *notFoundUserApiClient) GetUserById(accessToken string, id int64) (*models.User, error) {
+func (c *notFoundUserApiClient) GetUserById(accessToken string, id int64) (*api.UserResponse, error) {
 	return c.entity, c.err
 }
 
@@ -41,7 +41,7 @@ func TestUser_StaleOrMalformedUrlAnswers404(t *testing.T) {
 	const routePattern = "/admin/users/{userId}/details"
 
 	// present, gone and broken stand for the three answers the API can give this handler.
-	present := &models.User{Id: 42}
+	present := &api.UserResponse{Id: 42}
 	gone := &apiclient.APIError{Code: "NOT_FOUND", Message: "User not found", StatusCode: http.StatusNotFound}
 	broken := &apiclient.APIError{Code: "INTERNAL_SERVER_ERROR", Message: "the database is on fire", StatusCode: http.StatusInternalServerError}
 
@@ -52,7 +52,7 @@ func TestUser_StaleOrMalformedUrlAnswers404(t *testing.T) {
 		target       string
 		routed       bool
 		withJwt      bool
-		entity       *models.User
+		entity       *api.UserResponse
 		apiErr       error
 		wantNotFound bool
 	}{

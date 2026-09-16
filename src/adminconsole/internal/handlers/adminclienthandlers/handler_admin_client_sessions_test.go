@@ -12,7 +12,6 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/core/api"
 	mocks_handler_helpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
-	"github.com/leodip/goiabada/core/models"
 )
 
 // clientSessionsApiClient answers the three reads this page performs: the client, its sessions,
@@ -21,7 +20,7 @@ type clientSessionsApiClient struct {
 	apiclient.ApiClient
 	client   *api.ClientResponse
 	sessions []api.EnhancedUserSessionResponse
-	user     *models.User
+	user     *api.UserResponse
 }
 
 func (c *clientSessionsApiClient) GetClientById(accessToken string, clientId int64) (*api.ClientResponse, error) {
@@ -33,7 +32,7 @@ func (c *clientSessionsApiClient) GetClientSessionsByClientId(accessToken string
 	return c.sessions, nil
 }
 
-func (c *clientSessionsApiClient) GetUserById(accessToken string, userId int64) (*models.User, error) {
+func (c *clientSessionsApiClient) GetUserById(accessToken string, userId int64) (*api.UserResponse, error) {
 	return c.user, nil
 }
 
@@ -49,7 +48,7 @@ func TestHandleAdminClientUserSessionsGet_BindsTheRawUserAgent(t *testing.T) {
 
 	apiClient := &clientSessionsApiClient{
 		client: &api.ClientResponse{Id: 3, ClientIdentifier: "web-app"},
-		user:   &models.User{Id: 7, Email: "someone@example.com"},
+		user:   &api.UserResponse{Id: 7, Email: "someone@example.com"},
 		sessions: []api.EnhancedUserSessionResponse{
 			{Id: 1, UserId: 7, DeviceName: "goiabada-d2-second-device", DeviceType: "unknown", UserAgent: header},
 		},

@@ -49,10 +49,22 @@ func HandleAdminUserDeleteGet(
 			return
 		}
 
+		// The memberships are loaded rather than read off the user, because GET
+		// /api/v1/admin/users/{id} serves none: the page listed "none" for every user,
+		// whatever their real membership, and this is a confirmation screen for a
+		// destructive action, so under-reporting what it discards is the whole defect (#350).
+		_, groups, err := apiClient.GetUserGroups(jwtInfo.TokenResponse.AccessToken, id)
+		if err != nil {
+			handlers.HandleAPIError(httpHelper, w, r, err)
+			return
+		}
+
 		bind := map[string]interface{}{
-			"user":  user,
-			"page":  r.URL.Query().Get("page"),
-			"query": r.URL.Query().Get("query"),
+			"user":         user,
+			"userFullName": handlers.UserFullName(user),
+			"groups":       groups,
+			"page":         r.URL.Query().Get("page"),
+			"query":        r.URL.Query().Get("query"),
 		}
 
 		err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_users_delete.html", bind)

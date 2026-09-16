@@ -14,7 +14,7 @@ import (
 )
 
 // GetUserPermissions retrieves user permissions from the auth server
-func (c *AuthServerClient) GetUserPermissions(accessToken string, userId int64) (*models.User, []models.Permission, error) {
+func (c *AuthServerClient) GetUserPermissions(accessToken string, userId int64) (*api.UserResponse, []models.Permission, error) {
 	url := fmt.Sprintf("%s/api/v1/admin/users/%d/permissions", c.baseURL, userId)
 
 	req, err := http.NewRequest("GET", url, nil)
@@ -46,7 +46,7 @@ func (c *AuthServerClient) GetUserPermissions(accessToken string, userId int64) 
 		return nil, nil, errs.Errorf("failed to parse response: %w", err)
 	}
 
-	user := apiResp.User.ToUser()
+	user := &apiResp.User
 	permissions := make([]models.Permission, len(apiResp.Permissions))
 	for i, permResp := range apiResp.Permissions {
 		permissions[i] = models.Permission{
@@ -230,7 +230,7 @@ func (c *AuthServerClient) UpdateResourcePermissions(accessToken string, resourc
 }
 
 // GetUsersByPermission retrieves users that have the given permission with pagination
-func (c *AuthServerClient) GetUsersByPermission(accessToken string, permissionId int64, page, size int) ([]models.User, int, error) {
+func (c *AuthServerClient) GetUsersByPermission(accessToken string, permissionId int64, page, size int) ([]api.UserResponse, int, error) {
 	url := fmt.Sprintf("%s/api/v1/admin/permissions/%d/users?page=%d&size=%d", c.baseURL, permissionId, page, size)
 
 	req, err := http.NewRequest("GET", url, nil)
@@ -260,11 +260,7 @@ func (c *AuthServerClient) GetUsersByPermission(accessToken string, permissionId
 		return nil, 0, errs.Errorf("failed to parse response: %w", err)
 	}
 
-	users := make([]models.User, len(apiResp.Users))
-	for i, u := range apiResp.Users {
-		users[i] = *u.ToUser()
-	}
-	return users, apiResp.Total, nil
+	return apiResp.Users, apiResp.Total, nil
 }
 
 // SearchUsersWithPermissionAnnotation searches users and annotates with HasPermission for a permissionId

@@ -1,7 +1,6 @@
 package apiclient
 
 import (
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -10,7 +9,6 @@ import (
 
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
-	"github.com/leodip/goiabada/core/models"
 )
 
 func (c *AuthServerClient) GetUserSessionsByUserId(accessToken string, userId int64) ([]api.EnhancedUserSessionResponse, error) {
@@ -133,7 +131,7 @@ func (c *AuthServerClient) GetClientSessionsByClientId(accessToken string, clien
 	return response.Sessions, nil
 }
 
-func (c *AuthServerClient) GetUserSession(accessToken string, sessionIdentifier string) (*models.UserSession, error) {
+func (c *AuthServerClient) GetUserSession(accessToken string, sessionIdentifier string) (*api.UserSessionResponse, error) {
 	fullURL := c.baseURL + "/api/v1/admin/user-sessions/" + sessionIdentifier
 
 	req, err := http.NewRequest("GET", fullURL, nil)
@@ -164,37 +162,7 @@ func (c *AuthServerClient) GetUserSession(accessToken string, sessionIdentifier 
 		return nil, errs.Errorf("failed to decode response: %w", err)
 	}
 
-	// Convert response to models.UserSession
-	session := &models.UserSession{
-		Id:                response.Session.Id,
-		SessionIdentifier: response.Session.SessionIdentifier,
-		AuthMethods:       response.Session.AuthMethods,
-		AcrLevel:          response.Session.AcrLevel,
-		IpAddress:         response.Session.IpAddress,
-		DeviceName:        response.Session.DeviceName,
-		DeviceType:        response.Session.DeviceType,
-		DeviceOS:          response.Session.DeviceOS,
-		UserAgent:         response.Session.UserAgent,
-		UserId:            response.Session.UserId,
-	}
-
-	if response.Session.CreatedAt != nil {
-		session.CreatedAt = sql.NullTime{Time: *response.Session.CreatedAt, Valid: true}
-	}
-	if response.Session.UpdatedAt != nil {
-		session.UpdatedAt = sql.NullTime{Time: *response.Session.UpdatedAt, Valid: true}
-	}
-	if response.Session.Started != nil {
-		session.Started = *response.Session.Started
-	}
-	if response.Session.LastAccessed != nil {
-		session.LastAccessed = *response.Session.LastAccessed
-	}
-	if response.Session.AuthTime != nil {
-		session.AuthTime = *response.Session.AuthTime
-	}
-
-	return session, nil
+	return &response.Session, nil
 }
 
 func (c *AuthServerClient) GetAccountSessions(accessToken string) ([]api.EnhancedUserSessionResponse, error) {
@@ -265,7 +233,7 @@ func (c *AuthServerClient) DeleteAccountSession(accessToken string, sessionId in
 	return nil
 }
 
-func (c *AuthServerClient) GetUserConsents(accessToken string, userId int64) ([]models.UserConsent, error) {
+func (c *AuthServerClient) GetUserConsents(accessToken string, userId int64) ([]api.UserConsentResponse, error) {
 	fullURL := fmt.Sprintf("%s/api/v1/admin/users/%d/consents", c.baseURL, userId)
 
 	req, err := http.NewRequest("GET", fullURL, nil)
@@ -296,37 +264,7 @@ func (c *AuthServerClient) GetUserConsents(accessToken string, userId int64) ([]
 		return nil, errs.Errorf("failed to unmarshal response: %w", err)
 	}
 
-	// Convert API response to models
-	consents := make([]models.UserConsent, len(response.Consents))
-	for i, consentResp := range response.Consents {
-		consent := models.UserConsent{
-			Id:       consentResp.Id,
-			ClientId: consentResp.ClientId,
-			UserId:   consentResp.UserId,
-			Scope:    consentResp.Scope,
-		}
-
-		if consentResp.CreatedAt != nil {
-			consent.CreatedAt = sql.NullTime{Time: *consentResp.CreatedAt, Valid: true}
-		}
-		if consentResp.UpdatedAt != nil {
-			consent.UpdatedAt = sql.NullTime{Time: *consentResp.UpdatedAt, Valid: true}
-		}
-		if consentResp.GrantedAt != nil {
-			consent.GrantedAt = sql.NullTime{Time: *consentResp.GrantedAt, Valid: true}
-		}
-
-		// Set client information
-		consent.Client = models.Client{
-			Id:               consentResp.ClientId,
-			ClientIdentifier: consentResp.ClientIdentifier,
-			Description:      consentResp.ClientDescription,
-		}
-
-		consents[i] = consent
-	}
-
-	return consents, nil
+	return response.Consents, nil
 }
 
 func (c *AuthServerClient) DeleteUserConsent(accessToken string, consentId int64) error {

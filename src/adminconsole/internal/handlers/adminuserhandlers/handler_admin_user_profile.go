@@ -1,7 +1,6 @@
 package adminuserhandlers
 
 import (
-	"database/sql"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -191,10 +190,10 @@ func HandleAdminUserProfilePost(
 					layout := "2006-01-02"
 					parsedTime, err := time.Parse(layout, request.DateOfBirth)
 					if err == nil {
-						user.BirthDate = sql.NullTime{Time: parsedTime, Valid: true}
+						user.BirthDate = &parsedTime
 					}
 				} else {
-					user.BirthDate = sql.NullTime{Valid: false}
+					user.BirthDate = nil
 				}
 
 				bind := map[string]interface{}{

@@ -11,12 +11,11 @@ import (
 
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
-	"github.com/leodip/goiabada/core/models"
 )
 
 // ProfilePictureUploadResponse is defined in account_client.go
 
-func (c *AuthServerClient) SearchUsersPaginated(accessToken, query string, page, pageSize int) ([]models.User, int, error) {
+func (c *AuthServerClient) SearchUsersPaginated(accessToken, query string, page, pageSize int) ([]api.UserResponse, int, error) {
 	// Build URL with query parameters
 	fullURL := c.baseURL + "/api/v1/admin/users/search"
 	u, err := url.Parse(fullURL)
@@ -65,18 +64,10 @@ func (c *AuthServerClient) SearchUsersPaginated(accessToken, query string, page,
 		return nil, 0, errs.Errorf("failed to decode response: %w", err)
 	}
 
-	// Convert responses back to models.User
-	users := make([]models.User, len(response.Users))
-	for i, userResp := range response.Users {
-		if user := userResp.ToUser(); user != nil {
-			users[i] = *user
-		}
-	}
-
-	return users, response.Total, nil
+	return response.Users, response.Total, nil
 }
 
-func (c *AuthServerClient) GetUserById(accessToken string, userId int64) (*models.User, error) {
+func (c *AuthServerClient) GetUserById(accessToken string, userId int64) (*api.UserResponse, error) {
 	fullURL := c.baseURL + "/api/v1/admin/users/" + strconv.FormatInt(userId, 10)
 
 	req, err := http.NewRequest("GET", fullURL, nil)
@@ -107,10 +98,10 @@ func (c *AuthServerClient) GetUserById(accessToken string, userId int64) (*model
 		return nil, errs.Errorf("failed to decode response: %w", err)
 	}
 
-	return response.User.ToUser(), nil
+	return &response.User, nil
 }
 
-func (c *AuthServerClient) UpdateUserEnabled(accessToken string, userId int64, enabled bool) (*models.User, error) {
+func (c *AuthServerClient) UpdateUserEnabled(accessToken string, userId int64, enabled bool) (*api.UserResponse, error) {
 	fullURL := c.baseURL + "/api/v1/admin/users/" + strconv.FormatInt(userId, 10) + "/enabled"
 
 	request := api.UpdateUserEnabledRequest{
@@ -150,10 +141,10 @@ func (c *AuthServerClient) UpdateUserEnabled(accessToken string, userId int64, e
 		return nil, errs.Errorf("failed to decode response: %w", err)
 	}
 
-	return response.User.ToUser(), nil
+	return &response.User, nil
 }
 
-func (c *AuthServerClient) UpdateUserProfile(accessToken string, userId int64, request *api.UpdateUserProfileRequest) (*models.User, error) {
+func (c *AuthServerClient) UpdateUserProfile(accessToken string, userId int64, request *api.UpdateUserProfileRequest) (*api.UserResponse, error) {
 	fullURL := c.baseURL + "/api/v1/admin/users/" + strconv.FormatInt(userId, 10) + "/profile"
 
 	jsonData, err := json.Marshal(request)
@@ -189,10 +180,10 @@ func (c *AuthServerClient) UpdateUserProfile(accessToken string, userId int64, r
 		return nil, errs.Errorf("failed to decode response: %w", err)
 	}
 
-	return response.User.ToUser(), nil
+	return &response.User, nil
 }
 
-func (c *AuthServerClient) UpdateUserAddress(accessToken string, userId int64, request *api.UpdateUserAddressRequest) (*models.User, error) {
+func (c *AuthServerClient) UpdateUserAddress(accessToken string, userId int64, request *api.UpdateUserAddressRequest) (*api.UserResponse, error) {
 	fullURL := c.baseURL + "/api/v1/admin/users/" + strconv.FormatInt(userId, 10) + "/address"
 
 	jsonData, err := json.Marshal(request)
@@ -228,10 +219,10 @@ func (c *AuthServerClient) UpdateUserAddress(accessToken string, userId int64, r
 		return nil, errs.Errorf("failed to decode response: %w", err)
 	}
 
-	return response.User.ToUser(), nil
+	return &response.User, nil
 }
 
-func (c *AuthServerClient) UpdateUserEmail(accessToken string, userId int64, request *api.UpdateUserEmailRequest) (*models.User, error) {
+func (c *AuthServerClient) UpdateUserEmail(accessToken string, userId int64, request *api.UpdateUserEmailRequest) (*api.UserResponse, error) {
 	fullURL := c.baseURL + "/api/v1/admin/users/" + strconv.FormatInt(userId, 10) + "/email"
 
 	jsonData, err := json.Marshal(request)
@@ -267,10 +258,10 @@ func (c *AuthServerClient) UpdateUserEmail(accessToken string, userId int64, req
 		return nil, errs.Errorf("failed to decode response: %w", err)
 	}
 
-	return response.User.ToUser(), nil
+	return &response.User, nil
 }
 
-func (c *AuthServerClient) UpdateUserPassword(accessToken string, userId int64, request *api.UpdateUserPasswordRequest) (*models.User, error) {
+func (c *AuthServerClient) UpdateUserPassword(accessToken string, userId int64, request *api.UpdateUserPasswordRequest) (*api.UserResponse, error) {
 	fullURL := c.baseURL + "/api/v1/admin/users/" + strconv.FormatInt(userId, 10) + "/password"
 
 	jsonData, err := json.Marshal(request)
@@ -306,10 +297,10 @@ func (c *AuthServerClient) UpdateUserPassword(accessToken string, userId int64, 
 		return nil, errs.Errorf("failed to decode response: %w", err)
 	}
 
-	return response.User.ToUser(), nil
+	return &response.User, nil
 }
 
-func (c *AuthServerClient) UpdateUserOTP(accessToken string, userId int64, request *api.UpdateUserOTPRequest) (*models.User, error) {
+func (c *AuthServerClient) UpdateUserOTP(accessToken string, userId int64, request *api.UpdateUserOTPRequest) (*api.UserResponse, error) {
 	fullURL := c.baseURL + "/api/v1/admin/users/" + strconv.FormatInt(userId, 10) + "/otp"
 
 	jsonData, err := json.Marshal(request)
@@ -345,10 +336,10 @@ func (c *AuthServerClient) UpdateUserOTP(accessToken string, userId int64, reque
 		return nil, errs.Errorf("failed to decode response: %w", err)
 	}
 
-	return response.User.ToUser(), nil
+	return &response.User, nil
 }
 
-func (c *AuthServerClient) CreateUserAdmin(accessToken string, request *api.CreateUserAdminRequest) (*models.User, error) {
+func (c *AuthServerClient) CreateUserAdmin(accessToken string, request *api.CreateUserAdminRequest) (*api.UserResponse, error) {
 	fullURL := c.baseURL + "/api/v1/admin/users/create"
 
 	jsonData, err := json.Marshal(request)
@@ -384,7 +375,7 @@ func (c *AuthServerClient) CreateUserAdmin(accessToken string, request *api.Crea
 		return nil, errs.Errorf("failed to decode response: %w", err)
 	}
 
-	return response.User.ToUser(), nil
+	return &response.User, nil
 }
 
 // ProfilePictureInfo contains profile picture metadata

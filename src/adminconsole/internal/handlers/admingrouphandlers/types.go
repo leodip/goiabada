@@ -1,6 +1,6 @@
 package admingrouphandlers
 
-import "github.com/leodip/goiabada/core/models"
+import "github.com/leodip/goiabada/core/api"
 
 type UserResult struct {
 	Id           int64
@@ -21,7 +21,7 @@ type PageResult struct {
 	Page     int
 	PageSize int
 	Total    int
-	Users    []models.User
+	Users    []api.UserResponse
 }
 
 type PermissionsPostInput struct {

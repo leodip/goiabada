@@ -14,7 +14,6 @@ import (
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	mocks_handler_helpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
-	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
@@ -39,8 +38,8 @@ type flashStubApiClient struct {
 }
 
 func (flashStubApiClient) UpdateAccountPassword(accessToken string,
-	request *api.UpdateAccountPasswordRequest) (*models.User, error) {
-	return &models.User{Id: 7}, nil
+	request *api.UpdateAccountPasswordRequest) (*api.UserResponse, error) {
+	return &api.UserResponse{Id: 7}, nil
 }
 
 // newFlashTestStore is a real store over an in-memory backend. The flash has to cross a

@@ -70,6 +70,7 @@ func HandleAdminUserDetailsGet(
 
 		bind := map[string]interface{}{
 			"user":              user,
+			"userFullName":      handlers.UserFullName(user),
 			"page":              r.URL.Query().Get("page"),
 			"query":             r.URL.Query().Get("query"),
 			"savedSuccessfully": savedSuccessfully,

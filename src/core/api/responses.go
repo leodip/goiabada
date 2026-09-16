@@ -39,53 +39,6 @@ type UserResponse struct {
 	OTPEnabled                    bool       `json:"otpEnabled"`
 }
 
-func (resp *UserResponse) ToUser() *models.User {
-	if resp == nil {
-		return nil
-	}
-
-	user := &models.User{
-		Id:                            resp.Id,
-		Enabled:                       resp.Enabled,
-		Subject:                       resp.Subject,
-		Username:                      resp.Username,
-		GivenName:                     resp.GivenName,
-		MiddleName:                    resp.MiddleName,
-		FamilyName:                    resp.FamilyName,
-		Nickname:                      resp.Nickname,
-		Website:                       resp.Website,
-		Gender:                        resp.Gender,
-		Email:                         resp.Email,
-		EmailVerified:                 resp.EmailVerified,
-		ZoneInfoCountryName:           resp.ZoneInfoCountryName,
-		ZoneInfo:                      resp.ZoneInfo,
-		Locale:                        resp.Locale,
-		PhoneNumberCountryUniqueId:    resp.PhoneNumberCountryUniqueId,
-		PhoneNumberCountryCallingCode: resp.PhoneNumberCountryCallingCode,
-		PhoneNumber:                   resp.PhoneNumber,
-		PhoneNumberVerified:           resp.PhoneNumberVerified,
-		AddressLine1:                  resp.AddressLine1,
-		AddressLine2:                  resp.AddressLine2,
-		AddressLocality:               resp.AddressLocality,
-		AddressRegion:                 resp.AddressRegion,
-		AddressPostalCode:             resp.AddressPostalCode,
-		AddressCountry:                resp.AddressCountry,
-		OTPEnabled:                    resp.OTPEnabled,
-	}
-
-	if resp.CreatedAt != nil {
-		user.CreatedAt = sql.NullTime{Time: *resp.CreatedAt, Valid: true}
-	}
-	if resp.UpdatedAt != nil {
-		user.UpdatedAt = sql.NullTime{Time: *resp.UpdatedAt, Valid: true}
-	}
-	if resp.BirthDate != nil {
-		user.BirthDate = sql.NullTime{Time: *resp.BirthDate, Valid: true}
-	}
-
-	return user
-}
-
 type UserAttributeResponse struct {
 	Id                   int64      `json:"id"`
 	CreatedAt            *time.Time `json:"createdAt"`
@@ -95,30 +48,6 @@ type UserAttributeResponse struct {
 	IncludeInIdToken     bool       `json:"includeInIdToken"`
 	IncludeInAccessToken bool       `json:"includeInAccessToken"`
 	UserId               int64      `json:"userId"`
-}
-
-func (resp *UserAttributeResponse) ToUserAttribute() *models.UserAttribute {
-	if resp == nil {
-		return nil
-	}
-
-	attr := &models.UserAttribute{
-		Id:                   resp.Id,
-		Key:                  resp.Key,
-		Value:                resp.Value,
-		IncludeInIdToken:     resp.IncludeInIdToken,
-		IncludeInAccessToken: resp.IncludeInAccessToken,
-		UserId:               resp.UserId,
-	}
-
-	if resp.CreatedAt != nil {
-		attr.CreatedAt = sql.NullTime{Time: *resp.CreatedAt, Valid: true}
-	}
-	if resp.UpdatedAt != nil {
-		attr.UpdatedAt = sql.NullTime{Time: *resp.UpdatedAt, Valid: true}
-	}
-
-	return attr
 }
 
 // SettingsGeneralResponse represents the general settings returned by the API
