@@ -54,17 +54,6 @@ type MailpitMessage struct {
 	HTML      string    `json:"HTML"`
 }
 
-// ClearMailpit deletes all messages from Mailpit
-func ClearMailpit(t *testing.T) {
-	req, err := http.NewRequest(http.MethodDelete, "http://mailpit:8025/api/v1/messages", nil)
-	require.NoError(t, err, "Failed to create DELETE request")
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	require.NoError(t, err, "Failed to clear Mailpit messages")
-	defer func() { _ = resp.Body.Close() }()
-}
-
 // deleteMailpitMessage deletes a specific message from Mailpit
 func deleteMailpitMessage(t *testing.T, messageID string) {
 	req, err := http.NewRequest(http.MethodDelete, "http://mailpit:8025/api/v1/messages",
