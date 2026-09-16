@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
@@ -34,7 +35,7 @@ func HandleAPIResourcesGet(
 		})
 
 		response := api.GetResourcesResponse{
-			Resources: api.ToResourceResponses(resources),
+			Resources: apimapping.ToResourceResponses(resources),
 		}
 
 		writeJSON(w, r, http.StatusOK, response)
@@ -109,7 +110,7 @@ func HandleAPIResourceCreatePost(
 
 		// Response
 		response := api.CreateResourceResponse{
-			Resource: *api.ToResourceResponse(resource),
+			Resource: *apimapping.ToResourceResponse(resource),
 		}
 		writeJSON(w, r, http.StatusCreated, response)
 	}
@@ -143,7 +144,7 @@ func HandleAPIResourceGet(
 		}
 
 		response := api.GetResourceResponse{
-			Resource: *api.ToResourceResponse(resource),
+			Resource: *apimapping.ToResourceResponse(resource),
 		}
 		writeJSON(w, r, http.StatusOK, response)
 	}
@@ -246,7 +247,7 @@ func HandleAPIResourceUpdatePut(
 
 		// Response
 		response := api.UpdateResourceResponse{
-			Resource: *api.ToResourceResponse(resource),
+			Resource: *apimapping.ToResourceResponse(resource),
 		}
 		writeJSON(w, r, http.StatusOK, response)
 	}

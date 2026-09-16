@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
@@ -97,7 +98,7 @@ func HandleAPIUsersSearchGet(
 					}
 				}
 				annotatedUsers[i] = api.UserWithGroupMembershipResponse{
-					UserResponse: *api.ToUserResponse(&user),
+					UserResponse: *apimapping.ToUserResponse(&user),
 					InGroup:      inGroup,
 				}
 			}
@@ -158,7 +159,7 @@ func HandleAPIUsersSearchGet(
 					}
 				}
 				annotated[i] = api.UserWithPermissionResponse{
-					UserResponse:  *api.ToUserResponse(&u),
+					UserResponse:  *apimapping.ToUserResponse(&u),
 					HasPermission: has,
 				}
 			}
@@ -176,7 +177,7 @@ func HandleAPIUsersSearchGet(
 
 		// Create standard response
 		response := api.SearchUsersResponse{
-			Users: api.ToUserResponses(users),
+			Users: apimapping.ToUserResponses(users),
 			Total: total,
 			Page:  page,
 			Size:  size,

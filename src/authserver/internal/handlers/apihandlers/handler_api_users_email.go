@@ -9,6 +9,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
+	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/core/api"
@@ -98,7 +99,7 @@ func HandleAPIUserEmailPut(
 
 		// Create response
 		response := api.UpdateUserResponse{
-			User: *api.ToUserResponse(user),
+			User: *apimapping.ToUserResponse(user),
 		}
 
 		// Set content type and encode response

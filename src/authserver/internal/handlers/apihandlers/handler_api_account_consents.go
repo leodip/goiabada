@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/core/api"
@@ -51,7 +52,7 @@ func HandleAPIAccountConsentsGet(
 			return
 		}
 
-		resp := api.GetUserConsentsResponse{Consents: api.ToUserConsentResponses(consents)}
+		resp := api.GetUserConsentsResponse{Consents: apimapping.ToUserConsentResponses(consents)}
 		writeJSON(w, r, http.StatusOK, resp)
 	}
 }

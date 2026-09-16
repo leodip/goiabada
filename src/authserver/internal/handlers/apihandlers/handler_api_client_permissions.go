@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
@@ -54,8 +55,8 @@ func HandleAPIClientPermissionsGet(
 		}
 
 		resp := api.GetClientPermissionsResponse{
-			Client:      *api.ToClientResponse(client),
-			Permissions: api.ToPermissionResponses(client.Permissions),
+			Client:      *apimapping.ToClientResponse(client),
+			Permissions: apimapping.ToPermissionResponses(client.Permissions),
 		}
 
 		writeJSON(w, r, http.StatusOK, resp)

@@ -1,4 +1,4 @@
-package api
+package apimapping
 
 import (
 	"database/sql"
@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
@@ -25,7 +26,7 @@ import (
 // =============================================================================
 
 // sensitiveUserFields are the models.User fields that must never be exposed
-// through UserResponse, by field name or by JSON key.
+// through api.UserResponse, by field name or by JSON key.
 var sensitiveUserFields = []string{
 	"PasswordHash",
 	"OTPSecret",
@@ -40,10 +41,10 @@ var sensitiveUserFields = []string{
 	"OtpEnrollmentIssuedAt",
 }
 
-// This catches a sensitive field being added to UserResponse even before any
+// This catches a sensitive field being added to api.UserResponse even before any
 // mapper populates it, which a value-based test alone would miss.
 func TestUserResponse_StructHasNoSensitiveFields(t *testing.T) {
-	responseType := reflect.TypeOf(UserResponse{})
+	responseType := reflect.TypeOf(api.UserResponse{})
 
 	for i := 0; i < responseType.NumField(); i++ {
 		field := responseType.Field(i)
@@ -51,9 +52,9 @@ func TestUserResponse_StructHasNoSensitiveFields(t *testing.T) {
 
 		for _, forbidden := range sensitiveUserFields {
 			assert.NotEqual(t, forbidden, field.Name,
-				"UserResponse must not expose the sensitive field %q", forbidden)
+				"api.UserResponse must not expose the sensitive field %q", forbidden)
 			assert.NotEqual(t, strings.ToLower(forbidden), strings.ToLower(jsonKey),
-				"UserResponse must not expose a JSON key for the sensitive field %q", forbidden)
+				"api.UserResponse must not expose a JSON key for the sensitive field %q", forbidden)
 		}
 	}
 }
@@ -289,7 +290,7 @@ func TestUserResponse_ToUser_RoundTripsTimes(t *testing.T) {
 	assert.Equal(t, "k", roundTripped.Attributes[0].Key)
 }
 
-// UserResponse.Subject was a 16-byte named type until #278, reaching JSON through that
+// api.UserResponse.Subject was a 16-byte named type until #278, reaching JSON through that
 // type's MarshalText and coming back through UnmarshalText. It is a plain string now, and the
 // claim that made the swap safe is that no byte on the wire moved: the field is still the
 // bare canonical 36-character spelling, unquoted-array-free and unwrapped, and openapi.yaml
@@ -298,13 +299,13 @@ func TestUserResponse_ToUser_RoundTripsTimes(t *testing.T) {
 func TestUserResponse_SubjectIsABareCanonicalString(t *testing.T) {
 	const subject = "3f2a1c4e-5b6d-4e8f-9a0b-1c2d3e4f5a6b"
 
-	encoded, err := json.Marshal(&UserResponse{Id: 9, Subject: subject})
+	encoded, err := json.Marshal(&api.UserResponse{Id: 9, Subject: subject})
 	assert.NoError(t, err)
 
 	assert.Contains(t, string(encoded), `"subject":"`+subject+`"`,
 		"subject must marshal as the bare 36-character string a client already parses")
 
-	var decoded UserResponse
+	var decoded api.UserResponse
 	assert.NoError(t, json.Unmarshal(encoded, &decoded))
 	assert.Equal(t, subject, decoded.Subject, "the wire form must round-trip unchanged")
 	assert.Equal(t, subject, decoded.ToUser().Subject,
@@ -350,13 +351,13 @@ func TestMappers_NilInputReturnsNil(t *testing.T) {
 	assert.Nil(t, ToResourceResponses(nil))
 	assert.Nil(t, ToClientResponse(nil))
 
-	var nilUserResp *UserResponse
+	var nilUserResp *api.UserResponse
 	assert.Nil(t, nilUserResp.ToUser())
-	var nilAttrResp *UserAttributeResponse
+	var nilAttrResp *api.UserAttributeResponse
 	assert.Nil(t, nilAttrResp.ToUserAttribute())
-	var nilGroupResp *GroupResponse
+	var nilGroupResp *api.GroupResponse
 	assert.Nil(t, nilGroupResp.ToGroup())
-	var nilGroupAttrResp *GroupAttributeResponse
+	var nilGroupAttrResp *api.GroupAttributeResponse
 	assert.Nil(t, nilGroupAttrResp.ToGroupAttribute())
 }
 
@@ -364,8 +365,8 @@ func TestMappers_NilInputReturnsNil(t *testing.T) {
 // their JSON is `[]` instead of `null`. The user list mapper returns nil. That
 // inconsistency is load-bearing for API clients, so it is pinned here.
 func TestListMappers_NilSliceBehaviorDiffersByType(t *testing.T) {
-	assert.Equal(t, []GroupResponse{}, ToGroupResponses(nil, nil))
-	assert.Equal(t, []ClientResponse{}, ToClientResponses(nil))
+	assert.Equal(t, []api.GroupResponse{}, ToGroupResponses(nil, nil))
+	assert.Equal(t, []api.ClientResponse{}, ToClientResponses(nil))
 	assert.Nil(t, ToUserResponses(nil))
 
 	groupsJSON, err := json.Marshal(ToGroupResponses(nil, nil))
@@ -441,8 +442,8 @@ func TestUserSessionResponses_OmitLevel2AuthConfigHasChanged(t *testing.T) {
 		name  string
 		value interface{}
 	}{
-		{"UserSessionResponse", UserSessionResponse{Id: 1}},
-		{"EnhancedUserSessionResponse", EnhancedUserSessionResponse{Id: 1}},
+		{"api.UserSessionResponse", api.UserSessionResponse{Id: 1}},
+		{"api.EnhancedUserSessionResponse", api.EnhancedUserSessionResponse{Id: 1}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			raw, err := json.Marshal(tc.value)
@@ -462,8 +463,8 @@ func TestUserSessionResponses_OmitLevel2AuthConfigHasChanged(t *testing.T) {
 // tag renamed, dropped or given an omitempty would leave every one of them green while the
 // console and every other client read nothing (#281, plan review finding 6).
 //
-// Both structs are listed because they carry the field independently: EnhancedUserSessionResponse
-// is not built from UserSessionResponse in Go, only in the OpenAPI document's allOf.
+// Both structs are listed because they carry the field independently: api.EnhancedUserSessionResponse
+// is not built from api.UserSessionResponse in Go, only in the OpenAPI document's allOf.
 func TestUserSessionResponses_PublishUserAgent(t *testing.T) {
 	const header = `Mozilla/5.0 "quoted" <angled>`
 
@@ -471,8 +472,8 @@ func TestUserSessionResponses_PublishUserAgent(t *testing.T) {
 		name  string
 		value interface{}
 	}{
-		{"UserSessionResponse", UserSessionResponse{Id: 1, UserAgent: header}},
-		{"EnhancedUserSessionResponse", EnhancedUserSessionResponse{Id: 1, UserAgent: header}},
+		{"api.UserSessionResponse", api.UserSessionResponse{Id: 1, UserAgent: header}},
+		{"api.EnhancedUserSessionResponse", api.EnhancedUserSessionResponse{Id: 1, UserAgent: header}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			raw, err := json.Marshal(tc.value)
@@ -495,8 +496,8 @@ func TestUserSessionResponses_PublishUserAgentWhenEmpty(t *testing.T) {
 		name  string
 		value interface{}
 	}{
-		{"UserSessionResponse", UserSessionResponse{Id: 1}},
-		{"EnhancedUserSessionResponse", EnhancedUserSessionResponse{Id: 1}},
+		{"api.UserSessionResponse", api.UserSessionResponse{Id: 1}},
+		{"api.EnhancedUserSessionResponse", api.EnhancedUserSessionResponse{Id: 1}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			raw, err := json.Marshal(tc.value)
@@ -617,7 +618,7 @@ func TestToGroupResponses_NilMemberCountsYieldsZeroes(t *testing.T) {
 }
 
 func TestToGroupResponses_EmptySliceYieldsEmptySlice(t *testing.T) {
-	assert.Equal(t, []GroupResponse{}, ToGroupResponses([]models.Group{}, nil))
+	assert.Equal(t, []api.GroupResponse{}, ToGroupResponses([]models.Group{}, nil))
 }
 
 func TestGroupResponse_ToGroup_RoundTrip(t *testing.T) {
@@ -848,7 +849,7 @@ func TestToClientResponse_CreatedViaDCRIsCopiedNotAssumed(t *testing.T) {
 // Every mapper copies createdAt / updatedAt out of a sql.NullTime, and each one
 // does it with its own pair of branches. These are the timestamps an admin sees
 // in the console, so both the present and absent cases are worth pinning across
-// the mappers rather than only on UserResponse.
+// the mappers rather than only on api.UserResponse.
 // =============================================================================
 
 func TestMappers_CopyCreatedAtAndUpdatedAt(t *testing.T) {
@@ -936,5 +937,5 @@ func TestToClientResponses_MapsEachClientDistinctly(t *testing.T) {
 }
 
 func TestToClientResponses_EmptySliceYieldsEmptySlice(t *testing.T) {
-	assert.Equal(t, []ClientResponse{}, ToClientResponses([]models.Client{}))
+	assert.Equal(t, []api.ClientResponse{}, ToClientResponses([]models.Client{}))
 }

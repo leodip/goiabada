@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/core/api"
@@ -56,7 +57,7 @@ func HandleAPIUserAttributesGet(
 
 		// Create response
 		response := api.GetUserAttributesResponse{
-			Attributes: api.ToUserAttributeResponses(attributes),
+			Attributes: apimapping.ToUserAttributeResponses(attributes),
 		}
 
 		// Set content type and encode response
@@ -97,7 +98,7 @@ func HandleAPIUserAttributeGet(
 
 		// Create response
 		response := api.GetUserAttributeResponse{
-			Attribute: *api.ToUserAttributeResponse(attribute),
+			Attribute: *apimapping.ToUserAttributeResponse(attribute),
 		}
 
 		// Set content type and encode response
@@ -188,7 +189,7 @@ func HandleAPIUserAttributeCreatePost(
 
 		// Create response
 		response := api.CreateUserAttributeResponse{
-			Attribute: *api.ToUserAttributeResponse(userAttribute),
+			Attribute: *apimapping.ToUserAttributeResponse(userAttribute),
 		}
 
 		// Set content type and encode response
@@ -290,7 +291,7 @@ func HandleAPIUserAttributeUpdatePut(
 
 		// Create response
 		response := api.GetUserAttributeResponse{
-			Attribute: *api.ToUserAttributeResponse(attribute),
+			Attribute: *apimapping.ToUserAttributeResponse(attribute),
 		}
 
 		// Set content type and encode response

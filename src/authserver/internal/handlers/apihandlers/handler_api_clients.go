@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
@@ -143,7 +144,7 @@ func HandleAPIClientsGet(
 			}
 		}
 
-		clientResponses := api.ToClientResponses(clients)
+		clientResponses := apimapping.ToClientResponses(clients)
 
 		response := api.GetClientsResponse{
 			Clients: clientResponses,
@@ -198,7 +199,7 @@ func HandleAPIClientGet(
 
 		// Do not include permissions in this endpoint for consistency with users/groups
 
-		clientResponse := api.ToClientResponse(client)
+		clientResponse := apimapping.ToClientResponse(client)
 
 		// Decrypt client secret if it exists
 		if client.ClientSecretEncrypted != nil {
@@ -381,7 +382,7 @@ func HandleAPIClientCreatePost(
 		}
 
 		resp := api.CreateClientResponse{
-			Client: *api.ToClientResponse(client),
+			Client: *apimapping.ToClientResponse(client),
 		}
 
 		writeJSON(w, r, http.StatusCreated, resp)
@@ -586,7 +587,7 @@ func HandleAPIClientUpdatePut(
 		})
 
 		response := api.UpdateClientResponse{
-			Client: *api.ToClientResponse(client),
+			Client: *apimapping.ToClientResponse(client),
 		}
 
 		writeJSON(w, r, http.StatusOK, response)
@@ -716,7 +717,7 @@ func HandleAPIClientAuthenticationPut(
 			"loggedInUser": authHelper.GetLoggedInSubject(r),
 		})
 
-		resp := api.UpdateClientResponse{Client: *api.ToClientResponse(client)}
+		resp := api.UpdateClientResponse{Client: *apimapping.ToClientResponse(client)}
 		writeJSON(w, r, http.StatusOK, resp)
 	}
 }
@@ -808,7 +809,7 @@ func HandleAPIClientOAuth2FlowsPut(
 			"loggedInUser": authHelper.GetLoggedInSubject(r),
 		})
 
-		resp := api.UpdateClientResponse{Client: *api.ToClientResponse(client)}
+		resp := api.UpdateClientResponse{Client: *apimapping.ToClientResponse(client)}
 		writeJSON(w, r, http.StatusOK, resp)
 	}
 }
@@ -959,7 +960,7 @@ func HandleAPIClientRedirectURIsPut(
 			"loggedInUser": authHelper.GetLoggedInSubject(r),
 		})
 
-		resp := api.UpdateClientResponse{Client: *api.ToClientResponse(client)}
+		resp := api.UpdateClientResponse{Client: *apimapping.ToClientResponse(client)}
 		writeJSON(w, r, http.StatusOK, resp)
 	}
 }
@@ -1153,7 +1154,7 @@ func HandleAPIClientWebOriginsPut(
 			"loggedInUser": authHelper.GetLoggedInSubject(r),
 		})
 
-		resp := api.UpdateClientResponse{Client: *api.ToClientResponse(client)}
+		resp := api.UpdateClientResponse{Client: *apimapping.ToClientResponse(client)}
 		writeJSON(w, r, http.StatusOK, resp)
 	}
 }
@@ -1268,7 +1269,7 @@ func HandleAPIClientTokensPut(
 			"loggedInUser": authHelper.GetLoggedInSubject(r),
 		})
 
-		resp := api.UpdateClientResponse{Client: *api.ToClientResponse(client)}
+		resp := api.UpdateClientResponse{Client: *apimapping.ToClientResponse(client)}
 		writeJSON(w, r, http.StatusOK, resp)
 	}
 }

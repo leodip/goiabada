@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/errs"
@@ -86,7 +87,7 @@ func HandleAPIGroupsSearchGet(
 
 			// Build annotated responses (MemberCount omitted as not needed here)
 			for i := range groups {
-				gr := api.ToGroupResponse(&groups[i], 0)
+				gr := apimapping.ToGroupResponse(&groups[i], 0)
 				if gr == nil {
 					continue
 				}

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
@@ -174,7 +175,7 @@ func HandleAPIAccountEmailVerificationPost(
 
 		if user.EmailVerified {
 			// Already verified; return current state
-			resp := api.UpdateUserResponse{User: *api.ToUserResponse(user)}
+			resp := api.UpdateUserResponse{User: *apimapping.ToUserResponse(user)}
 			writeJSON(w, r, http.StatusOK, resp)
 			return
 		}
@@ -229,7 +230,7 @@ func HandleAPIAccountEmailVerificationPost(
 			"loggedInUser": subject,
 		})
 
-		resp := api.UpdateUserResponse{User: *api.ToUserResponse(user)}
+		resp := api.UpdateUserResponse{User: *apimapping.ToUserResponse(user)}
 		writeJSON(w, r, http.StatusOK, resp)
 	}
 }

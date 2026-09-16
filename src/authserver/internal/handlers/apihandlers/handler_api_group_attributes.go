@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
@@ -53,7 +54,7 @@ func HandleAPIGroupAttributesGet(
 		}
 
 		response := api.GetGroupAttributesResponse{
-			Attributes: api.ToGroupAttributeResponses(attributes),
+			Attributes: apimapping.ToGroupAttributeResponses(attributes),
 		}
 
 		// Ensure we never return a nil slice
@@ -100,7 +101,7 @@ func HandleAPIGroupAttributeGet(
 		}
 
 		response := api.GetGroupAttributeResponse{
-			Attribute: *api.ToGroupAttributeResponse(attribute),
+			Attribute: *apimapping.ToGroupAttributeResponse(attribute),
 		}
 
 		writeJSON(w, r, http.StatusOK, response)
@@ -189,7 +190,7 @@ func HandleAPIGroupAttributeCreatePost(
 
 		// Return created attribute
 		response := api.CreateGroupAttributeResponse{
-			Attribute: *api.ToGroupAttributeResponse(groupAttribute),
+			Attribute: *apimapping.ToGroupAttributeResponse(groupAttribute),
 		}
 
 		writeJSON(w, r, http.StatusCreated, response)
@@ -294,7 +295,7 @@ func HandleAPIGroupAttributeUpdatePut(
 
 		// Return updated attribute
 		response := api.UpdateGroupAttributeResponse{
-			Attribute: *api.ToGroupAttributeResponse(attribute),
+			Attribute: *apimapping.ToGroupAttributeResponse(attribute),
 		}
 
 		writeJSON(w, r, http.StatusOK, response)
