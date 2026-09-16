@@ -14,13 +14,13 @@ import (
 
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/authserver/internal/issuance"
+	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
-	"github.com/leodip/goiabada/core/validators"
 )
 
 // jsonErrorConformed answers an RFC 6749 5.2 error response with its description conformed to
@@ -139,7 +139,7 @@ func HandleTokenPost(
 			return
 		}
 
-		input := validators.ValidateTokenRequestInput{
+		input := protocolvalidation.ValidateTokenRequestInput{
 			GrantType:    grantType,
 			Code:         r.PostForm.Get("code"),
 			RedirectURI:  r.PostForm.Get("redirect_uri"),
@@ -445,7 +445,7 @@ func HandleTokenPost(
 				// the two cannot disagree about what an ROPC token is.
 				if !validateResult.Client.IsResourceOwnerPasswordCredentialsEnabled(settings.ResourceOwnerPasswordCredentialsEnabled) {
 					jsonErrorConformed(httpHelper, w, r, customerrors.NewErrorDetailWithHttpStatusCode(
-						"unauthorized_client", validators.ROPCNotAuthorizedErrorMsg, http.StatusBadRequest))
+						"unauthorized_client", protocolvalidation.ROPCNotAuthorizedErrorMsg, http.StatusBadRequest))
 					return
 				}
 			} else if !validateResult.Client.AuthorizationCodeEnabled {

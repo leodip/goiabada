@@ -4,6 +4,7 @@ import (
 	"net/url"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/encryption"
@@ -11,7 +12,6 @@ import (
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/testutil/fake"
-	"github.com/leodip/goiabada/core/validators"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -851,7 +851,7 @@ func TestROPC_RefreshToken_StopsWhenROPCDisabled(t *testing.T) {
 
 			assert.Equal(t, "unauthorized_client", stopped["error"],
 				"a live ROPC refresh token must stop the moment ROPC is turned off: %v", stopped)
-			assert.Equal(t, validators.ROPCNotAuthorizedErrorMsg, stopped["error_description"],
+			assert.Equal(t, protocolvalidation.ROPCNotAuthorizedErrorMsg, stopped["error_description"],
 				"the refusal must name the grant that was actually refused: %v", stopped)
 			assert.Nil(t, stopped["access_token"], "nothing may be minted: %v", stopped)
 		})

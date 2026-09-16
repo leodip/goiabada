@@ -13,6 +13,7 @@ import (
 
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
+	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
@@ -25,7 +26,6 @@ import (
 	"github.com/leodip/goiabada/core/oidc"
 	"github.com/leodip/goiabada/core/stringutil"
 	"github.com/leodip/goiabada/core/urlutil"
-	"github.com/leodip/goiabada/core/validators"
 )
 
 // validateIdTokenHint parses and validates the id_token_hint parameter.
@@ -157,7 +157,7 @@ func HandleAuthorizeGet(
 			}
 		}
 
-		err = authorizeValidator.ValidateClientAndRedirectURI(r.Context(), &validators.ValidateClientAndRedirectURIInput{
+		err = authorizeValidator.ValidateClientAndRedirectURI(r.Context(), &protocolvalidation.ValidateClientAndRedirectURIInput{
 			RequestId:    requestId,
 			ClientId:     authContext.ClientId,
 			RedirectURI:  authContext.RedirectURI,
@@ -204,7 +204,7 @@ func HandleAuthorizeGet(
 		// request asking for query or form_post is asking for a mode this server understands and
 		// simply may not use for tokens, so that error can be, and is, delivered as a redirect the
 		// client can parse.
-		if !validators.IsSupportedResponseMode(authContext.ResponseMode) {
+		if !protocolvalidation.IsSupportedResponseMode(authContext.ResponseMode) {
 			renderErrorUi(i18n.T(r.Context(), "auth_error.unsupported_response_mode.message"),
 				http.StatusBadRequest)
 			return
@@ -403,7 +403,7 @@ func HandleAuthorizeGet(
 			http.Redirect(w, r, config.GetAuthServer().BaseURL+"/auth/level1", http.StatusFound)
 		}
 
-		err = authorizeValidator.ValidateUnsupportedRequestParameters(&validators.ValidateUnsupportedRequestParametersInput{
+		err = authorizeValidator.ValidateUnsupportedRequestParameters(&protocolvalidation.ValidateUnsupportedRequestParametersInput{
 			HasRequest:    r.Form.Has("request"),
 			HasRequestURI: r.Form.Has("request_uri"),
 		})
@@ -423,7 +423,7 @@ func HandleAuthorizeGet(
 		pkceRequired := client.IsPKCERequired(settings.PKCERequired)
 		implicitGrantEnabled := client.IsImplicitGrantEnabled(settings.ImplicitFlowEnabled)
 
-		err = authorizeValidator.ValidateRequest(&validators.ValidateRequestInput{
+		err = authorizeValidator.ValidateRequest(&protocolvalidation.ValidateRequestInput{
 			ResponseType:         authContext.ResponseType,
 			CodeChallengeMethod:  authContext.CodeChallengeMethod,
 			CodeChallenge:        authContext.CodeChallenge,
@@ -994,7 +994,7 @@ func clientProvenance(ctx context.Context, database data.Database, clientIdentif
 // edit gets out of step (#241 decision 11).
 //
 // The flag to RedirectURIIsRegistered is computed from the response type, by the same token-sequence
-// test validators.ValidateClientAndRedirectURI and /auth/issue apply, so exactly one token equal to
+// test protocolvalidation.ValidateClientAndRedirectURI and /auth/issue apply, so exactly one token equal to
 // "code" buys loopback port flexibility and every implicit response stays strict. An earlier version
 // of this gate passed false unconditionally, reasoning that flexibility exists for a native app's
 // ephemeral port on a code request and an error redirect carries no code. That reasoning asks the
@@ -1054,7 +1054,7 @@ func redirectWillBeEmitted(ctx context.Context, database data.Database, client *
 	}
 
 	// Read off the token sequence rather than off ParseResponseType's booleans, for the reason
-	// stated at validators.ValidateClientAndRedirectURI: the parser ignores unrecognised values
+	// stated at protocolvalidation.ValidateClientAndRedirectURI: the parser ignores unrecognised values
 	// and collapses duplicates, so "code code" and "code foo" are true for HasCode && !HasToken
 	// && !HasIdToken and must not buy an arbitrary loopback port.
 	responseTypes := strings.Fields(responseType)

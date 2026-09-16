@@ -21,10 +21,10 @@ import (
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+	mocks_protocolvalidation "github.com/leodip/goiabada/authserver/internal/protocolvalidation/mocks"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
 	mocks_handlerhelpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
 	mocks_users "github.com/leodip/goiabada/core/user/mocks"
-	mocks_validators "github.com/leodip/goiabada/core/validators/mocks"
 )
 
 // Seam 5 at the token endpoint, which routes on two of the four wire types and used to read only
@@ -48,7 +48,7 @@ func wrappedTokenRequest(t *testing.T, failure error) (
 	userSessionManager := mocks_users.NewUserSessionManager(t)
 	database := mocks_data.NewDatabase(t)
 	tokenIssuer := mocks_handlers.NewTokenIssuer(t)
-	tokenValidator := mocks_validators.NewTokenValidator(t)
+	tokenValidator := mocks_protocolvalidation.NewTokenValidator(t)
 	auditLogger := mocks_audit.NewAuditLogger(t)
 
 	handler := HandleTokenPost(httpHelper, userSessionManager, database, tokenIssuer, tokenValidator,
@@ -60,7 +60,7 @@ func wrappedTokenRequest(t *testing.T, failure error) (
 	rr := httptest.NewRecorder()
 
 	tokenValidator.On("ValidateTokenRequest", mock.Anything,
-		mock.AnythingOfType("*validators.ValidateTokenRequestInput")).Return(nil, failure)
+		mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).Return(nil, failure)
 
 	return httpHelper, auditLogger, database, rr, req, handler
 }

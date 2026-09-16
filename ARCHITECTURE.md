@@ -117,7 +117,7 @@ A row whose owner is not `kernel` names the issue that moves it. A `kernel` row 
 | `core/user` | authserver | #346 |
 | `core/useragent` | authserver | #346 |
 | `core/uuidutil` | authserver | #360 |
-| `core/validators` | split | #344 |
+| `core/validators` | kernel | — |
 
 Notes on rows that are not self-evident:
 
@@ -134,6 +134,11 @@ Notes on rows that are not self-evident:
   decodes. The mapping was once #349's alone, but moving it without the fields — and without the
   reverse `ToUser()`/`ToGroup()` methods the admin console's `apiclient` calls 32 times — would have
   left every exception row below standing, so the two are one issue.
+- `core/validators` is kernel on the second half of the membership test rather than the first. One
+  of the two files it holds after #344 exports `ValidateNoAngleBrackets`, which fifteen sites in the
+  auth server call and the admin console never does. It stays because it is a four-line wrapper over
+  `ContainsAngleBrackets`, which both processes do call — one rule, packaged twice — and because the
+  row buys rule 2 over a package importing nothing but `strings`, `regexp` and `core/i18n`.
 - `core/oauth` is the largest split. The admin console is an OAuth client: it needs token response
   values, PKCE and JWT/JWKS validation. It does not issue codes or tokens and does not rotate
   signing keys. #338 drew that line: the provider half was `core/oauthprovider`, which #339 carried
@@ -202,46 +207,52 @@ the single largest piece of the boundary still to close.
 
 The admin console is a web UI that talks to the auth server over HTTP. It opens no database, sends
 no mail and generates no TOTP codes, so the libraries that do those things have no business in its
-binary. They are there anyway: `adminconsole/go.mod` lists all four database drivers as indirect
-dependencies, every one of them arriving through `core`.
+binary. `adminconsole/go.mod` still lists all four database drivers as indirect dependencies, and
+will until `core` stops requiring them, but a `go.mod` line is what the module graph permits rather
+than what the linker pulls in. What matters is the import closure, and #344 emptied it of them.
 
 This is the concrete harm the epic exists to fix, and it is measurable, so the guard measures it.
 `reachable today` is asserted against the real transitive import closure of the admin console's
 production packages. A module listed `no` that becomes reachable is a regression; a module listed
-`yes` that stops being reachable is a row to delete. `cleared by` is the issue expected to do it and
-is documentation only — if an earlier issue gets there first, the guard says so and the row changes
-then.
+`yes` that stops being reachable is a row to correct: deleted, or kept at `no` where the epic's
+point is that it must never come back, as the five driver rows below are. `cleared by` is the issue
+expected to do it and is documentation only — if an earlier issue gets there first, the guard says
+so and the row changes then.
 
 ### Foreign modules
 
 | module | why it must not be there | reachable today | cleared by |
 |---|---|---|---|
-| `modernc.org/sqlite` | SQLite driver | yes | #353 |
-| `github.com/go-sql-driver/mysql` | MySQL driver | yes | #353 |
-| `github.com/jackc/pgx/v5` | PostgreSQL driver | yes | #353 |
-| `github.com/microsoft/go-mssqldb` | SQL Server driver | yes | #353 |
-| `github.com/huandu/go-sqlbuilder` | SQL construction | yes | #353 |
+| `modernc.org/sqlite` | SQLite driver | no | — |
+| `github.com/go-sql-driver/mysql` | MySQL driver | no | — |
+| `github.com/jackc/pgx/v5` | PostgreSQL driver | no | — |
+| `github.com/microsoft/go-mssqldb` | SQL Server driver | no | — |
+| `github.com/huandu/go-sqlbuilder` | SQL construction | no | — |
 | `github.com/pquerna/otp` | TOTP generation | no | — |
 | `github.com/go-chi/cors` | CORS policy is the auth server's | no | — |
 
-Every driver arrives the same way, through one edge:
+Every driver used to arrive the same way, through one edge:
 
 ```
 adminconsole/cmd/goiabada-adminconsole -> core/validators -> core/data -> core/data/<engine> -> driver
 ```
 
 `core/data/database.go` imports all four engine packages, so importing `core/data` at all compiles
-every driver. One of the core packages the admin console imports reaches `core/data`:
+every driver. Exactly one of the core packages the admin console imports reached `core/data`:
 `core/validators`. #338 closed the other, `core/oauth`, and the rows stayed `yes`, which is why the
 table asserts reachability rather than counting edges.
 
-All five rows say #353 rather than #354 or #359, which is worth explaining because the ordering
-does not suggest it. `core/data/database.go` is the only production file in `core` that imports an engine
-package — every other importer is an auth-server test — so it is the single cut point, and #353
-point 7 already requires that `core/data` stop importing the four engines. The drivers therefore
-leave the admin console's binary at 13/16, two issues before the persistence packages themselves
-move. #353 reads like a staging step, so the effect is easy to miss; the guard will not miss it,
-because these rows go stale the moment it lands.
+**#344 severed that edge, and the five rows above are `no` because of it.** It moved the seven
+validators that touch a database or a country table to the auth server and left `core/validators`
+holding `identifier_validator.go` and `angle_brackets_validator.go`, which import `strings`,
+`regexp` and `core/i18n`. Ninety packages left the admin console's production closure with them,
+including `core/data`, all four drivers and `go-sqlbuilder`.
+
+These rows read #353 until then, on the argument that `core/data/database.go` is the only
+production file in `core` importing an engine package and so the single cut point. The drivers were
+expected to leave at 13/16 and left at 9/16, because severing the one edge that reaches `core/data`
+does the same job from the other end. Which is why `reachable today` is asserted against the real
+closure and not derived from an argument about which issue owns the cut.
 
 `github.com/pquerna/otp` is listed at `no` deliberately. It is not reachable now, `core/otp` moves
 to the auth server in #346, and the row states that it must not arrive in the meantime.

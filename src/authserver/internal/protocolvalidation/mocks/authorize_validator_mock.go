@@ -7,12 +7,12 @@
 
 //go:build !production
 
-package mocks_validator
+package mocks_protocolvalidation
 
 import (
 	"context"
 
-	"github.com/leodip/goiabada/core/validators"
+	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -53,7 +53,7 @@ func (_m *AuthorizeValidator) EXPECT() *AuthorizeValidator_Expecter {
 }
 
 // ValidateClientAndRedirectURI provides a mock function for the type AuthorizeValidator
-func (_mock *AuthorizeValidator) ValidateClientAndRedirectURI(ctx context.Context, input *validators.ValidateClientAndRedirectURIInput) error {
+func (_mock *AuthorizeValidator) ValidateClientAndRedirectURI(ctx context.Context, input *protocolvalidation.ValidateClientAndRedirectURIInput) error {
 	ret := _mock.Called(ctx, input)
 
 	if len(ret) == 0 {
@@ -61,7 +61,7 @@ func (_mock *AuthorizeValidator) ValidateClientAndRedirectURI(ctx context.Contex
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *validators.ValidateClientAndRedirectURIInput) error); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *protocolvalidation.ValidateClientAndRedirectURIInput) error); ok {
 		r0 = returnFunc(ctx, input)
 	} else {
 		r0 = ret.Error(0)
@@ -76,20 +76,20 @@ type AuthorizeValidator_ValidateClientAndRedirectURI_Call struct {
 
 // ValidateClientAndRedirectURI is a helper method to define mock.On call
 //   - ctx context.Context
-//   - input *validators.ValidateClientAndRedirectURIInput
+//   - input *protocolvalidation.ValidateClientAndRedirectURIInput
 func (_e *AuthorizeValidator_Expecter) ValidateClientAndRedirectURI(ctx any, input any) *AuthorizeValidator_ValidateClientAndRedirectURI_Call {
 	return &AuthorizeValidator_ValidateClientAndRedirectURI_Call{Call: _e.mock.On("ValidateClientAndRedirectURI", ctx, input)}
 }
 
-func (_c *AuthorizeValidator_ValidateClientAndRedirectURI_Call) Run(run func(ctx context.Context, input *validators.ValidateClientAndRedirectURIInput)) *AuthorizeValidator_ValidateClientAndRedirectURI_Call {
+func (_c *AuthorizeValidator_ValidateClientAndRedirectURI_Call) Run(run func(ctx context.Context, input *protocolvalidation.ValidateClientAndRedirectURIInput)) *AuthorizeValidator_ValidateClientAndRedirectURI_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
 			arg0 = args[0].(context.Context)
 		}
-		var arg1 *validators.ValidateClientAndRedirectURIInput
+		var arg1 *protocolvalidation.ValidateClientAndRedirectURIInput
 		if args[1] != nil {
-			arg1 = args[1].(*validators.ValidateClientAndRedirectURIInput)
+			arg1 = args[1].(*protocolvalidation.ValidateClientAndRedirectURIInput)
 		}
 		run(
 			arg0,
@@ -104,7 +104,7 @@ func (_c *AuthorizeValidator_ValidateClientAndRedirectURI_Call) Return(err error
 	return _c
 }
 
-func (_c *AuthorizeValidator_ValidateClientAndRedirectURI_Call) RunAndReturn(run func(ctx context.Context, input *validators.ValidateClientAndRedirectURIInput) error) *AuthorizeValidator_ValidateClientAndRedirectURI_Call {
+func (_c *AuthorizeValidator_ValidateClientAndRedirectURI_Call) RunAndReturn(run func(ctx context.Context, input *protocolvalidation.ValidateClientAndRedirectURIInput) error) *AuthorizeValidator_ValidateClientAndRedirectURI_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -170,7 +170,7 @@ func (_c *AuthorizeValidator_ValidatePrompt_Call) RunAndReturn(run func(prompt s
 }
 
 // ValidateRequest provides a mock function for the type AuthorizeValidator
-func (_mock *AuthorizeValidator) ValidateRequest(input *validators.ValidateRequestInput) error {
+func (_mock *AuthorizeValidator) ValidateRequest(input *protocolvalidation.ValidateRequestInput) error {
 	ret := _mock.Called(input)
 
 	if len(ret) == 0 {
@@ -178,7 +178,7 @@ func (_mock *AuthorizeValidator) ValidateRequest(input *validators.ValidateReque
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(*validators.ValidateRequestInput) error); ok {
+	if returnFunc, ok := ret.Get(0).(func(*protocolvalidation.ValidateRequestInput) error); ok {
 		r0 = returnFunc(input)
 	} else {
 		r0 = ret.Error(0)
@@ -192,16 +192,16 @@ type AuthorizeValidator_ValidateRequest_Call struct {
 }
 
 // ValidateRequest is a helper method to define mock.On call
-//   - input *validators.ValidateRequestInput
+//   - input *protocolvalidation.ValidateRequestInput
 func (_e *AuthorizeValidator_Expecter) ValidateRequest(input any) *AuthorizeValidator_ValidateRequest_Call {
 	return &AuthorizeValidator_ValidateRequest_Call{Call: _e.mock.On("ValidateRequest", input)}
 }
 
-func (_c *AuthorizeValidator_ValidateRequest_Call) Run(run func(input *validators.ValidateRequestInput)) *AuthorizeValidator_ValidateRequest_Call {
+func (_c *AuthorizeValidator_ValidateRequest_Call) Run(run func(input *protocolvalidation.ValidateRequestInput)) *AuthorizeValidator_ValidateRequest_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *validators.ValidateRequestInput
+		var arg0 *protocolvalidation.ValidateRequestInput
 		if args[0] != nil {
-			arg0 = args[0].(*validators.ValidateRequestInput)
+			arg0 = args[0].(*protocolvalidation.ValidateRequestInput)
 		}
 		run(
 			arg0,
@@ -215,7 +215,7 @@ func (_c *AuthorizeValidator_ValidateRequest_Call) Return(err error) *AuthorizeV
 	return _c
 }
 
-func (_c *AuthorizeValidator_ValidateRequest_Call) RunAndReturn(run func(input *validators.ValidateRequestInput) error) *AuthorizeValidator_ValidateRequest_Call {
+func (_c *AuthorizeValidator_ValidateRequest_Call) RunAndReturn(run func(input *protocolvalidation.ValidateRequestInput) error) *AuthorizeValidator_ValidateRequest_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -272,7 +272,7 @@ func (_c *AuthorizeValidator_ValidateScopes_Call) RunAndReturn(run func(scope st
 }
 
 // ValidateUnsupportedRequestParameters provides a mock function for the type AuthorizeValidator
-func (_mock *AuthorizeValidator) ValidateUnsupportedRequestParameters(input *validators.ValidateUnsupportedRequestParametersInput) error {
+func (_mock *AuthorizeValidator) ValidateUnsupportedRequestParameters(input *protocolvalidation.ValidateUnsupportedRequestParametersInput) error {
 	ret := _mock.Called(input)
 
 	if len(ret) == 0 {
@@ -280,7 +280,7 @@ func (_mock *AuthorizeValidator) ValidateUnsupportedRequestParameters(input *val
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(*validators.ValidateUnsupportedRequestParametersInput) error); ok {
+	if returnFunc, ok := ret.Get(0).(func(*protocolvalidation.ValidateUnsupportedRequestParametersInput) error); ok {
 		r0 = returnFunc(input)
 	} else {
 		r0 = ret.Error(0)
@@ -294,16 +294,16 @@ type AuthorizeValidator_ValidateUnsupportedRequestParameters_Call struct {
 }
 
 // ValidateUnsupportedRequestParameters is a helper method to define mock.On call
-//   - input *validators.ValidateUnsupportedRequestParametersInput
+//   - input *protocolvalidation.ValidateUnsupportedRequestParametersInput
 func (_e *AuthorizeValidator_Expecter) ValidateUnsupportedRequestParameters(input any) *AuthorizeValidator_ValidateUnsupportedRequestParameters_Call {
 	return &AuthorizeValidator_ValidateUnsupportedRequestParameters_Call{Call: _e.mock.On("ValidateUnsupportedRequestParameters", input)}
 }
 
-func (_c *AuthorizeValidator_ValidateUnsupportedRequestParameters_Call) Run(run func(input *validators.ValidateUnsupportedRequestParametersInput)) *AuthorizeValidator_ValidateUnsupportedRequestParameters_Call {
+func (_c *AuthorizeValidator_ValidateUnsupportedRequestParameters_Call) Run(run func(input *protocolvalidation.ValidateUnsupportedRequestParametersInput)) *AuthorizeValidator_ValidateUnsupportedRequestParameters_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *validators.ValidateUnsupportedRequestParametersInput
+		var arg0 *protocolvalidation.ValidateUnsupportedRequestParametersInput
 		if args[0] != nil {
-			arg0 = args[0].(*validators.ValidateUnsupportedRequestParametersInput)
+			arg0 = args[0].(*protocolvalidation.ValidateUnsupportedRequestParametersInput)
 		}
 		run(
 			arg0,
@@ -317,7 +317,7 @@ func (_c *AuthorizeValidator_ValidateUnsupportedRequestParameters_Call) Return(e
 	return _c
 }
 
-func (_c *AuthorizeValidator_ValidateUnsupportedRequestParameters_Call) RunAndReturn(run func(input *validators.ValidateUnsupportedRequestParametersInput) error) *AuthorizeValidator_ValidateUnsupportedRequestParameters_Call {
+func (_c *AuthorizeValidator_ValidateUnsupportedRequestParameters_Call) RunAndReturn(run func(input *protocolvalidation.ValidateUnsupportedRequestParametersInput) error) *AuthorizeValidator_ValidateUnsupportedRequestParameters_Call {
 	_c.Call.Return(run)
 	return _c
 }
