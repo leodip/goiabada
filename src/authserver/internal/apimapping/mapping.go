@@ -72,6 +72,39 @@ func ToUserResponses(users []models.User) []api.UserResponse {
 	return responses
 }
 
+// ToSessionOwnerResponse projects a user down to the five fields a session page shows about
+// whoever a listed session belongs to. It is not ToUserResponse narrowed for payload: the
+// client-sessions endpoint is the only caller and it is reached with the clients scopes alone,
+// so the fields left out are left out because that caller is not entitled to them (#373).
+func ToSessionOwnerResponse(user *models.User) *api.SessionOwnerResponse {
+	if user == nil {
+		return nil
+	}
+
+	return &api.SessionOwnerResponse{
+		Id:         user.Id,
+		Email:      user.Email,
+		GivenName:  user.GivenName,
+		MiddleName: user.MiddleName,
+		FamilyName: user.FamilyName,
+	}
+}
+
+func ToSessionOwnerResponses(users []models.User) []api.SessionOwnerResponse {
+	if users == nil {
+		return nil
+	}
+
+	responses := make([]api.SessionOwnerResponse, len(users))
+	for i, user := range users {
+		resp := ToSessionOwnerResponse(&user)
+		if resp != nil {
+			responses[i] = *resp
+		}
+	}
+	return responses
+}
+
 func ToUserAttributeResponse(attr *models.UserAttribute) *api.UserAttributeResponse {
 	if attr == nil {
 		return nil

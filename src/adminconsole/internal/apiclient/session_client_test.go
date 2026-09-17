@@ -414,7 +414,15 @@ func sessionListMethods() []sessionListMethod {
 			name:    "GetClientSessionsByClientId",
 			wantURI: "/api/v1/admin/clients/7/sessions?page=2&size=10",
 			call: func(c *AuthServerClient) ([]api.UserSessionDetailResponse, error) {
-				return c.GetClientSessionsByClientId("an-access-token", 7, 2, 10)
+				// The only one of the three answering an envelope rather than a bare list:
+				// its sessions span users, so it carries their owners too. The users half is
+				// decoded by its own case below, because the table's other two methods have
+				// no such field to assert (#373).
+				resp, err := c.GetClientSessionsByClientId("an-access-token", 7, 2, 10)
+				if err != nil {
+					return nil, err
+				}
+				return resp.Sessions, nil
 			},
 		},
 		{
@@ -506,4 +514,46 @@ func TestAuthServerClient_GetClientSessionsByClientIdBuildsThePaginationQuery(t 
 			assert.Equal(t, tc.wantURI, gotURI)
 		})
 	}
+}
+
+// The users half of the client sessions envelope, which no other session method carries. The
+// console reads a session's owner out of this array instead of fetching a user per row, so a
+// json tag renamed here reaches the page as two empty columns rather than as a compile error.
+//
+// Literal bytes again, and deliberately more than the five keys the endpoint sends: a decoder
+// that refused an unknown field would break the console on the next field the auth server adds,
+// and one that mapped by position rather than by name would pass the shorter body.
+func TestAuthServerClient_ClientSessionsDecodeTheOwnersArray(t *testing.T) {
+	client, _ := servesSessions(t, `{"sessions":[{`+sessionBodyFields+`}],"users":[
+		{"id":42,"email":"jane@example.com","givenName":"Jane","middleName":"Q","familyName":"Doe"},
+		{"id":43,"email":"sam@example.com","givenName":"Sam","middleName":"","familyName":"Reed",
+		 "somethingAddedLater":"ignored"}]}`)
+
+	resp, err := client.GetClientSessionsByClientId("an-access-token", 7, 1, 50)
+	require.NoError(t, err)
+	require.Len(t, resp.Sessions, 1)
+	require.Len(t, resp.Users, 2)
+
+	assert.Equal(t, api.SessionOwnerResponse{
+		Id: 42, Email: "jane@example.com", GivenName: "Jane", MiddleName: "Q", FamilyName: "Doe",
+	}, resp.Users[0])
+	assert.Equal(t, api.SessionOwnerResponse{
+		Id: 43, Email: "sam@example.com", GivenName: "Sam", FamilyName: "Reed",
+	}, resp.Users[1])
+
+	// The array is what the session's userId resolves against, which is the whole reason it is
+	// on the response.
+	assert.Equal(t, int64(42), resp.Sessions[0].UserId)
+}
+
+// An endpoint that sent no users at all, which is what a body from before this field existed
+// looks like. The console must be handed an empty lookup rather than a decoding failure: the
+// page renders every row with its device and its timestamps and blank owner columns.
+func TestAuthServerClient_ClientSessionsAcceptAnAbsentUsersArray(t *testing.T) {
+	client, _ := servesSessions(t, `{"sessions":[{`+sessionBodyFields+`}]}`)
+
+	resp, err := client.GetClientSessionsByClientId("an-access-token", 7, 1, 50)
+	require.NoError(t, err)
+	require.Len(t, resp.Sessions, 1)
+	assert.Empty(t, resp.Users)
 }

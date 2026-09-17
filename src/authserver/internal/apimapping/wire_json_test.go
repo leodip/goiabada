@@ -646,11 +646,77 @@ func TestWireJSON_ListMapperNilShapes(t *testing.T) {
 		{name: "ToGroupResponses", value: ToGroupResponses(nil, nil), literal: `[]`},
 		{name: "ToClientResponses", value: ToClientResponses(nil), literal: `[]`},
 		{name: "ToUserResponses", value: ToUserResponses(nil), literal: `null`},
+		{name: "ToSessionOwnerResponses", value: ToSessionOwnerResponses(nil), literal: `null`},
 		{name: "ToUserAttributeResponses", value: ToUserAttributeResponses(nil), literal: `null`},
 		{name: "ToGroupAttributeResponses", value: ToGroupAttributeResponses(nil), literal: `null`},
 		{name: "ToUserConsentResponses", value: ToUserConsentResponses(nil), literal: `null`},
 		{name: "ToPermissionResponses", value: ToPermissionResponses(nil), literal: `null`},
 		{name: "ToResourceResponses", value: ToResourceResponses(nil), literal: `null`},
+	})
+}
+
+// The client sessions envelope, which is the only session list that spans users and so the
+// only one that names who each session belongs to. Two things are pinned byte for byte.
+//
+// The users element's exact key set, which is decision 12 of #373: this endpoint is reached
+// with the clients scopes alone -- admin-read, manage-clients or manage -- while every users
+// route needs the users scopes, so the five fields here are what the documented scope split
+// allows a clients-only caller to learn about a person. Widening the element back to
+// UserResponse would hand it the subject, birth date, phone number, postal address, locale and
+// otpEnabled of everyone holding a live session on a client it manages, and it would fail here
+// rather than merely returning more.
+//
+// And the null that the producer must never emit: both arrays are required and neither is
+// nullable, so the nil row below is the shape HandleAPIClientSessionsGet is written to avoid on
+// an empty page. The integration tier reads the raw bytes of that page, because a decode into
+// this struct cannot tell [] from null.
+func TestWireJSON_ClientSessionsEnvelope(t *testing.T) {
+	session := *ToUserSessionDetailResponse(&models.UserSession{
+		Id: 21, SessionIdentifier: "b1c2d3", UserId: 7,
+	}, "")
+	sessionFields := `"id":21,"createdAt":null,"updatedAt":null,"sessionIdentifier":"b1c2d3",` +
+		`"started":null,"lastAccessed":null,"authMethods":"","acrLevel":"","authTime":null,` +
+		`"ipAddress":"","deviceName":"","deviceType":"","deviceOS":"","userAgent":"","userId":7,` +
+		`"isCurrent":false,"clientIdentifiers":[]`
+
+	runWireCases(t, []wireCase{
+		{
+			name: "GetClientSessionsResponse, populated",
+			value: api.GetClientSessionsResponse{
+				Sessions: []api.UserSessionDetailResponse{session},
+				Users: ToSessionOwnerResponses([]models.User{{
+					Id:           7,
+					Email:        "jane@example.com",
+					GivenName:    "Jane",
+					MiddleName:   "Q",
+					FamilyName:   "Doe",
+					Subject:      "0f5a1f3e-6d8a-4f6b-9a1e-2c3d4e5f6a7b",
+					Username:     "jdoe",
+					PhoneNumber:  "555-0100",
+					AddressLine1: "1 Somewhere Street",
+					OTPEnabled:   true,
+				}}),
+			},
+			literal: `{"sessions":[{` + sessionFields + `}],` +
+				`"users":[{"id":7,"email":"jane@example.com","givenName":"Jane",` +
+				`"middleName":"Q","familyName":"Doe"}]}`,
+		},
+		{
+			// What an empty page must not look like. Both fields are required arrays in the
+			// spec, and a nil slice reaches the wire as null, which is not [] to a generated
+			// client: it is a value its type cannot hold.
+			name:    "GetClientSessionsResponse, nil slices are null",
+			value:   api.GetClientSessionsResponse{},
+			literal: `{"sessions":null,"users":null}`,
+		},
+		{
+			name: "GetClientSessionsResponse, an empty page",
+			value: api.GetClientSessionsResponse{
+				Sessions: []api.UserSessionDetailResponse{},
+				Users:    []api.SessionOwnerResponse{},
+			},
+			literal: `{"sessions":[],"users":[]}`,
+		},
 	})
 }
 

@@ -72,10 +72,18 @@ func TestAPIClientSessionsGet_Success(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	assert.Equal(t, "application/json", resp.Header.Get("Content-Type"))
 
-	var out api.GetUserSessionsResponse
+	var out api.GetClientSessionsResponse
 	err = json.NewDecoder(resp.Body).Decode(&out)
 	assert.NoError(t, err)
 	assert.Len(t, out.Sessions, 2)
+
+	// Decision 10's normalization, at its smallest: two sessions of one person, so the array
+	// they resolve against holds one record and both rows are keys into it.
+	require.Len(t, out.Users, 1)
+	assert.Equal(t, testUser.Id, out.Users[0].Id)
+	assert.Equal(t, testUser.Email, out.Users[0].Email)
+	assert.Equal(t, "Test", out.Users[0].GivenName)
+	assert.Equal(t, "User", out.Users[0].FamilyName)
 
 	for _, s := range out.Sessions {
 		assert.Greater(t, s.Id, int64(0))
@@ -115,10 +123,20 @@ func TestAPIClientSessionsGet_EmptySessions(t *testing.T) {
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
-	var out api.GetUserSessionsResponse
-	err = json.NewDecoder(resp.Body).Decode(&out)
+	// Read the bytes, not the struct. Both fields are required arrays that the spec does not
+	// mark nullable, and a nil slice reaches the wire as null: a decode into
+	// GetClientSessionsResponse gives a zero-length slice either way, so it is blind to exactly
+	// the defect this asserts against. Empty is the shape a client with no live sessions hits,
+	// which is every client until somebody signs in through it (#373).
+	body := readBody(t, resp)
+	assert.Contains(t, body, `"sessions":[]`)
+	assert.Contains(t, body, `"users":[]`)
+
+	var out api.GetClientSessionsResponse
+	err = json.Unmarshal([]byte(body), &out)
 	assert.NoError(t, err)
 	assert.Len(t, out.Sessions, 0)
+	assert.Len(t, out.Users, 0)
 }
 
 func TestAPIClientSessionsGet_ClientNotFound(t *testing.T) {
@@ -267,7 +285,7 @@ func TestAPIClientSessionsGet_OnlyValidSessions(t *testing.T) {
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
-	var out api.GetUserSessionsResponse
+	var out api.GetClientSessionsResponse
 	err = json.NewDecoder(resp.Body).Decode(&out)
 	assert.NoError(t, err)
 	assert.Len(t, out.Sessions, 1)
@@ -344,7 +362,7 @@ func TestAPIClientSessionsGet_PaginationDefaultAndCap(t *testing.T) {
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
-	var out api.GetUserSessionsResponse
+	var out api.GetClientSessionsResponse
 	err = json.NewDecoder(resp.Body).Decode(&out)
 	assert.NoError(t, err)
 	assert.Len(t, out.Sessions, 50)
@@ -354,8 +372,113 @@ func TestAPIClientSessionsGet_PaginationDefaultAndCap(t *testing.T) {
 	resp2 := makeAPIRequest(t, "GET", url2, accessToken, nil)
 	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp2.StatusCode)
-	var out2 api.GetUserSessionsResponse
+	var out2 api.GetClientSessionsResponse
 	err = json.NewDecoder(resp2.Body).Decode(&out2)
 	assert.NoError(t, err)
 	assert.Len(t, out2.Sessions, 100)
+}
+
+// Decision 10, at the endpoint: the users array is normalized, so a person holding several
+// sessions on a client appears in it once, and every listed session's userId is a key into it.
+// A producer mapping one record per session would pass the success case above, which has a
+// single owner, and double a name here.
+//
+// Decision 12 rides on the same request, on the raw bytes: this route is reached with the
+// clients scopes alone -- admin-read, manage-clients or manage -- while every users route needs
+// the users scopes, so what a clients-only caller learns about a person is the five fields a
+// session page shows. The profile fields asserted absent are the ones an api.UserResponse would
+// have put here, and a decode into SessionOwnerResponse cannot see them arrive (#373).
+func TestAPIClientSessionsGet_UsersAreNormalizedAndCarryOnlyTheOwnerFields(t *testing.T) {
+	accessToken, _ := createAdminClientWithToken(t)
+
+	testClient := &models.Client{
+		ClientIdentifier:         "test-client-owners-" + fake.UUID()[:8],
+		ClientSecretEncrypted:    []byte("encrypted-secret"),
+		Description:              "Client",
+		Enabled:                  true,
+		AuthorizationCodeEnabled: true,
+	}
+	err := database.CreateClient(nil, testClient)
+	require.NoError(t, err)
+	defer func() { _ = database.DeleteClient(nil, testClient.Id) }()
+
+	// Two sessions for the first person, one for the second.
+	first := &models.User{
+		Subject:       fake.UUID(),
+		Enabled:       true,
+		Email:         uniqueEmail("first@client-owners.test"),
+		GivenName:     "Jane",
+		MiddleName:    "Q",
+		FamilyName:    "Doe",
+		PhoneNumber:   "555-0100",
+		AddressLine1:  "1 Somewhere Street",
+		Nickname:      "jd",
+		EmailVerified: true,
+	}
+	err = database.CreateUser(nil, first)
+	require.NoError(t, err)
+	defer func() { _ = database.DeleteUser(nil, first.Id) }()
+
+	second := &models.User{
+		Subject:       fake.UUID(),
+		Enabled:       true,
+		Email:         uniqueEmail("second@client-owners.test"),
+		GivenName:     "Sam",
+		FamilyName:    "Reed",
+		EmailVerified: true,
+	}
+	err = database.CreateUser(nil, second)
+	require.NoError(t, err)
+	defer func() { _ = database.DeleteUser(nil, second.Id) }()
+
+	now := time.Now().UTC()
+	for _, userId := range []int64{first.Id, first.Id, second.Id} {
+		session := createTestUserSession(t, userId, fake.UUID())
+		defer func(id int64) { _ = database.DeleteUserSession(nil, id) }(session.Id)
+
+		err = database.CreateUserSessionClient(nil, &models.UserSessionClient{
+			UserSessionId: session.Id, ClientId: testClient.Id,
+			Started: now.Add(-time.Hour), LastAccessed: now.Add(-5 * time.Minute),
+		})
+		require.NoError(t, err)
+	}
+
+	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(testClient.Id, 10) + "/sessions"
+	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
+	defer func() { _ = resp.Body.Close() }()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	body := readBody(t, resp)
+	var out api.GetClientSessionsResponse
+	require.NoError(t, json.Unmarshal([]byte(body), &out))
+
+	require.Len(t, out.Sessions, 3)
+	require.Len(t, out.Users, 2, "the person with two sessions must appear once")
+
+	owners := make(map[int64]api.SessionOwnerResponse, len(out.Users))
+	for _, owner := range out.Users {
+		_, duplicate := owners[owner.Id]
+		assert.False(t, duplicate, "user %d appears twice in the users array", owner.Id)
+		owners[owner.Id] = owner
+	}
+	for _, session := range out.Sessions {
+		_, resolved := owners[session.UserId]
+		assert.True(t, resolved, "session %d names user %d, which the users array does not carry",
+			session.Id, session.UserId)
+	}
+
+	assert.Equal(t, "Jane", owners[first.Id].GivenName)
+	assert.Equal(t, "Q", owners[first.Id].MiddleName)
+	assert.Equal(t, "Doe", owners[first.Id].FamilyName)
+	assert.Equal(t, first.Email, owners[first.Id].Email)
+	assert.Equal(t, "Sam Reed", owners[second.Id].GivenName+" "+owners[second.Id].FamilyName)
+
+	// The profile a clients-only caller is not entitled to. Each of these is a key an
+	// api.UserResponse would have carried into the same array.
+	for _, key := range []string{`"subject"`, `"nickname"`, `"phoneNumber"`, `"addressLine1"`,
+		`"birthDate"`, `"otpEnabled"`, `"username"`, `"locale"`} {
+		assert.NotContains(t, body, key,
+			"the client sessions response carries %s, which is reachable with manage-clients "+
+				"alone and belongs to the users scopes (#373 decision 12)", key)
+	}
 }

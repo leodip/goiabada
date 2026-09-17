@@ -2068,9 +2068,14 @@ paths:
       tags: [Clients]
       summary: List client sessions
       description: |
-        Get a page of the user sessions associated with a client. Sessions that
-        have passed the configured idle timeout or maximum lifetime are left out,
-        so the list is the live ones.
+        Get a page of the user sessions associated with a client, together with
+        the people they belong to. Sessions that have passed the configured idle
+        timeout or maximum lifetime are left out, so the list is the live ones.
+
+        A session's `userId` resolves against the normalized `users` array, where
+        a person holding several sessions appears once. Those records carry the
+        name parts and the email and nothing else, because this route is reached
+        with the clients scopes alone.
       operationId: getClientSessions
       parameters:
         - $ref: '#/components/parameters/ClientIdParam'
@@ -2088,7 +2093,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/GetUserSessionsResponse'
+                $ref: '#/components/schemas/GetClientSessionsResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -4232,6 +4237,49 @@ components:
             $ref: '#/components/schemas/UserSessionDetailResponse'
       required:
         - sessions
+
+    SessionOwnerResponse:
+      description: |
+        Who a listed session belongs to: the name parts and the email, which is what a
+        session page shows. Not a user profile, because the client sessions endpoint is
+        reached with the clients scopes alone.
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        email:
+          type: string
+        givenName:
+          type: string
+        middleName:
+          type: string
+        familyName:
+          type: string
+      required:
+        - id
+        - email
+        - givenName
+        - middleName
+        - familyName
+
+    GetClientSessionsResponse:
+      type: object
+      properties:
+        sessions:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserSessionDetailResponse'
+        users:
+          description: |
+            The owners of the sessions listed, normalized: a user holding several
+            sessions appears once. Every session's userId is a key into this array.
+          type: array
+          items:
+            $ref: '#/components/schemas/SessionOwnerResponse'
+      required:
+        - sessions
+        - users
 
     GetUserSessionResponse:
       type: object

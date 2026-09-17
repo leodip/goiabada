@@ -292,6 +292,8 @@ func TestToUserResponses_MapsEachUserDistinctly(t *testing.T) {
 func TestMappers_NilInputReturnsNil(t *testing.T) {
 	assert.Nil(t, ToUserResponse(nil))
 	assert.Nil(t, ToUserResponses(nil))
+	assert.Nil(t, ToSessionOwnerResponse(nil))
+	assert.Nil(t, ToSessionOwnerResponses(nil))
 	assert.Nil(t, ToUserAttributeResponse(nil))
 	assert.Nil(t, ToUserAttributeResponses(nil))
 	assert.Nil(t, ToUserSessionResponse(nil))
@@ -322,6 +324,70 @@ func TestListMappers_NilSliceBehaviorDiffersByType(t *testing.T) {
 	usersJSON, err := json.Marshal(ToUserResponses(nil))
 	assert.NoError(t, err)
 	assert.Equal(t, "null", string(usersJSON))
+}
+
+// =============================================================================
+// ToSessionOwnerResponse
+// =============================================================================
+
+// The projection is five fields, and which five is a scope decision rather than a payload one:
+// the client sessions endpoint is reached with the clients scopes alone, so a field added here
+// is a field a manage-clients token starts learning about everyone holding a live session on a
+// client it manages. This case is written as an exhaustive key set for that reason -- it fails
+// when a sixth field appears, not merely when one of the five stops being copied (#373
+// decision 12).
+func TestToSessionOwnerResponse_CarriesTheFiveFieldsAndNoOthers(t *testing.T) {
+	resp := ToSessionOwnerResponse(&models.User{
+		Id:         7,
+		Email:      "jane@example.com",
+		GivenName:  "Jane",
+		MiddleName: "Q",
+		FamilyName: "Doe",
+
+		// Everything below is on the same row and must not reach this shape.
+		Subject:      fake.UUID(),
+		Username:     "jdoe",
+		Nickname:     "jd",
+		PhoneNumber:  "555-0100",
+		AddressLine1: "1 Somewhere Street",
+		Locale:       "en",
+		OTPEnabled:   true,
+		BirthDate:    sql.NullTime{Time: time.Date(1990, 5, 15, 0, 0, 0, 0, time.UTC), Valid: true},
+	})
+
+	require.NotNil(t, resp)
+	assert.Equal(t, api.SessionOwnerResponse{
+		Id:         7,
+		Email:      "jane@example.com",
+		GivenName:  "Jane",
+		MiddleName: "Q",
+		FamilyName: "Doe",
+	}, *resp)
+
+	assert.Equal(t, 5, reflect.TypeOf(api.SessionOwnerResponse{}).NumField(),
+		"api.SessionOwnerResponse gained a field: this shape is reachable with the clients "+
+			"scopes alone, so widening it hands a manage-clients token more of a person's "+
+			"profile than the documented scope split allows (#373 decision 12)")
+}
+
+func TestToSessionOwnerResponses_MapsEachUserDistinctly(t *testing.T) {
+	resps := ToSessionOwnerResponses([]models.User{
+		{Id: 1, Email: "one@example.com", GivenName: "One"},
+		{Id: 2, Email: "two@example.com", GivenName: "Two"},
+	})
+
+	require.Len(t, resps, 2)
+	assert.Equal(t, int64(1), resps[0].Id)
+	assert.Equal(t, "one@example.com", resps[0].Email)
+	assert.Equal(t, int64(2), resps[1].Id)
+	assert.Equal(t, "Two", resps[1].GivenName)
+}
+
+// Nil in, nil out, as ToUserResponses does: the difference between [] and null belongs to the
+// producer, which is where an empty page has to answer an empty array rather than a null one.
+func TestToSessionOwnerResponses_NilAndEmpty(t *testing.T) {
+	assert.Nil(t, ToSessionOwnerResponses(nil))
+	assert.Equal(t, []api.SessionOwnerResponse{}, ToSessionOwnerResponses([]models.User{}))
 }
 
 // =============================================================================
