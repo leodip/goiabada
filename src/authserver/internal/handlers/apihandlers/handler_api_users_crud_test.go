@@ -14,6 +14,7 @@ import (
 	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+	"github.com/leodip/goiabada/authserver/internal/usercreation"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
@@ -497,4 +498,183 @@ func TestHandleAPIUserCreatePost_AnyOtherCreateFailureAnswers500(t *testing.T) {
 	httpHelper.AssertExpectations(t)
 	database.AssertExpectations(t)
 	userCreator.AssertExpectations(t)
+}
+
+// TestHandleAPIUserCreatePost_SetPasswordTypeMatrix is the whole of what setPasswordType decides,
+// on both SMTP settings, including the cell that used to fall through both arms.
+//
+// openapi.yaml publishes the property as enum [now, email] and leaves it out of the schema's
+// required array, which in OpenAPI means absent is allowed and a present value must be one of the
+// two. The handler compared against the two and refused nothing else, so with SMTP configured a
+// third value -- the field's absence included -- took neither the password branch nor the email
+// branch: the row was created enabled, holding authserver:manage-account, with no password hash, no
+// forgot-password code and no setup email. Nobody was ever told the account existed.
+//
+// The rows below are the contract as it now stands: a present value outside the set is refused, an
+// absent one is "now", and "email" is the one value that skips the password, and only where there
+// is SMTP to send it with. The two arms are driven by one boolean, so "neither" is no longer a
+// reachable state; these rows are what would go red if that boolean were split back into two
+// independent conditions.
+func TestHandleAPIUserCreatePost_SetPasswordTypeMatrix(t *testing.T) {
+	const goodPassword = "password123"
+
+	for _, tc := range []struct {
+		name string
+		// setPasswordType is omitted from the body entirely when absent is true, which is the
+		// case the schema permits and the one the defect was reachable through.
+		setPasswordType string
+		absent          bool
+		smtpEnabled     bool
+		password        string
+
+		wantStatus  int
+		wantCreated bool
+		wantEmail   bool
+		wantMessage string
+	}{
+		{name: "now with a password", setPasswordType: "now", smtpEnabled: true,
+			password: goodPassword, wantStatus: http.StatusCreated, wantCreated: true},
+		{name: "now without a password", setPasswordType: "now", smtpEnabled: true,
+			wantStatus: http.StatusBadRequest, wantMessage: "Password is required"},
+		{name: "now with no smtp", setPasswordType: "now", smtpEnabled: false,
+			password: goodPassword, wantStatus: http.StatusCreated, wantCreated: true},
+
+		{name: "email sends the setup mail", setPasswordType: "email", smtpEnabled: true,
+			wantStatus: http.StatusCreated, wantCreated: true, wantEmail: true},
+		// With no SMTP there is no mail to send, so the password is required whatever the field
+		// says. This is the one row where "email" does not mean email, and it is long-standing
+		// behaviour that the refusal above must not have disturbed.
+		{name: "email with no smtp still needs a password", setPasswordType: "email",
+			smtpEnabled: false, password: goodPassword,
+			wantStatus: http.StatusCreated, wantCreated: true},
+		{name: "email with no smtp and no password", setPasswordType: "email", smtpEnabled: false,
+			wantStatus: http.StatusBadRequest, wantMessage: "Password is required"},
+
+		// Absent is permitted by the schema and defaults to "now": it asks for a password rather
+		// than creating an account nobody can reach. Before the fix the first of these two was a
+		// 201 with an empty hash and no mail.
+		{name: "absent defaults to now", absent: true, smtpEnabled: true, password: goodPassword,
+			wantStatus: http.StatusCreated, wantCreated: true},
+		{name: "absent without a password is refused", absent: true, smtpEnabled: true,
+			wantStatus: http.StatusBadRequest, wantMessage: "Password is required"},
+		{name: "absent with no smtp", absent: true, smtpEnabled: false, password: goodPassword,
+			wantStatus: http.StatusCreated, wantCreated: true},
+		// Empty reaches the handler as absent does, because a client that always sends the key
+		// sends "" rather than omitting it.
+		{name: "empty is absent", setPasswordType: "", smtpEnabled: true, password: goodPassword,
+			wantStatus: http.StatusCreated, wantCreated: true},
+
+		// A present value outside the set is refused, which is what the published enum has always
+		// promised. Case matters: the enum is lowercase and so is the comparison.
+		{name: "a third value", setPasswordType: "later", smtpEnabled: true,
+			password: goodPassword, wantStatus: http.StatusBadRequest,
+			wantMessage: "setPasswordType"},
+		{name: "a near miss on email", setPasswordType: "e-mail", smtpEnabled: true,
+			wantStatus: http.StatusBadRequest, wantMessage: "setPasswordType"},
+		{name: "the right word in the wrong case", setPasswordType: "Email", smtpEnabled: true,
+			password: goodPassword, wantStatus: http.StatusBadRequest,
+			wantMessage: "setPasswordType"},
+		// Refused before the SMTP question is asked, so an unlisted value cannot be laundered
+		// into the password arm by a deployment that happens to have no mail configured.
+		{name: "a third value with no smtp", setPasswordType: "NOW", smtpEnabled: false,
+			password: goodPassword, wantStatus: http.StatusBadRequest,
+			wantMessage: "setPasswordType"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+			database := mocks_data.NewDatabase(t)
+			userCreator := mocks_handlers.NewUserCreator(t)
+			auditLogger := mocks_audit.NewAuditLogger(t)
+			emailSender := mocks_handlers.NewEmailSender(t)
+
+			handler := HandleAPIUserCreatePost(httpHelper, database, userCreator,
+				accountvalidation.NewEmailValidator(database),
+				accountvalidation.NewProfileValidator(database),
+				accountvalidation.NewPasswordValidator(),
+				auditLogger, emailSender)
+
+			payload := map[string]interface{}{"email": "newuser@example.com"}
+			if !tc.absent {
+				payload["setPasswordType"] = tc.setPasswordType
+			}
+			if tc.password != "" {
+				payload["password"] = tc.password
+			}
+			body, err := json.Marshal(payload)
+			require.NoError(t, err)
+
+			req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/users", bytes.NewReader(body))
+			req.Header.Set("Content-Type", "application/json")
+			req = setTokenContextWithClaims(req, map[string]interface{}{"sub": adminSubject})
+			req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings,
+				&models.Settings{AppName: "TestApp", SMTPEnabled: tc.smtpEnabled,
+					PasswordPolicy: enums.PasswordPolicyLow}))
+
+			database.On("GetUserByEmail", mock.Anything, "newuser@example.com").Return(nil, nil)
+
+			// createdUser is what the handler mutates on the email arm, so the assertions below
+			// read the hash off the input the handler actually passed rather than off a value
+			// this test chose.
+			createdUser := &models.User{Id: 7, Email: "newuser@example.com"}
+			var gotPasswordHash string
+			if tc.wantCreated {
+				userCreator.On("CreateUser", mock.Anything).
+					Run(func(args mock.Arguments) {
+						gotPasswordHash = args.Get(0).(*usercreation.CreateUserInput).PasswordHash
+					}).Return(createdUser, nil)
+				auditLogger.On("Log", mock.Anything, constants.AuditCreatedUser, mock.Anything).Return()
+			}
+			if tc.wantEmail {
+				database.On("UpdateUser", mock.Anything, createdUser).Return(nil)
+				httpHelper.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html",
+					"/emails/email_newuser_set_password.html", mock.Anything).
+					Return(&bytes.Buffer{}, nil)
+				emailSender.On("SendEmail", mock.Anything, mock.Anything).Return(nil)
+			}
+
+			rr := httptest.NewRecorder()
+			handler.ServeHTTP(rr, req)
+
+			require.Equal(t, tc.wantStatus, rr.Code, rr.Body.String())
+			if tc.wantMessage != "" {
+				assert.Contains(t, rr.Body.String(), tc.wantMessage)
+			}
+
+			if tc.wantCreated && !tc.wantEmail {
+				// The password arm: a real bcrypt hash of the password that was sent. Asserting
+				// that it verifies, rather than that it is non-empty, is what separates this from
+				// the defect, where the row was created with an empty hash bcrypt refuses.
+				require.NotEmpty(t, gotPasswordHash, "the account must be created with a password")
+				assert.True(t, hashutil.VerifyPasswordHash(gotPasswordHash, tc.password),
+					"the stored hash must verify against the password the request carried")
+			}
+			if tc.wantEmail {
+				// The email arm legitimately creates the row with no hash: the setup link is how
+				// the account becomes reachable, and the row carries the code that answers it.
+				assert.Empty(t, gotPasswordHash)
+				assert.NotEmpty(t, createdUser.ForgotPasswordCodeHash,
+					"a setup email is only meaningful beside the code that answers its link")
+			}
+
+			// The refusals must not have created anything, and the password arm must not have
+			// sent mail. Both are what mockery's strict expectations assert here: a call this
+			// table did not register fails the case.
+			httpHelper.AssertExpectations(t)
+			database.AssertExpectations(t)
+			userCreator.AssertExpectations(t)
+			emailSender.AssertExpectations(t)
+		})
+	}
+}
+
+// An empty password hash is what the email arm legitimately writes and what the defect wrote by
+// accident, so the property that made the defect a silent provisioning failure rather than a way in
+// is worth pinning where it can be read: bcrypt refuses such a row for every password, including
+// the empty one. Without this, "creates an account with no password" carries no information about
+// whether that account can be signed in to.
+func TestVerifyPasswordHash_AnEmptyHashAuthenticatesNothing(t *testing.T) {
+	for _, password := range []string{"", " ", "password123", "\x00"} {
+		assert.False(t, hashutil.VerifyPasswordHash("", password),
+			"an account with no password hash must not authenticate with %q", password)
+	}
 }

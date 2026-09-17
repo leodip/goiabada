@@ -24,14 +24,36 @@ type UpdateSettingsGeneralRequest struct {
 }
 
 type CreateUserAdminRequest struct {
-	Email           string `json:"email"`
-	EmailVerified   bool   `json:"emailVerified"`
-	GivenName       string `json:"givenName"`
-	MiddleName      string `json:"middleName"`
-	FamilyName      string `json:"familyName"`
-	SetPasswordType string `json:"setPasswordType"`    // "now" or "email"
-	Password        string `json:"password,omitempty"` // if "now"
+	Email         string `json:"email"`
+	EmailVerified bool   `json:"emailVerified"`
+	GivenName     string `json:"givenName"`
+	MiddleName    string `json:"middleName"`
+	FamilyName    string `json:"familyName"`
+	// SetPasswordType selects how the new account gets a password.
+	// SetPasswordTypeEmail sends a setup link; SetPasswordTypeNow requires Password on this
+	// request. The property is published as a closed enum and is not required, which in OpenAPI
+	// means absent is allowed and a present value must be one of the two: the endpoint refuses
+	// any other with 400, and treats absent as SetPasswordTypeNow.
+	SetPasswordType string `json:"setPasswordType,omitempty"`
+	// Password is required unless a setup email will be sent, which means whenever
+	// SetPasswordType is not SetPasswordTypeEmail, and on a deployment with no SMTP configured
+	// whatever SetPasswordType says.
+	Password string `json:"password,omitempty"`
 }
+
+// The two values CreateUserAdminRequest.SetPasswordType may take. Declared here, in the package
+// both modules share, for the reason AccountLogoutResponseModeFormPost is: the auth server compares
+// against them and the admin console sends them, and two literals in two modules is a disagreement
+// nothing in the build can see.
+//
+// Unlike that one this is a genuinely closed set. Before #350 the handler compared against these
+// two and refused nothing else, so a third value took neither branch and created an enabled account
+// with no password, no setup code and no setup email — nobody was ever told it existed. The schema
+// already promised the refusal; only the handler had to be taught to make it.
+const (
+	SetPasswordTypeNow   = "now"
+	SetPasswordTypeEmail = "email"
+)
 
 type UpdateUserProfileRequest struct {
 	Username            string `json:"username"`

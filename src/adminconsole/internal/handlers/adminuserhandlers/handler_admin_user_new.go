@@ -25,7 +25,7 @@ func HandleAdminUserNewGet(
 
 		bind := map[string]interface{}{
 			"smtpEnabled":     settings.SMTPEnabled,
-			"setPasswordType": "now",
+			"setPasswordType": api.SetPasswordTypeNow,
 			"page":            r.URL.Query().Get("page"),
 			"query":           r.URL.Query().Get("query"),
 		}
@@ -85,7 +85,11 @@ func HandleAdminUserNewPost(
 		// Prepare request for new API
 		setPasswordType := r.FormValue("setPasswordType")
 		password := ""
-		if (settings.SMTPEnabled && setPasswordType == "now") || !settings.SMTPEnabled {
+		// The same rule the API applies, so the form asks for exactly what the endpoint will
+		// require: a password unless a setup email will be sent. Derived from the email arm rather
+		// than written as a test for "now", so an absent or unexpected value asks for a password
+		// here exactly as it does there (#350).
+		if !settings.SMTPEnabled || setPasswordType != api.SetPasswordTypeEmail {
 			// r.PostFormValue rather than r.FormValue: r.Form merges the URL query behind the
 			// request body, so /admin/users/new?password=... would have set the new account's
 			// password, leaving it in the browser's history, in the Referer of anything the page

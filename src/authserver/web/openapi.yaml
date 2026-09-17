@@ -3927,7 +3927,10 @@ components:
         setPasswordType:
           type: string
           enum: [now, email]
-          description: '"now" to set password immediately, "email" to send setup email'
+          default: now
+          description: >-
+            "now" to set the password immediately, "email" to send a setup link. Optional:
+            absent is treated as "now". A present value outside the two is refused with 400.
         password:
           type: string
           description: >-

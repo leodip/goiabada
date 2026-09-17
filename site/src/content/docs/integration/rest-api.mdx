@@ -273,8 +273,8 @@ POST /api/v1/admin/users/create
 | <span style="white-space: nowrap;">`givenName`</span> | string | No | First name |
 | <span style="white-space: nowrap;">`middleName`</span> | string | No | Middle name |
 | <span style="white-space: nowrap;">`familyName`</span> | string | No | Last name |
-| <span style="white-space: nowrap;">`setPasswordType`</span> | string | No | `"now"` to set password immediately, `"email"` to send setup email |
-| <span style="white-space: nowrap;">`password`</span> | string | Conditional | Required if `setPasswordType` is `"now"` |
+| <span style="white-space: nowrap;">`setPasswordType`</span> | string | No | `"now"` to set password immediately, `"email"` to send setup email. Defaults to `"now"` when absent; any other value is rejected with 400 |
+| <span style="white-space: nowrap;">`password`</span> | string | Conditional | Required unless a setup email will be sent, so: required whenever `setPasswordType` is not `"email"`, and required whatever it says on a deployment with no SMTP configured |
 
 Answers `409` with error code `EMAIL_ALREADY_EXISTS` when the address is already registered. Retrying the same address will not succeed.
 

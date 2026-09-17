@@ -334,9 +334,35 @@ func HandleAPIUserCreatePost(
 			return
 		}
 
+		// setPasswordType is published as enum [now, email] and left out of the schema's required
+		// array, which in OpenAPI means absent is allowed and a present value must be one of the
+		// two. The document was therefore already right; the handler was not. It compared against
+		// the two values and refused nothing else, so on a deployment with SMTP configured a third
+		// value took neither the password branch nor the email branch: the account was created
+		// enabled, holding authserver:manage-account, with no password, no forgot-password code and
+		// no setup email. Nobody was ever told it existed. A passwordless row cannot be signed in
+		// to -- bcrypt refuses an empty hash for every password, the empty one included -- so the
+		// defect was a silent provisioning failure rather than a way in, and this refusal is what
+		// the contract already promised (#350).
+		if req.SetPasswordType != "" &&
+			req.SetPasswordType != api.SetPasswordTypeNow &&
+			req.SetPasswordType != api.SetPasswordTypeEmail {
+
+			writeJSONError(w, "setPasswordType must be \"now\" or \"email\"",
+				"VALIDATION_ERROR", http.StatusBadRequest)
+			return
+		}
+
+		// One boolean decides both arms, so they are exhaustive by construction and no value can
+		// take neither again. Email is the significant value; everything else, absent included,
+		// sets the password now, which is what a deployment with no SMTP has always done for every
+		// value. Defaulting the other way would make an omitted field send mail the caller never
+		// asked for.
+		sendSetupEmail := settings.SMTPEnabled && req.SetPasswordType == api.SetPasswordTypeEmail
+
 		// Password handling
 		var passwordHash string
-		if req.SetPasswordType == "now" || !settings.SMTPEnabled {
+		if !sendSetupEmail {
 			if req.Password == "" {
 				writeJSONError(w, "Password is required", "VALIDATION_ERROR", http.StatusBadRequest)
 				return
@@ -406,7 +432,7 @@ func HandleAPIUserCreatePost(
 		})
 
 		// Handle email flow if needed
-		if settings.SMTPEnabled && req.SetPasswordType == "email" {
+		if sendSetupEmail {
 			verificationCode := stringutil.GenerateSecurityRandomString(32)
 			verificationCodeEncrypted, err := encryption.EncryptData(verificationCode)
 			if err != nil {
