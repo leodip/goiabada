@@ -400,8 +400,13 @@ func (c *AuthServerClient) UpdateAccountOTP(accessToken string, request *api.Upd
 	return &response.User, nil
 }
 
-// CreateAccountLogoutRequest asks the auth server to prepare a logout operation.
-// It returns either a form_post instruction or a redirect URL.
+// CreateAccountLogoutRequest asks the auth server to prepare a logout operation. Exactly one of the
+// two returns is non-nil, and which one the endpoint chooses is what request.ResponseMode asked for.
+//
+// The two shapes share no field, so they are told apart by what survived the unmarshal rather than
+// by a discriminator: encoding/json fills neither struct from the other's body, and a body that
+// fills neither is an error rather than a nil pair, because the caller would otherwise dereference
+// whichever it expected.
 func (c *AuthServerClient) CreateAccountLogoutRequest(accessToken string, request *api.AccountLogoutRequest) (*api.AccountLogoutFormPostResponse, *api.AccountLogoutRedirectResponse, error) {
 	fullURL := c.baseURL + "/api/v1/account/logout-request"
 

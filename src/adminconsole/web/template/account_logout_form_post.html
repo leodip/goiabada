@@ -1,0 +1,34 @@
+{{define "title"}}{{ .appName }}{{end}}
+{{define "head"}}{{end}}
+
+{{define "body"}}
+
+<!-- The logout form binding. This page exists so the id_token_hint travels in a request body
+     instead of a top-level navigation's URL, where it would reach the address bar, the browser
+     history and the access log of every proxy in front of the deployment. It submits itself, so
+     it is visible only for as long as the browser takes to parse it (#350).
+
+     No visible localized text: the page is never read, and the one control below is the
+     fallback for a browser with JavaScript turned off. -->
+
+<main>
+
+<form id="logoutForm" method="post" action="{{ .endpoint }}">
+    {{range $name, $value := .params}}<input type="hidden" name="{{ $name }}" value="{{ $value }}" />
+    {{end}}
+    <noscript>
+        <div class="flex items-center justify-center h-screen p-8">
+            <button type="submit" class="btn btn-primary">{{ T $.ctx "adminconsole.menu.logout" }}</button>
+        </div>
+    </noscript>
+</form>
+
+<script>
+    // Parser-inserted and immediately after the form, so the element it names is already in the
+    // document. The submission is what carries the hint; nothing else on this page acts.
+    document.getElementById("logoutForm").submit();
+</script>
+
+</main>
+
+{{end}}

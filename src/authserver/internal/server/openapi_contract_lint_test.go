@@ -917,12 +917,6 @@ var apiStructsWithNoSchema = map[string]string{
 	"DynamicClientRegistrationResponse": "RFC 7591 registration at /connect/register, outside the Admin and Account API scope this document declares",
 	"DynamicClientRegistrationError":    "RFC 7591 registration at /connect/register, outside the Admin and Account API scope this document declares",
 	"PublicSettingsResponse":            "the unauthenticated /api/public/settings, outside the Admin and Account API scope this document declares",
-
-	// A shape no handler writes. HandleAPIAccountLogoutRequestPost ignores the request's
-	// responseMode outright and always answers AccountLogoutRedirectResponse, so there is no
-	// response for this document to declare. It is not dead code either: the admin console's
-	// apiclient still decodes it, which is a defect in the console rather than a gap here.
-	"AccountLogoutFormPostResponse": "no handler writes it; the logout endpoint always answers AccountLogoutRedirectResponse",
 }
 
 func TestOpenAPI_SchemaPropertiesMatchTheAPIStructs(t *testing.T) {

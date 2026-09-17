@@ -44,20 +44,42 @@ func HandleAccountLogoutGet(
 			return
 		}
 
-		// Build logout request via API (form_post preferred to avoid URL token leak)
+		// Ask for the form binding. A redirect would put the id_token_hint in the address bar
+		// of a top-level navigation, and so in the browser's history and in the access log of
+		// every proxy between here and the auth server; a self-submitting form carries it in a
+		// request body instead. The console is the one relying party shipped beside this server
+		// and has to follow the advice the integration docs give everyone else (#350 decision 2).
 		accessToken := jwtInfo.AccessToken.TokenBase64
 		req := &api.AccountLogoutRequest{
 			PostLogoutRedirectUri: config.GetAdminConsole().BaseURL,
 			State:                 stringutil.GenerateSecurityRandomString(32),
-			ResponseMode:          "redirect",
+			ResponseMode:          api.AccountLogoutResponseModeFormPost,
 		}
 
-		_, redirectResp, err := apiClient.CreateAccountLogoutRequest(accessToken, req)
+		formResp, redirectResp, err := apiClient.CreateAccountLogoutRequest(accessToken, req)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
-		// Always use redirect mode
+
+		// An older auth server answers the redirect shape whatever this asked for, so the
+		// redirect arm stays reachable and is not a fallback nobody takes. Both arms are checked
+		// rather than one assumed: the client returns exactly one of the two, and dereferencing
+		// the other is a nil panic on the page that ends a session.
+		if formResp != nil {
+			// The parameters are ranged out of the map the API sent rather than named here,
+			// so a parameter it starts sending reaches the form with no console edit.
+			err = httpHelper.RenderTemplate(w, r, "/layouts/no_menu_layout.html", "/account_logout_form_post.html",
+				map[string]interface{}{
+					"endpoint": formResp.Endpoint,
+					"params":   formResp.Params,
+				})
+			if err != nil {
+				httpHelper.InternalServerError(w, r, err)
+			}
+			return
+		}
+
 		http.Redirect(w, r, redirectResp.LogoutUrl, http.StatusFound)
 	}
 }

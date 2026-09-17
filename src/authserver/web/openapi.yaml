@@ -3122,8 +3122,10 @@ paths:
   /api/v1/account/logout-request:
     post:
       tags: [Account]
-      summary: Request logout URL
-      description: Get a logout URL with short-lived id_token_hint
+      summary: Prepare a logout
+      description: >-
+        Validate the logout target, mint a short-lived id_token_hint and return the prepared
+        logout operation, as either a self-submitting form's parameters or a URL to follow.
       operationId: requestAccountLogout
       requestBody:
         required: true
@@ -3133,11 +3135,16 @@ paths:
               $ref: '#/components/schemas/AccountLogoutRequest'
       responses:
         '200':
-          description: Logout URL
+          description: |
+            The prepared logout. The shape depends on the responseMode field of the request:
+            "form_post" gives AccountLogoutFormPostResponse, and anything else, absent
+            included, gives AccountLogoutRedirectResponse.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AccountLogoutRedirectResponse'
+                oneOf:
+                  - $ref: '#/components/schemas/AccountLogoutRedirectResponse'
+                  - $ref: '#/components/schemas/AccountLogoutFormPostResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -5596,9 +5603,12 @@ components:
           description: Auto-resolved if omitted
         responseMode:
           type: string
+          enum: [form_post, redirect]
           description: >-
-            Accepted and ignored. The response is always a redirect URL; there is no form_post
-            mode at this endpoint, and no value of this field changes what is returned.
+            Which response shape to prepare. "form_post" answers the parameters of a
+            self-submitting POST form, which keeps the id_token_hint out of a top-level
+            navigation's URL, its history and its referrers. Any other value, absent included,
+            answers a redirect URL.
 
     AccountLogoutRedirectResponse:
       type: object
@@ -5606,5 +5616,35 @@ components:
         logoutUrl:
           type: string
           format: uri
+          description: >-
+            The end-session URL to follow. It carries the id_token_hint in its query string,
+            so it reaches the address bar, the browser history and any intermediary access log;
+            request form_post instead where that matters.
       required:
         - logoutUrl
+
+    AccountLogoutFormPostResponse:
+      type: object
+      description: >-
+        The parameters of a POST to the end-session endpoint. Render them as hidden inputs of a
+        form the page submits itself, so the id_token_hint travels in the request body.
+      properties:
+        method:
+          type: string
+          enum: [POST]
+          description: Always POST.
+        endpoint:
+          type: string
+          format: uri
+          description: The end-session endpoint to submit to, with no query string of its own.
+        params:
+          type: object
+          additionalProperties:
+            type: string
+          description: >-
+            The form fields, as name to value: id_token_hint, post_logout_redirect_uri, and
+            state when the request sent one.
+      required:
+        - method
+        - endpoint
+        - params
