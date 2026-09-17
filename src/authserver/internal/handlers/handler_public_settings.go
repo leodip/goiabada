@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	"github.com/leodip/goiabada/authserver/internal/apiresponse"
-	"github.com/leodip/goiabada/authserver/internal/dtos"
+	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/errs"
 )
@@ -54,7 +54,7 @@ func (h *HandlerPublicSettings) ServeHTTP(w http.ResponseWriter, r *http.Request
 	// /.well-known/openid-configuration, which OIDC Discovery 1.0 section 3
 	// requires ("REQUIRED. URL using the https scheme ... that the OP asserts
 	// as its Issuer Identifier").
-	response := dtos.PublicSettingsResponse{
+	response := api.PublicSettingsResponse{
 		AppName:     settings.AppName,
 		UITheme:     settings.UITheme,
 		SMTPEnabled: settings.SMTPEnabled,

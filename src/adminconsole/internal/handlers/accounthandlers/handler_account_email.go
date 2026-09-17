@@ -10,7 +10,6 @@ import (
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/errs"
-	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
 )
@@ -51,7 +50,7 @@ func HandleAccountEmailGet(
 			}
 		}
 
-		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
+		settings := r.Context().Value(constants.ContextKeySettings).(*api.PublicSettingsResponse)
 
 		bind := map[string]interface{}{
 			"savedSuccessfully": savedSuccessfully,

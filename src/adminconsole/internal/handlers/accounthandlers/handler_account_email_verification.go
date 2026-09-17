@@ -11,7 +11,6 @@ import (
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/errs"
-	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
 )
@@ -36,7 +35,7 @@ func HandleAccountEmailVerificationGet(
 			return
 		}
 
-		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
+		settings := r.Context().Value(constants.ContextKeySettings).(*api.PublicSettingsResponse)
 		if !settings.SMTPEnabled {
 			httpHelper.InternalServerError(w, r, errs.New("SMTP is not enabled"))
 			return
@@ -137,7 +136,7 @@ func HandleAccountEmailVerificationPost(
 			// Handle invalid/expired code gracefully as validation error
 			var apiErr *apiclient.APIError
 			if errors.As(err, &apiErr) && apiErr.Code == "INVALID_OR_EXPIRED_VERIFICATION_CODE" {
-				settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
+				settings := r.Context().Value(constants.ContextKeySettings).(*api.PublicSettingsResponse)
 				bind := map[string]interface{}{
 					"savedSuccessfully": false,
 					"email":             user.Email,
@@ -154,7 +153,7 @@ func HandleAccountEmailVerificationPost(
 
 			// Delegate other errors to generic handler
 			handlers.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(errorMessage string) {
-				settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
+				settings := r.Context().Value(constants.ContextKeySettings).(*api.PublicSettingsResponse)
 				bind := map[string]interface{}{
 					"savedSuccessfully": false,
 					"email":             user.Email,

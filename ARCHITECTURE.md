@@ -183,12 +183,10 @@ of rows is the only measure of how much is left to do.
 | `core/handlerhelpers` | `core/hashutil` | #360 |
 | `core/oauth` | `core/hashutil` | #360 |
 | `core/testutil/fake` | `core/uuidutil` | #360 |
-| `adminconsole/internal/handlers/accounthandlers` | `core/models` | #350 |
-| `adminconsole/internal/handlers/adminuserhandlers` | `core/models` | #350 |
-| `adminconsole/internal/middleware` | `core/models` | #350 |
 
-Seven rows, and #350 owns four of them: what is left of the admin console's dependency on
-persistence models is the settings carrier and the one field in `core/customerrors`.
+Four rows, and #350 owns one of them: the admin console names `core/models` from no production
+package now, the settings carrier having been the last of it, and what is left is the one field in
+`core/customerrors`.
 
 ## Foreign modules the admin console must not compile
 

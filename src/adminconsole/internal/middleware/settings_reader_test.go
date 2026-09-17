@@ -4,15 +4,15 @@ import (
 	"context"
 	"testing"
 
+	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/handlerhelpers"
-	"github.com/leodip/goiabada/core/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestSettingsReader_LayoutSettings(t *testing.T) {
-	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &models.Settings{
+	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &api.PublicSettingsResponse{
 		AppName:     "sentinel app",
 		UITheme:     "sentinel theme",
 		SMTPEnabled: true,
@@ -28,7 +28,7 @@ func TestSettingsReader_LayoutSettings(t *testing.T) {
 }
 
 func TestSettingsReader_Issuer(t *testing.T) {
-	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &models.Settings{
+	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &api.PublicSettingsResponse{
 		Issuer: "https://sentinel.example",
 	})
 

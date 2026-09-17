@@ -9,7 +9,6 @@ import (
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
-	"github.com/leodip/goiabada/core/models"
 )
 
 // MiddlewareSettingsCache adds settings to the request context by fetching from the cache
@@ -66,17 +65,11 @@ func MiddlewareSettingsCache(settingsCache *cache.SettingsCache) func(http.Handl
 				return
 			}
 
-			// Convert to models.Settings for compatibility with existing code
-			// Note: every field here comes from the auth server's public API
-			settings := &models.Settings{
-				AppName:     publicSettings.AppName,
-				Issuer:      publicSettings.Issuer,
-				UITheme:     publicSettings.UITheme,
-				SMTPEnabled: publicSettings.SMTPEnabled,
-			}
-
-			// Add settings to request context
-			ctx := context.WithValue(r.Context(), constants.ContextKeySettings, settings)
+			// The decoded response goes on the context as it stands. It used to be copied into a
+			// models.Settings first, a persistence model with 32 fields of which four were ever
+			// filled and the other 28 sat at their zero values, so a reader that reached for one
+			// got a plausible answer that had never come from anywhere (#350).
+			ctx := context.WithValue(r.Context(), constants.ContextKeySettings, publicSettings)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}

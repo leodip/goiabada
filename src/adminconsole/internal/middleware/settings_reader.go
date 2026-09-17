@@ -3,20 +3,20 @@ package middleware
 import (
 	"context"
 
+	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/handlerhelpers"
-	"github.com/leodip/goiabada/core/models"
 )
 
 type SettingsReader struct{}
 
 func (SettingsReader) Issuer(ctx context.Context) string {
-	settings := ctx.Value(constants.ContextKeySettings).(*models.Settings)
+	settings := ctx.Value(constants.ContextKeySettings).(*api.PublicSettingsResponse)
 	return settings.Issuer
 }
 
 func (SettingsReader) LayoutSettings(ctx context.Context) handlerhelpers.LayoutSettings {
-	settings := ctx.Value(constants.ContextKeySettings).(*models.Settings)
+	settings := ctx.Value(constants.ContextKeySettings).(*api.PublicSettingsResponse)
 	return handlerhelpers.LayoutSettings{
 		AppName:     settings.AppName,
 		UITheme:     settings.UITheme,
