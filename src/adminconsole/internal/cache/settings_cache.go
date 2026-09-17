@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
-	"github.com/leodip/goiabada/adminconsole/internal/dtos"
+	"github.com/leodip/goiabada/core/api"
 )
 
 const (
@@ -15,7 +15,7 @@ const (
 type SettingsCache struct {
 	client     *apiclient.SettingsClient
 	mu         sync.RWMutex
-	cachedData *dtos.PublicSettingsResponse
+	cachedData *api.PublicSettingsResponse
 	cachedAt   time.Time
 }
 
@@ -26,7 +26,7 @@ func NewSettingsCache(authServerBaseURL string) *SettingsCache {
 }
 
 // Get returns the cached settings or fetches them if the cache is expired or empty
-func (c *SettingsCache) Get() (*dtos.PublicSettingsResponse, error) {
+func (c *SettingsCache) Get() (*api.PublicSettingsResponse, error) {
 	c.mu.RLock()
 	// Check if cache is valid
 	if c.cachedData != nil && time.Since(c.cachedAt) < cacheTTL {
@@ -50,7 +50,7 @@ func (c *SettingsCache) Invalidate() {
 }
 
 // fetchAndCache fetches settings from the authserver and caches them
-func (c *SettingsCache) fetchAndCache() (*dtos.PublicSettingsResponse, error) {
+func (c *SettingsCache) fetchAndCache() (*api.PublicSettingsResponse, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 

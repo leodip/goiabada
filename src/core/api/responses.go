@@ -646,3 +646,26 @@ type SessionLoadResponse struct {
 type SessionWriteResponse struct {
 	ExpiresAt time.Time `json:"expiresAt"`
 }
+
+// PublicSettingsResponse is what /api/public/settings answers. That endpoint needs no
+// authentication, so this type is the entire boundary between an anonymous caller and the 32
+// fields of models.Settings, among them the legacy AES encryption key and the encrypted SMTP
+// password. The auth server's handler_public_settings_test.go holds that boundary in two
+// directions: an allowlist of the fields below, and a case filling the model with recognizable
+// secrets and asserting none of them reach the body.
+//
+// Issuer is here because the admin console needs the value the auth server stamps into the iss
+// claim, and OIDC Core 1.0 section 3.1.3.7 requires a relying party to match it exactly. It
+// discloses nothing new: OIDC Discovery 1.0 section 3 already requires the same value to be served
+// to anonymous callers at /.well-known/openid-configuration (#285).
+//
+// It was declared twice until #350, once per module, field for field, with nothing in the build
+// checking that the two agreed: a field added on one side and forgotten on the other decoded to its
+// zero value in the console, silently. One declaration in the package both modules already share is
+// what ends that.
+type PublicSettingsResponse struct {
+	AppName     string `json:"appName"`
+	UITheme     string `json:"uiTheme"`
+	SMTPEnabled bool   `json:"smtpEnabled"`
+	Issuer      string `json:"issuer"`
+}

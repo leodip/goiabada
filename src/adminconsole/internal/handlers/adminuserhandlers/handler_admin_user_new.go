@@ -11,7 +11,6 @@ import (
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/errs"
-	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
 )
@@ -22,7 +21,7 @@ func HandleAdminUserNewGet(
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
+		settings := r.Context().Value(constants.ContextKeySettings).(*api.PublicSettingsResponse)
 
 		bind := map[string]interface{}{
 			"smtpEnabled":     settings.SMTPEnabled,
@@ -47,7 +46,7 @@ func HandleAdminUserNewPost(
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
+		settings := r.Context().Value(constants.ContextKeySettings).(*api.PublicSettingsResponse)
 
 		renderError := func(message string) {
 			bind := map[string]interface{}{

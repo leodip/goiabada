@@ -916,6 +916,7 @@ var apiStructsWithNoSchema = map[string]string{
 	"DynamicClientRegistrationRequest":  "RFC 7591 registration at /connect/register, outside the Admin and Account API scope this document declares",
 	"DynamicClientRegistrationResponse": "RFC 7591 registration at /connect/register, outside the Admin and Account API scope this document declares",
 	"DynamicClientRegistrationError":    "RFC 7591 registration at /connect/register, outside the Admin and Account API scope this document declares",
+	"PublicSettingsResponse":            "the unauthenticated /api/public/settings, outside the Admin and Account API scope this document declares",
 
 	// A shape no handler writes. HandleAPIAccountLogoutRequestPost ignores the request's
 	// responseMode outright and always answers AccountLogoutRedirectResponse, so there is no

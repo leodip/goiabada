@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/dtos"
+	"github.com/leodip/goiabada/core/api"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/stretchr/testify/assert"
@@ -47,7 +47,7 @@ func TestPublicSettings_Success(t *testing.T) {
 	assert.Equal(t, http.StatusOK, recorder.Code)
 	assert.Equal(t, "application/json", recorder.Header().Get("Content-Type"))
 
-	var body dtos.PublicSettingsResponse
+	var body api.PublicSettingsResponse
 	assert.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &body))
 	assert.Equal(t, "Goiabada Test", body.AppName)
 	assert.Equal(t, "dark", body.UITheme)
@@ -165,7 +165,7 @@ var publicSettingsAllowedFields = map[string]string{
 // the allowlist above, which forces the question "should this really be public?"
 // into review.
 func TestPublicSettingsResponse_ExposesOnlyAllowlistedFields(t *testing.T) {
-	responseType := reflect.TypeOf(dtos.PublicSettingsResponse{})
+	responseType := reflect.TypeOf(api.PublicSettingsResponse{})
 
 	assert.Equal(t, len(publicSettingsAllowedFields), responseType.NumField(),
 		"PublicSettingsResponse gained or lost a field; this endpoint needs no "+

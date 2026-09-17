@@ -31,7 +31,6 @@ import (
 	"github.com/leodip/goiabada/core/handlerhelpers"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/locales"
-	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/timezones"
 
 	"github.com/stretchr/testify/assert"
@@ -51,7 +50,7 @@ var rawKeyRe = regexp.MustCompile(`\b(adminconsole|common|auth|account|admin|con
 func render(t *testing.T, page string, bind map[string]interface{}) string {
 	t.Helper()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	settings := &models.Settings{AppName: "Test", UITheme: "dark", SMTPEnabled: true}
+	settings := &api.PublicSettingsResponse{AppName: "Test", UITheme: "dark", SMTPEnabled: true}
 	req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings, settings))
 	req = i18n.RefineLocalizerWithUILocales(req, []string{"pt-BR"})
 
@@ -78,7 +77,7 @@ func render(t *testing.T, page string, bind map[string]interface{}) string {
 // mentions the console's base URL as a string to assert against (#279).
 func TestRender_NotFoundPage(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/admin/clients/not-a-number/settings", nil)
-	settings := &models.Settings{AppName: "Test", UITheme: "dark", SMTPEnabled: true}
+	settings := &api.PublicSettingsResponse{AppName: "Test", UITheme: "dark", SMTPEnabled: true}
 	req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings, settings))
 	req = i18n.RefineLocalizerWithUILocales(req, []string{"pt-BR"})
 

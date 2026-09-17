@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/leodip/goiabada/adminconsole/internal/dtos"
+	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
 )
 
@@ -40,7 +40,7 @@ func NewSettingsClient(authServerBaseURL string) *SettingsClient {
 // Returns only safe-to-share settings: appName, uiTheme, smtpEnabled, issuer. The issuer is
 // already served anonymously at /.well-known/openid-configuration, which OIDC Discovery
 // section 3 requires, so carrying it here discloses nothing new (#285).
-func (c *SettingsClient) GetPublicSettings() (*dtos.PublicSettingsResponse, error) {
+func (c *SettingsClient) GetPublicSettings() (*api.PublicSettingsResponse, error) {
 	url := fmt.Sprintf("%s/api/public/settings", c.authServerBaseURL)
 
 	resp, err := c.httpClient.Get(url)
@@ -54,7 +54,7 @@ func (c *SettingsClient) GetPublicSettings() (*dtos.PublicSettingsResponse, erro
 		return nil, errs.Errorf("authserver returned status %d: %s", resp.StatusCode, string(body))
 	}
 
-	var settings dtos.PublicSettingsResponse
+	var settings api.PublicSettingsResponse
 	if err := json.NewDecoder(resp.Body).Decode(&settings); err != nil {
 		return nil, errs.Wrap(err, "failed to decode public settings response")
 	}

@@ -10,9 +10,9 @@ import (
 
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/adminconsole/internal/cache"
+	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/i18n"
-	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -34,7 +34,7 @@ func settingsServer(t *testing.T, payload string) *httptest.Server {
 
 // runSettingsChain drives MiddlewareSettingsCache against authServerBaseURL and
 // reports what the next handler saw, or nil if it was never reached.
-func runSettingsChain(t *testing.T, authServerBaseURL string) (*httptest.ResponseRecorder, *models.Settings) {
+func runSettingsChain(t *testing.T, authServerBaseURL string) (*httptest.ResponseRecorder, *api.PublicSettingsResponse) {
 	t.Helper()
 
 	return runSettingsChainForRequest(t, authServerBaseURL,
@@ -52,13 +52,13 @@ func runSettingsChain(t *testing.T, authServerBaseURL string) (*httptest.Respons
 // upgrading. TestInitMiddleware_RefusalsAreLocalized in internal/server pins the
 // real chain; this fixture pins that the middleware honours a localizer when one is
 // there.
-func runSettingsChainForRequest(t *testing.T, authServerBaseURL string, req *http.Request) (*httptest.ResponseRecorder, *models.Settings) {
+func runSettingsChainForRequest(t *testing.T, authServerBaseURL string, req *http.Request) (*httptest.ResponseRecorder, *api.PublicSettingsResponse) {
 	t.Helper()
 
-	var seen *models.Settings
+	var seen *api.PublicSettingsResponse
 	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		settings, ok := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
-		require.True(t, ok, "the middleware must put *models.Settings on the context")
+		settings, ok := r.Context().Value(constants.ContextKeySettings).(*api.PublicSettingsResponse)
+		require.True(t, ok, "the middleware must put *api.PublicSettingsResponse on the context")
 		seen = settings
 		w.WriteHeader(http.StatusOK)
 	})
@@ -89,7 +89,7 @@ func wantBody(t *testing.T, locale, key string) string {
 }
 
 // The defect this pins: the issuer used to come from GOIABADA_ADMINCONSOLE_ISSUER
-// while every other field on the same models.Settings came from the auth server.
+// while every other field on the same carrier came from the auth server.
 // Changing the issuer in Settings > General then left the console comparing a new
 // iss claim against a stale configured value, and every sign-in attempt landed
 // back at / (#285).
@@ -104,7 +104,7 @@ func TestMiddlewareSettingsCache_IssuerComesFromThePayload(t *testing.T) {
 }
 
 // Without this, the case above is satisfied by a middleware that hardcodes a
-// models.Settings and ignores the payload entirely.
+// response and ignores the payload entirely.
 func TestMiddlewareSettingsCache_TheOtherFieldsStillComeFromThePayload(t *testing.T) {
 	server := settingsServer(t, `{"appName":"A","uiTheme":"light","smtpEnabled":true,"issuer":"https://from-authserver.example"}`)
 
@@ -142,7 +142,7 @@ func TestMiddlewareSettingsCache_EmptyIssuerIsRefused(t *testing.T) {
 
 // Pre-existing behaviour, in this file because the fixture is shared and nothing
 // else in the repository asserts that a failed fetch stops the chain rather than
-// serving a zero-valued Settings.
+// serving a zero-valued response.
 func TestMiddlewareSettingsCache_AnUnreachableAuthServerIsRefused(t *testing.T) {
 	server := settingsServer(t, `{"appName":"A","uiTheme":"light","smtpEnabled":false,"issuer":"https://from-authserver.example"}`)
 	baseURL := server.URL
