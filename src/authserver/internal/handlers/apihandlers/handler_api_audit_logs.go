@@ -64,7 +64,7 @@ func HandleAPIAuditLogsGet(
 		for i, log := range auditLogs {
 			auditLogResponses[i] = api.AuditLogResponse{
 				Id:         log.Id,
-				CreatedAt:  log.CreatedAt.Format("2006-01-02T15:04:05Z07:00"), // ISO 8601
+				CreatedAt:  log.CreatedAt,
 				AuditEvent: log.AuditEvent,
 				Details:    log.Details, // JSON string
 				RequestId:  log.RequestId,

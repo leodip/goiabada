@@ -70,7 +70,10 @@
             <tbody>
                 {{range .pageResult.AuditLogs}}
                     <tr>
-                        <td><time datetime="{{.CreatedAt}}">{{.CreatedAt}}</time></td>
+                        {{/* The datetime attribute is the machine value the HTML <time> element
+                             defines, so it stays RFC3339 under every locale; the text beside it is
+                             the one a reader sees, and that one is localized (#373). */}}
+                        <td><time datetime="{{.CreatedAt.Format "2006-01-02T15:04:05Z07:00"}}">{{ DateTime $.ctx .CreatedAt }}</time></td>
                         <td><span class="badge badge-neutral">{{.AuditEvent}}</span></td>
                         <td class="whitespace-nowrap">{{if .RequestId}}{{.RequestId}}{{else}}-{{end}}</td>
                         <td class="audit-details" data-details="{{.Details}}"></td>

@@ -3,7 +3,6 @@ package accounthandlers
 import (
 	"encoding/json"
 	"net/http"
-	"time"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
@@ -39,12 +38,12 @@ func HandleAccountManageConsentsGet(
 				Client:            c.ClientIdentifier,
 				ClientDescription: c.ClientDescription,
 				Scope:             c.Scope,
-			}
-			// grantedAt is nullable on the wire, where the column it comes from is not: a
-			// consent row always records when it was granted, so an absent value is a
-			// response this console cannot date rather than an ungranted consent (#350).
-			if c.GrantedAt != nil {
-				ci.GrantedAt = c.GrantedAt.Format(time.RFC1123)
+				// grantedAt is nullable on the wire, where the column it comes from is not:
+				// a consent row always records when it was granted, so an absent value is a
+				// response this console cannot date rather than an ungranted consent (#350).
+				// It travels as the instant and the page formats it, so the date reads in
+				// the viewer's language rather than in English (#373).
+				GrantedAt: c.GrantedAt,
 			}
 			consentInfoArr = append(consentInfoArr, ci)
 		}

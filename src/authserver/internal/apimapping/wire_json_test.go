@@ -720,13 +720,63 @@ func TestWireJSON_ClientSessionsEnvelope(t *testing.T) {
 	})
 }
 
+// TestWireJSON_AuditLogFamily is the only thing that sees decision 11 of #373:
+// AuditLogResponse.CreatedAt was a string the handler filled by calling
+// Format("2006-01-02T15:04:05Z07:00") on the model's instant, and is a time.Time
+// now, so the console can localize a date instead of parsing one. That retype is
+// invisible to every other test in the tree -- the handler still compiles, the
+// integration test still decodes -- and it is invisible precisely because
+// encoding/json marshals a time.Time as RFC3339, which is what the hand-rolled
+// layout spelled out. The literal below is what says so, and what fails if the
+// field is ever retyped again or given a custom marshaller.
+//
+// The one difference from the string era is deliberate: the hand-rolled layout
+// had no fractional seconds and truncated them, where the marshaller emits
+// whatever the instant carries. The second case is that, written down.
+func TestWireJSON_AuditLogFamily(t *testing.T) {
+	entry := api.AuditLogResponse{
+		Id: 1, CreatedAt: wireCreated, AuditEvent: "user_login",
+		Details: `{"email":"alice@example.com"}`, RequestId: "host/Ppg6bHPK5f-000012",
+	}
+	entryJSON := `{"id":1,"createdAt":"2026-09-16T10:00:00Z","auditEvent":"user_login",` +
+		`"details":"{\"email\":\"alice@example.com\"}","requestId":"host/Ppg6bHPK5f-000012"}`
+
+	runWireCases(t, []wireCase{
+		{
+			name:    "AuditLogResponse",
+			value:   entry,
+			literal: entryJSON,
+		},
+		{
+			// createdAt is required and not nullable in the schema, which a non-pointer
+			// time.Time satisfies: there is no shape of this response carrying a null date.
+			// A sub-second instant keeps its precision, where the format it replaced dropped it.
+			name: "AuditLogResponse, sub-second precision survives",
+			value: api.AuditLogResponse{
+				Id: 2, CreatedAt: wireCreated.Add(1500 * time.Millisecond), AuditEvent: "user_login",
+			},
+			literal: `{"id":2,"createdAt":"2026-09-16T10:00:01.5Z","auditEvent":"user_login",` +
+				`"details":"","requestId":""}`,
+		},
+		{
+			name: "GetAuditLogsResponse",
+			value: api.GetAuditLogsResponse{
+				AuditLogs: []api.AuditLogResponse{entry},
+				Total:     73, Page: 4, Size: 20,
+			},
+			literal: `{"auditLogs":[` + entryJSON + `],"total":73,"page":4,"size":20}`,
+		},
+	})
+}
+
 // TestWireJSON_PaginatedWrappers covers the wrappers that carry a mapped family.
 // The last three embed their member anonymously, so its keys flatten in beside
 // the annotation rather than nesting under one -- a shape nothing else pins, and
 // one that moves with every field the member type gains or loses.
 //
-// GetAuditLogsResponse is paginated too and is deliberately absent: it carries
-// no mapped family and no part of #350 touches it.
+// GetAuditLogsResponse is paginated too and is covered by the case above rather
+// than here: it carries no mapped family, so what is worth pinning about it is
+// its member's timestamp.
 func TestWireJSON_PaginatedWrappers(t *testing.T) {
 	bareUser := ToUserResponse(&models.User{Id: 7})
 	bareUserFields := wireBareUserFields()

@@ -34,14 +34,11 @@ func HandleAdminSettingsKeysGet(
 
 		keys := make([]SettingsKey, 0, len(apiKeys))
 		for _, k := range apiKeys {
-			createdAt := ""
-			if k.CreatedAt != nil {
-				createdAt = k.CreatedAt.Format("02 Jan 2006 15:04:05 MST")
-			}
 			// API already returns state/type/algorithm and public key encodings
 			keys = append(keys, SettingsKey{
-				Id:               k.Id,
-				CreatedAt:        createdAt,
+				Id: k.Id,
+				// The instant, formatted by the page in the viewer's locale (#373).
+				CreatedAt:        k.CreatedAt,
 				State:            k.State,
 				KeyIdentifier:    k.KeyIdentifier,
 				Type:             k.Type,

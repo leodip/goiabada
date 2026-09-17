@@ -46,7 +46,7 @@
                 </tr>
                 <tr>
                     <td class="w-52">{{ T $.ctx "adminconsole.admin_users.delete.field.created_at" }}</td>
-                    <td>{{if .user.CreatedAt}}{{.user.CreatedAt.Format "02 Jan 2006 15:04:05 MST"}}{{end}}</td>
+                    <td>{{ DateTime $.ctx .user.CreatedAt }}</td>
                 </tr>
                 <tr>
                     <td class="w-52">{{ T $.ctx "adminconsole.admin_users.delete.field.member_of_groups" }}</td>
