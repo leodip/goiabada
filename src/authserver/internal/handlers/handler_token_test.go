@@ -886,7 +886,7 @@ func TestHandleTokenPost_AuthCodeReuse_RevokeFailureReturns500(t *testing.T) {
 		UserId:            13,
 		SessionIdentifier: "sid-reused",
 	}
-	reuseErr := &customerrors.AuthCodeReusedError{
+	reuseErr := &protocolvalidation.AuthCodeReusedError{
 		Detail: customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant", "Code is invalid.", http.StatusBadRequest),
 		Code:   reusedCode,
 	}
@@ -942,7 +942,7 @@ func TestHandleTokenPost_AuthCodeReuse_BeginTransactionFailureReturns500(t *test
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	rr := httptest.NewRecorder()
 
-	reuseErr := &customerrors.AuthCodeReusedError{
+	reuseErr := &protocolvalidation.AuthCodeReusedError{
 		Detail: customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant", "Code is invalid.", http.StatusBadRequest),
 		Code: &models.Code{
 			Id:                7,

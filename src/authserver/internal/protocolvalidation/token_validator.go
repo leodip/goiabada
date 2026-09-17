@@ -295,7 +295,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 		// If PKCE was not used and code_verifier was not provided, that's fine
 
 		if wasReused {
-			return nil, &customerrors.AuthCodeReusedError{
+			return nil, &AuthCodeReusedError{
 				Detail: customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant", "Code is invalid.",
 					http.StatusBadRequest),
 				Code: codeEntity,
