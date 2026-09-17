@@ -4208,21 +4208,11 @@ components:
         - userAgent
         - userId
 
-    EnhancedUserSessionResponse:
+    UserSessionDetailResponse:
       allOf:
         - $ref: '#/components/schemas/UserSessionResponse'
         - type: object
           properties:
-            startedAt:
-              type: string
-            durationSinceStarted:
-              type: string
-            lastAccessedAt:
-              type: string
-            durationSinceLastAccessed:
-              type: string
-            isValid:
-              type: boolean
             isCurrent:
               type: boolean
             clientIdentifiers:
@@ -4230,11 +4220,6 @@ components:
               items:
                 type: string
           required:
-            - startedAt
-            - durationSinceStarted
-            - lastAccessedAt
-            - durationSinceLastAccessed
-            - isValid
             - isCurrent
             - clientIdentifiers
 
@@ -4244,7 +4229,7 @@ components:
         sessions:
           type: array
           items:
-            $ref: '#/components/schemas/EnhancedUserSessionResponse'
+            $ref: '#/components/schemas/UserSessionDetailResponse'
       required:
         - sessions
 

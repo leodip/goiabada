@@ -12,6 +12,7 @@ import (
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestAPIClientSessionsGet_Success tests GET /api/v1/admin/clients/{id}/sessions happy path
@@ -79,16 +80,13 @@ func TestAPIClientSessionsGet_Success(t *testing.T) {
 	for _, s := range out.Sessions {
 		assert.Greater(t, s.Id, int64(0))
 		assert.NotEmpty(t, s.SessionIdentifier)
-		assert.NotEmpty(t, s.StartedAt)
-		assert.NotEmpty(t, s.DurationSinceStarted)
-		assert.NotEmpty(t, s.LastAccessedAt)
-		assert.NotEmpty(t, s.DurationSinceLastAccessed)
+		require.NotNil(t, s.Started)
+		require.NotNil(t, s.LastAccessed)
 		assert.Equal(t, "192.168.1.100", s.IpAddress)
 		assert.Equal(t, "Test Device", s.DeviceName)
 		assert.Equal(t, "computer", s.DeviceType)
 		assert.Equal(t, "linux", s.DeviceOS)
 		assert.Equal(t, testSessionUserAgent, s.UserAgent)
-		assert.True(t, s.IsValid)
 		assert.Equal(t, testUser.Id, s.UserId)
 		assert.Contains(t, s.ClientIdentifiers, testClient.ClientIdentifier)
 	}

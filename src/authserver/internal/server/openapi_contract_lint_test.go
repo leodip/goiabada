@@ -841,7 +841,7 @@ func TestOpenAPI_EveryRefResolves(t *testing.T) {
 // Composition is resolved on both sides. A property inherited through allOf or reached
 // through a $ref counts as documented, and a Go field promoted from an embedded struct counts
 // as declared. A first version of the measurement that did neither reported 21 phantom
-// properties on EnhancedUserSessionResponse alone, every one of which it inherits.
+// properties on the session detail schema alone, every one of which it inherits.
 //
 // Two limits, both real, both stated here rather than left to be discovered.
 //

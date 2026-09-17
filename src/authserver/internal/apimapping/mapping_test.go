@@ -13,6 +13,7 @@ import (
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // =============================================================================
@@ -377,6 +378,91 @@ func TestToUserSessionResponse_ZeroTimesBecomeNil(t *testing.T) {
 	assert.Nil(t, resp.UpdatedAt)
 }
 
+// The three list endpoints build every row through ToUserSessionDetailResponse, which is what
+// makes isCurrent mean the same thing on all three. The table below is the whole of that
+// function's judgement: everything else it returns is the base mapper's, already covered above.
+func TestToUserSessionDetailResponse_IsCurrentComparesTheCallersSid(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		currentSid string
+		want       bool
+	}{
+		// The empty case is not a formality: a client_credentials token and an offline grant
+		// both have sid suppressed, and an empty currentSid matching an empty
+		// SessionIdentifier would make every session in the list the caller's own.
+		{"no sid on the token", "", false},
+		{"the caller's own session", "session-abc", true},
+		{"another session", "session-xyz", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			detail := ToUserSessionDetailResponse(&models.UserSession{Id: 3, SessionIdentifier: "session-abc"}, tc.currentSid)
+
+			require.NotNil(t, detail)
+			assert.Equal(t, tc.want, detail.IsCurrent)
+		})
+	}
+}
+
+// An empty session identifier is what a row would carry if the column were ever blank, and it
+// must not match an empty sid either. Written separately because the case above fixes the
+// identifier and varies the claim; this one fixes the claim and varies the identifier.
+func TestToUserSessionDetailResponse_AnEmptySessionIdentifierIsNeverCurrent(t *testing.T) {
+	detail := ToUserSessionDetailResponse(&models.UserSession{Id: 3}, "")
+
+	require.NotNil(t, detail)
+	assert.False(t, detail.IsCurrent)
+}
+
+func TestToUserSessionDetailResponse_ClientIdentifiersComeFromTheLoadedClients(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		clients []models.UserSessionClient
+		want    []string
+	}{
+		{
+			name: "loaded",
+			clients: []models.UserSessionClient{
+				{ClientId: 1, Client: models.Client{Id: 1, ClientIdentifier: "portal"}},
+				{ClientId: 2, Client: models.Client{Id: 2, ClientIdentifier: "backoffice"}},
+			},
+			want: []string{"portal", "backoffice"},
+		},
+		// Both of these must be an empty slice and never nil: clientIdentifiers is a required
+		// array in the schema, and a nil slice marshals to null, which is not an empty array
+		// to anything generated from that document.
+		{"empty", []models.UserSessionClient{}, []string{}},
+		{"nil", nil, []string{}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			detail := ToUserSessionDetailResponse(&models.UserSession{Id: 3, Clients: tc.clients}, "")
+
+			require.NotNil(t, detail)
+			require.NotNil(t, detail.ClientIdentifiers)
+			assert.Equal(t, tc.want, detail.ClientIdentifiers)
+		})
+	}
+}
+
+func TestToUserSessionDetailResponse_NilSession(t *testing.T) {
+	assert.Nil(t, ToUserSessionDetailResponse(nil, "session-abc"))
+}
+
+// The embedded base is filled by the same mapper the single-session endpoint uses, so a field
+// dropped from one is dropped from both. This asserts the promotion rather than re-asserting
+// every field: TestToUserSessionResponse_MapsFields owns those.
+func TestToUserSessionDetailResponse_CarriesTheBaseResponse(t *testing.T) {
+	started := time.Date(2024, 3, 1, 10, 0, 0, 0, time.UTC)
+	session := &models.UserSession{Id: 3, SessionIdentifier: "session-abc", Started: started, UserId: 42}
+
+	detail := ToUserSessionDetailResponse(session, "")
+
+	require.NotNil(t, detail)
+	assert.Equal(t, *ToUserSessionResponse(session), detail.UserSessionResponse)
+	assert.Equal(t, int64(3), detail.Id)
+	assert.Equal(t, int64(42), detail.UserId)
+	assert.Equal(t, &started, detail.Started)
+}
+
 // The level2AuthConfigHasChanged field was published on both session response
 // schemas and described a per-session boolean that no longer decides anything.
 // It is gone from the wire, and the deletions that removed it are otherwise
@@ -388,7 +474,7 @@ func TestUserSessionResponses_OmitLevel2AuthConfigHasChanged(t *testing.T) {
 		value interface{}
 	}{
 		{"api.UserSessionResponse", api.UserSessionResponse{Id: 1}},
-		{"api.EnhancedUserSessionResponse", api.EnhancedUserSessionResponse{Id: 1}},
+		{"api.UserSessionDetailResponse", api.UserSessionDetailResponse{UserSessionResponse: api.UserSessionResponse{Id: 1}}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			raw, err := json.Marshal(tc.value)
@@ -408,8 +494,9 @@ func TestUserSessionResponses_OmitLevel2AuthConfigHasChanged(t *testing.T) {
 // tag renamed, dropped or given an omitempty would leave every one of them green while the
 // console and every other client read nothing (#281, plan review finding 6).
 //
-// Both structs are listed because they carry the field independently: api.EnhancedUserSessionResponse
-// is not built from api.UserSessionResponse in Go, only in the OpenAPI document's allOf.
+// Both structs are listed because the detail form is what the three list endpoints return, and
+// the wire key it publishes is the embedded one: a tag renamed on UserSessionResponse moves it on
+// both at once, which is exactly the coupling worth asserting rather than assuming.
 func TestUserSessionResponses_PublishUserAgent(t *testing.T) {
 	const header = `Mozilla/5.0 "quoted" <angled>`
 
@@ -418,7 +505,7 @@ func TestUserSessionResponses_PublishUserAgent(t *testing.T) {
 		value interface{}
 	}{
 		{"api.UserSessionResponse", api.UserSessionResponse{Id: 1, UserAgent: header}},
-		{"api.EnhancedUserSessionResponse", api.EnhancedUserSessionResponse{Id: 1, UserAgent: header}},
+		{"api.UserSessionDetailResponse", api.UserSessionDetailResponse{UserSessionResponse: api.UserSessionResponse{Id: 1, UserAgent: header}}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			raw, err := json.Marshal(tc.value)
@@ -442,7 +529,7 @@ func TestUserSessionResponses_PublishUserAgentWhenEmpty(t *testing.T) {
 		value interface{}
 	}{
 		{"api.UserSessionResponse", api.UserSessionResponse{Id: 1}},
-		{"api.EnhancedUserSessionResponse", api.EnhancedUserSessionResponse{Id: 1}},
+		{"api.UserSessionDetailResponse", api.UserSessionDetailResponse{UserSessionResponse: api.UserSessionResponse{Id: 1}}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			raw, err := json.Marshal(tc.value)

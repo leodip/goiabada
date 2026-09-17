@@ -111,6 +111,39 @@ func ToUserAttributeResponses(attrs []models.UserAttribute) []api.UserAttributeR
 	return responses
 }
 
+// ToUserSessionDetailResponse maps a session for the three list endpoints: the base response
+// plus whether the session is the caller's own and the identifiers of the clients it
+// authorized.
+//
+// currentSid is the "sid" claim of the caller's access token, empty when the token carries
+// none: client_credentials tokens and offline grants have it suppressed, and a caller holding
+// one is correctly told that none of the sessions is its own. Computing it here rather than at
+// each producer is what keeps the field meaning the same thing on all three endpoints; it was
+// assigned at one of the three, so the other two published a constant false (#373).
+//
+// session.Clients is read as already loaded and the database is never touched: the caller
+// hydrates the whole list in one query before calling this, which is why the mapping belongs in
+// this package (#350).
+func ToUserSessionDetailResponse(session *models.UserSession, currentSid string) *api.UserSessionDetailResponse {
+	base := ToUserSessionResponse(session)
+	if base == nil {
+		return nil
+	}
+
+	// Never nil: the schema declares clientIdentifiers a required array, and a nil slice
+	// marshals to null, which is not an empty array to anything reading the document.
+	clientIdentifiers := make([]string, 0, len(session.Clients))
+	for _, usc := range session.Clients {
+		clientIdentifiers = append(clientIdentifiers, usc.Client.ClientIdentifier)
+	}
+
+	return &api.UserSessionDetailResponse{
+		UserSessionResponse: *base,
+		IsCurrent:           currentSid != "" && session.SessionIdentifier == currentSid,
+		ClientIdentifiers:   clientIdentifiers,
+	}
+}
+
 func ToUserSessionResponse(session *models.UserSession) *api.UserSessionResponse {
 	if session == nil {
 		return nil

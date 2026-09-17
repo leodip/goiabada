@@ -323,34 +323,30 @@ func TestWireJSON_UserSessionFamily(t *testing.T) {
 		UserId:            7,
 	}
 
-	// The enhanced form has no mapper: handler_api_users_sessions.go and its two
-	// siblings build it inline from a UserSessionResponse plus the derived
-	// display fields. So its row pins the declared struct, which is all of it
-	// that could move.
-	enhanced := api.EnhancedUserSessionResponse{
-		Id:                        21,
-		CreatedAt:                 &wireCreated,
-		UpdatedAt:                 &wireUpdated,
-		SessionIdentifier:         "b1c2d3",
-		Started:                   &wireStarted,
-		LastAccessed:              &wireTouched,
-		AuthMethods:               "pwd otp",
-		AcrLevel:                  string(enums.AcrLevel2Optional),
-		AuthTime:                  &wireStarted,
-		IpAddress:                 "203.0.113.7",
-		DeviceName:                "Firefox",
-		DeviceType:                "Desktop",
-		DeviceOS:                  "Linux",
-		UserAgent:                 "Mozilla/5.0",
-		UserId:                    7,
-		StartedAt:                 "16 Sep 2026 09:00",
-		DurationSinceStarted:      "3 hours",
-		LastAccessedAt:            "16 Sep 2026 09:30",
-		DurationSinceLastAccessed: "2 hours",
-		IsValid:                   true,
-		IsCurrent:                 false,
-		ClientIdentifiers:         []string{"admin-console-client"},
-	}
+	// The detail form is what the three list endpoints return. It embeds
+	// UserSessionResponse, so this is also where the embedding is pinned: the base
+	// has to flatten into the same object rather than nest under a key, which is
+	// what the OpenAPI allOf claims and what every generated client will assume.
+	detail := *ToUserSessionDetailResponse(&models.UserSession{
+		Id:                21,
+		CreatedAt:         wireNullTime(wireCreated),
+		UpdatedAt:         wireNullTime(wireUpdated),
+		SessionIdentifier: "b1c2d3",
+		Started:           wireStarted,
+		LastAccessed:      wireTouched,
+		AuthMethods:       "pwd otp",
+		AcrLevel:          string(enums.AcrLevel2Optional),
+		AuthTime:          wireStarted,
+		IpAddress:         "203.0.113.7",
+		DeviceName:        "Firefox",
+		DeviceType:        "Desktop",
+		DeviceOS:          "Linux",
+		UserAgent:         "Mozilla/5.0",
+		UserId:            7,
+		Clients: []models.UserSessionClient{
+			{ClientId: 5, Client: models.Client{Id: 5, ClientIdentifier: "admin-console-client"}},
+		},
+	}, "")
 
 	runWireCases(t, []wireCase{
 		{
@@ -373,26 +369,43 @@ func TestWireJSON_UserSessionFamily(t *testing.T) {
 				`"deviceName":"","deviceType":"","deviceOS":"","userAgent":"","userId":7}`,
 		},
 		{
-			name:  "EnhancedUserSessionResponse, populated",
-			value: enhanced,
+			// The five keys this literal does not contain are the point of it:
+			// startedAt, durationSinceStarted, lastAccessedAt,
+			// durationSinceLastAccessed and isValid were published here until
+			// #373, four of them an English date and a Go duration computed from
+			// instants already in this same object, the fifth a constant true.
+			// A byte-for-byte literal is what fails if any of them comes back.
+			name:  "UserSessionDetailResponse, populated",
+			value: detail,
 			literal: `{"id":21,"createdAt":"2026-09-16T10:00:00Z","updatedAt":"2026-09-16T11:00:00Z",` +
 				`"sessionIdentifier":"b1c2d3","started":"2026-09-16T09:00:00Z",` +
 				`"lastAccessed":"2026-09-16T09:30:00Z","authMethods":"pwd otp",` +
 				`"acrLevel":"urn:goiabada:level2_optional","authTime":"2026-09-16T09:00:00Z",` +
 				`"ipAddress":"203.0.113.7","deviceName":"Firefox","deviceType":"Desktop","deviceOS":"Linux",` +
-				`"userAgent":"Mozilla/5.0","userId":7,"startedAt":"16 Sep 2026 09:00",` +
-				`"durationSinceStarted":"3 hours","lastAccessedAt":"16 Sep 2026 09:30",` +
-				`"durationSinceLastAccessed":"2 hours","isValid":true,"isCurrent":false,` +
+				`"userAgent":"Mozilla/5.0","userId":7,"isCurrent":false,` +
 				`"clientIdentifiers":["admin-console-client"]}`,
 		},
 		{
-			name:  "EnhancedUserSessionResponse, no client identifiers",
-			value: api.EnhancedUserSessionResponse{Id: 21, UserId: 7},
+			// isCurrent true, which no other row here carries, and the empty
+			// client list the mapper must publish as [] rather than null.
+			name:  "UserSessionDetailResponse, current and no clients",
+			value: *ToUserSessionDetailResponse(&models.UserSession{Id: 21, SessionIdentifier: "b1c2d3", UserId: 7}, "b1c2d3"),
+			literal: `{"id":21,"createdAt":null,"updatedAt":null,"sessionIdentifier":"b1c2d3","started":null,` +
+				`"lastAccessed":null,"authMethods":"","acrLevel":"","authTime":null,"ipAddress":"",` +
+				`"deviceName":"","deviceType":"","deviceOS":"","userAgent":"","userId":7,` +
+				`"isCurrent":true,"clientIdentifiers":[]}`,
+		},
+		{
+			// The declared struct with nothing built it: a nil ClientIdentifiers
+			// reaches the wire as null, which is why the mapper never leaves it
+			// nil. Kept so the difference between the two is visible here rather
+			// than asserted only in the mapper's own table.
+			name:  "UserSessionDetailResponse, a nil client list is null",
+			value: api.UserSessionDetailResponse{UserSessionResponse: api.UserSessionResponse{Id: 21, UserId: 7}},
 			literal: `{"id":21,"createdAt":null,"updatedAt":null,"sessionIdentifier":"","started":null,` +
 				`"lastAccessed":null,"authMethods":"","acrLevel":"","authTime":null,"ipAddress":"",` +
-				`"deviceName":"","deviceType":"","deviceOS":"","userAgent":"","userId":7,"startedAt":"",` +
-				`"durationSinceStarted":"","lastAccessedAt":"","durationSinceLastAccessed":"",` +
-				`"isValid":false,"isCurrent":false,"clientIdentifiers":null}`,
+				`"deviceName":"","deviceType":"","deviceOS":"","userAgent":"","userId":7,` +
+				`"isCurrent":false,"clientIdentifiers":null}`,
 		},
 	})
 }
