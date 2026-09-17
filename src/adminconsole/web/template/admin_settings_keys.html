@@ -152,7 +152,7 @@
                         <td>{{.Type}}</td>
                         <td>{{.Algorithm}}</td>
                         <td>{{.KeyIdentifier}}</td>
-                        <td>{{.CreatedAt}}</td>
+                        <td>{{ DateTime $.ctx .CreatedAt }}</td>
                         <td>
                             {{if eq .State "current"}}
                                 <span class="px-2 rounded text-success-content bg-success">{{ T $.ctx "adminconsole.admin_settings.keys.state_current" }}</span>

@@ -65,7 +65,7 @@
                 {{ range .consents }}
                     <tr>
                         <td><span class="font-semibold">{{.Client}}</span>{{if .ClientDescription}}<br />{{.ClientDescription}}{{end}}</td>
-                        <td>{{.GrantedAt}}</td>
+                        <td>{{ DateTime $.ctx .GrantedAt }}</td>
                         <td><span class="font-mono">{{.Scope}}</span></td>
                         <td>
                             <button class="btn btn-sm btn-primary" onclick="revokeClick(this, event, {{.ConsentId}}, '{{.Client}}', '{{.Scope}}');">{{ T $.ctx "adminconsole.admin_users.consents.revoke_button" }}</button>

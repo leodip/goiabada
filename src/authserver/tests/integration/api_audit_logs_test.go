@@ -83,9 +83,11 @@ func TestAPIAuditLogsGet_Success(t *testing.T) {
 		assert.Equal(t, auditEvent, entry.AuditEvent)
 		assert.NotZero(t, entry.Id)
 		assert.NotEmpty(t, entry.Details)
-		// createdAt is serialized as ISO 8601 and must parse back.
-		_, err := time.Parse(time.RFC3339, entry.CreatedAt)
-		assert.NoError(t, err, "createdAt %q must be ISO 8601", entry.CreatedAt)
+		// createdAt is a time.Time now, and the decode above is what proves it is still ISO
+		// 8601 on the wire: encoding/json accepts nothing else into a time.Time, so a payload
+		// that stopped being RFC3339 would have failed getAuditLogs rather than this line.
+		// What is left to say here is that the instant survived the round trip (#373).
+		assert.False(t, entry.CreatedAt.IsZero(), "createdAt must carry the instant the row was written")
 	}
 }
 

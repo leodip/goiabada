@@ -58,6 +58,24 @@ func addUrlParam(u string, k string, v interface{}) string {
 	return parsedUrl.String()
 }
 
+// instantOf normalizes whatever a template binds into the pointer the i18n
+// formatters take. The console's responses carry both shapes on purpose — a
+// nullable column reaches the wire as *time.Time and a NOT NULL one, like an
+// audit entry's createdAt, as time.Time — and a template cannot take the
+// address of a value, so the adapter belongs at this boundary rather than in
+// the formatter's signature. Anything else answers nil and therefore renders
+// blank, which is what deref below does for a *bool (#373).
+func instantOf(v any) *time.Time {
+	switch t := v.(type) {
+	case *time.Time:
+		return t
+	case time.Time:
+		return &t
+	default:
+		return nil
+	}
+}
+
 var templateFuncMap = template.FuncMap{
 	// T translates key against the localizer carried on ctx. ctx is the
 	// request context, injected into bind maps by RenderTemplateToBuffer
@@ -100,17 +118,17 @@ var templateFuncMap = template.FuncMap{
 
 	// DateTime renders an instant as an absolute date and time in the active
 	// locale's numeric layout, which lives in the catalog because Go's
-	// time.Format has no locale of its own. Takes *time.Time and renders ""
-	// for nil, so a template can bind a nullable column straight into a cell
-	// (#373).
-	"DateTime": func(ctx context.Context, t *time.Time) string {
-		return i18n.FormatDateTime(ctx, t)
+	// time.Format has no locale of its own. Takes a *time.Time or a time.Time
+	// through instantOf and renders "" for a nil or absent one, so a template
+	// can bind a nullable column straight into a cell (#373).
+	"DateTime": func(ctx context.Context, v any) string {
+		return i18n.FormatDateTime(ctx, instantOf(v))
 	},
 	// Since renders how long ago an instant was, as one translated phrase
 	// rather than a Go duration with a translated suffix after it. It supplies
 	// the clock, so a template reads {{ Since $.ctx .Started }} (#373).
-	"Since": func(ctx context.Context, t *time.Time) string {
-		return i18n.FormatSince(ctx, t, time.Now().UTC())
+	"Since": func(ctx context.Context, v any) string {
+		return i18n.FormatSince(ctx, instantOf(v), time.Now().UTC())
 	},
 
 	// RefCountry / RefPhoneCountry / RefTimezone resolve a country code,

@@ -68,9 +68,9 @@ func TestDateTimeAndSinceFuncMap(t *testing.T) {
 	ctx := context.Background()
 	instant := time.Date(2026, 9, 14, 21, 3, 7, 0, time.UTC)
 
-	dateTime, ok := templateFuncMap["DateTime"].(func(context.Context, *time.Time) string)
+	dateTime, ok := templateFuncMap["DateTime"].(func(context.Context, any) string)
 	if !ok {
-		t.Fatalf(`templateFuncMap["DateTime"] is not func(context.Context, *time.Time) string`)
+		t.Fatalf(`templateFuncMap["DateTime"] is not func(context.Context, any) string`)
 	}
 	if got, want := dateTime(ctx, &instant), i18n.FormatDateTime(ctx, &instant); got != want {
 		t.Errorf("DateTime() = %q, want %q", got, want)
@@ -79,9 +79,9 @@ func TestDateTimeAndSinceFuncMap(t *testing.T) {
 		t.Errorf("DateTime(nil) = %q, want the empty string", got)
 	}
 
-	since, ok := templateFuncMap["Since"].(func(context.Context, *time.Time) string)
+	since, ok := templateFuncMap["Since"].(func(context.Context, any) string)
 	if !ok {
-		t.Fatalf(`templateFuncMap["Since"] is not func(context.Context, *time.Time) string`)
+		t.Fatalf(`templateFuncMap["Since"] is not func(context.Context, any) string`)
 	}
 	// Three days and an hour back, so the answer is "3 days" on either side of
 	// the clock read Since performs for itself: the wrapper supplies
@@ -92,5 +92,35 @@ func TestDateTimeAndSinceFuncMap(t *testing.T) {
 	}
 	if got := since(ctx, nil); got != "" {
 		t.Errorf("Since(nil) = %q, want the empty string", got)
+	}
+}
+
+// TestInstantOf holds the adapter the two entries above normalize through. It
+// exists because the responses the console binds carry both shapes deliberately:
+// a nullable column reaches the wire as *time.Time, and an audit entry's
+// createdAt as a time.Time, since its column cannot be null. A template cannot
+// take the address of a value, so a page binding the second shape renders a
+// blank cell rather than a date unless this switch answers it (#373).
+func TestInstantOf(t *testing.T) {
+	instant := time.Date(2026, 9, 14, 21, 3, 7, 0, time.UTC)
+	var nilPointer *time.Time
+
+	if got := instantOf(&instant); got == nil || !got.Equal(instant) {
+		t.Errorf("instantOf(*time.Time) = %v, want %v", got, instant)
+	}
+	if got := instantOf(instant); got == nil || !got.Equal(instant) {
+		t.Errorf("instantOf(time.Time) = %v, want %v", got, instant)
+	}
+	if got := instantOf(nilPointer); got != nil {
+		t.Errorf("instantOf((*time.Time)(nil)) = %v, want nil", got)
+	}
+	if got := instantOf(nil); got != nil {
+		t.Errorf("instantOf(nil) = %v, want nil", got)
+	}
+	// Anything else renders blank rather than reaching the formatter, which is
+	// what deref does for a *bool: a template naming the wrong field is a bug
+	// the rendertest seam catches, not one worth a panic in a page.
+	if got := instantOf("2026-09-14"); got != nil {
+		t.Errorf("instantOf(string) = %v, want nil", got)
 	}
 }

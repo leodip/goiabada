@@ -628,10 +628,17 @@ const (
 )
 
 type AuditLogResponse struct {
-	Id         int64  `json:"id"`
-	CreatedAt  string `json:"createdAt"`
-	AuditEvent string `json:"auditEvent"`
-	Details    string `json:"details"`
+	Id int64 `json:"id"`
+	// CreatedAt is the instant, not a string the producer formatted: every consumer wants a
+	// time, and the one that renders it has to localize it rather than reproduce whatever
+	// layout the server picked. A value rather than a pointer because audit_logs.created_at is
+	// NOT NULL on every engine and the schema declares createdAt required and not nullable, so
+	// a pointer would publish a null that cannot occur. time.Time marshals to RFC3339, which is
+	// what the hand-rolled format produced, so the wire is unchanged but for the sub-second
+	// precision that format truncated (#373).
+	CreatedAt  time.Time `json:"createdAt"`
+	AuditEvent string    `json:"auditEvent"`
+	Details    string    `json:"details"`
 	// RequestId is the request's id as the application log carries it, empty when the entry
 	// was not written on a request (#328).
 	RequestId string `json:"requestId"`

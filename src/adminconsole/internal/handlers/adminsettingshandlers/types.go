@@ -1,6 +1,8 @@
 package adminsettingshandlers
 
 import (
+	"time"
+
 	"github.com/leodip/goiabada/core/api"
 )
 
@@ -41,8 +43,12 @@ type SettingsGeneral struct {
 }
 
 type SettingsKey struct {
-	Id               int64
-	CreatedAt        string
+	Id int64
+	// CreatedAt is the instant rather than pre-rendered text: the page formats it with the
+	// DateTime template function, which reads the layout from the viewer's catalog. Formatting
+	// it here produced "02 Jan 2006 15:04:05 MST" under every locale, month name included,
+	// because Go's time.Format has no locale of its own (#373).
+	CreatedAt        *time.Time
 	State            string
 	KeyIdentifier    string
 	Type             string

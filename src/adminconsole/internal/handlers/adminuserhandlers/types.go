@@ -19,8 +19,11 @@ type ConsentInfo struct {
 	ConsentId         int64
 	Client            string
 	ClientDescription string
-	GrantedAt         string
-	Scope             string
+	// GrantedAt is the instant rather than pre-rendered text, for the reason SessionInfo's
+	// two below carry theirs: formatting here produced an English RFC1123 date under every
+	// locale, because Go's time.Format has no locale of its own (#373).
+	GrantedAt *time.Time
+	Scope     string
 }
 
 type GroupsPostInput struct {

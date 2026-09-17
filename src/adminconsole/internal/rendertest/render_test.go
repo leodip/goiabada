@@ -403,12 +403,14 @@ func TestRender_AdminUsersPaginator(t *testing.T) {
 // in X-Request-Id, so the escaping is the one thing on this page standing between a stored
 // id and script in an administrator's browser.
 func TestRender_AdminSettingsAuditLogViewer(t *testing.T) {
+	auditWritten := time.Date(2026, 9, 12, 10, 0, 0, 0, time.UTC)
+
 	out := render(t, "/admin_settings_audit_log_viewer.html", map[string]interface{}{
 		"pageResult": adminsettingshandlers.AuditLogsPageResult{
 			AuditLogs: []api.AuditLogResponse{
-				{Id: 1, CreatedAt: "2026-09-12T10:00:00Z", AuditEvent: "user_login",
+				{Id: 1, CreatedAt: auditWritten, AuditEvent: "user_login",
 					Details: `{"email":"alice@example.com"}`, RequestId: "host/Ppg6bHPK5f-000012"},
-				{Id: 2, CreatedAt: "2026-09-12T10:00:01Z", AuditEvent: "revoked_user_auth_state",
+				{Id: 2, CreatedAt: auditWritten.Add(time.Second), AuditEvent: "revoked_user_auth_state",
 					Details: `{}`, RequestId: ""},
 			},
 			Total:      73,
@@ -442,6 +444,14 @@ func TestRender_AdminSettingsAuditLogViewer(t *testing.T) {
 	assert.Contains(t, out, "requestId=%22%3E%3Cscript%3Ealert%281%29%3C%2Fscript%3E")
 	assert.Contains(t, out, "auditEvent=user_login")
 	assert.NotContains(t, out, "page=-1")
+
+	// The timestamp column, which is two values in one cell and only one of them is prose.
+	// The text a reader sees is localized, in pt-BR's layout; the <time> element's datetime
+	// attribute is the machine value the HTML element defines and stays RFC3339 under every
+	// locale, which is what a later localization sweep must not "finish" (#373, decision 11).
+	assert.Contains(t, out, `<time datetime="2026-09-12T10:00:00Z">12/09/2026 10:00</time>`)
+	assert.NotContains(t, out, ">2026-09-12T10:00:00Z<",
+		"the ISO string is the attribute, never the text the page shows")
 }
 
 // The Device cell's tooltip, on all three session pages at once.
@@ -808,8 +818,13 @@ func TestRender_AdminUserDetails(t *testing.T) {
 
 	assert.Contains(t, out, "jane@example.com")
 	assert.Contains(t, out, "Jane Q Doe")
-	assert.Contains(t, out, "02 Jan 2026 03:04:05 UTC", "the created-at cell renders from the *time.Time")
-	assert.Contains(t, out, "04 Mar 2026 05:06:07 UTC", "and so does the last-updated cell")
+
+	// Both cells render through DateTime, in pt-BR's catalog layout: this page's dates were
+	// "02 Jan 2026 03:04:05 UTC" under every locale, month name and all, because the layout
+	// lived in the template and Go's time.Format has no locale (#373, decision 8).
+	assert.Contains(t, out, ">02/01/2026 03:04<", "the created-at cell renders from the *time.Time")
+	assert.Contains(t, out, ">04/03/2026 05:06<", "and so does the last-updated cell")
+	assert.NotContains(t, out, "Jan 2026", "an English month name is what the old layout produced")
 }
 
 // A user whose timestamps are absent renders an empty cell rather than the year 1: the guard in
@@ -848,7 +863,8 @@ func TestRender_AdminUserDelete(t *testing.T) {
 	})
 
 	assert.Contains(t, out, "Jane Q Doe")
-	assert.Contains(t, out, "02 Jan 2026 03:04:05 UTC")
+	assert.Contains(t, out, ">02/01/2026 03:04<", "the created-at cell is localized (#373)")
+	assert.NotContains(t, out, "Jan 2026", "an English month name is what the old layout produced")
 	assert.Contains(t, out, "admins", "the memberships the deletion discards have to be on the page")
 	assert.Contains(t, out, "site-viewers")
 	assert.NotContains(t, out, "(nenhum)", "with two groups listed, the none arm must not also render")
@@ -866,6 +882,136 @@ func TestRender_AdminUserDeleteWithNoGroups(t *testing.T) {
 
 	assert.Contains(t, out, "jane@example.com")
 	assert.Contains(t, out, "(nenhum)", "a user in no groups still gets the row's none arm")
+}
+
+// The two consent pages, which are two of decision 8's seven other dates (#373). Each rendered
+// GrantedAt as an English RFC1123 string its handler had already formatted -- "Wed, 16 Sep 2026
+// 12:00:00 UTC" beside Portuguese column headings -- and each now binds the instant and lets the
+// page format it. They are one case because they are one edit made twice, in two packages, and a
+// fix applied to the account page alone is the shape this guards against.
+func TestRender_ConsentPagesLocalizeTheGrantedAtCell(t *testing.T) {
+	granted := time.Date(2026, 9, 16, 12, 0, 0, 0, time.UTC)
+
+	for _, tc := range []struct {
+		name string
+		page string
+		bind map[string]interface{}
+	}{
+		{
+			name: "account",
+			page: "/account_manage_consents.html",
+			bind: map[string]interface{}{
+				"consents": []accounthandlers.ConsentInfo{{
+					ConsentId: 1, Client: "web-app", ClientDescription: "The web app",
+					GrantedAt: &granted, Scope: "openid profile",
+				}},
+			},
+		},
+		{
+			name: "admin user",
+			page: "/admin_users_consents.html",
+			bind: map[string]interface{}{
+				"user": &api.UserResponse{Id: 7, Email: "someone@example.com"},
+				"consents": []adminuserhandlers.ConsentInfo{{
+					ConsentId: 1, Client: "web-app", ClientDescription: "The web app",
+					GrantedAt: &granted, Scope: "openid profile",
+				}},
+				"page":              "1",
+				"query":             "",
+				"savedSuccessfully": false,
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			out := render(t, tc.page, tc.bind)
+
+			assert.Containsf(t, out, "<td>16/09/2026 12:00</td>",
+				"%s: the granted-at cell is not localized", tc.page)
+			assert.NotContainsf(t, out, granted.Format(time.RFC1123),
+				"%s: RFC1123 names the month and weekday in English under every locale", tc.page)
+		})
+	}
+}
+
+// A consent whose grantedAt is absent renders an empty cell rather than year 1. The column is NOT
+// NULL in the database, so this is the shape of a response the console cannot date rather than of
+// an ungranted consent (#350), and the guard that used to stand in front of the Format call is now
+// the formatter's own nil answer (#373).
+func TestRender_ConsentPageRendersAMissingGrantedAtAsBlank(t *testing.T) {
+	out := render(t, "/account_manage_consents.html", map[string]interface{}{
+		"consents": []accounthandlers.ConsentInfo{{
+			ConsentId: 1, Client: "web-app", Scope: "openid",
+		}},
+	})
+
+	assert.Contains(t, out, "<td></td>", "a nil instant must render an empty cell")
+	assert.NotContains(t, out, "0001", "year 1 is what a zero instant renders as")
+}
+
+// The signing keys page, the third of the three dates its handler used to format. Its layout was
+// "02 Jan 2006 15:04:05 MST", so it is the one site that showed a zone; the catalog layout carries
+// none, which decision 8 recorded as the wrinkle it answers. The values are UTC, as every date in
+// this console has always been (#373).
+func TestRender_AdminSettingsKeysLocalizesTheCreatedAtCell(t *testing.T) {
+	created := time.Date(2026, 9, 16, 12, 0, 0, 0, time.UTC)
+
+	out := render(t, "/admin_settings_keys.html", map[string]interface{}{
+		"keys": []adminsettingshandlers.SettingsKey{{
+			Id: 1, CreatedAt: &created, State: "current", KeyIdentifier: "key-1",
+			Type: "RSA", Algorithm: "RS256",
+		}},
+	})
+
+	assert.Contains(t, out, "<td>16/09/2026 12:00</td>", "the created-at cell is not localized")
+	assert.NotContains(t, out, "16 Sep 2026", "an English month name is what the old layout produced")
+}
+
+// Decision 8's exclusion, kept deliberately (#373). The dateOfBirth input is not a date the page
+// shows a reader: it is a form value the server parses back with a "2006-01-02" layout, so
+// localizing it would break the round trip on the next save -- silently, for pt-BR, since
+// "02/01/2026" parses as neither. The two inputs look like an oversight to anyone sweeping the
+// console for unlocalized dates, and this case is what stops that sweep "finishing the job".
+func TestRender_ProfilePagesKeepTheDateOfBirthMachineFormat(t *testing.T) {
+	born := time.Date(1990, 1, 2, 0, 0, 0, 0, time.UTC)
+	user := &api.UserResponse{Id: 7, Email: "someone@example.com", BirthDate: &born}
+
+	for _, tc := range []struct {
+		name string
+		page string
+		bind map[string]interface{}
+	}{
+		{
+			name: "account",
+			page: "/account_profile.html",
+			bind: map[string]interface{}{
+				"user":              user,
+				"timezones":         timezones.Get(),
+				"locales":           locales.Get(),
+				"savedSuccessfully": false,
+			},
+		},
+		{
+			name: "admin user",
+			page: "/admin_users_profile.html",
+			bind: map[string]interface{}{
+				"user":              user,
+				"timezones":         timezones.Get(),
+				"locales":           locales.Get(),
+				"page":              "1",
+				"query":             "",
+				"savedSuccessfully": false,
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			out := render(t, tc.page, tc.bind)
+
+			assert.Containsf(t, out, `value="1990-01-02"`,
+				"%s: the dateOfBirth input must stay the machine format the server parses back", tc.page)
+			assert.NotContainsf(t, out, `value="02/01/1990"`,
+				"%s: the catalog layout here would break the form's round trip", tc.page)
+		})
+	}
 }
 
 // Seam 4 for the group family (#350): the three group pages whose templates read the fields the
