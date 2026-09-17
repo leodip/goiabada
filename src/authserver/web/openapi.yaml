@@ -5603,12 +5603,13 @@ components:
           description: Auto-resolved if omitted
         responseMode:
           type: string
-          enum: [form_post, redirect]
           description: >-
             Which response shape to prepare. "form_post" answers the parameters of a
             self-submitting POST form, which keeps the id_token_hint out of a top-level
             navigation's URL, its history and its referrers. Any other value, absent included,
-            answers a redirect URL.
+            answers a redirect URL. The type is deliberately open rather than a closed set: the
+            endpoint refuses nothing here, so an enum would tell a validating client to withhold
+            a request this server answers.
 
     AccountLogoutRedirectResponse:
       type: object

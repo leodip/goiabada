@@ -1632,3 +1632,116 @@ func TestOpenAPI_APIFiveHundredsAreTheJSONEnvelope(t *testing.T) {
 			"document's operations", checked)
 	}
 }
+
+// requestEnumsTheServerDoesNotEnforce records the request properties whose published enum the
+// handler does not actually apply, so the check below reports a new one rather than this standing
+// pair. An entry is a known gap and not a blessing: at each of them the document is narrower than
+// the endpoint, and closing one is a decision about what that endpoint should do with an unlisted
+// value rather than a spelling fix.
+var requestEnumsTheServerDoesNotEnforce = map[string]string{
+	"CreateUserRequest.setPasswordType": "handler_api_users_crud.go compares it to \"now\" and " +
+		"to \"email\" and refuses nothing else: with SMTP configured, a third value creates the " +
+		"user with no password and sends no setup email, a third outcome the two-value enum does " +
+		"not describe. Predates #350 and is untouched by it",
+}
+
+// A closed enum on a request property is a promise that the server refuses everything outside it,
+// and a generated or validating client acts on that promise by rejecting the request before it is
+// sent. So the enum may only be published where the handler really does refuse: a field the server
+// reads permissively, giving every unlisted value a documented fallback, is narrower on paper than
+// at the endpoint, and the caller is told to withhold a request the server would have answered.
+//
+// That is what the logout responseMode was when #350 first published it: enum [form_post, redirect]
+// directly above a description reading "any other value, absent included, answers a redirect URL",
+// with an integration case driving "", "form-post", "FORM_POST" and "fragment" through the endpoint
+// to a 200 and the redirect shape. Exactly one value is significant there,
+// api.AccountLogoutResponseModeFormPost, which is a fallback rather than a two-value set and is now
+// documented as one.
+//
+// Response properties are deliberately not in this: an enum there is a promise the server keeps
+// rather than a restriction on what it accepts, which is why AccountLogoutFormPostResponse.method
+// may say POST and should.
+func TestOpenAPI_RequestSchemasPublishNoUnenforcedEnum(t *testing.T) {
+	doc := specDocument(t)
+	_, requestOnly, both := schemaReachability(t, doc)
+
+	reachable := map[string]bool{}
+	for name := range requestOnly {
+		reachable[name] = true
+	}
+	for name := range both {
+		reachable[name] = true
+	}
+	if len(reachable) < 20 {
+		t.Fatalf("only %d schemas reachable from a request body; the paths parse is no longer "+
+			"matching the document's shape", len(reachable))
+	}
+
+	for _, name := range sortedKeys(reachable) {
+		for _, property := range sortedKeys(enumProperties(doc.Components.Schemas[name])) {
+			if _, recorded := requestEnumsTheServerDoesNotEnforce[name+"."+property]; recorded {
+				continue
+			}
+			t.Errorf("the %s schema publishes a closed enum on %q, and nothing here says the "+
+				"handler refuses the values outside it. A validating client acts on that enum "+
+				"by refusing to send the request at all, so publish one only where the server "+
+				"really does reject every other value; where a single value is significant and "+
+				"every other one falls back, describe the fallback and leave the type open "+
+				"(#350)", name, property)
+		}
+	}
+}
+
+// enumProperties returns the properties one schema constrains with an enum, descending inline
+// allOf members and an array's items. A $ref is not followed: schemaReachability closes over
+// references, so the target is reached as itself and following it here would report one property
+// against every schema that refers to it.
+func enumProperties(node yaml.Node) map[string]bool {
+	out := map[string]bool{}
+
+	var walk func(n *yaml.Node)
+	walk = func(n *yaml.Node) {
+		if n == nil || n.Kind != yaml.MappingNode {
+			return
+		}
+		for i := 0; i+1 < len(n.Content); i += 2 {
+			key, val := n.Content[i].Value, n.Content[i+1]
+			switch key {
+			case "properties":
+				if val.Kind != yaml.MappingNode {
+					continue
+				}
+				for j := 0; j+1 < len(val.Content); j += 2 {
+					if declaresEnum(val.Content[j+1]) {
+						out[val.Content[j].Value] = true
+					}
+				}
+			case "allOf":
+				for _, member := range val.Content {
+					walk(member)
+				}
+			}
+		}
+	}
+	walk(&node)
+	return out
+}
+
+// declaresEnum reports whether one property's schema constrains it to a closed set, either on the
+// property itself or on the items of an array of them.
+func declaresEnum(n *yaml.Node) bool {
+	if n == nil || n.Kind != yaml.MappingNode {
+		return false
+	}
+	for i := 0; i+1 < len(n.Content); i += 2 {
+		switch n.Content[i].Value {
+		case "enum":
+			return true
+		case "items":
+			if declaresEnum(n.Content[i+1]) {
+				return true
+			}
+		}
+	}
+	return false
+}
