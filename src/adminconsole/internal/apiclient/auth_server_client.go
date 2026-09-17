@@ -28,7 +28,6 @@ type ApiClient interface {
 	GetUserSessionsByUserId(accessToken string, userId int64) ([]api.EnhancedUserSessionResponse, error)
 	DeleteUserSessionById(accessToken string, sessionId int64) error
 	GetClientSessionsByClientId(accessToken string, clientId int64, page, size int) ([]api.EnhancedUserSessionResponse, error)
-	GetUserSession(accessToken string, sessionIdentifier string) (*api.UserSessionResponse, error)
 	GetAccountSessions(accessToken string) ([]api.EnhancedUserSessionResponse, error)
 	DeleteAccountSession(accessToken string, sessionId int64) error
 	GetUserConsents(accessToken string, userId int64) ([]api.UserConsentResponse, error)

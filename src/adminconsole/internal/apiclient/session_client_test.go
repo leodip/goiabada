@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
@@ -334,69 +335,175 @@ func TestSessionTokenSource_ARefusalNamesTheClientAndTheRemedy(t *testing.T) {
 	})
 }
 
-// GetUserSession used to rebuild a models.UserSession field by field, and a field left out of that
-// literal was invisible to the compiler and to every page test, because the zero value of a string
-// is a legal header. It forwards the decoded response now (#350), which removes the literal but
-// not the exposure below it.
+// Seam "the client" (#373).
 //
-// So the raw header is asserted at the wire, from a body the test wrote, which is what pins the
-// decoded key: the client unmarshals into api.GetUserSessionResponse, so a json tag renamed in
-// core would show up here as an empty string rather than as a compile error (#281 decision 6).
-func TestAuthServerClient_GetUserSessionCopiesTheRawUserAgent(t *testing.T) {
-	const (
-		sessionIdentifier = "a-session-identifier"
-		header            = `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "odd" <build>`
-	)
+// The console reaches the auth server's three session lists through GetUserSessionsByUserId,
+// GetClientSessionsByClientId and GetAccountSessions, and none of the three had ever had its
+// real request path executed: the console's handler tests reach them only through hand-written
+// stubs returning canned structs, so the URL each builds and the json.Unmarshal each performs
+// ran nowhere. That decode is the one place a json tag renamed in core/api shows up as an empty
+// field rather than as a compile error (#281 decision 6), and this table is deliberately
+// written before the session response changes shape, so the proof exists before there is a
+// rename to catch.
+//
+// The body is literal bytes rather than marshalled from the api structs: a body produced by the
+// same tags it is meant to check proves nothing, which is the rule user_client_test.go already
+// states for the user family.
+//
+// The presentation fields the session response used to carry -- startedAt,
+// durationSinceStarted, lastAccessedAt, durationSinceLastAccessed and isValid -- are
+// deliberately absent from both the body and the assertions. This table is about the contract
+// that survives, so it must not need editing by the change it exists to protect.
 
-	var gotPath, gotAuthorization string
+// sessionUserAgent is what the JSON below must decode to, kept beside it in decoded form: the
+// header carries a quote and a pair of angle brackets, so the two spellings differ by JSON's own
+// escaping, and asserting the escaped one would pass on a client that never unescaped anything.
+const sessionUserAgent = `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "odd" <build>`
+
+// started is present and lastAccessed is null, so both arms of a *time.Time are read: the
+// difference between a page printing "01 Jan 0001" and a page printing nothing.
+const sessionBodyFields = `
+	"id": 7,
+	"sessionIdentifier": "a-session-identifier",
+	"started": "2026-01-02T03:04:05Z",
+	"lastAccessed": null,
+	"ipAddress": "203.0.113.7",
+	"deviceName": "Chrome 120",
+	"deviceType": "Desktop",
+	"deviceOS": "Linux",
+	"userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 \"odd\" <build>",
+	"userId": 42,
+	"isCurrent": true,
+	"clientIdentifiers": ["portal", "backoffice"]`
+
+// servesSessions is `serves` with the whole request target recorded rather than the path alone,
+// because GetClientSessionsByClientId assembles a query string by hand and that assembly is
+// half of what this file covers. It is a second helper rather than a widened `serves` because
+// that one has eleven callers, every one of them asserting against a path.
+func servesSessions(t *testing.T, body string) (*AuthServerClient, func() (string, string)) {
+	t.Helper()
+
+	var gotURI, gotAuthorization string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		gotPath = r.URL.Path
+		gotURI = r.URL.RequestURI()
 		gotAuthorization = r.Header.Get("Authorization")
-
 		w.Header().Set("Content-Type", "application/json")
-		require.NoError(t, json.NewEncoder(w).Encode(api.GetUserSessionResponse{
-			Session: api.UserSessionResponse{
-				Id:                7,
-				SessionIdentifier: sessionIdentifier,
-				IpAddress:         "203.0.113.7",
-				DeviceName:        "Chrome 120",
-				DeviceType:        "Desktop",
-				DeviceOS:          "Linux",
-				UserAgent:         header,
-				UserId:            42,
-			},
-		}))
+		_, _ = w.Write([]byte(body))
 	}))
 	t.Cleanup(server.Close)
 
-	session, err := NewAuthServerClient(server.URL).GetUserSession("an-access-token", sessionIdentifier)
-	require.NoError(t, err)
-	require.NotNil(t, session)
-
-	assert.Equal(t, "/api/v1/admin/user-sessions/"+sessionIdentifier, gotPath)
-	assert.Equal(t, "Bearer an-access-token", gotAuthorization)
-
-	assert.Equal(t, header, session.UserAgent)
-
-	// The three labels beside it still arrive, so a case that passes has not done so by the
-	// client having stopped copying the device fields altogether.
-	assert.Equal(t, "Chrome 120", session.DeviceName)
-	assert.Equal(t, "Desktop", session.DeviceType)
-	assert.Equal(t, "Linux", session.DeviceOS)
+	return NewAuthServerClient(server.URL), func() (string, string) { return gotURI, gotAuthorization }
 }
 
-// A session created before the column existed carries an empty header, and the console must be
-// handed that rather than a decoding failure: the field is required on the wire and present as
-// an empty string, which decision 7 accepted as permanent for pre-upgrade rows.
-func TestAuthServerClient_GetUserSessionAcceptsALegacyEmptyUserAgent(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"session":{"id":7,"sessionIdentifier":"legacy","userAgent":"","userId":42}}`))
-	}))
-	t.Cleanup(server.Close)
+type sessionListMethod struct {
+	name    string
+	wantURI string
+	call    func(c *AuthServerClient) ([]api.EnhancedUserSessionResponse, error)
+}
 
-	session, err := NewAuthServerClient(server.URL).GetUserSession("an-access-token", "legacy")
-	require.NoError(t, err)
-	require.NotNil(t, session)
-	assert.Equal(t, "", session.UserAgent)
+func sessionListMethods() []sessionListMethod {
+	return []sessionListMethod{
+		{
+			name:    "GetUserSessionsByUserId",
+			wantURI: "/api/v1/admin/users/42/sessions",
+			call: func(c *AuthServerClient) ([]api.EnhancedUserSessionResponse, error) {
+				return c.GetUserSessionsByUserId("an-access-token", 42)
+			},
+		},
+		{
+			name:    "GetClientSessionsByClientId",
+			wantURI: "/api/v1/admin/clients/7/sessions?page=2&size=10",
+			call: func(c *AuthServerClient) ([]api.EnhancedUserSessionResponse, error) {
+				return c.GetClientSessionsByClientId("an-access-token", 7, 2, 10)
+			},
+		},
+		{
+			name:    "GetAccountSessions",
+			wantURI: "/api/v1/account/sessions",
+			call: func(c *AuthServerClient) ([]api.EnhancedUserSessionResponse, error) {
+				return c.GetAccountSessions("an-access-token")
+			},
+		},
+	}
+}
+
+func TestAuthServerClient_SessionListsDecodeEveryFieldTheConsoleBinds(t *testing.T) {
+	for _, method := range sessionListMethods() {
+		t.Run(method.name, func(t *testing.T) {
+			client, recorded := servesSessions(t, `{"sessions":[{`+sessionBodyFields+`}]}`)
+
+			sessions, err := method.call(client)
+			require.NoError(t, err)
+			require.Len(t, sessions, 1)
+
+			gotURI, gotAuthorization := recorded()
+			assert.Equal(t, method.wantURI, gotURI)
+			assert.Equal(t, "Bearer an-access-token", gotAuthorization)
+
+			session := sessions[0]
+			assert.Equal(t, int64(7), session.Id)
+			assert.Equal(t, "a-session-identifier", session.SessionIdentifier)
+			require.NotNil(t, session.Started)
+			assert.Equal(t, time.Date(2026, time.January, 2, 3, 4, 5, 0, time.UTC), session.Started.UTC())
+			assert.Nil(t, session.LastAccessed)
+			assert.Equal(t, "203.0.113.7", session.IpAddress)
+			assert.Equal(t, "Chrome 120", session.DeviceName)
+			assert.Equal(t, "Desktop", session.DeviceType)
+			assert.Equal(t, "Linux", session.DeviceOS)
+			assert.Equal(t, int64(42), session.UserId)
+			assert.True(t, session.IsCurrent)
+			assert.Equal(t, []string{"portal", "backoffice"}, session.ClientIdentifiers)
+
+			// The raw header, byte for byte. It reaches the page as a tooltip, so a client
+			// that repaired or truncated it would leave two sessions whose device labels read
+			// alike indistinguishable (#281).
+			assert.Equal(t, sessionUserAgent, session.UserAgent)
+		})
+	}
+}
+
+// A session created before the userAgent column existed carries an empty header, and the
+// console must be handed that rather than a decoding failure: the field is required on the wire
+// and present as an empty string, which #281 decision 7 accepted as permanent for pre-upgrade
+// rows.
+func TestAuthServerClient_SessionListsAcceptALegacyEmptyUserAgent(t *testing.T) {
+	for _, method := range sessionListMethods() {
+		t.Run(method.name, func(t *testing.T) {
+			client, _ := servesSessions(t,
+				`{"sessions":[{"id":7,"sessionIdentifier":"legacy","userAgent":"","userId":42}]}`)
+
+			sessions, err := method.call(client)
+			require.NoError(t, err)
+			require.Len(t, sessions, 1)
+			assert.Equal(t, "", sessions[0].UserAgent)
+		})
+	}
+}
+
+// GetClientSessionsByClientId assembles its query string by hand, `q := "?"` then `q += "&"`,
+// and had no test at all. The neither case is the one that must produce a request target with
+// no `?` in it: an absent query is what leaves the endpoint free to apply its own defaults,
+// where `?page=0&size=0` would be asking it for page zero of nothing.
+func TestAuthServerClient_GetClientSessionsByClientIdBuildsThePaginationQuery(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		page    int
+		size    int
+		wantURI string
+	}{
+		{"page and size", 2, 10, "/api/v1/admin/clients/7/sessions?page=2&size=10"},
+		{"page only", 2, 0, "/api/v1/admin/clients/7/sessions?page=2"},
+		{"size only", 0, 10, "/api/v1/admin/clients/7/sessions?size=10"},
+		{"neither", 0, 0, "/api/v1/admin/clients/7/sessions"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			client, recorded := servesSessions(t, `{"sessions":[]}`)
+
+			_, err := client.GetClientSessionsByClientId("an-access-token", 7, tc.page, tc.size)
+			require.NoError(t, err)
+
+			gotURI, _ := recorded()
+			assert.Equal(t, tc.wantURI, gotURI)
+		})
+	}
 }
