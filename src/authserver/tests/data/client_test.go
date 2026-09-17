@@ -789,8 +789,13 @@ func TestGetClientsByIds_MoreIdsThanOneStatementCanCarry(t *testing.T) {
 // several statements is what could make the same row arrive twice, and a caller reading the
 // result as a set of clients cannot tell that from two clients (#373).
 //
-// The positions are chosen: 999 and 1000 are the last slot of the first statement's batch and the
-// first slot of the second's, which is the tightest place a duplicate can straddle.
+// Two placements, and the pair is what makes the case a proof rather than an illustration. 999 and
+// 1000 are the last slot of one statement and the first of the next, the tightest place a duplicate
+// can straddle; but dropping only a repeat of the id just kept passes it too, since collapsing
+// those two leaves 1,000 ids and one statement. 0 and 1000 have nothing adjacent to collapse, so
+// only a method that remembers every id it has already seen answers one row. Keep both: with the
+// far pair alone a boundary off by one slot goes unnoticed, and with the near pair alone
+// deduplicating neighbours passes for deduplicating the list (#373).
 func TestGetClientsByIds_ARepeatedIdOnEitherSideOfABatchBoundary(t *testing.T) {
 	random := fake.LetterN(6)
 	client := models.Client{
@@ -808,29 +813,42 @@ func TestGetClientsByIds_ARepeatedIdOnEitherSideOfABatchBoundary(t *testing.T) {
 		t.Fatalf("Failed to create test client: %v", err)
 	}
 
-	// Ids no row can hold, as in the test above: padding with distinct values is what puts the
-	// two copies of the real id in different statements.
+	// Ids no row can hold, as in the test above: padding with distinct values is what makes the
+	// list long enough for a statement boundary to fall between the two copies of the real id.
 	const paddingBase = int64(2_000_000_000)
 
-	ids := make([]int64, 1001)
-	for i := range ids {
-		ids[i] = paddingBase + int64(i)
-	}
-	ids[999] = client.Id
-	ids[1000] = client.Id
-
-	clients, err := database.GetClientsByIds(nil, ids)
-	if err != nil {
-		t.Fatalf("Failed to retrieve clients by ids: %v", err)
+	testCases := []struct {
+		name      string
+		positions []int
+	}{
+		{name: "the two slots the boundary sits between", positions: []int{999, 1000}},
+		{name: "one slot in each statement, nothing adjacent", positions: []int{0, 1000}},
 	}
 
-	if len(clients) != 1 {
-		t.Errorf("Expected 1 client for an id repeated across a batch boundary, got %d", len(clients))
-	}
-	for _, retrieved := range clients {
-		if retrieved.Id != client.Id {
-			t.Errorf("Expected client with ID %d, got %d", client.Id, retrieved.Id)
-		}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			ids := make([]int64, 1001)
+			for i := range ids {
+				ids[i] = paddingBase + int64(i)
+			}
+			for _, position := range testCase.positions {
+				ids[position] = client.Id
+			}
+
+			clients, err := database.GetClientsByIds(nil, ids)
+			if err != nil {
+				t.Fatalf("Failed to retrieve clients by ids: %v", err)
+			}
+
+			if len(clients) != 1 {
+				t.Errorf("Expected 1 client for an id repeated across a batch boundary, got %d", len(clients))
+			}
+			for _, retrieved := range clients {
+				if retrieved.Id != client.Id {
+					t.Errorf("Expected client with ID %d, got %d", client.Id, retrieved.Id)
+				}
+			}
+		})
 	}
 }
 
