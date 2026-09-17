@@ -3,7 +3,6 @@ package apihandlers
 import (
 	"net/http"
 	"strconv"
-	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
@@ -15,7 +14,8 @@ import (
 )
 
 // HandleAPIAccountSessionsGet - GET /api/v1/account/sessions
-// Returns the current user's valid sessions with enhanced details.
+// Returns the caller's own active sessions, each with the clients it authorized and
+// whether it is the session the caller's own token was issued through.
 func HandleAPIAccountSessionsGet(
 	database data.Database,
 ) http.HandlerFunc {
@@ -51,75 +51,25 @@ func HandleAPIAccountSessionsGet(
 			return
 		}
 
-		// Load nested client info (to collect client identifiers)
+		// Load the clients each session authorized; buildSessionDetails hydrates them.
 		if err := database.UserSessionsLoadClients(nil, userSessions); err != nil {
 			writeInternalServerError(w, r, err)
 			return
 		}
 
 		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
+
+		// This endpoint is the one that always had isCurrent; the two admin ones now read the
+		// same claim through the same mapper (#373 decision 1).
 		currentSid := jwtToken.GetStringClaim("sid")
 
-		enhanced := make([]api.EnhancedUserSessionResponse, 0, len(userSessions))
-		for _, us := range userSessions {
-			// Filter using current global settings
-			isValid := us.IsValid(settings.UserSessionIdleTimeoutInSeconds, settings.UserSessionMaxLifetimeInSeconds, nil)
-			if !isValid {
-				continue
-			}
-
-			// Ensure clients on session are also loaded
-			if err := database.UserSessionClientsLoadClients(nil, us.Clients); err != nil {
-				writeInternalServerError(w, r, err)
-				return
-			}
-
-			enh := api.EnhancedUserSessionResponse{
-				Id:                us.Id,
-				SessionIdentifier: us.SessionIdentifier,
-				AuthMethods:       us.AuthMethods,
-				AcrLevel:          us.AcrLevel,
-				IpAddress:         us.IpAddress,
-				DeviceName:        us.DeviceName,
-				DeviceType:        us.DeviceType,
-				DeviceOS:          us.DeviceOS,
-				UserAgent:         us.UserAgent,
-				UserId:            us.UserId,
-				IsValid:           isValid,
-				IsCurrent:         currentSid != "" && us.SessionIdentifier == currentSid,
-			}
-
-			if us.CreatedAt.Valid {
-				enh.CreatedAt = &us.CreatedAt.Time
-			}
-			if us.UpdatedAt.Valid {
-				enh.UpdatedAt = &us.UpdatedAt.Time
-			}
-			if !us.Started.IsZero() {
-				enh.Started = &us.Started
-				enh.StartedAt = us.Started.Format(time.RFC1123)
-				enh.DurationSinceStarted = time.Now().UTC().Sub(us.Started).Round(time.Second).String()
-			}
-			if !us.LastAccessed.IsZero() {
-				enh.LastAccessed = &us.LastAccessed
-				enh.LastAccessedAt = us.LastAccessed.Format(time.RFC1123)
-				enh.DurationSinceLastAccessed = time.Now().UTC().Sub(us.LastAccessed).Round(time.Second).String()
-			}
-			if !us.AuthTime.IsZero() {
-				enh.AuthTime = &us.AuthTime
-			}
-
-			// Collect client identifiers
-			clientIdentifiers := make([]string, 0, len(us.Clients))
-			for _, usc := range us.Clients {
-				clientIdentifiers = append(clientIdentifiers, usc.Client.ClientIdentifier)
-			}
-			enh.ClientIdentifiers = clientIdentifiers
-
-			enhanced = append(enhanced, enh)
+		sessions, err := buildSessionDetails(database, userSessions, settings, currentSid)
+		if err != nil {
+			writeInternalServerError(w, r, err)
+			return
 		}
 
-		resp := api.GetUserSessionsResponse{Sessions: enhanced}
+		resp := api.GetUserSessionsResponse{Sessions: sessions}
 		writeJSON(w, r, http.StatusOK, resp)
 	}
 }

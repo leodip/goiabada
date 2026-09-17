@@ -19,10 +19,10 @@ import (
 // the embedded nil interface, so a fetch this page has no business making panics.
 type accountSessionsApiClient struct {
 	apiclient.ApiClient
-	sessions []api.EnhancedUserSessionResponse
+	sessions []api.UserSessionDetailResponse
 }
 
-func (c *accountSessionsApiClient) GetAccountSessions(accessToken string) ([]api.EnhancedUserSessionResponse, error) {
+func (c *accountSessionsApiClient) GetAccountSessions(accessToken string) ([]api.UserSessionDetailResponse, error) {
 	return c.sessions, nil
 }
 
@@ -38,7 +38,7 @@ func TestHandleAccountSessionsGet_BindsTheRawUserAgent(t *testing.T) {
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/account_user_sessions.html").Maybe()
 
 	apiClient := &accountSessionsApiClient{
-		sessions: []api.EnhancedUserSessionResponse{
+		sessions: []api.UserSessionDetailResponse{
 			{Id: 1, DeviceName: "Chrome 120", DeviceType: "Desktop", DeviceOS: "Linux", UserAgent: header},
 			// A legacy row: the labels the old parser left behind, and no header at all.
 			{Id: 2, DeviceName: "Chrome 119.0.0.0", DeviceType: "Desktop", DeviceOS: "Linux x86_64"},
@@ -75,7 +75,7 @@ func TestHandleAccountSessionsGet_BindsTheSessionInstants(t *testing.T) {
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/account_user_sessions.html").Maybe()
 
 	apiClient := &accountSessionsApiClient{
-		sessions: []api.EnhancedUserSessionResponse{
+		sessions: []api.UserSessionDetailResponse{
 			{Id: 1, Started: &started, LastAccessed: &lastAccessed},
 		},
 	}
@@ -91,4 +91,32 @@ func TestHandleAccountSessionsGet_BindsTheSessionInstants(t *testing.T) {
 	require.NotNil(t, sessions[0].LastAccessed)
 	assert.Equal(t, started, *sessions[0].Started)
 	assert.Equal(t, lastAccessed, *sessions[0].LastAccessed)
+}
+
+// This page always believed the field; the other two do now. Written here as well so the trio is
+// symmetric: the copy is made by hand in three files, and a case in two of them cannot see the
+// third going wrong (#373 decision 1).
+func TestHandleAccountSessionsGet_BindsIsCurrentFromTheResponse(t *testing.T) {
+	httpHelper := mocks_handler_helpers.NewHttpHelper(t)
+	handlertest.RefuseInternalServerError(t, httpHelper)
+	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/account_user_sessions.html").Maybe()
+
+	apiClient := &accountSessionsApiClient{
+		sessions: []api.UserSessionDetailResponse{
+			{UserSessionResponse: api.UserSessionResponse{Id: 1, SessionIdentifier: "sid-one"}},
+			{UserSessionResponse: api.UserSessionResponse{Id: 2, SessionIdentifier: "sid-two"}, IsCurrent: true},
+		},
+	}
+
+	req := handlertest.Request(http.MethodGet, "/account/sessions", handlertest.WithAccessToken())
+
+	HandleAccountSessionsGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
+
+	sessions, ok := handlertest.Bind(t, httpHelper)["sessions"].([]SessionInfo)
+	require.True(t, ok, "the bind carries no []SessionInfo")
+	require.Len(t, sessions, 2)
+
+	assert.Equal(t, int64(2), sessions[0].UserSessionId)
+	assert.True(t, sessions[0].IsCurrent)
+	assert.False(t, sessions[1].IsCurrent)
 }

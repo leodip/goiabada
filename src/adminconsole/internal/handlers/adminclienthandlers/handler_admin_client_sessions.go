@@ -51,19 +51,16 @@ func HandleAdminClientUserSessionsGet(
 		}
 
 		// Get the first 50 sessions (server filters invalid)
-		enhancedSessions, err := apiClient.GetClientSessionsByClientId(jwtInfo.TokenResponse.AccessToken, clientResp.Id, 1, 50)
+		sessions, err := apiClient.GetClientSessionsByClientId(jwtInfo.TokenResponse.AccessToken, clientResp.Id, 1, 50)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 
-		sessionIdentifier := ""
-		if r.Context().Value(constants.ContextKeySessionIdentifier) != nil {
-			sessionIdentifier = r.Context().Value(constants.ContextKeySessionIdentifier).(string)
-		}
-
+		// IsCurrent comes from the response; this page no longer recomputes it from the sid on
+		// the console's own access token, which is the claim the auth server now reads (#373).
 		sessionInfoArr := []SessionInfo{}
-		for _, es := range enhancedSessions {
+		for _, es := range sessions {
 			// N+1: fetch user for email/full name
 			user, err := apiClient.GetUserById(jwtInfo.TokenResponse.AccessToken, es.UserId)
 			if err != nil {
@@ -72,6 +69,7 @@ func HandleAdminClientUserSessionsGet(
 			}
 			usi := SessionInfo{
 				UserSessionId: es.Id,
+				IsCurrent:     es.IsCurrent,
 				UserId:        es.UserId,
 				UserEmail:     "",
 				UserFullName:  "",
@@ -87,9 +85,6 @@ func HandleAdminClientUserSessionsGet(
 			if user != nil {
 				usi.UserEmail = user.Email
 				usi.UserFullName = handlers.UserFullName(user)
-			}
-			if es.SessionIdentifier == sessionIdentifier {
-				usi.IsCurrent = true
 			}
 			sessionInfoArr = append(sessionInfoArr, usi)
 		}

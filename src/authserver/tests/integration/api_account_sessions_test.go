@@ -63,11 +63,8 @@ func TestAPIAccountSessionsGet_Success_IncludesIsCurrent(t *testing.T) {
 	for _, s := range out.Sessions {
 		assert.Greater(t, s.Id, int64(0))
 		assert.NotEmpty(t, s.SessionIdentifier)
-		assert.NotEmpty(t, s.StartedAt)
-		assert.NotEmpty(t, s.DurationSinceStarted)
-		assert.NotEmpty(t, s.LastAccessedAt)
-		assert.NotEmpty(t, s.DurationSinceLastAccessed)
-		assert.True(t, s.IsValid)
+		require.NotNil(t, s.Started)
+		require.NotNil(t, s.LastAccessed)
 		// isCurrent must be present; true for the session associated to the access token (sid)
 		if s.IsCurrent {
 			foundCurrent = true

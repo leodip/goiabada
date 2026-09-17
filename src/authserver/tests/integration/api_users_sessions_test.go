@@ -100,10 +100,8 @@ func TestAPIUserSessionsGet_Success(t *testing.T) {
 	for _, session := range getResponse.Sessions {
 		assert.Greater(t, session.Id, int64(0))
 		assert.NotEmpty(t, session.SessionIdentifier)
-		assert.NotEmpty(t, session.StartedAt)
-		assert.NotEmpty(t, session.DurationSinceStarted)
-		assert.NotEmpty(t, session.LastAccessedAt)
-		assert.NotEmpty(t, session.DurationSinceLastAccessed)
+		require.NotNil(t, session.Started)
+		require.NotNil(t, session.LastAccessed)
 		assert.Equal(t, "192.168.1.100", session.IpAddress)
 		assert.Equal(t, "Test Device", session.DeviceName)
 		assert.Equal(t, "computer", session.DeviceType)
@@ -111,7 +109,6 @@ func TestAPIUserSessionsGet_Success(t *testing.T) {
 		// The raw header, byte for byte. The three Device* labels beside it are a parser's
 		// guess; this is what the row actually stored (#281 decision 6).
 		assert.Equal(t, testSessionUserAgent, session.UserAgent)
-		assert.True(t, session.IsValid)
 		assert.Equal(t, testUser.Id, session.UserId)
 		assert.Contains(t, session.ClientIdentifiers, testClient.ClientIdentifier)
 	}

@@ -11,7 +11,7 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 )
 
-func (c *AuthServerClient) GetUserSessionsByUserId(accessToken string, userId int64) ([]api.EnhancedUserSessionResponse, error) {
+func (c *AuthServerClient) GetUserSessionsByUserId(accessToken string, userId int64) ([]api.UserSessionDetailResponse, error) {
 	fullURL := c.baseURL + "/api/v1/admin/users/" + strconv.FormatInt(userId, 10) + "/sessions"
 
 	req, err := http.NewRequest("GET", fullURL, nil)
@@ -83,7 +83,7 @@ func (c *AuthServerClient) DeleteUserSessionById(accessToken string, sessionId i
 	return nil
 }
 
-func (c *AuthServerClient) GetClientSessionsByClientId(accessToken string, clientId int64, page, size int) ([]api.EnhancedUserSessionResponse, error) {
+func (c *AuthServerClient) GetClientSessionsByClientId(accessToken string, clientId int64, page, size int) ([]api.UserSessionDetailResponse, error) {
 	// Build URL with pagination params
 	fullURL := c.baseURL + "/api/v1/admin/clients/" + strconv.FormatInt(clientId, 10) + "/sessions"
 	// simple defaulting at caller, but include if provided
@@ -131,7 +131,7 @@ func (c *AuthServerClient) GetClientSessionsByClientId(accessToken string, clien
 	return response.Sessions, nil
 }
 
-func (c *AuthServerClient) GetAccountSessions(accessToken string) ([]api.EnhancedUserSessionResponse, error) {
+func (c *AuthServerClient) GetAccountSessions(accessToken string) ([]api.UserSessionDetailResponse, error) {
 	fullURL := c.baseURL + "/api/v1/account/sessions"
 
 	req, err := http.NewRequest("GET", fullURL, nil)

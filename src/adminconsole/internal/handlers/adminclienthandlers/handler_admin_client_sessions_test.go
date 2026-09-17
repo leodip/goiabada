@@ -20,7 +20,7 @@ import (
 type clientSessionsApiClient struct {
 	apiclient.ApiClient
 	client   *api.ClientResponse
-	sessions []api.EnhancedUserSessionResponse
+	sessions []api.UserSessionDetailResponse
 	user     *api.UserResponse
 }
 
@@ -29,7 +29,7 @@ func (c *clientSessionsApiClient) GetClientById(accessToken string, clientId int
 }
 
 func (c *clientSessionsApiClient) GetClientSessionsByClientId(accessToken string, clientId int64,
-	page, size int) ([]api.EnhancedUserSessionResponse, error) {
+	page, size int) ([]api.UserSessionDetailResponse, error) {
 	return c.sessions, nil
 }
 
@@ -50,7 +50,7 @@ func TestHandleAdminClientUserSessionsGet_BindsTheRawUserAgent(t *testing.T) {
 	apiClient := &clientSessionsApiClient{
 		client: &api.ClientResponse{Id: 3, ClientIdentifier: "web-app"},
 		user:   &api.UserResponse{Id: 7, Email: "someone@example.com"},
-		sessions: []api.EnhancedUserSessionResponse{
+		sessions: []api.UserSessionDetailResponse{
 			{Id: 1, UserId: 7, DeviceName: "goiabada-d2-second-device", DeviceType: "unknown", UserAgent: header},
 		},
 	}
@@ -84,7 +84,7 @@ func TestHandleAdminClientUserSessionsGet_BindsTheSessionInstants(t *testing.T) 
 	apiClient := &clientSessionsApiClient{
 		client: &api.ClientResponse{Id: 3, ClientIdentifier: "web-app"},
 		user:   &api.UserResponse{Id: 7, Email: "someone@example.com"},
-		sessions: []api.EnhancedUserSessionResponse{
+		sessions: []api.UserSessionDetailResponse{
 			{Id: 1, UserId: 7, Started: &started, LastAccessed: &lastAccessed},
 		},
 	}
@@ -103,4 +103,37 @@ func TestHandleAdminClientUserSessionsGet_BindsTheSessionInstants(t *testing.T) 
 	require.NotNil(t, sessions[0].LastAccessed)
 	assert.Equal(t, started, *sessions[0].Started)
 	assert.Equal(t, lastAccessed, *sessions[0].LastAccessed)
+}
+
+// The client page's twin of the admin user page's case, and written separately for the reason
+// every case in this trio is: this is the second of the two recomputations #373 deleted, and one
+// of them left behind would be invisible to the other's test.
+func TestHandleAdminClientUserSessionsGet_BindsIsCurrentFromTheResponse(t *testing.T) {
+	httpHelper := mocks_handler_helpers.NewHttpHelper(t)
+	handlertest.RefuseInternalServerError(t, httpHelper)
+	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_clients_usersessions.html").Maybe()
+
+	apiClient := &clientSessionsApiClient{
+		client: &api.ClientResponse{Id: 3},
+		user:   &api.UserResponse{Id: 7},
+		sessions: []api.UserSessionDetailResponse{
+			{UserSessionResponse: api.UserSessionResponse{Id: 1, SessionIdentifier: "sid-one"}},
+			{UserSessionResponse: api.UserSessionResponse{Id: 2, SessionIdentifier: "sid-two"}, IsCurrent: true},
+		},
+	}
+
+	req := handlertest.Request(http.MethodGet, "/admin/clients/3/user-sessions",
+		handlertest.WithAccessToken(),
+		handlertest.WithRouteParam("clientId", "3"),
+	)
+
+	HandleAdminClientUserSessionsGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
+
+	sessions, ok := handlertest.Bind(t, httpHelper)["sessions"].([]SessionInfo)
+	require.True(t, ok, "the bind carries no []SessionInfo")
+	require.Len(t, sessions, 2)
+
+	assert.Equal(t, int64(2), sessions[0].UserSessionId)
+	assert.True(t, sessions[0].IsCurrent)
+	assert.False(t, sessions[1].IsCurrent)
 }

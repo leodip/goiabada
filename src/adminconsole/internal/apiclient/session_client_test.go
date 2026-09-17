@@ -398,7 +398,7 @@ func servesSessions(t *testing.T, body string) (*AuthServerClient, func() (strin
 type sessionListMethod struct {
 	name    string
 	wantURI string
-	call    func(c *AuthServerClient) ([]api.EnhancedUserSessionResponse, error)
+	call    func(c *AuthServerClient) ([]api.UserSessionDetailResponse, error)
 }
 
 func sessionListMethods() []sessionListMethod {
@@ -406,21 +406,21 @@ func sessionListMethods() []sessionListMethod {
 		{
 			name:    "GetUserSessionsByUserId",
 			wantURI: "/api/v1/admin/users/42/sessions",
-			call: func(c *AuthServerClient) ([]api.EnhancedUserSessionResponse, error) {
+			call: func(c *AuthServerClient) ([]api.UserSessionDetailResponse, error) {
 				return c.GetUserSessionsByUserId("an-access-token", 42)
 			},
 		},
 		{
 			name:    "GetClientSessionsByClientId",
 			wantURI: "/api/v1/admin/clients/7/sessions?page=2&size=10",
-			call: func(c *AuthServerClient) ([]api.EnhancedUserSessionResponse, error) {
+			call: func(c *AuthServerClient) ([]api.UserSessionDetailResponse, error) {
 				return c.GetClientSessionsByClientId("an-access-token", 7, 2, 10)
 			},
 		},
 		{
 			name:    "GetAccountSessions",
 			wantURI: "/api/v1/account/sessions",
-			call: func(c *AuthServerClient) ([]api.EnhancedUserSessionResponse, error) {
+			call: func(c *AuthServerClient) ([]api.UserSessionDetailResponse, error) {
 				return c.GetAccountSessions("an-access-token")
 			},
 		},

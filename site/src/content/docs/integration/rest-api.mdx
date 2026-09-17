@@ -522,7 +522,7 @@ DELETE /api/v1/admin/user-attributes/{id}
 GET /api/v1/admin/users/{id}/sessions
 ```
 
-Returns enhanced session details including device info, IP address, and validity status.
+Returns the user's active sessions with their device, IP address and the identifiers of the clients they authorized, so an expired session is not in the list.
 
 #### Get session
 
@@ -1540,7 +1540,7 @@ DELETE /api/v1/account/consents/{id}
 GET /api/v1/account/sessions
 ```
 
-Returns all active sessions with device info and validity status. Each session includes an `isCurrent` flag indicating if it's the current session.
+Returns the caller's active sessions with their device, IP address and the identifiers of the clients they authorized, so an expired session is not in the list. Every session endpoint marks the session the calling token was issued through with `isCurrent`, which is `false` throughout for a token carrying no `sid` claim, such as one obtained through the client credentials grant.
 
 #### Terminate session
 

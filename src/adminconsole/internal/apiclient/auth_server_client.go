@@ -25,10 +25,10 @@ type ApiClient interface {
 	CreateUserAttribute(accessToken string, request *api.CreateUserAttributeRequest) (*api.UserAttributeResponse, error)
 	UpdateUserAttribute(accessToken string, attributeId int64, request *api.UpdateUserAttributeRequest) (*api.UserAttributeResponse, error)
 	DeleteUserAttribute(accessToken string, attributeId int64) error
-	GetUserSessionsByUserId(accessToken string, userId int64) ([]api.EnhancedUserSessionResponse, error)
+	GetUserSessionsByUserId(accessToken string, userId int64) ([]api.UserSessionDetailResponse, error)
 	DeleteUserSessionById(accessToken string, sessionId int64) error
-	GetClientSessionsByClientId(accessToken string, clientId int64, page, size int) ([]api.EnhancedUserSessionResponse, error)
-	GetAccountSessions(accessToken string) ([]api.EnhancedUserSessionResponse, error)
+	GetClientSessionsByClientId(accessToken string, clientId int64, page, size int) ([]api.UserSessionDetailResponse, error)
+	GetAccountSessions(accessToken string) ([]api.UserSessionDetailResponse, error)
 	DeleteAccountSession(accessToken string, sessionId int64) error
 	GetUserConsents(accessToken string, userId int64) ([]api.UserConsentResponse, error)
 	DeleteUserConsent(accessToken string, consentId int64) error

@@ -3,9 +3,9 @@ package apihandlers
 import (
 	"net/http"
 	"strconv"
-	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
@@ -14,7 +14,8 @@ import (
 
 // HandleAPIClientSessionsGet - GET /api/v1/admin/clients/{id}/sessions
 // Returns a paginated list of user sessions associated with a client.
-// Defaults: page=1, size=50. Caps size to 100. Filters out invalid sessions.
+// Defaults: page=1, size=50. Caps size to 100. Lists only sessions still active under the
+// current settings; an expired one is omitted rather than reported (#373 decision 2).
 func HandleAPIClientSessionsGet(
 	database data.Database,
 ) http.HandlerFunc {
@@ -68,7 +69,7 @@ func HandleAPIClientSessionsGet(
 			return
 		}
 
-		// Load clients for sessions to extract identifiers
+		// Load the clients each session authorized; buildSessionDetails hydrates them.
 		if err := database.UserSessionsLoadClients(nil, userSessions); err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -76,67 +77,22 @@ func HandleAPIClientSessionsGet(
 
 		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
 
-		// Build enhanced session responses (no user details to keep API generic; callers can fetch users)
-		enhanced := make([]api.EnhancedUserSessionResponse, 0, len(userSessions))
-		for _, us := range userSessions {
-			// Filter out invalid sessions per settings
-			isValid := us.IsValid(settings.UserSessionIdleTimeoutInSeconds, settings.UserSessionMaxLifetimeInSeconds, nil)
-			if !isValid {
-				continue
-			}
+		// The caller's own session, when its token names one. See the same read in
+		// handler_api_users_sessions.go: one mapper decides isCurrent for all three endpoints,
+		// so it means the same thing here as it does there (#373 decision 1).
+		currentSid := ""
+		if jwtToken, ok := middleware.GetValidatedToken(r); ok {
+			currentSid = jwtToken.GetStringClaim("sid")
+		}
 
-			// Ensure nested clients are loaded to fill client identifiers
-			if err := database.UserSessionClientsLoadClients(nil, us.Clients); err != nil {
-				writeInternalServerError(w, r, err)
-				return
-			}
-
-			enh := api.EnhancedUserSessionResponse{
-				Id:                us.Id,
-				SessionIdentifier: us.SessionIdentifier,
-				AuthMethods:       us.AuthMethods,
-				AcrLevel:          us.AcrLevel,
-				IpAddress:         us.IpAddress,
-				DeviceName:        us.DeviceName,
-				DeviceType:        us.DeviceType,
-				DeviceOS:          us.DeviceOS,
-				UserAgent:         us.UserAgent,
-				UserId:            us.UserId,
-				IsValid:           isValid,
-			}
-
-			if us.CreatedAt.Valid {
-				enh.CreatedAt = &us.CreatedAt.Time
-			}
-			if us.UpdatedAt.Valid {
-				enh.UpdatedAt = &us.UpdatedAt.Time
-			}
-			if !us.Started.IsZero() {
-				enh.Started = &us.Started
-				enh.StartedAt = us.Started.Format(time.RFC1123)
-				enh.DurationSinceStarted = time.Now().UTC().Sub(us.Started).Round(time.Second).String()
-			}
-			if !us.LastAccessed.IsZero() {
-				enh.LastAccessed = &us.LastAccessed
-				enh.LastAccessedAt = us.LastAccessed.Format(time.RFC1123)
-				enh.DurationSinceLastAccessed = time.Now().UTC().Sub(us.LastAccessed).Round(time.Second).String()
-			}
-			if !us.AuthTime.IsZero() {
-				enh.AuthTime = &us.AuthTime
-			}
-
-			// Collect client identifiers
-			clientIdentifiers := make([]string, 0, len(us.Clients))
-			for _, usc := range us.Clients {
-				clientIdentifiers = append(clientIdentifiers, usc.Client.ClientIdentifier)
-			}
-			enh.ClientIdentifiers = clientIdentifiers
-
-			enhanced = append(enhanced, enh)
+		sessions, err := buildSessionDetails(database, userSessions, settings, currentSid)
+		if err != nil {
+			writeInternalServerError(w, r, err)
+			return
 		}
 
 		response := api.GetUserSessionsResponse{
-			Sessions: enhanced,
+			Sessions: sessions,
 		}
 
 		writeJSON(w, r, http.StatusOK, response)

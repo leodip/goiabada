@@ -385,33 +385,25 @@ type GetPhoneCountriesResponse struct {
 	PhoneCountries []PhoneCountryResponse `json:"phoneCountries"`
 }
 
-type EnhancedUserSessionResponse struct {
-	Id                        int64      `json:"id"`
-	CreatedAt                 *time.Time `json:"createdAt"`
-	UpdatedAt                 *time.Time `json:"updatedAt"`
-	SessionIdentifier         string     `json:"sessionIdentifier"`
-	Started                   *time.Time `json:"started"`
-	LastAccessed              *time.Time `json:"lastAccessed"`
-	AuthMethods               string     `json:"authMethods"`
-	AcrLevel                  string     `json:"acrLevel"`
-	AuthTime                  *time.Time `json:"authTime"`
-	IpAddress                 string     `json:"ipAddress"`
-	DeviceName                string     `json:"deviceName"`
-	DeviceType                string     `json:"deviceType"`
-	DeviceOS                  string     `json:"deviceOS"`
-	UserAgent                 string     `json:"userAgent"`
-	UserId                    int64      `json:"userId"`
-	StartedAt                 string     `json:"startedAt"`
-	DurationSinceStarted      string     `json:"durationSinceStarted"`
-	LastAccessedAt            string     `json:"lastAccessedAt"`
-	DurationSinceLastAccessed string     `json:"durationSinceLastAccessed"`
-	IsValid                   bool       `json:"isValid"`
-	IsCurrent                 bool       `json:"isCurrent"`
-	ClientIdentifiers         []string   `json:"clientIdentifiers"`
+// UserSessionDetailResponse is a session plus the two things a caller cannot work out for
+// itself: the clients it authorized, which is a join, and whether it is the caller's own,
+// which needs a claim from a token an API caller may not be able to read (RFC 6749 1.4).
+// Everything else a page shows about a session is derived from the embedded timestamps by
+// whoever is rendering it.
+//
+// It carried four pre-rendered strings and a constant true isValid until #373. The strings
+// were an English RFC1123 date and a Go duration, computed at the server from instants that
+// were already in the same payload, so they were stale before the page drew them and no
+// locale could reach them; isValid was a field every producer set to true after skipping
+// every session for which it would have been false.
+type UserSessionDetailResponse struct {
+	UserSessionResponse
+	IsCurrent         bool     `json:"isCurrent"`
+	ClientIdentifiers []string `json:"clientIdentifiers"`
 }
 
 type GetUserSessionsResponse struct {
-	Sessions []EnhancedUserSessionResponse `json:"sessions"`
+	Sessions []UserSessionDetailResponse `json:"sessions"`
 }
 
 type CreateGroupResponse struct {

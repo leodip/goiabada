@@ -50,23 +50,22 @@ func HandleAdminUserSessionsGet(
 			return
 		}
 
-		// Get enhanced user sessions via API
-		enhancedSessions, err := apiClient.GetUserSessionsByUserId(jwtInfo.TokenResponse.AccessToken, user.Id)
+		// Get the user's sessions via API
+		sessions, err := apiClient.GetUserSessionsByUserId(jwtInfo.TokenResponse.AccessToken, user.Id)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 
-		sessionIdentifier := ""
-		if r.Context().Value(constants.ContextKeySessionIdentifier) != nil {
-			sessionIdentifier = r.Context().Value(constants.ContextKeySessionIdentifier).(string)
-		}
-
-		// Convert enhanced sessions to SessionInfo for template compatibility
+		// IsCurrent comes from the response. This page used to recompute it by comparing each
+		// row's sessionIdentifier against the sid the console lifted off its own access token,
+		// which is the same claim the auth server now reads, so the value is unchanged and there
+		// is one place left that decides it (#373).
 		sessionInfoArr := []SessionInfo{}
-		for _, es := range enhancedSessions {
-			usi := SessionInfo{
+		for _, es := range sessions {
+			sessionInfoArr = append(sessionInfoArr, SessionInfo{
 				UserSessionId: es.Id,
+				IsCurrent:     es.IsCurrent,
 				Started:       es.Started,
 				LastAccessed:  es.LastAccessed,
 				IpAddress:     es.IpAddress,
@@ -75,12 +74,7 @@ func HandleAdminUserSessionsGet(
 				DeviceOS:      es.DeviceOS,
 				UserAgent:     es.UserAgent,
 				Clients:       es.ClientIdentifiers,
-			}
-
-			if es.SessionIdentifier == sessionIdentifier {
-				usi.IsCurrent = true
-			}
-			sessionInfoArr = append(sessionInfoArr, usi)
+			})
 		}
 
 		sort.Slice(sessionInfoArr, func(i, j int) bool {

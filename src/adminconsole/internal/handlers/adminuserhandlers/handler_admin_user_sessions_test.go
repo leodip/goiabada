@@ -19,7 +19,7 @@ import (
 type userSessionsApiClient struct {
 	apiclient.ApiClient
 	user     *api.UserResponse
-	sessions []api.EnhancedUserSessionResponse
+	sessions []api.UserSessionDetailResponse
 }
 
 func (c *userSessionsApiClient) GetUserById(accessToken string, userId int64) (*api.UserResponse, error) {
@@ -27,7 +27,7 @@ func (c *userSessionsApiClient) GetUserById(accessToken string, userId int64) (*
 }
 
 func (c *userSessionsApiClient) GetUserSessionsByUserId(accessToken string,
-	userId int64) ([]api.EnhancedUserSessionResponse, error) {
+	userId int64) ([]api.UserSessionDetailResponse, error) {
 	return c.sessions, nil
 }
 
@@ -43,7 +43,7 @@ func TestHandleAdminUserSessionsGet_BindsTheRawUserAgent(t *testing.T) {
 
 	apiClient := &userSessionsApiClient{
 		user: &api.UserResponse{Id: 7},
-		sessions: []api.EnhancedUserSessionResponse{
+		sessions: []api.UserSessionDetailResponse{
 			{Id: 1, DeviceName: "Safari 17", DeviceType: "Desktop", DeviceOS: "macOS", UserAgent: header},
 		},
 	}
@@ -76,7 +76,7 @@ func TestHandleAdminUserSessionsGet_BindsTheSessionInstants(t *testing.T) {
 
 	apiClient := &userSessionsApiClient{
 		user: &api.UserResponse{Id: 7},
-		sessions: []api.EnhancedUserSessionResponse{
+		sessions: []api.UserSessionDetailResponse{
 			{Id: 1, Started: &started, LastAccessed: &lastAccessed},
 		},
 	}
@@ -95,4 +95,39 @@ func TestHandleAdminUserSessionsGet_BindsTheSessionInstants(t *testing.T) {
 	require.NotNil(t, sessions[0].LastAccessed)
 	assert.Equal(t, started, *sessions[0].Started)
 	assert.Equal(t, lastAccessed, *sessions[0].LastAccessed)
+}
+
+// The two admin pages used to compute IsCurrent themselves, comparing each row's
+// sessionIdentifier against the sid the console lifted off its own access token onto the request
+// context. The auth server reads that same claim now, so the page must believe the response and
+// nothing else: a page still recomputing would answer false here, because this request carries no
+// session identifier on its context at all (#373 decision 1).
+func TestHandleAdminUserSessionsGet_BindsIsCurrentFromTheResponse(t *testing.T) {
+	httpHelper := mocks_handler_helpers.NewHttpHelper(t)
+	handlertest.RefuseInternalServerError(t, httpHelper)
+	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_users_sessions.html").Maybe()
+
+	apiClient := &userSessionsApiClient{
+		user: &api.UserResponse{Id: 7},
+		sessions: []api.UserSessionDetailResponse{
+			{UserSessionResponse: api.UserSessionResponse{Id: 1, SessionIdentifier: "sid-one"}},
+			{UserSessionResponse: api.UserSessionResponse{Id: 2, SessionIdentifier: "sid-two"}, IsCurrent: true},
+		},
+	}
+
+	req := handlertest.Request(http.MethodGet, "/admin/users/7/sessions",
+		handlertest.WithAccessToken(),
+		handlertest.WithRouteParam("userId", "7"),
+	)
+
+	HandleAdminUserSessionsGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
+
+	sessions, ok := handlertest.Bind(t, httpHelper)["sessions"].([]SessionInfo)
+	require.True(t, ok, "the bind carries no []SessionInfo")
+	require.Len(t, sessions, 2)
+
+	// Sorted by id descending, so the current one is first.
+	assert.Equal(t, int64(2), sessions[0].UserSessionId)
+	assert.True(t, sessions[0].IsCurrent)
+	assert.False(t, sessions[1].IsCurrent)
 }
