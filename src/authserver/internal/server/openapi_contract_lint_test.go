@@ -1677,25 +1677,80 @@ func TestOpenAPI_RequestSchemasPublishNoUnenforcedEnum(t *testing.T) {
 			"matching the document's shape", len(reachable))
 	}
 
-	for _, name := range sortedKeys(reachable) {
-		for _, property := range sortedKeys(enumProperties(doc.Components.Schemas[name])) {
-			if _, recorded := requestEnumsTheServerDoesNotEnforce[name+"."+property]; recorded {
-				continue
-			}
-			t.Errorf("the %s schema publishes a closed enum on %q, and nothing here says the "+
-				"handler refuses the values outside it. A validating client acts on that enum "+
-				"by refusing to send the request at all, so publish one only where the server "+
-				"really does reject every other value; where a single value is significant and "+
-				"every other one falls back, describe the fallback and leave the type open "+
-				"(#350)", name, property)
-		}
+	unrecorded, stale := unenforcedRequestEnums(doc.Components.Schemas, reachable,
+		requestEnumsTheServerDoesNotEnforce)
+
+	for _, site := range unrecorded {
+		t.Errorf("the contract publishes a closed enum at %s, and nothing here says the handler "+
+			"refuses the values outside it. A validating client acts on that enum by refusing to "+
+			"send the request at all, so publish one only where the server really does reject "+
+			"every other value; where a single value is significant and every other one falls "+
+			"back, describe the fallback and leave the type open (#350)", site)
+	}
+	for _, site := range stale {
+		t.Errorf("requestEnumsTheServerDoesNotEnforce records %s, which publishes no closed enum "+
+			"on any request-reachable schema any more. Delete the entry: left standing it exempts "+
+			"whatever is published there next, which is the regression the map exists to report "+
+			"(#350)", site)
 	}
 }
 
+// unenforcedRequestEnums is the decision behind that check, as a pure function so its boundary can
+// be driven directly. It returns the request-reachable sites publishing a closed enum that the
+// exception map does not record, and the entries of that map no such site matched.
+//
+// The second half is what keeps the map a record rather than a blanket, and it is the shape
+// schemasWithNoAPIStruct and apiStructsWithNoSchema already use above: an exemption outlives the
+// defect it describes silently, so the entry left behind goes on exempting a property nobody
+// weighed. Both halves come back sorted, because a map range would reorder the failures between
+// runs.
+func unenforcedRequestEnums(schemas map[string]yaml.Node, reachable map[string]bool,
+	recorded map[string]string) (unrecorded, stale []string) {
+
+	matched := map[string]bool{}
+	for _, name := range sortedKeys(reachable) {
+		schema, declared := schemas[name]
+		if !declared {
+			continue // reachable by name from a path, but the document defines no such schema
+		}
+		for _, site := range sortedKeys(enumSites(name, schema)) {
+			if _, exempt := recorded[site]; exempt {
+				matched[site] = true
+				continue
+			}
+			unrecorded = append(unrecorded, site)
+		}
+	}
+	for _, site := range sortedKeys(recorded) {
+		if !matched[site] {
+			stale = append(stale, site)
+		}
+	}
+	return unrecorded, stale
+}
+
+// enumSites returns the places inside one schema that constrain a value to a closed set, each
+// spelled the way it is reported and recorded: the schema's own name where the schema is itself an
+// enum, and "<schema>.<property>" for a property of it.
+//
+// The schema's own name is in there because of how reachability works: a $ref is never followed
+// from inside a schema, since schemaReachability closes over references and the target is reached
+// as itself, so a property written as a $ref to a scalar enum schema is only ever seen when that
+// target is visited. Reporting a root enum is what makes "reached as itself" true rather than a
+// place the walk stops.
+func enumSites(name string, node yaml.Node) map[string]bool {
+	out := map[string]bool{}
+	if declaresEnum(&node) {
+		out[name] = true
+	}
+	for property := range enumProperties(node) {
+		out[name+"."+property] = true
+	}
+	return out
+}
+
 // enumProperties returns the properties one schema constrains with an enum, descending inline
-// allOf members and an array's items. A $ref is not followed: schemaReachability closes over
-// references, so the target is reached as itself and following it here would report one property
-// against every schema that refers to it.
+// allOf members. A $ref is not followed, for the reason enumSites gives.
 func enumProperties(node yaml.Node) map[string]bool {
 	out := map[string]bool{}
 
@@ -1727,8 +1782,13 @@ func enumProperties(node yaml.Node) map[string]bool {
 	return out
 }
 
-// declaresEnum reports whether one property's schema constrains it to a closed set, either on the
-// property itself or on the items of an array of them.
+// declaresEnum reports whether one schema constrains its value to a closed set: on the node itself,
+// on the items of an array of them, or inside any of the three composition keywords.
+//
+// The composition arms are not decoration. "enum" written directly and
+// "allOf: [{type: string, enum: [...]}]" are the same published contract, and a generated client
+// refuses the unlisted value on both, so a walk that reads only the first reports the spelling
+// rather than the promise -- and the check's whole subject is the promise (#350).
 func declaresEnum(n *yaml.Node) bool {
 	if n == nil || n.Kind != yaml.MappingNode {
 		return false
@@ -1741,7 +1801,164 @@ func declaresEnum(n *yaml.Node) bool {
 			if declaresEnum(n.Content[i+1]) {
 				return true
 			}
+		case "allOf", "oneOf", "anyOf":
+			for _, member := range n.Content[i+1].Content {
+				if declaresEnum(member) {
+					return true
+				}
+			}
 		}
 	}
 	return false
+}
+
+// schemaNode parses one inline schema the way doc.Components.Schemas holds it: the mapping itself,
+// not the document wrapping it, so a fixture and a real component schema reach the walks alike.
+func schemaNode(t *testing.T, y string) yaml.Node {
+	t.Helper()
+	var doc yaml.Node
+	if err := yaml.Unmarshal([]byte(y), &doc); err != nil {
+		t.Fatalf("parsing the fixture: %v", err)
+	}
+	if doc.Kind != yaml.DocumentNode || len(doc.Content) != 1 {
+		t.Fatalf("the fixture is not one YAML document: kind %d, %d children", doc.Kind,
+			len(doc.Content))
+	}
+	return *doc.Content[0]
+}
+
+// The boundary of declaresEnum, stated as cases rather than left to the switch. Every form here is
+// one a hand-written openapi.yaml can carry, and the four composition rows are the ones that made
+// the first version of this guard report the spelling instead of the promise: allOf, oneOf and
+// anyOf around the same closed set are the same contract to a generated client.
+func TestDeclaresEnum_TheFormsAClosedSetCanTake(t *testing.T) {
+	cases := []struct {
+		name   string
+		schema string
+		want   bool
+	}{
+		{"a direct enum", "type: string\nenum: [a, b]\n", true},
+		{"an enum on an array's items", "type: array\nitems:\n  type: string\n  enum: [a, b]\n", true},
+		{"an enum inside allOf", "allOf:\n  - type: string\n    enum: [a, b]\n", true},
+		{"an enum inside oneOf", "oneOf:\n  - type: string\n    enum: [a, b]\n", true},
+		{"an enum inside anyOf", "anyOf:\n  - type: string\n    enum: [a, b]\n", true},
+		{"an enum nested two deep", "allOf:\n  - oneOf:\n      - type: string\n        enum: [a]\n", true},
+		{"an enum beneath an array inside allOf",
+			"allOf:\n  - type: array\n    items:\n      enum: [a]\n", true},
+		{"an open string", "type: string\ndescription: anything\n", false},
+		{"an object whose property has one", "type: object\nproperties:\n  mode:\n    enum: [a]\n", false},
+		{"a composition carrying no enum",
+			"allOf:\n  - $ref: '#/components/schemas/Other'\n  - type: object\n    properties:\n      x:\n        type: boolean\n", false},
+		{"a bare $ref", "$ref: '#/components/schemas/Other'\n", false},
+		{"a scalar rather than a mapping", "just-a-string\n", false},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			node := schemaNode(t, c.schema)
+			if got := declaresEnum(&node); got != c.want {
+				t.Errorf("declaresEnum(%s) = %v, want %v", c.name, got, c.want)
+			}
+		})
+	}
+	if declaresEnum(nil) {
+		t.Errorf("declaresEnum(nil) = true, want false")
+	}
+}
+
+// enumSites is where a schema's own enum becomes reportable. The root row is the one that matters:
+// a property written as a $ref to a scalar enum schema is never read through the property, only
+// when that schema is visited as itself, so a walk finding nothing at the root leaves the form
+// unreachable from either direction.
+func TestEnumSites_NamesTheSchemaAndItsProperties(t *testing.T) {
+	cases := []struct {
+		name   string
+		schema string
+		want   []string
+	}{
+		{"a scalar enum schema", "type: string\nenum: [now, email]\n", []string{"Mode"}},
+		{"a property with one", "type: object\nproperties:\n  mode:\n    enum: [a]\n  other:\n    type: string\n",
+			[]string{"Mode.mode"}},
+		{"a property composing one", "type: object\nproperties:\n  mode:\n    allOf:\n      - type: string\n        enum: [a]\n",
+			[]string{"Mode.mode"}},
+		{"a property inside a schema-level allOf",
+			"allOf:\n  - $ref: '#/components/schemas/Other'\n  - type: object\n    properties:\n      mode:\n        enum: [a]\n",
+			[]string{"Mode.mode"}},
+		{"both at once", "enum: [x]\nproperties:\n  mode:\n    enum: [a]\n", []string{"Mode", "Mode.mode"}},
+		{"neither", "type: object\nproperties:\n  mode:\n    type: string\n", nil},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			got := sortedKeys(enumSites("Mode", schemaNode(t, c.schema)))
+			if len(got) != len(c.want) {
+				t.Fatalf("enumSites(%s) = %v, want %v", c.name, got, c.want)
+			}
+			for i := range got {
+				if got[i] != c.want[i] {
+					t.Errorf("enumSites(%s)[%d] = %q, want %q", c.name, i, got[i], c.want[i])
+				}
+			}
+		})
+	}
+}
+
+// The two halves of the decision, including the stale one. An exemption that outlives its defect
+// is the failure this covers: left standing it goes on exempting whatever is published at that
+// site next, which is exactly the regression the map exists to report.
+func TestUnenforcedRequestEnums_ReportsUnrecordedSitesAndStaleEntries(t *testing.T) {
+	schemas := map[string]yaml.Node{
+		"CreateUserRequest": schemaNode(t, "type: object\nproperties:\n  setPasswordType:\n    enum: [now, email]\n"),
+		"LogoutRequest":     schemaNode(t, "type: object\nproperties:\n  responseMode:\n    type: string\n"),
+		"FormPostResponse":  schemaNode(t, "type: object\nproperties:\n  method:\n    enum: [POST]\n"),
+	}
+	reachable := map[string]bool{"CreateUserRequest": true, "LogoutRequest": true}
+
+	t.Run("a recorded site is exempt and not stale", func(t *testing.T) {
+		unrecorded, stale := unenforcedRequestEnums(schemas, reachable,
+			map[string]string{"CreateUserRequest.setPasswordType": "why"})
+		if len(unrecorded) != 0 {
+			t.Errorf("unrecorded = %v, want none: the one enum site is recorded", unrecorded)
+		}
+		if len(stale) != 0 {
+			t.Errorf("stale = %v, want none: the entry matched a live site", stale)
+		}
+	})
+
+	t.Run("an unrecorded site is reported", func(t *testing.T) {
+		unrecorded, _ := unenforcedRequestEnums(schemas, reachable, nil)
+		if len(unrecorded) != 1 || unrecorded[0] != "CreateUserRequest.setPasswordType" {
+			t.Errorf("unrecorded = %v, want [CreateUserRequest.setPasswordType]", unrecorded)
+		}
+	})
+
+	t.Run("an entry matching nothing is stale", func(t *testing.T) {
+		_, stale := unenforcedRequestEnums(schemas, reachable,
+			map[string]string{
+				"CreateUserRequest.setPasswordType": "why",
+				"LogoutRequest.responseMode":        "the enum this recorded is gone",
+			})
+		if len(stale) != 1 || stale[0] != "LogoutRequest.responseMode" {
+			t.Errorf("stale = %v, want [LogoutRequest.responseMode]", stale)
+		}
+	})
+
+	t.Run("a response-only schema is neither", func(t *testing.T) {
+		unrecorded, stale := unenforcedRequestEnums(schemas, reachable,
+			map[string]string{"CreateUserRequest.setPasswordType": "why"})
+		for _, site := range append(append([]string{}, unrecorded...), stale...) {
+			if strings.HasPrefix(site, "FormPostResponse") {
+				t.Errorf("reported %s, which no request body reaches", site)
+			}
+		}
+	})
+
+	t.Run("a schema named by reachability but absent from the document is skipped", func(t *testing.T) {
+		unrecorded, stale := unenforcedRequestEnums(schemas,
+			map[string]bool{"CreateUserRequest": true, "Vanished": true},
+			map[string]string{"CreateUserRequest.setPasswordType": "why"})
+		if len(unrecorded) != 0 || len(stale) != 0 {
+			t.Errorf("unrecorded = %v, stale = %v, want neither", unrecorded, stale)
+		}
+	})
 }
