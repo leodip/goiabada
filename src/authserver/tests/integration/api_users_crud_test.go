@@ -13,6 +13,7 @@ import (
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestAPIUserGet tests the GET /api/v1/admin/users/{id} endpoint
@@ -603,4 +604,63 @@ func TestAPIUserDelete_Unauthorized(t *testing.T) {
 	stillExists, err := database.GetUserById(nil, testUser.Id)
 	assert.NoError(t, err)
 	assert.NotNil(t, stillExists)
+}
+
+// TestAPIUserCreatePost_SetPasswordTypeIsEnforced drives the published enum through the real
+// endpoint, which is where it matters: openapi.yaml declares setPasswordType as enum [now, email]
+// and a generated client acts on that by refusing to send anything else, so the server has to
+// refuse it too or the document is narrower on paper than the endpoint is in fact.
+//
+// Before #350 it did not. The handler compared against the two values and refused nothing else, so
+// on a deployment with SMTP configured a third value took neither arm: the account was created
+// enabled and holding authserver:manage-account, with no password hash, no forgot-password code and
+// no setup email, and nobody was told it existed. The first row below is that request, and it
+// answered 201 then.
+//
+// The unit matrix in handler_api_users_crud_test.go owns the arms and what each writes. This owns
+// the status through the real router, on every engine CI runs, and that no row leaves a user behind.
+func TestAPIUserCreatePost_SetPasswordTypeIsEnforced(t *testing.T) {
+	accessToken, _ := createAdminClientWithToken(t)
+
+	for _, tc := range []struct {
+		name            string
+		setPasswordType string
+		password        string
+		expectedStatus  int
+	}{
+		{"a third value", "later", "password123", http.StatusBadRequest},
+		{"a near miss on email", "e-mail", "password123", http.StatusBadRequest},
+		{"the right word in the wrong case", "Email", "password123", http.StatusBadRequest},
+		// Absent is permitted by the schema and means "now", so it is accepted with a password
+		// and refused without one. It is refused here for the missing password, not for the
+		// missing field, which is the distinction the default exists to make.
+		{"absent with a password", "", "password123", http.StatusCreated},
+		{"absent without a password", "", "", http.StatusBadRequest},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			email := uniqueEmail("setpasswordtype@create.test")
+			req := api.CreateUserAdminRequest{
+				Email:           email,
+				GivenName:       "Set",
+				FamilyName:      "Password",
+				SetPasswordType: tc.setPasswordType,
+				Password:        tc.password,
+			}
+
+			url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/create"
+			resp := makeAPIRequest(t, "POST", url, accessToken, req)
+			defer func() { _ = resp.Body.Close() }()
+
+			require.Equal(t, tc.expectedStatus, resp.StatusCode)
+
+			if tc.expectedStatus != http.StatusCreated {
+				// A refusal must leave nothing behind. The defect's whole harm was a row created
+				// where the caller was told nothing, so a 400 that still wrote one would be the
+				// same failure wearing a different status.
+				user, err := database.GetUserByEmail(nil, email)
+				require.NoError(t, err)
+				assert.Nil(t, user, "a refused create must not have written a user row")
+			}
+		})
+	}
 }

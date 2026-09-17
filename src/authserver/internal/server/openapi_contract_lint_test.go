@@ -1633,16 +1633,22 @@ func TestOpenAPI_APIFiveHundredsAreTheJSONEnvelope(t *testing.T) {
 	}
 }
 
-// requestEnumsTheServerDoesNotEnforce records the request properties whose published enum the
-// handler does not actually apply, so the check below reports a new one rather than this standing
-// pair. An entry is a known gap and not a blessing: at each of them the document is narrower than
-// the endpoint, and closing one is a decision about what that endpoint should do with an unlisted
-// value rather than a spelling fix.
-var requestEnumsTheServerDoesNotEnforce = map[string]string{
-	"CreateUserRequest.setPasswordType": "handler_api_users_crud.go compares it to \"now\" and " +
-		"to \"email\" and refuses nothing else: with SMTP configured, a third value creates the " +
-		"user with no password and sends no setup email, a third outcome the two-value enum does " +
-		"not describe. Predates #350 and is untouched by it",
+// publishedRequestEnums records every closed enum this document publishes on a request-reachable
+// schema, against what makes it honest. Nothing here can execute a handler, so enforcement cannot
+// be derived: the entry is the claim, written by whoever published the enum, and the check below
+// reports a site that arrives without one.
+//
+// An entry is therefore not a blessing. It says either "the handler refuses everything else, here"
+// or "it does not, and this is a known gap", and which of the two it says is the whole content of
+// the line. A gap left recorded is a burn-down item; an enforced site left recorded is what stops
+// the next person having to re-derive that it is enforced.
+var publishedRequestEnums = map[string]string{
+	"CreateUserRequest.setPasswordType": "enforced: handler_api_users_crud.go refuses a present " +
+		"value outside [now, email] with 400 before either arm is chosen, and treats absent as " +
+		"\"now\" per the schema's default. Covered by " +
+		"TestHandleAPIUserCreatePost_SetPasswordTypeMatrix. Was the one known gap on this list " +
+		"until #350: the handler compared against the two values and refused nothing else, so a " +
+		"third value created an account with no password and no setup email",
 }
 
 // A closed enum on a request property is a promise that the server refuses everything outside it,
@@ -1677,34 +1683,34 @@ func TestOpenAPI_RequestSchemasPublishNoUnenforcedEnum(t *testing.T) {
 			"matching the document's shape", len(reachable))
 	}
 
-	unrecorded, stale := unenforcedRequestEnums(doc.Components.Schemas, reachable,
-		requestEnumsTheServerDoesNotEnforce)
+	unrecorded, stale := unrecordedRequestEnums(doc.Components.Schemas, reachable,
+		publishedRequestEnums)
 
 	for _, site := range unrecorded {
-		t.Errorf("the contract publishes a closed enum at %s, and nothing here says the handler "+
-			"refuses the values outside it. A validating client acts on that enum by refusing to "+
-			"send the request at all, so publish one only where the server really does reject "+
-			"every other value; where a single value is significant and every other one falls "+
-			"back, describe the fallback and leave the type open (#350)", site)
+		t.Errorf("the contract publishes a closed enum at %s, and publishedRequestEnums does not "+
+			"say what enforces it. A validating client acts on that enum by refusing to send the "+
+			"request at all, so publish one only where the server really does reject every other "+
+			"value, and record here where it does; where a single value is significant and every "+
+			"other one falls back, describe the fallback and leave the type open (#350)", site)
 	}
 	for _, site := range stale {
-		t.Errorf("requestEnumsTheServerDoesNotEnforce records %s, which publishes no closed enum "+
+		t.Errorf("publishedRequestEnums records %s, which publishes no closed enum "+
 			"on any request-reachable schema any more. Delete the entry: left standing it exempts "+
 			"whatever is published there next, which is the regression the map exists to report "+
 			"(#350)", site)
 	}
 }
 
-// unenforcedRequestEnums is the decision behind that check, as a pure function so its boundary can
+// unrecordedRequestEnums is the decision behind that check, as a pure function so its boundary can
 // be driven directly. It returns the request-reachable sites publishing a closed enum that the
-// exception map does not record, and the entries of that map no such site matched.
+// record does not carry, and the entries of that record no such site matched.
 //
 // The second half is what keeps the map a record rather than a blanket, and it is the shape
 // schemasWithNoAPIStruct and apiStructsWithNoSchema already use above: an exemption outlives the
 // defect it describes silently, so the entry left behind goes on exempting a property nobody
 // weighed. Both halves come back sorted, because a map range would reorder the failures between
 // runs.
-func unenforcedRequestEnums(schemas map[string]yaml.Node, reachable map[string]bool,
+func unrecordedRequestEnums(schemas map[string]yaml.Node, reachable map[string]bool,
 	recorded map[string]string) (unrecorded, stale []string) {
 
 	matched := map[string]bool{}
@@ -1906,7 +1912,7 @@ func TestEnumSites_NamesTheSchemaAndItsProperties(t *testing.T) {
 // The two halves of the decision, including the stale one. An exemption that outlives its defect
 // is the failure this covers: left standing it goes on exempting whatever is published at that
 // site next, which is exactly the regression the map exists to report.
-func TestUnenforcedRequestEnums_ReportsUnrecordedSitesAndStaleEntries(t *testing.T) {
+func TestUnrecordedRequestEnums_ReportsUnrecordedSitesAndStaleEntries(t *testing.T) {
 	schemas := map[string]yaml.Node{
 		"CreateUserRequest": schemaNode(t, "type: object\nproperties:\n  setPasswordType:\n    enum: [now, email]\n"),
 		"LogoutRequest":     schemaNode(t, "type: object\nproperties:\n  responseMode:\n    type: string\n"),
@@ -1915,7 +1921,7 @@ func TestUnenforcedRequestEnums_ReportsUnrecordedSitesAndStaleEntries(t *testing
 	reachable := map[string]bool{"CreateUserRequest": true, "LogoutRequest": true}
 
 	t.Run("a recorded site is exempt and not stale", func(t *testing.T) {
-		unrecorded, stale := unenforcedRequestEnums(schemas, reachable,
+		unrecorded, stale := unrecordedRequestEnums(schemas, reachable,
 			map[string]string{"CreateUserRequest.setPasswordType": "why"})
 		if len(unrecorded) != 0 {
 			t.Errorf("unrecorded = %v, want none: the one enum site is recorded", unrecorded)
@@ -1926,14 +1932,14 @@ func TestUnenforcedRequestEnums_ReportsUnrecordedSitesAndStaleEntries(t *testing
 	})
 
 	t.Run("an unrecorded site is reported", func(t *testing.T) {
-		unrecorded, _ := unenforcedRequestEnums(schemas, reachable, nil)
+		unrecorded, _ := unrecordedRequestEnums(schemas, reachable, nil)
 		if len(unrecorded) != 1 || unrecorded[0] != "CreateUserRequest.setPasswordType" {
 			t.Errorf("unrecorded = %v, want [CreateUserRequest.setPasswordType]", unrecorded)
 		}
 	})
 
 	t.Run("an entry matching nothing is stale", func(t *testing.T) {
-		_, stale := unenforcedRequestEnums(schemas, reachable,
+		_, stale := unrecordedRequestEnums(schemas, reachable,
 			map[string]string{
 				"CreateUserRequest.setPasswordType": "why",
 				"LogoutRequest.responseMode":        "the enum this recorded is gone",
@@ -1944,7 +1950,7 @@ func TestUnenforcedRequestEnums_ReportsUnrecordedSitesAndStaleEntries(t *testing
 	})
 
 	t.Run("a response-only schema is neither", func(t *testing.T) {
-		unrecorded, stale := unenforcedRequestEnums(schemas, reachable,
+		unrecorded, stale := unrecordedRequestEnums(schemas, reachable,
 			map[string]string{"CreateUserRequest.setPasswordType": "why"})
 		for _, site := range append(append([]string{}, unrecorded...), stale...) {
 			if strings.HasPrefix(site, "FormPostResponse") {
@@ -1954,7 +1960,7 @@ func TestUnenforcedRequestEnums_ReportsUnrecordedSitesAndStaleEntries(t *testing
 	})
 
 	t.Run("a schema named by reachability but absent from the document is skipped", func(t *testing.T) {
-		unrecorded, stale := unenforcedRequestEnums(schemas,
+		unrecorded, stale := unrecordedRequestEnums(schemas,
 			map[string]bool{"CreateUserRequest": true, "Vanished": true},
 			map[string]string{"CreateUserRequest.setPasswordType": "why"})
 		if len(unrecorded) != 0 || len(stale) != 0 {
