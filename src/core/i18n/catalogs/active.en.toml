@@ -501,7 +501,6 @@
 "adminconsole.account.sessions.col_started" = "Started at"
 "adminconsole.account.sessions.col_last_accessed" = "Last accessed at"
 "adminconsole.account.sessions.current_label" = "Current session"
-"adminconsole.account.sessions.duration_ago_suffix" = " ago"
 "adminconsole.account.sessions.end_button" = "End session"
 "adminconsole.account.sessions.modal_confirm_title" = "Are you sure?"
 "adminconsole.account.sessions.modal_confirm_body_prefix" = "Would you like to end the session on device <span class='text-accent'>"
@@ -595,7 +594,6 @@
 "adminconsole.admin_clients.usersessions.col_started" = "Started at"
 "adminconsole.admin_clients.usersessions.col_last_accessed" = "Last accessed at"
 "adminconsole.admin_clients.usersessions.current_label" = "Current session"
-"adminconsole.admin_clients.usersessions.duration_ago_suffix" = " ago"
 "adminconsole.admin_clients.usersessions.end_button" = "End session"
 "adminconsole.admin_clients.usersessions.removed_label" = "Removed"
 "adminconsole.admin_clients.usersessions.empty" = "No sessions found."
@@ -946,7 +944,6 @@
 "adminconsole.admin_users.sessions.col_started_at" = "Started at"
 "adminconsole.admin_users.sessions.col_last_accessed_at" = "Last accessed at"
 "adminconsole.admin_users.sessions.current_label" = "Current session"
-"adminconsole.admin_users.sessions.duration_ago_suffix" = " ago"
 "adminconsole.admin_users.sessions.end_button" = "End session"
 "adminconsole.admin_users.sessions.empty" = "No sessions found."
 

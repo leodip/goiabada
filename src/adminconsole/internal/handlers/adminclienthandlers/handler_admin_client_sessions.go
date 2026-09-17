@@ -71,20 +71,18 @@ func HandleAdminClientUserSessionsGet(
 				return
 			}
 			usi := SessionInfo{
-				UserSessionId:             es.Id,
-				UserId:                    es.UserId,
-				UserEmail:                 "",
-				UserFullName:              "",
-				StartedAt:                 es.StartedAt,
-				DurationSinceStarted:      es.DurationSinceStarted,
-				LastAcessedAt:             es.LastAccessedAt,
-				DurationSinceLastAccessed: es.DurationSinceLastAccessed,
-				IpAddress:                 es.IpAddress,
-				DeviceName:                es.DeviceName,
-				DeviceType:                es.DeviceType,
-				DeviceOS:                  es.DeviceOS,
-				UserAgent:                 es.UserAgent,
-				Clients:                   es.ClientIdentifiers,
+				UserSessionId: es.Id,
+				UserId:        es.UserId,
+				UserEmail:     "",
+				UserFullName:  "",
+				Started:       es.Started,
+				LastAccessed:  es.LastAccessed,
+				IpAddress:     es.IpAddress,
+				DeviceName:    es.DeviceName,
+				DeviceType:    es.DeviceType,
+				DeviceOS:      es.DeviceOS,
+				UserAgent:     es.UserAgent,
+				Clients:       es.ClientIdentifiers,
 			}
 			if user != nil {
 				usi.UserEmail = user.Email

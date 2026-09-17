@@ -515,6 +515,96 @@ func TestRender_SessionPagesTooltipTheRawUserAgent(t *testing.T) {
 	}
 }
 
+// The two timestamp cells of the three session pages, in pt-BR, byte for byte.
+//
+// Decision 3 of #373 chose a catalog-held numeric layout over Go's RFC1123, which carries English
+// month and weekday names under every locale, and a whole translated phrase over a Go duration
+// string with a translated suffix glued to it ("72h30m0s atrás"). Both regressions render
+// something that merely looks wrong rather than breaking, so the cell is asserted exactly: the
+// layout literal below is the pin, and the RFC1123 form of the same instant is asserted absent.
+func TestRender_SessionPagesLocalizeTheTimestampCells(t *testing.T) {
+	// Relative to now, because the second line of each cell is how long ago the instant was. Both
+	// offsets sit half an hour and half a minute clear of their unit boundary, so neither phrase
+	// can change while the case runs.
+	now := time.Now().UTC()
+	started := now.Add(-72*time.Hour - 30*time.Minute)
+	lastAccessed := now.Add(-5*time.Minute - 30*time.Second)
+
+	// pt-BR's layout, written out here rather than read from the catalog: this literal is what a
+	// layout regressing to RFC1123, or to en's 01/02/2006 3:04 PM, is held against.
+	const layout = "02/01/2006 15:04"
+	startedCell := "<td>" + started.Format(layout) + "<br />há 3 dias</td>"
+	lastAccessedCell := "<td>" + lastAccessed.Format(layout) + "<br />há 5 minutos</td>"
+
+	for _, tc := range []struct {
+		name string
+		page string
+		bind map[string]interface{}
+	}{
+		{
+			name: "account",
+			page: "/account_user_sessions.html",
+			bind: map[string]interface{}{
+				"sessions": []accounthandlers.SessionInfo{{
+					UserSessionId: 1, Started: &started, LastAccessed: &lastAccessed,
+				}},
+			},
+		},
+		{
+			name: "admin user",
+			page: "/admin_users_sessions.html",
+			bind: map[string]interface{}{
+				"user": &api.UserResponse{Id: 7, Email: "someone@example.com"},
+				"sessions": []adminuserhandlers.SessionInfo{{
+					UserSessionId: 1, Started: &started, LastAccessed: &lastAccessed,
+				}},
+				"page":  "1",
+				"query": "",
+			},
+		},
+		{
+			name: "admin client",
+			page: "/admin_clients_usersessions.html",
+			bind: map[string]interface{}{
+				"client": &api.ClientResponse{Id: 3, ClientIdentifier: "web-app"},
+				"sessions": []adminclienthandlers.SessionInfo{{
+					UserSessionId: 1, UserId: 7, UserEmail: "someone@example.com",
+					Started: &started, LastAccessed: &lastAccessed,
+				}},
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			out := render(t, tc.page, tc.bind)
+
+			assert.Containsf(t, out, startedCell, "%s: the Started cell is not localized", tc.page)
+			assert.Containsf(t, out, lastAccessedCell,
+				"%s: the Last accessed cell is not localized", tc.page)
+
+			assert.NotContains(t, out, started.Format(time.RFC1123),
+				"RFC1123 names the month and weekday in English under every locale")
+			assert.NotContains(t, out, "atrás",
+				"the relative phrase is one translated string now, not a number with a suffix after it")
+		})
+	}
+}
+
+// A session whose instants are absent renders two empty cells rather than year 1 or a 2026-year
+// relative phrase. The client-sessions page is the one that can meet this: its rows come from a
+// list endpoint, and a row decoded from a payload written before those columns existed carries nil
+// (#373).
+func TestRender_SessionPagesRenderAMissingInstantAsBlank(t *testing.T) {
+	out := render(t, "/admin_clients_usersessions.html", map[string]interface{}{
+		"client": &api.ClientResponse{Id: 3, ClientIdentifier: "web-app"},
+		"sessions": []adminclienthandlers.SessionInfo{{
+			UserSessionId: 1, UserId: 7, UserEmail: "someone@example.com",
+		}},
+	})
+
+	assert.Contains(t, out, "<td><br /></td>", "a nil instant must render an empty cell")
+	assert.NotContains(t, out, "0001", "year 1 is what a zero instant renders as")
+}
+
 // The Device label reaches a second sink the tooltip above does not, and this is the case that
 // says it arrives there as text.
 //

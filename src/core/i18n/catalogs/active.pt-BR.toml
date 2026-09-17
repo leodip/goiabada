@@ -489,7 +489,6 @@
 "adminconsole.account.sessions.col_started" = "Iniciada em"
 "adminconsole.account.sessions.col_last_accessed" = "Último acesso em"
 "adminconsole.account.sessions.current_label" = "Sessão atual"
-"adminconsole.account.sessions.duration_ago_suffix" = " atrás"
 "adminconsole.account.sessions.end_button" = "Encerrar sessão"
 "adminconsole.account.sessions.modal_confirm_title" = "Tem certeza?"
 "adminconsole.account.sessions.modal_confirm_body_prefix" = "Deseja encerrar a sessão no dispositivo <span class='text-accent'>"
@@ -572,7 +571,6 @@
 "adminconsole.admin_clients.usersessions.col_started" = "Iniciada em"
 "adminconsole.admin_clients.usersessions.col_last_accessed" = "Último acesso em"
 "adminconsole.admin_clients.usersessions.current_label" = "Sessão atual"
-"adminconsole.admin_clients.usersessions.duration_ago_suffix" = " atrás"
 "adminconsole.admin_clients.usersessions.end_button" = "Encerrar sessão"
 "adminconsole.admin_clients.usersessions.removed_label" = "Removida"
 "adminconsole.admin_clients.usersessions.empty" = "Nenhuma sessão encontrada."
@@ -903,7 +901,6 @@
 "adminconsole.admin_users.sessions.col_started_at" = "Iniciada em"
 "adminconsole.admin_users.sessions.col_last_accessed_at" = "Último acesso em"
 "adminconsole.admin_users.sessions.current_label" = "Sessão atual"
-"adminconsole.admin_users.sessions.duration_ago_suffix" = " atrás"
 "adminconsole.admin_users.sessions.end_button" = "Encerrar sessão"
 "adminconsole.admin_users.sessions.empty" = "Nenhuma sessão encontrada."
 

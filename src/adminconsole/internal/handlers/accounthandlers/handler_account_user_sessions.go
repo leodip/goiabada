@@ -36,18 +36,16 @@ func HandleAccountSessionsGet(
 		sessionInfoArr := []SessionInfo{}
 		for _, es := range enhancedSessions {
 			usi := SessionInfo{
-				UserSessionId:             es.Id,
-				StartedAt:                 es.StartedAt,
-				DurationSinceStarted:      es.DurationSinceStarted,
-				LastAcessedAt:             es.LastAccessedAt,
-				DurationSinceLastAccessed: es.DurationSinceLastAccessed,
-				IpAddress:                 es.IpAddress,
-				DeviceName:                es.DeviceName,
-				DeviceType:                es.DeviceType,
-				DeviceOS:                  es.DeviceOS,
-				UserAgent:                 es.UserAgent,
-				Clients:                   es.ClientIdentifiers,
-				IsCurrent:                 es.IsCurrent,
+				UserSessionId: es.Id,
+				Started:       es.Started,
+				LastAccessed:  es.LastAccessed,
+				IpAddress:     es.IpAddress,
+				DeviceName:    es.DeviceName,
+				DeviceType:    es.DeviceType,
+				DeviceOS:      es.DeviceOS,
+				UserAgent:     es.UserAgent,
+				Clients:       es.ClientIdentifiers,
+				IsCurrent:     es.IsCurrent,
 			}
 			sessionInfoArr = append(sessionInfoArr, usi)
 		}
