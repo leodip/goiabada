@@ -39,6 +39,7 @@ type requestSpec struct {
 	contentType string
 	routeParams [][2]string
 	accessToken *string
+	jwtInfo     *oauth.JwtInfo
 	settings    any
 	hasSettings bool
 }
@@ -63,7 +64,9 @@ func Request(method, target string, opts ...Option) *http.Request {
 		}
 		ctx = context.WithValue(ctx, chi.RouteCtxKey, routeCtx)
 	}
-	if spec.accessToken != nil {
+	if spec.jwtInfo != nil {
+		ctx = context.WithValue(ctx, constants.ContextKeyJwtInfo, *spec.jwtInfo)
+	} else if spec.accessToken != nil {
 		ctx = context.WithValue(ctx, constants.ContextKeyJwtInfo,
 			oauth.JwtInfo{TokenResponse: oauth.TokenResponse{AccessToken: *spec.accessToken}})
 	}
@@ -80,6 +83,18 @@ func WithAccessToken() Option {
 	return func(spec *requestSpec) {
 		token := AccessToken
 		spec.accessToken = &token
+	}
+}
+
+// WithJwtInfo puts a whole oauth.JwtInfo on the context, for the handlers that read the parsed
+// token pointers rather than the raw bearer. WithAccessToken fills TokenResponse.AccessToken and
+// leaves IdToken and AccessToken nil, which is indistinguishable from a visitor who never
+// authenticated: the logout page, which reads both pointers, takes its unauthenticated arm.
+//
+// It replaces whatever WithAccessToken set, so the two are not combined.
+func WithJwtInfo(jwtInfo oauth.JwtInfo) Option {
+	return func(spec *requestSpec) {
+		spec.jwtInfo = &jwtInfo
 	}
 }
 

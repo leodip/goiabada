@@ -143,11 +143,18 @@ type AccountLogoutRequest struct {
 	PostLogoutRedirectUri string `json:"postLogoutRedirectUri"`
 	State                 string `json:"state,omitempty"`
 	ClientIdentifier      string `json:"clientIdentifier,omitempty"`
-	// ResponseMode is accepted and ignored. The handler reads no value from it and always
-	// answers AccountLogoutRedirectResponse; there is no form_post mode at this endpoint,
-	// and AccountLogoutFormPostResponse is never written (#245).
+	// ResponseMode selects which of the two response shapes the endpoint answers.
+	// AccountLogoutResponseModeFormPost asks for AccountLogoutFormPostResponse; every other
+	// value, absent and empty included, answers AccountLogoutRedirectResponse.
 	ResponseMode string `json:"responseMode,omitempty"`
 }
+
+// AccountLogoutResponseModeFormPost is the one value of AccountLogoutRequest.ResponseMode that
+// changes what /api/v1/account/logout-request answers. It is declared here, in the package both
+// modules share, because the auth server compares against it and the admin console sends it: two
+// literals in two modules is a disagreement nothing in the build can see, and a console that
+// misspelt it would silently go back to putting the id_token_hint in a top-level URL (#350).
+const AccountLogoutResponseModeFormPost = "form_post"
 
 // UpdateResourcePermissionsRequest replaces the set of permission definitions
 // for a resource. The auth server validates, sanitizes, applies create/update/delete,

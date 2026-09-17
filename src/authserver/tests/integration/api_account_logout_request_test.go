@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -1377,6 +1378,136 @@ func TestLogout_CrossOriginPost_EmptyHint_ExemptsAndIsStillRejected(t *testing.T
 			require.NoError(t, err)
 			assert.NotNil(t, survived,
 				"an exempted POST whose hint cannot be confirmed must tear nothing down before the End-User is asked")
+		})
+	}
+}
+
+// Seam 5 for decision 2 (#350): the endpoint answers the form binding when the request asks for it.
+//
+// The mode was accepted and discarded for a year: 8a9c49c3 added the field, the response type and
+// the console's request in one commit and wrote "We only support redirect mode now; ignore
+// responseMode input" in the same diff, while its message claimed both modes worked. The server half
+// of the POST binding was then built, tested and published by 8b69223f (#109) for exactly this use.
+// These cases are what makes the claim true.
+func TestAPIAccountLogoutRequest_FormPostMode_AnswersAFormInstruction(t *testing.T) {
+	_, accessToken, code := getUserAccessTokenAndCodeForAccountScope(t)
+
+	state := fake.LetterN(12)
+	urlLogoutReq := config.GetAuthServer().BaseURL + "/api/v1/account/logout-request"
+	resp := makeAPIRequest(t, "POST", urlLogoutReq, accessToken, api.AccountLogoutRequest{
+		PostLogoutRedirectUri: code.RedirectURI,
+		State:                 state,
+		ResponseMode:          api.AccountLogoutResponseModeFormPost,
+	})
+	defer func() { _ = resp.Body.Close() }()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	var out api.AccountLogoutFormPostResponse
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
+
+	assert.Equal(t, "POST", out.Method)
+
+	// The endpoint carries no query string. A hint appended here would be the leak this mode
+	// exists to close, arriving through the mode that is meant to prevent it.
+	assert.Equal(t, config.GetAuthServer().BaseURL+"/auth/logout", out.Endpoint)
+	assert.NotContains(t, out.Endpoint, "?")
+	assert.NotContains(t, out.Endpoint, "id_token_hint")
+
+	assert.NotEmpty(t, out.Params["id_token_hint"])
+	assert.Equal(t, code.RedirectURI, out.Params["post_logout_redirect_uri"])
+	assert.Equal(t, state, out.Params["state"])
+}
+
+// The two arms have to stay one parameter set. They are built separately, so the only way a second
+// arm drifts from the first is silently: a parameter the redirect URL carries and the form does not
+// reaches /auth/logout in one mode and not the other, and the endpoint answers differently for each.
+//
+// The state is the sharpest case, and it is asserted through the absent request rather than only the
+// present one: /auth/logout treats an absent state and an empty one as different requests
+// (TestLogout_Hintless_AbsentAndEmptyStateAreDifferentRedirects), and the redirect arm has never been
+// able to send an empty one, so neither may the form.
+func TestAPIAccountLogoutRequest_BothModesCarryTheSameParameters(t *testing.T) {
+	_, accessToken, code := getUserAccessTokenAndCodeForAccountScope(t)
+	urlLogoutReq := config.GetAuthServer().BaseURL + "/api/v1/account/logout-request"
+
+	for _, state := range []string{fake.LetterN(12), ""} {
+		name := "with a state"
+		if state == "" {
+			name = "with no state"
+		}
+		t.Run(name, func(t *testing.T) {
+			formReq := api.AccountLogoutRequest{
+				PostLogoutRedirectUri: code.RedirectURI,
+				State:                 state,
+				ResponseMode:          api.AccountLogoutResponseModeFormPost,
+			}
+			formResp := makeAPIRequest(t, "POST", urlLogoutReq, accessToken, formReq)
+			defer func() { _ = formResp.Body.Close() }()
+			require.Equal(t, http.StatusOK, formResp.StatusCode)
+			var form api.AccountLogoutFormPostResponse
+			require.NoError(t, json.NewDecoder(formResp.Body).Decode(&form))
+
+			redirectReq := formReq
+			redirectReq.ResponseMode = "redirect"
+			redirectResp := makeAPIRequest(t, "POST", urlLogoutReq, accessToken, redirectReq)
+			defer func() { _ = redirectResp.Body.Close() }()
+			require.Equal(t, http.StatusOK, redirectResp.StatusCode)
+			var redirect api.AccountLogoutRedirectResponse
+			require.NoError(t, json.NewDecoder(redirectResp.Body).Decode(&redirect))
+
+			u, err := url.Parse(redirect.LogoutUrl)
+			require.NoError(t, err)
+			assert.Equal(t, config.GetAuthServer().BaseURL+u.Path, form.Endpoint,
+				"both modes send the browser to the same endpoint")
+
+			// The hints differ: each response mints its own, with its own iat and signature. The
+			// parameter names, and every value but the hint, must not.
+			query := u.Query()
+			var queryNames, formNames []string
+			for name := range query {
+				queryNames = append(queryNames, name)
+			}
+			for name := range form.Params {
+				formNames = append(formNames, name)
+			}
+			assert.ElementsMatch(t, queryNames, formNames,
+				"a parameter one mode carries and the other does not reaches /auth/logout in one mode only")
+			for name := range form.Params {
+				if name == "id_token_hint" {
+					assert.NotEmpty(t, form.Params[name])
+					continue
+				}
+				assert.Equalf(t, query.Get(name), form.Params[name], "%s must match in both modes", name)
+			}
+			if state == "" {
+				assert.NotContains(t, form.Params, "state",
+					"an empty state is sent as no state, because /auth/logout tells the two apart")
+			}
+		})
+	}
+}
+
+// Every other value of responseMode keeps answering the redirect shape, which is what makes the new
+// mode opt-in: an existing caller that sends nothing, or sends a value this server does not know,
+// gets exactly what it got before rather than a shape it cannot decode.
+func TestAPIAccountLogoutRequest_AbsentAndUnknownResponseModeStillRedirect(t *testing.T) {
+	_, accessToken, code := getUserAccessTokenAndCodeForAccountScope(t)
+	urlLogoutReq := config.GetAuthServer().BaseURL + "/api/v1/account/logout-request"
+
+	for _, mode := range []string{"", "redirect", "form-post", "FORM_POST", "fragment"} {
+		t.Run("responseMode "+strconv.Quote(mode), func(t *testing.T) {
+			resp := makeAPIRequest(t, "POST", urlLogoutReq, accessToken, api.AccountLogoutRequest{
+				PostLogoutRedirectUri: code.RedirectURI,
+				ResponseMode:          mode,
+			})
+			defer func() { _ = resp.Body.Close() }()
+			require.Equal(t, http.StatusOK, resp.StatusCode)
+
+			body, err := io.ReadAll(resp.Body)
+			require.NoError(t, err)
+			assert.Contains(t, string(body), `"logoutUrl"`)
+			assert.NotContains(t, string(body), `"endpoint"`,
+				"only the exact value form_post selects the form binding")
 		})
 	}
 }

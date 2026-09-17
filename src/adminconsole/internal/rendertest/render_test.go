@@ -49,13 +49,20 @@ var rawKeyRe = regexp.MustCompile(`\b(adminconsole|common|auth|account|admin|con
 
 func render(t *testing.T, page string, bind map[string]interface{}) string {
 	t.Helper()
+	return renderWithLayout(t, "/layouts/menu_layout.html", page, bind)
+}
+
+// renderWithLayout is render with the layout named, for the one page that is not a menu page: the
+// logout form binding renders under no_menu_layout, the same layout the 404 and 500 pages use.
+func renderWithLayout(t *testing.T, layout, page string, bind map[string]interface{}) string {
+	t.Helper()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	settings := &api.PublicSettingsResponse{AppName: "Test", UITheme: "dark", SMTPEnabled: true}
 	req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings, settings))
 	req = i18n.RefineLocalizerWithUILocales(req, []string{"pt-BR"})
 
 	h := handlerhelpers.NewHttpHelper(web.TemplateFS(), adminmiddleware.SettingsReader{})
-	buf, err := h.RenderTemplateToBuffer(req, "/layouts/menu_layout.html", page, bind)
+	buf, err := h.RenderTemplateToBuffer(req, layout, page, bind)
 	require.NoErrorf(t, err, "render %s in pt-BR (template referenced data the bind lacks?)", page)
 
 	out := buf.String()
@@ -877,4 +884,49 @@ func TestRender_AdminResourcePermissions(t *testing.T) {
 	// html/template pads a number interpolated into a script with spaces, so the id is asserted in
 	// the form the browser actually receives rather than the form the template reads.
 	assert.Contains(t, out, `"id":  9 `)
+}
+
+// Seam 4 for the logout form binding (#350 decision 2). The only seam that reads the real template
+// through the real layout, and so the only one that can see the page a browser would receive.
+//
+// What it asserts is what the browser would submit and where: one POST form, an action equal to the
+// endpoint the API named with nothing appended to it, a hidden input per parameter, and the hook
+// that submits it. The action matters most. Building the same parameters into a query string here
+// would leave every case above this one green while restoring exactly the leak this mode closes,
+// because the id_token_hint would be back in a top-level navigation's URL.
+//
+// Where it stops: no browser executes here, so that the submission actually fires is the code gate's
+// to confirm. This case sees the hook declared, not run.
+func TestRender_AccountLogoutFormPost(t *testing.T) {
+	// The host deliberately does not start "auth.": rawKeyRe above reads "auth.example.com" as a
+	// leaked catalog key, which is a property of the fixture and not of the page.
+	const endpoint = "https://op.example.com/auth/logout"
+	params := map[string]string{
+		"id_token_hint":            "eyJhbGciOiJSUzI1NiJ9.e30.sig",
+		"post_logout_redirect_uri": "https://console.example.com/",
+		"state":                    "a-state",
+	}
+
+	out := renderWithLayout(t, "/layouts/no_menu_layout.html", "/account_logout_form_post.html",
+		map[string]interface{}{"endpoint": endpoint, "params": params})
+
+	assert.Equal(t, 1, strings.Count(out, "<form "), "exactly one form, so document.forms is unambiguous")
+	assert.Contains(t, out, `method="post"`, "the whole point of this page is the POST binding")
+	assert.Contains(t, out, `action="`+endpoint+`"`,
+		"the action is the endpoint the API named, with nothing appended")
+
+	for name, value := range params {
+		assert.Containsf(t, out, `name="`+name+`" value="`+value+`"`,
+			"%s must reach the form as a hidden input", name)
+	}
+
+	// The hint reaches the page exactly once, in the field it belongs in. A second occurrence would
+	// be it in a URL: an action, a link or a script, which is the leak this mode exists to close.
+	assert.Equal(t, 1, strings.Count(out, params["id_token_hint"]),
+		"the id_token_hint appears only as a form field, never in a URL")
+	assert.NotContains(t, out, endpoint+"?", "nothing may turn the endpoint back into a query string")
+
+	assert.Contains(t, out, `document.getElementById("logoutForm").submit()`,
+		"the form submits itself; without the hook the visitor sits on a blank page")
+	assert.Contains(t, out, "<noscript>", "a browser without JavaScript still needs a way through")
 }

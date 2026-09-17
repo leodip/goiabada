@@ -1574,9 +1574,9 @@ POST /api/v1/account/logout-request
 | `postLogoutRedirectUri` | string | Yes | URI to redirect after logout |
 | `state` | string | No | State parameter (echoed back) |
 | `clientIdentifier` | string | No | Client ID (auto-resolved if omitted) |
-| `responseMode` | string | No | `"form_post"` or `"redirect"` |
+| `responseMode` | string | No | `"form_post"` or `"redirect"` (the default) |
 
-**Response:**
+**Response, with `responseMode` set to `"redirect"` or omitted:**
 
 ```json
 {
@@ -1585,3 +1585,22 @@ POST /api/v1/account/logout-request
 ```
 
 Follow the `logoutUrl` to complete the logout process.
+
+**Response, with `responseMode` set to `"form_post"`:**
+
+```json
+{
+  "method": "POST",
+  "endpoint": "https://auth.example.com/auth/logout",
+  "params": {
+    "id_token_hint": "eyJhbGciOi...",
+    "post_logout_redirect_uri": "https://myapp.com/logged-out",
+    "state": "xyz123"
+  }
+}
+```
+
+`method` is always `"POST"` and `endpoint` carries no query string of its own. Render `params` as the
+hidden inputs of a form your page submits itself to `endpoint`, rather than as a query string:
+keeping the `id_token_hint` out of a URL is the point of this mode, since a URL reaches the address
+bar, the browser history and the access log of every proxy on the way.

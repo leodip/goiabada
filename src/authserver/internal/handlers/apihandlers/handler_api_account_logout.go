@@ -17,7 +17,8 @@ import (
 )
 
 // HandleAPIAccountLogoutRequestPost - POST /api/v1/account/logout-request
-// Returns a prepared logout instruction (form_post preferred) or a redirect URL.
+// Returns a prepared logout instruction: a self-submitting form's parameters when the request asks
+// for api.AccountLogoutResponseModeFormPost, and a ready-to-follow redirect URL otherwise.
 func HandleAPIAccountLogoutRequestPost(
 	database data.Database,
 ) http.HandlerFunc {
@@ -41,7 +42,6 @@ func HandleAPIAccountLogoutRequestPost(
 			writeJSONError(w, "postLogoutRedirectUri is required", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
-		// We only support redirect mode now; ignore responseMode input
 
 		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
 
@@ -157,6 +157,32 @@ func HandleAPIAccountLogoutRequestPost(
 		idToken, err := token.SignedString(privKey)
 		if err != nil {
 			writeInternalServerError(w, r, err)
+			return
+		}
+
+		// Both response modes carry the same parameters to the same endpoint, and the only
+		// difference is how the browser gets them there. state is present in neither when the
+		// request sent none: /auth/logout distinguishes an absent state from an empty one, and
+		// answers a different redirect for each, so a mode that sent "state=" where the other
+		// sent nothing would log the user out to a different place (RP-Initiated Logout 1.0
+		// section 2, where state is OPTIONAL; #350 decision 2).
+		if req.ResponseMode == api.AccountLogoutResponseModeFormPost {
+			// The form binding keeps the id_token_hint out of a top-level navigation's URL,
+			// and so out of the address bar, the browser history and the Referer of anything
+			// the landing page loads. Referrer-Policy and the 60-second exp do not reach an
+			// intermediary proxy's access log, which is what this mode is for (#109, #350).
+			params := map[string]string{
+				"id_token_hint":            idToken,
+				"post_logout_redirect_uri": postLogout,
+			}
+			if req.State != "" {
+				params["state"] = req.State
+			}
+			writeJSON(w, r, http.StatusOK, api.AccountLogoutFormPostResponse{
+				Method:   http.MethodPost,
+				Endpoint: config.GetAuthServer().BaseURL + "/auth/logout",
+				Params:   params,
+			})
 			return
 		}
 
