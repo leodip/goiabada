@@ -27,14 +27,14 @@ func HandleAccountSessionsGet(
 		}
 
 		// Fetch sessions via API
-		enhancedSessions, err := apiClient.GetAccountSessions(jwtInfo.TokenResponse.AccessToken)
+		sessions, err := apiClient.GetAccountSessions(jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 
 		sessionInfoArr := []SessionInfo{}
-		for _, es := range enhancedSessions {
+		for _, es := range sessions {
 			usi := SessionInfo{
 				UserSessionId: es.Id,
 				Started:       es.Started,
@@ -93,23 +93,21 @@ func HandleAccountSessionsEndSesssionPost(
 			return
 		}
 
-		// Check if we're deleting the current session
-		currentSessionIdentifier := ""
-		if jwtInfo.AccessToken != nil {
-			currentSessionIdentifier = jwtInfo.AccessToken.GetStringClaim("sid")
+		// Whether the row being deleted is the caller's own is a field on that row. The auth
+		// server computes isCurrent from the sid claim of the very token this request forwards,
+		// so this is the same comparison the console used to make for itself, now made once and
+		// in one place (#373).
+		sessions, err := apiClient.GetAccountSessions(jwtInfo.TokenResponse.AccessToken)
+		if err != nil {
+			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
+			return
 		}
 
 		isDeletingCurrentSession := false
-		if currentSessionIdentifier != "" {
-			// Fetch sessions to check if the session being deleted is the current one
-			enhancedSessions, err := apiClient.GetAccountSessions(jwtInfo.TokenResponse.AccessToken)
-			if err == nil {
-				for _, es := range enhancedSessions {
-					if es.Id == int64(userSessionId) && es.SessionIdentifier == currentSessionIdentifier {
-						isDeletingCurrentSession = true
-						break
-					}
-				}
+		for _, es := range sessions {
+			if es.Id == int64(userSessionId) && es.IsCurrent {
+				isDeletingCurrentSession = true
+				break
 			}
 		}
 
@@ -126,7 +124,7 @@ func HandleAccountSessionsEndSesssionPost(
 		}
 
 		// Delete session via API (server validates ownership and audits)
-		if err := apiClient.DeleteAccountSession(jwtInfo.TokenResponse.AccessToken, int64(userSessionId)); err != nil {
+		if err = apiClient.DeleteAccountSession(jwtInfo.TokenResponse.AccessToken, int64(userSessionId)); err != nil {
 			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
