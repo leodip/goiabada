@@ -31,8 +31,10 @@ import (
 	"github.com/leodip/goiabada/core/handlerhelpers"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/locales"
+	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/timezones"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -56,9 +58,25 @@ func render(t *testing.T, page string, bind map[string]interface{}) string {
 // logout form binding renders under no_menu_layout, the same layout the 404 and 500 pages use.
 func renderWithLayout(t *testing.T, layout, page string, bind map[string]interface{}) string {
 	t.Helper()
+	return renderWithLayoutAs(t, layout, page, bind, nil)
+}
+
+// renderWithLayoutAs is renderWithLayout with an ID token on the context, which is how every
+// authenticated page reaches the renderer in production: JwtSessionHandler puts an oauth.JwtInfo
+// there and HttpHelper.RenderTemplateToBuffer turns its claims into the `loggedInUser` bind that
+// menu_layout.html reads for the dropdown label. Passing nil claims is the anonymous request, which
+// is what every other case in this file renders and why the label is blank in all of them.
+func renderWithLayoutAs(t *testing.T, layout, page string, bind map[string]interface{},
+	idTokenClaims jwt.MapClaims) string {
+
+	t.Helper()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	settings := &api.PublicSettingsResponse{AppName: "Test", UITheme: "dark", SMTPEnabled: true}
 	req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings, settings))
+	if idTokenClaims != nil {
+		jwtInfo := oauth.JwtInfo{IdToken: &oauth.JwtToken{Claims: idTokenClaims}}
+		req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeyJwtInfo, jwtInfo))
+	}
 	req = i18n.RefineLocalizerWithUILocales(req, []string{"pt-BR"})
 
 	h := handlerhelpers.NewHttpHelper(web.TemplateFS(), adminmiddleware.SettingsReader{})
@@ -929,4 +947,93 @@ func TestRender_AccountLogoutFormPost(t *testing.T) {
 	assert.Contains(t, out, `document.getElementById("logoutForm").submit()`,
 		"the form submits itself; without the hook the visitor sits on a blank page")
 	assert.Contains(t, out, "<noscript>", "a browser without JavaScript still needs a way through")
+}
+
+// menuLabelRe captures the dropdown label in menu_layout.html: everything between the opening
+// <span class="inline-block text-sm align-middle"> and the chevron <svg> that closes it. That is
+// the whole of what a signed-in administrator reads at the top right of every admin and account
+// page, and reading it back off a rendered page is the only way to see it, because the layout is a
+// file no handler test ever executes.
+var menuLabelRe = regexp.MustCompile(`(?s)<span class="inline-block text-sm align-middle">(.*?)<svg`)
+
+func menuLabel(t *testing.T, out string) string {
+	t.Helper()
+	m := menuLabelRe.FindStringSubmatch(out)
+	require.Lenf(t, m, 2, "the dropdown label span is not in the rendered page at all")
+	return strings.TrimSpace(m[1])
+}
+
+// tagRe strips markup, so a case can assert on what an administrator actually reads rather than on
+// the elements carrying it. The subject-only case needs the distinction: the guard on a one-key map
+// is still true, so the inner <span> is emitted and only its text is empty.
+var tagRe = regexp.MustCompile(`<[^>]*>`)
+
+func menuLabelText(t *testing.T, out string) string {
+	t.Helper()
+	return strings.TrimSpace(tagRe.ReplaceAllString(menuLabel(t, out), ""))
+}
+
+// TestRender_MenuLabelShowsTheLoggedInUser is the case the rest of this file could not see. Every
+// other render here is an anonymous request, so `loggedInUser` is never bound and the dropdown
+// label comes back empty — which reads as "no handler binds it" if the harness is mistaken for the
+// product. The bind is real and it is central: HttpHelper.RenderTemplateToBuffer builds it from the
+// ID token's claims, and JwtSessionHandler puts that token on the context ahead of every route in
+// routes.go that renders a menu page. Rendering with a token is what distinguishes the two.
+func TestRender_MenuLabelShowsTheLoggedInUser(t *testing.T) {
+	claims := jwt.MapClaims{
+		"sub":         "a5f0c6b4-0000-4000-8000-000000000001",
+		"email":       "alice@example.com",
+		"given_name":  "Alice",
+		"middle_name": "Q",
+		"family_name": "Doe",
+	}
+
+	out := renderWithLayoutAs(t, "/layouts/menu_layout.html", "/admin_groups.html",
+		map[string]interface{}{"groups": []api.GroupResponse{}}, claims)
+
+	label := menuLabel(t, out)
+	assert.Contains(t, label, "Alice Q Doe",
+		"the full name assembled from the ID token's name claims must reach the dropdown")
+	assert.Contains(t, label, "alice@example.com", "the email must reach the dropdown")
+}
+
+// The name claims are optional; the email is what an administrator always has. With no name, the
+// label carries the email alone and no empty line above it.
+func TestRender_MenuLabelWithNoNameClaimsShowsTheEmailAlone(t *testing.T) {
+	claims := jwt.MapClaims{
+		"sub":   "a5f0c6b4-0000-4000-8000-000000000002",
+		"email": "bob@example.com",
+	}
+
+	out := renderWithLayoutAs(t, "/layouts/menu_layout.html", "/admin_groups.html",
+		map[string]interface{}{"groups": []api.GroupResponse{}}, claims)
+
+	label := menuLabel(t, out)
+	assert.Contains(t, label, "bob@example.com")
+	assert.NotContains(t, label, "<br />", "with no name there is no line to break")
+}
+
+// The ID token carries the name and email claims only when IncludeOpenIDConnectClaimsInIdToken is
+// on — the seeded default, but an administrator may turn it off globally or for the admin console's
+// own client, and then `sub` is all that arrives. The guard on the map is still satisfied, since a
+// one-key map is truthy, so the label renders with a missing `Email` key. A missing key on a
+// map[string]interface{} is an untyped nil, which text/template prints as "<no value>"; this pins
+// that the label degrades to blank instead of putting that string on every page.
+func TestRender_MenuLabelWithSubjectOnlyIsBlankNotNoValue(t *testing.T) {
+	claims := jwt.MapClaims{"sub": "a5f0c6b4-0000-4000-8000-000000000003"}
+
+	out := renderWithLayoutAs(t, "/layouts/menu_layout.html", "/admin_groups.html",
+		map[string]interface{}{"groups": []api.GroupResponse{}}, claims)
+
+	assert.NotContains(t, out, "no value", "a missing claim must not print a template placeholder")
+	assert.Empty(t, menuLabelText(t, out), "with only a subject there is nothing to show")
+}
+
+// The anonymous request, stated rather than left implicit: with no ID token on the context nothing
+// is bound, the outer guard is false, and the label is blank. This is the shape every other render
+// in this file has, and saying so here is what keeps the next reader from reading those blanks as a
+// defect in the page.
+func TestRender_MenuLabelWithNoTokenIsBlank(t *testing.T) {
+	out := render(t, "/admin_groups.html", map[string]interface{}{"groups": []api.GroupResponse{}})
+	assert.Empty(t, menuLabel(t, out), "an anonymous render binds no user, so not even the span is emitted")
 }
