@@ -268,39 +268,70 @@ func (d *CommonDatabase) convergeEmailGroup(lowered string, candidates []int64) 
 // engines compare NFC and NFD spellings of an accented character equal. A row the ENGINE
 // believes is a member is one only if Go's ToLower agrees. Trusting the engine here would make
 // the pass pick a survivor the group does not contain (#283, and see engineFoldedTheMatch).
+//
+// A candidate list longer than one statement can carry is read in batches, and the address term
+// rides in every one of them rather than being asked for separately: repeating an indexed unique
+// lookup costs less than the extra round trip, and it keeps the whole group one statement for
+// every list that fits in one batch, which is every list a real deployment has. A row two
+// statements both answer is kept once, by id (#373).
 func (d *CommonDatabase) readEmailGroup(lowered string, candidates []int64) ([]emailRow, error) {
-	sb := sqlbuilder.NewSelectBuilder()
-	sb.Select("id", "email", "enabled").From("users")
-
-	// The exact-match term is unconditional and the id term is not: an empty IN () is a syntax
-	// error on all four engines, and this runs at startup where that would be a crash.
-	terms := []string{sb.Equal("email", lowered)}
-	if len(candidates) > 0 {
-		terms = append(terms, sb.In("id", sqlbuilder.Flatten(candidates)...))
-	}
-	sb.Where(sb.Or(terms...))
-
-	query, args := sb.BuildWithFlavor(d.Flavor)
-
-	rows, err := d.QuerySql(nil, query, args...)
-	if err != nil {
-		return nil, errs.Wrapf(err, "unable to look up the users holding email %q", lowered)
-	}
-	defer func() { _ = rows.Close() }()
 
 	members := make([]emailRow, 0, len(candidates)+1)
-	for rows.Next() {
-		var r emailRow
-		if err := rows.Scan(&r.id, &r.email, &r.enabled); err != nil {
-			return nil, errs.Wrapf(err, "unable to scan a user holding email %q", lowered)
+	seen := make(map[int64]struct{}, len(candidates)+1)
+
+	read := func(batch []int64) error {
+		sb := sqlbuilder.NewSelectBuilder()
+		sb.Select("id", "email", "enabled").From("users")
+
+		// The exact-match term is unconditional and the id term is not: an empty IN () is a
+		// syntax error on all four engines, and this runs at startup where that would be a crash.
+		terms := []string{sb.Equal("email", lowered)}
+		if len(batch) > 0 {
+			terms = append(terms, sb.In("id", sqlbuilder.Flatten(batch)...))
 		}
-		if strings.ToLower(r.email) != lowered {
-			continue
+		sb.Where(sb.Or(terms...))
+
+		query, args := sb.BuildWithFlavor(d.Flavor)
+
+		rows, err := d.QuerySql(nil, query, args...)
+		if err != nil {
+			return errs.Wrapf(err, "unable to look up the users holding email %q", lowered)
 		}
-		members = append(members, r)
+		defer func() { _ = rows.Close() }()
+
+		for rows.Next() {
+			var r emailRow
+			if err := rows.Scan(&r.id, &r.email, &r.enabled); err != nil {
+				return errs.Wrapf(err, "unable to scan a user holding email %q", lowered)
+			}
+			if strings.ToLower(r.email) != lowered {
+				continue
+			}
+			// The address term rides in every batch, so the lowercase row answers each of them.
+			if _, alreadySeen := seen[r.id]; alreadySeen {
+				continue
+			}
+			seen[r.id] = struct{}{}
+			members = append(members, r)
+		}
+		if err := rows.Err(); err != nil {
+			return errs.Wrapf(err, "error iterating users holding email %q", lowered)
+		}
+
+		return nil
 	}
-	if err := rows.Err(); err != nil {
-		return nil, errs.Wrapf(err, "error iterating users holding email %q", lowered)
+
+	// forEachIdBatch calls its function zero times for an empty list, and an empty candidate list
+	// still has to ask for the row already spelled in lowercase, so that one is asked for here.
+	if len(candidates) == 0 {
+		if err := read(nil); err != nil {
+			return nil, err
+		}
+		return members, nil
+	}
+
+	if err := forEachIdBatch(candidates, read); err != nil {
+		return nil, err
 	}
 
 	return members, nil

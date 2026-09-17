@@ -137,32 +137,40 @@ func (d *CommonDatabase) GetResourcesByIds(tx *sql.Tx, resourceIds []int64) ([]m
 		return nil, nil
 	}
 
-	resourceStruct := sqlbuilder.NewStruct(new(models.Resource)).
-		For(d.Flavor)
-
-	selectBuilder := resourceStruct.SelectFrom("resources")
-	selectBuilder.Where(selectBuilder.In("id", sqlbuilder.Flatten(resourceIds)...))
-
-	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(tx, sql, args...)
-	if err != nil {
-		return nil, errs.Wrap(err, "unable to query database")
-	}
-	defer func() { _ = rows.Close() }()
-
 	var resources []models.Resource
-	for rows.Next() {
-		var resource models.Resource
-		addr := resourceStruct.Addr(&resource)
-		err = rows.Scan(addr...)
-		if err != nil {
-			return nil, errs.Wrap(err, "unable to scan resource")
-		}
-		resources = append(resources, resource)
-	}
 
-	if err := rows.Err(); err != nil {
-		return nil, errs.Wrap(err, "unable to read query results")
+	err := forEachIdBatch(resourceIds, func(batch []int64) error {
+		resourceStruct := sqlbuilder.NewStruct(new(models.Resource)).
+			For(d.Flavor)
+
+		selectBuilder := resourceStruct.SelectFrom("resources")
+		selectBuilder.Where(selectBuilder.In("id", sqlbuilder.Flatten(batch)...))
+
+		sql, args := selectBuilder.Build()
+		rows, err := d.QuerySql(tx, sql, args...)
+		if err != nil {
+			return errs.Wrap(err, "unable to query database")
+		}
+		defer func() { _ = rows.Close() }()
+
+		for rows.Next() {
+			var resource models.Resource
+			addr := resourceStruct.Addr(&resource)
+			err = rows.Scan(addr...)
+			if err != nil {
+				return errs.Wrap(err, "unable to scan resource")
+			}
+			resources = append(resources, resource)
+		}
+
+		if err := rows.Err(); err != nil {
+			return errs.Wrap(err, "unable to read query results")
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	return resources, nil

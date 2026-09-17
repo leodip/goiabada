@@ -131,32 +131,40 @@ func (d *CommonDatabase) GetUserSessionClientsByUserSessionIds(tx *sql.Tx, userS
 		return nil, nil
 	}
 
-	userSessionClientStruct := sqlbuilder.NewStruct(new(models.UserSessionClient)).
-		For(d.Flavor)
-
-	selectBuilder := userSessionClientStruct.SelectFrom("user_session_clients")
-	selectBuilder.Where(selectBuilder.In("user_session_id", sqlbuilder.Flatten(userSessionIds)...))
-
-	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(tx, sql, args...)
-	if err != nil {
-		return nil, errs.Wrap(err, "unable to query database")
-	}
-	defer func() { _ = rows.Close() }()
-
 	var userSessionClients []models.UserSessionClient
-	for rows.Next() {
-		var userSessionClient models.UserSessionClient
-		addr := userSessionClientStruct.Addr(&userSessionClient)
-		err = rows.Scan(addr...)
-		if err != nil {
-			return nil, errs.Wrap(err, "unable to scan userSessionClient")
-		}
-		userSessionClients = append(userSessionClients, userSessionClient)
-	}
 
-	if err := rows.Err(); err != nil {
-		return nil, errs.Wrap(err, "unable to read query results")
+	err := forEachIdBatch(userSessionIds, func(batch []int64) error {
+		userSessionClientStruct := sqlbuilder.NewStruct(new(models.UserSessionClient)).
+			For(d.Flavor)
+
+		selectBuilder := userSessionClientStruct.SelectFrom("user_session_clients")
+		selectBuilder.Where(selectBuilder.In("user_session_id", sqlbuilder.Flatten(batch)...))
+
+		sql, args := selectBuilder.Build()
+		rows, err := d.QuerySql(tx, sql, args...)
+		if err != nil {
+			return errs.Wrap(err, "unable to query database")
+		}
+		defer func() { _ = rows.Close() }()
+
+		for rows.Next() {
+			var userSessionClient models.UserSessionClient
+			addr := userSessionClientStruct.Addr(&userSessionClient)
+			err = rows.Scan(addr...)
+			if err != nil {
+				return errs.Wrap(err, "unable to scan userSessionClient")
+			}
+			userSessionClients = append(userSessionClients, userSessionClient)
+		}
+
+		if err := rows.Err(); err != nil {
+			return errs.Wrap(err, "unable to read query results")
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	return userSessionClients, nil
@@ -201,32 +209,40 @@ func (d *CommonDatabase) GetUserSessionsClientByIds(tx *sql.Tx, userSessionClien
 		return nil, nil
 	}
 
-	userSessionClientStruct := sqlbuilder.NewStruct(new(models.UserSessionClient)).
-		For(d.Flavor)
-
-	selectBuilder := userSessionClientStruct.SelectFrom("user_session_clients")
-	selectBuilder.Where(selectBuilder.In("id", sqlbuilder.Flatten(userSessionClientIds)...))
-
-	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(tx, sql, args...)
-	if err != nil {
-		return nil, errs.Wrap(err, "unable to query database")
-	}
-	defer func() { _ = rows.Close() }()
-
 	var userSessionClients []models.UserSessionClient
-	for rows.Next() {
-		var userSessionClient models.UserSessionClient
-		addr := userSessionClientStruct.Addr(&userSessionClient)
-		err = rows.Scan(addr...)
-		if err != nil {
-			return nil, errs.Wrap(err, "unable to scan userSessionClient")
-		}
-		userSessionClients = append(userSessionClients, userSessionClient)
-	}
 
-	if err := rows.Err(); err != nil {
-		return nil, errs.Wrap(err, "unable to read query results")
+	err := forEachIdBatch(userSessionClientIds, func(batch []int64) error {
+		userSessionClientStruct := sqlbuilder.NewStruct(new(models.UserSessionClient)).
+			For(d.Flavor)
+
+		selectBuilder := userSessionClientStruct.SelectFrom("user_session_clients")
+		selectBuilder.Where(selectBuilder.In("id", sqlbuilder.Flatten(batch)...))
+
+		sql, args := selectBuilder.Build()
+		rows, err := d.QuerySql(tx, sql, args...)
+		if err != nil {
+			return errs.Wrap(err, "unable to query database")
+		}
+		defer func() { _ = rows.Close() }()
+
+		for rows.Next() {
+			var userSessionClient models.UserSessionClient
+			addr := userSessionClientStruct.Addr(&userSessionClient)
+			err = rows.Scan(addr...)
+			if err != nil {
+				return errs.Wrap(err, "unable to scan userSessionClient")
+			}
+			userSessionClients = append(userSessionClients, userSessionClient)
+		}
+
+		if err := rows.Err(); err != nil {
+			return errs.Wrap(err, "unable to read query results")
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	return userSessionClients, nil
