@@ -783,6 +783,57 @@ func TestGetClientsByIds_MoreIdsThanOneStatementCanCarry(t *testing.T) {
 	}
 }
 
+// TestGetClientsByIds_ARepeatedIdOnEitherSideOfABatchBoundary asks for one client twice, at two
+// positions a batch boundary sits between. A single IN list answers a repeated id once, so the
+// method owes one row per matching client however long the list is; reading a long list in
+// several statements is what could make the same row arrive twice, and a caller reading the
+// result as a set of clients cannot tell that from two clients (#373).
+//
+// The positions are chosen: 999 and 1000 are the last slot of the first statement's batch and the
+// first slot of the second's, which is the tightest place a duplicate can straddle.
+func TestGetClientsByIds_ARepeatedIdOnEitherSideOfABatchBoundary(t *testing.T) {
+	random := fake.LetterN(6)
+	client := models.Client{
+		ClientIdentifier:                        "test_client_" + random,
+		ClientSecretEncrypted:                   []byte("encrypted_secret_" + random),
+		Description:                             "Test Client Description " + random,
+		Enabled:                                 true,
+		TokenExpirationInSeconds:                3600,
+		RefreshTokenOfflineIdleTimeoutInSeconds: 86400,
+		RefreshTokenOfflineMaxLifetimeInSeconds: 2592000,
+		IncludeOpenIDConnectClaimsInAccessToken: enums.ThreeStateSettingDefault.String(),
+		DefaultAcrLevel:                         enums.AcrLevel1,
+	}
+	if err := database.CreateClient(nil, &client); err != nil {
+		t.Fatalf("Failed to create test client: %v", err)
+	}
+
+	// Ids no row can hold, as in the test above: padding with distinct values is what puts the
+	// two copies of the real id in different statements.
+	const paddingBase = int64(2_000_000_000)
+
+	ids := make([]int64, 1001)
+	for i := range ids {
+		ids[i] = paddingBase + int64(i)
+	}
+	ids[999] = client.Id
+	ids[1000] = client.Id
+
+	clients, err := database.GetClientsByIds(nil, ids)
+	if err != nil {
+		t.Fatalf("Failed to retrieve clients by ids: %v", err)
+	}
+
+	if len(clients) != 1 {
+		t.Errorf("Expected 1 client for an id repeated across a batch boundary, got %d", len(clients))
+	}
+	for _, retrieved := range clients {
+		if retrieved.Id != client.Id {
+			t.Errorf("Expected client with ID %d, got %d", client.Id, retrieved.Id)
+		}
+	}
+}
+
 func TestClientLoadPermissions(t *testing.T) {
 	random := fake.LetterN(6)
 	client := &models.Client{

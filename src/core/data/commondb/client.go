@@ -325,14 +325,30 @@ func (d *CommonDatabase) GetClientsByIds(tx *sql.Tx, clientIds []int64) ([]model
 		return []models.Client{}, nil
 	}
 
-	clients := make([]models.Client, 0, len(clientIds))
-	for start := 0; start < len(clientIds); start += maxIdsPerStatement {
+	// One IN list answers a repeated id once, so the ids are deduplicated before they are split
+	// across statements: a duplicate falling either side of a batch boundary would otherwise come
+	// back as two copies of the same row, and the caller has no way to tell that from two clients.
+	// Deduplicating the input rather than the merged rows keeps the query count down as well, and
+	// it is what makes a long list's answer the same set the single statement used to return
+	// (#373).
+	uniqueIds := make([]int64, 0, len(clientIds))
+	seen := make(map[int64]struct{}, len(clientIds))
+	for _, clientId := range clientIds {
+		if _, alreadySeen := seen[clientId]; alreadySeen {
+			continue
+		}
+		seen[clientId] = struct{}{}
+		uniqueIds = append(uniqueIds, clientId)
+	}
+
+	clients := make([]models.Client, 0, len(uniqueIds))
+	for start := 0; start < len(uniqueIds); start += maxIdsPerStatement {
 		end := start + maxIdsPerStatement
-		if end > len(clientIds) {
-			end = len(clientIds)
+		if end > len(uniqueIds) {
+			end = len(uniqueIds)
 		}
 
-		batch, err := d.getClientsByIdsInOneStatement(tx, clientIds[start:end])
+		batch, err := d.getClientsByIdsInOneStatement(tx, uniqueIds[start:end])
 		if err != nil {
 			return nil, err
 		}
