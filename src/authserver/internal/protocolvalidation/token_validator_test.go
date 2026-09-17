@@ -964,7 +964,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
-		reused, ok := err.(*customerrors.AuthCodeReusedError)
+		reused, ok := err.(*AuthCodeReusedError)
 		assert.True(t, ok, "expected *AuthCodeReusedError sentinel, got %T", err)
 		assert.NotNil(t, reused.Code)
 		assert.Equal(t, codeEntity.Id, reused.Code.Id)
@@ -1018,7 +1018,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
-		reused, ok := err.(*customerrors.AuthCodeReusedError)
+		reused, ok := err.(*AuthCodeReusedError)
 		assert.True(t, ok, "expected *AuthCodeReusedError sentinel, got %T", err)
 		assert.Equal(t, codeEntity.Id, reused.Code.Id)
 	})
@@ -1060,7 +1060,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 
 		_, err := validator.ValidateTokenRequest(ctx, input)
 
-		_, ok := err.(*customerrors.AuthCodeReusedError)
+		_, ok := err.(*AuthCodeReusedError)
 		assert.True(t, ok, "expected sentinel even with disabled user; user-state checks must be skipped on reuse path. got %T", err)
 	})
 
@@ -1109,7 +1109,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 
 		_, err := validator.ValidateTokenRequest(ctx, input)
 
-		_, isSentinel := err.(*customerrors.AuthCodeReusedError)
+		_, isSentinel := err.(*AuthCodeReusedError)
 		assert.False(t, isSentinel, "wrong client_id must not yield revocation sentinel")
 		detail, ok := err.(*customerrors.ErrorDetail)
 		assert.True(t, ok)
@@ -1151,7 +1151,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 
 		_, err := validator.ValidateTokenRequest(ctx, input)
 
-		_, isSentinel := err.(*customerrors.AuthCodeReusedError)
+		_, isSentinel := err.(*AuthCodeReusedError)
 		assert.False(t, isSentinel, "wrong redirect_uri must not yield revocation sentinel")
 		detail, ok := err.(*customerrors.ErrorDetail)
 		assert.True(t, ok)
@@ -1200,7 +1200,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 
 		_, err = validator.ValidateTokenRequest(ctx, input)
 
-		_, isSentinel := err.(*customerrors.AuthCodeReusedError)
+		_, isSentinel := err.(*AuthCodeReusedError)
 		assert.False(t, isSentinel, "missing client_secret must not yield revocation sentinel")
 		detail, ok := err.(*customerrors.ErrorDetail)
 		assert.True(t, ok)
@@ -1248,7 +1248,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 
 		_, err = validator.ValidateTokenRequest(ctx, input)
 
-		_, isSentinel := err.(*customerrors.AuthCodeReusedError)
+		_, isSentinel := err.(*AuthCodeReusedError)
 		assert.False(t, isSentinel, "wrong client_secret must not yield revocation sentinel")
 		detail, ok := err.(*customerrors.ErrorDetail)
 		assert.True(t, ok)
@@ -1291,7 +1291,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 
 		_, err := validator.ValidateTokenRequest(ctx, input)
 
-		_, isSentinel := err.(*customerrors.AuthCodeReusedError)
+		_, isSentinel := err.(*AuthCodeReusedError)
 		assert.False(t, isSentinel, "wrong code_verifier must not yield revocation sentinel")
 		detail, ok := err.(*customerrors.ErrorDetail)
 		assert.True(t, ok)
@@ -1331,7 +1331,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 
 		_, err := validator.ValidateTokenRequest(ctx, input)
 
-		_, isSentinel := err.(*customerrors.AuthCodeReusedError)
+		_, isSentinel := err.(*AuthCodeReusedError)
 		assert.False(t, isSentinel, "unknown code must not yield revocation sentinel")
 		detail, ok := err.(*customerrors.ErrorDetail)
 		assert.True(t, ok)
@@ -6104,8 +6104,8 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 			})
 
 			assert.Nil(t, result)
-			reuseErr, ok := err.(*customerrors.AuthCodeReusedError)
-			if assert.True(t, ok, "expected *customerrors.AuthCodeReusedError, got %T: %v", err, err) {
+			reuseErr, ok := err.(*AuthCodeReusedError)
+			if assert.True(t, ok, "expected *AuthCodeReusedError, got %T: %v", err, err) {
 				assert.Equal(t, code, reuseErr.Code,
 					"the reuse error must carry the code entity, or the containment cascade has nothing to act on")
 			}

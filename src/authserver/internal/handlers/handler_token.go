@@ -163,7 +163,7 @@ func HandleTokenPost(
 			// has authenticated against the used code (client_id, redirect_uri,
 			// client_secret/PKCE), so revocation here cannot be triggered by
 			// an unauthenticated attacker.
-			var reused *customerrors.AuthCodeReusedError
+			var reused *protocolvalidation.AuthCodeReusedError
 			if errors.As(err, &reused) {
 				if revokeErr := revokeAndAuditAuthCodeReuse(r.Context(), database, auditLogger, reused.Code); revokeErr != nil {
 					httpHelper.InternalServerError(w, r, revokeErr)

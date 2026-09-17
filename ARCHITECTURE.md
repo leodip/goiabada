@@ -122,11 +122,12 @@ Notes on rows that are not self-evident:
   They are still held to the kernel rule: `core/testutil/fake` imports `core/uuidutil` today, and
   that is an exception below rather than a waiver, because #360 moves `uuidutil` and the edge has to
   be noticed then.
-- `core/api` stays, but only as declarations. The model-aware `ToResponse` mapping and the
-  model-typed fields both leave in #350; what remains is the wire contract the admin console
-  decodes. The mapping was once #349's alone, but moving it without the fields — and without the
-  reverse `ToUser()`/`ToGroup()` methods the admin console's `apiclient` called at 32 sites — would
-  have left every exception row below standing, so the two are one issue.
+- `core/api` is declarations and nothing else. The model-aware `ToResponse` mapping left for
+  `authserver/internal/apimapping` in #350, the model-typed fields became DTOs of its own, and the
+  reverse `ToUser()`/`ToGroup()` methods the admin console's `apiclient` called at 32 sites are
+  gone; what remains is the wire contract the admin console decodes. The mapping was once #349's
+  alone, but moving it without the fields would have left every exception row below standing, so
+  the two were one issue.
 - `core/validators` is kernel on the second half of the membership test rather than the first. One
   of the two files it holds after #344 exports `ValidateNoAngleBrackets`, which fifteen sites in the
   auth server call and the admin console never does. It stays because it is a four-line wrapper over
@@ -179,14 +180,13 @@ of rows is the only measure of how much is left to do.
 
 | from | to | issue |
 |---|---|---|
-| `core/customerrors` | `core/models` | #350 |
 | `core/handlerhelpers` | `core/hashutil` | #360 |
 | `core/oauth` | `core/hashutil` | #360 |
 | `core/testutil/fake` | `core/uuidutil` | #360 |
 
-Four rows, and #350 owns one of them: the admin console names `core/models` from no production
-package now, the settings carrier having been the last of it, and what is left is the one field in
-`core/customerrors`.
+Three rows, all #360's. #350 owned ten of them and owns none now: `core/api` names `core/models`
+nowhere, the admin console names it from no production package, and `AuthCodeReusedError` took the
+last edge with it to `authserver/internal/protocolvalidation`.
 
 ## Foreign modules the admin console must not compile
 

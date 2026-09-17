@@ -21,6 +21,7 @@ import (
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 	mocks_protocolvalidation "github.com/leodip/goiabada/authserver/internal/protocolvalidation/mocks"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
 	mocks_handlerhelpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
@@ -126,7 +127,7 @@ func TestHandleTokenPost_WrappedDeregisteredRedirectUriStillAudits(t *testing.T)
 // SHOULD is discharged by. The wrapper is seen through by errors.As because AuthCodeReusedError now
 // unwraps to its Detail as well.
 func TestHandleTokenPost_WrappedAuthCodeReuseStillRevokes(t *testing.T) {
-	reuse := &customerrors.AuthCodeReusedError{
+	reuse := &protocolvalidation.AuthCodeReusedError{
 		Detail: customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant", "Code is invalid.",
 			http.StatusBadRequest),
 		Code: &models.Code{Id: 7, ClientId: 3, UserId: 11, SessionIdentifier: "sid-reused"},

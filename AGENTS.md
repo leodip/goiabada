@@ -23,6 +23,7 @@ repository root. It is enforced rather than descriptive: see **Architecture guar
 
 ### Core (`src/core/`)
 - `models/` - All domain models (Client, User, Permission, Group, etc.)
+- `api/` - The admin API wire contract: request and response DTOs, declarations only, importing no `models/`. The model-to-DTO mapping belongs to the auth server, in `internal/apimapping` (#350)
 - `data/` - Database interface + implementations (commondb/, mysqldb/, postgresdb/, sqlitedb/, mssqldb/)
 - `oauth/` - Shared OAuth/OIDC client surface: JWT/JWKS parsing, token exchange, PKCE, response_type parsing
 - `validators/` - Identifier and angle-bracket validation, the two both applications use. The authorize and token validators live in `authserver/internal/protocolvalidation`, and the account validators — email, password, profile, address, phone — in `authserver/internal/accountvalidation` (#344)
