@@ -30,7 +30,7 @@ import (
 //
 // The number is a policy and not a schema rule, and it is worth being plain about what it costs:
 // nothing limits how many groups a deployment defines, and a user can be put into more than a
-// thousand of them one at a time through PUT /api/v1/admin/groups/{id}/members. Such a user's
+// thousand of them one at a time through POST /api/v1/admin/groups/{id}/members. Such a user's
 // membership cannot then be replaced through this endpoint, because even re-sending the set they
 // already hold names more ids than this allows -- only a smaller set is accepted. That state is
 // reachable rather than impossible, and the cap is a deliberate refusal to serve it rather than an
