@@ -1,8 +1,6 @@
 package handlertest
 
 import (
-	"fmt"
-
 	"github.com/stretchr/testify/mock"
 
 	mocks_handler_helpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
@@ -57,11 +55,7 @@ func Bind(reporter testutil.Reporter, httpHelper *mocks_handler_helpers.HttpHelp
 		}
 	}
 	if !rendered {
-		message := "the handler rendered nothing"
-		if len(context) > 0 {
-			message += " " + fmt.Sprintf(context[0].(string), context[1:]...)
-		}
-		reporter.Fatalf("%s", message)
+		reporter.Fatalf("%s", withContext("the handler rendered nothing", context))
 	}
 	return bind
 }

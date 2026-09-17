@@ -3,23 +3,32 @@ package adminuserhandlers
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/core/api"
 	mocks_handler_helpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
+	"github.com/leodip/goiabada/core/oauth"
 )
 
-// userSessionsApiClient answers the two reads this page performs and nothing else.
+// userSessionsApiClient answers the two reads this page performs and the delete its row buttons
+// perform, and nothing else. Deletes are recorded rather than counted, so a case can say which
+// session was deleted and a case expecting none can say so by asserting the slice is empty.
 type userSessionsApiClient struct {
 	apiclient.ApiClient
-	user     *api.UserResponse
-	sessions []api.UserSessionDetailResponse
+	user        *api.UserResponse
+	sessions    []api.UserSessionDetailResponse
+	sessionsErr error
+
+	deleted []int64
 }
 
 func (c *userSessionsApiClient) GetUserById(accessToken string, userId int64) (*api.UserResponse, error) {
@@ -28,7 +37,12 @@ func (c *userSessionsApiClient) GetUserById(accessToken string, userId int64) (*
 
 func (c *userSessionsApiClient) GetUserSessionsByUserId(accessToken string,
 	userId int64) ([]api.UserSessionDetailResponse, error) {
-	return c.sessions, nil
+	return c.sessions, c.sessionsErr
+}
+
+func (c *userSessionsApiClient) DeleteUserSessionById(accessToken string, sessionId int64) error {
+	c.deleted = append(c.deleted, sessionId)
+	return nil
 }
 
 // The admin-side twin of the account page's case: this handler also rebuilds SessionInfo by hand,
@@ -130,4 +144,135 @@ func TestHandleAdminUserSessionsGet_BindsIsCurrentFromTheResponse(t *testing.T) 
 	assert.Equal(t, int64(2), sessions[0].UserSessionId)
 	assert.True(t, sessions[0].IsCurrent)
 	assert.False(t, sessions[1].IsCurrent)
+}
+
+// The admin-side twin of the account page's case, written here for the reason every case in this
+// trio is written three times: the comparison is made by hand in three files, and a case in two of
+// them cannot see the third going wrong. An administrator viewing their own user row can delete
+// their own session from this page, which is the outcome the answer below turns on (#373).
+func TestHandleAdminUserSessionsPost_TheAnswerFollowsIsCurrentOnTheRow(t *testing.T) {
+	const deleting = 5
+
+	testCases := []struct {
+		name string
+		// sid, when set, is the claim on the console's own parsed access token. Without it the
+		// request carries the bearer alone and no parsed token at all.
+		sid         string
+		sessions    []api.UserSessionDetailResponse
+		wantCurrent bool
+	}{
+		{
+			name: "the row being deleted is the caller's own",
+			sessions: []api.UserSessionDetailResponse{
+				{UserSessionResponse: api.UserSessionResponse{Id: deleting}, IsCurrent: true},
+				{UserSessionResponse: api.UserSessionResponse{Id: 6}},
+			},
+			wantCurrent: true,
+		},
+		{
+			name: "another row is the caller's own",
+			sessions: []api.UserSessionDetailResponse{
+				{UserSessionResponse: api.UserSessionResponse{Id: deleting}},
+				{UserSessionResponse: api.UserSessionResponse{Id: 6}, IsCurrent: true},
+			},
+		},
+		{
+			name: "no row is the caller's own, which is what a client credentials token produces",
+			sessions: []api.UserSessionDetailResponse{
+				{UserSessionResponse: api.UserSessionResponse{Id: deleting}},
+				{UserSessionResponse: api.UserSessionResponse{Id: 6}},
+			},
+		},
+		{
+			name: "the row's identifier matches the console's own claim and the field says no",
+			sid:  "sid-one",
+			sessions: []api.UserSessionDetailResponse{
+				{UserSessionResponse: api.UserSessionResponse{Id: deleting, SessionIdentifier: "sid-one"}},
+			},
+		},
+		{
+			name: "the field says yes and the console's own claim names another session",
+			sid:  "sid-elsewhere",
+			sessions: []api.UserSessionDetailResponse{
+				{UserSessionResponse: api.UserSessionResponse{Id: deleting, SessionIdentifier: "sid-one"},
+					IsCurrent: true},
+			},
+			wantCurrent: true,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			httpHelper := mocks_handler_helpers.NewHttpHelper(t)
+			handlertest.ExpectEncodeJson(httpHelper).Once()
+
+			apiClient := &userSessionsApiClient{
+				user:     &api.UserResponse{Id: 7},
+				sessions: testCase.sessions,
+			}
+
+			opts := []handlertest.Option{
+				handlertest.WithRouteParam("userId", "7"),
+				handlertest.WithBody(strings.NewReader(`{"userSessionId": 5}`)),
+			}
+			if testCase.sid == "" {
+				opts = append(opts, handlertest.WithAccessToken())
+			} else {
+				opts = append(opts, handlertest.WithJwtInfo(oauth.JwtInfo{
+					TokenResponse: oauth.TokenResponse{AccessToken: handlertest.AccessToken},
+					AccessToken:   &oauth.JwtToken{Claims: jwt.MapClaims{"sid": testCase.sid}},
+				}))
+			}
+
+			req := handlertest.Request(http.MethodPost, "/admin/users/7/sessions", opts...)
+
+			HandleAdminUserSessionsPost(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
+
+			answer := handlertest.Encoded(t, httpHelper)
+			assert.Equal(t, true, answer["Success"])
+
+			if testCase.wantCurrent {
+				assert.Equal(t, true, answer["IsCurrentSession"],
+					"the browser has to be sent through the logout flow")
+				assert.Empty(t, apiClient.deleted,
+					"the logout flow ends the session; deleting it here would end it twice")
+				return
+			}
+			assert.NotContains(t, answer, "IsCurrentSession",
+				"a row that is not the caller's own is deleted in place")
+			assert.Equal(t, []int64{deleting}, apiClient.deleted)
+		})
+	}
+}
+
+// The list read is what the answer above turns on, so a list this handler cannot read is answered
+// rather than swallowed. It swallowed the failure until #373, because the read was made only to
+// compare against a claim rather than to decide the answer.
+func TestHandleAdminUserSessionsPost_AListTheApiCannotReadStopsTheDelete(t *testing.T) {
+	httpHelper := mocks_handler_helpers.NewHttpHelper(t)
+	var captured error
+	httpHelper.On("JsonError", mock.Anything, mock.Anything, mock.Anything).
+		Run(func(args mock.Arguments) {
+			captured, _ = args.Get(2).(error)
+		}).Return().Once()
+
+	apiClient := &userSessionsApiClient{
+		user: &api.UserResponse{Id: 7},
+		sessionsErr: &apiclient.APIError{
+			Code: "INTERNAL_SERVER_ERROR", Message: "the database is on fire",
+			StatusCode: http.StatusInternalServerError,
+		},
+	}
+
+	req := handlertest.Request(http.MethodPost, "/admin/users/7/sessions",
+		handlertest.WithAccessToken(),
+		handlertest.WithRouteParam("userId", "7"),
+		handlertest.WithBody(strings.NewReader(`{"userSessionId": 5}`)),
+	)
+
+	HandleAdminUserSessionsPost(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
+
+	httpHelper.AssertExpectations(t)
+	require.NotNil(t, captured, "the handler answered nothing")
+	assert.Empty(t, apiClient.deleted, "nothing may be deleted on an answer the handler cannot make")
 }

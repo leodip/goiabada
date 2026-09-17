@@ -161,3 +161,80 @@ func TestBind_StopsTheTestWhenTheHandlerRenderedNothing(t *testing.T) {
 	assert.True(t, report.Stopped, "a bind read with nothing rendered must end the test")
 	assert.Contains(t, report.Fatal, "rendered nothing")
 }
+
+// The AJAX half of the case above, and unbounded for the same reason.
+func TestExpectEncodeJson_AdmitsTheCallAndIsLeftUnbounded(t *testing.T) {
+	httpHelper := mocks_handler_helpers.NewHttpHelper(t)
+	call := ExpectEncodeJson(httpHelper)
+
+	assert.Equal(t, "EncodeJson", call.Method)
+	assert.Equal(t, 0, call.Repeatability, "ExpectEncodeJson must not bound the call itself")
+
+	httpHelper.EncodeJson(httptest.NewRecorder(), Request(http.MethodPost, "/account/sessions"),
+		struct{ Success bool }{Success: true})
+}
+
+// Two things at once: the last answer is the one returned, and it arrives marshalled, so a field
+// the handler left off its struct is absent from the map rather than present and false.
+func TestEncoded_ReturnsTheLastAnswerAsTheBrowserReadsIt(t *testing.T) {
+	httpHelper := mocks_handler_helpers.NewHttpHelper(t)
+	ExpectEncodeJson(httpHelper).Twice()
+
+	req := Request(http.MethodPost, "/account/sessions")
+	httpHelper.EncodeJson(httptest.NewRecorder(), req, struct {
+		Success          bool
+		IsCurrentSession bool
+	}{Success: false, IsCurrentSession: true})
+	httpHelper.EncodeJson(httptest.NewRecorder(), req, struct{ Success bool }{Success: true})
+
+	answer := Encoded(t, httpHelper)
+
+	assert.Equal(t, true, answer["Success"])
+	assert.NotContains(t, answer, "IsCurrentSession",
+		"the last answer carried no such field, so the map must not either")
+}
+
+func TestEncoded_StopsTheTestWhenTheHandlerAnsweredNothing(t *testing.T) {
+	httpHelper := mocks_handler_helpers.NewHttpHelper(t)
+
+	report := testutil.RunGuard(func(reporter testutil.Reporter) {
+		Encoded(reporter, httpHelper)
+	})
+
+	assert.True(t, report.Stopped, "an answer read with nothing encoded must end the test")
+	assert.Contains(t, report.Fatal, "encoded nothing")
+}
+
+// A value encoding/json cannot represent ends the test naming that, rather than returning an empty
+// map a case would then assert against and pass.
+func TestEncoded_StopsTheTestWhenTheAnswerDoesNotMarshal(t *testing.T) {
+	httpHelper := mocks_handler_helpers.NewHttpHelper(t)
+	ExpectEncodeJson(httpHelper).Once()
+
+	httpHelper.EncodeJson(httptest.NewRecorder(), Request(http.MethodPost, "/account/sessions"),
+		struct{ Ch chan int }{Ch: make(chan int)})
+
+	report := testutil.RunGuard(func(reporter testutil.Reporter) {
+		Encoded(reporter, httpHelper)
+	})
+
+	assert.True(t, report.Stopped, "an answer that does not marshal must end the test")
+	assert.Contains(t, report.Fatal, "does not marshal")
+}
+
+// A handler that answers a bare array or a string is not one of these, and the failure says so
+// rather than reporting a nil map the caller would index into.
+func TestEncoded_StopsTheTestWhenTheAnswerIsNotAnObject(t *testing.T) {
+	httpHelper := mocks_handler_helpers.NewHttpHelper(t)
+	ExpectEncodeJson(httpHelper).Once()
+
+	httpHelper.EncodeJson(httptest.NewRecorder(), Request(http.MethodPost, "/account/sessions"),
+		[]int{1, 2, 3})
+
+	report := testutil.RunGuard(func(reporter testutil.Reporter) {
+		Encoded(reporter, httpHelper)
+	})
+
+	assert.True(t, report.Stopped, "an answer that is not an object must end the test")
+	assert.Contains(t, report.Fatal, "not a JSON object")
+}

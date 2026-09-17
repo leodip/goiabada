@@ -155,23 +155,23 @@ func HandleAdminClientUserSessionsPost(
 			return
 		}
 
-		// Check if we're deleting the current session
-		currentSessionIdentifier := ""
-		if jwtInfo.AccessToken != nil {
-			currentSessionIdentifier = jwtInfo.AccessToken.GetStringClaim("sid")
+		// Whether the row being deleted is the caller's own is a field on that row. The auth
+		// server computes isCurrent from the sid claim of the very token this request forwards,
+		// so this is the same comparison the console used to make for itself, now made once and
+		// in one place (#373).
+		//
+		// The page this request comes from is the first 50 rows, so the same page is read back.
+		clientSessions, err := apiClient.GetClientSessionsByClientId(jwtInfo.TokenResponse.AccessToken, clientResp.Id, 1, 50)
+		if err != nil {
+			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
+			return
 		}
 
 		isDeletingCurrentSession := false
-		if currentSessionIdentifier != "" {
-			// Fetch sessions for this client to check if the session being deleted is the current one
-			clientSessions, err := apiClient.GetClientSessionsByClientId(jwtInfo.TokenResponse.AccessToken, clientResp.Id, 1, 50)
-			if err == nil {
-				for _, es := range clientSessions.Sessions {
-					if es.Id == int64(userSessionId) && es.SessionIdentifier == currentSessionIdentifier {
-						isDeletingCurrentSession = true
-						break
-					}
-				}
+		for _, es := range clientSessions.Sessions {
+			if es.Id == int64(userSessionId) && es.IsCurrent {
+				isDeletingCurrentSession = true
+				break
 			}
 		}
 
