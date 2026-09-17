@@ -20,6 +20,25 @@
 "common.field.password_confirmation" = "Password confirmation"
 "common.link.click_here" = "click here"
 
+# --- Dates and durations -----------------------------------------------------
+#
+# The layout is a Go reference-time layout, translatable because Go formats
+# month names in English under every locale. Translate the field order and the
+# clock (12- or 24-hour); keep the reference numbers exactly — 01 month,
+# 02 day, 2006 year, 03 or 15 hour, 04 minute — or no date will format. Each
+# "since" value carries the whole phrase, so the count sits where the language
+# puts it.
+"common.datetime.layout" = "01/02/2006 3:04 PM"
+"common.since.just_now" = "just now"
+"common.since.second.one" = "{{.count}} second ago"
+"common.since.second.other" = "{{.count}} seconds ago"
+"common.since.minute.one" = "{{.count}} minute ago"
+"common.since.minute.other" = "{{.count}} minutes ago"
+"common.since.hour.one" = "{{.count}} hour ago"
+"common.since.hour.other" = "{{.count}} hours ago"
+"common.since.day.one" = "{{.count}} day ago"
+"common.since.day.other" = "{{.count}} days ago"
+
 # --- Login page (auth/pwd) ---------------------------------------------------
 
 "auth.pwd.page_title" = "Password authentication"

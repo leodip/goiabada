@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/i18n"
@@ -96,6 +97,21 @@ var templateFuncMap = template.FuncMap{
 	// attribute, so the document advertises the language it actually renders
 	// in (screen readers, hyphenation, translation tools). Falls back to "en".
 	"Lang": func(ctx context.Context) string { return i18n.LocaleTag(ctx) },
+
+	// DateTime renders an instant as an absolute date and time in the active
+	// locale's numeric layout, which lives in the catalog because Go's
+	// time.Format has no locale of its own. Takes *time.Time and renders ""
+	// for nil, so a template can bind a nullable column straight into a cell
+	// (#373).
+	"DateTime": func(ctx context.Context, t *time.Time) string {
+		return i18n.FormatDateTime(ctx, t)
+	},
+	// Since renders how long ago an instant was, as one translated phrase
+	// rather than a Go duration with a translated suffix after it. It supplies
+	// the clock, so a template reads {{ Since $.ctx .Started }} (#373).
+	"Since": func(ctx context.Context, t *time.Time) string {
+		return i18n.FormatSince(ctx, t, time.Now().UTC())
+	},
 
 	// RefCountry / RefPhoneCountry / RefTimezone resolve a country code,
 	// phone country, or IANA zone to its localized label. Country names come

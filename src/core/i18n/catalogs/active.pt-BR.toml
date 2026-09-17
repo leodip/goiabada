@@ -18,6 +18,25 @@
 "common.field.password_confirmation" = "Confirmação da senha"
 "common.link.click_here" = "clique aqui"
 
+# --- Datas e durações --------------------------------------------------------
+#
+# O layout é um layout de referência do Go, traduzível porque o Go formata os
+# nomes de mês em inglês em qualquer idioma. Traduza a ordem dos campos e o
+# relógio (12 ou 24 horas); mantenha os números de referência exatamente —
+# 01 mês, 02 dia, 2006 ano, 03 ou 15 hora, 04 minuto — ou nenhuma data será
+# formatada. Cada valor "since" carrega a frase inteira, então a contagem fica
+# onde o idioma a coloca.
+"common.datetime.layout" = "02/01/2006 15:04"
+"common.since.just_now" = "agora mesmo"
+"common.since.second.one" = "há {{.count}} segundo"
+"common.since.second.other" = "há {{.count}} segundos"
+"common.since.minute.one" = "há {{.count}} minuto"
+"common.since.minute.other" = "há {{.count}} minutos"
+"common.since.hour.one" = "há {{.count}} hora"
+"common.since.hour.other" = "há {{.count}} horas"
+"common.since.day.one" = "há {{.count}} dia"
+"common.since.day.other" = "há {{.count}} dias"
+
 # --- Tela de login (auth/pwd) ------------------------------------------------
 
 "auth.pwd.page_title" = "Autenticação por senha"
