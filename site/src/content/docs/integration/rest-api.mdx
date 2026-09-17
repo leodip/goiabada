@@ -1542,7 +1542,7 @@ DELETE /api/v1/account/consents/{id}
 GET /api/v1/account/sessions
 ```
 
-Returns the caller's active sessions with their device, IP address and the identifiers of the clients they authorized, so an expired session is not in the list. Every session endpoint marks the session the calling token was issued through with `isCurrent`, which is `false` throughout for a token carrying no `sid` claim, such as one obtained through the client credentials grant.
+Returns the caller's active sessions with their device, IP address and the identifiers of the clients they authorized, so an expired session is not in the list. The account, user and client session list endpoints mark the session the calling token was issued through with `isCurrent`, which is `false` throughout for a token carrying no `sid` claim, such as one obtained through the client credentials grant.
 
 #### Terminate session
 

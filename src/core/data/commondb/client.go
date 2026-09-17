@@ -300,11 +300,53 @@ func (d *CommonDatabase) ClientLoadWebOrigins(tx *sql.Tx, client *models.Client)
 	return nil
 }
 
+// maxIdsPerStatement bounds how many ids one id-list lookup puts into a single statement. Every
+// id in an IN list is a bound parameter, and SQL Server refuses a statement carrying more than
+// 2,100 of them with error 8003, which is the lowest ceiling of the four supported engines:
+// modernc.org/sqlite allows 32,766, PostgreSQL 65,535, and MySQL bounds the statement's size
+// rather than its parameter count. Without a bound, a caller holding more ids than one statement
+// can carry gets an error rather than its rows, which reached the three session list endpoints as
+// an HTTP 500 on a request that was entirely valid (#373).
+//
+// Only GetClientsByIds is bounded by this today. The other id-list lookups in this package still
+// send whatever they are given, which is the same defect wherever the list is unbounded (#373).
+//
+// ceiling: one budget for all four engines rather than each engine's own, so a list of 1,001 to
+// 2,100 ids costs two statements on the three engines that would have taken it in one, and a list
+// read in several statements is no longer one snapshot -- a client deleted between two of them is
+// absent from the result, which is what the same delete already does between loading a session
+// and loading its clients. Revisit when a deployment is measured spending real time on the extra
+// round trip; a per-flavor budget is the next shape, and it owes a data tier case per engine.
+const maxIdsPerStatement = 1000
+
 func (d *CommonDatabase) GetClientsByIds(tx *sql.Tx, clientIds []int64) ([]models.Client, error) {
 
 	if len(clientIds) == 0 {
 		return []models.Client{}, nil
 	}
+
+	clients := make([]models.Client, 0, len(clientIds))
+	for start := 0; start < len(clientIds); start += maxIdsPerStatement {
+		end := start + maxIdsPerStatement
+		if end > len(clientIds) {
+			end = len(clientIds)
+		}
+
+		batch, err := d.getClientsByIdsInOneStatement(tx, clientIds[start:end])
+		if err != nil {
+			return nil, err
+		}
+
+		clients = append(clients, batch...)
+	}
+
+	return clients, nil
+}
+
+// getClientsByIdsInOneStatement reads one batch, and holds the rows open only for that batch:
+// the close is deferred here rather than in the loop above, so each statement's rows are
+// released before the next one is issued.
+func (d *CommonDatabase) getClientsByIdsInOneStatement(tx *sql.Tx, clientIds []int64) ([]models.Client, error) {
 
 	clientStruct := sqlbuilder.NewStruct(new(models.Client)).
 		For(d.Flavor)

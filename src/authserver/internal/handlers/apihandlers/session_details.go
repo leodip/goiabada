@@ -57,10 +57,14 @@ func buildSessionDetails(
 }
 
 // loadSessionClients fills in the Client on every UserSessionClient of every session given, in
-// one query. It is UserSessionClientsLoadClients hoisted out of the per-session loop, and it
+// one lookup. It is UserSessionClientsLoadClients hoisted out of the per-session loop, and it
 // keeps that method's refusal of an id with no row: a session naming a client that does not
 // exist is a broken row rather than a session with one fewer client, and answering 200 with the
 // client silently missing would hide it.
+//
+// The union it hands over is bounded by the deployment's client count and by nothing else, so
+// GetClientsByIds is the one that decides how many ids a single statement may bind; an id list
+// longer than that is read in several statements there rather than refused by the engine (#373).
 func loadSessionClients(database data.Database, sessions []models.UserSession) error {
 	clientIds := make([]int64, 0)
 	seen := make(map[int64]bool)
