@@ -704,6 +704,85 @@ func TestGetClientsByIds(t *testing.T) {
 	}
 }
 
+// TestGetClientsByIds_MoreIdsThanOneStatementCanCarry asks for more ids than a single statement
+// can bind. Every id in an IN list is a bound parameter and SQL Server refuses a statement
+// carrying more than 2,100 of them with error 8003, the lowest ceiling of the four engines, so
+// an unbounded list answered a valid request with an error instead of its rows. The method reads
+// long lists in several statements now, and this is the case that says so on every engine (#373).
+//
+// The two lengths are chosen: 2,101 is one past SQL Server's ceiling, and 2,000 is an exact
+// multiple of the batch size, where an off-by-one in the loop bounds drops the final batch
+// instead of failing loudly. The real ids sit in different batches in both, including the last
+// slot, so a batch that is never issued loses a client the assertions are counting.
+func TestGetClientsByIds_MoreIdsThanOneStatementCanCarry(t *testing.T) {
+	realIds := make([]int64, 3)
+	for i := 0; i < 3; i++ {
+		random := fake.LetterN(6)
+		client := models.Client{
+			ClientIdentifier:                        "test_client_" + random,
+			ClientSecretEncrypted:                   []byte("encrypted_secret_" + random),
+			Description:                             "Test Client Description " + random,
+			Enabled:                                 true,
+			TokenExpirationInSeconds:                3600,
+			RefreshTokenOfflineIdleTimeoutInSeconds: 86400,
+			RefreshTokenOfflineMaxLifetimeInSeconds: 2592000,
+			IncludeOpenIDConnectClaimsInAccessToken: enums.ThreeStateSettingDefault.String(),
+			DefaultAcrLevel:                         enums.AcrLevel1,
+		}
+		if err := database.CreateClient(nil, &client); err != nil {
+			t.Fatalf("Failed to create test client %d: %v", i, err)
+		}
+		realIds[i] = client.Id
+	}
+
+	// Ids no row can hold: client ids are assigned by the engine from one, so a billion up is
+	// free, and padding with distinct values is what makes the parameter count the real one.
+	const paddingBase = int64(1_000_000_000)
+
+	testCases := []struct {
+		name      string
+		total     int
+		positions []int
+	}{
+		{name: "one past SQL Server's 2,100 parameter ceiling", total: 2101, positions: []int{0, 1500, 2100}},
+		{name: "an exact multiple of the batch size", total: 2000, positions: []int{0, 999, 1999}},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			ids := make([]int64, testCase.total)
+			for i := range ids {
+				ids[i] = paddingBase + int64(i)
+			}
+			for i, position := range testCase.positions {
+				ids[position] = realIds[i]
+			}
+
+			clients, err := database.GetClientsByIds(nil, ids)
+			if err != nil {
+				t.Fatalf("Failed to retrieve %d clients by ids: %v", testCase.total, err)
+			}
+
+			if len(clients) != len(realIds) {
+				t.Errorf("Expected %d clients, got %d", len(realIds), len(clients))
+			}
+
+			for _, realId := range realIds {
+				found := false
+				for _, client := range clients {
+					if client.Id == realId {
+						found = true
+						break
+					}
+				}
+				if !found {
+					t.Errorf("Client with ID %d not found in retrieved clients", realId)
+				}
+			}
+		})
+	}
+}
+
 func TestClientLoadPermissions(t *testing.T) {
 	random := fake.LetterN(6)
 	client := &models.Client{
