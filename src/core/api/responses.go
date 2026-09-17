@@ -406,6 +406,33 @@ type GetUserSessionsResponse struct {
 	Sessions []UserSessionDetailResponse `json:"sessions"`
 }
 
+// SessionOwnerResponse is who a listed session belongs to, in the two things a session page
+// shows: the name parts and the email. Deliberately not UserResponse, because this shape is
+// only ever returned by the client-sessions endpoint, which is reached with the clients scopes
+// alone -- admin-read, manage-clients or manage -- and the documented scope split does not put
+// a person's profile inside the clients domain. Widening it back would let a manage-clients
+// token read the subject, birth date, phone number, postal address and otpEnabled of everyone
+// holding a live session on a client it manages (#373).
+type SessionOwnerResponse struct {
+	Id         int64  `json:"id"`
+	Email      string `json:"email"`
+	GivenName  string `json:"givenName"`
+	MiddleName string `json:"middleName"`
+	FamilyName string `json:"familyName"`
+}
+
+// GetClientSessionsResponse carries the owners of the sessions it lists, because that endpoint
+// is the only one listing sessions across users and the console read them back one at a time,
+// up to one HTTP round trip per row. Normalized: a user holding several sessions appears once,
+// and every session's userId is a key into this array (#373).
+//
+// Both arrays are required and neither is nullable, so a producer answering an empty page emits
+// [] rather than null; a nil slice would marshal as null against a schema that promises an array.
+type GetClientSessionsResponse struct {
+	Sessions []UserSessionDetailResponse `json:"sessions"`
+	Users    []SessionOwnerResponse      `json:"users"`
+}
+
 type CreateGroupResponse struct {
 	Group GroupResponse `json:"group"`
 }

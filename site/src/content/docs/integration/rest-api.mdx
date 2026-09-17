@@ -1006,6 +1006,8 @@ PUT /api/v1/admin/clients/{id}/permissions
 GET /api/v1/admin/clients/{id}/sessions?page=1&size=10
 ```
 
+Returns the client's active sessions alongside a normalized `users` array holding the name and email of each owner, so a session's `userId` is resolved from the same response rather than read back one user at a time.
+
 #### Client logo
 
 ##### Get client logo status

@@ -49,6 +49,17 @@ func decodeSessionList(t *testing.T, rr *httptest.ResponseRecorder) []api.UserSe
 	return out.Sessions
 }
 
+// expectSessionOwnerRead registers the one extra read the client endpoint makes: the owners of
+// the sessions it kept, in a single GetUsersByIds. Only that endpoint has it, because only that
+// one lists sessions across users.
+func expectSessionOwnerRead(database *mocks_data.Database, users ...models.User) {
+	byId := make(map[int64]models.User, len(users))
+	for _, user := range users {
+		byId[user.Id] = user
+	}
+	database.On("GetUsersByIds", (*sql.Tx)(nil), mock.Anything).Return(byId, nil).Once()
+}
+
 // expectSessionListReads registers the reads every list handler makes once it has its sessions:
 // the per-session client rows are already on the fixtures, so UserSessionsLoadClients is a no-op
 // here and GetClientsByIds is the one query buildSessionDetails runs.
@@ -121,6 +132,7 @@ func TestHandleAPIClientSessionsGet_ReadsTheCallersSidAndFilters(t *testing.T) {
 	database.On("GetUserSessionsByClientIdPaginated", (*sql.Tx)(nil), int64(7), 1, 50).
 		Return(sessions, len(sessions), nil).Once()
 	expectSessionListReads(database, sessions)
+	expectSessionOwnerRead(database, models.User{Id: 42, Email: "someone@example.com"})
 
 	req := sessionListRequest("/api/v1/admin/clients/7/sessions", "sid-mine", nil)
 	req = setChiURLParam(req, "id", "7")

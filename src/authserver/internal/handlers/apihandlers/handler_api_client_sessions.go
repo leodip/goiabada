@@ -5,17 +5,23 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
 )
 
 // HandleAPIClientSessionsGet - GET /api/v1/admin/clients/{id}/sessions
-// Returns a paginated list of user sessions associated with a client.
-// Defaults: page=1, size=50. Caps size to 100. Lists only sessions still active under the
-// current settings; an expired one is omitted rather than reported (#373 decision 2).
+// Returns a paginated list of user sessions associated with a client, and the people they
+// belong to. Defaults: page=1, size=50. Caps size to 100. Lists only sessions still active
+// under the current settings; an expired one is omitted rather than reported (#373 decision 2).
+//
+// This is the one session list spanning users, so the console could not name a session's owner
+// without reading each one back: it fetched a user per row, up to 50 HTTP round trips to render
+// one page. The owners ride along in a normalized users array instead (#373 decision 9).
 func HandleAPIClientSessionsGet(
 	database data.Database,
 ) http.HandlerFunc {
@@ -91,10 +97,60 @@ func HandleAPIClientSessionsGet(
 			return
 		}
 
-		response := api.GetUserSessionsResponse{
+		users, err := sessionOwners(database, sessions)
+		if err != nil {
+			writeInternalServerError(w, r, err)
+			return
+		}
+
+		response := api.GetClientSessionsResponse{
 			Sessions: sessions,
+			Users:    users,
 		}
 
 		writeJSON(w, r, http.StatusOK, response)
 	}
+}
+
+// sessionOwners resolves the people the given sessions belong to, in one query, and answers a
+// normalized array: a user holding several sessions appears once. The order is the order the
+// sessions first name each id rather than the map's, because a map's iteration order is random
+// and the response is something a wire-bytes case has to be able to write down.
+//
+// Never nil: the schema declares users a required array, and a nil slice marshals to null, which
+// is not an empty array to anything reading the document -- the same invariant the mapper keeps
+// for clientIdentifiers.
+//
+// A session naming a user with no row is refused rather than answered with the owner silently
+// missing, for the reason loadSessionClients refuses a client id with no row: user_sessions.user_id
+// is a non-null foreign key, so an unresolvable one is a broken row and a page rendering a blank
+// email in its place would hide it.
+func sessionOwners(database data.Database, sessions []api.UserSessionDetailResponse) ([]api.SessionOwnerResponse, error) {
+	userIds := make([]int64, 0, len(sessions))
+	seen := make(map[int64]bool, len(sessions))
+	for _, session := range sessions {
+		if !seen[session.UserId] {
+			seen[session.UserId] = true
+			userIds = append(userIds, session.UserId)
+		}
+	}
+	if len(userIds) == 0 {
+		return []api.SessionOwnerResponse{}, nil
+	}
+
+	usersById, err := database.GetUsersByIds(nil, userIds)
+	if err != nil {
+		return nil, errs.Wrap(err, "unable to get users by ids")
+	}
+
+	ordered := make([]models.User, 0, len(userIds))
+	for _, userId := range userIds {
+		user, ok := usersById[userId]
+		if !ok {
+			return nil, errs.Errorf("user with id %d not found", userId)
+		}
+		ordered = append(ordered, user)
+	}
+
+	return apimapping.ToSessionOwnerResponses(ordered), nil
 }

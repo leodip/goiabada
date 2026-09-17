@@ -9,6 +9,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
+	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
@@ -51,22 +52,23 @@ func HandleAdminClientUserSessionsGet(
 		}
 
 		// Get the first 50 sessions (server filters invalid)
-		sessions, err := apiClient.GetClientSessionsByClientId(jwtInfo.TokenResponse.AccessToken, clientResp.Id, 1, 50)
+		clientSessions, err := apiClient.GetClientSessionsByClientId(jwtInfo.TokenResponse.AccessToken, clientResp.Id, 1, 50)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 
+		// The owners arrive with the sessions, so this page no longer reads a user per row: at a
+		// full page that was 50 HTTP round trips to fill two columns (#373 decision 9).
+		owners := make(map[int64]api.SessionOwnerResponse, len(clientSessions.Users))
+		for _, owner := range clientSessions.Users {
+			owners[owner.Id] = owner
+		}
+
 		// IsCurrent comes from the response; this page no longer recomputes it from the sid on
 		// the console's own access token, which is the claim the auth server now reads (#373).
 		sessionInfoArr := []SessionInfo{}
-		for _, es := range sessions {
-			// N+1: fetch user for email/full name
-			user, err := apiClient.GetUserById(jwtInfo.TokenResponse.AccessToken, es.UserId)
-			if err != nil {
-				handlers.HandleAPIError(httpHelper, w, r, err)
-				return
-			}
+		for _, es := range clientSessions.Sessions {
 			usi := SessionInfo{
 				UserSessionId: es.Id,
 				IsCurrent:     es.IsCurrent,
@@ -82,9 +84,9 @@ func HandleAdminClientUserSessionsGet(
 				UserAgent:     es.UserAgent,
 				Clients:       es.ClientIdentifiers,
 			}
-			if user != nil {
-				usi.UserEmail = user.Email
-				usi.UserFullName = handlers.UserFullName(user)
+			if owner, ok := owners[es.UserId]; ok {
+				usi.UserEmail = owner.Email
+				usi.UserFullName = handlers.SessionOwnerFullName(&owner)
 			}
 			sessionInfoArr = append(sessionInfoArr, usi)
 		}
@@ -162,9 +164,9 @@ func HandleAdminClientUserSessionsPost(
 		isDeletingCurrentSession := false
 		if currentSessionIdentifier != "" {
 			// Fetch sessions for this client to check if the session being deleted is the current one
-			enhancedSessions, err := apiClient.GetClientSessionsByClientId(jwtInfo.TokenResponse.AccessToken, clientResp.Id, 1, 50)
+			clientSessions, err := apiClient.GetClientSessionsByClientId(jwtInfo.TokenResponse.AccessToken, clientResp.Id, 1, 50)
 			if err == nil {
-				for _, es := range enhancedSessions {
+				for _, es := range clientSessions.Sessions {
 					if es.Id == int64(userSessionId) && es.SessionIdentifier == currentSessionIdentifier {
 						isDeletingCurrentSession = true
 						break

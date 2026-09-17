@@ -83,7 +83,10 @@ func (c *AuthServerClient) DeleteUserSessionById(accessToken string, sessionId i
 	return nil
 }
 
-func (c *AuthServerClient) GetClientSessionsByClientId(accessToken string, clientId int64, page, size int) ([]api.UserSessionDetailResponse, error) {
+// GetClientSessionsByClientId answers the whole envelope rather than the sessions alone: this
+// endpoint is the only one listing sessions across users, and it returns their owners so the
+// caller does not read them back one at a time (#373).
+func (c *AuthServerClient) GetClientSessionsByClientId(accessToken string, clientId int64, page, size int) (*api.GetClientSessionsResponse, error) {
 	// Build URL with pagination params
 	fullURL := c.baseURL + "/api/v1/admin/clients/" + strconv.FormatInt(clientId, 10) + "/sessions"
 	// simple defaulting at caller, but include if provided
@@ -123,12 +126,12 @@ func (c *AuthServerClient) GetClientSessionsByClientId(accessToken string, clien
 		return nil, parseAPIError(resp, respBody)
 	}
 
-	var response api.GetUserSessionsResponse
+	var response api.GetClientSessionsResponse
 	if err := json.Unmarshal(respBody, &response); err != nil {
 		return nil, errs.Errorf("failed to decode response: %w", err)
 	}
 
-	return response.Sessions, nil
+	return &response, nil
 }
 
 func (c *AuthServerClient) GetAccountSessions(accessToken string) ([]api.UserSessionDetailResponse, error) {
