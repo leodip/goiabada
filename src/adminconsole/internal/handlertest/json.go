@@ -60,6 +60,13 @@ func Encoded(reporter testutil.Reporter, httpHelper *mocks_handler_helpers.HttpH
 		reporter.Fatalf("%s", withContext(fmt.Sprintf("the answer is not a JSON object: %v", err), context))
 		return nil
 	}
+	// A JSON null unmarshals into a map without an error and leaves it nil, so it reaches here as
+	// an object with no keys rather than as the absence it is. Left alone, a case asserting only
+	// that a field is absent would pass against a handler that answered nothing at all.
+	if decoded == nil {
+		reporter.Fatalf("%s", withContext("the answer is JSON null rather than an object", context))
+		return nil
+	}
 	return decoded
 }
 

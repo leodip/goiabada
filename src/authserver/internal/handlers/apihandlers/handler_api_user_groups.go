@@ -27,6 +27,15 @@ import (
 //
 // This bounds one array, not the request. How large a body the server reads before anything looks
 // at it is #205's axis and wants one answer for every endpoint rather than one for this one.
+//
+// The number is a policy and not a schema rule, and it is worth being plain about what it costs:
+// nothing limits how many groups a deployment defines, and a user can be put into more than a
+// thousand of them one at a time through PUT /api/v1/admin/groups/{id}/members. Such a user's
+// membership cannot then be replaced through this endpoint, because even re-sending the set they
+// already hold names more ids than this allows -- only a smaller set is accepted. That state is
+// reachable rather than impossible, and the cap is a deliberate refusal to serve it rather than an
+// oversight; it is published as maxItems on UpdateUserGroupsRequest so a caller meets it in the
+// contract rather than at runtime.
 const maxGroupIdsPerRequest = 1000
 
 func HandleAPIUserGroupsGet(

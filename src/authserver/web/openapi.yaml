@@ -4032,6 +4032,12 @@ components:
       properties:
         groupIds:
           type: array
+          maxItems: 1000
+          description: >-
+            The complete set of groups the user belongs to after the call. An array naming more
+            than 1000 groups is refused with VALIDATION_ERROR before any of them is read back,
+            because every id is validated against the database and the list is read in
+            statement-sized batches.
           items:
             type: integer
             format: int64

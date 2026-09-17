@@ -222,6 +222,24 @@ func TestEncoded_StopsTheTestWhenTheAnswerDoesNotMarshal(t *testing.T) {
 	assert.Contains(t, report.Fatal, "does not marshal")
 }
 
+// JSON null unmarshals into a map without an error and leaves it nil, so it arrives as an object
+// with no keys unless the helper says otherwise. It is the one answer that reaches the map branch
+// and is not a map, and a case asserting only that a field is absent would pass against a handler
+// that answered nothing at all.
+func TestEncoded_StopsTheTestWhenTheAnswerIsNull(t *testing.T) {
+	httpHelper := mocks_handler_helpers.NewHttpHelper(t)
+	ExpectEncodeJson(httpHelper).Once()
+
+	httpHelper.EncodeJson(httptest.NewRecorder(), Request(http.MethodPost, "/account/sessions"), nil)
+
+	report := testutil.RunGuard(func(reporter testutil.Reporter) {
+		Encoded(reporter, httpHelper)
+	})
+
+	require.True(t, report.Stopped, "a null answer must end the test rather than read as an empty object")
+	assert.Contains(t, report.Fatal, "JSON null")
+}
+
 // A handler that answers a bare array or a string is not one of these, and the failure says so
 // rather than reporting a nil map the caller would index into.
 func TestEncoded_StopsTheTestWhenTheAnswerIsNotAnObject(t *testing.T) {
