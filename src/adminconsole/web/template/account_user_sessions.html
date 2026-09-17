@@ -100,8 +100,8 @@
                             </ul>
                         </td>
                         <td>{{.IpAddress}}</td>
-                        <td>{{.StartedAt}}<br />{{.DurationSinceStarted}}{{ T $.ctx "adminconsole.account.sessions.duration_ago_suffix" }}</td>
-                        <td>{{.LastAcessedAt}}<br />{{.DurationSinceLastAccessed}}{{ T $.ctx "adminconsole.account.sessions.duration_ago_suffix" }}</td>
+                        <td>{{ DateTime $.ctx .Started }}<br />{{ Since $.ctx .Started }}</td>
+                        <td>{{ DateTime $.ctx .LastAccessed }}<br />{{ Since $.ctx .LastAccessed }}</td>
                         <td>
                             <div class="text-right">
                                 <span id="loadingIcon{{.UserSessionId}}" class="hidden w-5 h-5 mr-2 align-middle text-primary">&nbsp;</span>

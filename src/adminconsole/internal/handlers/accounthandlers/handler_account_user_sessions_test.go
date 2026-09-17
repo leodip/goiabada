@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -60,4 +61,34 @@ func TestHandleAccountSessionsGet_BindsTheRawUserAgent(t *testing.T) {
 
 	assert.Equal(t, int64(1), sessions[1].UserSessionId)
 	assert.Equal(t, header, sessions[1].UserAgent)
+}
+
+// The page formats the two timestamps itself now, which it can only do if the handler hands it the
+// instants. rendertest renders a bind the test wrote, so without this case a handler that dropped
+// the copy would leave both cells empty on a live page with every render case still green (#373).
+func TestHandleAccountSessionsGet_BindsTheSessionInstants(t *testing.T) {
+	started := time.Date(2026, 9, 14, 21, 3, 0, 0, time.UTC)
+	lastAccessed := time.Date(2026, 9, 17, 8, 45, 0, 0, time.UTC)
+
+	httpHelper := mocks_handler_helpers.NewHttpHelper(t)
+	handlertest.RefuseInternalServerError(t, httpHelper)
+	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/account_user_sessions.html").Maybe()
+
+	apiClient := &accountSessionsApiClient{
+		sessions: []api.EnhancedUserSessionResponse{
+			{Id: 1, Started: &started, LastAccessed: &lastAccessed},
+		},
+	}
+
+	req := handlertest.Request(http.MethodGet, "/account/sessions", handlertest.WithAccessToken())
+
+	HandleAccountSessionsGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
+
+	sessions, ok := handlertest.Bind(t, httpHelper)["sessions"].([]SessionInfo)
+	require.True(t, ok, "the bind carries no []SessionInfo")
+	require.Len(t, sessions, 1)
+	require.NotNil(t, sessions[0].Started)
+	require.NotNil(t, sessions[0].LastAccessed)
+	assert.Equal(t, started, *sessions[0].Started)
+	assert.Equal(t, lastAccessed, *sessions[0].LastAccessed)
 }

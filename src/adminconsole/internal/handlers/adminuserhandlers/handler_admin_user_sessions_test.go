@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -60,4 +61,38 @@ func TestHandleAdminUserSessionsGet_BindsTheRawUserAgent(t *testing.T) {
 	require.True(t, ok, "the bind carries no []SessionInfo")
 	require.Len(t, sessions, 1)
 	assert.Equal(t, header, sessions[0].UserAgent)
+}
+
+// The admin-side twin of the account page's instants case, for the same reason the user-agent case
+// is written three times: this is the second of three hand-built SessionInfo literals, and a copy
+// dropped from one of them is invisible to every render case (#373).
+func TestHandleAdminUserSessionsGet_BindsTheSessionInstants(t *testing.T) {
+	started := time.Date(2026, 9, 14, 21, 3, 0, 0, time.UTC)
+	lastAccessed := time.Date(2026, 9, 17, 8, 45, 0, 0, time.UTC)
+
+	httpHelper := mocks_handler_helpers.NewHttpHelper(t)
+	handlertest.RefuseInternalServerError(t, httpHelper)
+	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_users_sessions.html").Maybe()
+
+	apiClient := &userSessionsApiClient{
+		user: &api.UserResponse{Id: 7},
+		sessions: []api.EnhancedUserSessionResponse{
+			{Id: 1, Started: &started, LastAccessed: &lastAccessed},
+		},
+	}
+
+	req := handlertest.Request(http.MethodGet, "/admin/users/7/sessions",
+		handlertest.WithAccessToken(),
+		handlertest.WithRouteParam("userId", "7"),
+	)
+
+	HandleAdminUserSessionsGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
+
+	sessions, ok := handlertest.Bind(t, httpHelper)["sessions"].([]SessionInfo)
+	require.True(t, ok, "the bind carries no []SessionInfo")
+	require.Len(t, sessions, 1)
+	require.NotNil(t, sessions[0].Started)
+	require.NotNil(t, sessions[0].LastAccessed)
+	assert.Equal(t, started, *sessions[0].Started)
+	assert.Equal(t, lastAccessed, *sessions[0].LastAccessed)
 }
