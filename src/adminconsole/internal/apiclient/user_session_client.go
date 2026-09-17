@@ -131,40 +131,6 @@ func (c *AuthServerClient) GetClientSessionsByClientId(accessToken string, clien
 	return response.Sessions, nil
 }
 
-func (c *AuthServerClient) GetUserSession(accessToken string, sessionIdentifier string) (*api.UserSessionResponse, error) {
-	fullURL := c.baseURL + "/api/v1/admin/user-sessions/" + sessionIdentifier
-
-	req, err := http.NewRequest("GET", fullURL, nil)
-	if err != nil {
-		return nil, errs.Errorf("failed to create request: %w", err)
-	}
-
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, errs.Errorf("failed to make request: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, errs.Errorf("failed to read response body: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, parseAPIError(resp, respBody)
-	}
-
-	var response api.GetUserSessionResponse
-	if err := json.Unmarshal(respBody, &response); err != nil {
-		return nil, errs.Errorf("failed to decode response: %w", err)
-	}
-
-	return &response.Session, nil
-}
-
 func (c *AuthServerClient) GetAccountSessions(accessToken string) ([]api.EnhancedUserSessionResponse, error) {
 	fullURL := c.baseURL + "/api/v1/account/sessions"
 
