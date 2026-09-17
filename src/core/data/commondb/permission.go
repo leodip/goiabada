@@ -180,32 +180,40 @@ func (d *CommonDatabase) GetPermissionsByIds(tx *sql.Tx, permissionIds []int64) 
 		return nil, nil
 	}
 
-	permissionStruct := sqlbuilder.NewStruct(new(models.Permission)).
-		For(d.Flavor)
-
-	selectBuilder := permissionStruct.SelectFrom("permissions")
-	selectBuilder.Where(selectBuilder.In("id", sqlbuilder.Flatten(permissionIds)...))
-
-	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(tx, sql, args...)
-	if err != nil {
-		return nil, errs.Wrap(err, "unable to query database")
-	}
-	defer func() { _ = rows.Close() }()
-
 	var permissions []models.Permission
-	for rows.Next() {
-		var permission models.Permission
-		addr := permissionStruct.Addr(&permission)
-		err = rows.Scan(addr...)
-		if err != nil {
-			return nil, errs.Wrap(err, "unable to scan permission")
-		}
-		permissions = append(permissions, permission)
-	}
 
-	if err := rows.Err(); err != nil {
-		return nil, errs.Wrap(err, "unable to read query results")
+	err := forEachIdBatch(permissionIds, func(batch []int64) error {
+		permissionStruct := sqlbuilder.NewStruct(new(models.Permission)).
+			For(d.Flavor)
+
+		selectBuilder := permissionStruct.SelectFrom("permissions")
+		selectBuilder.Where(selectBuilder.In("id", sqlbuilder.Flatten(batch)...))
+
+		sql, args := selectBuilder.Build()
+		rows, err := d.QuerySql(tx, sql, args...)
+		if err != nil {
+			return errs.Wrap(err, "unable to query database")
+		}
+		defer func() { _ = rows.Close() }()
+
+		for rows.Next() {
+			var permission models.Permission
+			addr := permissionStruct.Addr(&permission)
+			err = rows.Scan(addr...)
+			if err != nil {
+				return errs.Wrap(err, "unable to scan permission")
+			}
+			permissions = append(permissions, permission)
+		}
+
+		if err := rows.Err(); err != nil {
+			return errs.Wrap(err, "unable to read query results")
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	return permissions, nil

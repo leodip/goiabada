@@ -101,32 +101,40 @@ func (d *CommonDatabase) GetUsersByIds(tx *sql.Tx, userIds []int64) (map[int64]m
 		return nil, nil
 	}
 
-	userStruct := sqlbuilder.NewStruct(new(models.User)).
-		For(d.Flavor)
-
-	selectBuilder := userStruct.SelectFrom("users")
-	selectBuilder.Where(selectBuilder.In("id", sqlbuilder.Flatten(userIds)...))
-
-	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(tx, sql, args...)
-	if err != nil {
-		return nil, errs.Wrap(err, "unable to query database")
-	}
-	defer func() { _ = rows.Close() }()
-
 	users := make(map[int64]models.User)
-	for rows.Next() {
-		var user models.User
-		addr := userStruct.Addr(&user)
-		err = rows.Scan(addr...)
-		if err != nil {
-			return nil, errs.Wrap(err, "unable to scan user")
-		}
-		users[user.Id] = user
-	}
 
-	if err := rows.Err(); err != nil {
-		return nil, errs.Wrap(err, "unable to read query results")
+	err := forEachIdBatch(userIds, func(batch []int64) error {
+		userStruct := sqlbuilder.NewStruct(new(models.User)).
+			For(d.Flavor)
+
+		selectBuilder := userStruct.SelectFrom("users")
+		selectBuilder.Where(selectBuilder.In("id", sqlbuilder.Flatten(batch)...))
+
+		sql, args := selectBuilder.Build()
+		rows, err := d.QuerySql(tx, sql, args...)
+		if err != nil {
+			return errs.Wrap(err, "unable to query database")
+		}
+		defer func() { _ = rows.Close() }()
+
+		for rows.Next() {
+			var user models.User
+			addr := userStruct.Addr(&user)
+			err = rows.Scan(addr...)
+			if err != nil {
+				return errs.Wrap(err, "unable to scan user")
+			}
+			users[user.Id] = user
+		}
+
+		if err := rows.Err(); err != nil {
+			return errs.Wrap(err, "unable to read query results")
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	return users, nil

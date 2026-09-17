@@ -16,6 +16,19 @@ import (
 	"github.com/leodip/goiabada/core/models"
 )
 
+// maxGroupIdsPerRequest bounds how many group ids one request body may name.
+//
+// The list is validated by reading every group it names back from the database, and a list longer
+// than one statement can bind is read in several of them (commondb's forEachIdBatch), so without a
+// bound a caller holding manage-users can post a million ids and buy a thousand statements reading
+// ids that cannot exist. The number is one statement's worth, which is the largest list that
+// validation reads in one go, and it is far above any real request: a user can hold at most as
+// many groups as the deployment has defined (#373).
+//
+// This bounds one array, not the request. How large a body the server reads before anything looks
+// at it is #205's axis and wants one answer for every endpoint rather than one for this one.
+const maxGroupIdsPerRequest = 1000
+
 func HandleAPIUserGroupsGet(
 	database data.Database,
 ) http.HandlerFunc {
@@ -94,6 +107,13 @@ func HandleAPIUserGroupsPut(
 		err = json.NewDecoder(r.Body).Decode(&request)
 		if err != nil {
 			writeJSONError(w, "Invalid request body", "INVALID_REQUEST_BODY", http.StatusBadRequest)
+			return
+		}
+
+		// Refused on the body alone, before any query: the ids are not read one at a time, so the
+		// cost of an oversized array is paid by the validation below rather than by the caller.
+		if len(request.GroupIds) > maxGroupIdsPerRequest {
+			writeJSONError(w, "Too many group ids", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 

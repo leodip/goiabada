@@ -119,32 +119,40 @@ func (d *CommonDatabase) GetGroupAttributesByGroupIds(tx *sql.Tx, groupIds []int
 		return nil, nil
 	}
 
-	groupAttributeStruct := sqlbuilder.NewStruct(new(models.GroupAttribute)).
-		For(d.Flavor)
-
-	selectBuilder := groupAttributeStruct.SelectFrom("group_attributes")
-	selectBuilder.Where(selectBuilder.In("group_id", sqlbuilder.Flatten(groupIds)...))
-
-	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(tx, sql, args...)
-	if err != nil {
-		return nil, errs.Wrap(err, "unable to query database")
-	}
-	defer func() { _ = rows.Close() }()
-
 	var groupAttributes []models.GroupAttribute
-	for rows.Next() {
-		var groupAttribute models.GroupAttribute
-		addr := groupAttributeStruct.Addr(&groupAttribute)
-		err = rows.Scan(addr...)
-		if err != nil {
-			return nil, errs.Wrap(err, "unable to scan groupAttribute")
-		}
-		groupAttributes = append(groupAttributes, groupAttribute)
-	}
 
-	if err := rows.Err(); err != nil {
-		return nil, errs.Wrap(err, "unable to read query results")
+	err := forEachIdBatch(groupIds, func(batch []int64) error {
+		groupAttributeStruct := sqlbuilder.NewStruct(new(models.GroupAttribute)).
+			For(d.Flavor)
+
+		selectBuilder := groupAttributeStruct.SelectFrom("group_attributes")
+		selectBuilder.Where(selectBuilder.In("group_id", sqlbuilder.Flatten(batch)...))
+
+		sql, args := selectBuilder.Build()
+		rows, err := d.QuerySql(tx, sql, args...)
+		if err != nil {
+			return errs.Wrap(err, "unable to query database")
+		}
+		defer func() { _ = rows.Close() }()
+
+		for rows.Next() {
+			var groupAttribute models.GroupAttribute
+			addr := groupAttributeStruct.Addr(&groupAttribute)
+			err = rows.Scan(addr...)
+			if err != nil {
+				return errs.Wrap(err, "unable to scan groupAttribute")
+			}
+			groupAttributes = append(groupAttributes, groupAttribute)
+		}
+
+		if err := rows.Err(); err != nil {
+			return errs.Wrap(err, "unable to read query results")
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	return groupAttributes, nil

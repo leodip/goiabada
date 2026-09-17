@@ -123,32 +123,40 @@ func (d *CommonDatabase) GetUserPermissionsByUserIds(tx *sql.Tx, userIds []int64
 		return nil, nil
 	}
 
-	userPermissionStruct := sqlbuilder.NewStruct(new(models.UserPermission)).
-		For(d.Flavor)
-
-	selectBuilder := userPermissionStruct.SelectFrom("users_permissions")
-	selectBuilder.Where(selectBuilder.In("user_id", sqlbuilder.Flatten(userIds)...))
-
-	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(tx, sql, args...)
-	if err != nil {
-		return nil, errs.Wrap(err, "unable to query database")
-	}
-	defer func() { _ = rows.Close() }()
-
 	var userPermissions []models.UserPermission
-	for rows.Next() {
-		var userPermission models.UserPermission
-		addr := userPermissionStruct.Addr(&userPermission)
-		err = rows.Scan(addr...)
-		if err != nil {
-			return nil, errs.Wrap(err, "unable to scan userPermission")
-		}
-		userPermissions = append(userPermissions, userPermission)
-	}
 
-	if err := rows.Err(); err != nil {
-		return nil, errs.Wrap(err, "unable to read query results")
+	err := forEachIdBatch(userIds, func(batch []int64) error {
+		userPermissionStruct := sqlbuilder.NewStruct(new(models.UserPermission)).
+			For(d.Flavor)
+
+		selectBuilder := userPermissionStruct.SelectFrom("users_permissions")
+		selectBuilder.Where(selectBuilder.In("user_id", sqlbuilder.Flatten(batch)...))
+
+		sql, args := selectBuilder.Build()
+		rows, err := d.QuerySql(tx, sql, args...)
+		if err != nil {
+			return errs.Wrap(err, "unable to query database")
+		}
+		defer func() { _ = rows.Close() }()
+
+		for rows.Next() {
+			var userPermission models.UserPermission
+			addr := userPermissionStruct.Addr(&userPermission)
+			err = rows.Scan(addr...)
+			if err != nil {
+				return errs.Wrap(err, "unable to scan userPermission")
+			}
+			userPermissions = append(userPermissions, userPermission)
+		}
+
+		if err := rows.Err(); err != nil {
+			return errs.Wrap(err, "unable to read query results")
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	return userPermissions, nil

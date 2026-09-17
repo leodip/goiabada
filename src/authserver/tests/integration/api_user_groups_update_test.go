@@ -312,3 +312,81 @@ func TestAPIUserGroupsPut_Unauthorized(t *testing.T) {
 	// Assert: Should be unauthorized
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 }
+
+// TestAPIUserGroupsPut_TheGroupIdArrayIsBounded is the caller-steerable half of #373's id-list
+// sweep. Every id this endpoint is given is read back to check the group exists, and every id in
+// an IN list is a bound parameter: before the sweep, an array past SQL Server's 2,100 parameter
+// ceiling answered HTTP 500 on a deployment running that engine. The lookup reads long lists in
+// several statements now, so nothing crashes, but an unbounded array would still buy one statement
+// per thousand ids for a set that cannot exist -- a user can hold at most as many groups as the
+// deployment has defined.
+//
+// The pair is the boundary. At the cap the request is not refused for its size: it goes through to
+// the existence check and is answered by it, which is the code the second row asserts. One past,
+// it never reaches a query at all. Asserting the code rather than the status is what separates
+// them, since both are 400.
+func TestAPIUserGroupsPut_TheGroupIdArrayIsBounded(t *testing.T) {
+	const maxGroupIdsPerRequest = 1000
+
+	accessToken, _ := createAdminClientWithToken(t)
+
+	testCases := []struct {
+		name string
+		// total is how many ids the array carries. None of them names a real group: the point is
+		// which check answers, and both answer before anything is written.
+		total int
+		// wantCode is the error_code in the envelope, which is what tells the two checks apart.
+		wantCode string
+	}{
+		{
+			name:     "one past the cap is refused for its size",
+			total:    maxGroupIdsPerRequest + 1,
+			wantCode: "VALIDATION_ERROR",
+		},
+		{
+			name:     "the cap itself reaches the existence check",
+			total:    maxGroupIdsPerRequest,
+			wantCode: "handler.admin_user_groups.not_found",
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			testUser := &models.User{
+				Subject:    fake.UUID(),
+				Enabled:    true,
+				Email:      uniqueEmail("testuser@groups-bound.test"),
+				GivenName:  "Test",
+				FamilyName: "User",
+			}
+			err := database.CreateUser(nil, testUser)
+			assert.NoError(t, err)
+			defer func() {
+				_ = database.DeleteUser(nil, testUser.Id)
+			}()
+
+			groupIds := make([]int64, testCase.total)
+			for i := range groupIds {
+				groupIds[i] = int64(1_000_000_000 + i)
+			}
+
+			url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" +
+				strconv.FormatInt(testUser.Id, 10) + "/groups"
+			resp := makeAPIRequest(t, "PUT", url, accessToken,
+				api.UpdateUserGroupsRequest{GroupIds: groupIds})
+			defer func() { _ = resp.Body.Close() }()
+
+			assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+
+			var errResp api.ErrorResponse
+			err = json.NewDecoder(resp.Body).Decode(&errResp)
+			assert.NoError(t, err)
+			assert.Equal(t, testCase.wantCode, errResp.ErrorCode)
+
+			// Nothing was written either way: the user belongs to no group afterwards.
+			err = database.UserLoadGroups(nil, testUser)
+			assert.NoError(t, err)
+			assert.Empty(t, testUser.Groups)
+		})
+	}
+}

@@ -300,96 +300,48 @@ func (d *CommonDatabase) ClientLoadWebOrigins(tx *sql.Tx, client *models.Client)
 	return nil
 }
 
-// maxIdsPerStatement bounds how many ids one id-list lookup puts into a single statement. Every
-// id in an IN list is a bound parameter, and SQL Server refuses a statement carrying more than
-// 2,100 of them with error 8003, which is the lowest ceiling of the four supported engines:
-// modernc.org/sqlite allows 32,766, PostgreSQL 65,535, and MySQL bounds the statement's size
-// rather than its parameter count. Without a bound, a caller holding more ids than one statement
-// can carry gets an error rather than its rows, which reached the three session list endpoints as
-// an HTTP 500 on a request that was entirely valid (#373).
-//
-// Only GetClientsByIds is bounded by this today. The other id-list lookups in this package still
-// send whatever they are given, which is the same defect wherever the list is unbounded (#373).
-//
-// ceiling: one budget for all four engines rather than each engine's own, so a list of 1,001 to
-// 2,100 ids costs two statements on the three engines that would have taken it in one, and a list
-// read in several statements is no longer one snapshot -- a client deleted between two of them is
-// absent from the result, which is what the same delete already does between loading a session
-// and loading its clients. Revisit when a deployment is measured spending real time on the extra
-// round trip; a per-flavor budget is the next shape, and it owes a data tier case per engine.
-const maxIdsPerStatement = 1000
-
 func (d *CommonDatabase) GetClientsByIds(tx *sql.Tx, clientIds []int64) ([]models.Client, error) {
 
 	if len(clientIds) == 0 {
 		return []models.Client{}, nil
 	}
 
-	// One IN list answers a repeated id once, so the ids are deduplicated before they are split
-	// across statements: a duplicate falling either side of a batch boundary would otherwise come
-	// back as two copies of the same row, and the caller has no way to tell that from two clients.
-	// Deduplicating the input rather than the merged rows keeps the query count down as well, and
-	// it is what makes a long list's answer the same set the single statement used to return
-	// (#373).
-	uniqueIds := make([]int64, 0, len(clientIds))
-	seen := make(map[int64]struct{}, len(clientIds))
-	for _, clientId := range clientIds {
-		if _, alreadySeen := seen[clientId]; alreadySeen {
-			continue
-		}
-		seen[clientId] = struct{}{}
-		uniqueIds = append(uniqueIds, clientId)
-	}
+	clients := make([]models.Client, 0, len(clientIds))
 
-	clients := make([]models.Client, 0, len(uniqueIds))
-	for start := 0; start < len(uniqueIds); start += maxIdsPerStatement {
-		end := start + maxIdsPerStatement
-		if end > len(uniqueIds) {
-			end = len(uniqueIds)
-		}
+	err := forEachIdBatch(clientIds, func(batch []int64) error {
+		clientStruct := sqlbuilder.NewStruct(new(models.Client)).
+			For(d.Flavor)
 
-		batch, err := d.getClientsByIdsInOneStatement(tx, uniqueIds[start:end])
+		selectBuilder := clientStruct.SelectFrom("clients")
+		selectBuilder.Where(selectBuilder.In("id", sqlbuilder.Flatten(batch)...))
+
+		sql, args := selectBuilder.Build()
+		rows, err := d.QuerySql(tx, sql, args...)
 		if err != nil {
-			return nil, err
+			return errs.Wrap(err, "unable to query database")
+		}
+		// Deferred inside the closure, so each statement's rows are released before the next
+		// one is issued rather than all of them at the end.
+		defer func() { _ = rows.Close() }()
+
+		for rows.Next() {
+			var client models.Client
+			addr := clientStruct.Addr(&client)
+			err = rows.Scan(addr...)
+			if err != nil {
+				return errs.Wrap(err, "unable to scan client")
+			}
+			clients = append(clients, client)
 		}
 
-		clients = append(clients, batch...)
-	}
+		if err := rows.Err(); err != nil {
+			return errs.Wrap(err, "unable to read query results")
+		}
 
-	return clients, nil
-}
-
-// getClientsByIdsInOneStatement reads one batch, and holds the rows open only for that batch:
-// the close is deferred here rather than in the loop above, so each statement's rows are
-// released before the next one is issued.
-func (d *CommonDatabase) getClientsByIdsInOneStatement(tx *sql.Tx, clientIds []int64) ([]models.Client, error) {
-
-	clientStruct := sqlbuilder.NewStruct(new(models.Client)).
-		For(d.Flavor)
-
-	selectBuilder := clientStruct.SelectFrom("clients")
-	selectBuilder.Where(selectBuilder.In("id", sqlbuilder.Flatten(clientIds)...))
-
-	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(tx, sql, args...)
+		return nil
+	})
 	if err != nil {
-		return nil, errs.Wrap(err, "unable to query database")
-	}
-	defer func() { _ = rows.Close() }()
-
-	clients := make([]models.Client, 0)
-	for rows.Next() {
-		var client models.Client
-		addr := clientStruct.Addr(&client)
-		err = rows.Scan(addr...)
-		if err != nil {
-			return nil, errs.Wrap(err, "unable to scan client")
-		}
-		clients = append(clients, client)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, errs.Wrap(err, "unable to read query results")
+		return nil, err
 	}
 
 	return clients, nil

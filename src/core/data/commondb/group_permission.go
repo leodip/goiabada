@@ -140,32 +140,40 @@ func (d *CommonDatabase) GetGroupPermissionsByGroupIds(tx *sql.Tx, groupIds []in
 		return nil, nil
 	}
 
-	groupPermissionStruct := sqlbuilder.NewStruct(new(models.GroupPermission)).
-		For(d.Flavor)
-
-	selectBuilder := groupPermissionStruct.SelectFrom("groups_permissions")
-	selectBuilder.Where(selectBuilder.In("group_id", sqlbuilder.Flatten(groupIds)...))
-
-	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(tx, sql, args...)
-	if err != nil {
-		return nil, errs.Wrap(err, "unable to query database")
-	}
-	defer func() { _ = rows.Close() }()
-
 	var groupPermissions []models.GroupPermission
-	for rows.Next() {
-		var groupPermission models.GroupPermission
-		addr := groupPermissionStruct.Addr(&groupPermission)
-		err = rows.Scan(addr...)
-		if err != nil {
-			return nil, errs.Wrap(err, "unable to scan groupPermission")
-		}
-		groupPermissions = append(groupPermissions, groupPermission)
-	}
 
-	if err := rows.Err(); err != nil {
-		return nil, errs.Wrap(err, "unable to read query results")
+	err := forEachIdBatch(groupIds, func(batch []int64) error {
+		groupPermissionStruct := sqlbuilder.NewStruct(new(models.GroupPermission)).
+			For(d.Flavor)
+
+		selectBuilder := groupPermissionStruct.SelectFrom("groups_permissions")
+		selectBuilder.Where(selectBuilder.In("group_id", sqlbuilder.Flatten(batch)...))
+
+		sql, args := selectBuilder.Build()
+		rows, err := d.QuerySql(tx, sql, args...)
+		if err != nil {
+			return errs.Wrap(err, "unable to query database")
+		}
+		defer func() { _ = rows.Close() }()
+
+		for rows.Next() {
+			var groupPermission models.GroupPermission
+			addr := groupPermissionStruct.Addr(&groupPermission)
+			err = rows.Scan(addr...)
+			if err != nil {
+				return errs.Wrap(err, "unable to scan groupPermission")
+			}
+			groupPermissions = append(groupPermissions, groupPermission)
+		}
+
+		if err := rows.Err(); err != nil {
+			return errs.Wrap(err, "unable to read query results")
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	return groupPermissions, nil

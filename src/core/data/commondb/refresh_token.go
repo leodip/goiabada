@@ -602,27 +602,36 @@ func (d *CommonDatabase) PromoteRefreshTokenGenerations(tx *sql.Tx, refreshToken
 		return nil
 	}
 
-	ids := make([]interface{}, 0, len(refreshTokenIds))
-	for _, id := range refreshTokenIds {
-		ids = append(ids, id)
-	}
+	// One instant for the whole promotion rather than one per statement, so a long list does not
+	// leave the rows it promoted carrying updated_at values a few milliseconds apart.
+	updatedAt := time.Now().UTC()
 
-	ub := d.Flavor.NewUpdateBuilder()
-	ub.Update("refresh_tokens")
-	ub.Set(
-		ub.Assign("auth_state_generation", generation),
-		ub.Assign("updated_at", time.Now().UTC()),
-	)
-	ub.Where(
-		ub.In("id", ids...),
-		ub.Equal("revoked", false),
-	)
+	// A long id list is promoted in several statements (see forEachIdBatch). The caller always
+	// holds a transaction -- this is only reachable from the revocation sweep -- so the several
+	// statements commit or roll back together, exactly as the one did.
+	return forEachIdBatch(refreshTokenIds, func(batch []int64) error {
+		ids := make([]interface{}, 0, len(batch))
+		for _, id := range batch {
+			ids = append(ids, id)
+		}
 
-	sql, args := ub.BuildWithFlavor(d.Flavor)
-	_, err := d.ExecSql(tx, sql, args...)
-	if err != nil {
-		return errs.Wrap(err, "unable to promote refresh token generations")
-	}
+		ub := d.Flavor.NewUpdateBuilder()
+		ub.Update("refresh_tokens")
+		ub.Set(
+			ub.Assign("auth_state_generation", generation),
+			ub.Assign("updated_at", updatedAt),
+		)
+		ub.Where(
+			ub.In("id", ids...),
+			ub.Equal("revoked", false),
+		)
 
-	return nil
+		sql, args := ub.BuildWithFlavor(d.Flavor)
+		_, err := d.ExecSql(tx, sql, args...)
+		if err != nil {
+			return errs.Wrap(err, "unable to promote refresh token generations")
+		}
+
+		return nil
+	})
 }

@@ -123,32 +123,40 @@ func (d *CommonDatabase) GetUserGroupsByUserIds(tx *sql.Tx, userIds []int64) ([]
 		return nil, nil
 	}
 
-	userGroupStruct := sqlbuilder.NewStruct(new(models.UserGroup)).
-		For(d.Flavor)
-
-	selectBuilder := userGroupStruct.SelectFrom("users_groups")
-	selectBuilder.Where(selectBuilder.In("user_id", sqlbuilder.Flatten(userIds)...))
-
-	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(tx, sql, args...)
-	if err != nil {
-		return nil, errs.Wrap(err, "unable to query database")
-	}
-	defer func() { _ = rows.Close() }()
-
 	var userGroups []models.UserGroup
-	for rows.Next() {
-		var userGroup models.UserGroup
-		addr := userGroupStruct.Addr(&userGroup)
-		err = rows.Scan(addr...)
-		if err != nil {
-			return nil, errs.Wrap(err, "unable to scan userGroup")
-		}
-		userGroups = append(userGroups, userGroup)
-	}
 
-	if err := rows.Err(); err != nil {
-		return nil, errs.Wrap(err, "unable to read query results")
+	err := forEachIdBatch(userIds, func(batch []int64) error {
+		userGroupStruct := sqlbuilder.NewStruct(new(models.UserGroup)).
+			For(d.Flavor)
+
+		selectBuilder := userGroupStruct.SelectFrom("users_groups")
+		selectBuilder.Where(selectBuilder.In("user_id", sqlbuilder.Flatten(batch)...))
+
+		sql, args := selectBuilder.Build()
+		rows, err := d.QuerySql(tx, sql, args...)
+		if err != nil {
+			return errs.Wrap(err, "unable to query database")
+		}
+		defer func() { _ = rows.Close() }()
+
+		for rows.Next() {
+			var userGroup models.UserGroup
+			addr := userGroupStruct.Addr(&userGroup)
+			err = rows.Scan(addr...)
+			if err != nil {
+				return errs.Wrap(err, "unable to scan userGroup")
+			}
+			userGroups = append(userGroups, userGroup)
+		}
+
+		if err := rows.Err(); err != nil {
+			return errs.Wrap(err, "unable to read query results")
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	return userGroups, nil

@@ -1,6 +1,11 @@
 package commondb
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
 
 // TestPickEmailSurvivor pins the rule that decides which of two rows spelling the same
 // address keeps it: the member already equal to its own lowercased form, and the lowest id
@@ -78,4 +83,59 @@ func TestPickEmailSurvivor(t *testing.T) {
 			}
 		})
 	}
+}
+
+// readEmailGroup's candidate list is the only one in commondb whose IN term shares a WHERE with
+// another predicate, so the batching had a choice to make and these two cases are the choice:
+// the address term rides in every statement, and a row two statements both answer is kept once.
+//
+// It has no data tier case, unlike the twelve lookups in id_list_batching_test.go, because its
+// list is the users whose address differs from another only by case and a group past the budget
+// would need that many accounts. The statement shape is the other lookups', so what the four
+// engines have to say about a long IN list is already said there; what is this function's own is
+// below (#373).
+func TestReadEmailGroup_ReadsALongCandidateListInBatches(t *testing.T) {
+	candidates := make([]int64, maxIdsPerStatement+1)
+	for i := range candidates {
+		// The lowercase row is id 1 and is not a candidate: the opening scan keeps only rows that
+		// differ from their own lowercase form, which is what the address term exists to add back.
+		candidates[i] = int64(i + 2)
+	}
+
+	d := &scriptedDriver{rows: []*scriptedRows{
+		// First statement: the address term answers the lowercase row, and this batch's ids
+		// answer one candidate.
+		groupResult(groupRow(1, "alice@x.com", true), groupRow(2, "Alice@x.com", true)),
+		// Second statement: the address term answers the same row again, which is what the
+		// deduplication is for, plus the one candidate the first batch could not carry.
+		groupResult(groupRow(1, "alice@x.com", true), groupRow(int64(maxIdsPerStatement+2), "ALICE@x.com", true)),
+	}}
+
+	members, err := scriptedDB(t, d).readEmailGroup("alice@x.com", candidates)
+	require.NoError(t, err)
+
+	assert.Equal(t, 2, d.queryCount, "a candidate list one past the budget is read in two statements")
+
+	ids := make([]int64, 0, len(members))
+	for _, member := range members {
+		ids = append(ids, member.id)
+	}
+	assert.Equal(t, []int64{1, 2, int64(maxIdsPerStatement + 2)}, ids,
+		"the row both statements answered is kept once, and every other member once each")
+}
+
+// An empty candidate list still has to ask for the row already spelled in lowercase. The helper
+// calls its function zero times for an empty list, so that statement is issued outside it; a
+// version that left it to the helper would answer that the group is empty and converge nothing.
+func TestReadEmailGroup_AnEmptyCandidateListStillAsksForTheLowercaseRow(t *testing.T) {
+	d := &scriptedDriver{rows: []*scriptedRows{
+		groupResult(groupRow(1, "alice@x.com", true)),
+	}}
+
+	members, err := scriptedDB(t, d).readEmailGroup("alice@x.com", nil)
+	require.NoError(t, err)
+
+	assert.Equal(t, 1, d.queryCount, "exactly one statement, and never an empty IN ()")
+	require.Len(t, members, 1)
+	assert.Equal(t, int64(1), members[0].id)
 }
