@@ -34,11 +34,14 @@ import (
 // was that a real persistence failure became indistinguishable from normal operation, on two of
 // four engines, in the one table an operator audits.
 //
-// THE FIX FOR THAT CALL SITE WAS ONE FUNCTION. This test is here because nothing stopped the
-// next one. The trap is invisible in review (the call reads like any other), invisible in the
-// type system (it compiles, and it is the right method name), and invisible to the whole
-// four-engine test suite unless a test happens to assert on log output. A caller that actually
-// used the returned id would get a hard error rather than a false alarm.
+// THE FIX FOR THAT CALL SITE WAS ONE FUNCTION, an unexported insert that stopped at the
+// statement instead of reading the id back. Both it and its caller are gone: #351 replaced the
+// backfill with a migration and a pre-flight, so this package emits no audit event at all any
+// more. This test is here because nothing stopped the next one. The trap is invisible in review
+// (the call reads like any other), invisible in the type system (it compiles, and it is the
+// right method name), and invisible to the whole four-engine test suite unless a test happens to
+// assert on log output. A caller that actually used the returned id would get a hard error
+// rather than a false alarm.
 //
 // THE BOUNDARY, stated because it decides what this file is worth. It compares method NAMES: a
 // name declared by either dialect with a body that is not a single delegation to
@@ -83,9 +86,9 @@ func TestCommonDatabase_NoSelfCallToAnOverriddenMethod(t *testing.T) {
 	if len(offenders) > 0 {
 		t.Errorf("%d self-call(s) in commondb resolve to an implementation two engines replace:\n  %s\n\n"+
 			"Each one runs the wrong SQL on the engine that overrode it, silently. Give this package "+
-			"its own unexported helper that does what the caller actually needs (see "+
-			"insertAuditLogWithoutId, which exists for this reason), or take the value through the "+
-			"Database interface where the override applies.",
+			"its own unexported helper that does what the caller actually needs and no more -- the "+
+			"divergence is usually a value the caller never wanted -- or take the value through the "+
+			"Database interface, where the override applies.",
 			len(offenders), strings.Join(offenders, "\n  "))
 	}
 }
