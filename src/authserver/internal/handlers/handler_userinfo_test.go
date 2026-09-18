@@ -16,7 +16,8 @@ import (
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
 	mocks_handlerhelpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
 
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/authserver/internal/constants"
+	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/handlerhelpers"
 	"github.com/leodip/goiabada/core/models"
@@ -80,7 +81,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/userinfo", nil)
 		jwtToken := oauth.JwtToken{
 			Claims: map[string]interface{}{
-				"scope": constants.AuthServerResourceIdentifier + ":" + constants.UserinfoPermissionIdentifier,
+				"scope": coreconstants.AuthServerResourceIdentifier + ":" + coreconstants.UserinfoPermissionIdentifier,
 			},
 		}
 		ctx := context.WithValue(req.Context(), constants.ContextKeyValidatedToken, jwtToken)
@@ -111,7 +112,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		jwtToken := oauth.JwtToken{
 			Claims: map[string]interface{}{
 				"sub":   "user123",
-				"scope": constants.AuthServerResourceIdentifier + ":" + constants.UserinfoPermissionIdentifier,
+				"scope": coreconstants.AuthServerResourceIdentifier + ":" + coreconstants.UserinfoPermissionIdentifier,
 			},
 		}
 		ctx := context.WithValue(req.Context(), constants.ContextKeyValidatedToken, jwtToken)
@@ -143,7 +144,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		jwtToken := oauth.JwtToken{
 			Claims: map[string]interface{}{
 				"sub":   sub,
-				"scope": constants.AuthServerResourceIdentifier + ":" + constants.UserinfoPermissionIdentifier,
+				"scope": coreconstants.AuthServerResourceIdentifier + ":" + coreconstants.UserinfoPermissionIdentifier,
 			},
 		}
 		ctx := context.WithValue(req.Context(), constants.ContextKeyValidatedToken, jwtToken)
@@ -180,7 +181,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		jwtToken := oauth.JwtToken{
 			Claims: map[string]interface{}{
 				"sub":   sub,
-				"scope": constants.AuthServerResourceIdentifier + ":" + constants.UserinfoPermissionIdentifier + " profile email address phone groups attributes",
+				"scope": coreconstants.AuthServerResourceIdentifier + ":" + coreconstants.UserinfoPermissionIdentifier + " profile email address phone groups attributes",
 			},
 		}
 		ctx := context.WithValue(req.Context(), constants.ContextKeyValidatedToken, jwtToken)
@@ -324,7 +325,7 @@ func TestHandleUserInfoGetPost_RefusalsAreInvalidTokenOnTheWire(t *testing.T) {
 			jwtToken := oauth.JwtToken{
 				Claims: map[string]interface{}{
 					"sub":   "user123",
-					"scope": constants.AuthServerResourceIdentifier + ":" + constants.UserinfoPermissionIdentifier,
+					"scope": coreconstants.AuthServerResourceIdentifier + ":" + coreconstants.UserinfoPermissionIdentifier,
 				},
 			}
 			req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeyValidatedToken, jwtToken))

@@ -14,7 +14,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/config"
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/stretchr/testify/assert"

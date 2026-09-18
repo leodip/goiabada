@@ -18,7 +18,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/errs"

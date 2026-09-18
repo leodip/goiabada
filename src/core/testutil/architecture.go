@@ -17,9 +17,10 @@ import (
 )
 
 // AssertArchitecture holds the repository's module and package ownership rules to the tree they
-// describe. The rules themselves are not written here: they are the three tables in
+// describe. The rules themselves are not written here: they are the four tables in
 // ARCHITECTURE.md at the repository root, which this function parses and then checks against the
-// real import graph. That file names each rule and carries the reasoning; this one decides.
+// real tree — three against the import graph, and the fourth against the production references to
+// core/constants. That file names each rule and carries the reasoning; this one decides.
 //
 // Putting the data in the document rather than in Go is the same choice AssertAgentDocs made for
 // the ceremony's state roster (#252). A dependency rule is prose about code, and prose about code
@@ -67,7 +68,22 @@ func assertArchitecture(r Reporter, root string) {
 		r.Fatalf("found no production Go packages under %s", root)
 	}
 
+	census, err := buildConstantsCensus(root, graph)
+	if err != nil {
+		r.Fatalf("reading the %s census under %s: %v", coreConstantsPkg, root, err)
+	}
+	// The same silent failure as the empty graph, one table down. A census that read no
+	// declaration satisfies "every symbol has a row" for nothing at all, and a census that found no
+	// reference would rest every justification on an empty set.
+	if len(census.declared) == 0 {
+		r.Fatalf("found no exported declarations in %s under %s", coreConstantsPkg, root)
+	}
+	if len(census.refs) == 0 {
+		r.Fatalf("found no production reference to any %s symbol under %s", coreConstantsPkg, root)
+	}
+
 	findings = append(findings, checkArchitecture(tables, graph)...)
+	findings = append(findings, checkConstantsOwnership(tables, graph, census)...)
 
 	sort.Strings(findings)
 	for _, f := range findings {
@@ -78,8 +94,9 @@ func assertArchitecture(r Reporter, root string) {
 // architectureDoc is the file holding the rules, relative to the repository root.
 const architectureDoc = "ARCHITECTURE.md"
 
-// The three headings whose tables are data. Each is the deepest heading of its section, so the
-// prose above it is free to change without touching the parser.
+// The headings whose tables are data. Each is the deepest heading of its section, so the
+// prose above it is free to change without touching the parser. The fourth, constantsHeading,
+// is declared beside the checks that read it in constants_ownership.go.
 const (
 	ownershipHeading = "### Package ownership"
 	exceptionHeading = "### Temporary exceptions"
@@ -127,6 +144,7 @@ type architectureTables struct {
 	owners     []ownerRow
 	exceptions []exceptionRow
 	foreign    []foreignRow
+	constants  []constantsRow
 }
 
 // importGraph is the tree as the compiler sees it: one entry per package directory holding at least
@@ -189,6 +207,18 @@ func parseArchitectureDoc(doc string) (architectureTables, []string) {
 			continue
 		}
 		tables.foreign = append(tables.foreign, foreignRow{module: row.cells[0], reachable: reachable, clearedBy: row.cells[3], line: row.line})
+	}
+
+	constants, ok := tableUnder(lines, constantsHeading)
+	if !ok {
+		findings = append(findings, fmt.Sprintf("%s has no %q table", architectureDoc, constantsHeading))
+	}
+	for _, row := range constants {
+		if len(row.cells) != 3 {
+			findings = append(findings, fmt.Sprintf("%s:%d: a core constants row needs 3 cells, found %d", architectureDoc, row.line, len(row.cells)))
+			continue
+		}
+		tables.constants = append(tables.constants, constantsRow{symbol: row.cells[0], justification: row.cells[1], issue: row.cells[2], line: row.line})
 	}
 
 	return tables, findings

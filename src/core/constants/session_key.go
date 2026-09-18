@@ -1,22 +1,18 @@
 package constants
 
-// Session name constants for each application
-const AuthServerSessionName string = "authserver"
+// AdminConsoleSessionName is the name of the admin console's browser session, and it is in
+// core because both processes name it: the auth server's session backend stores the admin
+// console's server-side sessions under it, so the two must agree on the string or the admin
+// console's sessions are written under a name it does not read (#266).
+//
+// The auth server's own name is not here. Nothing outside that module names it (#351).
 const AdminConsoleSessionName string = "adminconsole"
 
-const SessionKeySessionIdentifier string = "SessionIdentifier"
-const SessionKeyAuthContext string = "AuthContext"
+// SessionKeyJwt is the admin console's authenticated-session key, read by core/middleware.
 const SessionKeyJwt string = "Jwt"
 
-// SessionKeyLinkMarker holds the marker written once an emailed reset or activation
-// link has been validated, so the rest of the flow runs on a URL carrying no
-// credential (#112).
-//
-// One key for both flows rather than one each: a user is in one of them at a time,
-// and sharing the key is what lets a marker belonging to the other flow be told
-// apart from no marker at all.
-const SessionKeyLinkMarker string = "LinkMarker"
-
+// The OAuth client's ceremony keys. The admin console writes and reads them and
+// core/handlerhelpers reads them in both binaries, so they stay in core (#351).
 const SessionKeyState string = "State"
 const SessionKeyNonce string = "Nonce"
 const SessionKeyRedirectURI string = "RedirectURI"

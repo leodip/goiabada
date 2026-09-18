@@ -13,9 +13,10 @@ import (
 	"log/slog"
 
 	"github.com/leodip/goiabada/authserver/internal/config"
+	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/server"
 	"github.com/leodip/goiabada/authserver/internal/sessionbackend"
-	"github.com/leodip/goiabada/core/constants"
+	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/i18n"
@@ -39,9 +40,9 @@ func main() {
 
 	slog.Info("auth server started")
 	slog.Info("build information",
-		"version", constants.Version,
-		"build_date", constants.BuildDate,
-		"git_commit", constants.GitCommit)
+		"version", coreconstants.Version,
+		"build_date", coreconstants.BuildDate,
+		"git_commit", coreconstants.GitCommit)
 	slog.Info("config loaded")
 
 	// The `migrate` subcommand is dispatched here: after the configuration is loaded, because it

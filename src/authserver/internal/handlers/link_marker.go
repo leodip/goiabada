@@ -8,7 +8,7 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/sessionstore"
 
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/core/stringutil"
 )
 

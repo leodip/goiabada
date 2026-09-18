@@ -1,7 +1,8 @@
 # Architecture
 
-This file records which module owns what, and it is executable. The three tables below —
-[package ownership](#package-ownership), [temporary exceptions](#temporary-exceptions) and
+This file records which module owns what, and it is executable. The four tables below —
+[package ownership](#package-ownership), [core constants ownership](#core-constants-ownership),
+[temporary exceptions](#temporary-exceptions) and
 [foreign modules](#foreign-modules-the-admin-console-must-not-compile) — are parsed by
 `AssertArchitecture` in `src/core/testutil/architecture.go`, which every module's unit tier calls.
 A row that stops describing the tree fails the tier, in both directions: an edge the tables do not
@@ -85,7 +86,7 @@ A row whose owner is not `kernel` names the issue that moves it. A `kernel` row 
 | `core/api` | kernel | — |
 | `core/auditlog` | authserver | #359 |
 | `core/cmd` | authserver | #354 |
-| `core/constants` | split | #351 |
+| `core/constants` | kernel | — |
 | `core/countries` | kernel | — |
 | `core/customerrors` | kernel | — |
 | `core/data` | authserver | #359 |
@@ -136,6 +137,80 @@ Notes on rows that are not self-evident:
   values, PKCE and JWT/JWKS validation. It does not issue codes or tokens and does not rotate
   signing keys. #338 drew that line: the provider half was `core/oauthprovider`, which #339 carried
   to the auth server whole, as `authserver/internal/ceremony`, `issuance` and `signingkeys`.
+- `core/constants` is `kernel`, and it is the one package whose ownership is also recorded symbol
+  by symbol, in the table below. Package granularity cannot hold it: a constant is a string, so an
+  auth-server-only name declared there costs nothing at compile time and breaks none of the rules
+  below.
+
+## Core constants ownership
+
+Every exported symbol `core/constants` declares has a row saying why core still declares it, as one
+of four justifications, checked against the real reference graph the way the tables above and below
+are checked against the import graph. Production references only, for the same reason rules 2 and 3
+read production files: a test may name anything from anywhere.
+
+This table exists because nothing else could have caught what it catches. The package reached 139
+symbols, 108 of them named by a single process, with every import rule satisfied at every step
+(#351).
+
+| justification | means |
+|---|---|
+| `kernel` | a `kernel` core package references it in production, so rule 2 forbids it leaving |
+| `both-apps` | both applications reference it in production |
+| `moving` | in core, only a package on its way out of core references it; the issue names the move that ends the justification |
+| `contract` | none of the above, but it is an intentionally stable cross-process value |
+
+A row states the strongest justification the tree backs, in that order, and a row claiming less than
+the tree supports fails. So `contract` is reachable only when nothing else holds, which is the whole
+point of it: making somebody write the word turns it into a claim a reviewer can argue with, where
+silence is not. No row carries it today.
+
+### Core constants ownership
+
+| symbol | justification | issue |
+|---|---|---|
+| `AdminConsoleClientIdentifier` | moving | #359 |
+| `AdminConsoleSessionName` | both-apps | — |
+| `AdminReadPermissionIdentifier` | moving | #359 |
+| `AuthServerResourceIdentifier` | kernel | — |
+| `BrowserSessionsPermissionIdentifier` | both-apps | — |
+| `BuildDate` | kernel | — |
+| `BuiltInAuthServerPermissionIdentifiers` | both-apps | — |
+| `ContextKeyBearerToken` | kernel | — |
+| `ContextKeyJwtInfo` | kernel | — |
+| `GitCommit` | kernel | — |
+| `ManageAccountPermissionIdentifier` | kernel | — |
+| `ManageClientsPermissionIdentifier` | moving | #359 |
+| `ManagePermissionIdentifier` | kernel | — |
+| `ManageSettingsPermissionIdentifier` | moving | #359 |
+| `ManageUsersPermissionIdentifier` | moving | #359 |
+| `SessionKeyCodeVerifier` | kernel | — |
+| `SessionKeyJwt` | kernel | — |
+| `SessionKeyNonce` | kernel | — |
+| `SessionKeyRedirectBack` | kernel | — |
+| `SessionKeyRedirectURI` | kernel | — |
+| `SessionKeyState` | kernel | — |
+| `UserinfoPermissionIdentifier` | both-apps | — |
+| `Version` | kernel | — |
+
+Notes on rows that are not self-evident:
+
+- `AdminConsoleSessionName` is here and its twin is not. The auth server's session backend stores
+  the admin console's server-side sessions, so it names that session name at one production site,
+  and the two processes must agree on the string or the admin console's sessions are written under
+  a name it does not read (#266). Nothing outside the auth server names `AuthServerSessionName`.
+- The five `moving` rows are in core only because `core/data` and `core/models` name them, seeding
+  the built-in permission rows and the admin console's client. Both packages leave in #359, and
+  when they do nothing in core references these five and the rows stop being backed. They are not
+  `contract`: that claims an intentionally stable cross-process value, and these are ordinary
+  identifiers that happen to be seeded by a package on its way out.
+- There is no `ContextKeySettings` row because the two processes share nothing but its spelling.
+  Each declares its own, and each asserts a different type out of it — `*models.Settings` in the
+  auth server against `*api.PublicSettingsResponse` in the admin console — so either assertion
+  panics on the other's value. It satisfied the letter of `both-apps`, and that row would have been
+  true and misleading (#351).
+- `Version`, `BuildDate` and `GitCommit` are `kernel` because `core/handlerhelpers` puts them into
+  every rendered page's template data, in both binaries.
 
 ## Rules
 
@@ -156,8 +231,13 @@ The guard reports findings by these names.
 6. **table hygiene** — every top-level `core` package has exactly one ownership row; every non-kernel
    row names an issue and every kernel row names none; every exception corresponds to a violation
    that exists right now; every violation has an exception.
+7. **core constants** — every exported symbol `core/constants` declares has exactly one row in
+   [Core constants ownership](#core-constants-ownership-1), and each row states the strongest
+   justification the reference graph backs. A symbol with no row fails, a row for a symbol that is
+   gone fails, and a row claiming less than the tree supports fails. Only a `moving` row names an
+   issue, because it is the only justification that expires.
 
-Rules 2, 3 and 4 read production files only. A test may import a mock, a fixture or a helper from
+Rules 2, 3, 4 and 7 read production files only. A test may import a mock, a fixture or a helper from
 anywhere; that is what test code is for, and holding it to the production graph would make
 `core/testutil` unusable from the tiers that call it. Rule 1 is the exception, for the reason given
 above. Rule 5 reads production files because it is about what lands in a shipped binary.
@@ -255,10 +335,14 @@ slog and agent-document guards.
 
 It reads imports from the AST rather than matching text, so an import inside a comment or a string
 is not a finding and a renamed import alias still is one. It parses production and test files
-separately because the rules above treat them differently.
+separately because the rules above treat them differently. Rule 7 reads the same way, one level
+down: `src/core/testutil/constants_ownership.go` reads the exported declarations of
+`core/constants` and, from every production file that imports it, the symbols selected off whatever
+identifier that file binds the import to.
 
 `src/core/testutil/architecture_lint_test.go` is the core tier's caller;
-`src/core/testutil/architecture_rules_test.go` holds the guard's own tests. They run the rule table
+`src/core/testutil/architecture_rules_test.go` and
+`src/core/testutil/constants_ownership_rules_test.go` hold the guard's own tests. They run the rule table
 against fixture trees written into a temp directory, one fixture per rule and per deliberate
 leniency, and then take the real tables apart one row at a time — dropping each exception and
 flipping each declared reachability — because the tree satisfies this document by construction, so

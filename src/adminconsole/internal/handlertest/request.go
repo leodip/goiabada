@@ -20,7 +20,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/adminconsole/internal/constants"
+	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/oauth"
 )
 
@@ -65,9 +66,9 @@ func Request(method, target string, opts ...Option) *http.Request {
 		ctx = context.WithValue(ctx, chi.RouteCtxKey, routeCtx)
 	}
 	if spec.jwtInfo != nil {
-		ctx = context.WithValue(ctx, constants.ContextKeyJwtInfo, *spec.jwtInfo)
+		ctx = context.WithValue(ctx, coreconstants.ContextKeyJwtInfo, *spec.jwtInfo)
 	} else if spec.accessToken != nil {
-		ctx = context.WithValue(ctx, constants.ContextKeyJwtInfo,
+		ctx = context.WithValue(ctx, coreconstants.ContextKeyJwtInfo,
 			oauth.JwtInfo{TokenResponse: oauth.TokenResponse{AccessToken: *spec.accessToken}})
 	}
 	if spec.hasSettings {

@@ -36,10 +36,3 @@ var BuiltInAuthServerPermissionIdentifiers = []string{
 	ManageSettingsPermissionIdentifier,
 	BrowserSessionsPermissionIdentifier,
 }
-
-const (
-	// OIDC Authorization Error Codes (per OpenID Connect Core 1.0, Section 3.1.2.6)
-	ErrorLoginRequired       = "login_required"
-	ErrorConsentRequired     = "consent_required"
-	ErrorInteractionRequired = "interaction_required"
-)

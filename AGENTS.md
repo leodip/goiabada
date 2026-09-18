@@ -27,7 +27,9 @@ repository root. It is enforced rather than descriptive: see **Architecture guar
 - `data/` - Database interface + implementations (commondb/, mysqldb/, postgresdb/, sqlitedb/, mssqldb/)
 - `oauth/` - Shared OAuth/OIDC client surface: JWT/JWKS parsing, token exchange, PKCE, response_type parsing
 - `validators/` - Identifier and angle-bracket validation, the two both applications use. The authorize and token validators live in `authserver/internal/protocolvalidation`, and the account validators — email, password, profile, address, phone — in `authserver/internal/accountvalidation` (#344)
-- `constants/` - Resource and permission identifiers, context and session keys
+- `constants/` - Permission identifiers, and the context and session keys a kernel package or both
+  processes read. Each process declares its own in `internal/constants`; `ARCHITECTURE.md` has a row
+  per surviving symbol (#351)
 
 ### Auth Server (`src/authserver/`)
 - `internal/handlers/` - HTTP handlers (auth flows, token, userinfo, DCR)
@@ -357,14 +359,17 @@ checks the same thing per module, where an unformatted file also costs that modu
 unparam and golangci-lint run.
 
 **Architecture guard**: `ARCHITECTURE.md` at the repository root records the allowed module edges,
-the intended final owner of every top-level `core` package, the temporary exceptions to those rules,
-and the third-party modules the admin console must not compile. Its three tables are data, not
-prose: `AssertArchitecture` in `core/testutil/architecture.go` parses them and checks them against
-the real import graph, and all three module unit tiers call it. The check runs in both directions,
+the intended final owner of every top-level `core` package, why each symbol left in `core/constants`
+is still there, the temporary exceptions to those rules, and the third-party modules the admin
+console must not compile. Its four tables are data, not prose: `AssertArchitecture` in
+`core/testutil/architecture.go` parses them and checks them against the real import graph, and the
+fourth against every production reference to `core/constants`; all three module unit tiers call it. The check runs in both directions,
 which is what makes the document a burn-down list rather than a wish — an edge the tables do not
 allow is a failure, and so is an exception left standing for an edge that no longer exists, so the
 issue that removes an edge has to remove its row with it (#332). A new top-level `core` package
-fails the tier until the table says where it belongs.
+fails the tier until the table says where it belongs, and so does a new symbol in `core/constants`,
+whose row has to name the strongest of `kernel`, `both-apps`, `moving` and `contract` that the
+reference graph backs (#351).
 
 **Dead-interface guard**: the auth server and admin console unit tiers each run
 `TestHandlers_NoDeadInterfaces` over their own `internal/handlers` package, holding every interface

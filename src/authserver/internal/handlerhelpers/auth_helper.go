@@ -6,7 +6,8 @@ import (
 	"net/http"
 
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/authserver/internal/constants"
+	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
@@ -45,9 +46,9 @@ func (s *AuthHelper) GetAuthContext(r *http.Request) (*ceremony.AuthContext, err
 
 func (s *AuthHelper) GetLoggedInSubject(r *http.Request) string {
 	var jwtInfo oauth.JwtInfo
-	if r.Context().Value(constants.ContextKeyJwtInfo) != nil {
+	if r.Context().Value(coreconstants.ContextKeyJwtInfo) != nil {
 		var ok bool
-		jwtInfo, ok = r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		jwtInfo, ok = r.Context().Value(coreconstants.ContextKeyJwtInfo).(oauth.JwtInfo)
 		if !ok {
 			// The stack rides inside the error attribute rather than being concatenated into
 			// the message by debug.Stack(): errs.New captures it here, at the origin, and every

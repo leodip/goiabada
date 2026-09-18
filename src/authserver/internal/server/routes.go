@@ -5,6 +5,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/config"
+	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	authhandlerhelpers "github.com/leodip/goiabada/authserver/internal/handlerhelpers"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
@@ -18,7 +19,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/signingkeys"
 	"github.com/leodip/goiabada/authserver/internal/usercreation"
 	"github.com/leodip/goiabada/authserver/internal/usersession"
-	"github.com/leodip/goiabada/core/constants"
+	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/handlerhelpers"
 	core_middleware "github.com/leodip/goiabada/core/middleware"
 	"github.com/leodip/goiabada/core/validators"
@@ -80,8 +81,8 @@ func (s *Server) initRoutes(root chi.Router) {
 	// RequireUserBoundToken comes AFTER the scope check so an insufficient-scope caller still
 	// receives the 403 it receives today. GET and POST are separate registrations: a guard added
 	// to only one of them leaves the other reachable.
-	root.With(authHeaderToContext, middleware.RequireBearerTokenScope(constants.AuthServerResourceIdentifier+":"+constants.UserinfoPermissionIdentifier), middleware.RequireUserBoundToken(), middleware.RequireValidSession(s.database)).Get("/userinfo", handlers.HandleUserInfoGetPost(httpHelper, s.database, auditLogger))
-	root.With(authHeaderToContext, middleware.RequireBearerTokenScope(constants.AuthServerResourceIdentifier+":"+constants.UserinfoPermissionIdentifier), middleware.RequireUserBoundToken(), middleware.RequireValidSession(s.database)).Post("/userinfo", handlers.HandleUserInfoGetPost(httpHelper, s.database, auditLogger))
+	root.With(authHeaderToContext, middleware.RequireBearerTokenScope(coreconstants.AuthServerResourceIdentifier+":"+coreconstants.UserinfoPermissionIdentifier), middleware.RequireUserBoundToken(), middleware.RequireValidSession(s.database)).Get("/userinfo", handlers.HandleUserInfoGetPost(httpHelper, s.database, auditLogger))
+	root.With(authHeaderToContext, middleware.RequireBearerTokenScope(coreconstants.AuthServerResourceIdentifier+":"+coreconstants.UserinfoPermissionIdentifier), middleware.RequireUserBoundToken(), middleware.RequireValidSession(s.database)).Post("/userinfo", handlers.HandleUserInfoGetPost(httpHelper, s.database, auditLogger))
 	root.Get("/health", handlers.HandleHealthCheckGet(httpHelper))
 	root.Get("/openapi.yaml", handlers.HandleOpenAPIGet())
 	root.Get("/userinfo/picture/{subject}", handlers.HandleProfilePictureGet(httpHelper, s.database))
@@ -139,47 +140,47 @@ func (s *Server) initRoutes(root chi.Router) {
 
 		// Scope helper function
 		scope := func(perm string) string {
-			return constants.AuthServerResourceIdentifier + ":" + perm
+			return coreconstants.AuthServerResourceIdentifier + ":" + perm
 		}
 
 		// Scope sets for granular authorization
 		// Read-only: admin-read OR manage
 		scopesRead := []string{
-			scope(constants.AdminReadPermissionIdentifier),
-			scope(constants.ManagePermissionIdentifier),
+			scope(coreconstants.AdminReadPermissionIdentifier),
+			scope(coreconstants.ManagePermissionIdentifier),
 		}
 		// Users domain: manage-users OR manage
 		scopesUsers := []string{
-			scope(constants.ManageUsersPermissionIdentifier),
-			scope(constants.ManagePermissionIdentifier),
+			scope(coreconstants.ManageUsersPermissionIdentifier),
+			scope(coreconstants.ManagePermissionIdentifier),
 		}
 		// Users read: admin-read OR manage-users OR manage
 		scopesUsersRead := []string{
-			scope(constants.AdminReadPermissionIdentifier),
-			scope(constants.ManageUsersPermissionIdentifier),
-			scope(constants.ManagePermissionIdentifier),
+			scope(coreconstants.AdminReadPermissionIdentifier),
+			scope(coreconstants.ManageUsersPermissionIdentifier),
+			scope(coreconstants.ManagePermissionIdentifier),
 		}
 		// Clients domain: manage-clients OR manage
 		scopesClients := []string{
-			scope(constants.ManageClientsPermissionIdentifier),
-			scope(constants.ManagePermissionIdentifier),
+			scope(coreconstants.ManageClientsPermissionIdentifier),
+			scope(coreconstants.ManagePermissionIdentifier),
 		}
 		// Clients read: admin-read OR manage-clients OR manage
 		scopesClientsRead := []string{
-			scope(constants.AdminReadPermissionIdentifier),
-			scope(constants.ManageClientsPermissionIdentifier),
-			scope(constants.ManagePermissionIdentifier),
+			scope(coreconstants.AdminReadPermissionIdentifier),
+			scope(coreconstants.ManageClientsPermissionIdentifier),
+			scope(coreconstants.ManagePermissionIdentifier),
 		}
 		// Settings domain: manage-settings OR manage
 		scopesSettings := []string{
-			scope(constants.ManageSettingsPermissionIdentifier),
-			scope(constants.ManagePermissionIdentifier),
+			scope(coreconstants.ManageSettingsPermissionIdentifier),
+			scope(coreconstants.ManagePermissionIdentifier),
 		}
 		// Settings read: admin-read OR manage-settings OR manage
 		scopesSettingsRead := []string{
-			scope(constants.AdminReadPermissionIdentifier),
-			scope(constants.ManageSettingsPermissionIdentifier),
-			scope(constants.ManagePermissionIdentifier),
+			scope(coreconstants.AdminReadPermissionIdentifier),
+			scope(coreconstants.ManageSettingsPermissionIdentifier),
+			scope(coreconstants.ManagePermissionIdentifier),
 		}
 
 		// User management routes
@@ -322,7 +323,7 @@ func (s *Server) initRoutes(root chi.Router) {
 		r.Use(core_middleware.MiddlewareNoStore())
 		r.Use(middleware.APIDebugMiddleware())
 		r.Use(authHeaderToContext)
-		r.Use(middleware.RequireBearerTokenScope(constants.AuthServerResourceIdentifier + ":" + constants.ManageAccountPermissionIdentifier))
+		r.Use(middleware.RequireBearerTokenScope(coreconstants.AuthServerResourceIdentifier + ":" + coreconstants.ManageAccountPermissionIdentifier))
 		// After the scope check, so an insufficient-scope caller still receives the 403 it
 		// receives today. These handlers resolve the acting user from `sub`, which is the
 		// client identifier on a client_credentials token, so the token type must be gated.
@@ -394,7 +395,7 @@ func (s *Server) initRoutes(root chi.Router) {
 		// One narrow permission of its own, deliberately not one of the manage-* admin
 		// API scopes: holding the admin console's client secret must not be a way to
 		// drive the whole admin API with no user present.
-		r.Use(middleware.RequireBearerTokenScope(constants.AuthServerResourceIdentifier + ":" + constants.BrowserSessionsPermissionIdentifier))
+		r.Use(middleware.RequireBearerTokenScope(coreconstants.AuthServerResourceIdentifier + ":" + coreconstants.BrowserSessionsPermissionIdentifier))
 
 		// No RequireUserBoundToken and no RequireValidSession here, and both absences are
 		// deliberate. This endpoint is reached only by a client_credentials token, which

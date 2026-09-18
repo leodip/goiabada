@@ -19,8 +19,8 @@ import (
 	mocks_handlerhelpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
 
 	"github.com/leodip/goiabada/authserver/internal/config"
+	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
-	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/errs"

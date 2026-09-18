@@ -3,8 +3,8 @@ package middleware
 import (
 	"context"
 
+	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/handlerhelpers"
 )
 

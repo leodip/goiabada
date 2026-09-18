@@ -14,9 +14,10 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/config"
+	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/otp"
 	"github.com/leodip/goiabada/authserver/web"
-	"github.com/leodip/goiabada/core/constants"
+	coreconstants "github.com/leodip/goiabada/core/constants"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/models"
@@ -195,10 +196,10 @@ func apiRequest(method string, target string, body string) *http.Request {
 	r.Header.Set("Content-Type", "application/json")
 	token := oauth.JwtToken{Claims: jwt.MapClaims{
 		"sub":       routesTestSubject,
-		"scope":     constants.AuthServerResourceIdentifier + ":" + constants.ManageAccountPermissionIdentifier,
+		"scope":     coreconstants.AuthServerResourceIdentifier + ":" + coreconstants.ManageAccountPermissionIdentifier,
 		"auth_time": float64(time.Now().Add(-time.Minute).Unix()),
 	}}
-	r = r.WithContext(context.WithValue(r.Context(), constants.ContextKeyBearerToken, token))
+	r = r.WithContext(context.WithValue(r.Context(), coreconstants.ContextKeyBearerToken, token))
 	return withRoutesTestSettings(r)
 }
 

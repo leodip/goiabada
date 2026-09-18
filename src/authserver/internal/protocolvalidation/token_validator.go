@@ -12,7 +12,8 @@ import (
 
 	"github.com/leodip/goiabada/core/errs"
 
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/authserver/internal/constants"
+	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/encryption"
@@ -844,8 +845,8 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 		// Pinned by the "legacy grant down-scoped to bare userinfo" case in
 		// TestValidateTokenRequest_RefreshToken_ROPC_InjectedUserInfoScope, which is the only test
 		// that can tell the two sources apart: in every other case `scopes` == tokenScope.
-		userInfoScope := fmt.Sprintf("%v:%v", constants.AuthServerResourceIdentifier,
-			constants.UserinfoPermissionIdentifier)
+		userInfoScope := fmt.Sprintf("%v:%v", coreconstants.AuthServerResourceIdentifier,
+			coreconstants.UserinfoPermissionIdentifier)
 		storedScopeHasOidcScope := false
 		for _, storedScopeStr := range strings.Split(tokenScope, " ") {
 			if oidc.IsIdTokenScope(storedScopeStr) {
