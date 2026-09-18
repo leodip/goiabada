@@ -290,7 +290,7 @@ func assertEmailIndex000047(t *testing.T, h *isolatedDB, phase string) {
 // way out. A check wired into one of them only would leave whichever it missed able to trip
 // idx_email and leave the schema dirty, which is the state decision 16 exists to prevent.
 //
-// sqlite only: NewDatabase takes a config.DatabaseConfig, and a DSN pointing at a throwaway file
+// sqlite only: NewDatabase takes a data.DatabaseConfig, and a DSN pointing at a throwaway file
 // is the one way to reach it without touching the shared test database this tier runs against.
 // What is under test is the wiring rather than any engine's LOWER(), and the engines are
 // TestMigration000047_LowercaseEmails' business.
@@ -300,7 +300,7 @@ func TestNewDatabase_RefusesAnEmailCaseCollisionAtStartup(t *testing.T) {
 	}
 
 	dsn := filepath.Join(t.TempDir(), "startup_preflight.db")
-	cfg := &config.DatabaseConfig{Type: "sqlite", DSN: dsn}
+	cfg := &data.DatabaseConfig{Type: "sqlite", DSN: dsn}
 
 	// A database sitting one below 000047 with a collision already in it, which is what a legacy
 	// deployment upgrading across this release looks like.
@@ -319,7 +319,8 @@ func TestNewDatabase_RefusesAnEmailCaseCollisionAtStartup(t *testing.T) {
 	}))
 	require.NoError(t, seed.DB.Close(), "close the seeding handle before the server opens its own")
 
-	opened, err := data.NewDatabase(cfg, false)
+	opened, err := data.NewDatabase(cfg,
+		config.GetAESEncryptionKey(), config.GetAESEncryptionKeyPrevious(), false)
 
 	require.Error(t, err, "startup must refuse a database holding a collision rather than migrate it")
 	assert.Nil(t, opened, "a refused startup must hand back no database")

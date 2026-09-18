@@ -27,6 +27,24 @@ var database data.Database
 // suite for no added certainty.
 const timestampTick = 2 * time.Millisecond
 
+// dataDatabaseConfig maps the GOIABADA_DB_* configuration this tier runs against onto the shape
+// core/data declares for itself, which is what core/data takes since it stopped reading the
+// configuration singleton (#351). One helper for the package, because every handle it opens is
+// opened against the same configured engine.
+func dataDatabaseConfig() *data.DatabaseConfig {
+	dbConfig := config.GetDatabase()
+	return &data.DatabaseConfig{
+		Type:     dbConfig.Type,
+		Username: dbConfig.Username,
+		Password: dbConfig.Password,
+		Host:     dbConfig.Host,
+		Port:     dbConfig.Port,
+		Name:     dbConfig.Name,
+		DSN:      dbConfig.DSN,
+		Create:   dbConfig.Create,
+	}
+}
+
 func TestMain(m *testing.M) {
 	slog.Info("running TestMain")
 
@@ -56,7 +74,8 @@ func TestMain(m *testing.M) {
 
 	// Initialize database
 	var err error
-	database, err = data.NewDatabase(config.GetDatabase(), false)
+	database, err = data.NewDatabase(dataDatabaseConfig(),
+		config.GetAESEncryptionKey(), config.GetAESEncryptionKeyPrevious(), false)
 	if err != nil {
 		slog.Error("failed to initialize database", "error", err)
 		os.Exit(1)

@@ -6,12 +6,10 @@ import (
 	"os"
 	"testing"
 
-	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/i18n"
 )
 
 func TestMain(m *testing.M) {
-	config.Init()
 	// The CSRF and JWT middleware render localized error pages, so without a loaded
 	// bundle i18n.T falls back to echoing the key and the body assertions would pass
 	// against the key rather than against the message.
