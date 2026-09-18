@@ -36,6 +36,11 @@ type auditPagingApiClient struct {
 	events []string
 	// requestIds records the same for the request id filter (#328).
 	requestIds []string
+	// eventTypes is the catalog the auth server answers with, and eventTypesErr the
+	// refusal it answers with instead. The viewer fetches the dropdown's options over
+	// the API rather than compiling them in (#351).
+	eventTypes    []string
+	eventTypesErr error
 }
 
 func (c *auditPagingApiClient) GetAuditLogsPaginated(accessToken string, page, pageSize int,
@@ -51,6 +56,13 @@ func (c *auditPagingApiClient) GetAuditLogsPaginated(accessToken string, page, p
 		Page:      page,
 		Size:      pageSize,
 	}, nil
+}
+
+func (c *auditPagingApiClient) GetAuditEventTypes(accessToken string) (*api.GetAuditEventTypesResponse, error) {
+	if c.eventTypesErr != nil {
+		return nil, c.eventTypesErr
+	}
+	return &api.GetAuditEventTypesResponse{AuditEventTypes: c.eventTypes}, nil
 }
 
 // logsOnPage is the slice of a log of total entries that page holds, each
@@ -373,4 +385,59 @@ func currentPage(t *testing.T, p *pagination.Paginator) int {
 	}
 	require.NotZero(t, current, "the bar highlights nothing")
 	return current
+}
+
+// Seam 5's handler half (#351). The filter dropdown used to be constants.AuditEventTypes
+// compiled into this binary; it is now whatever the auth server answered. The catalog below is
+// deliberately not a real one, so a handler that fell back on a compiled-in list would render
+// the wrong options rather than coincidentally the right ones.
+func TestHandleAdminSettingsAuditLogViewerGet_TheDropdownIsWhatTheApiAnswered(t *testing.T) {
+	httpHelper := mocks_handler_helpers.NewHttpHelper(t)
+	handlertest.RefuseInternalServerError(t, httpHelper)
+	handlertest.ExpectRender(httpHelper,
+		"/layouts/menu_layout.html", "/admin_settings_audit_log_viewer.html").Once()
+
+	catalog := []string{"an_event_no_constant_declares", "another_one"}
+	apiClient := &auditPagingApiClient{total: 3, eventTypes: catalog}
+
+	req := handlertest.Request(http.MethodGet, "/admin/settings/audit-log-viewer",
+		handlertest.WithAccessToken())
+	HandleAdminSettingsAuditLogViewerGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
+
+	bind := handlertest.Bind(t, httpHelper)
+	assert.Equal(t, catalog, bind["auditEventTypes"],
+		"the dropdown did not come from the catalog the API answered with")
+}
+
+// A catalog the auth server refuses is an error, not an empty dropdown. Rendering the page
+// anyway would show a filter with no options and nothing saying why, which reads as "this
+// deployment has no audit events" rather than as a failed call.
+func TestHandleAdminSettingsAuditLogViewerGet_ACatalogFailureIsNotAnEmptyDropdown(t *testing.T) {
+	httpHelper := mocks_handler_helpers.NewHttpHelper(t)
+
+	var answered error
+	httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).
+		Run(func(args mock.Arguments) { answered = args.Get(2).(error) }).Once()
+	handlertest.ExpectRender(httpHelper, mock.Anything, mock.Anything).Maybe()
+
+	apiClient := &auditPagingApiClient{
+		total: 3,
+		eventTypesErr: &apiclient.APIError{
+			Code:       "insufficient_scope",
+			Message:    "Insufficient scope.",
+			StatusCode: http.StatusForbidden,
+		},
+	}
+
+	req := handlertest.Request(http.MethodGet, "/admin/settings/audit-log-viewer",
+		handlertest.WithAccessToken())
+	HandleAdminSettingsAuditLogViewerGet(httpHelper, apiClient).ServeHTTP(httptest.NewRecorder(), req)
+
+	require.Error(t, answered, "the handler did not answer the catalog failure")
+	assert.Contains(t, answered.Error(), "Insufficient scope.")
+
+	for _, call := range httpHelper.Calls {
+		assert.NotEqual(t, "RenderTemplate", call.Method,
+			"the viewer rendered a page over a catalog it never got")
+	}
 }

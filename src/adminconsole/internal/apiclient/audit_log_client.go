@@ -123,3 +123,39 @@ func (c *AuthServerClient) GetAuditLogsPaginated(accessToken string, page, pageS
 	}
 	return &response, nil
 }
+
+// GetAuditEventTypes fetches the catalog of audit event names the auth server can write, which
+// is what the viewer's filter dropdown offers. The admin console holds no audit event name of
+// its own: a name compiled in here would be one the two binaries could disagree about after a
+// partial upgrade, offering a filter value the server never writes (#351).
+func (c *AuthServerClient) GetAuditEventTypes(accessToken string) (*api.GetAuditEventTypesResponse, error) {
+	fullURL := c.baseURL + "/api/v1/admin/audit-logs/event-types"
+
+	req, err := http.NewRequest("GET", fullURL, nil)
+	if err != nil {
+		return nil, errs.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, errs.Errorf("failed to make request: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, errs.Errorf("failed to read response body: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, parseAPIError(resp, body)
+	}
+
+	var response api.GetAuditEventTypesResponse
+	if err := json.Unmarshal(body, &response); err != nil {
+		return nil, errs.Errorf("failed to decode response: %w", err)
+	}
+	return &response, nil
+}

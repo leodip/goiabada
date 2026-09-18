@@ -307,6 +307,9 @@ func (s *Server) initRoutes(root chi.Router) {
 
 		// Audit Logs Viewer
 		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/audit-logs", apihandlers.HandleAPIAuditLogsGet(s.database))
+		// The catalog the auditEvent filter above accepts. Same read scope, because it describes
+		// that endpoint and tells a caller nothing the endpoint itself does not (#351).
+		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/audit-logs/event-types", apihandlers.HandleAPIAuditEventTypesGet())
 
 		// Reference data routes (read-only, accessible by any admin scope)
 		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesRead)).Get("/phone-countries", apihandlers.HandleAPIPhoneCountriesGet())

@@ -83,3 +83,66 @@ func TestGetAuditLogsPaginated_BothFiltersReachTheServerEscaped(t *testing.T) {
 		})
 	}
 }
+
+// The catalog half of seam 5 (#351). The viewer's dropdown is now a value fetched over the
+// wire rather than a slice compiled in, so three things about the fetch are load-bearing: it
+// asks the right path, it carries the bearer token, and a refusal comes back as an error
+// rather than as an empty catalog. The last is what would otherwise render a dropdown with no
+// options and no explanation on a token that lost its scope.
+func TestGetAuditEventTypes_RequestsTheCatalogAndCarriesTheToken(t *testing.T) {
+	var gotPath, gotAuth string
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		gotAuth = r.Header.Get("Authorization")
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(api.GetAuditEventTypesResponse{
+			AuditEventTypes: []string{"created_user", "deleted_user"},
+		})
+	}))
+	defer server.Close()
+
+	client := NewAuthServerClient(server.URL)
+	resp, err := client.GetAuditEventTypes("an-access-token")
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+
+	assert.Equal(t, "/api/v1/admin/audit-logs/event-types", gotPath)
+	assert.Equal(t, "Bearer an-access-token", gotAuth)
+	assert.Equal(t, []string{"created_user", "deleted_user"}, resp.AuditEventTypes)
+}
+
+func TestGetAuditEventTypes_ARefusalIsAnError(t *testing.T) {
+	testCases := []struct {
+		name   string
+		status int
+		body   string
+	}{
+		{"forbidden, as the API writes it", http.StatusForbidden,
+			`{"error":"insufficient_scope","error_description":"Insufficient scope."}`},
+		{"unauthorized", http.StatusUnauthorized,
+			`{"error":"unauthorized","error_description":"Access token required."}`},
+		{"a body that is not the error envelope", http.StatusInternalServerError, "upstream is down"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(tc.status)
+				_, _ = w.Write([]byte(tc.body))
+			}))
+			defer server.Close()
+
+			resp, err := NewAuthServerClient(server.URL).GetAuditEventTypes("an-access-token")
+			require.Error(t, err)
+			assert.Nil(t, resp, "a refused catalog must not come back as an empty one")
+
+			// Through the classifier, so the handler above it can map the status rather
+			// than meet an opaque error.
+			var apiErr *APIError
+			require.ErrorAs(t, err, &apiErr)
+			assert.Equal(t, tc.status, apiErr.StatusCode)
+		})
+	}
+}

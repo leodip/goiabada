@@ -2710,6 +2710,30 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
 
+  /api/v1/admin/audit-logs/event-types:
+    get:
+      tags: [Audit Logs]
+      summary: Get audit event types
+      description: |
+        Get the catalog of audit event names this server can write, which is the set the
+        auditEvent filter on GET /api/v1/admin/audit-logs accepts. The list is fixed at build
+        time, not derived from the rows present, so it includes events that have not yet
+        occurred on this deployment.
+      operationId: getAuditEventTypes
+      responses:
+        '200':
+          description: Audit event types
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetAuditEventTypesResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
   # =============================================================================
   # ACCOUNT API
   # =============================================================================
@@ -5487,6 +5511,16 @@ components:
         - auditEvent
         - details
         - requestId
+
+    GetAuditEventTypesResponse:
+      type: object
+      properties:
+        auditEventTypes:
+          type: array
+          items:
+            type: string
+      required:
+        - auditEventTypes
 
     GetAuditLogsResponse:
       type: object
