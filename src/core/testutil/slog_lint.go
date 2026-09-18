@@ -153,7 +153,7 @@ var slogHandlerInstalls = map[string]bool{
 // core/testutil install one unnoticed.
 var slogHandlerOwners = []string{
 	"core/logging",
-	"core/cmd/schemadump",
+	"authserver/cmd/schemadump",
 	"authserver/cmd/goiabada-authserver",
 	"adminconsole/cmd/goiabada-adminconsole",
 	"core/testutil/slog_capture.go",

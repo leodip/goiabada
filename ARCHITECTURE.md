@@ -85,7 +85,6 @@ A row whose owner is not `kernel` names the issue that moves it. A `kernel` row 
 |---|---|---|
 | `core/api` | kernel | — |
 | `core/auditlog` | authserver | #359 |
-| `core/cmd` | authserver | #354 |
 | `core/constants` | kernel | — |
 | `core/countries` | kernel | — |
 | `core/customerrors` | kernel | — |
