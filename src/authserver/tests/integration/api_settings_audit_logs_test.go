@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
@@ -245,7 +246,7 @@ func TestAPISettingsAuditLogsPut_IsItselfAudited(t *testing.T) {
 	err = database.UpdateSettings(nil, settings)
 	assert.NoError(t, err)
 
-	before, _, err := database.GetAuditLogsPaginated(nil, 1, 1, constants.AuditUpdatedAuditLogsSettings, "")
+	before, _, err := database.GetAuditLogsPaginated(nil, 1, 1, audit.AuditUpdatedAuditLogsSettings, "")
 	assert.NoError(t, err)
 	var lastIdBefore int64
 	if len(before) > 0 {
@@ -261,7 +262,7 @@ func TestAPISettingsAuditLogsPut_IsItselfAudited(t *testing.T) {
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
-	after, total, err := database.GetAuditLogsPaginated(nil, 1, 1, constants.AuditUpdatedAuditLogsSettings, "")
+	after, total, err := database.GetAuditLogsPaginated(nil, 1, 1, audit.AuditUpdatedAuditLogsSettings, "")
 	assert.NoError(t, err)
 	assert.Greater(t, total, 0, "the settings change must be recorded")
 	assert.NotEmpty(t, after)

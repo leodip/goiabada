@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
+	"github.com/leodip/goiabada/authserver/internal/audit"
 	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	authmiddleware "github.com/leodip/goiabada/authserver/internal/middleware"
@@ -36,7 +37,7 @@ func expectCeremonyMismatch(t *testing.T, httpHelper *mocks_handlerhelpers.HttpH
 	auditLogger *mocks_audit.AuditLogger, rr *httptest.ResponseRecorder, req *http.Request) {
 	t.Helper()
 
-	auditLogger.On("Log", mock.Anything, constants.AuditAuthCeremonyMismatch, mock.Anything).Return().Once()
+	auditLogger.On("Log", mock.Anything, audit.AuditAuthCeremonyMismatch, mock.Anything).Return().Once()
 	httpHelper.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html", "/auth_error.html",
 		mock.MatchedBy(func(data map[string]interface{}) bool {
 			return data["_httpStatus"] == http.StatusBadRequest &&
@@ -224,7 +225,7 @@ func TestRejectCeremonyMismatch_AuditsUnderTheRequestsContext(t *testing.T) {
 
 	auditLogger.On("Log", mock.MatchedBy(func(ctx context.Context) bool {
 		return chimiddleware.GetReqID(ctx) == requestId
-	}), constants.AuditAuthCeremonyMismatch, mock.MatchedBy(func(details map[string]interface{}) bool {
+	}), audit.AuditAuthCeremonyMismatch, mock.MatchedBy(func(details map[string]interface{}) bool {
 		return details["clientId"] == "test-client"
 	})).Return().Once()
 	httpHelper.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html", "/auth_error.html",

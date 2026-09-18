@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/uithemes"
 	"github.com/leodip/goiabada/core/api"
@@ -77,7 +78,7 @@ func HandleAPISettingsUIThemePut(
 		}
 
 		// Audit log old/new
-		auditLogger.Log(r.Context(), constants.AuditUpdatedUIThemeSettings, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.AuditUpdatedUIThemeSettings, map[string]interface{}{
 			"loggedInUser": authHelper.GetLoggedInSubject(r),
 			"oldUITheme":   oldTheme,
 			"newUITheme":   currentSettings.UITheme,

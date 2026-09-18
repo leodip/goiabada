@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
@@ -235,7 +236,7 @@ func HandleAuthPwdPost(
 			// charging it is also what keeps this branch from being a cheaper way to
 			// enumerate addresses than the branch below.
 			credentialFailures.RecordCredentialFailure(r)
-			auditLogger.Log(r.Context(), constants.AuditAuthFailedPwd, map[string]interface{}{
+			auditLogger.Log(r.Context(), audit.AuditAuthFailedPwd, map[string]interface{}{
 				"email": email,
 			})
 			renderError(authFailed)
@@ -244,7 +245,7 @@ func HandleAuthPwdPost(
 
 		if !hashutil.VerifyPasswordHash(user.PasswordHash, password) {
 			credentialFailures.RecordCredentialFailure(r)
-			auditLogger.Log(r.Context(), constants.AuditAuthFailedPwd, map[string]interface{}{
+			auditLogger.Log(r.Context(), audit.AuditAuthFailedPwd, map[string]interface{}{
 				"email": email,
 			})
 			renderError(authFailed)
@@ -261,7 +262,7 @@ func HandleAuthPwdPost(
 		// and missing-password renders above, which verify nothing at all. Charging those
 		// would let anyone spend an account's failure budget without ever guessing (#219).
 		if !user.Enabled {
-			auditLogger.Log(r.Context(), constants.AuditUserDisabled, map[string]interface{}{
+			auditLogger.Log(r.Context(), audit.AuditUserDisabled, map[string]interface{}{
 				"userId": user.Id,
 			})
 			renderError(i18n.NewLocalizedError(i18n.ErrCodeLoginAccountDisabled, nil))
@@ -270,7 +271,7 @@ func HandleAuthPwdPost(
 
 		// from this point the user is considered authenticated with pwd
 
-		auditLogger.Log(r.Context(), constants.AuditAuthSuccessPwd, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.AuditAuthSuccessPwd, map[string]interface{}{
 			"userId": user.Id,
 		})
 

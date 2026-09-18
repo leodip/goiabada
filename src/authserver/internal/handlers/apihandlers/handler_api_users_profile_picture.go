@@ -6,11 +6,11 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/imaging"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/core/config"
-	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/models"
 )
@@ -119,7 +119,7 @@ func HandleAPIUserProfilePicturePost(
 		}
 
 		// Log audit event
-		auditLogger.Log(r.Context(), constants.AuditUpdatedUserProfilePicture, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.AuditUpdatedUserProfilePicture, map[string]interface{}{
 			"userId":       user.Id,
 			"loggedInUser": loggedInUser,
 		})
@@ -180,7 +180,7 @@ func HandleAPIUserProfilePictureDelete(
 		}
 
 		// Log audit event
-		auditLogger.Log(r.Context(), constants.AuditDeletedUserProfilePicture, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.AuditDeletedUserProfilePicture, map[string]interface{}{
 			"userId":       user.Id,
 			"loggedInUser": loggedInUser,
 		})

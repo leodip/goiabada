@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/otp"
 	"github.com/leodip/goiabada/core/config"
@@ -288,7 +289,7 @@ func HandleAuthOtpPost(
 
 		// i18n surface: A — browser-flow form rerender.
 		if !user.Enabled {
-			auditLogger.Log(r.Context(), constants.AuditUserDisabled, map[string]interface{}{
+			auditLogger.Log(r.Context(), audit.AuditUserDisabled, map[string]interface{}{
 				"userId": user.Id,
 			})
 			renderError(i18n.NewLocalizedError(i18n.ErrCodeOtpAccountDisabled, nil).Localize(r.Context()))
@@ -320,7 +321,7 @@ func HandleAuthOtpPost(
 				// Every wrong code is a guess at three of a million, so this is the
 				// counter the whole OTP budget exists to move (#219).
 				credentialFailures.RecordCredentialFailure(r)
-				auditLogger.Log(r.Context(), constants.AuditAuthFailedOtp, map[string]interface{}{
+				auditLogger.Log(r.Context(), audit.AuditAuthFailedOtp, map[string]interface{}{
 					"userId": user.Id,
 				})
 				renderError(incorrectOtpError)
@@ -341,11 +342,11 @@ func HandleAuthOtpPost(
 				// A replayed step is refused exactly as a wrong code is, so it counts as
 				// one: a code already spent proves nothing about who is submitting it.
 				credentialFailures.RecordCredentialFailure(r)
-				auditLogger.Log(r.Context(), constants.AuditOTPCodeReplayDetected, map[string]interface{}{
+				auditLogger.Log(r.Context(), audit.AuditOTPCodeReplayDetected, map[string]interface{}{
 					"userId": user.Id,
 					"step":   step,
 				})
-				auditLogger.Log(r.Context(), constants.AuditAuthFailedOtp, map[string]interface{}{
+				auditLogger.Log(r.Context(), audit.AuditAuthFailedOtp, map[string]interface{}{
 					"userId": user.Id,
 				})
 				renderError(incorrectOtpError)
@@ -356,7 +357,7 @@ func HandleAuthOtpPost(
 			step, matched := otp.MatchStep(otpCode, secretKey, time.Now().UTC())
 			if !matched {
 				credentialFailures.RecordCredentialFailure(r)
-				auditLogger.Log(r.Context(), constants.AuditAuthFailedOtp, map[string]interface{}{
+				auditLogger.Log(r.Context(), audit.AuditAuthFailedOtp, map[string]interface{}{
 					"userId": user.Id,
 				})
 				renderError(incorrectOtpError)
@@ -376,11 +377,11 @@ func HandleAuthOtpPost(
 			}
 			if !consumed {
 				credentialFailures.RecordCredentialFailure(r)
-				auditLogger.Log(r.Context(), constants.AuditOTPCodeReplayDetected, map[string]interface{}{
+				auditLogger.Log(r.Context(), audit.AuditOTPCodeReplayDetected, map[string]interface{}{
 					"userId": user.Id,
 					"step":   step,
 				})
-				auditLogger.Log(r.Context(), constants.AuditAuthFailedOtp, map[string]interface{}{
+				auditLogger.Log(r.Context(), audit.AuditAuthFailedOtp, map[string]interface{}{
 					"userId": user.Id,
 				})
 				renderError(incorrectOtpError)
@@ -410,14 +411,14 @@ func HandleAuthOtpPost(
 			// here, so a concurrent change cannot be laundered into it (#242).
 			authContext.OtpConfigGeneration = &enrolledGeneration
 
-			auditLogger.Log(r.Context(), constants.AuditEnabledOTP, map[string]interface{}{
+			auditLogger.Log(r.Context(), audit.AuditEnabledOTP, map[string]interface{}{
 				"userId": user.Id,
 			})
 		}
 
 		// from this point the user is considered authenticated with otp
 
-		auditLogger.Log(r.Context(), constants.AuditAuthSuccessOtp, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.AuditAuthSuccessOtp, map[string]interface{}{
 			"userId": user.Id,
 		})
 

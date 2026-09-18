@@ -12,6 +12,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
+	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
@@ -260,7 +261,7 @@ func HandleAPIClientDelete(
 			return
 		}
 
-		auditLogger.Log(r.Context(), constants.AuditDeletedClient, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.AuditDeletedClient, map[string]interface{}{
 			"clientId":         client.Id,
 			"clientIdentifier": client.ClientIdentifier,
 			"loggedInUser":     authHelper.GetLoggedInSubject(r),
@@ -365,7 +366,7 @@ func HandleAPIClientCreatePost(
 		}
 
 		// Audit log
-		auditLogger.Log(r.Context(), constants.AuditCreatedClient, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.AuditCreatedClient, map[string]interface{}{
 			"clientId":         client.Id,
 			"clientIdentifier": client.ClientIdentifier,
 			"loggedInUser":     authHelper.GetLoggedInSubject(r),
@@ -581,7 +582,7 @@ func HandleAPIClientUpdatePut(
 		}
 
 		// Audit log
-		auditLogger.Log(r.Context(), constants.AuditUpdatedClientSettings, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.AuditUpdatedClientSettings, map[string]interface{}{
 			"clientId":     client.Id,
 			"loggedInUser": authHelper.GetLoggedInSubject(r),
 		})
@@ -712,7 +713,7 @@ func HandleAPIClientAuthenticationPut(
 		}
 
 		// Audit
-		auditLogger.Log(r.Context(), constants.AuditUpdatedClientAuthentication, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.AuditUpdatedClientAuthentication, map[string]interface{}{
 			"clientId":     client.Id,
 			"loggedInUser": authHelper.GetLoggedInSubject(r),
 		})
@@ -804,7 +805,7 @@ func HandleAPIClientOAuth2FlowsPut(
 		}
 
 		// Audit
-		auditLogger.Log(r.Context(), constants.AuditUpdatedClientOAuth2Flows, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.AuditUpdatedClientOAuth2Flows, map[string]interface{}{
 			"clientId":     client.Id,
 			"loggedInUser": authHelper.GetLoggedInSubject(r),
 		})
@@ -955,7 +956,7 @@ func HandleAPIClientRedirectURIsPut(
 		}
 
 		// Audit
-		auditLogger.Log(r.Context(), constants.AuditUpdatedRedirectURIs, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.AuditUpdatedRedirectURIs, map[string]interface{}{
 			"clientId":     client.Id,
 			"loggedInUser": authHelper.GetLoggedInSubject(r),
 		})
@@ -1149,7 +1150,7 @@ func HandleAPIClientWebOriginsPut(
 		}
 
 		// Audit
-		auditLogger.Log(r.Context(), constants.AuditUpdatedWebOrigins, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.AuditUpdatedWebOrigins, map[string]interface{}{
 			"clientId":     client.Id,
 			"loggedInUser": authHelper.GetLoggedInSubject(r),
 		})
@@ -1264,7 +1265,7 @@ func HandleAPIClientTokensPut(
 		}
 
 		// Audit
-		auditLogger.Log(r.Context(), constants.AuditUpdatedClientTokens, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.AuditUpdatedClientTokens, map[string]interface{}{
 			"clientId":     client.Id,
 			"loggedInUser": authHelper.GetLoggedInSubject(r),
 		})

@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/audit"
 	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
@@ -656,7 +657,7 @@ func TestHandleExistingSessionOnLogout(t *testing.T) {
 
 		authHelper.On("GetLoggedInSubject", mock.Anything).Return("user-123")
 
-		auditLogger.On("Log", mock.Anything, constants.AuditDeletedUserSessionClient, mock.Anything).Return()
+		auditLogger.On("Log", mock.Anything, audit.AuditDeletedUserSessionClient, mock.Anything).Return()
 
 		err := handleExistingSessionOnLogout(r, sessionIdentifier, client, database, auditLogger, authHelper)
 
@@ -697,8 +698,8 @@ func TestHandleExistingSessionOnLogout(t *testing.T) {
 
 		authHelper.On("GetLoggedInSubject", mock.Anything).Return("user-123")
 
-		auditLogger.On("Log", mock.Anything, constants.AuditDeletedUserSessionClient, mock.Anything).Return()
-		auditLogger.On("Log", mock.Anything, constants.AuditLogout, mock.Anything).Return()
+		auditLogger.On("Log", mock.Anything, audit.AuditDeletedUserSessionClient, mock.Anything).Return()
+		auditLogger.On("Log", mock.Anything, audit.AuditLogout, mock.Anything).Return()
 
 		err := handleExistingSessionOnLogout(r, sessionIdentifier, client, database, auditLogger, authHelper)
 
@@ -869,8 +870,8 @@ func stubPerClientTeardown(
 	database.On("DeleteUserSession", mock.Anything, int64(42)).Return(nil)
 
 	authHelper.On("GetLoggedInSubject", mock.Anything).Return("user-123")
-	auditLogger.On("Log", mock.Anything, constants.AuditDeletedUserSessionClient, mock.Anything).Return()
-	auditLogger.On("Log", mock.Anything, constants.AuditLogout, mock.Anything).Return()
+	auditLogger.On("Log", mock.Anything, audit.AuditDeletedUserSessionClient, mock.Anything).Return()
+	auditLogger.On("Log", mock.Anything, audit.AuditLogout, mock.Anything).Return()
 }
 
 // mustParseURL fails the test rather than returning a zero URL, so an assertion on a malformed
@@ -971,10 +972,10 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 
 		authHelper.On("GetLoggedInSubject", mock.Anything).Return("user-123")
 
-		auditLogger.On("Log", mock.Anything, constants.AuditDeletedUserSession, mock.MatchedBy(func(details map[string]interface{}) bool {
+		auditLogger.On("Log", mock.Anything, audit.AuditDeletedUserSession, mock.MatchedBy(func(details map[string]interface{}) bool {
 			return details["userSessionId"] == int64(42) && details["loggedInUser"] == "user-123"
 		})).Return()
-		auditLogger.On("Log", mock.Anything, constants.AuditLogout, mock.MatchedBy(func(details map[string]interface{}) bool {
+		auditLogger.On("Log", mock.Anything, audit.AuditLogout, mock.MatchedBy(func(details map[string]interface{}) bool {
 			return details["userId"] == int64(123) &&
 				details["sessionIdentifier"] == "test-session" &&
 				details["loggedInUser"] == "user-123"
@@ -1332,10 +1333,10 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 				database.On("DeleteUserSession", mock.Anything, int64(42)).Return(nil)
 
 				authHelper.On("GetLoggedInSubject", mock.Anything).Return("user-123")
-				auditLogger.On("Log", mock.Anything, constants.AuditDeletedUserSession, mock.MatchedBy(func(details map[string]interface{}) bool {
+				auditLogger.On("Log", mock.Anything, audit.AuditDeletedUserSession, mock.MatchedBy(func(details map[string]interface{}) bool {
 					return details["userSessionId"] == int64(42) && details["loggedInUser"] == "user-123"
 				})).Return()
-				auditLogger.On("Log", mock.Anything, constants.AuditLogout, mock.MatchedBy(func(details map[string]interface{}) bool {
+				auditLogger.On("Log", mock.Anything, audit.AuditLogout, mock.MatchedBy(func(details map[string]interface{}) bool {
 					return details["userId"] == int64(123) && details["sessionIdentifier"] == "test-session"
 				})).Return()
 
@@ -1412,7 +1413,7 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 
 				assert.Equal(t, http.StatusInternalServerError, rr.Code)
 				// A failed teardown must not be reported as a completed logout.
-				auditLogger.AssertNotCalled(t, "Log", mock.Anything, constants.AuditLogout, mock.Anything)
+				auditLogger.AssertNotCalled(t, "Log", mock.Anything, audit.AuditLogout, mock.Anything)
 				httpHelper.AssertExpectations(t)
 			})
 		}
@@ -1462,7 +1463,7 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 				tc.stubDB(database)
 
 				authHelper.On("GetLoggedInSubject", mock.Anything).Return("user-123")
-				auditLogger.On("Log", mock.Anything, constants.AuditLogout, mock.MatchedBy(func(details map[string]interface{}) bool {
+				auditLogger.On("Log", mock.Anything, audit.AuditLogout, mock.MatchedBy(func(details map[string]interface{}) bool {
 					return details["userId"] == int64(0) && details["sessionIdentifier"] == tc.sessionIdentifier
 				})).Return()
 
@@ -1476,7 +1477,7 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 				assert.Equal(t, http.StatusOK, rr.Code)
 				assert.Empty(t, mockSession.Values, "the OP session cookie must be cleared")
 				database.AssertNotCalled(t, "DeleteUserSession", mock.Anything, mock.Anything)
-				auditLogger.AssertNotCalled(t, "Log", mock.Anything, constants.AuditDeletedUserSession, mock.Anything)
+				auditLogger.AssertNotCalled(t, "Log", mock.Anything, audit.AuditDeletedUserSession, mock.Anything)
 				auditLogger.AssertExpectations(t)
 			})
 		}

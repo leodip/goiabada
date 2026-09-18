@@ -17,6 +17,7 @@ import (
 	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/require"
 
+	"github.com/leodip/goiabada/authserver/internal/audit"
 	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	authmiddleware "github.com/leodip/goiabada/authserver/internal/middleware"
@@ -464,11 +465,11 @@ func TestHandleTokenPost(t *testing.T) {
 		userSessionManager.On("BumpUserSession", req, mockSessionIdentifier, mockClientId, "", "").
 			Return(mockUserSession, nil)
 
-		auditLogger.On("Log", mock.Anything, constants.AuditBumpedUserSession, mock.MatchedBy(func(details map[string]interface{}) bool {
+		auditLogger.On("Log", mock.Anything, audit.AuditBumpedUserSession, mock.MatchedBy(func(details map[string]interface{}) bool {
 			return details["userId"] == mockUserId && details["clientId"] == mockClientId
 		})).Return()
 
-		auditLogger.On("Log", mock.Anything, constants.AuditTokenIssuedRefreshTokenResponse, mock.MatchedBy(func(details map[string]interface{}) bool {
+		auditLogger.On("Log", mock.Anything, audit.AuditTokenIssuedRefreshTokenResponse, mock.MatchedBy(func(details map[string]interface{}) bool {
 			return details["codeId"] == mockCodeId && details["refreshTokenJti"] == mockRefreshTokenJti
 		})).Return()
 
@@ -539,7 +540,7 @@ func TestHandleTokenPost(t *testing.T) {
 		tokenIssuer.On("GenerateTokenResponseForRefresh", req.Context(), mock.AnythingOfType("*issuance.GenerateTokenForRefreshInput")).
 			Return(mockTokenResponse, nil)
 
-		auditLogger.On("Log", mock.Anything, constants.AuditTokenIssuedRefreshTokenResponse, mock.MatchedBy(func(details map[string]interface{}) bool {
+		auditLogger.On("Log", mock.Anything, audit.AuditTokenIssuedRefreshTokenResponse, mock.MatchedBy(func(details map[string]interface{}) bool {
 			return details["codeId"] == mockCodeId && details["refreshTokenJti"] == mockRefreshTokenJti
 		})).Return()
 
@@ -1178,7 +1179,7 @@ func TestHandleTokenPost_Refresh_Replay_AuditsContainment(t *testing.T) {
 			database.On("RevokeRefreshTokenFamily", (*sql.Tx)(nil), familyJti).Return(int64(2), nil)
 
 			var logged []map[string]interface{}
-			auditLogger.On("Log", mock.Anything, constants.AuditRefreshTokenReplayDetected, mock.AnythingOfType("map[string]interface {}")).
+			auditLogger.On("Log", mock.Anything, audit.AuditRefreshTokenReplayDetected, mock.AnythingOfType("map[string]interface {}")).
 				Run(func(args mock.Arguments) {
 					logged = append(logged, args.Get(2).(map[string]interface{}))
 				}).Return()
@@ -1544,7 +1545,7 @@ func TestHandleTokenPost_ScopeDenialAudit(t *testing.T) {
 			tokenValidator.On("ValidateTokenRequest", req.Context(),
 				mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).Return(nil, denial)
 
-			auditLogger.On("Log", mock.Anything, constants.AuditTokenScopeDenied, mock.MatchedBy(
+			auditLogger.On("Log", mock.Anything, audit.AuditTokenScopeDenied, mock.MatchedBy(
 				func(details map[string]interface{}) bool {
 					return details["clientIdentifier"] == "test_client" &&
 						details["grantType"] == tc.grantType &&
@@ -1617,7 +1618,7 @@ func TestHandleTokenPost_ScopeDenialAudit(t *testing.T) {
 		tokenIssuer.On("GenerateTokenResponseForClientCred", req.Context(), mockClient, "billing-api:read").
 			Return(tokenResponse, nil)
 
-		auditLogger.On("Log", mock.Anything, constants.AuditTokenIssuedClientCredentialsResponse, mock.MatchedBy(
+		auditLogger.On("Log", mock.Anything, audit.AuditTokenIssuedClientCredentialsResponse, mock.MatchedBy(
 			func(details map[string]interface{}) bool {
 				clientId, ok := details["clientId"].(int64)
 				return ok && clientId == mockClient.Id && details["scope"] == "billing-api:read"
@@ -1683,7 +1684,7 @@ func TestHandleTokenPost_ROPC_IgnoresBrowserSession(t *testing.T) {
 		Run(func(args mock.Arguments) { captured = args.Get(1).(*issuance.ROPCGrantInput) }).
 		Return(&issuance.ROPCGrantResponse{AccessToken: "at", TokenType: "Bearer"}, nil)
 
-	auditLogger.On("Log", mock.Anything, constants.AuditTokenIssuedROPCResponse, mock.Anything).Return()
+	auditLogger.On("Log", mock.Anything, audit.AuditTokenIssuedROPCResponse, mock.Anything).Return()
 	httpHelper.On("EncodeJson", rr, mock.Anything, mock.Anything).Return()
 
 	handler.ServeHTTP(rr, req)
@@ -1834,7 +1835,7 @@ func TestHandleTokenPost_ROPC_SpendsTheLimiterBudgetOnInvalidGrantOnly(t *testin
 		handler, auditLogger := newHandler(t, invalidGrant)
 		assert.Equal(t, http.StatusOK, post(handler))
 		// Declared since the grant was written and never fired until now (#126).
-		auditLogger.AssertCalled(t, "Log", mock.Anything, constants.AuditROPCAuthFailed, map[string]interface{}{
+		auditLogger.AssertCalled(t, "Log", mock.Anything, audit.AuditROPCAuthFailed, map[string]interface{}{
 			"email":            username,
 			"clientIdentifier": "app",
 		})
@@ -1852,7 +1853,7 @@ func TestHandleTokenPost_ROPC_SpendsTheLimiterBudgetOnInvalidGrantOnly(t *testin
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.RemoteAddr = "203.0.113.7:5000"
 		handler.ServeHTTP(httptest.NewRecorder(), req)
-		auditLogger.AssertCalled(t, "Log", mock.Anything, constants.AuditROPCAuthFailed, map[string]interface{}{
+		auditLogger.AssertCalled(t, "Log", mock.Anything, audit.AuditROPCAuthFailed, map[string]interface{}{
 			"email":            username,
 			"clientIdentifier": "app",
 		})
@@ -1886,7 +1887,7 @@ func TestHandleTokenPost_ROPC_SpendsTheLimiterBudgetOnInvalidGrantOnly(t *testin
 		t.Run(tc.name+" emits no ropc_auth_failed", func(t *testing.T) {
 			handler, auditLogger := newHandler(t, tc.err)
 			assert.Equal(t, http.StatusOK, post(handler))
-			auditLogger.AssertNotCalled(t, "Log", mock.Anything, constants.AuditROPCAuthFailed, mock.Anything)
+			auditLogger.AssertNotCalled(t, "Log", mock.Anything, audit.AuditROPCAuthFailed, mock.Anything)
 		})
 	}
 
@@ -1897,7 +1898,7 @@ func TestHandleTokenPost_ROPC_SpendsTheLimiterBudgetOnInvalidGrantOnly(t *testin
 		for i := 0; i < 25; i++ { // under ropc_ip's 30, which counts every request
 			assert.Equal(t, http.StatusOK, post(handler), "grant %d should succeed", i+1)
 		}
-		auditLogger.AssertNotCalled(t, "Log", mock.Anything, constants.AuditROPCAuthFailed, mock.Anything)
+		auditLogger.AssertNotCalled(t, "Log", mock.Anything, audit.AuditROPCAuthFailed, mock.Anything)
 	})
 }
 
@@ -2242,7 +2243,7 @@ func TestHandleTokenPost_Refresh_ContainmentPrecedesFlowGate(t *testing.T) {
 			database.On("RevokeRefreshTokenFamily", (*sql.Tx)(nil), "jti-family").Return(int64(2), nil).Once()
 
 			var logged []map[string]interface{}
-			auditLogger.On("Log", mock.Anything, constants.AuditRefreshTokenReplayDetected, mock.AnythingOfType("map[string]interface {}")).
+			auditLogger.On("Log", mock.Anything, audit.AuditRefreshTokenReplayDetected, mock.AnythingOfType("map[string]interface {}")).
 				Run(func(args mock.Arguments) {
 					logged = append(logged, args.Get(2).(map[string]interface{}))
 				}).Return().Once()
@@ -2307,7 +2308,7 @@ func TestHandleTokenPost_RedemptionRegistrationRefusalAudit(t *testing.T) {
 		tokenValidator.On("ValidateTokenRequest", req.Context(),
 			mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).Return(nil, refusal)
 
-		auditLogger.On("Log", mock.Anything, constants.AuditRedemptionRefusedRedirectURI, mock.MatchedBy(
+		auditLogger.On("Log", mock.Anything, audit.AuditRedemptionRefusedRedirectURI, mock.MatchedBy(
 			func(details map[string]interface{}) bool {
 				// clientIdentifier, the request's string, matching the neighbouring events.
 				// Unlike AuditTokenScopeDenied's it has been PROVED rather than asserted: this

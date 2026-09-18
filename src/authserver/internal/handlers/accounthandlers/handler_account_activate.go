@@ -8,10 +8,10 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/sessionstore"
 
+	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/usercreation"
 	"github.com/leodip/goiabada/core/config"
-	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/hashutil"
@@ -218,7 +218,7 @@ func handleActivationCleanHop(httpHelper handlers.HttpHelper, httpSession sessio
 		return
 	}
 
-	auditLogger.Log(r.Context(), constants.AuditCreatedUser, map[string]interface{}{
+	auditLogger.Log(r.Context(), audit.AuditCreatedUser, map[string]interface{}{
 		"email": createdUser.Email,
 	})
 
@@ -232,7 +232,7 @@ func handleActivationCleanHop(httpHelper handlers.HttpHelper, httpSession sessio
 		return
 	}
 
-	auditLogger.Log(r.Context(), constants.AuditActivatedAccount, map[string]interface{}{
+	auditLogger.Log(r.Context(), audit.AuditActivatedAccount, map[string]interface{}{
 		"email": createdUser.Email,
 	})
 

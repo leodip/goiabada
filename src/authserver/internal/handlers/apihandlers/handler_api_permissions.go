@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
+	"github.com/leodip/goiabada/authserver/internal/audit"
 	srvhandlers "github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
@@ -282,7 +283,7 @@ func HandleAPIResourcePermissionsPut(
 		}
 
 		// Audit consolidated update
-		auditLogger.Log(r.Context(), constants.AuditUpdatedResourcePermissions, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.AuditUpdatedResourcePermissions, map[string]interface{}{
 			"resourceId":   resource.Id,
 			"loggedInUser": authHelper.GetLoggedInSubject(r),
 		})

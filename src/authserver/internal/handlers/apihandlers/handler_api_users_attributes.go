@@ -7,10 +7,10 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
+	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/models"
@@ -181,7 +181,7 @@ func HandleAPIUserAttributeCreatePost(
 		}
 
 		// Log audit event
-		auditLogger.Log(r.Context(), constants.AuditAddedUserAttribute, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.AuditAddedUserAttribute, map[string]interface{}{
 			"userId":          user.Id,
 			"userAttributeId": userAttribute.Id,
 			"loggedInUser":    loggedInUser,
@@ -283,7 +283,7 @@ func HandleAPIUserAttributeUpdatePut(
 		}
 
 		// Log audit event
-		auditLogger.Log(r.Context(), constants.AuditUpdatedUserAttribute, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.AuditUpdatedUserAttribute, map[string]interface{}{
 			"userId":          attribute.UserId,
 			"userAttributeId": attribute.Id,
 			"loggedInUser":    loggedInUser,
@@ -346,7 +346,7 @@ func HandleAPIUserAttributeDelete(
 		}
 
 		// Log audit event
-		auditLogger.Log(r.Context(), constants.AuditDeleteUserAttribute, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.AuditDeleteUserAttribute, map[string]interface{}{
 			"userId":          attribute.UserId,
 			"userAttributeId": attributeId,
 			"loggedInUser":    loggedInUser,

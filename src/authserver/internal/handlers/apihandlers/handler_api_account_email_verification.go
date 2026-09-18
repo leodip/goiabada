@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
+	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
@@ -115,7 +116,7 @@ func HandleAPIAccountEmailVerificationSendPost(
 		}
 
 		// Audit
-		auditLogger.Log(r.Context(), constants.AuditSentEmailVerificationMessage, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.AuditSentEmailVerificationMessage, map[string]interface{}{
 			"userId":           user.Id,
 			"emailDestination": user.Email,
 			"loggedInUser":     subject,
@@ -208,7 +209,7 @@ func HandleAPIAccountEmailVerificationPost(
 			// attempting the credential.
 			credentialFailures.RecordCredentialFailure(r)
 
-			auditLogger.Log(r.Context(), constants.AuditFailedEmailVerificationCode, map[string]interface{}{
+			auditLogger.Log(r.Context(), audit.AuditFailedEmailVerificationCode, map[string]interface{}{
 				"userId":       user.Id,
 				"loggedInUser": subject,
 			})
@@ -225,7 +226,7 @@ func HandleAPIAccountEmailVerificationPost(
 			return
 		}
 
-		auditLogger.Log(r.Context(), constants.AuditVerifiedEmail, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.AuditVerifiedEmail, map[string]interface{}{
 			"userId":       user.Id,
 			"loggedInUser": subject,
 		})

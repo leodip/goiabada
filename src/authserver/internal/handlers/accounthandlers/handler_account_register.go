@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/usercreation"
@@ -199,7 +200,7 @@ func HandleAccountRegisterPost(
 				return
 			}
 
-			auditLogger.Log(r.Context(), constants.AuditCreatedPreRegistration, map[string]interface{}{
+			auditLogger.Log(r.Context(), audit.AuditCreatedPreRegistration, map[string]interface{}{
 				"email": preRegistration.Email,
 			})
 
@@ -256,7 +257,7 @@ func HandleAccountRegisterPost(
 				return
 			}
 
-			auditLogger.Log(r.Context(), constants.AuditCreatedUser, map[string]interface{}{
+			auditLogger.Log(r.Context(), audit.AuditCreatedUser, map[string]interface{}{
 				"email": email,
 			})
 

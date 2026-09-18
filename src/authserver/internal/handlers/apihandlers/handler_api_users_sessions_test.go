@@ -7,9 +7,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/audit"
 	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
-	"github.com/leodip/goiabada/core/constants"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/stretchr/testify/assert"
@@ -81,12 +81,12 @@ func TestHandleAPIUserSessionDelete_TerminatesAndAuditsBothEvents(t *testing.T) 
 
 	authHelper.On("GetLoggedInSubject", mock.Anything).Return(subject)
 	var deletedPayload map[string]interface{}
-	auditLogger.On("Log", mock.Anything, constants.AuditDeletedUserSession, mock.Anything).
+	auditLogger.On("Log", mock.Anything, audit.AuditDeletedUserSession, mock.Anything).
 		Run(func(args mock.Arguments) {
 			deletedPayload = args.Get(2).(map[string]interface{})
 		}).Return().Once()
 	var terminatedPayload map[string]interface{}
-	auditLogger.On("Log", mock.Anything, constants.AuditTerminatedUserSession, mock.Anything).
+	auditLogger.On("Log", mock.Anything, audit.AuditTerminatedUserSession, mock.Anything).
 		Run(func(args mock.Arguments) {
 			terminatedPayload = args.Get(2).(map[string]interface{})
 		}).Return().Once()

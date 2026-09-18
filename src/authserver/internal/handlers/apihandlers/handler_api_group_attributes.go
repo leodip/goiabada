@@ -7,9 +7,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
+	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
@@ -181,7 +181,7 @@ func HandleAPIGroupAttributeCreatePost(
 		}
 
 		// Audit log
-		auditLogger.Log(r.Context(), constants.AuditAddedGroupAttribute, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.AuditAddedGroupAttribute, map[string]interface{}{
 			"groupAttributeId": groupAttribute.Id,
 			"groupId":          group.Id,
 			"groupIdentifier":  group.GroupIdentifier,
@@ -286,7 +286,7 @@ func HandleAPIGroupAttributeUpdatePut(
 		}
 
 		// Audit log
-		auditLogger.Log(r.Context(), constants.AuditUpdatedGroupAttribute, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.AuditUpdatedGroupAttribute, map[string]interface{}{
 			"groupAttributeId": attribute.Id,
 			"groupId":          attribute.GroupId,
 			"groupIdentifier":  group.GroupIdentifier,
@@ -353,7 +353,7 @@ func HandleAPIGroupAttributeDelete(
 		}
 
 		// Audit log
-		auditLogger.Log(r.Context(), constants.AuditDeleteGroupAttribute, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.AuditDeleteGroupAttribute, map[string]interface{}{
 			"groupAttributeId": id,
 			"groupId":          attribute.GroupId,
 			"groupIdentifier":  group.GroupIdentifier,

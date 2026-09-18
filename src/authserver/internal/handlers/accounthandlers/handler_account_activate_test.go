@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/leodip/goiabada/authserver/internal/audit"
 	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
@@ -460,10 +461,10 @@ func TestHandleAccountActivateGet_Clean(t *testing.T) {
 		}).Return(createdUser, nil).Once()
 
 		database.On("DeletePreRegistration", (*sql.Tx)(nil), int64(7)).Return(nil).Once()
-		auditLogger.On("Log", mock.Anything, constants.AuditCreatedUser, mock.MatchedBy(func(details map[string]interface{}) bool {
+		auditLogger.On("Log", mock.Anything, audit.AuditCreatedUser, mock.MatchedBy(func(details map[string]interface{}) bool {
 			return details["email"] == activateTestEmail
 		})).Return().Once()
-		auditLogger.On("Log", mock.Anything, constants.AuditActivatedAccount, mock.MatchedBy(func(details map[string]interface{}) bool {
+		auditLogger.On("Log", mock.Anything, audit.AuditActivatedAccount, mock.MatchedBy(func(details map[string]interface{}) bool {
 			return details["email"] == activateTestEmail
 		})).Return().Once()
 		httpHelper.On("RenderTemplate", mock.Anything, mock.Anything, "/layouts/auth_layout.html",

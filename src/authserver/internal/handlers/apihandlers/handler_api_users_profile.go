@@ -11,10 +11,10 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
+	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/enums"
 )
@@ -134,7 +134,7 @@ func HandleAPIUserProfilePut(
 		}
 
 		// Log audit event
-		auditLogger.Log(r.Context(), constants.AuditUpdatedUserProfile, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.AuditUpdatedUserProfile, map[string]interface{}{
 			"userId":       user.Id,
 			"loggedInUser": loggedInUser,
 		})
@@ -229,7 +229,7 @@ func HandleAPIUserAddressPut(
 		}
 
 		// Log audit event
-		auditLogger.Log(r.Context(), constants.AuditUpdatedUserAddress, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.AuditUpdatedUserAddress, map[string]interface{}{
 			"userId":       user.Id,
 			"loggedInUser": loggedInUser,
 		})

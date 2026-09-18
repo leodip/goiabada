@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/core/api"
@@ -84,7 +85,7 @@ func HandleAPISettingsEmailPut(
 				return
 			}
 
-			auditLogger.Log(r.Context(), constants.AuditUpdatedSMTPSettings, map[string]interface{}{
+			auditLogger.Log(r.Context(), audit.AuditUpdatedSMTPSettings, map[string]interface{}{
 				"loggedInUser": authHelper.GetLoggedInSubject(r),
 			})
 
@@ -200,7 +201,7 @@ func HandleAPISettingsEmailPut(
 			return
 		}
 
-		auditLogger.Log(r.Context(), constants.AuditUpdatedSMTPSettings, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.AuditUpdatedSMTPSettings, map[string]interface{}{
 			"loggedInUser": authHelper.GetLoggedInSubject(r),
 		})
 
@@ -262,7 +263,7 @@ func HandleAPISettingsEmailSendTestPost(
 			return
 		}
 
-		auditLogger.Log(r.Context(), constants.AuditSentTestEmail, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.AuditSentTestEmail, map[string]interface{}{
 			"loggedInUser": authHelper.GetLoggedInSubject(r),
 			"to":           req.To,
 		})

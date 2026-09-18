@@ -21,6 +21,7 @@ import (
 	"time"
 
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
+	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/ratelimit"
 	"github.com/leodip/goiabada/core/constants"
@@ -97,8 +98,8 @@ func newTestMiddleware(authHelper AuthHelper, enabled bool) *RateLimiterMiddlewa
 }
 
 func newAuditedTestMiddleware(authHelper AuthHelper, enabled bool) (*RateLimiterMiddleware, *stubAuditLogger) {
-	audit := &stubAuditLogger{}
-	return NewRateLimiterMiddleware(authHelper, handlerhelpers.NewHttpHelper(testTemplateFS, SettingsReader{}), audit, enabled), audit
+	auditLog := &stubAuditLogger{}
+	return NewRateLimiterMiddleware(authHelper, handlerhelpers.NewHttpHelper(testTemplateFS, SettingsReader{}), auditLog, enabled), auditLog
 }
 
 // limiterRequest builds the request a limited route actually receives. Settings are on the
@@ -1781,7 +1782,7 @@ func TestRejection_AuditedOncePerKeyPerWindow(t *testing.T) {
 	const host = "203.0.113.7:5000"
 
 	t.Run("many rejections on one key produce one event", func(t *testing.T) {
-		m, audit := newAuditedTestMiddleware(nil, true)
+		m, auditLog := newAuditedTestMiddleware(nil, true)
 		refused := 0
 		for i := 0; i < 25; i++ {
 			if code, _, _ := runPwd(m, "victim@example.com", host, true); code == http.StatusTooManyRequests {
@@ -1791,25 +1792,25 @@ func TestRejection_AuditedOncePerKeyPerWindow(t *testing.T) {
 		if refused < 10 {
 			t.Fatalf("only %d of 25 requests were refused; the case needs a burst of rejections", refused)
 		}
-		if got := audit.count(constants.AuditRateLimitExceeded); got != 1 {
+		if got := auditLog.count(audit.AuditRateLimitExceeded); got != 1 {
 			t.Errorf("got %d rate_limit_exceeded events for %d rejections on one key, want exactly 1",
 				got, refused)
 		}
 	})
 
 	t.Run("the event carries the limiter and the account", func(t *testing.T) {
-		m, audit := newAuditedTestMiddleware(nil, true)
+		m, auditLog := newAuditedTestMiddleware(nil, true)
 		for i := 0; i < 11; i++ {
 			runPwd(m, "Victim@Example.com", host, true)
 		}
-		audit.mu.Lock()
-		defer audit.mu.Unlock()
-		if len(audit.events) != 1 {
-			t.Fatalf("got %d events, want 1", len(audit.events))
+		auditLog.mu.Lock()
+		defer auditLog.mu.Unlock()
+		if len(auditLog.events) != 1 {
+			t.Fatalf("got %d events, want 1", len(auditLog.events))
 		}
-		e := audit.events[0]
-		if e.name != constants.AuditRateLimitExceeded {
-			t.Errorf("event name = %q, want %q", e.name, constants.AuditRateLimitExceeded)
+		e := auditLog.events[0]
+		if e.name != audit.AuditRateLimitExceeded {
+			t.Errorf("event name = %q, want %q", e.name, audit.AuditRateLimitExceeded)
 		}
 		if e.details["limiter"] != "pwd_account_net" {
 			t.Errorf("details[limiter] = %v, want pwd_account_net", e.details["limiter"])
@@ -1835,7 +1836,7 @@ func TestRejection_AuditedOncePerKeyPerWindow(t *testing.T) {
 	})
 
 	t.Run("two keys produce two events", func(t *testing.T) {
-		m, audit := newAuditedTestMiddleware(nil, true)
+		m, auditLog := newAuditedTestMiddleware(nil, true)
 		for i := 0; i < 11; i++ {
 			runPwd(m, "one@example.com", host, true)
 		}
@@ -1844,17 +1845,17 @@ func TestRejection_AuditedOncePerKeyPerWindow(t *testing.T) {
 		}
 		// A gate keyed globally rather than per key would report the first account and
 		// go silent for the second, which is the failure that makes the bound useless.
-		if got := audit.count(constants.AuditRateLimitExceeded); got != 2 {
+		if got := auditLog.count(audit.AuditRateLimitExceeded); got != 2 {
 			t.Errorf("got %d events for two rejected accounts, want 2", got)
 		}
 	})
 
 	t.Run("no event when nothing is refused", func(t *testing.T) {
-		m, audit := newAuditedTestMiddleware(nil, true)
+		m, auditLog := newAuditedTestMiddleware(nil, true)
 		for i := 0; i < 10; i++ {
 			runPwd(m, fmt.Sprintf("user%d@example.com", i), host, true)
 		}
-		if got := audit.count(constants.AuditRateLimitExceeded); got != 0 {
+		if got := auditLog.count(audit.AuditRateLimitExceeded); got != 0 {
 			t.Errorf("got %d events with nothing refused, want 0", got)
 		}
 	})

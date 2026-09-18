@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
+	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
@@ -595,7 +596,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		// testutil.AssertAuditLogContext, which refuses a Background one here.
 		auditLogger.On("Log", mock.MatchedBy(func(ctx context.Context) bool {
 			return chimiddleware.GetReqID(ctx) == "goiabada/req-pwd-1"
-		}), constants.AuditAuthFailedPwd, mock.MatchedBy(func(details map[string]interface{}) bool {
+		}), audit.AuditAuthFailedPwd, mock.MatchedBy(func(details map[string]interface{}) bool {
 			return details["email"] == "test@example.com"
 		})).Return()
 
@@ -658,7 +659,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 
 		database.On("GetUserByEmail", mock.Anything, "bob@example.com").Return(nil, nil)
 
-		auditLogger.On("Log", mock.Anything, constants.AuditAuthFailedPwd, mock.MatchedBy(func(details map[string]interface{}) bool {
+		auditLogger.On("Log", mock.Anything, audit.AuditAuthFailedPwd, mock.MatchedBy(func(details map[string]interface{}) bool {
 			return details["email"] == "bob@example.com"
 		})).Return()
 
@@ -770,7 +771,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		}
 		database.On("GetUserByEmail", mock.Anything, "test@example.com").Return(user, nil)
 
-		auditLogger.On("Log", mock.Anything, constants.AuditAuthSuccessPwd, mock.MatchedBy(func(details map[string]interface{}) bool {
+		auditLogger.On("Log", mock.Anything, audit.AuditAuthSuccessPwd, mock.MatchedBy(func(details map[string]interface{}) bool {
 			return details["userId"] == int64(1)
 		})).Return()
 
@@ -872,7 +873,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		}
 		database.On("GetUserByEmail", mock.Anything, "disabled@example.com").Return(disabledUser, nil)
 
-		auditLogger.On("Log", mock.Anything, constants.AuditUserDisabled, mock.MatchedBy(func(details map[string]interface{}) bool {
+		auditLogger.On("Log", mock.Anything, audit.AuditUserDisabled, mock.MatchedBy(func(details map[string]interface{}) bool {
 			return details["userId"] == int64(2)
 		})).Return()
 

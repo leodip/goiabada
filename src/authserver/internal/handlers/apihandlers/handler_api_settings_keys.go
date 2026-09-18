@@ -8,10 +8,10 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/signingkeys"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/errs"
@@ -95,7 +95,7 @@ func HandleAPISettingsKeysRotatePost(
 		case err == nil:
 			// Audited here and only here, so the log carries exactly one entry per rotation
 			// that actually happened.
-			auditLogger.Log(r.Context(), constants.AuditRotatedKeys, map[string]interface{}{
+			auditLogger.Log(r.Context(), audit.AuditRotatedKeys, map[string]interface{}{
 				"loggedInUser": authHelper.GetLoggedInSubject(r),
 			})
 
@@ -164,7 +164,7 @@ func HandleAPISettingsKeyDelete(
 			return
 		}
 
-		auditLogger.Log(r.Context(), constants.AuditRevokedKey, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.AuditRevokedKey, map[string]interface{}{
 			"loggedInUser": authHelper.GetLoggedInSubject(r),
 			"keyId":        kp.KeyIdentifier,
 		})

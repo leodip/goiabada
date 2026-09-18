@@ -6,9 +6,9 @@ import (
 	"strings"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/core/config"
-	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/errs"
@@ -55,7 +55,7 @@ func HandleUserInfoGetPost(
 		}
 
 		if !user.Enabled {
-			auditLogger.Log(r.Context(), constants.AuditUserDisabled, map[string]interface{}{
+			auditLogger.Log(r.Context(), audit.AuditUserDisabled, map[string]interface{}{
 				"userId": user.Id,
 			})
 

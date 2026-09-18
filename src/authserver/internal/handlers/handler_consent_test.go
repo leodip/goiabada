@@ -10,11 +10,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/audit"
 	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/core/config"
-	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
 	mocks_handlerhelpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
@@ -875,7 +875,7 @@ func TestHandleConsentPost(t *testing.T) {
 			return consent.UserId == 1 && consent.ClientId == 1 && consent.Scope == "openid profile"
 		})).Return(nil)
 
-		auditLogger.On("Log", mock.Anything, constants.AuditSavedConsent, mock.Anything).Return()
+		auditLogger.On("Log", mock.Anything, audit.AuditSavedConsent, mock.Anything).Return()
 
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateReadyToIssueCode && ac.ConsentedScope == "openid profile"
@@ -943,7 +943,7 @@ func TestHandleConsentPost(t *testing.T) {
 			return consent.UserId == 1 && consent.ClientId == 1 && consent.Scope == "openid profile"
 		})).Return(nil)
 
-		auditLogger.On("Log", mock.Anything, constants.AuditSavedConsent, mock.Anything).Return()
+		auditLogger.On("Log", mock.Anything, audit.AuditSavedConsent, mock.Anything).Return()
 
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateReadyToIssueCode && ac.ConsentedScope == "openid profile"
@@ -1013,7 +1013,7 @@ func TestHandleConsentPost(t *testing.T) {
 			return true
 		})).Return(nil)
 
-		auditLogger.On("Log", mock.Anything, constants.AuditSavedConsent, mock.Anything).Return()
+		auditLogger.On("Log", mock.Anything, audit.AuditSavedConsent, mock.Anything).Return()
 
 		var saved *ceremony.AuthContext
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
@@ -1879,7 +1879,7 @@ func TestHandleConsentPost(t *testing.T) {
 						return true
 					})).Return(nil)
 
-					auditLogger.On("Log", mock.Anything, constants.AuditSavedConsent, mock.Anything).Return()
+					auditLogger.On("Log", mock.Anything, audit.AuditSavedConsent, mock.Anything).Return()
 
 					var saved *ceremony.AuthContext
 					authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
@@ -1952,7 +1952,7 @@ func TestHandleConsentPost(t *testing.T) {
 			return consent.Scope == "email"
 		})).Return(nil)
 
-		auditLogger.On("Log", mock.Anything, constants.AuditSavedConsent, mock.Anything).Return()
+		auditLogger.On("Log", mock.Anything, audit.AuditSavedConsent, mock.Anything).Return()
 
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.ConsentedScope == "email"

@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/audit"
 	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
-	"github.com/leodip/goiabada/core/constants"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/stretchr/testify/assert"
@@ -124,7 +124,7 @@ func TestHandleAPIUserConsentDelete_Success(t *testing.T) {
 
 	database.On("GetUserConsentById", (*sql.Tx)(nil), int64(5)).Return(&models.UserConsent{Id: 5, UserId: 7}, nil)
 	database.On("DeleteUserConsent", (*sql.Tx)(nil), int64(5)).Return(nil)
-	auditLogger.On("Log", mock.Anything, constants.AuditDeletedUserConsent, mock.MatchedBy(func(details map[string]interface{}) bool {
+	auditLogger.On("Log", mock.Anything, audit.AuditDeletedUserConsent, mock.MatchedBy(func(details map[string]interface{}) bool {
 		return details["userId"] == int64(7) && details["consentId"] == int64(5)
 	})).Return()
 

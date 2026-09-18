@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/core/api"
@@ -132,7 +133,7 @@ func HandleAPIUserSessionDelete(
 		// that rolled back would be a false record. deleted_user_session keeps its existing
 		// payload untouched and terminated_user_session carries the security detail (decision 9).
 		loggedInUser := authHelper.GetLoggedInSubject(r)
-		auditLogger.Log(r.Context(), constants.AuditDeletedUserSession, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.AuditDeletedUserSession, map[string]interface{}{
 			"userSessionId": sessionId,
 			"loggedInUser":  loggedInUser,
 		})

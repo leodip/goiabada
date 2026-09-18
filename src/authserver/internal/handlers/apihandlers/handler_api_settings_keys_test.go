@@ -9,9 +9,9 @@ import (
 	"testing"
 
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/leodip/goiabada/authserver/internal/audit"
 	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
-	"github.com/leodip/goiabada/core/constants"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/models"
@@ -90,7 +90,7 @@ func TestHandleAPISettingsKeysRotatePost_Success(t *testing.T) {
 
 	authHelper.On("GetLoggedInSubject", mock.Anything).Return(subject)
 	var payload map[string]interface{}
-	auditLogger.On("Log", mock.Anything, constants.AuditRotatedKeys, mock.Anything).
+	auditLogger.On("Log", mock.Anything, audit.AuditRotatedKeys, mock.Anything).
 		Run(func(args mock.Arguments) {
 			payload = args.Get(2).(map[string]interface{})
 		}).Return().Once()

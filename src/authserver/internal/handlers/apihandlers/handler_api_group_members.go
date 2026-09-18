@@ -7,9 +7,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
+	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
@@ -150,7 +150,7 @@ func HandleAPIGroupMemberAddPost(
 		}
 
 		// Audit log
-		auditLogger.Log(r.Context(), constants.AuditUserAddedToGroup, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.AuditUserAddedToGroup, map[string]interface{}{
 			"userId":       user.Id,
 			"groupId":      group.Id,
 			"loggedInUser": authHelper.GetLoggedInSubject(r),
@@ -238,7 +238,7 @@ func HandleAPIGroupMemberDelete(
 		}
 
 		// Audit log
-		auditLogger.Log(r.Context(), constants.AuditUserRemovedFromGroup, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.AuditUserRemovedFromGroup, map[string]interface{}{
 			"userId":       user.Id,
 			"groupId":      group.Id,
 			"loggedInUser": authHelper.GetLoggedInSubject(r),

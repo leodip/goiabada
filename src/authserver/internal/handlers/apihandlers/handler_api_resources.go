@@ -9,9 +9,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
+	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
@@ -102,7 +102,7 @@ func HandleAPIResourceCreatePost(
 		}
 
 		// Audit log
-		auditLogger.Log(r.Context(), constants.AuditCreatedResource, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.AuditCreatedResource, map[string]interface{}{
 			"resourceId":         resource.Id,
 			"resourceIdentifier": resource.ResourceIdentifier,
 			"loggedInUser":       authHelper.GetLoggedInSubject(r),
@@ -239,7 +239,7 @@ func HandleAPIResourceUpdatePut(
 		}
 
 		// Audit
-		auditLogger.Log(r.Context(), constants.AuditUpdatedResource, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.AuditUpdatedResource, map[string]interface{}{
 			"resourceId":         resource.Id,
 			"resourceIdentifier": resource.ResourceIdentifier,
 			"loggedInUser":       authHelper.GetLoggedInSubject(r),
@@ -292,7 +292,7 @@ func HandleAPIResourceDelete(
 			return
 		}
 
-		auditLogger.Log(r.Context(), constants.AuditDeletedResource, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.AuditDeletedResource, map[string]interface{}{
 			"resourceId":         resource.Id,
 			"resourceIdentifier": resource.ResourceIdentifier,
 			"loggedInUser":       authHelper.GetLoggedInSubject(r),

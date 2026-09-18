@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
+	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/otp"
@@ -377,7 +378,7 @@ func HandleAPIAccountOTPPut(
 				// emits nothing when a code is simply wrong, and enabling OTP is not an
 				// authentication ceremony. Decision 5 puts the replay event alongside the
 				// existing failure event, and here there is none.
-				auditLogger.Log(r.Context(), constants.AuditOTPCodeReplayDetected, map[string]interface{}{
+				auditLogger.Log(r.Context(), audit.AuditOTPCodeReplayDetected, map[string]interface{}{
 					"userId": user.Id,
 					"step":   step,
 				})
@@ -401,7 +402,7 @@ func HandleAPIAccountOTPPut(
 				return
 			}
 
-			auditLogger.Log(r.Context(), constants.AuditEnabledOTP, map[string]interface{}{
+			auditLogger.Log(r.Context(), audit.AuditEnabledOTP, map[string]interface{}{
 				"userId": user.Id,
 			})
 		} else {
@@ -416,7 +417,7 @@ func HandleAPIAccountOTPPut(
 				return
 			}
 
-			auditLogger.Log(r.Context(), constants.AuditDisabledOTP, map[string]interface{}{
+			auditLogger.Log(r.Context(), audit.AuditDisabledOTP, map[string]interface{}{
 				"userId": user.Id,
 			})
 		}

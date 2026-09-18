@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/apiresponse"
+	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/ratelimit"
 	"github.com/leodip/goiabada/core/constants"
@@ -456,7 +457,7 @@ func (m *RateLimiterMiddleware) reportTrip(ctx context.Context, t *tier, key str
 		details = map[string]interface{}{}
 	}
 	details["limiter"] = t.name
-	m.auditLogger.Log(ctx, constants.AuditRateLimitExceeded, details)
+	m.auditLogger.Log(ctx, audit.AuditRateLimitExceeded, details)
 }
 
 // reject writes the 429 in the shape the route's caller parses.

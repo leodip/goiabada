@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
@@ -65,7 +66,7 @@ func HandleAPISettingsAuditLogsPut(
 
 		// Audit log before saving, so the logger reads the old settings
 		// and always records the change (even when disabling logging)
-		auditLogger.Log(r.Context(), constants.AuditUpdatedAuditLogsSettings, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.AuditUpdatedAuditLogsSettings, map[string]interface{}{
 			"loggedInUser":               authHelper.GetLoggedInSubject(r),
 			"auditLogsInConsoleEnabled":  req.AuditLogsInConsoleEnabled,
 			"auditLogsInDatabaseEnabled": req.AuditLogsInDatabaseEnabled,

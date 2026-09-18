@@ -9,7 +9,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
@@ -19,6 +18,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
+	"github.com/leodip/goiabada/authserver/internal/audit"
 	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
@@ -87,7 +87,7 @@ func TestHandleTokenPost_WrappedUserDisabledStillAudits(t *testing.T) {
 	httpHelper, auditLogger, _, rr, req, handler := wrappedTokenRequest(t,
 		errs.Wrap(disabled, "unable to validate the token request"))
 
-	auditLogger.On("Log", mock.Anything, constants.AuditUserDisabled, mock.Anything).Return().Once()
+	auditLogger.On("Log", mock.Anything, audit.AuditUserDisabled, mock.Anything).Return().Once()
 	captured := expectJsonErrorWithDetail(httpHelper)
 
 	handler.ServeHTTP(rr, req)
@@ -111,7 +111,7 @@ func TestHandleTokenPost_WrappedDeregisteredRedirectUriStillAudits(t *testing.T)
 	httpHelper, auditLogger, _, rr, req, handler := wrappedTokenRequest(t,
 		errs.Wrap(refusal, "unable to validate the token request"))
 
-	auditLogger.On("Log", mock.Anything, constants.AuditRedemptionRefusedRedirectURI, mock.Anything).Return().Once()
+	auditLogger.On("Log", mock.Anything, audit.AuditRedemptionRefusedRedirectURI, mock.Anything).Return().Once()
 	captured := expectJsonErrorWithDetail(httpHelper)
 
 	handler.ServeHTTP(rr, req)
@@ -142,7 +142,7 @@ func TestHandleTokenPost_WrappedAuthCodeReuseStillRevokes(t *testing.T) {
 		Return(nil, nil).Once()
 
 	var auditedCodeId int64
-	auditLogger.On("Log", mock.Anything, constants.AuditAuthCodeReuseDetected, mock.Anything).
+	auditLogger.On("Log", mock.Anything, audit.AuditAuthCodeReuseDetected, mock.Anything).
 		Run(func(args mock.Arguments) {
 			details, _ := args.Get(2).(map[string]interface{})
 			auditedCodeId, _ = details["codeId"].(int64)

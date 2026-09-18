@@ -7,9 +7,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
+	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
@@ -195,7 +195,7 @@ func HandleAPIClientPermissionsPut(
 		}
 
 		// Audit consolidated update
-		auditLogger.Log(r.Context(), constants.AuditUpdatedClientPermissions, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.AuditUpdatedClientPermissions, map[string]interface{}{
 			"clientId":     client.Id,
 			"loggedInUser": authHelper.GetLoggedInSubject(r),
 		})

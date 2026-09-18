@@ -8,10 +8,10 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
+	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
 )
 
@@ -72,7 +72,7 @@ func HandleAPIAccountEmailPut(
 		}
 
 		// Audit
-		auditLogger.Log(r.Context(), constants.AuditUpdatedOwnEmail, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.AuditUpdatedOwnEmail, map[string]interface{}{
 			"userId":       user.Id,
 			"loggedInUser": subject,
 		})
