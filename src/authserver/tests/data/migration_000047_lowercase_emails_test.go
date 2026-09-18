@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/config"
-	"github.com/leodip/goiabada/core/data"
+	"github.com/leodip/goiabada/authserver/internal/datafactory"
 	"github.com/leodip/goiabada/core/data/migrator"
 	"github.com/leodip/goiabada/core/data/sqlitedb"
 	"github.com/leodip/goiabada/core/models"
@@ -18,7 +18,7 @@ import (
 
 // beforeLowercaseEmails000047 is the version these tests seed at: the one below the migration
 // under test. Derived from the constant so a renumbering moves both together.
-const beforeLowercaseEmails000047 = data.LowercaseEmailsVersion - 1
+const beforeLowercaseEmails000047 = datafactory.LowercaseEmailsVersion - 1
 
 // lowercaseCase000047 is one seeded address and whether THIS engine's own LOWER() reduces it the
 // way Go's strings.ToLower does.
@@ -123,7 +123,7 @@ func TestMigration000047_LowercaseEmails(t *testing.T) {
 
 	// 2, first half: what the pre-flight says BEFORE the migration runs. Collected here so the
 	// same set can be compared against what the migration actually leaves behind.
-	preflightErr := data.CheckEmailCaseBeforeMigrating(h.DB, beforeLowercaseEmails000047, data.LowercaseEmailsVersion)
+	preflightErr := datafactory.CheckEmailCaseBeforeMigrating(h.DB, beforeLowercaseEmails000047, datafactory.LowercaseEmailsVersion)
 
 	// Ordinary upgrades must not be refused, so the engines that agree about all five characters
 	// have to pass this table outright. That is what says the refusals below are about the rows.
@@ -144,7 +144,7 @@ func TestMigration000047_LowercaseEmails(t *testing.T) {
 	// The migration itself. It must SUCCEED on every engine: nothing seeded here collides, and a
 	// row the engine cannot reduce is left behind rather than failing the statement, which is
 	// precisely why the pre-flight and not the UPDATE is what refuses.
-	require.NoErrorf(t, h.Migrator.Migrate(data.LowercaseEmailsVersion), "apply 000047 on %s", engine)
+	require.NoErrorf(t, h.Migrator.Migrate(datafactory.LowercaseEmailsVersion), "apply 000047 on %s", engine)
 
 	// 1 and 2, second half.
 	var leftBehind []int64
@@ -190,7 +190,7 @@ func TestMigration000047_LowercaseEmails(t *testing.T) {
 	require.NoError(t, h.Migrator.Migrate(beforeLowercaseEmails000047), "roll back 000047")
 	assert.Equal(t, strings.ToLower(cases[0].raw), storedEmail000047(t, h, ids[0]),
 		"the down migration is a no-op: a repaired address must stay repaired")
-	require.NoError(t, h.Migrator.Migrate(data.LowercaseEmailsVersion), "re-apply 000047")
+	require.NoError(t, h.Migrator.Migrate(datafactory.LowercaseEmailsVersion), "re-apply 000047")
 	assertEmailIndex000047(t, h, "after a down/up round trip")
 }
 
@@ -219,7 +219,7 @@ func TestMigration000047_ACollisionWouldFailTheMigration(t *testing.T) {
 	upper := seedUserEmail000047(t, h, 0, "Collide@example.com")
 	lower := seedUserEmail000047(t, h, 1, "collide@example.com")
 
-	err := data.CheckEmailCaseBeforeMigrating(h.DB, beforeLowercaseEmails000047, data.LowercaseEmailsVersion)
+	err := datafactory.CheckEmailCaseBeforeMigrating(h.DB, beforeLowercaseEmails000047, datafactory.LowercaseEmailsVersion)
 	require.Errorf(t, err, "two addresses differing only by case must refuse the upgrade on %s", engineName000047())
 	assert.Contains(t, err.Error(), fmt.Sprintf("users.id=%d", upper))
 	assert.Contains(t, err.Error(), fmt.Sprintf("users.id=%d", lower),
@@ -227,7 +227,7 @@ func TestMigration000047_ACollisionWouldFailTheMigration(t *testing.T) {
 
 	// And the refusal is not theatre. Nothing else in this suite shows that the alternative is a
 	// failed migration rather than a tidier one.
-	assert.Errorf(t, h.Migrator.Migrate(data.LowercaseEmailsVersion),
+	assert.Errorf(t, h.Migrator.Migrate(datafactory.LowercaseEmailsVersion),
 		"lowercasing both rows onto one value must trip the UNIQUE idx_email on %s; if this passes, the unique index is not being enforced and the pre-flight is guarding nothing",
 		engineName000047())
 }
@@ -290,7 +290,7 @@ func assertEmailIndex000047(t *testing.T, h *isolatedDB, phase string) {
 // way out. A check wired into one of them only would leave whichever it missed able to trip
 // idx_email and leave the schema dirty, which is the state decision 16 exists to prevent.
 //
-// sqlite only: NewDatabase takes a data.DatabaseConfig, and a DSN pointing at a throwaway file
+// sqlite only: NewDatabase takes a config.DatabaseConfig, and a DSN pointing at a throwaway file
 // is the one way to reach it without touching the shared test database this tier runs against.
 // What is under test is the wiring rather than any engine's LOWER(), and the engines are
 // TestMigration000047_LowercaseEmails' business.
@@ -300,7 +300,7 @@ func TestNewDatabase_RefusesAnEmailCaseCollisionAtStartup(t *testing.T) {
 	}
 
 	dsn := filepath.Join(t.TempDir(), "startup_preflight.db")
-	cfg := &data.DatabaseConfig{Type: "sqlite", DSN: dsn}
+	cfg := &config.DatabaseConfig{Type: "sqlite", DSN: dsn}
 
 	// A database sitting one below 000047 with a collision already in it, which is what a legacy
 	// deployment upgrading across this release looks like.
@@ -319,7 +319,7 @@ func TestNewDatabase_RefusesAnEmailCaseCollisionAtStartup(t *testing.T) {
 	}))
 	require.NoError(t, seed.DB.Close(), "close the seeding handle before the server opens its own")
 
-	opened, err := data.NewDatabase(cfg,
+	opened, err := datafactory.NewDatabase(cfg,
 		config.GetAESEncryptionKey(), config.GetAESEncryptionKeyPrevious(), false)
 
 	require.Error(t, err, "startup must refuse a database holding a collision rather than migrate it")

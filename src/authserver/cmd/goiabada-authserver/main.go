@@ -14,6 +14,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/constants"
+	"github.com/leodip/goiabada/authserver/internal/datafactory"
 	"github.com/leodip/goiabada/authserver/internal/server"
 	"github.com/leodip/goiabada/authserver/internal/sessionbackend"
 	coreconstants "github.com/leodip/goiabada/core/constants"
@@ -104,7 +105,7 @@ func main() {
 		"local_time", now,
 		"utc_time", now.UTC())
 
-	database, err := data.NewDatabase(config.GetDataDatabaseConfig(),
+	database, err := datafactory.NewDatabase(config.GetDatabase(),
 		config.GetAESEncryptionKey(), config.GetAESEncryptionKeyPrevious(),
 		config.GetAuthServer().LogSQL)
 	if err != nil {

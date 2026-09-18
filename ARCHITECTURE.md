@@ -301,10 +301,11 @@ Every driver used to arrive the same way, through one edge:
 adminconsole/cmd/goiabada-adminconsole -> core/validators -> core/data -> core/data/<engine> -> driver
 ```
 
-`core/data/database.go` imports all four engine packages, so importing `core/data` at all compiles
-every driver. Exactly one of the core packages the admin console imports reached `core/data`:
-`core/validators`. #338 closed the other, `core/oauth`, and the rows stayed `yes`, which is why the
-table asserts reachability rather than counting edges.
+`core/data/database.go` imported all four engine packages until #353 moved the selection to
+`authserver/internal/datafactory`, so importing `core/data` at all compiled every driver. Exactly
+one of the core packages the admin console imports reached `core/data`: `core/validators`. #338
+closed the other, `core/oauth`, and the rows stayed `yes`, which is why the table asserts
+reachability rather than counting edges.
 
 **#344 severed that edge, and the five rows above are `no` because of it.** It moved the seven
 validators that touch a database or a country table to the auth server and left `core/validators`
@@ -312,11 +313,12 @@ holding `identifier_validator.go` and `angle_brackets_validator.go`, which impor
 `regexp` and `core/i18n`. Ninety packages left the admin console's production closure with them,
 including `core/data`, all four drivers and `go-sqlbuilder`.
 
-These rows read #353 until then, on the argument that `core/data/database.go` is the only
-production file in `core` importing an engine package and so the single cut point. The drivers were
-expected to leave at 13/16 and left at 9/16, because severing the one edge that reaches `core/data`
-does the same job from the other end. Which is why `reachable today` is asserted against the real
-closure and not derived from an argument about which issue owns the cut.
+These rows read #353 until then, on the argument that `core/data/database.go` was the only
+production file in `core` importing an engine package and so the single cut point; #353 made that
+cut in the end, for #354. The drivers were expected to leave at 13/16 and left at 9/16, because
+severing the one edge that reaches `core/data` does the same job from the other end. Which is why
+`reachable today` is asserted against the real closure and not derived from an argument about
+which issue owns the cut.
 
 `github.com/pquerna/otp` is listed at `no` deliberately. It is not reachable now, it never will be
 now that `otp` is the auth server's (#346), and the row states that it must not arrive.

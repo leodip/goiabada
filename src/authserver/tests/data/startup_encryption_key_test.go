@@ -4,7 +4,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/leodip/goiabada/core/data"
+	"github.com/leodip/goiabada/authserver/internal/config"
+	"github.com/leodip/goiabada/authserver/internal/datafactory"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -25,13 +26,13 @@ import (
 // sqlite only, and for the reason TestNewDatabase_RefusesAnEmailCaseCollisionAtStartup gives: a
 // DSN pointing at a throwaway file is the one way to reach NewDatabase without touching the
 // shared database this tier runs against. The guard is engine-independent, being a length check
-// in core/data that runs before any engine sees the key.
+// in datafactory that runs before any engine sees the key.
 func TestNewDatabase_RefusesAnAESKeyOfTheWrongLength(t *testing.T) {
 	if engine := dbType(); engine != "sqlite" && engine != "" {
 		t.Skip("needs a DSN to a throwaway database, which only sqlite has; the length check under test is engine-independent")
 	}
 
-	cfg := &data.DatabaseConfig{Type: "sqlite", DSN: filepath.Join(t.TempDir(), "startup_key.db")}
+	cfg := &config.DatabaseConfig{Type: "sqlite", DSN: filepath.Join(t.TempDir(), "startup_key.db")}
 
 	refusals := []struct {
 		name string
@@ -44,7 +45,7 @@ func TestNewDatabase_RefusesAnAESKeyOfTheWrongLength(t *testing.T) {
 	}
 	for _, tc := range refusals {
 		t.Run(tc.name, func(t *testing.T) {
-			opened, err := data.NewDatabase(cfg, tc.key, nil, false)
+			opened, err := datafactory.NewDatabase(cfg, tc.key, nil, false)
 
 			require.Error(t, err, "a key of %d bytes must not be accepted", len(tc.key))
 			assert.Nil(t, opened, "a refused startup must hand back no database")
@@ -58,7 +59,7 @@ func TestNewDatabase_RefusesAnAESKeyOfTheWrongLength(t *testing.T) {
 	// purpose: by now the schema is at head, so this call exercises the guard and the startup
 	// tasks and nothing else.
 	t.Run("a 32-byte key is accepted", func(t *testing.T) {
-		opened, err := data.NewDatabase(cfg, make([]byte, 32), nil, false)
+		opened, err := datafactory.NewDatabase(cfg, make([]byte, 32), nil, false)
 
 		require.NoError(t, err, "a 32-byte key is the configuration the guard exists to admit")
 		assert.NotNil(t, opened, "an accepted startup must hand back a database")

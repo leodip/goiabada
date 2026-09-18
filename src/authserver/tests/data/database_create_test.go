@@ -25,7 +25,7 @@ import (
 // statement. GOIABADA_DB_CREATE decides whether they do, and these tests own both answers at
 // the constructor boundary (#293).
 //
-// Why the boundary and not data.NewDatabase: the factory also migrates and runs the startup
+// Why the boundary and not datafactory.NewDatabase: the factory also migrates and runs the startup
 // data tasks, so a failure there could be any of three things. The constructor's contract is
 // "given a config, return a usable handle or an error", and that is what an operator's
 // deployment either satisfies or does not.
@@ -250,7 +250,7 @@ const concurrentConstructors = 8
 // pinned out of the maintenance pool, spans the existence check and the create, so at most one
 // process ever issues CREATE DATABASE (decision 5).
 //
-// Deliberately at the CONSTRUCTOR and not at data.NewDatabase, per §5: the factory also migrates,
+// Deliberately at the CONSTRUCTOR and not at datafactory.NewDatabase, per §5: the factory also migrates,
 // and a race measured through it would be measuring migration concurrency too, against a lock the
 // migrator already takes for itself.
 func TestNewDatabase_CreateTrue_ConcurrentConstructorsAgainstAnAbsentDatabase(t *testing.T) {

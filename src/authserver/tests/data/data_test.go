@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/config"
+	"github.com/leodip/goiabada/authserver/internal/datafactory"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/encryption"
 )
@@ -56,7 +57,7 @@ func TestMain(m *testing.M) {
 
 	// Initialize database
 	var err error
-	database, err = data.NewDatabase(config.GetDataDatabaseConfig(),
+	database, err = datafactory.NewDatabase(config.GetDatabase(),
 		config.GetAESEncryptionKey(), config.GetAESEncryptionKeyPrevious(), false)
 	if err != nil {
 		slog.Error("failed to initialize database", "error", err)

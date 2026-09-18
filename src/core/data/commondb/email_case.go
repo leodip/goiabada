@@ -8,8 +8,8 @@ import (
 
 // ScanEmailCase reads every users row as its id, its stored address, and that address as THIS
 // engine's own LOWER() reduces it. It is the whole of the read behind the startup pre-flight
-// (data.CheckEmailCaseBeforeMigrating) and does no comparing of its own, because the comparison
-// is a Go rule and the engines disagree about the SQL one (#351).
+// (datafactory.CheckEmailCaseBeforeMigrating) and does no comparing of its own, because the
+// comparison is a Go rule and the engines disagree about the SQL one (#351).
 //
 // LOWER(email) is selected rather than computed, and that is the point of the method. Migration
 // 000047 repairs exactly the rows its own `WHERE email <> LOWER(email)` selects, so the only way

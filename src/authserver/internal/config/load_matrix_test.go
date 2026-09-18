@@ -13,7 +13,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/testutil"
 )
 
@@ -683,37 +682,5 @@ func TestLoadFrom_SaysNothingWhenNoRemovedSettingIsSet(t *testing.T) {
 
 	if records := capture.Records(); len(records) != 0 {
 		t.Errorf("got %d records loading a clean environment, want none: %v", len(records), capture.Text())
-	}
-}
-
-// TestGetDataDatabaseConfig_ReadsTheLoadedConfiguration is the exported half of the mapping: the
-// field-by-field cases in database_config_test.go drive the pure function, and this one is what
-// says the accessor reads the configuration this process actually loaded rather than a zero value.
-func TestGetDataDatabaseConfig_ReadsTheLoadedConfiguration(t *testing.T) {
-	loadMatrix(t, map[string]string{
-		"GOIABADA_DB_TYPE":     "postgres",
-		"GOIABADA_DB_HOST":     "db.env.example.com",
-		"GOIABADA_DB_NAME":     "goiabada_env",
-		"GOIABADA_DB_PORT":     "15432",
-		"GOIABADA_DB_USERNAME": "env-user",
-		"GOIABADA_DB_PASSWORD": "env-password",
-		"GOIABADA_DB_DSN":      "file:env.db?cache=shared",
-		"GOIABADA_DB_CREATE":   "false",
-	}, nil)
-
-	got := GetDataDatabaseConfig()
-
-	want := &data.DatabaseConfig{
-		Type:     "postgres",
-		Username: "env-user",
-		Password: "env-password",
-		Host:     "db.env.example.com",
-		Port:     15432,
-		Name:     "goiabada_env",
-		DSN:      "file:env.db?cache=shared",
-		Create:   false,
-	}
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("GetDataDatabaseConfig() = %#v, want %#v", got, want)
 	}
 }

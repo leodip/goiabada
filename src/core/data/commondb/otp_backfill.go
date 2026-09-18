@@ -14,9 +14,9 @@ import (
 // it is not reselected on a later run, and a run interrupted partway simply
 // finishes the remaining rows next time. It returns the number of rows migrated.
 //
-// The caller (data.NewDatabase) runs this at startup, before the server begins
-// serving, and treats any error as fatal so the process never serves requests
-// with a partially-migrated 2FA store.
+// The caller (datafactory.NewDatabase) runs this at startup, before the
+// server begins serving, and treats any error as fatal so the process
+// never serves requests with a partially-migrated 2FA store.
 func (d *CommonDatabase) BackfillEncryptedOTPSecrets(aesKey []byte) (int, error) {
 	if len(aesKey) != 32 {
 		return 0, errs.New("cannot backfill OTP secrets: AES key must be 32 bytes")

@@ -9,14 +9,14 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/leodip/goiabada/core/data"
+	"github.com/leodip/goiabada/authserver/internal/datafactory"
 	"github.com/leodip/goiabada/core/data/migrator"
 )
 
 // beforeLowercaseEmails is the version this command steps up FROM in these tests: the one below
 // the migration that lowercases stored addresses. Derived from the constant rather than written
 // as 46, so a renumbering moves both together.
-const beforeLowercaseEmails = data.LowercaseEmailsVersion - 1
+const beforeLowercaseEmails = datafactory.LowercaseEmailsVersion - 1
 
 // seedEmail writes one users row directly, at whatever version the schema is currently at.
 //
@@ -37,7 +37,7 @@ func seedEmail(t *testing.T, sqlDB *sql.DB, id int64, email string) {
 // TestMigrateTo_RefusesAnEmailCaseCollisionAndLeavesTheSchemaAlone is decision 16's promise
 // asserted at the entry point the plan review found unguarded.
 //
-// `migrate to` is the only path to the migrator that does not come through data.NewDatabase: it
+// `migrate to` is the only path to the migrator that does not come through datafactory.NewDatabase: it
 // opens through OpenDatabase deliberately, so that a downward step is possible. Without the
 // pre-flight here, this command on a colliding database would trip the UNIQUE idx_email half way
 // up the chain. That is the expensive outcome, not merely a failed command: the migrator writes a
@@ -54,7 +54,7 @@ func TestMigrateTo_RefusesAnEmailCaseCollisionAndLeavesTheSchemaAlone(t *testing
 	seedEmail(t, sqlDB, 2, "alice@example.com")
 
 	var out bytes.Buffer
-	code := runMigrate([]string{"to", strconv.Itoa(data.LowercaseEmailsVersion)}, db, m, rollbackFloor, &out)
+	code := runMigrate([]string{"to", strconv.Itoa(datafactory.LowercaseEmailsVersion)}, db, m, rollbackFloor, &out)
 
 	require.Equal(t, 1, code, "a collision must refuse: %s", out.String())
 	assert.Contains(t, out.String(), "users.id=1")
@@ -83,7 +83,7 @@ func TestMigrateTo_RefusesAnAddressSQLiteWillNotLowercase(t *testing.T) {
 	seedEmail(t, sqlDB, 1, "Ädmin@example.com")
 
 	var out bytes.Buffer
-	code := runMigrate([]string{"to", strconv.Itoa(data.LowercaseEmailsVersion)}, db, m, rollbackFloor, &out)
+	code := runMigrate([]string{"to", strconv.Itoa(datafactory.LowercaseEmailsVersion)}, db, m, rollbackFloor, &out)
 
 	require.Equal(t, 1, code, "an address this engine's LOWER() will not reduce must refuse: %s", out.String())
 	assert.Contains(t, out.String(), "users.id=1")
@@ -108,13 +108,13 @@ func TestMigrateTo_LowercasesAndDoesNotRefuseWhatItCanRepair(t *testing.T) {
 	seedEmail(t, sqlDB, 2, "already@example.com")
 
 	var out bytes.Buffer
-	code := runMigrate([]string{"to", strconv.Itoa(data.LowercaseEmailsVersion)}, db, m, rollbackFloor, &out)
+	code := runMigrate([]string{"to", strconv.Itoa(datafactory.LowercaseEmailsVersion)}, db, m, rollbackFloor, &out)
 
 	require.Equal(t, 0, code, "nothing here is a hazard: %s", out.String())
 
 	version, dirty, err := m.Version()
 	require.NoError(t, err)
-	assert.Equal(t, data.LowercaseEmailsVersion, version)
+	assert.Equal(t, datafactory.LowercaseEmailsVersion, version)
 	assert.False(t, dirty)
 
 	assert.Equal(t, "legacy.user@example.com", storedEmail(t, sqlDB, 1),

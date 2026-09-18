@@ -113,7 +113,7 @@ func buildRCSIFixture() (*rcsiFixture, error) {
 	// 1. Create the database through the constructor the migration fixtures use, so it lands at
 	//    the collation #283 pins, and then let go of it completely.
 	//
-	//    NOT data.NewDatabase, and the difference is not cosmetic. That entry point runs the
+	//    NOT datafactory.NewDatabase, and the difference is not cosmetic. That entry point runs the
 	//    migration chain and the startup data tasks, neither of which this step wants, and it
 	//    returns the data.Database interface, which declares no Close: the pool it opened would
 	//    stay open for the life of the process and step 2 would be an ALTER DATABASE evicting
@@ -175,7 +175,7 @@ func buildRCSIFixture() (*rcsiFixture, error) {
 	//    THAT, and it is goal 5's test. A runner that held its connection would leave it busy,
 	//    Close would leave it alone, and this would report one.
 	//
-	//    data.NewDatabase cannot be used for either job. It always migrates and it runs the
+	//    datafactory.NewDatabase cannot be used for either job. It always migrates and it runs the
 	//    startup data tasks, and step 5 wants neither on the handles the tests run on.
 	migrating, err := mssqldb.NewMsSQLDatabase(rcsiConfig(cfg, name), false)
 	if err != nil {
@@ -188,7 +188,7 @@ func buildRCSIFixture() (*rcsiFixture, error) {
 		return nil, fmt.Errorf("the migrating handle for %s still holds %d connection(s) after it was closed, so the runner did not give its connection back", name, open)
 	}
 
-	// 5. Only now the two handles the tests run on. They do NOT run data.NewDatabase's startup
+	// 5. Only now the two handles the tests run on. They do NOT run datafactory.NewDatabase's startup
 	//    data tasks, and on this database every one of them is a no-op: the key migration and the
 	//    rotation both key off a settings row that a database nobody has seeded does not have,
 	//    and the OTP and email passes walk a users table with nothing in it.

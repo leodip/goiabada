@@ -14,11 +14,11 @@ import (
 // not scan, or to die after a good row.
 //
 // Every case here holds one property, and it is fail-closed rather than complete-looking. The
-// caller above this method, data.CheckEmailCaseBeforeMigrating, reads the rows it is given and
-// nothing else, so an empty or short result reads as "no address collides" and the upgrade
+// caller above this method, datafactory.CheckEmailCaseBeforeMigrating, reads the rows it is given
+// and nothing else, so an empty or short result reads as "no address collides" and the upgrade
 // crosses migration 000047 having looked at a fraction of the table. A storage failure turned
-// into a clean result is therefore not a lost error message: it is the pre-flight passing on
-// rows it never saw, which is the outcome the pre-flight exists to prevent (#351).
+// into a clean result is therefore not a lost error message: it is the pre-flight passing on rows
+// it never saw, which is the outcome the pre-flight exists to prevent (#351).
 //
 // The backfill this replaced had scan and iteration failure cases of its own. The replacement
 // method arrived without them, and all three of its error exits could be neutralized with the
