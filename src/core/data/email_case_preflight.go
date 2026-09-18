@@ -131,19 +131,19 @@ func findEnginesLowerDisagreements(rows []models.EmailCaseRow) []models.EmailCas
 func describeEmailCaseHazards(collisions [][]models.EmailCaseRow, unreachable []models.EmailCaseRow) string {
 	var b strings.Builder
 
-	b.WriteString(fmt.Sprintf(
+	fmt.Fprintf(&b,
 		"refusing to migrate: schema version %06d lowercases every stored email address, and the "+
 			"users table holds rows it cannot resolve. Nothing has been migrated and the database is "+
-			"not dirty. Fix the rows below and start again.", LowercaseEmailsVersion))
+			"not dirty. Fix the rows below and start again.", LowercaseEmailsVersion)
 
 	if len(collisions) > 0 {
 		b.WriteString("\n\ntwo or more accounts differ only by case, so lowercasing them would " +
 			"collide on the UNIQUE index idx_email. Decide which account keeps the address and " +
 			"change or delete the others; this server will not choose for you:")
 		for _, group := range collisions {
-			b.WriteString(fmt.Sprintf("\n  %q is held by:", strings.ToLower(group[0].Email)))
+			fmt.Fprintf(&b, "\n  %q is held by:", strings.ToLower(group[0].Email))
 			for _, row := range group {
-				b.WriteString(fmt.Sprintf("\n    users.id=%d email=%q", row.Id, row.Email))
+				fmt.Fprintf(&b, "\n    users.id=%d email=%q", row.Id, row.Email)
 			}
 		}
 	}
@@ -153,8 +153,8 @@ func describeEmailCaseHazards(collisions [][]models.EmailCaseRow, unreachable []
 			"way Goiabada does, so the migration would report success and leave them unreachable by " +
 			"every sign-in path. Lowercase them by hand, then start again:")
 		for _, row := range unreachable {
-			b.WriteString(fmt.Sprintf("\n  users.id=%d email=%q, engine LOWER() gives %q, Goiabada needs %q",
-				row.Id, row.Email, row.EngineLowered, strings.ToLower(row.Email)))
+			fmt.Fprintf(&b, "\n  users.id=%d email=%q, engine LOWER() gives %q, Goiabada needs %q",
+				row.Id, row.Email, row.EngineLowered, strings.ToLower(row.Email))
 		}
 	}
 
