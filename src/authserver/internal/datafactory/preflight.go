@@ -1,10 +1,11 @@
-package data
+package datafactory
 
 import (
 	"fmt"
 	"sort"
 	"strings"
 
+	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/data/migrator"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
@@ -50,7 +51,7 @@ const LowercaseEmailsVersion = 47
 // still serving traffic can insert the lowercase twin of a legacy address between this read and
 // 000047's UPDATE. #351 decision 18 answered that with downtime and a release note rather than
 // machinery, so an upgrade across 000047 wants traffic stopped first.
-func CheckEmailCaseBeforeMigrating(database Database, recorded int, target int) error {
+func CheckEmailCaseBeforeMigrating(database data.Database, recorded int, target int) error {
 	if recorded == migrator.NilVersion || recorded >= LowercaseEmailsVersion {
 		return nil
 	}
@@ -159,4 +160,37 @@ func describeEmailCaseHazards(collisions [][]models.EmailCaseRow, unreachable []
 	}
 
 	return b.String()
+}
+
+// preflightEmailCase reads where this database stands and hands the answer to
+// CheckEmailCaseBeforeMigrating, which is where the policy and every test live. It is the
+// startup half of that check; the `migrate to` subcommand has the other, because it reaches
+// OpenDatabase directly and never comes through here (#351).
+//
+// A database that cannot produce a migrator is passed rather than refused. Every engine type
+// implements NewMigrator, so the only way to land here is a new engine that did not, which
+// database.Migrate() is about to fail on anyway with a message about migrating rather than about
+// email addresses.
+func preflightEmailCase(database data.Database) error {
+	provider, ok := database.(MigratorProvider)
+	if !ok {
+		return nil
+	}
+
+	m, err := provider.NewMigrator()
+	if err != nil {
+		return errs.Wrap(err, "unable to prepare the migration runner for the email case pre-flight")
+	}
+
+	recorded, _, err := m.Version()
+	if migrator.IsNilVersion(err) {
+		recorded = migrator.NilVersion
+	} else if err != nil {
+		// A dirty database reports its version without error, so this is a read that failed. The
+		// migration about to run would fail on the same handle; say which read it was.
+		return errs.Wrap(err, "unable to read the schema version for the email case pre-flight")
+	}
+
+	// NewDatabase always migrates to head, so head is the target.
+	return CheckEmailCaseBeforeMigrating(database, recorded, m.Head())
 }

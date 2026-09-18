@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/leodip/goiabada/authserver/internal/config"
+	"github.com/leodip/goiabada/authserver/internal/datafactory"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/data/migrator"
@@ -46,18 +47,18 @@ const (
 )
 
 // migrateCommand opens the configured database WITHOUT migrating it and hands its migrator to
-// runMigrate. It is the only caller of data.OpenDatabase: data.NewDatabase brings the schema to
+// runMigrate. It is the only caller of datafactory.OpenDatabase: datafactory.NewDatabase brings the schema to
 // head on the way out, which would make a step down impossible and a `migrate version` on a
 // database behind this binary a lie, since the read would happen after the migration it was meant
 // to report on.
 func migrateCommand(args []string) int {
-	database, err := data.OpenDatabase(config.GetDataDatabaseConfig(), false)
+	database, err := datafactory.OpenDatabase(config.GetDatabase(), false)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "unable to open the database: %+v\n", err)
 		return migrateExitError
 	}
 
-	provider, ok := database.(data.MigratorProvider)
+	provider, ok := database.(datafactory.MigratorProvider)
 	if !ok {
 		// Every engine type implements NewMigrator, so this is a new engine that forgot to.
 		fmt.Fprintf(os.Stderr, "this database engine cannot be migrated by hand: %T has no NewMigrator\n", database)
@@ -79,7 +80,7 @@ func migrateCommand(args []string) int {
 //
 // The database is here for the pre-flight migrateTo runs before an upward step (#351). The
 // migrator alone cannot answer it: the check reads the users table through the engine's own SQL,
-// and this command is the only path to a migrator that does not come through data.NewDatabase,
+// and this command is the only path to a migrator that does not come through datafactory.NewDatabase,
 // where the startup half of the same check lives.
 //
 // It takes the floor as a parameter rather than reading rollbackFloor so that a test can place a
@@ -205,7 +206,7 @@ func migrateTo(database data.Database, m *migrator.Migrator, target int, floor i
 	outf(out, "migrations to run, in order: %s\n", formatPlan(plan))
 
 	// The same refusal `goiabada-authserver` performs at startup, run here because this command is
-	// the only path to the migrator that does not come through data.NewDatabase: it opens through
+	// the only path to the migrator that does not come through datafactory.NewDatabase: it opens through
 	// OpenDatabase precisely so a downward step is possible. Without it, `migrate to 47` on a
 	// database holding an email case collision would trip the UNIQUE idx_email half way up the
 	// chain and leave the schema dirty, which is the state the check exists to prevent and which
@@ -222,7 +223,7 @@ func migrateTo(database data.Database, m *migrator.Migrator, target int, floor i
 		return migrateExitError
 	}
 
-	if err := data.CheckEmailCaseBeforeMigrating(database, current, target); err != nil {
+	if err := datafactory.CheckEmailCaseBeforeMigrating(database, current, target); err != nil {
 		outf(out, "%+v\n", err)
 		return migrateExitError
 	}

@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/config"
+	"github.com/leodip/goiabada/authserver/internal/datafactory"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/i18n"
@@ -46,7 +47,7 @@ func TestMain(m *testing.M) {
 	}
 
 	var err error
-	database, err = data.NewDatabase(config.GetDataDatabaseConfig(),
+	database, err = datafactory.NewDatabase(config.GetDatabase(),
 		config.GetAESEncryptionKey(), config.GetAESEncryptionKeyPrevious(), false)
 	if err != nil {
 		panic(err)

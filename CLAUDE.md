@@ -37,6 +37,7 @@ repository root. It is enforced rather than descriptive: see **Architecture guar
 - `internal/handlers/apihandlers/` - Admin API handlers
 - `internal/{ceremony,issuance,signingkeys}/` - Provider-side issuance: codes, tokens, key rotation, ceremony context
 - `internal/{permissions,usercreation,usersession,useragent,emaildelivery,otp,imaging,uithemes}/` - Application services and leaf helpers: permissions, user creation, sessions, email, OTP, images, themes
+- `internal/datafactory/` - Database composition: engine selection, config mapping, the email-case pre-flight, the startup data tasks (#353)
 - `internal/server/routes.go` - All route definitions
 - `web/template/` - HTML templates
 - `tests/integration/` - Integration tests

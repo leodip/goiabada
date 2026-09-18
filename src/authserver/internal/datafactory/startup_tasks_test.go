@@ -1,4 +1,4 @@
-package data
+package datafactory
 
 import (
 	"database/sql"
@@ -25,8 +25,8 @@ var startupKey = make([]byte, 32)
 //
 // The email lowercase pass was the fourth task here and was this test's headline case until #351
 // made it migration 000047. Its fail-closed property did not go away with it: it moved to
-// data.CheckEmailCaseBeforeMigrating, which refuses BEFORE the migration chain rather than
-// repairing after it, and is covered in email_case_preflight_test.go.
+// CheckEmailCaseBeforeMigrating, which refuses BEFORE the migration chain rather than
+// repairing after it, and is covered in preflight_test.go.
 //
 // One case per task, each stubbing the tasks before it as succeeding and the task itself as
 // failing, and asserting the error comes back out. The final case is the whole sequence
