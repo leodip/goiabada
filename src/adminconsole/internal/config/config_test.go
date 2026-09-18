@@ -11,77 +11,6 @@ import (
 	"github.com/leodip/goiabada/core/constants"
 )
 
-func TestValidateAESEncryptionKey(t *testing.T) {
-	saved := cfg.AESEncryptionKey
-	defer func() { cfg.AESEncryptionKey = saved }()
-
-	tests := []struct {
-		name    string
-		key     string
-		wantErr bool
-	}{
-		{"valid 32-byte hex", "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff", false},
-		{"empty", "", true},
-		{"not hex", "zzzz", true},
-		{"too short (16 bytes)", "00112233445566778899aabbccddeeff", true},
-		{"too long (33 bytes)", "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff00", true},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			cfg.AESEncryptionKey = tt.key
-			err := ValidateAESEncryptionKey()
-			if tt.wantErr && err == nil {
-				t.Errorf("ValidateAESEncryptionKey(%q): expected error, got nil", tt.key)
-			}
-			if !tt.wantErr && err != nil {
-				t.Errorf("ValidateAESEncryptionKey(%q): unexpected error: %v", tt.key, err)
-			}
-			if !tt.wantErr {
-				if got := GetAESEncryptionKey(); len(got) != 32 {
-					t.Errorf("GetAESEncryptionKey() length = %d, want 32", len(got))
-				}
-			}
-		})
-	}
-}
-
-func TestValidateAESEncryptionKey_Previous(t *testing.T) {
-	savedCur := cfg.AESEncryptionKey
-	savedPrev := cfg.AESEncryptionKeyPrevious
-	defer func() {
-		cfg.AESEncryptionKey = savedCur
-		cfg.AESEncryptionKeyPrevious = savedPrev
-	}()
-
-	cfg.AESEncryptionKey = "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff"
-
-	tests := []struct {
-		name    string
-		prev    string
-		wantErr bool
-	}{
-		{"absent is fine", "", false},
-		{"valid previous", "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210", false},
-		{"previous not hex", "zzzz", true},
-		{"previous wrong length", "00112233445566778899aabbccddeeff", true},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			cfg.AESEncryptionKeyPrevious = tt.prev
-			err := ValidateAESEncryptionKey()
-			if tt.wantErr && err == nil {
-				t.Errorf("expected error for previous=%q, got nil", tt.prev)
-			}
-			if !tt.wantErr && err != nil {
-				t.Errorf("unexpected error for previous=%q: %v", tt.prev, err)
-			}
-			if !tt.wantErr && tt.prev != "" && len(GetAESEncryptionKeyPrevious()) != 32 {
-				t.Errorf("GetAESEncryptionKeyPrevious() length = %d, want 32", len(GetAESEncryptionKeyPrevious()))
-			}
-		})
-	}
-}
-
 func TestSplitCSV(t *testing.T) {
 	tests := []struct {
 		name string
@@ -123,62 +52,12 @@ func TestGetEnvAsStringSlice(t *testing.T) {
 	})
 }
 
-func TestGetEnvAsBoolDefault(t *testing.T) {
-	const key = "GOIABADA_TEST_DB_CREATE"
-
-	// Every case is run against both defaults, so the default is observed rather than assumed:
-	// a case that only ever ran with defaultVal=false could not tell the fallback apart from
-	// a parsed false.
-	tests := []struct {
-		name string
-		// set is false for the unset case, which is the one the helper exists for.
-		set          bool
-		value        string
-		wantTrueDef  bool
-		wantFalseDef bool
-	}{
-		{name: "unset returns the default", set: false, wantTrueDef: true, wantFalseDef: false},
-		{name: `"true"`, set: true, value: "true", wantTrueDef: true, wantFalseDef: true},
-		{name: `"1"`, set: true, value: "1", wantTrueDef: true, wantFalseDef: true},
-		{name: `"T"`, set: true, value: "T", wantTrueDef: true, wantFalseDef: true},
-		{name: `"TRUE"`, set: true, value: "TRUE", wantTrueDef: true, wantFalseDef: true},
-		{name: `"false"`, set: true, value: "false", wantTrueDef: false, wantFalseDef: false},
-		{name: `"0"`, set: true, value: "0", wantTrueDef: false, wantFalseDef: false},
-		{name: `"f"`, set: true, value: "f", wantTrueDef: false, wantFalseDef: false},
-		{name: "whitespace is trimmed", set: true, value: " false ", wantTrueDef: false, wantFalseDef: false},
-		// strconv.ParseBool rejects all four, so each falls back to the default. Keep the
-		// "no" case: it reads as false and is not, and against defaultVal=true it returns true.
-		{name: `"yes" is not parseable`, set: true, value: "yes", wantTrueDef: true, wantFalseDef: false},
-		{name: `"no" is not parseable`, set: true, value: "no", wantTrueDef: true, wantFalseDef: false},
-		{name: "empty is not parseable", set: true, value: "", wantTrueDef: true, wantFalseDef: false},
-		{name: `"maybe" is not parseable`, set: true, value: "maybe", wantTrueDef: true, wantFalseDef: false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// t.Setenv cannot unset, but it registers the restore, so setting then
-			// unsetting leaves the variable absent for this subtest only.
-			t.Setenv(key, tt.value)
-			if !tt.set {
-				if err := os.Unsetenv(key); err != nil {
-					t.Fatalf("os.Unsetenv(%s) = %v", key, err)
-				}
-			}
-			if got := getEnvAsBoolDefault(key, true); got != tt.wantTrueDef {
-				t.Errorf("getEnvAsBoolDefault(%s=%q, true) = %v, want %v", key, tt.value, got, tt.wantTrueDef)
-			}
-			if got := getEnvAsBoolDefault(key, false); got != tt.wantFalseDef {
-				t.Errorf("getEnvAsBoolDefault(%s=%q, false) = %v, want %v", key, tt.value, got, tt.wantFalseDef)
-			}
-		})
-	}
-}
-
 func TestGetEnv(t *testing.T) {
 	const key = "GOIABADA_TEST_GETENV"
 
 	// Both sides are trimmed, which is the rule a quoted value in a compose file or an env
-	// file meets: GOIABADA_DB_HOST=" db " is the same host as GOIABADA_DB_HOST=db.
+	// file meets: GOIABADA_ADMINCONSOLE_LOG_LEVEL=" debug " is the same level as
+	// GOIABADA_ADMINCONSOLE_LOG_LEVEL=debug.
 	tests := []struct {
 		name string
 		// set is false for the unset case, which is what the default is for.
@@ -187,15 +66,15 @@ func TestGetEnv(t *testing.T) {
 		defaultVal string
 		want       string
 	}{
-		{name: "unset returns the default", set: false, defaultVal: "sqlite", want: "sqlite"},
-		{name: "unset returns the default trimmed", set: false, defaultVal: "  sqlite  ", want: "sqlite"},
-		{name: "set returns the value", set: true, value: "mysql", defaultVal: "sqlite", want: "mysql"},
-		{name: "set returns the value trimmed", set: true, value: "  mysql\t", defaultVal: "sqlite", want: "mysql"},
+		{name: "unset returns the default", set: false, defaultVal: "info", want: "info"},
+		{name: "unset returns the default trimmed", set: false, defaultVal: "  info  ", want: "info"},
+		{name: "set returns the value", set: true, value: "debug", defaultVal: "info", want: "debug"},
+		{name: "set returns the value trimmed", set: true, value: "  debug\t", defaultVal: "info", want: "debug"},
 		// Present-and-empty is a value, not an absence: os.LookupEnv reports it as set, so
-		// the default does not apply. An operator who writes GOIABADA_AUTHSERVER_LOG_FORMAT=
+		// the default does not apply. An operator who writes GOIABADA_ADMINCONSOLE_LOG_FORMAT=
 		// has chosen the empty string.
-		{name: "set to empty is not the default", set: true, value: "", defaultVal: "sqlite", want: ""},
-		{name: "set to whitespace only is not the default", set: true, value: "   ", defaultVal: "sqlite", want: ""},
+		{name: "set to empty is not the default", set: true, value: "", defaultVal: "info", want: ""},
+		{name: "set to whitespace only is not the default", set: true, value: "   ", defaultVal: "info", want: ""},
 	}
 
 	for _, tt := range tests {
@@ -224,14 +103,14 @@ func TestGetEnvAsInt(t *testing.T) {
 		value string
 		want  int
 	}{
-		{name: "unset returns the default", set: false, want: 9443},
-		{name: "a number", set: true, value: "8443", want: 8443},
+		{name: "unset returns the default", set: false, want: 9444},
+		{name: "a number", set: true, value: "8444", want: 8444},
 		{name: "a negative number", set: true, value: "-1", want: -1},
-		{name: "whitespace is trimmed", set: true, value: "  8443  ", want: 8443},
-		{name: "empty falls back", set: true, value: "", want: 9443},
-		{name: "non-numeric falls back", set: true, value: "https", want: 9443},
-		{name: "a decimal falls back", set: true, value: "8443.0", want: 9443},
-		{name: "an overflowing number falls back", set: true, value: "99999999999999999999", want: 9443},
+		{name: "whitespace is trimmed", set: true, value: "  8444  ", want: 8444},
+		{name: "empty falls back", set: true, value: "", want: 9444},
+		{name: "non-numeric falls back", set: true, value: "https", want: 9444},
+		{name: "a decimal falls back", set: true, value: "8444.0", want: 9444},
+		{name: "an overflowing number falls back", set: true, value: "99999999999999999999", want: 9444},
 	}
 
 	for _, tt := range tests {
@@ -242,43 +121,8 @@ func TestGetEnvAsInt(t *testing.T) {
 					t.Fatalf("os.Unsetenv(%s) = %v", key, err)
 				}
 			}
-			if got := getEnvAsInt(key, 9443); got != tt.want {
-				t.Errorf("getEnvAsInt(%s=%q, 9443) = %d, want %d", key, tt.value, got, tt.want)
-			}
-		})
-	}
-}
-
-func TestGetEnvAsInt64(t *testing.T) {
-	const key = "GOIABADA_TEST_MAX_SIZE"
-	const defaultVal = int64(3 * 1024 * 1024)
-
-	tests := []struct {
-		name  string
-		set   bool
-		value string
-		want  int64
-	}{
-		{name: "unset returns the default", set: false, want: defaultVal},
-		{name: "a number", set: true, value: "5242880", want: 5242880},
-		// The reason this one is int64 rather than int: a size beyond the 32-bit range.
-		{name: "a number beyond 32 bits", set: true, value: "4294967296", want: 4294967296},
-		{name: "whitespace is trimmed", set: true, value: " 5242880 ", want: 5242880},
-		{name: "empty falls back", set: true, value: "", want: defaultVal},
-		{name: "non-numeric falls back", set: true, value: "3MB", want: defaultVal},
-		{name: "an overflowing number falls back", set: true, value: "99999999999999999999", want: defaultVal},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Setenv(key, tt.value)
-			if !tt.set {
-				if err := os.Unsetenv(key); err != nil {
-					t.Fatalf("os.Unsetenv(%s) = %v", key, err)
-				}
-			}
-			if got := getEnvAsInt64(key, defaultVal); got != tt.want {
-				t.Errorf("getEnvAsInt64(%s=%q, %d) = %d, want %d", key, tt.value, defaultVal, got, tt.want)
+			if got := getEnvAsInt(key, 9444); got != tt.want {
+				t.Errorf("getEnvAsInt(%s=%q, 9444) = %d, want %d", key, tt.value, got, tt.want)
 			}
 		})
 	}
@@ -289,7 +133,8 @@ func TestGetEnvAsBool(t *testing.T) {
 
 	// getEnvAsBool can only ever express default-false: anything unparseable is false, which
 	// is the safe answer for every setting that reaches it (each one turns something on).
-	// A setting whose default is true goes through getEnvAsBoolDefault instead (#293).
+	// Nothing this process loads has a default of true, which is why getEnvAsBoolDefault
+	// (#293) stayed with the auth server, whose GOIABADA_DB_CREATE is the one such setting.
 	tests := []struct {
 		name  string
 		set   bool
@@ -325,26 +170,24 @@ func TestGetEnvAsBool(t *testing.T) {
 }
 
 func TestIsCookieSecure(t *testing.T) {
-	// Secure is derived solely from the base URL scheme (there is no override).
+	// Secure is derived solely from the base URL scheme (there is no override), and from this
+	// process's own base URL: the auth server's cookies are decided in the auth server, which
+	// is why there is no IsCookieSecure on the peer struct to test beside this one (#351).
 	tests := []struct {
 		name    string
 		baseURL string
 		want    bool
 	}{
-		{"http -> not secure (dev)", "http://localhost:9090", false},
-		{"https -> secure", "https://auth.example.com", true},
-		{"HTTPS uppercase -> secure", "HTTPS://AUTH.EXAMPLE.COM", true},
-		{"whitespace-padded https -> secure", "  https://auth.example.com  ", true},
+		{"http -> not secure (dev)", "http://localhost:9091", false},
+		{"https -> secure", "https://admin.example.com", true},
+		{"HTTPS uppercase -> secure", "HTTPS://ADMIN.EXAMPLE.COM", true},
+		{"whitespace-padded https -> secure", "  https://admin.example.com  ", true},
 		{"empty -> not secure", "", false},
 		{"non-http scheme -> not secure", "ftp://example.com", false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			as := &AuthServerConfig{BaseURL: tt.baseURL}
-			if got := as.IsCookieSecure(); got != tt.want {
-				t.Errorf("AuthServerConfig.IsCookieSecure() = %v, want %v", got, tt.want)
-			}
 			ac := &AdminConsoleConfig{BaseURL: tt.baseURL}
 			if got := ac.IsCookieSecure(); got != tt.want {
 				t.Errorf("AdminConsoleConfig.IsCookieSecure() = %v, want %v", got, tt.want)
@@ -386,196 +229,9 @@ var validAuthKey = strings.Repeat("ab", 64)
 // validEncKey is 32 bytes as 64 hex characters (openssl rand -hex 32).
 var validEncKey = strings.Repeat("cd", 32)
 
-// Session keys sign and encrypt the browser session cookie. A short or absent
-// key must fail startup rather than silently weakening the cookie, so both
-// validators are exercised across every rejection branch.
-func TestValidateAuthServerSessionKeys(t *testing.T) {
-	savedAuth := cfg.AuthServer.SessionAuthenticationKey
-	savedEnc := cfg.AuthServer.SessionEncryptionKey
-	savedPrevAuth := cfg.AuthServer.SessionAuthenticationKeyPrevious
-	savedPrevEnc := cfg.AuthServer.SessionEncryptionKeyPrevious
-	defer func() {
-		cfg.AuthServer.SessionAuthenticationKey = savedAuth
-		cfg.AuthServer.SessionEncryptionKey = savedEnc
-		cfg.AuthServer.SessionAuthenticationKeyPrevious = savedPrevAuth
-		cfg.AuthServer.SessionEncryptionKeyPrevious = savedPrevEnc
-	}()
-
-	tests := []struct {
-		name        string
-		authKey     string
-		encKey      string
-		prevAuthKey string
-		prevEncKey  string
-		wantErr     bool
-		wantErrPart string
-	}{
-		{
-			name:    "both keys valid",
-			authKey: validAuthKey,
-			encKey:  validEncKey,
-		},
-		{
-			name:        "authentication key missing",
-			authKey:     "",
-			encKey:      validEncKey,
-			wantErr:     true,
-			wantErrPart: "GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY is required",
-		},
-		{
-			name:        "encryption key missing",
-			authKey:     validAuthKey,
-			encKey:      "",
-			wantErr:     true,
-			wantErrPart: "GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY is required",
-		},
-		{
-			name:        "authentication key not hex",
-			authKey:     strings.Repeat("zz", 64),
-			encKey:      validEncKey,
-			wantErr:     true,
-			wantErrPart: "must be hex-encoded",
-		},
-		{
-			name:        "encryption key not hex",
-			authKey:     validAuthKey,
-			encKey:      strings.Repeat("zz", 32),
-			wantErr:     true,
-			wantErrPart: "must be hex-encoded",
-		},
-		{
-			name:        "authentication key too short",
-			authKey:     strings.Repeat("ab", 32),
-			encKey:      validEncKey,
-			wantErr:     true,
-			wantErrPart: "must be 64 bytes",
-		},
-		{
-			name:        "authentication key too long",
-			authKey:     strings.Repeat("ab", 65),
-			encKey:      validEncKey,
-			wantErr:     true,
-			wantErrPart: "must be 64 bytes",
-		},
-		{
-			name:        "encryption key too short",
-			authKey:     validAuthKey,
-			encKey:      strings.Repeat("cd", 16),
-			wantErr:     true,
-			wantErrPart: "must be 32 bytes",
-		},
-		{
-			name:        "encryption key too long",
-			authKey:     validAuthKey,
-			encKey:      strings.Repeat("cd", 33),
-			wantErr:     true,
-			wantErrPart: "must be 32 bytes",
-		},
-		{
-			name:        "odd number of hex characters",
-			authKey:     strings.Repeat("ab", 63) + "a",
-			encKey:      validEncKey,
-			wantErr:     true,
-			wantErrPart: "must be hex-encoded",
-		},
-		{
-			// The ordinary state: no rotation in progress, so there is no previous pair to
-			// validate. Named rather than left implicit, because every case above it now
-			// relies on the previous pair being absent.
-			name:    "previous pair absent",
-			authKey: validAuthKey,
-			encKey:  validEncKey,
-		},
-		{
-			name:        "previous pair valid",
-			authKey:     validAuthKey,
-			encKey:      validEncKey,
-			prevAuthKey: validAuthKey,
-			prevEncKey:  validEncKey,
-		},
-		{
-			// Half a previous pair opens nothing, so it is refused rather than read as no
-			// rotation. An operator who mistyped one variable name would otherwise be told
-			// the rotation is in place while every session it was meant to keep alive is
-			// turned away.
-			name:        "previous authentication key set alone",
-			authKey:     validAuthKey,
-			encKey:      validEncKey,
-			prevAuthKey: validAuthKey,
-			wantErr:     true,
-			wantErrPart: "GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY_PREVIOUS is required",
-		},
-		{
-			name:        "previous encryption key set alone",
-			authKey:     validAuthKey,
-			encKey:      validEncKey,
-			prevEncKey:  validEncKey,
-			wantErr:     true,
-			wantErrPart: "GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY_PREVIOUS is required",
-		},
-		{
-			name:        "previous authentication key not hex",
-			authKey:     validAuthKey,
-			encKey:      validEncKey,
-			prevAuthKey: strings.Repeat("zz", 64),
-			prevEncKey:  validEncKey,
-			wantErr:     true,
-			wantErrPart: "GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY_PREVIOUS must be hex-encoded",
-		},
-		{
-			name:        "previous encryption key not hex",
-			authKey:     validAuthKey,
-			encKey:      validEncKey,
-			prevAuthKey: validAuthKey,
-			prevEncKey:  strings.Repeat("zz", 32),
-			wantErr:     true,
-			wantErrPart: "GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY_PREVIOUS must be hex-encoded",
-		},
-		{
-			name:        "previous authentication key wrong length",
-			authKey:     validAuthKey,
-			encKey:      validEncKey,
-			prevAuthKey: strings.Repeat("ab", 32),
-			prevEncKey:  validEncKey,
-			wantErr:     true,
-			wantErrPart: "GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY_PREVIOUS must be 64 bytes",
-		},
-		{
-			name:        "previous encryption key wrong length",
-			authKey:     validAuthKey,
-			encKey:      validEncKey,
-			prevAuthKey: validAuthKey,
-			prevEncKey:  strings.Repeat("cd", 33),
-			wantErr:     true,
-			wantErrPart: "GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY_PREVIOUS must be 32 bytes",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			cfg.AuthServer.SessionAuthenticationKey = tt.authKey
-			cfg.AuthServer.SessionEncryptionKey = tt.encKey
-			cfg.AuthServer.SessionAuthenticationKeyPrevious = tt.prevAuthKey
-			cfg.AuthServer.SessionEncryptionKeyPrevious = tt.prevEncKey
-
-			err := ValidateAuthServerSessionKeys()
-
-			if tt.wantErr {
-				if err == nil {
-					t.Fatalf("expected an error, got nil")
-				}
-				if !strings.Contains(err.Error(), tt.wantErrPart) {
-					t.Errorf("error %q does not contain %q", err.Error(), tt.wantErrPart)
-				}
-				return
-			}
-			if err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
-		})
-	}
-}
-
+// Session keys sign and encrypt the browser session cookie. A short or absent key must fail
+// startup rather than silently weakening the cookie, so the validator is exercised across
+// every rejection branch.
 func TestValidateAdminConsoleSessionKeys(t *testing.T) {
 	savedAuth := cfg.AdminConsole.SessionAuthenticationKey
 	savedEnc := cfg.AdminConsole.SessionEncryptionKey
@@ -867,33 +523,6 @@ func TestValidateRemovedAdminConsoleVars_MessageCarriesTheRemedy(t *testing.T) {
 	}
 }
 
-// The two validators must be independent: admin console keys being wrong must
-// not make the auth server's keys look wrong, and vice versa.
-func TestSessionKeyValidatorsAreIndependent(t *testing.T) {
-	savedAuthServerAuth := cfg.AuthServer.SessionAuthenticationKey
-	savedAuthServerEnc := cfg.AuthServer.SessionEncryptionKey
-	savedAdminAuth := cfg.AdminConsole.SessionAuthenticationKey
-	savedAdminEnc := cfg.AdminConsole.SessionEncryptionKey
-	defer func() {
-		cfg.AuthServer.SessionAuthenticationKey = savedAuthServerAuth
-		cfg.AuthServer.SessionEncryptionKey = savedAuthServerEnc
-		cfg.AdminConsole.SessionAuthenticationKey = savedAdminAuth
-		cfg.AdminConsole.SessionEncryptionKey = savedAdminEnc
-	}()
-
-	cfg.AuthServer.SessionAuthenticationKey = validAuthKey
-	cfg.AuthServer.SessionEncryptionKey = validEncKey
-	cfg.AdminConsole.SessionAuthenticationKey = ""
-	cfg.AdminConsole.SessionEncryptionKey = ""
-
-	if err := ValidateAuthServerSessionKeys(); err != nil {
-		t.Errorf("auth server keys should be valid regardless of admin console keys: %v", err)
-	}
-	if err := ValidateAdminConsoleSessionKeys(); err == nil {
-		t.Error("admin console keys should be reported as missing")
-	}
-}
-
 // GetEffectiveBaseURL lets a deployment reach the auth server over an internal
 // address (container network, service mesh) while still publishing a public URL.
 func TestGetEffectiveBaseURL(t *testing.T) {
@@ -921,6 +550,12 @@ func TestGetEffectiveBaseURL(t *testing.T) {
 			want:            "https://auth.example.com",
 		},
 		{
+			name:            "a whitespace-only internal URL falls back",
+			baseURL:         "https://auth.example.com",
+			internalBaseURL: "   ",
+			want:            "https://auth.example.com",
+		},
+		{
 			name: "both empty",
 			want: "",
 		},
@@ -940,31 +575,6 @@ func TestGetEffectiveBaseURL(t *testing.T) {
 	}
 }
 
-func TestSimpleAccessors(t *testing.T) {
-	savedEmail := cfg.AdminEmail
-	savedPassword := cfg.AdminPassword
-	savedAppName := cfg.AppName
-	defer func() {
-		cfg.AdminEmail = savedEmail
-		cfg.AdminPassword = savedPassword
-		cfg.AppName = savedAppName
-	}()
-
-	cfg.AdminEmail = "admin@example.com"
-	cfg.AdminPassword = "s3cret"
-	cfg.AppName = "Goiabada Test"
-
-	if got := GetAdminEmail(); got != "admin@example.com" {
-		t.Errorf("GetAdminEmail() = %q", got)
-	}
-	if got := GetAdminPassword(); got != "s3cret" {
-		t.Errorf("GetAdminPassword() = %q", got)
-	}
-	if got := GetAppName(); got != "Goiabada Test" {
-		t.Errorf("GetAppName() = %q", got)
-	}
-}
-
 // -----------------------------------------------------------------------------
 // Seam 2: the two log settings, from the environment and from the command line
 // -----------------------------------------------------------------------------
@@ -972,19 +582,15 @@ func TestSimpleAccessors(t *testing.T) {
 // logEnvVars is every variable the cases below read, cleared before each one so
 // a developer's own environment cannot decide what a default case observes.
 var logEnvVars = []string{
-	"GOIABADA_AUTHSERVER_LOG_LEVEL",
-	"GOIABADA_AUTHSERVER_LOG_FORMAT",
 	"GOIABADA_ADMINCONSOLE_LOG_LEVEL",
 	"GOIABADA_ADMINCONSOLE_LOG_FORMAT",
 }
 
-// logSettings is compared whole against a positional literal in the `want:` of twelve cases, so
+// logSettings is compared whole against a positional literal in the `want:` of every case, so
 // every field is read by that comparison and none of them by selector.
 //
 //nolint:unused // read whole by comparison, never by selector
 type logSettings struct {
-	authLevel   string
-	authFormat  string
 	adminLevel  string
 	adminFormat string
 }
@@ -1021,8 +627,6 @@ func loadLogSettings(t *testing.T, env map[string]string, args []string) logSett
 	loadFrom(fs, args)
 
 	return logSettings{
-		authLevel:   cfg.AuthServer.LogLevel,
-		authFormat:  cfg.AuthServer.LogFormat,
 		adminLevel:  cfg.AdminConsole.LogLevel,
 		adminFormat: cfg.AdminConsole.LogFormat,
 	}
@@ -1039,74 +643,50 @@ func TestLoadFrom_LogSettings(t *testing.T) {
 	}{
 		{
 			name: "nothing set at all",
-			want: logSettings{"info", "text", "info", "text"},
+			want: logSettings{"info", "text"},
 		},
 		{
-			name: "the auth server's level, from the environment",
-			env:  map[string]string{"GOIABADA_AUTHSERVER_LOG_LEVEL": "debug"},
-			want: logSettings{"debug", "text", "info", "text"},
+			name: "the level, from the environment",
+			env:  map[string]string{"GOIABADA_ADMINCONSOLE_LOG_LEVEL": "debug"},
+			want: logSettings{"debug", "text"},
 		},
 		{
-			name: "the auth server's format, from the environment",
-			env:  map[string]string{"GOIABADA_AUTHSERVER_LOG_FORMAT": "json"},
-			want: logSettings{"info", "json", "info", "text"},
-		},
-		{
-			name: "the admin console's level, from the environment",
-			env:  map[string]string{"GOIABADA_ADMINCONSOLE_LOG_LEVEL": "error"},
-			want: logSettings{"info", "text", "error", "text"},
-		},
-		{
-			name: "the admin console's format, from the environment",
+			name: "the format, from the environment",
 			env:  map[string]string{"GOIABADA_ADMINCONSOLE_LOG_FORMAT": "json"},
-			want: logSettings{"info", "text", "info", "json"},
+			want: logSettings{"info", "json"},
 		},
 		{
-			name: "the auth server's level, from the command line",
-			env:  map[string]string{"GOIABADA_AUTHSERVER_LOG_LEVEL": "debug"},
-			args: []string{"--authserver-log-level=warn"},
-			want: logSettings{"warn", "text", "info", "text"},
-		},
-		{
-			name: "the auth server's format, from the command line",
-			env:  map[string]string{"GOIABADA_AUTHSERVER_LOG_FORMAT": "text"},
-			args: []string{"--authserver-log-format=json"},
-			want: logSettings{"info", "json", "info", "text"},
-		},
-		{
-			name: "the admin console's level, from the command line",
+			name: "the level, from the command line",
 			env:  map[string]string{"GOIABADA_ADMINCONSOLE_LOG_LEVEL": "debug"},
 			args: []string{"--adminconsole-log-level=warn"},
-			want: logSettings{"info", "text", "warn", "text"},
+			want: logSettings{"warn", "text"},
 		},
 		{
-			name: "the admin console's format, from the command line",
+			name: "the format, from the command line",
 			env:  map[string]string{"GOIABADA_ADMINCONSOLE_LOG_FORMAT": "text"},
 			args: []string{"--adminconsole-log-format=json"},
-			want: logSettings{"info", "text", "info", "json"},
+			want: logSettings{"info", "json"},
 		},
 		{
-			name: "both servers at once, each with its own values",
+			name: "both at once, each with its own value",
 			env: map[string]string{
-				"GOIABADA_AUTHSERVER_LOG_LEVEL":    "debug",
-				"GOIABADA_AUTHSERVER_LOG_FORMAT":   "json",
-				"GOIABADA_ADMINCONSOLE_LOG_LEVEL":  "error",
-				"GOIABADA_ADMINCONSOLE_LOG_FORMAT": "text",
+				"GOIABADA_ADMINCONSOLE_LOG_LEVEL":  "debug",
+				"GOIABADA_ADMINCONSOLE_LOG_FORMAT": "json",
 			},
-			want: logSettings{"debug", "json", "error", "text"},
+			want: logSettings{"debug", "json"},
 		},
 		{
 			name: "an unrecognised value is carried through unchanged",
-			env:  map[string]string{"GOIABADA_AUTHSERVER_LOG_LEVEL": "verbose"},
+			env:  map[string]string{"GOIABADA_ADMINCONSOLE_LOG_LEVEL": "verbose"},
 			// Nothing here validates: logging.Install refuses at startup, so the
 			// value is checked once, where it is used, and the server names it in
 			// the failure rather than silently falling back to info.
-			want: logSettings{"verbose", "text", "info", "text"},
+			want: logSettings{"verbose", "text"},
 		},
 		{
 			name: "a variable set to the empty string is not the default",
-			env:  map[string]string{"GOIABADA_AUTHSERVER_LOG_FORMAT": ""},
-			want: logSettings{"info", "", "info", "text"},
+			env:  map[string]string{"GOIABADA_ADMINCONSOLE_LOG_FORMAT": ""},
+			want: logSettings{"info", ""},
 		},
 	}
 

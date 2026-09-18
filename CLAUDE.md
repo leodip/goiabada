@@ -27,7 +27,6 @@ repository root. It is enforced rather than descriptive: see **Architecture guar
 - `data/` - Database interface + implementations (commondb/, mysqldb/, postgresdb/, sqlitedb/, mssqldb/)
 - `oauth/` - Shared OAuth/OIDC client surface: JWT/JWKS parsing, token exchange, PKCE, response_type parsing
 - `validators/` - Identifier and angle-bracket validation, the two both applications use. The authorize and token validators live in `authserver/internal/protocolvalidation`, and the account validators — email, password, profile, address, phone — in `authserver/internal/accountvalidation` (#344)
-- `config/` - Configuration from environment variables
 - `constants/` - Resource and permission identifiers, context and session keys
 
 ### Auth Server (`src/authserver/`)
@@ -303,7 +302,7 @@ All via environment variables with `GOIABADA_` prefix. Key ones:
 - `GOIABADA_AUTHSERVER_BASEURL` - Public URL
 - `GOIABADA_ADMIN_EMAIL` / `GOIABADA_ADMIN_PASSWORD` - Initial admin
 
-See `src/core/config/config.go` for all options.
+See `src/authserver/internal/config/config.go` and `src/adminconsole/internal/config/config.go` for all options; each binary loads only its own.
 
 ## Testing
 

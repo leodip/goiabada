@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/leodip/goiabada/core/config"
+	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/errs"
 	mocks_handlerhelpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"

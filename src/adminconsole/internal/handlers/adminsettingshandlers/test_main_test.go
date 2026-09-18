@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/leodip/goiabada/core/config"
+	"github.com/leodip/goiabada/adminconsole/internal/config"
 )
 
 func TestMain(m *testing.M) {
