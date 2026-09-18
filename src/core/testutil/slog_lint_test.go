@@ -168,7 +168,7 @@ import "log/slog"
 
 func main() { slog.SetDefault(slog.Default()) }
 `)
-	tree.write("core/cmd/schemadump/main.go", `package main
+	tree.write("authserver/cmd/schemadump/main.go", `package main
 
 import "log/slog"
 
