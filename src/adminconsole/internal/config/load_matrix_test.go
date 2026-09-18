@@ -1,9 +1,9 @@
 package config
 
 import (
-	"bytes"
 	"flag"
 	"io"
+	"log/slog"
 	"os"
 	"reflect"
 	"regexp"
@@ -11,6 +11,8 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/leodip/goiabada/core/testutil"
 )
 
 // -----------------------------------------------------------------------------
@@ -18,10 +20,10 @@ import (
 // the flag that beats it.
 // -----------------------------------------------------------------------------
 //
-// This file is deliberately self-contained apart from unsetEnv: it is copied into each
-// process's own config package and narrowed to the half that process owns when core/config
-// is split (#351), and the same assertions passing on both sides of that move is the whole
-// point of writing them here first.
+// This is stage 1's matrix, written against core/config's loadFrom and carried here unchanged
+// except for its roster: 21 variables and 17 flags, the admin console's own 19 and the 2 auth
+// server endpoints it talks to. The same assertions passing on both sides of the move is what
+// makes it a lock on the behaviour rather than a description of it (#351).
 
 // configVar is one live GOIABADA_* setting: its flag if it has one, what loadFrom lands
 // when nothing is set, and what it lands from the environment and from the command line.
@@ -72,15 +74,6 @@ func intVar(name, flagName string, def, fromEnv, fromFlag int, read func() any) 
 	}
 }
 
-// int64VarNoFlag is the int64 row for a variable with no flag of its own.
-func int64VarNoFlag(name string, def, fromEnv int64, read func() any) configVar {
-	return configVar{
-		env: name, def: def,
-		envValue: strconv.FormatInt(fromEnv, 10), envWant: fromEnv,
-		read: read,
-	}
-}
-
 func boolVar(name, flagName string, def, fromEnv, fromFlag bool, read func() any) configVar {
 	return configVar{
 		env: name, flag: flagName, def: def,
@@ -101,98 +94,22 @@ func csvVar(name, flagName, fromEnv string, wantEnv []string, fromFlag string, w
 	}
 }
 
-// hexKeyVar is a data-encryption key row. Neither key has a flag, and both are read through
-// the decoding accessor, so the row asserts the decoded bytes rather than the hex text.
-func hexKeyVar(name string, def []byte, fromEnv string, wantEnv []byte, read func() any) configVar {
-	return configVar{env: name, def: def, envValue: fromEnv, envWant: wantEnv, read: read}
-}
-
-// configVariables is every live GOIABADA_* variable: 24 auth server, 19 admin console,
-// 8 database and 5 top-level, of which 45 have a flag. The four names loadFrom mentions
-// that are not live configuration are in nonLiveEnvVars.
+// configVariables is every live GOIABADA_* variable this process loads: the admin console's own
+// 19 and the 2 auth server endpoints it talks to, of which 17 have a flag. The names loadFrom
+// mentions that are not live configuration are in nonLiveEnvVars.
 var configVariables = []configVar{
-	// Auth server
-	strVar("GOIABADA_AUTHSERVER_BASEURL", "authserver-baseurl", "http://localhost:9090",
-		"https://auth.env.example.com", "https://auth.flag.example.com",
-		func() any { return GetAuthServer().BaseURL }),
-	strVar("GOIABADA_AUTHSERVER_INTERNALBASEURL", "authserver-internalbaseurl", "",
-		"http://auth-env.internal:9090", "http://auth-flag.internal:9090",
-		func() any { return GetAuthServer().InternalBaseURL }),
-	strVar("GOIABADA_AUTHSERVER_LISTEN_HOST_HTTPS", "authserver-listen-host-https", "0.0.0.0",
-		"10.0.0.1", "10.0.0.2",
-		func() any { return GetAuthServer().ListenHostHttps }),
-	intVar("GOIABADA_AUTHSERVER_LISTEN_PORT_HTTPS", "authserver-listen-port-https", 9443,
-		19443, 29443,
-		func() any { return GetAuthServer().ListenPortHttps }),
-	strVar("GOIABADA_AUTHSERVER_LISTEN_HOST_HTTP", "authserver-listen-host-http", "0.0.0.0",
-		"10.0.1.1", "10.0.1.2",
-		func() any { return GetAuthServer().ListenHostHttp }),
-	intVar("GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP", "authserver-listen-port-http", 9090,
-		19090, 29090,
-		func() any { return GetAuthServer().ListenPortHttp }),
-	boolVar("GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS", "authserver-trust-proxy-headers", false,
-		true, false,
-		func() any { return GetAuthServer().TrustProxyHeaders }),
-	csvVar("GOIABADA_AUTHSERVER_TRUSTED_PROXIES", "authserver-trusted-proxies",
-		" 10.0.0.0/8 , 172.16.0.0/12 ", []string{"10.0.0.0/8", "172.16.0.0/12"},
-		"192.168.0.1,, ,203.0.113.0/24", []string{"192.168.0.1", "203.0.113.0/24"},
-		func() any { return GetAuthServer().TrustedProxies }),
-	boolVar("GOIABADA_AUTHSERVER_LOG_HTTP_REQUESTS", "authserver-log-http-requests", false,
-		true, false,
-		func() any { return GetAuthServer().LogHttpRequests }),
-	strVar("GOIABADA_AUTHSERVER_LOG_LEVEL", "authserver-log-level", "info",
-		"debug", "warn",
-		func() any { return GetAuthServer().LogLevel }),
-	strVar("GOIABADA_AUTHSERVER_LOG_FORMAT", "authserver-log-format", "text",
-		"json", "text",
-		func() any { return GetAuthServer().LogFormat }),
-	strVar("GOIABADA_AUTHSERVER_CERTFILE", "authserver-certfile", "",
-		"/env/auth-cert.pem", "/flag/auth-cert.pem",
-		func() any { return GetAuthServer().CertFile }),
-	strVar("GOIABADA_AUTHSERVER_KEYFILE", "authserver-keyfile", "",
-		"/env/auth-key.pem", "/flag/auth-key.pem",
-		func() any { return GetAuthServer().KeyFile }),
-	boolVar("GOIABADA_AUTHSERVER_LOG_SQL", "authserver-log-sql", false,
-		true, false,
-		func() any { return GetAuthServer().LogSQL }),
-	strVar("GOIABADA_AUTHSERVER_STATICDIR", "authserver-staticdir", "",
-		"/env/auth-static", "/flag/auth-static",
-		func() any { return GetAuthServer().StaticDir }),
-	strVar("GOIABADA_AUTHSERVER_TEMPLATEDIR", "authserver-templatedir", "",
-		"/env/auth-templates", "/flag/auth-templates",
-		func() any { return GetAuthServer().TemplateDir }),
-	boolVar("GOIABADA_AUTHSERVER_DEBUG_API_REQUESTS", "authserver-debug-api-requests", false,
-		true, false,
-		func() any { return GetAuthServer().DebugAPIRequests }),
-	strVar("GOIABADA_AUTHSERVER_BOOTSTRAP_ENV_OUTFILE", "authserver-bootstrap-env-outfile", "",
-		"/env/bootstrap.env", "/flag/bootstrap.env",
-		func() any { return GetAuthServer().BootstrapEnvOutFile }),
-	strVarNoFlag("GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY", "", strings.Repeat("a1", 64),
-		func() any { return GetAuthServer().SessionAuthenticationKey }),
-	strVarNoFlag("GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY", "", strings.Repeat("a2", 32),
-		func() any { return GetAuthServer().SessionEncryptionKey }),
-	strVarNoFlag("GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY_PREVIOUS", "", strings.Repeat("a3", 64),
-		func() any { return GetAuthServer().SessionAuthenticationKeyPrevious }),
-	strVarNoFlag("GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY_PREVIOUS", "", strings.Repeat("a4", 32),
-		func() any { return GetAuthServer().SessionEncryptionKeyPrevious }),
-	boolVar("GOIABADA_AUTHSERVER_RATELIMITER_ENABLED", "authserver-ratelimiter-enabled", false,
-		true, false,
-		func() any { return GetAuthServer().RateLimiterEnabled }),
-	int64VarNoFlag("GOIABADA_PROFILE_PICTURE_MAX_SIZE_BYTES", 3*1024*1024, 5*1024*1024,
-		func() any { return GetAuthServer().ProfilePictureMaxSizeBytes }),
-
 	// Admin console
 	strVar("GOIABADA_ADMINCONSOLE_BASEURL", "adminconsole-baseurl", "http://localhost:9091",
 		"https://admin.env.example.com", "https://admin.flag.example.com",
 		func() any { return GetAdminConsole().BaseURL }),
 	strVar("GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTPS", "adminconsole-listen-host-https", "0.0.0.0",
-		"10.1.0.1", "10.1.0.2",
+		"10.0.0.1", "10.0.0.2",
 		func() any { return GetAdminConsole().ListenHostHttps }),
 	intVar("GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTPS", "adminconsole-listen-port-https", 9444,
 		19444, 29444,
 		func() any { return GetAdminConsole().ListenPortHttps }),
 	strVar("GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTP", "adminconsole-listen-host-http", "0.0.0.0",
-		"10.1.1.1", "10.1.1.2",
+		"10.0.1.1", "10.0.1.2",
 		func() any { return GetAdminConsole().ListenHostHttp }),
 	intVar("GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTP", "adminconsole-listen-port-http", 9091,
 		19091, 29091,
@@ -201,14 +118,14 @@ var configVariables = []configVar{
 		true, false,
 		func() any { return GetAdminConsole().TrustProxyHeaders }),
 	csvVar("GOIABADA_ADMINCONSOLE_TRUSTED_PROXIES", "adminconsole-trusted-proxies",
-		" 10.1.0.0/8 , 172.17.0.0/12 ", []string{"10.1.0.0/8", "172.17.0.0/12"},
-		"192.168.1.1, ,203.0.113.1", []string{"192.168.1.1", "203.0.113.1"},
+		" 10.0.0.0/8 , 172.16.0.0/12 ", []string{"10.0.0.0/8", "172.16.0.0/12"},
+		"192.168.0.1,, ,203.0.113.0/24", []string{"192.168.0.1", "203.0.113.0/24"},
 		func() any { return GetAdminConsole().TrustedProxies }),
 	boolVar("GOIABADA_ADMINCONSOLE_LOG_HTTP_REQUESTS", "adminconsole-log-http-requests", false,
 		true, false,
 		func() any { return GetAdminConsole().LogHttpRequests }),
 	strVar("GOIABADA_ADMINCONSOLE_LOG_LEVEL", "adminconsole-log-level", "info",
-		"error", "warn",
+		"debug", "warn",
 		func() any { return GetAdminConsole().LogLevel }),
 	strVar("GOIABADA_ADMINCONSOLE_LOG_FORMAT", "adminconsole-log-format", "text",
 		"json", "text",
@@ -237,63 +154,31 @@ var configVariables = []configVar{
 	strVarNoFlag("GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY_PREVIOUS", "", strings.Repeat("b4", 32),
 		func() any { return GetAdminConsole().SessionEncryptionKeyPrevious }),
 
-	// Database
-	strVar("GOIABADA_DB_TYPE", "db-type", "sqlite",
-		"mysql", "postgres",
-		func() any { return GetDatabase().Type }),
-	strVar("GOIABADA_DB_USERNAME", "db-username", "root",
-		"env-user", "flag-user",
-		func() any { return GetDatabase().Username }),
-	strVar("GOIABADA_DB_PASSWORD", "db-password", "",
-		"env-db-password", "flag-db-password",
-		func() any { return GetDatabase().Password }),
-	strVar("GOIABADA_DB_HOST", "db-host", "localhost",
-		"env.db.example.com", "flag.db.example.com",
-		func() any { return GetDatabase().Host }),
-	intVar("GOIABADA_DB_PORT", "db-port", 3306,
-		13306, 23306,
-		func() any { return GetDatabase().Port }),
-	strVar("GOIABADA_DB_NAME", "db-name", "goiabada",
-		"env_goiabada", "flag_goiabada",
-		func() any { return GetDatabase().Name }),
-	strVar("GOIABADA_DB_DSN", "db-dsn", "file::memory:?cache=shared",
-		"file:env.db?cache=shared", "file:flag.db?cache=shared",
-		func() any { return GetDatabase().DSN }),
-	// The one setting whose default is true, which is why it goes through
-	// getEnvAsBoolDefault rather than getEnvAsBool (#293).
-	boolVar("GOIABADA_DB_CREATE", "db-create", true,
-		false, true,
-		func() any { return GetDatabase().Create }),
-
-	// Initial setup and the data-encryption keys
-	strVar("GOIABADA_ADMIN_EMAIL", "admin-email", "admin",
-		"env-admin@example.com", "flag-admin@example.com",
-		func() any { return GetAdminEmail() }),
-	strVar("GOIABADA_ADMIN_PASSWORD", "admin-password", "changeme",
-		"env-admin-password", "flag-admin-password",
-		func() any { return GetAdminPassword() }),
-	strVar("GOIABADA_APPNAME", "appname", "Goiabada",
-		"Env Goiabada", "Flag Goiabada",
-		func() any { return GetAppName() }),
-	// hex.DecodeString("") answers an empty non-nil slice, so the current key's default is
-	// an empty slice where the previous key's, which short-circuits on the empty string, is
-	// nil. reflect.DeepEqual tells the two apart, which is why the rows record them apart.
-	hexKeyVar("GOIABADA_AES_ENCRYPTION_KEY", []byte{},
-		strings.Repeat("ab", 32), bytes.Repeat([]byte{0xab}, 32),
-		func() any { return GetAESEncryptionKey() }),
-	hexKeyVar("GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS", []byte(nil),
-		strings.Repeat("cd", 32), bytes.Repeat([]byte{0xcd}, 32),
-		func() any { return GetAESEncryptionKeyPrevious() }),
+	// Auth server: the two endpoints this process talks to. The other 22 GOIABADA_AUTHSERVER_*
+	// variables are the peer's own and are not loaded here, so they have no row -- and the drift
+	// guard below checks that in both directions, against config.go.
+	strVar("GOIABADA_AUTHSERVER_BASEURL", "authserver-baseurl", "http://localhost:9090",
+		"https://auth.env.example.com", "https://auth.flag.example.com",
+		func() any { return GetAuthServer().BaseURL }),
+	strVar("GOIABADA_AUTHSERVER_INTERNALBASEURL", "authserver-internalbaseurl", "",
+		"http://auth-env.internal:9090", "http://auth-flag.internal:9090",
+		func() any { return GetAuthServer().InternalBaseURL }),
 }
 
-// nonLiveEnvVars are the GOIABADA_* names loadFrom mentions that are not live configuration:
-// the two removed cookie settings it warns about, because the Secure flag is derived from an
-// https base URL (#293), and the two removed admin console settings
-// ValidateRemovedAdminConsoleVars refuses outright (#285). They land on no field, so they have
-// no row, and the drift guard carries them as a named exception rather than as silence.
+// nonLiveEnvVars are the GOIABADA_* names loadFrom's file mentions that are not live
+// configuration. They land on no field, so they have no row, and the drift guard carries them as
+// named exceptions rather than as silence.
+//
+// The first is the removed cookie setting this binary warns about, because the Secure flag is
+// derived from an https base URL (#293). The second is the auth server's, which this binary
+// stopped warning about (#351) and now spells only in the comment saying so: the drift guard
+// reads names wherever they appear in the source, so a name in prose needs an entry here just as
+// one in a warning list does. What holds the warning itself to naming only the admin console's is
+// TestLoadFrom_WarnsAboutThisProcessesRemovedSettingOnly, not this list. The last two are the
+// variables ValidateRemovedAdminConsoleVars refuses outright rather than loads (#285).
 var nonLiveEnvVars = []string{
-	"GOIABADA_AUTHSERVER_SET_COOKIE_SECURE",
 	"GOIABADA_ADMINCONSOLE_SET_COOKIE_SECURE",
+	"GOIABADA_AUTHSERVER_SET_COOKIE_SECURE",
 	"GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_ID",
 	"GOIABADA_ADMINCONSOLE_ISSUER",
 }
@@ -367,66 +252,163 @@ func TestLoadFrom_FlagBeatsTheEnvironment(t *testing.T) {
 	}
 }
 
-// TestLoadFrom_RegistersEveryFlag is the "before" half of the flag narrowing (#351 decision 3):
-// both binaries register the identical 45 flags today, because loadFrom registers every one of
-// them on whatever set it is handed. Each process's own config package carries this test
-// narrowed to its own flags once the split lands.
-func TestLoadFrom_RegistersEveryFlag(t *testing.T) {
+// -----------------------------------------------------------------------------
+// Seam 2: the registered flag set of this binary
+// -----------------------------------------------------------------------------
+
+// adminConsoleFlags is the 17 flags the admin console registers after the split (#351): its own
+// 15, and the two auth server endpoints it talks to.
+//
+// It is written out rather than derived from configVariables, and that is the whole point. A
+// derived expectation cannot fail when a flag is dropped from the table and from config.go
+// together, which is exactly what an import change or a careless narrowing does. This list and
+// refusedFlags are the only two places in this module that say what its command line is, and the
+// narrowing is the one observable behaviour change this issue makes.
+var adminConsoleFlags = []string{
+	"adminconsole-baseurl",
+	"adminconsole-certfile",
+	"adminconsole-keyfile",
+	"adminconsole-listen-host-http",
+	"adminconsole-listen-host-https",
+	"adminconsole-listen-port-http",
+	"adminconsole-listen-port-https",
+	"adminconsole-log-format",
+	"adminconsole-log-http-requests",
+	"adminconsole-log-level",
+	"adminconsole-oauth-client-secret",
+	"adminconsole-staticdir",
+	"adminconsole-templatedir",
+	"adminconsole-trust-proxy-headers",
+	"adminconsole-trusted-proxies",
+	"authserver-baseurl",
+	"authserver-internalbaseurl",
+}
+
+// refusedFlags is the other half of the narrowing, named rather than merely absent: the 28
+// settings this binary used to accept and ignore -- the auth server's own 17, the 8 database
+// flags and the 3 initial-setup flags, none of which the admin console can act on, since it has
+// no listener of the auth server's, no database access and seeds nothing. flag.CommandLine is
+// built with ExitOnError, so `goiabada-adminconsole -db-type=mysql` now prints "flag provided but
+// not defined" and exits 2 where it used to parse and change nothing.
+//
+// Asserting these by name is what makes the case fail for its stated reason. "Not in the expected
+// set" would also pass if loadFrom registered nothing at all.
+var refusedFlags = []string{
+	"admin-email",
+	"admin-password",
+	"appname",
+	"authserver-bootstrap-env-outfile",
+	"authserver-certfile",
+	"authserver-debug-api-requests",
+	"authserver-keyfile",
+	"authserver-listen-host-http",
+	"authserver-listen-host-https",
+	"authserver-listen-port-http",
+	"authserver-listen-port-https",
+	"authserver-log-format",
+	"authserver-log-http-requests",
+	"authserver-log-level",
+	"authserver-log-sql",
+	"authserver-ratelimiter-enabled",
+	"authserver-staticdir",
+	"authserver-templatedir",
+	"authserver-trust-proxy-headers",
+	"authserver-trusted-proxies",
+	"db-create",
+	"db-dsn",
+	"db-host",
+	"db-name",
+	"db-password",
+	"db-port",
+	"db-type",
+	"db-username",
+}
+
+// TestLoadFrom_RegistersExactlyTheAdminConsoleFlags holds what this binary's command line is, in
+// both directions: a flag in the list that loadFrom does not register, and a flag it registers
+// that the list does not claim.
+func TestLoadFrom_RegistersExactlyTheAdminConsoleFlags(t *testing.T) {
 	fs := loadMatrix(t, nil, nil)
 
 	registered := map[string]bool{}
 	fs.VisitAll(func(f *flag.Flag) { registered[f.Name] = true })
 
-	expected := map[string]bool{}
-	for _, v := range configVariables {
-		if v.flag != "" {
-			expected[v.flag] = true
-		}
+	if len(registered) == 0 {
+		t.Fatal("loadFrom registered no flags at all, so this case checked nothing")
 	}
 
-	for name := range expected {
+	expected := map[string]bool{}
+	for _, name := range adminConsoleFlags {
+		expected[name] = true
+	}
+
+	for _, name := range adminConsoleFlags {
 		if !registered[name] {
-			t.Errorf("the table has a flag %q that loadFrom does not register", name)
+			t.Errorf("the admin console is meant to register %q and loadFrom does not", name)
 		}
 	}
-	for name := range registered {
+	for _, name := range sortedKeys(registered) {
 		if !expected[name] {
-			t.Errorf("loadFrom registers a flag %q that no row in the table claims", name)
+			t.Errorf("loadFrom registers %q, which is not one of the admin console's flags", name)
 		}
 	}
 }
 
-// TestAESKeyAccessors_AnswerNilOnAMalformedKey covers the arms the table cannot reach: both
-// accessors decode, and both answer nil rather than an error when the value is not hex.
-// ValidateAESEncryptionKey is what refuses such a value at startup, so the accessors are only
-// reached once it has passed; a nil here is the accessor declining to guess. The previous
-// key's unset-means-nil arm is the row's default case.
-func TestAESKeyAccessors_AnswerNilOnAMalformedKey(t *testing.T) {
-	tests := []struct {
-		name string
-		env  map[string]string
-		read func() any
-	}{
-		{
-			name: "the current key",
-			env:  map[string]string{"GOIABADA_AES_ENCRYPTION_KEY": "zz"},
-			read: func() any { return GetAESEncryptionKey() },
-		},
-		{
-			name: "the previous key",
-			env:  map[string]string{"GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS": "zz"},
-			read: func() any { return GetAESEncryptionKeyPrevious() },
-		},
+// TestLoadFrom_RefusesTheAuthServersOwnFlags is decision 3's narrowing asserted as a refusal.
+// Registering the peer's listener, logging and database flags is loading the peer's
+// configuration, and a flag this binary cannot act on reads to an operator as having configured
+// something: `goiabada-adminconsole -db-type=mysql` parsed and was ignored before the split.
+func TestLoadFrom_RefusesTheAuthServersOwnFlags(t *testing.T) {
+	fs := loadMatrix(t, nil, nil)
+
+	registered := map[string]bool{}
+	fs.VisitAll(func(f *flag.Flag) { registered[f.Name] = true })
+
+	for _, name := range refusedFlags {
+		if registered[name] {
+			t.Errorf("the admin console registers %q, which belongs to the auth server and which this binary cannot act on", name)
+		}
+	}
+}
+
+// TestFlagLists_AgreeWithTheTable holds the two literals and configVariables to each other, so
+// neither can be edited alone. Without it the lists are a second roster nothing checks, and the
+// drift guard below only ever sees the table.
+func TestFlagLists_AgreeWithTheTable(t *testing.T) {
+	inTable := map[string]bool{}
+	for _, v := range configVariables {
+		if v.flag != "" {
+			inTable[v.flag] = true
+		}
 	}
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			loadMatrix(t, test.env, nil)
+	expected := map[string]bool{}
+	for _, name := range adminConsoleFlags {
+		if expected[name] {
+			t.Errorf("adminConsoleFlags names %q twice", name)
+		}
+		expected[name] = true
+		if !inTable[name] {
+			t.Errorf("adminConsoleFlags names %q, which no row in configVariables claims", name)
+		}
+	}
+	for _, name := range sortedKeys(inTable) {
+		if !expected[name] {
+			t.Errorf("a row in configVariables claims the flag %q, which adminConsoleFlags does not list", name)
+		}
+	}
 
-			if got := test.read(); got != nil && !reflect.DeepEqual(got, []byte(nil)) {
-				t.Errorf("a malformed key decoded to %#v, want nil", got)
-			}
-		})
+	for _, name := range refusedFlags {
+		if expected[name] {
+			t.Errorf("%q is in both adminConsoleFlags and refusedFlags", name)
+		}
+	}
+
+	// 45 flags were registered by both binaries before the split, and the admin console keeps 17
+	// of them. The two lists partition that surface, so a flag that quietly left both is a flag
+	// nobody decided about.
+	if got := len(adminConsoleFlags) + len(refusedFlags); got != 45 {
+		t.Errorf("the two lists cover %d flags, want the 45 both binaries registered before the split", got)
 	}
 }
 
@@ -551,4 +533,45 @@ func sortedKeys(m map[string]bool) []string {
 	}
 	sort.Strings(out)
 	return out
+}
+
+// TestLoadFrom_WarnsAboutThisProcessesRemovedSettingOnly is decision 4 of #351: each process warns
+// about its own removed settings. Both binaries used to warn about both removed cookie variables,
+// so the admin console's log carried a line about a setting whose cookies it never wrote.
+//
+// Both variables are set, so the case cannot pass by the auth server's simply being absent, and
+// the record naming it would be a failure rather than a silence.
+func TestLoadFrom_WarnsAboutThisProcessesRemovedSettingOnly(t *testing.T) {
+	capture := testutil.CaptureSlog(t)
+
+	loadMatrix(t, map[string]string{
+		"GOIABADA_ADMINCONSOLE_SET_COOKIE_SECURE": "true",
+		"GOIABADA_AUTHSERVER_SET_COOKIE_SECURE":   "true",
+	}, nil)
+
+	records := capture.Records()
+	if len(records) != 1 {
+		t.Fatalf("got %d records, want exactly one: %v", len(records), capture.Text())
+	}
+	if records[0].Level != slog.LevelWarn {
+		t.Errorf("the record is at %v, want warn: a removed setting an operator still sets is a handled configuration problem", records[0].Level)
+	}
+	if got := records[0].Attrs["setting"]; got != "GOIABADA_ADMINCONSOLE_SET_COOKIE_SECURE" {
+		t.Errorf(`setting = %v, want "GOIABADA_ADMINCONSOLE_SET_COOKIE_SECURE"`, got)
+	}
+	if strings.Contains(capture.Text(), "GOIABADA_AUTHSERVER_SET_COOKIE_SECURE") {
+		t.Errorf("the admin console named the auth server's removed setting, which is the auth server's to warn about: %s", capture.Text())
+	}
+}
+
+// TestLoadFrom_SaysNothingWhenNoRemovedSettingIsSet is the quiet half. Without it the case above
+// passes for a loadFrom that warns unconditionally.
+func TestLoadFrom_SaysNothingWhenNoRemovedSettingIsSet(t *testing.T) {
+	capture := testutil.CaptureSlog(t)
+
+	loadMatrix(t, nil, nil)
+
+	if records := capture.Records(); len(records) != 0 {
+		t.Errorf("got %d records loading a clean environment, want none: %v", len(records), capture.Text())
+	}
 }

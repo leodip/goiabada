@@ -10,7 +10,7 @@ Goiabada consists of two applications, each with its own configuration:
 - **Auth server** (`goiabada-authserver`) - Handles authentication, OAuth2/OIDC endpoints, and database access
 - **Admin console** (`goiabada-adminconsole`) - Provides the administrative interface
 
-Configuration can be set via **environment variables** or **command-line flags**. When both are set, flags take precedence.
+Configuration can be set via **environment variables** or **command-line flags**. When both are set, flags take precedence. Each binary accepts only the flags it acts on; a flag belonging to the other application is rejected.
 
 ## Auth server variables
 

@@ -8,7 +8,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/adminconsole/internal/cache"
-	"github.com/leodip/goiabada/core/config"
+	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/core/testutil"
 )
 
