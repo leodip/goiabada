@@ -11,7 +11,8 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/authserver/internal/constants"
+	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/errs"
@@ -728,8 +729,8 @@ func (t *TokenIssuer) generateAccessTokenCore(settings *models.Settings, input *
 	for _, s := range scopes {
 		if oidc.IsIdTokenScope(s) {
 			// if an OIDC scope is present, give access to the userinfo endpoint
-			if !slices.Contains(audCollection, constants.AuthServerResourceIdentifier) {
-				audCollection = append(audCollection, constants.AuthServerResourceIdentifier)
+			if !slices.Contains(audCollection, coreconstants.AuthServerResourceIdentifier) {
+				audCollection = append(audCollection, coreconstants.AuthServerResourceIdentifier)
 			}
 			addUserInfoScope = true
 			continue
@@ -755,7 +756,7 @@ func (t *TokenIssuer) generateAccessTokenCore(settings *models.Settings, input *
 
 	if addUserInfoScope {
 		// if an OIDC scope is present, give access to the userinfo endpoint
-		userInfoScopeStr := fmt.Sprintf("%v:%v", constants.AuthServerResourceIdentifier, constants.UserinfoPermissionIdentifier)
+		userInfoScopeStr := fmt.Sprintf("%v:%v", coreconstants.AuthServerResourceIdentifier, coreconstants.UserinfoPermissionIdentifier)
 		if !slices.Contains(scopes, userInfoScopeStr) {
 			scopes = append(scopes, userInfoScopeStr)
 		}

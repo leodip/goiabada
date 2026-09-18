@@ -14,7 +14,8 @@ import (
 	mocks_sessionstore "github.com/leodip/goiabada/core/sessionstore/mocks"
 
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/authserver/internal/constants"
+	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
@@ -104,7 +105,7 @@ func TestGetLoggedInSubject(t *testing.T) {
 				Claims: map[string]interface{}{"sub": "test-subject"},
 			},
 		}
-		ctx := context.WithValue(req.Context(), constants.ContextKeyJwtInfo, jwtInfo)
+		ctx := context.WithValue(req.Context(), coreconstants.ContextKeyJwtInfo, jwtInfo)
 		req = req.WithContext(ctx)
 
 		subject := helper.GetLoggedInSubject(req)
@@ -122,7 +123,7 @@ func TestGetLoggedInSubject(t *testing.T) {
 
 	t.Run("InvalidJwtInfo", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
-		ctx := context.WithValue(req.Context(), constants.ContextKeyJwtInfo, "invalid")
+		ctx := context.WithValue(req.Context(), coreconstants.ContextKeyJwtInfo, "invalid")
 		req = req.WithContext(ctx)
 
 		logged := testutil.CaptureSlog(t)
@@ -153,7 +154,7 @@ func TestGetLoggedInSubject(t *testing.T) {
 	t.Run("NoIdToken", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		jwtInfo := oauth.JwtInfo{}
-		ctx := context.WithValue(req.Context(), constants.ContextKeyJwtInfo, jwtInfo)
+		ctx := context.WithValue(req.Context(), coreconstants.ContextKeyJwtInfo, jwtInfo)
 		req = req.WithContext(ctx)
 
 		subject := helper.GetLoggedInSubject(req)

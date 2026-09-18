@@ -1502,8 +1502,13 @@ type matrixOwner struct {
 	persistent       bool
 }
 
+// The auth server's two values are written out rather than named. Its session name and
+// authenticated-session key are declared in authserver/internal/constants, and core may not
+// import a process module at all, in production or in a test. TestConstants_PinTheValuesCoreWritesOut
+// in that package holds the declarations to these literals, so the pair cannot drift apart
+// with this matrix still passing (#351).
 var matrixOwners = []matrixOwner{
-	{"authserver", constants.AuthServerSessionName, constants.SessionKeySessionIdentifier, true},
+	{"authserver", "authserver", "SessionIdentifier", true},
 	{"adminconsole", constants.AdminConsoleSessionName, constants.SessionKeyJwt, false},
 }
 

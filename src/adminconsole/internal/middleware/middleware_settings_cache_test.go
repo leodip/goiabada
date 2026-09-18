@@ -10,8 +10,8 @@ import (
 
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/adminconsole/internal/cache"
+	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/testutil"
 	"github.com/stretchr/testify/assert"

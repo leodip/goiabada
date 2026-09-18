@@ -679,6 +679,13 @@ More prose.
 |---|---|---|---|
 | ` + "`modernc.org/sqlite`" + ` | SQLite driver | yes | #359 |
 | ` + "`github.com/pquerna/otp`" + ` | TOTP | no | — |
+
+### Core constants ownership
+
+| symbol | justification | issue |
+|---|---|---|
+| ` + "`Version`" + ` | kernel | — |
+| ` + "`ManageUsersPermissionIdentifier`" + ` | moving | #359 |
 `
 
 	tables, findings := parseArchitectureDoc(doc)
@@ -695,13 +702,18 @@ More prose.
 		{module: "modernc.org/sqlite", reachable: true, clearedBy: "#359", line: 24},
 		{module: "github.com/pquerna/otp", reachable: false, clearedBy: "—", line: 25},
 	}, tables.foreign)
+	assert.Equal(t, []constantsRow{
+		{symbol: "Version", justification: "kernel", issue: "—", line: 31},
+		{symbol: "ManageUsersPermissionIdentifier", justification: "moving", issue: "#359", line: 32},
+	}, tables.constants)
 }
 
 func TestArchitecture_DocParsingRejects(t *testing.T) {
 	t.Run("a missing table", func(t *testing.T) {
 		_, findings := parseArchitectureDoc("# Architecture\n")
-		assert.Len(t, findings, 3)
+		assert.Len(t, findings, 4)
 		assert.Contains(t, findings[0], `has no "### Package ownership" table`)
+		assert.Contains(t, findings[3], `has no "### Core constants ownership" table`)
 	})
 
 	t.Run("a row with the wrong number of cells", func(t *testing.T) {
@@ -824,27 +836,35 @@ func architectureFixture(t *testing.T, doc string, files map[string]string) stri
 	return root
 }
 
-// architectureDocWith renders a document carrying the three headings the parser needs, with only
-// the ownership table populated. The other two are left as a header and a separator, which is what
-// an empty table looks like to tableUnder.
+// architectureDocWith renders a document carrying the four headings the parser needs, with only the
+// ownership and core-constants tables populated. The other two are left as a header and a
+// separator, which is what an empty table looks like to tableUnder.
+//
+// The two ownership rows and the one constants row it always writes are the baseline rule 7 needs:
+// the guard is fatal on a tree declaring no core constant or referencing none, so every fixture
+// driving the reporting half carries constantsBaselineFiles alongside its own.
 func architectureDocWith(ownership ...string) string {
 	var b strings.Builder
 	b.WriteString("# Architecture\n\nProse that mentions | pipes | and is not a row.\n\n")
 	b.WriteString("### Package ownership\n\n| package | owner | moves in |\n|---|---|---|\n")
+	b.WriteString("| `core/constants` | kernel | — |\n")
+	b.WriteString("| `core/errs` | kernel | — |\n")
 	for _, row := range ownership {
 		b.WriteString(row + "\n")
 	}
 	b.WriteString("\n### Temporary exceptions\n\n| from | to | issue |\n|---|---|---|\n")
 	b.WriteString("\n### Foreign modules\n\n| module | why | reachable today | cleared by |\n|---|---|---|---|\n")
+	b.WriteString("\n### Core constants ownership\n\n| symbol | justification | issue |\n|---|---|---|\n")
+	b.WriteString("| `Shared` | kernel | — |\n")
 	return b.String()
 }
 
 // TestArchitecture_TheGuardPassesATreeItsTablesDescribe is the clean direction, and it is what keeps
 // every case below from passing for the wrong reason.
 func TestArchitecture_TheGuardPassesATreeItsTablesDescribe(t *testing.T) {
-	root := architectureFixture(t, architectureDocWith("| `core/api` | kernel | — |"), map[string]string{
+	root := architectureFixture(t, architectureDocWith("| `core/api` | kernel | — |"), withConstantsBaseline(map[string]string{
 		"core/api/api.go": pkg("api"),
-	})
+	}))
 
 	report := RunGuard(func(r Reporter) { assertArchitecture(r, root) })
 
@@ -855,10 +875,10 @@ func TestArchitecture_TheGuardPassesATreeItsTablesDescribe(t *testing.T) {
 // rule that makes the document a burn-down list rather than a wish: a new top-level core package
 // fails the tier until the table says where it belongs.
 func TestArchitecture_TheGuardFailsOnAPackageTheTableDoesNotName(t *testing.T) {
-	root := architectureFixture(t, architectureDocWith("| `core/api` | kernel | — |"), map[string]string{
+	root := architectureFixture(t, architectureDocWith("| `core/api` | kernel | — |"), withConstantsBaseline(map[string]string{
 		"core/api/api.go":      pkg("api"),
 		"core/newcomer/new.go": pkg("newcomer"),
-	})
+	}))
 
 	report := RunGuard(func(r Reporter) { assertArchitecture(r, root) })
 
@@ -871,9 +891,9 @@ func TestArchitecture_TheGuardFailsOnAPackageTheTableDoesNotName(t *testing.T) {
 // TestArchitecture_TheGuardFailsOnAForbiddenModuleEdge is the rule with no exceptions, and the one
 // a reader is likeliest to meet: core depends on neither process.
 func TestArchitecture_TheGuardFailsOnAForbiddenModuleEdge(t *testing.T) {
-	root := architectureFixture(t, architectureDocWith("| `core/api` | kernel | — |"), map[string]string{
+	root := architectureFixture(t, architectureDocWith("| `core/api` | kernel | — |"), withConstantsBaseline(map[string]string{
 		"core/api/api.go": pkg("api", "example.test/authserver/internal/handlers"),
-	})
+	}))
 
 	report := RunGuard(func(r Reporter) { assertArchitecture(r, root) })
 
@@ -892,10 +912,10 @@ func TestArchitecture_TheGuardFailsOnAStaleExceptionRow(t *testing.T) {
 		"### Temporary exceptions\n\n| from | to | issue |\n|---|---|---|\n",
 		"### Temporary exceptions\n\n| from | to | issue |\n|---|---|---|\n| `core/api` | `core/models` | #350 |\n",
 		1)
-	root := architectureFixture(t, doc, map[string]string{
+	root := architectureFixture(t, doc, withConstantsBaseline(map[string]string{
 		"core/api/api.go":       pkg("api"),
 		"core/models/models.go": pkg("models"),
-	})
+	}))
 
 	report := RunGuard(func(r Reporter) { assertArchitecture(r, root) })
 

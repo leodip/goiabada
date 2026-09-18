@@ -19,7 +19,7 @@ import (
 	mocks_accountvalidation "github.com/leodip/goiabada/authserver/internal/accountvalidation/mocks"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/authserver/internal/constants"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
 	"github.com/leodip/goiabada/core/encryption"
 	mocks_handlerhelpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"

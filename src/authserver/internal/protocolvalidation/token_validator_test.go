@@ -11,7 +11,8 @@ import (
 
 	"errors"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/authserver/internal/constants"
+	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/hashutil"
@@ -5263,7 +5264,7 @@ func TestValidateTokenRequest_ROPC_ResourcePermission_ResolutionFailures(t *test
 // below is reachable in production only for tokens issued BEFORE the fix, and an integration test
 // cannot construct it without writing a refresh token row directly.
 func TestValidateTokenRequest_RefreshToken_ROPC_InjectedUserInfoScope(t *testing.T) {
-	userInfoScope := constants.AuthServerResourceIdentifier + ":" + constants.UserinfoPermissionIdentifier
+	userInfoScope := coreconstants.AuthServerResourceIdentifier + ":" + coreconstants.UserinfoPermissionIdentifier
 
 	testCases := []struct {
 		name string

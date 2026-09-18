@@ -14,7 +14,8 @@ import (
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
 	"github.com/leodip/goiabada/core/encryption"
 
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/authserver/internal/constants"
+	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/testutil/fake"
@@ -904,7 +905,7 @@ func TestGenerateAccessToken(t *testing.T) {
 
 	assert.Equal(t, settings.Issuer, claims["iss"])
 	assert.Equal(t, user.Subject, claims["sub"])
-	assert.Equal(t, constants.AuthServerResourceIdentifier, claims["aud"])
+	assert.Equal(t, coreconstants.AuthServerResourceIdentifier, claims["aud"])
 	assert.Equal(t, code.Nonce, claims["nonce"])
 	assert.Equal(t, code.AcrLevel, claims["acr"])
 	assert.ElementsMatch(t, strings.Fields(code.AuthMethods), claims["amr"])
@@ -1078,7 +1079,7 @@ func TestGenerateAccessToken_WithGroupsAndAttributes(t *testing.T) {
 
 	assert.Equal(t, settings.Issuer, claims["iss"])
 	assert.Equal(t, user.Subject, claims["sub"])
-	assert.Equal(t, constants.AuthServerResourceIdentifier, claims["aud"])
+	assert.Equal(t, coreconstants.AuthServerResourceIdentifier, claims["aud"])
 	assert.Equal(t, code.Nonce, claims["nonce"])
 	assert.Equal(t, code.AcrLevel, claims["acr"])
 	assert.ElementsMatch(t, strings.Fields(code.AuthMethods), claims["amr"])
@@ -2186,7 +2187,7 @@ func TestGenerateTokenResponseForRefresh(t *testing.T) {
 	accessClaims := verifyAndDecodeToken(t, response.AccessToken, publicKeyBytes)
 	assert.Equal(t, settings.Issuer, accessClaims["iss"])
 	assert.Equal(t, user.Subject, accessClaims["sub"])
-	assert.ElementsMatch(t, []string{constants.AuthServerResourceIdentifier, "resource1"}, accessClaims["aud"])
+	assert.ElementsMatch(t, []string{coreconstants.AuthServerResourceIdentifier, "resource1"}, accessClaims["aud"])
 	assert.Equal(t, code.Nonce, accessClaims["nonce"])
 	assert.Equal(t, code.AcrLevel, accessClaims["acr"])
 	assert.ElementsMatch(t, strings.Fields(code.AuthMethods), accessClaims["amr"])

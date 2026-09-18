@@ -13,7 +13,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/adminconsole/internal/constants"
+	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/errs"
 	mocks_handler_helpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
 	"github.com/leodip/goiabada/core/oauth"
@@ -26,7 +27,7 @@ import (
 func TestRequest_AnOptionNotGivenLeavesTheValueOff(t *testing.T) {
 	req := Request(http.MethodGet, "/admin/users")
 
-	assert.Nil(t, req.Context().Value(constants.ContextKeyJwtInfo),
+	assert.Nil(t, req.Context().Value(coreconstants.ContextKeyJwtInfo),
 		"a request built without WithAccessToken must carry no JwtInfo at all")
 	assert.Nil(t, req.Context().Value(constants.ContextKeySettings),
 		"a request built without WithSettings must carry no settings at all")
@@ -38,7 +39,7 @@ func TestRequest_AnOptionNotGivenLeavesTheValueOff(t *testing.T) {
 func TestRequest_WithAccessTokenCarriesTheBearerTheHandlersRead(t *testing.T) {
 	req := Request(http.MethodGet, "/admin/users", WithAccessToken())
 
-	jwtInfo, ok := req.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+	jwtInfo, ok := req.Context().Value(coreconstants.ContextKeyJwtInfo).(oauth.JwtInfo)
 	require.True(t, ok, "the context carries no oauth.JwtInfo")
 	assert.Equal(t, AccessToken, jwtInfo.TokenResponse.AccessToken)
 }

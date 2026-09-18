@@ -7,7 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/authserver/internal/constants"
+	coreconstants "github.com/leodip/goiabada/core/constants"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/sessionstore"
@@ -490,7 +491,7 @@ func TestDatabaseBackend_ConstructorsFixEveryOperationOwner(t *testing.T) {
 		},
 		{
 			name:  "admin console",
-			owner: constants.AdminConsoleSessionName,
+			owner: coreconstants.AdminConsoleSessionName,
 			new:   func(database *mocks_data.Database) sessionstore.Backend { return NewAdminConsoleBackend(database) },
 		},
 	} {

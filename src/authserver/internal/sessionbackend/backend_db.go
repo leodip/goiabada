@@ -6,7 +6,8 @@ import (
 	"encoding/hex"
 	"time"
 
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/authserver/internal/constants"
+	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
@@ -33,7 +34,7 @@ func NewAuthServerBackend(database data.Database) sessionstore.Backend {
 // apart. Fixing it in these constructors rather than accepting it from a caller makes
 // it impossible for the session endpoint to select the auth server's rows (#334).
 func NewAdminConsoleBackend(database data.Database) sessionstore.Backend {
-	return newBackend(database, constants.AdminConsoleSessionName)
+	return newBackend(database, coreconstants.AdminConsoleSessionName)
 }
 
 func newBackend(database data.Database, owner string) *dbBackend {

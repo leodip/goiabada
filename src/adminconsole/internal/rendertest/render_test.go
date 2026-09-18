@@ -18,6 +18,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers/accounthandlers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers/adminclienthandlers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers/adminsettingshandlers"
@@ -26,7 +27,7 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/pagination"
 	web "github.com/leodip/goiabada/adminconsole/web"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/constants"
+	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/countries"
 	"github.com/leodip/goiabada/core/handlerhelpers"
 	"github.com/leodip/goiabada/core/i18n"
@@ -75,7 +76,7 @@ func renderWithLayoutAs(t *testing.T, layout, page string, bind map[string]inter
 	req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings, settings))
 	if idTokenClaims != nil {
 		jwtInfo := oauth.JwtInfo{IdToken: &oauth.JwtToken{Claims: idTokenClaims}}
-		req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeyJwtInfo, jwtInfo))
+		req = req.WithContext(context.WithValue(req.Context(), coreconstants.ContextKeyJwtInfo, jwtInfo))
 	}
 	req = i18n.RefineLocalizerWithUILocales(req, []string{"pt-BR"})
 

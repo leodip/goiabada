@@ -7,9 +7,10 @@ import (
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/config"
+	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/constants"
+	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
@@ -24,7 +25,7 @@ func HandleAccountEmailVerificationGet(
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		// Get JWT info to extract access token
-		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		jwtInfo, ok := r.Context().Value(coreconstants.ContextKeyJwtInfo).(oauth.JwtInfo)
 		if !ok {
 			httpHelper.InternalServerError(w, r, errs.New("no JWT info found in context"))
 			return
@@ -41,7 +42,7 @@ func HandleAccountEmailVerificationGet(
 			return
 		}
 
-		sess, err := httpSession.Get(r, constants.AdminConsoleSessionName)
+		sess, err := httpSession.Get(r, coreconstants.AdminConsoleSessionName)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
@@ -81,7 +82,7 @@ func HandleAccountEmailSendVerificationPost(
 		result := EmailSendVerificationResult{}
 
 		// Get JWT info to extract access token
-		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		jwtInfo, ok := r.Context().Value(coreconstants.ContextKeyJwtInfo).(oauth.JwtInfo)
 		if !ok {
 			httpHelper.JsonError(w, r, errs.New("no JWT info found in context"))
 			return
@@ -111,7 +112,7 @@ func HandleAccountEmailVerificationPost(
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		// Get JWT info for API calls and current profile rendering
-		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		jwtInfo, ok := r.Context().Value(coreconstants.ContextKeyJwtInfo).(oauth.JwtInfo)
 		if !ok {
 			httpHelper.InternalServerError(w, r, errs.New("no JWT info found in context"))
 			return
@@ -169,7 +170,7 @@ func HandleAccountEmailVerificationPost(
 			return
 		}
 
-		sess, err := httpSession.Get(r, constants.AdminConsoleSessionName)
+		sess, err := httpSession.Get(r, coreconstants.AdminConsoleSessionName)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
