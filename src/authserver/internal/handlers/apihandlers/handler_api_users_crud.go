@@ -12,6 +12,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
+	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
@@ -152,7 +153,7 @@ func HandleAPIUserPasswordPut(
 		}
 
 		// Both events, after commit. The pre-existing one is unchanged (decision 7).
-		auditLogger.Log(r.Context(), constants.AuditUpdatedUserAuthentication, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.AuditUpdatedUserAuthentication, map[string]interface{}{
 			"userId":       user.Id,
 			"loggedInUser": loggedInUser,
 		})
@@ -237,7 +238,7 @@ func HandleAPIUserOTPPut(
 		}
 
 		// Log audit event
-		auditLogger.Log(r.Context(), constants.AuditDisabledOTP, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.AuditDisabledOTP, map[string]interface{}{
 			"userId": user.Id,
 		})
 
@@ -426,7 +427,7 @@ func HandleAPIUserCreatePost(
 		}
 
 		// Log audit event
-		auditLogger.Log(r.Context(), constants.AuditCreatedUser, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.AuditCreatedUser, map[string]interface{}{
 			"email":        createdUser.Email,
 			"loggedInUser": loggedInUser,
 		})
@@ -620,7 +621,7 @@ func HandleAPIUserEnabledPut(
 
 		// Unchanged in both directions, per decision 7: the endpoint's existing event still
 		// fires for every successful request, including the ones that revoke nothing.
-		auditLogger.Log(r.Context(), constants.AuditUpdatedUserDetails, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.AuditUpdatedUserDetails, map[string]interface{}{
 			"userId":       userId,
 			"loggedInUser": loggedInUser,
 		})
@@ -696,7 +697,7 @@ func HandleAPIUserDelete(
 		}
 
 		// Log audit event
-		auditLogger.Log(r.Context(), constants.AuditDeletedUser, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.AuditDeletedUser, map[string]interface{}{
 			"userId":       userId,
 			"loggedInUser": loggedInUser,
 		})

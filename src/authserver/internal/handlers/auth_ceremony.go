@@ -5,9 +5,9 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
-	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/i18n"
 )
 
@@ -78,7 +78,7 @@ func rejectCeremonyMismatch(httpHelper HttpHelper, auditLogger AuditLogger, w ht
 	if authContext.UserId != 0 {
 		details["userId"] = authContext.UserId
 	}
-	auditLogger.Log(r.Context(), constants.AuditAuthCeremonyMismatch, details)
+	auditLogger.Log(r.Context(), audit.AuditAuthCeremonyMismatch, details)
 
 	bind := map[string]interface{}{
 		"title":       i18n.T(r.Context(), "auth_error.ceremony_mismatch.title"),

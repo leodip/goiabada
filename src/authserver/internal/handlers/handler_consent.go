@@ -11,9 +11,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/core/config"
-	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/errs"
@@ -399,7 +399,7 @@ func HandleConsentPost(
 				}
 				authContext.ConsentedScope = consent.Scope
 
-				auditLogger.Log(r.Context(), constants.AuditSavedConsent, map[string]interface{}{
+				auditLogger.Log(r.Context(), audit.AuditSavedConsent, map[string]interface{}{
 					"userId":    consent.UserId,
 					"clientId":  consent.ClientId,
 					"consentId": consent.Id,

@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
@@ -339,12 +340,12 @@ func TestAPIAuditLogsGet_RequestIdFilter(t *testing.T) {
 		assert.Equal(t, 1, body.Total)
 		if assert.Len(t, body.AuditLogs, 1) {
 			assert.Equal(t, requestId, body.AuditLogs[0].RequestId)
-			assert.Equal(t, constants.AuditUpdatedAuditLogsSettings, body.AuditLogs[0].AuditEvent)
+			assert.Equal(t, audit.AuditUpdatedAuditLogsSettings, body.AuditLogs[0].AuditEvent)
 		}
 
 		t.Run("and narrows further with the audit event", func(t *testing.T) {
 			withEvent, resp := getAuditLogs(t, accessToken, "requestId="+url.QueryEscape(requestId)+
-				"&auditEvent="+constants.AuditUpdatedAuditLogsSettings)
+				"&auditEvent="+audit.AuditUpdatedAuditLogsSettings)
 			defer func() { _ = resp.Body.Close() }()
 
 			assert.Equal(t, 1, withEvent.Total)
@@ -385,7 +386,7 @@ func TestAPIAuditLogsGet_RequestIdFilter(t *testing.T) {
 	// only entries written off a request, and rows older than the column, carry none.
 	t.Run("with no header the entry still carries the id chi generated", func(t *testing.T) {
 		before, resp := getAuditLogs(t, accessToken,
-			"auditEvent="+constants.AuditUpdatedAuditLogsSettings+"&size=1")
+			"auditEvent="+audit.AuditUpdatedAuditLogsSettings+"&size=1")
 		defer func() { _ = resp.Body.Close() }()
 		var lastIdBefore int64
 		if len(before.AuditLogs) > 0 {
@@ -395,7 +396,7 @@ func TestAPIAuditLogsGet_RequestIdFilter(t *testing.T) {
 		auditedPutWithRequestId(t, accessToken, "")
 
 		after, resp2 := getAuditLogs(t, accessToken,
-			"auditEvent="+constants.AuditUpdatedAuditLogsSettings+"&size=1")
+			"auditEvent="+audit.AuditUpdatedAuditLogsSettings+"&size=1")
 		defer func() { _ = resp2.Body.Close() }()
 
 		if assert.Len(t, after.AuditLogs, 1) {

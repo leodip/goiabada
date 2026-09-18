@@ -7,10 +7,10 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/encryption"
 )
@@ -67,7 +67,7 @@ func HandleAPIUserEmailVerificationCodePost(
 			loggedInUser = jwtToken.GetStringClaim("sub")
 		}
 
-		auditLogger.Log(r.Context(), constants.AuditGeneratedEmailVerificationCode, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.AuditGeneratedEmailVerificationCode, map[string]interface{}{
 			"userId":       user.Id,
 			"email":        user.Email,
 			"loggedInUser": loggedInUser,

@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 	"github.com/leodip/goiabada/core/config"
@@ -566,7 +567,7 @@ func HandleAuthorizeGet(
 
 				// the user account has been disabled
 				// we should log this event and return an error to the client
-				auditLogger.Log(r.Context(), constants.AuditUserDisabled, map[string]interface{}{
+				auditLogger.Log(r.Context(), audit.AuditUserDisabled, map[string]interface{}{
 					"userId": userSession.UserId,
 				})
 
@@ -662,7 +663,7 @@ func handlePromptNone(w http.ResponseWriter, r *http.Request, httpHelper HttpHel
 
 	// 3. Check user is enabled
 	if !userSession.User.Enabled {
-		auditLogger.Log(r.Context(), constants.AuditUserDisabled, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.AuditUserDisabled, map[string]interface{}{
 			"userId": userSession.UserId,
 		})
 		redirectWithError("access_denied", "The user account is disabled")
@@ -790,7 +791,7 @@ func handlePromptNone(w http.ResponseWriter, r *http.Request, httpHelper HttpHel
 		return
 	}
 
-	auditLogger.Log(r.Context(), constants.AuditBumpedUserSession, map[string]interface{}{
+	auditLogger.Log(r.Context(), audit.AuditBumpedUserSession, map[string]interface{}{
 		"userId":   authContext.UserId,
 		"clientId": client.Id,
 	})

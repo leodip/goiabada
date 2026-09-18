@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
+	"github.com/leodip/goiabada/authserver/internal/audit"
 	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
 	"github.com/leodip/goiabada/core/constants"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
@@ -113,9 +114,9 @@ func TestHandleAPIAccountPasswordPut_PreservesTheCallersSession(t *testing.T) {
 	database.On("PromoteUserSessionGeneration", apiRevokeTx, int64(100), int64(8)).Return(nil).Once()
 	database.On("DeleteUserSession", apiRevokeTx, int64(200)).Return(nil).Once()
 
-	auditLogger.On("Log", mock.Anything, constants.AuditChangedPassword, mock.Anything).Return().Once()
+	auditLogger.On("Log", mock.Anything, audit.AuditChangedPassword, mock.Anything).Return().Once()
 	var payload map[string]interface{}
-	auditLogger.On("Log", mock.Anything, constants.AuditRevokedUserAuthState, mock.Anything).
+	auditLogger.On("Log", mock.Anything, audit.AuditRevokedUserAuthState, mock.Anything).
 		Run(func(args mock.Arguments) {
 			payload = args.Get(2).(map[string]interface{})
 		}).Return().Once()
@@ -174,9 +175,9 @@ func TestHandleAPIAccountPasswordPut_SidlessBearerRevokesEverything(t *testing.T
 	database.On("SetUserPasswordHash", apiRevokeTx, int64(42), mock.Anything).Return(nil).Once()
 	stubSweep(database, 42, 8)
 
-	auditLogger.On("Log", mock.Anything, constants.AuditChangedPassword, mock.Anything).Return().Once()
+	auditLogger.On("Log", mock.Anything, audit.AuditChangedPassword, mock.Anything).Return().Once()
 	var payload map[string]interface{}
-	auditLogger.On("Log", mock.Anything, constants.AuditRevokedUserAuthState, mock.Anything).
+	auditLogger.On("Log", mock.Anything, audit.AuditRevokedUserAuthState, mock.Anything).
 		Run(func(args mock.Arguments) {
 			payload = args.Get(2).(map[string]interface{})
 		}).Return().Once()

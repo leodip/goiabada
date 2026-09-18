@@ -7,8 +7,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/audit"
 	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
-	"github.com/leodip/goiabada/core/constants"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/stretchr/testify/assert"
@@ -250,7 +250,7 @@ func TestHandleAPIClientLogoPost_CreateNew(t *testing.T) {
 		return cl.ClientId == int64(123) && cl.ContentType == "image/png"
 	})).Return(nil)
 
-	auditLogger.On("Log", mock.Anything, constants.AuditUpdatedClientLogo, mock.MatchedBy(func(details map[string]interface{}) bool {
+	auditLogger.On("Log", mock.Anything, audit.AuditUpdatedClientLogo, mock.MatchedBy(func(details map[string]interface{}) bool {
 		return details["clientId"] == client.Id && details["loggedInUser"] == adminSub
 	})).Return()
 
@@ -296,7 +296,7 @@ func TestHandleAPIClientLogoPost_UpdateExisting(t *testing.T) {
 		return cl.Id == existingLogo.Id && cl.ContentType == "image/png"
 	})).Return(nil)
 
-	auditLogger.On("Log", mock.Anything, constants.AuditUpdatedClientLogo, mock.MatchedBy(func(details map[string]interface{}) bool {
+	auditLogger.On("Log", mock.Anything, audit.AuditUpdatedClientLogo, mock.MatchedBy(func(details map[string]interface{}) bool {
 		return details["clientId"] == client.Id && details["loggedInUser"] == adminSub
 	})).Return()
 
@@ -397,7 +397,7 @@ func TestHandleAPIClientLogoDelete_Success(t *testing.T) {
 	database.On("GetClientById", (*sql.Tx)(nil), int64(123)).Return(client, nil)
 	database.On("DeleteClientLogo", (*sql.Tx)(nil), int64(123)).Return(nil)
 
-	auditLogger.On("Log", mock.Anything, constants.AuditDeletedClientLogo, mock.MatchedBy(func(details map[string]interface{}) bool {
+	auditLogger.On("Log", mock.Anything, audit.AuditDeletedClientLogo, mock.MatchedBy(func(details map[string]interface{}) bool {
 		return details["clientId"] == client.Id && details["loggedInUser"] == adminSub
 	})).Return()
 

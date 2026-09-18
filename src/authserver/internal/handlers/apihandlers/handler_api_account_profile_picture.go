@@ -4,11 +4,11 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/imaging"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/core/config"
-	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
@@ -111,7 +111,7 @@ func HandleAPIAccountProfilePicturePost(
 		}
 
 		// Log audit event
-		auditLogger.Log(r.Context(), constants.AuditUpdatedOwnProfilePicture, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.AuditUpdatedOwnProfilePicture, map[string]interface{}{
 			"userId": user.Id,
 		})
 
@@ -164,7 +164,7 @@ func HandleAPIAccountProfilePictureDelete(
 		}
 
 		// Log audit event
-		auditLogger.Log(r.Context(), constants.AuditDeletedOwnProfilePicture, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.AuditDeletedOwnProfilePicture, map[string]interface{}{
 			"userId": user.Id,
 		})
 

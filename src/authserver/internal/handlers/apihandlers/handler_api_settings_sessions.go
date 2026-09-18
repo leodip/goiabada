@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
@@ -85,7 +86,7 @@ func HandleAPISettingsSessionsPut(
 		}
 
 		// Audit log
-		auditLogger.Log(r.Context(), constants.AuditUpdatedSessionsSettings, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.AuditUpdatedSessionsSettings, map[string]interface{}{
 			"loggedInUser": authHelper.GetLoggedInSubject(r),
 		})
 

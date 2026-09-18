@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/audit"
 	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/otp"
@@ -148,7 +149,7 @@ func TestHandleAPIAccountOTPPut_Enable_ReplayIsRefused(t *testing.T) {
 	// this test. That asymmetry is deliberate and decision 5 permits it, since there is no existing
 	// failure event at this endpoint for the replay event to be emitted "alongside".
 	var payload map[string]interface{}
-	auditLogger.On("Log", mock.Anything, constants.AuditOTPCodeReplayDetected, mock.Anything).
+	auditLogger.On("Log", mock.Anything, audit.AuditOTPCodeReplayDetected, mock.Anything).
 		Run(func(args mock.Arguments) {
 			payload = args.Get(2).(map[string]interface{})
 		}).Return().Once()
@@ -260,7 +261,7 @@ func TestHandleAPIAccountOTPPut_Enable_CommitsBothWritesAtomically(t *testing.T)
 		Run(func(mock.Arguments) { calls = append(calls, "clear") }).Once()
 
 	database.On("GetUserById", (*sql.Tx)(nil), user.Id).Return(user, nil).Once()
-	auditLogger.On("Log", mock.Anything, constants.AuditEnabledOTP, mock.Anything).Return().Once()
+	auditLogger.On("Log", mock.Anything, audit.AuditEnabledOTP, mock.Anything).Return().Once()
 
 	rr := httptest.NewRecorder()
 	HandleAPIAccountOTPPut(database, auditLogger, unlimitedCredentials{}).
@@ -373,7 +374,7 @@ func TestHandleAPIAccountOTPPut_Disable_CommitsBothWritesAtomically(t *testing.T
 		Run(func(mock.Arguments) { calls = append(calls, "increment") }).Once()
 
 	database.On("GetUserById", (*sql.Tx)(nil), user.Id).Return(user, nil).Once()
-	auditLogger.On("Log", mock.Anything, constants.AuditDisabledOTP, mock.Anything).Return().Once()
+	auditLogger.On("Log", mock.Anything, audit.AuditDisabledOTP, mock.Anything).Return().Once()
 
 	rr := httptest.NewRecorder()
 	HandleAPIAccountOTPPut(database, auditLogger, unlimitedCredentials{}).
@@ -835,7 +836,7 @@ func TestHandleAPIAccountOTPPut_Enable_StoresTheIssuedSeed(t *testing.T) {
 	// live seed still installed behind it.
 	database.On("ClearPendingOTPEnrollment", tx, user.Id).Return(nil).Once()
 	database.On("GetUserById", (*sql.Tx)(nil), user.Id).Return(user, nil).Once()
-	auditLogger.On("Log", mock.Anything, constants.AuditEnabledOTP, mock.Anything).Return().Once()
+	auditLogger.On("Log", mock.Anything, audit.AuditEnabledOTP, mock.Anything).Return().Once()
 
 	rr := httptest.NewRecorder()
 	HandleAPIAccountOTPPut(database, auditLogger, unlimitedCredentials{}).

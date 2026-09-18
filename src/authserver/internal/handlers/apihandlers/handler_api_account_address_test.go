@@ -13,9 +13,9 @@ import (
 
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
+	"github.com/leodip/goiabada/authserver/internal/audit"
 	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/constants"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/testutil"
@@ -85,7 +85,7 @@ func TestHandleAPIAccountAddressPut_ASuccessWritesTheWholeBody(t *testing.T) {
 	user := &models.User{Id: 42, Subject: "the-subject"}
 	database.On("GetUserBySubject", (*sql.Tx)(nil), "the-subject").Return(user, nil).Once()
 	database.On("UpdateUser", (*sql.Tx)(nil), mock.Anything).Return(nil).Once()
-	auditLogger.On("Log", mock.Anything, constants.AuditUpdatedOwnAddress, mock.Anything).Return().Once()
+	auditLogger.On("Log", mock.Anything, audit.AuditUpdatedOwnAddress, mock.Anything).Return().Once()
 
 	rr := httptest.NewRecorder()
 	handler := HandleAPIAccountAddressPut(database, accountvalidation.NewAddressValidator(), auditLogger)

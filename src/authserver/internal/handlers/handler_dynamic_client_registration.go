@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/apiresponse"
+	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
@@ -147,7 +148,7 @@ func HandleDynamicClientRegistrationPost(
 		}
 
 		// 12. Audit log
-		auditLogger.Log(r.Context(), constants.AuditDynamicClientRegistration, map[string]interface{}{
+		auditLogger.Log(r.Context(), audit.AuditDynamicClientRegistration, map[string]interface{}{
 			"clientId":         client.Id,
 			"clientIdentifier": client.ClientIdentifier,
 			"grantTypes":       req.GrantTypes,

@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"sort"
 
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
@@ -599,7 +599,7 @@ func RevokeClientGrantsTx(db data.Database, clientId int64,
 func LogRevokedClientGrants(ctx context.Context, auditLogger AuditLogger, clientId int64, reason string,
 	loggedInUser string, result ClientGrantRevocationResult) {
 
-	auditLogger.Log(ctx, constants.AuditRevokedClientGrants, map[string]interface{}{
+	auditLogger.Log(ctx, audit.AuditRevokedClientGrants, map[string]interface{}{
 		"clientId":     clientId,
 		"reason":       reason,
 		"loggedInUser": loggedInUser,
@@ -622,7 +622,7 @@ func LogRevokedClientGrants(ctx context.Context, auditLogger AuditLogger, client
 func LogRevokedUserAuthState(ctx context.Context, auditLogger AuditLogger, userId int64, reason string,
 	loggedInUser string, result RevocationResult) {
 
-	auditLogger.Log(ctx, constants.AuditRevokedUserAuthState, map[string]interface{}{
+	auditLogger.Log(ctx, audit.AuditRevokedUserAuthState, map[string]interface{}{
 		"userId":       userId,
 		"reason":       reason,
 		"loggedInUser": loggedInUser,
@@ -654,7 +654,7 @@ func LogRevokedUserAuthState(ctx context.Context, auditLogger AuditLogger, userI
 func LogTerminatedUserSession(ctx context.Context, auditLogger AuditLogger, userSession *models.UserSession,
 	loggedInUser string, result TerminationResult) {
 
-	auditLogger.Log(ctx, constants.AuditTerminatedUserSession, map[string]interface{}{
+	auditLogger.Log(ctx, audit.AuditTerminatedUserSession, map[string]interface{}{
 		"userId":            userSession.UserId,
 		"userSessionId":     userSession.Id,
 		"sessionIdentifier": userSession.SessionIdentifier,

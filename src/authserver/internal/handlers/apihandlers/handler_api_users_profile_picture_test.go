@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/leodip/goiabada/authserver/internal/audit"
 	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
 	"github.com/leodip/goiabada/core/constants"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
@@ -266,7 +267,7 @@ func TestHandleAPIUserProfilePicturePost_CreateNew(t *testing.T) {
 		return pp.UserId == int64(123) && pp.ContentType == "image/png"
 	})).Return(nil)
 
-	auditLogger.On("Log", mock.Anything, constants.AuditUpdatedUserProfilePicture, mock.MatchedBy(func(details map[string]interface{}) bool {
+	auditLogger.On("Log", mock.Anything, audit.AuditUpdatedUserProfilePicture, mock.MatchedBy(func(details map[string]interface{}) bool {
 		return details["userId"] == user.Id && details["loggedInUser"] == adminSub
 	})).Return()
 
@@ -313,7 +314,7 @@ func TestHandleAPIUserProfilePicturePost_UpdateExisting(t *testing.T) {
 		return pp.Id == existingPicture.Id && pp.ContentType == "image/png"
 	})).Return(nil)
 
-	auditLogger.On("Log", mock.Anything, constants.AuditUpdatedUserProfilePicture, mock.MatchedBy(func(details map[string]interface{}) bool {
+	auditLogger.On("Log", mock.Anything, audit.AuditUpdatedUserProfilePicture, mock.MatchedBy(func(details map[string]interface{}) bool {
 		return details["userId"] == user.Id && details["loggedInUser"] == adminSub
 	})).Return()
 
@@ -411,7 +412,7 @@ func TestHandleAPIUserProfilePictureDelete_Success(t *testing.T) {
 	database.On("GetUserById", (*sql.Tx)(nil), int64(123)).Return(user, nil)
 	database.On("DeleteUserProfilePicture", (*sql.Tx)(nil), int64(123)).Return(nil)
 
-	auditLogger.On("Log", mock.Anything, constants.AuditDeletedUserProfilePicture, mock.MatchedBy(func(details map[string]interface{}) bool {
+	auditLogger.On("Log", mock.Anything, audit.AuditDeletedUserProfilePicture, mock.MatchedBy(func(details map[string]interface{}) bool {
 		return details["userId"] == user.Id && details["loggedInUser"] == adminSub
 	})).Return()
 

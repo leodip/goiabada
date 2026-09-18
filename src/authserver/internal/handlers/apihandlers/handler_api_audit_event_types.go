@@ -3,8 +3,8 @@ package apihandlers
 import (
 	"net/http"
 
+	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/constants"
 )
 
 // HandleAPIAuditEventTypesGet - GET /api/v1/admin/audit-logs/event-types
@@ -23,7 +23,7 @@ func HandleAPIAuditEventTypesGet() http.HandlerFunc {
 		// Requires scopesSettingsRead, the same read scope GET /api/v1/admin/audit-logs carries.
 
 		response := api.GetAuditEventTypesResponse{
-			AuditEventTypes: constants.AuditEventTypes,
+			AuditEventTypes: audit.AuditEventTypes,
 		}
 
 		writeJSON(w, r, http.StatusOK, response)

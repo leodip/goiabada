@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/issuance"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 	"github.com/leodip/goiabada/core/constants"
@@ -174,7 +175,7 @@ func HandleTokenPost(
 			}
 			// Check if user is disabled and log audit event
 			if errors.Is(err, customerrors.ErrUserDisabled) {
-				auditLogger.Log(r.Context(), constants.AuditUserDisabled, map[string]interface{}{
+				auditLogger.Log(r.Context(), audit.AuditUserDisabled, map[string]interface{}{
 					"clientId": input.ClientId,
 				})
 			}
@@ -193,7 +194,7 @@ func HandleTokenPost(
 			// reached only below client authentication and PKCE, so the identifier here has
 			// been proved rather than merely asserted.
 			if errors.Is(err, customerrors.ErrCodeRedirectURIDeregistered) {
-				auditLogger.Log(r.Context(), constants.AuditRedemptionRefusedRedirectURI, map[string]interface{}{
+				auditLogger.Log(r.Context(), audit.AuditRedemptionRefusedRedirectURI, map[string]interface{}{
 					"clientIdentifier": input.ClientId,
 				})
 			}
@@ -251,7 +252,7 @@ func HandleTokenPost(
 				!errors.Is(err, customerrors.ErrClientDisabled) {
 
 				credentialFailures.RecordCredentialFailure(r)
-				auditLogger.Log(r.Context(), constants.AuditROPCAuthFailed, map[string]interface{}{
+				auditLogger.Log(r.Context(), audit.AuditROPCAuthFailed, map[string]interface{}{
 					// Normalized to what the limiter keyed its bucket on and to what every
 					// write path stores, so the audit row and the budget name one account.
 					"email": strings.ToLower(strings.TrimSpace(input.Username)),
@@ -264,7 +265,7 @@ func HandleTokenPost(
 			}
 
 			if errors.As(err, &errDetail) && errDetail.GetCode() == "invalid_scope" {
-				auditLogger.Log(r.Context(), constants.AuditTokenScopeDenied, map[string]interface{}{
+				auditLogger.Log(r.Context(), audit.AuditTokenScopeDenied, map[string]interface{}{
 					// clientIdentifier, the string from the request, not the numeric clientId the
 					// issuance events use: the validator discards the client model on failure. See
 					// the constant's doc comment for what this attests to per grant type.
@@ -326,7 +327,7 @@ func HandleTokenPost(
 				return
 			}
 
-			auditLogger.Log(r.Context(), constants.AuditTokenIssuedAuthorizationCodeResponse, map[string]interface{}{
+			auditLogger.Log(r.Context(), audit.AuditTokenIssuedAuthorizationCodeResponse, map[string]interface{}{
 				"codeId": validateResult.CodeEntity.Id,
 			})
 
@@ -342,7 +343,7 @@ func HandleTokenPost(
 				return
 			}
 
-			auditLogger.Log(r.Context(), constants.AuditTokenIssuedClientCredentialsResponse, map[string]interface{}{
+			auditLogger.Log(r.Context(), audit.AuditTokenIssuedClientCredentialsResponse, map[string]interface{}{
 				"clientId": validateResult.Client.Id,
 				// Which scopes were issued, to whom. Absent before, which is why exploitation of
 				// the #104 cross-resource escalation cannot be reconstructed from the audit log for
@@ -402,7 +403,7 @@ func HandleTokenPost(
 						replayFlow = "auth_code"
 					}
 
-					auditLogger.Log(r.Context(), constants.AuditRefreshTokenReplayDetected, map[string]interface{}{
+					auditLogger.Log(r.Context(), audit.AuditRefreshTokenReplayDetected, map[string]interface{}{
 						"presentedRefreshTokenJti": refreshToken.RefreshTokenJti,
 						"firstRefreshTokenJti":     refreshToken.FirstRefreshTokenJti,
 						"revokedCount":             revokedCount,
@@ -516,7 +517,7 @@ func HandleTokenPost(
 					return
 				}
 
-				auditLogger.Log(r.Context(), constants.AuditTokenIssuedRefreshTokenResponse, map[string]interface{}{
+				auditLogger.Log(r.Context(), audit.AuditTokenIssuedRefreshTokenResponse, map[string]interface{}{
 					"userId":          validateResult.RefreshToken.UserId.Int64,
 					"clientId":        validateResult.RefreshToken.ClientId.Int64,
 					"refreshTokenJti": validateResult.RefreshToken.RefreshTokenJti,
@@ -549,13 +550,13 @@ func HandleTokenPost(
 						return
 					}
 
-					auditLogger.Log(r.Context(), constants.AuditBumpedUserSession, map[string]interface{}{
+					auditLogger.Log(r.Context(), audit.AuditBumpedUserSession, map[string]interface{}{
 						"userId":   userSession.UserId,
 						"clientId": refreshToken.Code.ClientId,
 					})
 				}
 
-				auditLogger.Log(r.Context(), constants.AuditTokenIssuedRefreshTokenResponse, map[string]interface{}{
+				auditLogger.Log(r.Context(), audit.AuditTokenIssuedRefreshTokenResponse, map[string]interface{}{
 					"codeId":          validateResult.CodeEntity.Id,
 					"refreshTokenJti": validateResult.RefreshToken.RefreshTokenJti,
 					"flow":            "auth_code",
@@ -589,7 +590,7 @@ func HandleTokenPost(
 				return
 			}
 
-			auditLogger.Log(r.Context(), constants.AuditTokenIssuedROPCResponse, map[string]interface{}{
+			auditLogger.Log(r.Context(), audit.AuditTokenIssuedROPCResponse, map[string]interface{}{
 				"userId":   validateResult.User.Id,
 				"clientId": validateResult.Client.Id,
 			})
@@ -620,7 +621,7 @@ func revokeAndAuditAuthCodeReuse(ctx context.Context, database data.Database, au
 		return err
 	}
 	if code != nil {
-		auditLogger.Log(ctx, constants.AuditAuthCodeReuseDetected, map[string]interface{}{
+		auditLogger.Log(ctx, audit.AuditAuthCodeReuseDetected, map[string]interface{}{
 			"clientId":                code.ClientId,
 			"userId":                  code.UserId,
 			"codeId":                  code.Id,

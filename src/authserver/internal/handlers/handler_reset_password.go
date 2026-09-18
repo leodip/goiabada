@@ -11,9 +11,9 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/sessionstore"
 
+	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/core/config"
-	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/hashutil"
@@ -192,7 +192,7 @@ func auditFailedResetPasswordCode(auditLogger AuditLogger, r *http.Request, user
 		details["userId"] = userId
 	}
 
-	auditLogger.Log(r.Context(), constants.AuditFailedResetPasswordCode, details)
+	auditLogger.Log(r.Context(), audit.AuditFailedResetPasswordCode, details)
 }
 
 // rejectResetPassword audits the cause and renders the one indistinguishable response. The

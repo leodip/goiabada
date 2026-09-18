@@ -28,7 +28,7 @@ repository root. It is enforced rather than descriptive: see **Architecture guar
 - `oauth/` - Shared OAuth/OIDC client surface: JWT/JWKS parsing, token exchange, PKCE, response_type parsing
 - `validators/` - Identifier and angle-bracket validation, the two both applications use. The authorize and token validators live in `authserver/internal/protocolvalidation`, and the account validators — email, password, profile, address, phone — in `authserver/internal/accountvalidation` (#344)
 - `config/` - Configuration from environment variables
-- `constants/` - Audit event names, resource identifiers
+- `constants/` - Resource and permission identifiers, context and session keys
 
 ### Auth Server (`src/authserver/`)
 - `internal/handlers/` - HTTP handlers (auth flows, token, userinfo, DCR)
@@ -343,9 +343,9 @@ a walk that reached nothing into `Fatalf`. The reporting half takes a `testutil.
 exported `Assert*` keeps its `*testing.T` and delegates, so no caller moves. Both halves are then
 driven from a rule test: the finder directly, the reporting half through `testutil.RunGuard`, which
 runs it on its own goroutine so a recorded `Fatalf` ends it in `runtime.Goexit` the way the real one
-does. Fifteen guards follow this -- ten in `core/testutil`, plus `core/data`'s begin-transaction,
-benign-sentinel, page-offset and id-list-bound lints and the auth server's API error-code
-lint. Each owes three cases: a tree that must fail, a tree that must pass, and the walk that
+does. Sixteen guards follow this -- ten in `core/testutil`, plus `core/data`'s begin-transaction,
+benign-sentinel, page-offset and id-list-bound lints and the auth server's API error-code and
+audit-catalog lints. Each owes three cases: a tree that must fail, a tree that must pass, and the walk that
 reached nothing. Without the last two the first proves nothing, and without the reporting half
 under test a defect in the five lines that report disables the guard across every module with
 nothing going red -- which is what blinding `AssertNoDeadInterfaces` demonstrated on `8883642d`
@@ -417,7 +417,7 @@ every up.sql carrying it, and a `.down.sql` with no statement in it owes
 ## Important Patterns
 
 1. **Handler signature**: `HandleXxxGet/Post(dependencies...) http.HandlerFunc`
-2. **Audit logging**: All security events logged via `auditLogger` (see `constants/constants.go` for event names)
+2. **Audit logging**: All security events logged via `auditLogger` (see `authserver/internal/audit/events.go` for event names)
 3. **Rate limiting**: Applied to credential checks and unauthenticated endpoints (login, OTP, ROPC, account password and OTP changes, email verification, forgot/reset password, self-registration, activation, DCR). Credential checks count failures only, so a successful attempt spends nothing
 4. **Permissions model**: Resources contain Permissions; Users/Groups/Clients can have Permissions
 5. **Credential form fields**: A handler reads a credential-bearing field (`password`, `passwordConfirmation`, `currentPassword`, `newPassword`, `newPasswordConfirmation`, `otp`, `secretKey`, `base64Image`, `verificationCode`, `clientSecret`) and a form-binding marker (`ceremonyId`, `continuationId`) with `r.PostFormValue`, never `r.FormValue`. `r.FormValue` merges the URL query behind the request body, so the value would be accepted from the request target, where it reaches the browser's history, the `Referer` of anything the page loads, and the access log of every proxy, gateway and CDN in front of the deployment. Every such form is POST-only with a separate GET handler that renders it, so the query is never a submission. Enforced by `core/testutil.AssertNoCredentialQueryFallback`, which carries the walk and the four merged-form accessors it refuses, called from a `credential_read_lint_test.go` in each `internal/handlers` package and from `core/middleware`, where the bearer-token read lives; each caller owns its own name list, because the lists must differ. The auth server's adds the four token-endpoint credentials (`code`, `code_verifier`, `refresh_token`, `client_secret`) and the kernel's is `access_token` alone. Only `state` is exempt, at `handler_authorize.go`, which OIDC Core 3.1.2.1 requires the authorization endpoint to accept over GET as well as POST; `code` is not, being an authorization *response* value the client returns in the request entity-body (RFC 6749 4.1.2, 4.1.3) (#202, #333)
