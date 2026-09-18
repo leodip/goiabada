@@ -19,8 +19,8 @@ func (d *SQLiteDatabase) BackfillEncryptedOTPSecrets(aesKey []byte) (int, error)
 	return d.CommonDB.BackfillEncryptedOTPSecrets(aesKey)
 }
 
-func (d *SQLiteDatabase) BackfillLowercaseEmails() (int, int, error) {
-	return d.CommonDB.BackfillLowercaseEmails()
+func (d *SQLiteDatabase) ScanEmailCase() ([]models.EmailCaseRow, error) {
+	return d.CommonDB.ScanEmailCase()
 }
 
 func (d *SQLiteDatabase) ReencryptDataToNewKey(oldKey, newKey []byte) error {

@@ -1,0 +1,20 @@
+-- Lowercase every stored users.email (#221, #283, #351). See the sqlite migration of the same
+-- number for why this repair is a migration now rather than the Go startup pass it replaces, why
+-- no account is disabled by it, and what the pre-flight refuses before the chain runs.
+--
+-- The predicate depends on the collation 000040 installs. users.email is
+-- Latin1_General_100_CS_AS_KS_WS_SC_UTF8 from that migration onward, per column rather than per
+-- database so an operator's pre-created database cannot leave it case-insensitive, and that is
+-- what makes `<>` select the legacy rows. Under the folding collation this column carried before
+-- 000040 this would be a silent no-op, which is why the number is above it.
+--
+-- THIS ENGINE'S LOWER() IS NOT FULLY UNICODE-AWARE at that collation. Measured against
+-- mcr.microsoft.com/mssql/server:2022-latest, it leaves U+1E9E (capital sharp s) and U+212A
+-- (kelvin sign) UNCHANGED where Go's strings.ToLower maps them to U+00DF and U+006B; U+00C4,
+-- U+0130 and U+0391 agree. So a stored 'ẞ@example.com' is not selected by this predicate and
+-- would survive as stored, unreachable by every credential path, all of which lowercase in Go
+-- first. data.CheckEmailCaseBeforeMigrating refuses to migrate such a database and names the row.
+--
+-- No EXEC wrapper, on 000033's reasoning: this adds no column and names only columns that already
+-- exist, so a plain statement resolves at batch compile time.
+UPDATE [users] SET [email] = LOWER([email]) WHERE [email] <> LOWER([email]);

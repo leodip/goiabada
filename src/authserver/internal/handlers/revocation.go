@@ -236,11 +236,12 @@ func RevokeUserAuthState(ctx context.Context, db data.Database, tx *sql.Tx, user
 // rather than inline strings so the four sites cannot drift and a log consumer has something to
 // match against.
 //
-// A fifth reason exists and is NOT here: constants.RevocationReasonEmailCollisionBackfill, for
-// the startup pass that disables the losers of an email case collision (#283). It is declared
-// in core because the site emitting it is commondb, which cannot import this package. Adding a
-// sixth means deciding which module its site lives in; the full list is enumerated on
-// constants.AuditRevokedUserAuthState.
+// These four are now the whole list, and this is now its only home. A fifth,
+// constants.RevocationReasonEmailCollisionBackfill, was declared in core because the site
+// emitting it was the startup pass that disabled the losers of an email case collision (#283),
+// and core cannot import this package. #351 replaced that pass with migration 000047 and a
+// pre-flight that refuses to migrate a colliding database instead of disabling an account, so
+// nothing in core revokes anything any more.
 const (
 	RevocationReasonPasswordReset    = "password_reset"
 	RevocationReasonPasswordChange   = "password_change"

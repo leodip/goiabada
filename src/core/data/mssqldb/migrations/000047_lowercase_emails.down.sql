@@ -1,0 +1,7 @@
+-- Migration 000047 down: intentional no-op.
+--
+-- The conversion is one-way: the original casing of an address is recorded nowhere, so setting
+-- anything back would invent a value rather than restore one. Neither was the Go startup pass
+-- this replaces reversible, for the same reason.
+--
+-- If you must roll back the convention, restore from a pre-migration backup.
