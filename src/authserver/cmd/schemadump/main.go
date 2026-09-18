@@ -1,7 +1,7 @@
 // Command schemadump regenerates the four committed golden files, one per database engine,
 // each recording what that engine's migration chain actually builds (#284).
 //
-//	cd src/core && go run ./cmd/schemadump
+//	cd src/authserver && go run ./cmd/schemadump
 //
 // It has to run inside the dev container, because nothing else resolves mysql-server,
 // postgres-server or mssql-server. Run it whenever a migration lands: the data tier compares
@@ -29,11 +29,11 @@ import (
 
 	_ "github.com/go-sql-driver/mysql"
 	_ "github.com/jackc/pgx/v5/stdlib"
-	"github.com/leodip/goiabada/core/data/mssqldb"
-	"github.com/leodip/goiabada/core/data/mysqldb"
-	"github.com/leodip/goiabada/core/data/postgresdb"
-	"github.com/leodip/goiabada/core/data/schemadump"
-	"github.com/leodip/goiabada/core/data/sqlitedb"
+	"github.com/leodip/goiabada/authserver/internal/data/mssqldb"
+	"github.com/leodip/goiabada/authserver/internal/data/mysqldb"
+	"github.com/leodip/goiabada/authserver/internal/data/postgresdb"
+	"github.com/leodip/goiabada/authserver/internal/data/schemadump"
+	"github.com/leodip/goiabada/authserver/internal/data/sqlitedb"
 	"github.com/leodip/goiabada/core/errs"
 	_ "github.com/microsoft/go-mssqldb"
 )
