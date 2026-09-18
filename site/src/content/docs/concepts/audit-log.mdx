@@ -41,7 +41,7 @@ Two pages are available in the admin console under **Settings**:
 - **Audit log settings**: toggle the console and database targets, and configure retention.
 - **Audit log viewer**: browse persisted events with event type and request id filtering, and pagination. Each entry shows the event name, timestamp, request id, and a JSON details payload.
 
-The viewer reads directly from the `audit_logs` table, so it only shows events captured while database persistence was enabled.
+The viewer reads through the auth server's admin API, which serves the rows from the `audit_logs` table, so it only shows events captured while database persistence was enabled. The event type filter is filled from the auth server's catalog of event names, so it offers every event this server can write, including ones that have not occurred on this deployment yet.
 
 ## REST API
 
@@ -49,12 +49,13 @@ The same configuration and viewer are available via the admin REST API:
 
 - `GET/PUT /api/v1/admin/settings/audit-logs`: read or update logging targets and retention.
 - `GET /api/v1/admin/audit-logs`: paginated viewer endpoint with optional `auditEvent` and `requestId` filters.
+- `GET /api/v1/admin/audit-logs/event-types`: the catalog of event identifiers the `auditEvent` filter accepts.
 
 See [REST API › Audit log settings](/integration/rest-api/#audit-log-settings) for full details.
 
 ## Event format
 
-Every audit event has a stable string identifier (such as `token_issued_authorization_code_response`, `user_login`, or `deleted_user_session_client`) and a JSON details payload describing the actors and parameters involved. The full set of event identifiers is defined in `src/authserver/internal/audit/events.go`.
+Every audit event has a stable string identifier (such as `token_issued_authorization_code_response`, `auth_success_pwd`, or `deleted_user_session_client`) and a JSON details payload describing the actors and parameters involved. The full set of event identifiers is defined in `src/authserver/internal/audit/events.go`.
 
 In the database, each row of the `audit_logs` table stores:
 

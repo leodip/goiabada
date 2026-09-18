@@ -1197,12 +1197,13 @@ PUT /api/v1/admin/settings/audit-logs
 #### Audit logs (viewer)
 
 ```
-GET /api/v1/admin/audit-logs?page=1&size=20&auditEvent=user_login&requestId=host/Ppg6bHPK5f-000012
+GET /api/v1/admin/audit-logs?page=1&size=20&auditEvent=auth_success_pwd&requestId=host/Ppg6bHPK5f-000012
 ```
 
 Returns paginated audit log entries from the database. All query parameters are optional.
 
 **Field notes:**
+- `auditEvent`: Return only entries carrying this event identifier, matched exactly. The accepted values are the catalog below, and a value outside it returns an empty page rather than an error
 - `requestId`: Return only entries carrying this request id, matched exactly
 
 ```json
@@ -1211,7 +1212,7 @@ Returns paginated audit log entries from the database. All query parameters are 
     {
       "id": 1,
       "createdAt": "2025-01-15T10:30:00Z",
-      "auditEvent": "user_login",
+      "auditEvent": "auth_success_pwd",
       "details": "{\"userId\":\"123\",\"ip\":\"192.168.1.1\"}",
       "requestId": "host/Ppg6bHPK5f-000012"
     }
@@ -1221,6 +1222,27 @@ Returns paginated audit log entries from the database. All query parameters are 
   "size": 20
 }
 ```
+
+#### Audit event types
+
+```
+GET /api/v1/admin/audit-logs/event-types
+```
+
+Returns the catalog of audit event identifiers this server can write, which is the set the `auditEvent` filter accepts. The list is fixed at build time rather than derived from the rows present, so it carries events that have not occurred on this deployment yet. The admin console's audit log viewer fills its filter dropdown from this endpoint.
+
+```json
+{
+  "auditEventTypes": [
+    "activated_account",
+    "added_group_attribute",
+    "added_group_permission",
+    "added_user_attribute"
+  ]
+}
+```
+
+The response carries the whole catalog, sorted by identifier; the sample above is its first four entries.
 
 #### Signing keys
 
