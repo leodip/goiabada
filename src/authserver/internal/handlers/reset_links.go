@@ -3,7 +3,7 @@ package handlers
 import (
 	"net/url"
 
-	"github.com/leodip/goiabada/core/config"
+	"github.com/leodip/goiabada/authserver/internal/config"
 )
 
 // ResetPasswordPath and AccountActivatePath are the paths of the two endpoints an

@@ -6,7 +6,7 @@ import (
 	"net/http"
 
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
-	"github.com/leodip/goiabada/core/config"
+	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/enums"

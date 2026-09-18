@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/leodip/goiabada/core/config"
+	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/hashutil"

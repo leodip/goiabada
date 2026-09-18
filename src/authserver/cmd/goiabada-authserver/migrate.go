@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/leodip/goiabada/core/config"
+	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/data/migrator"
@@ -51,7 +51,7 @@ const (
 // database behind this binary a lie, since the read would happen after the migration it was meant
 // to report on.
 func migrateCommand(args []string) int {
-	database, err := data.OpenDatabase(dataDatabaseConfig(config.GetDatabase()), false)
+	database, err := data.OpenDatabase(config.GetDataDatabaseConfig(), false)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "unable to open the database: %+v\n", err)
 		return migrateExitError

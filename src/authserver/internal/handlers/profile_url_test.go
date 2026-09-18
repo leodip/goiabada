@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/core/config"
+	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/stretchr/testify/assert"
 )
 

@@ -12,9 +12,9 @@ import (
 
 	"log/slog"
 
+	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/server"
 	"github.com/leodip/goiabada/authserver/internal/sessionbackend"
-	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/encryption"
@@ -23,28 +23,6 @@ import (
 	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/leodip/goiabada/core/timezones"
 )
-
-// dataDatabaseConfig maps this process's GOIABADA_DB_* configuration onto the shape core/data
-// declares for itself. core/data stopped reading the configuration singleton in #351, so the
-// hand-over happens here, on the auth server's side of the boundary, and both entry paths that
-// open a database (startup and the migrate subcommand) come through it.
-//
-// It takes the source configuration rather than reading the singleton itself so that the mapping
-// is testable: eight fields copied by hand is eight chances to write one of them into the wrong
-// place, and a swapped Host and Name is a server that cannot open its database with a
-// configuration the operator set correctly.
-func dataDatabaseConfig(dbConfig *config.DatabaseConfig) *data.DatabaseConfig {
-	return &data.DatabaseConfig{
-		Type:     dbConfig.Type,
-		Username: dbConfig.Username,
-		Password: dbConfig.Password,
-		Host:     dbConfig.Host,
-		Port:     dbConfig.Port,
-		Name:     dbConfig.Name,
-		DSN:      dbConfig.DSN,
-		Create:   dbConfig.Create,
-	}
-}
 
 func main() {
 
@@ -125,7 +103,7 @@ func main() {
 		"local_time", now,
 		"utc_time", now.UTC())
 
-	database, err := data.NewDatabase(dataDatabaseConfig(config.GetDatabase()),
+	database, err := data.NewDatabase(config.GetDataDatabaseConfig(),
 		config.GetAESEncryptionKey(), config.GetAESEncryptionKeyPrevious(),
 		config.GetAuthServer().LogSQL)
 	if err != nil {

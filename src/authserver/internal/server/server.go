@@ -17,10 +17,10 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/leodip/goiabada/authserver/internal/config"
 	authhandlerhelpers "github.com/leodip/goiabada/authserver/internal/handlerhelpers"
 	authserver_middleware "github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/workers"
-	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/errs"

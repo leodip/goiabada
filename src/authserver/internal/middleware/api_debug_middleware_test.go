@@ -15,9 +15,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
+	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/otp"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/logging"
 	"github.com/leodip/goiabada/core/testutil"
 	"github.com/pquerna/otp/totp"

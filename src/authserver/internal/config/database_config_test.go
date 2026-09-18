@@ -1,9 +1,8 @@
-package main
+package config
 
 import (
 	"testing"
 
-	"github.com/leodip/goiabada/core/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -18,7 +17,7 @@ import (
 // configured. The two string fields most easily swapped, Host and Name, carry values that would
 // each be plausible in the other's place.
 func TestDataDatabaseConfig_CarriesEveryFieldToItsOwnPlace(t *testing.T) {
-	mapped := dataDatabaseConfig(&config.DatabaseConfig{
+	mapped := dataDatabaseConfig(&DatabaseConfig{
 		Type:     "postgres",
 		Username: "the-username",
 		Password: "the-password",
@@ -45,7 +44,7 @@ func TestDataDatabaseConfig_CarriesEveryFieldToItsOwnPlace(t *testing.T) {
 // loader, where every other GOIABADA_* default lives and where the matrix stage 1 wrote asserts
 // them; a second one applied on the way past would be invisible to that matrix.
 func TestDataDatabaseConfig_CarriesAZeroValuedConfiguration(t *testing.T) {
-	mapped := dataDatabaseConfig(&config.DatabaseConfig{})
+	mapped := dataDatabaseConfig(&DatabaseConfig{})
 
 	require.NotNil(t, mapped)
 	assert.Equal(t, "", mapped.Type)

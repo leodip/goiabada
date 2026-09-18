@@ -3,7 +3,7 @@ package handlers
 import (
 	"net/http"
 
-	"github.com/leodip/goiabada/core/config"
+	"github.com/leodip/goiabada/authserver/internal/config"
 )
 
 func HandleIndexGet(

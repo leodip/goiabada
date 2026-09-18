@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/core/config"
+	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/testutil/fake"

@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leodip/goiabada/core/config"
+	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/core/data/migrator"
 	"github.com/leodip/goiabada/core/data/mssqldb"
 	"github.com/stretchr/testify/require"

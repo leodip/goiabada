@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/leodip/goiabada/core/config"
+	"github.com/leodip/goiabada/authserver/internal/config"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/testutil"
