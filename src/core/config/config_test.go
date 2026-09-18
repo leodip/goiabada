@@ -174,6 +174,156 @@ func TestGetEnvAsBoolDefault(t *testing.T) {
 	}
 }
 
+func TestGetEnv(t *testing.T) {
+	const key = "GOIABADA_TEST_GETENV"
+
+	// Both sides are trimmed, which is the rule a quoted value in a compose file or an env
+	// file meets: GOIABADA_DB_HOST=" db " is the same host as GOIABADA_DB_HOST=db.
+	tests := []struct {
+		name string
+		// set is false for the unset case, which is what the default is for.
+		set        bool
+		value      string
+		defaultVal string
+		want       string
+	}{
+		{name: "unset returns the default", set: false, defaultVal: "sqlite", want: "sqlite"},
+		{name: "unset returns the default trimmed", set: false, defaultVal: "  sqlite  ", want: "sqlite"},
+		{name: "set returns the value", set: true, value: "mysql", defaultVal: "sqlite", want: "mysql"},
+		{name: "set returns the value trimmed", set: true, value: "  mysql\t", defaultVal: "sqlite", want: "mysql"},
+		// Present-and-empty is a value, not an absence: os.LookupEnv reports it as set, so
+		// the default does not apply. An operator who writes GOIABADA_AUTHSERVER_LOG_FORMAT=
+		// has chosen the empty string.
+		{name: "set to empty is not the default", set: true, value: "", defaultVal: "sqlite", want: ""},
+		{name: "set to whitespace only is not the default", set: true, value: "   ", defaultVal: "sqlite", want: ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv(key, tt.value)
+			if !tt.set {
+				if err := os.Unsetenv(key); err != nil {
+					t.Fatalf("os.Unsetenv(%s) = %v", key, err)
+				}
+			}
+			if got := getEnv(key, tt.defaultVal); got != tt.want {
+				t.Errorf("getEnv(%s=%q, %q) = %q, want %q", key, tt.value, tt.defaultVal, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestGetEnvAsInt(t *testing.T) {
+	const key = "GOIABADA_TEST_PORT"
+
+	// Anything strconv.Atoi refuses falls back to the default rather than to zero, so a
+	// mistyped port leaves the server on the port it was shipped with instead of on port 0.
+	tests := []struct {
+		name  string
+		set   bool
+		value string
+		want  int
+	}{
+		{name: "unset returns the default", set: false, want: 9443},
+		{name: "a number", set: true, value: "8443", want: 8443},
+		{name: "a negative number", set: true, value: "-1", want: -1},
+		{name: "whitespace is trimmed", set: true, value: "  8443  ", want: 8443},
+		{name: "empty falls back", set: true, value: "", want: 9443},
+		{name: "non-numeric falls back", set: true, value: "https", want: 9443},
+		{name: "a decimal falls back", set: true, value: "8443.0", want: 9443},
+		{name: "an overflowing number falls back", set: true, value: "99999999999999999999", want: 9443},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv(key, tt.value)
+			if !tt.set {
+				if err := os.Unsetenv(key); err != nil {
+					t.Fatalf("os.Unsetenv(%s) = %v", key, err)
+				}
+			}
+			if got := getEnvAsInt(key, 9443); got != tt.want {
+				t.Errorf("getEnvAsInt(%s=%q, 9443) = %d, want %d", key, tt.value, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestGetEnvAsInt64(t *testing.T) {
+	const key = "GOIABADA_TEST_MAX_SIZE"
+	const defaultVal = int64(3 * 1024 * 1024)
+
+	tests := []struct {
+		name  string
+		set   bool
+		value string
+		want  int64
+	}{
+		{name: "unset returns the default", set: false, want: defaultVal},
+		{name: "a number", set: true, value: "5242880", want: 5242880},
+		// The reason this one is int64 rather than int: a size beyond the 32-bit range.
+		{name: "a number beyond 32 bits", set: true, value: "4294967296", want: 4294967296},
+		{name: "whitespace is trimmed", set: true, value: " 5242880 ", want: 5242880},
+		{name: "empty falls back", set: true, value: "", want: defaultVal},
+		{name: "non-numeric falls back", set: true, value: "3MB", want: defaultVal},
+		{name: "an overflowing number falls back", set: true, value: "99999999999999999999", want: defaultVal},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv(key, tt.value)
+			if !tt.set {
+				if err := os.Unsetenv(key); err != nil {
+					t.Fatalf("os.Unsetenv(%s) = %v", key, err)
+				}
+			}
+			if got := getEnvAsInt64(key, defaultVal); got != tt.want {
+				t.Errorf("getEnvAsInt64(%s=%q, %d) = %d, want %d", key, tt.value, defaultVal, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestGetEnvAsBool(t *testing.T) {
+	const key = "GOIABADA_TEST_TRUST_PROXY_HEADERS"
+
+	// getEnvAsBool can only ever express default-false: anything unparseable is false, which
+	// is the safe answer for every setting that reaches it (each one turns something on).
+	// A setting whose default is true goes through getEnvAsBoolDefault instead (#293).
+	tests := []struct {
+		name  string
+		set   bool
+		value string
+		want  bool
+	}{
+		{name: "unset is false", set: false, want: false},
+		{name: `"true"`, set: true, value: "true", want: true},
+		{name: `"1"`, set: true, value: "1", want: true},
+		{name: `"T"`, set: true, value: "T", want: true},
+		{name: `"false"`, set: true, value: "false", want: false},
+		{name: "whitespace is trimmed", set: true, value: " true ", want: true},
+		{name: "empty is false", set: true, value: "", want: false},
+		// It reads as an affirmative and is not one, which is the case worth pinning: an
+		// operator writing yes gets the setting off.
+		{name: `"yes" is not parseable, so false`, set: true, value: "yes", want: false},
+		{name: `"maybe" is not parseable, so false`, set: true, value: "maybe", want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv(key, tt.value)
+			if !tt.set {
+				if err := os.Unsetenv(key); err != nil {
+					t.Fatalf("os.Unsetenv(%s) = %v", key, err)
+				}
+			}
+			if got := getEnvAsBool(key); got != tt.want {
+				t.Errorf("getEnvAsBool(%s=%q) = %v, want %v", key, tt.value, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestIsCookieSecure(t *testing.T) {
 	// Secure is derived solely from the base URL scheme (there is no override).
 	tests := []struct {
