@@ -9,7 +9,6 @@ import (
 
 	"github.com/leodip/goiabada/core/errs"
 
-	"github.com/leodip/goiabada/core/config"
 	"github.com/leodip/goiabada/core/data/commondb"
 	"github.com/leodip/goiabada/core/data/migrator"
 	"github.com/leodip/goiabada/core/data/mssqldb"
@@ -553,7 +552,26 @@ type MigratorProvider interface {
 // It exists so that the `migrate` subcommand can reach an engine's migrator without the schema
 // being brought to head first, which is what NewDatabase does and what makes NewDatabase useless
 // for a rollback. Every other caller wants NewDatabase (#268).
-func OpenDatabase(dbConfig *config.DatabaseConfig, logSQL bool) (Database, error) {
+// DatabaseConfig is everything core/data needs to open a database, declared here rather than
+// read out of a process's configuration package. Each engine package declares the same shape for
+// itself, and OpenDatabase maps into whichever one the Type names; this is the copy the callers
+// fill in.
+//
+// It is core/data's own because core cannot read a process's configuration: the auth server owns
+// the GOIABADA_DB_* variables and the five call sites map their values in, so nothing under core/
+// has to know where they came from (#351). The engine switch that reads Type is #353's to move.
+type DatabaseConfig struct {
+	Type     string
+	Username string
+	Password string
+	Host     string
+	Port     int
+	Name     string
+	DSN      string
+	Create   bool
+}
+
+func OpenDatabase(dbConfig *DatabaseConfig, logSQL bool) (Database, error) {
 	var database Database
 	var err error
 
@@ -625,7 +643,15 @@ func OpenDatabase(dbConfig *config.DatabaseConfig, logSQL bool) (Database, error
 	return database, nil
 }
 
-func NewDatabase(dbConfig *config.DatabaseConfig, logSQL bool) (Database, error) {
+// NewDatabase opens the configured database, refuses it if the stored email addresses cannot
+// survive migration 000047, brings the schema to head and then runs the startup data tasks.
+//
+// The two data-encryption keys are parameters rather than reads of a configuration singleton, for
+// the reason DatabaseConfig is declared here (#351), and with the side effect that the refusal
+// below is now one call away from a test rather than unreachable. aesKey is required and must be
+// 32 bytes; previousAESKey is optional and is acted on only at that length, by the env-to-env
+// rotation inside runStartupDataTasks.
+func NewDatabase(dbConfig *DatabaseConfig, aesKey []byte, previousAESKey []byte, logSQL bool) (Database, error) {
 	database, err := OpenDatabase(dbConfig, logSQL)
 	if err != nil {
 		return nil, err
@@ -644,12 +670,11 @@ func NewDatabase(dbConfig *config.DatabaseConfig, logSQL bool) (Database, error)
 	// co-located with the ciphertext. It is validated fatally in each app's main
 	// before this point; guard here too so any entry path (including tests) fails
 	// closed rather than encrypting with a bad key.
-	envKey := config.GetAESEncryptionKey()
-	if len(envKey) != 32 {
+	if len(aesKey) != 32 {
 		return nil, errs.New("GOIABADA_AES_ENCRYPTION_KEY must be set to a 32-byte hex key")
 	}
 
-	if err := runStartupDataTasks(database, envKey, config.GetAESEncryptionKeyPrevious()); err != nil {
+	if err := runStartupDataTasks(database, aesKey, previousAESKey); err != nil {
 		return nil, err
 	}
 

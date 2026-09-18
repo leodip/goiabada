@@ -42,7 +42,8 @@ func secondDatabase(t *testing.T) data.Database {
 	t.Helper()
 
 	secondHandleOnce.Do(func() {
-		secondHandle, secondHandleErr = data.NewDatabase(config.GetDatabase(), false)
+		secondHandle, secondHandleErr = data.NewDatabase(dataDatabaseConfig(),
+			config.GetAESEncryptionKey(), config.GetAESEncryptionKeyPrevious(), false)
 	})
 
 	require.NoError(t, secondHandleErr, "opening a second database handle")
