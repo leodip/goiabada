@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/config"
 	"github.com/stretchr/testify/assert"
 )
 

@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leodip/goiabada/core/config"
+	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/core/data/mssqldb"
 	"github.com/leodip/goiabada/core/data/mysqldb"
 	"github.com/leodip/goiabada/core/data/postgresdb"

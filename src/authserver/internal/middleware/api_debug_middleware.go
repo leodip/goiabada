@@ -11,7 +11,7 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/leodip/goiabada/core/config"
+	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/logging"
 	// Aliased because this file's own package is named middleware.

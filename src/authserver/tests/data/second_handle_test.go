@@ -4,7 +4,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/leodip/goiabada/core/config"
+	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/stretchr/testify/require"
 )
@@ -42,7 +42,7 @@ func secondDatabase(t *testing.T) data.Database {
 	t.Helper()
 
 	secondHandleOnce.Do(func() {
-		secondHandle, secondHandleErr = data.NewDatabase(dataDatabaseConfig(),
+		secondHandle, secondHandleErr = data.NewDatabase(config.GetDataDatabaseConfig(),
 			config.GetAESEncryptionKey(), config.GetAESEncryptionKeyPrevious(), false)
 	})
 

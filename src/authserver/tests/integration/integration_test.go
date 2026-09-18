@@ -6,7 +6,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/leodip/goiabada/core/config"
+	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/i18n"
@@ -46,17 +46,8 @@ func TestMain(m *testing.M) {
 	}
 
 	var err error
-	dbConfig := config.GetDatabase()
-	database, err = data.NewDatabase(&data.DatabaseConfig{
-		Type:     dbConfig.Type,
-		Username: dbConfig.Username,
-		Password: dbConfig.Password,
-		Host:     dbConfig.Host,
-		Port:     dbConfig.Port,
-		Name:     dbConfig.Name,
-		DSN:      dbConfig.DSN,
-		Create:   dbConfig.Create,
-	}, config.GetAESEncryptionKey(), config.GetAESEncryptionKeyPrevious(), false)
+	database, err = data.NewDatabase(config.GetDataDatabaseConfig(),
+		config.GetAESEncryptionKey(), config.GetAESEncryptionKeyPrevious(), false)
 	if err != nil {
 		panic(err)
 	}

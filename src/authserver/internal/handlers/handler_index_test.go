@@ -7,7 +7,7 @@ import (
 
 	mocks_handlerhelpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
 
-	"github.com/leodip/goiabada/core/config"
+	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/stretchr/testify/assert"
 )
 

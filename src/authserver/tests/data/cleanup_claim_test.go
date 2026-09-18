@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leodip/goiabada/core/config"
+	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/core/models"
 )
 
