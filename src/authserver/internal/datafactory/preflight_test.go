@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/data/migrator"
 	mocks_data "github.com/leodip/goiabada/core/data/mocks"
 	"github.com/leodip/goiabada/core/models"
@@ -184,4 +185,25 @@ func TestCheckEmailCaseBeforeMigrating_AScanFailureIsFatal(t *testing.T) {
 	assert.Contains(t, err.Error(), "unable to read stored email addresses",
 		"the message must name what failed: this is the only thing the operator is told")
 	assert.ErrorIs(t, err, boom, "the cause must survive, or the storage failure is invisible under a message about email")
+}
+
+// TestPreflightEmailCase_PassesADatabaseWithNoMigrator covers preflightEmailCase's one leniency:
+// a handle that cannot produce a migrator is passed rather than refused.
+//
+// It is deliberate and therefore earns a case. The recorded version is what decides whether the
+// check runs at all, and a database that cannot say what version it is at cannot be judged; every
+// production handle is one of the four engines and does implement MigratorProvider, so the arm is
+// reached only by a substitute, which is exactly what a generated mock of data.Database is. If
+// someone puts NewMigrator on the Database interface, this case goes red and says so rather than
+// quietly starting to exercise the other arms against a mock.
+func TestPreflightEmailCase_PassesADatabaseWithNoMigrator(t *testing.T) {
+	db := mocks_data.NewDatabase(t)
+
+	var _ data.Database = db
+	_, isProvider := any(db).(MigratorProvider)
+	require.False(t, isProvider,
+		"the mock must not implement MigratorProvider, or this test exercises the migrator arm while claiming to cover the leniency")
+
+	assert.NoError(t, preflightEmailCase(db),
+		"a database that cannot produce a migrator is passed, because the recorded version is what decides whether the check applies")
 }
