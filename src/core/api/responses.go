@@ -651,6 +651,17 @@ type GetAuditLogsResponse struct {
 	Size      int                `json:"size"`
 }
 
+// GetAuditEventTypesResponse is the catalog of every audit event name this server can write,
+// which is what the auditEvent filter on GET /api/v1/admin/audit-logs accepts. It is a fixed
+// list rather than the distinct values present in the table: a filter offering only what has
+// already happened cannot express "show me the ones that have not".
+//
+// It is its own route rather than a field on GetAuditLogsResponse because that response is
+// paginated and filtered, so the catalog would ride on every page of every query (#351).
+type GetAuditEventTypesResponse struct {
+	AuditEventTypes []string `json:"auditEventTypes"`
+}
+
 // The browser session endpoint's response bodies (#266). See the request types for why
 // there is no owner anywhere in this contract.
 

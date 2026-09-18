@@ -62,7 +62,7 @@ func TestAuditEventTypes_NonEmpty(t *testing.T) {
 
 // TestAuditEventTypes_Count acts as a drift guard - update expected count when adding/removing audit events
 func TestAuditEventTypes_Count(t *testing.T) {
-	expectedCount := 104
+	expectedCount := 100
 	actualCount := len(AuditEventTypes)
 
 	require.Equal(t, expectedCount, actualCount,
@@ -143,7 +143,6 @@ func TestAuditEventTypes_MatchesConstants(t *testing.T) {
 		AuditAuthFailedPwd,
 		AuditAuthSuccessOtp,
 		AuditAuthSuccessPwd,
-		AuditAutoRefreshedToken,
 		AuditBumpedUserSession,
 		AuditChangedPassword,
 		AuditCreatedAuthCode,
@@ -189,7 +188,6 @@ func TestAuditEventTypes_MatchesConstants(t *testing.T) {
 		AuditRotatedKeys,
 		AuditSavedConsent,
 		AuditSentEmailVerificationMessage,
-		AuditSentPhoneVerificationMessage,
 		AuditSentTestEmail,
 		AuditStartedNewUserSesson,
 		AuditTerminatedUserSession,
@@ -218,7 +216,6 @@ func TestAuditEventTypes_MatchesConstants(t *testing.T) {
 		AuditUpdatedResource,
 		AuditUpdatedResourcePermissions,
 		AuditUpdatedSessionsSettings,
-		AuditUpdatedSMSSettings,
 		AuditUpdatedSMTPSettings,
 		AuditUpdatedTokensSettings,
 		AuditUpdatedUIThemeSettings,
@@ -235,7 +232,6 @@ func TestAuditEventTypes_MatchesConstants(t *testing.T) {
 		AuditUserDisabled,
 		AuditUserRemovedFromGroup,
 		AuditVerifiedEmail,
-		AuditVerifiedPhone,
 	}
 
 	constantsMap := make(map[string]bool)

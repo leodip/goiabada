@@ -188,6 +188,16 @@ func HandleAdminSettingsAuditLogViewerGet(
 			}
 		}
 
+		// The filter dropdown's options come from the auth server, which owns the event names
+		// and is the only process that writes them. Compiling the list in here would let the
+		// two binaries disagree after a partial upgrade, offering a filter value the server
+		// never writes or omitting one it does (#351).
+		eventTypesResp, err := apiClient.GetAuditEventTypes(jwtInfo.TokenResponse.AccessToken)
+		if err != nil {
+			handlers.HandleAPIError(httpHelper, w, r, err)
+			return
+		}
+
 		pageResult := AuditLogsPageResult{
 			AuditLogs:  auditLogsResp.AuditLogs,
 			Total:      auditLogsResp.Total,
@@ -205,7 +215,7 @@ func HandleAdminSettingsAuditLogViewerGet(
 			"selectedEvent":     auditEvent,
 			"selectedRequestId": requestId,
 			"paginatorLink":     auditLogViewerLink(auditEvent, requestId),
-			"auditEventTypes":   constants.AuditEventTypes,
+			"auditEventTypes":   eventTypesResp.AuditEventTypes,
 		}
 
 		err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_settings_audit_log_viewer.html", bind)

@@ -183,7 +183,6 @@ const (
 	AuditUpdatedSMTPSettings          = "updated_smtp_settings"
 	AuditUpdatedGeneralSettings       = "updated_general_settings"
 	AuditUpdatedSessionsSettings      = "updated_sessions_settings"
-	AuditUpdatedSMSSettings           = "updated_sms_settings"
 	AuditUpdatedTokensSettings        = "updated_tokens_settings"
 	AuditUpdatedUIThemeSettings       = "updated_ui_theme_settings"
 	AuditUpdatedAuditLogsSettings     = "updated_audit_logs_settings"
@@ -208,8 +207,6 @@ const (
 	AuditSentEmailVerificationMessage = "sent_email_verification_message"
 	AuditFailedEmailVerificationCode  = "failed_email_verification_code"
 	AuditFailedResetPasswordCode      = "failed_reset_password_code"
-	AuditVerifiedPhone                = "verified_phone"
-	AuditSentPhoneVerificationMessage = "sent_phone_verification_message"
 	AuditChangedPassword              = "changed_password"
 	// AuditRevokedUserAuthState records that a credential change invalidated a user's live
 	// authentication state: their generation advanced, their sessions were terminated and their
@@ -288,7 +285,6 @@ const (
 
 	AuditEnabledOTP                     = "enabled_otp"
 	AuditDisabledOTP                    = "disabled_otp"
-	AuditAutoRefreshedToken             = "auto_refreshed_token"
 	AuditSentTestEmail                  = "sent_test_email"
 	AuditUpdatedUserProfilePicture      = "updated_user_profile_picture"
 	AuditDeletedUserProfilePicture      = "deleted_user_profile_picture"
@@ -364,7 +360,6 @@ var AuditEventTypes = []string{
 	AuditAuthFailedPwd,
 	AuditAuthSuccessOtp,
 	AuditAuthSuccessPwd,
-	AuditAutoRefreshedToken,
 	AuditBumpedUserSession,
 	AuditChangedPassword,
 	AuditCreatedAuthCode,
@@ -410,7 +405,6 @@ var AuditEventTypes = []string{
 	AuditRotatedKeys,
 	AuditSavedConsent,
 	AuditSentEmailVerificationMessage,
-	AuditSentPhoneVerificationMessage,
 	AuditSentTestEmail,
 	AuditStartedNewUserSesson,
 	AuditTerminatedUserSession,
@@ -439,7 +433,6 @@ var AuditEventTypes = []string{
 	AuditUpdatedResource,
 	AuditUpdatedResourcePermissions,
 	AuditUpdatedSessionsSettings,
-	AuditUpdatedSMSSettings,
 	AuditUpdatedSMTPSettings,
 	AuditUpdatedTokensSettings,
 	AuditUpdatedUIThemeSettings,
@@ -456,5 +449,4 @@ var AuditEventTypes = []string{
 	AuditUserDisabled,
 	AuditUserRemovedFromGroup,
 	AuditVerifiedEmail,
-	AuditVerifiedPhone,
 }

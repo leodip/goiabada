@@ -101,6 +101,7 @@ type ApiClient interface {
 	GetSettingsAuditLogs(accessToken string) (*api.SettingsAuditLogsResponse, error)
 	UpdateSettingsAuditLogs(accessToken string, request *api.UpdateSettingsAuditLogsRequest) (*api.SettingsAuditLogsResponse, error)
 	GetAuditLogsPaginated(accessToken string, page, pageSize int, auditEvent string, requestId string) (*api.GetAuditLogsResponse, error)
+	GetAuditEventTypes(accessToken string) (*api.GetAuditEventTypesResponse, error)
 	// Account (self-service)
 	GetAccountProfile(accessToken string) (*api.UserResponse, error)
 	UpdateAccountProfile(accessToken string, request *api.UpdateUserProfileRequest) (*api.UserResponse, error)
