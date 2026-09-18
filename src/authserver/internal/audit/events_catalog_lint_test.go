@@ -45,6 +45,12 @@ import (
 // auditCatalogFile is the one file holding both lists, relative to the source root, forward
 // slashes. Splitting them across files is not an extension point: the guard's whole claim is
 // that the two edits an event needs are next to each other and checked together.
+//
+// That claim is checked rather than stated, by auditDeclarationsOutsideTheCatalogFile below.
+// Without it the scope is the hole: an Audit* constant declared in any other file of this
+// package is compared against nothing, so it can be emitted and absent from the catalog with
+// every comparison here passing -- which is exactly the #209 defect, surviving inside the guard
+// written to close it.
 const auditCatalogFile = "authserver/internal/audit/events.go"
 
 // auditCatalogSource is what one parse of that file yields: the Audit* constants it declares,
@@ -146,6 +152,66 @@ func stringLiteralValue(e ast.Expr) (string, bool) {
 	return value, true
 }
 
+// auditDeclarationsOutsideTheCatalogFile reads every other production Go file in the audit
+// package and returns the Audit* string declarations they carry, "file: Name" apiece, alongside
+// the names of the files it read.
+//
+// It returns what it scanned because an empty finding here is indistinguishable from a walk that
+// reached nothing: the directory moving, or the suffix test going wrong, would leave this
+// reporting no declarations outside the catalog file forever, which is the passing answer.
+// TestAuditCatalog_TheSiblingScanReadsTheRestOfThePackage holds it to having read the real
+// package's other file.
+//
+// Consts and vars alike, because the prefix is what makes a name an audit event here and a
+// mutable one would escape a const-only scan for no reason. Test files are excluded: this file's
+// own fixtures declare Audit* constants inside string literals, and a fixture is not a
+// declaration the binary carries.
+func auditDeclarationsOutsideTheCatalogFile(dir, catalogFile string) (scanned []string, outside []string, err error) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	fset := token.NewFileSet()
+	for _, entry := range entries {
+		name := entry.Name()
+		if entry.IsDir() || !strings.HasSuffix(name, ".go") ||
+			strings.HasSuffix(name, "_test.go") || name == catalogFile {
+			continue
+		}
+		scanned = append(scanned, name)
+
+		f, parseErr := parser.ParseFile(fset, filepath.Join(dir, name), nil, 0)
+		if parseErr != nil {
+			return scanned, nil, parseErr
+		}
+		for _, decl := range f.Decls {
+			gen, ok := decl.(*ast.GenDecl)
+			if !ok || (gen.Tok != token.CONST && gen.Tok != token.VAR) {
+				continue
+			}
+			for _, spec := range gen.Specs {
+				vs, ok := spec.(*ast.ValueSpec)
+				if !ok {
+					continue
+				}
+				for i, ident := range vs.Names {
+					if !strings.HasPrefix(ident.Name, "Audit") || i >= len(vs.Values) {
+						continue
+					}
+					if _, ok := stringLiteralValue(vs.Values[i]); !ok {
+						continue
+					}
+					outside = append(outside, name+": "+ident.Name)
+				}
+			}
+		}
+	}
+
+	sort.Strings(outside)
+	return scanned, outside, nil
+}
+
 // TestAuditCatalog_MatchesTheDeclarations holds the real file to the rule, and the compiled
 // AuditEventTypes to the file.
 func TestAuditCatalog_MatchesTheDeclarations(t *testing.T) {
@@ -178,6 +244,24 @@ func assertAuditCatalogComplete(r testutil.Reporter, path string, compiled []str
 	}
 	if len(src.catalogued) == 0 {
 		r.Fatalf("parsed no AuditEventTypes entries out of %s", path)
+	}
+
+	// The declarations the parse above cannot see, because they are in another file. Reported
+	// before the comparisons rather than folded into them: the answer is to move the constant
+	// beside the catalog, not to add it to a catalog the guard would then be reading out of two
+	// places.
+	_, outside, err := auditDeclarationsOutsideTheCatalogFile(filepath.Dir(path), filepath.Base(path))
+	if err != nil {
+		r.Fatalf("reading the audit package beside %s: %v", path, err)
+	}
+	if len(outside) > 0 {
+		r.Errorf("%d Audit* declaration(s) in the audit package but outside %s:\n\t%s\n\n"+
+			"Every audit event name is declared beside AuditEventTypes, because that is the only "+
+			"way one guard can hold the two edits an event needs to each other: a name declared "+
+			"elsewhere is emitted, written to audit_logs, and absent from the filter dropdown "+
+			"with nothing going red. Move it into %s. If it is not an event name, it does not "+
+			"belong under the Audit prefix in this package (#209).",
+			len(outside), auditCatalogFile, strings.Join(outside, "\n\t"), auditCatalogFile)
 	}
 
 	inCatalog := map[string]bool{}
@@ -452,4 +536,94 @@ var AuditEventTypes = []string{
 	assert.Contains(t, report.Text(), "no Audit* declaration beside them")
 	assert.Contains(t, report.Text(), "AuditAuthFailedPwd")
 	assert.Contains(t, report.Text(), "absent from AuditEventTypes")
+}
+
+// auditSiblingFixture writes another production file beside a fixture events.go, which is the
+// one shape the parse of events.go alone cannot see.
+func auditSiblingFixture(t *testing.T, catalogPath, name, src string) {
+	t.Helper()
+	require.NoError(t, os.WriteFile(filepath.Join(filepath.Dir(catalogPath), name), []byte(src), 0o644))
+}
+
+// TestAuditCatalog_TheGuardFailsOnADeclarationOutsideTheCatalogFile is the #209 defect in the
+// one place this guard could not see it: the constant added to another file of the package, the
+// catalog entry forgotten, and every comparison over events.go passing because the declaration
+// was never in the set being compared.
+func TestAuditCatalog_TheGuardFailsOnADeclarationOutsideTheCatalogFile(t *testing.T) {
+	path := auditCatalogFixture(t, `package audit
+
+const (
+	AuditAuthFailedPwd = "auth_failed_pwd"
+)
+
+var AuditEventTypes = []string{
+	AuditAuthFailedPwd,
+}
+`)
+	auditSiblingFixture(t, path, "audit.go", `package audit
+
+const AuditForgottenOutsideEvents = "forgotten_outside_events"
+`)
+
+	report := testutil.RunGuard(func(r testutil.Reporter) {
+		assertAuditCatalogComplete(r, path, []string{"auth_failed_pwd"})
+	})
+
+	require.True(t, report.Failed(), "a declaration outside the catalog file passed the guard")
+	assert.False(t, report.Stopped, "a finding is an Errorf, not a Fatalf")
+	assert.Contains(t, report.Text(), "audit.go: AuditForgottenOutsideEvents")
+	assert.Contains(t, report.Text(), "outside")
+	// The two same-file comparisons have nothing to say about it, so it must not be reported as
+	// a name the catalog is missing as well: the fix is to move it, not to list it twice.
+	assert.NotContains(t, report.Text(), "absent from AuditEventTypes")
+}
+
+// TestAuditCatalog_TheSiblingScanPassesAPackageWhoseOtherFilesDeclareNoEvents is the other half:
+// without it a scan that flagged everything would satisfy the case above. audit.go really does
+// declare AuditLogger, so a rule reading "any Audit* name" rather than "any Audit* name bound to
+// a string" would fail the real package on the type that gives the package its purpose.
+func TestAuditCatalog_TheSiblingScanPassesAPackageWhoseOtherFilesDeclareNoEvents(t *testing.T) {
+	path := auditCatalogFixture(t, `package audit
+
+const (
+	AuditAuthFailedPwd = "auth_failed_pwd"
+)
+
+var AuditEventTypes = []string{
+	AuditAuthFailedPwd,
+}
+`)
+	auditSiblingFixture(t, path, "audit.go", `package audit
+
+type AuditLogger struct{}
+
+const auditQueueDepth = 100
+
+func AuditNothing() string { return "not a declaration" }
+`)
+	auditSiblingFixture(t, path, "audit_helpers_test.go", `package audit
+
+const AuditOnlyInATestFile = "only_in_a_test_file"
+`)
+
+	report := testutil.RunGuard(func(r testutil.Reporter) {
+		assertAuditCatalogComplete(r, path, []string{"auth_failed_pwd"})
+	})
+
+	assert.False(t, report.Failed(), "a package with no event declared outside the catalog file failed the guard: %s", report.Text())
+}
+
+// TestAuditCatalog_TheSiblingScanReadsTheRestOfThePackage is the walk that reached nothing. The
+// scan reports an absence, and an absence is what a walk that read no files reports too, so
+// without this the directory moving under it would leave it passing forever.
+func TestAuditCatalog_TheSiblingScanReadsTheRestOfThePackage(t *testing.T) {
+	dir := filepath.Dir(filepath.Join(testutil.SourceRoot(t), filepath.FromSlash(auditCatalogFile)))
+
+	scanned, outside, err := auditDeclarationsOutsideTheCatalogFile(dir, "events.go")
+
+	require.NoError(t, err)
+	assert.Contains(t, scanned, "audit.go", "the scan read no production file beside events.go")
+	assert.NotContains(t, scanned, "events.go", "the catalog file is parsed by the comparison above, not by this scan")
+	assert.NotContains(t, scanned, "events_test.go", "a test file is not a declaration the binary carries")
+	assert.Empty(t, outside, "the audit event names all belong in events.go")
 }

@@ -54,7 +54,7 @@ See [REST API › Audit log settings](/integration/rest-api/#audit-log-settings)
 
 ## Event format
 
-Every audit event has a stable string identifier (such as `token_issued_authorization_code_response`, `user_login`, or `deleted_user_session_client`) and a JSON details payload describing the actors and parameters involved. The full set of event identifiers is defined in `src/core/constants/constants.go`.
+Every audit event has a stable string identifier (such as `token_issued_authorization_code_response`, `user_login`, or `deleted_user_session_client`) and a JSON details payload describing the actors and parameters involved. The full set of event identifiers is defined in `src/authserver/internal/audit/events.go`.
 
 In the database, each row of the `audit_logs` table stores:
 
