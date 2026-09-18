@@ -1,0 +1,14 @@
+-- Lowercase every stored users.email (#221, #283, #351). See the sqlite migration of the same
+-- number for why this repair is a migration now rather than the Go startup pass it replaces, why
+-- no account is disabled by it, and what the pre-flight refuses before the chain runs.
+--
+-- The predicate depends on the collation 000040 installs. users.email is utf8mb4_0900_as_cs from
+-- that migration onward, so `<>` is case-sensitive and this statement selects the legacy rows.
+-- Under the folding collation this table carried before 000040, `email <> LOWER(email)` is false
+-- for every row and this would be a silent no-op, which is why the number is above it.
+--
+-- MySQL's LOWER() is Unicode-aware at this collation: measured against the dev stack it agrees
+-- with Go's strings.ToLower on U+00C4, U+0130, U+0391, U+1E9E and U+212A, which are the
+-- characters SQLite and SQL Server disagree on. The pre-flight checks it anyway, on every engine,
+-- because agreeing today is not the same claim as agreeing after a collation change.
+UPDATE `users` SET `email` = LOWER(`email`) WHERE `email` <> LOWER(`email`);

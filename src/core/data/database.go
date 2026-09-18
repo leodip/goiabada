@@ -34,14 +34,13 @@ type Database interface {
 	RunInTransaction(fn func(tx *sql.Tx) error) error
 	Migrate() error
 	BackfillEncryptedOTPSecrets(aesKey []byte) (int, error)
-	// BackfillLowercaseEmails brings every stored users.email down to its lowercase form,
-	// so a credential path that lowercases the address it was given can reach the row, on
-	// every engine rather than only the two that fold case in "=" (#221, #283). Where two
-	// rows differ only by case one survives, lowercased, and the rest are disabled with
-	// their address intact, their authentication generation advanced and their sessions
-	// and refresh tokens gone, in one transaction each (#106's invariant for any
-	// enabled-to-disabled transition). Returns rows lowercased and rows disabled.
-	BackfillLowercaseEmails() (int, int, error)
+	// ScanEmailCase reads every users row as its id, its stored address and that address as
+	// THIS engine's own LOWER() reduces it, which is the read behind the startup pre-flight
+	// (CheckEmailCaseBeforeMigrating). It compares nothing: the engines disagree about what
+	// LOWER() means and the rule is Go's strings.ToLower, so the comparison is the caller's
+	// (#351). It replaced BackfillLowercaseEmails, which repaired the data at startup rather
+	// than refusing to migrate it.
+	ScanEmailCase() ([]models.EmailCaseRow, error)
 	ReencryptDataToNewKey(oldKey, newKey []byte) error
 	RotateEncryptionKeyIfNeeded(currentKey, previousKey []byte) (bool, error)
 	IsEmpty() (bool, error)
@@ -632,6 +631,10 @@ func NewDatabase(dbConfig *config.DatabaseConfig, logSQL bool) (Database, error)
 		return nil, err
 	}
 
+	if err := preflightEmailCase(database); err != nil {
+		return nil, err
+	}
+
 	err = database.Migrate()
 	if err != nil {
 		return nil, err
@@ -653,10 +656,44 @@ func NewDatabase(dbConfig *config.DatabaseConfig, logSQL bool) (Database, error)
 	return database, nil
 }
 
+// preflightEmailCase reads where this database stands and hands the answer to
+// CheckEmailCaseBeforeMigrating, which is where the policy and every test live. It is the
+// startup half of that check; the `migrate to` subcommand has the other, because it reaches
+// OpenDatabase directly and never comes through here (#351).
+//
+// A database that cannot produce a migrator is passed rather than refused. Every engine type
+// implements NewMigrator, so the only way to land here is a new engine that did not, which
+// database.Migrate() is about to fail on anyway with a message about migrating rather than about
+// email addresses.
+func preflightEmailCase(database Database) error {
+	provider, ok := database.(MigratorProvider)
+	if !ok {
+		return nil
+	}
+
+	m, err := provider.NewMigrator()
+	if err != nil {
+		return errs.Wrap(err, "unable to prepare the migration runner for the email case pre-flight")
+	}
+
+	recorded, _, err := m.Version()
+	if migrator.IsNilVersion(err) {
+		recorded = migrator.NilVersion
+	} else if err != nil {
+		// A dirty database reports its version without error, so this is a read that failed. The
+		// migration about to run would fail on the same handle; say which read it was.
+		return errs.Wrap(err, "unable to read the schema version for the email case pre-flight")
+	}
+
+	// NewDatabase always migrates to head, so head is the target.
+	return CheckEmailCaseBeforeMigrating(database, recorded, m.Head())
+}
+
 // runStartupDataTasks is everything that has to happen to the stored data after the migration
 // chain and before either application serves a request: the one-shot move of the data key out
-// of the database, an optional env-to-env key rotation, the TOTP secret encryption pass (#82)
-// and the email lowercase pass (#221, #283).
+// of the database, an optional env-to-env key rotation, and the TOTP secret encryption pass
+// (#82). The email lowercase pass was the fourth until #351 made it migration 000047 and a
+// pre-flight that runs BEFORE the chain rather than after it.
 //
 // EVERY ONE OF THEM IS FAIL-CLOSED, and that is the property this function exists to make
 // testable rather than merely true. Each returns an error that must stop startup, because each
@@ -710,23 +747,6 @@ func runStartupDataTasks(database Database, envKey []byte, previousKey []byte) e
 	}
 	if migrated > 0 {
 		slog.Info("encrypted legacy plaintext otp secrets at rest", "count", migrated)
-	}
-
-	// Lowercase any legacy mixed-case email addresses (issues #221 and #283). Fail-closed and
-	// idempotent, and a no-op on a fresh DB. It runs here, after the migration chain and before
-	// either application serves, because the alternative is a window in which a row's address
-	// cannot be matched by the lowercased value every credential path looks it up with.
-	//
-	// Not a migration file: the rule is Go's strings.ToLower over the whole alphabet, and
-	// SQLite's SQL LOWER() maps ASCII only, so the same statement would mean two different
-	// things on four engines.
-	lowercased, disabled, err := database.BackfillLowercaseEmails()
-	if err != nil {
-		return errs.Wrap(err, "failed to lowercase legacy user email addresses")
-	}
-	if lowercased > 0 || disabled > 0 {
-		slog.Info("lowercased legacy user email addresses", "lowercased", lowercased,
-			"disabled", disabled)
 	}
 
 	return nil

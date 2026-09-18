@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/data/migrator"
 	"github.com/leodip/goiabada/core/data/sqlitedb"
 )
@@ -19,7 +20,10 @@ import (
 // embedded migration set, which is what seam 3 asks for: the command observed against the runner
 // it will run against in production, not a double that agrees with it. A file rather than
 // :memory: because the migrations create and drop real objects across many statements.
-func newTestMigrator(t *testing.T) (*migrator.Migrator, *sql.DB) {
+//
+// It returns the data.Database as well, because runMigrate takes one from #351 onward: migrateTo
+// runs the email case pre-flight before an upward step, and that check reads the users table.
+func newTestMigrator(t *testing.T) (data.Database, *migrator.Migrator, *sql.DB) {
 	t.Helper()
 
 	path := filepath.Join(t.TempDir(), "migrate_test.db")
@@ -32,7 +36,7 @@ func newTestMigrator(t *testing.T) (*migrator.Migrator, *sql.DB) {
 
 	m, err := db.NewMigrator()
 	require.NoError(t, err)
-	return m, db.DB
+	return db, m, db.DB
 }
 
 // head is the highest version the embedded migration set carries, and headf the way this command
@@ -49,10 +53,10 @@ func headf(m *migrator.Migrator) string {
 }
 
 func TestMigrateVersion_NeverMigratedDatabase(t *testing.T) {
-	m, _ := newTestMigrator(t)
+	db, m, _ := newTestMigrator(t)
 	var out bytes.Buffer
 
-	code := runMigrate([]string{"version"}, m, rollbackFloor, &out)
+	code := runMigrate([]string{"version"}, db, m, rollbackFloor, &out)
 
 	require.Equal(t, 0, code)
 	assert.Contains(t, out.String(), "engine: sqlite")
@@ -61,11 +65,11 @@ func TestMigrateVersion_NeverMigratedDatabase(t *testing.T) {
 }
 
 func TestMigrateVersion_ReportsWhatTheDatabaseRecords(t *testing.T) {
-	m, _ := newTestMigrator(t)
+	db, m, _ := newTestMigrator(t)
 	require.NoError(t, m.Up())
 
 	var out bytes.Buffer
-	code := runMigrate([]string{"version"}, m, rollbackFloor, &out)
+	code := runMigrate([]string{"version"}, db, m, rollbackFloor, &out)
 
 	require.Equal(t, 0, code)
 	assert.Contains(t, out.String(), "the database records schema version "+headf(m))
@@ -75,12 +79,12 @@ func TestMigrateVersion_ReportsWhatTheDatabaseRecords(t *testing.T) {
 // A dirty database is exactly when an operator runs `migrate version` first, so it has to answer
 // there and say which of the two problems it is looking at.
 func TestMigrateVersion_AnnouncesADirtyDatabase(t *testing.T) {
-	m, sqlDB := newTestMigrator(t)
+	db, m, sqlDB := newTestMigrator(t)
 	require.NoError(t, m.Up())
 	markDirty(t, m, sqlDB, head(m))
 
 	var out bytes.Buffer
-	code := runMigrate([]string{"version"}, m, rollbackFloor, &out)
+	code := runMigrate([]string{"version"}, db, m, rollbackFloor, &out)
 
 	require.Equal(t, 0, code)
 	assert.Contains(t, out.String(), headf(m))
@@ -89,10 +93,10 @@ func TestMigrateVersion_AnnouncesADirtyDatabase(t *testing.T) {
 }
 
 func TestMigrateTo_StepsUpToTheHeadAndPrintsThePlan(t *testing.T) {
-	m, _ := newTestMigrator(t)
+	db, m, _ := newTestMigrator(t)
 	var out bytes.Buffer
 
-	code := runMigrate([]string{"to", strconv.Itoa(head(m))}, m, rollbackFloor, &out)
+	code := runMigrate([]string{"to", strconv.Itoa(head(m))}, db, m, rollbackFloor, &out)
 
 	require.Equal(t, 0, code, out.String())
 	assert.Contains(t, out.String(), "current schema version: none (never migrated)")
@@ -109,26 +113,26 @@ func TestMigrateTo_StepsUpToTheHeadAndPrintsThePlan(t *testing.T) {
 }
 
 func TestMigrateTo_AlreadyThereIsNotAFailure(t *testing.T) {
-	m, _ := newTestMigrator(t)
+	db, m, _ := newTestMigrator(t)
 	require.NoError(t, m.Up())
 
 	var out bytes.Buffer
-	code := runMigrate([]string{"to", headf(m)}, m, rollbackFloor, &out)
+	code := runMigrate([]string{"to", headf(m)}, db, m, rollbackFloor, &out)
 
 	require.Equal(t, 0, code)
 	assert.Contains(t, out.String(), "already at schema version "+headf(m))
 	assert.NotContains(t, out.String(), "migrations to run")
 }
 
-// The direction the command exists for. rollbackFloor sits one below the head, so the only step
-// down production allows is a single one; the floor is lowered here rather than in production so
-// that the plan asserted is a multi-step one, which is where the order and the listing matter.
+// The direction the command exists for. rollbackFloor sits just below the head, so the steps down
+// production allows are few; the floor is lowered here rather than in production so that the plan
+// asserted is a long multi-step one, which is where the order and the listing matter.
 func TestMigrateTo_StepsDownUnderALoweredFloor(t *testing.T) {
-	m, _ := newTestMigrator(t)
+	db, m, _ := newTestMigrator(t)
 	require.NoError(t, m.Up())
 
 	var out bytes.Buffer
-	code := runMigrate([]string{"to", "000041"}, m, 24, &out)
+	code := runMigrate([]string{"to", "000041"}, db, m, 24, &out)
 
 	require.Equal(t, 0, code, out.String())
 	assert.Contains(t, out.String(), "current schema version: "+headf(m))
@@ -137,7 +141,7 @@ func TestMigrateTo_StepsDownUnderALoweredFloor(t *testing.T) {
 	// versions THIS engine carries rather than a count: 000042 is a MySQL migration and SQLite
 	// steps straight from 000043 to 000041. Spelled out rather than derived, because the CHAIN
 	// is what is under test here: a migration added on one engine alone must not appear in it.
-	assert.Contains(t, out.String(), "migrations to run, in order: 000046, 000045, 000044, 000043\n")
+	assert.Contains(t, out.String(), "migrations to run, in order: 000047, 000046, 000045, 000044, 000043\n")
 	assert.Contains(t, out.String(), "now at schema version 000041")
 
 	version, dirty, err := m.Version()
@@ -150,10 +154,10 @@ func TestMigrateTo_StepsDownUnderALoweredFloor(t *testing.T) {
 func TestMigrateTo_AcceptsBareAndPaddedVersions(t *testing.T) {
 	for _, arg := range []string{"41", "000041"} {
 		t.Run(arg, func(t *testing.T) {
-			m, _ := newTestMigrator(t)
+			db, m, _ := newTestMigrator(t)
 			var out bytes.Buffer
 
-			code := runMigrate([]string{"to", arg}, m, rollbackFloor, &out)
+			code := runMigrate([]string{"to", arg}, db, m, rollbackFloor, &out)
 
 			// Below the floor, so refused, and the refusal names the number it parsed: 000041
 			// for both forms, which is what shows the padded one was not read as octal 33.
@@ -165,11 +169,11 @@ func TestMigrateTo_AcceptsBareAndPaddedVersions(t *testing.T) {
 }
 
 func TestMigrateTo_RefusesATargetBelowTheRollbackFloor(t *testing.T) {
-	m, _ := newTestMigrator(t)
+	db, m, _ := newTestMigrator(t)
 	require.NoError(t, m.Up())
 
 	var out bytes.Buffer
-	code := runMigrate([]string{"to", "30"}, m, rollbackFloor, &out)
+	code := runMigrate([]string{"to", "30"}, db, m, rollbackFloor, &out)
 
 	require.Equal(t, 1, code)
 	assert.Contains(t, out.String(), "000030")
@@ -184,11 +188,11 @@ func TestMigrateTo_RefusesATargetBelowTheRollbackFloor(t *testing.T) {
 }
 
 func TestMigrateTo_RefusesATargetAboveTheHead(t *testing.T) {
-	m, _ := newTestMigrator(t)
+	db, m, _ := newTestMigrator(t)
 	require.NoError(t, m.Up())
 
 	var out bytes.Buffer
-	code := runMigrate([]string{"to", "99"}, m, rollbackFloor, &out)
+	code := runMigrate([]string{"to", "99"}, db, m, rollbackFloor, &out)
 
 	require.Equal(t, 1, code)
 	assert.Contains(t, out.String(), "000099")
@@ -199,12 +203,12 @@ func TestMigrateTo_RefusesATargetAboveTheHead(t *testing.T) {
 // A dirty database is refused before the plan is printed, so nothing suggests the command is
 // about to run and the message is the runner's, which carries the two legal end states.
 func TestMigrateTo_RefusesADirtyDatabase(t *testing.T) {
-	m, sqlDB := newTestMigrator(t)
+	db, m, sqlDB := newTestMigrator(t)
 	require.NoError(t, m.Up())
 	markDirty(t, m, sqlDB, head(m))
 
 	var out bytes.Buffer
-	code := runMigrate([]string{"to", strconv.Itoa(head(m))}, m, rollbackFloor, &out)
+	code := runMigrate([]string{"to", strconv.Itoa(head(m))}, db, m, rollbackFloor, &out)
 
 	require.Equal(t, 1, code)
 	assert.Contains(t, out.String(), "dirty")
@@ -229,10 +233,10 @@ func TestRunMigrate_UsageRefusals(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			m, _ := newTestMigrator(t)
+			db, m, _ := newTestMigrator(t)
 			var out bytes.Buffer
 
-			code := runMigrate(c.args, m, rollbackFloor, &out)
+			code := runMigrate(c.args, db, m, rollbackFloor, &out)
 
 			// 2, not 1: a mistyped command and a database that refused need different
 			// responses, and the number is what a deployment script branches on. Asserted as

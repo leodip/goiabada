@@ -236,65 +236,6 @@ func (_c *Database_BackfillEncryptedOTPSecrets_Call) RunAndReturn(run func(aesKe
 	return _c
 }
 
-// BackfillLowercaseEmails provides a mock function for the type Database
-func (_mock *Database) BackfillLowercaseEmails() (int, int, error) {
-	ret := _mock.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for BackfillLowercaseEmails")
-	}
-
-	var r0 int
-	var r1 int
-	var r2 error
-	if returnFunc, ok := ret.Get(0).(func() (int, int, error)); ok {
-		return returnFunc()
-	}
-	if returnFunc, ok := ret.Get(0).(func() int); ok {
-		r0 = returnFunc()
-	} else {
-		r0 = ret.Get(0).(int)
-	}
-	if returnFunc, ok := ret.Get(1).(func() int); ok {
-		r1 = returnFunc()
-	} else {
-		r1 = ret.Get(1).(int)
-	}
-	if returnFunc, ok := ret.Get(2).(func() error); ok {
-		r2 = returnFunc()
-	} else {
-		r2 = ret.Error(2)
-	}
-	return r0, r1, r2
-}
-
-// Database_BackfillLowercaseEmails_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'BackfillLowercaseEmails'
-type Database_BackfillLowercaseEmails_Call struct {
-	*mock.Call
-}
-
-// BackfillLowercaseEmails is a helper method to define mock.On call
-func (_e *Database_Expecter) BackfillLowercaseEmails() *Database_BackfillLowercaseEmails_Call {
-	return &Database_BackfillLowercaseEmails_Call{Call: _e.mock.On("BackfillLowercaseEmails")}
-}
-
-func (_c *Database_BackfillLowercaseEmails_Call) Run(run func()) *Database_BackfillLowercaseEmails_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run()
-	})
-	return _c
-}
-
-func (_c *Database_BackfillLowercaseEmails_Call) Return(n int, n1 int, err error) *Database_BackfillLowercaseEmails_Call {
-	_c.Call.Return(n, n1, err)
-	return _c
-}
-
-func (_c *Database_BackfillLowercaseEmails_Call) RunAndReturn(run func() (int, int, error)) *Database_BackfillLowercaseEmails_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // BeginTransaction provides a mock function for the type Database
 func (_mock *Database) BeginTransaction() (*sql.Tx, error) {
 	ret := _mock.Called()
@@ -10986,6 +10927,61 @@ func (_c *Database_RunInTransaction_Call) Return(err error) *Database_RunInTrans
 }
 
 func (_c *Database_RunInTransaction_Call) RunAndReturn(run func(fn func(tx *sql.Tx) error) error) *Database_RunInTransaction_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ScanEmailCase provides a mock function for the type Database
+func (_mock *Database) ScanEmailCase() ([]models.EmailCaseRow, error) {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for ScanEmailCase")
+	}
+
+	var r0 []models.EmailCaseRow
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func() ([]models.EmailCaseRow, error)); ok {
+		return returnFunc()
+	}
+	if returnFunc, ok := ret.Get(0).(func() []models.EmailCaseRow); ok {
+		r0 = returnFunc()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]models.EmailCaseRow)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func() error); ok {
+		r1 = returnFunc()
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_ScanEmailCase_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ScanEmailCase'
+type Database_ScanEmailCase_Call struct {
+	*mock.Call
+}
+
+// ScanEmailCase is a helper method to define mock.On call
+func (_e *Database_Expecter) ScanEmailCase() *Database_ScanEmailCase_Call {
+	return &Database_ScanEmailCase_Call{Call: _e.mock.On("ScanEmailCase")}
+}
+
+func (_c *Database_ScanEmailCase_Call) Run(run func()) *Database_ScanEmailCase_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *Database_ScanEmailCase_Call) Return(emailCaseRows []models.EmailCaseRow, err error) *Database_ScanEmailCase_Call {
+	_c.Call.Return(emailCaseRows, err)
+	return _c
+}
+
+func (_c *Database_ScanEmailCase_Call) RunAndReturn(run func() ([]models.EmailCaseRow, error)) *Database_ScanEmailCase_Call {
 	_c.Call.Return(run)
 	return _c
 }

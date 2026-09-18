@@ -1,0 +1,13 @@
+-- Lowercase every stored users.email (#221, #283, #351). See the sqlite migration of the same
+-- number for why this repair is a migration now rather than the Go startup pass it replaces, why
+-- no account is disabled by it, and what the pre-flight refuses before the chain runs.
+--
+-- PostgreSQL has compared byte-wise all along and has no 000040 file, so this predicate has
+-- always meant what it says here. A mixed-case address on this engine cannot sign in today, and
+-- a collision between two case variants is representable and always has been: the pre-flight is
+-- what refuses one rather than this statement failing on idx_email.
+--
+-- lower() is Unicode-aware: measured against the dev stack it agrees with Go's strings.ToLower on
+-- U+00C4, U+0130, U+0391, U+1E9E and U+212A, which are the characters SQLite and SQL Server
+-- disagree on. The pre-flight checks it anyway, on every engine.
+UPDATE users SET email = LOWER(email) WHERE email <> LOWER(email);

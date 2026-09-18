@@ -70,18 +70,23 @@ func migrateCommand(args []string) int {
 		return migrateExitError
 	}
 
-	return runMigrate(args, m, rollbackFloor, os.Stdout)
+	return runMigrate(args, database, m, rollbackFloor, os.Stdout)
 }
 
 // runMigrate is the whole of the `migrate` subcommand: the arguments that followed the word
-// "migrate", a migrator over the configured engine's embedded set, the lowest version it may step
-// down to, and somewhere to print. It returns the process exit code.
+// "migrate", the opened database, a migrator over the configured engine's embedded set, the
+// lowest version it may step down to, and somewhere to print. It returns the process exit code.
+//
+// The database is here for the pre-flight migrateTo runs before an upward step (#351). The
+// migrator alone cannot answer it: the check reads the users table through the engine's own SQL,
+// and this command is the only path to a migrator that does not come through data.NewDatabase,
+// where the startup half of the same check lives.
 //
 // It takes the floor as a parameter rather than reading rollbackFloor so that a test can place a
 // database above the floor and step it down. On a release where the floor is the head, which is
 // this one, no downward step is reachable through the constant at all, and the direction the
 // command exists for would go untested.
-func runMigrate(args []string, m *migrator.Migrator, floor int, out io.Writer) int {
+func runMigrate(args []string, database data.Database, m *migrator.Migrator, floor int, out io.Writer) int {
 	if len(args) == 0 {
 		outf(out, "%s\n", migrateUsage)
 		return migrateExitUsage
@@ -104,7 +109,7 @@ func runMigrate(args []string, m *migrator.Migrator, floor int, out io.Writer) i
 			outf(out, "%s\n\n%s\n", err, migrateUsage)
 			return migrateExitUsage
 		}
-		return migrateTo(m, target, floor, out)
+		return migrateTo(database, m, target, floor, out)
 	default:
 		outf(out, "unknown migrate subcommand %q\n\n%s\n", args[0], migrateUsage)
 		return migrateExitUsage
@@ -151,12 +156,14 @@ func migrateVersion(m *migrator.Migrator, out io.Writer) int {
 
 // migrateTo steps the schema to target, in whichever direction that is.
 //
-// The refusals it composes itself are the two the runner cannot know about: the rollback floor,
+// The refusals it composes itself are the three the runner cannot know about: the rollback floor,
 // which is this release's promise rather than a property of the migration set, and a target above
 // the head, which the runner reports as an unknown version without saying that being above the
-// head is what makes it unknown. Everything else is printed as the runner phrased it, because
-// ErrDirty and ErrUnknownVersion already carry the facts an operator needs (decision 7 of #268).
-func migrateTo(m *migrator.Migrator, target int, floor int, out io.Writer) int {
+// head is what makes it unknown, and the stored email addresses migration 000047 cannot resolve,
+// which is a fact about the data rather than about the schema (#351). Everything else is printed
+// as the runner phrased it, because ErrDirty and ErrUnknownVersion already carry the facts an
+// operator needs (decision 7 of #268).
+func migrateTo(database data.Database, m *migrator.Migrator, target int, floor int, out io.Writer) int {
 	if target < floor {
 		// Neutral about direction on purpose: the floor refuses any target below it, and a
 		// database still at an old version can ask for one on the way UP as easily as down.
@@ -196,6 +203,29 @@ func migrateTo(m *migrator.Migrator, target int, floor int, out io.Writer) int {
 	}
 	outf(out, "target schema version: %06d\n", target)
 	outf(out, "migrations to run, in order: %s\n", formatPlan(plan))
+
+	// The same refusal `goiabada-authserver` performs at startup, run here because this command is
+	// the only path to the migrator that does not come through data.NewDatabase: it opens through
+	// OpenDatabase precisely so a downward step is possible. Without it, `migrate to 47` on a
+	// database holding an email case collision would trip the UNIQUE idx_email half way up the
+	// chain and leave the schema dirty, which is the state the check exists to prevent and which
+	// this command has no verb to recover from (#351).
+	//
+	// A version read that failed for any other reason is refused rather than skipped. Version()
+	// answers NilVersion on every error, so passing current through would read a broken database
+	// as a fresh one and skip the check on exactly the database least worth guessing about. Plan
+	// above makes this all but unreachable, since it reads the version too; unreachable is not the
+	// same as safe when the consequence is a dirty schema.
+	if versionErr != nil && !migrator.IsNilVersion(versionErr) {
+		outf(out, "unable to read the database's schema version before checking stored email "+
+			"addresses: %s\n", versionErr)
+		return migrateExitError
+	}
+
+	if err := data.CheckEmailCaseBeforeMigrating(database, current, target); err != nil {
+		outf(out, "%+v\n", err)
+		return migrateExitError
+	}
 
 	if err := m.Migrate(target); err != nil {
 		if migrator.IsNoChange(err) {

@@ -1,0 +1,31 @@
+-- Migration 000047: bring every stored users.email down to its lowercase form, so a credential
+-- path that lowercases the address it was given can reach the row (#221, #283, #351).
+--
+-- This replaces a Go startup pass, commondb.BackfillLowercaseEmails, which did the same repair
+-- and rather more: where two rows differed only by case it picked a survivor, disabled the rest
+-- and destroyed their credentials, at startup, with nobody asking. A unique index on users.email
+-- has existed on all four engines since 000001, and under the FOLDING collation MySQL and SQL
+-- Server used before 000040 that index cannot hold two addresses differing only by case. So the
+-- collision that machinery existed for could not pre-exist on either engine that needs this
+-- repair, and on SQLite and PostgreSQL, which have always compared byte-wise, a colliding row
+-- already cannot sign in. Nothing here disables an account or revokes a credential; the startup
+-- pre-flight refuses to migrate a database holding a collision instead, and names the rows.
+--
+-- ABOVE 000040 deliberately. That migration moves every string column to a case-sensitive
+-- collation, which is what makes this statement's predicate mean anything: under a folding
+-- collation `email <> LOWER(email)` is false for every row and the whole migration is a silent
+-- no-op. SQLite has compared byte-wise all along, so the ordering matters to MySQL and SQL
+-- Server rather than here, but the number is global and the reasoning belongs in one file.
+--
+-- SQLITE'S LOWER() MAPS ASCII ONLY, through modernc.org/sqlite. An address carrying a non-ASCII
+-- uppercase letter -- Ädmin@x.com, and measured also U+0130, U+0391, U+1E9E and U+212A -- is not
+-- even SELECTED by this predicate here, and survives the migration as stored. That is not
+-- tolerated and not documented as a limit: data.CheckEmailCaseBeforeMigrating runs before the
+-- chain, compares each address against what THIS engine's own LOWER() makes of it, and refuses
+-- to migrate at all when the two disagree. It is engine-agnostic rather than a SQLite special
+-- case because SQL Server diverges too, on U+1E9E and U+212A.
+--
+-- An upgrade across this migration wants traffic stopped first. The pre-flight is a scan, and a
+-- registration landing between the scan and this statement can insert the lowercase twin of a
+-- legacy mixed-case address, which this UPDATE would then collide with (#351 decision 18).
+UPDATE users SET email = LOWER(email) WHERE email <> LOWER(email);

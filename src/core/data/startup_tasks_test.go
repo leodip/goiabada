@@ -19,11 +19,14 @@ var startupKey = make([]byte, 32)
 // at startup, before it serves anything: a data task that fails must stop the process rather
 // than let it run on half-converted data.
 //
-// It matters most for the email lowercase pass (#221, #283). Migration 000040 makes every string
-// column case-sensitive, and from that moment a credential path can only find the row whose
-// address is already lowercase. If the pass fails halfway and startup continues, the accounts it
-// had not reached yet cannot sign in and nothing anywhere says why. The same shape holds for the
-// two encryption passes: serving on data that is half re-encrypted is worse than not serving.
+// Serving on data that is half re-encrypted is worse than not serving: half the rows readable
+// under the env key and half under the legacy one is a database no single key opens, and a TOTP
+// secret the pass did not reach is still in plaintext at rest.
+//
+// The email lowercase pass was the fourth task here and was this test's headline case until #351
+// made it migration 000047. Its fail-closed property did not go away with it: it moved to
+// data.CheckEmailCaseBeforeMigrating, which refuses BEFORE the migration chain rather than
+// repairing after it, and is covered in email_case_preflight_test.go.
 //
 // One case per task, each stubbing the tasks before it as succeeding and the task itself as
 // failing, and asserting the error comes back out. The final case is the whole sequence
@@ -82,16 +85,6 @@ func TestRunStartupDataTasks_IsFailClosed(t *testing.T) {
 			wantErr: "failed to encrypt legacy plaintext OTP secrets",
 			why:     "a TOTP secret left in plaintext at rest is the defect #82 closed, and serving would leave it open silently",
 		},
-		{
-			name: "the email lowercase pass",
-			arrange: func(db *mocks_data.Database) {
-				db.EXPECT().GetSettingsById((*sql.Tx)(nil), int64(1)).Return(nil, nil)
-				db.EXPECT().BackfillEncryptedOTPSecrets(startupKey).Return(0, nil)
-				db.EXPECT().BackfillLowercaseEmails().Return(0, 0, boom)
-			},
-			wantErr: "failed to lowercase legacy user email addresses",
-			why:     "after 000040 an address this pass did not reach cannot be found by any credential path, so serving turns a failed pass into a set of accounts locked out with no message",
-		},
 	}
 
 	for _, tc := range tests {
@@ -111,7 +104,6 @@ func TestRunStartupDataTasks_IsFailClosed(t *testing.T) {
 		db := mocks_data.NewDatabase(t)
 		db.EXPECT().GetSettingsById((*sql.Tx)(nil), int64(1)).Return(nil, nil)
 		db.EXPECT().BackfillEncryptedOTPSecrets(startupKey).Return(3, nil)
-		db.EXPECT().BackfillLowercaseEmails().Return(2, 1, nil)
 
 		assert.NoError(t, runStartupDataTasks(db, startupKey, nil),
 			"every task succeeded, so the cases above fail because of the injected error rather than because of an unset mock")
