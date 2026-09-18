@@ -64,9 +64,14 @@ const auditCatalogFile = "authserver/internal/audit/events.go"
 // as catalogued-but-not-declared at once -- a difference that is not there (#209). An
 // identifier off the tree cannot be truncated, and TestAuditCatalog_TheParserKeepsDigitsWhole
 // pins that.
+//
+// mutable is the one shape that is neither: an Audit* name bound to a string with var rather
+// than const, inside the catalog file. It is collected separately because it is refused rather
+// than compared -- see the report in assertAuditCatalogComplete.
 type auditCatalogSource struct {
 	declared   map[string]string
 	catalogued []string
+	mutable    []string
 }
 
 // parseAuditCatalogSource reads the declarations and the catalog out of one Go file.
@@ -76,6 +81,14 @@ type auditCatalogSource struct {
 // instead of the constant, say -- is reported under the spelling it was written with, so the
 // failure sends the reader to the line rather than silently dropping the entry and reporting
 // the constant it duplicates as missing.
+//
+// Every OTHER Audit* var bound to a string goes to src.mutable rather than to src.declared,
+// because an event name declared that way is refused. Without this the var branch reaches only
+// AuditEventTypes, so `var AuditFoo = "foo"` written into this file is in neither list: not
+// compared against the catalog here, and not reached by the sibling scan below, which reads
+// every file of the package EXCEPT this one. The sibling scan's own advice is to move an
+// outside declaration into this file, so the guard would be telling an author how to make a
+// declaration invisible to it.
 func parseAuditCatalogSource(path string) (auditCatalogSource, error) {
 	src := auditCatalogSource{declared: map[string]string{}}
 
@@ -111,28 +124,44 @@ func parseAuditCatalogSource(path string) (auditCatalogSource, error) {
 		case token.VAR:
 			for _, spec := range gen.Specs {
 				vs, ok := spec.(*ast.ValueSpec)
-				if !ok || len(vs.Names) != 1 || vs.Names[0].Name != "AuditEventTypes" || len(vs.Values) != 1 {
-					continue
-				}
-				lit, ok := vs.Values[0].(*ast.CompositeLit)
 				if !ok {
 					continue
 				}
-				for _, elt := range lit.Elts {
-					if id, ok := elt.(*ast.Ident); ok {
-						src.catalogued = append(src.catalogued, id.Name)
+				for i, name := range vs.Names {
+					if name.Name != "AuditEventTypes" {
+						if !strings.HasPrefix(name.Name, "Audit") || i >= len(vs.Values) {
+							continue
+						}
+						if _, ok := stringLiteralValue(vs.Values[i]); !ok {
+							continue
+						}
+						src.mutable = append(src.mutable, name.Name)
 						continue
 					}
-					if value, ok := stringLiteralValue(elt); ok {
-						src.catalogued = append(src.catalogued, strconv.Quote(value))
+					if len(vs.Names) != 1 || len(vs.Values) != 1 {
 						continue
 					}
-					src.catalogued = append(src.catalogued, "<not an identifier>")
+					lit, ok := vs.Values[0].(*ast.CompositeLit)
+					if !ok {
+						continue
+					}
+					for _, elt := range lit.Elts {
+						if id, ok := elt.(*ast.Ident); ok {
+							src.catalogued = append(src.catalogued, id.Name)
+							continue
+						}
+						if value, ok := stringLiteralValue(elt); ok {
+							src.catalogued = append(src.catalogued, strconv.Quote(value))
+							continue
+						}
+						src.catalogued = append(src.catalogued, "<not an identifier>")
+					}
 				}
 			}
 		}
 	}
 
+	sort.Strings(src.mutable)
 	return src, nil
 }
 
@@ -259,9 +288,26 @@ func assertAuditCatalogComplete(r testutil.Reporter, path string, compiled []str
 			"Every audit event name is declared beside AuditEventTypes, because that is the only "+
 			"way one guard can hold the two edits an event needs to each other: a name declared "+
 			"elsewhere is emitted, written to audit_logs, and absent from the filter dropdown "+
-			"with nothing going red. Move it into %s. If it is not an event name, it does not "+
-			"belong under the Audit prefix in this package (#209).",
+			"with nothing going red. Move it into %s, declared with const. If it is not an event "+
+			"name, it does not belong under the Audit prefix in this package (#209).",
 			len(outside), auditCatalogFile, strings.Join(outside, "\n\t"), auditCatalogFile)
+	}
+
+	// An event name declared with var inside the catalog file. Refused rather than compared,
+	// because a name that can be assigned again is not a name: AuditEventTypes is built from
+	// these values at init, so a later write leaves the catalog the operator filters on and the
+	// value an emission writes to audit_logs as two different strings, with every comparison
+	// below still holding. Every one of the 100 event identifiers is a const, so this forbids
+	// nothing the package does.
+	if len(src.mutable) > 0 {
+		r.Errorf("%d Audit* name(s) declared with var in %s:\n\t%s\n\n"+
+			"An audit event name is a const. Declaring one with var puts it outside every "+
+			"comparison this guard makes -- it is not one of the declarations checked against "+
+			"the catalog, and the scan that reads the rest of the package deliberately skips "+
+			"this file -- so it would be emitted and absent from the filter dropdown with "+
+			"nothing going red, which is the defect this guard exists to catch. Declare it "+
+			"with const, beside the others. AuditEventTypes is the one var here (#209).",
+			len(src.mutable), auditCatalogFile, strings.Join(src.mutable, "\n\t"))
 	}
 
 	inCatalog := map[string]bool{}
@@ -626,4 +672,157 @@ func TestAuditCatalog_TheSiblingScanReadsTheRestOfThePackage(t *testing.T) {
 	assert.NotContains(t, scanned, "events.go", "the catalog file is parsed by the comparison above, not by this scan")
 	assert.NotContains(t, scanned, "events_test.go", "a test file is not a declaration the binary carries")
 	assert.Empty(t, outside, "the audit event names all belong in events.go")
+}
+
+// TestAuditCatalog_TheSiblingScanReadsEveryProductionFileAndNotJustTheFirst is the partial-walk
+// case. The one above proves the scan reached a file; it cannot tell that apart from a scan that
+// stops after the first directory entry, because every other fixture here has exactly one
+// eligible sibling and os.ReadDir returns it first. So the declaration goes in the LATER file,
+// and the set of names read is asserted whole rather than by membership: an early stop and a
+// per-file omission both change that set.
+func TestAuditCatalog_TheSiblingScanReadsEveryProductionFileAndNotJustTheFirst(t *testing.T) {
+	path := auditCatalogFixture(t, `package audit
+
+const (
+	AuditAuthFailedPwd = "auth_failed_pwd"
+)
+
+var AuditEventTypes = []string{
+	AuditAuthFailedPwd,
+}
+`)
+	auditSiblingFixture(t, path, "audit.go", `package audit
+
+type AuditLogger struct{}
+`)
+	auditSiblingFixture(t, path, "zz_more_events.go", `package audit
+
+const AuditForgottenInALaterFile = "forgotten_in_a_later_file"
+`)
+	auditSiblingFixture(t, path, "zz_more_events_test.go", `package audit
+
+const AuditForgottenInALaterTestFile = "forgotten_in_a_later_test_file"
+`)
+
+	scanned, outside, err := auditDeclarationsOutsideTheCatalogFile(filepath.Dir(path), "events.go")
+
+	require.NoError(t, err)
+	// Whole, in os.ReadDir's order: the catalog file and the test file are the two exclusions,
+	// and everything else the package carries is read.
+	assert.Equal(t, []string{"audit.go", "zz_more_events.go"}, scanned)
+	assert.Equal(t, []string{"zz_more_events.go: AuditForgottenInALaterFile"}, outside)
+
+	// And the reporting half says so, so this is a property of the guard rather than of a
+	// helper nothing drives.
+	report := testutil.RunGuard(func(r testutil.Reporter) {
+		assertAuditCatalogComplete(r, path, []string{"auth_failed_pwd"})
+	})
+	require.True(t, report.Failed(), "a declaration in the second production file passed the guard")
+	assert.Contains(t, report.Text(), "zz_more_events.go: AuditForgottenInALaterFile")
+}
+
+// TestAuditCatalog_TheGuardFailsOnAnEventNameDeclaredWithVar takes the declaration kind on both
+// sides of the catalog-file boundary, because the guard reaches the two sides through different
+// code and each was pinned by const alone.
+//
+// Outside: the sibling scan accepts const and var by design, and every fixture gave it a const,
+// so dropping token.VAR from its condition left the package green. Inside: parseAuditCatalogSource
+// read no var but AuditEventTypes, so a var written into events.go was in neither list -- and
+// since the sibling scan skips events.go, doing what the outside failure tells you to do was
+// what made the declaration invisible.
+func TestAuditCatalog_TheGuardFailsOnAnEventNameDeclaredWithVar(t *testing.T) {
+	t.Run("outside the catalog file", func(t *testing.T) {
+		path := auditCatalogFixture(t, `package audit
+
+const (
+	AuditAuthFailedPwd = "auth_failed_pwd"
+)
+
+var AuditEventTypes = []string{
+	AuditAuthFailedPwd,
+}
+`)
+		auditSiblingFixture(t, path, "audit.go", `package audit
+
+var AuditForgottenOutsideAsAVar = "forgotten_outside_as_a_var"
+`)
+
+		report := testutil.RunGuard(func(r testutil.Reporter) {
+			assertAuditCatalogComplete(r, path, []string{"auth_failed_pwd"})
+		})
+
+		require.True(t, report.Failed(), "a var event name outside the catalog file passed the guard")
+		assert.False(t, report.Stopped, "a finding is an Errorf, not a Fatalf")
+		assert.Contains(t, report.Text(), "audit.go: AuditForgottenOutsideAsAVar")
+		// The advice has to land it somewhere the guard can see, which is the const block.
+		assert.Contains(t, report.Text(), "declared with const")
+	})
+
+	t.Run("inside the catalog file", func(t *testing.T) {
+		path := auditCatalogFixture(t, `package audit
+
+const (
+	AuditAuthFailedPwd = "auth_failed_pwd"
+)
+
+var AuditForgottenInsideEvents = "forgotten_inside_events"
+
+var AuditEventTypes = []string{
+	AuditAuthFailedPwd,
+}
+`)
+
+		report := testutil.RunGuard(func(r testutil.Reporter) {
+			assertAuditCatalogComplete(r, path, []string{"auth_failed_pwd"})
+		})
+
+		require.True(t, report.Failed(), "a var event name inside the catalog file passed the guard")
+		assert.False(t, report.Stopped, "a finding is an Errorf, not a Fatalf")
+		assert.Contains(t, report.Text(), "AuditForgottenInsideEvents")
+		assert.Contains(t, report.Text(), "declared with var")
+		// Reported as the one thing it is. It is not in src.declared, so reporting it as a
+		// declaration missing from the catalog as well would send the reader to add a var to
+		// the slice, which is the wrong edit.
+		assert.NotContains(t, report.Text(), "absent from AuditEventTypes")
+		assert.NotContains(t, report.Text(), "but outside")
+	})
+
+	// The pass half. Without it a check refusing every Audit* var would satisfy both cases
+	// above, and it would be wrong in the same way the sibling scan would be wrong to refuse
+	// the AuditLogger type: what makes a name an event here is the prefix AND a string value,
+	// so a var of some other type keeps the prefix legitimately.
+	t.Run("an Audit name that is not bound to a string is left alone", func(t *testing.T) {
+		path := auditCatalogFixture(t, `package audit
+
+const (
+	AuditAuthFailedPwd = "auth_failed_pwd"
+)
+
+var AuditLoggerDefault *AuditLogger
+
+var AuditRetryBudget = 3
+
+var auditQueueName = "audit_queue"
+
+var AuditEventTypes = []string{
+	AuditAuthFailedPwd,
+}
+`)
+
+		report := testutil.RunGuard(func(r testutil.Reporter) {
+			assertAuditCatalogComplete(r, path, []string{"auth_failed_pwd"})
+		})
+
+		assert.False(t, report.Failed(), "a non-event Audit* var failed the guard: %s", report.Text())
+	})
+
+	// And the var the package really does have is not caught by any of it: AuditEventTypes is
+	// the catalog, so a rule reading "no Audit* var" would fail the real file outright.
+	t.Run("AuditEventTypes itself is untouched", func(t *testing.T) {
+		src, err := parseAuditCatalogSource(
+			filepath.Join(testutil.SourceRoot(t), filepath.FromSlash(auditCatalogFile)))
+		require.NoError(t, err)
+		assert.Empty(t, src.mutable, "the real catalog file declares no event name with var")
+		assert.NotEmpty(t, src.catalogued, "AuditEventTypes was read as the catalog")
+	})
 }
