@@ -17,7 +17,7 @@ import (
 )
 
 // TestAuditLogger_ConsoleRecordCarriesTheEventAndTheDetails is the console half of AuditLogger,
-// at the seam auditlog.LogToConsole now owns.
+// at the seam LogToConsole owns.
 //
 // These three cases used to marshal an envelope into the message field and compare the message
 // against an expected JSON document. That is the shape #320 decision 7 replaced: a collector
