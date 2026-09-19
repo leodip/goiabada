@@ -67,10 +67,6 @@ func (d *MySQLDatabase) GetUserByForgotPasswordCodeHash(tx *sql.Tx, codeHash str
 	return d.CommonDB.GetUserByForgotPasswordCodeHash(tx, codeHash)
 }
 
-func (d *MySQLDatabase) GetLastUserWithOTPState(tx *sql.Tx, otpEnabledState bool) (*models.User, error) {
-	return d.CommonDB.GetLastUserWithOTPState(tx, otpEnabledState)
-}
-
 func (d *MySQLDatabase) SearchUsersPaginated(tx *sql.Tx, query string, page int, pageSize int) ([]models.User, int, error) {
 	return d.CommonDB.SearchUsersPaginated(tx, query, page, pageSize)
 }
