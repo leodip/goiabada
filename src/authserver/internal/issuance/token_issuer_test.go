@@ -15,8 +15,8 @@ import (
 	"github.com/leodip/goiabada/core/encryption"
 
 	"github.com/leodip/goiabada/authserver/internal/constants"
+	"github.com/leodip/goiabada/authserver/internal/models"
 	coreconstants "github.com/leodip/goiabada/core/constants"
-	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/leodip/goiabada/core/uuidutil"

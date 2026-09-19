@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/data/commondb"
-	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/authserver/internal/models"
 )
 
 type Database interface {

@@ -4,10 +4,10 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/signingkeys"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/enums"
-	"github.com/leodip/goiabada/core/models"
 )
 
 // This is seam 1 at the data tier, on all four engines: the rotator's composition against

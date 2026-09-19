@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/enums"
-	"github.com/leodip/goiabada/core/models"
 )
 
 func TestCreateSettings(t *testing.T) {

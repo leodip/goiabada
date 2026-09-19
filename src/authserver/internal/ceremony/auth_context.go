@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/enums"
-	"github.com/leodip/goiabada/core/models"
 )
 
 var (

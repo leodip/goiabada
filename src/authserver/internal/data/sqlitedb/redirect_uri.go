@@ -3,7 +3,7 @@ package sqlitedb
 import (
 	"database/sql"
 
-	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/authserver/internal/models"
 )
 
 func (d *SQLiteDatabase) CreateRedirectURI(tx *sql.Tx, redirectURI *models.RedirectURI) error {

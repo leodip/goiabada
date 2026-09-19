@@ -3,7 +3,7 @@ package mysqldb
 import (
 	"database/sql"
 
-	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/authserver/internal/models"
 )
 
 func (d *MySQLDatabase) CreateClientPermission(tx *sql.Tx, clientPermission *models.ClientPermission) error {

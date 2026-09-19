@@ -10,12 +10,12 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/hashutil"
-	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/rsautil"
 	"github.com/leodip/goiabada/core/stringutil"
 	"github.com/leodip/goiabada/core/uuidutil"
