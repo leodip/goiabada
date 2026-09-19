@@ -492,8 +492,8 @@ func firstError(errs ...error) error {
 // schema.sql snapshot held until it was deleted (#284).
 //
 // The source root is found by ascending from the working directory rather than by counting
-// "../" from a caller's package, because the two consumers sit at different depths and in
-// different modules: the generator runs from src/authserver and the per-engine assertion from
+// "../" from a caller's package, because the two consumers sit at different depths: the
+// generator runs from src/authserver and the per-engine assertion from
 // src/authserver/tests/data. A wrong root is not a loud failure, it names a file that is
 // simply absent, so the ascent identifies the root by requiring every module to be under it.
 // core/testutil.sourceRoot does the same walk for the gofmt guard; it is not shared because
