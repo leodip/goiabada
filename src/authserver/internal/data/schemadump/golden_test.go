@@ -302,7 +302,7 @@ func TestParseRefusesADamagedFile(t *testing.T) {
 
 // TestGoldenPath names the four files decision 3 places beside each engine's migrations, and
 // finds them from a working directory well below the source root, which is where both
-// consumers actually run: the generator from src/core and the per-engine assertion from
+// consumers actually run: the generator from src/authserver and the per-engine assertion from
 // src/authserver/tests/data.
 func TestGoldenPath(t *testing.T) {
 	root, err := SourceRoot()
@@ -311,7 +311,7 @@ func TestGoldenPath(t *testing.T) {
 	for _, d := range []Dialect{SQLite, MySQL, Postgres, MSSQL} {
 		path, err := GoldenPath(d)
 		require.NoErrorf(t, err, "GoldenPath(%s)", d)
-		assert.Equalf(t, filepath.Join(root, "core", "data", string(d)+"db", "schema.golden"), path,
+		assert.Equalf(t, filepath.Join(root, "authserver", "internal", "data", string(d)+"db", "schema.golden"), path,
 			"the %s golden file sits beside that engine's migrations", d)
 		_, statErr := os.Stat(filepath.Dir(path))
 		assert.NoErrorf(t, statErr, "the directory holding the %s golden file exists", d)

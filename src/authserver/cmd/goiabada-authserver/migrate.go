@@ -8,10 +8,10 @@ import (
 	"strings"
 
 	"github.com/leodip/goiabada/authserver/internal/config"
+	"github.com/leodip/goiabada/authserver/internal/data/migrator"
 	"github.com/leodip/goiabada/authserver/internal/datafactory"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data"
-	"github.com/leodip/goiabada/core/data/migrator"
 	"github.com/leodip/goiabada/core/errs"
 )
 

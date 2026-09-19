@@ -9,6 +9,8 @@ import (
 	"sort"
 	"strings"
 	"testing"
+
+	"github.com/leodip/goiabada/core/testutil"
 )
 
 // TestCommonDatabase_NoSelfCallToAnOverriddenMethod is the structural half of the defect the
@@ -59,10 +61,16 @@ import (
 // selfCalls tracks the names known to hold a *CommonDatabase rather than the receiver's name, and
 // states there what remains outside it.
 func TestCommonDatabase_NoSelfCallToAnOverriddenMethod(t *testing.T) {
+	// The two dialects are located from the source root rather than by counting "../" from
+	// here: #354 moved the four engine adapters to authserver/internal/data while commondb
+	// stayed in core, so they are no longer siblings and will be again when #359 takes this
+	// package. A relative path is the one spelling that silently stops enumerating when the
+	// directory moves, and this guard is worth nothing the moment it enumerates nothing.
+	root := testutil.SourceRoot(t)
 	divergent := map[string][]string{}
 	for _, dialect := range []struct{ dir, recvType string }{
-		{"../postgresdb", "PostgresDatabase"},
-		{"../mssqldb", "MsSQLDatabase"},
+		{filepath.Join(root, "authserver", "internal", "data", "postgresdb"), "PostgresDatabase"},
+		{filepath.Join(root, "authserver", "internal", "data", "mssqldb"), "MsSQLDatabase"},
 	} {
 		for name := range divergentMethods(t, dialect.dir, dialect.recvType) {
 			divergent[name] = append(divergent[name], dialect.recvType)

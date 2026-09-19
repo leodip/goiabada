@@ -10,9 +10,9 @@ import (
 
 	mysqldriver "github.com/go-sql-driver/mysql"
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/leodip/goiabada/authserver/internal/data/migrator"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/data/commondb"
-	"github.com/leodip/goiabada/core/data/migrator"
 	"github.com/leodip/goiabada/core/errs"
 )
 

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/leodip/goiabada/core/data/migrator"
+	"github.com/leodip/goiabada/authserver/internal/data/migrator"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

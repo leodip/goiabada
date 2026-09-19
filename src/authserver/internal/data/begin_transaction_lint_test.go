@@ -33,11 +33,11 @@ import (
 // Nothing else is exempt, and the list is not the place to put a new owner: an owner that cannot
 // be written as a closure is a design question, not an exemption.
 var runInTransactionOwners = map[string]bool{
-	"core/data/commondb/db.go":   true,
-	"core/data/sqlitedb/db.go":   true,
-	"core/data/mysqldb/db.go":    true,
-	"core/data/postgresdb/db.go": true,
-	"core/data/mssqldb/db.go":    true,
+	"core/data/commondb/db.go":                  true,
+	"authserver/internal/data/sqlitedb/db.go":   true,
+	"authserver/internal/data/mysqldb/db.go":    true,
+	"authserver/internal/data/postgresdb/db.go": true,
+	"authserver/internal/data/mssqldb/db.go":    true,
 }
 
 // bareBeginTransactionCall is one call expression selecting BeginTransaction in a file that is

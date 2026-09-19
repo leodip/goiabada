@@ -5,8 +5,8 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/leodip/goiabada/authserver/internal/data/migrator"
 	"github.com/leodip/goiabada/core/data"
-	"github.com/leodip/goiabada/core/data/migrator"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
 )

@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/core/data/migrator"
+	"github.com/leodip/goiabada/authserver/internal/data/migrator"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/urlutil"
 	"github.com/stretchr/testify/assert"

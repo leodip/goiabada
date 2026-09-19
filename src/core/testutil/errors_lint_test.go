@@ -103,8 +103,8 @@ import "errors"
 func parenCallee() error { return (errors.New)("x") }
 `)
 
-	// Resolution is by import path: this is core/data/mssqldb/db.go's shape, and a check matching
-	// the literal text "errors." walks straight past it.
+	// Resolution is by import path: this is authserver/internal/data/mssqldb/db.go's shape, and a
+	// check matching the literal text "errors." walks straight past it.
 	write("core/caught/goerrors_alias.go", `package caught
 
 import goerrors "errors"

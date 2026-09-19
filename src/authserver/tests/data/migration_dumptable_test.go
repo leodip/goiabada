@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/core/data/schemadump"
+	"github.com/leodip/goiabada/authserver/internal/data/schemadump"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -140,7 +140,7 @@ func TestDumpTable_ReadsTheCatalog(t *testing.T) {
 
 // tablesAt000035 is how many tables a database migrated to 000035 holds: the 25 application
 // tables plus schema_migrations. Recounted from
-// grep -c "^table" src/core/data/<engine>db/schema.golden, which reports 26 on every
+// grep -c "^table" src/authserver/internal/data/<engine>db/schema.golden, which reports 26 on every
 // engine at head, and checked against 000036 to 000042, none of which adds or drops a table:
 // 000039 rebuilds two on SQLite and 000041 rebuilds schema_migrations there, and all three
 // go back.
