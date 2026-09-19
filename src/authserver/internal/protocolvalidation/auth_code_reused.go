@@ -1,8 +1,8 @@
 package protocolvalidation
 
 import (
+	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/customerrors"
-	"github.com/leodip/goiabada/core/models"
 )
 
 // AuthCodeReusedError is the sentinel returned by the token validator when an
@@ -15,8 +15,9 @@ import (
 //
 // It lives beside the validator that constructs it rather than in core/customerrors, because Code
 // is a persistence model and the kernel's error package is compiled by the admin console, which
-// has no use for a row: carrying the field there republished core/models across a module boundary
-// for one authserver-only type (#350). ErrorDetail and the sentinels stay where they were.
+// has no use for a row: carrying the field there republished authserver/internal/models across a
+// module boundary for one authserver-only type (#350). ErrorDetail and the sentinels stay where
+// they were.
 //
 // Detail is the *customerrors.ErrorDetail to render to the client (invalid_grant,
 // "Code is invalid.", 400), and Unwrap exposes it, so HttpHelper.JsonError answers 400 with that

@@ -7,12 +7,12 @@ Open-source authentication server in Go. OAuth2/OIDC compliant with SSO, 2FA, an
 
 ```
 src/
-├── core/           # Shared: models, oauth, validators, kernel helpers
+├── core/           # Shared: oauth, validators, kernel helpers
 ├── authserver/     # OAuth2/OIDC endpoints, user auth flows
 └── adminconsole/   # Admin UI for managing users/clients/permissions
 ```
 
-- **Core** (`src/core/go.mod`): Models, JWT handling, OAuth logic, wire contract
+- **Core** (`src/core/go.mod`): JWT handling, OAuth logic, wire contract
 - **Auth Server** (`src/authserver/go.mod`): Main auth endpoints, token issuance
 - **Admin Console** (`src/adminconsole/go.mod`): Admin management UI
 
@@ -22,8 +22,7 @@ repository root. It is enforced rather than descriptive: see **Architecture guar
 ## Key Directories
 
 ### Core (`src/core/`)
-- `models/` - All domain models (Client, User, Permission, Group, etc.)
-- `api/` - The admin API wire contract: request and response DTOs, declarations only, importing no `models/`. The model-to-DTO mapping belongs to the auth server, in `internal/apimapping` (#350)
+- `api/` - The admin API wire contract: request and response DTOs, declarations only, importing no persistence model. The model-to-DTO mapping belongs to the auth server, in `internal/apimapping` (#350)
 - `oauth/` - Shared OAuth/OIDC client surface: JWT/JWKS parsing, token exchange, PKCE, response_type parsing
 - `validators/` - Identifier and angle-bracket validation, the two both applications use. The authorize and token validators live in `authserver/internal/protocolvalidation`, and the account validators — email, password, profile, address, phone — in `authserver/internal/accountvalidation` (#344)
 - `constants/` - Permission identifiers, and the context and session keys a kernel package or both
@@ -36,6 +35,7 @@ repository root. It is enforced rather than descriptive: see **Architecture guar
 - `internal/handlers/apihandlers/` - Admin API handlers
 - `internal/{ceremony,issuance,signingkeys}/` - Provider-side issuance: codes, tokens, key rotation, ceremony context
 - `internal/{permissions,usercreation,usersession,useragent,emaildelivery,otp,imaging,uithemes}/` - Application services and leaf helpers: permissions, user creation, sessions, email, OTP, images, themes
+- `internal/models/` - All domain models (Client, User, Permission, Group, etc.) (#359)
 - `internal/data/` - The `Database` interface, the seeder, `commondb/`, the four engine adapters and the generated `Database` mock (#354, #359)
 - `internal/datafactory/` - Database composition: engine selection, config mapping, the email-case pre-flight, the startup data tasks (#353)
 - `internal/server/routes.go` - All route definitions

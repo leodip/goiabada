@@ -5,7 +5,7 @@ import (
 	"log/slog"
 
 	"github.com/leodip/goiabada/authserver/internal/data"
-	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/authserver/internal/models"
 )
 
 // ClientDisplayInfo contains the client information to display on auth and consent screens

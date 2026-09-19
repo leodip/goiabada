@@ -2,8 +2,8 @@ package commondb
 
 import (
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/errs"
-	"github.com/leodip/goiabada/core/models"
 )
 
 // ScanEmailCase reads every users row as its id, its stored address, and that address as THIS

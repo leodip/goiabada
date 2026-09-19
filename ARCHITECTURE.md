@@ -97,7 +97,6 @@ A row whose owner is not `kernel` names the issue that moves it. A `kernel` row 
 | `core/logging` | kernel | — |
 | `core/middleware` | kernel | — |
 | `core/mocks` | kernel | — |
-| `core/models` | authserver | #359 |
 | `core/oauth` | kernel | — |
 | `core/oidc` | authserver | #360 |
 | `core/rsautil` | authserver | #360 |
@@ -250,11 +249,10 @@ removes it. An exception is not a waiver: when the edge goes, the row must go wi
 fails until it does. That is how the epic burns down — #335 already instructs its implementer to
 "remove the exact architecture exceptions introduced by #332 for these edges".
 
-Both ends name a package, never a module and never a parent. `adminconsole/internal/handlers` is
-granted its dependency on `core/models`; `adminconsole` is not, and neither is
-`adminconsole/internal/handlers/adminuserhandlers`, which is why it has a row of its own. A
-module-wide grant would let a second package acquire the same dependency in silence, and the count
-of rows is the only measure of how much is left to do.
+Both ends name a package, never a module and never a parent. `core/handlerhelpers` is granted its
+dependency on `core/hashutil`; `core` is not, and neither is `core/oauth`, which is why it has a
+row of its own. A module-wide grant would let a second package acquire the same dependency in
+silence, and the count of rows is the only measure of how much is left to do.
 
 ### Temporary exceptions
 
@@ -264,9 +262,9 @@ of rows is the only measure of how much is left to do.
 | `core/oauth` | `core/hashutil` | #360 |
 | `core/testutil/fake` | `core/uuidutil` | #360 |
 
-Three rows, all #360's. #350 owned ten of them and owns none now: `core/api` names `core/models`
-nowhere, the admin console names it from no production package, and `AuthCodeReusedError` took the
-last edge with it to `authserver/internal/protocolvalidation`.
+Three rows, all #360's. #350 owned ten of them and owns none now: `core/api` names
+`authserver/internal/models` nowhere, the admin console names it from no production package, and
+`AuthCodeReusedError` took the last edge with it to `authserver/internal/protocolvalidation`.
 
 ## Foreign modules the admin console must not compile
 

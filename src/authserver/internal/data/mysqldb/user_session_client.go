@@ -3,7 +3,7 @@ package mysqldb
 import (
 	"database/sql"
 
-	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/authserver/internal/models"
 )
 
 func (d *MySQLDatabase) CreateUserSessionClient(tx *sql.Tx, userSessionClient *models.UserSessionClient) error {

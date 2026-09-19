@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/config"
-	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/authserver/internal/models"
 )
 
 // TryClaimCleanupRun is the cross-instance lock for the background cleanup, so the

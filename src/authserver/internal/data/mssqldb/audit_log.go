@@ -8,8 +8,8 @@ import (
 
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/leodip/goiabada/authserver/internal/data/commondb"
+	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/errs"
-	"github.com/leodip/goiabada/core/models"
 )
 
 func (d *MsSQLDatabase) CreateAuditLog(tx *sql.Tx, auditLog *models.AuditLog) error {

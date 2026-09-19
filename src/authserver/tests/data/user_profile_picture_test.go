@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/authserver/internal/models"
 )
 
 // createTestPNG creates a valid PNG image with the specified dimensions

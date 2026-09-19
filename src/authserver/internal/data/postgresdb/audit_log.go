@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/errs"
-	"github.com/leodip/goiabada/core/models"
 )
 
 func (d *PostgresDatabase) CreateAuditLog(tx *sql.Tx, auditLog *models.AuditLog) error {

@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/authserver/internal/models"
 )
 
 func (d *MySQLDatabase) CreateUser(tx *sql.Tx, user *models.User) error {

@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/authserver/internal/models"
 )
 
 func (d *SQLiteDatabase) CreateBrowserSession(tx *sql.Tx, browserSession *models.BrowserSession) error {
