@@ -62,10 +62,13 @@ import (
 // states there what remains outside it.
 func TestCommonDatabase_NoSelfCallToAnOverriddenMethod(t *testing.T) {
 	// The two dialects are located from the source root rather than by counting "../" from
-	// here: #354 moved the four engine adapters to authserver/internal/data while commondb
-	// stayed in core, so they are no longer siblings and will be again when #359 takes this
-	// package. A relative path is the one spelling that silently stops enumerating when the
-	// directory moves, and this guard is worth nothing the moment it enumerates nothing.
+	// here. #354 moved the four engine adapters to authserver/internal/data while commondb
+	// stayed in core, so they stopped being siblings, and they are siblings again once #359
+	// moves this package to sit beside them. The ascent is what every other tree-wide guard
+	// in this repository uses, and it is the spelling that survives both moves; "../mssqldb"
+	// survives neither, and worse, it never writes the path a move sweeps for, so the sweep
+	// that repointed the other five constants could not have found it. This one was found by
+	// running the tier.
 	root := testutil.SourceRoot(t)
 	divergent := map[string][]string{}
 	for _, dialect := range []struct{ dir, recvType string }{
