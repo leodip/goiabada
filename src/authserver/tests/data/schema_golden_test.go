@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/core/data/schemadump"
+	"github.com/leodip/goiabada/authserver/internal/data/schemadump"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -44,7 +44,7 @@ func TestSchemaGolden_MatchesTheCommittedFile(t *testing.T) {
 		return
 	}
 	t.Fatalf("the %s catalog is not what %s records.\n%s\n\nRegenerate all four with:\n"+
-		"  cd src/core && go run ./cmd/schemadump\n"+
+		"  cd src/authserver && go run ./cmd/schemadump\n"+
 		"and commit the result. The four files move together.",
 		dbType(), path, diffLines(string(committed), string(encoded)))
 }
@@ -84,7 +84,7 @@ func TestSchemaGolden_CommittedFileParses(t *testing.T) {
 	require.NoErrorf(t, err, "read the migration version of the freshly migrated %s database", dbType())
 	assert.Equalf(t, migrated, g.Migrated,
 		"%s records migration version %d, but %s migrates to %d. Regenerate all four with:\n"+
-			"  cd src/core && go run ./cmd/schemadump",
+			"  cd src/authserver && go run ./cmd/schemadump",
 		path, g.Migrated, dbType(), migrated)
 }
 

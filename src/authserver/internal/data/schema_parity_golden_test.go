@@ -65,7 +65,7 @@ func TestSchemaParity_TheFourCommittedGoldenFiles(t *testing.T) {
 		"its reason and its count, or a migration to write. #284 decision 6 says a divergence is "+
 		"fixed on the branch that found it and never recorded as a known defect.\n"+
 		"If the golden files themselves are stale, regenerate them with:\n"+
-		"  cd src/core && go run ./cmd/schemadump",
+		"  cd src/authserver && go run ./cmd/schemadump",
 		strings.Join(problems, "\n\n"))
 }
 

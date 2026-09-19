@@ -49,11 +49,11 @@ import (
 // a func assigned to a package variable is a function body that runs when it is called, not at
 // init, and its calls are reported like any other.
 //
-// Resolution is by import path, not by the name written at the call site: core/data/mssqldb/db.go
-// imports stdlib errors as goerrors, and a check that matched the literal text "errors." would
-// walk straight past it while also catching every unrelated package that happens to be called
-// errors. Parentheses around a callee are stripped for the same reason, since (errors.New)("x")
-// constructs exactly what errors.New("x") constructs.
+// Resolution is by import path, not by the name written at the call site:
+// authserver/internal/data/mssqldb/db.go imports stdlib errors as goerrors, and a check that
+// matched the literal text "errors." would walk straight past it while also catching every
+// unrelated package that happens to be called errors. Parentheses around a callee are stripped
+// for the same reason, since (errors.New)("x") constructs exactly what errors.New("x") constructs.
 //
 // The boundary is one file's own imports, which is what makes this a parsing test and not a type
 // check: an unrelated package re-exporting a stdlib constructor under its own name would need
@@ -295,7 +295,7 @@ func legacyErrorUsesInFile(file *ast.File, fset *token.FileSet, rel string) []le
 	var uses []legacyErrorUse
 
 	// importPaths maps the name a file actually writes at a call site to the path it imports, so
-	// the goerrors alias in core/data/mssqldb/db.go resolves like any other.
+	// the goerrors alias in authserver/internal/data/mssqldb/db.go resolves like any other.
 	importPaths := map[string]string{}
 	for _, spec := range file.Imports {
 		path, err := strconv.Unquote(spec.Path.Value)

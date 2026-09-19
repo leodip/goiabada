@@ -45,10 +45,17 @@ import (
 // question, not an exemption.
 const pageOffsetOwner = "core/data/commondb/pagination.go"
 
-// pageOffsetRoot is the subtree the rule covers: the data layer, where an
+// pageOffsetRoots are the subtrees the rule covers: the data layer, where an
 // offset becomes SQL. Page arithmetic above it lands in a slice or a page bar
 // rather than in a query, and answers to its own rules.
-const pageOffsetRoot = "core/data"
+//
+// Two of them because the data layer is split across two modules while #354's
+// move settles: the four engine adapters are under the auth server and
+// commondb is still in core, and both are places an offset becomes SQL. It
+// collapses back to one when #359 takes commondb. A single root covering only
+// one of them would drop the other out of the rule's reach without failing
+// anything, which is the silent narrowing #333 found on 8883642d (#354).
+var pageOffsetRoots = []string{"core/data", "authserver/internal/data"}
 
 // handRolledOffset is one "(x - 1) * y" expression in a file that is not
 // allowed to hold it.
@@ -72,12 +79,20 @@ type handRolledOffset struct {
 // operand names are not inspected: the shape is the whole signal, and a read
 // that wanted this arithmetic for something other than an offset would still be
 // clearer calling PageOffset or naming what it is.
-func findHandRolledOffsets(root, sub, owner string) ([]handRolledOffset, int, error) {
+func findHandRolledOffsets(root string, dirs []string, owner string) ([]handRolledOffset, int, error) {
+	roots := []string{root}
+	if len(dirs) > 0 {
+		roots = roots[:0]
+		for _, dir := range dirs {
+			roots = append(roots, filepath.Join(root, filepath.FromSlash(dir)))
+		}
+	}
+
 	var found []handRolledOffset
 	files := 0
 
-	err := filepath.WalkDir(filepath.Join(root, filepath.FromSlash(sub)),
-		func(path string, d fs.DirEntry, err error) error {
+	for _, start := range roots {
+		err := filepath.WalkDir(start, func(path string, d fs.DirEntry, err error) error {
 			if err != nil {
 				return err
 			}
@@ -121,8 +136,12 @@ func findHandRolledOffsets(root, sub, owner string) ([]handRolledOffset, int, er
 			})
 			return nil
 		})
+		if err != nil {
+			return nil, 0, err
+		}
+	}
 
-	return found, files, err
+	return found, files, nil
 }
 
 // unparen strips the parentheses an expression is written with, so the shape is
@@ -180,17 +199,17 @@ func identText(e ast.Expr) string {
 
 // TestNoHandRolledPageOffset holds the real tree to the rule.
 func TestNoHandRolledPageOffset(t *testing.T) {
-	assertNoHandRolledPageOffset(t, testutil.SourceRoot(t), pageOffsetRoot, pageOffsetOwner)
+	assertNoHandRolledPageOffset(t, testutil.SourceRoot(t), pageOffsetRoots, pageOffsetOwner)
 }
 
 // assertNoHandRolledPageOffset is the reporting half, taking the root and the scope as parameters
 // and failing through a testutil.Reporter so a rule test can drive it against a fixture tree.
 // Without that seam these lines are reached only by the call above, which walks a tree that has
 // been clean since #305.
-func assertNoHandRolledPageOffset(r testutil.Reporter, root, sub, owner string) {
+func assertNoHandRolledPageOffset(r testutil.Reporter, root string, dirs []string, owner string) {
 	r.Helper()
 
-	found, files, err := findHandRolledOffsets(root, sub, owner)
+	found, files, err := findHandRolledOffsets(root, dirs, owner)
 	if err != nil {
 		r.Fatalf("walking %s: %v", root, err)
 	}
@@ -198,7 +217,7 @@ func assertNoHandRolledPageOffset(r testutil.Reporter, root, sub, owner string) 
 	// pass, which is the one way a guard like this fails silently in the
 	// direction that matters.
 	if files == 0 {
-		r.Fatalf("walked no Go files under %s/%s", root, sub)
+		r.Fatalf("walked no Go files under %s (dirs: %s)", root, strings.Join(dirs, ", "))
 	}
 
 	if len(found) == 0 {
@@ -216,7 +235,7 @@ func assertNoHandRolledPageOffset(r testutil.Reporter, root, sub, owner string) 
 		"for, and a dialect override that formats the number into SQL itself gets the engine's "+
 		"refusal and a 500 (#305). PageOffset saturates at the largest offset that fits, which "+
 		"is past the end of any table, so the read returns the empty page it should.",
-		len(found), sub, strings.Join(lines, "\n\t"))
+		len(found), strings.Join(dirs, ", "), strings.Join(lines, "\n\t"))
 }
 
 // TestNoHandRolledPageOffset_TheCheckerMatchesTheShapeAndNotTheSpelling is the
@@ -320,7 +339,7 @@ func offsetE(page, pageSize int) int {
 }
 `)
 
-	found, files, err := findHandRolledOffsets(root, pageOffsetRoot, pageOffsetOwner)
+	found, files, err := findHandRolledOffsets(root, pageOffsetRoots, pageOffsetOwner)
 	require.NoError(t, err)
 	require.NotZero(t, files)
 
@@ -354,7 +373,17 @@ func offsetE(page, pageSize int) int {
 // by TestNoHandRolledPageOffset, which walks a tree that has been clean since #305.
 func TestNoHandRolledPageOffset_TheGuardFailsOnArithmetic(t *testing.T) {
 	root := t.TempDir()
+	// One offending file in each root, so the case says the finding is reported from both
+	// subtrees rather than only from whichever the walk happens to reach first. A fixture in
+	// one root alone would also leave the other missing from the temp tree, which is the walk
+	// error the case below is about and not the finding this one is asserting.
 	writeLintFixture(t, root, "authserver/internal/data/mysqldb/users.go", `package mysqldb
+
+func window(page, pageSize int) int {
+	return (page - 1) * pageSize
+}
+`)
+	writeLintFixture(t, root, "core/data/commondb/users.go", `package commondb
 
 func window(page, pageSize int) int {
 	return (page - 1) * pageSize
@@ -362,12 +391,13 @@ func window(page, pageSize int) int {
 `)
 
 	report := testutil.RunGuard(func(r testutil.Reporter) {
-		assertNoHandRolledPageOffset(r, root, pageOffsetRoot, pageOffsetOwner)
+		assertNoHandRolledPageOffset(r, root, pageOffsetRoots, pageOffsetOwner)
 	})
 
 	require.True(t, report.Failed(), "hand-rolled offset arithmetic passed the guard")
 	assert.False(t, report.Stopped, "a finding is an Errorf, not a Fatalf")
 	assert.Contains(t, report.Text(), "authserver/internal/data/mysqldb/users.go:4")
+	assert.Contains(t, report.Text(), "core/data/commondb/users.go:4")
 	assert.Contains(t, report.Text(), "commondb.PageOffset(page, pageSize)")
 	assert.Contains(t, report.Text(), "#305")
 }
@@ -382,41 +412,53 @@ func window(page, pageSize int) int {
 	return commondb.PageOffset(page, pageSize)
 }
 `)
+	writeLintFixture(t, root, "core/data/commondb/users.go", `package commondb
+
+func window(page, pageSize int) int {
+	return PageOffset(page, pageSize)
+}
+`)
 
 	report := testutil.RunGuard(func(r testutil.Reporter) {
-		assertNoHandRolledPageOffset(r, root, pageOffsetRoot, pageOffsetOwner)
+		assertNoHandRolledPageOffset(r, root, pageOffsetRoots, pageOffsetOwner)
 	})
 
 	assert.False(t, report.Failed(), "a PageOffset call failed the guard: %s", report.Text())
 }
 
 // TestNoHandRolledPageOffset_TheGuardIsFatalOnAnEmptyWalk pins the seam, and this guard's scope
-// makes it the likeliest of the four here to trip it: the walk is one subdirectory, so the Go
-// moving out from under it empties the walk without emptying the repository.
+// makes it the likeliest of the four here to trip it: the walk is two named subdirectories, so
+// the Go moving out from under them empties the walk without emptying the repository. Both have
+// to exist and hold no Go for that to be the branch reached; a scope that is not there at all is
+// the different failure the case below pins.
 func TestNoHandRolledPageOffset_TheGuardIsFatalOnAnEmptyWalk(t *testing.T) {
 	root := t.TempDir()
+	writeLintFixture(t, root, "authserver/internal/data/notes.md", "and out of here too\n")
 	writeLintFixture(t, root, "core/data/notes.md", "the queries moved out of here\n")
 	writeLintFixture(t, root, "core/elsewhere/users.go", "package elsewhere\n")
 
 	report := testutil.RunGuard(func(r testutil.Reporter) {
-		assertNoHandRolledPageOffset(r, root, pageOffsetRoot, pageOffsetOwner)
+		assertNoHandRolledPageOffset(r, root, pageOffsetRoots, pageOffsetOwner)
 	})
 
 	require.True(t, report.Stopped, "an empty walk must be fatal rather than a pass")
 	assert.Contains(t, report.Fatal, "walked no Go files under")
-	assert.Contains(t, report.Fatal, pageOffsetRoot, "the fatal names the scope that covered nothing")
+	for _, dir := range pageOffsetRoots {
+		assert.Contains(t, report.Fatal, dir, "the fatal names every scope that covered nothing")
+	}
 }
 
-// TestNoHandRolledPageOffset_AScopeThatIsNotThereIsFatalToo is the other way this guard's one
-// subdirectory disappears, and it is answered as a walk error rather than as an empty scope. The
+// TestNoHandRolledPageOffset_AScopeThatIsNotThereIsFatalToo is the other way one of this guard's
+// subdirectories disappears, and it is answered as a walk error rather than as an empty scope. The
 // two are worth telling apart: a directory holding no Go any more is a fact about the tree, and a
-// directory that is not there at all is a scope constant nobody updated.
+// directory that is not there at all is a scope constant nobody updated. One missing root is
+// enough, which is what keeps a two-element scope no weaker than a one-element one.
 func TestNoHandRolledPageOffset_AScopeThatIsNotThereIsFatalToo(t *testing.T) {
 	root := t.TempDir()
 	writeLintFixture(t, root, "core/elsewhere/users.go", "package elsewhere\n")
 
 	report := testutil.RunGuard(func(r testutil.Reporter) {
-		assertNoHandRolledPageOffset(r, root, pageOffsetRoot, pageOffsetOwner)
+		assertNoHandRolledPageOffset(r, root, pageOffsetRoots, pageOffsetOwner)
 	})
 
 	require.True(t, report.Stopped)

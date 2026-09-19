@@ -1276,7 +1276,7 @@ func checkGoldenVersion(tree migrationTree, recorded map[schemadump.Dialect]int)
 		if got != highest[d] {
 			out = append(out, migrationFinding{"golden version", where, fmt.Sprintf(
 				"was dumped at migration %d, but %sdb's highest migration is %06d; "+
-					"regenerate all four with `cd src/core && go run ./cmd/schemadump` in the dev container",
+					"regenerate all four with `cd src/authserver && go run ./cmd/schemadump` in the dev container",
 				got, d, highest[d])})
 		}
 	}

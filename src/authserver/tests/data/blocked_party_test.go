@@ -8,10 +8,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leodip/goiabada/core/data/mssqldb"
-	"github.com/leodip/goiabada/core/data/mysqldb"
-	"github.com/leodip/goiabada/core/data/postgresdb"
-	"github.com/leodip/goiabada/core/data/sqlitedb"
+	"github.com/leodip/goiabada/authserver/internal/data/mssqldb"
+	"github.com/leodip/goiabada/authserver/internal/data/mysqldb"
+	"github.com/leodip/goiabada/authserver/internal/data/postgresdb"
+	"github.com/leodip/goiabada/authserver/internal/data/sqlitedb"
 )
 
 // A CONCURRENCY TEST THAT CANNOT SEE THE OTHER PARTY BLOCK MEASURES NOTHING.

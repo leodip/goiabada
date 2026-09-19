@@ -13,12 +13,12 @@ import (
 	"strings"
 
 	"github.com/leodip/goiabada/authserver/internal/config"
+	"github.com/leodip/goiabada/authserver/internal/data/migrator"
+	"github.com/leodip/goiabada/authserver/internal/data/mssqldb"
+	"github.com/leodip/goiabada/authserver/internal/data/mysqldb"
+	"github.com/leodip/goiabada/authserver/internal/data/postgresdb"
+	"github.com/leodip/goiabada/authserver/internal/data/sqlitedb"
 	"github.com/leodip/goiabada/core/data"
-	"github.com/leodip/goiabada/core/data/migrator"
-	"github.com/leodip/goiabada/core/data/mssqldb"
-	"github.com/leodip/goiabada/core/data/mysqldb"
-	"github.com/leodip/goiabada/core/data/postgresdb"
-	"github.com/leodip/goiabada/core/data/sqlitedb"
 	"github.com/leodip/goiabada/core/errs"
 )
 
