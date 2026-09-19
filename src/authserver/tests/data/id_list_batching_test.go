@@ -23,8 +23,9 @@ const absentIdBase = int64(1_000_000_000)
 //
 // One table rather than a case per file, because the property is one property and the thirteen
 // lookups differ only in what they select. A new lookup adds a row here and the lint in
-// src/core/data adds nothing by itself: it can see that forEachIdBatch is called and not that the
-// IN list was built from the batch rather than from the whole list. This is what sees that.
+// src/authserver/internal/data adds nothing by itself: it can see that forEachIdBatch is called
+// and not that the IN list was built from the batch rather than from the whole list. This is
+// what sees that.
 //
 // The two lengths are chosen: 2,101 is one past SQL Server's ceiling, and 2,000 is an exact
 // multiple of the batch size, where an off-by-one in the loop bounds drops the final batch instead

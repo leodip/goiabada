@@ -201,9 +201,9 @@ func newIsolated(t *testing.T, db migratable, sqlDB *sql.DB, name string) *isola
 	return &isolatedDB{DB: db, SQL: sqlDB, Migrator: m, Name: name}
 }
 
-// The shapes and the dumper live in the core module now, at data/schemadump, because the
+// The shapes and the dumper live at authserver/internal/data/schemadump, because the
 // generator command that writes the golden files cannot reach an unexported helper in
-// another module's test package (#284). What stays here is the thin layer this package's
+// another package (#284). What stays here is the thin layer this package's
 // migration tests were written against.
 //
 // tableShape is a defined type over schemadump.TableShape rather than an alias or an

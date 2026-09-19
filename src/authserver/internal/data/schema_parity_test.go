@@ -3,8 +3,8 @@ package data
 // The cross-engine parity comparison (#284, seam 3): a pure function over four parsed golden
 // files that says whether the four supported engines build the same schema.
 //
-// It lives here, in the core module with no database of its own, because that is the only
-// place it can run once. The data tier runs one engine per process, selected by
+// It lives here, in the auth server's internal tier with no database of its own, because that
+// is the only place it can run once. The data tier runs one engine per process, selected by
 // GOIABADA_DB_TYPE, so a comparison that lived there would run four times in CI, each time
 // doing identical work that needs no database at all. Reading committed files instead means
 // no database state can make it green.

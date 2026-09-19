@@ -384,8 +384,8 @@ func broken( {
 //
 // core/testutil is a live instance of the row the parser exists for: errors_lint.go names the
 // pkg/errors import path in a comment and in a string literal, and neither is an import.
-// core/data/benign_sentinel_lint_test.go spells it inside a raw string, and being a test file it
-// is out of scope twice over.
+// authserver/internal/data/benign_sentinel_lint_test.go spells it inside a raw string, and
+// being a test file it is out of scope twice over.
 func TestNoLegacyErrors_TheTreeItself(t *testing.T) {
 	AssertNoLegacyErrors(t)
 }
