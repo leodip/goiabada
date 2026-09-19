@@ -13,7 +13,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/leodip/goiabada/core/data/schemadump"
+	"github.com/leodip/goiabada/authserver/internal/data/schemadump"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

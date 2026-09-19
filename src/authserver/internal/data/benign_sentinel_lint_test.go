@@ -17,7 +17,7 @@ package data
 // one a comment would not reach. This test makes it a compile-time-adjacent fact instead (#268).
 //
 // It reads and parses files and nothing else: no database, no git, no network, so it runs in the
-// core tier on every CI job rather than only the four database ones.
+// authserver internal tier on every CI job rather than only the four database ones.
 
 import (
 	"go/ast"
@@ -215,12 +215,12 @@ func TestNoErrorsIsOnABenignMigratorSentinel_TheCheckerReadsTheTarget(t *testing
 
 	// Accepted: the identity helpers, errors.Is on an error that is NOT benign, and the names
 	// inside a comment and a string.
-	write("core/data/sqlitedb/db.go", `package sqlitedb
+	write("authserver/internal/data/sqlitedb/db.go", `package sqlitedb
 
 import (
 	"errors"
 
-	"github.com/leodip/goiabada/core/data/migrator"
+	"github.com/leodip/goiabada/authserver/internal/data/migrator"
 	"github.com/leodip/goiabada/core/data/matcher"
 )
 
@@ -248,12 +248,12 @@ func migrate(m *migrator.Migrator) error {
 		"the helpers, a non-benign target, a comment, a string and an Is on some other package are all fine")
 
 	// Refused: both spellings of both sentinels, qualified and bare.
-	write("core/data/mysqldb/db.go", `package mysqldb
+	write("authserver/internal/data/mysqldb/db.go", `package mysqldb
 
 import (
 	"errors"
 
-	"github.com/leodip/goiabada/core/data/migrator"
+	"github.com/leodip/goiabada/authserver/internal/data/migrator"
 )
 
 func migrate(m *migrator.Migrator) error {
@@ -268,7 +268,7 @@ func migrate(m *migrator.Migrator) error {
 	return err
 }
 `)
-	write("core/data/migrator/inside.go", `package migrator
+	write("authserver/internal/data/migrator/inside.go", `package migrator
 
 import "errors"
 
@@ -278,12 +278,12 @@ func isNothingToDo(err error) bool { return errors.Is(err, ErrNoChange) }
 	// exactly this name today, so a checker keyed on the identifier "errors" misses the one file
 	// where the mistake is nearest to hand. The migrator import is aliased too, because the target
 	// is read by selector name and must not depend on the package's spelling either.
-	write("core/data/mssqldb/db.go", `package mssqldb
+	write("authserver/internal/data/mssqldb/db.go", `package mssqldb
 
 import (
 	goerrors "errors"
 
-	mig "github.com/leodip/goiabada/core/data/migrator"
+	mig "github.com/leodip/goiabada/authserver/internal/data/migrator"
 )
 
 func migrate(m *mig.Migrator) error {
@@ -301,12 +301,12 @@ func migrate(m *mig.Migrator) error {
 	// github.com/pkg/errors is imported by 220 files under src/ and binds the same identifier an
 	// unaliased standard import does. Its Is forwards to the standard one, so it finds the
 	// sentinel inside the join in exactly the same way and is the same defect.
-	write("core/data/postgresdb/db.go", `package postgresdb
+	write("authserver/internal/data/postgresdb/db.go", `package postgresdb
 
 import (
 	"github.com/pkg/errors"
 
-	"github.com/leodip/goiabada/core/data/migrator"
+	"github.com/leodip/goiabada/authserver/internal/data/migrator"
 )
 
 func migrate(m *migrator.Migrator) error {
@@ -318,12 +318,12 @@ func migrate(m *migrator.Migrator) error {
 }
 `)
 	// And a test file carrying the same call, which is walked past rather than reported.
-	write("core/data/mysqldb/db_test.go", `package mysqldb
+	write("authserver/internal/data/mysqldb/db_test.go", `package mysqldb
 
 import (
 	"errors"
 
-	"github.com/leodip/goiabada/core/data/migrator"
+	"github.com/leodip/goiabada/authserver/internal/data/migrator"
 )
 
 func assertNoChange(err error) bool { return errors.Is(err, migrator.ErrNoChange) }
@@ -339,12 +339,12 @@ func assertNoChange(err error) bool { return errors.Is(err, migrator.ErrNoChange
 	}
 	sort.Strings(seen)
 	require.Equal(t, []string{
-		"core/data/migrator/inside.go ErrNoChange",
-		"core/data/mssqldb/db.go ErrNilVersion",
-		"core/data/mssqldb/db.go ErrNoChange",
-		"core/data/mysqldb/db.go ErrNilVersion",
-		"core/data/mysqldb/db.go ErrNoChange",
-		"core/data/postgresdb/db.go ErrNoChange",
+		"authserver/internal/data/migrator/inside.go ErrNoChange",
+		"authserver/internal/data/mssqldb/db.go ErrNilVersion",
+		"authserver/internal/data/mssqldb/db.go ErrNoChange",
+		"authserver/internal/data/mysqldb/db.go ErrNilVersion",
+		"authserver/internal/data/mysqldb/db.go ErrNoChange",
+		"authserver/internal/data/postgresdb/db.go ErrNoChange",
 	}, seen, "both sentinels under every spelling of both errors packages, and nothing from the test file")
 }
 
@@ -354,12 +354,12 @@ func assertNoChange(err error) bool { return errors.Is(err, migrator.ErrNoChange
 // clean since #268.
 func TestNoErrorsIsOnABenignMigratorSentinel_TheGuardFailsOnAMatch(t *testing.T) {
 	root := t.TempDir()
-	writeLintFixture(t, root, "core/data/mysqldb/migrate.go", `package mysqldb
+	writeLintFixture(t, root, "authserver/internal/data/mysqldb/migrate.go", `package mysqldb
 
 import (
 	"errors"
 
-	"github.com/leodip/goiabada/core/data/migrator"
+	"github.com/leodip/goiabada/authserver/internal/data/migrator"
 )
 
 func migrate(m *migrator.Migrator) error {
@@ -376,7 +376,7 @@ func migrate(m *migrator.Migrator) error {
 
 	require.True(t, report.Failed(), "an errors.Is on a benign sentinel passed the guard")
 	assert.False(t, report.Stopped, "a finding is an Errorf, not a Fatalf")
-	assert.Contains(t, report.Text(), "core/data/mysqldb/migrate.go:10")
+	assert.Contains(t, report.Text(), "authserver/internal/data/mysqldb/migrate.go:10")
 	assert.Contains(t, report.Text(), "ErrNoChange")
 	assert.Contains(t, report.Text(), "migrator.IsNoChange")
 	assert.Contains(t, report.Text(), "#268")
@@ -386,9 +386,9 @@ func migrate(m *migrator.Migrator) error {
 // call the rule exists to send readers to.
 func TestNoErrorsIsOnABenignMigratorSentinel_TheGuardPassesTheHelper(t *testing.T) {
 	root := t.TempDir()
-	writeLintFixture(t, root, "core/data/mysqldb/migrate.go", `package mysqldb
+	writeLintFixture(t, root, "authserver/internal/data/mysqldb/migrate.go", `package mysqldb
 
-import "github.com/leodip/goiabada/core/data/migrator"
+import "github.com/leodip/goiabada/authserver/internal/data/migrator"
 
 func migrate(m *migrator.Migrator) error {
 	if err := m.Up(); err != nil && !migrator.IsNoChange(err) {

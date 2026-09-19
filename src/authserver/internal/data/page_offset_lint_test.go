@@ -21,8 +21,8 @@ package data
 // next paginated read, or the next dialect override, is the one this catches.
 //
 // It reads and parses files and nothing else: no database, no git, no network,
-// so it runs in the core tier on every CI job rather than only the four
-// database ones.
+// so it runs in the authserver internal tier on every CI job rather than only
+// the four database ones.
 
 import (
 	"go/ast"
@@ -240,7 +240,7 @@ func page(page, pageSize int) int {
 	return PageOffset(page, pageSize)
 }
 `)
-	write("core/data/mssqldb/audit_log.go", `package mssqldb
+	write("authserver/internal/data/mssqldb/audit_log.go", `package mssqldb
 
 import "fmt"
 
@@ -295,14 +295,14 @@ func offsetB(p, n int) int {
 	return (p-1)*n
 }
 `)
-	write("core/data/postgresdb/audit_log.go", `package postgresdb
+	write("authserver/internal/data/postgresdb/audit_log.go", `package postgresdb
 
 func offsetC(page, pageSize int) int {
 	offset := ((page) - 1) * pageSize
 	return offset
 }
 `)
-	write("core/data/mysqldb/group.go", `package mysqldb
+	write("authserver/internal/data/mysqldb/group.go", `package mysqldb
 
 type params struct{ Page, Size int }
 
@@ -313,7 +313,7 @@ func offsetD(p params) int {
 	// Rejected: the same offset with the operands the other way round. It is
 	// the same arithmetic and the same overflow, and it is what a checker
 	// reading only the left operand lets through.
-	write("core/data/sqlitedb/user.go", `package sqlitedb
+	write("authserver/internal/data/sqlitedb/user.go", `package sqlitedb
 
 func offsetE(page, pageSize int) int {
 	return pageSize * (page - 1)
@@ -331,9 +331,9 @@ func offsetE(page, pageSize int) int {
 	assert.ElementsMatch(t, []string{
 		"core/data/commondb/user.go:4",
 		"core/data/commondb/user_session.go:4",
-		"core/data/postgresdb/audit_log.go:4",
-		"core/data/mysqldb/group.go:6",
-		"core/data/sqlitedb/user.go:4",
+		"authserver/internal/data/postgresdb/audit_log.go:4",
+		"authserver/internal/data/mysqldb/group.go:6",
+		"authserver/internal/data/sqlitedb/user.go:4",
 	}, got, "the checker matched the wrong set")
 
 	// And the failure names the expression, so the reader is sent to the line
@@ -343,10 +343,10 @@ func offsetE(page, pageSize int) int {
 		byFile[f.file] = f.text
 	}
 	assert.Equal(t, "(page - 1) * pageSize", byFile["core/data/commondb/user.go"])
-	assert.Equal(t, "(p.Page - 1) * p.Size", byFile["core/data/mysqldb/group.go"])
+	assert.Equal(t, "(p.Page - 1) * p.Size", byFile["authserver/internal/data/mysqldb/group.go"])
 	// And the commuted one is rendered the way it is written, rather than
 	// silently normalised into the other order.
-	assert.Equal(t, "pageSize * (page - 1)", byFile["core/data/sqlitedb/user.go"])
+	assert.Equal(t, "pageSize * (page - 1)", byFile["authserver/internal/data/sqlitedb/user.go"])
 }
 
 // TestNoHandRolledPageOffset_TheGuardFailsOnArithmetic is the third half. The case above asserts on
@@ -354,7 +354,7 @@ func offsetE(page, pageSize int) int {
 // by TestNoHandRolledPageOffset, which walks a tree that has been clean since #305.
 func TestNoHandRolledPageOffset_TheGuardFailsOnArithmetic(t *testing.T) {
 	root := t.TempDir()
-	writeLintFixture(t, root, "core/data/mysqldb/users.go", `package mysqldb
+	writeLintFixture(t, root, "authserver/internal/data/mysqldb/users.go", `package mysqldb
 
 func window(page, pageSize int) int {
 	return (page - 1) * pageSize
@@ -367,7 +367,7 @@ func window(page, pageSize int) int {
 
 	require.True(t, report.Failed(), "hand-rolled offset arithmetic passed the guard")
 	assert.False(t, report.Stopped, "a finding is an Errorf, not a Fatalf")
-	assert.Contains(t, report.Text(), "core/data/mysqldb/users.go:4")
+	assert.Contains(t, report.Text(), "authserver/internal/data/mysqldb/users.go:4")
 	assert.Contains(t, report.Text(), "commondb.PageOffset(page, pageSize)")
 	assert.Contains(t, report.Text(), "#305")
 }
@@ -376,7 +376,7 @@ func window(page, pageSize int) int {
 // replaced the arithmetic.
 func TestNoHandRolledPageOffset_TheGuardPassesTheHelper(t *testing.T) {
 	root := t.TempDir()
-	writeLintFixture(t, root, "core/data/mysqldb/users.go", `package mysqldb
+	writeLintFixture(t, root, "authserver/internal/data/mysqldb/users.go", `package mysqldb
 
 func window(page, pageSize int) int {
 	return commondb.PageOffset(page, pageSize)

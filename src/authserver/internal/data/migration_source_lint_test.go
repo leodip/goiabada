@@ -7,9 +7,9 @@ package data
 // has quietly stopped matching anything is caught by the synthetic half, and this half is a
 // claim about what is actually on disk.
 //
-// It reads files and nothing else: no database, no git, no network, so it runs in the core tier
-// on every CI job rather than only the four database ones, and it gives the same answer in a
-// tarball, in a worktree and on a shallow clone (#288 decision 1).
+// It reads files and nothing else: no database, no git, no network, so it runs in the authserver
+// internal tier on every CI job rather than only the four database ones, and it gives the same
+// answer in a tarball, in a worktree and on a shallow clone (#288 decision 1).
 
 import (
 	"fmt"
@@ -18,7 +18,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/core/data/schemadump"
+	"github.com/leodip/goiabada/authserver/internal/data/schemadump"
 	"github.com/stretchr/testify/require"
 )
 
@@ -106,7 +106,7 @@ func committedMigrationTree(t *testing.T) migrationTree {
 	root, err := schemadump.SourceRoot()
 	require.NoError(t, err, "find the source root the way schemadump.GoldenPath does")
 
-	dirs, err := filepath.Glob(filepath.Join(root, "core", "data", "*db", "migrations"))
+	dirs, err := filepath.Glob(filepath.Join(root, "authserver", "internal", "data", "*db", "migrations"))
 	require.NoError(t, err, "discover the migration directories")
 
 	// commondb has no migrations subdirectory and so is not here.
