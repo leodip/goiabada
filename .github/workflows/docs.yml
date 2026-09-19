@@ -1,7 +1,7 @@
 # The documentation image. Decoupled from releases, so a typo fix ships when it
 # is merged rather than waiting for the next release or a remembered manual
 # dispatch. The path filter means Go-only PRs, the large majority, never pay for
-# it (docs/ci-v2-design.md 4.9).
+# it.
 #
 # This workflow owns EVERY docs build. An earlier draft had publish.yml dispatch
 # it as well, which meant a stable release built and pushed the docs image

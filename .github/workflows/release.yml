@@ -1,6 +1,6 @@
 # Tag-driven release. Pushing v1.6.0 is the entire procedure; everything below
 # derives from that one tag, and it stops at a DRAFT so the notes can be written
-# before anything user-visible moves (docs/ci-v2-design.md 4.6).
+# before anything user-visible moves.
 #
 # Actions are SHA-pinned here, not tag-pinned as in check.yml. This workflow
 # holds Docker Hub credentials, and a moving tag like @v3 means whoever controls
@@ -211,7 +211,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       # Version tags only. `latest` moves in publish.yml, when the release is
-      # deliberately published (4.6).
+      # deliberately published.
       - name: Build and push multi-arch images
         working-directory: src/build
         env:

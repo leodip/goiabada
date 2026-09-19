@@ -6,7 +6,7 @@
 # cannot see any of them -- they are shell downloads, Dockerfile pins and script
 # tags in HTML rather than package manifests. Those stay
 # `./version-manager.sh check` territory. The two tools are complementary, not
-# overlapping (docs/ci-v2-design.md 5.9).
+# overlapping.
 
 version: 2
 

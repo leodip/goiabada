@@ -282,6 +282,11 @@ point is that it must never come back, as the five driver rows below are. `clear
 expected to do it and is documentation only — if an earlier issue gets there first, the guard says
 so and the row changes then.
 
+A row may name a package inside a module the admin console otherwise compiles legitimately:
+`golang.org/x/crypto/bcrypt` is one, because `core/sessionstore/codec.go` reaches
+`golang.org/x/crypto` for `chacha20poly1305`, so a row for the parent module would be false
+(#360).
+
 ### Foreign modules
 
 | module | why it must not be there | reachable today | cleared by |
@@ -293,6 +298,7 @@ so and the row changes then.
 | `github.com/huandu/go-sqlbuilder` | SQL construction | no | — |
 | `github.com/pquerna/otp` | TOTP generation | no | — |
 | `github.com/go-chi/cors` | CORS policy is the auth server's | no | — |
+| `golang.org/x/crypto/bcrypt` | provider-only password hashing | yes | #360 |
 
 Every driver used to arrive the same way, through one edge:
 

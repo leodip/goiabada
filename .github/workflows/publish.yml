@@ -1,12 +1,11 @@
 # Phase two of the release. Publishing the draft is what moves `latest`, so the
 # tag every unpinned `docker compose` deployment follows changes at the moment
-# you consciously decide to release, not when CI happened to go green
-# (docs/ci-v2-design.md 4.6).
+# you consciously decide to release, not when CI happened to go green.
 #
 # Deleting the draft instead is a real abort: no user-visible tag ever moved.
 #
 # This workflow does NOT touch the docs. docs.yml owns every docs build,
-# listening for the same event; neither dispatches the other (5.4).
+# listening for the same event; neither dispatches the other.
 
 name: Publish
 
