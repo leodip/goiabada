@@ -3,8 +3,7 @@
 # packages each pair as a zip.
 #
 # The version is no longer edited into this file. It comes from the caller,
-# which in a release is the git tag (see docs/ci-v2-design.md 4.1). A plain
-# local run produces "dev".
+# which in a release is the git tag. A plain local run produces "dev".
 #
 # set -euo pipefail matters more here than it looks: without it, build_platform
 # ran cd, go build and zip with no status checks, the loop continued across all

@@ -2,8 +2,8 @@
 # Cross-compiles goiabada-setup for every supported platform.
 #
 # The version is no longer edited into this file. It comes from the caller,
-# which in a release is the git tag (see docs/ci-v2-design.md 4.1). A plain
-# local run produces "dev", which is the honest answer for a source build.
+# which in a release is the git tag. A plain local run produces "dev", which
+# is the honest answer for a source build.
 set -euo pipefail
 
 VERSION="${GOIABADA_VERSION:-dev}"

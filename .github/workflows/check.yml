@@ -34,7 +34,7 @@ concurrency:
   # runners on the previous commit. Never cancel a push to main.
   #
   # This was `true` unconditionally, which was wrong: `Build validation` runs
-  # ONLY on push (4.5), and it is the sole job that exercises the release path
+  # ONLY on push, and it is the sole job that exercises the release path
   # -- five cross-compiles plus both Docker images. Merging two PRs in quick
   # succession cancelled the first one's run, so a commit landed on main having
   # never had its build path validated, which is precisely what that job exists
@@ -197,8 +197,7 @@ jobs:
       # The standalone staticcheck binary is deliberately not run. It does not
       # ship the QF (quickfix) checks that golangci-lint's bundled copy
       # registers, making it a strict subset that cannot fail when golangci-lint
-      # passes. .golangci.yml is the single definition of lint-clean
-      # (docs/ci-v2-design.md 5.8).
+      # passes. .golangci.yml is the single definition of lint-clean.
       - name: gofmt, vet, golangci-lint, unparam
         run: |
           rc=0

@@ -4,7 +4,7 @@ set -euo pipefail  # Exit on error, undefined variables, pipe failures
 # Configuration
 #
 # The version is no longer edited into this file. It comes from the caller,
-# which in a release is the git tag (see docs/ci-v2-design.md 4.1).
+# which in a release is the git tag.
 VERSION="${GOIABADA_VERSION:-dev}"
 BUILD_DATE=$(date +%Y-%m-%d)
 GIT_COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
@@ -134,7 +134,7 @@ if [[ "$PUSH" == true ]]; then
     # Version tag only. The `latest` tags are no longer produced here: they are
     # moved by publish.yml when a release is deliberately published, so that the
     # tag every unpinned deployment follows changes at that moment rather than
-    # whenever CI happens to go green (docs/ci-v2-design.md 4.6).
+    # whenever CI happens to go green.
     docker buildx build --progress=plain \
       --platform "$PLATFORMS" \
       -f ./build/Dockerfile-authserver \
@@ -175,7 +175,7 @@ else
     # Version tag only. The `latest` tags are no longer produced here: they are
     # moved by publish.yml when a release is deliberately published, so that the
     # tag every unpinned deployment follows changes at that moment rather than
-    # whenever CI happens to go green (docs/ci-v2-design.md 4.6).
+    # whenever CI happens to go green.
     docker buildx build --progress=plain \
       --platform linux/amd64 \
       -f ./build/Dockerfile-authserver \
