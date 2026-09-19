@@ -22,11 +22,8 @@ func TestUser_OTPSecret(t *testing.T) {
 		t.Fatalf("SetOTPSecret: %v", err)
 	}
 
-	// The plaintext column must be cleared, and the encrypted value must be
-	// populated without containing the seed verbatim.
-	if u.OTPSecret != "" {
-		t.Errorf("OTPSecret plaintext = %q, want empty", u.OTPSecret)
-	}
+	// The encrypted value must be populated without containing the seed verbatim. There is no
+	// plaintext column to check: migration 000048 dropped users.otp_secret (#98).
 	if len(u.OTPSecretEncrypted) == 0 {
 		t.Fatal("OTPSecretEncrypted is empty after SetOTPSecret")
 	}
@@ -58,10 +55,13 @@ func TestUser_OTPSecret(t *testing.T) {
 		t.Errorf("GetOTPSecret on empty user = (%q, %v), want (\"\", nil)", got, err)
 	}
 
-	// ClearOTPSecret removes both representations.
+	// ClearOTPSecret removes the stored seed.
 	u.ClearOTPSecret()
-	if u.OTPSecret != "" || len(u.OTPSecretEncrypted) != 0 {
-		t.Errorf("ClearOTPSecret left data: plaintext=%q enc len=%d", u.OTPSecret, len(u.OTPSecretEncrypted))
+	if len(u.OTPSecretEncrypted) != 0 {
+		t.Errorf("ClearOTPSecret left data: enc len=%d", len(u.OTPSecretEncrypted))
+	}
+	if got, err := u.GetOTPSecret(); err != nil || got != "" {
+		t.Errorf("GetOTPSecret after ClearOTPSecret = (%q, %v), want (\"\", nil)", got, err)
 	}
 }
 

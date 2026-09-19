@@ -48,7 +48,6 @@ func TestAuthOtp_ClientDisplay_ShowDisplayName_Enabled(t *testing.T) {
 		Enabled:            true,
 		Email:              userEmail,
 		PasswordHash:       passwordHashed,
-		OTPSecret:          key.Secret(),
 		OTPSecretEncrypted: encryptOTPSecretForTest(t, key.Secret()),
 		OTPEnabled:         true,
 	}
@@ -110,7 +109,6 @@ func TestAuthOtp_ClientDisplay_AllEnabled_Enabled(t *testing.T) {
 		Enabled:            true,
 		Email:              userEmail,
 		PasswordHash:       passwordHashed,
-		OTPSecret:          key.Secret(),
 		OTPSecretEncrypted: encryptOTPSecretForTest(t, key.Secret()),
 		OTPEnabled:         true,
 	}
@@ -173,7 +171,6 @@ func TestAuthOtp_ClientDisplay_AllDisabled_Enabled(t *testing.T) {
 		Enabled:            true,
 		Email:              userEmail,
 		PasswordHash:       passwordHashed,
-		OTPSecret:          key.Secret(),
 		OTPSecretEncrypted: encryptOTPSecretForTest(t, key.Secret()),
 		OTPEnabled:         true,
 	}

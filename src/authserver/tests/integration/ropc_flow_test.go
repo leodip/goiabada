@@ -575,8 +575,7 @@ func TestROPC_UserWith2FAEnabled(t *testing.T) {
 		Enabled:            true,
 		Email:              fake.Email(),
 		PasswordHash:       passwordHashed,
-		OTPEnabled:         true,               // 2FA enabled
-		OTPSecret:          "JBSWY3DPEHPK3PXP", // Dummy OTP secret
+		OTPEnabled:         true, // 2FA enabled
 		OTPSecretEncrypted: encryptOTPSecretForTest(t, "JBSWY3DPEHPK3PXP"),
 	}
 	err = database.CreateUser(nil, user)

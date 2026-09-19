@@ -619,7 +619,6 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsR
 		Enabled:            true,
 		Email:              userEmail,
 		PasswordHash:       passwordHashed,
-		OTPSecret:          key.Secret(),
 		OTPSecretEncrypted: encryptOTPSecretForTest(t, key.Secret()),
 		OTPEnabled:         true,
 	}
@@ -684,7 +683,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsR
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	otpCode, err := totp.GenerateCode(user.OTPSecret, time.Now())
+	otpCode, err := totp.GenerateCode(key.Secret(), time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -781,7 +780,6 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsR
 		Enabled:            true,
 		Email:              userEmail,
 		PasswordHash:       passwordHashed,
-		OTPSecret:          key.Secret(),
 		OTPSecretEncrypted: encryptOTPSecretForTest(t, key.Secret()),
 		OTPEnabled:         true,
 	}
@@ -846,7 +844,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsR
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	otpCode, err := totp.GenerateCode(user.OTPSecret, time.Now())
+	otpCode, err := totp.GenerateCode(key.Secret(), time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1257,7 +1255,6 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 		Enabled:            true,
 		Email:              userEmail,
 		PasswordHash:       passwordHashed,
-		OTPSecret:          key.Secret(),
 		OTPSecretEncrypted: encryptOTPSecretForTest(t, key.Secret()),
 		OTPEnabled:         true,
 	}
@@ -1322,7 +1319,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	otpCode, err := totp.GenerateCode(user.OTPSecret, time.Now())
+	otpCode, err := totp.GenerateCode(key.Secret(), time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1419,7 +1416,6 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 		Enabled:            true,
 		Email:              userEmail,
 		PasswordHash:       passwordHashed,
-		OTPSecret:          key.Secret(),
 		OTPSecretEncrypted: encryptOTPSecretForTest(t, key.Secret()),
 		OTPEnabled:         true,
 	}
@@ -1484,7 +1480,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	otpCode, err := totp.GenerateCode(user.OTPSecret, time.Now())
+	otpCode, err := totp.GenerateCode(key.Secret(), time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1833,7 +1829,6 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsR
 		Enabled:            true,
 		Email:              userEmail,
 		PasswordHash:       passwordHashed,
-		OTPSecret:          key.Secret(),
 		OTPSecretEncrypted: encryptOTPSecretForTest(t, key.Secret()),
 		OTPEnabled:         true,
 	}
@@ -1898,7 +1893,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsR
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	otpCode, err := totp.GenerateCode(user.OTPSecret, time.Now())
+	otpCode, err := totp.GenerateCode(key.Secret(), time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2104,7 +2099,6 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 		Enabled:            true,
 		Email:              userEmail,
 		PasswordHash:       passwordHashed,
-		OTPSecret:          key.Secret(),
 		OTPSecretEncrypted: encryptOTPSecretForTest(t, key.Secret()),
 		OTPEnabled:         true,
 	}
@@ -2169,7 +2163,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	otpCode, err := totp.GenerateCode(user.OTPSecret, time.Now())
+	otpCode, err := totp.GenerateCode(key.Secret(), time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}

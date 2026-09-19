@@ -64,10 +64,11 @@ type crossUserBrowser struct {
 	sessionA *models.UserSession
 }
 
-// createCrossUserUser makes a user this file can sign in. withOtp enrols a real TOTP secret, kept in
-// plaintext on the model so a case can generate a passcode from it, and encrypted at rest the way
-// production stores it.
-func createCrossUserUser(t *testing.T, withOtp bool) (*models.User, string) {
+// createCrossUserUser makes a user this file can sign in. withOtp enrols a real TOTP secret,
+// encrypted at rest the way production stores it, and RETURNS the plaintext seed so a case can
+// generate a passcode from it: users.otp_secret was dropped by migration 000048 (#98), so the seed
+// lives in a local rather than on the model. Without withOtp the returned seed is empty.
+func createCrossUserUser(t *testing.T, withOtp bool) (*models.User, string, string) {
 	password := fake.Password(10)
 	passwordHashed, err := hashutil.HashPassword(password)
 	require.NoError(t, err)
@@ -79,16 +80,17 @@ func createCrossUserUser(t *testing.T, withOtp bool) (*models.User, string) {
 		PasswordHash: passwordHashed,
 	}
 
+	otpSecret := ""
 	if withOtp {
 		key, err := totp.Generate(totp.GenerateOpts{Issuer: "Goiabada", AccountName: user.Email})
 		require.NoError(t, err)
-		user.OTPSecret = key.Secret()
-		user.OTPSecretEncrypted = encryptOTPSecretForTest(t, key.Secret())
+		otpSecret = key.Secret()
+		user.OTPSecretEncrypted = encryptOTPSecretForTest(t, otpSecret)
 		user.OTPEnabled = true
 	}
 
 	require.NoError(t, database.CreateUser(nil, user))
-	return user, password
+	return user, password, otpSecret
 }
 
 // createCrossUserBrowser builds the confidential client, both users, and a browser with user A
@@ -142,8 +144,8 @@ func createCrossUserBrowser(t *testing.T, defaultAcrLevel enums.AcrLevel,
 
 	// A presents a second factor whenever A's own level asks for one; B never does.
 	aPresentsOtp := aSessionAcrLevel.IsHigherThan(enums.AcrLevel1)
-	userA, passwordA := createCrossUserUser(t, aPresentsOtp)
-	userB, passwordB := createCrossUserUser(t, false)
+	userA, passwordA, otpSecretA := createCrossUserUser(t, aPresentsOtp)
+	userB, passwordB, _ := createCrossUserUser(t, false)
 
 	b := &crossUserBrowser{
 		jar:          createHttpClient(t),
@@ -163,7 +165,7 @@ func createCrossUserBrowser(t *testing.T, defaultAcrLevel enums.AcrLevel,
 		aExtra = "&acr_values=" + url.QueryEscape(aSessionAcrLevel.String())
 	}
 	signInWithPassword(t, b.jar, crossUserAuthorizeUrl(b, aExtra),
-		userA.Email, passwordA, aPresentsOtp, userA.OTPSecret)
+		userA.Email, passwordA, aPresentsOtp, otpSecretA)
 
 	sessionsA, err := database.GetUserSessionsByUserId(nil, userA.Id)
 	require.NoError(t, err)

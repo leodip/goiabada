@@ -18,10 +18,10 @@ import (
 // was started with and no test could hand it a different one. With the key a parameter the branch
 // is one call away, which is half the reason decision 7 made it one.
 //
-// The refusal matters because of what runs immediately after it. runStartupDataTasks re-encrypts
-// data at rest to this key and encrypts legacy plaintext OTP secrets with it, so a short or
-// absent key that got past here would not fail loudly; it would write ciphertext no correctly
-// configured restart can decrypt.
+// The refusal matters because of what runs immediately after it. runStartupDataTasks re-keys
+// every protected column to this key when a previous key is supplied, so a short or absent key
+// that got past here would not fail loudly; it would write ciphertext no correctly configured
+// restart can decrypt.
 //
 // sqlite only, and for the reason TestNewDatabase_RefusesAnEmailCaseCollisionAtStartup gives: a
 // DSN pointing at a throwaway file is the one way to reach NewDatabase without touching the

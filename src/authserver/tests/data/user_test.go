@@ -72,7 +72,7 @@ func TestUpdateUser(t *testing.T) {
 	user.AddressPostalCode = fake.DigitN(5)
 	user.AddressCountry = strings.ToUpper(fake.LetterN(2))
 	user.PasswordHash = fake.Password(64)
-	user.OTPSecret = fake.UUID()
+	user.OTPSecretEncrypted = []byte(fake.Password(32))
 	user.OTPEnabled = !user.OTPEnabled
 	user.ForgotPasswordCodeEncrypted = []byte(fake.Password(32))
 	user.ForgotPasswordCodeIssuedAt = sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true}
@@ -468,7 +468,7 @@ func createTestUserOn(t *testing.T, db data.Database) *models.User {
 		AddressPostalCode:                    fake.DigitN(5),
 		AddressCountry:                       strings.ToUpper(fake.LetterN(2)),
 		PasswordHash:                         fake.Password(64),
-		OTPSecret:                            fake.UUID(),
+		OTPSecretEncrypted:                   []byte(fake.Password(32)),
 		OTPEnabled:                           fake.Bool(),
 		ForgotPasswordCodeEncrypted:          []byte(fake.Password(32)),
 		ForgotPasswordCodeIssuedAt:           sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true},
@@ -575,8 +575,8 @@ func compareUsers(t *testing.T, expected, actual *models.User) {
 	if actual.PasswordHash != expected.PasswordHash {
 		t.Errorf("PasswordHash mismatch: expected %s, got %s", expected.PasswordHash, actual.PasswordHash)
 	}
-	if actual.OTPSecret != expected.OTPSecret {
-		t.Errorf("OTPSecret mismatch: expected %s, got %s", expected.OTPSecret, actual.OTPSecret)
+	if string(actual.OTPSecretEncrypted) != string(expected.OTPSecretEncrypted) {
+		t.Errorf("OTPSecretEncrypted mismatch")
 	}
 	if actual.OTPEnabled != expected.OTPEnabled {
 		t.Errorf("OTPEnabled mismatch: expected %v, got %v", expected.OTPEnabled, actual.OTPEnabled)

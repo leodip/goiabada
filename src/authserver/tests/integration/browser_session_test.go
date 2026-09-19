@@ -170,7 +170,6 @@ func TestBrowserSession_IdentifierRotatesAtStepUp(t *testing.T) {
 	// step-up on the session the first one created rather than a fresh sign-in.
 	otpKey, err := totp.Generate(totp.GenerateOpts{Issuer: "Goiabada", AccountName: user.Email})
 	require.NoError(t, err)
-	user.OTPSecret = otpKey.Secret()
 	user.OTPSecretEncrypted = encryptOTPSecretForTest(t, otpKey.Secret())
 	user.OTPEnabled = true
 	require.NoError(t, database.UpdateUser(nil, user))
@@ -209,7 +208,7 @@ func TestBrowserSession_IdentifierRotatesAtStepUp(t *testing.T) {
 	// identifier the browser was reachable by at level 1.
 	beforeOtpId := decodeSessionIdentifier(t, requireSessionCookie(t, httpClient))
 
-	otpCode, err := totp.GenerateCode(user.OTPSecret, time.Now())
+	otpCode, err := totp.GenerateCode(otpKey.Secret(), time.Now())
 	require.NoError(t, err)
 	resp = authenticateWithOtp(t, httpClient, redirectLocation, resp, otpCode)
 	defer func() { _ = resp.Body.Close() }()
