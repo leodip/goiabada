@@ -43,21 +43,20 @@ import (
 // own body. Relative to the source root, forward slashes. It is not the place
 // to put a second owner -- a read that cannot use PageOffset is a design
 // question, not an exemption.
-const pageOffsetOwner = "core/data/commondb/pagination.go"
+const pageOffsetOwner = "authserver/internal/data/commondb/pagination.go"
 
 // pageOffsetRoots are the subtrees the rule covers: the data layer, where an
 // offset becomes SQL. Page arithmetic above it lands in a slice or a page bar
 // rather than in a query, and answers to its own rules.
 //
-// Two of them because the data layer sits in two modules until #359 moves
-// commondb: the four engine adapters are under the auth server and commondb
-// is still in core, and both are places an offset becomes SQL. One root
-// covering one of them would drop the other out of the rule's reach without
-// failing anything, which is the shape blinding AssertNoDeadInterfaces
-// demonstrated on 8883642d -- the guard stays green and stops guarding. It
-// collapses back to one element when commondb lands beside the adapters
-// (#354, #359).
-var pageOffsetRoots = []string{"core/data", "authserver/internal/data"}
+// One of them since #359 moved commondb in beside the four engine adapters,
+// which is every place in the tree an offset becomes SQL. It was two while the
+// data layer sat in two modules, and a second root has to be added back the day
+// a third such place appears: a root covering one of two would drop the other
+// out of the rule's reach without failing anything, which is the shape blinding
+// AssertNoDeadInterfaces demonstrated on 8883642d -- the guard stays green and
+// stops guarding.
+var pageOffsetRoots = []string{"authserver/internal/data"}
 
 // handRolledOffset is one "(x - 1) * y" expression in a file that is not
 // allowed to hold it.
@@ -256,7 +255,7 @@ func TestNoHandRolledPageOffset_TheCheckerMatchesTheShapeAndNotTheSpelling(t *te
 
 	// Accepted: the call that replaced the arithmetic, in both the forms the
 	// tree uses -- handed to the builder, and named first for a format string.
-	write("core/data/commondb/group.go", `package commondb
+	write("authserver/internal/data/commondb/group.go", `package commondb
 
 func page(page, pageSize int) int {
 	return PageOffset(page, pageSize)
@@ -272,7 +271,7 @@ func page(page, pageSize int) string {
 }
 `)
 	// Accepted: the owner's own body, which is where the arithmetic lives.
-	write("core/data/commondb/pagination.go", `package commondb
+	write("authserver/internal/data/commondb/pagination.go", `package commondb
 
 func PageOffset(page, pageSize int) int {
 	return (page - 1) * pageSize
@@ -282,14 +281,14 @@ func PageOffset(page, pageSize int) int {
 	// than 1, and multiplying without subtracting, are not page offsets --
 	// written both ways round, so widening the checker to both operands did not
 	// widen what it matches.
-	write("core/data/commondb/other.go", `package commondb
+	write("authserver/internal/data/commondb/other.go", `package commondb
 
 func sizes(a, b int) (int, int, int, int, int, int) {
 	return (a - 2) * b, a * b, (a + 1) * b, b * (a - 2), b * a, b * (a + 1)
 }
 `)
 	// Accepted: the identifier inside a comment and inside a string.
-	write("core/data/commondb/comment.go", `package commondb
+	write("authserver/internal/data/commondb/comment.go", `package commondb
 
 // A comment writing (page - 1) * pageSize is not arithmetic.
 const message = "(page - 1) * pageSize"
@@ -305,13 +304,13 @@ func window(page, pageSize int) int {
 `)
 
 	// Rejected: the seven shapes the tree held, spelled every way they were.
-	write("core/data/commondb/user.go", `package commondb
+	write("authserver/internal/data/commondb/user.go", `package commondb
 
 func offsetA(page, pageSize int) int {
 	return (page - 1) * pageSize
 }
 `)
-	write("core/data/commondb/user_session.go", `package commondb
+	write("authserver/internal/data/commondb/user_session.go", `package commondb
 
 func offsetB(p, n int) int {
 	return (p-1)*n
@@ -351,8 +350,8 @@ func offsetE(page, pageSize int) int {
 		got = append(got, f.file+":"+itoa(f.line))
 	}
 	assert.ElementsMatch(t, []string{
-		"core/data/commondb/user.go:4",
-		"core/data/commondb/user_session.go:4",
+		"authserver/internal/data/commondb/user.go:4",
+		"authserver/internal/data/commondb/user_session.go:4",
 		"authserver/internal/data/postgresdb/audit_log.go:4",
 		"authserver/internal/data/mysqldb/group.go:6",
 		"authserver/internal/data/sqlitedb/user.go:4",
@@ -364,7 +363,7 @@ func offsetE(page, pageSize int) int {
 	for _, f := range found {
 		byFile[f.file] = f.text
 	}
-	assert.Equal(t, "(page - 1) * pageSize", byFile["core/data/commondb/user.go"])
+	assert.Equal(t, "(page - 1) * pageSize", byFile["authserver/internal/data/commondb/user.go"])
 	assert.Equal(t, "(p.Page - 1) * p.Size", byFile["authserver/internal/data/mysqldb/group.go"])
 	// And the commuted one is rendered the way it is written, rather than
 	// silently normalised into the other order.
@@ -386,7 +385,7 @@ func window(page, pageSize int) int {
 	return (page - 1) * pageSize
 }
 `)
-	writeLintFixture(t, root, "core/data/commondb/users.go", `package commondb
+	writeLintFixture(t, root, "authserver/internal/data/commondb/users.go", `package commondb
 
 func window(page, pageSize int) int {
 	return (page - 1) * pageSize
@@ -400,7 +399,7 @@ func window(page, pageSize int) int {
 	require.True(t, report.Failed(), "hand-rolled offset arithmetic passed the guard")
 	assert.False(t, report.Stopped, "a finding is an Errorf, not a Fatalf")
 	assert.Contains(t, report.Text(), "authserver/internal/data/mysqldb/users.go:4")
-	assert.Contains(t, report.Text(), "core/data/commondb/users.go:4")
+	assert.Contains(t, report.Text(), "authserver/internal/data/commondb/users.go:4")
 	assert.Contains(t, report.Text(), "commondb.PageOffset(page, pageSize)")
 	assert.Contains(t, report.Text(), "#305")
 }
@@ -415,7 +414,7 @@ func window(page, pageSize int) int {
 	return commondb.PageOffset(page, pageSize)
 }
 `)
-	writeLintFixture(t, root, "core/data/commondb/users.go", `package commondb
+	writeLintFixture(t, root, "authserver/internal/data/commondb/users.go", `package commondb
 
 func window(page, pageSize int) int {
 	return PageOffset(page, pageSize)
@@ -437,7 +436,7 @@ func window(page, pageSize int) int {
 func TestNoHandRolledPageOffset_TheGuardIsFatalOnAnEmptyWalk(t *testing.T) {
 	root := t.TempDir()
 	writeLintFixture(t, root, "authserver/internal/data/notes.md", "and out of here too\n")
-	writeLintFixture(t, root, "core/data/notes.md", "the queries moved out of here\n")
+	writeLintFixture(t, root, "authserver/internal/data/notes.md", "the queries moved out of here\n")
 	writeLintFixture(t, root, "core/elsewhere/users.go", "package elsewhere\n")
 
 	report := testutil.RunGuard(func(r testutil.Reporter) {

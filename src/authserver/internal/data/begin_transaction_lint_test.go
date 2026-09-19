@@ -33,7 +33,7 @@ import (
 // Nothing else is exempt, and the list is not the place to put a new owner: an owner that cannot
 // be written as a closure is a design question, not an exemption.
 var runInTransactionOwners = map[string]bool{
-	"core/data/commondb/db.go":                  true,
+	"authserver/internal/data/commondb/db.go":   true,
 	"authserver/internal/data/sqlitedb/db.go":   true,
 	"authserver/internal/data/mysqldb/db.go":    true,
 	"authserver/internal/data/postgresdb/db.go": true,
@@ -155,7 +155,7 @@ func TestNoBareBeginTransaction_TheCheckerTellsACallFromADeclaration(t *testing.
 
 	// Accepted: the interface declaration the agreement keeps, a mockery-shaped method
 	// declaration, and the identifier inside a comment and inside a string.
-	write("core/data/database.go", `package data
+	write("authserver/internal/data/database.go", `package data
 
 import "database/sql"
 
@@ -164,7 +164,7 @@ type Database interface {
 	RunInTransaction(fn func(tx *sql.Tx) error) error
 }
 `)
-	write("core/data/mocks/database_mock.go", `package mocks
+	write("authserver/internal/data/mocks/database_mock.go", `package mocks
 
 import "database/sql"
 
@@ -184,7 +184,7 @@ const message = "BeginTransaction() failed"
 func ok() string { return message }
 `)
 	// Accepted: a call inside an exempt file.
-	write("core/data/commondb/db.go", `package commondb
+	write("authserver/internal/data/commondb/db.go", `package commondb
 
 import "database/sql"
 

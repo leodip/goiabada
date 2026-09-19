@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leodip/goiabada/core/data"
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/models"

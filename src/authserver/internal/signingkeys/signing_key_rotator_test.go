@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	mocks_data "github.com/leodip/goiabada/core/data/mocks"
+	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/uuidutil"

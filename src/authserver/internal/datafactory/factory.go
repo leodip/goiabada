@@ -2,9 +2,10 @@
 // configuration, selects the engine, opens it, refuses a schema the stored data cannot survive,
 // migrates it and runs the startup data tasks.
 //
-// It is the auth server's and not core/data's because selecting an engine means importing all
-// four of them, which made every importer of core/data compile every driver. core/data now
-// declares the Database interface and nothing that chooses between implementations of it (#353).
+// It is its own package and not the data package's because selecting an engine means importing
+// all four of them, which made every importer of the Database interface compile every driver back
+// when that interface was core/data's. internal/data declares the interface and nothing that
+// chooses between implementations of it (#353, #359).
 package datafactory
 
 import (
@@ -13,12 +14,12 @@ import (
 	"strings"
 
 	"github.com/leodip/goiabada/authserver/internal/config"
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/data/migrator"
 	"github.com/leodip/goiabada/authserver/internal/data/mssqldb"
 	"github.com/leodip/goiabada/authserver/internal/data/mysqldb"
 	"github.com/leodip/goiabada/authserver/internal/data/postgresdb"
 	"github.com/leodip/goiabada/authserver/internal/data/sqlitedb"
-	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/errs"
 )
 

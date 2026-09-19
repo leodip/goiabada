@@ -3,7 +3,7 @@ package datafactory
 import (
 	"log/slog"
 
-	"github.com/leodip/goiabada/core/data"
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/core/errs"
 )
 

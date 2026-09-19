@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/leodip/goiabada/core/data/commondb"
+	"github.com/leodip/goiabada/authserver/internal/data/commondb"
 	"github.com/leodip/goiabada/core/models"
 )
 

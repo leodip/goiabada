@@ -221,7 +221,7 @@ import (
 	"errors"
 
 	"github.com/leodip/goiabada/authserver/internal/data/migrator"
-	"github.com/leodip/goiabada/core/data/matcher"
+	"github.com/leodip/goiabada/authserver/internal/data/matcher"
 )
 
 // errors.Is(err, migrator.ErrNoChange) in a comment is not a call.

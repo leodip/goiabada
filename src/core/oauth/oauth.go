@@ -7,7 +7,7 @@
 //
 // ParseResponseType sits here although only the auth server calls it. Its one other
 // caller was core/validators, which the admin console linked for unrelated helpers, so
-// moving this dependency-free file to the provider side would have dragged core/data and
+// moving this dependency-free file to the provider side would have dragged the data layer and
 // all four drivers into the admin console's binary. #344 removed that caller and nothing
 // in core names ParseResponseType any more, but the conclusion stands on the reason
 // beside it: since #339 put code and token issuance and key rotation under

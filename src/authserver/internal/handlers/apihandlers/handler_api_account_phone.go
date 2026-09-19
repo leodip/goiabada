@@ -8,11 +8,11 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/phonecountries"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/data"
 )
 
 // HandleAPIAccountPhonePut - PUT /api/v1/account/phone

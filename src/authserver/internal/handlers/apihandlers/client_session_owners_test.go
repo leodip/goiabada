@@ -7,8 +7,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/core/api"
-	mocks_data "github.com/leodip/goiabada/core/data/mocks"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/stretchr/testify/assert"
