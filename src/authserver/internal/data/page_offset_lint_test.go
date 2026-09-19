@@ -49,12 +49,14 @@ const pageOffsetOwner = "core/data/commondb/pagination.go"
 // offset becomes SQL. Page arithmetic above it lands in a slice or a page bar
 // rather than in a query, and answers to its own rules.
 //
-// Two of them because the data layer is split across two modules while #354's
-// move settles: the four engine adapters are under the auth server and
-// commondb is still in core, and both are places an offset becomes SQL. It
-// collapses back to one when #359 takes commondb. A single root covering only
-// one of them would drop the other out of the rule's reach without failing
-// anything, which is the silent narrowing #333 found on 8883642d (#354).
+// Two of them because the data layer sits in two modules until #359 moves
+// commondb: the four engine adapters are under the auth server and commondb
+// is still in core, and both are places an offset becomes SQL. One root
+// covering one of them would drop the other out of the rule's reach without
+// failing anything, which is the shape blinding AssertNoDeadInterfaces
+// demonstrated on 8883642d -- the guard stays green and stops guarding. It
+// collapses back to one element when commondb lands beside the adapters
+// (#354, #359).
 var pageOffsetRoots = []string{"core/data", "authserver/internal/data"}
 
 // handRolledOffset is one "(x - 1) * y" expression in a file that is not
@@ -66,9 +68,10 @@ type handRolledOffset struct {
 	text string
 }
 
-// findHandRolledOffsets walks root for non-test Go files under sub and reports
-// every expression of the shape "(x - 1) * y", which is the page offset written
-// out by hand.
+// findHandRolledOffsets walks root for non-test Go files under each of dirs and
+// reports every expression of the shape "(x - 1) * y", which is the page offset
+// written out by hand. An empty dirs walks root itself, the same signature the
+// five core/testutil guards carry.
 //
 // Both operands of the multiplication are examined, not just the left one:
 // multiplication commutes, so "pageSize * (page - 1)" is the same offset and
