@@ -25,11 +25,14 @@ import (
 // exists to remove. sloglint reads slog's own calls, not ours, so it cannot see this shape at
 // all (#328 decision 3).
 //
-// Scope is deliberately the request-path directories rather than the two audit packages: the
+// Scope is deliberately the request-path directories rather than the audit package alone: the
 // rule is about a call site, and a call site in a package a request runs through has a request
 // context in reach by construction. Elsewhere — a startup pass, a worker, a command — a
-// Background context is the honest answer, which is why core/data/commondb's backfill passes one
-// and is not refused here.
+// Background context is the honest answer and is admitted rather than refused. This named
+// core/data/commondb's email-collision backfill as the live example of that admission until #351
+// deleted the backfill (5130cd3a), and read "the two audit packages" until #359 folded
+// core/auditlog into authserver/internal/audit; no production site takes the admission today, so
+// the fixture tree's core/config/startup.go is where it is pinned.
 //
 // The rule matches on the selector name alone, so it covers slog.Log as well as auditLogger.Log
 // and any future method by that name. That is wider than the issue and correct for the same

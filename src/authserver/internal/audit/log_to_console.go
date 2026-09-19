@@ -1,13 +1,12 @@
-// Package auditlog owns the console half of audit logging: the one record every
-// audit event writes to the application log, whichever site raised it (#320).
-package auditlog
+package audit
 
 import (
 	"context"
 	"log/slog"
 )
 
-// LogToConsole writes one audit event to the application log.
+// LogToConsole writes one audit event to the application log: the console half of audit logging,
+// the one record every audit event writes to the application log whichever site raised it (#320).
 //
 // details is passed as an attribute value rather than marshalled into the
 // message, which is the whole point of the function. Under JSON the collector
@@ -31,15 +30,11 @@ import (
 // the two could not be joined at all (#328). The identifying details the event
 // carries are about the subject, not about the request.
 //
-// Two sites call this, and that is the second reason it exists. The authserver's
-// AuditLogger and the email-collision backfill in core/data/commondb both write
-// this record, and they cannot share code any higher up because core cannot
-// import the authserver module. Before this they were two hand-copied envelope
-// structs, so a change to one silently produced two shapes on one log stream.
-// The backfill passes context.Background(), because it runs at startup inside a
-// Database method with no request in existence, and a Background context adds
-// nothing to the record: its record carries no request_id, which is the truth
-// about it rather than a gap.
+// It is a function of this package rather than of its own because there is one caller left,
+// AuditLogger.Log in audit.go. It was a core package while a backfill in the data layer wrote this
+// record from the other side of the module boundary; #351 deleted that backfill, and #359 folded
+// what was left of the package in here. It stays exported and separate from Log because the record
+// it writes is one of the two halves Log chooses between, and the settings row decides which.
 func LogToConsole(ctx context.Context, event string, details map[string]any) {
 	slog.InfoContext(ctx, "audit event", "event", event, "details", details)
 }
