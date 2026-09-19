@@ -30,7 +30,7 @@ import (
 // secret would pass even if the reload had replaced the stored seed with the same value by
 // coincidence, and more to the point it would not be the code the user's authenticator holds.
 func TestAuthOtp_EnrolmentReloadRendersTheSameSecret(t *testing.T) {
-	client, redirectUri, user, password := createLevel2MandatoryUser(t, false)
+	client, redirectUri, user, password, _ := createLevel2MandatoryUser(t, false)
 
 	httpClient, otpPage, otpUrl := startOtpCeremony(t, client, redirectUri, user, password, "")
 	first := getOtpSecretFromEnrollmentPage(t, otpPage)
@@ -78,7 +78,7 @@ func TestAuthOtp_EnrolmentReloadRendersTheSameSecret(t *testing.T) {
 // HandleAuthorizeGet and the old seed leaves with the old context, so the second enrolment page
 // cannot be showing the first ceremony's secret.
 func TestAuthOtp_SecondAuthorizeInTheSameBrowserGetsANewSecret(t *testing.T) {
-	client, redirectUri, user, password := createLevel2MandatoryUser(t, false)
+	client, redirectUri, user, password, _ := createLevel2MandatoryUser(t, false)
 
 	httpClient, otpPage, _ := startOtpCeremony(t, client, redirectUri, user, password, "")
 	first := getOtpSecretFromEnrollmentPage(t, otpPage)

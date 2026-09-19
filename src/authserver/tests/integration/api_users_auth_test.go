@@ -164,7 +164,6 @@ func TestAPIUserOTPPut_DisableSuccess(t *testing.T) {
 		FamilyName:         "User",
 		EmailVerified:      true,
 		OTPEnabled:         true,
-		OTPSecret:          secret.Secret(),
 		OTPSecretEncrypted: encryptOTPSecretForTest(t, secret.Secret()),
 	}
 	err = database.CreateUser(nil, testUser)
@@ -198,7 +197,8 @@ func TestAPIUserOTPPut_DisableSuccess(t *testing.T) {
 	updatedUser, err := database.GetUserById(nil, testUser.Id)
 	assert.NoError(t, err)
 	assert.False(t, updatedUser.OTPEnabled)
-	assert.Empty(t, updatedUser.OTPSecret)
+	// The seed itself is gone, not merely unreachable (#98).
+	assert.Empty(t, updatedUser.OTPSecretEncrypted)
 }
 
 // TestAPIUserOTPPut_DisableResetsConsumedStep pins the second of the two disable sites #111

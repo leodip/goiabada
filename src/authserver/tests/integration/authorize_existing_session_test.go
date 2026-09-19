@@ -185,7 +185,6 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2OptionalRequest_OtpEnabled(
 	}
 
 	user.OTPEnabled = true
-	user.OTPSecret = key.Secret()
 	user.OTPSecretEncrypted = encryptOTPSecretForTest(t, key.Secret())
 	err = database.UpdateUser(nil, user)
 	if err != nil {
@@ -233,7 +232,7 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2OptionalRequest_OtpEnabled(
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	otpCode, err := totp.GenerateCode(user.OTPSecret, time.Now())
+	otpCode, err := totp.GenerateCode(key.Secret(), time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -389,7 +388,6 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2MandatoryRequest_OtpEnabled
 	}
 
 	user.OTPEnabled = true
-	user.OTPSecret = key.Secret()
 	user.OTPSecretEncrypted = encryptOTPSecretForTest(t, key.Secret())
 	err = database.UpdateUser(nil, user)
 	if err != nil {
@@ -437,7 +435,7 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2MandatoryRequest_OtpEnabled
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	otpCode, err := totp.GenerateCode(user.OTPSecret, time.Now())
+	otpCode, err := totp.GenerateCode(key.Secret(), time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -656,7 +654,6 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2OptionalRequest_Otp
 	}
 
 	user.OTPEnabled = true
-	user.OTPSecret = key.Secret()
 	user.OTPSecretEncrypted = encryptOTPSecretForTest(t, key.Secret())
 	err = database.UpdateUser(nil, user)
 	if err != nil {
@@ -710,7 +707,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2OptionalRequest_Otp
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	otpCode, err := totp.GenerateCode(user.OTPSecret, time.Now())
+	otpCode, err := totp.GenerateCode(key.Secret(), time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -886,7 +883,6 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2MandatoryRequest_Ot
 	}
 
 	user.OTPEnabled = true
-	user.OTPSecret = key.Secret()
 	user.OTPSecretEncrypted = encryptOTPSecretForTest(t, key.Secret())
 	err = database.UpdateUser(nil, user)
 	if err != nil {
@@ -934,7 +930,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2MandatoryRequest_Ot
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	otpCode, err := totp.GenerateCode(user.OTPSecret, time.Now())
+	otpCode, err := totp.GenerateCode(key.Secret(), time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -985,7 +981,9 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2MandatoryRequest_Ot
 		t.Fatal(err)
 	}
 	assert.True(t, updatedUser.OTPEnabled)
-	assert.Equal(t, user.OTPSecret, updatedUser.OTPSecret)
+	// The stored seed was not rewritten. Compared as ciphertext because migration 000048 dropped
+	// users.otp_secret (#98); nothing re-encrypts here, so equal bytes mean an untouched column.
+	assert.Equal(t, user.OTPSecretEncrypted, updatedUser.OTPSecretEncrypted)
 }
 
 func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel1Request(t *testing.T) {
@@ -1068,7 +1066,6 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2OptionalRequest_Ot
 
 	// Disable OTP for the user
 	user.OTPEnabled = false
-	user.OTPSecret = ""
 	err := database.UpdateUser(nil, user)
 	if err != nil {
 		t.Fatal(err)
@@ -1151,7 +1148,6 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2OptionalRequest_Ot
 		t.Fatal(err)
 	}
 	assert.False(t, updatedUser.OTPEnabled)
-	assert.Empty(t, updatedUser.OTPSecret)
 }
 
 func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2OptionalRequest_OtpEnabled(t *testing.T) {
@@ -1247,7 +1243,6 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2MandatoryRequest_O
 
 	// Disable OTP for the user
 	user.OTPEnabled = false
-	user.OTPSecret = ""
 	err := database.UpdateUser(nil, user)
 	if err != nil {
 		t.Fatal(err)
@@ -1450,5 +1445,7 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2MandatoryRequest_O
 		t.Fatal(err)
 	}
 	assert.True(t, updatedUser.OTPEnabled)
-	assert.Equal(t, user.OTPSecret, updatedUser.OTPSecret)
+	// The stored seed was not rewritten. Compared as ciphertext because migration 000048 dropped
+	// users.otp_secret (#98); nothing re-encrypts here, so equal bytes mean an untouched column.
+	assert.Equal(t, user.OTPSecretEncrypted, updatedUser.OTPSecretEncrypted)
 }

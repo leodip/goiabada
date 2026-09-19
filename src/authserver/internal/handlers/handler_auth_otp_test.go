@@ -1091,8 +1091,9 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		var calls []string
 		expectRunInTransaction(database, otpEnrolTx, func(edge string) { calls = append(calls, edge) })
 		database.On("UpdateUser", otpEnrolTx, mock.MatchedBy(func(u *models.User) bool {
-			// The secret must be stored encrypted, with the plaintext column cleared.
-			if u.Id != 1 || !u.OTPEnabled || u.OTPSecret != "" || len(u.OTPSecretEncrypted) == 0 {
+			// The secret must be stored encrypted. There is no plaintext column any more: migration
+			// 000048 dropped users.otp_secret (#98).
+			if u.Id != 1 || !u.OTPEnabled || len(u.OTPSecretEncrypted) == 0 {
 				return false
 			}
 			decrypted, err := u.GetOTPSecret()

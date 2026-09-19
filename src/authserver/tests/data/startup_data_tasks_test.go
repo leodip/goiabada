@@ -36,69 +36,16 @@ func seedThrowawayDatabase(t *testing.T, name string, seed func(db data.Database
 	return &config.DatabaseConfig{Type: "sqlite", DSN: dsn}
 }
 
-// TestNewDatabase_RunsTheStartupDataTasksOnTheDatabaseItOpened pins the one edge of the startup
-// pipeline that the helper's own table cannot reach: that NewDatabase actually calls
-// runStartupDataTasks on the database it just opened, with the key it was handed.
+// TestNewDatabase_HandsTheStartupTasksThePreviousKey pins that the previous key NewDatabase is
+// given reaches runStartupDataTasks, rather than being dropped on the way. Dropped, the env-to-env
+// rotation of #83 is skipped in silence -- the startup succeeds, and the server then serves
+// requests against data it cannot decrypt.
 //
-// runStartupDataTasks is tested in datafactory against a mock, one case per fail-closed branch,
-// and those cases pass whether or not anything calls the function. So does every other test in
-// this tier, because a fresh database has no legacy plaintext for the tasks to convert. Deleting
-// the call in NewDatabase therefore left all 598 sqlite data tests green, which is a move that
-// can silently drop the legacy key migration, the env-to-env rotation and this OTP backfill
-// while the suite reports success (#353).
-//
-// The observable effect is the backfill of #82: a row holding a plaintext TOTP secret comes back
-// with the plaintext blanked and a ciphertext that decrypts to it. Nothing but the startup pass
-// touches that row between the two opens.
-//
-// sqlite only, for the reason TestNewDatabase_RefusesAnAESKeyOfTheWrongLength gives: a DSN to a
-// throwaway file is the one way to reach NewDatabase without running the startup pass over the
-// shared database this tier runs against. The edge under test is engine-independent, being a call
-// in datafactory that happens before any engine-specific code runs.
-func TestNewDatabase_RunsTheStartupDataTasksOnTheDatabaseItOpened(t *testing.T) {
-	if engine := dbType(); engine != "sqlite" && engine != "" {
-		t.Skip("needs a DSN to a throwaway database, which only sqlite has; the call under test is engine-independent")
-	}
-
-	// The key the process cipher was initialized with in TestMain, so the model's GetOTPSecret
-	// can read back whatever the startup pass wrote.
-	key := config.GetAESEncryptionKey()
-
-	const legacySeed = "STARTUPTASKSEED1"
-	var legacy *models.User
-
-	cfg := seedThrowawayDatabase(t, "startup_tasks.db", func(db data.Database) {
-		legacy = &models.User{
-			Subject:      fake.UUID(),
-			Username:     fake.UUID(),
-			Email:        fake.UUID() + "@example.com",
-			PasswordHash: "x",
-			OTPSecret:    legacySeed,
-			OTPEnabled:   true,
-		}
-		require.NoError(t, db.CreateUser(nil, legacy), "the legacy row is the whole fixture")
-	})
-
-	opened, err := datafactory.NewDatabase(cfg, key, nil, false)
-	require.NoError(t, err, "a migrated database and a 32-byte key is a startup that must succeed")
-	require.NotNil(t, opened)
-
-	got, err := opened.GetUserById(nil, legacy.Id)
-	require.NoError(t, err)
-	require.NotNil(t, got, "the seeded row survives the second open")
-
-	assert.Empty(t, got.OTPSecret,
-		"the backfill blanks the plaintext column, and an untouched plaintext secret is what a dropped startup pass looks like")
-
-	decrypted, err := got.GetOTPSecret()
-	require.NoError(t, err, "the ciphertext the startup pass wrote must be readable with the key it was given")
-	assert.Equal(t, legacySeed, decrypted, "the secret has to survive the conversion, not merely be replaced")
-}
-
-// TestNewDatabase_HandsTheStartupTasksThePreviousKey pins the second half of the same edge: the
-// previous key NewDatabase is given reaches runStartupDataTasks, rather than being dropped on the
-// way. Dropped, the env-to-env rotation of #83 is skipped in silence -- the startup succeeds, and
-// the server then serves requests against data it cannot decrypt.
+// IT IS ALSO THE SOLE PIN ON THE CALL ITSELF. A sibling case used to hold that edge with a
+// plaintext TOTP seed the startup backfill converted; #359 deleted that conversion (#262, #98), so
+// the canary below is what is left. It only rewrites if NewDatabase calls runStartupDataTasks at
+// all, which is worth stating because deleting that call left all 598 sqlite data tests green
+// (#353): every other test in this tier passes whether or not the startup pass runs.
 //
 // The detection canary is the one RotateEncryptionKeyIfNeeded uses: an encrypted RSA private key
 // PEM. Seeded under the previous key, a startup carrying that key rewrites it under the current
@@ -148,13 +95,12 @@ func TestNewDatabase_HandsTheStartupTasksThePreviousKey(t *testing.T) {
 // runStartupDataTasks collapses every one of its fail-closed branches into one returned error,
 // and NewDatabase has to turn that error into a refused startup rather than a usable handle.
 //
-// The two cases above prove the call happens and that both keys reach it, and the helper's own
-// mock table in datafactory proves each internal branch fails closed. None of them reaches this
-// arm: changing it from `return nil, err` to `return database, nil` left all 600 sqlite data
-// tests green. That is a server reporting a successful startup after the legacy key migration,
-// the env-to-env rotation or the plaintext OTP backfill has failed, then serving requests over
-// data it could not convert -- which is precisely the outcome every one of those branches is
-// fail-closed to prevent (#353).
+// The case above proves the call happens and that both keys reach it, and the helper's own mock
+// table in datafactory proves the surviving branch fails closed. Neither reaches this arm:
+// changing it from `return nil, err` to `return database, nil` left all 600 sqlite data tests
+// green. That is a server reporting a successful startup after the env-to-env key rotation has
+// failed, then serving requests over data it could not re-key -- which is precisely the outcome
+// that branch is fail-closed to prevent (#353).
 //
 // The forcing fixture is the rotation canary seeded under a THIRD key. RotateEncryptionKeyIfNeeded
 // treats a canary that decrypts under the current key as "already rotated" and one that decrypts
@@ -162,8 +108,8 @@ func TestNewDatabase_HandsTheStartupTasksThePreviousKey(t *testing.T) {
 // misconfiguration it refuses outright rather than guessing at, so it is the cheapest real task
 // failure this tier can construct.
 //
-// sqlite only, for the reason the two cases above give: a DSN to a throwaway file is the one way
-// to reach NewDatabase without running the startup pass over the shared database this tier runs
+// sqlite only, for the reason the case above gives: a DSN to a throwaway file is the one way to
+// reach NewDatabase without running the startup pass over the shared database this tier runs
 // against. The arm under test is engine-independent, being a return in datafactory.
 func TestNewDatabase_RefusesAStartupWhoseDataTasksFailed(t *testing.T) {
 	if engine := dbType(); engine != "sqlite" && engine != "" {

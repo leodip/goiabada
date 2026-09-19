@@ -22,7 +22,6 @@ type Database interface {
 	// transaction and write any audit event after this returns, so a rerun is a first run.
 	RunInTransaction(fn func(tx *sql.Tx) error) error
 	Migrate() error
-	BackfillEncryptedOTPSecrets(aesKey []byte) (int, error)
 	// ScanEmailCase reads every users row as its id, its stored address and that address as
 	// THIS engine's own LOWER() reduces it, which is the read behind the startup pre-flight
 	// (the auth server's datafactory.CheckEmailCaseBeforeMigrating). It compares nothing: the
@@ -30,7 +29,6 @@ type Database interface {
 	// comparison is the caller's (#351). It replaced BackfillLowercaseEmails, which repaired
 	// the data at startup rather than refusing to migrate it.
 	ScanEmailCase() ([]models.EmailCaseRow, error)
-	ReencryptDataToNewKey(oldKey, newKey []byte) error
 	RotateEncryptionKeyIfNeeded(currentKey, previousKey []byte) (bool, error)
 	IsEmpty() (bool, error)
 

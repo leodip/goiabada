@@ -25,14 +25,19 @@ type Settings struct {
 	IncludeOpenIDConnectClaimsInIdToken       bool                 `db:"include_open_id_connect_claims_in_id_token"`
 	// AESEncryptionKeyLegacy is the data key as historically stored in the DB.
 	// The key now comes from the environment (config.GetAESEncryptionKey, issue
-	// #83); this column is retained only so the startup re-encryption migration
-	// can read the old key. It is blanked once data has been re-encrypted under
-	// the env key. Do NOT use it for encrypt/decrypt at runtime.
+	// #83). Do NOT use it for encrypt/decrypt at runtime.
+	//
+	// NOTHING READS IT ANY MORE. #359 deleted the startup re-encryption that was
+	// its one reader (#262), and its only remaining production write is the
+	// seeder's AESEncryptionKeyLegacy: []byte{}. The field and the column stay
+	// because aes_encryption_key is NOT NULL with no default on all four engines,
+	// so removing the field would break the seeder's INSERT without a second
+	// migration; a blanked column is harmless.
 	//
 	// It is tagged dont-update so UpdateSettings never writes it: the column is
 	// NOT NULL, and some drivers read a blanked (empty) value back as nil, which
 	// would otherwise make a normal settings update write NULL and fail. Only the
-	// seeder (insert) and the migration (direct SQL) ever write this column.
+	// seeder's insert ever writes this column.
 	AESEncryptionKeyLegacy []byte `db:"aes_encryption_key" fieldtag:"dont-update"`
 	SMTPHost               string `db:"smtp_host"`
 	SMTPPort               int    `db:"smtp_port"`

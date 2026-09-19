@@ -23,13 +23,16 @@ var aesProtectedColumns = []struct{ table, column string }{
 	{"pre_registrations", "verification_code_encrypted"},
 }
 
-// ReencryptDataToNewKey re-encrypts every secret stored at rest from oldKey to
-// newKey, encrypts the RSA private keys (historically stored as plaintext PEM),
-// and blanks the legacy aes_encryption_key column so the migration is not
-// repeated. The whole operation runs in ONE transaction: it is all-or-nothing,
-// so a failure leaves the data under oldKey and the next startup retries
-// cleanly (fail-closed). See issue #83.
-func (d *CommonDatabase) ReencryptDataToNewKey(oldKey, newKey []byte) error {
+// reencryptToKey re-encrypts every secret stored at rest from oldKey to newKey and re-encrypts
+// the RSA private keys. The whole operation runs in ONE transaction: it is all-or-nothing, so a
+// failure leaves the data under oldKey and the caller can retry cleanly (fail-closed). See issue
+// #83.
+//
+// It is unexported because rotation is its only caller. It was the exported
+// ReencryptDataToNewKey until #359 deleted the 1.5.x startup conversion that was the other one
+// (#262); with that gone it re-keys and does nothing else, in particular it no longer blanks
+// settings.aes_encryption_key, which was the conversion's own bookkeeping.
+func (d *CommonDatabase) reencryptToKey(oldKey, newKey []byte) error {
 	if len(oldKey) != 32 || len(newKey) != 32 {
 		return errs.New("re-encryption requires 32-byte old and new keys")
 	}
@@ -83,7 +86,7 @@ func (d *CommonDatabase) RotateEncryptionKeyIfNeeded(currentKey, previousKey []b
 			"data-at-rest decrypts under neither GOIABADA_AES_ENCRYPTION_KEY nor GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS")
 	}
 
-	if err := d.ReencryptDataToNewKey(previousKey, currentKey); err != nil {
+	if err := d.reencryptToKey(previousKey, currentKey); err != nil {
 		return false, err
 	}
 	return true, nil
@@ -98,17 +101,10 @@ func (d *CommonDatabase) reencryptAll(tx *sql.Tx, oldKey, newKey []byte) error {
 	if err := d.reencryptPrivateKeys(tx, oldKey, newKey); err != nil {
 		return errs.Wrap(err, "re-encrypting RSA private keys")
 	}
-
-	// Blank the legacy key column so subsequent startups skip the migration. The
-	// column is NOT NULL, so write an empty blob rather than NULL (len 0 still
-	// reads as "no legacy key").
-	ub := sqlbuilder.NewUpdateBuilder()
-	ub.Update("settings")
-	ub.Set(ub.Assign("aes_encryption_key", []byte{}))
-	query, args := ub.BuildWithFlavor(d.Flavor)
-	if _, err := d.ExecSql(tx, query, args...); err != nil {
-		return errs.Wrap(err, "unable to blank legacy aes_encryption_key column")
-	}
+	// settings.aes_encryption_key is deliberately left alone. Blanking it was the 1.5.x startup
+	// conversion's own bookkeeping ("so subsequent startups skip the migration"), and rotation
+	// only ever reached it by sharing this helper; there is no migration to skip after #359
+	// deleted the conversion (#262). rotate_test.go pins that it stays.
 	return nil
 }
 
@@ -168,10 +164,15 @@ func (d *CommonDatabase) reencryptStringColumn(tx *sql.Tx, table, column string,
 	return nil
 }
 
-// reencryptPrivateKeys encrypts/re-encrypts the RSA private-key PEMs. On the
-// first migration they are plaintext PEM (detected by the "-----BEGIN" prefix)
-// and simply get encrypted with newKey; on a later rotation they are ciphertext
-// under oldKey and are decrypted then re-encrypted.
+// reencryptPrivateKeys encrypts/re-encrypts the RSA private-key PEMs. A PEM held as ciphertext
+// under oldKey is decrypted and re-encrypted under newKey.
+//
+// The plaintext-PEM branch below is unreachable rather than wrong. It existed for the 1.5.x
+// startup conversion, where the PEMs were still plaintext; #359 deleted that caller (#262), and
+// the one caller left, RotateEncryptionKeyIfNeeded, picks the first non-empty PrivateKeyPEM as its
+// canary and errors before calling here when it decrypts under neither key. So a plaintext PEM
+// fails closed at the canary, never reaching this branch. It is kept because deleting it would
+// change a crypto path for no observable gain.
 func (d *CommonDatabase) reencryptPrivateKeys(tx *sql.Tx, oldKey, newKey []byte) error {
 	sb := sqlbuilder.NewSelectBuilder()
 	sb.Select("id", "private_key_pem").From("key_pairs")

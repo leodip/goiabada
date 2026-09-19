@@ -360,7 +360,6 @@ func TestSessionEndedDuringStepUp_OtpAloneDoesNotRecreateTheSession(t *testing.T
 		t.Fatal(err)
 	}
 	user.OTPEnabled = true
-	user.OTPSecret = key.Secret()
 	user.OTPSecretEncrypted = encryptOTPSecretForTest(t, key.Secret())
 	err = database.UpdateUser(nil, user)
 	if err != nil {
@@ -413,7 +412,7 @@ func TestSessionEndedDuringStepUp_OtpAloneDoesNotRecreateTheSession(t *testing.T
 	err = database.DeleteUserSession(nil, userSession.Id)
 	assert.NoError(t, err)
 
-	otpCode, err := totp.GenerateCode(user.OTPSecret, time.Now())
+	otpCode, err := totp.GenerateCode(key.Secret(), time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}

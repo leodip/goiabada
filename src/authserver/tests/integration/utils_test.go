@@ -612,7 +612,6 @@ func createSessionWithAcrLevel2Mandatory(t *testing.T) (*http.Client, *models.Cl
 		Enabled:            true,
 		Email:              fake.Email(),
 		PasswordHash:       passwordHashed,
-		OTPSecret:          key.Secret(),
 		OTPSecretEncrypted: encryptOTPSecretForTest(t, key.Secret()),
 		OTPEnabled:         true,
 	}
@@ -667,7 +666,7 @@ func createSessionWithAcrLevel2Mandatory(t *testing.T) (*http.Client, *models.Cl
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	otpCode, err := totp.GenerateCode(user.OTPSecret, time.Now())
+	otpCode, err := totp.GenerateCode(key.Secret(), time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -706,8 +705,9 @@ func createSessionWithAcrLevel2Mandatory(t *testing.T) (*http.Client, *models.Cl
 
 // encryptOTPSecretForTest encrypts a TOTP secret with the server's AES key, so a
 // test can persist a user whose OTP secret is stored the way production stores
-// it (issue #82: encrypted at rest). Set the result on user.OTPSecretEncrypted;
-// keep the plaintext in user.OTPSecret for generating OTP codes in the test.
+// it (issue #82: encrypted at rest). Set the result on user.OTPSecretEncrypted,
+// which is the only column a seed lives in since migration 000048 dropped
+// users.otp_secret (#98), and keep the plaintext in a local for generating codes.
 func encryptOTPSecretForTest(t *testing.T, plain string) []byte {
 	enc, err := encryption.EncryptData(plain)
 	assert.NoError(t, err)

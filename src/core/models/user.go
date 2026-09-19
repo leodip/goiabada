@@ -42,7 +42,6 @@ type User struct {
 	AddressPostalCode                    string       `db:"address_postal_code"`
 	AddressCountry                       string       `db:"address_country"`
 	PasswordHash                         string       `db:"password_hash"`
-	OTPSecret                            string       `db:"otp_secret"`
 	OTPSecretEncrypted                   []byte       `db:"otp_secret_encrypted"`
 	OTPEnabled                           bool         `db:"otp_enabled"`
 	ForgotPasswordCodeEncrypted          []byte       `db:"forgot_password_code_encrypted"`
@@ -116,23 +115,22 @@ type User struct {
 }
 
 // SetOTPSecret encrypts the TOTP seed at rest (AES-256-GCM, via the process
-// data cipher) into OTPSecretEncrypted and clears the legacy plaintext OTPSecret
-// field. See issue #82: TOTP secrets must not be stored in plaintext. The data
-// cipher must be initialized at startup (encryption.InitDataCipher, issue #83).
+// data cipher) into OTPSecretEncrypted. See issue #82: TOTP secrets must not be
+// stored in plaintext. The data cipher must be initialized at startup
+// (encryption.InitDataCipher, issue #83).
 func (u *User) SetOTPSecret(secret string) error {
 	encrypted, err := encryption.EncryptData(secret)
 	if err != nil {
 		return err
 	}
 	u.OTPSecretEncrypted = encrypted
-	u.OTPSecret = ""
 	return nil
 }
 
 // GetOTPSecret returns the decrypted TOTP seed, or an empty string if the user
-// has no encrypted secret. Existing rows are migrated to the encrypted form at
-// startup (BackfillEncryptedOTPSecrets), so at runtime the plaintext column is
-// always empty and is not consulted here.
+// has no encrypted secret. It is the only way a seed is read: the legacy
+// plaintext users.otp_secret column was dropped by migration 000048 along with
+// the startup pass that converted it (#98, #262).
 func (u *User) GetOTPSecret() (string, error) {
 	if len(u.OTPSecretEncrypted) == 0 {
 		return "", nil
@@ -140,11 +138,9 @@ func (u *User) GetOTPSecret() (string, error) {
 	return encryption.DecryptData(u.OTPSecretEncrypted)
 }
 
-// ClearOTPSecret removes any stored TOTP seed, both the encrypted value and the
-// legacy plaintext field.
+// ClearOTPSecret removes any stored TOTP seed.
 func (u *User) ClearOTPSecret() {
 	u.OTPSecretEncrypted = nil
-	u.OTPSecret = ""
 }
 
 func (u *User) HasAddress() bool {

@@ -58,16 +58,8 @@ func (d *PostgresDatabase) UpdateUser(tx *sql.Tx, user *models.User) error {
 	return d.CommonDB.UpdateUser(tx, user)
 }
 
-func (d *PostgresDatabase) BackfillEncryptedOTPSecrets(aesKey []byte) (int, error) {
-	return d.CommonDB.BackfillEncryptedOTPSecrets(aesKey)
-}
-
 func (d *PostgresDatabase) ScanEmailCase() ([]models.EmailCaseRow, error) {
 	return d.CommonDB.ScanEmailCase()
-}
-
-func (d *PostgresDatabase) ReencryptDataToNewKey(oldKey, newKey []byte) error {
-	return d.CommonDB.ReencryptDataToNewKey(oldKey, newKey)
 }
 
 func (d *PostgresDatabase) RotateEncryptionKeyIfNeeded(currentKey, previousKey []byte) (bool, error) {

@@ -176,66 +176,6 @@ func (_c *Database_AcquireUserSessionRow_Call) RunAndReturn(run func(tx *sql.Tx,
 	return _c
 }
 
-// BackfillEncryptedOTPSecrets provides a mock function for the type Database
-func (_mock *Database) BackfillEncryptedOTPSecrets(aesKey []byte) (int, error) {
-	ret := _mock.Called(aesKey)
-
-	if len(ret) == 0 {
-		panic("no return value specified for BackfillEncryptedOTPSecrets")
-	}
-
-	var r0 int
-	var r1 error
-	if returnFunc, ok := ret.Get(0).(func([]byte) (int, error)); ok {
-		return returnFunc(aesKey)
-	}
-	if returnFunc, ok := ret.Get(0).(func([]byte) int); ok {
-		r0 = returnFunc(aesKey)
-	} else {
-		r0 = ret.Get(0).(int)
-	}
-	if returnFunc, ok := ret.Get(1).(func([]byte) error); ok {
-		r1 = returnFunc(aesKey)
-	} else {
-		r1 = ret.Error(1)
-	}
-	return r0, r1
-}
-
-// Database_BackfillEncryptedOTPSecrets_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'BackfillEncryptedOTPSecrets'
-type Database_BackfillEncryptedOTPSecrets_Call struct {
-	*mock.Call
-}
-
-// BackfillEncryptedOTPSecrets is a helper method to define mock.On call
-//   - aesKey []byte
-func (_e *Database_Expecter) BackfillEncryptedOTPSecrets(aesKey any) *Database_BackfillEncryptedOTPSecrets_Call {
-	return &Database_BackfillEncryptedOTPSecrets_Call{Call: _e.mock.On("BackfillEncryptedOTPSecrets", aesKey)}
-}
-
-func (_c *Database_BackfillEncryptedOTPSecrets_Call) Run(run func(aesKey []byte)) *Database_BackfillEncryptedOTPSecrets_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 []byte
-		if args[0] != nil {
-			arg0 = args[0].([]byte)
-		}
-		run(
-			arg0,
-		)
-	})
-	return _c
-}
-
-func (_c *Database_BackfillEncryptedOTPSecrets_Call) Return(n int, err error) *Database_BackfillEncryptedOTPSecrets_Call {
-	_c.Call.Return(n, err)
-	return _c
-}
-
-func (_c *Database_BackfillEncryptedOTPSecrets_Call) RunAndReturn(run func(aesKey []byte) (int, error)) *Database_BackfillEncryptedOTPSecrets_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // BeginTransaction provides a mock function for the type Database
 func (_mock *Database) BeginTransaction() (*sql.Tx, error) {
 	ret := _mock.Called()
@@ -10276,63 +10216,6 @@ func (_c *Database_PromoteUserSessionOtpConfigGeneration_Call) Return(err error)
 }
 
 func (_c *Database_PromoteUserSessionOtpConfigGeneration_Call) RunAndReturn(run func(tx *sql.Tx, userSessionId int64, generation int64) error) *Database_PromoteUserSessionOtpConfigGeneration_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// ReencryptDataToNewKey provides a mock function for the type Database
-func (_mock *Database) ReencryptDataToNewKey(oldKey []byte, newKey []byte) error {
-	ret := _mock.Called(oldKey, newKey)
-
-	if len(ret) == 0 {
-		panic("no return value specified for ReencryptDataToNewKey")
-	}
-
-	var r0 error
-	if returnFunc, ok := ret.Get(0).(func([]byte, []byte) error); ok {
-		r0 = returnFunc(oldKey, newKey)
-	} else {
-		r0 = ret.Error(0)
-	}
-	return r0
-}
-
-// Database_ReencryptDataToNewKey_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ReencryptDataToNewKey'
-type Database_ReencryptDataToNewKey_Call struct {
-	*mock.Call
-}
-
-// ReencryptDataToNewKey is a helper method to define mock.On call
-//   - oldKey []byte
-//   - newKey []byte
-func (_e *Database_Expecter) ReencryptDataToNewKey(oldKey any, newKey any) *Database_ReencryptDataToNewKey_Call {
-	return &Database_ReencryptDataToNewKey_Call{Call: _e.mock.On("ReencryptDataToNewKey", oldKey, newKey)}
-}
-
-func (_c *Database_ReencryptDataToNewKey_Call) Run(run func(oldKey []byte, newKey []byte)) *Database_ReencryptDataToNewKey_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 []byte
-		if args[0] != nil {
-			arg0 = args[0].([]byte)
-		}
-		var arg1 []byte
-		if args[1] != nil {
-			arg1 = args[1].([]byte)
-		}
-		run(
-			arg0,
-			arg1,
-		)
-	})
-	return _c
-}
-
-func (_c *Database_ReencryptDataToNewKey_Call) Return(err error) *Database_ReencryptDataToNewKey_Call {
-	_c.Call.Return(err)
-	return _c
-}
-
-func (_c *Database_ReencryptDataToNewKey_Call) RunAndReturn(run func(oldKey []byte, newKey []byte) error) *Database_ReencryptDataToNewKey_Call {
 	_c.Call.Return(run)
 	return _c
 }
