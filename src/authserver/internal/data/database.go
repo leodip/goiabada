@@ -80,7 +80,6 @@ type Database interface {
 	// returns (nil, nil) without querying: '' is the dormant value on every row with no
 	// code outstanding, so a query would match one of them.
 	GetUserByForgotPasswordCodeHash(tx *sql.Tx, codeHash string) (*models.User, error)
-	GetLastUserWithOTPState(tx *sql.Tx, otpEnabledState bool) (*models.User, error)
 	SearchUsersPaginated(tx *sql.Tx, query string, page int, pageSize int) ([]models.User, int, error)
 	DeleteUser(tx *sql.Tx, userId int64) error
 	// IncrementUserAuthStateGeneration advances the user's authentication generation

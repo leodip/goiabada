@@ -415,28 +415,6 @@ func (d *CommonDatabase) GetUserByForgotPasswordCodeHash(tx *sql.Tx, codeHash st
 	return user, nil
 }
 
-func (d *CommonDatabase) GetLastUserWithOTPState(tx *sql.Tx, otpEnabledState bool) (*models.User, error) {
-	userStruct := sqlbuilder.NewStruct(new(models.User)).
-		For(d.Flavor)
-
-	selectBuilder := userStruct.SelectFrom("users")
-	selectBuilder.Where(
-		selectBuilder.And(
-			selectBuilder.Equal("otp_enabled", otpEnabledState),
-			selectBuilder.Equal("enabled", true),
-		),
-	)
-	selectBuilder.OrderByDesc("id")
-	selectBuilder.Limit(1)
-
-	user, err := d.getUserCommon(tx, selectBuilder, userStruct)
-	if err != nil {
-		return nil, err
-	}
-
-	return user, nil
-}
-
 // The columns the admin console's user search reads. The page query and the count query both
 // build their predicates from this one list, through searchUserLikeClauses, so the two cannot
 // drift apart and start disagreeing about how many rows a page is a slice of.
