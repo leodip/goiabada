@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/constants"
+	"github.com/leodip/goiabada/authserver/internal/data"
 	coreconstants "github.com/leodip/goiabada/core/constants"
-	"github.com/leodip/goiabada/core/data"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/sessionstore"

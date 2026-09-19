@@ -14,7 +14,7 @@ import (
 	"testing"
 
 	"github.com/go-chi/chi/v5"
-	mocks_data "github.com/leodip/goiabada/core/data/mocks"
+	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	mocks_handlerhelpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/stretchr/testify/assert"

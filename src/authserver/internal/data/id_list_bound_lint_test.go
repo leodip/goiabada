@@ -120,7 +120,7 @@ func findUnboundedIdLists(root string) ([]unboundedIdList, int, error) {
 
 // TestIdListsAreBoundedByOneStatement holds the real tree to the rule.
 func TestIdListsAreBoundedByOneStatement(t *testing.T) {
-	assertIdListsAreBounded(t, filepath.Join(testutil.SourceRoot(t), "core", "data", "commondb"))
+	assertIdListsAreBounded(t, filepath.Join(testutil.SourceRoot(t), "authserver", "internal", "data", "commondb"))
 }
 
 // assertIdListsAreBounded is the reporting half, taking the root as a parameter and failing

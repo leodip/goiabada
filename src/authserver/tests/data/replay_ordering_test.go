@@ -4,8 +4,8 @@ import (
 	"database/sql"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
-	"github.com/leodip/goiabada/core/data"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

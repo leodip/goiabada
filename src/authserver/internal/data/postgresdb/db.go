@@ -13,9 +13,9 @@ import (
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/jackc/pgx/v5/pgconn"
 	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/leodip/goiabada/authserver/internal/data/commondb"
 	"github.com/leodip/goiabada/authserver/internal/data/migrator"
 	"github.com/leodip/goiabada/core/constants"
-	"github.com/leodip/goiabada/core/data/commondb"
 	"github.com/leodip/goiabada/core/errs"
 )
 

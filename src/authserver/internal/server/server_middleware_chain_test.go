@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/go-chi/chi/v5"
-	mocks_data "github.com/leodip/goiabada/core/data/mocks"
+	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

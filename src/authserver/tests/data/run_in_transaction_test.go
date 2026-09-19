@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leodip/goiabada/core/data"
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
@@ -16,11 +16,11 @@ import (
 )
 
 // RunInTransaction against the real engines. The attempt count, the backoff and the warning
-// are the scripted driver's to pin (core/data/commondb/run_in_transaction_test.go); what only a
-// real engine can answer is whether the rows end up where the contract says, and whether the
-// dialect's classifier recognises the deadlock its own driver actually raises. The last case
-// here is the smallest deadlock that can be forced, two rows taken in opposite orders, and it
-// is the shape the production-pair tests build on (#301).
+// are the scripted driver's to pin (authserver/internal/data/commondb/run_in_transaction_test.go);
+// what only a real engine can answer is whether the rows end up where the contract says, and
+// whether the dialect's classifier recognises the deadlock its own driver actually raises. The
+// last case here is the smallest deadlock that can be forced, two rows taken in opposite orders,
+// and it is the shape the production-pair tests build on (#301).
 
 // deadlockCeiling bounds the forced deadlock. PostgreSQL looks for cycles after deadlock_timeout,
 // one second by default; SQL Server's monitor runs every five seconds; InnoDB detects at once.

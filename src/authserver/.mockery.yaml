@@ -15,6 +15,13 @@ template-data:
   mock-build-tags: "!production"
   boilerplate-file: "../mockery-header.txt"
 packages:
+  # Database interface, authserver's own since #359 moved it out of core
+  github.com/leodip/goiabada/authserver/internal/data:
+    interfaces:
+      Database:
+        config:
+          dir: "./internal/data/mocks"
+          pkgname: "mocks_data"
   github.com/leodip/goiabada/authserver/internal/handlers:
     interfaces:
       AuthorizeValidator:
