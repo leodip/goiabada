@@ -26,8 +26,8 @@ import (
 // between versions.
 
 // schemaMigrationsDDL is sqlitedb's pinned shape for the version table (#284), repeated here
-// rather than imported: sqlitedb will import this package in stage 2, and a test importing it back
-// would be a cycle.
+// rather than imported: sqlitedb imports this package, so a test importing it back would be a
+// cycle.
 const schemaMigrationsDDL = `CREATE TABLE IF NOT EXISTS schema_migrations (
 	version INTEGER NOT NULL PRIMARY KEY,
 	dirty BOOLEAN NOT NULL
