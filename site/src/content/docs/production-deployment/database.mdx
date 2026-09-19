@@ -59,9 +59,10 @@ To refuse an absent file instead of creating one, put `mode=rw` in `GOIABADA_DB_
 ## Schema migrations and rollback
 
 Goiabada migrates its own schema. The auth server applies whatever migrations its release carries
-when it starts, so an upgrade needs nothing beyond installing the new version and restarting. It
-refuses to start on a database that is half migrated, and on one a newer release has already
-migrated, since it cannot know what that release changed. The admin console holds no database
+when it starts, so the schema needs no step of its own during an upgrade. Anything more a release
+asks of an upgrade, its release notes state. It refuses to start on a database that is half
+migrated, and on one a newer release has already migrated, since it cannot know what that release
+changed. The admin console holds no database
 connection of its own and reaches the auth server through its API, so restarting it migrates
 nothing.
 
