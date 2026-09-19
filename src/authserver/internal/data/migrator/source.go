@@ -14,10 +14,10 @@ import (
 // keeps SQLite's five-digit 00001_initial_create counted as version 1 rather than as absent. The
 // extension is captured but unconstrained, again as the library had it.
 //
-// src/core/data/migration_rules_test.go carries the same reading in its own migrationFileRe, and
-// deliberately so: that lint is a check ON the migration directories and has to keep working if
-// this parser ever drifts, so the two are twins by intent rather than one importing the other
-// (#268).
+// src/authserver/internal/data/migration_rules_test.go carries the same reading in its own
+// migrationFileRe, and deliberately so: that lint is a check ON the migration directories and has
+// to keep working if this parser ever drifts, so the two are twins by intent rather than one
+// importing the other (#268).
 var migrationFileRe = regexp.MustCompile(`^([0-9]+)_(.*)\.(down|up)\.(.*)$`)
 
 // source is the set of migration files a binary carries for one engine, parsed once at

@@ -39,7 +39,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/leodip/goiabada/core/data/schemadump"
+	"github.com/leodip/goiabada/authserver/internal/data/schemadump"
 )
 
 // parityDialects is every engine the comparison requires, in the order failure messages

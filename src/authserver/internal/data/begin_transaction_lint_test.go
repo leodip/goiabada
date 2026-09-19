@@ -11,7 +11,7 @@ package data
 // had not read it; this test makes it a compile-time-adjacent fact instead.
 //
 // It reads and parses files and nothing else: no database, no git, no network, so it runs in the
-// core tier on every CI job rather than only the four database ones.
+// authserver internal tier on every CI job rather than only the four database ones.
 
 import (
 	"go/ast"
