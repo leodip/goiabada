@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/config"
-	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
@@ -91,11 +91,11 @@ func authorizeOnExistingSession(t *testing.T, httpClient *http.Client, client *m
 // It fails for its stated reason in both directions: the third ceremony reaching /auth/issue is a
 // bypass, and the second one failing to reach /auth/otp would mean the re-prompt never fired.
 func TestOtpCeremony_AbandonedLevel2LeavesTheObligationStanding(t *testing.T) {
-	client, redirectUri, user, password := createLevel2MandatoryUser(t, true)
+	client, redirectUri, user, password, otpSecret := createLevel2MandatoryUser(t, true)
 
 	// Ceremony one: password and OTP, which leaves a live level 2 session on this jar.
 	httpClient, otpPage, otpUrl := startOtpCeremony(t, client, redirectUri, user, password, "")
-	firstCode, err := totp.GenerateCode(user.OTPSecret, time.Now())
+	firstCode, err := totp.GenerateCode(otpSecret, time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -144,7 +144,7 @@ func TestOtpCeremony_AbandonedLevel2LeavesTheObligationStanding(t *testing.T) {
 // It fails for its stated reason in both directions: reaching /auth/otp again is the bug, and a
 // first ceremony that never reached the enrollment form would fail at startOtpCeremony instead.
 func TestOtpCeremony_BrowserEnrolmentDoesNotOweAnImmediatePrompt(t *testing.T) {
-	client, redirectUri, user, password := createLevel2MandatoryUser(t, false)
+	client, redirectUri, user, password, _ := createLevel2MandatoryUser(t, false)
 
 	httpClient, otpPage, otpUrl := startOtpCeremony(t, client, redirectUri, user, password, "")
 	secret := getOtpSecretFromEnrollmentPage(t, otpPage)

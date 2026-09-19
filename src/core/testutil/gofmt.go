@@ -116,7 +116,7 @@ var modules = []string{"core", "authserver", "adminconsole", filepath.Join("cmd"
 // SourceRoot returns the directory holding every module in the repository, found
 // by ascending from the test's working directory. It is what every tree-wide
 // guard walks from: AssertGofmted here, and the bare-BeginTransaction lint in
-// core/data (#301).
+// authserver/internal/data (#301, moved there by #354 and #359).
 //
 // Ascending rather than accepting a relative path keeps each caller from having
 // to encode how deep its own package sits. That matters because a wrong root is

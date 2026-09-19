@@ -84,11 +84,9 @@ A row whose owner is not `kernel` names the issue that moves it. A `kernel` row 
 | package | owner | moves in |
 |---|---|---|
 | `core/api` | kernel | — |
-| `core/auditlog` | authserver | #359 |
 | `core/constants` | kernel | — |
 | `core/countries` | kernel | — |
 | `core/customerrors` | kernel | — |
-| `core/data` | authserver | #359 |
 | `core/encryption` | authserver | #360 |
 | `core/enums` | kernel | — |
 | `core/errs` | kernel | — |
@@ -99,7 +97,6 @@ A row whose owner is not `kernel` names the issue that moves it. A `kernel` row 
 | `core/logging` | kernel | — |
 | `core/middleware` | kernel | — |
 | `core/mocks` | kernel | — |
-| `core/models` | authserver | #359 |
 | `core/oauth` | kernel | — |
 | `core/oidc` | authserver | #360 |
 | `core/rsautil` | authserver | #360 |
@@ -162,15 +159,15 @@ symbols, 108 of them named by a single process, with every import rule satisfied
 A row states the strongest justification the tree backs, in that order, and a row claiming less than
 the tree supports fails. So `contract` is reachable only when nothing else holds, which is the whole
 point of it: making somebody write the word turns it into a claim a reviewer can argue with, where
-silence is not. No row carries it today.
+silence is not. Four rows carry it, the permission identifiers #359 left behind.
 
 ### Core constants ownership
 
 | symbol | justification | issue |
 |---|---|---|
-| `AdminConsoleClientIdentifier` | moving | #359 |
+| `AdminConsoleClientIdentifier` | both-apps | — |
 | `AdminConsoleSessionName` | both-apps | — |
-| `AdminReadPermissionIdentifier` | moving | #359 |
+| `AdminReadPermissionIdentifier` | contract | — |
 | `AuthServerResourceIdentifier` | kernel | — |
 | `BrowserSessionsPermissionIdentifier` | both-apps | — |
 | `BuildDate` | kernel | — |
@@ -179,10 +176,10 @@ silence is not. No row carries it today.
 | `ContextKeyJwtInfo` | kernel | — |
 | `GitCommit` | kernel | — |
 | `ManageAccountPermissionIdentifier` | kernel | — |
-| `ManageClientsPermissionIdentifier` | moving | #359 |
+| `ManageClientsPermissionIdentifier` | contract | — |
 | `ManagePermissionIdentifier` | kernel | — |
-| `ManageSettingsPermissionIdentifier` | moving | #359 |
-| `ManageUsersPermissionIdentifier` | moving | #359 |
+| `ManageSettingsPermissionIdentifier` | contract | — |
+| `ManageUsersPermissionIdentifier` | contract | — |
 | `SessionKeyCodeVerifier` | kernel | — |
 | `SessionKeyJwt` | kernel | — |
 | `SessionKeyNonce` | kernel | — |
@@ -198,11 +195,15 @@ Notes on rows that are not self-evident:
   the admin console's server-side sessions, so it names that session name at one production site,
   and the two processes must agree on the string or the admin console's sessions are written under
   a name it does not read (#266). Nothing outside the auth server names `AuthServerSessionName`.
-- The five `moving` rows are in core only because `core/data` and `core/models` name them, seeding
-  the built-in permission rows and the admin console's client. Both packages leave in #359, and
-  when they do nothing in core references these five and the rows stop being backed. They are not
-  `contract`: that claims an intentionally stable cross-process value, and these are ordinary
-  identifiers that happen to be seeded by a package on its way out.
+- These five were `moving | #359` until #359 carried the seeder that named them out of core. The
+  note here then predicted that nothing would reference them afterwards; it was wrong.
+  `AdminConsoleClientIdentifier` is `both-apps`, named by the admin console at four production
+  sites and by the moved seeder. The four permission identifiers are `contract`, their only
+  referrers being `authserver/internal/server/routes.go` and that seeder. The word is earned and
+  not conceded to the guard: they are the scope strings a client asks for and a token carries, and
+  the admin console compiles all four through `BuiltInAuthServerPermissionIdentifiers`, which is
+  `both-apps` on its own account and cannot leave core — moving them out beside it would spell
+  eight scope strings twice with nothing holding the two spellings equal.
 - There is no `ContextKeySettings` row because the two processes share nothing but its spelling.
   Each declares its own, and each asserts a different type out of it — `*models.Settings` in the
   auth server against `*api.PublicSettingsResponse` in the admin console — so either assertion
@@ -248,11 +249,10 @@ removes it. An exception is not a waiver: when the edge goes, the row must go wi
 fails until it does. That is how the epic burns down — #335 already instructs its implementer to
 "remove the exact architecture exceptions introduced by #332 for these edges".
 
-Both ends name a package, never a module and never a parent. `adminconsole/internal/handlers` is
-granted its dependency on `core/models`; `adminconsole` is not, and neither is
-`adminconsole/internal/handlers/adminuserhandlers`, which is why it has a row of its own. A
-module-wide grant would let a second package acquire the same dependency in silence, and the count
-of rows is the only measure of how much is left to do.
+Both ends name a package, never a module and never a parent. `core/handlerhelpers` is granted its
+dependency on `core/hashutil`; `core` is not, and neither is `core/oauth`, which is why it has a
+row of its own. A module-wide grant would let a second package acquire the same dependency in
+silence, and the count of rows is the only measure of how much is left to do.
 
 ### Temporary exceptions
 
@@ -262,9 +262,9 @@ of rows is the only measure of how much is left to do.
 | `core/oauth` | `core/hashutil` | #360 |
 | `core/testutil/fake` | `core/uuidutil` | #360 |
 
-Three rows, all #360's. #350 owned ten of them and owns none now: `core/api` names `core/models`
-nowhere, the admin console names it from no production package, and `AuthCodeReusedError` took the
-last edge with it to `authserver/internal/protocolvalidation`.
+Three rows, all #360's. #350 owned ten of them and owns none now: `core/api` names
+`authserver/internal/models` nowhere, the admin console names it from no production package, and
+`AuthCodeReusedError` took the last edge with it to `authserver/internal/protocolvalidation`.
 
 ## Foreign modules the admin console must not compile
 
@@ -301,7 +301,9 @@ adminconsole/cmd/goiabada-adminconsole -> core/validators -> core/data -> core/d
 ```
 
 `core/data/database.go` imported all four engine packages until #353 moved the selection to
-`authserver/internal/datafactory`, so importing `core/data` at all compiled every driver. Exactly
+`authserver/internal/datafactory`, so importing `core/data` at all compiled every driver. The paths
+in this history are the ones that existed then: `core/data` is `authserver/internal/data` since
+#359, and the engine packages moved under it in #354. Exactly
 one of the core packages the admin console imports reached `core/data`: `core/validators`. #338
 closed the other, `core/oauth`, and the rows stayed `yes`, which is why the table asserts
 reachability rather than counting edges.
@@ -315,7 +317,7 @@ including `core/data`, all four drivers and `go-sqlbuilder`.
 These rows read #353 until then, on the argument that `core/data/database.go` was the only
 production file in `core` importing an engine package and so the single cut point; #353 made that
 cut in the end, for #354. The drivers were expected to leave at 13/16 and left at 9/16, because
-severing the one edge that reaches `core/data` does the same job from the other end. Which is why
+severing the one edge that reached `core/data` did the same job from the other end. Which is why
 `reachable today` is asserted against the real closure and not derived from an argument about
 which issue owns the cut.
 

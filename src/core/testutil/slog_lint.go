@@ -225,15 +225,17 @@ var slogSpreadSites = []slogSpreadSite{
 // when it reaches no files at all.
 //
 // Left out on purpose, each a ceiling recorded in the PR of #320 rather than a site this rule
-// admits: core/data, whose transaction and statement records run under RunInTransaction with no
-// context to reach them short of changing every Database method; and core/stringutil, whose one
-// record is written from a template function like addUrlParam below. A startup, worker or main
-// package is not a request path and is not listed.
+// admits: authserver/internal/data, whose transaction and statement records run under
+// RunInTransaction with no context to reach them short of changing every Database method (it was
+// core/data until #359 moved it, and the ceiling moved with it, unchanged); and core/stringutil,
+// whose one record is written from a template function like addUrlParam below. A startup, worker
+// or main package is not a request path and is not listed.
 //
-// authserver/internal/audit and core/auditlog were the third such ceiling and are now listed:
-// AuditLogger.Log takes a context and its 126 call sites pass the request's, so a plain record
-// there is refused from #328 onward. The compiler forces the parameter; what it cannot force is
-// that the context is the request's, which is AssertAuditLogContext's rule over this same list.
+// authserver/internal/audit was the third such ceiling and is now listed: AuditLogger.Log takes a
+// context and its 126 call sites pass the request's, so a plain record there is refused from #328
+// onward. The compiler forces the parameter; what it cannot force is that the context is the
+// request's, which is AssertAuditLogContext's rule over this same list. It was two packages until
+// #359 folded core/auditlog, which held the console record's one writer, into it.
 var slogRequestPathDirs = []string{
 	"authserver/internal/audit",
 	"authserver/internal/handlerhelpers",
@@ -257,7 +259,6 @@ var slogRequestPathDirs = []string{
 	"adminconsole/internal/handlers",
 	"adminconsole/internal/middleware",
 	"adminconsole/internal/apiclient",
-	"core/auditlog",
 	"core/middleware",
 	"core/validators",
 	"core/oauth",

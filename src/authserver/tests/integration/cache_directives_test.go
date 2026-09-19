@@ -37,7 +37,7 @@ func assertNotStorable(t *testing.T, resp *http.Response, what string) {
 // the login form and stops there, which is as far as the claim goes: the page is rendered, and
 // what it carries is a header the request that fetched it received.
 func TestCacheDirectives_ThePasswordFormIsNotStorable(t *testing.T) {
-	client, redirectUri, _, _ := createLevel2MandatoryUser(t, false)
+	client, redirectUri, _, _, _ := createLevel2MandatoryUser(t, false)
 
 	httpClient := createHttpClient(t)
 
@@ -65,7 +65,7 @@ func TestCacheDirectives_ThePasswordFormIsNotStorable(t *testing.T) {
 // renders the TOTP seed in plain text, which is the surface #247 was opened about. The user has no
 // authenticator yet, so /auth/otp answers with the enrolment arm.
 func TestCacheDirectives_TheOtpEnrolmentPageIsNotStorable(t *testing.T) {
-	client, redirectUri, user, password := createLevel2MandatoryUser(t, false)
+	client, redirectUri, user, password, _ := createLevel2MandatoryUser(t, false)
 
 	_, otpPage, _ := startOtpCeremony(t, client, redirectUri, user, password, "")
 	defer func() { _ = otpPage.Body.Close() }()

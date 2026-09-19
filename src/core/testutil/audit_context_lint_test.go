@@ -46,7 +46,12 @@ func parenthesised(auditLogger logger, r *http.Request) {
 	// "context.Background". Both constructors are planted under the alias, because a rule that
 	// resolved the import for one and not the other would pass this file on the strength of the
 	// half it did resolve.
-	tree.write("core/auditlog/aliased.go", `package auditlog
+	//
+	// It sits in a listed core directory on purpose, and moved from core/auditlog to here when #359
+	// folded that package into authserver/internal/audit: it is the tree's only refused plant on
+	// the core side of slogRequestPathDirs, so putting it beside caught.go in the auth server would
+	// leave the core half of the walk proving nothing.
+	tree.write("core/sessionstore/aliased.go", `package sessionstore
 
 import (
 	stdctx "context"
@@ -157,8 +162,8 @@ func inMock(auditLogger logger) {
 		"authserver/internal/handlers/caught.go:13 context.Background() passed to .Log in a request-path package",
 		"authserver/internal/handlers/caught.go:17 context.TODO() passed to .Log in a request-path package",
 		"authserver/internal/handlers/caught.go:21 context.Background() passed to .Log in a request-path package",
-		"core/auditlog/aliased.go:12 context.Background() passed to .Log in a request-path package",
-		"core/auditlog/aliased.go:16 context.TODO() passed to .Log in a request-path package",
+		"core/sessionstore/aliased.go:12 context.Background() passed to .Log in a request-path package",
+		"core/sessionstore/aliased.go:16 context.TODO() passed to .Log in a request-path package",
 	}
 	sort.Strings(want)
 	sort.Strings(got)

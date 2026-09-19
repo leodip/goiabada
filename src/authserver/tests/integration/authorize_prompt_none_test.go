@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/config"
+	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/hashutil"
-	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
@@ -63,7 +63,6 @@ func TestPromptNone_AcrStepUpNeeded_ReturnsInteractionRequired(t *testing.T) {
 		t.Fatal(err)
 	}
 	user.OTPEnabled = true
-	user.OTPSecret = key.Secret()
 	user.OTPSecretEncrypted = encryptOTPSecretForTest(t, key.Secret())
 	err = database.UpdateUser(nil, user)
 	if err != nil {
@@ -103,7 +102,6 @@ func TestPromptNone_OtpEnrollmentNeeded_ReturnsInteractionRequired(t *testing.T)
 
 	// Ensure user does NOT have OTP enabled
 	user.OTPEnabled = false
-	user.OTPSecret = ""
 	err := database.UpdateUser(nil, user)
 	if err != nil {
 		t.Fatal(err)
@@ -535,7 +533,6 @@ func TestPromptNone_OtpOptionalNoOtp_ReturnsInteractionRequired(t *testing.T) {
 
 	// Ensure user does NOT have OTP enabled
 	user.OTPEnabled = false
-	user.OTPSecret = ""
 	err := database.UpdateUser(nil, user)
 	if err != nil {
 		t.Fatal(err)
@@ -596,7 +593,6 @@ func TestPromptNone_OtpConfigChanged_ReturnsInteractionRequired(t *testing.T) {
 		t.Fatal(err)
 	}
 	user.OTPEnabled = true
-	user.OTPSecret = key.Secret()
 	user.OTPSecretEncrypted = encryptOTPSecretForTest(t, key.Secret())
 	err = database.UpdateUser(nil, user)
 	if err != nil {
@@ -663,7 +659,6 @@ func TestPromptNone_OtpConfigChanged_RefusalWritesNothing(t *testing.T) {
 		t.Fatal(err)
 	}
 	user.OTPEnabled = true
-	user.OTPSecret = key.Secret()
 	user.OTPSecretEncrypted = encryptOTPSecretForTest(t, key.Secret())
 	if err := database.UpdateUser(nil, user); err != nil {
 		t.Fatal(err)

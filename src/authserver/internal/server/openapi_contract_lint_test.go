@@ -862,12 +862,12 @@ func TestOpenAPI_EveryRefResolves(t *testing.T) {
 // SOME SHAPES ON THE WIRE WERE NOT core/api STRUCTS, and exempting them was a hole rather
 // than a limit. Four nested schemas were waved through here on the true observation that no
 // core/api type declared them, and all four turned out to be incomplete against the
-// core/models type they really serialized: fifteen fields the API emitted on every one of
-// these responses had no entry in the contract, and adding a bogus property to one left this
-// whole tier green (#245, final review finding 3). They were paired to core/models here until
-// #350 replaced every model-typed response field with a DTO, at which point the pairing had
-// nothing left to reach: a core/api struct now checks each surviving one. What stays exempt is
-// only what no Go type declares at all.
+// authserver/internal/models type they really serialized: fifteen fields the API emitted on
+// every one of these responses had no entry in the contract, and adding a bogus property to one
+// left this whole tier green (#245, final review finding 3). They were paired to
+// authserver/internal/models here until #350 replaced every model-typed response field with a
+// DTO, at which point the pairing had nothing left to reach: a core/api struct now checks each
+// surviving one. What stays exempt is only what no Go type declares at all.
 
 // schemaStructNames pairs a component schema with the src/core/api struct it describes where
 // the two are deliberately named differently. An entry pairs rather than exempts, so the

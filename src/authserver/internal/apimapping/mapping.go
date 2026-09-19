@@ -1,13 +1,13 @@
 // Package apimapping owns the auth server's mapping from persistence models to the
 // wire types in core/api. It lives here, and not beside the types it produces, so that
 // core/api declares JSON and nothing else: the kernel's wire contract must not depend on
-// core/models, and the admin console must be able to decode a response without linking
-// the persistence layer (#350).
+// authserver/internal/models, and the admin console must be able to decode a response
+// without linking the persistence layer (#350).
 package apimapping
 
 import (
+	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/models"
 )
 
 func ToUserResponse(user *models.User) *api.UserResponse {

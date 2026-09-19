@@ -71,7 +71,7 @@ func TestSchemaParity_TheFourCommittedGoldenFiles(t *testing.T) {
 
 // parityAllowlist is every place the four engines are deliberately allowed to differ.
 //
-// Eleven rules covering 339 places. It is few rules and many instances on purpose: a
+// Eleven rules covering 338 places. It is few rules and many instances on purpose: a
 // difference in VOCABULARY, TEXT against varchar(256) against nvarchar(256), or the four
 // collation names, is a mapping in canonicalType and canonicalCollation and never a rule
 // here. What reaches this list is what survives canonicalisation, which is a real difference
@@ -103,8 +103,8 @@ func parityAllowlist() []parityRule {
 				"so a width there would be documentation the engine ignores. The other three " +
 				"enforce theirs, which is why this is recorded as a difference rather than " +
 				"folded onto unbounded: SQLite really does store a value SQL Server would refuse.",
-			Count:  93,
-			Digest: "1385937ad9cb4754",
+			Count:  92,
+			Digest: "5daae1c664d49fa7",
 			Excuses: func(d parityDivergence) bool {
 				return d.Axis == parityAxisType && oddOneOut(d, schemadump.SQLite) &&
 					d.Says[schemadump.SQLite] == "string(no declared length)" &&

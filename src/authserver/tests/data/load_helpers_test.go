@@ -3,7 +3,7 @@ package datatests
 import (
 	"testing"
 
-	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/testutil/fake"
 )
 
@@ -614,8 +614,13 @@ func TestGetGroupMembersPaginated_InvalidGroupId(t *testing.T) {
 // =============================================================================
 // GetLastUserWithOTPState
 //
-// Used by the OTP backfill to walk users by OTP state. It returns the
-// highest-numbered ENABLED user matching the requested state, so a freshly
+// NO PRODUCTION CALLER. The comment here used to name the OTP backfill, which was already wrong
+// -- BackfillEncryptedOTPSecrets issued its own query and never called this -- and #359 deleted
+// that function outright (#262). The method is still on the Database interface, so this test pins
+// the query it issues for as long as that is true; removing it is out of scope here, because this
+// issue does not narrow the interface.
+//
+// It returns the highest-numbered ENABLED user matching the requested state, so a freshly
 // created user is the expected answer.
 // =============================================================================
 

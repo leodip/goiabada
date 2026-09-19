@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/errs"
-	"github.com/leodip/goiabada/core/models"
 )
 
 func (d *MsSQLDatabase) CreateUser(tx *sql.Tx, user *models.User) error {
@@ -63,16 +63,8 @@ func (d *MsSQLDatabase) UpdateUser(tx *sql.Tx, user *models.User) error {
 	return d.CommonDB.UpdateUser(tx, user)
 }
 
-func (d *MsSQLDatabase) BackfillEncryptedOTPSecrets(aesKey []byte) (int, error) {
-	return d.CommonDB.BackfillEncryptedOTPSecrets(aesKey)
-}
-
 func (d *MsSQLDatabase) ScanEmailCase() ([]models.EmailCaseRow, error) {
 	return d.CommonDB.ScanEmailCase()
-}
-
-func (d *MsSQLDatabase) ReencryptDataToNewKey(oldKey, newKey []byte) error {
-	return d.CommonDB.ReencryptDataToNewKey(oldKey, newKey)
 }
 
 func (d *MsSQLDatabase) RotateEncryptionKeyIfNeeded(currentKey, previousKey []byte) (bool, error) {

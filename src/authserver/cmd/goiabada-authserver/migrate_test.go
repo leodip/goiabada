@@ -11,9 +11,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/data/migrator"
 	"github.com/leodip/goiabada/authserver/internal/data/sqlitedb"
-	"github.com/leodip/goiabada/core/data"
 )
 
 // newTestMigrator gives each test its own SQLite file database and a migrator over the real
@@ -141,7 +141,7 @@ func TestMigrateTo_StepsDownUnderALoweredFloor(t *testing.T) {
 	// versions THIS engine carries rather than a count: 000042 is a MySQL migration and SQLite
 	// steps straight from 000043 to 000041. Spelled out rather than derived, because the CHAIN
 	// is what is under test here: a migration added on one engine alone must not appear in it.
-	assert.Contains(t, out.String(), "migrations to run, in order: 000047, 000046, 000045, 000044, 000043\n")
+	assert.Contains(t, out.String(), "migrations to run, in order: 000048, 000047, 000046, 000045, 000044, 000043\n")
 	assert.Contains(t, out.String(), "now at schema version 000041")
 
 	version, dirty, err := m.Version()

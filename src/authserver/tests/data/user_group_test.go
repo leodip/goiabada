@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/authserver/internal/models"
 )
 
 func TestCreateUserGroup(t *testing.T) {

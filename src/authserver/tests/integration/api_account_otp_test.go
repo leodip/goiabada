@@ -9,13 +9,13 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/config"
+	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/otp"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/hashutil"
-	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
@@ -197,7 +197,6 @@ func TestAPIAccountOTPEnrollmentGet_Success(t *testing.T) {
 	// Ensure OTP disabled on the account user
 	u, _ := database.GetUserById(nil, userId)
 	u.OTPEnabled = false
-	u.OTPSecret = ""
 	_ = database.UpdateUser(nil, u)
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/account/otp/enrollment"
@@ -223,7 +222,6 @@ func TestAPIAccountOTPEnrollmentGet_AlreadyEnabled(t *testing.T) {
 	// Enable OTP on the account user directly
 	u, _ := database.GetUserById(nil, userId)
 	u.OTPEnabled = true
-	u.OTPSecret = "JBSWY3DPEHPK3PXP" // base32 test secret
 	u.OTPSecretEncrypted = encryptOTPSecretForTest(t, "JBSWY3DPEHPK3PXP")
 	_ = database.UpdateUser(nil, u)
 
@@ -274,7 +272,6 @@ func TestAPIAccountOTPPut_Enable_Success(t *testing.T) {
 	setUserPasswordForOTP(t, userId, "Correct1!")
 	u, _ := database.GetUserById(nil, userId)
 	u.OTPEnabled = false
-	u.OTPSecret = ""
 	_ = database.UpdateUser(nil, u)
 
 	// The seed comes from the issuing endpoint, which is the only one the PUT will accept.
@@ -302,7 +299,6 @@ func TestAPIAccountOTPPut_Enable_Success(t *testing.T) {
 	updated, err := database.GetUserById(nil, userId)
 	assert.NoError(t, err)
 	assert.True(t, updated.OTPEnabled)
-	assert.Empty(t, updated.OTPSecret)
 	decrypted, err := updated.GetOTPSecret()
 	assert.NoError(t, err)
 	assert.Equal(t, strings.ToUpper(secret), decrypted)
@@ -374,7 +370,6 @@ func TestAPIAccountOTPPut_Disable_Success(t *testing.T) {
 	// Pre-enable OTP directly on the account user
 	u, _ := database.GetUserById(nil, userId)
 	u.OTPEnabled = true
-	u.OTPSecret = "JBSWY3DPEHPK3PXP"
 	u.OTPSecretEncrypted = encryptOTPSecretForTest(t, "JBSWY3DPEHPK3PXP")
 	_ = database.UpdateUser(nil, u)
 
@@ -390,7 +385,9 @@ func TestAPIAccountOTPPut_Disable_Success(t *testing.T) {
 	updated, err := database.GetUserById(nil, userId)
 	assert.NoError(t, err)
 	assert.False(t, updated.OTPEnabled)
-	assert.Equal(t, "", updated.OTPSecret)
+	// The seed itself is gone, not merely unreachable. Read through the column that carries it
+	// since migration 000048 dropped users.otp_secret (#98).
+	assert.Empty(t, updated.OTPSecretEncrypted)
 }
 
 // TestAPIAccountOTPPut_Disable_ResetsConsumedStep is seam 4's pin for #111 decision 4: disabling
@@ -526,7 +523,6 @@ func TestAPIAccountOTPPut_Enable_AdvancesOtpConfigGeneration(t *testing.T) {
 	// Ensure OTP disabled for this account user
 	u, _ := database.GetUserById(nil, userId)
 	u.OTPEnabled = false
-	u.OTPSecret = ""
 	_ = database.UpdateUser(nil, u)
 
 	before, err := database.GetUserById(nil, userId)
@@ -574,7 +570,6 @@ func TestAPIAccountOTPPut_Disable_AdvancesOtpConfigGeneration(t *testing.T) {
 	// Pre-enable OTP directly on this account user
 	u, _ := database.GetUserById(nil, userId)
 	u.OTPEnabled = true
-	u.OTPSecret = "JBSWY3DPEHPK3PXP"
 	u.OTPSecretEncrypted = encryptOTPSecretForTest(t, "JBSWY3DPEHPK3PXP")
 	_ = database.UpdateUser(nil, u)
 
@@ -612,7 +607,6 @@ func TestAPIAccountOTPPut_Disable_NotEnabled(t *testing.T) {
 	// Ensure disabled on the account user
 	u, _ := database.GetUserById(nil, userId)
 	u.OTPEnabled = false
-	u.OTPSecret = ""
 	_ = database.UpdateUser(nil, u)
 
 	reqBody := api.UpdateAccountOTPRequest{Enabled: false, Password: "Correct1!"}

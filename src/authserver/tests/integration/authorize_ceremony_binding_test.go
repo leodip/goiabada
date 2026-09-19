@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/config"
+	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/hashutil"
-	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
@@ -372,7 +372,7 @@ func walkToOtpPrompt(t *testing.T, httpClient *http.Client, client *models.Clien
 // step, and the passcode in front of the user would have stopped working for the request they were
 // actually on, which is a forgotten tab breaking a live sign-in (#79 decision 5, #111 decision 3).
 func TestAuthorize_OtpFormFromAReplacedCeremonyIsRefused(t *testing.T) {
-	clientA, redirectUriA, user, password := createLevel2MandatoryUser(t, true)
+	clientA, redirectUriA, user, password, otpSecret := createLevel2MandatoryUser(t, true)
 	clientB, redirectUriB := createLevel2MandatoryClient(t)
 
 	httpClient := createHttpClient(t)
@@ -392,7 +392,7 @@ func TestAuthorize_OtpFormFromAReplacedCeremonyIsRefused(t *testing.T) {
 	assert.NotEqual(t, ceremonyA, ceremonyB,
 		"each authorization request must render its own ceremony id, or nothing is bound")
 
-	otpCode, err := totp.GenerateCode(user.OTPSecret, time.Now())
+	otpCode, err := totp.GenerateCode(otpSecret, time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}

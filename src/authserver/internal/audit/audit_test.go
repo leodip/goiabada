@@ -8,8 +8,8 @@ import (
 
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/authserver/internal/constants"
-	mocks "github.com/leodip/goiabada/core/data/mocks"
-	"github.com/leodip/goiabada/core/models"
+	mocks "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -17,7 +17,7 @@ import (
 )
 
 // TestAuditLogger_ConsoleRecordCarriesTheEventAndTheDetails is the console half of AuditLogger,
-// at the seam auditlog.LogToConsole now owns.
+// at the seam LogToConsole owns.
 //
 // These three cases used to marshal an envelope into the message field and compare the message
 // against an expected JSON document. That is the shape #320 decision 7 replaced: a collector

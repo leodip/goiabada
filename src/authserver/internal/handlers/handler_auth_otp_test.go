@@ -16,18 +16,18 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/constants"
+	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/otp"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/i18n"
-	"github.com/leodip/goiabada/core/models"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
+	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
-	mocks_data "github.com/leodip/goiabada/core/data/mocks"
 	mocks_handlerhelpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
 )
 
@@ -1091,8 +1091,9 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		var calls []string
 		expectRunInTransaction(database, otpEnrolTx, func(edge string) { calls = append(calls, edge) })
 		database.On("UpdateUser", otpEnrolTx, mock.MatchedBy(func(u *models.User) bool {
-			// The secret must be stored encrypted, with the plaintext column cleared.
-			if u.Id != 1 || !u.OTPEnabled || u.OTPSecret != "" || len(u.OTPSecretEncrypted) == 0 {
+			// The secret must be stored encrypted. There is no plaintext column any more: migration
+			// 000048 dropped users.otp_secret (#98).
+			if u.Id != 1 || !u.OTPEnabled || len(u.OTPSecretEncrypted) == 0 {
 				return false
 			}
 			decrypted, err := u.GetOTPSecret()

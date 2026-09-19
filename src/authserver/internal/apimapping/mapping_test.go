@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -28,6 +28,9 @@ import (
 
 // sensitiveUserFields are the models.User fields that must never be exposed
 // through api.UserResponse, by field name or by JSON key.
+// OTPSecret is still listed though models.User no longer declares it: migration 000048 dropped
+// the column (#98), and the claim here is about the RESPONSE, which must never grow a key by that
+// name either.
 var sensitiveUserFields = []string{
 	"PasswordHash",
 	"OTPSecret",
@@ -73,7 +76,6 @@ func TestToUserResponse_DoesNotLeakSecrets(t *testing.T) {
 		Id:                                   1,
 		Email:                                "user@example.com",
 		PasswordHash:                         "SENTINEL-password-hash",
-		OTPSecret:                            "SENTINEL-otp-secret-plaintext",
 		OTPSecretEncrypted:                   otpSecretEncrypted,
 		EmailVerificationCodeEncrypted:       emailCodeEncrypted,
 		EmailVerificationCodeIssuedAt:        sql.NullTime{Time: time.Now(), Valid: true},
@@ -94,7 +96,6 @@ func TestToUserResponse_DoesNotLeakSecrets(t *testing.T) {
 
 	// Plaintext secrets.
 	assert.NotContains(t, payload, "SENTINEL-password-hash")
-	assert.NotContains(t, payload, "SENTINEL-otp-secret-plaintext")
 
 	// Byte-slice secrets would serialize as base64, so check that encoding too.
 	for _, secret := range [][]byte{otpSecretEncrypted, emailCodeEncrypted, phoneCodeEncrypted,

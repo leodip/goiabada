@@ -13,7 +13,7 @@ import (
 	"database/sql"
 
 	"github.com/leodip/goiabada/authserver/internal/issuance"
-	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/authserver/internal/models"
 	mock "github.com/stretchr/testify/mock"
 )
 

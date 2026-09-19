@@ -5,12 +5,12 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/config"
+	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/hashutil"
-	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 )
@@ -575,8 +575,7 @@ func TestROPC_UserWith2FAEnabled(t *testing.T) {
 		Enabled:            true,
 		Email:              fake.Email(),
 		PasswordHash:       passwordHashed,
-		OTPEnabled:         true,               // 2FA enabled
-		OTPSecret:          "JBSWY3DPEHPK3PXP", // Dummy OTP secret
+		OTPEnabled:         true, // 2FA enabled
 		OTPSecretEncrypted: encryptOTPSecretForTest(t, "JBSWY3DPEHPK3PXP"),
 	}
 	err = database.CreateUser(nil, user)

@@ -9,9 +9,9 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/leodip/goiabada/authserver/internal/config"
+	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/hashutil"
-	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
@@ -280,7 +280,6 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsN
 		Enabled:            true,
 		Email:              userEmail,
 		PasswordHash:       passwordHashed,
-		OTPSecret:          key.Secret(),
 		OTPSecretEncrypted: encryptOTPSecretForTest(t, key.Secret()),
 		OTPEnabled:         true,
 	}
@@ -335,7 +334,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsN
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	otpCode, err := totp.GenerateCode(user.OTPSecret, time.Now())
+	otpCode, err := totp.GenerateCode(key.Secret(), time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -539,7 +538,6 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 		Enabled:            true,
 		Email:              userEmail,
 		PasswordHash:       passwordHashed,
-		OTPSecret:          key.Secret(),
 		OTPSecretEncrypted: encryptOTPSecretForTest(t, key.Secret()),
 		OTPEnabled:         true,
 	}
@@ -594,7 +592,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	otpCode, err := totp.GenerateCode(user.OTPSecret, time.Now())
+	otpCode, err := totp.GenerateCode(key.Secret(), time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -880,7 +878,6 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 		Enabled:            true,
 		Email:              userEmail,
 		PasswordHash:       passwordHashed,
-		OTPSecret:          key.Secret(),
 		OTPSecretEncrypted: encryptOTPSecretForTest(t, key.Secret()),
 		OTPEnabled:         true,
 	}

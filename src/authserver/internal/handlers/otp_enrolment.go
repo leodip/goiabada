@@ -3,8 +3,8 @@ package handlers
 import (
 	"database/sql"
 
-	"github.com/leodip/goiabada/core/data"
-	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/authserver/internal/data"
+	"github.com/leodip/goiabada/authserver/internal/models"
 )
 
 // EnableUserOTPTx establishes a user's authenticator: it writes the user, whose OTPEnabled

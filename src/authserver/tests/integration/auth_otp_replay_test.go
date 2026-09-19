@@ -10,11 +10,11 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/leodip/goiabada/authserver/internal/config"
+	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/otp"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/hashutil"
-	"github.com/leodip/goiabada/core/models"
 	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
@@ -57,11 +57,13 @@ func createLevel2MandatoryClient(t *testing.T) (*models.Client, *models.Redirect
 // it completes no ceremony, so the user's consumed-step marker is still 0 and the test owns
 // every code ever submitted for them.
 //
-// With otpEnabled the user is enrolled with a fresh secret, kept in plaintext on the model for
-// generating codes and encrypted in the column the way production stores it. Without it the
-// first ceremony enrolls, which is what the second test needs.
+// With otpEnabled the user is enrolled with a fresh secret, encrypted in the column the way
+// production stores it, and the plaintext seed is RETURNED rather than carried on the model:
+// users.otp_secret was dropped by migration 000048 (#98), so the caller generating codes holds
+// the seed in a local. Without otpEnabled the first ceremony enrols, which is what the second
+// test needs, and the returned seed is empty.
 func createLevel2MandatoryUser(t *testing.T, otpEnabled bool) (*models.Client, *models.RedirectURI,
-	*models.User, string) {
+	*models.User, string, string) {
 
 	client, redirectUri := createLevel2MandatoryClient(t)
 
@@ -78,6 +80,7 @@ func createLevel2MandatoryUser(t *testing.T, otpEnabled bool) (*models.Client, *
 		PasswordHash: passwordHashed,
 	}
 
+	otpSecret := ""
 	if otpEnabled {
 		key, err := totp.Generate(totp.GenerateOpts{
 			Issuer:      "Goiabada",
@@ -86,8 +89,8 @@ func createLevel2MandatoryUser(t *testing.T, otpEnabled bool) (*models.Client, *
 		if err != nil {
 			t.Fatal(err)
 		}
-		user.OTPSecret = key.Secret()
-		user.OTPSecretEncrypted = encryptOTPSecretForTest(t, key.Secret())
+		otpSecret = key.Secret()
+		user.OTPSecretEncrypted = encryptOTPSecretForTest(t, otpSecret)
 		user.OTPEnabled = true
 	}
 
@@ -96,7 +99,7 @@ func createLevel2MandatoryUser(t *testing.T, otpEnabled bool) (*models.Client, *
 		t.Fatal(err)
 	}
 
-	return client, redirectUri, user, password
+	return client, redirectUri, user, password, otpSecret
 }
 
 // startOtpCeremony drives a brand new authorization request through the password form and
@@ -258,11 +261,11 @@ func nextStepCode(t *testing.T, secret string, consumed string) string {
 // which succeeds, so the refusal cannot be explained by a ceremony that was never going to
 // work.
 func TestAuthOtp_ReplayedCodeIsRefused(t *testing.T) {
-	client, redirectUri, user, password := createLevel2MandatoryUser(t, true)
+	client, redirectUri, user, password, otpSecret := createLevel2MandatoryUser(t, true)
 
 	httpClient, otpPage, otpUrl := startOtpCeremony(t, client, redirectUri, user, password, "")
 
-	codeC, err := totp.GenerateCode(user.OTPSecret, time.Now())
+	codeC, err := totp.GenerateCode(otpSecret, time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -282,7 +285,7 @@ func TestAuthOtp_ReplayedCodeIsRefused(t *testing.T) {
 	// Control: the ceremony is alive and the form works, so only the replay was refused. It posts
 	// the page the refusal rerendered, which is the page a user who mistyped a code is actually
 	// looking at, so this also requires that rerender to carry the ceremony id (#79).
-	resp = authenticateWithOtp(t, httpClient, otpUrl, refused, nextStepCode(t, user.OTPSecret, codeC))
+	resp = authenticateWithOtp(t, httpClient, otpUrl, refused, nextStepCode(t, otpSecret, codeC))
 	_ = refused.Body.Close()
 	assertRedirect(t, resp, "/auth/completed")
 	_ = resp.Body.Close()
@@ -298,7 +301,7 @@ func TestAuthOtp_ReplayedCodeIsRefused(t *testing.T) {
 // exactly twice. As above, the later-step control shows the second ceremony was capable of
 // succeeding.
 func TestAuthOtp_EnrolmentCodeIsRefusedAtVerification(t *testing.T) {
-	client, redirectUri, user, password := createLevel2MandatoryUser(t, false)
+	client, redirectUri, user, password, _ := createLevel2MandatoryUser(t, false)
 
 	httpClient, otpPage, otpUrl := startOtpCeremony(t, client, redirectUri, user, password, "")
 	secret := getOtpSecretFromEnrollmentPage(t, otpPage)
@@ -415,7 +418,7 @@ func TestAuthOtp_APIEnrolmentCodeIsRefusedAtVerification(t *testing.T) {
 // Scope stops at the OTP form. Completing the ceremony is the replay tests' subject above, and
 // reaching the form is the whole of what the floor decides here.
 func TestOtpCeremony_AcrValuesLevel1CannotSkipMandatoryOtp(t *testing.T) {
-	client, redirectUri, user, password := createLevel2MandatoryUser(t, true)
+	client, redirectUri, user, password, _ := createLevel2MandatoryUser(t, true)
 
 	httpClient, otpPage, otpUrl := startOtpCeremony(t, client, redirectUri, user, password,
 		"&acr_values="+url.QueryEscape(enums.AcrLevel1.String()))

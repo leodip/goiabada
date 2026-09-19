@@ -10,7 +10,7 @@
 package mocks_handlers
 
 import (
-	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/authserver/internal/models"
 	mock "github.com/stretchr/testify/mock"
 )
 

@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/leodip/goiabada/core/models"
+	"github.com/leodip/goiabada/authserver/internal/models"
 )
 
 func (d *MySQLDatabase) CreateUser(tx *sql.Tx, user *models.User) error {
@@ -15,16 +15,8 @@ func (d *MySQLDatabase) UpdateUser(tx *sql.Tx, user *models.User) error {
 	return d.CommonDB.UpdateUser(tx, user)
 }
 
-func (d *MySQLDatabase) BackfillEncryptedOTPSecrets(aesKey []byte) (int, error) {
-	return d.CommonDB.BackfillEncryptedOTPSecrets(aesKey)
-}
-
 func (d *MySQLDatabase) ScanEmailCase() ([]models.EmailCaseRow, error) {
 	return d.CommonDB.ScanEmailCase()
-}
-
-func (d *MySQLDatabase) ReencryptDataToNewKey(oldKey, newKey []byte) error {
-	return d.CommonDB.ReencryptDataToNewKey(oldKey, newKey)
 }
 
 func (d *MySQLDatabase) RotateEncryptionKeyIfNeeded(currentKey, previousKey []byte) (bool, error) {

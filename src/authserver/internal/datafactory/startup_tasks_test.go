@@ -1,13 +1,12 @@
 package datafactory
 
 import (
-	"database/sql"
 	"errors"
 	"testing"
 
-	mocks_data "github.com/leodip/goiabada/core/data/mocks"
-	"github.com/leodip/goiabada/core/models"
+	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -19,93 +18,54 @@ var startupKey = make([]byte, 32)
 // at startup, before it serves anything: a data task that fails must stop the process rather
 // than let it run on half-converted data.
 //
-// Serving on data that is half re-encrypted is worse than not serving: half the rows readable
-// under the env key and half under the legacy one is a database no single key opens, and a TOTP
-// secret the pass did not reach is still in plaintext at rest.
+// Serving on data that is half re-keyed is worse than not serving: half the rows readable under
+// the current key and half under the previous one is a database no single key opens.
 //
-// The email lowercase pass was the fourth task here and was this test's headline case until #351
-// made it migration 000047. Its fail-closed property did not go away with it: it moved to
-// CheckEmailCaseBeforeMigrating, which refuses BEFORE the migration chain rather than
-// repairing after it, and is covered in preflight_test.go.
+// ONE TASK IS LEFT, and the two that went are why the cases below look thin. The email lowercase
+// pass was the fourth and was this test's headline case until #351 made it migration 000047; its
+// fail-closed property moved to CheckEmailCaseBeforeMigrating, which refuses BEFORE the migration
+// chain rather than repairing after it, and is covered in preflight_test.go. The one-shot move of
+// the data key out of the database and the TOTP secret encryption pass (#82) were deleted by #359
+// along with the policy decision that an upgrade must pass through 1.6.x (#262).
 //
-// One case per task, each stubbing the tasks before it as succeeding and the task itself as
-// failing, and asserting the error comes back out. The final case is the whole sequence
-// succeeding, which is what says the failures above are caused by the failure and not by a
-// mock nobody set up.
+// So the table is the rotation's failure case, plus the sequence succeeding, which is what says
+// the failure is caused by the injected error and not by a mock nobody set up. The third case is
+// the one guarding what is NOT there.
 func TestRunStartupDataTasks_IsFailClosed(t *testing.T) {
 	boom := errors.New("storage is unavailable")
 
-	// A settings row still holding the legacy 32-byte key, which is what makes the one-shot
-	// re-encryption run at all. Absent it the task is skipped, so a case asserting that it
-	// fails closed would pass with the call deleted.
-	legacySettings := &models.Settings{
-		AESEncryptionKeyLegacy: make([]byte, 32),
-	}
-
-	tests := []struct {
-		name        string
-		previousKey []byte
-		arrange     func(db *mocks_data.Database)
-		wantErr     string
-		why         string
-	}{
-		{
-			name: "the settings read",
-			arrange: func(db *mocks_data.Database) {
-				db.EXPECT().GetSettingsById((*sql.Tx)(nil), int64(1)).Return(nil, boom)
-			},
-			wantErr: "unable to load settings for encryption migration",
-			why:     "an unreadable settings row means the legacy key cannot be ruled out, so continuing could serve on data encrypted under a key nobody is using",
-		},
-		{
-			name: "the one-shot move of the data key out of the database",
-			arrange: func(db *mocks_data.Database) {
-				db.EXPECT().GetSettingsById((*sql.Tx)(nil), int64(1)).Return(legacySettings, nil)
-				db.EXPECT().ReencryptDataToNewKey(legacySettings.AESEncryptionKeyLegacy, startupKey).Return(boom)
-			},
-			wantErr: "failed to migrate data-at-rest encryption",
-			why:     "half the rows would be readable under the env key and half under the legacy one",
-		},
-		{
-			name:        "the env-to-env key rotation",
-			previousKey: make([]byte, 32),
-			arrange: func(db *mocks_data.Database) {
-				db.EXPECT().GetSettingsById((*sql.Tx)(nil), int64(1)).Return(nil, nil)
-				db.EXPECT().RotateEncryptionKeyIfNeeded(startupKey, make([]byte, 32)).Return(false, boom)
-			},
-			wantErr: "AES data key rotation failed",
-			why:     "same hazard as above, from the other direction",
-		},
-		{
-			name: "the TOTP secret encryption pass",
-			arrange: func(db *mocks_data.Database) {
-				db.EXPECT().GetSettingsById((*sql.Tx)(nil), int64(1)).Return(nil, nil)
-				db.EXPECT().BackfillEncryptedOTPSecrets(startupKey).Return(0, boom)
-			},
-			wantErr: "failed to encrypt legacy plaintext OTP secrets",
-			why:     "a TOTP secret left in plaintext at rest is the defect #82 closed, and serving would leave it open silently",
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			db := mocks_data.NewDatabase(t)
-			tc.arrange(db)
-
-			err := runStartupDataTasks(db, startupKey, tc.previousKey)
-
-			require.Errorf(t, err, "a failure in %s must stop startup: %s", tc.name, tc.why)
-			assert.Containsf(t, err.Error(), tc.wantErr,
-				"the error must name what failed, because this is the only message an operator gets: %v", err)
-		})
-	}
-
-	t.Run("and the whole sequence succeeding returns no error", func(t *testing.T) {
+	t.Run("the env-to-env key rotation", func(t *testing.T) {
 		db := mocks_data.NewDatabase(t)
-		db.EXPECT().GetSettingsById((*sql.Tx)(nil), int64(1)).Return(nil, nil)
-		db.EXPECT().BackfillEncryptedOTPSecrets(startupKey).Return(3, nil)
+		db.EXPECT().RotateEncryptionKeyIfNeeded(startupKey, make([]byte, 32)).Return(false, boom)
 
-		assert.NoError(t, runStartupDataTasks(db, startupKey, nil),
-			"every task succeeded, so the cases above fail because of the injected error rather than because of an unset mock")
+		err := runStartupDataTasks(db, startupKey, make([]byte, 32))
+
+		require.Error(t, err,
+			"a rotation failure must stop startup: half the rows would read under the current key and half under the previous one")
+		assert.Contains(t, err.Error(), "AES data key rotation failed",
+			"the error must name what failed, because this is the only message an operator gets")
+	})
+
+	t.Run("a previous key of the wrong length skips the rotation entirely", func(t *testing.T) {
+		db := mocks_data.NewDatabase(t)
+
+		assert.NoError(t, runStartupDataTasks(db, startupKey, []byte("too short")),
+			"rotation is acted on only at 32 bytes, so nothing must be called here")
+		db.AssertNotCalled(t, "RotateEncryptionKeyIfNeeded", mock.Anything, mock.Anything)
+	})
+
+	// The assertion that fails if someone re-adds a settings read. runStartupDataTasks read
+	// settings.aes_encryption_key for the 1.5.x conversion alone, and #359 deleted that
+	// conversion (#262); the legacy column has no reader left and rotation never wanted one.
+	//
+	// AssertNotCalled is spelled out rather than left to mockery's unexpected-call panic, because
+	// an assertion that is only the absence of a line is not one a reader can see.
+	t.Run("and the surviving sequence reads no settings at all", func(t *testing.T) {
+		db := mocks_data.NewDatabase(t)
+		db.EXPECT().RotateEncryptionKeyIfNeeded(startupKey, make([]byte, 32)).Return(true, nil)
+
+		assert.NoError(t, runStartupDataTasks(db, startupKey, make([]byte, 32)),
+			"a successful rotation is a successful startup, so the case above fails because of the injected error")
+		db.AssertNotCalled(t, "GetSettingsById", mock.Anything, mock.Anything)
 	})
 }

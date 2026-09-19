@@ -7,7 +7,7 @@ import (
 	"log/slog"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/leodip/goiabada/core/data"
+	"github.com/leodip/goiabada/authserver/internal/data"
 	oauth "github.com/leodip/goiabada/core/oauth"
 )
 
