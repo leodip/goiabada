@@ -5,7 +5,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/leodip/goiabada/core/encryption"
+	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/core/i18n"
 )
 

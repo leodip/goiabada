@@ -9,7 +9,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/datafactory"
-	"github.com/leodip/goiabada/core/encryption"
+	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/core/i18n"
 )
 

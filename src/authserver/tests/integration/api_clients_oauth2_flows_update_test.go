@@ -9,10 +9,10 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/config"
+	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
-	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/stringutil"
 	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
