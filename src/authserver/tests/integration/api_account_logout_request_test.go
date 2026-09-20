@@ -458,7 +458,7 @@ func TestAPIAccountLogoutRequest_ValidationErrors_And_Scope(t *testing.T) {
 //     any of which can hide a control this helper has just read and approved. What the document
 //     declares itself is refused, the style attribute above the form and inside it and a <style>
 //     block anywhere in it; what another file declares needs a CSS engine.
-//   - Script. A handler registered from /static/utils.js or from the layout's JSBootstrap block can
+//   - Script. A handler registered from /static/utils.js, the one script this server serves, can
 //     cancel the submit event. The sets below refuse an inline handler on the form and on the
 //     affirmative control, and refuse a <script> inside the form, which is the part the template
 //     declares; the rest needs a JavaScript engine.

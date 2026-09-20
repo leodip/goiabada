@@ -16,9 +16,12 @@ import (
 )
 
 // jsBootstrapKeys is the catalog-key list emitted by the JSBootstrap helper.
-// Keep in sync with utils.js / image-upload.js: every key consumed by t() or
-// tFormat() in those files must appear here, and every key listed here must
-// have a corresponding entry in active.en.toml.
+// Keep in sync with the admin console's utils.js / image-upload.js, which are
+// the only consumers: every key consumed by t() or tFormat() in those files
+// must appear here, and every key listed here must have a corresponding entry
+// in active.en.toml. The auth server serves neither file and no longer calls
+// JSBootstrap from its layouts, its one client-side helper being
+// showModalDialog, which takes strings the server has already localized (#360).
 var jsBootstrapKeys = []string{
 	"js.error.session_expired_title",
 	"js.error.session_expired_body",
@@ -162,8 +165,10 @@ var templateFuncMap = template.FuncMap{
 
 	// JSBootstrap renders a <script> block that populates window.i18n with
 	// the strings client-side JS needs (session-expired modal, image-upload
-	// status messages, etc.). Layouts call it once after loading utils.js;
-	// utils.js's t() / tFormat() helpers read from window.i18n at runtime.
+	// status messages, etc.). The admin console's two layouts call it once
+	// after loading utils.js, whose t() / tFormat() helpers read window.i18n
+	// at runtime; they are the only callers, and a layout that emits the block
+	// without serving a reader ships a table nothing consumes (#360).
 	//
 	// The set of bootstrap keys is fixed and small. Adding a new client-side
 	// string means: (1) add a "js.*" key to active.en.toml, (2) extend the
