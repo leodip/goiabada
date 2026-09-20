@@ -1224,12 +1224,18 @@ func HandleAPIClientTokensPut(
 			return
 		}
 
-		// Validate three-state settings
-		if _, err := models.ThreeStateSettingFromString(strings.TrimSpace(req.IncludeOpenIDConnectClaimsInAccessToken)); err != nil {
+		// Validate three-state settings. The parsed values are what the columns are written from
+		// below, rather than a second independent trim of the same request field: a string that
+		// parsed is one of the three the type declares, so String() gives back exactly what was
+		// trimmed, and the stored value can no longer drift from the value that was validated
+		// (#385).
+		includeClaimsInAccessToken, err := models.ThreeStateSettingFromString(strings.TrimSpace(req.IncludeOpenIDConnectClaimsInAccessToken))
+		if err != nil {
 			writeJSONError(w, "Invalid value for includeOpenIDConnectClaimsInAccessToken.", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
-		if _, err := models.ThreeStateSettingFromString(strings.TrimSpace(req.IncludeOpenIDConnectClaimsInIdToken)); err != nil {
+		includeClaimsInIdToken, err := models.ThreeStateSettingFromString(strings.TrimSpace(req.IncludeOpenIDConnectClaimsInIdToken))
+		if err != nil {
 			writeJSONError(w, "Invalid value for includeOpenIDConnectClaimsInIdToken.", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
@@ -1238,8 +1244,8 @@ func HandleAPIClientTokensPut(
 		client.TokenExpirationInSeconds = req.TokenExpirationInSeconds
 		client.RefreshTokenOfflineIdleTimeoutInSeconds = req.RefreshTokenOfflineIdleTimeoutInSeconds
 		client.RefreshTokenOfflineMaxLifetimeInSeconds = req.RefreshTokenOfflineMaxLifetimeInSeconds
-		client.IncludeOpenIDConnectClaimsInAccessToken = strings.TrimSpace(req.IncludeOpenIDConnectClaimsInAccessToken)
-		client.IncludeOpenIDConnectClaimsInIdToken = strings.TrimSpace(req.IncludeOpenIDConnectClaimsInIdToken)
+		client.IncludeOpenIDConnectClaimsInAccessToken = includeClaimsInAccessToken.String()
+		client.IncludeOpenIDConnectClaimsInIdToken = includeClaimsInIdToken.String()
 
 		if err := updateClientNotOwningAuthenticationMode(database, client); err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error updating client tokens"), "client_id", client.Id)

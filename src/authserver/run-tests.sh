@@ -12,8 +12,9 @@
 #                             adminconsole  - adminconsole module tests
 #                             data          - data-layer tests (per DB)
 #                             integration   - end-to-end integration tests (per DB)
-#                             lint          - golangci-lint over the four modules, the
-#                                             command CI's Lint job runs per module, plus
+#                             lint          - golangci-lint and unparam over the four
+#                                             modules, the commands CI's Lint job runs
+#                                             per module, plus
 #                                             checks that the generated Tailwind CSS, the
 #                                             mocks and the core symbol ownership table
 #                                             are committed
@@ -56,7 +57,7 @@
 #   # The three module tiers under the race detector, as CI's Unit / race job runs them
 #   ./run-tests.sh --type modules --race
 #
-#   # golangci-lint alone, which is where sloglint holds the logging convention (#320)
+#   # golangci-lint and unparam alone, where sloglint holds the logging convention (#320)
 #   ./run-tests.sh --type lint
 #
 # Notes:
@@ -503,19 +504,32 @@ configure_database() {
 # module leg ran, and moving it into golangci-lint would otherwise have made it
 # CI-only, unlike every other guard in the tree. First among the tiers because
 # it is the cheapest and the one a sweep breaks.
+#
+# unparam runs here for the same reason, and it was added because the claim in
+# the paragraph above was not true of it: CI's Lint job runs `unparam -exported`
+# beside golangci-lint and this tier ran only golangci-lint, so an exported
+# function whose result no caller in its own module uses was invisible to every
+# check on this machine. #385 stage 7 moved ThreeStateSettingFromString from
+# core into authserver, where both call sites discard the parsed value, and the
+# finding appeared only once CI ran -- on a commit already reviewed and pushed.
+# gofmt and `go vet`, the other two legs of that job, are held already: gofmt by
+# TestGoSourcesAreGofmted in every module tier, vet by `where.sh build`.
 if should_run_lint; then
     log="$LOG_DIR/00-lint.log"
-    echo "Running golangci-lint over the four modules... (log: $log)"
+    echo "Running golangci-lint and unparam over the four modules... (log: $log)"
     start=$SECONDS
     gha_group "Lint"
-    if ! command -v golangci-lint >/dev/null 2>&1; then
-        echo "golangci-lint is not on PATH; run this inside the dev container, which installs the version versions.yaml pins" | tee "$log"
-        gha_summary_row "Lint" "-" "FAIL" "$(fmt_duration $((SECONDS - start)))"
-        fail_with "Lint" "$log"
-    fi
+    for tool in golangci-lint unparam; do
+        if ! command -v "$tool" >/dev/null 2>&1; then
+            echo "$tool is not on PATH; run this inside the dev container, which installs the version versions.yaml pins" | tee "$log"
+            gha_summary_row "Lint" "-" "FAIL" "$(fmt_duration $((SECONDS - start)))"
+            fail_with "Lint" "$log"
+        fi
+    done
     if ! (
         for m in core authserver adminconsole cmd/goiabada-setup; do
             echo "== $m"
+            (cd "../$m" && unparam -exported ./...) || exit 1
             (cd "../$m" && golangci-lint run --max-same-issues=0 --max-issues-per-linter=0 ./...) || exit 1
         done
     ) 2>&1 | tee "$log"; then
