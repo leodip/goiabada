@@ -18,6 +18,7 @@ import (
 	"github.com/leodip/goiabada/core/constants"
 	mocks_handler_helpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
 	"github.com/leodip/goiabada/core/sessionstore"
+	"github.com/leodip/goiabada/core/sessionstore/sessiontest"
 )
 
 // The two "with permission" pages are the other two of the three admin lists
@@ -124,7 +125,7 @@ func aPermission() []api.PermissionResponse {
 // handlers read a flash out of the session before they render.
 func testStore() *sessionstore.ServerSideStore {
 	store, err := sessionstore.NewServerSideStore(
-		sessionstore.NewMemoryBackend(),
+		sessiontest.NewMemoryBackend(),
 		constants.SessionKeyJwt,
 		false,
 		sessionstore.KeyPair{

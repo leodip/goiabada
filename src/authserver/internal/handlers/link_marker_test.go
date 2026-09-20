@@ -14,6 +14,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/core/sessionstore"
+	"github.com/leodip/goiabada/core/sessionstore/sessiontest"
 
 	mocks_sessionstore "github.com/leodip/goiabada/core/sessionstore/mocks"
 )
@@ -29,7 +30,7 @@ import (
 // TestClearedLinkMarkerDoesNotSurviveInACapturedCookie.
 func newMarkerTestStore() *sessionstore.ServerSideStore {
 	store, err := sessionstore.NewServerSideStore(
-		sessionstore.NewMemoryBackend(),
+		sessiontest.NewMemoryBackend(),
 		constants.SessionKeySessionIdentifier,
 		false,
 		sessionstore.KeyPair{

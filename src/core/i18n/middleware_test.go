@@ -7,20 +7,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/golang-jwt/jwt/v5"
-	"github.com/leodip/goiabada/core/constants"
-	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-func newJwtInfoWithLocale(locale string) oauth.JwtInfo {
-	return oauth.JwtInfo{
-		IdToken: &oauth.JwtToken{
-			Claims: jwt.MapClaims{"locale": locale},
-		},
-	}
-}
 
 type stubUILocalesReader struct {
 	locales []string
@@ -164,172 +153,147 @@ func TestMiddlewareLocale_DoesNotConsumePostBody(t *testing.T) {
 	})).ServeHTTP(rr, req)
 }
 
-func TestRefineLocalizerWithUserLocale_ReturnsNewRequest(t *testing.T) {
-	req := httptest.NewRequest("GET", "/", nil)
+// WithLocale is the whole of core/i18n's locale-setting surface, so these cases
+// own both halves of it: the primitive's own rules, and the three helpers it
+// replaced, each against the expression that replaced it (#385).
 
-	// Apply the global locale middleware first so the request has a
-	// baseline localizer.
-	mw := MiddlewareLocale(nil)
-	var inner *http.Request
-	mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		inner = r
-	})).ServeHTTP(httptest.NewRecorder(), req)
+func TestWithLocale_TagsResolveInOrderAndTheWholeListReachesTheMatcher(t *testing.T) {
+	// "fr pt-BR" is the shape an RP's ui_locales arrives in. fr has no catalog,
+	// so the answer is pt-BR only because every usable tag reaches the matcher:
+	// resolving usable[0] alone would answer English and silently discard the
+	// RP's second choice.
+	ctx := WithLocale(context.Background(), true, "fr", "pt-BR")
+	assert.Equal(t, "Entrar", T(ctx, "auth.pwd.title"))
+	assert.Equal(t, "fr", LocaleTag(ctx), "the recorded tag is the first usable one, not the matched one")
+}
 
-	refined := RefineLocalizerWithUserLocale(inner, "pt-BR")
-	assert.NotSame(t, inner, refined, "RefineLocalizerWithUserLocale must return a new *http.Request")
+func TestWithLocale_EmptyTagIsSkippedRatherThanEndingTheSearch(t *testing.T) {
+	ctx := WithLocale(context.Background(), true, "", "pt-BR")
+	assert.Equal(t, "Entrar", T(ctx, "auth.pwd.title"))
+	assert.Equal(t, "pt-BR", LocaleTag(ctx))
+
+	// Whitespace is not a tag either. The translator cannot show this on its
+	// own — the matcher discards an unparseable preference, so it lands on
+	// pt-BR whether or not the tag was skipped — but the recorded tag can:
+	// skipping records pt-BR, not the whitespace.
+	ctx = WithLocale(context.Background(), true, "   ", "pt-BR")
+	assert.Equal(t, "Entrar", T(ctx, "auth.pwd.title"))
+	assert.Equal(t, "pt-BR", LocaleTag(ctx))
+}
+
+func TestWithLocale_NoUsableTagReturnsTheContextUnchanged(t *testing.T) {
+	// The edge that preserves RefineLocalizerWithUserLocale's no-op: a user
+	// with no stored locale must keep the localizer the request already has,
+	// not be moved to English.
+	base := WithLocale(context.Background(), true, "pt-BR")
+	for _, tags := range [][]string{nil, {}, {""}, {"", "  "}} {
+		// explicit true on purpose: a non-explicit call would be turned back
+		// by the intent guard above, which would answer this case for the
+		// wrong reason and hide a tag that was wrongly judged usable.
+		got := WithLocale(base, true, tags...)
+		assert.Equal(t, base, got, "tags %q must return ctx identically", tags)
+		assert.Equal(t, "Entrar", T(got, "auth.pwd.title"))
+		assert.Equal(t, "pt-BR", LocaleTag(got))
+	}
+}
+
+func TestWithLocale_NonExplicitDefersToExplicitIntentAndExplicitAlwaysWins(t *testing.T) {
+	explicit := WithLocale(context.Background(), true, "pt-BR")
+	require.True(t, hasExplicitIntent(explicit))
+
+	kept := WithLocale(explicit, false, "en")
+	assert.Equal(t, "Entrar", T(kept, "auth.pwd.title"),
+		"a non-explicit call must not clobber a locale the request asked for")
+
+	won := WithLocale(explicit, true, "en")
+	assert.Equal(t, "Login", T(won, "auth.pwd.title"), "an explicit call always wins")
+
+	// A non-explicit locale is not itself protected.
+	tentative := WithLocale(context.Background(), false, "pt-BR")
+	require.False(t, hasExplicitIntent(tentative))
+	assert.Equal(t, "Login", T(WithLocale(tentative, false, "en"), "auth.pwd.title"))
+}
+
+func TestWithLocale_TrailingEnglishIsTheEmptyLocaleArm(t *testing.T) {
+	// WithLocale(ctx, true, locale, "en") is what replaced EmailContext, and
+	// this is the arm that made the old helper two branches: an empty
+	// recipient locale renders English rather than the locale of whoever
+	// triggered the send.
+	ctx := WithLocale(WithLocale(context.Background(), true, "pt-BR"), true, "", "en")
+	assert.Equal(t, "Login", T(ctx, "auth.pwd.title"))
+	assert.Equal(t, "en", LocaleTag(ctx))
+
+	// And a recipient who does have one still gets it.
+	ctx = WithLocale(context.Background(), true, "pt-BR", "en")
+	assert.Equal(t, "Entrar", T(ctx, "auth.pwd.title"))
+	assert.Equal(t, "pt-BR", LocaleTag(ctx))
+}
+
+func TestWithLocale_ReplacesRefineLocalizerWithUserLocale(t *testing.T) {
+	// r = r.WithContext(i18n.WithLocale(r.Context(), false, user.Locale)),
+	// at handler_auth_pwd.go once the password has been checked.
+	inner := throughLocaleMiddleware(t, httptest.NewRequest("GET", "/", nil))
+
+	refined := inner.WithContext(WithLocale(inner.Context(), false, "pt-BR"))
 	assert.Equal(t, "Entrar", T(refined.Context(), "auth.pwd.title"))
-	// Original context untouched.
-	assert.Equal(t, "Login", T(inner.Context(), "auth.pwd.title"))
+	assert.Equal(t, "Login", T(inner.Context(), "auth.pwd.title"),
+		"contexts are immutable: the original must be untouched")
+
+	// An empty stored locale changes nothing.
+	assert.Equal(t, inner.Context(), WithLocale(inner.Context(), false, ""))
+
+	// And an explicit ?ui_locales suppresses the override.
+	explicit := throughLocaleMiddleware(t, httptest.NewRequest("GET", "/auth/pwd?ui_locales=pt-BR", nil))
+	assert.Equal(t, "Entrar", T(WithLocale(explicit.Context(), false, "en"), "auth.pwd.title"))
 }
 
-func TestRefineLocalizerWithUserLocale_NoOpWhenLocaleEmpty(t *testing.T) {
+func TestWithLocale_ReplacesRefineLocalizerWithUILocales(t *testing.T) {
+	// r = r.WithContext(i18n.WithLocale(r.Context(), true, uiLocales...)),
+	// at handler_authorize.go and refineLogoutLocale, where uiLocales is a
+	// SanitizeUILocales list.
 	req := httptest.NewRequest("GET", "/", nil)
-	mw := MiddlewareLocale(nil)
-	var inner *http.Request
-	mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		inner = r
-	})).ServeHTTP(httptest.NewRecorder(), req)
-
-	refined := RefineLocalizerWithUserLocale(inner, "")
-	assert.Same(t, inner, refined)
-	assert.Equal(t, "Login", T(refined.Context(), "auth.pwd.title"))
-}
-
-func TestRefineLocalizerWithUserLocale_SkipsWhenExplicitIntent(t *testing.T) {
-	// Explicit ?ui_locales=pt-BR should suppress the user-locale override.
-	// The assertion below is that "Entrar" (pt-BR) wins over the stored locale "en".
-	req := httptest.NewRequest("GET", "/auth/pwd?ui_locales=pt-BR", nil)
-	mw := MiddlewareLocale(nil)
-	var inner *http.Request
-	mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		inner = r
-	})).ServeHTTP(httptest.NewRecorder(), req)
-
-	require.True(t, hasExplicitIntent(inner.Context()))
-
-	// The stored locale is "en", but explicit pt-BR should win.
-	refined := RefineLocalizerWithUserLocale(inner, "en")
-	assert.Equal(t, "Entrar", T(refined.Context(), "auth.pwd.title"),
-		"explicit intent (?ui_locales=pt-BR) must not be overridden by the stored locale")
-}
-
-func TestRefineLocalizerWithUILocales_RoundTrip(t *testing.T) {
-	req := httptest.NewRequest("GET", "/", nil)
-	refined := RefineLocalizerWithUILocales(req, []string{"pt-BR"})
+	refined := req.WithContext(WithLocale(req.Context(), true, SanitizeUILocales("pt-BR")...))
 	assert.NotSame(t, req, refined)
 	assert.True(t, hasExplicitIntent(refined.Context()))
 	assert.Equal(t, "Entrar", T(refined.Context(), "auth.pwd.title"))
+
+	// An absent parameter sanitizes to nothing and must stay a no-op.
+	assert.Equal(t, req.Context(), WithLocale(req.Context(), true, SanitizeUILocales("")...))
 }
 
-func TestRefineLocalizerWithUILocales_EmptyIsNoOp(t *testing.T) {
-	req := httptest.NewRequest("GET", "/", nil)
-	refined := RefineLocalizerWithUILocales(req, nil)
-	assert.Same(t, req, refined)
+func TestWithLocale_ReplacesEmailContext(t *testing.T) {
+	// emailReq := r.WithContext(i18n.WithLocale(r.Context(), true, user.Locale, "en")),
+	// at the five email-send sites. The request's own locale is the admin's;
+	// the email is the recipient's, so the call overrides rather than defers.
+	admin := throughLocaleMiddleware(t, httptest.NewRequest("GET", "/api/v1/admin/users?ui_locales=pt-BR", nil))
+	require.True(t, hasExplicitIntent(admin.Context()))
+
+	assert.Equal(t, "Login", T(WithLocale(admin.Context(), true, "en", "en"), "auth.pwd.title"),
+		"the recipient's locale must win over the sending admin's explicit one")
+	assert.Equal(t, "Entrar", T(WithLocale(admin.Context(), true, "pt-BR", "en"), "auth.pwd.title"))
+	assert.Equal(t, "Login", T(WithLocale(admin.Context(), true, "", "en"), "auth.pwd.title"),
+		"a recipient with no stored locale reads English, not the admin's")
 }
 
-func TestMiddlewareLocaleFromJWT_ReadsLocaleClaim(t *testing.T) {
-	// No explicit intent, locale claim present → the JWT-locale refinement
-	// applies the claim.
-	req := httptest.NewRequest("GET", "/admin/users", nil)
-	ctx := context.WithValue(req.Context(), constants.ContextKeyJwtInfo, newJwtInfoWithLocale("pt-BR"))
-	req = req.WithContext(ctx)
+func TestWithLocale_NilContextIsTolerated(t *testing.T) {
+	// EmailContext documented this for a background worker with no request.
+	//nolint:staticcheck // SA1012: the nil tolerance is the behaviour under test.
+	ctx := WithLocale(nil, true, "pt-BR")
+	require.NotNil(t, ctx)
+	assert.Equal(t, "Entrar", T(ctx, "auth.pwd.title"))
+}
 
-	// Run the global locale middleware first (no signals → English baseline).
-	mw := MiddlewareLocale(nil)
-	var baseReq *http.Request
-	mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		baseReq = r
+// throughLocaleMiddleware runs the global locale middleware over req and returns
+// the request it handed down, which is the baseline every refinement starts from.
+func throughLocaleMiddleware(t *testing.T, req *http.Request) *http.Request {
+	t.Helper()
+
+	var inner *http.Request
+	MiddlewareLocale(nil)(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		inner = r
 	})).ServeHTTP(httptest.NewRecorder(), req)
-	require.False(t, hasExplicitIntent(baseReq.Context()))
-
-	// JWT-locale refinement picks up the locale claim.
-	refine := MiddlewareLocaleFromJWT()
-	var seen string
-	refine(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		seen = T(r.Context(), "auth.pwd.title")
-	})).ServeHTTP(httptest.NewRecorder(), baseReq)
-	assert.Equal(t, "Entrar", seen)
-}
-
-func TestMiddlewareLocaleFromJWT_SkipsWhenExplicitIntent(t *testing.T) {
-	// Explicit ?ui_locales=pt-BR; user's claim is "en" — the JWT-locale
-	// refinement must not downgrade away from the explicit intent.
-	req := httptest.NewRequest("GET", "/admin/users?ui_locales=pt-BR", nil)
-	ctx := context.WithValue(req.Context(), constants.ContextKeyJwtInfo, newJwtInfoWithLocale("en"))
-	req = req.WithContext(ctx)
-
-	mw := MiddlewareLocale(nil)
-	var baseReq *http.Request
-	mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		baseReq = r
-	})).ServeHTTP(httptest.NewRecorder(), req)
-	require.True(t, hasExplicitIntent(baseReq.Context()))
-
-	refine := MiddlewareLocaleFromJWT()
-	var seen string
-	refine(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		seen = T(r.Context(), "auth.pwd.title")
-	})).ServeHTTP(httptest.NewRecorder(), baseReq)
-	assert.Equal(t, "Entrar", seen, "explicit pt-BR must not be overridden by claim=en")
-}
-
-func TestMiddlewareLocaleFromJWT_FallsThroughWhenClaimMissing(t *testing.T) {
-	// No explicit intent, no locale claim → keeps the previously-resolved
-	// localizer. Accept-Language pt-BR is the signal we keep.
-	req := httptest.NewRequest("GET", "/admin/users", nil)
-	req.Header.Set("Accept-Language", "pt-BR")
-	// JwtInfo present but no locale claim:
-	ctx := context.WithValue(req.Context(), constants.ContextKeyJwtInfo, oauth.JwtInfo{
-		IdToken: &oauth.JwtToken{Claims: jwt.MapClaims{}},
-	})
-	req = req.WithContext(ctx)
-
-	mw := MiddlewareLocale(nil)
-	var baseReq *http.Request
-	mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		baseReq = r
-	})).ServeHTTP(httptest.NewRecorder(), req)
-
-	refine := MiddlewareLocaleFromJWT()
-	var seen string
-	refine(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		seen = T(r.Context(), "auth.pwd.title")
-	})).ServeHTTP(httptest.NewRecorder(), baseReq)
-	assert.Equal(t, "Entrar", seen, "missing locale claim must NOT silently jump to English")
-}
-
-func TestIsMachineRequest(t *testing.T) {
-	cases := []struct {
-		path string
-		want bool
-	}{
-		// Surface B (machine)
-		{"/api/v1/admin/users", true},
-		{"/api/v1/account/profile", true},
-		{"/api/public/settings", true},
-		{"/auth/token", true},
-		{"/connect/register", true},
-		{"/userinfo", true},
-		{"/userinfo/picture/abc", true},
-		{"/.well-known/openid-configuration", true},
-		{"/certs", true},
-		{"/client/logo/foo", true},
-		// Surface A (browser)
-		{"/auth/authorize", false},
-		{"/auth/pwd", false},
-		{"/auth/otp", false},
-		{"/auth/consent", false},
-		{"/account/register", false},
-		{"/admin/clients", false},
-		{"/", false},
-		{"/health", false},
-	}
-	for _, c := range cases {
-		t.Run(c.path, func(t *testing.T) {
-			req := httptest.NewRequest("GET", c.path, nil)
-			assert.Equal(t, c.want, IsMachineRequest(req))
-		})
-	}
+	require.NotNil(t, inner)
+	return inner
 }
 
 // TestResolveRequestLocale covers the exported resolution a middleware answering

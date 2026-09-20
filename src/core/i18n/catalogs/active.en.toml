@@ -1562,7 +1562,7 @@
 
 # --- Email subjects ----------------------------------------------------------
 #
-# Subjects render through T against the recipient-locale context (i18n.EmailContext)
+# Subjects render through T against the recipient-locale context (i18n.WithLocale)
 # at the email-send site. Email bodies use the per-locale template-file pattern:
 # emails/email_xxx.<locale>.html overrides emails/email_xxx.html when present.
 

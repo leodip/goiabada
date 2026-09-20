@@ -53,7 +53,7 @@ const logoutFormPath = "/auth/logout"
 // (#109). Same pattern as HandleAuthorizeGet, and the return value must be assigned.
 func refineLogoutLocale(r *http.Request) *http.Request {
 	if uiLocales := i18n.SanitizeUILocales(r.FormValue("ui_locales")); len(uiLocales) > 0 {
-		return i18n.RefineLocalizerWithUILocales(r, uiLocales)
+		return r.WithContext(i18n.WithLocale(r.Context(), true, uiLocales...))
 	}
 	return r
 }

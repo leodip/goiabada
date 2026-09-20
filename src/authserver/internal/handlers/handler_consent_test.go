@@ -121,7 +121,7 @@ func TestBuildScopeInfoArray(t *testing.T) {
 	// render hardcoded English.
 	t.Run("Localizes descriptions in pt-BR", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/auth/consent", nil)
-		req = i18n.RefineLocalizerWithUILocales(req, []string{"pt-BR"})
+		req = req.WithContext(i18n.WithLocale(req.Context(), true, "pt-BR"))
 
 		result := buildScopeInfoArray(req.Context(), "openid offline_access custom:read", nil)
 		assert.Len(t, result, 3)

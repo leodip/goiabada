@@ -17,7 +17,6 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/middleware"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/handlerhelpers"
-	"github.com/leodip/goiabada/core/i18n"
 	custom_middleware "github.com/leodip/goiabada/core/middleware"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/validators"
@@ -64,7 +63,7 @@ func (s *Server) initRoutes(root chi.Router) {
 	// request intent (?ui_locales or in-flight AuthContext.UILocales) is
 	// present. Falls through to the existing localizer if the claim is
 	// missing — never silently jumps to English.
-	localeFromJWT := i18n.MiddlewareLocaleFromJWT()
+	localeFromJWT := middleware.MiddlewareLocaleFromJWT()
 
 	// Define middleware combinations
 	baseAuth := []func(http.Handler) http.Handler{

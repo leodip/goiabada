@@ -255,7 +255,7 @@ func HandleAuthPwdPost(
 		// Password verified — surfacing user-specific errors (account disabled,
 		// downstream flow messages) in user.Locale is now safe and correct.
 		// Skipped when explicit request or in-flight UI locales are in play.
-		r = i18n.RefineLocalizerWithUserLocale(r, user.Locale)
+		r = r.WithContext(i18n.WithLocale(r.Context(), false, user.Locale))
 
 		// Deliberately not a credential failure: the password was right, so there is
 		// nothing here for the rate limiter to bound. The same holds for the missing-email

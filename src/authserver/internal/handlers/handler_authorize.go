@@ -132,7 +132,7 @@ func HandleAuthorizeGet(
 			// localizer now so any browser-visible response on this request
 			// (error pages, the level1 password page) renders in the chosen
 			// locale.
-			r = i18n.RefineLocalizerWithUILocales(r, uiLocales)
+			r = r.WithContext(i18n.WithLocale(r.Context(), true, uiLocales...))
 		}
 
 		err := authHelper.SaveAuthContext(w, r, &authContext)

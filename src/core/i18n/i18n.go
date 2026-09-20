@@ -9,11 +9,10 @@
 //     is established) and attaches a tentative localizer based on
 //     ?ui_locales, in-flight UI locales (authserver only),
 //     Accept-Language, then English.
-//   - User-locale refinement runs once identity is known. Adminconsole
-//     uses MiddlewareLocaleFromJWT (route-level, after JWT validation);
-//     authserver uses the per-handler RefineLocalizerWithUserLocale helper. Both
-//     skip the refinement when the request carries explicit locale intent
-//     (?ui_locales or in-flight UI locales).
+//   - WithLocale is the one locale-setting primitive, and which refinement a
+//     process wants is its own: adminconsole from the JWT locale claim,
+//     authserver from the user's stored locale, both from an RP's ui_locales.
+//     A non-explicit call defers to explicit intent already on the context.
 //   - T and Localizer read the localizer off context.Context.
 package i18n
 

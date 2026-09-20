@@ -5,14 +5,12 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
-
-	"github.com/leodip/goiabada/core/constants"
-	"github.com/leodip/goiabada/core/oauth"
 )
 
 // UILocalesReader supplies locale preferences from an in-flight authorize
 // transaction. Adminconsole passes nil because it has no such transaction
-// state (identity comes from JWT, handled separately by MiddlewareLocaleFromJWT).
+// state (identity comes from JWT, which adminconsole refines from in a
+// middleware of its own over WithLocale).
 type UILocalesReader interface {
 	UILocales(r *http.Request) []string
 }
@@ -72,9 +70,9 @@ func SanitizeUILocales(raw string) []string {
 //  4. English fallback.
 //
 // When the source is (1) or (2) the localizer is marked as carrying
-// "explicit intent" — RefineLocalizerWithUserLocale and MiddlewareLocaleFromJWT
-// honor that mark by skipping their override. This prevents user-locale
-// refinement from clobbering an explicit per-request preference.
+// "explicit intent", which a non-explicit WithLocale call honors by leaving it
+// alone. This prevents user-locale refinement from clobbering an explicit
+// per-request preference.
 //
 // Runs even if LoadBundle hasn't been called — in that case it becomes a
 // no-op and Localizer falls back to a synthetic English localizer.
@@ -139,97 +137,61 @@ func resolveLocale(ctx context.Context, r *http.Request, uiLocalesReader UILocal
 	return attachLocale(ctx, bundle.english, "en", false)
 }
 
-// MiddlewareLocaleFromJWT reads the locale claim from the JWT info already
-// on the request context (set by JwtSessionHandler) and refines the
-// localizer to it, unless the request carries explicit locale intent. Used
-// by adminconsole's authenticated route chains to honor each user's stored
-// locale preference.
+// WithLocale attaches the translator for the locale the caller is asking for, and
+// is the whole of core/i18n's locale-setting surface: every policy about which
+// locale a process wants, and where it reads it from, belongs to that process.
 //
-// Falls through to the existing localizer when the claim is missing
-// (older tokens, scope misconfiguration, third-party admin client without
-// the profile scope) — never silently jumps to English.
-func MiddlewareLocaleFromJWT() func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ctx := r.Context()
-			if hasExplicitIntent(ctx) {
-				next.ServeHTTP(w, r)
-				return
-			}
-			locale := localeClaimFromJwt(ctx)
-			if locale == "" {
-				next.ServeHTTP(w, r)
-				return
-			}
-			bundle := defaultBundle
-			if bundle == nil {
-				next.ServeHTTP(w, r)
-				return
-			}
-			ctx = attachLocale(ctx, bundle.localizerFor([]string{locale}), locale, false)
-			next.ServeHTTP(w, r.WithContext(ctx))
-		})
-	}
-}
-
-func localeClaimFromJwt(ctx context.Context) string {
-	v := ctx.Value(constants.ContextKeyJwtInfo)
-	if v == nil {
-		return ""
-	}
-	jwtInfo, ok := v.(oauth.JwtInfo)
-	if !ok || jwtInfo.IdToken == nil {
-		return ""
-	}
-	return strings.TrimSpace(jwtInfo.IdToken.GetStringClaim("locale"))
-}
-
-// RefineLocalizerWithUserLocale is the authserver per-handler refinement helper.
-// It returns a NEW *http.Request when the locale changes. Go contexts are
-// immutable: dropping the return value silently leaves the localizer unchanged.
+// The tags are preferences, best first, and all the usable ones — non-empty
+// after trimming — are matched together, the way an Accept-Language list is. An
+// empty tag is skipped rather than ending the search, so a caller can write a
+// preference ahead of a fallback and get the fallback only when the preference
+// is absent: WithLocale(ctx, true, user.Locale, "en"). Matching is
+// Bundle.localizerFor's, which means a tag no catalog matches still resolves,
+// to English, while the tag itself is recorded as asked for. When no tag is
+// usable, or LoadBundle has not run, ctx is returned unchanged.
 //
-// Canonical use:
+// explicit marks the locale as a stated per-request preference: an RP's
+// ui_locales, or an email rendered in its recipient's language rather than in
+// the language of whoever triggered the send. A call with explicit false leaves
+// an explicit locale already on ctx untouched, which is what stops user-locale
+// refinement clobbering what the request asked for; a call with explicit true
+// always wins.
 //
-//	r = i18n.RefineLocalizerWithUserLocale(r, user.Locale)
-//	// every downstream call (rendering, redirects, error helpers) MUST
-//	// use the returned r.
+// Go contexts are immutable, so the returned context is the whole of the
+// effect. On a request that means
 //
-// The override is suppressed when explicit request intent is present
-// (current ?ui_locales or UI locales from an in-flight authorize flow) — this
-// prevents user-locale refinement from clobbering an RP's stated ui_locales
-// when the user authenticates inside the multi-step flow.
-func RefineLocalizerWithUserLocale(r *http.Request, locale string) *http.Request {
-	locale = strings.TrimSpace(locale)
-	if locale == "" {
-		return r
-	}
-	ctx := r.Context()
-	if hasExplicitIntent(ctx) {
-		return r
+//	r = r.WithContext(i18n.WithLocale(r.Context(), false, user.Locale))
+//	// every downstream call (rendering, redirects, error helpers) MUST use
+//	// the returned r.
+//
+// Dropping the return value silently leaves the localizer unchanged.
+func WithLocale(ctx context.Context, explicit bool, tags ...string) context.Context {
+	if ctx == nil {
+		ctx = context.Background()
 	}
 	bundle := defaultBundle
 	if bundle == nil {
-		return r
+		return ctx
 	}
-	ctx = attachLocale(ctx, bundle.localizerFor([]string{locale}), locale, false)
-	return r.WithContext(ctx)
-}
+	if !explicit && hasExplicitIntent(ctx) {
+		return ctx
+	}
 
-// RefineLocalizerWithUILocales is used by handler_authorize.go after
-// capturing a form-body ui_locales (which the global locale middleware
-// cannot see — it only reads the query string to avoid consuming the POST
-// body). Returns a new *http.Request. The same return-value-must-be-assigned
-// rule from RefineLocalizerWithUserLocale applies.
-func RefineLocalizerWithUILocales(r *http.Request, uiLocales []string) *http.Request {
-	if len(uiLocales) == 0 {
-		return r
+	usable := make([]string, 0, len(tags))
+	for _, tag := range tags {
+		if tag = strings.TrimSpace(tag); tag != "" {
+			usable = append(usable, tag)
+		}
 	}
-	bundle := defaultBundle
-	if bundle == nil {
-		return r
+	if len(usable) == 0 {
+		return ctx
 	}
-	ctx := attachLocale(r.Context(), bundle.localizerFor(uiLocales), uiLocales[0], true)
-	return r.WithContext(ctx)
+	// The whole list reaches the matcher, not just usable[0]: ui_locales
+	// arrives as "fr pt-BR" and today resolves pt-BR, because fr has no
+	// catalog and the matcher reads the list as one preference order.
+	// Matching only the first tag would answer English there, silently
+	// discarding the RP's second choice (#385).
+	return attachLocale(ctx, bundle.localizerFor(usable), usable[0], explicit)
 }
 
 // attachLocale stores the localizer plus the primary resolved language tag
@@ -266,58 +228,6 @@ func hasExplicitIntent(ctx context.Context) bool {
 		if b, ok := v.(bool); ok {
 			return b
 		}
-	}
-	return false
-}
-
-// EmailContext returns a context configured to render in the recipient's
-// locale, decoupled from the originating request's locale. Used at
-// email-send sites: the recipient cares about reading the email in their
-// language, not the locale of whoever triggered the send (an admin issuing
-// a welcome email, a server-side cron job, etc.).
-//
-// parent is the originating request context. EmailContext overlays the
-// recipient-locale localizer on top of it, preserving every other context
-// value the caller may need downstream (Settings, JWT info, audit
-// metadata, request-id). Pass nil when there is genuinely no parent
-// context (background workers); in that case context.Background() is used.
-//
-// recipientLocale is the BCP 47 tag (e.g. "pt-BR"). An empty string falls
-// back to English. The returned context can be attached to a request via
-// r.WithContext(...) before calling RenderTemplateToBuffer.
-func EmailContext(parent context.Context, recipientLocale string) context.Context {
-	if parent == nil {
-		parent = context.Background()
-	}
-	bundle := defaultBundle
-	if bundle == nil {
-		return parent
-	}
-	tag := strings.TrimSpace(recipientLocale)
-	if tag == "" {
-		return attachLocale(parent, bundle.english, "en", false)
-	}
-	return attachLocale(parent, bundle.localizerFor([]string{tag}), tag, false)
-}
-
-// IsMachineRequest classifies a request by response surface: returns true
-// for machine surfaces (admin/account API, OAuth/OIDC protocol endpoints,
-// OIDC discovery, JWKS, public machine endpoints), false for browser HTML
-// surfaces. Used at middleware error-emit sites to fork between localized
-// HTML and English JSON envelopes.
-func IsMachineRequest(r *http.Request) bool {
-	p := r.URL.Path
-	switch {
-	case strings.HasPrefix(p, "/api/v1/"),
-		strings.HasPrefix(p, "/api/public/"),
-		p == "/auth/token",
-		p == "/connect/register",
-		p == "/userinfo",
-		strings.HasPrefix(p, "/userinfo/"),
-		strings.HasPrefix(p, "/.well-known/"),
-		p == "/certs",
-		strings.HasPrefix(p, "/client/logo/"):
-		return true
 	}
 	return false
 }
