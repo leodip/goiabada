@@ -44,7 +44,6 @@ func HandleAPIResourcesGet(
 
 // HandleAPIResourceCreatePost - POST /api/v1/admin/resources
 func HandleAPIResourceCreatePost(
-	authHelper handlers.AuthHelper,
 	database data.Database,
 	identifierValidator *validators.IdentifierValidator,
 	auditLogger handlers.AuditLogger,
@@ -105,7 +104,7 @@ func HandleAPIResourceCreatePost(
 		auditLogger.Log(r.Context(), audit.AuditCreatedResource, map[string]interface{}{
 			"resourceId":         resource.Id,
 			"resourceIdentifier": resource.ResourceIdentifier,
-			"loggedInUser":       authHelper.GetLoggedInSubject(r),
+			"loggedInUser":       callerSubject(r),
 		})
 
 		// Response
@@ -152,7 +151,6 @@ func HandleAPIResourceGet(
 
 // HandleAPIResourceUpdatePut - PUT /api/v1/admin/resources/{id}
 func HandleAPIResourceUpdatePut(
-	authHelper handlers.AuthHelper,
 	database data.Database,
 	identifierValidator *validators.IdentifierValidator,
 	auditLogger handlers.AuditLogger,
@@ -242,7 +240,7 @@ func HandleAPIResourceUpdatePut(
 		auditLogger.Log(r.Context(), audit.AuditUpdatedResource, map[string]interface{}{
 			"resourceId":         resource.Id,
 			"resourceIdentifier": resource.ResourceIdentifier,
-			"loggedInUser":       authHelper.GetLoggedInSubject(r),
+			"loggedInUser":       callerSubject(r),
 		})
 
 		// Response
@@ -255,7 +253,6 @@ func HandleAPIResourceUpdatePut(
 
 // HandleAPIResourceDelete - DELETE /api/v1/admin/resources/{id}
 func HandleAPIResourceDelete(
-	authHelper handlers.AuthHelper,
 	database data.Database,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
@@ -295,7 +292,7 @@ func HandleAPIResourceDelete(
 		auditLogger.Log(r.Context(), audit.AuditDeletedResource, map[string]interface{}{
 			"resourceId":         resource.Id,
 			"resourceIdentifier": resource.ResourceIdentifier,
-			"loggedInUser":       authHelper.GetLoggedInSubject(r),
+			"loggedInUser":       callerSubject(r),
 		})
 
 		resp := api.SuccessResponse{Success: true}

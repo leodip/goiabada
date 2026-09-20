@@ -3,7 +3,7 @@ package server
 import (
 	"testing"
 
-	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -19,6 +19,6 @@ func TestNewAuthServerHTTPClient_CarriesTheConfiguredTimeout(t *testing.T) {
 	client := newAuthServerHTTPClient()
 
 	require.NotNil(t, client)
-	assert.Equal(t, oauth.TokenExchangeTimeout, client.Timeout,
+	assert.Equal(t, oauthclient.TokenExchangeTimeout, client.Timeout,
 		"the one client this process uses against the auth server is bounded")
 }

@@ -10,7 +10,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -40,7 +39,6 @@ func accountSessionDeleteRequest(sessionId string, subject string) *http.Request
 func TestHandleAPIAccountSessionDelete_TerminatesAndAuditsBothEvents(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_audit.NewAuditLogger(t)
-	authHelper := mocks_handlers.NewAuthHelper(t)
 
 	const subject = "the-user"
 	user := &models.User{Id: 42, Enabled: true}
@@ -52,7 +50,6 @@ func TestHandleAPIAccountSessionDelete_TerminatesAndAuditsBothEvents(t *testing.
 		{Id: 1, RefreshTokenJti: "rt-live"},
 	})
 
-	authHelper.On("GetLoggedInSubject", mock.Anything).Return(subject)
 	var deletedPayload map[string]interface{}
 	auditLogger.On("Log", mock.Anything, audit.AuditDeletedUserSession, mock.Anything).
 		Run(func(args mock.Arguments) {
@@ -65,7 +62,7 @@ func TestHandleAPIAccountSessionDelete_TerminatesAndAuditsBothEvents(t *testing.
 		}).Return().Once()
 
 	rr := httptest.NewRecorder()
-	handler := HandleAPIAccountSessionDelete(database, authHelper, auditLogger)
+	handler := HandleAPIAccountSessionDelete(database, auditLogger)
 	handler.ServeHTTP(rr, accountSessionDeleteRequest("100", subject))
 
 	assert.Equal(t, http.StatusOK, rr.Code)
@@ -95,7 +92,6 @@ func TestHandleAPIAccountSessionDelete_TerminatesAndAuditsBothEvents(t *testing.
 func TestHandleAPIAccountSessionDelete_ForbiddenDoesNotTerminate(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_audit.NewAuditLogger(t)
-	authHelper := mocks_handlers.NewAuthHelper(t)
 
 	const subject = "the-user"
 	// The session belongs to user 7; the caller is user 42.
@@ -105,7 +101,7 @@ func TestHandleAPIAccountSessionDelete_ForbiddenDoesNotTerminate(t *testing.T) {
 		Return(&models.User{Id: 42, Enabled: true}, nil).Once()
 
 	rr := httptest.NewRecorder()
-	handler := HandleAPIAccountSessionDelete(database, authHelper, auditLogger)
+	handler := HandleAPIAccountSessionDelete(database, auditLogger)
 	handler.ServeHTTP(rr, accountSessionDeleteRequest("100", subject))
 
 	assert.Equal(t, http.StatusForbidden, rr.Code)
@@ -122,7 +118,6 @@ func TestHandleAPIAccountSessionDelete_ForbiddenDoesNotTerminate(t *testing.T) {
 func TestHandleAPIAccountSessionDelete_TerminationFailureIsA500(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_audit.NewAuditLogger(t)
-	authHelper := mocks_handlers.NewAuthHelper(t)
 
 	const subject = "the-user"
 	database.On("GetUserSessionById", (*sql.Tx)(nil), int64(100)).
@@ -135,7 +130,7 @@ func TestHandleAPIAccountSessionDelete_TerminationFailureIsA500(t *testing.T) {
 		Return(errors.New("the session delete failed")).Once()
 
 	rr := httptest.NewRecorder()
-	handler := HandleAPIAccountSessionDelete(database, authHelper, auditLogger)
+	handler := HandleAPIAccountSessionDelete(database, auditLogger)
 	handler.ServeHTTP(rr, accountSessionDeleteRequest("100", subject))
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)

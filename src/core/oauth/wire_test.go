@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/leodip/goiabada/core/constants"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -16,7 +15,8 @@ import (
 // than from the type name alone.
 //
 // The admin console keeps a TokenResponse in its session (handler_auth_callback.go writes
-// it, core/middleware reads it back), and session.Values is a map[interface{}]interface{},
+// it, adminconsole/internal/middleware reads it back), and session.Values is a
+// map[interface{}]interface{},
 // so every session in flight carries this string. Declaring the type at another import
 // path changes it, and the decode of an existing session then fails with "name not
 // registered for interface": the store answers that with a fresh session rather than a
@@ -42,8 +42,11 @@ func TestTokenResponse_GobSessionIdentity(t *testing.T) {
 
 	// The shape the session store encodes: the value arrives at the encoder through an
 	// interface, which is what makes gob write the concrete type's name into the stream.
+	// The key is written out because adminconsole/internal/constants declares it and core
+	// may not import a process module; what this test is about is the encoded value, not
+	// the key it sits under (#385).
 	values := map[interface{}]interface{}{
-		constants.SessionKeyJwt: want,
+		"Jwt": want,
 	}
 
 	var encoded bytes.Buffer
@@ -55,7 +58,7 @@ func TestTokenResponse_GobSessionIdentity(t *testing.T) {
 	decoded := map[interface{}]interface{}{}
 	require.NoError(t, gob.NewDecoder(bytes.NewReader(encoded.Bytes())).Decode(&decoded))
 
-	got, ok := decoded[constants.SessionKeyJwt].(TokenResponse)
+	got, ok := decoded["Jwt"].(TokenResponse)
 	require.True(t, ok, "the session value must decode back to oauth.TokenResponse")
 	assert.Equal(t, want, got)
 }

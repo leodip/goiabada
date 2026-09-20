@@ -1,4 +1,4 @@
-package oauth
+package oauthclient
 
 import (
 	"context"
@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/oauth"
 )
 
 type TokenExchanger struct {
@@ -29,7 +30,7 @@ func NewTokenExchanger(httpClient *http.Client) *TokenExchanger {
 func (te *TokenExchanger) ExchangeCodeForTokens(
 	ctx context.Context,
 	code, redirectURI, clientId, clientSecret, codeVerifier, tokenEndpoint string,
-) (*TokenResponse, error) {
+) (*oauth.TokenResponse, error) {
 	data := url.Values{}
 	data.Set("grant_type", "authorization_code")
 	data.Set("code", code)
@@ -63,7 +64,7 @@ func (te *TokenExchanger) ExchangeCodeForTokens(
 		return nil, errs.Errorf("error response from server: %s", body)
 	}
 
-	var tokenResponse TokenResponse
+	var tokenResponse oauth.TokenResponse
 	err = json.Unmarshal(body, &tokenResponse)
 	if err != nil {
 		return nil, errs.Errorf("error parsing response: %v", err)

@@ -6,15 +6,7 @@ package constants
 // console's sessions are written under a name it does not read (#266).
 //
 // The auth server's own name is not here. Nothing outside that module names it (#351).
+//
+// The keys inside that session are not here either. Only the admin console writes or reads
+// them, so they are declared in adminconsole/internal/constants (#385).
 const AdminConsoleSessionName string = "adminconsole"
-
-// SessionKeyJwt is the admin console's authenticated-session key, read by core/middleware.
-const SessionKeyJwt string = "Jwt"
-
-// The OAuth client's ceremony keys. The admin console writes and reads them and
-// core/handlerhelpers reads them in both binaries, so they stay in core (#351).
-const SessionKeyState string = "State"
-const SessionKeyNonce string = "Nonce"
-const SessionKeyRedirectURI string = "RedirectURI"
-const SessionKeyCodeVerifier string = "CodeVerifier"
-const SessionKeyRedirectBack string = "RedirectBack"

@@ -36,7 +36,6 @@ type AuthHelper interface {
 	GetAuthContext(r *http.Request) (*ceremony.AuthContext, error)
 	SaveAuthContext(w http.ResponseWriter, r *http.Request, authContext *ceremony.AuthContext) error
 	ClearAuthContext(w http.ResponseWriter, r *http.Request) error
-	GetLoggedInSubject(r *http.Request) string
 	// RegenerateSession replaces the browser session's identifier without losing its
 	// contents, which is what a server-side session store must do at every privilege
 	// change to match a cookie store's structural immunity to session fixation (#266).

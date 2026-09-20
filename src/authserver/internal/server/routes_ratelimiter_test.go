@@ -199,7 +199,7 @@ func apiRequest(method string, target string, body string) *http.Request {
 		"scope":     coreconstants.AuthServerResourceIdentifier + ":" + coreconstants.ManageAccountPermissionIdentifier,
 		"auth_time": float64(time.Now().Add(-time.Minute).Unix()),
 	}}
-	r = r.WithContext(context.WithValue(r.Context(), coreconstants.ContextKeyBearerToken, token))
+	r = r.WithContext(context.WithValue(r.Context(), constants.ContextKeyBearerToken, token))
 	return withRoutesTestSettings(r)
 }
 

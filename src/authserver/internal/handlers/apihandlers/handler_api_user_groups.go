@@ -94,7 +94,6 @@ func HandleAPIUserGroupsGet(
 
 func HandleAPIUserGroupsPut(
 	database data.Database,
-	authHelper handlers.AuthHelper,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 
@@ -169,7 +168,7 @@ func HandleAPIUserGroupsPut(
 			requestedGroupIds[groupId] = true
 		}
 
-		loggedInSubject := authHelper.GetLoggedInSubject(r)
+		loggedInSubject := callerSubject(r)
 
 		// Add groups that are in requested but not in current
 		for _, groupId := range request.GroupIds {

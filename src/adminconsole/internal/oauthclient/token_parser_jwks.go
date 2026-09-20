@@ -1,4 +1,4 @@
-package oauth
+package oauthclient
 
 import (
 	"context"
@@ -14,6 +14,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/oauth"
 )
 
 // JWKSTokenParser validates tokens using the auth server JWKS endpoint.
@@ -23,7 +24,7 @@ type JWKSTokenParser struct {
 	httpClient *http.Client
 
 	mu         sync.RWMutex
-	cachedJwks Jwks
+	cachedJwks oauth.Jwks
 }
 
 // NewJWKSTokenParser creates a JWKS-based token parser. The baseURL should be the
@@ -38,8 +39,8 @@ func NewJWKSTokenParser(baseURL string, httpClient *http.Client) *JWKSTokenParse
 	}
 }
 
-func (tp *JWKSTokenParser) DecodeAndValidateTokenResponse(ctx context.Context, tokenResponse *TokenResponse) (*JwtInfo, error) {
-	result := &JwtInfo{TokenResponse: *tokenResponse}
+func (tp *JWKSTokenParser) DecodeAndValidateTokenResponse(ctx context.Context, tokenResponse *oauth.TokenResponse) (*oauth.JwtInfo, error) {
+	result := &oauth.JwtInfo{TokenResponse: *tokenResponse}
 
 	var err error
 	if len(tokenResponse.AccessToken) > 0 {
@@ -66,8 +67,8 @@ func (tp *JWKSTokenParser) DecodeAndValidateTokenResponse(ctx context.Context, t
 	return result, nil
 }
 
-func (tp *JWKSTokenParser) DecodeAndValidateTokenString(ctx context.Context, token string, _ *rsa.PublicKey, withExpirationCheck bool) (*JwtToken, error) {
-	result := &JwtToken{TokenBase64: token}
+func (tp *JWKSTokenParser) DecodeAndValidateTokenString(ctx context.Context, token string, _ *rsa.PublicKey, withExpirationCheck bool) (*oauth.JwtToken, error) {
+	result := &oauth.JwtToken{TokenBase64: token}
 	if len(token) == 0 {
 		return result, nil
 	}
@@ -144,7 +145,7 @@ func (tp *JWKSTokenParser) refreshJwks(ctx context.Context) error {
 	// request keeps its own context rather than a detached one: fetching /certs is an
 	// idempotent read of a document the server holds no state for, so abandoning it when
 	// the browser goes away loses nothing (#338).
-	var jwks Jwks
+	var jwks oauth.Jwks
 	if err := json.NewDecoder(io.LimitReader(resp.Body, MaxTokenResponseBytes)).Decode(&jwks); err != nil {
 		return err
 	}
@@ -154,7 +155,7 @@ func (tp *JWKSTokenParser) refreshJwks(ctx context.Context) error {
 	return nil
 }
 
-func jwkToRSAPublicKey(j Jwk) (*rsa.PublicKey, error) {
+func jwkToRSAPublicKey(j oauth.Jwk) (*rsa.PublicKey, error) {
 	if j.Kty != "RSA" {
 		return nil, errs.New("unsupported JWK kty")
 	}

@@ -36,7 +36,6 @@ func HandleAPISettingsSessionsGet(
 
 // HandleAPISettingsSessionsPut - PUT /api/v1/admin/settings/sessions
 func HandleAPISettingsSessionsPut(
-	authHelper handlers.AuthHelper,
 	database data.Database,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
@@ -87,7 +86,7 @@ func HandleAPISettingsSessionsPut(
 
 		// Audit log
 		auditLogger.Log(r.Context(), audit.AuditUpdatedSessionsSettings, map[string]interface{}{
-			"loggedInUser": authHelper.GetLoggedInSubject(r),
+			"loggedInUser": callerSubject(r),
 		})
 
 		resp := api.SettingsSessionsResponse{

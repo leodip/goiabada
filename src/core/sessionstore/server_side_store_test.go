@@ -1502,14 +1502,15 @@ type matrixOwner struct {
 	persistent       bool
 }
 
-// The auth server's two values are written out rather than named. Its session name and
-// authenticated-session key are declared in authserver/internal/constants, and core may not
-// import a process module at all, in production or in a test. TestConstants_PinTheValuesCoreWritesOut
-// in that package holds the declarations to these literals, so the pair cannot drift apart
-// with this matrix still passing (#351).
+// Both owners' authenticated-session keys are written out rather than named, and so is the auth
+// server's session name. They are declared in authserver/internal/constants and
+// adminconsole/internal/constants, and core may not import a process module at all, in production
+// or in a test. TestConstants_PinTheValuesCoreWritesOut in each of those packages holds the
+// declarations to these literals, so a pair cannot drift apart with this matrix still passing
+// (#351, #385).
 var matrixOwners = []matrixOwner{
 	{"authserver", "authserver", "SessionIdentifier", true},
-	{"adminconsole", constants.AdminConsoleSessionName, constants.SessionKeyJwt, false},
+	{"adminconsole", constants.AdminConsoleSessionName, "Jwt", false},
 }
 
 func newMatrixStore(owner matrixOwner, backend Backend, secure bool) *ServerSideStore {

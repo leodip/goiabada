@@ -2,15 +2,11 @@ package handlerhelpers
 
 import (
 	"encoding/json"
-	"log/slog"
 	"net/http"
 
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/constants"
-	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
-	"github.com/leodip/goiabada/core/errs"
-	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
@@ -42,28 +38,6 @@ func (s *AuthHelper) GetAuthContext(r *http.Request) (*ceremony.AuthContext, err
 		return nil, err
 	}
 	return &authContext, nil
-}
-
-func (s *AuthHelper) GetLoggedInSubject(r *http.Request) string {
-	var jwtInfo oauth.JwtInfo
-	if r.Context().Value(coreconstants.ContextKeyJwtInfo) != nil {
-		var ok bool
-		jwtInfo, ok = r.Context().Value(coreconstants.ContextKeyJwtInfo).(oauth.JwtInfo)
-		if !ok {
-			// The stack rides inside the error attribute rather than being concatenated into
-			// the message by debug.Stack(): errs.New captures it here, at the origin, and every
-			// handler prints it with %+v, so the record stays one line of structured fields in
-			// a JSON stream instead of a multi-line blob no collector could parse (#320, #279).
-			slog.ErrorContext(r.Context(), "unable to cast jwtInfo",
-				"error", errs.New("unable to cast jwtInfo"))
-			return ""
-		}
-		if jwtInfo.IdToken != nil {
-			sub := jwtInfo.IdToken.GetStringClaim("sub")
-			return sub
-		}
-	}
-	return ""
 }
 
 func (s *AuthHelper) SaveAuthContext(w http.ResponseWriter, r *http.Request, authContext *ceremony.AuthContext) error {

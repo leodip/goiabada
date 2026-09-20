@@ -76,7 +76,6 @@ func HandleAPIGroupPermissionsGet(
 
 func HandleAPIGroupPermissionsPut(
 	database data.Database,
-	authHelper handlers.AuthHelper,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -168,7 +167,7 @@ func HandleAPIGroupPermissionsPut(
 				auditLogger.Log(r.Context(), audit.AuditAddedGroupPermission, map[string]interface{}{
 					"groupId":      group.Id,
 					"permissionId": permission.Id,
-					"loggedInUser": authHelper.GetLoggedInSubject(r),
+					"loggedInUser": callerSubject(r),
 				})
 			}
 		}
@@ -205,7 +204,7 @@ func HandleAPIGroupPermissionsPut(
 			auditLogger.Log(r.Context(), audit.AuditDeletedGroupPermission, map[string]interface{}{
 				"groupId":      group.Id,
 				"permissionId": permissionId,
-				"loggedInUser": authHelper.GetLoggedInSubject(r),
+				"loggedInUser": callerSubject(r),
 			})
 		}
 

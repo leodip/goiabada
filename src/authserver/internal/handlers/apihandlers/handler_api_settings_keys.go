@@ -81,7 +81,6 @@ func HandleAPISettingsKeysGet(
 // before the check that a next key even existed, so a rotation that was about to be refused
 // had already destroyed the key still signing live tokens (#251).
 func HandleAPISettingsKeysRotatePost(
-	authHelper handlers.AuthHelper,
 	database data.Database,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
@@ -96,7 +95,7 @@ func HandleAPISettingsKeysRotatePost(
 			// Audited here and only here, so the log carries exactly one entry per rotation
 			// that actually happened.
 			auditLogger.Log(r.Context(), audit.AuditRotatedKeys, map[string]interface{}{
-				"loggedInUser": authHelper.GetLoggedInSubject(r),
+				"loggedInUser": callerSubject(r),
 			})
 
 			writeJSON(w, r, http.StatusOK, api.SuccessResponse{Success: true})
@@ -127,7 +126,6 @@ func HandleAPISettingsKeysRotatePost(
 
 // HandleAPISettingsKeyDelete - DELETE /api/v1/admin/settings/keys/{id}
 func HandleAPISettingsKeyDelete(
-	authHelper handlers.AuthHelper,
 	database data.Database,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
@@ -165,7 +163,7 @@ func HandleAPISettingsKeyDelete(
 		}
 
 		auditLogger.Log(r.Context(), audit.AuditRevokedKey, map[string]interface{}{
-			"loggedInUser": authHelper.GetLoggedInSubject(r),
+			"loggedInUser": callerSubject(r),
 			"keyId":        kp.KeyIdentifier,
 		})
 

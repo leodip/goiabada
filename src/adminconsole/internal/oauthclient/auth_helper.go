@@ -1,11 +1,11 @@
-package handlerhelpers
+package oauthclient
 
 import (
 	"fmt"
 	"net/http"
 	"net/url"
 
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"

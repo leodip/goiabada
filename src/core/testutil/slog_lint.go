@@ -215,7 +215,12 @@ var slogSpreadSites = []slogSpreadSite{
 // handlers call on a request (#344) -- the eight application service and leaf packages that
 // followed them out of core (#346) -- and the core packages the handlers call into on a request:
 // the shared middleware, the identifier and angle-bracket validators that stayed there, the
-// client-side token parser, the handler helpers and the session store.
+// handler helpers and the session store.
+//
+// adminconsole/internal/oauthclient is here because the client-side token parser is: its JWKS
+// fetch writes the one record that package carries, and #385 moved it out of core/oauth. Listed
+// at the move rather than afterwards, since the walk only fails when it reaches no files at all,
+// so a directory absent from this list costs coverage in silence.
 //
 // authserver/internal/protocolvalidation carries the one record any of the three writes, the
 // redirect_uri refusal in authorize_validator.go. accountvalidation and what is left of
@@ -259,6 +264,7 @@ var slogRequestPathDirs = []string{
 	"adminconsole/internal/handlers",
 	"adminconsole/internal/middleware",
 	"adminconsole/internal/apiclient",
+	"adminconsole/internal/oauthclient",
 	"core/middleware",
 	"core/validators",
 	"core/oauth",

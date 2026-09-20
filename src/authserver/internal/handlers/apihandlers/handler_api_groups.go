@@ -57,7 +57,6 @@ func HandleAPIGroupsGet(
 }
 
 func HandleAPIGroupCreatePost(
-	authHelper handlers.AuthHelper,
 	database data.Database,
 	identifierValidator *validators.IdentifierValidator,
 	auditLogger handlers.AuditLogger,
@@ -126,7 +125,7 @@ func HandleAPIGroupCreatePost(
 		auditLogger.Log(r.Context(), audit.AuditCreatedGroup, map[string]interface{}{
 			"groupId":         group.Id,
 			"groupIdentifier": group.GroupIdentifier,
-			"loggedInUser":    authHelper.GetLoggedInSubject(r),
+			"loggedInUser":    callerSubject(r),
 		})
 
 		// Return created group
@@ -182,7 +181,6 @@ func HandleAPIGroupGet(
 }
 
 func HandleAPIGroupUpdatePut(
-	authHelper handlers.AuthHelper,
 	database data.Database,
 	identifierValidator *validators.IdentifierValidator,
 	auditLogger handlers.AuditLogger,
@@ -271,7 +269,7 @@ func HandleAPIGroupUpdatePut(
 		auditLogger.Log(r.Context(), audit.AuditUpdatedGroup, map[string]interface{}{
 			"groupId":         group.Id,
 			"groupIdentifier": group.GroupIdentifier,
-			"loggedInUser":    authHelper.GetLoggedInSubject(r),
+			"loggedInUser":    callerSubject(r),
 		})
 
 		// Get member count for response
@@ -291,7 +289,6 @@ func HandleAPIGroupUpdatePut(
 }
 
 func HandleAPIGroupDelete(
-	authHelper handlers.AuthHelper,
 	database data.Database,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
@@ -332,7 +329,7 @@ func HandleAPIGroupDelete(
 		auditLogger.Log(r.Context(), audit.AuditDeletedGroup, map[string]interface{}{
 			"groupId":         group.Id,
 			"groupIdentifier": group.GroupIdentifier,
-			"loggedInUser":    authHelper.GetLoggedInSubject(r),
+			"loggedInUser":    callerSubject(r),
 		})
 
 		// Return success response

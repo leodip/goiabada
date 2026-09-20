@@ -222,7 +222,6 @@ func HandleAPIClientGet(
 
 // HandleAPIClientDelete - DELETE /api/v1/admin/clients/{id}
 func HandleAPIClientDelete(
-	authHelper handlers.AuthHelper,
 	database data.Database,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
@@ -264,7 +263,7 @@ func HandleAPIClientDelete(
 		auditLogger.Log(r.Context(), audit.AuditDeletedClient, map[string]interface{}{
 			"clientId":         client.Id,
 			"clientIdentifier": client.ClientIdentifier,
-			"loggedInUser":     authHelper.GetLoggedInSubject(r),
+			"loggedInUser":     callerSubject(r),
 		})
 
 		resp := api.SuccessResponse{Success: true}
@@ -274,7 +273,6 @@ func HandleAPIClientDelete(
 
 // HandleAPIClientCreatePost - POST /api/v1/admin/clients
 func HandleAPIClientCreatePost(
-	authHelper handlers.AuthHelper,
 	database data.Database,
 	identifierValidator *validators.IdentifierValidator,
 	auditLogger handlers.AuditLogger,
@@ -369,7 +367,7 @@ func HandleAPIClientCreatePost(
 		auditLogger.Log(r.Context(), audit.AuditCreatedClient, map[string]interface{}{
 			"clientId":         client.Id,
 			"clientIdentifier": client.ClientIdentifier,
-			"loggedInUser":     authHelper.GetLoggedInSubject(r),
+			"loggedInUser":     callerSubject(r),
 		})
 
 		// Load related fields for response consistency (fail if these operations fail)
@@ -392,7 +390,6 @@ func HandleAPIClientCreatePost(
 
 // HandleAPIClientUpdatePut - PUT /api/v1/admin/clients/{id}
 func HandleAPIClientUpdatePut(
-	authHelper handlers.AuthHelper,
 	database data.Database,
 	identifierValidator *validators.IdentifierValidator,
 	auditLogger handlers.AuditLogger,
@@ -584,7 +581,7 @@ func HandleAPIClientUpdatePut(
 		// Audit log
 		auditLogger.Log(r.Context(), audit.AuditUpdatedClientSettings, map[string]interface{}{
 			"clientId":     client.Id,
-			"loggedInUser": authHelper.GetLoggedInSubject(r),
+			"loggedInUser": callerSubject(r),
 		})
 
 		response := api.UpdateClientResponse{
@@ -598,7 +595,6 @@ func HandleAPIClientUpdatePut(
 // HandleAPIClientAuthenticationPut - PUT /api/v1/admin/clients/{id}/authentication
 // Changes client's public/confidential mode and client secret.
 func HandleAPIClientAuthenticationPut(
-	authHelper handlers.AuthHelper,
 	database data.Database,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
@@ -695,7 +691,7 @@ func HandleAPIClientAuthenticationPut(
 			// already-public client revoked nothing and must not claim to.
 			if becamePublic {
 				handlers.LogRevokedClientGrants(r.Context(), auditLogger, client.Id,
-					handlers.RevocationReasonClientBecamePublic, authHelper.GetLoggedInSubject(r), result)
+					handlers.RevocationReasonClientBecamePublic, callerSubject(r), result)
 			}
 		} else if err := database.UpdateClient(nil, client); err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error updating client authentication"), "client_id", client.Id)
@@ -715,7 +711,7 @@ func HandleAPIClientAuthenticationPut(
 		// Audit
 		auditLogger.Log(r.Context(), audit.AuditUpdatedClientAuthentication, map[string]interface{}{
 			"clientId":     client.Id,
-			"loggedInUser": authHelper.GetLoggedInSubject(r),
+			"loggedInUser": callerSubject(r),
 		})
 
 		resp := api.UpdateClientResponse{Client: *apimapping.ToClientResponse(client)}
@@ -743,7 +739,6 @@ func validateClientSecret(secret string) error {
 // HandleAPIClientOAuth2FlowsPut - PUT /api/v1/admin/clients/{id}/oauth2-flows
 // Updates which OAuth2 flows are enabled for the client.
 func HandleAPIClientOAuth2FlowsPut(
-	authHelper handlers.AuthHelper,
 	database data.Database,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
@@ -807,7 +802,7 @@ func HandleAPIClientOAuth2FlowsPut(
 		// Audit
 		auditLogger.Log(r.Context(), audit.AuditUpdatedClientOAuth2Flows, map[string]interface{}{
 			"clientId":     client.Id,
-			"loggedInUser": authHelper.GetLoggedInSubject(r),
+			"loggedInUser": callerSubject(r),
 		})
 
 		resp := api.UpdateClientResponse{Client: *apimapping.ToClientResponse(client)}
@@ -819,7 +814,6 @@ func HandleAPIClientOAuth2FlowsPut(
 // Replaces the full set of redirect URIs for the client. The server validates
 // inputs, enforces business rules, computes add/remove, and returns the updated client.
 func HandleAPIClientRedirectURIsPut(
-	authHelper handlers.AuthHelper,
 	database data.Database,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
@@ -958,7 +952,7 @@ func HandleAPIClientRedirectURIsPut(
 		// Audit
 		auditLogger.Log(r.Context(), audit.AuditUpdatedRedirectURIs, map[string]interface{}{
 			"clientId":     client.Id,
-			"loggedInUser": authHelper.GetLoggedInSubject(r),
+			"loggedInUser": callerSubject(r),
 		})
 
 		resp := api.UpdateClientResponse{Client: *apimapping.ToClientResponse(client)}
@@ -979,7 +973,6 @@ const maxWebOriginLength = 256
 // canonicalized to the exact string a browser sends in an Origin header, or refused, so a stored
 // origin is always one CORS can match.
 func HandleAPIClientWebOriginsPut(
-	authHelper handlers.AuthHelper,
 	database data.Database,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
@@ -1152,7 +1145,7 @@ func HandleAPIClientWebOriginsPut(
 		// Audit
 		auditLogger.Log(r.Context(), audit.AuditUpdatedWebOrigins, map[string]interface{}{
 			"clientId":     client.Id,
-			"loggedInUser": authHelper.GetLoggedInSubject(r),
+			"loggedInUser": callerSubject(r),
 		})
 
 		resp := api.UpdateClientResponse{Client: *apimapping.ToClientResponse(client)}
@@ -1180,7 +1173,6 @@ func (f *webOriginsWriteFailure) Unwrap() error { return f.err }
 // HandleAPIClientTokensPut - PUT /api/v1/admin/clients/{id}/tokens
 // Updates token-related settings for a client.
 func HandleAPIClientTokensPut(
-	authHelper handlers.AuthHelper,
 	database data.Database,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
@@ -1267,7 +1259,7 @@ func HandleAPIClientTokensPut(
 		// Audit
 		auditLogger.Log(r.Context(), audit.AuditUpdatedClientTokens, map[string]interface{}{
 			"clientId":     client.Id,
-			"loggedInUser": authHelper.GetLoggedInSubject(r),
+			"loggedInUser": callerSubject(r),
 		})
 
 		resp := api.UpdateClientResponse{Client: *apimapping.ToClientResponse(client)}

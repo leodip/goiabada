@@ -11,8 +11,9 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/cache"
 	"github.com/leodip/goiabada/adminconsole/internal/config"
+	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/server"
-	"github.com/leodip/goiabada/core/constants"
+	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/logging"
 	"github.com/leodip/goiabada/core/oauth"
@@ -34,9 +35,9 @@ func main() {
 
 	slog.Info("admin console started")
 	slog.Info("build information",
-		"version", constants.Version,
-		"build_date", constants.BuildDate,
-		"git_commit", constants.GitCommit)
+		"version", coreconstants.Version,
+		"build_date", coreconstants.BuildDate,
+		"git_commit", coreconstants.GitCommit)
 	slog.Info("config loaded")
 
 	// Refuse a configuration carried over from a release where the client id and the issuer
@@ -93,7 +94,7 @@ func main() {
 	// The admin console keeps the token response in its session, and session.Values is a
 	// map[interface{}]interface{}, so gob has to be told the concrete type before it can
 	// decode one back. This registration is live: handler_auth_callback.go writes the value
-	// and core/middleware reads it. The auth server had the same two lines and encoded no
+	// and internal/middleware reads it. The auth server had the same two lines and encoded no
 	// such value, so they went with #338; the name this call registers is pinned by
 	// TestTokenResponse_GobSessionIdentity in core/oauth, because it is written into every
 	// session in flight and an administrator whose session cannot be decoded is signed out.
@@ -149,7 +150,7 @@ func main() {
 	// and split the ciphertext across up to fifty of them (#266).
 	tokenSource := apiclient.NewSessionTokenSource(
 		config.GetAuthServer().GetEffectiveBaseURL(),
-		constants.AdminConsoleClientIdentifier,
+		coreconstants.AdminConsoleClientIdentifier,
 		adminConsoleConfig.OAuthClientSecret,
 	)
 

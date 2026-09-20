@@ -84,3 +84,13 @@ packages:
         config:
           dir: "./internal/handlers/mocks"
           pkgname: "mocks_handlers"
+  # Bearer-token middleware, this module's since #385 moved it out of core/middleware
+  github.com/leodip/goiabada/authserver/internal/middleware:
+    interfaces:
+      # Unexported, so the global structname template would emit an unusable
+      # lowercase type name outside the generated package. Name it explicitly (#338).
+      tokenParser:
+        config:
+          dir: "./internal/middleware/mocks"
+          pkgname: "mocks_middleware"
+          structname: "TokenParser"

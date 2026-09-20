@@ -1,4 +1,4 @@
-package oauth
+package oauthclient
 
 import (
 	"context"
@@ -9,6 +9,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -146,7 +147,7 @@ func TestExchangeCodeForTokens_DecodesEveryTokenResponseField(t *testing.T) {
 	require.NotNil(t, tokenResponse)
 
 	// Field by field rather than against a struct literal: a field added to
-	// TokenResponse later leaves a gap here that reads as a gap.
+	// oauth.TokenResponse later leaves a gap here that reads as a gap.
 	assert.Equal(t, "the-access-token", tokenResponse.AccessToken)
 	assert.Equal(t, "the-id-token", tokenResponse.IdToken)
 	assert.Equal(t, "Bearer", tokenResponse.TokenType)
@@ -168,7 +169,7 @@ func TestExchangeCodeForTokens_AcceptsAnEmptyJSONObject(t *testing.T) {
 
 	require.NoError(t, err)
 	require.NotNil(t, tokenResponse)
-	assert.Equal(t, TokenResponse{}, *tokenResponse)
+	assert.Equal(t, oauth.TokenResponse{}, *tokenResponse)
 }
 
 // Refused by the json.Unmarshal error check and by nothing else: the endpoint
@@ -199,7 +200,7 @@ func TestExchangeCodeForTokens_RejectsAnEmptyBody(t *testing.T) {
 }
 
 // Refused by the status check and by nothing else: this body is valid JSON and
-// unmarshals cleanly into a zero TokenResponse, so with the status gate removed
+// unmarshals cleanly into a zero oauth.TokenResponse, so with the status gate removed
 // the call would succeed.
 func TestExchangeCodeForTokens_ReturnsTheBodyOfANon200(t *testing.T) {
 	endpoint, _ := newTokenEndpoint(t, http.StatusBadRequest,

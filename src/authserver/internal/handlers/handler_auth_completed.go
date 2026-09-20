@@ -267,11 +267,11 @@ func HandleAuthCompletedGet(
 				// this one after the creation instead would leave that failure recorded as a
 				// termination with no actor and no reason, which is the worse trade (#133).
 				//
-				// Both events below carry "" for loggedInUser rather than
-				// authHelper.GetLoggedInSubject(r), which reads the cookie: at this instant the
-				// cookie still names the user being terminated, so passing it would record the
-				// party losing the session as the actor who ended it. The actor is this event's
-				// userId, which is where an auditor reads it.
+				// Neither event below carries loggedInUser: this is a browser ceremony with
+				// no bearer token, and the only identity in scope is the cookie's, which at
+				// this instant still names the user being terminated -- recording it would
+				// name the party losing the session as the actor who ended it. The actor is
+				// this event's userId, which is where an auditor reads it.
 				auditLogger.Log(r.Context(), audit.AuditCrossUserSessionReplaced, map[string]interface{}{
 					"userId":                    authContext.UserId,
 					"previousUserId":            userSession.UserId,

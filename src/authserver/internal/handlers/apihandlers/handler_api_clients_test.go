@@ -13,7 +13,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
@@ -224,7 +223,6 @@ func TestUpdateClientNotOwningAuthenticationMode_AFailedAcquisitionDoesNotWrite(
 func TestHandleAPIClientAuthenticationPut_ClassifiesTheFlipAgainstTheRow(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_audit.NewAuditLogger(t)
-	authHelper := mocks_handlers.NewAuthHelper(t)
 
 	// The snapshot the handler works from: already public.
 	database.On("GetClientById", (*sql.Tx)(nil), int64(7)).
@@ -240,7 +238,6 @@ func TestHandleAPIClientAuthenticationPut_ClassifiesTheFlipAgainstTheRow(t *test
 		Return([]*models.RefreshToken{}, nil).Once()
 	stubClientResponseLoads(database)
 
-	authHelper.On("GetLoggedInSubject", mock.Anything).Return("the-admin")
 	var revokedPayload map[string]interface{}
 	auditLogger.On("Log", mock.Anything, audit.AuditRevokedClientGrants, mock.Anything).
 		Run(func(args mock.Arguments) {
@@ -249,7 +246,7 @@ func TestHandleAPIClientAuthenticationPut_ClassifiesTheFlipAgainstTheRow(t *test
 	auditLogger.On("Log", mock.Anything, audit.AuditUpdatedClientAuthentication, mock.Anything).Return().Once()
 
 	rr := httptest.NewRecorder()
-	handler := HandleAPIClientAuthenticationPut(authHelper, database, auditLogger)
+	handler := HandleAPIClientAuthenticationPut(database, auditLogger)
 	handler.ServeHTTP(rr, authenticationPutRequest(t, "7", api.UpdateClientAuthenticationRequest{IsPublic: true}))
 
 	assert.Equal(t, http.StatusOK, rr.Code)
@@ -274,7 +271,6 @@ func TestHandleAPIClientAuthenticationPut_ClassifiesTheFlipAgainstTheRow(t *test
 func TestHandleAPIClientAuthenticationPut_AFailedClassificationRevokesNothingAndSavesNothing(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_audit.NewAuditLogger(t)
-	authHelper := mocks_handlers.NewAuthHelper(t)
 
 	database.On("GetClientById", (*sql.Tx)(nil), int64(7)).
 		Return(&models.Client{Id: 7, IsPublic: false, ClientSecretEncrypted: []byte("secret")}, nil).Once()
@@ -283,7 +279,7 @@ func TestHandleAPIClientAuthenticationPut_AFailedClassificationRevokesNothingAnd
 		Return(false, errors.New("no client with that id")).Once()
 
 	rr := httptest.NewRecorder()
-	handler := HandleAPIClientAuthenticationPut(authHelper, database, auditLogger)
+	handler := HandleAPIClientAuthenticationPut(database, auditLogger)
 	handler.ServeHTTP(rr, authenticationPutRequest(t, "7", api.UpdateClientAuthenticationRequest{IsPublic: true}))
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
@@ -304,7 +300,6 @@ func TestHandleAPIClientAuthenticationPut_AFailedClassificationRevokesNothingAnd
 func TestHandleAPIClientAuthenticationPut_ASaveOfAnAlreadyPublicClientRevokesNothing(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_audit.NewAuditLogger(t)
-	authHelper := mocks_handlers.NewAuthHelper(t)
 
 	database.On("GetClientById", (*sql.Tx)(nil), int64(7)).
 		Return(&models.Client{Id: 7, IsPublic: true}, nil).Once()
@@ -314,10 +309,9 @@ func TestHandleAPIClientAuthenticationPut_ASaveOfAnAlreadyPublicClientRevokesNot
 	stubClientResponseLoads(database)
 
 	auditLogger.On("Log", mock.Anything, audit.AuditUpdatedClientAuthentication, mock.Anything).Return().Once()
-	authHelper.On("GetLoggedInSubject", mock.Anything).Return("the-admin")
 
 	rr := httptest.NewRecorder()
-	handler := HandleAPIClientAuthenticationPut(authHelper, database, auditLogger)
+	handler := HandleAPIClientAuthenticationPut(database, auditLogger)
 	handler.ServeHTTP(rr, authenticationPutRequest(t, "7", api.UpdateClientAuthenticationRequest{IsPublic: true}))
 
 	assert.Equal(t, http.StatusOK, rr.Code)
@@ -375,7 +369,6 @@ func webOriginsPutRequest(t *testing.T, id string, origins []string) *http.Reque
 func TestHandleAPIClientWebOriginsPut_SavesInOneTransactionUnderTheRowAcquisition(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_audit.NewAuditLogger(t)
-	authHelper := mocks_handlers.NewAuthHelper(t)
 
 	client := &models.Client{Id: 7, AuthorizationCodeEnabled: false}
 	database.On("GetClientById", (*sql.Tx)(nil), int64(7)).Return(client, nil).Once()
@@ -395,11 +388,10 @@ func TestHandleAPIClientWebOriginsPut_SavesInOneTransactionUnderTheRowAcquisitio
 	database.On("DeleteWebOrigin", clientUpdateTx, int64(11)).Return(nil).Once()
 	stubClientResponseLoads(database)
 
-	authHelper.On("GetLoggedInSubject", mock.Anything).Return("the-admin")
 	auditLogger.On("Log", mock.Anything, audit.AuditUpdatedWebOrigins, mock.Anything).Return().Once()
 
 	rr := httptest.NewRecorder()
-	handler := HandleAPIClientWebOriginsPut(authHelper, database, auditLogger)
+	handler := HandleAPIClientWebOriginsPut(database, auditLogger)
 	handler.ServeHTTP(rr, webOriginsPutRequest(t, "7", []string{"https://new.example.com"}))
 
 	assert.Equal(t, http.StatusOK, rr.Code)
@@ -424,7 +416,6 @@ func TestHandleAPIClientWebOriginsPut_SavesInOneTransactionUnderTheRowAcquisitio
 func TestHandleAPIClientWebOriginsPut_AFailedWriteCommitsNothing(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_audit.NewAuditLogger(t)
-	authHelper := mocks_handlers.NewAuthHelper(t)
 
 	database.On("GetClientById", (*sql.Tx)(nil), int64(7)).
 		Return(&models.Client{Id: 7, AuthorizationCodeEnabled: true}, nil).Once()
@@ -435,7 +426,7 @@ func TestHandleAPIClientWebOriginsPut_AFailedWriteCommitsNothing(t *testing.T) {
 	database.On("CreateWebOrigin", clientUpdateTx, mock.Anything).Return(diskFull).Once()
 
 	rr := httptest.NewRecorder()
-	handler := HandleAPIClientWebOriginsPut(authHelper, database, auditLogger)
+	handler := HandleAPIClientWebOriginsPut(database, auditLogger)
 	handler.ServeHTTP(rr, webOriginsPutRequest(t, "7", []string{"https://a.example.com"}))
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
@@ -461,7 +452,6 @@ func TestHandleAPIClientWebOriginsPut_AFailedWriteCommitsNothing(t *testing.T) {
 func TestHandleAPIClientWebOriginsPut_AFailedLoadIsAnsweredAsALoadFailure(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_audit.NewAuditLogger(t)
-	authHelper := mocks_handlers.NewAuthHelper(t)
 
 	database.On("GetClientById", (*sql.Tx)(nil), int64(7)).
 		Return(&models.Client{Id: 7, AuthorizationCodeEnabled: true}, nil).Once()
@@ -471,7 +461,7 @@ func TestHandleAPIClientWebOriginsPut_AFailedLoadIsAnsweredAsALoadFailure(t *tes
 	database.On("ClientLoadWebOrigins", clientUpdateTx, mock.Anything).Return(loadErr).Once()
 
 	rr := httptest.NewRecorder()
-	handler := HandleAPIClientWebOriginsPut(authHelper, database, auditLogger)
+	handler := HandleAPIClientWebOriginsPut(database, auditLogger)
 	handler.ServeHTTP(rr, webOriginsPutRequest(t, "7", []string{"https://a.example.com"}))
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
@@ -496,7 +486,6 @@ func TestHandleAPIClientWebOriginsPut_AFailedLoadIsAnsweredAsALoadFailure(t *tes
 func TestHandleAPIClientWebOriginsPut_ARerunAttemptAnswersOnce(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_audit.NewAuditLogger(t)
-	authHelper := mocks_handlers.NewAuthHelper(t)
 
 	client := &models.Client{Id: 7, AuthorizationCodeEnabled: true}
 	database.On("GetClientById", (*sql.Tx)(nil), int64(7)).Return(client, nil).Once()
@@ -524,11 +513,10 @@ func TestHandleAPIClientWebOriginsPut_ARerunAttemptAnswersOnce(t *testing.T) {
 	database.On("CreateWebOrigin", clientUpdateTx, mock.Anything).Return(nil).Once()
 	stubClientResponseLoads(database)
 
-	authHelper.On("GetLoggedInSubject", mock.Anything).Return("the-admin")
 	auditLogger.On("Log", mock.Anything, audit.AuditUpdatedWebOrigins, mock.Anything).Return().Once()
 
 	rr := httptest.NewRecorder()
-	handler := HandleAPIClientWebOriginsPut(authHelper, database, auditLogger)
+	handler := HandleAPIClientWebOriginsPut(database, auditLogger)
 	handler.ServeHTTP(rr, webOriginsPutRequest(t, "7", []string{"https://a.example.com"}))
 
 	assert.Equal(t, 2, attempts)
@@ -545,7 +533,6 @@ func TestHandleAPIClientWebOriginsPut_ARerunAttemptAnswersOnce(t *testing.T) {
 func TestHandleAPIClientWebOriginsPut_AnExhaustedRetryIsOneFiveHundred(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_audit.NewAuditLogger(t)
-	authHelper := mocks_handlers.NewAuthHelper(t)
 
 	database.On("GetClientById", (*sql.Tx)(nil), int64(7)).
 		Return(&models.Client{Id: 7, AuthorizationCodeEnabled: true}, nil).Once()
@@ -553,7 +540,7 @@ func TestHandleAPIClientWebOriginsPut_AnExhaustedRetryIsOneFiveHundred(t *testin
 	expectRunInTransactionRefused(database, exhausted)
 
 	rr := httptest.NewRecorder()
-	handler := HandleAPIClientWebOriginsPut(authHelper, database, auditLogger)
+	handler := HandleAPIClientWebOriginsPut(database, auditLogger)
 	handler.ServeHTTP(rr, webOriginsPutRequest(t, "7", []string{"https://a.example.com"}))
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
@@ -573,7 +560,6 @@ func TestHandleAPIClientWebOriginsPut_AnExhaustedRetryIsOneFiveHundred(t *testin
 func TestHandleAPIClientWebOriginsPut_AnOverlongOriginIsRefusedNotStored(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_audit.NewAuditLogger(t)
-	authHelper := mocks_handlers.NewAuthHelper(t)
 
 	database.On("GetClientById", (*sql.Tx)(nil), int64(7)).
 		Return(&models.Client{Id: 7, AuthorizationCodeEnabled: true}, nil).Once()
@@ -585,7 +571,7 @@ func TestHandleAPIClientWebOriginsPut_AnOverlongOriginIsRefusedNotStored(t *test
 	require.Greater(t, len(origin), maxWebOriginLength)
 
 	rr := httptest.NewRecorder()
-	handler := HandleAPIClientWebOriginsPut(authHelper, database, auditLogger)
+	handler := HandleAPIClientWebOriginsPut(database, auditLogger)
 	handler.ServeHTTP(rr, webOriginsPutRequest(t, "7", []string{origin}))
 
 	assert.Equal(t, http.StatusBadRequest, rr.Code)

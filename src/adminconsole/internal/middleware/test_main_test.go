@@ -1,18 +1,43 @@
 package middleware
 
 import (
+	"context"
+	"net/http"
 	"os"
 	"testing"
 
 	"github.com/leodip/goiabada/core/i18n"
 )
 
-// Both of MiddlewareSettingsCache's refusals render through i18n.T, so without a
-// loaded bundle T echoes the key and every body assertion in this package would
-// pass against the key rather than against the message.
+// MiddlewareSettingsCache's two refusals and the JWT middleware's server-error page all
+// render through i18n.T, so without a loaded bundle T echoes the key and every body
+// assertion in this package would pass against the key rather than against the message.
 func TestMain(m *testing.M) {
 	if _, err := i18n.LoadBundle(); err != nil {
 		panic(err)
 	}
 	os.Exit(m.Run())
+}
+
+// stubIssuerReader stands in for middleware.SettingsReader, which reads the issuer off a
+// settings value this package's tests have no business putting on the context.
+type stubIssuerReader struct {
+	issuer string
+}
+
+func (s stubIssuerReader) Issuer(context.Context) string {
+	return s.issuer
+}
+
+// stubErrorRenderer stands in for *handlerhelpers.HttpHelper, whose real
+// InternalServerError needs a template FS this package has no business carrying.
+// It answers the way the real one does on a failed render: 500 with a body, so a
+// test that only asserts the status still means what it did before the middleware
+// started rendering a page. Stateless on purpose, so one value is safe to share
+// across every construction in this package; a test that needs to see the error
+// itself declares a recording renderer of its own.
+type stubErrorRenderer struct{}
+
+func (stubErrorRenderer) InternalServerError(w http.ResponseWriter, r *http.Request, _ error) {
+	http.Error(w, i18n.T(r.Context(), "error.body"), http.StatusInternalServerError)
 }

@@ -9,9 +9,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
+	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/constants"
+	coreconstants "github.com/leodip/goiabada/core/constants"
 	mocks_handler_helpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
 	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/leodip/goiabada/core/sessionstore/sessiontest"
@@ -72,7 +73,7 @@ func flashInSession(t *testing.T, store *sessionstore.ServerSideStore, keys ...s
 	req := httptest.NewRequest(http.MethodGet, "/admin/users", nil)
 	rec := httptest.NewRecorder()
 
-	sess, err := store.Get(req, constants.AdminConsoleSessionName)
+	sess, err := store.Get(req, coreconstants.AdminConsoleSessionName)
 	require.NoError(t, err)
 	for _, key := range keys {
 		sess.SetFlash(key, "true")
