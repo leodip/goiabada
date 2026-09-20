@@ -6,7 +6,6 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/models"
-	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/oauth"
 )
 
@@ -31,18 +30,18 @@ func HandleCertsGet(
 
 		for idx, signingKey := range allSigningKeys {
 
-			keyState, err := enums.KeyStateFromString(signingKey.State)
+			keyState, err := models.KeyStateFromString(signingKey.State)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
 				return
 			}
 
 			switch keyState {
-			case enums.KeyStateNext:
+			case models.KeyStateNext:
 				nextKey = &allSigningKeys[idx]
-			case enums.KeyStateCurrent:
+			case models.KeyStateCurrent:
 				currentKey = &allSigningKeys[idx]
-			case enums.KeyStatePrevious:
+			case models.KeyStatePrevious:
 				previousKey = &allSigningKeys[idx]
 			}
 		}

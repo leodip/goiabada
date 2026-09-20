@@ -39,10 +39,10 @@ true and misleading.
 the declaring package and are the only seeds; `own-package` and `reachable` then require a source
 that is already justified, and iterate to a fixpoint. Two references never count for the symbol they
 name: a method's receiver, because a method rides with its receiver and so cannot vouch for it, and
-the declared type of a const or var the same package writes. Without both, `core/enums` justifies
-itself — `AcrLevel` would be `own-package` because `AcrLevel1 AcrLevel = …` and
-`func (acr AcrLevel) IsHigherThan` name it — and the guard would be blind to exactly the package
-#385 deletes. An asserted row is not a seed either: two mutually referring symbols could otherwise
+the declared type of a const or var the same package writes. Without both, `core/enums` justified
+itself — `AcrLevel` would have been `own-package` because `AcrLevel1 AcrLevel = …` and
+`func (acr AcrLevel) IsHigherThan` named it — and the guard would have been blind to exactly the
+package #385 deleted. An asserted row is not a seed either: two mutually referring symbols could otherwise
 each be justified by the other's assertion, and the table would not even be stable under
 regeneration.
 
@@ -246,51 +246,17 @@ command itself and fails on a tree it changed.
 | `core/customerrors` | `ErrorDetail` | both-apps | — |
 | `core/customerrors` | `NewErrorDetail` | contract | One of the two neutral `ErrorDetail` constructors. `NewErrorDetailWithHttpStatusCode` beside it is `both-apps`, and the pair is one API that both processes compile. |
 | `core/customerrors` | `NewErrorDetailWithHttpStatusCode` | both-apps | — |
-| `core/enums` | `AcrLevel` | moving | #385 decision 6 moves it to `authserver/internal/models`, which carries it on a column the seeder writes. |
-| `core/enums` | `AcrLevel1` | moving | #385 decision 6 moves it to `authserver/internal/models`, which carries it on a column the seeder writes. |
-| `core/enums` | `AcrLevel2Mandatory` | moving | #385 decision 6 moves it to `authserver/internal/models`, which carries it on a column the seeder writes. |
-| `core/enums` | `AcrLevel2Optional` | moving | #385 decision 6 moves it to `authserver/internal/models`, which carries it on a column the seeder writes. |
-| `core/enums` | `AcrLevelFromString` | moving | #385 decision 6 moves it to `authserver/internal/models`, which carries it on a column the seeder writes. |
-| `core/enums` | `AcrMax` | moving | #385 decision 6 moves it to `authserver/internal/models`, which carries it on a column the seeder writes. |
-| `core/enums` | `AuthMethod` | moving | #385 decision 6 moves it to `authserver/internal/ceremony`, beside the `AuthContext.AuthMethods` that accumulates it. |
-| `core/enums` | `AuthMethodOTP` | moving | #385 decision 6 moves it to `authserver/internal/ceremony`, beside the `AuthContext.AuthMethods` that accumulates it. |
-| `core/enums` | `AuthMethodPassword` | moving | #385 decision 6 moves it to `authserver/internal/ceremony`, beside the `AuthContext.AuthMethods` that accumulates it. |
-| `core/enums` | `Gender` | both-apps | — |
-| `core/enums` | `GenderFemale` | reachable | — |
-| `core/enums` | `GenderMale` | reachable | — |
-| `core/enums` | `GenderOther` | reachable | — |
-| `core/enums` | `IsGenderValid` | contract | The `Gender` type's own bound, and the only statement of which of its values are legal. #385 decision 17 keeps it beside the type, which moves to `core/gender`. |
-| `core/enums` | `KeyState` | moving | #385 decision 7 moves it to `authserver/internal/models`; `commondb` builds a SQL WHERE with it and `data` imports nothing above `models`. |
-| `core/enums` | `KeyStateCurrent` | both-apps | — |
-| `core/enums` | `KeyStateFromString` | moving | #385 decision 7 moves it to `authserver/internal/models`; `commondb` builds a SQL WHERE with it and `data` imports nothing above `models`. |
-| `core/enums` | `KeyStateNext` | both-apps | — |
-| `core/enums` | `KeyStatePrevious` | both-apps | — |
-| `core/enums` | `PasswordPolicy` | moving | #385 decision 6 moves it to `authserver/internal/models`, which carries it on a column the seeder writes. |
-| `core/enums` | `PasswordPolicyFromString` | moving | #385 decision 6 moves it to `authserver/internal/models`, which carries it on a column the seeder writes. |
-| `core/enums` | `PasswordPolicyHigh` | moving | #385 decision 6 moves it to `authserver/internal/models`, which carries it on a column the seeder writes. |
-| `core/enums` | `PasswordPolicyLow` | moving | #385 decision 6 moves it to `authserver/internal/models`, which carries it on a column the seeder writes. |
-| `core/enums` | `PasswordPolicyMedium` | moving | #385 decision 6 moves it to `authserver/internal/models`, which carries it on a column the seeder writes. |
-| `core/enums` | `PasswordPolicyNone` | moving | #385 decision 6 moves it to `authserver/internal/models`, which carries it on a column the seeder writes. |
-| `core/enums` | `SMTPEncryption` | moving | #385 decision 6 moves it to `authserver/internal/emaildelivery`, the only thing that acts on it. |
-| `core/enums` | `SMTPEncryptionFromString` | moving | #385 decision 6 moves it to `authserver/internal/emaildelivery`, the only thing that acts on it. |
-| `core/enums` | `SMTPEncryptionNone` | moving | #385 decision 6 moves it to `authserver/internal/emaildelivery`, the only thing that acts on it. |
-| `core/enums` | `SMTPEncryptionSSLTLS` | moving | #385 decision 6 moves it to `authserver/internal/emaildelivery`, the only thing that acts on it. |
-| `core/enums` | `SMTPEncryptionSTARTTLS` | moving | #385 decision 6 moves it to `authserver/internal/emaildelivery`, the only thing that acts on it. |
-| `core/enums` | `ThreeStateSetting` | moving | #385 decision 6 moves it to `authserver/internal/models`, which carries it on a column the seeder writes. |
-| `core/enums` | `ThreeStateSettingDefault` | moving | #385 decision 6 moves it to `authserver/internal/models`, which carries it on a column the seeder writes. |
-| `core/enums` | `ThreeStateSettingFromString` | moving | #385 decision 6 moves it to `authserver/internal/models`, which carries it on a column the seeder writes. |
-| `core/enums` | `ThreeStateSettingOff` | moving | #385 decision 6 moves it to `authserver/internal/models`, which carries it on a column the seeder writes. |
-| `core/enums` | `ThreeStateSettingOn` | moving | #385 decision 6 moves it to `authserver/internal/models`, which carries it on a column the seeder writes. |
-| `core/enums` | `TokenType` | moving | #385 decision 6 moves it to `authserver/internal/issuance`, which produces every value it has. |
-| `core/enums` | `TokenTypeBearer` | moving | #385 decision 6 moves it to `authserver/internal/issuance`, which produces every value it has. |
-| `core/enums` | `TokenTypeId` | moving | #385 decision 6 moves it to `authserver/internal/issuance`, which produces every value it has. |
-| `core/enums` | `TokenTypeRefresh` | moving | #385 decision 6 moves it to `authserver/internal/issuance`, which produces every value it has. |
 | `core/errs` | `Errorf` | kernel | — |
 | `core/errs` | `Join` | contract | One function of the error kernel both processes compile. CLAUDE.md pattern 7 names it as the only legal `errors.Join` in this tree, so it is part of the convention rather than of one caller. |
 | `core/errs` | `New` | kernel | — |
 | `core/errs` | `WithStack` | kernel | — |
 | `core/errs` | `Wrap` | kernel | — |
 | `core/errs` | `Wrapf` | kernel | — |
+| `core/gender` | `Gender` | both-apps | — |
+| `core/gender` | `GenderFemale` | own-package | — |
+| `core/gender` | `GenderMale` | reachable | — |
+| `core/gender` | `GenderOther` | own-package | — |
+| `core/gender` | `IsGenderValid` | contract | The `Gender` type's own bound, and the only statement of which of its values are legal, which is why a caller holding an int asks here rather than comparing against `GenderOther` itself. The admin console names only `Gender`, so the tree justifies the type and not this (#385 decision 17). |
 | `core/hashutil` | `HashString` | both-apps | — |
 | `core/hashutil` | `VerifyStringHash` | kernel | — |
 | `core/i18n` | `Bundle` | own-package | — |

@@ -6,7 +6,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
-	"github.com/leodip/goiabada/core/enums"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -20,7 +19,7 @@ func TestConsent_ClientDisplay_ShowDisplayName(t *testing.T) {
 		ShowDescription:  false,
 		ShowWebsiteURL:   false,
 		ConsentRequired:  true, // Consent required
-		DefaultAcrLevel:  enums.AcrLevel1,
+		DefaultAcrLevel:  models.AcrLevel1,
 	})
 
 	redirectUri := &models.RedirectURI{
@@ -69,7 +68,7 @@ func TestConsent_ClientDisplay_ShowLogo_WithLogo(t *testing.T) {
 		ShowDescription:  false,
 		ShowWebsiteURL:   false,
 		ConsentRequired:  true,
-		DefaultAcrLevel:  enums.AcrLevel1,
+		DefaultAcrLevel:  models.AcrLevel1,
 	})
 
 	redirectUri := &models.RedirectURI{
@@ -118,7 +117,7 @@ func TestConsent_ClientDisplay_ShowDescription(t *testing.T) {
 		ShowDisplayName:  false,
 		ShowWebsiteURL:   false,
 		ConsentRequired:  true,
-		DefaultAcrLevel:  enums.AcrLevel1,
+		DefaultAcrLevel:  models.AcrLevel1,
 	})
 
 	redirectUri := &models.RedirectURI{
@@ -170,7 +169,7 @@ func TestConsent_ClientDisplay_AllEnabled(t *testing.T) {
 		ShowWebsiteURL:   true,
 		UploadLogo:       true,
 		ConsentRequired:  true,
-		DefaultAcrLevel:  enums.AcrLevel1,
+		DefaultAcrLevel:  models.AcrLevel1,
 	})
 
 	redirectUri := &models.RedirectURI{
@@ -223,7 +222,7 @@ func TestConsent_ClientDisplay_AllDisabled(t *testing.T) {
 		ShowWebsiteURL:   false,
 		UploadLogo:       true, // Logo exists but hidden
 		ConsentRequired:  true,
-		DefaultAcrLevel:  enums.AcrLevel1,
+		DefaultAcrLevel:  models.AcrLevel1,
 	})
 
 	redirectUri := &models.RedirectURI{

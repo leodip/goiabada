@@ -9,7 +9,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
-	"github.com/leodip/goiabada/core/enums"
+	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/errs"
 )
 
@@ -85,7 +85,7 @@ func HandleAuthLevel2Get(
 		// is OTP optional or mandatory?
 		targetAcrLevel := authContext.GetTargetAcrLevel(client.DefaultAcrLevel)
 		switch targetAcrLevel {
-		case enums.AcrLevel2Optional:
+		case models.AcrLevel2Optional:
 			// optional
 			// if user has OTP enabled, we'll ask for it
 			if user.OTPEnabled {
@@ -106,7 +106,7 @@ func HandleAuthLevel2Get(
 				}
 				http.Redirect(w, r, config.GetAuthServer().BaseURL+"/auth/completed", http.StatusFound)
 			}
-		case enums.AcrLevel2Mandatory:
+		case models.AcrLevel2Mandatory:
 			// OTP is mandatory
 			authContext.AuthState = ceremony.AuthStateLevel2OTP
 			err = authHelper.SaveAuthContext(w, r, authContext)

@@ -9,11 +9,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
-	"github.com/leodip/goiabada/core/enums"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 )
@@ -24,7 +24,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ConsentIsFu
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          enums.AcrLevel1,
+		DefaultAcrLevel:          models.AcrLevel1,
 	}
 
 	err := database.CreateClient(nil, client)
@@ -137,8 +137,8 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ConsentIsFu
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
-	assert.Equal(t, enums.AcrLevel1.String(), code.AcrLevel)
-	assert.Equal(t, enums.AuthMethodPassword.String(), code.AuthMethods)
+	assert.Equal(t, models.AcrLevel1.String(), code.AcrLevel)
+	assert.Equal(t, ceremony.AuthMethodPassword.String(), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 
 	consent, err := database.GetConsentByUserIdAndClientId(nil, user.Id, client.Id)
@@ -159,7 +159,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ConsentIsPa
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          enums.AcrLevel1,
+		DefaultAcrLevel:          models.AcrLevel1,
 	}
 
 	err := database.CreateClient(nil, client)
@@ -275,8 +275,8 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ConsentIsPa
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
-	assert.Equal(t, enums.AcrLevel1.String(), code.AcrLevel)
-	assert.Equal(t, enums.AuthMethodPassword.String(), code.AuthMethods)
+	assert.Equal(t, models.AcrLevel1.String(), code.AcrLevel)
+	assert.Equal(t, ceremony.AuthMethodPassword.String(), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 
 	consent, err := database.GetConsentByUserIdAndClientId(nil, user.Id, client.Id)
@@ -297,7 +297,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIs
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          enums.AcrLevel2Optional,
+		DefaultAcrLevel:          models.AcrLevel2Optional,
 	}
 
 	err := database.CreateClient(nil, client)
@@ -415,8 +415,8 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIs
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
-	assert.Equal(t, enums.AcrLevel2Optional.String(), code.AcrLevel)
-	assert.Equal(t, enums.AuthMethodPassword.String(), code.AuthMethods)
+	assert.Equal(t, models.AcrLevel2Optional.String(), code.AcrLevel)
+	assert.Equal(t, ceremony.AuthMethodPassword.String(), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 
 	consent, err := database.GetConsentByUserIdAndClientId(nil, user.Id, client.Id)
@@ -437,7 +437,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIs
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          enums.AcrLevel2Optional,
+		DefaultAcrLevel:          models.AcrLevel2Optional,
 	}
 
 	err := database.CreateClient(nil, client)
@@ -559,8 +559,8 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIs
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
-	assert.Equal(t, enums.AcrLevel2Optional.String(), code.AcrLevel)
-	assert.Equal(t, enums.AuthMethodPassword.String(), code.AuthMethods)
+	assert.Equal(t, models.AcrLevel2Optional.String(), code.AcrLevel)
+	assert.Equal(t, ceremony.AuthMethodPassword.String(), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 
 	consent, err := database.GetConsentByUserIdAndClientId(nil, user.Id, client.Id)
@@ -581,7 +581,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsR
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          enums.AcrLevel2Optional,
+		DefaultAcrLevel:          models.AcrLevel2Optional,
 	}
 
 	err := database.CreateClient(nil, client)
@@ -720,8 +720,8 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsR
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
-	assert.Equal(t, enums.AcrLevel2Optional.String(), code.AcrLevel)
-	assert.Equal(t, fmt.Sprintf("%s %s", enums.AuthMethodPassword.String(), enums.AuthMethodOTP.String()), code.AuthMethods)
+	assert.Equal(t, models.AcrLevel2Optional.String(), code.AcrLevel)
+	assert.Equal(t, fmt.Sprintf("%s %s", ceremony.AuthMethodPassword.String(), ceremony.AuthMethodOTP.String()), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 
 	consent, err := database.GetConsentByUserIdAndClientId(nil, user.Id, client.Id)
@@ -742,7 +742,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsR
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          enums.AcrLevel2Optional,
+		DefaultAcrLevel:          models.AcrLevel2Optional,
 	}
 
 	err := database.CreateClient(nil, client)
@@ -885,8 +885,8 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsR
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
-	assert.Equal(t, enums.AcrLevel2Optional.String(), code.AcrLevel)
-	assert.Equal(t, fmt.Sprintf("%s %s", enums.AuthMethodPassword.String(), enums.AuthMethodOTP.String()), code.AuthMethods)
+	assert.Equal(t, models.AcrLevel2Optional.String(), code.AcrLevel)
+	assert.Equal(t, fmt.Sprintf("%s %s", ceremony.AuthMethodPassword.String(), ceremony.AuthMethodOTP.String()), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 
 	consent, err := database.GetConsentByUserIdAndClientId(nil, user.Id, client.Id)
@@ -907,7 +907,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          enums.AcrLevel2Mandatory,
+		DefaultAcrLevel:          models.AcrLevel2Mandatory,
 	}
 
 	err := database.CreateClient(nil, client)
@@ -1038,8 +1038,8 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
-	assert.Equal(t, enums.AcrLevel2Mandatory.String(), code.AcrLevel)
-	assert.Equal(t, fmt.Sprintf("%s %s", enums.AuthMethodPassword.String(), enums.AuthMethodOTP.String()), code.AuthMethods)
+	assert.Equal(t, models.AcrLevel2Mandatory.String(), code.AcrLevel)
+	assert.Equal(t, fmt.Sprintf("%s %s", ceremony.AuthMethodPassword.String(), ceremony.AuthMethodOTP.String()), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 
 	consent, err := database.GetConsentByUserIdAndClientId(nil, user.Id, client.Id)
@@ -1060,7 +1060,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          enums.AcrLevel2Mandatory,
+		DefaultAcrLevel:          models.AcrLevel2Mandatory,
 	}
 
 	err := database.CreateClient(nil, client)
@@ -1195,8 +1195,8 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
-	assert.Equal(t, enums.AcrLevel2Mandatory.String(), code.AcrLevel)
-	assert.Equal(t, fmt.Sprintf("%s %s", enums.AuthMethodPassword.String(), enums.AuthMethodOTP.String()), code.AuthMethods)
+	assert.Equal(t, models.AcrLevel2Mandatory.String(), code.AcrLevel)
+	assert.Equal(t, fmt.Sprintf("%s %s", ceremony.AuthMethodPassword.String(), ceremony.AuthMethodOTP.String()), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 
 	consent, err := database.GetConsentByUserIdAndClientId(nil, user.Id, client.Id)
@@ -1217,7 +1217,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          enums.AcrLevel2Mandatory,
+		DefaultAcrLevel:          models.AcrLevel2Mandatory,
 	}
 
 	err := database.CreateClient(nil, client)
@@ -1356,8 +1356,8 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
-	assert.Equal(t, enums.AcrLevel2Mandatory.String(), code.AcrLevel)
-	assert.Equal(t, fmt.Sprintf("%s %s", enums.AuthMethodPassword.String(), enums.AuthMethodOTP.String()), code.AuthMethods)
+	assert.Equal(t, models.AcrLevel2Mandatory.String(), code.AcrLevel)
+	assert.Equal(t, fmt.Sprintf("%s %s", ceremony.AuthMethodPassword.String(), ceremony.AuthMethodOTP.String()), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 
 	consent, err := database.GetConsentByUserIdAndClientId(nil, user.Id, client.Id)
@@ -1378,7 +1378,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          enums.AcrLevel2Mandatory,
+		DefaultAcrLevel:          models.AcrLevel2Mandatory,
 	}
 
 	err := database.CreateClient(nil, client)
@@ -1521,8 +1521,8 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
-	assert.Equal(t, enums.AcrLevel2Mandatory.String(), code.AcrLevel)
-	assert.Equal(t, fmt.Sprintf("%s %s", enums.AuthMethodPassword.String(), enums.AuthMethodOTP.String()), code.AuthMethods)
+	assert.Equal(t, models.AcrLevel2Mandatory.String(), code.AcrLevel)
+	assert.Equal(t, fmt.Sprintf("%s %s", ceremony.AuthMethodPassword.String(), ceremony.AuthMethodOTP.String()), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 
 	consent, err := database.GetConsentByUserIdAndClientId(nil, user.Id, client.Id)
@@ -1543,7 +1543,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ConsentIsCa
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          enums.AcrLevel1,
+		DefaultAcrLevel:          models.AcrLevel1,
 	}
 
 	err := database.CreateClient(nil, client)
@@ -1673,7 +1673,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIs
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          enums.AcrLevel2Optional,
+		DefaultAcrLevel:          models.AcrLevel2Optional,
 	}
 
 	err := database.CreateClient(nil, client)
@@ -1791,7 +1791,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsR
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          enums.AcrLevel2Optional,
+		DefaultAcrLevel:          models.AcrLevel2Optional,
 	}
 
 	err := database.CreateClient(nil, client)
@@ -1930,7 +1930,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          enums.AcrLevel2Mandatory,
+		DefaultAcrLevel:          models.AcrLevel2Mandatory,
 	}
 
 	err := database.CreateClient(nil, client)
@@ -2061,7 +2061,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          enums.AcrLevel2Mandatory,
+		DefaultAcrLevel:          models.AcrLevel2Mandatory,
 	}
 
 	err := database.CreateClient(nil, client)
@@ -2205,7 +2205,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ElevenScope
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          enums.AcrLevel1,
+		DefaultAcrLevel:          models.AcrLevel1,
 	}
 
 	err := database.CreateClient(nil, client)

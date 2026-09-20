@@ -8,7 +8,6 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	"github.com/leodip/goiabada/core/enums"
 
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/uuidutil"
@@ -66,7 +65,7 @@ func TestCreateAuthCode(t *testing.T) {
 			UserAgent:           "Mozilla/5.0",
 			ResponseMode:        "query",
 			IpAddress:           "127.0.0.1",
-			AcrLevel:            string(enums.AcrLevel1),
+			AcrLevel:            string(models.AcrLevel1),
 			AuthMethods:         "pwd",
 		},
 		SessionIdentifier: "session123",
@@ -155,7 +154,7 @@ func TestCreateAuthCode_BoundsTheUserAgent(t *testing.T) {
 					UserAgent:      tc.userAgent,
 					ResponseMode:   "query",
 					IpAddress:      "127.0.0.1",
-					AcrLevel:       string(enums.AcrLevel1),
+					AcrLevel:       string(models.AcrLevel1),
 					AuthMethods:    "pwd",
 				},
 				SessionIdentifier: "session123",

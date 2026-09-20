@@ -23,7 +23,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/usercreation"
-	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/stretchr/testify/assert"
@@ -238,7 +237,7 @@ func TestHandleAPIUserPasswordPut_RevokesEverything(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	req = setChiURLParam(req, "id", "42")
 	ctx := context.WithValue(req.Context(), constants.ContextKeySettings,
-		&models.Settings{PasswordPolicy: enums.PasswordPolicyLow})
+		&models.Settings{PasswordPolicy: models.PasswordPolicyLow})
 	req = setTokenContextWithClaims(req.WithContext(ctx),
 		map[string]interface{}{"sub": adminSubject, "auth_time": float64(1)})
 
@@ -610,7 +609,7 @@ func TestHandleAPIUserCreatePost_SetPasswordTypeMatrix(t *testing.T) {
 			req = setTokenContextWithClaims(req, map[string]interface{}{"sub": adminSubject})
 			req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings,
 				&models.Settings{AppName: "TestApp", SMTPEnabled: tc.smtpEnabled,
-					PasswordPolicy: enums.PasswordPolicyLow}))
+					PasswordPolicy: models.PasswordPolicyLow}))
 
 			database.On("GetUserByEmail", mock.Anything, "newuser@example.com").Return(nil, nil)
 

@@ -12,7 +12,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
-	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 )
@@ -31,7 +30,7 @@ func TestPromptNone_ClientDefaultAcrHigher(t *testing.T) {
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          enums.AcrLevel2Optional,
+		DefaultAcrLevel:          models.AcrLevel2Optional,
 	}
 	err := database.CreateClient(nil, client)
 	if err != nil {
@@ -131,7 +130,7 @@ func TestPromptNone_AcrValuesCannotLowerTheClientFloor(t *testing.T) {
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          enums.AcrLevel2Optional,
+		DefaultAcrLevel:          models.AcrLevel2Optional,
 	}
 	err := database.CreateClient(nil, client)
 	if err != nil {
@@ -162,7 +161,7 @@ func TestPromptNone_AcrValuesCannotLowerTheClientFloor(t *testing.T) {
 		"&state=" + requestState +
 		"&nonce=" + requestNonce +
 		"&prompt=none" +
-		"&acr_values=" + enums.AcrLevel1.String()
+		"&acr_values=" + models.AcrLevel1.String()
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
@@ -286,7 +285,7 @@ func TestPromptNone_CodeExchange(t *testing.T) {
 		Enabled:                                 true,
 		AuthorizationCodeEnabled:                true,
 		ConsentRequired:                         false,
-		DefaultAcrLevel:                         enums.AcrLevel1,
+		DefaultAcrLevel:                         models.AcrLevel1,
 		TokenExpirationInSeconds:                300,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 3600,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 86400,
@@ -439,7 +438,7 @@ func TestPromptNone_SubClaimConsistent(t *testing.T) {
 		Enabled:                                 true,
 		AuthorizationCodeEnabled:                true,
 		ConsentRequired:                         false,
-		DefaultAcrLevel:                         enums.AcrLevel1,
+		DefaultAcrLevel:                         models.AcrLevel1,
 		TokenExpirationInSeconds:                300,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 3600,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 86400,
@@ -597,7 +596,7 @@ func TestPromptNone_AuthTimePreservedInToken(t *testing.T) {
 		Enabled:                                 true,
 		AuthorizationCodeEnabled:                true,
 		ConsentRequired:                         false,
-		DefaultAcrLevel:                         enums.AcrLevel1,
+		DefaultAcrLevel:                         models.AcrLevel1,
 		TokenExpirationInSeconds:                300,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 3600,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 86400,
@@ -756,7 +755,7 @@ func TestPromptNone_PKCEWrongVerifier(t *testing.T) {
 		Enabled:                                 true,
 		AuthorizationCodeEnabled:                true,
 		ConsentRequired:                         false,
-		DefaultAcrLevel:                         enums.AcrLevel1,
+		DefaultAcrLevel:                         models.AcrLevel1,
 		TokenExpirationInSeconds:                300,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 3600,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 86400,
@@ -906,7 +905,7 @@ func TestPromptNone_RefreshWithOfflineAccess(t *testing.T) {
 		Enabled:                                 true,
 		AuthorizationCodeEnabled:                true,
 		ConsentRequired:                         true,
-		DefaultAcrLevel:                         enums.AcrLevel1,
+		DefaultAcrLevel:                         models.AcrLevel1,
 		TokenExpirationInSeconds:                300,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 3600,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 86400,
@@ -1096,7 +1095,7 @@ func TestPromptNone_NoncePreserved(t *testing.T) {
 		Enabled:                                 true,
 		AuthorizationCodeEnabled:                true,
 		ConsentRequired:                         false,
-		DefaultAcrLevel:                         enums.AcrLevel1,
+		DefaultAcrLevel:                         models.AcrLevel1,
 		TokenExpirationInSeconds:                300,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 3600,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 86400,
@@ -1243,7 +1242,7 @@ func TestPromptNone_PKCESupported(t *testing.T) {
 		Enabled:                                 true,
 		AuthorizationCodeEnabled:                true,
 		ConsentRequired:                         false,
-		DefaultAcrLevel:                         enums.AcrLevel1,
+		DefaultAcrLevel:                         models.AcrLevel1,
 		TokenExpirationInSeconds:                300,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 3600,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 86400,

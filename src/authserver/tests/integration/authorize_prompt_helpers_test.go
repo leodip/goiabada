@@ -10,7 +10,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
-	"github.com/leodip/goiabada/core/enums"
 )
 
 // =============================================================================
@@ -47,7 +46,7 @@ func createTestClientAndRedirectURI(t *testing.T) (*models.Client, *models.Redir
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          enums.AcrLevel1,
+		DefaultAcrLevel:          models.AcrLevel1,
 	}
 	err := database.CreateClient(nil, client)
 	if err != nil {
@@ -73,7 +72,7 @@ func createSessionWithAcrLevel1AndPassword(t *testing.T) (*http.Client, *models.
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          enums.AcrLevel1,
+		DefaultAcrLevel:          models.AcrLevel1,
 	}
 
 	err := database.CreateClient(nil, client)

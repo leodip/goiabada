@@ -6,7 +6,6 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
-	"github.com/leodip/goiabada/core/enums"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -26,7 +25,7 @@ func TestAuthPwd_UILocales_PreservedAcrossFlow(t *testing.T) {
 		DisplayName:      "Test app",
 		ShowDisplayName:  true,
 		ConsentRequired:  false,
-		DefaultAcrLevel:  enums.AcrLevel1,
+		DefaultAcrLevel:  models.AcrLevel1,
 	})
 
 	redirectUri := &models.RedirectURI{

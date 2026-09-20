@@ -11,9 +11,9 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
+	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/signingkeys"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/errs"
 )
 
@@ -52,19 +52,19 @@ func HandleAPISettingsKeysGet(
 		// Order: next, current, then all previous
 		ordered := make([]api.SettingsSigningKeyResponse, 0, len(mapped))
 		for _, v := range mapped {
-			if v.State == enums.KeyStateNext.String() {
+			if v.State == models.KeyStateNext.String() {
 				ordered = append(ordered, v)
 				break
 			}
 		}
 		for _, v := range mapped {
-			if v.State == enums.KeyStateCurrent.String() {
+			if v.State == models.KeyStateCurrent.String() {
 				ordered = append(ordered, v)
 				break
 			}
 		}
 		for _, v := range mapped {
-			if v.State == enums.KeyStatePrevious.String() {
+			if v.State == models.KeyStatePrevious.String() {
 				ordered = append(ordered, v)
 			}
 		}
@@ -147,12 +147,12 @@ func HandleAPISettingsKeyDelete(
 			return
 		}
 
-		keyState, err := enums.KeyStateFromString(kp.State)
+		keyState, err := models.KeyStateFromString(kp.State)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
 		}
-		if keyState != enums.KeyStatePrevious {
+		if keyState != models.KeyStatePrevious {
 			writeJSONError(w, "Only a previous key can be revoked", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}

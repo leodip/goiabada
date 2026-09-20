@@ -16,7 +16,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/rsautil"
 	"github.com/leodip/goiabada/authserver/internal/uuidutil"
 	"github.com/leodip/goiabada/core/constants"
-	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/stringutil"
 )
@@ -147,15 +146,15 @@ func (ds *DatabaseSeeder) Seed() error {
 		ConsentRequired:          false,
 		IsPublic:                 false,
 		AuthorizationCodeEnabled: true,
-		DefaultAcrLevel:          enums.AcrLevel2Optional,
+		DefaultAcrLevel:          models.AcrLevel2Optional,
 		// The admin console obtains a bearer token through client_credentials to reach
 		// its own browser sessions on the auth server, so this grant is on from the
 		// start. It carries the single browser-sessions permission granted below and
 		// nothing wider (#266).
 		ClientCredentialsEnabled:                true,
 		ClientSecretEncrypted:                   clientSecretEncrypted,
-		IncludeOpenIDConnectClaimsInAccessToken: enums.ThreeStateSettingDefault.String(),
-		IncludeOpenIDConnectClaimsInIdToken:     enums.ThreeStateSettingDefault.String(),
+		IncludeOpenIDConnectClaimsInAccessToken: models.ThreeStateSettingDefault.String(),
+		IncludeOpenIDConnectClaimsInIdToken:     models.ThreeStateSettingDefault.String(),
 		ShowDisplayName:                         true,
 	}
 
@@ -411,7 +410,7 @@ func (ds *DatabaseSeeder) Seed() error {
 		return errs.Wrap(err, "unable to encrypt current signing key")
 	}
 	keyPair := &models.KeyPair{
-		State:             enums.KeyStateCurrent.String(),
+		State:             models.KeyStateCurrent.String(),
 		KeyIdentifier:     kid,
 		Type:              "RSA",
 		Algorithm:         "RS256",
@@ -456,7 +455,7 @@ func (ds *DatabaseSeeder) Seed() error {
 		return errs.Wrap(err, "unable to encrypt next signing key")
 	}
 	keyPair = &models.KeyPair{
-		State:             enums.KeyStateNext.String(),
+		State:             models.KeyStateNext.String(),
 		KeyIdentifier:     kid,
 		Type:              "RSA",
 		Algorithm:         "RS256",
@@ -483,7 +482,7 @@ func (ds *DatabaseSeeder) Seed() error {
 		UITheme:                 "",
 		SelfRegistrationEnabled: true,
 		SelfRegistrationRequiresEmailVerification: false,
-		PasswordPolicy: enums.PasswordPolicyLow,
+		PasswordPolicy: models.PasswordPolicyLow,
 		// The data key is supplied from the environment (issue #83); the legacy
 		// aes_encryption_key column is left empty on fresh installs. It is NOT NULL,
 		// so store an empty (non-nil) blob rather than nil.

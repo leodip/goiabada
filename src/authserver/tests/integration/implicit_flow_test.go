@@ -13,7 +13,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
-	"github.com/leodip/goiabada/core/enums"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -64,7 +63,7 @@ func createImplicitFlowClient(t *testing.T, implicitEnabled *bool) (*models.Clie
 		AuthorizationCodeEnabled: false, // Disable auth code to test implicit-only
 		ImplicitGrantEnabled:     implicitEnabled,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          enums.AcrLevel1,
+		DefaultAcrLevel:          models.AcrLevel1,
 	}
 
 	err := database.CreateClient(nil, client)
@@ -598,7 +597,7 @@ func TestImplicitFlow_UnsupportedResponseType_HybridFlow(t *testing.T) {
 		AuthorizationCodeEnabled: true,
 		ImplicitGrantEnabled:     nil,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          enums.AcrLevel1,
+		DefaultAcrLevel:          models.AcrLevel1,
 	}
 	err = database.CreateClient(nil, client)
 	assert.NoError(t, err)
@@ -796,7 +795,7 @@ func TestImplicitFlow_WithResourcePermissions(t *testing.T) {
 		AuthorizationCodeEnabled: false,
 		ImplicitGrantEnabled:     nil,
 		ConsentRequired:          true, // Consent required
-		DefaultAcrLevel:          enums.AcrLevel1,
+		DefaultAcrLevel:          models.AcrLevel1,
 	}
 	err = database.CreateClient(nil, client)
 	assert.NoError(t, err)
@@ -1340,7 +1339,7 @@ func TestImplicitFlow_AuthCodeFlowClient_CanAlsoUseImplicit(t *testing.T) {
 		AuthorizationCodeEnabled: true, // Auth code enabled
 		ImplicitGrantEnabled:     nil,  // Inherit from global (enabled)
 		ConsentRequired:          false,
-		DefaultAcrLevel:          enums.AcrLevel1,
+		DefaultAcrLevel:          models.AcrLevel1,
 	}
 	err = database.CreateClient(nil, client)
 	assert.NoError(t, err)

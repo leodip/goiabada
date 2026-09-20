@@ -17,7 +17,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/uuidutil"
 	coreconstants "github.com/leodip/goiabada/core/constants"
-	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
 
@@ -108,7 +107,7 @@ func (t *TokenIssuer) GenerateTokenResponseForAuthCode(ctx context.Context,
 	}
 
 	var tokenResponse = oauth.TokenResponse{
-		TokenType: enums.TokenTypeBearer.String(),
+		TokenType: TokenTypeBearer.String(),
 		ExpiresIn: int64(tokenExpirationInSeconds),
 	}
 
@@ -431,7 +430,7 @@ func (t *TokenIssuer) GenerateTokenResponseForClientCred(ctx context.Context, cl
 	default:
 		claims["aud"] = audCollection
 	}
-	claims["typ"] = enums.TokenTypeBearer.String()
+	claims["typ"] = TokenTypeBearer.String()
 	claims["exp"] = now.Add(time.Duration(time.Second * time.Duration(settings.TokenExpirationInSeconds))).Unix()
 	claims["scope"] = scope
 
@@ -465,7 +464,7 @@ func (t *TokenIssuer) GenerateTokenResponseForRefresh(ctx context.Context, input
 	}
 
 	var tokenResponse = oauth.TokenResponse{
-		TokenType: enums.TokenTypeBearer.String(),
+		TokenType: TokenTypeBearer.String(),
 		ExpiresIn: int64(tokenExpirationInSeconds),
 	}
 
@@ -564,7 +563,7 @@ func (t *TokenIssuer) GenerateTokenResponseForRefreshROPC(ctx context.Context, i
 	}
 
 	var tokenResponse = oauth.TokenResponse{
-		TokenType: enums.TokenTypeBearer.String(),
+		TokenType: TokenTypeBearer.String(),
 		ExpiresIn: int64(tokenExpirationInSeconds),
 	}
 
@@ -763,7 +762,7 @@ func (t *TokenIssuer) generateAccessTokenCore(settings *models.Settings, input *
 		scope = strings.Join(scopes, " ")
 	}
 
-	claims["typ"] = enums.TokenTypeBearer.String()
+	claims["typ"] = TokenTypeBearer.String()
 
 	tokenExpirationInSeconds := settings.TokenExpirationInSeconds
 	if input.Client.TokenExpirationInSeconds > 0 {
@@ -780,9 +779,9 @@ func (t *TokenIssuer) generateAccessTokenCore(settings *models.Settings, input *
 
 	// OpenID Connect claims in access token (if enabled)
 	includeOpenIDConnectClaimsInAccessToken := settings.IncludeOpenIDConnectClaimsInAccessToken
-	if input.Client.IncludeOpenIDConnectClaimsInAccessToken == enums.ThreeStateSettingOn.String() ||
-		input.Client.IncludeOpenIDConnectClaimsInAccessToken == enums.ThreeStateSettingOff.String() {
-		includeOpenIDConnectClaimsInAccessToken = input.Client.IncludeOpenIDConnectClaimsInAccessToken == enums.ThreeStateSettingOn.String()
+	if input.Client.IncludeOpenIDConnectClaimsInAccessToken == models.ThreeStateSettingOn.String() ||
+		input.Client.IncludeOpenIDConnectClaimsInAccessToken == models.ThreeStateSettingOff.String() {
+		includeOpenIDConnectClaimsInAccessToken = input.Client.IncludeOpenIDConnectClaimsInAccessToken == models.ThreeStateSettingOn.String()
 	}
 
 	if slices.Contains(scopes, "openid") && includeOpenIDConnectClaimsInAccessToken {
@@ -884,9 +883,9 @@ func (t *TokenIssuer) generateIdTokenCore(settings *models.Settings, input *Toke
 	// Per OIDC Core 5.4, scope claims (email, profile, etc.) MAY be in ID tokens
 	// but SHOULD be available from /userinfo endpoint for strict conformance.
 	includeOpenIDConnectClaimsInIdToken := settings.IncludeOpenIDConnectClaimsInIdToken
-	if input.Client.IncludeOpenIDConnectClaimsInIdToken == enums.ThreeStateSettingOn.String() ||
-		input.Client.IncludeOpenIDConnectClaimsInIdToken == enums.ThreeStateSettingOff.String() {
-		includeOpenIDConnectClaimsInIdToken = input.Client.IncludeOpenIDConnectClaimsInIdToken == enums.ThreeStateSettingOn.String()
+	if input.Client.IncludeOpenIDConnectClaimsInIdToken == models.ThreeStateSettingOn.String() ||
+		input.Client.IncludeOpenIDConnectClaimsInIdToken == models.ThreeStateSettingOff.String() {
+		includeOpenIDConnectClaimsInIdToken = input.Client.IncludeOpenIDConnectClaimsInIdToken == models.ThreeStateSettingOn.String()
 	}
 
 	if includeOpenIDConnectClaimsInIdToken {
@@ -1027,7 +1026,7 @@ func (t *TokenIssuer) GenerateTokenResponseForImplicit(ctx context.Context,
 	}
 
 	response := &ImplicitGrantResponse{
-		TokenType: enums.TokenTypeBearer.String(),
+		TokenType: TokenTypeBearer.String(),
 		ExpiresIn: int64(tokenExpirationInSeconds),
 	}
 
@@ -1161,7 +1160,7 @@ func (t *TokenIssuer) GenerateTokenResponseForROPC(ctx context.Context,
 	}
 
 	response := &ROPCGrantResponse{
-		TokenType: enums.TokenTypeBearer.String(),
+		TokenType: TokenTypeBearer.String(),
 		ExpiresIn: int64(tokenExpirationInSeconds),
 	}
 

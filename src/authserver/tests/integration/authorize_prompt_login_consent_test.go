@@ -12,7 +12,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
-	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
@@ -29,7 +28,7 @@ func TestPromptConsent_ForcesConsentEvenWhenAlreadyConsented(t *testing.T) {
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          false, // Consent NOT normally required
-		DefaultAcrLevel:          enums.AcrLevel1,
+		DefaultAcrLevel:          models.AcrLevel1,
 	}
 	err := database.CreateClient(nil, client)
 	if err != nil {
@@ -331,7 +330,7 @@ func TestPromptLogin_PreservesAcrLevel(t *testing.T) {
 		"&state=" + requestState +
 		"&nonce=" + requestNonce +
 		"&prompt=login" +
-		"&acr_values=" + enums.AcrLevel2Optional.String()
+		"&acr_values=" + models.AcrLevel2Optional.String()
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
@@ -423,7 +422,7 @@ func TestPromptConsent_UserDeclines(t *testing.T) {
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          enums.AcrLevel1,
+		DefaultAcrLevel:          models.AcrLevel1,
 	}
 	err := database.CreateClient(nil, client)
 	if err != nil {
@@ -629,7 +628,7 @@ func TestPromptLogin_NewAuthTime(t *testing.T) {
 		Enabled:                                 true,
 		AuthorizationCodeEnabled:                true,
 		ConsentRequired:                         false,
-		DefaultAcrLevel:                         enums.AcrLevel1,
+		DefaultAcrLevel:                         models.AcrLevel1,
 		TokenExpirationInSeconds:                300,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 3600,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 86400,

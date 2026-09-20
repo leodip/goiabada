@@ -7,7 +7,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/signingkeys"
-	"github.com/leodip/goiabada/core/enums"
 )
 
 // This is seam 1 at the data tier, on all four engines: the rotator's composition against
@@ -31,9 +30,9 @@ import (
 func seedOneKeyPerState(t *testing.T) (previous, current, next *models.KeyPair) {
 	t.Helper()
 
-	previous = createKeyPairInState(t, enums.KeyStatePrevious.String())
-	current = createKeyPairInState(t, enums.KeyStateCurrent.String())
-	next = createKeyPairInState(t, enums.KeyStateNext.String())
+	previous = createKeyPairInState(t, models.KeyStatePrevious.String())
+	current = createKeyPairInState(t, models.KeyStateCurrent.String())
+	next = createKeyPairInState(t, models.KeyStateNext.String())
 	return previous, current, next
 }
 
@@ -63,7 +62,7 @@ func TestSigningKeyRotator_Rotate_MovesEveryKeyOneStep(t *testing.T) {
 
 	// The old current key is now the only previous one. This is the key that signed every
 	// token still in flight, and retaining it is what OIDC Core 10.1.1 asks for.
-	newPrevious := byState[enums.KeyStatePrevious.String()]
+	newPrevious := byState[models.KeyStatePrevious.String()]
 	if newPrevious == nil {
 		t.Fatal("Expected a previous key after rotating")
 	}
@@ -73,7 +72,7 @@ func TestSigningKeyRotator_Rotate_MovesEveryKeyOneStep(t *testing.T) {
 	}
 
 	// The old next key is now current, so the deployment can still sign.
-	newCurrent := byState[enums.KeyStateCurrent.String()]
+	newCurrent := byState[models.KeyStateCurrent.String()]
 	if newCurrent == nil {
 		t.Fatal("Expected a current key after rotating")
 	}
@@ -94,7 +93,7 @@ func TestSigningKeyRotator_Rotate_MovesEveryKeyOneStep(t *testing.T) {
 	}
 
 	// A freshly generated next key, not a row moved from somewhere else.
-	newNext := byState[enums.KeyStateNext.String()]
+	newNext := byState[models.KeyStateNext.String()]
 	if newNext == nil {
 		t.Fatal("Expected a next key after rotating")
 	}
@@ -137,7 +136,7 @@ func TestSigningKeyRotator_Rotate_MovesEveryKeyOneStep(t *testing.T) {
 // key. Against a real engine, so the refusal's rollback is a real rollback.
 func TestSigningKeyRotator_Rotate_RefusesWithNoNextKeyAndKeepsThePrevious(t *testing.T) {
 	previous, current, _ := seedOneKeyPerState(t)
-	clearKeyPairState(t, enums.KeyStateNext.String())
+	clearKeyPairState(t, models.KeyStateNext.String())
 
 	err := signingkeys.NewSigningKeyRotator(database).Rotate()
 	if err == nil {
@@ -156,7 +155,7 @@ func TestSigningKeyRotator_Rotate_RefusesWithNoNextKeyAndKeepsThePrevious(t *tes
 	if survivor == nil {
 		t.Fatal("The previous key was deleted by a rotation that then refused")
 	}
-	if survivor.State != enums.KeyStatePrevious.String() {
+	if survivor.State != models.KeyStatePrevious.String() {
 		t.Errorf("Expected the previous key to be untouched, it is in state %s", survivor.State)
 	}
 
@@ -164,7 +163,7 @@ func TestSigningKeyRotator_Rotate_RefusesWithNoNextKeyAndKeepsThePrevious(t *tes
 	if err != nil {
 		t.Fatalf("Failed to look up the current key: %v", err)
 	}
-	if stillCurrent == nil || stillCurrent.State != enums.KeyStateCurrent.String() {
+	if stillCurrent == nil || stillCurrent.State != models.KeyStateCurrent.String() {
 		t.Error("Expected the current key to be untouched by the refused rotation")
 	}
 

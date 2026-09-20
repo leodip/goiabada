@@ -16,7 +16,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/urlutil"
 	"github.com/leodip/goiabada/authserver/internal/uuidutil"
-	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/stringutil"
 	"github.com/leodip/goiabada/core/validators"
@@ -117,8 +116,8 @@ func HandleDynamicClientRegistrationPost(
 			CreatedViaDCR:                           true,
 			AuthorizationCodeEnabled:                containsGrantType(req.GrantTypes, "authorization_code"),
 			ClientCredentialsEnabled:                containsGrantType(req.GrantTypes, "client_credentials"),
-			DefaultAcrLevel:                         enums.AcrLevel2Optional,
-			IncludeOpenIDConnectClaimsInAccessToken: enums.ThreeStateSettingDefault.String(),
+			DefaultAcrLevel:                         models.AcrLevel2Optional,
+			IncludeOpenIDConnectClaimsInAccessToken: models.ThreeStateSettingDefault.String(),
 			// Token expiration settings use global defaults from settings
 			TokenExpirationInSeconds:                settings.TokenExpirationInSeconds,
 			RefreshTokenOfflineIdleTimeoutInSeconds: settings.RefreshTokenOfflineIdleTimeoutInSeconds,

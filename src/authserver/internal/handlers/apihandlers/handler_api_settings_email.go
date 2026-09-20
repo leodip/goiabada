@@ -18,7 +18,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
 )
@@ -73,7 +72,7 @@ func HandleAPISettingsEmailPut(
 			currentSettings.SMTPEnabled = false
 			currentSettings.SMTPHost = ""
 			currentSettings.SMTPPort = 0
-			currentSettings.SMTPEncryption = enums.SMTPEncryptionNone.String()
+			currentSettings.SMTPEncryption = emaildelivery.SMTPEncryptionNone.String()
 			currentSettings.SMTPUsername = ""
 			currentSettings.SMTPPasswordEncrypted = nil
 			currentSettings.SMTPFromName = ""
@@ -127,7 +126,7 @@ func HandleAPISettingsEmailPut(
 		}
 
 		// Encryption value
-		smtpEncryption, err := enums.SMTPEncryptionFromString(req.SMTPEncryption)
+		smtpEncryption, err := emaildelivery.SMTPEncryptionFromString(req.SMTPEncryption)
 		if err != nil {
 			writeJSONError(w, "Invalid SMTP encryption.", "VALIDATION_ERROR", http.StatusBadRequest)
 			return

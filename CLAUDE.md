@@ -25,6 +25,8 @@ repository root. It is enforced rather than descriptive: see **Architecture guar
 - `api/` - The admin API wire contract: request and response DTOs, declarations only, importing no persistence model. The model-to-DTO mapping belongs to the auth server, in `internal/apimapping` (#350)
 - `oauth/` - The OAuth/OIDC values both processes share: token, JWT and JWKS types, and the PKCE challenge helper. The admin console's client of the protocol — JWKS parser, code exchanger, authorize redirect — is `adminconsole/internal/oauthclient`; `response_type` parsing is the provider's and is in `authserver/internal/protocolvalidation` (#385)
 - There is no `handlerhelpers/` here: each application renders its own pages from its own `internal/handlerhelpers`, because the one shared renderer bound admin page data no auth server template could reach and parsed every template with a `FuncMap` of which the auth server calls four entries out of twenty-two (#385)
+- `gender/` - The three gender values the OIDC `gender` claim is written from, and the bound that says which integers name one. A fourth shared reference vocabulary beside `countries/`, `locales/` and `timezones/`: the auth server validates and stores a gender, the admin console renders and re-renders one, and both name the same three strings (#385)
+- There is no `enums/` here: the six auth-server-only enumerations it held went to the domains that own them — `AcrLevel`, `PasswordPolicy`, `ThreeStateSetting` and `KeyState` to `authserver/internal/models`, forced there because `internal/data` names them and imports nothing above it, `AuthMethod` to `ceremony`, `TokenType` to `issuance` and `SMTPEncryption` to `emaildelivery` — leaving `Gender` as `core/gender`. A package named for a Go construct is what invites the next unrelated one in beside it (#385)
 - `validators/` - Identifier validation and the angle-bracket predicate, the two rules both applications apply. `ValidateNoAngleBrackets`, which wraps the predicate in an error only the auth server emits, is in `authserver/internal/accountvalidation` beside the other account validators — email, password, profile, address, phone — and the authorize and token validators are in `authserver/internal/protocolvalidation` (#344, #385)
 - `constants/` - Permission identifiers, the version stamp, and the one session name both processes
   must agree on. No context key and no other session key: each process declares its own in
@@ -110,7 +112,7 @@ Programmatic client registration for MCP servers, native apps, etc.
 The auth code flow uses a state machine tracked in `AuthContext` (stored in the server-side session store, keyed by a cookie (#266)).
 
 ### ACR Levels (Authentication Context Class Reference)
-Defined in `src/core/enums/enums.go`:
+Defined in `src/authserver/internal/models/acr_level.go`:
 - **`urn:goiabada:level1`** - Password only (single factor)
 - **`urn:goiabada:level2_optional`** - Password + OTP if user has OTP enabled (skip if not)
 - **`urn:goiabada:level2_mandatory`** - Password + OTP required (user must enroll if not already)
@@ -233,7 +235,7 @@ When user has valid session (`UserSession` in DB + session cookie):
 ## SSO and ACR/AMR Details
 
 ### AMR (Authentication Methods Reference)
-Two methods tracked (`enums.go`): `pwd` (password), `otp` (time-based OTP).
+Two methods tracked (`ceremony/auth_method.go`): `pwd` (password), `otp` (time-based OTP).
 Stored as space-separated string in `AuthContext.AuthMethods` and `UserSession.AuthMethods`.
 Output in tokens as JSON array per OIDC spec: `"amr": ["pwd", "otp"]`
 
@@ -257,7 +259,7 @@ Valid if ALL true:
 3. If `max_age` param: `now <= Started + max_age`
 
 ### ACR Step-Up Logic (`handler_auth_level1.go`)
-Uses `enums.AcrLevel.IsHigherThan()` for comparison (priority: level1=1, level2_optional=2, level2_mandatory=3).
+Uses `models.AcrLevel.IsHigherThan()` for comparison (priority: level1=1, level2_optional=2, level2_mandatory=3).
 
 **With valid session:**
 - Target ACR higher than session ACR → redirect to level2 (step-up)

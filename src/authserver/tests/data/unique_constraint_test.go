@@ -7,7 +7,6 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
-	"github.com/leodip/goiabada/core/enums"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -107,7 +106,7 @@ func TestUnique_KeyPairState(t *testing.T) {
 	// 'next' rather than 'current', because 'next' is the only duplicate the rotation
 	// defect could actually produce: two concurrent rotations both inserting a new next
 	// key. The constraint covers all three states identically (#251).
-	next := enums.KeyStateNext.String()
+	next := models.KeyStateNext.String()
 	existing := createKeyPairInState(t, next)
 
 	duplicate := &models.KeyPair{

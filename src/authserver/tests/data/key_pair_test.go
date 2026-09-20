@@ -7,11 +7,10 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
-	"github.com/leodip/goiabada/core/enums"
 )
 
 func TestCreateKeyPair(t *testing.T) {
-	keyPair := createKeyPairInState(t, enums.KeyStateCurrent.String())
+	keyPair := createKeyPairInState(t, models.KeyStateCurrent.String())
 
 	if keyPair.Id == 0 {
 		t.Error("Expected non-zero ID after creation")
@@ -32,17 +31,17 @@ func TestCreateKeyPair(t *testing.T) {
 }
 
 func TestUpdateKeyPair(t *testing.T) {
-	keyPair := createKeyPairInState(t, enums.KeyStateCurrent.String())
+	keyPair := createKeyPairInState(t, models.KeyStateCurrent.String())
 
 	// The destination state is cleared before the row is moved into it. UNIQUE (state)
 	// refuses an update into an occupied state, and the data-test database is shared and
 	// never dropped, so a 'previous' row left behind by an earlier case or an earlier run
 	// would fail this update on all four engines. Production observes the same ordering:
 	// the rotator deletes the previous key before demoting the current one (#251).
-	clearKeyPairState(t, enums.KeyStatePrevious.String())
+	clearKeyPairState(t, models.KeyStatePrevious.String())
 
 	// Update all properties
-	keyPair.State = enums.KeyStatePrevious.String()
+	keyPair.State = models.KeyStatePrevious.String()
 	keyPair.KeyIdentifier = "updated_" + fake.UUID()
 	keyPair.Type = "EC"
 	keyPair.Algorithm = "ES256"
@@ -95,7 +94,7 @@ func TestUpdateKeyPair(t *testing.T) {
 }
 
 func TestGetKeyPairById(t *testing.T) {
-	keyPair := createKeyPairInState(t, enums.KeyStateCurrent.String())
+	keyPair := createKeyPairInState(t, models.KeyStateCurrent.String())
 
 	retrievedKeyPair, err := database.GetKeyPairById(nil, keyPair.Id)
 	if err != nil {
@@ -133,8 +132,8 @@ func TestGetAllSigningKeys(t *testing.T) {
 	// is the reason it holds two rows at all: GetAllSigningKeys returns every signing
 	// key whatever state it is in, which is what lets the token parser fall back to a
 	// previous key and what lets /certs publish the whole set (#251).
-	keyPair1 := createKeyPairInState(t, enums.KeyStateCurrent.String())
-	keyPair2 := createKeyPairInState(t, enums.KeyStateNext.String())
+	keyPair1 := createKeyPairInState(t, models.KeyStateCurrent.String())
+	keyPair2 := createKeyPairInState(t, models.KeyStateNext.String())
 
 	keyPairs, err = database.GetAllSigningKeys(nil)
 	if err != nil {
@@ -184,7 +183,7 @@ func TestGetCurrentSigningKey(t *testing.T) {
 		t.Fatal("Expected an error when no key pair is in the current state, got nil")
 	}
 
-	keyPair := createKeyPairInState(t, enums.KeyStateCurrent.String())
+	keyPair := createKeyPairInState(t, models.KeyStateCurrent.String())
 
 	currentKeyPair, err := database.GetCurrentSigningKey(nil)
 	if err != nil {
@@ -199,7 +198,7 @@ func TestGetCurrentSigningKey(t *testing.T) {
 }
 
 func TestDeleteKeyPair(t *testing.T) {
-	keyPair := createKeyPairInState(t, enums.KeyStateCurrent.String())
+	keyPair := createKeyPairInState(t, models.KeyStateCurrent.String())
 
 	err := database.DeleteKeyPair(nil, keyPair.Id)
 	if err != nil {
@@ -306,8 +305,8 @@ func createKeyPairInState(t *testing.T, state string) *models.KeyPair {
 }
 
 func TestUpdateKeyPairState_TransitionsAndReadsBack(t *testing.T) {
-	current := enums.KeyStateCurrent.String()
-	previous := enums.KeyStatePrevious.String()
+	current := models.KeyStateCurrent.String()
+	previous := models.KeyStatePrevious.String()
 
 	keyPair := createKeyPairInState(t, current)
 	clearKeyPairState(t, previous)
@@ -330,8 +329,8 @@ func TestUpdateKeyPairState_TransitionsAndReadsBack(t *testing.T) {
 }
 
 func TestUpdateKeyPairState_RepeatedCallDoesNotTransition(t *testing.T) {
-	current := enums.KeyStateCurrent.String()
-	previous := enums.KeyStatePrevious.String()
+	current := models.KeyStateCurrent.String()
+	previous := models.KeyStatePrevious.String()
 
 	keyPair := createKeyPairInState(t, current)
 	clearKeyPairState(t, previous)
@@ -357,9 +356,9 @@ func TestUpdateKeyPairState_RepeatedCallDoesNotTransition(t *testing.T) {
 }
 
 func TestUpdateKeyPairState_WrongFromStateDoesNotTransition(t *testing.T) {
-	current := enums.KeyStateCurrent.String()
-	next := enums.KeyStateNext.String()
-	previous := enums.KeyStatePrevious.String()
+	current := models.KeyStateCurrent.String()
+	next := models.KeyStateNext.String()
+	previous := models.KeyStatePrevious.String()
 
 	// A row in 'next' asked to make the current -> previous transition. This varies
 	// exactly one thing from TestUpdateKeyPairState_TransitionsAndReadsBack.
@@ -385,7 +384,7 @@ func TestUpdateKeyPairState_WrongFromStateDoesNotTransition(t *testing.T) {
 
 func TestUpdateKeyPairState_MissingIdDoesNotTransition(t *testing.T) {
 	moved, err := database.UpdateKeyPairState(nil, 99999,
-		enums.KeyStateCurrent.String(), enums.KeyStatePrevious.String())
+		models.KeyStateCurrent.String(), models.KeyStatePrevious.String())
 	if err != nil {
 		t.Fatalf("Expected no error for a non-existent key pair, got: %v", err)
 	}
@@ -396,7 +395,7 @@ func TestUpdateKeyPairState_MissingIdDoesNotTransition(t *testing.T) {
 
 func TestUpdateKeyPairState_ZeroIdIsAnError(t *testing.T) {
 	moved, err := database.UpdateKeyPairState(nil, 0,
-		enums.KeyStateCurrent.String(), enums.KeyStatePrevious.String())
+		models.KeyStateCurrent.String(), models.KeyStatePrevious.String())
 	if err == nil {
 		t.Fatal("Expected an error for a zero key pair id, got nil")
 	}
@@ -406,8 +405,8 @@ func TestUpdateKeyPairState_ZeroIdIsAnError(t *testing.T) {
 }
 
 func TestUpdateKeyPairState_EnlistsInCallersTransaction(t *testing.T) {
-	current := enums.KeyStateCurrent.String()
-	previous := enums.KeyStatePrevious.String()
+	current := models.KeyStateCurrent.String()
+	previous := models.KeyStatePrevious.String()
 
 	keyPair := createKeyPairInState(t, current)
 	clearKeyPairState(t, previous)
@@ -458,8 +457,8 @@ func TestUpdateKeyPairState_EnlistsInCallersTransaction(t *testing.T) {
 // before any driver is reached, so this is real-implementation behaviour rather than a
 // per-dialect quirk or an injected fake.
 func TestUpdateKeyPairState_StorageFailureIsAnError(t *testing.T) {
-	current := enums.KeyStateCurrent.String()
-	previous := enums.KeyStatePrevious.String()
+	current := models.KeyStateCurrent.String()
+	previous := models.KeyStatePrevious.String()
 
 	keyPair := createKeyPairInState(t, current)
 	clearKeyPairState(t, previous)
@@ -509,8 +508,8 @@ func TestUpdateKeyPairState_StorageFailureIsAnError(t *testing.T) {
 // transactions overlapped would be unprovable on sqlite, where that setting makes
 // overlap impossible by construction, so the assertion is on being blocked (#251).
 func TestUpdateKeyPairState_Concurrent(t *testing.T) {
-	current := enums.KeyStateCurrent.String()
-	previous := enums.KeyStatePrevious.String()
+	current := models.KeyStateCurrent.String()
+	previous := models.KeyStatePrevious.String()
 
 	keyPair := createKeyPairInState(t, current)
 	clearKeyPairState(t, previous)

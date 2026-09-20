@@ -8,7 +8,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
-	"github.com/leodip/goiabada/core/enums"
 )
 
 func TestCreateClient(t *testing.T) {
@@ -25,9 +24,9 @@ func TestCreateClient(t *testing.T) {
 		TokenExpirationInSeconds:                3600,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 86400,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 2592000,
-		IncludeOpenIDConnectClaimsInAccessToken: enums.ThreeStateSettingDefault.String(),
-		IncludeOpenIDConnectClaimsInIdToken:     enums.ThreeStateSettingDefault.String(),
-		DefaultAcrLevel:                         enums.AcrLevel1,
+		IncludeOpenIDConnectClaimsInAccessToken: models.ThreeStateSettingDefault.String(),
+		IncludeOpenIDConnectClaimsInIdToken:     models.ThreeStateSettingDefault.String(),
+		DefaultAcrLevel:                         models.AcrLevel1,
 	}
 
 	err := database.CreateClient(nil, client)
@@ -106,9 +105,9 @@ func TestUpdateClient(t *testing.T) {
 		TokenExpirationInSeconds:                3600,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 86400,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 2592000,
-		IncludeOpenIDConnectClaimsInAccessToken: enums.ThreeStateSettingDefault.String(),
-		IncludeOpenIDConnectClaimsInIdToken:     enums.ThreeStateSettingDefault.String(),
-		DefaultAcrLevel:                         enums.AcrLevel1,
+		IncludeOpenIDConnectClaimsInAccessToken: models.ThreeStateSettingDefault.String(),
+		IncludeOpenIDConnectClaimsInIdToken:     models.ThreeStateSettingDefault.String(),
+		DefaultAcrLevel:                         models.AcrLevel1,
 	}
 
 	err := database.CreateClient(nil, originalClient)
@@ -129,9 +128,9 @@ func TestUpdateClient(t *testing.T) {
 		TokenExpirationInSeconds:                7200,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 172800,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 5184000,
-		IncludeOpenIDConnectClaimsInAccessToken: enums.ThreeStateSettingOn.String(),
-		IncludeOpenIDConnectClaimsInIdToken:     enums.ThreeStateSettingOff.String(),
-		DefaultAcrLevel:                         enums.AcrLevel2Optional,
+		IncludeOpenIDConnectClaimsInAccessToken: models.ThreeStateSettingOn.String(),
+		IncludeOpenIDConnectClaimsInIdToken:     models.ThreeStateSettingOff.String(),
+		DefaultAcrLevel:                         models.AcrLevel2Optional,
 	}
 
 	err = database.UpdateClient(nil, updatedClient)
@@ -237,8 +236,8 @@ func TestGetClientById(t *testing.T) {
 		TokenExpirationInSeconds:                3600,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 86400,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 2592000,
-		IncludeOpenIDConnectClaimsInAccessToken: enums.ThreeStateSettingDefault.String(),
-		DefaultAcrLevel:                         enums.AcrLevel1,
+		IncludeOpenIDConnectClaimsInAccessToken: models.ThreeStateSettingDefault.String(),
+		DefaultAcrLevel:                         models.AcrLevel1,
 	}
 
 	err := database.CreateClient(nil, client)
@@ -337,8 +336,8 @@ func TestGetClientByClientIdentifier(t *testing.T) {
 		TokenExpirationInSeconds:                3600,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 86400,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 2592000,
-		IncludeOpenIDConnectClaimsInAccessToken: enums.ThreeStateSettingDefault.String(),
-		DefaultAcrLevel:                         enums.AcrLevel1,
+		IncludeOpenIDConnectClaimsInAccessToken: models.ThreeStateSettingDefault.String(),
+		DefaultAcrLevel:                         models.AcrLevel1,
 	}
 
 	err := database.CreateClient(nil, client)
@@ -436,8 +435,8 @@ func TestClientLoadRedirectURIs(t *testing.T) {
 		TokenExpirationInSeconds:                3600,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 86400,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 2592000,
-		IncludeOpenIDConnectClaimsInAccessToken: enums.ThreeStateSettingDefault.String(),
-		DefaultAcrLevel:                         enums.AcrLevel1,
+		IncludeOpenIDConnectClaimsInAccessToken: models.ThreeStateSettingDefault.String(),
+		DefaultAcrLevel:                         models.AcrLevel1,
 	}
 
 	err := database.CreateClient(nil, client)
@@ -521,8 +520,8 @@ func TestClientLoadWebOrigins(t *testing.T) {
 		TokenExpirationInSeconds:                3600,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 86400,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 2592000,
-		IncludeOpenIDConnectClaimsInAccessToken: enums.ThreeStateSettingDefault.String(),
-		DefaultAcrLevel:                         enums.AcrLevel1,
+		IncludeOpenIDConnectClaimsInAccessToken: models.ThreeStateSettingDefault.String(),
+		DefaultAcrLevel:                         models.AcrLevel1,
 	}
 
 	err := database.CreateClient(nil, client)
@@ -611,8 +610,8 @@ func TestGetClientsByIds(t *testing.T) {
 			TokenExpirationInSeconds:                3600 + i*1800,
 			RefreshTokenOfflineIdleTimeoutInSeconds: 86400 + i*43200,
 			RefreshTokenOfflineMaxLifetimeInSeconds: 2592000 + i*1296000,
-			IncludeOpenIDConnectClaimsInAccessToken: enums.ThreeStateSettingDefault.String(),
-			DefaultAcrLevel:                         enums.AcrLevel1,
+			IncludeOpenIDConnectClaimsInAccessToken: models.ThreeStateSettingDefault.String(),
+			DefaultAcrLevel:                         models.AcrLevel1,
 		}
 
 		err := database.CreateClient(nil, &client)
@@ -726,8 +725,8 @@ func TestGetClientsByIds_MoreIdsThanOneStatementCanCarry(t *testing.T) {
 			TokenExpirationInSeconds:                3600,
 			RefreshTokenOfflineIdleTimeoutInSeconds: 86400,
 			RefreshTokenOfflineMaxLifetimeInSeconds: 2592000,
-			IncludeOpenIDConnectClaimsInAccessToken: enums.ThreeStateSettingDefault.String(),
-			DefaultAcrLevel:                         enums.AcrLevel1,
+			IncludeOpenIDConnectClaimsInAccessToken: models.ThreeStateSettingDefault.String(),
+			DefaultAcrLevel:                         models.AcrLevel1,
 		}
 		if err := database.CreateClient(nil, &client); err != nil {
 			t.Fatalf("Failed to create test client %d: %v", i, err)
@@ -806,8 +805,8 @@ func TestGetClientsByIds_ARepeatedIdOnEitherSideOfABatchBoundary(t *testing.T) {
 		TokenExpirationInSeconds:                3600,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 86400,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 2592000,
-		IncludeOpenIDConnectClaimsInAccessToken: enums.ThreeStateSettingDefault.String(),
-		DefaultAcrLevel:                         enums.AcrLevel1,
+		IncludeOpenIDConnectClaimsInAccessToken: models.ThreeStateSettingDefault.String(),
+		DefaultAcrLevel:                         models.AcrLevel1,
 	}
 	if err := database.CreateClient(nil, &client); err != nil {
 		t.Fatalf("Failed to create test client: %v", err)
@@ -866,8 +865,8 @@ func TestClientLoadPermissions(t *testing.T) {
 		TokenExpirationInSeconds:                3600,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 86400,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 2592000,
-		IncludeOpenIDConnectClaimsInAccessToken: enums.ThreeStateSettingDefault.String(),
-		DefaultAcrLevel:                         enums.AcrLevel1,
+		IncludeOpenIDConnectClaimsInAccessToken: models.ThreeStateSettingDefault.String(),
+		DefaultAcrLevel:                         models.AcrLevel1,
 	}
 
 	err := database.CreateClient(nil, client)
@@ -993,8 +992,8 @@ func TestGetAllClients(t *testing.T) {
 			TokenExpirationInSeconds:                3600 + i*1800,
 			RefreshTokenOfflineIdleTimeoutInSeconds: 86400 + i*43200,
 			RefreshTokenOfflineMaxLifetimeInSeconds: 2592000 + i*1296000,
-			IncludeOpenIDConnectClaimsInAccessToken: enums.ThreeStateSettingDefault.String(),
-			DefaultAcrLevel:                         enums.AcrLevel1,
+			IncludeOpenIDConnectClaimsInAccessToken: models.ThreeStateSettingDefault.String(),
+			DefaultAcrLevel:                         models.AcrLevel1,
 		}
 
 		err := database.CreateClient(nil, client)
@@ -1115,8 +1114,8 @@ func TestDeleteClient(t *testing.T) {
 		TokenExpirationInSeconds:                3600,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 86400,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 2592000,
-		IncludeOpenIDConnectClaimsInAccessToken: enums.ThreeStateSettingDefault.String(),
-		DefaultAcrLevel:                         enums.AcrLevel1,
+		IncludeOpenIDConnectClaimsInAccessToken: models.ThreeStateSettingDefault.String(),
+		DefaultAcrLevel:                         models.AcrLevel1,
 	}
 
 	err := database.CreateClient(nil, client)
@@ -1264,8 +1263,8 @@ func TestClientNullableOverrideFields(t *testing.T) {
 		TokenExpirationInSeconds:                3600,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 86400,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 2592000,
-		IncludeOpenIDConnectClaimsInAccessToken: enums.ThreeStateSettingDefault.String(),
-		DefaultAcrLevel:                         enums.AcrLevel1,
+		IncludeOpenIDConnectClaimsInAccessToken: models.ThreeStateSettingDefault.String(),
+		DefaultAcrLevel:                         models.AcrLevel1,
 		// PKCERequired, ImplicitGrantEnabled, ResourceOwnerPasswordCredentialsEnabled are nil (use global settings)
 	}
 
@@ -1307,8 +1306,8 @@ func TestClientNullableOverrideFields(t *testing.T) {
 		TokenExpirationInSeconds:                3600,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 86400,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 2592000,
-		IncludeOpenIDConnectClaimsInAccessToken: enums.ThreeStateSettingDefault.String(),
-		DefaultAcrLevel:                         enums.AcrLevel1,
+		IncludeOpenIDConnectClaimsInAccessToken: models.ThreeStateSettingDefault.String(),
+		DefaultAcrLevel:                         models.AcrLevel1,
 		PKCERequired:                            &pkceTrue,
 		ImplicitGrantEnabled:                    &implicitTrue,
 		ResourceOwnerPasswordCredentialsEnabled: &ropcTrue,
@@ -1352,8 +1351,8 @@ func TestClientNullableOverrideFields(t *testing.T) {
 		TokenExpirationInSeconds:                3600,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 86400,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 2592000,
-		IncludeOpenIDConnectClaimsInAccessToken: enums.ThreeStateSettingDefault.String(),
-		DefaultAcrLevel:                         enums.AcrLevel1,
+		IncludeOpenIDConnectClaimsInAccessToken: models.ThreeStateSettingDefault.String(),
+		DefaultAcrLevel:                         models.AcrLevel1,
 		PKCERequired:                            &pkceFalse,
 		ImplicitGrantEnabled:                    &implicitFalse,
 		ResourceOwnerPasswordCredentialsEnabled: &ropcFalse,
@@ -1822,7 +1821,7 @@ func newCaseTestClient(t *testing.T, identifier string) *models.Client {
 		TokenExpirationInSeconds:                3600,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 86400,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 2592000,
-		IncludeOpenIDConnectClaimsInAccessToken: enums.ThreeStateSettingDefault.String(),
-		DefaultAcrLevel:                         enums.AcrLevel1,
+		IncludeOpenIDConnectClaimsInAccessToken: models.ThreeStateSettingDefault.String(),
+		DefaultAcrLevel:                         models.AcrLevel1,
 	}
 }

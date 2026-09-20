@@ -10,7 +10,6 @@ import (
 	mocks_handlerhelpers "github.com/leodip/goiabada/authserver/internal/handlerhelpers/mocks"
 
 	"github.com/leodip/goiabada/authserver/internal/models"
-	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -29,15 +28,15 @@ func TestHandleCertsGet(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		nextKey := models.KeyPair{
-			State:        enums.KeyStateNext.String(),
+			State:        models.KeyStateNext.String(),
 			PublicKeyJWK: []byte(`{"kid":"next-kid","kty":"RSA","alg":"RS256","use":"sig","n":"next-n","e":"AQAB"}`),
 		}
 		currentKey := models.KeyPair{
-			State:        enums.KeyStateCurrent.String(),
+			State:        models.KeyStateCurrent.String(),
 			PublicKeyJWK: []byte(`{"kid":"current-kid","kty":"RSA","alg":"RS256","use":"sig","n":"current-n","e":"AQAB"}`),
 		}
 		previousKey := models.KeyPair{
-			State:        enums.KeyStatePrevious.String(),
+			State:        models.KeyStatePrevious.String(),
 			PublicKeyJWK: []byte(`{"kid":"previous-kid","kty":"RSA","alg":"RS256","use":"sig","n":"previous-n","e":"AQAB"}`),
 		}
 
@@ -72,7 +71,7 @@ func TestHandleCertsGet(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		currentKey := models.KeyPair{
-			State:        enums.KeyStateCurrent.String(),
+			State:        models.KeyStateCurrent.String(),
 			PublicKeyJWK: []byte(`{"kid":"current-kid","kty":"RSA","alg":"RS256","use":"sig","n":"current-n","e":"AQAB"}`),
 		}
 
@@ -158,7 +157,7 @@ func TestHandleCertsGet(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		invalidJSONKey := models.KeyPair{
-			State:        enums.KeyStateCurrent.String(),
+			State:        models.KeyStateCurrent.String(),
 			PublicKeyJWK: []byte(`invalid json`),
 		}
 

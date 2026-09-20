@@ -16,7 +16,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
-	"github.com/leodip/goiabada/core/enums"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 )
@@ -465,7 +464,7 @@ func seedExtraSessionForOTPTest(t *testing.T, userId int64) *models.UserSession 
 		Started:             now,
 		LastAccessed:        now,
 		AuthMethods:         "pwd otp",
-		AcrLevel:            enums.AcrLevel2Optional.String(),
+		AcrLevel:            models.AcrLevel2Optional.String(),
 		AuthTime:            now,
 		IpAddress:           "10.0.0.1",
 		DeviceName:          "another device",

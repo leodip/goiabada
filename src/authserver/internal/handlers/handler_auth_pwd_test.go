@@ -16,7 +16,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/core/customerrors"
-	"github.com/leodip/goiabada/core/enums"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
@@ -796,7 +795,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		authHelper.On("SaveAuthContext", rr, mock.Anything, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.UserId == 1 &&
 				ac.AuthState == ceremony.AuthStateLevel1PasswordCompleted &&
-				ac.AuthMethods == enums.AuthMethodPassword.String() &&
+				ac.AuthMethods == ceremony.AuthMethodPassword.String() &&
 				ac.AuthenticatedAt != nil && !ac.AuthenticatedAt.IsZero() &&
 				// This handler is the only writer of Level1AuthCompleted, so this is the
 				// only unit case that fails if the write is dropped. Without it the gate in

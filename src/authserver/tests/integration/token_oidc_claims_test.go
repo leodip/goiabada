@@ -12,7 +12,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
-	"github.com/leodip/goiabada/core/enums"
+	"github.com/leodip/goiabada/core/gender"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 )
@@ -293,7 +293,7 @@ func createAuthCodeWithUserProfile(t *testing.T, clientSecret string, scope stri
 		AuthorizationCodeEnabled: true,
 		IsPublic:                 false,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          enums.AcrLevel2Optional,
+		DefaultAcrLevel:          models.AcrLevel2Optional,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
 
@@ -319,11 +319,11 @@ func createAuthCodeWithUserProfile(t *testing.T, clientSecret string, scope stri
 	}
 
 	// The gender column is 16 characters and the claim is echoed back verbatim,
-	// so the fixture picks one of the two strings enums.Gender.String() returns
+	// so the fixture picks one of the two strings gender.Gender.String() returns
 	// rather than a generated run (#272).
-	gender := enums.GenderFemale.String()
+	genderValue := gender.GenderFemale.String()
 	if fake.Bool() {
-		gender = enums.GenderMale.String()
+		genderValue = gender.GenderMale.String()
 	}
 
 	// Create user with full profile data.
@@ -345,7 +345,7 @@ func createAuthCodeWithUserProfile(t *testing.T, clientSecret string, scope stri
 		MiddleName:          fake.MiddleName(),
 		Nickname:            fake.Username(),
 		Website:             fake.URL(),
-		Gender:              gender,
+		Gender:              genderValue,
 		BirthDate:           sql.NullTime{Time: fake.Date(), Valid: true},
 		ZoneInfo:            "America/New_York",
 		Locale:              "en-US",

@@ -4,11 +4,11 @@ import (
 	"net/url"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
-	"github.com/leodip/goiabada/core/enums"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -45,7 +45,7 @@ func TestAcrSnapshot_ClientRaisedMidCeremonyDoesNotElevateTheAcr(t *testing.T) {
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          enums.AcrLevel1,
+		DefaultAcrLevel:          models.AcrLevel1,
 	}
 	require.NoError(t, database.CreateClient(nil, client))
 
@@ -106,7 +106,7 @@ func TestAcrSnapshot_ClientRaisedMidCeremonyDoesNotElevateTheAcr(t *testing.T) {
 	_ = resp.Body.Close()
 
 	// The administrator tightens the client's policy, mid-ceremony.
-	client.DefaultAcrLevel = enums.AcrLevel2Mandatory
+	client.DefaultAcrLevel = models.AcrLevel2Mandatory
 	require.NoError(t, database.UpdateClient(nil, client))
 
 	resp = loadPage(t, httpClient, loc)
@@ -120,10 +120,10 @@ func TestAcrSnapshot_ClientRaisedMidCeremonyDoesNotElevateTheAcr(t *testing.T) {
 	require.NotEmpty(t, codeVal, "the ceremony should still complete; the raise applies to later requests")
 
 	code := loadCodeFromDatabase(t, codeVal)
-	assert.Equal(t, enums.AcrLevel1.String(), code.AcrLevel,
+	assert.Equal(t, models.AcrLevel1.String(), code.AcrLevel,
 		"the acr must describe the authentication this ceremony performed, not the policy that "+
 			"replaced the one it was accepted under")
-	assert.Equal(t, enums.AuthMethodPassword.String(), code.AuthMethods,
+	assert.Equal(t, ceremony.AuthMethodPassword.String(), code.AuthMethods,
 		"no second factor was presented, which is what makes a level2_mandatory acr a false claim")
 
 	// The session the ceremony bound to carries the same level, so the next request on this browser
@@ -132,6 +132,6 @@ func TestAcrSnapshot_ClientRaisedMidCeremonyDoesNotElevateTheAcr(t *testing.T) {
 	sessions, err := database.GetUserSessionsByUserId(nil, user.Id)
 	require.NoError(t, err)
 	require.Len(t, sessions, 1)
-	assert.Equal(t, enums.AcrLevel1.String(), sessions[0].AcrLevel,
+	assert.Equal(t, models.AcrLevel1.String(), sessions[0].AcrLevel,
 		"the session records the level reached, so a later step-up is decided from the truth")
 }

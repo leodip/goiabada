@@ -17,7 +17,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
-	"github.com/leodip/goiabada/core/enums"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -94,7 +93,7 @@ func (e *credentialEnv) putPassword(t *testing.T, current, next string) *httptes
 	// The password validator reads the policy straight off the context and panics on the type
 	// assertion without it, and MiddlewareSettings puts it there in production.
 	ctx := context.WithValue(req.Context(), constants.ContextKeySettings,
-		&models.Settings{PasswordPolicy: enums.PasswordPolicyLow})
+		&models.Settings{PasswordPolicy: models.PasswordPolicyLow})
 	req = setTokenContextWithClaims(req.WithContext(ctx),
 		map[string]interface{}{"sub": credentialSubject})
 

@@ -13,7 +13,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/enums"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -652,7 +651,7 @@ func TestDCR_ConfidentialClient_DefaultAcrLevel(t *testing.T) {
 	client, err := database.GetClientByClientIdentifier(nil, response.ClientID)
 	assert.NoError(t, err)
 
-	assert.Equal(t, enums.AcrLevel2Optional, client.DefaultAcrLevel, "Should default to level 2 optional")
+	assert.Equal(t, models.AcrLevel2Optional, client.DefaultAcrLevel, "Should default to level 2 optional")
 
 	// Verify token expiration uses global settings
 	settings, err := database.GetSettingsById(nil, 1)

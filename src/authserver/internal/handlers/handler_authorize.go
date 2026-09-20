@@ -22,7 +22,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 	"github.com/leodip/goiabada/authserver/internal/urlutil"
 	"github.com/leodip/goiabada/core/customerrors"
-	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/stringutil"
@@ -681,7 +680,7 @@ func handlePromptNone(w http.ResponseWriter, r *http.Request, httpHelper HttpHel
 
 	// 4. Check ACR requirements
 	targetAcrLevel := authContext.GetTargetAcrLevel(client.DefaultAcrLevel)
-	sessionAcrLevel, err := enums.AcrLevelFromString(userSession.AcrLevel)
+	sessionAcrLevel, err := models.AcrLevelFromString(userSession.AcrLevel)
 	if err != nil {
 		// Unknown session ACR, treat as insufficient
 		redirectWithError(constants.ErrorInteractionRequired, "Higher authentication level required")
@@ -697,7 +696,7 @@ func handlePromptNone(w http.ResponseWriter, r *http.Request, httpHelper HttpHel
 	// 5. Check OTP requirements for level2
 	// For level2_mandatory: user MUST have OTP enabled
 	// For level2_optional: if user has OTP but session doesn't have OTP method, need step-up
-	if targetAcrLevel == enums.AcrLevel2Mandatory {
+	if targetAcrLevel == models.AcrLevel2Mandatory {
 		if !userSession.User.OTPEnabled {
 			redirectWithError(constants.ErrorInteractionRequired, "Additional authentication setup required")
 			return
@@ -714,7 +713,7 @@ func handlePromptNone(w http.ResponseWriter, r *http.Request, httpHelper HttpHel
 	// it here (#242 decision 1).
 	if userSession.OtpConfigGeneration != userSession.User.OtpConfigGeneration {
 		// Only matters if target requires level2
-		if targetAcrLevel == enums.AcrLevel2Optional || targetAcrLevel == enums.AcrLevel2Mandatory {
+		if targetAcrLevel == models.AcrLevel2Optional || targetAcrLevel == models.AcrLevel2Mandatory {
 			redirectWithError(constants.ErrorInteractionRequired, "Authentication configuration has changed")
 			return
 		}

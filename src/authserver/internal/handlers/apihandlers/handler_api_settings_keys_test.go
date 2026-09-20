@@ -3,6 +3,7 @@ package apihandlers
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -13,7 +14,7 @@ import (
 	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
-	"github.com/leodip/goiabada/core/enums"
+	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -40,7 +41,7 @@ var rotateTx = &sql.Tx{}
 
 // signingKey builds a key_pairs row in the given state. Only Id and State matter here: nothing in
 // this file reads key material.
-func signingKey(id int64, state enums.KeyState) models.KeyPair {
+func signingKey(id int64, state models.KeyState) models.KeyPair {
 	return models.KeyPair{Id: id, State: state.String(), Type: "RSA", Algorithm: "RS256"}
 }
 
@@ -76,17 +77,17 @@ func TestHandleAPISettingsKeysRotatePost_Success(t *testing.T) {
 	auditLogger := mocks_audit.NewAuditLogger(t)
 
 	stub := stubRotateRead(database, []models.KeyPair{
-		signingKey(1, enums.KeyStatePrevious),
-		signingKey(2, enums.KeyStateCurrent),
-		signingKey(3, enums.KeyStateNext),
+		signingKey(1, models.KeyStatePrevious),
+		signingKey(2, models.KeyStateCurrent),
+		signingKey(3, models.KeyStateNext),
 	})
 	database.On("DeleteKeyPair", rotateTx, int64(1)).Return(nil).Once()
 	database.On("UpdateKeyPairState", rotateTx, int64(2),
-		enums.KeyStateCurrent.String(), enums.KeyStatePrevious.String()).Return(true, nil).Once()
+		models.KeyStateCurrent.String(), models.KeyStatePrevious.String()).Return(true, nil).Once()
 	database.On("UpdateKeyPairState", rotateTx, int64(3),
-		enums.KeyStateNext.String(), enums.KeyStateCurrent.String()).Return(true, nil).Once()
+		models.KeyStateNext.String(), models.KeyStateCurrent.String()).Return(true, nil).Once()
 	database.On("CreateKeyPair", rotateTx, mock.MatchedBy(func(kp *models.KeyPair) bool {
-		return kp.State == enums.KeyStateNext.String()
+		return kp.State == models.KeyStateNext.String()
 	})).Return(nil).Once()
 
 	var payload map[string]interface{}
@@ -115,12 +116,12 @@ func TestHandleAPISettingsKeysRotatePost_RotationInProgress(t *testing.T) {
 	auditLogger := mocks_audit.NewAuditLogger(t)
 
 	stub := stubRotateRead(database, []models.KeyPair{
-		signingKey(2, enums.KeyStateCurrent),
-		signingKey(3, enums.KeyStateNext),
+		signingKey(2, models.KeyStateCurrent),
+		signingKey(3, models.KeyStateNext),
 	})
 	// The compare-and-set transitions no row: another rotation already moved this key.
 	database.On("UpdateKeyPairState", rotateTx, int64(2),
-		enums.KeyStateCurrent.String(), enums.KeyStatePrevious.String()).Return(false, nil).Once()
+		models.KeyStateCurrent.String(), models.KeyStatePrevious.String()).Return(false, nil).Once()
 
 	rr := httptest.NewRecorder()
 	HandleAPISettingsKeysRotatePost(database, auditLogger).ServeHTTP(rr, rotateRequest())
@@ -147,8 +148,8 @@ func TestHandleAPISettingsKeysRotatePost_KeySetIncomplete(t *testing.T) {
 	auditLogger := mocks_audit.NewAuditLogger(t)
 
 	stub := stubRotateRead(database, []models.KeyPair{
-		signingKey(1, enums.KeyStatePrevious),
-		signingKey(2, enums.KeyStateCurrent),
+		signingKey(1, models.KeyStatePrevious),
+		signingKey(2, models.KeyStateCurrent),
 	})
 
 	rr := httptest.NewRecorder()
@@ -197,4 +198,95 @@ func TestHandleAPISettingsKeysRotatePost_InternalError(t *testing.T) {
 	assert.Equal(t, "INTERNAL_SERVER_ERROR", decodeErrorBody(t, rr).ErrorCode)
 	database.AssertExpectations(t)
 	auditLogger.AssertExpectations(t)
+}
+
+// TestHandleAPISettingsKeysGet_OrdersNextCurrentPrevious owns the guarantee the admin console now
+// relies on. Its page used to re-impose this order with a structurally identical copy of the loop
+// below, which is the only reason the console named a signing-key state at all; #385 deleted the
+// copy, so the order is this endpoint's claim and has to be tested where it is made. The console's
+// own case can only show that it renders what its stub returned.
+//
+// Every row is fed deliberately unsorted, because a fixture already in the answer's order passes
+// with the loop deleted.
+func TestHandleAPISettingsKeysGet_OrdersNextCurrentPrevious(t *testing.T) {
+
+	testCases := []struct {
+		name  string
+		given []models.KeyState
+		want  []string
+		why   string
+	}{
+		{
+			name:  "reversed",
+			given: []models.KeyState{models.KeyStatePrevious, models.KeyStateCurrent, models.KeyStateNext},
+			want:  []string{"next", "current", "previous"},
+			why:   "the full set, arriving backwards",
+		},
+		{
+			name:  "next last, two previous keys",
+			given: []models.KeyState{models.KeyStatePrevious, models.KeyStatePrevious, models.KeyStateCurrent, models.KeyStateNext},
+			want:  []string{"next", "current", "previous", "previous"},
+			why:   "every previous key is kept, after the single next and current",
+		},
+		{
+			name:  "current first",
+			given: []models.KeyState{models.KeyStateCurrent, models.KeyStateNext, models.KeyStatePrevious},
+			want:  []string{"next", "current", "previous"},
+			why:   "next is hoisted above current",
+		},
+		{
+			name:  "no next key, which is the state a refused rotation leaves",
+			given: []models.KeyState{models.KeyStatePrevious, models.KeyStateCurrent},
+			want:  []string{"current", "previous"},
+			why:   "an absent state contributes no row rather than an empty one",
+		},
+		{
+			name:  "one key only",
+			given: []models.KeyState{models.KeyStateCurrent},
+			want:  []string{"current"},
+			why:   "a freshly seeded deployment before its first rotation",
+		},
+		{
+			name:  "no keys at all",
+			given: nil,
+			want:  []string{},
+			why:   "an empty answer is an empty list, not a null",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			database := mocks_data.NewDatabase(t)
+
+			keys := make([]models.KeyPair, 0, len(tc.given))
+			for i, state := range tc.given {
+				keys = append(keys, signingKey(int64(i+1), state))
+			}
+			// The typed nil the handler passes, not an untyped one: testify compares the
+			// argument's dynamic type too, so `nil` here never matches `(*sql.Tx)(nil)`.
+			database.On("GetAllSigningKeys", (*sql.Tx)(nil)).Return(keys, nil).Once()
+
+			rr := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/settings/keys", nil)
+			HandleAPISettingsKeysGet(database).ServeHTTP(rr, req)
+
+			require.Equal(t, http.StatusOK, rr.Code)
+
+			var body api.GetSettingsKeysResponse
+			require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &body))
+
+			states := make([]string, 0, len(body.Keys))
+			for _, k := range body.Keys {
+				states = append(states, k.State)
+			}
+			assert.Equal(t, tc.want, states, "%s", tc.why)
+
+			// Every key the database held is in the answer. Without this, a loop that dropped a
+			// previous key rather than misordering it would pass every row above except the one
+			// carrying two.
+			assert.Len(t, body.Keys, len(tc.given), "no key is lost on the way out")
+
+			database.AssertExpectations(t)
+		})
+	}
 }

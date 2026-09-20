@@ -5,14 +5,18 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
+	mocks_handlerhelpers "github.com/leodip/goiabada/adminconsole/internal/handlerhelpers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	adminmiddleware "github.com/leodip/goiabada/adminconsole/internal/middleware"
+	"github.com/leodip/goiabada/core/api"
 )
 
 // stubApiClient embeds apiclient.ApiClient so its hundred-odd other methods come for free
@@ -22,10 +26,15 @@ import (
 type stubApiClient struct {
 	apiclient.ApiClient
 	rotateErr error
+	keys      []api.SettingsSigningKeyResponse
 }
 
 func (s *stubApiClient) RotateSettingsKeys(accessToken string) error {
 	return s.rotateErr
+}
+
+func (s *stubApiClient) GetSettingsKeys(accessToken string) ([]api.SettingsSigningKeyResponse, error) {
+	return s.keys, nil
 }
 
 // TestHandleAdminSettingsKeysRotatePost_APIErrorReachesTheBrowser owns the wiring between
@@ -141,4 +150,112 @@ func TestHandleAdminSettingsKeysRotatePost_SuccessIsUnchanged(t *testing.T) {
 	err := json.Unmarshal(rec.Body.Bytes(), &response)
 	assert.NoError(t, err)
 	assert.True(t, response.Success)
+}
+
+// TestHandleAdminSettingsKeysGet_RendersTheApiOrder owns the console half of the claim that freed
+// KeyState from core (#385 decision 7). The page used to re-sort the list with a structurally
+// identical copy of the loop GET /api/v1/admin/settings/keys already applies, which is the only
+// reason the console named a signing-key state at all.
+//
+// The first row is the property a reader cares about: the page still shows next, then current, then
+// every previous. The remaining rows are what makes the deletion observable rather than merely
+// harmless -- they hand the handler an order the API would not produce, and pass only if the page
+// renders it through untouched. Restoring the loop turns each of them red.
+//
+// The producer's own guarantee is pinned where it is produced, in the auth server's
+// handler_api_settings_keys_test.go. Without that half this file would only prove its own stub
+// returned what it was told to.
+func TestHandleAdminSettingsKeysGet_RendersTheApiOrder(t *testing.T) {
+
+	testCases := []struct {
+		name  string
+		given []string
+		why   string
+	}{
+		{
+			name:  "the order the API returns",
+			given: []string{"next", "current", "previous", "previous"},
+			why:   "next, then current, then every previous, which is what the page has always shown",
+		},
+		{
+			name:  "an order the API would not produce is not repaired here",
+			given: []string{"previous", "current", "next"},
+			why:   "the page reports what the API ordered; it no longer has an opinion of its own",
+		},
+		{
+			name:  "two previous keys keep their relative order",
+			given: []string{"current", "previous", "next", "previous"},
+			why:   "the deleted loop would have hoisted next and current out of this",
+		},
+		{
+			name:  "an incomplete key set renders what there is",
+			given: []string{"current"},
+			why:   "no next key is a deployment state the page has to survive",
+		},
+		{
+			name:  "an empty list renders an empty table",
+			given: nil,
+			why:   "the page binds a slice either way",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+
+			apiKeys := make([]api.SettingsSigningKeyResponse, 0, len(tc.given))
+			for i, state := range tc.given {
+				apiKeys = append(apiKeys, api.SettingsSigningKeyResponse{
+					Id:            int64(i + 1),
+					State:         state,
+					KeyIdentifier: "key-" + strconv.Itoa(i+1),
+					Type:          "RSA",
+					Algorithm:     "RS256",
+				})
+			}
+
+			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+			handlertest.RefuseInternalServerError(t, httpHelper)
+			handlertest.ExpectRender(httpHelper,
+				"/layouts/menu_layout.html", "/admin_settings_keys.html").Once()
+
+			req := handlertest.Request(http.MethodGet, "/admin/settings/keys",
+				handlertest.WithAccessToken())
+
+			handler := HandleAdminSettingsKeysGet(httpHelper, &stubApiClient{keys: apiKeys})
+			handler.ServeHTTP(httptest.NewRecorder(), req)
+
+			bind := handlertest.Bind(t, httpHelper, "for %v", tc.given)
+
+			keys, ok := bind["keys"].([]SettingsKey)
+			require.True(t, ok, "the page binds keys as []SettingsKey, got %T", bind["keys"])
+
+			states := make([]string, 0, len(keys))
+			identifiers := make([]string, 0, len(keys))
+			for _, k := range keys {
+				states = append(states, k.State)
+				identifiers = append(identifiers, k.KeyIdentifier)
+			}
+
+			assert.Equal(t, tc.given, statesOrNil(states), "rendered order: %s", tc.why)
+
+			// The identifiers pin that the rows are the API's own rather than rebuilt from the
+			// states: two previous keys are indistinguishable by state alone, so a loop that
+			// reordered them would pass the assertion above.
+			wantIdentifiers := make([]string, 0, len(tc.given))
+			for i := range tc.given {
+				wantIdentifiers = append(wantIdentifiers, "key-"+strconv.Itoa(i+1))
+			}
+			assert.Equal(t, statesOrNil(wantIdentifiers), statesOrNil(identifiers),
+				"each row carries the API row it was built from")
+		})
+	}
+}
+
+// statesOrNil collapses an empty slice to nil so the empty-list row compares against the nil the
+// table declares, rather than against a zero-length slice assert.Equal treats as different.
+func statesOrNil(values []string) []string {
+	if len(values) == 0 {
+		return nil
+	}
+	return values
 }

@@ -11,7 +11,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
-	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -35,7 +34,7 @@ func TestToken_AuthCode_LoopbackEphemeralPort(t *testing.T) {
 		AuthorizationCodeEnabled: true,
 		IsPublic:                 false,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          enums.AcrLevel2Optional,
+		DefaultAcrLevel:          models.AcrLevel2Optional,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
 	err = database.CreateClient(nil, client)

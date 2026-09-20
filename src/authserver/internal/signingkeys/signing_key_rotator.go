@@ -11,7 +11,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/rsautil"
 	"github.com/leodip/goiabada/authserver/internal/uuidutil"
-	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/errs"
 )
 
@@ -98,16 +97,16 @@ func (r *SigningKeyRotator) Rotate() error {
 		var previousKey *models.KeyPair
 		for i := range allSigningKeys {
 			kp := &allSigningKeys[i]
-			keyState, err := enums.KeyStateFromString(kp.State)
+			keyState, err := models.KeyStateFromString(kp.State)
 			if err != nil {
 				return err
 			}
 			switch keyState {
-			case enums.KeyStateCurrent:
+			case models.KeyStateCurrent:
 				currentKey = kp
-			case enums.KeyStateNext:
+			case models.KeyStateNext:
 				nextKey = kp
-			case enums.KeyStatePrevious:
+			case models.KeyStatePrevious:
 				previousKey = kp
 			}
 		}
@@ -128,7 +127,7 @@ func (r *SigningKeyRotator) Rotate() error {
 		}
 
 		moved, err := r.database.UpdateKeyPairState(tx, currentKey.Id,
-			enums.KeyStateCurrent.String(), enums.KeyStatePrevious.String())
+			models.KeyStateCurrent.String(), models.KeyStatePrevious.String())
 		if err != nil {
 			return err
 		}
@@ -137,7 +136,7 @@ func (r *SigningKeyRotator) Rotate() error {
 		}
 
 		moved, err = r.database.UpdateKeyPairState(tx, nextKey.Id,
-			enums.KeyStateNext.String(), enums.KeyStateCurrent.String())
+			models.KeyStateNext.String(), models.KeyStateCurrent.String())
 		if err != nil {
 			return err
 		}
@@ -177,7 +176,7 @@ func (r *SigningKeyRotator) generateNextKey() (*models.KeyPair, error) {
 	}
 
 	return &models.KeyPair{
-		State:             enums.KeyStateNext.String(),
+		State:             models.KeyStateNext.String(),
 		KeyIdentifier:     kid,
 		Type:              "RSA",
 		Algorithm:         "RS256",

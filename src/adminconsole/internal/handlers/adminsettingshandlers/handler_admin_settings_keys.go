@@ -7,7 +7,6 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
-	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
 )
@@ -49,27 +48,14 @@ func HandleAdminSettingsKeysGet(
 			})
 		}
 
-		orderedKeys := make([]SettingsKey, 0, len(keys))
-		for _, ki := range keys {
-			if ki.State == enums.KeyStateNext.String() {
-				orderedKeys = append(orderedKeys, ki)
-				break
-			}
-		}
-		for _, ki := range keys {
-			if ki.State == enums.KeyStateCurrent.String() {
-				orderedKeys = append(orderedKeys, ki)
-				break
-			}
-		}
-		for _, ki := range keys {
-			if ki.State == enums.KeyStatePrevious.String() {
-				orderedKeys = append(orderedKeys, ki)
-			}
-		}
-
+		// Rendered in the order the API returned. GET /api/v1/admin/settings/keys orders its
+		// response next, current, then all previous, and the loop that used to re-impose that
+		// order here was a structurally identical copy of the one that produces it, so it only
+		// ever reordered a list already in that order. Restoring it would make the page's order
+		// the console's claim rather than the API's, and would go stale the moment the API's
+		// changed (#385).
 		bind := map[string]interface{}{
-			"keys": orderedKeys,
+			"keys": keys,
 		}
 
 		err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_settings_keys.html", bind)

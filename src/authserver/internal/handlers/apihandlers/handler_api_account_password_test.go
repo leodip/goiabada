@@ -17,7 +17,6 @@ import (
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
-	"github.com/leodip/goiabada/core/enums"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -59,7 +58,7 @@ func accountPasswordRequest(t *testing.T, claims map[string]interface{}, current
 	// The password validator reads the policy straight off the context, so settings must be
 	// there or it panics on the type assertion.
 	ctx := context.WithValue(req.Context(), constants.ContextKeySettings,
-		&models.Settings{PasswordPolicy: enums.PasswordPolicyLow})
+		&models.Settings{PasswordPolicy: models.PasswordPolicyLow})
 	return setTokenContextWithClaims(req.WithContext(ctx), claims)
 }
 

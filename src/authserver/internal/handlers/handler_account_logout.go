@@ -12,9 +12,9 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
+	"github.com/leodip/goiabada/authserver/internal/issuance"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/urlutil"
-	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/sessionstore"
@@ -204,7 +204,7 @@ type hintClassification struct {
 }
 
 // nonIdTokenTypValues are the "typ" claim values Goiabada stamps on tokens that are NOT ID Tokens:
-// enums.TokenTypeBearer on access tokens, and the two refresh-token markers "Offline" and "Refresh",
+// issuance.TokenTypeBearer on access tokens, and the two refresh-token markers "Offline" and "Refresh",
 // which are unexported constants in src/authserver/internal/issuance/token_issuer.go. generateIdTokenCore emits no typ
 // at all, and neither does the short-lived hint HandleAPIAccountLogoutRequestPost mints, so this
 // rejects nothing an RP can legitimately present.
@@ -212,9 +212,9 @@ type hintClassification struct {
 // It is a denylist rather than a requirement that typ be "ID" for exactly that reason: no ID Token
 // this server issues carries the claim, so requiring it would reject every real hint.
 var nonIdTokenTypValues = map[string]bool{
-	enums.TokenTypeBearer.String():  true, // "Bearer", access tokens
-	enums.TokenTypeRefresh.String(): true, // "Refresh", session-bound refresh tokens
-	"Offline":                       true, // offline refresh tokens; the constant is unexported
+	issuance.TokenTypeBearer.String():  true, // "Bearer", access tokens
+	issuance.TokenTypeRefresh.String(): true, // "Refresh", session-bound refresh tokens
+	"Offline":                          true, // offline refresh tokens; the constant is unexported
 }
 
 // rejectIdTokenHint is the one answer for a hint classifyIdTokenHint refuses: the record every

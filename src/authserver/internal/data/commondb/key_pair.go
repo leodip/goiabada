@@ -6,7 +6,6 @@ import (
 
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/leodip/goiabada/authserver/internal/models"
-	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/errs"
 )
 
@@ -188,7 +187,7 @@ func (d *CommonDatabase) GetCurrentSigningKey(tx *sql.Tx) (*models.KeyPair, erro
 		For(d.Flavor)
 
 	selectBuilder := keyPairStruct.SelectFrom("key_pairs")
-	selectBuilder.Where(selectBuilder.Equal("state", enums.KeyStateCurrent.String()))
+	selectBuilder.Where(selectBuilder.Equal("state", models.KeyStateCurrent.String()))
 
 	keyPair, err := d.getKeyPairCommon(tx, selectBuilder, keyPairStruct)
 	if err != nil {

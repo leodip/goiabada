@@ -8,12 +8,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
-	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
@@ -115,8 +115,8 @@ func createCrossUserUser(t *testing.T, withOtp bool) (*models.User, string, stri
 // A session at level1 never asks A for a second factor, so a fixture built with aSessionAcrLevel at
 // level1 cannot make the two differ. There the methods assertions are consistency checks; the
 // provenance is carried by the cases where A reaches level2_optional.
-func createCrossUserBrowser(t *testing.T, defaultAcrLevel enums.AcrLevel,
-	aSessionAcrLevel enums.AcrLevel) *crossUserBrowser {
+func createCrossUserBrowser(t *testing.T, defaultAcrLevel models.AcrLevel,
+	aSessionAcrLevel models.AcrLevel) *crossUserBrowser {
 
 	require.False(t, defaultAcrLevel.IsHigherThan(aSessionAcrLevel),
 		"the client's level is a floor under A's ceremony too, so A's session cannot end up below it")
@@ -143,7 +143,7 @@ func createCrossUserBrowser(t *testing.T, defaultAcrLevel enums.AcrLevel,
 	require.NoError(t, database.CreateRedirectURI(nil, redirectUri))
 
 	// A presents a second factor whenever A's own level asks for one; B never does.
-	aPresentsOtp := aSessionAcrLevel.IsHigherThan(enums.AcrLevel1)
+	aPresentsOtp := aSessionAcrLevel.IsHigherThan(models.AcrLevel1)
 	userA, passwordA, otpSecretA := createCrossUserUser(t, aPresentsOtp)
 	userB, passwordB, _ := createCrossUserUser(t, false)
 
@@ -176,9 +176,9 @@ func createCrossUserBrowser(t *testing.T, defaultAcrLevel enums.AcrLevel,
 	// anything while it differs from B's "pwd". If a change to this fixture ever stopped A presenting
 	// a second factor, those assertions would keep passing while proving nothing, so the fixture says
 	// out loud what it set up.
-	expectedMethodsA := enums.AuthMethodPassword.String()
+	expectedMethodsA := ceremony.AuthMethodPassword.String()
 	if aPresentsOtp {
-		expectedMethodsA += " " + enums.AuthMethodOTP.String()
+		expectedMethodsA += " " + ceremony.AuthMethodOTP.String()
 	}
 	require.Equal(t, expectedMethodsA, sessionsA[0].AuthMethods,
 		"the fixture's whole value is that the previous user's session records methods of its own")
@@ -321,7 +321,7 @@ func assertCeremonyBoundToUserB(t *testing.T, b *crossUserBrowser, codeVal strin
 	// provenance: the forbidden value is a value that actually exists in this database, on the row the
 	// ceremony was cookied to. Exact equality rather than Contains, since the failure being pinned is
 	// an extra method arriving from somewhere else.
-	assert.Equal(t, enums.AuthMethodPassword.String(), code.AuthMethods,
+	assert.Equal(t, ceremony.AuthMethodPassword.String(), code.AuthMethods,
 		"the code's methods must be what this ceremony proved, not what the browser's previous session held")
 
 	tokenData := redeemCrossUserCode(t, b, b.jar, codeVal)
@@ -346,7 +346,7 @@ func assertCeremonyBoundToUserB(t *testing.T, b *crossUserBrowser, codeVal strin
 		{"id_token", idClaims},
 		{"access_token", accessClaims},
 	} {
-		assert.Equal(t, []interface{}{enums.AuthMethodPassword.String()}, token.claims["amr"],
+		assert.Equal(t, []interface{}{ceremony.AuthMethodPassword.String()}, token.claims["amr"],
 			"%s must carry only the methods this ceremony proved", token.name)
 		assert.Equal(t, code.AcrLevel, token.claims["acr"],
 			"%s must carry the acr the ceremony recorded on its own code", token.name)
@@ -409,7 +409,7 @@ func assertNextRequestAuthenticatesAsUserB(t *testing.T, b *crossUserBrowser, ex
 // B has no OTP, so level2 is satisfied immediately and the ceremony completes, which is what lets
 // the rest of the rule be asserted in the same pass.
 func TestCrossUser_PromptLogin_BindsToTheAuthenticatingUsersSession(t *testing.T) {
-	b := createCrossUserBrowser(t, enums.AcrLevel2Optional, enums.AcrLevel2Optional)
+	b := createCrossUserBrowser(t, models.AcrLevel2Optional, models.AcrLevel2Optional)
 
 	codeVal := signInWithPassword(t, b.jar, crossUserAuthorizeUrl(b, "&prompt=login"),
 		b.userB.Email, b.passwordB, true, "")
@@ -437,13 +437,13 @@ func TestCrossUser_IdTokenHintNamingTheNewUser_DoesNotInheritTheOldSessionsAcr(t
 	// stay at level1 for this case to keep discriminating: B's ceremony asks for level1, and the
 	// floor would otherwise raise B's target to the client's level, making the value the test
 	// expects and the value it forbids the same string (#240, decision 5).
-	b := createCrossUserBrowser(t, enums.AcrLevel1, enums.AcrLevel2Optional)
+	b := createCrossUserBrowser(t, models.AcrLevel1, models.AcrLevel2Optional)
 
 	// B's ID token has to come from somewhere, so B signs in once on a browser of their own. That
 	// session is swept away when B's ceremony below mints its own, since StartNewUserSession deletes
 	// the new user's other sessions on the same device and address, which is why the shared block
 	// can still insist B holds exactly one session at the end.
-	level1 := "&acr_values=" + url.QueryEscape(enums.AcrLevel1.String())
+	level1 := "&acr_values=" + url.QueryEscape(models.AcrLevel1.String())
 	otherBrowser := createHttpClient(t)
 	hintCodeVal := signInWithPassword(t, otherBrowser, crossUserAuthorizeUrl(b, level1),
 		b.userB.Email, b.passwordB, false, "")
@@ -456,7 +456,7 @@ func TestCrossUser_IdTokenHintNamingTheNewUser_DoesNotInheritTheOldSessionsAcr(t
 		b.userB.Email, b.passwordB, false, "")
 
 	code := loadCodeFromDatabase(t, codeVal)
-	assert.Equal(t, enums.AcrLevel1.String(), code.AcrLevel,
+	assert.Equal(t, models.AcrLevel1.String(), code.AcrLevel,
 		"the acr must describe this ceremony, not the session the browser arrived with")
 
 	assertCeremonyBoundToUserB(t, b, codeVal)
@@ -476,7 +476,7 @@ func TestCrossUser_IdTokenHintNamingTheNewUser_DoesNotInheritTheOldSessionsAcr(t
 // session is reused, so /auth/authorize answers /auth/level1completed and B never sees a password
 // form; here it answers /auth/level1.
 func TestCrossUser_ExpiredForeignSession_BindsToTheAuthenticatingUsersSession(t *testing.T) {
-	b := createCrossUserBrowser(t, enums.AcrLevel1, enums.AcrLevel1)
+	b := createCrossUserBrowser(t, models.AcrLevel1, models.AcrLevel1)
 
 	codeVal := signInWithPassword(t, b.jar, crossUserAuthorizeUrl(b, "&max_age=0"),
 		b.userB.Email, b.passwordB, false, "")

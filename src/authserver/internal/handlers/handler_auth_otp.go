@@ -14,7 +14,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/otp"
-	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
 )
@@ -422,7 +421,7 @@ func HandleAuthOtpPost(
 			"userId": user.Id,
 		})
 
-		authContext.AddAuthMethod(enums.AuthMethodOTP.String())
+		authContext.AddAuthMethod(ceremony.AuthMethodOTP.String())
 		// Mark that real authentication occurred — used by handler_auth_completed
 		// to decide whether to refresh the session's AuthTime.
 		//

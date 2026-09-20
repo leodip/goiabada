@@ -7,7 +7,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
-	"github.com/leodip/goiabada/core/enums"
 )
 
 // testUserAgent and testUserAgentUpdated are raw User-Agent headers, not parsed labels: the
@@ -51,7 +50,7 @@ func TestUpdateUserSession(t *testing.T) {
 	userSession.Started = time.Now().UTC().Add(-1 * time.Hour).Truncate(time.Microsecond)
 	userSession.LastAccessed = time.Now().UTC().Truncate(time.Microsecond)
 	userSession.AuthMethods = "pwd,otp"
-	userSession.AcrLevel = enums.AcrLevel2Optional.String()
+	userSession.AcrLevel = models.AcrLevel2Optional.String()
 	userSession.AuthTime = time.Now().UTC().Add(-30 * time.Minute).Truncate(time.Microsecond)
 	userSession.IpAddress = "192.168.1.2"
 	userSession.DeviceName = "Updated Device"
@@ -338,7 +337,7 @@ func createTestUserSessionOn(t *testing.T, db data.Database, userId int64) *mode
 		Started:           time.Now().UTC().Truncate(time.Microsecond),
 		LastAccessed:      time.Now().UTC().Truncate(time.Microsecond),
 		AuthMethods:       "pwd",
-		AcrLevel:          enums.AcrLevel1.String(),
+		AcrLevel:          models.AcrLevel1.String(),
 		AuthTime:          time.Now().UTC().Truncate(time.Microsecond),
 		IpAddress:         fake.IPv4Address(),
 		DeviceName:        fake.Name(),
@@ -473,7 +472,7 @@ func TestDeleteIdleSessions(t *testing.T) {
 		RefreshTokenOfflineIdleTimeoutInSeconds: 86400,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 86400 * 30, // 30 days
 		IncludeOpenIDConnectClaimsInAccessToken: "no",
-		DefaultAcrLevel:                         enums.AcrLevel1,
+		DefaultAcrLevel:                         models.AcrLevel1,
 	}
 	err = database.CreateClient(nil, client)
 	if err != nil {
@@ -489,7 +488,7 @@ func TestDeleteIdleSessions(t *testing.T) {
 		Started:           now.Add(-10 * time.Minute),
 		LastAccessed:      now.Add(-10 * time.Minute),
 		AuthMethods:       "pwd",
-		AcrLevel:          enums.AcrLevel1.String(),
+		AcrLevel:          models.AcrLevel1.String(),
 		AuthTime:          now.Add(-10 * time.Minute),
 		IpAddress:         fake.IPv4Address(),
 		DeviceName:        fake.Name(),
@@ -520,7 +519,7 @@ func TestDeleteIdleSessions(t *testing.T) {
 		Started:           now.Add(-3 * time.Hour),
 		LastAccessed:      now.Add(-2 * time.Hour),
 		AuthMethods:       "pwd",
-		AcrLevel:          enums.AcrLevel1.String(),
+		AcrLevel:          models.AcrLevel1.String(),
 		AuthTime:          now.Add(-3 * time.Hour),
 		IpAddress:         fake.IPv4Address(),
 		DeviceName:        fake.Name(),
@@ -551,7 +550,7 @@ func TestDeleteIdleSessions(t *testing.T) {
 		Started:           now.Add(-5 * time.Hour),
 		LastAccessed:      now.Add(-4 * time.Hour),
 		AuthMethods:       "pwd",
-		AcrLevel:          enums.AcrLevel1.String(),
+		AcrLevel:          models.AcrLevel1.String(),
 		AuthTime:          now.Add(-5 * time.Hour),
 		IpAddress:         fake.IPv4Address(),
 		DeviceName:        fake.Name(),
@@ -671,7 +670,7 @@ func TestDeleteExpiredSessions(t *testing.T) {
 		RefreshTokenOfflineIdleTimeoutInSeconds: 86400,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 86400 * 30, // 30 days
 		IncludeOpenIDConnectClaimsInAccessToken: "no",
-		DefaultAcrLevel:                         enums.AcrLevel1,
+		DefaultAcrLevel:                         models.AcrLevel1,
 	}
 	err = database.CreateClient(nil, client)
 	if err != nil {
@@ -687,7 +686,7 @@ func TestDeleteExpiredSessions(t *testing.T) {
 		Started:           now.Add(-1 * time.Hour),
 		LastAccessed:      now,
 		AuthMethods:       "pwd",
-		AcrLevel:          enums.AcrLevel1.String(),
+		AcrLevel:          models.AcrLevel1.String(),
 		AuthTime:          now.Add(-1 * time.Hour),
 		IpAddress:         fake.IPv4Address(),
 		DeviceName:        fake.Name(),
@@ -718,7 +717,7 @@ func TestDeleteExpiredSessions(t *testing.T) {
 		Started:           now.Add(-48 * time.Hour),
 		LastAccessed:      now,
 		AuthMethods:       "pwd",
-		AcrLevel:          enums.AcrLevel1.String(),
+		AcrLevel:          models.AcrLevel1.String(),
 		AuthTime:          now.Add(-48 * time.Hour),
 		IpAddress:         fake.IPv4Address(),
 		DeviceName:        fake.Name(),
@@ -749,7 +748,7 @@ func TestDeleteExpiredSessions(t *testing.T) {
 		Started:           now.Add(-120 * time.Hour),
 		LastAccessed:      now,
 		AuthMethods:       "pwd",
-		AcrLevel:          enums.AcrLevel1.String(),
+		AcrLevel:          models.AcrLevel1.String(),
 		AuthTime:          now.Add(-120 * time.Hour),
 		IpAddress:         fake.IPv4Address(),
 		DeviceName:        fake.Name(),

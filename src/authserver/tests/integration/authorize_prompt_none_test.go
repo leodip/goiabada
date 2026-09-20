@@ -11,7 +11,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
-	"github.com/leodip/goiabada/core/enums"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 )
@@ -80,7 +79,7 @@ func TestPromptNone_AcrStepUpNeeded_ReturnsInteractionRequired(t *testing.T) {
 		"&scope=" + url.QueryEscape("openid profile") +
 		"&state=" + requestState +
 		"&prompt=none" +
-		"&acr_values=" + enums.AcrLevel2Optional.String()
+		"&acr_values=" + models.AcrLevel2Optional.String()
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
@@ -118,7 +117,7 @@ func TestPromptNone_OtpEnrollmentNeeded_ReturnsInteractionRequired(t *testing.T)
 		"&scope=" + url.QueryEscape("openid profile") +
 		"&state=" + requestState +
 		"&prompt=none" +
-		"&acr_values=" + enums.AcrLevel2Mandatory.String()
+		"&acr_values=" + models.AcrLevel2Mandatory.String()
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
@@ -176,7 +175,7 @@ func TestPromptNone_ConsentRequired_ReturnsConsentRequired(t *testing.T) {
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true, // Consent required
-		DefaultAcrLevel:          enums.AcrLevel1,
+		DefaultAcrLevel:          models.AcrLevel1,
 	}
 	err := database.CreateClient(nil, client)
 	if err != nil {
@@ -551,7 +550,7 @@ func TestPromptNone_OtpOptionalNoOtp_ReturnsInteractionRequired(t *testing.T) {
 		"&scope=" + url.QueryEscape("openid profile") +
 		"&state=" + requestState +
 		"&prompt=none" +
-		"&acr_values=" + enums.AcrLevel2Optional.String()
+		"&acr_values=" + models.AcrLevel2Optional.String()
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
@@ -619,7 +618,7 @@ func TestPromptNone_OtpConfigChanged_ReturnsInteractionRequired(t *testing.T) {
 		"&scope=" + url.QueryEscape("openid profile") +
 		"&state=" + requestState +
 		"&prompt=none" +
-		"&acr_values=" + enums.AcrLevel2Optional.String()
+		"&acr_values=" + models.AcrLevel2Optional.String()
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
@@ -683,7 +682,7 @@ func TestPromptNone_OtpConfigChanged_RefusalWritesNothing(t *testing.T) {
 			"&scope=" + url.QueryEscape("openid profile") +
 			"&state=" + requestState +
 			"&prompt=none" +
-			"&acr_values=" + enums.AcrLevel2Optional.String()
+			"&acr_values=" + models.AcrLevel2Optional.String()
 
 		resp, err := httpClient.Get(destUrl)
 		if err != nil {
@@ -739,7 +738,7 @@ func TestPromptNone_OtpConfigChangedLevel1Target_Success(t *testing.T) {
 		"&state=" + requestState +
 		"&nonce=" + requestNonce +
 		"&prompt=none" +
-		"&acr_values=" + enums.AcrLevel1.String()
+		"&acr_values=" + models.AcrLevel1.String()
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
@@ -892,7 +891,7 @@ func TestPromptNone_FullConsentCoverage(t *testing.T) {
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          enums.AcrLevel1,
+		DefaultAcrLevel:          models.AcrLevel1,
 	}
 	err := database.CreateClient(nil, client)
 	if err != nil {
@@ -1036,7 +1035,7 @@ func TestPromptNone_PartialConsentCoverage(t *testing.T) {
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          enums.AcrLevel1,
+		DefaultAcrLevel:          models.AcrLevel1,
 	}
 	err := database.CreateClient(nil, client)
 	if err != nil {
@@ -1159,7 +1158,7 @@ func TestPromptNone_OfflineAccessNotInConsent(t *testing.T) {
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          enums.AcrLevel1,
+		DefaultAcrLevel:          models.AcrLevel1,
 	}
 	err := database.CreateClient(nil, client)
 	if err != nil {
@@ -1291,7 +1290,7 @@ func TestPromptNone_OfflineAccessInConsent(t *testing.T) {
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          enums.AcrLevel1,
+		DefaultAcrLevel:          models.AcrLevel1,
 	}
 	err := database.CreateClient(nil, client)
 	if err != nil {
@@ -1435,7 +1434,7 @@ func TestPromptNone_RequestSubsetOfConsent(t *testing.T) {
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          enums.AcrLevel1,
+		DefaultAcrLevel:          models.AcrLevel1,
 	}
 	err := database.CreateClient(nil, client)
 	if err != nil {

@@ -4,7 +4,6 @@ import (
 	"database/sql"
 
 	"github.com/leodip/goiabada/core/constants"
-	"github.com/leodip/goiabada/core/enums"
 )
 
 type Client struct {
@@ -40,16 +39,16 @@ type Client struct {
 	// RFC 6749 Section 4.3
 	// SECURITY NOTE: ROPC is deprecated in OAuth 2.1 due to credential exposure risks.
 	// nil = use global setting, true = enabled, false = disabled
-	ResourceOwnerPasswordCredentialsEnabled *bool          `db:"resource_owner_password_credentials_enabled"`
-	TokenExpirationInSeconds                int            `db:"token_expiration_in_seconds"`
-	RefreshTokenOfflineIdleTimeoutInSeconds int            `db:"refresh_token_offline_idle_timeout_in_seconds"`
-	RefreshTokenOfflineMaxLifetimeInSeconds int            `db:"refresh_token_offline_max_lifetime_in_seconds"`
-	IncludeOpenIDConnectClaimsInAccessToken string         `db:"include_open_id_connect_claims_in_access_token"`
-	IncludeOpenIDConnectClaimsInIdToken     string         `db:"include_open_id_connect_claims_in_id_token"`
-	DefaultAcrLevel                         enums.AcrLevel `db:"default_acr_level"`
-	Permissions                             []Permission   `db:"-"`
-	RedirectURIs                            []RedirectURI  `db:"-"`
-	WebOrigins                              []WebOrigin    `db:"-"`
+	ResourceOwnerPasswordCredentialsEnabled *bool         `db:"resource_owner_password_credentials_enabled"`
+	TokenExpirationInSeconds                int           `db:"token_expiration_in_seconds"`
+	RefreshTokenOfflineIdleTimeoutInSeconds int           `db:"refresh_token_offline_idle_timeout_in_seconds"`
+	RefreshTokenOfflineMaxLifetimeInSeconds int           `db:"refresh_token_offline_max_lifetime_in_seconds"`
+	IncludeOpenIDConnectClaimsInAccessToken string        `db:"include_open_id_connect_claims_in_access_token"`
+	IncludeOpenIDConnectClaimsInIdToken     string        `db:"include_open_id_connect_claims_in_id_token"`
+	DefaultAcrLevel                         AcrLevel      `db:"default_acr_level"`
+	Permissions                             []Permission  `db:"-"`
+	RedirectURIs                            []RedirectURI `db:"-"`
+	WebOrigins                              []WebOrigin   `db:"-"`
 }
 
 func (c *Client) IsSystemLevelClient() bool {

@@ -15,7 +15,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/usersession"
-	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/errs"
 )
 
@@ -183,7 +182,7 @@ func HandleAuthCompletedGet(
 			// client would discharge a level 2 obligation it never addressed. It is the same
 			// predicate /auth/level1completed uses to decide the step-up, so the two agree by
 			// construction (#242 decision 3).
-			if authContext.OtpConfigGeneration != nil && targetAcrLevel.IsHigherThan(enums.AcrLevel1) {
+			if authContext.OtpConfigGeneration != nil && targetAcrLevel.IsHigherThan(models.AcrLevel1) {
 				err = database.PromoteUserSessionOtpConfigGeneration(nil, bumpedSession.Id,
 					*authContext.OtpConfigGeneration)
 				if err != nil {

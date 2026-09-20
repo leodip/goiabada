@@ -11,7 +11,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
-	"github.com/leodip/goiabada/core/enums"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -49,7 +48,7 @@ func TestToken_InvalidGrantType(t *testing.T) {
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ClientCredentialsEnabled: true,
-		DefaultAcrLevel:          enums.AcrLevel2Optional,
+		DefaultAcrLevel:          models.AcrLevel2Optional,
 	}
 	err := database.CreateClient(nil, client)
 	assert.Nil(t, err)
