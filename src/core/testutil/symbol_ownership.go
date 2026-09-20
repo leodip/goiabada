@@ -548,7 +548,8 @@ func (c *symbolCensus) spread(dir string, pkg *packageSymbols, names map[string]
 // local, a parameter, a struct field, a struct-literal key or a label sharing an exported symbol's
 // name would justify it, and this tree already has that shape -- core/testutil declares a type
 // Address and a field named Address. Those are resolved with go/types over each package's own
-// syntax instead, so an identifier counts only when it resolves to the declared object.
+// syntax instead, production files and internal test files alike, so an identifier counts only
+// when it resolves to the declared object.
 //
 // ceiling: the go/types pass runs with a stub importer, so nothing an import contributes is
 // resolved and every selector on an imported package is an error the checker is told to continue
@@ -590,8 +591,12 @@ func buildSymbolCensus(root string, graph *importGraph) (*symbolCensus, error) {
 			// only exported spellings sit inside a raw string template.
 			continue
 		}
-		if path, ok := graph.importPath(dir); ok {
-			byImportPath[path] = dir
+		importPath, hasPath := graph.importPath(dir)
+		if hasPath {
+			byImportPath[importPath] = dir
+		}
+		if err := census.readOwnPackageTests(root, dir, importPath); err != nil {
+			return nil, err
 		}
 		for name := range pkg.exported {
 			census.declared = append(census.declared, symbolKey{pkg: dir, name: name})
@@ -762,30 +767,37 @@ func readDecl(pkg *packageSymbols, decl ast.Decl, scope *types.Scope, info *type
 		if d.Tok == token.IMPORT {
 			return
 		}
-		var lastType ast.Expr
 		for _, spec := range d.Specs {
 			switch s := spec.(type) {
 			case *ast.TypeSpec:
 				owner := pkg.node(s.Name.Name)
 				collect(pkg, owner.decl, s.Type, s.Name.Name, scope, info)
 			case *ast.ValueSpec:
-				// A const with neither a type nor an expression inherits both from the nearest
-				// preceding spec that carries them, which is the Go spec's rule and the reason
-				// GenderMale and GenderOther are consts of Gender although neither spells it.
-				if s.Type != nil || len(s.Values) > 0 {
-					lastType = s.Type
-				}
-				for _, name := range s.Names {
+				for i, name := range s.Names {
 					owner := pkg.node(name.Name)
+					// One expression per name is positional, which is what Go means by
+					// `var a, b = f(), g()`: a is initialised by f and b by g, and nothing a
+					// names is evidence for anything b names. Any other count is the
+					// tuple-valued form, `var a, b = pair()`, where the single expression
+					// really does initialise both names -- or a const spec repeating the one
+					// above it, which has no expression of its own at all.
+					if len(s.Values) == len(s.Names) {
+						collect(pkg, owner.body, s.Values[i], name.Name, scope, info)
+					} else {
+						for _, value := range s.Values {
+							collect(pkg, owner.body, value, name.Name, scope, info)
+						}
+					}
 					// The declared type of a const or var never counts as evidence for the type:
 					// it is the second shape that lets an enum justify the type it enumerates.
 					// It is recorded instead, because the arrow runs the other way -- a const of a
-					// justified type is reachable.
-					if named := namedTypeIn(lastType, scope); named != "" {
+					// justified type is reachable. Deleting it from the body afterwards is what
+					// extends that to `LevelLow = Level("low")`, where the declared type is
+					// spelled in the initializer rather than in the type slot and would otherwise
+					// read as an ordinary reference to it.
+					if named := namedValueType(name.Name, scope); named != "" {
 						pkg.valueType[name.Name] = named
-					}
-					for _, value := range s.Values {
-						collect(pkg, owner.body, value, name.Name, scope, info)
+						delete(owner.body, named)
 					}
 				}
 			}
@@ -828,19 +840,36 @@ func receiverTypeName(recv *ast.FieldList) string {
 	}
 }
 
-// namedTypeIn returns the package-level type a value spec's type expression names directly, or ""
-// when it names none. Only a bare identifier counts: a slice, a map or a pointer is a composite,
-// and the arrow this feeds -- a const of a justified type is reachable -- is about an enum member,
-// not about a variable holding a collection.
-func namedTypeIn(expr ast.Expr, scope *types.Scope) string {
-	ident, ok := expr.(*ast.Ident)
-	if !ok {
+// namedValueType returns the same-package named type a package-level const or var has, or "" when
+// it has none. It reads the type go/types gave the value rather than the type slot of its spec,
+// because the three spellings below declare the same constant and a reader choosing one of the
+// last two should not be handed an asserted escape hatch for a symbol the tree justifies:
+//
+//	const ColourRed Colour = "red"      // the type slot
+//	const ColourRed = Colour("red")     // a conversion in the expression
+//	const ( ColourRed Colour = "red"; ColourBlue )  // repeating the spec above it
+//
+// Reading the syntax spec by spec instead is what made probe/census2.out call GenderFemale,
+// GenderMale and GenderOther test-only while Gender itself was both-apps.
+//
+// Only a named type this package declares counts. A slice, a map or a pointer is a composite, and
+// the arrow this feeds -- a const of a justified type is reachable -- is about an enum member,
+// not about a variable holding a collection; a type from an import is not a row in this table.
+func namedValueType(name string, scope *types.Scope) string {
+	obj := scope.Lookup(name)
+	switch obj.(type) {
+	case *types.Const, *types.Var:
+	default:
 		return ""
 	}
-	if _, isType := scope.Lookup(ident.Name).(*types.TypeName); !isType {
+	named, isNamed := types.Unalias(obj.Type()).(*types.Named)
+	if !isNamed {
 		return ""
 	}
-	return ident.Name
+	if named.Obj() == nil || named.Obj().Parent() != scope {
+		return ""
+	}
+	return named.Obj().Name()
 }
 
 // collect records every package-level name of this package that a syntax subtree reaches, skipping
@@ -897,10 +926,9 @@ func (c *symbolCensus) readReferences(root string, graph *importGraph, byImportP
 			return errs.Wrapf(readErr, "reading %s", path)
 		}
 		// A file not containing the core module path cannot import a core package, so it cannot
-		// name a symbol from one. Its own package's tests are the exception: they name their
-		// package's symbols unqualified.
-		_, ownsSymbols := c.pkgs[dir]
-		if !bytes.Contains(content, []byte(corePath)) && (!isTest || !ownsSymbols) {
+		// name a symbol from one. A declaring package's own tests name their symbols with no
+		// import at all, and readOwnPackageTests has already read those.
+		if !bytes.Contains(content, []byte(corePath)) {
 			return nil
 		}
 
@@ -913,29 +941,86 @@ func (c *symbolCensus) readReferences(root string, graph *importGraph, byImportP
 			return nil
 		}
 
-		if isTest && ownsSymbols {
-			c.recordOwnPackageTest(dir, file)
-		}
 		c.recordSelectors(dir, isTest, byImportPath, file)
 		return nil
 	})
 }
 
-// recordOwnPackageTest marks every symbol the declaring package's own tests name. This arm is by
-// spelling, because an internal test file and an external one resolve the same name two different
-// ways and neither is worth a second type-check: the only thing it can decide is whether a symbol
-// nothing else references may be called test support, and a symbol some test does not really name
-// is then merely refused a word it could not have earned anyway.
-func (c *symbolCensus) recordOwnPackageTest(dir string, file *ast.File) {
-	pkg := c.pkgs[dir]
-	ast.Inspect(file, func(n ast.Node) bool {
-		ident, ok := n.(*ast.Ident)
-		if !ok || !pkg.exported[ident.Name] {
-			return true
+// readOwnPackageTests records the symbols a core package's own tests name, which is the half of a
+// test-support row that the tree can supply rather than contradict.
+//
+// It is a per-package pass rather than a branch of the reference walk because the two kinds of
+// test file in a directory resolve a name two different ways. An internal test (`package p`) names
+// a symbol unqualified, so it is type-checked together with the production files and read by
+// object identity, exactly as collect reads a production declaration. An external test
+// (`package p_test`) is a different package that reaches the symbol through the import, so it is
+// read as a selector like any other importing file.
+//
+// Reading the internal arm by spelling instead is what the final review caught: a local variable,
+// a parameter or a field spelled like an exported orphan made the orphan look named, so
+// test-support -- the one asserted word the tree can argue with -- would have parked dead code in
+// core behind a word the guard believed it had checked (#385).
+func (c *symbolCensus) readOwnPackageTests(root, dir, importPath string) error {
+	abs := filepath.Join(root, filepath.FromSlash(dir))
+	entries, err := os.ReadDir(abs)
+	if err != nil {
+		return errs.Wrapf(err, "reading %s", dir)
+	}
+
+	fset := token.NewFileSet()
+	var production, internal, external []*ast.File
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".go") {
+			continue
 		}
-		c.tests[symbolKey{pkg: dir, name: ident.Name}] = true
-		return true
-	})
+		file, pErr := parser.ParseFile(fset, filepath.Join(abs, entry.Name()), nil, parser.ParseComments)
+		if pErr != nil {
+			// A file that does not parse is a compile error the build tier owns, exactly as in
+			// corePackageDirs.
+			continue
+		}
+		switch {
+		case !strings.HasSuffix(entry.Name(), "_test.go"):
+			if !exemptByBuildConstraint(file, fset) {
+				production = append(production, file)
+			}
+		case strings.HasSuffix(file.Name.Name, "_test"):
+			external = append(external, file)
+		default:
+			internal = append(internal, file)
+		}
+	}
+
+	pkg := c.pkgs[dir]
+	for _, file := range external {
+		local, imports := localImportName(file, importPath)
+		if !imports {
+			continue
+		}
+		for _, name := range selectedNames(file, local) {
+			if pkg.exported[name] {
+				c.tests[symbolKey{pkg: dir, name: name}] = true
+			}
+		}
+	}
+
+	if len(internal) == 0 {
+		return nil
+	}
+	scope, info := checkPackage(fset, dir, append(production, internal...))
+	for _, file := range internal {
+		ast.Inspect(file, func(n ast.Node) bool {
+			ident, ok := n.(*ast.Ident)
+			if !ok || !pkg.exported[ident.Name] {
+				return true
+			}
+			if obj := info.Uses[ident]; obj != nil && obj.Parent() == scope {
+				c.tests[symbolKey{pkg: dir, name: ident.Name}] = true
+			}
+			return true
+		})
+	}
+	return nil
 }
 
 // recordSelectors reads the symbols one file selects off the core packages it imports, and files
