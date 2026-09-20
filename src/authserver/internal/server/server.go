@@ -305,8 +305,9 @@ func (s *Server) initMiddleware() chi.Router {
 	// Accept-Language, or English. Must run AFTER MiddlewareSessionIdentifier
 	// so the session is decoded — the reader gets UI locales from session-backed
 	// authorize state. User-locale refinement happens per-handler in authserver
-	// (RefineLocalizerWithUserLocale), since identity is established at handler
-	// scope rather than at middleware scope.
+	// (an i18n.WithLocale call once a password has been checked), since
+	// identity is established at handler scope rather than at middleware
+	// scope.
 	i18nAuthHelper := authhandlerhelpers.NewAuthHelper(s.sessionStore, constants.AuthServerSessionName)
 
 	app := s.router.With(

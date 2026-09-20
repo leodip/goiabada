@@ -1136,7 +1136,8 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		}
 
 		// First save: AuthContext just constructed; UILocales must be captured here.
-		// The request pointer changes after RefineLocalizerWithUILocales, so we use
+		// The request pointer changes when the handler refines the localizer to
+		// the ui_locales it just captured, so we use
 		// mock.Anything for the request slot.
 		authHelper.On("SaveAuthContext", rr, mock.Anything, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateInitial && hasUILocales(ac)

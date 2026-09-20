@@ -68,7 +68,7 @@ func TestRaw_ResolvesTheLocaleTheSameWayTAsDoes(t *testing.T) {
 }
 
 func TestRaw_NoLocalizerOnContextResolvesFromLocaleTag(t *testing.T) {
-	// EmailContext and bare test contexts carry the tag but no translator.
+	// A bare test context carries the tag but no translator.
 	ctx := context.WithValue(context.Background(), ctxKeyLocaleTag, "pt-BR")
 	assert.Equal(t, "Enviar", Raw(ctx, "js.image_upload.upload_button"))
 }

@@ -11,9 +11,9 @@ import (
 //
 // It resolves the locale exactly as T() does, off the translator the locale
 // middleware attached, so a page and its JS strings can never disagree about
-// which locale they are in. Without a translator on the context — the
-// EmailContext and bare-test-context cases — it resolves from LocaleTag(ctx)
-// through the same matcher (#273).
+// which locale they are in. Without a translator on the context — a bare test
+// context, say — it resolves from LocaleTag(ctx) through the same matcher
+// (#273).
 func Raw(ctx context.Context, key string) string {
 	var loc *Translator
 	if ctx != nil {

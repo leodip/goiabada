@@ -188,7 +188,7 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 		})).Return(nil)
 
 		// The handler now wraps the request with a recipient-locale context
-		// (i18n.EmailContext) before rendering the email body, so the request
+		// (i18n.WithLocale) before rendering the email body, so the request
 		// pointer differs from the original. mock.Anything keeps the
 		// expectation focused on the layout / template / bind args.
 		var emailedLink string

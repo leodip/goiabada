@@ -19,6 +19,7 @@ import (
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
+	"github.com/leodip/goiabada/core/sessionstore/sessiontest"
 	"github.com/leodip/goiabada/core/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -245,7 +246,7 @@ func newRealStoreAuthHelper(t *testing.T) (*AuthHelper, *sessionstore.ServerSide
 	t.Helper()
 	authKey := []byte("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")
 	encKey := []byte("0123456789abcdef0123456789abcdef")
-	store, err := sessionstore.NewServerSideStore(sessionstore.NewMemoryBackend(),
+	store, err := sessionstore.NewServerSideStore(sessiontest.NewMemoryBackend(),
 		constants.SessionKeySessionIdentifier, false,
 		sessionstore.KeyPair{AuthenticationKey: authKey, EncryptionKey: encKey}, nil)
 	if err != nil {

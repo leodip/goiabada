@@ -320,7 +320,6 @@ command itself and fails on a tree it changed.
 | `core/hashutil` | `HashString` | kernel | — |
 | `core/hashutil` | `VerifyStringHash` | kernel | — |
 | `core/i18n` | `Bundle` | own-package | — |
-| `core/i18n` | `EmailContext` | moving | #385 decision 11 replaces it with the one exported locale primitive, `i18n.WithLocale`. |
 | `core/i18n` | `ErrCodeAddressAngleBrackets` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
 | `core/i18n` | `ErrCodeAddressCountryInvalid` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
 | `core/i18n` | `ErrCodeAddressLine1TooLong` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
@@ -392,31 +391,23 @@ command itself and fails on a tree it changed.
 | `core/i18n` | `ErrCodeUserGroupsNotFound` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
 | `core/i18n` | `FormatDateTime` | kernel | — |
 | `core/i18n` | `FormatSince` | kernel | — |
-| `core/i18n` | `IsMachineRequest` | moving | #385 decision 4 deletes it: nothing outside its own test has ever called it. |
 | `core/i18n` | `LoadBundle` | both-apps | — |
 | `core/i18n` | `LocaleLabel` | kernel | — |
 | `core/i18n` | `LocaleTag` | kernel | — |
 | `core/i18n` | `LocalizedError` | both-apps | — |
 | `core/i18n` | `Localizer` | own-package | — |
 | `core/i18n` | `MiddlewareLocale` | both-apps | — |
-| `core/i18n` | `MiddlewareLocaleFromJWT` | moving | #385 decision 11 moves it to `adminconsole/internal/middleware`, whose session it reads. |
 | `core/i18n` | `NewLocalizedError` | kernel | — |
 | `core/i18n` | `Raw` | kernel | — |
 | `core/i18n` | `RefCountry` | kernel | — |
 | `core/i18n` | `RefPhoneCountry` | kernel | — |
 | `core/i18n` | `RefTimezone` | kernel | — |
-| `core/i18n` | `RefineLocalizerWithUILocales` | moving | #385 decision 11 replaces it with the one exported locale primitive, `i18n.WithLocale`. |
-| `core/i18n` | `RefineLocalizerWithUserLocale` | moving | #385 decision 11 replaces it with the one exported locale primitive, `i18n.WithLocale`. |
 | `core/i18n` | `ResolveRequestLocale` | kernel | — |
 | `core/i18n` | `SanitizeUILocales` | own-package | — |
-| `core/i18n` | `SystemEntityDescription` | kernel | — |
-| `core/i18n` | `SystemEntityDisplay` | kernel | — |
-| `core/i18n` | `SystemEntityKindClient` | moving | #385 decision 4 deletes `system_entities.go`, whose registry is empty, so both functions over it always return the fallback. |
-| `core/i18n` | `SystemEntityKindPermission` | moving | #385 decision 4 deletes `system_entities.go`, whose registry is empty, so both functions over it always return the fallback. |
-| `core/i18n` | `SystemEntityKindResource` | moving | #385 decision 4 deletes `system_entities.go`, whose registry is empty, so both functions over it always return the fallback. |
 | `core/i18n` | `T` | kernel | — |
 | `core/i18n` | `Translator` | own-package | — |
 | `core/i18n` | `UILocalesReader` | reachable | — |
+| `core/i18n` | `WithLocale` | both-apps | — |
 | `core/locales` | `Get` | both-apps | — |
 | `core/locales` | `Locale` | own-package | — |
 | `core/logging` | `FieldForLog` | kernel | — |
@@ -462,24 +453,24 @@ command itself and fails on a tree it changed.
 | `core/sessionstore` | `Backend` | both-apps | — |
 | `core/sessionstore` | `DecodeKeyPair` | both-apps | — |
 | `core/sessionstore` | `DecodePreviousKeyPair` | both-apps | — |
-| `core/sessionstore` | `ErrNotFound` | both-apps | — |
+| `core/sessionstore` | `ErrNotFound` | kernel | — |
 | `core/sessionstore` | `ExpiresAt` | contract | The rule deciding when a browser session row stops being usable. The admin console's sessions live in rows the auth server's backend writes, so the rule is cross-process even though only the writing side calls it (#266). |
 | `core/sessionstore` | `KeyPair` | own-package | — |
 | `core/sessionstore` | `MaxSessionDataBytes` | own-package | — |
 | `core/sessionstore` | `MaxSessionWireBytes` | both-apps | — |
-| `core/sessionstore` | `MemoryBackend` | moving | #385 decision 13 moves it to `core/sessionstore/sessiontest`; no binary constructs it, and both link it today. |
-| `core/sessionstore` | `NewMemoryBackend` | moving | #385 decision 13 moves it to `core/sessionstore/sessiontest`; no binary constructs it, and both link it today. |
 | `core/sessionstore` | `NewServerSideStore` | both-apps | — |
 | `core/sessionstore` | `NewSession` | own-package | — |
 | `core/sessionstore` | `Options` | own-package | — |
 | `core/sessionstore` | `PreAuthLifetime` | contract | The unauthenticated half of the `ExpiresAt` rule beside it, and the one value that decides it. |
-| `core/sessionstore` | `Record` | both-apps | — |
+| `core/sessionstore` | `Record` | kernel | — |
 | `core/sessionstore` | `Regenerator` | both-apps | — |
 | `core/sessionstore` | `ServerSideStore` | own-package | — |
 | `core/sessionstore` | `Session` | own-package | — |
 | `core/sessionstore` | `SessionIdBytes` | own-package | — |
 | `core/sessionstore` | `Store` | kernel | — |
 | `core/sessionstore` | `TouchThreshold` | own-package | — |
+| `core/sessionstore/sessiontest` | `MemoryBackend` | test-support | Test support: the in-memory session backend nine test files across the two servers drive. Its own package precisely so no binary links it (#385). |
+| `core/sessionstore/sessiontest` | `NewMemoryBackend` | test-support | Test support: the in-memory session backend nine test files across the two servers drive. Its own package precisely so no binary links it (#385). |
 | `core/stringutil` | `ConvertToString` | kernel | — |
 | `core/stringutil` | `GenerateRandomLetterString` | moving | #385 moves it beside its one production caller in `authserver/internal/handlers/apihandlers`. |
 | `core/stringutil` | `GenerateRandomNumberString` | moving | #385 moves it beside its one production caller in `authserver/internal/handlers/apihandlers`. |

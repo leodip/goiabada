@@ -14,6 +14,7 @@ import (
 	"github.com/leodip/goiabada/core/constants"
 	mocks_handler_helpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
 	"github.com/leodip/goiabada/core/sessionstore"
+	"github.com/leodip/goiabada/core/sessionstore/sessiontest"
 )
 
 // The user details page is the one handler in the tree that reads two flash keys behind a
@@ -39,7 +40,7 @@ func (flashStubApiClient) GetUserById(accessToken string, id int64) (*api.UserRe
 // interesting once it has crossed a save and a load.
 func newFlashTestStore() *sessionstore.ServerSideStore {
 	store, err := sessionstore.NewServerSideStore(
-		sessionstore.NewMemoryBackend(),
+		sessiontest.NewMemoryBackend(),
 		constants.SessionKeyJwt,
 		false,
 		sessionstore.KeyPair{

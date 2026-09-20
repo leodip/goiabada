@@ -102,18 +102,6 @@ var templateFuncMap = template.FuncMap{
 		}
 		return i18n.T(ctx, key, args)
 	},
-	// SysName / SysDesc resolve built-in system entity names against the
-	// catalog. User-created entities fall back to the DB-stored value.
-	"SysName": func(ctx context.Context, kind, identifier, dbFallback string) string {
-		return i18n.SystemEntityDisplay(ctx, kind, identifier, dbFallback)
-	},
-	"SysDesc": func(ctx context.Context, kind, identifier, dbFallback string) string {
-		return i18n.SystemEntityDescription(ctx, kind, identifier, dbFallback)
-	},
-	// DirAttr resolves to "ltr" or "rtl" for the active locale. Returns
-	// "ltr" for every currently supported locale; the hook exists so RTL
-	// support can be added later without retrofitting templates.
-	"DirAttr": func(_ context.Context) string { return "ltr" },
 	// Lang resolves the active locale's BCP 47 tag for the <html lang="...">
 	// attribute, so the document advertises the language it actually renders
 	// in (screen readers, hyphenation, translation tools). Falls back to "en".

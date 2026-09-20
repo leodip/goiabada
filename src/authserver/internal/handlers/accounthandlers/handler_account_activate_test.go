@@ -26,6 +26,7 @@ import (
 	mocks_handlerhelpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/sessionstore"
+	"github.com/leodip/goiabada/core/sessionstore/sessiontest"
 )
 
 // The activation flow's state machine, at seam 3.
@@ -41,7 +42,7 @@ import (
 // assert is unchanged by that, since the marker round-trips either way.
 func newMarkerTestStore() *sessionstore.ServerSideStore {
 	store, err := sessionstore.NewServerSideStore(
-		sessionstore.NewMemoryBackend(),
+		sessiontest.NewMemoryBackend(),
 		constants.SessionKeySessionIdentifier,
 		false,
 		sessionstore.KeyPair{

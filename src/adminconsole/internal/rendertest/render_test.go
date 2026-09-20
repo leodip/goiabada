@@ -78,7 +78,7 @@ func renderWithLayoutAs(t *testing.T, layout, page string, bind map[string]inter
 		jwtInfo := oauth.JwtInfo{IdToken: &oauth.JwtToken{Claims: idTokenClaims}}
 		req = req.WithContext(context.WithValue(req.Context(), coreconstants.ContextKeyJwtInfo, jwtInfo))
 	}
-	req = i18n.RefineLocalizerWithUILocales(req, []string{"pt-BR"})
+	req = req.WithContext(i18n.WithLocale(req.Context(), true, "pt-BR"))
 
 	h := handlerhelpers.NewHttpHelper(web.TemplateFS(), adminmiddleware.SettingsReader{})
 	buf, err := h.RenderTemplateToBuffer(req, layout, page, bind)
@@ -105,7 +105,7 @@ func TestRender_NotFoundPage(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/admin/clients/not-a-number/settings", nil)
 	settings := &api.PublicSettingsResponse{AppName: "Test", UITheme: "dark", SMTPEnabled: true}
 	req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings, settings))
-	req = i18n.RefineLocalizerWithUILocales(req, []string{"pt-BR"})
+	req = req.WithContext(i18n.WithLocale(req.Context(), true, "pt-BR"))
 
 	w := httptest.NewRecorder()
 	handlerhelpers.NewHttpHelper(web.TemplateFS(), adminmiddleware.SettingsReader{}).NotFound(w, req)

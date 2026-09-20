@@ -476,7 +476,7 @@ func HandleAPIUserCreatePost(
 			// Newly-created user has no stored Locale yet; render the
 			// "set your password" email in English. Once the user logs in
 			// and chooses a locale, subsequent emails honor it.
-			emailReq := r.WithContext(i18n.EmailContext(r.Context(), createdUser.Locale))
+			emailReq := r.WithContext(i18n.WithLocale(r.Context(), true, createdUser.Locale, "en"))
 			buf, err := httpHelper.RenderTemplateToBuffer(emailReq, "/layouts/email_layout.html", "/emails/email_newuser_set_password.html", bind)
 			if err != nil {
 				writeInternalServerError(w, r, err)

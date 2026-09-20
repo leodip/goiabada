@@ -15,6 +15,7 @@ import (
 	"github.com/leodip/goiabada/core/constants"
 	mocks_handler_helpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
 	"github.com/leodip/goiabada/core/sessionstore"
+	"github.com/leodip/goiabada/core/sessionstore/sessiontest"
 )
 
 // This file exists because the session store's own tests cannot see the 69 call sites that
@@ -47,7 +48,7 @@ func (flashStubApiClient) UpdateAccountPassword(accessToken string,
 // the test put in it, which is the assertion making itself true.
 func newFlashTestStore() *sessionstore.ServerSideStore {
 	store, err := sessionstore.NewServerSideStore(
-		sessionstore.NewMemoryBackend(),
+		sessiontest.NewMemoryBackend(),
 		constants.SessionKeyJwt,
 		false,
 		sessionstore.KeyPair{
