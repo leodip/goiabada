@@ -12,10 +12,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
+	mocks_handlerhelpers "github.com/leodip/goiabada/adminconsole/internal/handlerhelpers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/customerrors"
-	mocks_handler_helpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
 )
 
 // Decision 13 on an AJAX preflight read, which is where the console's own sweep left the shape it
@@ -82,7 +82,7 @@ func TestResourceUsersWithPermissionRemovePost_ForwardsTheApisStatusAsJson(t *te
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			httpHelper := mocks_handler_helpers.NewHttpHelper(t)
+			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 			var captured error
 			httpHelper.On("JsonError", mock.Anything, mock.Anything, mock.Anything).
 				Run(func(args mock.Arguments) {

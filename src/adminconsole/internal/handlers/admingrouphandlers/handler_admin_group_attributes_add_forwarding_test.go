@@ -11,9 +11,9 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
+	mocks_handlerhelpers "github.com/leodip/goiabada/adminconsole/internal/handlerhelpers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/core/api"
-	mocks_handler_helpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
 )
 
 // Decision 11 at a form that submits through the API, and the row that makes it worth its own test:
@@ -84,7 +84,7 @@ func TestGroupAttributesAddPost_TellsTheApisStatusesApart(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			httpHelper := mocks_handler_helpers.NewHttpHelper(t)
+			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 			var renderedError any
 			switch testCase.want {
 			case answerRenderForm:

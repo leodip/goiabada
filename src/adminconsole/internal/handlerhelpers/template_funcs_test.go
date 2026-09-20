@@ -4,6 +4,7 @@ import (
 	"context"
 	"html/template"
 	"reflect"
+	"sort"
 	"testing"
 	"time"
 
@@ -122,5 +123,29 @@ func TestInstantOf(t *testing.T) {
 	// the rendertest seam catches, not one worth a panic in a page.
 	if got := instantOf("2026-09-14"); got != nil {
 		t.Errorf("instantOf(string) = %v, want nil", got)
+	}
+}
+
+// TestTemplateFuncMap_IsThisApplicationsTwentyTwo pins the split #385 made. The one map in core
+// held these same twenty-two and the auth server parsed every template with all of them, though
+// its pages call four: T, Lang, args and versionComment, which are also here. The other eighteen
+// -- the five page predicates over this console's own URL paths, the JS bootstrap block, the
+// reference-data formatters -- are this application's alone, and a new entry here means one of its
+// templates calls it.
+func TestTemplateFuncMap_IsThisApplicationsTwentyTwo(t *testing.T) {
+	keys := make([]string, 0, len(templateFuncMap))
+	for k := range templateFuncMap {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	want := []string{
+		"DateTime", "JSBootstrap", "Lang", "LocaleLabel", "RefCountry", "RefPhoneCountry",
+		"RefTimezone", "Since", "T", "add", "addUrlParam", "args", "concat", "deref",
+		"isAdminClientPage", "isAdminGroupPage", "isAdminResourcePage", "isAdminSettingsEmailPage",
+		"isAdminUserPage", "isLast", "marshal", "versionComment",
+	}
+	if !reflect.DeepEqual(keys, want) {
+		t.Errorf("templateFuncMap = %v, want %v", keys, want)
 	}
 }

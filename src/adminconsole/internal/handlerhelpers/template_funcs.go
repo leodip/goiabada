@@ -4,16 +4,23 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"html/template"
 	"log/slog"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/i18n"
-	"github.com/leodip/goiabada/core/stringutil"
 )
+
+// This file is one of two. The auth server's copy declares the four entries its templates call --
+// T, Lang, args and versionComment -- and the twenty-two below include those four. The one map
+// both binaries parsed with lived in core until #385, so every page this server renders parsed
+// eighteen functions it could not reach, five of them predicates over this console's own URL
+// paths (#385).
 
 // jsBootstrapKeys is the catalog-key list emitted by the JSBootstrap helper.
 // Keep in sync with the admin console's utils.js / image-upload.js, which are
@@ -44,10 +51,15 @@ var jsBootstrapKeys = []string{
 	"js.image_upload.error_prefix",
 }
 
-// addUrlParam is the template function that appends one query parameter to a URL. It is the one
-// closure of templateFuncMap lifted to a name, because html/template calls a function with no
+// addUrlParam is the template function that appends one query parameter to a URL. It is one of two
+// closures of templateFuncMap lifted to a name, because html/template calls a function with no
 // context and its record therefore carries no request_id: testutil's slogPlainSites lists it by
 // this name as the reason a plain slog call stands in a request-path package (#320).
+//
+// convertToString below is the other, and it is why the pair is here rather than in core. It was
+// core/stringutil.ConvertToString, exported for this one caller and writing its plain record
+// lawfully only because core/stringutil sits outside slogRequestPathDirs. Moving it in with its
+// caller costs it a third slogPlainSites row and retires that exemption by directory (#385).
 func addUrlParam(u string, k string, v interface{}) string {
 	parsedUrl, err := url.Parse(u)
 	if err != nil {
@@ -56,9 +68,32 @@ func addUrlParam(u string, k string, v interface{}) string {
 	}
 	query := parsedUrl.Query()
 
-	query.Add(k, stringutil.ConvertToString(v))
+	query.Add(k, convertToString(v))
 	parsedUrl.RawQuery = query.Encode()
 	return parsedUrl.String()
+}
+
+// convertToString renders a template's bind value as the string a query parameter carries. Only
+// addUrlParam calls it, which is why it is unexported and why it lives beside it: it was
+// core/stringutil.ConvertToString, and core published it for this one caller (#385).
+func convertToString(v interface{}) string {
+	switch val := v.(type) {
+	case int:
+		return strconv.Itoa(val)
+	case bool:
+		return strconv.FormatBool(val)
+	case string:
+		return val
+	case float64:
+		return strconv.FormatFloat(val, 'f', -1, 64)
+	default:
+		// The type rather than val, which is what this record has always claimed to carry and
+		// never did: "type" held the value itself, so an unconvertible value of an unknown
+		// type was written into the log under a key naming what it is not (#320 decision 3).
+		slog.Warn("unable to convert a value to a string, the type is not supported",
+			"type", fmt.Sprintf("%T", v))
+		return ""
+	}
 }
 
 // instantOf normalizes whatever a template binds into the pointer the i18n

@@ -10,9 +10,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
+	mocks_handlerhelpers "github.com/leodip/goiabada/adminconsole/internal/handlerhelpers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/core/api"
-	mocks_handler_helpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
 )
 
 // Decision 10 at the console's seam. These five pages disable rename and delete on a system-level
@@ -45,7 +45,7 @@ func (c *systemLevelApiClient) GetPermissionsByResource(accessToken string, reso
 func bindOfSystemLevelPage(t *testing.T, page string, resource api.ResourceResponse) map[string]interface{} {
 	t.Helper()
 
-	httpHelper := mocks_handler_helpers.NewHttpHelper(t)
+	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, mock.Anything, mock.Anything).Once()
 
@@ -102,7 +102,7 @@ func TestAdminResourcePages_TheSystemLevelFlagIsTheServersAnswer(t *testing.T) {
 // re-renders with the refusal and DeleteResource is never reached, which the embedded stub proves
 // by panicking if it is.
 func TestAdminResourceDeletePost_RefusesOnTheServersFlag(t *testing.T) {
-	httpHelper := mocks_handler_helpers.NewHttpHelper(t)
+	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, mock.Anything, mock.Anything).Once()
 

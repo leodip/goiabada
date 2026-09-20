@@ -7,10 +7,11 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
+	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/adminconsole/internal/pagination"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/constants"
+	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
@@ -60,9 +61,9 @@ func HandleAdminResourceGroupsWithPermissionGet(
 		}
 
 		// filter out the userinfo permission if the resource is authserver
-		if resource.ResourceIdentifier == constants.AuthServerResourceIdentifier {
+		if resource.ResourceIdentifier == coreconstants.AuthServerResourceIdentifier {
 			permissions = slices.DeleteFunc(permissions, func(p api.PermissionResponse) bool {
-				return p.PermissionIdentifier == constants.UserinfoPermissionIdentifier
+				return p.PermissionIdentifier == coreconstants.UserinfoPermissionIdentifier
 			})
 		}
 
@@ -178,7 +179,7 @@ func HandleAdminResourceGroupsWithPermissionGet(
 		pageResult := GroupsWithPermissionPageResult{Page: pageInt, PageSize: pageSize, Total: total, Groups: groupInfoArr}
 		p := pagination.New(total, pageSize, pageInt, 5)
 
-		sess, err := httpSession.Get(r, constants.AdminConsoleSessionName)
+		sess, err := httpSession.Get(r, coreconstants.AdminConsoleSessionName)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
@@ -290,9 +291,9 @@ func HandleAdminResourceGroupsWithPermissionAddPermissionPost(
 		}
 
 		// filter out the userinfo permission if the resource is authserver
-		if resource.ResourceIdentifier == constants.AuthServerResourceIdentifier {
+		if resource.ResourceIdentifier == coreconstants.AuthServerResourceIdentifier {
 			permissions = slices.DeleteFunc(permissions, func(p api.PermissionResponse) bool {
-				return p.PermissionIdentifier == constants.UserinfoPermissionIdentifier
+				return p.PermissionIdentifier == coreconstants.UserinfoPermissionIdentifier
 			})
 		}
 
@@ -422,8 +423,8 @@ func HandleAdminResourceGroupsWithPermissionRemovePermissionPost(
 		// filter out the userinfo permission if the resource is authserver
 		filteredPermissions := []api.PermissionResponse{}
 		for idx, permission := range permissions {
-			if permission.Resource.ResourceIdentifier == constants.AuthServerResourceIdentifier {
-				if permission.PermissionIdentifier != constants.UserinfoPermissionIdentifier {
+			if permission.Resource.ResourceIdentifier == coreconstants.AuthServerResourceIdentifier {
+				if permission.PermissionIdentifier != coreconstants.UserinfoPermissionIdentifier {
 					filteredPermissions = append(filteredPermissions, permissions[idx])
 				}
 			} else {

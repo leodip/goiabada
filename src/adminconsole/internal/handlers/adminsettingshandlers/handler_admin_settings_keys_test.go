@@ -10,9 +10,9 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
+	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	adminmiddleware "github.com/leodip/goiabada/adminconsole/internal/middleware"
-	"github.com/leodip/goiabada/core/handlerhelpers"
 )
 
 // stubApiClient embeds apiclient.ApiClient so its hundred-odd other methods come for free

@@ -9,9 +9,9 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
+	mocks_handlerhelpers "github.com/leodip/goiabada/adminconsole/internal/handlerhelpers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/core/api"
-	mocks_handler_helpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
 )
 
 // Decision 11 on a page that reads its entity through the API rather than through the database.
@@ -64,7 +64,7 @@ func TestClientDeleteGet_ForwardsTheApisStatus(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			httpHelper := mocks_handler_helpers.NewHttpHelper(t)
+			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 			if testCase.wantNotFound {
 				httpHelper.On("NotFound", mock.Anything, mock.Anything).Return().Once()
 			} else {

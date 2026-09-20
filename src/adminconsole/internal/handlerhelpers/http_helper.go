@@ -14,12 +14,25 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/adminconsole/internal/constants"
+	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/oauth"
 )
+
+// This renderer is one of two. The auth server has its own copy in
+// authserver/internal/handlerhelpers, and about 238 of the lines below are the same in both.
+//
+// The duplication is deliberate and is what owning a renderer costs. The single copy this
+// replaced lived in core and hid two things only one binary ever reached: the loggedInUser and
+// isAdmin page data, which the auth server never binds, and a template FuncMap of which this
+// application calls all twenty-two entries where the auth server calls four. Passing either in as
+// a parameter would have left one shared package behaving differently for its two callers, which
+// is the shape #385
+// exists to remove. Drift between the two copies is the accepted price; a change worth making in
+// one is worth reading the other for (#385).
 
 type LayoutSettings struct {
 	AppName     string
@@ -144,11 +157,11 @@ func (h *HttpHelper) RenderTemplateToBuffer(r *http.Request, layoutName string, 
 	data["uiTheme"] = settings.UITheme
 	data["urlPath"] = r.URL.Path
 	data["smtpEnabled"] = settings.SMTPEnabled
-	data["goiabadaVersion"] = constants.Version + " (" + constants.BuildDate + ")"
+	data["goiabadaVersion"] = coreconstants.Version + " (" + coreconstants.BuildDate + ")"
 	// Inject the request context so templates can call {{ T $.ctx "..." }}
-	// and every other locale-reading template function. This is the single
-	// canonical injection point for both authserver and adminconsole render
-	// paths.
+	// and every other locale-reading template function. This is this
+	// application's one injection point; the auth server's renderer has its
+	// own, and the two are deliberately separate (#385).
 	data["ctx"] = r.Context()
 
 	var jwtInfo oauth.JwtInfo
@@ -214,7 +227,7 @@ func (h *HttpHelper) RenderTemplateToBuffer(r *http.Request, layoutName string, 
 			data["loggedInUser"] = loggedInUser
 		}
 		if jwtInfo.AccessToken != nil &&
-			jwtInfo.AccessToken.HasScope(constants.AuthServerResourceIdentifier+":"+constants.ManagePermissionIdentifier) {
+			jwtInfo.AccessToken.HasScope(coreconstants.AuthServerResourceIdentifier+":"+coreconstants.ManagePermissionIdentifier) {
 			data["isAdmin"] = true
 		}
 	}
@@ -340,61 +353,4 @@ func (h *HttpHelper) EncodeJson(w http.ResponseWriter, r *http.Request, data int
 	if err != nil {
 		h.JsonError(w, r, err)
 	}
-}
-
-func (h *HttpHelper) GetFromUrlQueryOrFormPost(r *http.Request, key string) string {
-	return GetFromUrlQueryOrFormPost(r, key)
-}
-
-func (h *HttpHelper) LookupFromUrlQueryOrFormPost(r *http.Request, key string) (string, bool) {
-	return LookupFromUrlQueryOrFormPost(r, key)
-}
-
-// The two functions below carry the behaviour and the methods above are delegates, because a
-// caller that has no HttpHelper still has to read a parameter exactly as a handler would.
-//
-// The CSRF middleware is that caller (#109). It decides whether to exempt POST /auth/logout on
-// whether an id_token_hint is PRESENT, and the logout handler then classifies the very same
-// parameter. Those two readings have to be the same reading: middleware saying "present" where the
-// handler says "absent" exempts a cross-site POST and then routes it down the hintless branch,
-// which tears the whole session down with no consent. A second implementation beside this one is
-// how that drift arrives, so there is one implementation and both halves call it.
-
-// GetFromUrlQueryOrFormPost returns the value of key from the URL query, falling back to the
-// form body. It cannot distinguish an absent parameter from one supplied empty: both are "".
-func GetFromUrlQueryOrFormPost(r *http.Request, key string) string {
-	value := r.URL.Query().Get(key)
-	if len(value) == 0 {
-		value = r.FormValue(key)
-	}
-	return value
-}
-
-// LookupFromUrlQueryOrFormPost reports the value of key and whether the parameter was
-// supplied at all. GetFromUrlQueryOrFormPost cannot express that difference: it returns
-// "" both for a parameter that was absent and for one supplied empty.
-//
-// RP-initiated logout needs the distinction, because the OP echoes the RP's "state" back
-// on the post-logout redirect and the two cases have different answers: an RP that sent
-// "state=" must get "state=" back, and one that sent nothing must get no state parameter
-// at all. Collapsing them either invents a parameter the RP never sent or drops one it
-// did (#109).
-//
-// The value comes from GetFromUrlQueryOrFormPost rather than being re-derived, so the
-// query-beats-body precedence cannot drift between the two helpers. Presence is only
-// consulted when that value is empty, and r.PostForm is populated by then: an empty
-// query value is exactly the case where the legacy helper falls through to r.FormValue,
-// which parses the body.
-func LookupFromUrlQueryOrFormPost(r *http.Request, key string) (string, bool) {
-	value := GetFromUrlQueryOrFormPost(r, key)
-	if len(value) > 0 {
-		return value, true
-	}
-	if _, ok := r.URL.Query()[key]; ok {
-		return "", true
-	}
-	if _, ok := r.PostForm[key]; ok {
-		return "", true
-	}
-	return "", false
 }

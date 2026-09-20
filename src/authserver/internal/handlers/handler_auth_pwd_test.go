@@ -22,8 +22,8 @@ import (
 
 	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	mocks_handlerhelpers "github.com/leodip/goiabada/authserver/internal/handlerhelpers/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
-	mocks_handlerhelpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
 )
 
 func TestHandleAuthPwdGet(t *testing.T) {

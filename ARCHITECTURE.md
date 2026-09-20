@@ -98,7 +98,6 @@ A row whose owner is not `kernel` names the issue that moves it. A `kernel` row 
 | `core/customerrors` | kernel | — |
 | `core/enums` | kernel | — |
 | `core/errs` | kernel | — |
-| `core/handlerhelpers` | kernel | — |
 | `core/hashutil` | kernel | — |
 | `core/i18n` | kernel | — |
 | `core/locales` | kernel | — |
@@ -176,19 +175,18 @@ silence is not. Four rows carry it, the permission identifiers #359 left behind.
 | `AdminConsoleClientIdentifier` | both-apps | — |
 | `AdminConsoleSessionName` | both-apps | — |
 | `AdminReadPermissionIdentifier` | contract | — |
-| `AuthServerResourceIdentifier` | kernel | — |
+| `AuthServerResourceIdentifier` | both-apps | — |
 | `BrowserSessionsPermissionIdentifier` | both-apps | — |
-| `BuildDate` | kernel | — |
+| `BuildDate` | both-apps | — |
 | `BuiltInAuthServerPermissionIdentifiers` | both-apps | — |
-| `ContextKeyJwtInfo` | kernel | — |
-| `GitCommit` | kernel | — |
+| `GitCommit` | both-apps | — |
 | `ManageAccountPermissionIdentifier` | both-apps | — |
 | `ManageClientsPermissionIdentifier` | contract | — |
-| `ManagePermissionIdentifier` | kernel | — |
+| `ManagePermissionIdentifier` | both-apps | — |
 | `ManageSettingsPermissionIdentifier` | contract | — |
 | `ManageUsersPermissionIdentifier` | contract | — |
 | `UserinfoPermissionIdentifier` | both-apps | — |
-| `Version` | kernel | — |
+| `Version` | both-apps | — |
 
 Notes on rows that are not self-evident:
 
@@ -210,16 +208,23 @@ Notes on rows that are not self-evident:
   auth server against `*api.PublicSettingsResponse` in the admin console — so either assertion
   panics on the other's value. It satisfied the letter of `both-apps`, and that row would have been
   true and misleading (#351).
-- `Version`, `BuildDate` and `GitCommit` are `kernel` because `core/handlerhelpers` puts them into
-  every rendered page's template data, in both binaries.
-- The six `SessionKey*` and `ContextKeyBearerToken` were here until #385 and are not any more. They
-  were `kernel` on the strength of one core package each: `core/handlerhelpers/auth_helper.go` and
-  `core/middleware/middleware_jwt.go` for the session keys, the latter alone for the bearer key.
-  Both files held one application's implementation, so #385 moved them — the OAuth client and JWT
-  session middleware to `adminconsole/internal`, the bearer middleware to `authserver/internal` —
-  and every key went with its one writer, to that module's own `internal/constants`.
-  `ContextKeyJwtInfo` stays, `kernel` on `core/handlerhelpers/http_helper.go`, which reads it for
-  the admin page data; it leaves when that reader does.
+- No row reads `kernel` any more, and that is #385's doing rather than an omission. Every symbol
+  that carried the word did so on the strength of one core package: `core/handlerhelpers`, which
+  put `Version`, `BuildDate` and `GitCommit` into every rendered page's template data and read
+  `AuthServerResourceIdentifier` and `ManagePermissionIdentifier` to decide `isAdmin`. That
+  renderer was two applications' renderers in one package, so #385 split it, and the five dropped
+  to `both-apps` in the same commit with nothing else in the tree changing. They are still named
+  by both binaries, which is why they are still here.
+- The six `SessionKey*`, `ContextKeyBearerToken` and `ContextKeyJwtInfo` were here until #385 and
+  are not any more, so core declares no context key at all and `core/constants/context_key.go` is
+  gone. Each was `kernel` on the strength of one core package: `core/handlerhelpers/auth_helper.go`
+  and `core/middleware/middleware_jwt.go` for the session keys, the latter alone for the bearer
+  key, `core/handlerhelpers/http_helper.go` for `ContextKeyJwtInfo`, which read it to bind the
+  admin page data. Every one of those files held one application's implementation, so #385 moved
+  them — the OAuth client, the JWT session middleware and the console's renderer to
+  `adminconsole/internal`, the bearer middleware and the auth server's renderer to
+  `authserver/internal` — and every key went with its one writer, to that module's own
+  `internal/constants`.
 - `ManageAccountPermissionIdentifier` dropped from `kernel` to `both-apps` in the same commit, for
   the same reason and with no change in the tree beyond it: `core/middleware/middleware_jwt.go`
   was its one core referrer, through `buildScopeString`. Both applications still name it, so it

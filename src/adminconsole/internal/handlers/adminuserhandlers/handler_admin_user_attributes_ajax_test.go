@@ -13,10 +13,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
+	mocks_handlerhelpers "github.com/leodip/goiabada/adminconsole/internal/handlerhelpers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/customerrors"
-	mocks_handler_helpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
 )
 
 // Decision 11 answered for an AJAX request, at this handler group's seam. Stage 8 gave the page
@@ -135,7 +135,7 @@ func TestUserAttributesRemove_StaleOrMalformedUrlAnswers404AsJson(t *testing.T) 
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			httpHelper := mocks_handler_helpers.NewHttpHelper(t)
+			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 			var captured error
 			httpHelper.On("JsonError", mock.Anything, mock.Anything, mock.Anything).
 				Run(func(args mock.Arguments) {
@@ -198,7 +198,7 @@ func TestUserConsents_MalformedBodyAnswers400AsJson(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			httpHelper := mocks_handler_helpers.NewHttpHelper(t)
+			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 			var captured error
 			httpHelper.On("JsonError", mock.Anything, mock.Anything, mock.Anything).
 				Run(func(args mock.Arguments) {

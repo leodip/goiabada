@@ -19,7 +19,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
-	mocks_handlerhelpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
+	mocks_handlerhelpers "github.com/leodip/goiabada/authserver/internal/handlerhelpers/mocks"
 )
 
 func TestHandleAuthLevel1Get(t *testing.T) {

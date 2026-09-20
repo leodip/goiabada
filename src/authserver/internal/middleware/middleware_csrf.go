@@ -3,7 +3,7 @@ package middleware
 import (
 	"net/http"
 
-	"github.com/leodip/goiabada/core/handlerhelpers"
+	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
 )
 
 // LogoutIdTokenHintPresent reports whether this is a POST to the logout endpoint carrying an

@@ -214,13 +214,17 @@ var slogSpreadSites = []slogSpreadSite{
 // context, code and token issuance, and the signing keys (#339) -- the two validator packages the
 // handlers call on a request (#344) -- the eight application service and leaf packages that
 // followed them out of core (#346) -- and the core packages the handlers call into on a request:
-// the shared middleware, the identifier and angle-bracket validators that stayed there, the
-// handler helpers and the session store.
+// the shared middleware, the identifier and angle-bracket validators that stayed there, and the
+// session store.
 //
 // adminconsole/internal/oauthclient is here because the client-side token parser is: its JWKS
 // fetch writes the one record that package carries, and #385 moved it out of core/oauth. Listed
 // at the move rather than afterwards, since the walk only fails when it reaches no files at all,
 // so a directory absent from this list costs coverage in silence.
+//
+// adminconsole/internal/handlerhelpers is here for the same reason and core/handlerhelpers is
+// gone: #385 split the one renderer both binaries parsed their templates with into one per
+// application. The auth server's half joined authserver/internal/handlerhelpers, already listed.
 //
 // authserver/internal/protocolvalidation carries the one record any of the three writes, the
 // redirect_uri refusal in authorize_validator.go. accountvalidation and what is left of
@@ -265,10 +269,10 @@ var slogRequestPathDirs = []string{
 	"adminconsole/internal/middleware",
 	"adminconsole/internal/apiclient",
 	"adminconsole/internal/oauthclient",
+	"adminconsole/internal/handlerhelpers",
 	"core/middleware",
 	"core/validators",
 	"core/oauth",
-	"core/handlerhelpers",
 	"core/sessionstore",
 }
 
@@ -280,15 +284,17 @@ type slogPlainSite struct {
 	name  string
 }
 
-// slogPlainSites is rule 5's table. Two functions, each with the reason no context reaches it:
+// slogPlainSites is rule 5's table. Three functions, each with the reason no context reaches it:
 // parseCIDRs runs once, when the real-IP middleware is constructed at startup, and its record is
-// about the configuration rather than a request; addUrlParam is a template function, and
-// html/template calls it with no context, so a record it writes has nothing to carry request_id
-// on. A third function of the second kind, stringutil.ConvertToString, sits outside the listed
-// directories and is named in the comment on them.
+// about the configuration rather than a request; addUrlParam and convertToString are the admin
+// console's template function and the helper it calls, and html/template invokes a template
+// function with no context, so a record either writes has nothing to carry request_id on.
+// convertToString was core/stringutil.ConvertToString and stood outside these directories
+// altogether until #385 moved it in with its one caller.
 var slogPlainSites = []slogPlainSite{
 	{scope: "core/middleware/middleware_realip.go", name: "parseCIDRs"},
-	{scope: "core/handlerhelpers/template_funcs.go", name: "addUrlParam"},
+	{scope: "adminconsole/internal/handlerhelpers/template_funcs.go", name: "addUrlParam"},
+	{scope: "adminconsole/internal/handlerhelpers/template_funcs.go", name: "convertToString"},
 }
 
 var (

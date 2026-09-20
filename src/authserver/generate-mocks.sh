@@ -9,12 +9,14 @@ echo "========================================"
 # The "//go:build !production" constraint on each mock comes from
 # template-data.mock-build-tags in the .mockery.yaml files, not from this script.
 #
-# Three modules have a config, and each writes inside itself with one deliberate
-# exception: authserver/.mockery.yaml writes the HttpHelper mock into
-# ../core/handlerhelpers/mocks, from authserver's own interface declaration. Never add
-# a second config writing a file another one writes -- whichever module runs last
-# silently wins. adminconsole gained its config in #385, when the JWT session
-# middleware and its two mocked ports moved there out of core/middleware.
+# Three modules have a config and each writes only inside itself. That was not true
+# until #385: authserver/.mockery.yaml wrote the HttpHelper mock into
+# ../core/handlerhelpers/mocks and both applications imported it from there, which the
+# renderer split ended -- each module now declares its own HttpHelper port and
+# generates its own mock beside its own renderer. Never add a config that writes a file
+# another one writes; whichever module runs last silently wins, with nothing saying so.
+# adminconsole gained its config in #385, when the JWT session middleware and its two
+# mocked ports moved there out of core/middleware.
 
 # Get the directory where this script is located
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
