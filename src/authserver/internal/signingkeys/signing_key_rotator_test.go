@@ -8,7 +8,6 @@ import (
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/uuidutil"
-	"github.com/leodip/goiabada/core/enums"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -74,9 +73,9 @@ func keyPairInState(id int64, state string) models.KeyPair {
 // fullKeySet is the ordinary starting point: one key in each state.
 func fullKeySet() []models.KeyPair {
 	return []models.KeyPair{
-		keyPairInState(1, enums.KeyStateCurrent.String()),
-		keyPairInState(2, enums.KeyStateNext.String()),
-		keyPairInState(3, enums.KeyStatePrevious.String()),
+		keyPairInState(1, models.KeyStateCurrent.String()),
+		keyPairInState(2, models.KeyStateNext.String()),
+		keyPairInState(3, models.KeyStatePrevious.String()),
 	}
 }
 
@@ -94,10 +93,10 @@ func TestSigningKeyRotator_Rotate_Success(t *testing.T) {
 	database.On("DeleteKeyPair", rotatorTx, int64(3)).Return(nil).Once().
 		Run(record("DeleteKeyPair"))
 	database.On("UpdateKeyPairState", rotatorTx, int64(1),
-		enums.KeyStateCurrent.String(), enums.KeyStatePrevious.String()).
+		models.KeyStateCurrent.String(), models.KeyStatePrevious.String()).
 		Return(true, nil).Once().Run(record("demote"))
 	database.On("UpdateKeyPairState", rotatorTx, int64(2),
-		enums.KeyStateNext.String(), enums.KeyStateCurrent.String()).
+		models.KeyStateNext.String(), models.KeyStateCurrent.String()).
 		Return(true, nil).Once().Run(record("promote"))
 
 	var created *models.KeyPair
@@ -124,7 +123,7 @@ func TestSigningKeyRotator_Rotate_Success(t *testing.T) {
 	assert.NoError(t, stub.bodyErr)
 
 	require.NotNil(t, created)
-	assert.Equal(t, enums.KeyStateNext.String(), created.State)
+	assert.Equal(t, models.KeyStateNext.String(), created.State)
 	assert.Equal(t, "RSA", created.Type)
 	assert.Equal(t, "RS256", created.Algorithm)
 	// The kid is a canonical v4 the generator produced, not merely a non-empty string: it is
@@ -148,13 +147,13 @@ func TestSigningKeyRotator_Rotate_SucceedsWithNoPreviousKey(t *testing.T) {
 
 	expectRotatorTransaction(database, nil)
 	database.On("GetAllSigningKeys", rotatorTx).Return([]models.KeyPair{
-		keyPairInState(1, enums.KeyStateCurrent.String()),
-		keyPairInState(2, enums.KeyStateNext.String()),
+		keyPairInState(1, models.KeyStateCurrent.String()),
+		keyPairInState(2, models.KeyStateNext.String()),
 	}, nil).Once()
 	database.On("UpdateKeyPairState", rotatorTx, int64(1),
-		enums.KeyStateCurrent.String(), enums.KeyStatePrevious.String()).Return(true, nil).Once()
+		models.KeyStateCurrent.String(), models.KeyStatePrevious.String()).Return(true, nil).Once()
 	database.On("UpdateKeyPairState", rotatorTx, int64(2),
-		enums.KeyStateNext.String(), enums.KeyStateCurrent.String()).Return(true, nil).Once()
+		models.KeyStateNext.String(), models.KeyStateCurrent.String()).Return(true, nil).Once()
 	database.On("CreateKeyPair", rotatorTx, mock.Anything).Return(nil).Once()
 
 	require.NoError(t, newTestRotator(database).Rotate())
@@ -172,15 +171,15 @@ func TestSigningKeyRotator_Rotate_GuardRefusesBeforeAnyWrite(t *testing.T) {
 		{
 			name: "no next key",
 			keys: []models.KeyPair{
-				keyPairInState(1, enums.KeyStateCurrent.String()),
-				keyPairInState(3, enums.KeyStatePrevious.String()),
+				keyPairInState(1, models.KeyStateCurrent.String()),
+				keyPairInState(3, models.KeyStatePrevious.String()),
 			},
 		},
 		{
 			name: "no current key",
 			keys: []models.KeyPair{
-				keyPairInState(2, enums.KeyStateNext.String()),
-				keyPairInState(3, enums.KeyStatePrevious.String()),
+				keyPairInState(2, models.KeyStateNext.String()),
+				keyPairInState(3, models.KeyStatePrevious.String()),
 			},
 		},
 		{
@@ -220,7 +219,7 @@ func TestSigningKeyRotator_Rotate_LosesTheDemotion(t *testing.T) {
 	database.On("GetAllSigningKeys", rotatorTx).Return(fullKeySet(), nil).Once()
 	database.On("DeleteKeyPair", rotatorTx, int64(3)).Return(nil).Once()
 	database.On("UpdateKeyPairState", rotatorTx, int64(1),
-		enums.KeyStateCurrent.String(), enums.KeyStatePrevious.String()).
+		models.KeyStateCurrent.String(), models.KeyStatePrevious.String()).
 		Return(false, nil).Once()
 
 	err := newTestRotator(database).Rotate()
@@ -230,7 +229,7 @@ func TestSigningKeyRotator_Rotate_LosesTheDemotion(t *testing.T) {
 	// attempted and nothing may commit: the body hands the refusal to the helper, which
 	// rolls the delete back with it.
 	database.AssertNotCalled(t, "UpdateKeyPairState", rotatorTx, int64(2),
-		enums.KeyStateNext.String(), enums.KeyStateCurrent.String())
+		models.KeyStateNext.String(), models.KeyStateCurrent.String())
 	database.AssertNotCalled(t, "CreateKeyPair", mock.Anything, mock.Anything)
 	assert.ErrorIs(t, stub.bodyErr, ErrRotationInProgress)
 }
@@ -244,10 +243,10 @@ func TestSigningKeyRotator_Rotate_LosesThePromotion(t *testing.T) {
 	database.On("GetAllSigningKeys", rotatorTx).Return(fullKeySet(), nil).Once()
 	database.On("DeleteKeyPair", rotatorTx, int64(3)).Return(nil).Once()
 	database.On("UpdateKeyPairState", rotatorTx, int64(1),
-		enums.KeyStateCurrent.String(), enums.KeyStatePrevious.String()).
+		models.KeyStateCurrent.String(), models.KeyStatePrevious.String()).
 		Return(true, nil).Once()
 	database.On("UpdateKeyPairState", rotatorTx, int64(2),
-		enums.KeyStateNext.String(), enums.KeyStateCurrent.String()).
+		models.KeyStateNext.String(), models.KeyStateCurrent.String()).
 		Return(false, nil).Once()
 
 	err := newTestRotator(database).Rotate()
@@ -288,7 +287,7 @@ func TestSigningKeyRotator_Rotate_RollsBackOnFailureAtEveryStep(t *testing.T) {
 				database.On("GetAllSigningKeys", rotatorTx).Return(fullKeySet(), nil).Once()
 				database.On("DeleteKeyPair", rotatorTx, int64(3)).Return(nil).Once()
 				database.On("UpdateKeyPairState", rotatorTx, int64(1),
-					enums.KeyStateCurrent.String(), enums.KeyStatePrevious.String()).
+					models.KeyStateCurrent.String(), models.KeyStatePrevious.String()).
 					Return(false, failure).Once()
 			},
 		},
@@ -298,10 +297,10 @@ func TestSigningKeyRotator_Rotate_RollsBackOnFailureAtEveryStep(t *testing.T) {
 				database.On("GetAllSigningKeys", rotatorTx).Return(fullKeySet(), nil).Once()
 				database.On("DeleteKeyPair", rotatorTx, int64(3)).Return(nil).Once()
 				database.On("UpdateKeyPairState", rotatorTx, int64(1),
-					enums.KeyStateCurrent.String(), enums.KeyStatePrevious.String()).
+					models.KeyStateCurrent.String(), models.KeyStatePrevious.String()).
 					Return(true, nil).Once()
 				database.On("UpdateKeyPairState", rotatorTx, int64(2),
-					enums.KeyStateNext.String(), enums.KeyStateCurrent.String()).
+					models.KeyStateNext.String(), models.KeyStateCurrent.String()).
 					Return(false, failure).Once()
 			},
 		},
@@ -311,10 +310,10 @@ func TestSigningKeyRotator_Rotate_RollsBackOnFailureAtEveryStep(t *testing.T) {
 				database.On("GetAllSigningKeys", rotatorTx).Return(fullKeySet(), nil).Once()
 				database.On("DeleteKeyPair", rotatorTx, int64(3)).Return(nil).Once()
 				database.On("UpdateKeyPairState", rotatorTx, int64(1),
-					enums.KeyStateCurrent.String(), enums.KeyStatePrevious.String()).
+					models.KeyStateCurrent.String(), models.KeyStatePrevious.String()).
 					Return(true, nil).Once()
 				database.On("UpdateKeyPairState", rotatorTx, int64(2),
-					enums.KeyStateNext.String(), enums.KeyStateCurrent.String()).
+					models.KeyStateNext.String(), models.KeyStateCurrent.String()).
 					Return(true, nil).Once()
 				database.On("CreateKeyPair", rotatorTx, mock.Anything).Return(failure).Once()
 			},
@@ -361,9 +360,9 @@ func TestSigningKeyRotator_Rotate_CommitFailureIsReported(t *testing.T) {
 	database.On("GetAllSigningKeys", rotatorTx).Return(fullKeySet(), nil).Once()
 	database.On("DeleteKeyPair", rotatorTx, int64(3)).Return(nil).Once()
 	database.On("UpdateKeyPairState", rotatorTx, int64(1),
-		enums.KeyStateCurrent.String(), enums.KeyStatePrevious.String()).Return(true, nil).Once()
+		models.KeyStateCurrent.String(), models.KeyStatePrevious.String()).Return(true, nil).Once()
 	database.On("UpdateKeyPairState", rotatorTx, int64(2),
-		enums.KeyStateNext.String(), enums.KeyStateCurrent.String()).Return(true, nil).Once()
+		models.KeyStateNext.String(), models.KeyStateCurrent.String()).Return(true, nil).Once()
 	database.On("CreateKeyPair", rotatorTx, mock.Anything).Return(nil).Once()
 
 	assert.ErrorIs(t, newTestRotator(database).Rotate(), failure)

@@ -15,7 +15,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
 )
@@ -118,7 +117,7 @@ func HandleAPISettingsGeneralPut(
 		}
 
 		// Validation: Password policy
-		passwordPolicy, err := enums.PasswordPolicyFromString(strings.TrimSpace(req.PasswordPolicy))
+		passwordPolicy, err := models.PasswordPolicyFromString(strings.TrimSpace(req.PasswordPolicy))
 		if err != nil {
 			writeJSONError(w, "Invalid password policy", "VALIDATION_ERROR", http.StatusBadRequest)
 			return

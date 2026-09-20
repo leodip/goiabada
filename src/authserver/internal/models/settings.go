@@ -2,27 +2,25 @@ package models
 
 import (
 	"database/sql"
-
-	"github.com/leodip/goiabada/core/enums"
 )
 
 type Settings struct {
-	Id                                        int64                `db:"id" fieldtag:"pk"`
-	CreatedAt                                 sql.NullTime         `db:"created_at" fieldtag:"dont-update"`
-	UpdatedAt                                 sql.NullTime         `db:"updated_at"`
-	AppName                                   string               `db:"app_name"`
-	Issuer                                    string               `db:"issuer"`
-	UITheme                                   string               `db:"ui_theme"`
-	PasswordPolicy                            enums.PasswordPolicy `db:"password_policy"`
-	SelfRegistrationEnabled                   bool                 `db:"self_registration_enabled"`
-	SelfRegistrationRequiresEmailVerification bool                 `db:"self_registration_requires_email_verification"`
-	TokenExpirationInSeconds                  int                  `db:"token_expiration_in_seconds"`
-	RefreshTokenOfflineIdleTimeoutInSeconds   int                  `db:"refresh_token_offline_idle_timeout_in_seconds"`
-	RefreshTokenOfflineMaxLifetimeInSeconds   int                  `db:"refresh_token_offline_max_lifetime_in_seconds"`
-	UserSessionIdleTimeoutInSeconds           int                  `db:"user_session_idle_timeout_in_seconds"`
-	UserSessionMaxLifetimeInSeconds           int                  `db:"user_session_max_lifetime_in_seconds"`
-	IncludeOpenIDConnectClaimsInAccessToken   bool                 `db:"include_open_id_connect_claims_in_access_token"`
-	IncludeOpenIDConnectClaimsInIdToken       bool                 `db:"include_open_id_connect_claims_in_id_token"`
+	Id                                        int64          `db:"id" fieldtag:"pk"`
+	CreatedAt                                 sql.NullTime   `db:"created_at" fieldtag:"dont-update"`
+	UpdatedAt                                 sql.NullTime   `db:"updated_at"`
+	AppName                                   string         `db:"app_name"`
+	Issuer                                    string         `db:"issuer"`
+	UITheme                                   string         `db:"ui_theme"`
+	PasswordPolicy                            PasswordPolicy `db:"password_policy"`
+	SelfRegistrationEnabled                   bool           `db:"self_registration_enabled"`
+	SelfRegistrationRequiresEmailVerification bool           `db:"self_registration_requires_email_verification"`
+	TokenExpirationInSeconds                  int            `db:"token_expiration_in_seconds"`
+	RefreshTokenOfflineIdleTimeoutInSeconds   int            `db:"refresh_token_offline_idle_timeout_in_seconds"`
+	RefreshTokenOfflineMaxLifetimeInSeconds   int            `db:"refresh_token_offline_max_lifetime_in_seconds"`
+	UserSessionIdleTimeoutInSeconds           int            `db:"user_session_idle_timeout_in_seconds"`
+	UserSessionMaxLifetimeInSeconds           int            `db:"user_session_max_lifetime_in_seconds"`
+	IncludeOpenIDConnectClaimsInAccessToken   bool           `db:"include_open_id_connect_claims_in_access_token"`
+	IncludeOpenIDConnectClaimsInIdToken       bool           `db:"include_open_id_connect_claims_in_id_token"`
 	// AESEncryptionKeyLegacy is the data key as historically stored in the DB.
 	// The key now comes from the environment (config.GetAESEncryptionKey, issue
 	// #83). Do NOT use it for encrypt/decrypt at runtime.

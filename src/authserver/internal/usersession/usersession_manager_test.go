@@ -9,7 +9,6 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/models"
-	"github.com/leodip/goiabada/core/enums"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
@@ -24,24 +23,24 @@ func TestShouldUpgradeAcrLevel(t *testing.T) {
 	// Test all valid ACR level upgrade scenarios
 	t.Run("level1 to level2_optional should upgrade", func(t *testing.T) {
 		result := shouldUpgradeAcrLevel(
-			enums.AcrLevel1.String(),
-			enums.AcrLevel2Optional.String(),
+			models.AcrLevel1.String(),
+			models.AcrLevel2Optional.String(),
 		)
 		assert.True(t, result, "level1 → level2_optional should return true (upgrade)")
 	})
 
 	t.Run("level1 to level2_mandatory should upgrade", func(t *testing.T) {
 		result := shouldUpgradeAcrLevel(
-			enums.AcrLevel1.String(),
-			enums.AcrLevel2Mandatory.String(),
+			models.AcrLevel1.String(),
+			models.AcrLevel2Mandatory.String(),
 		)
 		assert.True(t, result, "level1 → level2_mandatory should return true (upgrade)")
 	})
 
 	t.Run("level2_optional to level2_mandatory should upgrade", func(t *testing.T) {
 		result := shouldUpgradeAcrLevel(
-			enums.AcrLevel2Optional.String(),
-			enums.AcrLevel2Mandatory.String(),
+			models.AcrLevel2Optional.String(),
+			models.AcrLevel2Mandatory.String(),
 		)
 		assert.True(t, result, "level2_optional → level2_mandatory should return true (upgrade)")
 	})
@@ -49,24 +48,24 @@ func TestShouldUpgradeAcrLevel(t *testing.T) {
 	// Test all valid ACR level NO upgrade scenarios (same or downgrade)
 	t.Run("level2_optional to level1 should NOT upgrade (downgrade)", func(t *testing.T) {
 		result := shouldUpgradeAcrLevel(
-			enums.AcrLevel2Optional.String(),
-			enums.AcrLevel1.String(),
+			models.AcrLevel2Optional.String(),
+			models.AcrLevel1.String(),
 		)
 		assert.False(t, result, "level2_optional → level1 should return false (no downgrade)")
 	})
 
 	t.Run("level2_mandatory to level1 should NOT upgrade (downgrade)", func(t *testing.T) {
 		result := shouldUpgradeAcrLevel(
-			enums.AcrLevel2Mandatory.String(),
-			enums.AcrLevel1.String(),
+			models.AcrLevel2Mandatory.String(),
+			models.AcrLevel1.String(),
 		)
 		assert.False(t, result, "level2_mandatory → level1 should return false (no downgrade)")
 	})
 
 	t.Run("level2_mandatory to level2_optional should NOT upgrade (downgrade)", func(t *testing.T) {
 		result := shouldUpgradeAcrLevel(
-			enums.AcrLevel2Mandatory.String(),
-			enums.AcrLevel2Optional.String(),
+			models.AcrLevel2Mandatory.String(),
+			models.AcrLevel2Optional.String(),
 		)
 		assert.False(t, result, "level2_mandatory → level2_optional should return false (no downgrade)")
 	})
@@ -74,24 +73,24 @@ func TestShouldUpgradeAcrLevel(t *testing.T) {
 	// Test same level scenarios
 	t.Run("level1 to level1 should NOT upgrade (same)", func(t *testing.T) {
 		result := shouldUpgradeAcrLevel(
-			enums.AcrLevel1.String(),
-			enums.AcrLevel1.String(),
+			models.AcrLevel1.String(),
+			models.AcrLevel1.String(),
 		)
 		assert.False(t, result, "level1 → level1 should return false (same level)")
 	})
 
 	t.Run("level2_optional to level2_optional should NOT upgrade (same)", func(t *testing.T) {
 		result := shouldUpgradeAcrLevel(
-			enums.AcrLevel2Optional.String(),
-			enums.AcrLevel2Optional.String(),
+			models.AcrLevel2Optional.String(),
+			models.AcrLevel2Optional.String(),
 		)
 		assert.False(t, result, "level2_optional → level2_optional should return false (same level)")
 	})
 
 	t.Run("level2_mandatory to level2_mandatory should NOT upgrade (same)", func(t *testing.T) {
 		result := shouldUpgradeAcrLevel(
-			enums.AcrLevel2Mandatory.String(),
-			enums.AcrLevel2Mandatory.String(),
+			models.AcrLevel2Mandatory.String(),
+			models.AcrLevel2Mandatory.String(),
 		)
 		assert.False(t, result, "level2_mandatory → level2_mandatory should return false (same level)")
 	})
@@ -100,14 +99,14 @@ func TestShouldUpgradeAcrLevel(t *testing.T) {
 	t.Run("unknown current ACR should NOT upgrade (fail-safe)", func(t *testing.T) {
 		result := shouldUpgradeAcrLevel(
 			"unknown:acr:level",
-			enums.AcrLevel2Mandatory.String(),
+			models.AcrLevel2Mandatory.String(),
 		)
 		assert.False(t, result, "unknown current ACR should return false (fail-safe)")
 	})
 
 	t.Run("unknown new ACR should NOT upgrade (fail-safe)", func(t *testing.T) {
 		result := shouldUpgradeAcrLevel(
-			enums.AcrLevel1.String(),
+			models.AcrLevel1.String(),
 			"unknown:acr:level",
 		)
 		assert.False(t, result, "unknown new ACR should return false (fail-safe)")
@@ -124,14 +123,14 @@ func TestShouldUpgradeAcrLevel(t *testing.T) {
 	t.Run("empty current ACR should NOT upgrade (fail-safe)", func(t *testing.T) {
 		result := shouldUpgradeAcrLevel(
 			"",
-			enums.AcrLevel2Mandatory.String(),
+			models.AcrLevel2Mandatory.String(),
 		)
 		assert.False(t, result, "empty current ACR should return false (fail-safe)")
 	})
 
 	t.Run("empty new ACR should NOT upgrade (fail-safe)", func(t *testing.T) {
 		result := shouldUpgradeAcrLevel(
-			enums.AcrLevel1.String(),
+			models.AcrLevel1.String(),
 			"",
 		)
 		assert.False(t, result, "empty new ACR should return false (fail-safe)")
@@ -175,7 +174,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 		req := createRequest()
 
 		// Session starts at level1 with password only
-		userSession := createUserSession(enums.AcrLevel1.String(), "pwd")
+		userSession := createUserSession(models.AcrLevel1.String(), "pwd")
 
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, "test-session-id").
 			Return(userSession, nil)
@@ -184,18 +183,18 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 		expectRunInTransaction(database)
 		database.On("UpdateUserSession", mock.Anything, mock.MatchedBy(func(s *models.UserSession) bool {
 			// Verify the session was updated with new ACR and AuthMethods
-			return s.AcrLevel == enums.AcrLevel2Optional.String() &&
+			return s.AcrLevel == models.AcrLevel2Optional.String() &&
 				s.AuthMethods == "pwd otp"
 		})).Return(nil)
 		database.On("CreateUserSessionClient", mock.Anything, mock.Anything).Return(nil)
 
 		// Step-up to level2_optional with pwd+otp
 		result, err := manager.BumpUserSession(req, "test-session-id", 456,
-			"pwd otp", enums.AcrLevel2Optional.String())
+			"pwd otp", models.AcrLevel2Optional.String())
 
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
-		assert.Equal(t, enums.AcrLevel2Optional.String(), result.AcrLevel)
+		assert.Equal(t, models.AcrLevel2Optional.String(), result.AcrLevel)
 		assert.Equal(t, "pwd otp", result.AuthMethods)
 
 		database.AssertExpectations(t)
@@ -206,7 +205,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 		manager := &UserSessionManager{database: database}
 		req := createRequest()
 
-		userSession := createUserSession(enums.AcrLevel1.String(), "pwd")
+		userSession := createUserSession(models.AcrLevel1.String(), "pwd")
 
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, "test-session-id").
 			Return(userSession, nil)
@@ -214,17 +213,17 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 			Return(nil)
 		expectRunInTransaction(database)
 		database.On("UpdateUserSession", mock.Anything, mock.MatchedBy(func(s *models.UserSession) bool {
-			return s.AcrLevel == enums.AcrLevel2Mandatory.String() &&
+			return s.AcrLevel == models.AcrLevel2Mandatory.String() &&
 				s.AuthMethods == "pwd otp"
 		})).Return(nil)
 		database.On("CreateUserSessionClient", mock.Anything, mock.Anything).Return(nil)
 
 		result, err := manager.BumpUserSession(req, "test-session-id", 456,
-			"pwd otp", enums.AcrLevel2Mandatory.String())
+			"pwd otp", models.AcrLevel2Mandatory.String())
 
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
-		assert.Equal(t, enums.AcrLevel2Mandatory.String(), result.AcrLevel)
+		assert.Equal(t, models.AcrLevel2Mandatory.String(), result.AcrLevel)
 		assert.Equal(t, "pwd otp", result.AuthMethods)
 
 		database.AssertExpectations(t)
@@ -236,7 +235,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 		req := createRequest()
 
 		// Already at level2_optional with pwd+otp
-		userSession := createUserSession(enums.AcrLevel2Optional.String(), "pwd otp")
+		userSession := createUserSession(models.AcrLevel2Optional.String(), "pwd otp")
 
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, "test-session-id").
 			Return(userSession, nil)
@@ -245,17 +244,17 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 		expectRunInTransaction(database)
 		database.On("UpdateUserSession", mock.Anything, mock.MatchedBy(func(s *models.UserSession) bool {
 			// ACR should upgrade, AuthMethods should stay the same
-			return s.AcrLevel == enums.AcrLevel2Mandatory.String() &&
+			return s.AcrLevel == models.AcrLevel2Mandatory.String() &&
 				s.AuthMethods == "pwd otp"
 		})).Return(nil)
 		database.On("CreateUserSessionClient", mock.Anything, mock.Anything).Return(nil)
 
 		result, err := manager.BumpUserSession(req, "test-session-id", 456,
-			"pwd otp", enums.AcrLevel2Mandatory.String())
+			"pwd otp", models.AcrLevel2Mandatory.String())
 
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
-		assert.Equal(t, enums.AcrLevel2Mandatory.String(), result.AcrLevel)
+		assert.Equal(t, models.AcrLevel2Mandatory.String(), result.AcrLevel)
 
 		database.AssertExpectations(t)
 	})
@@ -266,7 +265,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 		req := createRequest()
 
 		// Session is at level2_mandatory
-		userSession := createUserSession(enums.AcrLevel2Mandatory.String(), "pwd otp")
+		userSession := createUserSession(models.AcrLevel2Mandatory.String(), "pwd otp")
 
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, "test-session-id").
 			Return(userSession, nil)
@@ -275,17 +274,17 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 		expectRunInTransaction(database)
 		database.On("UpdateUserSession", mock.Anything, mock.MatchedBy(func(s *models.UserSession) bool {
 			// ACR should NOT be downgraded, should remain level2_mandatory
-			return s.AcrLevel == enums.AcrLevel2Mandatory.String()
+			return s.AcrLevel == models.AcrLevel2Mandatory.String()
 		})).Return(nil)
 		database.On("CreateUserSessionClient", mock.Anything, mock.Anything).Return(nil)
 
 		// Request level1, but session should stay at level2_mandatory
 		result, err := manager.BumpUserSession(req, "test-session-id", 456,
-			"pwd otp", enums.AcrLevel1.String())
+			"pwd otp", models.AcrLevel1.String())
 
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
-		assert.Equal(t, enums.AcrLevel2Mandatory.String(), result.AcrLevel,
+		assert.Equal(t, models.AcrLevel2Mandatory.String(), result.AcrLevel,
 			"ACR should NOT be downgraded from level2_mandatory to level1")
 
 		database.AssertExpectations(t)
@@ -296,7 +295,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 		manager := &UserSessionManager{database: database}
 		req := createRequest()
 
-		userSession := createUserSession(enums.AcrLevel2Optional.String(), "pwd otp")
+		userSession := createUserSession(models.AcrLevel2Optional.String(), "pwd otp")
 
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, "test-session-id").
 			Return(userSession, nil)
@@ -304,16 +303,16 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 			Return(nil)
 		expectRunInTransaction(database)
 		database.On("UpdateUserSession", mock.Anything, mock.MatchedBy(func(s *models.UserSession) bool {
-			return s.AcrLevel == enums.AcrLevel2Optional.String()
+			return s.AcrLevel == models.AcrLevel2Optional.String()
 		})).Return(nil)
 		database.On("CreateUserSessionClient", mock.Anything, mock.Anything).Return(nil)
 
 		result, err := manager.BumpUserSession(req, "test-session-id", 456,
-			"pwd otp", enums.AcrLevel1.String())
+			"pwd otp", models.AcrLevel1.String())
 
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
-		assert.Equal(t, enums.AcrLevel2Optional.String(), result.AcrLevel,
+		assert.Equal(t, models.AcrLevel2Optional.String(), result.AcrLevel,
 			"ACR should NOT be downgraded from level2_optional to level1")
 
 		database.AssertExpectations(t)
@@ -324,7 +323,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 		manager := &UserSessionManager{database: database}
 		req := createRequest()
 
-		userSession := createUserSession(enums.AcrLevel2Optional.String(), "pwd otp")
+		userSession := createUserSession(models.AcrLevel2Optional.String(), "pwd otp")
 
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, "test-session-id").
 			Return(userSession, nil)
@@ -332,17 +331,17 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 			Return(nil)
 		expectRunInTransaction(database)
 		database.On("UpdateUserSession", mock.Anything, mock.MatchedBy(func(s *models.UserSession) bool {
-			return s.AcrLevel == enums.AcrLevel2Optional.String() &&
+			return s.AcrLevel == models.AcrLevel2Optional.String() &&
 				s.AuthMethods == "pwd otp"
 		})).Return(nil)
 		database.On("CreateUserSessionClient", mock.Anything, mock.Anything).Return(nil)
 
 		result, err := manager.BumpUserSession(req, "test-session-id", 456,
-			"pwd otp", enums.AcrLevel2Optional.String())
+			"pwd otp", models.AcrLevel2Optional.String())
 
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
-		assert.Equal(t, enums.AcrLevel2Optional.String(), result.AcrLevel)
+		assert.Equal(t, models.AcrLevel2Optional.String(), result.AcrLevel)
 
 		database.AssertExpectations(t)
 	})
@@ -352,7 +351,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 		manager := &UserSessionManager{database: database}
 		req := createRequest()
 
-		userSession := createUserSession(enums.AcrLevel1.String(), "pwd")
+		userSession := createUserSession(models.AcrLevel1.String(), "pwd")
 
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, "test-session-id").
 			Return(userSession, nil)
@@ -367,7 +366,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 
 		// Pass empty authMethods - should preserve existing
 		result, err := manager.BumpUserSession(req, "test-session-id", 456,
-			"", enums.AcrLevel1.String())
+			"", models.AcrLevel1.String())
 
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
@@ -382,7 +381,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 		manager := &UserSessionManager{database: database}
 		req := createRequest()
 
-		userSession := createUserSession(enums.AcrLevel2Optional.String(), "pwd otp")
+		userSession := createUserSession(models.AcrLevel2Optional.String(), "pwd otp")
 
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, "test-session-id").
 			Return(userSession, nil)
@@ -391,7 +390,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 		expectRunInTransaction(database)
 		database.On("UpdateUserSession", mock.Anything, mock.MatchedBy(func(s *models.UserSession) bool {
 			// AcrLevel should remain level2_optional when empty string passed
-			return s.AcrLevel == enums.AcrLevel2Optional.String()
+			return s.AcrLevel == models.AcrLevel2Optional.String()
 		})).Return(nil)
 		database.On("CreateUserSessionClient", mock.Anything, mock.Anything).Return(nil)
 
@@ -401,7 +400,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
-		assert.Equal(t, enums.AcrLevel2Optional.String(), result.AcrLevel,
+		assert.Equal(t, models.AcrLevel2Optional.String(), result.AcrLevel,
 			"AcrLevel should be preserved when empty string is passed")
 
 		database.AssertExpectations(t)
@@ -412,7 +411,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 		manager := &UserSessionManager{database: database}
 		req := createRequest()
 
-		userSession := createUserSession(enums.AcrLevel2Mandatory.String(), "pwd otp")
+		userSession := createUserSession(models.AcrLevel2Mandatory.String(), "pwd otp")
 
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, "test-session-id").
 			Return(userSession, nil)
@@ -421,7 +420,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 		expectRunInTransaction(database)
 		database.On("UpdateUserSession", mock.Anything, mock.MatchedBy(func(s *models.UserSession) bool {
 			// Both should be preserved
-			return s.AcrLevel == enums.AcrLevel2Mandatory.String() &&
+			return s.AcrLevel == models.AcrLevel2Mandatory.String() &&
 				s.AuthMethods == "pwd otp"
 		})).Return(nil)
 		database.On("CreateUserSessionClient", mock.Anything, mock.Anything).Return(nil)
@@ -431,7 +430,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
-		assert.Equal(t, enums.AcrLevel2Mandatory.String(), result.AcrLevel)
+		assert.Equal(t, models.AcrLevel2Mandatory.String(), result.AcrLevel)
 		assert.Equal(t, "pwd otp", result.AuthMethods)
 
 		database.AssertExpectations(t)
@@ -444,7 +443,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 
 		// Edge case: same ACR but different auth methods string
 		// (This shouldn't normally happen, but we should handle it)
-		userSession := createUserSession(enums.AcrLevel2Optional.String(), "pwd")
+		userSession := createUserSession(models.AcrLevel2Optional.String(), "pwd")
 
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, "test-session-id").
 			Return(userSession, nil)
@@ -458,7 +457,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 		database.On("CreateUserSessionClient", mock.Anything, mock.Anything).Return(nil)
 
 		result, err := manager.BumpUserSession(req, "test-session-id", 456,
-			"pwd otp", enums.AcrLevel2Optional.String())
+			"pwd otp", models.AcrLevel2Optional.String())
 
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
@@ -476,7 +475,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 			Return(nil, nil)
 
 		result, err := manager.BumpUserSession(req, "non-existent-session", 456,
-			"pwd", enums.AcrLevel1.String())
+			"pwd", models.AcrLevel1.String())
 
 		assert.Error(t, err)
 		assert.Nil(t, result)
@@ -506,7 +505,7 @@ func TestBumpUserSession_ClientTracking(t *testing.T) {
 			Id:                1,
 			SessionIdentifier: "test-session-id",
 			UserId:            123,
-			AcrLevel:          enums.AcrLevel1.String(),
+			AcrLevel:          models.AcrLevel1.String(),
 			AuthMethods:       "pwd",
 			IpAddress:         "192.168.1.1",
 			LastAccessed:      time.Now().UTC().Add(-1 * time.Hour),
@@ -546,7 +545,7 @@ func TestBumpUserSession_ClientTracking(t *testing.T) {
 			Id:                1,
 			SessionIdentifier: "test-session-id",
 			UserId:            123,
-			AcrLevel:          enums.AcrLevel1.String(),
+			AcrLevel:          models.AcrLevel1.String(),
 			AuthMethods:       "pwd",
 			IpAddress:         "192.168.1.1",
 			LastAccessed:      oldTime,
@@ -585,7 +584,7 @@ func TestBumpUserSession_ClientTracking(t *testing.T) {
 			Id:                1,
 			SessionIdentifier: "test-session-id",
 			UserId:            123,
-			AcrLevel:          enums.AcrLevel1.String(),
+			AcrLevel:          models.AcrLevel1.String(),
 			AuthMethods:       "pwd",
 			IpAddress:         "192.168.1.1", // Original IP
 			LastAccessed:      time.Now().UTC().Add(-1 * time.Hour),
@@ -621,7 +620,7 @@ func TestBumpUserSession_ClientTracking(t *testing.T) {
 			Id:                1,
 			SessionIdentifier: "test-session-id",
 			UserId:            123,
-			AcrLevel:          enums.AcrLevel1.String(),
+			AcrLevel:          models.AcrLevel1.String(),
 			AuthMethods:       "pwd",
 			IpAddress:         "192.168.1.1",
 			LastAccessed:      time.Now().UTC().Add(-1 * time.Hour),
@@ -777,44 +776,44 @@ func TestWillRaisePrivilege(t *testing.T) {
 			name:        "Nil session raises nothing",
 			userSession: nil,
 			authMethods: "pwd otp",
-			acrLevel:    enums.AcrLevel2Mandatory.String(),
+			acrLevel:    models.AcrLevel2Mandatory.String(),
 			expected:    false,
 		},
 		{
 			name:        "Neither changes",
-			userSession: &models.UserSession{AuthMethods: "pwd", AcrLevel: enums.AcrLevel1.String()},
+			userSession: &models.UserSession{AuthMethods: "pwd", AcrLevel: models.AcrLevel1.String()},
 			authMethods: "pwd",
-			acrLevel:    enums.AcrLevel1.String(),
+			acrLevel:    models.AcrLevel1.String(),
 			expected:    false,
 		},
 		{
 			name:        "Auth methods rise",
-			userSession: &models.UserSession{AuthMethods: "pwd", AcrLevel: enums.AcrLevel1.String()},
+			userSession: &models.UserSession{AuthMethods: "pwd", AcrLevel: models.AcrLevel1.String()},
 			authMethods: "pwd otp",
-			acrLevel:    enums.AcrLevel1.String(),
+			acrLevel:    models.AcrLevel1.String(),
 			expected:    true,
 		},
 		{
 			name:        "ACR level rises",
-			userSession: &models.UserSession{AuthMethods: "pwd", AcrLevel: enums.AcrLevel1.String()},
+			userSession: &models.UserSession{AuthMethods: "pwd", AcrLevel: models.AcrLevel1.String()},
 			authMethods: "pwd",
-			acrLevel:    enums.AcrLevel2Mandatory.String(),
+			acrLevel:    models.AcrLevel2Mandatory.String(),
 			expected:    true,
 		},
 		{
 			// The session already holds the stronger level, so this ceremony is not a
 			// step-up and rotating would spend a write on nothing.
 			name:        "ACR level would be downgraded",
-			userSession: &models.UserSession{AuthMethods: "pwd otp", AcrLevel: enums.AcrLevel2Mandatory.String()},
+			userSession: &models.UserSession{AuthMethods: "pwd otp", AcrLevel: models.AcrLevel2Mandatory.String()},
 			authMethods: "pwd otp",
-			acrLevel:    enums.AcrLevel1.String(),
+			acrLevel:    models.AcrLevel1.String(),
 			expected:    false,
 		},
 		{
 			// An empty incoming value means the ceremony recorded nothing, which is not a
 			// change. Reading it as one would rotate on every SSO reuse.
 			name:        "Empty inputs change nothing",
-			userSession: &models.UserSession{AuthMethods: "pwd", AcrLevel: enums.AcrLevel1.String()},
+			userSession: &models.UserSession{AuthMethods: "pwd", AcrLevel: models.AcrLevel1.String()},
 			authMethods: "",
 			acrLevel:    "",
 			expected:    false,

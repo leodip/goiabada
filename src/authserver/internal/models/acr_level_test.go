@@ -1,4 +1,4 @@
-package enums
+package models
 
 import (
 	"testing"
@@ -338,6 +338,32 @@ func TestAcrLevel_String(t *testing.T) {
 				parsed, err := AcrLevelFromString(str)
 				assert.NoError(t, err)
 				assert.Equal(t, level, parsed)
+			})
+		}
+	})
+
+	// The complement of the totality the six integer enums gained in #385: AcrLevel is
+	// string-backed, so there is no range to be outside of, and an unrecognized value has to
+	// survive rather than collapse to "". OIDC Core defines acr as a case-sensitive string whose
+	// meaning can be deployment-specific, so discarding one would change what a token carries for
+	// a value this server simply does not rank. Priority answering 0 is what keeps comparison safe
+	// without throwing the value away, which the unknown-ACR cases above already pin.
+	t.Run("An unrecognized ACR value survives String verbatim", func(t *testing.T) {
+		testCases := []string{
+			"urn:goiabada:level3",
+			"urn:example:loa:substantial",
+			"urn:goiabada:LEVEL1",
+			"level1",
+			"   ",
+			"",
+		}
+
+		for _, raw := range testCases {
+			t.Run(raw, func(t *testing.T) {
+				assert.Equal(t, raw, AcrLevel(raw).String(),
+					"String must not collapse an acr value this server does not rank")
+				assert.Equal(t, 0, AcrLevel(raw).Priority(),
+					"and it must rank 0, which is what makes keeping the value safe")
 			})
 		}
 	})

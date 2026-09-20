@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/models"
-	"github.com/leodip/goiabada/core/enums"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -94,29 +93,29 @@ func TestGetTargetAcrLevel_SingleValue(t *testing.T) {
 	testCases := []struct {
 		name          string
 		acrValues     string
-		clientDefault enums.AcrLevel
-		want          enums.AcrLevel
+		clientDefault models.AcrLevel
+		want          models.AcrLevel
 		note          string
 	}{
 		{
 			name:          "level1 requested at a level1 client",
 			acrValues:     "urn:goiabada:level1",
-			clientDefault: enums.AcrLevel1,
-			want:          enums.AcrLevel1,
+			clientDefault: models.AcrLevel1,
+			want:          models.AcrLevel1,
 			note:          "at the floor",
 		},
 		{
 			name:          "level1 requested at a level2_optional client is raised",
 			acrValues:     "urn:goiabada:level1",
-			clientDefault: enums.AcrLevel2Optional,
-			want:          enums.AcrLevel2Optional,
+			clientDefault: models.AcrLevel2Optional,
+			want:          models.AcrLevel2Optional,
 			note:          "clamped",
 		},
 		{
 			name:          "level1 requested at a level2_mandatory client is raised",
 			acrValues:     "urn:goiabada:level1",
-			clientDefault: enums.AcrLevel2Mandatory,
-			want:          enums.AcrLevel2Mandatory,
+			clientDefault: models.AcrLevel2Mandatory,
+			want:          models.AcrLevel2Mandatory,
 			// This row is the defect itself: before the floor existed, appending
 			// &acr_values=urn:goiabada:level1 to the authorization URL turned off the second
 			// factor of a client configured to demand one (#240).
@@ -125,8 +124,8 @@ func TestGetTargetAcrLevel_SingleValue(t *testing.T) {
 		{
 			name:          "level2_optional requested at a level1 client is honoured",
 			acrValues:     "urn:goiabada:level2_optional",
-			clientDefault: enums.AcrLevel1,
-			want:          enums.AcrLevel2Optional,
+			clientDefault: models.AcrLevel1,
+			want:          models.AcrLevel2Optional,
 			// KEEP THIS ROW. It, and the two below it, are the regression guard against
 			// implementing the floor as "the client default always wins". That mistake leaves
 			// step-up broken while every clamped row above still passes, so nothing else here
@@ -136,36 +135,36 @@ func TestGetTargetAcrLevel_SingleValue(t *testing.T) {
 		{
 			name:          "level2_optional requested at a level2_optional client",
 			acrValues:     "urn:goiabada:level2_optional",
-			clientDefault: enums.AcrLevel2Optional,
-			want:          enums.AcrLevel2Optional,
+			clientDefault: models.AcrLevel2Optional,
+			want:          models.AcrLevel2Optional,
 			note:          "at the floor",
 		},
 		{
 			name:          "level2_optional requested at a level2_mandatory client is raised",
 			acrValues:     "urn:goiabada:level2_optional",
-			clientDefault: enums.AcrLevel2Mandatory,
-			want:          enums.AcrLevel2Mandatory,
+			clientDefault: models.AcrLevel2Mandatory,
+			want:          models.AcrLevel2Mandatory,
 			note:          "clamped",
 		},
 		{
 			name:          "level2_mandatory requested at a level1 client is honoured",
 			acrValues:     "urn:goiabada:level2_mandatory",
-			clientDefault: enums.AcrLevel1,
-			want:          enums.AcrLevel2Mandatory,
+			clientDefault: models.AcrLevel1,
+			want:          models.AcrLevel2Mandatory,
 			note:          "step-up preserved, see the KEEP note above",
 		},
 		{
 			name:          "level2_mandatory requested at a level2_optional client is honoured",
 			acrValues:     "urn:goiabada:level2_mandatory",
-			clientDefault: enums.AcrLevel2Optional,
-			want:          enums.AcrLevel2Mandatory,
+			clientDefault: models.AcrLevel2Optional,
+			want:          models.AcrLevel2Mandatory,
 			note:          "step-up preserved, see the KEEP note above",
 		},
 		{
 			name:          "level2_mandatory requested at a level2_mandatory client",
 			acrValues:     "urn:goiabada:level2_mandatory",
-			clientDefault: enums.AcrLevel2Mandatory,
-			want:          enums.AcrLevel2Mandatory,
+			clientDefault: models.AcrLevel2Mandatory,
+			want:          models.AcrLevel2Mandatory,
 			note:          "at the floor",
 		},
 	}
@@ -186,32 +185,32 @@ func TestGetTargetAcrLevel_FirstRecognizedValueWins(t *testing.T) {
 	testCases := []struct {
 		name          string
 		acrValues     string
-		clientDefault enums.AcrLevel
-		want          enums.AcrLevel
+		clientDefault models.AcrLevel
+		want          models.AcrLevel
 	}{
 		{
 			name:          "level1 listed first",
 			acrValues:     "urn:goiabada:level1 urn:goiabada:level2_mandatory",
-			clientDefault: enums.AcrLevel1,
-			want:          enums.AcrLevel1,
+			clientDefault: models.AcrLevel1,
+			want:          models.AcrLevel1,
 		},
 		{
 			name:          "level2_mandatory listed first",
 			acrValues:     "urn:goiabada:level2_mandatory urn:goiabada:level1",
-			clientDefault: enums.AcrLevel1,
-			want:          enums.AcrLevel2Mandatory,
+			clientDefault: models.AcrLevel1,
+			want:          models.AcrLevel2Mandatory,
 		},
 		{
 			name:          "level2_optional listed first",
 			acrValues:     "urn:goiabada:level2_optional urn:goiabada:level1 urn:goiabada:level2_mandatory",
-			clientDefault: enums.AcrLevel1,
-			want:          enums.AcrLevel2Optional,
+			clientDefault: models.AcrLevel1,
+			want:          models.AcrLevel2Optional,
 		},
 		{
 			name:          "unrecognized value ahead of a valid one is skipped",
 			acrValues:     "urn:example:unknown urn:goiabada:level2_mandatory",
-			clientDefault: enums.AcrLevel1,
-			want:          enums.AcrLevel2Mandatory,
+			clientDefault: models.AcrLevel1,
+			want:          models.AcrLevel2Mandatory,
 		},
 		{
 			// KEEP THIS EXPECTATION. level2_mandatory is listed and is NOT the answer: the first
@@ -222,20 +221,20 @@ func TestGetTargetAcrLevel_FirstRecognizedValueWins(t *testing.T) {
 			// than a mistake (#240).
 			name:          "the floor answers, not a higher value listed later",
 			acrValues:     "urn:goiabada:level1 urn:goiabada:level2_mandatory",
-			clientDefault: enums.AcrLevel2Optional,
-			want:          enums.AcrLevel2Optional,
+			clientDefault: models.AcrLevel2Optional,
+			want:          models.AcrLevel2Optional,
 		},
 		{
 			name:          "unrecognized value skipped, then the survivor is raised",
 			acrValues:     "urn:example:unknown urn:goiabada:level1",
-			clientDefault: enums.AcrLevel2Optional,
-			want:          enums.AcrLevel2Optional,
+			clientDefault: models.AcrLevel2Optional,
+			want:          models.AcrLevel2Optional,
 		},
 		{
 			name:          "duplicate entries collapse, then the survivor is raised",
 			acrValues:     "urn:goiabada:level1 urn:goiabada:level1",
-			clientDefault: enums.AcrLevel2Optional,
-			want:          enums.AcrLevel2Optional,
+			clientDefault: models.AcrLevel2Optional,
+			want:          models.AcrLevel2Optional,
 		},
 	}
 
@@ -273,8 +272,8 @@ func TestGetTargetAcrLevel_FallsBackToClientDefault(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ac := &AuthContext{AcrValuesFromAuthorizeRequest: tc.acrValues}
 
-			assert.Equal(t, enums.AcrLevel2Mandatory, ac.GetTargetAcrLevel(enums.AcrLevel2Mandatory))
-			assert.Equal(t, enums.AcrLevel1, ac.GetTargetAcrLevel(enums.AcrLevel1))
+			assert.Equal(t, models.AcrLevel2Mandatory, ac.GetTargetAcrLevel(models.AcrLevel2Mandatory))
+			assert.Equal(t, models.AcrLevel1, ac.GetTargetAcrLevel(models.AcrLevel1))
 		})
 	}
 }
@@ -284,28 +283,28 @@ func TestGetTargetAcrLevel_FallsBackToClientDefault(t *testing.T) {
 func TestGetTargetAcrLevel_SnapshotWinsOverTheLiveClientDefault(t *testing.T) {
 	t.Run("a client default raised mid-ceremony does not raise the target", func(t *testing.T) {
 		ac := &AuthContext{}
-		ac.SetTargetAcrLevel(enums.AcrLevel1)
+		ac.SetTargetAcrLevel(models.AcrLevel1)
 
 		// The administrator raises the row after the ceremony started. Reading it here is what
 		// would stamp an acr naming a second factor the user never performed.
-		assert.Equal(t, enums.AcrLevel1, ac.GetTargetAcrLevel(enums.AcrLevel2Mandatory))
+		assert.Equal(t, models.AcrLevel1, ac.GetTargetAcrLevel(models.AcrLevel2Mandatory))
 	})
 
 	t.Run("a client default lowered mid-ceremony does not lower the target", func(t *testing.T) {
 		ac := &AuthContext{}
-		ac.SetTargetAcrLevel(enums.AcrLevel2Mandatory)
+		ac.SetTargetAcrLevel(models.AcrLevel2Mandatory)
 
 		// Reading the lowered row here is what takes /auth/level2's switch to its default branch
 		// and answers 500.
-		assert.Equal(t, enums.AcrLevel2Mandatory, ac.GetTargetAcrLevel(enums.AcrLevel1))
+		assert.Equal(t, models.AcrLevel2Mandatory, ac.GetTargetAcrLevel(models.AcrLevel1))
 	})
 
 	t.Run("the snapshot carries the floor, not the raw request", func(t *testing.T) {
 		ac := &AuthContext{AcrValuesFromAuthorizeRequest: "urn:goiabada:level1"}
-		ac.SetTargetAcrLevel(enums.AcrLevel2Mandatory)
+		ac.SetTargetAcrLevel(models.AcrLevel2Mandatory)
 
-		assert.Equal(t, enums.AcrLevel2Mandatory.String(), ac.TargetAcrLevel)
-		assert.Equal(t, enums.AcrLevel2Mandatory, ac.GetTargetAcrLevel(enums.AcrLevel1))
+		assert.Equal(t, models.AcrLevel2Mandatory.String(), ac.TargetAcrLevel)
+		assert.Equal(t, models.AcrLevel2Mandatory, ac.GetTargetAcrLevel(models.AcrLevel1))
 	})
 }
 
@@ -331,7 +330,7 @@ func TestGetTargetAcrLevel_UnusableSnapshotFallsBackToTheClientDefault(t *testin
 
 			// The floor still applies on the fallback arm, so the answer is the client's level
 			// and not the level1 the request asked for.
-			assert.Equal(t, enums.AcrLevel2Optional, ac.GetTargetAcrLevel(enums.AcrLevel2Optional))
+			assert.Equal(t, models.AcrLevel2Optional, ac.GetTargetAcrLevel(models.AcrLevel2Optional))
 		})
 	}
 }
@@ -339,7 +338,7 @@ func TestGetTargetAcrLevel_UnusableSnapshotFallsBackToTheClientDefault(t *testin
 // SetTargetAcrLevel and GetTargetAcrLevel are pinned to each other rather than each only to
 // itself: whatever the writer stores, the reader must give back unchanged for every level.
 func TestSetTargetAcrLevel_RoundTripsEveryLevel(t *testing.T) {
-	for _, clientDefault := range []enums.AcrLevel{enums.AcrLevel1, enums.AcrLevel2Optional, enums.AcrLevel2Mandatory} {
+	for _, clientDefault := range []models.AcrLevel{models.AcrLevel1, models.AcrLevel2Optional, models.AcrLevel2Mandatory} {
 		t.Run(clientDefault.String(), func(t *testing.T) {
 			ac := &AuthContext{}
 			ac.SetTargetAcrLevel(clientDefault)
@@ -347,9 +346,9 @@ func TestSetTargetAcrLevel_RoundTripsEveryLevel(t *testing.T) {
 			assert.Equal(t, clientDefault.String(), ac.TargetAcrLevel)
 			// Read back against a client default that differs from the snapshot wherever it can,
 			// so a reader ignoring the snapshot answers something else.
-			other := enums.AcrLevel1
-			if clientDefault == enums.AcrLevel1 {
-				other = enums.AcrLevel2Mandatory
+			other := models.AcrLevel1
+			if clientDefault == models.AcrLevel1 {
+				other = models.AcrLevel2Mandatory
 			}
 			assert.Equal(t, clientDefault, ac.GetTargetAcrLevel(other))
 		})
@@ -364,7 +363,7 @@ func TestParseAcrValuesFromAuthorizeRequest(t *testing.T) {
 
 		result := ac.parseAcrValuesFromAuthorizeRequest()
 
-		assert.Equal(t, []enums.AcrLevel{enums.AcrLevel1, enums.AcrLevel2Mandatory}, result)
+		assert.Equal(t, []models.AcrLevel{models.AcrLevel1, models.AcrLevel2Mandatory}, result)
 	})
 
 	t.Run("deduplicates repeated values preserving first position", func(t *testing.T) {
@@ -374,7 +373,7 @@ func TestParseAcrValuesFromAuthorizeRequest(t *testing.T) {
 
 		result := ac.parseAcrValuesFromAuthorizeRequest()
 
-		assert.Equal(t, []enums.AcrLevel{enums.AcrLevel2Optional, enums.AcrLevel1}, result)
+		assert.Equal(t, []models.AcrLevel{models.AcrLevel2Optional, models.AcrLevel1}, result)
 	})
 
 	t.Run("drops unrecognized values", func(t *testing.T) {
@@ -384,7 +383,7 @@ func TestParseAcrValuesFromAuthorizeRequest(t *testing.T) {
 
 		result := ac.parseAcrValuesFromAuthorizeRequest()
 
-		assert.Equal(t, []enums.AcrLevel{enums.AcrLevel1}, result)
+		assert.Equal(t, []models.AcrLevel{models.AcrLevel1}, result)
 	})
 
 	t.Run("empty input yields an empty slice", func(t *testing.T) {
@@ -412,7 +411,7 @@ func TestParseAcrValuesFromAuthorizeRequest(t *testing.T) {
 // =============================================================================
 
 func TestSetAcrLevel_NoSessionUsesTarget(t *testing.T) {
-	for _, target := range []enums.AcrLevel{enums.AcrLevel1, enums.AcrLevel2Optional, enums.AcrLevel2Mandatory} {
+	for _, target := range []models.AcrLevel{models.AcrLevel1, models.AcrLevel2Optional, models.AcrLevel2Mandatory} {
 		t.Run(target.String(), func(t *testing.T) {
 			ac := &AuthContext{}
 
@@ -427,37 +426,37 @@ func TestSetAcrLevel_NoSessionUsesTarget(t *testing.T) {
 func TestSetAcrLevel_UsesHigherOfTargetAndSession(t *testing.T) {
 	testCases := []struct {
 		name        string
-		target      enums.AcrLevel
-		sessionAcr  enums.AcrLevel
-		wantAcr     enums.AcrLevel
+		target      models.AcrLevel
+		sessionAcr  models.AcrLevel
+		wantAcr     models.AcrLevel
 		description string
 	}{
 		{
 			name:        "session higher than target is kept",
-			target:      enums.AcrLevel1,
-			sessionAcr:  enums.AcrLevel2Mandatory,
-			wantAcr:     enums.AcrLevel2Mandatory,
+			target:      models.AcrLevel1,
+			sessionAcr:  models.AcrLevel2Mandatory,
+			wantAcr:     models.AcrLevel2Mandatory,
 			description: "a level2 session must not be downgraded by a level1 request",
 		},
 		{
 			name:        "target higher than session wins",
-			target:      enums.AcrLevel2Mandatory,
-			sessionAcr:  enums.AcrLevel1,
-			wantAcr:     enums.AcrLevel2Mandatory,
+			target:      models.AcrLevel2Mandatory,
+			sessionAcr:  models.AcrLevel1,
+			wantAcr:     models.AcrLevel2Mandatory,
 			description: "a step-up request must raise the ACR",
 		},
 		{
 			name:        "equal levels",
-			target:      enums.AcrLevel2Optional,
-			sessionAcr:  enums.AcrLevel2Optional,
-			wantAcr:     enums.AcrLevel2Optional,
+			target:      models.AcrLevel2Optional,
+			sessionAcr:  models.AcrLevel2Optional,
+			wantAcr:     models.AcrLevel2Optional,
 			description: "matching levels stay put",
 		},
 		{
 			name:        "optional session with mandatory target",
-			target:      enums.AcrLevel2Mandatory,
-			sessionAcr:  enums.AcrLevel2Optional,
-			wantAcr:     enums.AcrLevel2Mandatory,
+			target:      models.AcrLevel2Mandatory,
+			sessionAcr:  models.AcrLevel2Optional,
+			wantAcr:     models.AcrLevel2Mandatory,
 			description: "mandatory outranks optional",
 		},
 	}
@@ -481,7 +480,7 @@ func TestSetAcrLevel_InvalidSessionAcrReturnsError(t *testing.T) {
 	ac := &AuthContext{}
 	session := &models.UserSession{AcrLevel: "urn:goiabada:bogus"}
 
-	err := ac.SetAcrLevel(enums.AcrLevel1, session)
+	err := ac.SetAcrLevel(models.AcrLevel1, session)
 
 	assert.Error(t, err)
 	assert.Equal(t, "", ac.AcrLevel, "the ACR must not be set when the session level cannot be parsed")

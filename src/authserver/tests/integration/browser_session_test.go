@@ -13,7 +13,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
-	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
@@ -184,7 +183,7 @@ func TestBrowserSession_IdentifierRotatesAtStepUp(t *testing.T) {
 	level1Id := decodeSessionIdentifier(t, level1Cookie)
 
 	// A second client, wanting level 2 from the same browser.
-	level2Client, level2RedirectUri := newClientAndRedirectUri(t, enums.AcrLevel2Mandatory)
+	level2Client, level2RedirectUri := newClientAndRedirectUri(t, models.AcrLevel2Mandatory)
 
 	resp = beginAuthorize(t, httpClient, level2Client, level2RedirectUri)
 	defer func() { _ = resp.Body.Close() }()
@@ -372,7 +371,7 @@ func assertIdentifierIsNotSignedIn(t *testing.T, cookie *http.Cookie,
 func newLevel1Actors(t *testing.T) (*models.Client, *models.RedirectURI, *models.User, string) {
 	t.Helper()
 
-	client, redirectUri := newClientAndRedirectUri(t, enums.AcrLevel1)
+	client, redirectUri := newClientAndRedirectUri(t, models.AcrLevel1)
 
 	password := fake.Password(8)
 	passwordHashed, err := passwordhash.Hash(password)
@@ -389,7 +388,7 @@ func newLevel1Actors(t *testing.T) (*models.Client, *models.RedirectURI, *models
 	return client, redirectUri, user, password
 }
 
-func newClientAndRedirectUri(t *testing.T, acrLevel enums.AcrLevel) (*models.Client, *models.RedirectURI) {
+func newClientAndRedirectUri(t *testing.T, acrLevel models.AcrLevel) (*models.Client, *models.RedirectURI) {
 	t.Helper()
 
 	client := &models.Client{

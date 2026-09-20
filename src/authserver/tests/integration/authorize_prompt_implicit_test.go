@@ -10,7 +10,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
-	"github.com/leodip/goiabada/core/enums"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -46,7 +45,7 @@ func createImplicitClientForPromptTests(t *testing.T) (*models.Client, *models.R
 		AuthorizationCodeEnabled: true, // Needed for establishing session
 		ImplicitGrantEnabled:     nil,  // Inherit from global (enabled)
 		ConsentRequired:          false,
-		DefaultAcrLevel:          enums.AcrLevel1,
+		DefaultAcrLevel:          models.AcrLevel1,
 	}
 
 	err := database.CreateClient(nil, client)

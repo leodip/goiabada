@@ -13,7 +13,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
-	"github.com/leodip/goiabada/core/enums"
+	"github.com/leodip/goiabada/core/gender"
 	"github.com/leodip/goiabada/core/hashutil"
 )
 
@@ -50,7 +50,7 @@ func TestUpdateUser(t *testing.T) {
 	user.FamilyName = "Updated" + fake.LastName()
 	user.Nickname = "Updated" + fake.FirstName()
 	user.Website = "https://updated" + strings.ToLower(fake.LetterN(8)) + ".example.com"
-	user.Gender = enums.GenderFemale.String()
+	user.Gender = gender.GenderFemale.String()
 	user.Email = "updated_" + fake.Email()
 	user.EmailVerified = !user.EmailVerified
 	user.EmailVerificationCodeEncrypted = []byte(fake.Password(32))
@@ -446,7 +446,7 @@ func createTestUserOn(t *testing.T, db data.Database) *models.User {
 		FamilyName:                           fake.LastName(),
 		Nickname:                             fake.FirstName(),
 		Website:                              fake.URL(),
-		Gender:                               enums.GenderOther.String(),
+		Gender:                               gender.GenderOther.String(),
 		Email:                                fake.Email(),
 		EmailVerified:                        fake.Bool(),
 		EmailVerificationCodeEncrypted:       []byte(fake.Password(32)),

@@ -11,7 +11,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/constants"
-	"github.com/leodip/goiabada/core/enums"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -30,7 +29,7 @@ func createROPCClient(t *testing.T, clientSecret string, isPublic bool) *models.
 		// field after this call, as the two inline clients further down this file do.
 		AuthorizationCodeEnabled:                false,
 		ResourceOwnerPasswordCredentialsEnabled: &ropcEnabled,
-		DefaultAcrLevel:                         enums.AcrLevel1,
+		DefaultAcrLevel:                         models.AcrLevel1,
 	}
 
 	if !isPublic && clientSecret != "" {
@@ -175,7 +174,7 @@ func TestROPC_GlobalDisabled(t *testing.T) {
 		IsPublic:                                true,
 		AuthorizationCodeEnabled:                true,
 		ResourceOwnerPasswordCredentialsEnabled: nil, // Follow global setting
-		DefaultAcrLevel:                         enums.AcrLevel1,
+		DefaultAcrLevel:                         models.AcrLevel1,
 	}
 	err = database.CreateClient(nil, client)
 	assert.Nil(t, err)
@@ -221,7 +220,7 @@ func TestROPC_ClientOverrideDisabled(t *testing.T) {
 		IsPublic:                                true,
 		AuthorizationCodeEnabled:                true,
 		ResourceOwnerPasswordCredentialsEnabled: &ropcDisabled,
-		DefaultAcrLevel:                         enums.AcrLevel1,
+		DefaultAcrLevel:                         models.AcrLevel1,
 	}
 	err = database.CreateClient(nil, client)
 	assert.Nil(t, err)

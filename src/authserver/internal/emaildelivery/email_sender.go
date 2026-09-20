@@ -21,7 +21,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
-	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/errs"
 )
 
@@ -73,7 +72,7 @@ func (e *EmailSender) SendEmail(ctx context.Context, input *SendEmailInput) erro
 		password = decryptedPassword
 	}
 
-	smtpEnc, err := enums.SMTPEncryptionFromString(settings.SMTPEncryption)
+	smtpEnc, err := SMTPEncryptionFromString(settings.SMTPEncryption)
 	if err != nil {
 		return errs.Wrap(err, "unable to parse the SMTP encryption")
 	}
@@ -109,7 +108,7 @@ func (e *EmailSender) SendEmail(ctx context.Context, input *SendEmailInput) erro
 	tlsConfig := &tls.Config{ServerName: host, RootCAs: e.rootCAs}
 
 	var conn net.Conn
-	if smtpEnc == enums.SMTPEncryptionSSLTLS {
+	if smtpEnc == SMTPEncryptionSSLTLS {
 		conn, err = (&tls.Dialer{NetDialer: netDialer, Config: tlsConfig}).DialContext(ctx, "tcp", addr)
 	} else {
 		conn, err = netDialer.DialContext(ctx, "tcp", addr)
@@ -130,7 +129,7 @@ func (e *EmailSender) SendEmail(ctx context.Context, input *SendEmailInput) erro
 	}
 	defer func() { _ = client.Close() }()
 
-	if smtpEnc == enums.SMTPEncryptionSTARTTLS {
+	if smtpEnc == SMTPEncryptionSTARTTLS {
 		// The operator asked for STARTTLS, so a server that does not offer it is refused rather
 		// than continued with in the clear. RFC 3207 section 4 leaves the choice to the client,
 		// and a silent downgrade here is indistinguishable from a STARTTLS-stripping attacker
@@ -177,7 +176,7 @@ func (e *EmailSender) SendEmail(ctx context.Context, input *SendEmailInput) erro
 
 // authenticate picks a mechanism and runs it. The password is only put on the wire when the
 // connection protects it, or when it never leaves the machine.
-func authenticate(client *smtp.Client, host string, smtpEnc enums.SMTPEncryption, username, password string) error {
+func authenticate(client *smtp.Client, host string, smtpEnc SMTPEncryption, username, password string) error {
 
 	ok, mechs := client.Extension("AUTH")
 	if !ok {
@@ -204,7 +203,7 @@ func authenticate(client *smtp.Client, host string, smtpEnc enums.SMTPEncryption
 	// requires the pairing on the server side. The gate covers both mechanisms here, before any
 	// AUTH command, rather than leaning on net/smtp.PlainAuth's own refusal, which loginAuth has
 	// no counterpart to and whose message names no setting (#274).
-	secure := smtpEnc != enums.SMTPEncryptionNone || isLocalHost(host)
+	secure := smtpEnc != SMTPEncryptionNone || isLocalHost(host)
 	if (mechanism == "PLAIN" || mechanism == "LOGIN") && !secure {
 		return errs.New("the SMTP server would receive the password unencrypted; set the encryption to STARTTLS or SSL/TLS")
 	}

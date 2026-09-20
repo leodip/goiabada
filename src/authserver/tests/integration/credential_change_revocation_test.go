@@ -18,7 +18,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
-	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
@@ -330,7 +329,7 @@ func createOfflineGrant(t *testing.T) *offlineGrant {
 		// (one without offline_access) skip consent and SSO straight through, which is how the
 		// session-bound bearer below is obtained.
 		ConsentRequired:                         false,
-		DefaultAcrLevel:                         enums.AcrLevel1,
+		DefaultAcrLevel:                         models.AcrLevel1,
 		TokenExpirationInSeconds:                300,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 3600,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 86400,

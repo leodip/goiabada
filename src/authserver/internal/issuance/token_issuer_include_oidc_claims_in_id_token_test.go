@@ -13,7 +13,6 @@ import (
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
-	"github.com/leodip/goiabada/core/enums"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -70,7 +69,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_GlobalEnabled(t *te
 		Client: &models.Client{
 			ClientIdentifier: "test-client",
 			// IncludeOpenIDConnectClaimsInIdToken is "default", so uses global setting
-			IncludeOpenIDConnectClaimsInIdToken: enums.ThreeStateSettingDefault.String(),
+			IncludeOpenIDConnectClaimsInIdToken: models.ThreeStateSettingDefault.String(),
 		},
 		Scope:             "openid profile email address phone",
 		Nonce:             "test-nonce",
@@ -164,7 +163,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_GlobalDisabled(t *t
 		Client: &models.Client{
 			ClientIdentifier: "test-client",
 			// IncludeOpenIDConnectClaimsInIdToken is "default", so uses global setting
-			IncludeOpenIDConnectClaimsInIdToken: enums.ThreeStateSettingDefault.String(),
+			IncludeOpenIDConnectClaimsInIdToken: models.ThreeStateSettingDefault.String(),
 		},
 		Scope:             "openid profile email address phone",
 		Nonce:             "test-nonce",
@@ -245,7 +244,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_ClientOverrideOn(t 
 		Client: &models.Client{
 			ClientIdentifier: "test-client",
 			// Client override: ON (should include claims despite global disabled)
-			IncludeOpenIDConnectClaimsInIdToken: enums.ThreeStateSettingOn.String(),
+			IncludeOpenIDConnectClaimsInIdToken: models.ThreeStateSettingOn.String(),
 		},
 		Scope:             "openid profile email",
 		Nonce:             "test-nonce",
@@ -310,7 +309,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_ClientOverrideOff(t
 		Client: &models.Client{
 			ClientIdentifier: "test-client",
 			// Client override: OFF (should NOT include claims despite global enabled)
-			IncludeOpenIDConnectClaimsInIdToken: enums.ThreeStateSettingOff.String(),
+			IncludeOpenIDConnectClaimsInIdToken: models.ThreeStateSettingOff.String(),
 		},
 		Scope:             "openid profile email",
 		Nonce:             "test-nonce",
@@ -378,7 +377,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_GroupsAndAttributes
 		},
 		Client: &models.Client{
 			ClientIdentifier:                    "test-client",
-			IncludeOpenIDConnectClaimsInIdToken: enums.ThreeStateSettingDefault.String(),
+			IncludeOpenIDConnectClaimsInIdToken: models.ThreeStateSettingDefault.String(),
 		},
 		Scope:             "openid profile email groups attributes",
 		Nonce:             "test-nonce",
@@ -455,7 +454,7 @@ func TestGenerateTokenResponseForAuthCode_IncludeOpenIDConnectClaimsInIdToken_Fu
 		RefreshTokenOfflineIdleTimeoutInSeconds: 3600,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 7200,
 		// Client uses default (which is global disabled)
-		IncludeOpenIDConnectClaimsInIdToken: enums.ThreeStateSettingDefault.String(),
+		IncludeOpenIDConnectClaimsInIdToken: models.ThreeStateSettingDefault.String(),
 	}
 	user := &models.User{
 		Id:            1,
@@ -562,7 +561,7 @@ func TestGenerateTokenResponseForAuthCode_IncludeOpenIDConnectClaimsInIdToken_Cl
 		ClientIdentifier:         "test-client-override",
 		TokenExpirationInSeconds: 900,
 		// Client override: ON
-		IncludeOpenIDConnectClaimsInIdToken: enums.ThreeStateSettingOn.String(),
+		IncludeOpenIDConnectClaimsInIdToken: models.ThreeStateSettingOn.String(),
 	}
 	user := &models.User{
 		Id:            2,
@@ -647,7 +646,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_MinimalScope_NotAff
 		},
 		Client: &models.Client{
 			ClientIdentifier:                    "minimal-client",
-			IncludeOpenIDConnectClaimsInIdToken: enums.ThreeStateSettingDefault.String(),
+			IncludeOpenIDConnectClaimsInIdToken: models.ThreeStateSettingDefault.String(),
 		},
 		Scope:             "openid", // Minimal scope - no profile/email scopes
 		Nonce:             "test-nonce",
@@ -707,7 +706,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_MinimalScope_Global
 		},
 		Client: &models.Client{
 			ClientIdentifier:                    "minimal-enabled-client",
-			IncludeOpenIDConnectClaimsInIdToken: enums.ThreeStateSettingDefault.String(),
+			IncludeOpenIDConnectClaimsInIdToken: models.ThreeStateSettingDefault.String(),
 		},
 		Scope:             "openid", // Minimal scope - no profile/email scopes
 		Nonce:             "test-nonce",
@@ -770,7 +769,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_PartialScope_EmailO
 		},
 		Client: &models.Client{
 			ClientIdentifier:                    "email-only-client",
-			IncludeOpenIDConnectClaimsInIdToken: enums.ThreeStateSettingDefault.String(),
+			IncludeOpenIDConnectClaimsInIdToken: models.ThreeStateSettingDefault.String(),
 		},
 		Scope:             "openid email", // Only email scope, NOT profile/address/phone
 		Nonce:             "test-nonce",
@@ -845,7 +844,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_WithProfilePicture(
 		},
 		Client: &models.Client{
 			ClientIdentifier:                    "picture-client",
-			IncludeOpenIDConnectClaimsInIdToken: enums.ThreeStateSettingDefault.String(),
+			IncludeOpenIDConnectClaimsInIdToken: models.ThreeStateSettingDefault.String(),
 		},
 		Scope:             "openid profile email",
 		Nonce:             "test-nonce",
@@ -920,7 +919,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_EmptyUserFields(t *
 		},
 		Client: &models.Client{
 			ClientIdentifier:                    "minimal-fields-client",
-			IncludeOpenIDConnectClaimsInIdToken: enums.ThreeStateSettingDefault.String(),
+			IncludeOpenIDConnectClaimsInIdToken: models.ThreeStateSettingDefault.String(),
 		},
 		Scope:             "openid profile email address phone",
 		Nonce:             "test-nonce",

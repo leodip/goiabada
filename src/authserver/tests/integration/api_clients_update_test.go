@@ -14,7 +14,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
-	"github.com/leodip/goiabada/core/enums"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -63,7 +62,7 @@ func TestAPIClientUpdatePut_Success(t *testing.T) {
 	assert.Equal(t, "https://example.com", refreshed.WebsiteURL)
 	assert.Equal(t, updateReq.Enabled, refreshed.Enabled)
 	assert.Equal(t, updateReq.ConsentRequired, refreshed.ConsentRequired)
-	assert.Equal(t, enums.AcrLevel1, refreshed.DefaultAcrLevel)
+	assert.Equal(t, models.AcrLevel1, refreshed.DefaultAcrLevel)
 }
 
 func TestAPIClientUpdatePut_ValidationErrors(t *testing.T) {
@@ -581,7 +580,7 @@ func createTestClientUnique(t *testing.T, authCodeEnabled bool) *models.Client {
 		IsPublic:                 true,
 		AuthorizationCodeEnabled: authCodeEnabled,
 		ClientCredentialsEnabled: false,
-		DefaultAcrLevel:          enums.AcrLevel2Optional,
+		DefaultAcrLevel:          models.AcrLevel2Optional,
 	}
 	err := database.CreateClient(nil, client)
 	assert.NoError(t, err)

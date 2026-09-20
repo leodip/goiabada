@@ -15,7 +15,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
-	"github.com/leodip/goiabada/core/enums"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -91,7 +90,7 @@ func createImpersonatingClientCredentialsToken(t *testing.T, subject string, per
 		Enabled:                  true,
 		ClientCredentialsEnabled: true,
 		IsPublic:                 false,
-		DefaultAcrLevel:          enums.AcrLevel2Optional,
+		DefaultAcrLevel:          models.AcrLevel2Optional,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
 	err = database.CreateClient(nil, client)

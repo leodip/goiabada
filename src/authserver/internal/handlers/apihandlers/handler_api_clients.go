@@ -21,7 +21,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/urlutil"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/stringutil"
@@ -353,10 +352,10 @@ func HandleAPIClientCreatePost(
 			IsPublic:                                false,
 			ConsentRequired:                         false,
 			Enabled:                                 true,
-			DefaultAcrLevel:                         enums.AcrLevel2Optional,
+			DefaultAcrLevel:                         models.AcrLevel2Optional,
 			AuthorizationCodeEnabled:                req.AuthorizationCodeEnabled,
 			ClientCredentialsEnabled:                req.ClientCredentialsEnabled,
-			IncludeOpenIDConnectClaimsInAccessToken: enums.ThreeStateSettingDefault.String(),
+			IncludeOpenIDConnectClaimsInAccessToken: models.ThreeStateSettingDefault.String(),
 		}
 
 		if err := database.CreateClient(nil, client); err != nil {
@@ -556,7 +555,7 @@ func HandleAPIClientUpdatePut(
 		client.ShowWebsiteURL = updateReq.ShowWebsiteURL
 
 		if client.AuthorizationCodeEnabled && strings.TrimSpace(updateReq.DefaultAcrLevel) != "" {
-			acrLevel, err := enums.AcrLevelFromString(updateReq.DefaultAcrLevel)
+			acrLevel, err := models.AcrLevelFromString(updateReq.DefaultAcrLevel)
 			if err != nil {
 				writeJSONError(w, "Invalid default ACR level", "VALIDATION_ERROR", http.StatusBadRequest)
 				return
@@ -1226,11 +1225,11 @@ func HandleAPIClientTokensPut(
 		}
 
 		// Validate three-state settings
-		if _, err := enums.ThreeStateSettingFromString(strings.TrimSpace(req.IncludeOpenIDConnectClaimsInAccessToken)); err != nil {
+		if _, err := models.ThreeStateSettingFromString(strings.TrimSpace(req.IncludeOpenIDConnectClaimsInAccessToken)); err != nil {
 			writeJSONError(w, "Invalid value for includeOpenIDConnectClaimsInAccessToken.", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
-		if _, err := enums.ThreeStateSettingFromString(strings.TrimSpace(req.IncludeOpenIDConnectClaimsInIdToken)); err != nil {
+		if _, err := models.ThreeStateSettingFromString(strings.TrimSpace(req.IncludeOpenIDConnectClaimsInIdToken)); err != nil {
 			writeJSONError(w, "Invalid value for includeOpenIDConnectClaimsInIdToken.", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}

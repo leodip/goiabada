@@ -15,7 +15,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/enums"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 )
@@ -33,7 +32,7 @@ func createLevel2MandatoryClient(t *testing.T) (*models.Client, *models.Redirect
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          enums.AcrLevel2Mandatory,
+		DefaultAcrLevel:          models.AcrLevel2Mandatory,
 	}
 	err := database.CreateClient(nil, client)
 	if err != nil {
@@ -421,7 +420,7 @@ func TestOtpCeremony_AcrValuesLevel1CannotSkipMandatoryOtp(t *testing.T) {
 	client, redirectUri, user, password, _ := createLevel2MandatoryUser(t, true)
 
 	httpClient, otpPage, otpUrl := startOtpCeremony(t, client, redirectUri, user, password,
-		"&acr_values="+url.QueryEscape(enums.AcrLevel1.String()))
+		"&acr_values="+url.QueryEscape(models.AcrLevel1.String()))
 	defer func() { _ = otpPage.Body.Close() }()
 
 	assert.NotNil(t, httpClient)

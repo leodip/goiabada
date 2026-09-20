@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
+	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
@@ -22,7 +23,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/constants"
-	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/oauth"
@@ -353,7 +353,7 @@ func createSessionWithAcrLevel1(t *testing.T) (*http.Client, *models.Client, *mo
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          enums.AcrLevel1,
+		DefaultAcrLevel:          models.AcrLevel1,
 	}
 
 	err := database.CreateClient(nil, client)
@@ -449,8 +449,8 @@ func createSessionWithAcrLevel1(t *testing.T) (*http.Client, *models.Client, *mo
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
-	assert.Equal(t, enums.AcrLevel1.String(), code.AcrLevel)
-	assert.Equal(t, enums.AuthMethodPassword.String(), code.AuthMethods)
+	assert.Equal(t, models.AcrLevel1.String(), code.AcrLevel)
+	assert.Equal(t, ceremony.AuthMethodPassword.String(), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 
 	return httpClient, client, redirectUri, user
@@ -462,7 +462,7 @@ func createSessionWithAcrLevel2Optional(t *testing.T) (*http.Client, *models.Cli
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          enums.AcrLevel2Optional,
+		DefaultAcrLevel:          models.AcrLevel2Optional,
 	}
 
 	err := database.CreateClient(nil, client)
@@ -562,8 +562,8 @@ func createSessionWithAcrLevel2Optional(t *testing.T) (*http.Client, *models.Cli
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
-	assert.Equal(t, enums.AcrLevel2Optional.String(), code.AcrLevel)
-	assert.Equal(t, enums.AuthMethodPassword.String(), code.AuthMethods)
+	assert.Equal(t, models.AcrLevel2Optional.String(), code.AcrLevel)
+	assert.Equal(t, ceremony.AuthMethodPassword.String(), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 
 	return httpClient, client, redirectUri, user
@@ -575,7 +575,7 @@ func createSessionWithAcrLevel2Mandatory(t *testing.T) (*http.Client, *models.Cl
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          enums.AcrLevel2Mandatory,
+		DefaultAcrLevel:          models.AcrLevel2Mandatory,
 	}
 
 	err := database.CreateClient(nil, client)
@@ -697,8 +697,8 @@ func createSessionWithAcrLevel2Mandatory(t *testing.T) (*http.Client, *models.Cl
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
-	assert.Equal(t, enums.AcrLevel2Mandatory.String(), code.AcrLevel)
-	assert.Equal(t, fmt.Sprintf("%s %s", enums.AuthMethodPassword.String(), enums.AuthMethodOTP.String()), code.AuthMethods)
+	assert.Equal(t, models.AcrLevel2Mandatory.String(), code.AcrLevel)
+	assert.Equal(t, fmt.Sprintf("%s %s", ceremony.AuthMethodPassword.String(), ceremony.AuthMethodOTP.String()), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 
 	return httpClient, client, redirectUri, user
@@ -757,7 +757,7 @@ func createAuthCode(t *testing.T, clientSecret string, scope string, opts ...aut
 		AuthorizationCodeEnabled: true,
 		IsPublic:                 opt.isPublic,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          enums.AcrLevel2Optional,
+		DefaultAcrLevel:          models.AcrLevel2Optional,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 		PKCERequired:             opt.pkceRequired,
 	}
@@ -881,7 +881,7 @@ func createAuthCodeEnsuringUserScope(t *testing.T, clientSecret string, scope st
 		AuthorizationCodeEnabled: true,
 		IsPublic:                 false,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          enums.AcrLevel2Optional,
+		DefaultAcrLevel:          models.AcrLevel2Optional,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
 
@@ -1471,7 +1471,7 @@ type ClientDisplaySettings struct {
 	ShowWebsiteURL   bool
 	UploadLogo       bool // Whether to actually upload a logo
 	ConsentRequired  bool
-	DefaultAcrLevel  enums.AcrLevel
+	DefaultAcrLevel  models.AcrLevel
 }
 
 // createClientWithDisplaySettings creates a client with specified display settings

@@ -6,7 +6,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
-	"github.com/leodip/goiabada/core/enums"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 )
@@ -21,7 +20,7 @@ func TestAuthOtp_ClientDisplay_ShowDisplayName_Enabled(t *testing.T) {
 		ShowDescription:  false,
 		ShowWebsiteURL:   false,
 		ConsentRequired:  false,
-		DefaultAcrLevel:  enums.AcrLevel2Mandatory, // Requires OTP
+		DefaultAcrLevel:  models.AcrLevel2Mandatory, // Requires OTP
 	})
 
 	redirectUri := &models.RedirectURI{
@@ -82,7 +81,7 @@ func TestAuthOtp_ClientDisplay_AllEnabled_Enabled(t *testing.T) {
 		ShowWebsiteURL:   true,
 		UploadLogo:       true,
 		ConsentRequired:  false,
-		DefaultAcrLevel:  enums.AcrLevel2Mandatory,
+		DefaultAcrLevel:  models.AcrLevel2Mandatory,
 	})
 
 	redirectUri := &models.RedirectURI{
@@ -144,7 +143,7 @@ func TestAuthOtp_ClientDisplay_AllDisabled_Enabled(t *testing.T) {
 		ShowWebsiteURL:   false,
 		UploadLogo:       true,
 		ConsentRequired:  false,
-		DefaultAcrLevel:  enums.AcrLevel2Mandatory,
+		DefaultAcrLevel:  models.AcrLevel2Mandatory,
 	})
 
 	redirectUri := &models.RedirectURI{
@@ -202,7 +201,7 @@ func TestAuthOtp_ClientDisplay_ShowDisplayName_Enrollment(t *testing.T) {
 		ShowDescription:  false,
 		ShowWebsiteURL:   false,
 		ConsentRequired:  false,
-		DefaultAcrLevel:  enums.AcrLevel2Mandatory, // Requires OTP
+		DefaultAcrLevel:  models.AcrLevel2Mandatory, // Requires OTP
 	})
 
 	redirectUri := &models.RedirectURI{
@@ -255,7 +254,7 @@ func TestAuthOtp_ClientDisplay_AllEnabled_Enrollment(t *testing.T) {
 		ShowWebsiteURL:   true,
 		UploadLogo:       true,
 		ConsentRequired:  false,
-		DefaultAcrLevel:  enums.AcrLevel2Mandatory,
+		DefaultAcrLevel:  models.AcrLevel2Mandatory,
 	})
 
 	redirectUri := &models.RedirectURI{
@@ -309,7 +308,7 @@ func TestAuthOtp_ClientDisplay_AllDisabled_Enrollment(t *testing.T) {
 		ShowWebsiteURL:   false,
 		UploadLogo:       true,
 		ConsentRequired:  false,
-		DefaultAcrLevel:  enums.AcrLevel2Mandatory,
+		DefaultAcrLevel:  models.AcrLevel2Mandatory,
 	})
 
 	redirectUri := &models.RedirectURI{

@@ -12,8 +12,8 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/core/api"
 	coreconstants "github.com/leodip/goiabada/core/constants"
-	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/gender"
 	"github.com/leodip/goiabada/core/locales"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
@@ -146,7 +146,7 @@ func HandleAccountProfilePost(
 
 				if len(request.Gender) > 0 {
 					if i, err := strconv.Atoi(request.Gender); err == nil {
-						user.Gender = enums.Gender(i).String()
+						user.Gender = gender.Gender(i).String()
 					}
 				} else {
 					user.Gender = ""

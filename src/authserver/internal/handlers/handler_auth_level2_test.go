@@ -9,7 +9,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/customerrors"
-	"github.com/leodip/goiabada/core/enums"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
@@ -114,7 +113,7 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		client := &models.Client{
 			Id:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  enums.AcrLevel2Optional,
+			DefaultAcrLevel:  models.AcrLevel2Optional,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
 
@@ -160,7 +159,7 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		client := &models.Client{
 			Id:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  enums.AcrLevel2Optional,
+			DefaultAcrLevel:  models.AcrLevel2Optional,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
 
@@ -211,7 +210,7 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		client := &models.Client{
 			Id:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  enums.AcrLevel2Mandatory,
+			DefaultAcrLevel:  models.AcrLevel2Mandatory,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
 
@@ -261,7 +260,7 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		client := &models.Client{
 			Id:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  enums.AcrLevel2Mandatory,
+			DefaultAcrLevel:  models.AcrLevel2Mandatory,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
 
@@ -303,7 +302,7 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		client := &models.Client{
 			Id:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  enums.AcrLevel1,
+			DefaultAcrLevel:  models.AcrLevel1,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
 

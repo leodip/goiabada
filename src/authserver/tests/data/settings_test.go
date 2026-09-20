@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/models"
-	"github.com/leodip/goiabada/core/enums"
 )
 
 func TestCreateSettings(t *testing.T) {
@@ -13,7 +12,7 @@ func TestCreateSettings(t *testing.T) {
 		AppName:                 "TestApp",
 		Issuer:                  "https://test.com",
 		UITheme:                 "default",
-		PasswordPolicy:          enums.PasswordPolicyMedium,
+		PasswordPolicy:          models.PasswordPolicyMedium,
 		SelfRegistrationEnabled: true,
 		SelfRegistrationRequiresEmailVerification: true,
 		TokenExpirationInSeconds:                  3600,
@@ -67,7 +66,7 @@ func TestUpdateSettings(t *testing.T) {
 	settings.AppName = "UpdatedApp"
 	settings.Issuer = "https://updated.com"
 	settings.UITheme = "dark"
-	settings.PasswordPolicy = enums.PasswordPolicyHigh
+	settings.PasswordPolicy = models.PasswordPolicyHigh
 	settings.SelfRegistrationEnabled = false
 	settings.SelfRegistrationRequiresEmailVerification = false
 	settings.TokenExpirationInSeconds = 7200
@@ -136,7 +135,7 @@ func createTestSettings(t *testing.T) *models.Settings {
 		AppName:                 "TestApp",
 		Issuer:                  "https://test.com",
 		UITheme:                 "default",
-		PasswordPolicy:          enums.PasswordPolicyMedium,
+		PasswordPolicy:          models.PasswordPolicyMedium,
 		SelfRegistrationEnabled: true,
 		SelfRegistrationRequiresEmailVerification: true,
 		TokenExpirationInSeconds:                  3600,

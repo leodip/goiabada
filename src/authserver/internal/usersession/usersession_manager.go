@@ -14,7 +14,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/useragent"
 	"github.com/leodip/goiabada/authserver/internal/uuidutil"
-	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/sessionstore"
 )
@@ -414,14 +413,14 @@ func raisesAuthMethods(current, incoming string) bool {
 // This is used during step-up authentication: when a user with a level1 session
 // authenticates with OTP for a level2 client, the session's ACR should be upgraded.
 //
-// Uses enums.AcrLevel.IsHigherThan() as the single source of truth for ACR comparison.
+// Uses models.AcrLevel.IsHigherThan() as the single source of truth for ACR comparison.
 func shouldUpgradeAcrLevel(currentAcr, newAcr string) bool {
-	currentLevel, err := enums.AcrLevelFromString(currentAcr)
+	currentLevel, err := models.AcrLevelFromString(currentAcr)
 	if err != nil {
 		return false // Unknown current ACR, fail safe
 	}
 
-	newLevel, err := enums.AcrLevelFromString(newAcr)
+	newLevel, err := models.AcrLevelFromString(newAcr)
 	if err != nil {
 		return false // Unknown new ACR, fail safe
 	}

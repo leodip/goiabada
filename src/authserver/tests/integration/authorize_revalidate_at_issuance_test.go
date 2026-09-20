@@ -12,7 +12,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
-	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 )
@@ -67,7 +66,7 @@ func parkOnConsentScreen(t *testing.T, requestScope string, clientSecret string,
 		// The consent screen is what holds the ceremony still between /auth/completed and
 		// /auth/issue, which is the whole window these cases are about.
 		ConsentRequired:       true,
-		DefaultAcrLevel:       enums.AcrLevel1,
+		DefaultAcrLevel:       models.AcrLevel1,
 		ClientSecretEncrypted: clientSecretEncrypted,
 	}
 	err = database.CreateClient(nil, client)

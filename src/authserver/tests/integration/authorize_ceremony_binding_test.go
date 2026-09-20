@@ -10,7 +10,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
-	"github.com/leodip/goiabada/core/enums"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 )
@@ -29,7 +28,7 @@ func createLevel1Client(t *testing.T, consentRequired bool) (*models.Client, *mo
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          consentRequired,
-		DefaultAcrLevel:          enums.AcrLevel1,
+		DefaultAcrLevel:          models.AcrLevel1,
 	}
 	if err := database.CreateClient(nil, client); err != nil {
 		t.Fatal(err)

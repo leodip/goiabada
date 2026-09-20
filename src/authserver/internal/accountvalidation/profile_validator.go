@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/data"
-	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/gender"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/locales"
 	"github.com/leodip/goiabada/core/timezones"
@@ -165,7 +165,7 @@ func (val *ProfileValidator) ValidateProfile(input *ValidateProfileInput) error 
 		if err != nil {
 			return i18n.NewLocalizedError(i18n.ErrCodeProfileGenderInvalid, nil)
 		}
-		if !enums.IsGenderValid(i) {
+		if !gender.IsGenderValid(i) {
 			return i18n.NewLocalizedError(i18n.ErrCodeProfileGenderInvalid, nil)
 		}
 	}

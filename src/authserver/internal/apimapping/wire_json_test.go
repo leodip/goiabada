@@ -9,7 +9,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
-	"github.com/leodip/goiabada/core/enums"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -313,7 +312,7 @@ func TestWireJSON_UserSessionFamily(t *testing.T) {
 		Started:           wireStarted,
 		LastAccessed:      wireTouched,
 		AuthMethods:       "pwd otp",
-		AcrLevel:          string(enums.AcrLevel2Optional),
+		AcrLevel:          string(models.AcrLevel2Optional),
 		AuthTime:          wireStarted,
 		IpAddress:         "203.0.113.7",
 		DeviceName:        "Firefox",
@@ -335,7 +334,7 @@ func TestWireJSON_UserSessionFamily(t *testing.T) {
 		Started:           wireStarted,
 		LastAccessed:      wireTouched,
 		AuthMethods:       "pwd otp",
-		AcrLevel:          string(enums.AcrLevel2Optional),
+		AcrLevel:          string(models.AcrLevel2Optional),
 		AuthTime:          wireStarted,
 		IpAddress:         "203.0.113.7",
 		DeviceName:        "Firefox",
@@ -567,7 +566,7 @@ func TestWireJSON_ClientFamily(t *testing.T) {
 		RefreshTokenOfflineMaxLifetimeInSeconds: 86400,
 		IncludeOpenIDConnectClaimsInAccessToken: "on",
 		IncludeOpenIDConnectClaimsInIdToken:     "off",
-		DefaultAcrLevel:                         enums.AcrLevel1,
+		DefaultAcrLevel:                         models.AcrLevel1,
 		RedirectURIs: []models.RedirectURI{{
 			Id:        1,
 			CreatedAt: wireNullTime(wireCreated),

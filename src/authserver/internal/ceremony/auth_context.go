@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/models"
-	"github.com/leodip/goiabada/core/enums"
 )
 
 var (
@@ -243,20 +242,20 @@ func (ac *AuthContext) ParseRequestedMaxAge() *int {
 // existing session. The effective ACR is the maximum of the target and session ACR,
 // ensuring we never downgrade the authentication level within a session.
 //
-// Uses enums.AcrMax() as the single source of truth for ACR comparison.
-func (ac *AuthContext) SetAcrLevel(targetAcrLevel enums.AcrLevel, userSession *models.UserSession) error {
+// Uses models.AcrMax() as the single source of truth for ACR comparison.
+func (ac *AuthContext) SetAcrLevel(targetAcrLevel models.AcrLevel, userSession *models.UserSession) error {
 	if userSession == nil {
 		ac.AcrLevel = targetAcrLevel.String()
 		return nil
 	}
 
-	userSessionAcrLevel, err := enums.AcrLevelFromString(userSession.AcrLevel)
+	userSessionAcrLevel, err := models.AcrLevelFromString(userSession.AcrLevel)
 	if err != nil {
 		return err
 	}
 
 	// Use the higher of the two ACR levels (never downgrade)
-	ac.AcrLevel = enums.AcrMax(targetAcrLevel, userSessionAcrLevel).String()
+	ac.AcrLevel = models.AcrMax(targetAcrLevel, userSessionAcrLevel).String()
 	return nil
 }
 
@@ -274,15 +273,15 @@ func (ac *AuthContext) OwnsSession(userSession *models.UserSession) bool {
 	return userSession != nil && ac.UserId != 0 && userSession.UserId == ac.UserId
 }
 
-func (ac *AuthContext) parseAcrValuesFromAuthorizeRequest() []enums.AcrLevel {
-	arr := []enums.AcrLevel{}
+func (ac *AuthContext) parseAcrValuesFromAuthorizeRequest() []models.AcrLevel {
+	arr := []models.AcrLevel{}
 	acrValues := ac.AcrValuesFromAuthorizeRequest
 	if len(strings.TrimSpace(acrValues)) > 0 {
 		space := regexp.MustCompile(`\s+`)
 		acrValues = space.ReplaceAllString(acrValues, " ")
 		parts := strings.Split(acrValues, " ")
 		for _, v := range parts {
-			acr, err := enums.AcrLevelFromString(v)
+			acr, err := models.AcrLevelFromString(v)
 			if err == nil && !slices.Contains(arr, acr) {
 				arr = append(arr, acr)
 			}
@@ -295,7 +294,7 @@ func (ac *AuthContext) parseAcrValuesFromAuthorizeRequest() []enums.AcrLevel {
 // authorization request is accepted, because a target recomputed later is a target an
 // administrator can move underneath a ceremony that is already in progress. See TargetAcrLevel
 // for what that costs (#240).
-func (ac *AuthContext) SetTargetAcrLevel(defaultAcrLevelFromClient enums.AcrLevel) {
+func (ac *AuthContext) SetTargetAcrLevel(defaultAcrLevelFromClient models.AcrLevel) {
 	ac.TargetAcrLevel = ac.computeTargetAcrLevel(defaultAcrLevelFromClient).String()
 }
 
@@ -304,9 +303,9 @@ func (ac *AuthContext) SetTargetAcrLevel(defaultAcrLevelFromClient enums.AcrLeve
 // client's current default. It stays the only way a caller obtains a target, so no handler can
 // compute one another way and be missed. See TargetAcrLevel for why the fallback is the safe
 // direction.
-func (ac *AuthContext) GetTargetAcrLevel(defaultAcrLevelFromClient enums.AcrLevel) enums.AcrLevel {
+func (ac *AuthContext) GetTargetAcrLevel(defaultAcrLevelFromClient models.AcrLevel) models.AcrLevel {
 	if ac.TargetAcrLevel != "" {
-		acr, err := enums.AcrLevelFromString(ac.TargetAcrLevel)
+		acr, err := models.AcrLevelFromString(ac.TargetAcrLevel)
 		if err == nil {
 			return acr
 		}
@@ -324,12 +323,12 @@ func (ac *AuthContext) GetTargetAcrLevel(defaultAcrLevelFromClient enums.AcrLeve
 // which is what makes this a floor rather than the client default always winning, and dropping
 // that half would leave step-up broken while every clamp case still passed.
 //
-// enums.AcrMax is the codebase's existing comparison, already used by SetAcrLevel one layer up for
+// models.AcrMax is the codebase's existing comparison, already used by SetAcrLevel one layer up for
 // the same never-downgrade rule against a session's ACR (#240).
-func (ac *AuthContext) computeTargetAcrLevel(defaultAcrLevelFromClient enums.AcrLevel) enums.AcrLevel {
+func (ac *AuthContext) computeTargetAcrLevel(defaultAcrLevelFromClient models.AcrLevel) models.AcrLevel {
 	acrValuesFromAuthorizeRequest := ac.parseAcrValuesFromAuthorizeRequest()
 	if len(acrValuesFromAuthorizeRequest) > 0 {
-		return enums.AcrMax(acrValuesFromAuthorizeRequest[0], defaultAcrLevelFromClient)
+		return models.AcrMax(acrValuesFromAuthorizeRequest[0], defaultAcrLevelFromClient)
 	}
 	return defaultAcrLevelFromClient
 }

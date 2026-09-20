@@ -10,7 +10,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
-	"github.com/leodip/goiabada/core/enums"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 )
@@ -38,7 +37,7 @@ func TestSessionDeletedDuringAuthFlow_LoginSucceeds(t *testing.T) {
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          enums.AcrLevel1,
+		DefaultAcrLevel:          models.AcrLevel1,
 	}
 	err := database.CreateClient(nil, client)
 	assert.NoError(t, err)
@@ -216,7 +215,7 @@ func TestSessionEndedOnConsentScreen_NoCodeIsIssued(t *testing.T) {
 		// The consent screen is what holds the ceremony still between /auth/completed and
 		// /auth/issue, which is the whole window this case is about.
 		ConsentRequired: true,
-		DefaultAcrLevel: enums.AcrLevel1,
+		DefaultAcrLevel: models.AcrLevel1,
 	}
 	err := database.CreateClient(nil, client)
 	assert.NoError(t, err)
@@ -386,7 +385,7 @@ func TestSessionEndedDuringStepUp_OtpAloneDoesNotRecreateTheSession(t *testing.T
 		"&scope=" + url.QueryEscape(requestScope) +
 		"&state=" + requestState +
 		"&nonce=" + requestNonce +
-		"&acr_values=" + enums.AcrLevel2Mandatory.String()
+		"&acr_values=" + models.AcrLevel2Mandatory.String()
 
 	resp, err := httpClient.Get(destUrl)
 	assert.NoError(t, err)

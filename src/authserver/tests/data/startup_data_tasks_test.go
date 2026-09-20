@@ -12,7 +12,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
-	"github.com/leodip/goiabada/core/enums"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -66,7 +65,7 @@ func TestNewDatabase_HandsTheStartupTasksThePreviousKey(t *testing.T) {
 
 	cfg := seedThrowawayDatabase(t, "startup_rotation.db", func(db data.Database) {
 		require.NoError(t, db.CreateKeyPair(nil, &models.KeyPair{
-			State:         enums.KeyStateCurrent.String(),
+			State:         models.KeyStateCurrent.String(),
 			KeyIdentifier: fake.UUID(),
 			Type:          "RSA",
 			Algorithm:     "RS256",
@@ -130,7 +129,7 @@ func TestNewDatabase_RefusesAStartupWhoseDataTasksFailed(t *testing.T) {
 
 	cfg := seedThrowawayDatabase(t, "startup_tasks_failed.db", func(db data.Database) {
 		require.NoError(t, db.CreateKeyPair(nil, &models.KeyPair{
-			State:         enums.KeyStateCurrent.String(),
+			State:         models.KeyStateCurrent.String(),
 			KeyIdentifier: fake.UUID(),
 			Type:          "RSA",
 			Algorithm:     "RS256",

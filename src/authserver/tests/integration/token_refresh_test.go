@@ -17,7 +17,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
-	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -99,7 +98,7 @@ func TestToken_Refresh_ClientSecretIsMissing(t *testing.T) {
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		ClientCredentialsEnabled: true,
-		DefaultAcrLevel:          enums.AcrLevel2Optional,
+		DefaultAcrLevel:          models.AcrLevel2Optional,
 		IsPublic:                 false,
 		AuthorizationCodeEnabled: true,
 		ClientSecretEncrypted:    clientSecretEncrypted,
@@ -267,7 +266,7 @@ func TestToken_Refresh_TokenExpired(t *testing.T) {
 		AuthorizationCodeEnabled: true,
 		IsPublic:                 false,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          enums.AcrLevel2Optional,
+		DefaultAcrLevel:          models.AcrLevel2Optional,
 	}
 
 	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
@@ -350,7 +349,7 @@ func TestToken_Refresh_WrongClient(t *testing.T) {
 		AuthorizationCodeEnabled: true,
 		IsPublic:                 false,
 		ConsentRequired:          false,
-		DefaultAcrLevel:          enums.AcrLevel2Optional,
+		DefaultAcrLevel:          models.AcrLevel2Optional,
 		ClientSecretEncrypted:    wrongClientSecretEncrypted,
 	}
 	err = database.CreateClient(nil, wrongClient)
@@ -442,7 +441,7 @@ func TestToken_Refresh_ConsentRemoved(t *testing.T) {
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          enums.AcrLevel1,
+		DefaultAcrLevel:          models.AcrLevel1,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
 	err = database.CreateClient(nil, client)
@@ -576,7 +575,7 @@ func TestToken_Refresh_ConsentDoesNotIncludeScope(t *testing.T) {
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ConsentRequired:          true,
-		DefaultAcrLevel:          enums.AcrLevel1,
+		DefaultAcrLevel:          models.AcrLevel1,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
 	err = database.CreateClient(nil, client)

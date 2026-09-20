@@ -13,7 +13,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
-	"github.com/leodip/goiabada/core/enums"
+	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/errs"
 )
 
@@ -148,14 +148,14 @@ func HandleAuthLevel1CompletedGet(
 
 		if hasValidUserSession {
 			// Parse the session's ACR level
-			acrLevelFromSession, err := enums.AcrLevelFromString(userSession.AcrLevel)
+			acrLevelFromSession, err := models.AcrLevelFromString(userSession.AcrLevel)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
 				return
 			}
 
 			// Step-up required if target ACR is higher than session ACR.
-			// Uses enums.AcrLevel.IsHigherThan() as the single source of truth.
+			// Uses models.AcrLevel.IsHigherThan() as the single source of truth.
 			if targetAcrLevel.IsHigherThan(acrLevelFromSession) {
 				shouldRedirectToLevel2 = true
 			}
@@ -175,10 +175,10 @@ func HandleAuthLevel1CompletedGet(
 			// should not happen, and if it does the fail-closed answer is the one to give. It is
 			// also what makes migration 000031's -1 seed work with no special case.
 			if userSession.OtpConfigGeneration != userSession.User.OtpConfigGeneration &&
-				targetAcrLevel.IsHigherThan(enums.AcrLevel1) {
+				targetAcrLevel.IsHigherThan(models.AcrLevel1) {
 				shouldRedirectToLevel2 = true
 			}
-		} else if targetAcrLevel.IsHigherThan(enums.AcrLevel1) {
+		} else if targetAcrLevel.IsHigherThan(models.AcrLevel1) {
 			// No valid session and target requires level2
 			shouldRedirectToLevel2 = true
 		}

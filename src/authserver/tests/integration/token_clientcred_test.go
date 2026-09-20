@@ -11,7 +11,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/constants"
-	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 )
@@ -33,7 +32,7 @@ func TestToken_ClientCred_ClientSecretBasic_Success(t *testing.T) {
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		ClientCredentialsEnabled: true,
-		DefaultAcrLevel:          enums.AcrLevel2Optional,
+		DefaultAcrLevel:          models.AcrLevel2Optional,
 		IsPublic:                 false,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
@@ -71,7 +70,7 @@ func TestToken_ClientCred_ClientSecretBasic_WrongSecret(t *testing.T) {
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		ClientCredentialsEnabled: true,
-		DefaultAcrLevel:          enums.AcrLevel2Optional,
+		DefaultAcrLevel:          models.AcrLevel2Optional,
 		IsPublic:                 false,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
@@ -101,7 +100,7 @@ func TestToken_ClientCred_FlowIsNotEnabled(t *testing.T) {
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ClientCredentialsEnabled: false, // Client credentials flow is not enabled
-		DefaultAcrLevel:          enums.AcrLevel2Optional,
+		DefaultAcrLevel:          models.AcrLevel2Optional,
 	}
 	err := database.CreateClient(nil, client)
 	assert.NoError(t, err)
@@ -127,7 +126,7 @@ func TestToken_ClientCred_ClientSecretIsMissing(t *testing.T) {
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ClientCredentialsEnabled: true,
-		DefaultAcrLevel:          enums.AcrLevel2Optional,
+		DefaultAcrLevel:          models.AcrLevel2Optional,
 		IsPublic:                 false, // Set to false to require a client secret
 	}
 	err := database.CreateClient(nil, client)
@@ -159,7 +158,7 @@ func TestToken_ClientCred_ClientAuthFailed(t *testing.T) {
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 		ClientCredentialsEnabled: true,
-		DefaultAcrLevel:          enums.AcrLevel2Optional,
+		DefaultAcrLevel:          models.AcrLevel2Optional,
 		IsPublic:                 false,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
@@ -191,7 +190,7 @@ func TestToken_ClientCred_InvalidScope(t *testing.T) {
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		ClientCredentialsEnabled: true,
-		DefaultAcrLevel:          enums.AcrLevel2Optional,
+		DefaultAcrLevel:          models.AcrLevel2Optional,
 		IsPublic:                 false,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
@@ -271,7 +270,7 @@ func TestToken_ClientCred_NoScopesGiven(t *testing.T) {
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		ClientCredentialsEnabled: true,
-		DefaultAcrLevel:          enums.AcrLevel2Optional,
+		DefaultAcrLevel:          models.AcrLevel2Optional,
 		IsPublic:                 false,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
@@ -337,7 +336,7 @@ func TestToken_ClientCred_SpecificScope(t *testing.T) {
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		ClientCredentialsEnabled: true,
-		DefaultAcrLevel:          enums.AcrLevel2Optional,
+		DefaultAcrLevel:          models.AcrLevel2Optional,
 		IsPublic:                 false,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
@@ -412,7 +411,7 @@ func TestToken_ClientCred_CrossResourcePermissionCollision(t *testing.T) {
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		ClientCredentialsEnabled: true,
-		DefaultAcrLevel:          enums.AcrLevel2Optional,
+		DefaultAcrLevel:          models.AcrLevel2Optional,
 		IsPublic:                 false,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
@@ -494,7 +493,7 @@ func TestToken_ClientCred_AuthServerScopeNotReachableByCollision(t *testing.T) {
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		ClientCredentialsEnabled: true,
-		DefaultAcrLevel:          enums.AcrLevel2Optional,
+		DefaultAcrLevel:          models.AcrLevel2Optional,
 		IsPublic:                 false,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
@@ -585,7 +584,7 @@ func TestToken_ClientCred_TabSeparatedScopeIsNormalized(t *testing.T) {
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		ClientCredentialsEnabled: true,
-		DefaultAcrLevel:          enums.AcrLevel2Optional,
+		DefaultAcrLevel:          models.AcrLevel2Optional,
 		IsPublic:                 false,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
@@ -659,7 +658,7 @@ func TestToken_ClientCred_InvalidScopeWithEmoji_DescriptionIsConformed(t *testin
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
 		ClientCredentialsEnabled: true,
-		DefaultAcrLevel:          enums.AcrLevel2Optional,
+		DefaultAcrLevel:          models.AcrLevel2Optional,
 		IsPublic:                 false,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}

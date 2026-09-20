@@ -15,7 +15,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/enums"
+	"github.com/leodip/goiabada/core/gender"
 )
 
 // HandleAPIAccountProfileGet - GET /api/v1/account/profile
@@ -119,8 +119,8 @@ func HandleAPIAccountProfilePut(
 		user.Website = input.Website
 
 		if len(input.Gender) > 0 {
-			if i, err := strconv.Atoi(input.Gender); err == nil && enums.IsGenderValid(i) {
-				user.Gender = enums.Gender(i).String()
+			if i, err := strconv.Atoi(input.Gender); err == nil && gender.IsGenderValid(i) {
+				user.Gender = gender.Gender(i).String()
 			}
 		} else {
 			user.Gender = ""

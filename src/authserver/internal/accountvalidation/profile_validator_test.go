@@ -10,7 +10,7 @@ import (
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
-	"github.com/leodip/goiabada/core/enums"
+	"github.com/leodip/goiabada/core/gender"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -574,9 +574,9 @@ func TestValidateProfile_Gender(t *testing.T) {
 		gender       string
 		expectedCode string
 	}{
-		{"female", fmt.Sprintf("%d", int(enums.GenderFemale)), ""},
-		{"male", fmt.Sprintf("%d", int(enums.GenderMale)), ""},
-		{"other", fmt.Sprintf("%d", int(enums.GenderOther)), ""},
+		{"female", fmt.Sprintf("%d", int(gender.GenderFemale)), ""},
+		{"male", fmt.Sprintf("%d", int(gender.GenderMale)), ""},
+		{"other", fmt.Sprintf("%d", int(gender.GenderOther)), ""},
 		{"empty is allowed", "", ""},
 		{"not a number", "female", i18n.ErrCodeProfileGenderInvalid},
 		{"out of range high", "3", i18n.ErrCodeProfileGenderInvalid},
@@ -825,7 +825,7 @@ func TestValidateProfile_FullyPopulatedValidProfile(t *testing.T) {
 		FamilyName:          "O'Brien",
 		Nickname:            "jd",
 		Website:             "https://example.com",
-		Gender:              fmt.Sprintf("%d", int(enums.GenderFemale)),
+		Gender:              fmt.Sprintf("%d", int(gender.GenderFemale)),
 		DateOfBirth:         "1990-05-15",
 		ZoneInfoCountryName: "Brazil",
 		ZoneInfo:            "America/Sao_Paulo",

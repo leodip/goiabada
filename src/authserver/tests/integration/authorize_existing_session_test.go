@@ -6,9 +6,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/config"
+	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
-	"github.com/leodip/goiabada/core/enums"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 )
@@ -37,7 +38,7 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel1Request(t *testing.T) {
 		"&scope=" + url.QueryEscape(requestScope) +
 		"&state=" + requestState +
 		"&nonce=" + requestNonce +
-		"&acr_values=" + enums.AcrLevel1.String()
+		"&acr_values=" + models.AcrLevel1.String()
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
@@ -78,8 +79,8 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel1Request(t *testing.T) {
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
-	assert.Equal(t, enums.AcrLevel1.String(), code.AcrLevel)
-	assert.Equal(t, enums.AuthMethodPassword.String(), code.AuthMethods)
+	assert.Equal(t, models.AcrLevel1.String(), code.AcrLevel)
+	assert.Equal(t, ceremony.AuthMethodPassword.String(), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 
 	assert.Equal(t, userSession1.Id, userSession2.Id)
@@ -118,7 +119,7 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2OptionalRequest_OtpDisabled
 		"&scope=" + url.QueryEscape(requestScope) +
 		"&state=" + requestState +
 		"&nonce=" + requestNonce +
-		"&acr_values=" + enums.AcrLevel2Optional.String()
+		"&acr_values=" + models.AcrLevel2Optional.String()
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
@@ -163,8 +164,8 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2OptionalRequest_OtpDisabled
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
-	assert.Equal(t, enums.AcrLevel2Optional.String(), code.AcrLevel)
-	assert.Equal(t, enums.AuthMethodPassword.String(), code.AuthMethods)
+	assert.Equal(t, models.AcrLevel2Optional.String(), code.AcrLevel)
+	assert.Equal(t, ceremony.AuthMethodPassword.String(), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 
 	assert.Equal(t, userSession1.Id, userSession2.Id)
@@ -212,7 +213,7 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2OptionalRequest_OtpEnabled(
 		"&scope=" + url.QueryEscape(requestScope) +
 		"&state=" + requestState +
 		"&nonce=" + requestNonce +
-		"&acr_values=" + enums.AcrLevel2Optional.String()
+		"&acr_values=" + models.AcrLevel2Optional.String()
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
@@ -268,8 +269,8 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2OptionalRequest_OtpEnabled(
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
-	assert.Equal(t, enums.AcrLevel2Optional.String(), code.AcrLevel)
-	assert.Equal(t, fmt.Sprintf("%s %s", enums.AuthMethodPassword.String(), enums.AuthMethodOTP.String()), code.AuthMethods)
+	assert.Equal(t, models.AcrLevel2Optional.String(), code.AcrLevel)
+	assert.Equal(t, fmt.Sprintf("%s %s", ceremony.AuthMethodPassword.String(), ceremony.AuthMethodOTP.String()), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 
 	assert.Equal(t, userSession1.Id, userSession2.Id)
@@ -308,7 +309,7 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2MandatoryRequest_OtpDisable
 		"&scope=" + url.QueryEscape(requestScope) +
 		"&state=" + requestState +
 		"&nonce=" + requestNonce +
-		"&acr_values=" + enums.AcrLevel2Mandatory.String()
+		"&acr_values=" + models.AcrLevel2Mandatory.String()
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
@@ -365,8 +366,8 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2MandatoryRequest_OtpDisable
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
-	assert.Equal(t, enums.AcrLevel2Mandatory.String(), code.AcrLevel)
-	assert.Equal(t, fmt.Sprintf("%s %s", enums.AuthMethodPassword.String(), enums.AuthMethodOTP.String()), code.AuthMethods)
+	assert.Equal(t, models.AcrLevel2Mandatory.String(), code.AcrLevel)
+	assert.Equal(t, fmt.Sprintf("%s %s", ceremony.AuthMethodPassword.String(), ceremony.AuthMethodOTP.String()), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 
 	assert.Equal(t, userSession1.Id, userSession2.Id)
@@ -415,7 +416,7 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2MandatoryRequest_OtpEnabled
 		"&scope=" + url.QueryEscape(requestScope) +
 		"&state=" + requestState +
 		"&nonce=" + requestNonce +
-		"&acr_values=" + enums.AcrLevel2Mandatory.String()
+		"&acr_values=" + models.AcrLevel2Mandatory.String()
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
@@ -471,8 +472,8 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2MandatoryRequest_OtpEnabled
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
-	assert.Equal(t, enums.AcrLevel2Mandatory.String(), code.AcrLevel)
-	assert.Equal(t, fmt.Sprintf("%s %s", enums.AuthMethodPassword.String(), enums.AuthMethodOTP.String()), code.AuthMethods)
+	assert.Equal(t, models.AcrLevel2Mandatory.String(), code.AcrLevel)
+	assert.Equal(t, fmt.Sprintf("%s %s", ceremony.AuthMethodPassword.String(), ceremony.AuthMethodOTP.String()), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 
 	assert.Equal(t, userSession1.Id, userSession2.Id)
@@ -505,7 +506,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel1Request(t *testing.
 		"&scope=" + url.QueryEscape(requestScope) +
 		"&state=" + requestState +
 		"&nonce=" + requestNonce +
-		"&acr_values=" + enums.AcrLevel1.String()
+		"&acr_values=" + models.AcrLevel1.String()
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
@@ -546,8 +547,8 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel1Request(t *testing.
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
-	assert.Equal(t, enums.AcrLevel2Optional.String(), code.AcrLevel)
-	assert.Equal(t, enums.AuthMethodPassword.String(), code.AuthMethods)
+	assert.Equal(t, models.AcrLevel2Optional.String(), code.AcrLevel)
+	assert.Equal(t, ceremony.AuthMethodPassword.String(), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 
 	assert.Equal(t, userSession1.Id, userSession2.Id)
@@ -587,7 +588,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2OptionalRequest_Otp
 		"&scope=" + url.QueryEscape(requestScope) +
 		"&state=" + requestState +
 		"&nonce=" + requestNonce +
-		"&acr_values=" + enums.AcrLevel2Optional.String()
+		"&acr_values=" + models.AcrLevel2Optional.String()
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
@@ -628,8 +629,8 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2OptionalRequest_Otp
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
-	assert.Equal(t, enums.AcrLevel2Optional.String(), code.AcrLevel)
-	assert.Equal(t, enums.AuthMethodPassword.String(), code.AuthMethods)
+	assert.Equal(t, models.AcrLevel2Optional.String(), code.AcrLevel)
+	assert.Equal(t, ceremony.AuthMethodPassword.String(), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 
 	assert.Equal(t, userSession1.Id, userSession2.Id)
@@ -687,7 +688,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2OptionalRequest_Otp
 		"&scope=" + url.QueryEscape(requestScope) +
 		"&state=" + requestState +
 		"&nonce=" + requestNonce +
-		"&acr_values=" + enums.AcrLevel2Optional.String()
+		"&acr_values=" + models.AcrLevel2Optional.String()
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
@@ -743,8 +744,8 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2OptionalRequest_Otp
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
-	assert.Equal(t, enums.AcrLevel2Optional.String(), code.AcrLevel)
-	assert.Equal(t, fmt.Sprintf("%s %s", enums.AuthMethodPassword.String(), enums.AuthMethodOTP.String()), code.AuthMethods)
+	assert.Equal(t, models.AcrLevel2Optional.String(), code.AcrLevel)
+	assert.Equal(t, fmt.Sprintf("%s %s", ceremony.AuthMethodPassword.String(), ceremony.AuthMethodOTP.String()), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 
 	assert.Equal(t, userSession1.Id, userSession2.Id)
@@ -795,7 +796,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2MandatoryRequest_Ot
 		"&scope=" + url.QueryEscape(requestScope) +
 		"&state=" + requestState +
 		"&nonce=" + requestNonce +
-		"&acr_values=" + enums.AcrLevel2Mandatory.String()
+		"&acr_values=" + models.AcrLevel2Mandatory.String()
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
@@ -852,8 +853,8 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2MandatoryRequest_Ot
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
-	assert.Equal(t, enums.AcrLevel2Mandatory.String(), code.AcrLevel)
-	assert.Equal(t, fmt.Sprintf("%s %s", enums.AuthMethodPassword.String(), enums.AuthMethodOTP.String()), code.AuthMethods)
+	assert.Equal(t, models.AcrLevel2Mandatory.String(), code.AcrLevel)
+	assert.Equal(t, fmt.Sprintf("%s %s", ceremony.AuthMethodPassword.String(), ceremony.AuthMethodOTP.String()), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 
 	assert.Equal(t, userSession1.Id, userSession2.Id)
@@ -910,7 +911,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2MandatoryRequest_Ot
 		"&scope=" + url.QueryEscape(requestScope) +
 		"&state=" + requestState +
 		"&nonce=" + requestNonce +
-		"&acr_values=" + enums.AcrLevel2Mandatory.String()
+		"&acr_values=" + models.AcrLevel2Mandatory.String()
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
@@ -966,8 +967,8 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2MandatoryRequest_Ot
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
-	assert.Equal(t, enums.AcrLevel2Mandatory.String(), code.AcrLevel)
-	assert.Equal(t, fmt.Sprintf("%s %s", enums.AuthMethodPassword.String(), enums.AuthMethodOTP.String()), code.AuthMethods)
+	assert.Equal(t, models.AcrLevel2Mandatory.String(), code.AcrLevel)
+	assert.Equal(t, fmt.Sprintf("%s %s", ceremony.AuthMethodPassword.String(), ceremony.AuthMethodOTP.String()), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 
 	assert.Equal(t, userSession1.Id, userSession2.Id)
@@ -1010,7 +1011,7 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel1Request(t *testing
 		"&scope=" + url.QueryEscape(requestScope) +
 		"&state=" + requestState +
 		"&nonce=" + requestNonce +
-		"&acr_values=" + enums.AcrLevel1.String()
+		"&acr_values=" + models.AcrLevel1.String()
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
@@ -1051,8 +1052,8 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel1Request(t *testing
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
-	assert.Equal(t, enums.AcrLevel2Mandatory.String(), code.AcrLevel)
-	assert.Equal(t, fmt.Sprintf("%s %s", enums.AuthMethodPassword.String(), enums.AuthMethodOTP.String()), code.AuthMethods)
+	assert.Equal(t, models.AcrLevel2Mandatory.String(), code.AcrLevel)
+	assert.Equal(t, fmt.Sprintf("%s %s", ceremony.AuthMethodPassword.String(), ceremony.AuthMethodOTP.String()), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 
 	assert.Equal(t, userSession1.Id, userSession2.Id)
@@ -1092,7 +1093,7 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2OptionalRequest_Ot
 		"&scope=" + url.QueryEscape(requestScope) +
 		"&state=" + requestState +
 		"&nonce=" + requestNonce +
-		"&acr_values=" + enums.AcrLevel2Optional.String()
+		"&acr_values=" + models.AcrLevel2Optional.String()
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
@@ -1133,8 +1134,8 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2OptionalRequest_Ot
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
-	assert.Equal(t, enums.AcrLevel2Mandatory.String(), code.AcrLevel)
-	assert.Equal(t, fmt.Sprintf("%s %s", enums.AuthMethodPassword.String(), enums.AuthMethodOTP.String()), code.AuthMethods)
+	assert.Equal(t, models.AcrLevel2Mandatory.String(), code.AcrLevel)
+	assert.Equal(t, fmt.Sprintf("%s %s", ceremony.AuthMethodPassword.String(), ceremony.AuthMethodOTP.String()), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 
 	assert.Equal(t, userSession1.Id, userSession2.Id)
@@ -1179,7 +1180,7 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2OptionalRequest_Ot
 		"&scope=" + url.QueryEscape(requestScope) +
 		"&state=" + requestState +
 		"&nonce=" + requestNonce +
-		"&acr_values=" + enums.AcrLevel2Optional.String()
+		"&acr_values=" + models.AcrLevel2Optional.String()
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
@@ -1220,8 +1221,8 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2OptionalRequest_Ot
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
-	assert.Equal(t, enums.AcrLevel2Mandatory.String(), code.AcrLevel)
-	assert.Equal(t, fmt.Sprintf("%s %s", enums.AuthMethodPassword.String(), enums.AuthMethodOTP.String()), code.AuthMethods)
+	assert.Equal(t, models.AcrLevel2Mandatory.String(), code.AcrLevel)
+	assert.Equal(t, fmt.Sprintf("%s %s", ceremony.AuthMethodPassword.String(), ceremony.AuthMethodOTP.String()), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 
 	assert.Equal(t, userSession1.Id, userSession2.Id)
@@ -1285,7 +1286,7 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2MandatoryRequest_O
 		"&scope=" + url.QueryEscape(requestScope) +
 		"&state=" + requestState +
 		"&nonce=" + requestNonce +
-		"&acr_values=" + enums.AcrLevel2Mandatory.String()
+		"&acr_values=" + models.AcrLevel2Mandatory.String()
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
@@ -1342,8 +1343,8 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2MandatoryRequest_O
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
-	assert.Equal(t, enums.AcrLevel2Mandatory.String(), code.AcrLevel)
-	assert.Equal(t, fmt.Sprintf("%s %s", enums.AuthMethodPassword.String(), enums.AuthMethodOTP.String()), code.AuthMethods)
+	assert.Equal(t, models.AcrLevel2Mandatory.String(), code.AcrLevel)
+	assert.Equal(t, fmt.Sprintf("%s %s", ceremony.AuthMethodPassword.String(), ceremony.AuthMethodOTP.String()), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 
 	assert.Equal(t, userSession1.Id, userSession2.Id)
@@ -1389,7 +1390,7 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2MandatoryRequest_O
 		"&scope=" + url.QueryEscape(requestScope) +
 		"&state=" + requestState +
 		"&nonce=" + requestNonce +
-		"&acr_values=" + enums.AcrLevel2Mandatory.String()
+		"&acr_values=" + models.AcrLevel2Mandatory.String()
 
 	resp, err := httpClient.Get(destUrl)
 	if err != nil {
@@ -1430,8 +1431,8 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2MandatoryRequest_O
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, "query", code.ResponseMode)
 	assertWithinLastXSeconds(t, code.AuthenticatedAt, 3)
-	assert.Equal(t, enums.AcrLevel2Mandatory.String(), code.AcrLevel)
-	assert.Equal(t, fmt.Sprintf("%s %s", enums.AuthMethodPassword.String(), enums.AuthMethodOTP.String()), code.AuthMethods)
+	assert.Equal(t, models.AcrLevel2Mandatory.String(), code.AcrLevel)
+	assert.Equal(t, fmt.Sprintf("%s %s", ceremony.AuthMethodPassword.String(), ceremony.AuthMethodOTP.String()), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 
 	assert.Equal(t, userSession1.Id, userSession2.Id)

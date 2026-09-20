@@ -15,9 +15,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/authserver/internal/config"
+	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
-	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/testutil"
 )
 
@@ -59,7 +59,7 @@ func useMailpitSMTP(t *testing.T) func() {
 	settings.SMTPEnabled = true
 	settings.SMTPHost = "mailpit"
 	settings.SMTPPort = 1025
-	settings.SMTPEncryption = enums.SMTPEncryptionNone.String()
+	settings.SMTPEncryption = emaildelivery.SMTPEncryptionNone.String()
 	settings.SMTPFromName = "Goiabada"
 	settings.SMTPFromEmail = "noreply@goiabada.dev"
 	require.NoError(t, database.UpdateSettings(nil, settings))

@@ -19,7 +19,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/customerrors"
-	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/mocks"
 	"github.com/leodip/goiabada/core/oauth"
@@ -112,7 +111,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		client := &models.Client{
 			Id:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  enums.AcrLevel1,
+			DefaultAcrLevel:  models.AcrLevel1,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
 
@@ -201,7 +200,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		client := &models.Client{
 			Id:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  enums.AcrLevel1,
+			DefaultAcrLevel:  models.AcrLevel1,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
 
@@ -378,7 +377,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		client := &models.Client{
 			Id:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  enums.AcrLevel1,
+			DefaultAcrLevel:  models.AcrLevel1,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
 
@@ -493,7 +492,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		client := &models.Client{
 			Id:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  enums.AcrLevel1,
+			DefaultAcrLevel:  models.AcrLevel1,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
 
@@ -559,7 +558,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		client := &models.Client{
 			Id:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  enums.AcrLevel1,
+			DefaultAcrLevel:  models.AcrLevel1,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
 
@@ -616,7 +615,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		client := &models.Client{
 			Id:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  enums.AcrLevel1,
+			DefaultAcrLevel:  models.AcrLevel1,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
 
@@ -687,7 +686,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		client := &models.Client{
 			Id:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  enums.AcrLevel1,
+			DefaultAcrLevel:  models.AcrLevel1,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
 
@@ -752,7 +751,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		client := &models.Client{
 			Id:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  enums.AcrLevel1,
+			DefaultAcrLevel:  models.AcrLevel1,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
 
@@ -807,7 +806,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		client := &models.Client{
 			Id:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  enums.AcrLevel1,
+			DefaultAcrLevel:  models.AcrLevel1,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
 
@@ -915,7 +914,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		client := &models.Client{
 			Id:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  enums.AcrLevel2Optional,
+			DefaultAcrLevel:  models.AcrLevel2Optional,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
 
@@ -926,8 +925,8 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		userSession := &models.UserSession{
 			Id:          1,
 			UserId:      123,
-			AcrLevel:    enums.AcrLevel1.String(), // Set this to the appropriate level
-			AuthMethods: "pwd",                    // Set this to the appropriate method(s)
+			AcrLevel:    models.AcrLevel1.String(), // Set this to the appropriate level
+			AuthMethods: "pwd",                     // Set this to the appropriate method(s)
 			User: models.User{
 				Id:      123,
 				Enabled: true,
@@ -1004,7 +1003,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		client := &models.Client{
 			Id:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  enums.AcrLevel1,
+			DefaultAcrLevel:  models.AcrLevel1,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
 
@@ -1082,7 +1081,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		client := &models.Client{
 			Id:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  enums.AcrLevel1,
+			DefaultAcrLevel:  models.AcrLevel1,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
 
@@ -1147,7 +1146,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.Anything).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.Anything).Return(nil)
 
-		client := &models.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: enums.AcrLevel1}
+		client := &models.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: models.AcrLevel1}
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
 
 		authorizeValidator.On("ValidateRequest", mock.Anything).Return(nil)
@@ -1220,7 +1219,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.Anything).Return(nil)
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.Anything).Return(nil)
 
-		client := &models.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: enums.AcrLevel1}
+		client := &models.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: models.AcrLevel1}
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
 
 		authorizeValidator.On("ValidateRequest", mock.Anything).Return(nil)
@@ -2272,7 +2271,7 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 		client := &models.Client{
 			Id:                   1,
 			ClientIdentifier:     "test-client",
-			DefaultAcrLevel:      enums.AcrLevel1,
+			DefaultAcrLevel:      models.AcrLevel1,
 			ImplicitGrantEnabled: nil, // Uses global setting
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
@@ -2342,7 +2341,7 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 		client := &models.Client{
 			Id:                   1,
 			ClientIdentifier:     "test-client",
-			DefaultAcrLevel:      enums.AcrLevel1,
+			DefaultAcrLevel:      models.AcrLevel1,
 			ImplicitGrantEnabled: nil,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
@@ -2411,7 +2410,7 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 		client := &models.Client{
 			Id:                   1,
 			ClientIdentifier:     "test-client",
-			DefaultAcrLevel:      enums.AcrLevel1,
+			DefaultAcrLevel:      models.AcrLevel1,
 			ImplicitGrantEnabled: nil, // Uses global setting (disabled)
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
@@ -2474,7 +2473,7 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 		client := &models.Client{
 			Id:                   1,
 			ClientIdentifier:     "test-client",
-			DefaultAcrLevel:      enums.AcrLevel1,
+			DefaultAcrLevel:      models.AcrLevel1,
 			ImplicitGrantEnabled: &implicitEnabled, // Client override
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
@@ -2545,7 +2544,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		client := &models.Client{
 			Id:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  enums.AcrLevel1,
+			DefaultAcrLevel:  models.AcrLevel1,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
 
@@ -2608,7 +2607,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		client := &models.Client{
 			Id:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  enums.AcrLevel1,
+			DefaultAcrLevel:  models.AcrLevel1,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
 
@@ -2678,7 +2677,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		client := &models.Client{
 			Id:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  enums.AcrLevel1,
+			DefaultAcrLevel:  models.AcrLevel1,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
 
@@ -2748,7 +2747,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		client := &models.Client{
 			Id:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  enums.AcrLevel1,
+			DefaultAcrLevel:  models.AcrLevel1,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
 
@@ -2772,7 +2771,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		userSession := &models.UserSession{
 			Id:          1,
 			UserId:      123,
-			AcrLevel:    enums.AcrLevel1.String(),
+			AcrLevel:    models.AcrLevel1.String(),
 			AuthMethods: "pwd",
 			User: models.User{
 				Id:      123,
@@ -2840,7 +2839,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		client := &models.Client{
 			Id:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  enums.AcrLevel1,
+			DefaultAcrLevel:  models.AcrLevel1,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
 
@@ -2864,7 +2863,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		userSession := &models.UserSession{
 			Id:          1,
 			UserId:      123,
-			AcrLevel:    enums.AcrLevel1.String(),
+			AcrLevel:    models.AcrLevel1.String(),
 			AuthMethods: "pwd",
 			User: models.User{
 				Id:      123,
@@ -2934,7 +2933,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		client := &models.Client{
 			Id:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  enums.AcrLevel1,
+			DefaultAcrLevel:  models.AcrLevel1,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
 
@@ -2958,7 +2957,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		userSession := &models.UserSession{
 			Id:          1,
 			UserId:      456,
-			AcrLevel:    enums.AcrLevel1.String(),
+			AcrLevel:    models.AcrLevel1.String(),
 			AuthMethods: "pwd",
 			User: models.User{
 				Id:      456,
@@ -3025,7 +3024,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		client := &models.Client{
 			Id:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  enums.AcrLevel1,
+			DefaultAcrLevel:  models.AcrLevel1,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
 
@@ -3054,7 +3053,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		userSession := &models.UserSession{
 			Id:          1,
 			UserId:      789,
-			AcrLevel:    enums.AcrLevel1.String(),
+			AcrLevel:    models.AcrLevel1.String(),
 			AuthMethods: "pwd",
 			// Session at 7, user at 9. The prompt=none path is a SEPARATE session-reuse
 			// site from the interactive one, and it must inherit from the session too, or a
@@ -3076,7 +3075,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 			return u.Id == 789
 		})).Return("openid", nil)
 
-		userSessionManager.On("BumpUserSession", req, "session-789", int64(1), "pwd", enums.AcrLevel1.String()).Return(userSession, nil)
+		userSessionManager.On("BumpUserSession", req, "session-789", int64(1), "pwd", models.AcrLevel1.String()).Return(userSession, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.AuditBumpedUserSession, mock.MatchedBy(func(details map[string]interface{}) bool {
 			return details["userId"] == int64(789) && details["clientId"] == int64(1)
@@ -3141,7 +3140,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		client := &models.Client{
 			Id:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  enums.AcrLevel1,
+			DefaultAcrLevel:  models.AcrLevel1,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
 
@@ -3165,7 +3164,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		userSession := &models.UserSession{
 			Id:          1,
 			UserId:      999,
-			AcrLevel:    enums.AcrLevel1.String(),
+			AcrLevel:    models.AcrLevel1.String(),
 			AuthMethods: "pwd",
 			User: models.User{
 				Id:      999,
@@ -3241,7 +3240,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		client := &models.Client{
 			Id:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  enums.AcrLevel1,
+			DefaultAcrLevel:  models.AcrLevel1,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
 
@@ -3261,7 +3260,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		userSession := &models.UserSession{
 			Id:          1,
 			UserId:      999,
-			AcrLevel:    enums.AcrLevel1.String(),
+			AcrLevel:    models.AcrLevel1.String(),
 			AuthMethods: "pwd",
 			User: models.User{
 				Id:      999,
@@ -3343,7 +3342,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		client := &models.Client{
 			Id:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  enums.AcrLevel1,
+			DefaultAcrLevel:  models.AcrLevel1,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
 
@@ -3363,7 +3362,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		userSession := &models.UserSession{
 			Id:          1,
 			UserId:      999,
-			AcrLevel:    enums.AcrLevel1.String(),
+			AcrLevel:    models.AcrLevel1.String(),
 			AuthMethods: "pwd",
 			User: models.User{
 				Id:      999,
@@ -3437,7 +3436,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		client := &models.Client{
 			Id:               1,
 			ClientIdentifier: "test-client",
-			DefaultAcrLevel:  enums.AcrLevel1,
+			DefaultAcrLevel:  models.AcrLevel1,
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
 
@@ -3457,7 +3456,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		userSession := &models.UserSession{
 			Id:          1,
 			UserId:      999,
-			AcrLevel:    enums.AcrLevel1.String(),
+			AcrLevel:    models.AcrLevel1.String(),
 			AuthMethods: "pwd",
 			User: models.User{
 				Id:      999,

@@ -12,7 +12,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/enums"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -432,8 +431,8 @@ func createTestClient(t *testing.T, identifier string) *models.Client {
 		TokenExpirationInSeconds:                3600,
 		RefreshTokenOfflineIdleTimeoutInSeconds: 86400,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 2592000,
-		IncludeOpenIDConnectClaimsInAccessToken: enums.ThreeStateSettingDefault.String(),
-		DefaultAcrLevel:                         enums.AcrLevel1,
+		IncludeOpenIDConnectClaimsInAccessToken: models.ThreeStateSettingDefault.String(),
+		DefaultAcrLevel:                         models.AcrLevel1,
 	}
 	err := database.CreateClient(nil, client)
 	assert.NoError(t, err)

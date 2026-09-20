@@ -6,7 +6,6 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/models"
-	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/i18n"
 )
 
@@ -28,14 +27,14 @@ func (val *PasswordValidator) ValidatePassword(ctx context.Context, password str
 	mustIncludeASpecialChar := false
 
 	switch settings.PasswordPolicy {
-	case enums.PasswordPolicyLow:
+	case models.PasswordPolicyLow:
 		minLength = 6
-	case enums.PasswordPolicyMedium:
+	case models.PasswordPolicyMedium:
 		minLength = 8
 		mustIncludeLowerCase = true
 		mustIncludeUpperCase = true
 		mustIncludeANumber = true
-	case enums.PasswordPolicyHigh:
+	case models.PasswordPolicyHigh:
 		minLength = 10
 		mustIncludeLowerCase = true
 		mustIncludeUpperCase = true
