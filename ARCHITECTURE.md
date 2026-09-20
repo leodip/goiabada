@@ -6,7 +6,10 @@ This file records which module owns what, and it is executable. The four tables 
 [foreign modules](#foreign-modules-the-admin-console-must-not-compile) — are parsed by
 `AssertArchitecture` in `src/core/testutil/architecture.go`, which every module's unit tier calls.
 A row that stops describing the tree fails the tier, in both directions: an edge the tables do not
-allow is a finding, and so is an exception listed for an edge that no longer exists.
+allow is a finding, and so is an exception listed for an edge that no longer exists. A fifth table,
+one row per exported symbol every `core` package declares, is data in the same sense and lives in
+[`src/core/OWNERSHIP.md`](src/core/OWNERSHIP.md); rule 8 below is its rule, and
+`AssertSymbolOwnership` reads it from the same three tiers.
 
 That is the whole point of writing it down here rather than in prose. The dependency direction
 between these three modules is not visible at a call site and is not a compile error until the day
@@ -65,6 +68,11 @@ The test that decides `core` membership is not "is it reusable" but "do both pro
 or is it an intentionally stable cross-process contract". Reusability is a property of almost any
 well-written package and is the reason `core` grew into a second application.
 
+The same question asked one grain finer — why does `core` declare *this symbol* — has a row per
+exported symbol in [`src/core/OWNERSHIP.md`](src/core/OWNERSHIP.md), which is rule 8 below. It lives
+there rather than here because it is some four hundred rows of data, and this document's value is
+the prose they would bury (#385).
+
 ## Package ownership
 
 Every top-level package under `src/core` has a row. `owner` is where the package must end up, not
@@ -84,6 +92,7 @@ A row whose owner is not `kernel` names the issue that moves it. A `kernel` row 
 | package | owner | moves in |
 |---|---|---|
 | `core/api` | kernel | — |
+| `core/cmd` | kernel | — |
 | `core/constants` | kernel | — |
 | `core/countries` | kernel | — |
 | `core/customerrors` | kernel | — |
@@ -109,6 +118,9 @@ Notes on rows that are not self-evident:
   deletion, and it does exist as a directory of generated mocks in a working tree that has run the
   mock generator, but git has never tracked a file under it. A row for it fails the completeness
   rule, which is how this was found.
+- `core/cmd` is kernel because it is one developer tool, `ownershipdump`, which writes the per-symbol
+  table described below. The row exists because the guard reads any directory under `core` holding a
+  production Go file, and rule 6 fails without it (#385).
 - `core/mocks` and `core/testutil` are kernel because they are test support compiled into no binary.
   They are still held to the kernel rule, and #360 is what made that hold rather than merely claim
   it: `core/testutil/fake` imported `core/uuidutil` under an exception rather than a waiver, so the
@@ -232,11 +244,19 @@ The guard reports findings by these names.
    justification the reference graph backs. A symbol with no row fails, a row for a symbol that is
    gone fails, and a row claiming less than the tree supports fails. Only a `moving` row names an
    issue, because it is the only justification that expires.
+8. **core symbols** — every exported symbol any `core` package declares has exactly one row in
+   [`src/core/OWNERSHIP.md`](src/core/OWNERSHIP.md), stating the strongest of seven justifications
+   the reference graph backs. Four are computed — `kernel`, `both-apps`, `own-package`, `reachable`
+   — and three are asserted with a note the guard requires to be non-empty: `test-support`,
+   `contract` and `moving`. Same both directions as rule 7, and the same reason: `core/constants`
+   reached 139 symbols, 108 named by a single process, with every rule above green throughout. That
+   file's own header carries the definitions and the ceilings (#385).
 
-Rules 2, 3, 4 and 7 read production files only. A test may import a mock, a fixture or a helper from
+Rules 2, 3, 4, 7 and 8 read production files only. A test may import a mock, a fixture or a helper from
 anywhere; that is what test code is for, and holding it to the production graph would make
 `core/testutil` unusable from the tiers that call it. Rule 1 is the exception, for the reason given
-above. Rule 5 reads production files because it is about what lands in a shipped binary.
+above. Rule 5 reads production files because it is about what lands in a shipped binary, and rule
+8's `test-support` half reads them the same way, for the same reason.
 
 ## Temporary exceptions
 
@@ -344,9 +364,19 @@ down: `src/core/testutil/constants_ownership.go` reads the exported declarations
 `core/constants` and, from every production file that imports it, the symbols selected off whatever
 identifier that file binds the import to.
 
+Rule 8 lives beside them rather than in this file. `AssertSymbolOwnership` in
+`src/core/testutil/symbol_ownership.go` is called from the same three tiers and checks
+`src/core/OWNERSHIP.md`; `src/core/cmd/ownershipdump` writes the computed rows from the same census,
+so the tool and the guard cannot read the tree differently, and `./run-tests.sh --type lint` runs
+the tool and fails on a tree it changed. References from outside a declaring package are read as
+selectors, like rule 7's; references from inside it are resolved with `go/types`, because there an
+identifier carries no selector and matching one by spelling would let a local or a struct field
+justify its namesake.
+
 `src/core/testutil/architecture_lint_test.go` is the core tier's caller;
-`src/core/testutil/architecture_rules_test.go` and
-`src/core/testutil/constants_ownership_rules_test.go` hold the guard's own tests. They run the rule table
+`src/core/testutil/architecture_rules_test.go`,
+`src/core/testutil/constants_ownership_rules_test.go` and
+`src/core/testutil/symbol_ownership_rules_test.go` hold the guard's own tests. They run the rule table
 against fixture trees written into a temp directory, one fixture per rule and per deliberate
 leniency, and then take the real tables apart one row at a time — dropping each exception and
 flipping each declared reachability — because the tree satisfies this document by construction, so
