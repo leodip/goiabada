@@ -19,9 +19,9 @@ import (
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/otp"
+	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/encryption"
-	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -111,7 +111,7 @@ func currentOtpCode(t *testing.T) string {
 // pending pair every case here would stop at OTP_ENROLLMENT_NOT_PENDING before reaching the claim.
 func otpTestUser(t *testing.T, password string) *models.User {
 	t.Helper()
-	hash, err := hashutil.HashPassword(password)
+	hash, err := passwordhash.Hash(password)
 	require.NoError(t, err)
 	ciphertext, issuedAt := pendingEnrollment(t, otpTestKeyURL, time.Now().UTC())
 	// OTPEnabled false: the OTP_ALREADY_ENABLED check above the claim is what makes this the only

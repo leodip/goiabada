@@ -1,3 +1,7 @@
+// Package hashutil hashes a string with SHA-256 and checks one against its hash. It stays in core
+// while the rest of what this package held moved to authserver/internal/passwordhash, because both
+// processes reach it independently: the auth server hashes authorization, verification and reset
+// codes to locate rows, and the admin console hashes the nonce it sends and re-checks it (#360).
 package hashutil
 
 import (
@@ -5,15 +9,7 @@ import (
 	"fmt"
 
 	"github.com/leodip/goiabada/core/errs"
-	"golang.org/x/crypto/bcrypt"
 )
-
-// DummyPasswordHash is a pre-computed bcrypt hash used for timing-safe user enumeration protection.
-// When a user lookup fails (user doesn't exist), we still perform a bcrypt comparison against
-// this dummy hash to ensure the response time is similar to when a user does exist.
-// This prevents attackers from determining whether an email exists based on response timing.
-// The hash was generated using bcrypt.DefaultCost (10) for the string "dummy_password_for_timing_safe_comparison".
-const DummyPasswordHash = "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy"
 
 // HashString can hash strings of any length
 func HashString(s string) (string, error) {
@@ -33,18 +29,4 @@ func VerifyStringHash(hashedString string, s string) bool {
 		return false
 	}
 	return hash == hashedString
-}
-
-// The maximum length for password is 72 bytes
-func HashPassword(password string) (string, error) {
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-	if err != nil {
-		return "", errs.Wrap(err, "unable to hash")
-	}
-	return string(hash), nil
-}
-
-func VerifyPasswordHash(hashedPassword string, password string) bool {
-	err := bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(password))
-	return err == nil
 }

@@ -13,10 +13,10 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/errs"
-	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/i18n"
 )
 
@@ -230,7 +230,7 @@ func HandleAuthPwdPost(
 			// even when the user doesn't exist. This ensures the response time is similar
 			// to when a user exists but the password is wrong, preventing attackers from
 			// determining whether an email exists based on response timing differences.
-			hashutil.VerifyPasswordHash(hashutil.DummyPasswordHash, password)
+			passwordhash.Verify(passwordhash.DummyHash, password)
 
 			// A guess against an address that names no account is still a guess, and
 			// charging it is also what keeps this branch from being a cheaper way to
@@ -243,7 +243,7 @@ func HandleAuthPwdPost(
 			return
 		}
 
-		if !hashutil.VerifyPasswordHash(user.PasswordHash, password) {
+		if !passwordhash.Verify(user.PasswordHash, password) {
 			credentialFailures.RecordCredentialFailure(r)
 			auditLogger.Log(r.Context(), audit.AuditAuthFailedPwd, map[string]interface{}{
 				"email": email,

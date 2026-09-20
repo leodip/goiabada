@@ -14,6 +14,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/usercreation"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/encryption"
@@ -163,7 +164,7 @@ func HandleAccountRegisterPost(
 		}
 
 		if settings.SMTPEnabled && settings.SelfRegistrationRequiresEmailVerification {
-			passwordHash, err := hashutil.HashPassword(password)
+			passwordHash, err := passwordhash.Hash(password)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
 				return
@@ -241,7 +242,7 @@ func HandleAccountRegisterPost(
 				httpHelper.InternalServerError(w, r, err)
 			}
 		} else {
-			passwordHash, err := hashutil.HashPassword(password)
+			passwordHash, err := passwordhash.Hash(password)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
 				return

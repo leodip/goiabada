@@ -11,11 +11,11 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/otp"
+	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/enums"
-	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
@@ -42,7 +42,7 @@ func setUserPasswordForOTP(t *testing.T, userId int64, newPassword string) {
 		t.Fatalf("user %d not found", userId)
 	}
 
-	hash, err := hashutil.HashPassword(newPassword)
+	hash, err := passwordhash.Hash(newPassword)
 	assert.NoError(t, err)
 	user.PasswordHash = hash
 	err = database.UpdateUser(nil, user)
@@ -51,7 +51,7 @@ func setUserPasswordForOTP(t *testing.T, userId int64, newPassword string) {
 	// Verify password persisted and matches
 	u2, err := database.GetUserById(nil, userId)
 	assert.NoError(t, err)
-	assert.True(t, hashutil.VerifyPasswordHash(u2.PasswordHash, newPassword), "password hash should match new password")
+	assert.True(t, passwordhash.Verify(u2.PasswordHash, newPassword), "password hash should match new password")
 }
 
 // helper: get current account user id via profile for a given access token

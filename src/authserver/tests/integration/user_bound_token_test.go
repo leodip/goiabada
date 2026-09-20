@@ -10,11 +10,11 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/enums"
-	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -58,7 +58,7 @@ func createUserWithSubject(t *testing.T, subject string) (*models.User, string) 
 	t.Helper()
 
 	password := fake.Password(12)
-	passwordHashed, err := hashutil.HashPassword(password)
+	passwordHashed, err := passwordhash.Hash(password)
 	require.NoError(t, err)
 
 	user := &models.User{
@@ -343,7 +343,7 @@ func userAccessTokenViaROPC(t *testing.T) (string, *models.User, string) {
 
 	password := fake.Password(12)
 	user, _ := createUserWithSubject(t, fake.UUID())
-	passwordHashed, err := hashutil.HashPassword(password)
+	passwordHashed, err := passwordhash.Hash(password)
 	require.NoError(t, err)
 	user.PasswordHash = passwordHashed
 	err = database.UpdateUser(nil, user)

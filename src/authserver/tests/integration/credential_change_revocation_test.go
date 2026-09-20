@@ -13,6 +13,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/encryption"
@@ -340,7 +341,7 @@ func createOfflineGrant(t *testing.T) *offlineGrant {
 	require.NoError(t, database.CreateRedirectURI(nil, redirectURI))
 
 	password := fake.Password(12)
-	passwordHashed, err := hashutil.HashPassword(password)
+	passwordHashed, err := passwordhash.Hash(password)
 	require.NoError(t, err)
 
 	user := &models.User{
@@ -508,7 +509,7 @@ func resetPasswordFor(t *testing.T, user *models.User, newPassword string) {
 	// failed and left everything untouched.
 	after, err := database.GetUserById(nil, user.Id)
 	require.NoError(t, err)
-	require.True(t, hashutil.VerifyPasswordHash(after.PasswordHash, newPassword),
+	require.True(t, passwordhash.Verify(after.PasswordHash, newPassword),
 		"the reset must have replaced the password hash")
 }
 

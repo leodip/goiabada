@@ -12,8 +12,8 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
+	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/hashutil"
 )
 
 // HandleAPIAccountPasswordPut - PUT /api/v1/account/password
@@ -66,7 +66,7 @@ func HandleAPIAccountPasswordPut(
 		}
 
 		// Verify current password
-		if !hashutil.VerifyPasswordHash(user.PasswordHash, req.CurrentPassword) {
+		if !passwordhash.Verify(user.PasswordHash, req.CurrentPassword) {
 			// The only branch that is a guess at the password, which is why it is the only one
 			// that spends the budget shared with PUT /api/v1/account/otp. A missing token, a
 			// blank subject, an undecodable body, a missing field and an unknown user are all
@@ -85,7 +85,7 @@ func HandleAPIAccountPasswordPut(
 		}
 
 		// Hash and update
-		passwordHash, err := hashutil.HashPassword(req.NewPassword)
+		passwordHash, err := passwordhash.Hash(req.NewPassword)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return

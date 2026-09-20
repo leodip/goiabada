@@ -16,10 +16,10 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/otp"
+	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/errs"
-	"github.com/leodip/goiabada/core/hashutil"
 )
 
 // otpEnrollmentLifetime is how long an enrollment the server has issued stays usable: the window
@@ -279,7 +279,7 @@ func HandleAPIAccountOTPPut(
 			writeJSONError(w, "Authentication failed. Check your password and try again.", "AUTHENTICATION_FAILED", http.StatusBadRequest)
 			return
 		}
-		if !hashutil.VerifyPasswordHash(user.PasswordHash, req.Password) {
+		if !passwordhash.Verify(user.PasswordHash, req.Password) {
 			// The one branch here that is a guess at the password, and so the only one that
 			// spends the budget shared with PUT /api/v1/account/password. The blank check
 			// above compares nothing, and the enable branch's wrong code and replay below are

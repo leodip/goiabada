@@ -13,10 +13,10 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/encryption"
-	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -4182,7 +4182,7 @@ func TestValidateTokenRequest_ROPC_Success(t *testing.T) {
 	}
 	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
 
-	passwordHash, _ := hashutil.HashPassword("correctpassword")
+	passwordHash, _ := passwordhash.Hash("correctpassword")
 	user := &models.User{
 		Id:           1,
 		Email:        "user@example.com",
@@ -4272,7 +4272,7 @@ func TestValidateTokenRequest_ROPC_ClientOverrideEnabled(t *testing.T) {
 	}
 	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
 
-	passwordHash, _ := hashutil.HashPassword("correctpassword")
+	passwordHash, _ := passwordhash.Hash("correctpassword")
 	user := &models.User{
 		Id:           1,
 		Email:        "user@example.com",
@@ -4619,7 +4619,7 @@ func TestValidateTokenRequest_ROPC_InvalidPassword(t *testing.T) {
 	}
 	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
 
-	passwordHash, _ := hashutil.HashPassword("correctpassword")
+	passwordHash, _ := passwordhash.Hash("correctpassword")
 	user := &models.User{
 		Id:           1,
 		Email:        "user@example.com",
@@ -4668,7 +4668,7 @@ func TestValidateTokenRequest_ROPC_UserDisabled(t *testing.T) {
 	}
 	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
 
-	passwordHash, _ := hashutil.HashPassword("correctpassword")
+	passwordHash, _ := passwordhash.Hash("correctpassword")
 	user := &models.User{
 		Id:           1,
 		Email:        "user@example.com",
@@ -4717,7 +4717,7 @@ func TestValidateTokenRequest_ROPC_UserWith2FA(t *testing.T) {
 	}
 	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
 
-	passwordHash, _ := hashutil.HashPassword("correctpassword")
+	passwordHash, _ := passwordhash.Hash("correctpassword")
 	user := &models.User{
 		Id:           1,
 		Email:        "user@example.com",
@@ -4855,7 +4855,7 @@ func TestValidateTokenRequest_ROPC_ConfidentialClient_Success(t *testing.T) {
 	}
 	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
 
-	passwordHash, _ := hashutil.HashPassword("userpassword")
+	passwordHash, _ := passwordhash.Hash("userpassword")
 	user := &models.User{
 		Id:           1,
 		Email:        "user@example.com",
@@ -4909,7 +4909,7 @@ func TestValidateTokenRequest_ROPC_EmptyScope_DefaultsToOpenId(t *testing.T) {
 	}
 	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
 
-	passwordHash, _ := hashutil.HashPassword("correctpassword")
+	passwordHash, _ := passwordhash.Hash("correctpassword")
 	user := &models.User{
 		Id:           1,
 		Email:        "user@example.com",
@@ -4958,7 +4958,7 @@ func TestValidateTokenRequest_ROPC_WithOfflineAccess(t *testing.T) {
 	}
 	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
 
-	passwordHash, _ := hashutil.HashPassword("correctpassword")
+	passwordHash, _ := passwordhash.Hash("correctpassword")
 	user := &models.User{
 		Id:           1,
 		Email:        "user@example.com",
@@ -5007,7 +5007,7 @@ func TestValidateTokenRequest_ROPC_InvalidScopeFormat(t *testing.T) {
 	}
 	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
 
-	passwordHash, _ := hashutil.HashPassword("correctpassword")
+	passwordHash, _ := passwordhash.Hash("correctpassword")
 	user := &models.User{
 		Id:           1,
 		Email:        "user@example.com",
@@ -5060,7 +5060,7 @@ func TestValidateTokenRequest_ROPC_ResourcePermission_Success(t *testing.T) {
 	}
 	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
 
-	passwordHash, _ := hashutil.HashPassword("correctpassword")
+	passwordHash, _ := passwordhash.Hash("correctpassword")
 	user := &models.User{
 		Id:           1,
 		Email:        "user@example.com",
@@ -5121,7 +5121,7 @@ func TestValidateTokenRequest_ROPC_ResourcePermission_UserLacksPermission(t *tes
 	}
 	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
 
-	passwordHash, _ := hashutil.HashPassword("correctpassword")
+	passwordHash, _ := passwordhash.Hash("correctpassword")
 	user := &models.User{
 		Id:           1,
 		Email:        "user@example.com",
@@ -5214,7 +5214,7 @@ func TestValidateTokenRequest_ROPC_ResourcePermission_ResolutionFailures(t *test
 			settings := &models.Settings{ResourceOwnerPasswordCredentialsEnabled: true}
 			ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
 
-			passwordHash, _ := hashutil.HashPassword("correctpassword")
+			passwordHash, _ := passwordhash.Hash("correctpassword")
 			user := &models.User{
 				Id:           1,
 				Email:        "user@example.com",

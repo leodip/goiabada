@@ -16,6 +16,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/i18n"
@@ -451,7 +452,7 @@ func HandleResetPasswordPost(
 			return
 		}
 
-		passwordHash, err := hashutil.HashPassword(password)
+		passwordHash, err := passwordhash.Hash(password)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return

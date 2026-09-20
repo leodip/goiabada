@@ -8,16 +8,16 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
-	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/stretchr/testify/assert"
 )
 
 // helper to set a user's password to a known value
 func setUserPassword(t *testing.T, user *models.User, newPassword string) {
 	t.Helper()
-	hash, err := hashutil.HashPassword(newPassword)
+	hash, err := passwordhash.Hash(newPassword)
 	assert.NoError(t, err)
 	user.PasswordHash = hash
 	err = database.UpdateUser(nil, user)
@@ -58,7 +58,7 @@ func TestAPIAccountPasswordPut_Success(t *testing.T) {
 	// Verify password updated in DB and matches
 	updatedUser, err := database.GetUserById(nil, u.Id)
 	assert.NoError(t, err)
-	assert.True(t, hashutil.VerifyPasswordHash(updatedUser.PasswordHash, reqBody.NewPassword))
+	assert.True(t, passwordhash.Verify(updatedUser.PasswordHash, reqBody.NewPassword))
 }
 
 func TestAPIAccountPasswordPut_WrongCurrentPassword(t *testing.T) {

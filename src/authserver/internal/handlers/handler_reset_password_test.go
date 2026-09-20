@@ -22,6 +22,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/core/encryption"
 	mocks_handlerhelpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
 	"github.com/leodip/goiabada/core/hashutil"
@@ -1019,7 +1020,7 @@ func TestHandleResetPasswordPost_HappyPath(t *testing.T) {
 
 	assert.NotEmpty(t, savedHash)
 	assert.NotEqual(t, "the-previous-hash", savedHash, "the password hash must be replaced")
-	assert.True(t, hashutil.VerifyPasswordHash(savedHash, newPassword),
+	assert.True(t, passwordhash.Verify(savedHash, newPassword),
 		"the stored hash must verify against the new password")
 
 	// The browser's own copy of the marker is dropped. Hygiene rather than the boundary:
