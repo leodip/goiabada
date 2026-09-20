@@ -1,3 +1,9 @@
+// Package rsautil generates RSA key pairs and renders them as PEM and as JWK, which
+// is what the auth server's signing keys are made of and how /certs serves them.
+//
+// It belongs to the auth server because minting a signing key is the auth server's
+// job: the key rotation and the database seeder are its only two callers anywhere in
+// the tree (#360).
 package rsautil
 
 import (
