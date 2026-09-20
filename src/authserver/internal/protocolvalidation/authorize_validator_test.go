@@ -214,7 +214,7 @@ func TestValidateClientAndRedirectURI_MissingRedirectURI(t *testing.T) {
 }
 
 func TestValidateClientAndRedirectURI_ValidClientAndRedirectURI(t *testing.T) {
-	// The exhaustive loopback matching tables live with the helper in core/urlutil. These
+	// The exhaustive loopback matching tables live with the helper in authserver/internal/urlutil. These
 	// cases cover only what a pure-function test cannot: that the validator is wired to it,
 	// and that the flow gate scoping port flexibility to the code flow holds (#41).
 	tests := []struct {
@@ -357,7 +357,7 @@ func TestValidateClientAndRedirectURI_InvalidRedirectURI(t *testing.T) {
 		// refuses anyway, so it would pass with the gate deleted and prove nothing. These
 		// rows are refusable only by the gate.
 		//
-		// The exhaustive table for the predicate lives in core/urlutil. These are the thin
+		// The exhaustive table for the predicate lives in authserver/internal/urlutil. These are the thin
 		// proof that this validator consults it, one row per rule the gate enforces.
 		{
 			name:        "scheme-relative, the reported shape",

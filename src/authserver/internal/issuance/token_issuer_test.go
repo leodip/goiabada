@@ -16,10 +16,10 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
+	"github.com/leodip/goiabada/authserver/internal/uuidutil"
 	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/oauth"
-	"github.com/leodip/goiabada/core/testutil/fake"
-	"github.com/leodip/goiabada/core/uuidutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"

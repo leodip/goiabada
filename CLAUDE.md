@@ -35,6 +35,7 @@ repository root. It is enforced rather than descriptive: see **Architecture guar
 - `internal/handlers/apihandlers/` - Admin API handlers
 - `internal/{ceremony,issuance,signingkeys}/` - Provider-side issuance: codes, tokens, key rotation, ceremony context
 - `internal/{permissions,usercreation,usersession,useragent,emaildelivery,otp,imaging,uithemes}/` - Application services and leaf helpers: permissions, user creation, sessions, email, OTP, images, themes
+- `internal/{encryption,passwordhash,oidc,rsautil,urlutil,uuidutil}/` - The authserver-only utilities #360 moved out of `core`: AES and bcrypt, discovery metadata, RSA key generation, redirect-URI and origin predicates, UUIDs (#360)
 - `internal/models/` - All domain models (Client, User, Permission, Group, etc.) (#359)
 - `internal/data/` - The `Database` interface, the seeder, `commondb/`, the four engine adapters and the generated `Database` mock (#354, #359)
 - `internal/datafactory/` - Database composition: engine selection, config mapping, the email-case pre-flight, the startup data tasks (#353)
@@ -326,7 +327,7 @@ Three test types:
 
 **Best way to run all tests**: `./run-tests.sh` inside the dev container (from `src/authserver/`).
 
-**Test fixtures**: tests draw random values from `core/testutil/fake`, a `_test.go`-only package
+**Test fixtures**: tests draw random values from `authserver/internal/testutil/fake`, a test-only package
 over `crypto/rand` that replaced a third-party faker in #272. Reach for it rather than adding a
 dependency the next time a test needs a random string.
 

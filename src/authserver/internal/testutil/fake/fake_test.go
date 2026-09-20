@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leodip/goiabada/core/urlutil"
-	"github.com/leodip/goiabada/core/uuidutil"
+	"github.com/leodip/goiabada/authserver/internal/urlutil"
+	"github.com/leodip/goiabada/authserver/internal/uuidutil"
 )
 
 // draws is how many times each property below is exercised. Every generator here

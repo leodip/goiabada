@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leodip/goiabada/core/testutil/fake"
+	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	pquernaotp "github.com/pquerna/otp"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"

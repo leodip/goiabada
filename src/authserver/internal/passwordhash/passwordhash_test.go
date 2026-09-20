@@ -3,7 +3,7 @@ package passwordhash
 import (
 	"testing"
 
-	"github.com/leodip/goiabada/core/testutil/fake"
+	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 )
 
 func TestHash(t *testing.T) {

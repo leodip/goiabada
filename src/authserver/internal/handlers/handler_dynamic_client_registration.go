@@ -13,12 +13,12 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/urlutil"
+	"github.com/leodip/goiabada/authserver/internal/uuidutil"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/stringutil"
-	"github.com/leodip/goiabada/core/urlutil"
-	"github.com/leodip/goiabada/core/uuidutil"
 	"github.com/leodip/goiabada/core/validators"
 )
 
@@ -324,7 +324,7 @@ func validateRedirectURI(uri string, isPublic bool) error {
 
 	// For public clients (MCP use case), only allow loopback http or custom schemes.
 	//
-	// The host comparison is exact, via the shared predicate in core/urlutil. It used to be
+	// The host comparison is exact, via the shared predicate in authserver/internal/urlutil. It used to be
 	// a strings.HasPrefix test, which accepted any host merely starting with a loopback
 	// name, localhost.attacker.com included. See issue #105.
 	if isPublic {
