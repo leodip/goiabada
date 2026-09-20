@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/leodip/goiabada/authserver/internal/apiresponse"
+	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/i18n"
 )
@@ -78,4 +79,25 @@ func writeValidationError(w http.ResponseWriter, r *http.Request, err error) {
 		return
 	}
 	writeJSONError(w, err.Error(), "VALIDATION_ERROR", http.StatusBadRequest)
+}
+
+// callerSubject is the `sub` of the access token this request authenticated with, and it is
+// what an audit row's "loggedInUser" names: the administrator who performed the action.
+//
+// Every handler in this package sits behind JwtAuthorizationHeaderToContext and a scope
+// middleware, so the token is on the context whenever the request got this far; the empty
+// string is what a caller with no validated token would have recorded anyway, which is the
+// same fallback the thirty-eight sites that already read the token inline carry.
+//
+// This replaced AuthHelper.GetLoggedInSubject, which read the admin console's session key
+// ContextKeyJwtInfo. Nothing in this process writes that key -- the auth server installs the
+// bearer middleware, not the JWT session middleware -- so every row audited through it named
+// nobody. Do not reintroduce a session read here: this surface is authenticated by bearer
+// token and has no browser session to read (#385).
+func callerSubject(r *http.Request) string {
+	jwtToken, ok := middleware.GetValidatedToken(r)
+	if !ok {
+		return ""
+	}
+	return jwtToken.GetStringClaim("sub")
 }

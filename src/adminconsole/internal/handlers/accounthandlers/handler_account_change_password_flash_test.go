@@ -10,9 +10,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
+	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/constants"
 	mocks_handler_helpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
 	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/leodip/goiabada/core/sessionstore/sessiontest"

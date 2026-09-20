@@ -16,7 +16,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/adminconsole/internal/config"
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/adminconsole/internal/constants"
+	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/errs"
 	mocks_handlerhelpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
 	"github.com/leodip/goiabada/core/oauth"
@@ -82,7 +83,7 @@ func TestSlogConvention_TheCodeExchangeIsDebugAndCarriesTheBaseUrlAndTheRequestI
 		constants.SessionKeyRedirectURI:  "https://adminconsole.example/auth/callback",
 	}}
 	httpSession := mocks_sessionstore.NewStore(t)
-	httpSession.On("Get", mock.Anything, constants.AdminConsoleSessionName).Return(session, nil)
+	httpSession.On("Get", mock.Anything, coreconstants.AdminConsoleSessionName).Return(session, nil)
 
 	form := url.Values{"state": {"the-state"}, "code": {"the-code"}}
 	req := httptest.NewRequest(http.MethodPost, "/auth/callback", strings.NewReader(form.Encode()))

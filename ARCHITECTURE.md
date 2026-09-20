@@ -180,20 +180,13 @@ silence is not. Four rows carry it, the permission identifiers #359 left behind.
 | `BrowserSessionsPermissionIdentifier` | both-apps | — |
 | `BuildDate` | kernel | — |
 | `BuiltInAuthServerPermissionIdentifiers` | both-apps | — |
-| `ContextKeyBearerToken` | kernel | — |
 | `ContextKeyJwtInfo` | kernel | — |
 | `GitCommit` | kernel | — |
-| `ManageAccountPermissionIdentifier` | kernel | — |
+| `ManageAccountPermissionIdentifier` | both-apps | — |
 | `ManageClientsPermissionIdentifier` | contract | — |
 | `ManagePermissionIdentifier` | kernel | — |
 | `ManageSettingsPermissionIdentifier` | contract | — |
 | `ManageUsersPermissionIdentifier` | contract | — |
-| `SessionKeyCodeVerifier` | kernel | — |
-| `SessionKeyJwt` | kernel | — |
-| `SessionKeyNonce` | kernel | — |
-| `SessionKeyRedirectBack` | kernel | — |
-| `SessionKeyRedirectURI` | kernel | — |
-| `SessionKeyState` | kernel | — |
 | `UserinfoPermissionIdentifier` | both-apps | — |
 | `Version` | kernel | — |
 
@@ -219,6 +212,18 @@ Notes on rows that are not self-evident:
   true and misleading (#351).
 - `Version`, `BuildDate` and `GitCommit` are `kernel` because `core/handlerhelpers` puts them into
   every rendered page's template data, in both binaries.
+- The six `SessionKey*` and `ContextKeyBearerToken` were here until #385 and are not any more. They
+  were `kernel` on the strength of one core package each: `core/handlerhelpers/auth_helper.go` and
+  `core/middleware/middleware_jwt.go` for the session keys, the latter alone for the bearer key.
+  Both files held one application's implementation, so #385 moved them — the OAuth client and JWT
+  session middleware to `adminconsole/internal`, the bearer middleware to `authserver/internal` —
+  and every key went with its one writer, to that module's own `internal/constants`.
+  `ContextKeyJwtInfo` stays, `kernel` on `core/handlerhelpers/http_helper.go`, which reads it for
+  the admin page data; it leaves when that reader does.
+- `ManageAccountPermissionIdentifier` dropped from `kernel` to `both-apps` in the same commit, for
+  the same reason and with no change in the tree beyond it: `core/middleware/middleware_jwt.go`
+  was its one core referrer, through `buildScopeString`. Both applications still name it, so it
+  stays in core on the weaker claim.
 
 ## Rules
 

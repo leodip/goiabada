@@ -41,11 +41,10 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		tokenParser := mocks_handlers.NewTokenParser(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
-		handler := HandleAccountLogoutGet(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
+		handler := HandleAccountLogoutGet(httpHelper, httpSession, database, tokenParser, auditLogger)
 
 		req, _ := http.NewRequest("GET", "/logout", nil)
 		rr := httptest.NewRecorder()
@@ -78,11 +77,10 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 	t.Run("Hintless GET carries the confirming POST's fields and never the hint", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		tokenParser := mocks_handlers.NewTokenParser(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
-		handler := HandleAccountLogoutGet(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
+		handler := HandleAccountLogoutGet(httpHelper, httpSession, database, tokenParser, auditLogger)
 
 		req, _ := http.NewRequest("GET", "/auth/logout", nil)
 		rr := httptest.NewRecorder()
@@ -133,11 +131,10 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 			t.Run(tc.name, func(t *testing.T) {
 				httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 				httpSession := mocks_sessionstore.NewStore(t)
-				authHelper := mocks_handlers.NewAuthHelper(t)
 				database := mocks_data.NewDatabase(t)
 				tokenParser := mocks_handlers.NewTokenParser(t)
 				auditLogger := mocks_audit.NewAuditLogger(t)
-				handler := HandleAccountLogoutGet(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
+				handler := HandleAccountLogoutGet(httpHelper, httpSession, database, tokenParser, auditLogger)
 
 				req, _ := http.NewRequest("GET", "/auth/logout", nil)
 				rr := httptest.NewRecorder()
@@ -168,11 +165,10 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 	t.Run("Hintless GET honours ui_locales", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		tokenParser := mocks_handlers.NewTokenParser(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
-		handler := HandleAccountLogoutGet(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
+		handler := HandleAccountLogoutGet(httpHelper, httpSession, database, tokenParser, auditLogger)
 
 		req, _ := http.NewRequest("GET", "/auth/logout?ui_locales=pt-BR", nil)
 		rr := httptest.NewRecorder()
@@ -197,19 +193,18 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 	t.Run("A confirmed hint with no post_logout_redirect_uri still logs the user out", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		tokenParser := mocks_handlers.NewTokenParser(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		handler := HandleAccountLogoutGet(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
+		handler := HandleAccountLogoutGet(httpHelper, httpSession, database, tokenParser, auditLogger)
 
 		req := hintedRequest(t, http.MethodGet, url.Values{"id_token_hint": {hintedToken}}, hintedSessionId)
 		rr := httptest.NewRecorder()
 
 		client := stubConfirmedHint(httpHelper, database, tokenParser, hintedClaims())
 		httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, "post_logout_redirect_uri").Return("")
-		stubPerClientTeardown(database, auditLogger, authHelper, client, hintedSessionId)
+		stubPerClientTeardown(database, auditLogger, client, hintedSessionId)
 
 		mockSession := expectCookieWipedBeforeSave(t, httpSession)
 		httpHelper.On("RenderTemplate", rr, mock.Anything, "/layouts/auth_layout.html", "/logged_out.html",
@@ -236,12 +231,11 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 	t.Run("A confirmed hint tears down per client and redirects", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		tokenParser := mocks_handlers.NewTokenParser(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		handler := HandleAccountLogoutGet(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
+		handler := HandleAccountLogoutGet(httpHelper, httpSession, database, tokenParser, auditLogger)
 
 		req := hintedRequest(t, http.MethodGet, url.Values{"id_token_hint": {hintedToken}}, hintedSessionId)
 		rr := httptest.NewRecorder()
@@ -250,7 +244,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 		httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, "post_logout_redirect_uri").Return(hintedRegisteredURI)
 		httpHelper.On("LookupFromUrlQueryOrFormPost", mock.Anything, "state").Return("aB+cd/efgh==#&x=1", true)
 		stubRegisteredURI(database, client, hintedRegisteredURI)
-		stubPerClientTeardown(database, auditLogger, authHelper, client, hintedSessionId)
+		stubPerClientTeardown(database, auditLogger, client, hintedSessionId)
 
 		mockSession := expectCookieWipedBeforeSave(t, httpSession)
 
@@ -277,12 +271,11 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 	t.Run("A confirmed hint whose target is unregistered is declined, and the logout still happens", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		tokenParser := mocks_handlers.NewTokenParser(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		handler := HandleAccountLogoutGet(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
+		handler := HandleAccountLogoutGet(httpHelper, httpSession, database, tokenParser, auditLogger)
 
 		req := hintedRequest(t, http.MethodGet, url.Values{"id_token_hint": {hintedToken}}, hintedSessionId)
 		rr := httptest.NewRecorder()
@@ -291,7 +284,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 		httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, "post_logout_redirect_uri").
 			Return("https://example.com/somewhere-else")
 		stubRegisteredURI(database, client, hintedRegisteredURI)
-		stubPerClientTeardown(database, auditLogger, authHelper, client, hintedSessionId)
+		stubPerClientTeardown(database, auditLogger, client, hintedSessionId)
 
 		mockSession := expectCookieWipedBeforeSave(t, httpSession)
 		httpHelper.On("RenderTemplate", rr, mock.Anything, "/layouts/auth_layout.html", "/logged_out.html",
@@ -316,19 +309,18 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 	t.Run("A confirmed hint with no browser session tears down the session its sid names", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		tokenParser := mocks_handlers.NewTokenParser(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		handler := HandleAccountLogoutGet(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
+		handler := HandleAccountLogoutGet(httpHelper, httpSession, database, tokenParser, auditLogger)
 
 		req := hintedRequest(t, http.MethodGet, url.Values{"id_token_hint": {hintedToken}}, "")
 		rr := httptest.NewRecorder()
 
 		client := stubConfirmedHint(httpHelper, database, tokenParser, hintedClaims())
 		httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, "post_logout_redirect_uri").Return("")
-		stubPerClientTeardown(database, auditLogger, authHelper, client, hintedSessionId)
+		stubPerClientTeardown(database, auditLogger, client, hintedSessionId)
 
 		expectCookieWipedBeforeSave(t, httpSession)
 		httpHelper.On("RenderTemplate", rr, mock.Anything, "/layouts/auth_layout.html", "/logged_out.html",
@@ -347,12 +339,11 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 	t.Run("An expired hint whose session is still live is honoured in full", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		tokenParser := mocks_handlers.NewTokenParser(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		handler := HandleAccountLogoutGet(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
+		handler := HandleAccountLogoutGet(httpHelper, httpSession, database, tokenParser, auditLogger)
 
 		req := hintedRequest(t, http.MethodGet, url.Values{"id_token_hint": {hintedToken}}, hintedSessionId)
 		rr := httptest.NewRecorder()
@@ -366,7 +357,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 		stubRegisteredURI(database, client, hintedRegisteredURI)
 		// The tolerance lookup and the teardown read the same row through the same call, which is one
 		// of the reasons a database fault there propagates rather than being read as "no such session".
-		stubPerClientTeardown(database, auditLogger, authHelper, client, hintedSessionId)
+		stubPerClientTeardown(database, auditLogger, client, hintedSessionId)
 
 		expectCookieWipedBeforeSave(t, httpSession)
 
@@ -384,12 +375,11 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 	t.Run("A database fault while judging an expired hint is a 500", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		tokenParser := mocks_handlers.NewTokenParser(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		handler := HandleAccountLogoutGet(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
+		handler := HandleAccountLogoutGet(httpHelper, httpSession, database, tokenParser, auditLogger)
 
 		req := hintedRequest(t, http.MethodGet, url.Values{"id_token_hint": {hintedToken}}, hintedSessionId)
 		rr := httptest.NewRecorder()
@@ -428,12 +418,11 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 	t.Run("A rejected hint reaches the consent page without its client_id", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		tokenParser := mocks_handlers.NewTokenParser(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		handler := HandleAccountLogoutGet(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
+		handler := HandleAccountLogoutGet(httpHelper, httpSession, database, tokenParser, auditLogger)
 
 		req := hintedRequest(t, http.MethodGet, url.Values{"id_token_hint": {hintedToken}}, hintedSessionId)
 		rr := httptest.NewRecorder()
@@ -589,12 +578,11 @@ func TestHandleExistingSessionOnLogout(t *testing.T) {
 		r := &http.Request{}
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
 
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, "test-session").
 			Return(nil, errors.New("lookup exploded"))
 
-		err := handleExistingSessionOnLogout(r, "test-session", &models.Client{}, database, auditLogger, authHelper)
+		err := handleExistingSessionOnLogout(r, "test-session", &models.Client{}, database, auditLogger)
 
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "lookup exploded")
@@ -606,11 +594,10 @@ func TestHandleExistingSessionOnLogout(t *testing.T) {
 		r := &http.Request{}
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
 
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, "test-session").Return(nil, nil)
 
-		err := handleExistingSessionOnLogout(r, "test-session", &models.Client{}, database, auditLogger, authHelper)
+		err := handleExistingSessionOnLogout(r, "test-session", &models.Client{}, database, auditLogger)
 
 		assert.NoError(t, err, "a session that is not there is nothing to tear down, not a failure")
 		database.AssertExpectations(t)
@@ -628,7 +615,6 @@ func TestHandleExistingSessionOnLogout(t *testing.T) {
 		}
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
 
 		userSession := &models.UserSession{
 			Id:     1,
@@ -655,16 +641,13 @@ func TestHandleExistingSessionOnLogout(t *testing.T) {
 		database.On("DeleteUserSessionClient", mock.Anything, int64(1)).Return(nil)
 		// We don't expect DeleteUserSession to be called in this case
 
-		authHelper.On("GetLoggedInSubject", mock.Anything).Return("user-123")
-
 		auditLogger.On("Log", mock.Anything, audit.AuditDeletedUserSessionClient, mock.Anything).Return()
 
-		err := handleExistingSessionOnLogout(r, sessionIdentifier, client, database, auditLogger, authHelper)
+		err := handleExistingSessionOnLogout(r, sessionIdentifier, client, database, auditLogger)
 
 		assert.NoError(t, err)
 		database.AssertExpectations(t)
 		auditLogger.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
 	})
 
 	t.Run("Delete entire user session", func(t *testing.T) {
@@ -675,7 +658,6 @@ func TestHandleExistingSessionOnLogout(t *testing.T) {
 		}
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
 
 		userSession := &models.UserSession{
 			Id:     1,
@@ -696,17 +678,14 @@ func TestHandleExistingSessionOnLogout(t *testing.T) {
 		database.On("DeleteUserSessionClient", mock.Anything, int64(1)).Return(nil)
 		database.On("DeleteUserSession", mock.Anything, int64(1)).Return(nil)
 
-		authHelper.On("GetLoggedInSubject", mock.Anything).Return("user-123")
-
 		auditLogger.On("Log", mock.Anything, audit.AuditDeletedUserSessionClient, mock.Anything).Return()
 		auditLogger.On("Log", mock.Anything, audit.AuditLogout, mock.Anything).Return()
 
-		err := handleExistingSessionOnLogout(r, sessionIdentifier, client, database, auditLogger, authHelper)
+		err := handleExistingSessionOnLogout(r, sessionIdentifier, client, database, auditLogger)
 
 		assert.NoError(t, err)
 		database.AssertExpectations(t)
 		auditLogger.AssertExpectations(t)
-		authHelper.AssertExpectations(t)
 	})
 
 	t.Run("Client not found in user session", func(t *testing.T) {
@@ -717,7 +696,6 @@ func TestHandleExistingSessionOnLogout(t *testing.T) {
 		}
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
 
 		userSession := &models.UserSession{
 			Id:     1,
@@ -736,12 +714,11 @@ func TestHandleExistingSessionOnLogout(t *testing.T) {
 		database.On("UserSessionLoadClients", mock.Anything, userSession).Return(nil)
 		database.On("UserSessionClientsLoadClients", mock.Anything, userSession.Clients).Return(nil)
 
-		err := handleExistingSessionOnLogout(r, sessionIdentifier, client, database, auditLogger, authHelper)
+		err := handleExistingSessionOnLogout(r, sessionIdentifier, client, database, auditLogger)
 
 		assert.NoError(t, err) // The function should not return an error if the client is not found in the session
 		database.AssertExpectations(t)
 		auditLogger.AssertNotCalled(t, "Log")
-		authHelper.AssertNotCalled(t, "GetLoggedInSubject")
 	})
 }
 
@@ -847,10 +824,23 @@ func stubRegisteredURI(database *mocks_data.Database, client *models.Client, uri
 //
 // Per-client is what the assertions in the cases are really about: the hint's SIGNED aud scopes the
 // teardown, and an unauthenticated client_id never does.
+// loggedInUserIsPresentAndEmpty holds the shape of a logout audit payload's actor key: present,
+// and empty. /auth/logout carries no bearer token -- authHeaderToContext is mounted on /userinfo
+// and the /api/ groups and nowhere else -- so there is no caller identity for these four rows to
+// record, and "" is what they carried before #385 deleted the session accessor that produced it.
+//
+// Present matters as much as empty. AuditLogResponse.Details is the marshalled map, returned
+// verbatim by GET /api/v1/admin/audit-logs, so dropping the key would be a change a consumer of
+// that endpoint can see. A bare == "" comparison would pass on an absent key too, which is why
+// this reads the second return value.
+func loggedInUserIsPresentAndEmpty(details map[string]interface{}) bool {
+	v, ok := details["loggedInUser"]
+	return ok && v == ""
+}
+
 func stubPerClientTeardown(
 	database *mocks_data.Database,
 	auditLogger *mocks_audit.AuditLogger,
-	authHelper *mocks_handlers.AuthHelper,
 	client *models.Client,
 	sessionIdentifier string,
 ) {
@@ -869,7 +859,6 @@ func stubPerClientTeardown(
 	database.On("DeleteUserSessionClient", mock.Anything, int64(7)).Return(nil)
 	database.On("DeleteUserSession", mock.Anything, int64(42)).Return(nil)
 
-	authHelper.On("GetLoggedInSubject", mock.Anything).Return("user-123")
 	auditLogger.On("Log", mock.Anything, audit.AuditDeletedUserSessionClient, mock.Anything).Return()
 	auditLogger.On("Log", mock.Anything, audit.AuditLogout, mock.Anything).Return()
 }
@@ -953,12 +942,11 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 	t.Run("Deletes the whole session and lands on the signed-out page", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		tokenParser := mocks_handlers.NewTokenParser(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		handler := HandleAccountLogoutPost(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
+		handler := HandleAccountLogoutPost(httpHelper, httpSession, database, tokenParser, auditLogger)
 
 		req := withSessionIdentifier(logoutPostRequest(t, url.Values{}), "test-session")
 		rr := httptest.NewRecorder()
@@ -970,15 +958,13 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, "test-session").Return(userSession, nil)
 		database.On("DeleteUserSession", mock.Anything, int64(42)).Return(nil)
 
-		authHelper.On("GetLoggedInSubject", mock.Anything).Return("user-123")
-
 		auditLogger.On("Log", mock.Anything, audit.AuditDeletedUserSession, mock.MatchedBy(func(details map[string]interface{}) bool {
-			return details["userSessionId"] == int64(42) && details["loggedInUser"] == "user-123"
+			return details["userSessionId"] == int64(42) && loggedInUserIsPresentAndEmpty(details)
 		})).Return()
 		auditLogger.On("Log", mock.Anything, audit.AuditLogout, mock.MatchedBy(func(details map[string]interface{}) bool {
 			return details["userId"] == int64(123) &&
 				details["sessionIdentifier"] == "test-session" &&
-				details["loggedInUser"] == "user-123"
+				loggedInUserIsPresentAndEmpty(details)
 		})).Return()
 
 		mockSession := expectCookieWipedBeforeSave(t, httpSession)
@@ -1004,12 +990,11 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 	t.Run("client_id plus a registered URI redirects, with exactly one state and no sid", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		tokenParser := mocks_handlers.NewTokenParser(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		handler := HandleAccountLogoutPost(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
+		handler := HandleAccountLogoutPost(httpHelper, httpSession, database, tokenParser, auditLogger)
 
 		req := withSessionIdentifier(logoutPostRequest(t, url.Values{}), "test-session")
 		rr := httptest.NewRecorder()
@@ -1030,7 +1015,6 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, "test-session").Return(userSession, nil)
 		database.On("DeleteUserSession", mock.Anything, int64(42)).Return(nil)
 
-		authHelper.On("GetLoggedInSubject", mock.Anything).Return("user-123")
 		auditLogger.On("Log", mock.Anything, mock.Anything, mock.Anything).Return()
 
 		// The redirect branch is the one where an omitted or late wipe hides: the browser leaves for
@@ -1305,12 +1289,11 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 			t.Run(tc.name, func(t *testing.T) {
 				httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 				httpSession := mocks_sessionstore.NewStore(t)
-				authHelper := mocks_handlers.NewAuthHelper(t)
 				database := mocks_data.NewDatabase(t)
 				tokenParser := mocks_handlers.NewTokenParser(t)
 				auditLogger := mocks_audit.NewAuditLogger(t)
 
-				handler := HandleAccountLogoutPost(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
+				handler := HandleAccountLogoutPost(httpHelper, httpSession, database, tokenParser, auditLogger)
 
 				req := withSessionIdentifier(logoutPostRequest(t, url.Values{}), "test-session")
 				rr := httptest.NewRecorder()
@@ -1332,9 +1315,8 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 				database.On("GetUserSessionBySessionIdentifier", mock.Anything, "test-session").Return(userSession, nil)
 				database.On("DeleteUserSession", mock.Anything, int64(42)).Return(nil)
 
-				authHelper.On("GetLoggedInSubject", mock.Anything).Return("user-123")
 				auditLogger.On("Log", mock.Anything, audit.AuditDeletedUserSession, mock.MatchedBy(func(details map[string]interface{}) bool {
-					return details["userSessionId"] == int64(42) && details["loggedInUser"] == "user-123"
+					return details["userSessionId"] == int64(42) && loggedInUserIsPresentAndEmpty(details)
 				})).Return()
 				auditLogger.On("Log", mock.Anything, audit.AuditLogout, mock.MatchedBy(func(details map[string]interface{}) bool {
 					return details["userId"] == int64(123) && details["sessionIdentifier"] == "test-session"
@@ -1389,12 +1371,11 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 			t.Run(tc.name, func(t *testing.T) {
 				httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 				httpSession := mocks_sessionstore.NewStore(t)
-				authHelper := mocks_handlers.NewAuthHelper(t)
 				database := mocks_data.NewDatabase(t)
 				tokenParser := mocks_handlers.NewTokenParser(t)
 				auditLogger := mocks_audit.NewAuditLogger(t)
 
-				handler := HandleAccountLogoutPost(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
+				handler := HandleAccountLogoutPost(httpHelper, httpSession, database, tokenParser, auditLogger)
 
 				req := withSessionIdentifier(logoutPostRequest(t, url.Values{}), "test-session")
 				rr := httptest.NewRecorder()
@@ -1445,12 +1426,11 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 			t.Run(tc.name, func(t *testing.T) {
 				httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 				httpSession := mocks_sessionstore.NewStore(t)
-				authHelper := mocks_handlers.NewAuthHelper(t)
 				database := mocks_data.NewDatabase(t)
 				tokenParser := mocks_handlers.NewTokenParser(t)
 				auditLogger := mocks_audit.NewAuditLogger(t)
 
-				handler := HandleAccountLogoutPost(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
+				handler := HandleAccountLogoutPost(httpHelper, httpSession, database, tokenParser, auditLogger)
 
 				req := logoutPostRequest(t, url.Values{})
 				if tc.sessionIdentifier != "" {
@@ -1462,7 +1442,6 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 				httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, "post_logout_redirect_uri").Return("")
 				tc.stubDB(database)
 
-				authHelper.On("GetLoggedInSubject", mock.Anything).Return("user-123")
 				auditLogger.On("Log", mock.Anything, audit.AuditLogout, mock.MatchedBy(func(details map[string]interface{}) bool {
 					return details["userId"] == int64(0) && details["sessionIdentifier"] == tc.sessionIdentifier
 				})).Return()
@@ -1489,12 +1468,11 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 	t.Run("ui_locales in the body only renders the signed-out page in that locale", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		tokenParser := mocks_handlers.NewTokenParser(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		handler := HandleAccountLogoutPost(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
+		handler := HandleAccountLogoutPost(httpHelper, httpSession, database, tokenParser, auditLogger)
 
 		req := logoutPostRequest(t, url.Values{"ui_locales": {"pt-BR"}})
 		rr := httptest.NewRecorder()
@@ -1502,7 +1480,6 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 		httpHelper.On("LookupFromUrlQueryOrFormPost", mock.Anything, "id_token_hint").Return("", false)
 		httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, "post_logout_redirect_uri").Return("")
 
-		authHelper.On("GetLoggedInSubject", mock.Anything).Return("user-123")
 		auditLogger.On("Log", mock.Anything, mock.Anything, mock.Anything).Return()
 
 		mockSession := expectCookieWipedBeforeSave(t, httpSession)
@@ -1525,12 +1502,11 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 	t.Run("ui_locales in the body only reaches a hinted POST's render", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		tokenParser := mocks_handlers.NewTokenParser(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		handler := HandleAccountLogoutPost(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
+		handler := HandleAccountLogoutPost(httpHelper, httpSession, database, tokenParser, auditLogger)
 
 		req := hintedRequest(t, http.MethodPost, url.Values{
 			"id_token_hint": {hintedToken},
@@ -1540,7 +1516,7 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 
 		client := stubConfirmedHint(httpHelper, database, tokenParser, hintedClaims())
 		httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, "post_logout_redirect_uri").Return("")
-		stubPerClientTeardown(database, auditLogger, authHelper, client, hintedSessionId)
+		stubPerClientTeardown(database, auditLogger, client, hintedSessionId)
 
 		expectCookieWipedBeforeSave(t, httpSession)
 		httpHelper.On("RenderTemplate", rr, mock.MatchedBy(func(rendered *http.Request) bool {
@@ -1572,12 +1548,11 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 	t.Run("A POST whose hint is rejected is sent to the GET binding", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		tokenParser := mocks_handlers.NewTokenParser(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		handler := HandleAccountLogoutPost(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
+		handler := HandleAccountLogoutPost(httpHelper, httpSession, database, tokenParser, auditLogger)
 
 		req := hintedRequest(t, http.MethodPost, url.Values{
 			"id_token_hint": {hintedToken},
@@ -1637,12 +1612,11 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 			t.Run(tc.name, func(t *testing.T) {
 				httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 				httpSession := mocks_sessionstore.NewStore(t)
-				authHelper := mocks_handlers.NewAuthHelper(t)
 				database := mocks_data.NewDatabase(t)
 				tokenParser := mocks_handlers.NewTokenParser(t)
 				auditLogger := mocks_audit.NewAuditLogger(t)
 
-				handler := HandleAccountLogoutPost(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
+				handler := HandleAccountLogoutPost(httpHelper, httpSession, database, tokenParser, auditLogger)
 
 				req := hintedRequest(t, http.MethodPost, url.Values{"id_token_hint": {hintedToken}}, hintedSessionId)
 				rr := httptest.NewRecorder()
@@ -1672,12 +1646,11 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 	t.Run("Session store error", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		tokenParser := mocks_handlers.NewTokenParser(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		handler := HandleAccountLogoutPost(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
+		handler := HandleAccountLogoutPost(httpHelper, httpSession, database, tokenParser, auditLogger)
 
 		req := logoutPostRequest(t, url.Values{})
 		rr := httptest.NewRecorder()
@@ -1685,7 +1658,6 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 		httpHelper.On("LookupFromUrlQueryOrFormPost", mock.Anything, "id_token_hint").Return("", false)
 		httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, "post_logout_redirect_uri").Return("")
 
-		authHelper.On("GetLoggedInSubject", mock.Anything).Return("user-123")
 		auditLogger.On("Log", mock.Anything, mock.Anything, mock.Anything).Return()
 
 		httpSession.On("Get", mock.Anything, constants.AuthServerSessionName).
@@ -1707,12 +1679,11 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 	t.Run("Session save error", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
-		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		tokenParser := mocks_handlers.NewTokenParser(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		handler := HandleAccountLogoutPost(httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
+		handler := HandleAccountLogoutPost(httpHelper, httpSession, database, tokenParser, auditLogger)
 
 		req := logoutPostRequest(t, url.Values{})
 		rr := httptest.NewRecorder()
@@ -1720,7 +1691,6 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 		httpHelper.On("LookupFromUrlQueryOrFormPost", mock.Anything, "id_token_hint").Return("", false)
 		httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, "post_logout_redirect_uri").Return("")
 
-		authHelper.On("GetLoggedInSubject", mock.Anything).Return("user-123")
 		auditLogger.On("Log", mock.Anything, mock.Anything, mock.Anything).Return()
 
 		mockSession := &sessionstore.Session{

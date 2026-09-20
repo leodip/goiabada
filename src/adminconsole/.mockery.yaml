@@ -1,0 +1,35 @@
+# This config covers the interfaces the admin console owns and mocks. Since #385 that
+# is the JWT session middleware's two ports, AuthHelper and tokenParser, which moved
+# here out of core/middleware along with the middleware that holds them.
+#
+# Every dir below is inside adminconsole. Two configs writing the same file means
+# whichever module runs last silently wins, which is why authserver/.mockery.yaml is
+# the only one that writes outside its own module, and only into core/handlerhelpers
+# (#338, #385).
+filename: "{{.InterfaceName | snakecase}}_mock.go"
+structname: "{{.InterfaceName}}"
+template: testify
+# Emits "//go:build !production" in every generated mock, keeping testify out of
+# production builds (see build/Dockerfile-*, which build with -tags=production).
+#
+# boilerplate-file names the same file authserver/.mockery.yaml does, spelled
+# relative to this module because the path resolves against mockery's working
+# directory. See that file for what it is for (#338).
+template-data:
+  mock-build-tags: "!production"
+  boilerplate-file: "../mockery-header.txt"
+packages:
+  # JWT session middleware
+  github.com/leodip/goiabada/adminconsole/internal/middleware:
+    interfaces:
+      AuthHelper:
+        config:
+          dir: "./internal/middleware/mocks"
+          pkgname: "mocks_middleware"
+      # Unexported, so the global structname template would emit an unusable
+      # lowercase type name outside the generated package. Name it explicitly (#338).
+      tokenParser:
+        config:
+          dir: "./internal/middleware/mocks"
+          pkgname: "mocks_middleware"
+          structname: "TokenParser"

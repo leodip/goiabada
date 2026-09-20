@@ -1,9 +1,14 @@
 // Package oauth is the OAuth2/OIDC surface both processes share: the value types that
-// cross the wire or a session (TokenResponse, JwtInfo, JwtToken, Jwk, Jwks), the client
-// side of the protocol (the JWKS token parser and the code-for-token exchanger), the
-// PKCE challenge helper and the response_type parser. It reaches no database and no
+// cross the wire or a session (TokenResponse, JwtInfo, JwtToken, Jwk, Jwks), the PKCE
+// challenge helper and the response_type parser. It reaches no database and no
 // persistence type, which is what lets the admin console link it without linking a
 // driver.
+//
+// The client side of the protocol is no longer here. The JWKS token parser, the
+// code-for-token exchanger and the two bounds they share went to
+// adminconsole/internal/oauthclient in #385, with the authorize redirect that starts the
+// ceremony: one application speaks that half, so a shared package was hiding its
+// implementation.
 //
 // ParseResponseType sits here although only the auth server calls it. Its one other
 // caller was core/validators, which the admin console linked for unrelated helpers, so
@@ -20,25 +25,6 @@ package oauth
 import (
 	"crypto/sha256"
 	"encoding/base64"
-	"time"
-)
-
-// TokenExchangeTimeout bounds one call the admin console makes to the auth server, and
-// MaxTokenResponseBytes bounds how much of the answer is read. Both take the values the
-// admin console already applies to the same endpoint: SessionTokenSource in
-// adminconsole/internal/apiclient/session_client.go performs a client_credentials exchange
-// against /auth/token with exactly this timeout and this limit, and its sibling
-// session_backend.go writes down the reason for the ten seconds -- a lookup on the request
-// path of every page has to become an error quickly rather than holding the browser open.
-// Three calls doing the same thing against the same endpoint must not carry three different
-// numbers.
-//
-// Neither is configuration. A new environment variable is a name the product has to keep,
-// and nothing here needs tuning per deployment: a deployment where these bite was already
-// failing at session_backend.go (#338).
-const (
-	TokenExchangeTimeout  = 10 * time.Second
-	MaxTokenResponseBytes = 1 << 20
 )
 
 func GeneratePKCECodeChallenge(codeVerifier string) string {

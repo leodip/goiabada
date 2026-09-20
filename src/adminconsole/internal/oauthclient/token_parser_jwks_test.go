@@ -1,4 +1,4 @@
-package oauth
+package oauthclient
 
 import (
 	"bytes"
@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -74,8 +75,8 @@ func testKeys(t *testing.T) (*rsa.PrivateKey, *rsa.PrivateKey) {
 	return signingKey, attackerKey
 }
 
-func jwkFromPublicKey(kid string, pub *rsa.PublicKey) Jwk {
-	return Jwk{
+func jwkFromPublicKey(kid string, pub *rsa.PublicKey) oauth.Jwk {
+	return oauth.Jwk{
 		Alg: "RS256",
 		Kid: kid,
 		Kty: "RSA",
@@ -87,7 +88,7 @@ func jwkFromPublicKey(kid string, pub *rsa.PublicKey) Jwk {
 
 // newJwksServer serves the given keys at /certs and counts how many times it is
 // hit, so tests can assert the parser caches rather than refetching per token.
-func newJwksServer(t *testing.T, keys ...Jwk) (*httptest.Server, *atomic.Int32) {
+func newJwksServer(t *testing.T, keys ...oauth.Jwk) (*httptest.Server, *atomic.Int32) {
 	t.Helper()
 	var hits atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -97,7 +98,7 @@ func newJwksServer(t *testing.T, keys ...Jwk) (*httptest.Server, *atomic.Int32) 
 		}
 		hits.Add(1)
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(Jwks{Keys: keys})
+		_ = json.NewEncoder(w).Encode(oauth.Jwks{Keys: keys})
 	}))
 	t.Cleanup(server.Close)
 	return server, &hits
@@ -483,7 +484,7 @@ func TestDecodeAndValidateTokenResponse_AllThreeTokens(t *testing.T) {
 	refreshClaims["typ"] = "refresh"
 	refreshClaims["exp"] = time.Now().Add(-time.Hour).Unix()
 
-	tokenResponse := &TokenResponse{
+	tokenResponse := &oauth.TokenResponse{
 		AccessToken:  signRS256(t, key, "key-1", accessClaims),
 		IdToken:      signRS256(t, key, "key-1", idClaims),
 		RefreshToken: signRS256(t, key, "key-1", refreshClaims),
@@ -508,7 +509,7 @@ func TestDecodeAndValidateTokenResponse_OnlyAccessToken(t *testing.T) {
 	server, _ := newJwksServer(t, jwkFromPublicKey("key-1", &key.PublicKey))
 	tp := NewJWKSTokenParser(server.URL, server.Client())
 
-	result, err := tp.DecodeAndValidateTokenResponse(context.Background(), &TokenResponse{
+	result, err := tp.DecodeAndValidateTokenResponse(context.Background(), &oauth.TokenResponse{
 		AccessToken: signRS256(t, key, "key-1", validClaims()),
 	})
 
@@ -521,7 +522,7 @@ func TestDecodeAndValidateTokenResponse_OnlyAccessToken(t *testing.T) {
 func TestDecodeAndValidateTokenResponse_EmptyResponse(t *testing.T) {
 	tp := NewJWKSTokenParser("https://auth.example.com", nil)
 
-	result, err := tp.DecodeAndValidateTokenResponse(context.Background(), &TokenResponse{})
+	result, err := tp.DecodeAndValidateTokenResponse(context.Background(), &oauth.TokenResponse{})
 
 	assert.NoError(t, err)
 	assert.NotNil(t, result)
@@ -539,24 +540,24 @@ func TestDecodeAndValidateTokenResponse_RejectsForgedTokenInAnySlot(t *testing.T
 
 	testCases := []struct {
 		name     string
-		response func(t *testing.T) *TokenResponse
+		response func(t *testing.T) *oauth.TokenResponse
 	}{
 		{
 			name: "forged access token",
-			response: func(t *testing.T) *TokenResponse {
-				return &TokenResponse{AccessToken: forged(t)}
+			response: func(t *testing.T) *oauth.TokenResponse {
+				return &oauth.TokenResponse{AccessToken: forged(t)}
 			},
 		},
 		{
 			name: "forged id token",
-			response: func(t *testing.T) *TokenResponse {
-				return &TokenResponse{AccessToken: valid(t), IdToken: forged(t)}
+			response: func(t *testing.T) *oauth.TokenResponse {
+				return &oauth.TokenResponse{AccessToken: valid(t), IdToken: forged(t)}
 			},
 		},
 		{
 			name: "forged refresh token",
-			response: func(t *testing.T) *TokenResponse {
-				return &TokenResponse{AccessToken: valid(t), IdToken: valid(t), RefreshToken: forged(t)}
+			response: func(t *testing.T) *oauth.TokenResponse {
+				return &oauth.TokenResponse{AccessToken: valid(t), IdToken: valid(t), RefreshToken: forged(t)}
 			},
 		},
 	}
@@ -582,7 +583,7 @@ func TestDecodeAndValidateTokenResponse_RejectsExpiredAccessToken(t *testing.T) 
 	claims := validClaims()
 	claims["exp"] = time.Now().Add(-time.Hour).Unix()
 
-	result, err := tp.DecodeAndValidateTokenResponse(context.Background(), &TokenResponse{
+	result, err := tp.DecodeAndValidateTokenResponse(context.Background(), &oauth.TokenResponse{
 		AccessToken: signRS256(t, key, "key-1", claims),
 	})
 
@@ -611,14 +612,14 @@ func TestJwkToRSAPublicKey_Rejections(t *testing.T) {
 
 	testCases := []struct {
 		name string
-		jwk  Jwk
+		jwk  oauth.Jwk
 	}{
-		{"unsupported kty", Jwk{Kty: "EC", N: valid.N, E: valid.E}},
-		{"empty kty", Jwk{Kty: "", N: valid.N, E: valid.E}},
-		{"lowercase kty is not accepted", Jwk{Kty: "rsa", N: valid.N, E: valid.E}},
-		{"invalid base64 modulus", Jwk{Kty: "RSA", N: "!!!not base64!!!", E: valid.E}},
-		{"invalid base64 exponent", Jwk{Kty: "RSA", N: valid.N, E: "!!!not base64!!!"}},
-		{"standard base64 padding is rejected", Jwk{Kty: "RSA", N: valid.N + "==", E: valid.E}},
+		{"unsupported kty", oauth.Jwk{Kty: "EC", N: valid.N, E: valid.E}},
+		{"empty kty", oauth.Jwk{Kty: "", N: valid.N, E: valid.E}},
+		{"lowercase kty is not accepted", oauth.Jwk{Kty: "rsa", N: valid.N, E: valid.E}},
+		{"invalid base64 modulus", oauth.Jwk{Kty: "RSA", N: "!!!not base64!!!", E: valid.E}},
+		{"invalid base64 exponent", oauth.Jwk{Kty: "RSA", N: valid.N, E: "!!!not base64!!!"}},
+		{"standard base64 padding is rejected", oauth.Jwk{Kty: "RSA", N: valid.N + "==", E: valid.E}},
 	}
 
 	for _, tc := range testCases {
@@ -675,7 +676,7 @@ func TestGetPublicKeyFromCache(t *testing.T) {
 
 	t.Run("matching kid returns the key", func(t *testing.T) {
 		tp := NewJWKSTokenParser("https://auth.example.com", nil)
-		tp.cachedJwks = Jwks{Keys: []Jwk{jwkFromPublicKey("key-1", &key.PublicKey)}}
+		tp.cachedJwks = oauth.Jwks{Keys: []oauth.Jwk{jwkFromPublicKey("key-1", &key.PublicKey)}}
 
 		pub := tp.getPublicKeyFromCache("key-1")
 
@@ -685,14 +686,14 @@ func TestGetPublicKeyFromCache(t *testing.T) {
 
 	t.Run("non-matching kid returns nil", func(t *testing.T) {
 		tp := NewJWKSTokenParser("https://auth.example.com", nil)
-		tp.cachedJwks = Jwks{Keys: []Jwk{jwkFromPublicKey("key-1", &key.PublicKey)}}
+		tp.cachedJwks = oauth.Jwks{Keys: []oauth.Jwk{jwkFromPublicKey("key-1", &key.PublicKey)}}
 
 		assert.Nil(t, tp.getPublicKeyFromCache("key-2"))
 	})
 
 	t.Run("empty kid with a single key returns that key", func(t *testing.T) {
 		tp := NewJWKSTokenParser("https://auth.example.com", nil)
-		tp.cachedJwks = Jwks{Keys: []Jwk{jwkFromPublicKey("key-1", &key.PublicKey)}}
+		tp.cachedJwks = oauth.Jwks{Keys: []oauth.Jwk{jwkFromPublicKey("key-1", &key.PublicKey)}}
 
 		pub := tp.getPublicKeyFromCache("")
 
@@ -702,7 +703,7 @@ func TestGetPublicKeyFromCache(t *testing.T) {
 
 	t.Run("empty kid with several keys returns nil", func(t *testing.T) {
 		tp := NewJWKSTokenParser("https://auth.example.com", nil)
-		tp.cachedJwks = Jwks{Keys: []Jwk{
+		tp.cachedJwks = oauth.Jwks{Keys: []oauth.Jwk{
 			jwkFromPublicKey("key-1", &key.PublicKey),
 			jwkFromPublicKey("key-2", &attacker.PublicKey),
 		}}
@@ -712,14 +713,14 @@ func TestGetPublicKeyFromCache(t *testing.T) {
 
 	t.Run("empty kid with a single undecodable key returns nil", func(t *testing.T) {
 		tp := NewJWKSTokenParser("https://auth.example.com", nil)
-		tp.cachedJwks = Jwks{Keys: []Jwk{{Kty: "EC", Kid: "key-1"}}}
+		tp.cachedJwks = oauth.Jwks{Keys: []oauth.Jwk{{Kty: "EC", Kid: "key-1"}}}
 
 		assert.Nil(t, tp.getPublicKeyFromCache(""))
 	})
 
 	t.Run("matching kid on an undecodable key returns nil", func(t *testing.T) {
 		tp := NewJWKSTokenParser("https://auth.example.com", nil)
-		tp.cachedJwks = Jwks{Keys: []Jwk{{Kty: "EC", Kid: "key-1"}}}
+		tp.cachedJwks = oauth.Jwks{Keys: []oauth.Jwk{{Kty: "EC", Kid: "key-1"}}}
 
 		assert.Nil(t, tp.getPublicKeyFromCache("key-1"))
 	})
@@ -767,7 +768,7 @@ func TestRefreshJwks_AcceptsADocumentUnderTheCap(t *testing.T) {
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err)
 
-	encoded, err := json.Marshal(Jwks{Keys: []Jwk{jwkFromPublicKey("key-1", &key.PublicKey)}})
+	encoded, err := json.Marshal(oauth.Jwks{Keys: []oauth.Jwk{jwkFromPublicKey("key-1", &key.PublicKey)}})
 	require.NoError(t, err)
 	require.Less(t, len(encoded), MaxTokenResponseBytes)
 

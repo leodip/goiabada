@@ -7,9 +7,10 @@ import (
 	"strings"
 
 	"github.com/leodip/goiabada/adminconsole/internal/config"
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/adminconsole/internal/constants"
+	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
+	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/errs"
-	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
@@ -20,7 +21,7 @@ func HandleAuthCallbackPost(
 	tokenExchanger TokenExchanger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		sess, err := httpSession.Get(r, constants.AdminConsoleSessionName)
+		sess, err := httpSession.Get(r, coreconstants.AdminConsoleSessionName)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
@@ -87,7 +88,7 @@ func HandleAuthCallbackPost(
 
 		// The admin console is always the client the seeder provisions, so the identifier
 		// is the constant and only the secret is per deployment (#285).
-		clientID := constants.AdminConsoleClientIdentifier
+		clientID := coreconstants.AdminConsoleClientIdentifier
 		clientSecret := config.GetAdminConsole().OAuthClientSecret
 
 		// The browser may be gone; the auth server is not. authorization_code is single use,
@@ -103,9 +104,9 @@ func HandleAuthCallbackPost(
 		// under a cookie that can never be delivered, and the burned code buys nothing either
 		// way. So a browser that leaves here still has to sign in again -- what the detachment
 		// prevents is the exchange being abandoned in flight, not the sign-in failing. The
-		// refresh in core/middleware carries its detached context further than this, because
+		// refresh in internal/middleware carries its detached context further than this, because
 		// there a session already exists and holds the token being replaced (#338).
-		ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), oauth.TokenExchangeTimeout)
+		ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), oauthclient.TokenExchangeTimeout)
 		defer cancel()
 
 		tokenResponse, err := tokenExchanger.ExchangeCodeForTokens(ctx, code, redirectURI, clientID,

@@ -23,7 +23,6 @@ import (
 func HandleAccountLogoutGet(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
-	authHelper AuthHelper,
 	database data.Database,
 	tokenParser TokenParser,
 	auditLogger AuditLogger,
@@ -31,7 +30,7 @@ func HandleAccountLogoutGet(
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		r = refineLogoutLocale(r)
-		doLogout(w, r, httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
+		doLogout(w, r, httpHelper, httpSession, database, tokenParser, auditLogger)
 	}
 }
 
@@ -511,7 +510,6 @@ func handleExistingSessionOnLogout(
 	client *models.Client,
 	database data.Database,
 	auditLogger AuditLogger,
-	authHelper AuthHelper,
 ) error {
 	userSession, err := database.GetUserSessionBySessionIdentifier(nil, sessionIdentifier)
 	if err != nil {
@@ -538,11 +536,16 @@ func handleExistingSessionOnLogout(
 				return err
 			}
 
+			// "" rather than a subject, and the key stays: /auth/logout carries no bearer
+			// token -- authHeaderToContext is mounted on /userinfo and the /api/ groups and
+			// nowhere else -- so there is no caller identity to read here, and "" is what
+			// this row has always carried. The actor is this event's own userId, which is
+			// where an auditor reads it (#385).
 			auditLogger.Log(r.Context(), audit.AuditDeletedUserSessionClient, map[string]interface{}{
 				"userId":        userSession.UserId,
 				"userSessionId": userSession.Id,
 				"clientId":      sessionClient.Client.Id,
-				"loggedInUser":  authHelper.GetLoggedInSubject(r),
+				"loggedInUser":  "",
 			})
 
 			if len(userSession.Clients) == 1 {
@@ -551,10 +554,12 @@ func handleExistingSessionOnLogout(
 					return err
 				}
 
+				// "" for the reason given above: no bearer token reaches /auth/logout, and
+				// the actor is this event's own userId.
 				auditLogger.Log(r.Context(), audit.AuditLogout, map[string]interface{}{
 					"userId":            userSession.UserId,
 					"sessionIdentifier": sessionIdentifier,
-					"loggedInUser":      authHelper.GetLoggedInSubject(r),
+					"loggedInUser":      "",
 				})
 			}
 			break
@@ -567,14 +572,13 @@ func handleExistingSessionOnLogout(
 func HandleAccountLogoutPost(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
-	authHelper AuthHelper,
 	database data.Database,
 	tokenParser TokenParser,
 	auditLogger AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		r = refineLogoutLocale(r)
-		doLogout(w, r, httpHelper, httpSession, authHelper, database, tokenParser, auditLogger)
+		doLogout(w, r, httpHelper, httpSession, database, tokenParser, auditLogger)
 	}
 }
 
@@ -596,7 +600,6 @@ func doLogout(
 	r *http.Request,
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
-	authHelper AuthHelper,
 	database data.Database,
 	tokenParser TokenParser,
 	auditLogger AuditLogger,
@@ -664,7 +667,7 @@ func doLogout(
 		// teardown, because it is unauthenticated and a caller could name any client; it is trusted
 		// only for deciding whether a supplied URI is registered to the client it names, which is
 		// self-limiting (#109).
-		if err := handleExistingSessionOnLogout(r, hint.sessionIdentifier, hint.client, database, auditLogger, authHelper); err != nil {
+		if err := handleExistingSessionOnLogout(r, hint.sessionIdentifier, hint.client, database, auditLogger); err != nil {
 			// A failed teardown is the one thing here that does deserve a 500: the End-User is still
 			// signed in and saying otherwise would be a lie. Contrast the redirect resolution above,
 			// whose failures deliberately degrade to "no redirect".
@@ -683,7 +686,7 @@ func doLogout(
 		userId := int64(0)
 		if len(sessionIdentifier) > 0 {
 			var err error
-			userId, err = deleteWholeUserSession(r, sessionIdentifier, database, auditLogger, authHelper)
+			userId, err = deleteWholeUserSession(r, sessionIdentifier, database, auditLogger)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
 				return
@@ -693,10 +696,13 @@ func doLogout(
 		// Unconditional, as before, so a logout with no usable session still records the attempt.
 		// There being no session to end is not a failure: it may have been reaped or ended from
 		// another device, and the End-User asking to leave has got what they asked for either way.
+		// "" rather than a subject, and the key stays: /auth/logout carries no bearer token,
+		// so there is no caller identity to read, and "" is what this row has always
+		// carried. The actor is this event's own userId (#385).
 		auditLogger.Log(r.Context(), audit.AuditLogout, map[string]interface{}{
 			"userId":            userId,
 			"sessionIdentifier": sessionIdentifier,
-			"loggedInUser":      authHelper.GetLoggedInSubject(r),
+			"loggedInUser":      "",
 		})
 	}
 
@@ -777,7 +783,6 @@ func deleteWholeUserSession(
 	sessionIdentifier string,
 	database data.Database,
 	auditLogger AuditLogger,
-	authHelper AuthHelper,
 ) (int64, error) {
 	userSession, err := database.GetUserSessionBySessionIdentifier(nil, sessionIdentifier)
 	if err != nil {
@@ -791,9 +796,12 @@ func deleteWholeUserSession(
 		return 0, err
 	}
 
+	// "" rather than a subject, and the key stays: /auth/logout carries no bearer token, so
+	// there is no caller identity to read, and "" is what this row has always carried. The
+	// actor is this event's own userSessionId (#385).
 	auditLogger.Log(r.Context(), audit.AuditDeletedUserSession, map[string]interface{}{
 		"userSessionId": userSession.Id,
-		"loggedInUser":  authHelper.GetLoggedInSubject(r),
+		"loggedInUser":  "",
 	})
 
 	return userSession.UserId, nil

@@ -34,7 +34,7 @@ import (
 // absent from the list below: an account name is not a credential, and the limiter and the handler
 // it protects must keep reading it the same way or a case variant buys a fresh bucket (#219).
 func TestHandlers_NoCredentialQueryFallback(t *testing.T) {
-	// The ten credential-bearing names, as quoted literals. A value under any of them
+	// The eleven credential-bearing names, as quoted literals. A value under any of them
 	// authenticates, authorizes or configures on its own.
 	forbidden := []string{
 		`"password"`,
@@ -72,6 +72,24 @@ func TestHandlers_NoCredentialQueryFallback(t *testing.T) {
 		`"code_verifier"`,
 		`"refresh_token"`,
 		`"client_secret"`,
+		// The bearer token, read from a form body by JwtAuthorizationHeaderToContext in
+		// internal/middleware. That read arrived in this module with the middleware in #385;
+		// before it, core/middleware/credential_read_lint_test.go was the only caller holding
+		// it, and neither application list carried the name, so the one lawful form-body token
+		// read in the repository would have been pinned by nobody.
+		//
+		// A bearer token is the value the specifications are loudest about keeping out of a
+		// URL. RFC 6750 section 2.3 says the URI query method "has a high likelihood of being
+		// logged" with the other parameters and SHOULD NOT be used where the header or the
+		// request body is available, and RFC 9700 section 4.3.2 hardens that to "Clients MUST
+		// NOT pass access tokens in a URI query parameter". r.FormValue accepts exactly that
+		// request, because ParseForm merges the URL query behind the body, so the accessor is
+		// the whole of the difference between honouring those sentences and not.
+		//
+		// The read the middleware performs is lawful because it is r.PostFormValue and because
+		// OIDC Core 1.0 section 5.3.1 allows the UserInfo endpoint to take the token from a
+		// form-encoded body. The query is what is refused, not the body.
+		`"access_token"`,
 		// The form-binding markers, read through their constants rather than a literal.
 		// They authorize nothing alone, but a marker supplied by a URL is not a submission,
 		// and reading one from a URL reintroduces the shape #201 removed from the reset

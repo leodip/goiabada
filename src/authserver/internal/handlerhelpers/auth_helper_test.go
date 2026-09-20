@@ -1,10 +1,7 @@
 package handlerhelpers
 
 import (
-	"context"
 	"encoding/json"
-	"fmt"
-	"log/slog"
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
@@ -15,12 +12,9 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/constants"
-	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
-	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/leodip/goiabada/core/sessionstore/sessiontest"
-	"github.com/leodip/goiabada/core/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -92,75 +86,6 @@ func TestGetAuthContext(t *testing.T) {
 		assert.Error(t, err)
 		assert.Nil(t, result)
 		mockStore.AssertExpectations(t)
-	})
-}
-
-func TestGetLoggedInSubject(t *testing.T) {
-	const testSessionName = "test-session"
-	helper := NewAuthHelper(nil, testSessionName)
-
-	t.Run("Success", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
-		jwtInfo := oauth.JwtInfo{
-			IdToken: &oauth.JwtToken{
-				Claims: map[string]interface{}{"sub": "test-subject"},
-			},
-		}
-		ctx := context.WithValue(req.Context(), coreconstants.ContextKeyJwtInfo, jwtInfo)
-		req = req.WithContext(ctx)
-
-		subject := helper.GetLoggedInSubject(req)
-
-		assert.Equal(t, "test-subject", subject)
-	})
-
-	t.Run("NoJwtInfo", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
-
-		subject := helper.GetLoggedInSubject(req)
-
-		assert.Empty(t, subject)
-	})
-
-	t.Run("InvalidJwtInfo", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
-		ctx := context.WithValue(req.Context(), coreconstants.ContextKeyJwtInfo, "invalid")
-		req = req.WithContext(ctx)
-
-		logged := testutil.CaptureSlog(t)
-
-		subject := helper.GetLoggedInSubject(req)
-
-		assert.Empty(t, subject)
-
-		// A record rather than a line of text, which is what the stack move bought. This
-		// used to concatenate debug.Stack() into the message and assert on the rendered
-		// "ERROR unable to cast jwtInfo" prefix, an assertion only the built-in handler's
-		// format could satisfy: it passed under log.SetOutput and would have failed the
-		// moment either server installed a handler (#320).
-		records := logged.Records()
-		require.Len(t, records, 1)
-		assert.Equal(t, slog.LevelError, records[0].Level)
-		assert.Equal(t, "unable to cast jwtInfo", records[0].Message)
-
-		// The stack the message used to carry, now inside the error attribute where every
-		// handler prints it with %+v. Asserting on this function's own frame, so a plain
-		// errors.New here would fail rather than merely logging less.
-		err, isError := records[0].Attrs["error"].(error)
-		require.True(t, isError, "the error attribute must be an error value, not a string")
-		assert.Contains(t, fmt.Sprintf("%+v", err), "GetLoggedInSubject",
-			"the errs stack must name the frame the cast failed in")
-	})
-
-	t.Run("NoIdToken", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
-		jwtInfo := oauth.JwtInfo{}
-		ctx := context.WithValue(req.Context(), coreconstants.ContextKeyJwtInfo, jwtInfo)
-		req = req.WithContext(ctx)
-
-		subject := helper.GetLoggedInSubject(req)
-
-		assert.Empty(t, subject)
 	})
 }
 

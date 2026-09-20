@@ -28,13 +28,23 @@ import (
 // there is no mock store to observe the call on either.
 //
 // What it proves and what it does not. It proves that the file which writes the token set
-// into a session also reaches the store's rotation, which is what a copy-paste, a revert
-// or a rewritten handler would drop. It does not prove the two are on the same path, and
-// nothing lexical could. The store's own half, that rotation issues a different identifier
+// at the privilege transition also reaches the store's rotation, which is what a copy-paste,
+// a revert or a rewritten handler would drop. It does not prove the two are on the same path,
+// and nothing lexical could. The store's own half, that rotation issues a different identifier
 // and removes the old row, is real behaviour and is covered at
 // core/sessionstore.TestServerSideStore_RegenerateRotatesAnAdminConsoleSession; the auth
 // server's equivalent site is observed end to end, through a real cookie jar, at
 // TestBrowserSession_IdentifierRotatesAtSignIn.
+//
+// Why the writers are enumerated rather than held to one blanket rule. Until #385 this module
+// had exactly one file writing the key, so "every writer rotates" and "the sign-in writer
+// rotates" were the same sentence. #385 moved the JWT session middleware here out of
+// core/middleware, and its refresh writes the key too -- on a session that was already
+// authenticated, which is not the transition this guard exists for and must not rotate. A
+// blanket rule would have to be either wrong about that file or silenced for it by path,
+// and a silenced path is where the next real sign-in site would hide. So each writer is
+// classified here, and a writer this list does not name fails the guard until a human says
+// which kind it is.
 func TestHandlers_SignInRotatesTheSessionIdentifier(t *testing.T) {
 	// The write that makes a session authenticated in this module. It is the store's own
 	// AuthenticatedKey for the adminconsole owner, so this string is the definition of
@@ -44,6 +54,18 @@ func TestHandlers_SignInRotatesTheSessionIdentifier(t *testing.T) {
 	// The rotation, named by the interface rather than the method, since a caller has to
 	// assert to it before it can call anything.
 	const rotation = "sessionstore.Regenerator"
+
+	// Every file in this module allowed to write the authenticated key, and why it is or is
+	// not the privilege transition. Paths are as WalkDir yields them from this package.
+	mustRotate := map[string]bool{
+		// Sign-in. The anonymous handle the browser arrived with must not name the session
+		// this fills with the administrator's tokens (#266).
+		"../handlers/handler_auth_callback.go": true,
+		// Refresh. The session is already the administrator's and already holds the token
+		// being replaced, so no principal changes here and there is no planted handle to
+		// strand; rotating would only cost the browser a cookie write per refresh (#385).
+		"../middleware/middleware_jwt.go": false,
+	}
 
 	// go test runs with the package directory as the working directory, so ".." is
 	// src/adminconsole/internal.
@@ -71,10 +93,18 @@ func TestHandlers_SignInRotatesTheSessionIdentifier(t *testing.T) {
 		}
 
 		found++
-		if !strings.Contains(text, rotation) {
-			t.Errorf("%s writes the authenticated session key but never reaches %s. "+
-				"A handle that existed before sign-in must not name the session sign-in "+
-				"produces, and nothing else in this module would notice it does (#266)", path, rotation)
+		slash := filepath.ToSlash(path)
+		rotates, known := mustRotate[slash]
+		switch {
+		case !known:
+			t.Errorf("%s writes the authenticated session key and this guard does not know it. "+
+				"Say which it is in mustRotate: a privilege transition, which must reach %s, or a "+
+				"rewrite of a session that was already authenticated, which must not (#266, #385)",
+				slash, rotation)
+		case rotates && !strings.Contains(text, rotation):
+			t.Errorf("%s writes the authenticated session key at the privilege transition but never "+
+				"reaches %s. A handle that existed before sign-in must not name the session sign-in "+
+				"produces, and nothing else in this module would notice it does (#266)", slash, rotation)
 		}
 		return nil
 	})
@@ -86,5 +116,13 @@ func TestHandlers_SignInRotatesTheSessionIdentifier(t *testing.T) {
 	// guarding after the code it watches is renamed or moved.
 	if found == 0 {
 		t.Fatalf("no source under internal/ writes %q, so this guard is watching nothing", authenticatedWrite)
+	}
+	// The other direction, and the reason the map is not merely an allow-list: a named writer
+	// that no longer writes the key has been renamed, moved or deleted, and the row standing
+	// for it would let a fresh file take that path with nothing checking it.
+	if found != len(mustRotate) {
+		t.Errorf("mustRotate names %d writers but the walk found %d. A row for a file that no "+
+			"longer writes %q is a row the next file at that path inherits for free",
+			len(mustRotate), found, authenticatedWrite)
 	}
 }

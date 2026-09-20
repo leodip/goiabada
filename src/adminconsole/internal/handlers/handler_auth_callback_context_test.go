@@ -10,7 +10,9 @@ import (
 	"time"
 
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/adminconsole/internal/constants"
+	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
+	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
@@ -63,7 +65,7 @@ func (e *contextRecordingExchanger) ExchangeCodeForTokens(ctx context.Context, c
 // here, so a sign-in whose browser has gone still fails at the token validation
 // or the session write that follow; persisting it instead would leave a row of
 // administrator tokens under an undeliverable cookie. The refresh in
-// core/middleware is the opposite case and carries its detached context through
+// internal/middleware is the opposite case and carries its detached context through
 // its save (#338).
 func TestHandleAuthCallbackPost_DetachesTheExchangeFromTheBrowsersContext(t *testing.T) {
 	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
@@ -75,7 +77,7 @@ func TestHandleAuthCallbackPost_DetachesTheExchangeFromTheBrowsersContext(t *tes
 		constants.SessionKeyRedirectURI:  "https://adminconsole.example/auth/callback",
 	}}
 	httpSession := mocks_sessionstore.NewStore(t)
-	httpSession.On("Get", mock.Anything, constants.AdminConsoleSessionName).Return(session, nil)
+	httpSession.On("Get", mock.Anything, coreconstants.AdminConsoleSessionName).Return(session, nil)
 
 	form := url.Values{"state": {"the-state"}, "code": {"the-code"}}
 	req := httptest.NewRequest(http.MethodPost, "/auth/callback", strings.NewReader(form.Encode()))
@@ -100,14 +102,14 @@ func TestHandleAuthCallbackPost_DetachesTheExchangeFromTheBrowsersContext(t *tes
 		"the exchange runs on a context detached from the browser's, which is already cancelled")
 
 	require.True(t, exchanger.hasLimit, "detached, but not unbounded")
-	assert.LessOrEqual(t, time.Until(exchanger.deadline), oauth.TokenExchangeTimeout,
+	assert.LessOrEqual(t, time.Until(exchanger.deadline), oauthclient.TokenExchangeTimeout,
 		"bounded by TokenExchangeTimeout, which is what replaces the cancellation")
 	// The tolerance is what the handler spends between taking the deadline and calling the
 	// exchanger, which is a few microseconds; a second is generous for a loaded machine and
 	// still refuses any value that is not the ten seconds decision 11 chose. Subtracting a
 	// minute from a ten second constant was the earlier form, and a negative lower bound
 	// asserts nothing (#338).
-	assert.Greater(t, time.Until(exchanger.deadline), oauth.TokenExchangeTimeout-time.Second,
+	assert.Greater(t, time.Until(exchanger.deadline), oauthclient.TokenExchangeTimeout-time.Second,
 		"and by that value rather than by something shorter")
 
 	// Detached from the cancellation and from nothing else. WithoutCancel keeps the

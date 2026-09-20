@@ -15,10 +15,9 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/handlers/adminsettingshandlers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers/adminuserhandlers"
 	"github.com/leodip/goiabada/adminconsole/internal/middleware"
+	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/handlerhelpers"
-	custom_middleware "github.com/leodip/goiabada/core/middleware"
-	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/validators"
 )
 
@@ -31,16 +30,16 @@ func (s *Server) initRoutes(root chi.Router) {
 
 	authServerClient := newAuthServerHTTPClient()
 
-	tokenParser := oauth.NewJWKSTokenParser(authBase, authServerClient)
-	tokenExchanger := oauth.NewTokenExchanger(authServerClient)
+	tokenParser := oauthclient.NewJWKSTokenParser(authBase, authServerClient)
+	tokenExchanger := oauthclient.NewTokenExchanger(authServerClient)
 
 	identifierValidator := validators.NewIdentifierValidator()
 
 	httpHelper := handlerhelpers.NewHttpHelper(s.templateFS, middleware.SettingsReader{})
-	authHelper := handlerhelpers.NewAuthHelper(s.sessionStore, constants.AdminConsoleSessionName, config.GetAdminConsole().BaseURL, config.GetAuthServer().BaseURL)
+	authHelper := oauthclient.NewAuthHelper(s.sessionStore, constants.AdminConsoleSessionName, config.GetAdminConsole().BaseURL, config.GetAuthServer().BaseURL)
 
 	// Initialize middleware
-	middlewareJwt := custom_middleware.NewMiddlewareJwt(
+	middlewareJwt := middleware.NewMiddlewareJwt(
 		s.sessionStore,
 		constants.AdminConsoleSessionName,
 		tokenParser,
@@ -280,5 +279,5 @@ func (s *Server) initRoutes(root chi.Router) {
 // context -- it is an idempotent read -- and a browser context carries no deadline. So the
 // timeout here is what bounds it, and a function is what a test can reach (#338).
 func newAuthServerHTTPClient() *http.Client {
-	return &http.Client{Timeout: oauth.TokenExchangeTimeout}
+	return &http.Client{Timeout: oauthclient.TokenExchangeTimeout}
 }

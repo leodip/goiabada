@@ -18,7 +18,6 @@ import (
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/api"
-	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/testutil"
 	"github.com/stretchr/testify/assert"
@@ -37,7 +36,7 @@ func TestRequireBearerTokenScope(t *testing.T) {
 		}
 
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
-		ctx := context.WithValue(req.Context(), coreconstants.ContextKeyBearerToken, token)
+		ctx := context.WithValue(req.Context(), constants.ContextKeyBearerToken, token)
 		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
@@ -62,7 +61,7 @@ func TestRequireBearerTokenScope(t *testing.T) {
 		}
 
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
-		ctx := context.WithValue(req.Context(), coreconstants.ContextKeyBearerToken, token)
+		ctx := context.WithValue(req.Context(), constants.ContextKeyBearerToken, token)
 		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
@@ -87,7 +86,7 @@ func TestRequireBearerTokenScope(t *testing.T) {
 		}
 
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
-		ctx := context.WithValue(req.Context(), coreconstants.ContextKeyBearerToken, token)
+		ctx := context.WithValue(req.Context(), constants.ContextKeyBearerToken, token)
 		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
@@ -112,7 +111,7 @@ func TestRequireBearerTokenScope(t *testing.T) {
 		}
 
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
-		ctx := context.WithValue(req.Context(), coreconstants.ContextKeyBearerToken, token)
+		ctx := context.WithValue(req.Context(), constants.ContextKeyBearerToken, token)
 		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
@@ -137,7 +136,7 @@ func TestRequireBearerTokenScope(t *testing.T) {
 		}
 
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
-		ctx := context.WithValue(req.Context(), coreconstants.ContextKeyBearerToken, token)
+		ctx := context.WithValue(req.Context(), constants.ContextKeyBearerToken, token)
 		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
@@ -173,7 +172,7 @@ func TestRequireBearerTokenScope(t *testing.T) {
 		handler := RequireBearerTokenScope("authserver:manage")
 
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
-		ctx := context.WithValue(req.Context(), coreconstants.ContextKeyBearerToken, "invalid-string-token")
+		ctx := context.WithValue(req.Context(), constants.ContextKeyBearerToken, "invalid-string-token")
 		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
@@ -198,7 +197,7 @@ func TestRequireBearerTokenScope(t *testing.T) {
 		}
 
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
-		ctx := context.WithValue(req.Context(), coreconstants.ContextKeyBearerToken, token)
+		ctx := context.WithValue(req.Context(), constants.ContextKeyBearerToken, token)
 		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
@@ -224,7 +223,7 @@ func TestRequireBearerTokenScope(t *testing.T) {
 		}
 
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
-		ctx := context.WithValue(req.Context(), coreconstants.ContextKeyBearerToken, token)
+		ctx := context.WithValue(req.Context(), constants.ContextKeyBearerToken, token)
 		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
@@ -251,7 +250,7 @@ func TestRequireBearerTokenScopeAnyOf(t *testing.T) {
 		}
 
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
-		ctx := context.WithValue(req.Context(), coreconstants.ContextKeyBearerToken, token)
+		ctx := context.WithValue(req.Context(), constants.ContextKeyBearerToken, token)
 		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
@@ -276,7 +275,7 @@ func TestRequireBearerTokenScopeAnyOf(t *testing.T) {
 		}
 
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
-		ctx := context.WithValue(req.Context(), coreconstants.ContextKeyBearerToken, token)
+		ctx := context.WithValue(req.Context(), constants.ContextKeyBearerToken, token)
 		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
@@ -305,7 +304,7 @@ func TestRequireBearerTokenScopeAnyOf(t *testing.T) {
 		}
 
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
-		ctx := context.WithValue(req.Context(), coreconstants.ContextKeyBearerToken, token)
+		ctx := context.WithValue(req.Context(), constants.ContextKeyBearerToken, token)
 		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
@@ -330,7 +329,7 @@ func TestRequireBearerTokenScopeAnyOf(t *testing.T) {
 		}
 
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
-		ctx := context.WithValue(req.Context(), coreconstants.ContextKeyBearerToken, token)
+		ctx := context.WithValue(req.Context(), constants.ContextKeyBearerToken, token)
 		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
@@ -366,7 +365,7 @@ func TestRequireBearerTokenScopeAnyOf(t *testing.T) {
 		handler := RequireBearerTokenScopeAnyOf([]string{"authserver:admin-read", "authserver:manage"})
 
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
-		ctx := context.WithValue(req.Context(), coreconstants.ContextKeyBearerToken, "invalid-token")
+		ctx := context.WithValue(req.Context(), constants.ContextKeyBearerToken, "invalid-token")
 		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
@@ -392,7 +391,7 @@ func TestRequireBearerTokenScopeAnyOf(t *testing.T) {
 		}
 
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
-		ctx := context.WithValue(req.Context(), coreconstants.ContextKeyBearerToken, token)
+		ctx := context.WithValue(req.Context(), constants.ContextKeyBearerToken, token)
 		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
@@ -419,7 +418,7 @@ func TestRequireBearerTokenScopeAnyOf_EdgeCases(t *testing.T) {
 		}
 
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
-		ctx := context.WithValue(req.Context(), coreconstants.ContextKeyBearerToken, token)
+		ctx := context.WithValue(req.Context(), constants.ContextKeyBearerToken, token)
 		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
@@ -444,7 +443,7 @@ func TestRequireBearerTokenScopeAnyOf_EdgeCases(t *testing.T) {
 		}
 
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
-		ctx := context.WithValue(req.Context(), coreconstants.ContextKeyBearerToken, token)
+		ctx := context.WithValue(req.Context(), constants.ContextKeyBearerToken, token)
 		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
@@ -469,7 +468,7 @@ func TestRequireBearerTokenScopeAnyOf_EdgeCases(t *testing.T) {
 		}
 
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
-		ctx := context.WithValue(req.Context(), coreconstants.ContextKeyBearerToken, token)
+		ctx := context.WithValue(req.Context(), constants.ContextKeyBearerToken, token)
 		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
@@ -494,7 +493,7 @@ func TestRequireBearerTokenScopeAnyOf_EdgeCases(t *testing.T) {
 		}
 
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
-		ctx := context.WithValue(req.Context(), coreconstants.ContextKeyBearerToken, token)
+		ctx := context.WithValue(req.Context(), constants.ContextKeyBearerToken, token)
 		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
@@ -519,7 +518,7 @@ func TestRequireBearerTokenScopeAnyOf_EdgeCases(t *testing.T) {
 		}
 
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
-		ctx := context.WithValue(req.Context(), coreconstants.ContextKeyBearerToken, token)
+		ctx := context.WithValue(req.Context(), constants.ContextKeyBearerToken, token)
 		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
@@ -549,7 +548,7 @@ func TestRequireBearerTokenScopeAnyOf_EdgeCases(t *testing.T) {
 		}
 
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
-		ctx := context.WithValue(req.Context(), coreconstants.ContextKeyBearerToken, token)
+		ctx := context.WithValue(req.Context(), constants.ContextKeyBearerToken, token)
 		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
@@ -577,7 +576,7 @@ func TestRequireBearerTokenScopeAnyOf_EdgeCases(t *testing.T) {
 		}
 
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
-		ctx := context.WithValue(req.Context(), coreconstants.ContextKeyBearerToken, token)
+		ctx := context.WithValue(req.Context(), constants.ContextKeyBearerToken, token)
 		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
@@ -632,7 +631,7 @@ func TestGranularScopeScenarios(t *testing.T) {
 		}
 
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
-		ctx := context.WithValue(req.Context(), coreconstants.ContextKeyBearerToken, token)
+		ctx := context.WithValue(req.Context(), constants.ContextKeyBearerToken, token)
 		req = req.WithContext(ctx)
 
 		// Should pass for read
@@ -661,7 +660,7 @@ func TestGranularScopeScenarios(t *testing.T) {
 		}
 
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
-		ctx := context.WithValue(req.Context(), coreconstants.ContextKeyBearerToken, token)
+		ctx := context.WithValue(req.Context(), constants.ContextKeyBearerToken, token)
 		req = req.WithContext(ctx)
 
 		// Should pass for read
@@ -689,7 +688,7 @@ func TestGranularScopeScenarios(t *testing.T) {
 		}
 
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
-		ctx := context.WithValue(req.Context(), coreconstants.ContextKeyBearerToken, token)
+		ctx := context.WithValue(req.Context(), constants.ContextKeyBearerToken, token)
 		req = req.WithContext(ctx)
 
 		// Should fail for clients read
@@ -719,7 +718,7 @@ func TestGranularScopeScenarios(t *testing.T) {
 		}
 
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
-		ctx := context.WithValue(req.Context(), coreconstants.ContextKeyBearerToken, token)
+		ctx := context.WithValue(req.Context(), constants.ContextKeyBearerToken, token)
 		req = req.WithContext(ctx)
 
 		allScopeSets := [][]string{
@@ -746,7 +745,7 @@ func TestGranularScopeScenarios(t *testing.T) {
 		}
 
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
-		ctx := context.WithValue(req.Context(), coreconstants.ContextKeyBearerToken, token)
+		ctx := context.WithValue(req.Context(), constants.ContextKeyBearerToken, token)
 		req = req.WithContext(ctx)
 
 		readScopeSets := [][]string{scopesUsersRead, scopesClientsRead, scopesSettingsRead}
@@ -769,7 +768,7 @@ func TestGranularScopeScenarios(t *testing.T) {
 		}
 
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
-		ctx := context.WithValue(req.Context(), coreconstants.ContextKeyBearerToken, token)
+		ctx := context.WithValue(req.Context(), constants.ContextKeyBearerToken, token)
 		req = req.WithContext(ctx)
 
 		writeScopeSets := [][]string{scopesUsers, scopesClients, scopesSettings}
@@ -793,7 +792,7 @@ func TestGranularScopeScenarios(t *testing.T) {
 		}
 
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
-		ctx := context.WithValue(req.Context(), coreconstants.ContextKeyBearerToken, token)
+		ctx := context.WithValue(req.Context(), constants.ContextKeyBearerToken, token)
 		req = req.WithContext(ctx)
 
 		// Should access users
@@ -852,7 +851,7 @@ func TestRequireValidSession(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
-		ctx := context.WithValue(req.Context(), coreconstants.ContextKeyBearerToken, "not-a-jwt")
+		ctx := context.WithValue(req.Context(), constants.ContextKeyBearerToken, "not-a-jwt")
 		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
@@ -878,7 +877,7 @@ func TestRequireValidSession(t *testing.T) {
 		}
 
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
-		ctx := context.WithValue(req.Context(), coreconstants.ContextKeyBearerToken, token)
+		ctx := context.WithValue(req.Context(), constants.ContextKeyBearerToken, token)
 		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
@@ -917,7 +916,7 @@ func TestRequireValidSession(t *testing.T) {
 		}
 
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
-		ctx := context.WithValue(req.Context(), coreconstants.ContextKeyBearerToken, token)
+		ctx := context.WithValue(req.Context(), constants.ContextKeyBearerToken, token)
 		req = req.WithContext(ctx)
 		req = settingsInCtx(req)
 
@@ -950,7 +949,7 @@ func TestRequireValidSession(t *testing.T) {
 		}
 
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
-		ctx := context.WithValue(req.Context(), coreconstants.ContextKeyBearerToken, token)
+		ctx := context.WithValue(req.Context(), constants.ContextKeyBearerToken, token)
 		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
@@ -991,7 +990,7 @@ func TestRequireValidSession(t *testing.T) {
 		}
 
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
-		ctx := context.WithValue(req.Context(), coreconstants.ContextKeyBearerToken, token)
+		ctx := context.WithValue(req.Context(), constants.ContextKeyBearerToken, token)
 		req = req.WithContext(ctx)
 		req = settingsInCtx(req)
 
@@ -1035,7 +1034,7 @@ func TestRequireValidSession(t *testing.T) {
 		}
 
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
-		ctx := context.WithValue(req.Context(), coreconstants.ContextKeyBearerToken, token)
+		ctx := context.WithValue(req.Context(), constants.ContextKeyBearerToken, token)
 		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
@@ -1074,7 +1073,7 @@ func TestRequireValidSession(t *testing.T) {
 		}
 
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
-		ctx := context.WithValue(req.Context(), coreconstants.ContextKeyBearerToken, token)
+		ctx := context.WithValue(req.Context(), constants.ContextKeyBearerToken, token)
 		// Settings stored as a non-pointer struct, which fails the type assertion.
 		ctx = context.WithValue(ctx, constants.ContextKeySettings, models.Settings{})
 		req = req.WithContext(ctx)
@@ -1108,7 +1107,7 @@ func TestRequireValidSession(t *testing.T) {
 		}
 
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
-		ctx := context.WithValue(req.Context(), coreconstants.ContextKeyBearerToken, token)
+		ctx := context.WithValue(req.Context(), constants.ContextKeyBearerToken, token)
 		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
@@ -1142,7 +1141,7 @@ func TestRequireValidSession(t *testing.T) {
 		}
 
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
-		ctx := context.WithValue(req.Context(), coreconstants.ContextKeyBearerToken, token)
+		ctx := context.WithValue(req.Context(), constants.ContextKeyBearerToken, token)
 		req = req.WithContext(ctx)
 
 		rr := httptest.NewRecorder()
@@ -1521,10 +1520,10 @@ func TestRequireValidSession_Table(t *testing.T) {
 				// nothing in context
 			case tc.wrongType:
 				req = req.WithContext(context.WithValue(req.Context(),
-					coreconstants.ContextKeyBearerToken, "not-a-jwt"))
+					constants.ContextKeyBearerToken, "not-a-jwt"))
 			default:
 				req = req.WithContext(context.WithValue(req.Context(),
-					coreconstants.ContextKeyBearerToken, oauth.JwtToken{Claims: tc.claims}))
+					constants.ContextKeyBearerToken, oauth.JwtToken{Claims: tc.claims}))
 			}
 			if !tc.noSettings {
 				req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings,
@@ -1620,7 +1619,7 @@ func TestRequireUserBoundToken(t *testing.T) {
 		}
 
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
-		req = req.WithContext(context.WithValue(req.Context(), coreconstants.ContextKeyBearerToken, token))
+		req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeyBearerToken, token))
 
 		rr := httptest.NewRecorder()
 		nextCalled := false
@@ -1647,7 +1646,7 @@ func TestRequireUserBoundToken(t *testing.T) {
 		logs := testutil.CaptureSlog(t)
 
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
-		req = req.WithContext(context.WithValue(req.Context(), coreconstants.ContextKeyBearerToken, token))
+		req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeyBearerToken, token))
 
 		rr := httptest.NewRecorder()
 		nextCalled := false
@@ -1686,7 +1685,7 @@ func TestRequireUserBoundToken(t *testing.T) {
 
 	t.Run("rejects when the context value is not a JwtToken", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
-		req = req.WithContext(context.WithValue(req.Context(), coreconstants.ContextKeyBearerToken, "not-a-token"))
+		req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeyBearerToken, "not-a-token"))
 
 		rr := httptest.NewRecorder()
 		nextCalled := false
@@ -1712,7 +1711,7 @@ func TestRequireUserBoundToken(t *testing.T) {
 		}
 
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
-		req = req.WithContext(context.WithValue(req.Context(), coreconstants.ContextKeyBearerToken, token))
+		req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeyBearerToken, token))
 
 		rr := httptest.NewRecorder()
 		nextCalled := false
@@ -1781,7 +1780,7 @@ func TestRequireValidSession_AFiveHundredCarriesTheRequestIdAndLogsOnce(t *testi
 		"sid": "sid-boom", "auth_time": float64(1), "sub": "user-1",
 	}}
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/users", nil)
-	ctx := context.WithValue(req.Context(), coreconstants.ContextKeyBearerToken, token)
+	ctx := context.WithValue(req.Context(), constants.ContextKeyBearerToken, token)
 	ctx = context.WithValue(ctx, chimiddleware.RequestIDKey, requestId)
 	req = req.WithContext(ctx)
 

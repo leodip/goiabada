@@ -70,7 +70,6 @@ func HandleAPIUserPermissionsGet(
 
 func HandleAPIUserPermissionsPut(
 	database data.Database,
-	authHelper handlers.AuthHelper,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -151,7 +150,7 @@ func HandleAPIUserPermissionsPut(
 				auditLogger.Log(r.Context(), audit.AuditAddedUserPermission, map[string]interface{}{
 					"userId":       user.Id,
 					"permissionId": permission.Id,
-					"loggedInUser": authHelper.GetLoggedInSubject(r),
+					"loggedInUser": callerSubject(r),
 				})
 			}
 		}
@@ -188,7 +187,7 @@ func HandleAPIUserPermissionsPut(
 			auditLogger.Log(r.Context(), audit.AuditDeletedUserPermission, map[string]interface{}{
 				"userId":       user.Id,
 				"permissionId": permissionId,
-				"loggedInUser": authHelper.GetLoggedInSubject(r),
+				"loggedInUser": callerSubject(r),
 			})
 		}
 

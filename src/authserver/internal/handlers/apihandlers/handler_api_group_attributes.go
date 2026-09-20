@@ -109,7 +109,6 @@ func HandleAPIGroupAttributeGet(
 }
 
 func HandleAPIGroupAttributeCreatePost(
-	authHelper handlers.AuthHelper,
 	database data.Database,
 	identifierValidator *validators.IdentifierValidator,
 	auditLogger handlers.AuditLogger,
@@ -185,7 +184,7 @@ func HandleAPIGroupAttributeCreatePost(
 			"groupAttributeId": groupAttribute.Id,
 			"groupId":          group.Id,
 			"groupIdentifier":  group.GroupIdentifier,
-			"loggedInUser":     authHelper.GetLoggedInSubject(r),
+			"loggedInUser":     callerSubject(r),
 		})
 
 		// Return created attribute
@@ -198,7 +197,6 @@ func HandleAPIGroupAttributeCreatePost(
 }
 
 func HandleAPIGroupAttributeUpdatePut(
-	authHelper handlers.AuthHelper,
 	database data.Database,
 	identifierValidator *validators.IdentifierValidator,
 	auditLogger handlers.AuditLogger,
@@ -290,7 +288,7 @@ func HandleAPIGroupAttributeUpdatePut(
 			"groupAttributeId": attribute.Id,
 			"groupId":          attribute.GroupId,
 			"groupIdentifier":  group.GroupIdentifier,
-			"loggedInUser":     authHelper.GetLoggedInSubject(r),
+			"loggedInUser":     callerSubject(r),
 		})
 
 		// Return updated attribute
@@ -303,7 +301,6 @@ func HandleAPIGroupAttributeUpdatePut(
 }
 
 func HandleAPIGroupAttributeDelete(
-	authHelper handlers.AuthHelper,
 	database data.Database,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
@@ -357,7 +354,7 @@ func HandleAPIGroupAttributeDelete(
 			"groupAttributeId": id,
 			"groupId":          attribute.GroupId,
 			"groupIdentifier":  group.GroupIdentifier,
-			"loggedInUser":     authHelper.GetLoggedInSubject(r),
+			"loggedInUser":     callerSubject(r),
 		})
 
 		// Return success response

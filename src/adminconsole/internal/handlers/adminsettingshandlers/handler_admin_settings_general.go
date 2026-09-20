@@ -8,9 +8,10 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/cache"
 	"github.com/leodip/goiabada/adminconsole/internal/config"
+	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/constants"
+	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
@@ -25,7 +26,7 @@ func HandleAdminSettingsGeneralGet(
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		jwtInfo, ok := r.Context().Value(coreconstants.ContextKeyJwtInfo).(oauth.JwtInfo)
 		if !ok {
 			httpHelper.InternalServerError(w, r, errs.New("no JWT info found in context"))
 			return
@@ -50,7 +51,7 @@ func HandleAdminSettingsGeneralGet(
 			ResourceOwnerPasswordCredentialsEnabled:   apiResp.ResourceOwnerPasswordCredentialsEnabled,
 		}
 
-		sess, err := httpSession.Get(r, constants.AdminConsoleSessionName)
+		sess, err := httpSession.Get(r, coreconstants.AdminConsoleSessionName)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
@@ -87,7 +88,7 @@ func HandleAdminSettingsGeneralPost(
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		jwtInfo, ok := r.Context().Value(coreconstants.ContextKeyJwtInfo).(oauth.JwtInfo)
 		if !ok {
 			httpHelper.InternalServerError(w, r, errs.New("no JWT info found in context"))
 			return
@@ -150,7 +151,7 @@ func HandleAdminSettingsGeneralPost(
 		// Check if issuer was changed
 		if originalIssuer != updatedResp.Issuer {
 			// Clear the session
-			sess, err := httpSession.Get(r, constants.AdminConsoleSessionName)
+			sess, err := httpSession.Get(r, coreconstants.AdminConsoleSessionName)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
 				return
@@ -171,7 +172,7 @@ func HandleAdminSettingsGeneralPost(
 		}
 
 		// Normal flow - set success message and redirect back to settings
-		sess, err := httpSession.Get(r, constants.AdminConsoleSessionName)
+		sess, err := httpSession.Get(r, coreconstants.AdminConsoleSessionName)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return

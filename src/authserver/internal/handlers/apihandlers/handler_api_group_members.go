@@ -80,7 +80,6 @@ func HandleAPIGroupMembersGet(
 }
 
 func HandleAPIGroupMemberAddPost(
-	authHelper handlers.AuthHelper,
 	database data.Database,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
@@ -153,7 +152,7 @@ func HandleAPIGroupMemberAddPost(
 		auditLogger.Log(r.Context(), audit.AuditUserAddedToGroup, map[string]interface{}{
 			"userId":       user.Id,
 			"groupId":      group.Id,
-			"loggedInUser": authHelper.GetLoggedInSubject(r),
+			"loggedInUser": callerSubject(r),
 		})
 
 		// Return success response
@@ -166,7 +165,6 @@ func HandleAPIGroupMemberAddPost(
 }
 
 func HandleAPIGroupMemberDelete(
-	authHelper handlers.AuthHelper,
 	database data.Database,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
@@ -241,7 +239,7 @@ func HandleAPIGroupMemberDelete(
 		auditLogger.Log(r.Context(), audit.AuditUserRemovedFromGroup, map[string]interface{}{
 			"userId":       user.Id,
 			"groupId":      group.Id,
-			"loggedInUser": authHelper.GetLoggedInSubject(r),
+			"loggedInUser": callerSubject(r),
 		})
 
 		// Return success response

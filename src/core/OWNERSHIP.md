@@ -236,20 +236,13 @@ command itself and fails on a tree it changed.
 | `core/constants` | `BrowserSessionsPermissionIdentifier` | both-apps | — |
 | `core/constants` | `BuildDate` | kernel | — |
 | `core/constants` | `BuiltInAuthServerPermissionIdentifiers` | both-apps | — |
-| `core/constants` | `ContextKeyBearerToken` | kernel | — |
 | `core/constants` | `ContextKeyJwtInfo` | kernel | — |
 | `core/constants` | `GitCommit` | kernel | — |
-| `core/constants` | `ManageAccountPermissionIdentifier` | kernel | — |
+| `core/constants` | `ManageAccountPermissionIdentifier` | both-apps | — |
 | `core/constants` | `ManageClientsPermissionIdentifier` | own-package | — |
 | `core/constants` | `ManagePermissionIdentifier` | kernel | — |
 | `core/constants` | `ManageSettingsPermissionIdentifier` | own-package | — |
 | `core/constants` | `ManageUsersPermissionIdentifier` | own-package | — |
-| `core/constants` | `SessionKeyCodeVerifier` | kernel | — |
-| `core/constants` | `SessionKeyJwt` | kernel | — |
-| `core/constants` | `SessionKeyNonce` | kernel | — |
-| `core/constants` | `SessionKeyRedirectBack` | kernel | — |
-| `core/constants` | `SessionKeyRedirectURI` | kernel | — |
-| `core/constants` | `SessionKeyState` | kernel | — |
 | `core/constants` | `UserinfoPermissionIdentifier` | both-apps | — |
 | `core/constants` | `Version` | kernel | — |
 | `core/countries` | `AllInfo` | both-apps | — |
@@ -309,15 +302,13 @@ command itself and fails on a tree it changed.
 | `core/errs` | `WithStack` | kernel | — |
 | `core/errs` | `Wrap` | kernel | — |
 | `core/errs` | `Wrapf` | kernel | — |
-| `core/handlerhelpers` | `AuthHelper` | moving | #385 decision 2 moves the admin console authorize redirect to `adminconsole/internal/oauthclient`. |
 | `core/handlerhelpers` | `GetFromUrlQueryOrFormPost` | own-package | — |
 | `core/handlerhelpers` | `HttpHelper` | own-package | — |
 | `core/handlerhelpers` | `LayoutSettings` | both-apps | — |
 | `core/handlerhelpers` | `LookupFromUrlQueryOrFormPost` | kernel | — |
-| `core/handlerhelpers` | `NewAuthHelper` | moving | #385 decision 2 moves the admin console authorize redirect to `adminconsole/internal/oauthclient`. |
 | `core/handlerhelpers` | `NewHttpHelper` | both-apps | — |
 | `core/handlerhelpers` | `SettingsReader` | reachable | — |
-| `core/hashutil` | `HashString` | kernel | — |
+| `core/hashutil` | `HashString` | both-apps | — |
 | `core/hashutil` | `VerifyStringHash` | kernel | — |
 | `core/i18n` | `Bundle` | own-package | — |
 | `core/i18n` | `ErrCodeAddressAngleBrackets` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
@@ -418,38 +409,25 @@ command itself and fails on a tree it changed.
 | `core/logging` | `TruncateCounted` | kernel | — |
 | `core/logging` | `TruncationMarker` | kernel | — |
 | `core/logging` | `WrapRequestID` | kernel | — |
-| `core/middleware` | `AuthHelper` | moving | #385 decision 2 moves the JWT session middleware and its ports to `adminconsole/internal/middleware`. |
-| `core/middleware` | `HTTPClient` | moving | #385 decision 2 moves the JWT session middleware and its ports to `adminconsole/internal/middleware`. |
-| `core/middleware` | `MiddlewareBearerToken` | moving | #385 moves the provider-side middleware to `authserver/internal/middleware`. |
 | `core/middleware` | `MiddlewareCookieReset` | both-apps | — |
 | `core/middleware` | `MiddlewareCsrf` | both-apps | — |
-| `core/middleware` | `MiddlewareJwt` | moving | #385 decision 2 moves the JWT session middleware and its ports to `adminconsole/internal/middleware`. |
 | `core/middleware` | `MiddlewareNoStore` | moving | #385 moves the provider-side middleware to `authserver/internal/middleware`. |
 | `core/middleware` | `MiddlewareRealIP` | both-apps | — |
 | `core/middleware` | `MiddlewareRequestLogger` | both-apps | — |
 | `core/middleware` | `MiddlewareSecurityHeaders` | both-apps | — |
 | `core/middleware` | `MiddlewareSkipCsrf` | both-apps | — |
-| `core/middleware` | `NewMiddlewareBearerToken` | moving | #385 moves the provider-side middleware to `authserver/internal/middleware`. |
-| `core/middleware` | `NewMiddlewareJwt` | moving | #385 decision 2 moves the JWT session middleware and its ports to `adminconsole/internal/middleware`. |
 | `core/middleware` | `RequestTargetForLog` | own-package | — |
-| `core/middleware` | `ServerErrorRenderer` | moving | #385 decision 2 moves the JWT session middleware and its ports to `adminconsole/internal/middleware`. |
 | `core/mocks` | `TestFS` | test-support | Test support: a hand-written `fs.FS` fake for the template loaders, named only from tests. |
 | `core/mocks` | `TestFile` | test-support | Test support: a hand-written `fs.FS` fake for the template loaders, named only from tests. |
 | `core/mocks` | `TestFileInfo` | test-support | Test support: a hand-written `fs.FS` fake for the template loaders, named only from tests. |
-| `core/oauth` | `GeneratePKCECodeChallenge` | kernel | — |
-| `core/oauth` | `JWKSTokenParser` | moving | #385 decision 2 moves the admin console OAuth client to `adminconsole/internal/oauthclient`. |
-| `core/oauth` | `Jwk` | moving | #385 decision 2 moves the admin console OAuth client to `adminconsole/internal/oauthclient`. |
-| `core/oauth` | `Jwks` | moving | #385 decision 2 moves the admin console OAuth client to `adminconsole/internal/oauthclient`. |
+| `core/oauth` | `GeneratePKCECodeChallenge` | both-apps | — |
+| `core/oauth` | `Jwk` | both-apps | — |
+| `core/oauth` | `Jwks` | both-apps | — |
 | `core/oauth` | `JwtInfo` | kernel | — |
-| `core/oauth` | `JwtToken` | kernel | — |
-| `core/oauth` | `MaxTokenResponseBytes` | kernel | — |
-| `core/oauth` | `NewJWKSTokenParser` | moving | #385 decision 2 moves the admin console OAuth client to `adminconsole/internal/oauthclient`. |
-| `core/oauth` | `NewTokenExchanger` | moving | #385 decision 2 moves the admin console OAuth client to `adminconsole/internal/oauthclient`. |
+| `core/oauth` | `JwtToken` | both-apps | — |
 | `core/oauth` | `ParseResponseType` | moving | #385 moves `response_type` parsing to `authserver/internal/protocolvalidation`; it is provider-side. |
 | `core/oauth` | `ResponseTypeInfo` | moving | #385 moves `response_type` parsing to `authserver/internal/protocolvalidation`; it is provider-side. |
-| `core/oauth` | `TokenExchangeTimeout` | kernel | — |
-| `core/oauth` | `TokenExchanger` | moving | #385 decision 2 moves the admin console OAuth client to `adminconsole/internal/oauthclient`. |
-| `core/oauth` | `TokenResponse` | kernel | — |
+| `core/oauth` | `TokenResponse` | both-apps | — |
 | `core/sessionstore` | `Backend` | both-apps | — |
 | `core/sessionstore` | `DecodeKeyPair` | both-apps | — |
 | `core/sessionstore` | `DecodePreviousKeyPair` | both-apps | — |
@@ -474,7 +452,7 @@ command itself and fails on a tree it changed.
 | `core/stringutil` | `ConvertToString` | kernel | — |
 | `core/stringutil` | `GenerateRandomLetterString` | moving | #385 moves it beside its one production caller in `authserver/internal/handlers/apihandlers`. |
 | `core/stringutil` | `GenerateRandomNumberString` | moving | #385 moves it beside its one production caller in `authserver/internal/handlers/apihandlers`. |
-| `core/stringutil` | `GenerateSecurityRandomString` | kernel | — |
+| `core/stringutil` | `GenerateSecurityRandomString` | both-apps | — |
 | `core/testutil` | `Address` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
 | `core/testutil` | `AssertAgentDocs` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
 | `core/testutil` | `AssertArchitecture` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |

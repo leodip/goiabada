@@ -68,7 +68,6 @@ func HandleAPIClientPermissionsGet(
 // security, and audit logging are done here to support non-admin-console clients.
 func HandleAPIClientPermissionsPut(
 	database data.Database,
-	authHelper handlers.AuthHelper,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -197,7 +196,7 @@ func HandleAPIClientPermissionsPut(
 		// Audit consolidated update
 		auditLogger.Log(r.Context(), audit.AuditUpdatedClientPermissions, map[string]interface{}{
 			"clientId":     client.Id,
-			"loggedInUser": authHelper.GetLoggedInSubject(r),
+			"loggedInUser": callerSubject(r),
 		})
 
 		// Respond success

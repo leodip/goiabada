@@ -39,7 +39,6 @@ func HandleAPISettingsTokensGet(
 
 // HandleAPISettingsTokensPut - PUT /api/v1/admin/settings/tokens
 func HandleAPISettingsTokensPut(
-	authHelper handlers.AuthHelper,
 	database data.Database,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
@@ -120,7 +119,7 @@ func HandleAPISettingsTokensPut(
 			"includeOpenIDConnectClaimsInIdToken":     currentSettings.IncludeOpenIDConnectClaimsInIdToken,
 		}
 		auditLogger.Log(r.Context(), audit.AuditUpdatedTokensSettings, map[string]interface{}{
-			"loggedInUser": authHelper.GetLoggedInSubject(r),
+			"loggedInUser": callerSubject(r),
 			"old":          oldVals,
 			"new":          newVals,
 		})

@@ -80,7 +80,6 @@ func HandleAPIAccountSessionsGet(
 // current session is allowed.
 func HandleAPIAccountSessionDelete(
 	database data.Database,
-	authHelper handlers.AuthHelper,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -140,7 +139,7 @@ func HandleAPIAccountSessionDelete(
 		// Both events, after the commit, neither on the error path above: an audited termination
 		// that rolled back would be a false record. deleted_user_session keeps its existing
 		// payload untouched and terminated_user_session carries the security detail (decision 9).
-		loggedInUser := authHelper.GetLoggedInSubject(r)
+		loggedInUser := callerSubject(r)
 		auditLogger.Log(r.Context(), audit.AuditDeletedUserSession, map[string]interface{}{
 			"userSessionId": sessionId,
 			"loggedInUser":  loggedInUser,

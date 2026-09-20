@@ -11,7 +11,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/adminconsole/internal/constants"
+	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
+	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
@@ -48,19 +50,10 @@ type HTTPClient interface {
 //
 // The page reads the settings off the request context for its layout and the
 // localizer for its text, so this middleware belongs below whatever puts those
-// there. Both modules mount it on the branch that does. Mounted above them, a
-// failure here renders nothing and panics into Recoverer instead.
+// there, which is where initRoutes mounts it. Mounted above them, a failure here
+// renders nothing and panics into Recoverer instead.
 type ServerErrorRenderer interface {
 	InternalServerError(w http.ResponseWriter, r *http.Request, err error)
-}
-
-type MiddlewareBearerToken struct {
-	tokenParser tokenParser
-}
-
-// NewMiddlewareBearerToken constructs middleware that extracts bearer tokens from requests.
-func NewMiddlewareBearerToken(tokenParser tokenParser) *MiddlewareBearerToken {
-	return &MiddlewareBearerToken{tokenParser: tokenParser}
 }
 
 type MiddlewareJwt struct {
@@ -104,48 +97,6 @@ func NewMiddlewareJwt(
 		baseURL:           baseURL,
 		clientID:          clientID,
 		clientSecret:      clientSecret,
-	}
-}
-
-// JwtAuthorizationHeaderToContext is a middleware that extracts the JWT token from the Authorization header
-// or from the POST body (access_token parameter) and stores it in the context.
-// Per RFC 6750, the Authorization header takes precedence over the POST body.
-// POST body token extraction is supported per OIDC Core 1.0 Section 5.3.1 for the UserInfo endpoint.
-func (m *MiddlewareBearerToken) JwtAuthorizationHeaderToContext() func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ctx := r.Context()
-
-			var tokenStr string
-
-			// First, try to extract token from Authorization header (takes precedence per RFC 6750)
-			const BEARER_SCHEMA = "Bearer "
-			authHeader := r.Header.Get("Authorization")
-			if strings.HasPrefix(authHeader, BEARER_SCHEMA) && len(authHeader) > len(BEARER_SCHEMA) {
-				tokenStr = authHeader[len(BEARER_SCHEMA):]
-			}
-
-			// If no token in header and this is a POST request with form content type,
-			// try to extract from POST body (OIDC Core 1.0 Section 5.3.1)
-			if tokenStr == "" && r.Method == http.MethodPost {
-				contentType := r.Header.Get("Content-Type")
-				if strings.HasPrefix(contentType, "application/x-www-form-urlencoded") {
-					if err := r.ParseForm(); err == nil {
-						tokenStr = r.PostFormValue("access_token")
-					}
-				}
-			}
-
-			// Validate and store the token if found
-			if tokenStr != "" {
-				token, err := m.tokenParser.DecodeAndValidateTokenString(r.Context(), tokenStr, nil, true)
-				if err == nil {
-					ctx = context.WithValue(ctx, constants.ContextKeyBearerToken, *token)
-				}
-			}
-
-			next.ServeHTTP(w, r.WithContext(ctx))
-		})
 	}
 }
 
@@ -221,7 +172,7 @@ func (m *MiddlewareJwt) JwtSessionHandler() func(http.Handler) http.Handler {
 						return
 					}
 
-					ctx = context.WithValue(ctx, constants.ContextKeyJwtInfo, *jwtInfo)
+					ctx = context.WithValue(ctx, coreconstants.ContextKeyJwtInfo, *jwtInfo)
 				}
 			}
 
@@ -261,7 +212,7 @@ func (m *MiddlewareJwt) refreshToken(
 	// values, so request_id still reaches every record below, and drops only its
 	// cancellation; context.Background() would drop the request id with it. The deadline is
 	// what bounds this instead (#338).
-	ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), oauth.TokenExchangeTimeout)
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), oauthclient.TokenExchangeTimeout)
 	defer cancel()
 
 	// Create the HTTP request
@@ -290,7 +241,7 @@ func (m *MiddlewareJwt) refreshToken(
 	// Read the response, bounded: a peer answering with an endless body would otherwise be
 	// read into memory until the process dies. Cut rather than refused, so an oversized
 	// answer fails to parse below and the caller clears the session and carries on.
-	body, err := io.ReadAll(io.LimitReader(resp.Body, oauth.MaxTokenResponseBytes))
+	body, err := io.ReadAll(io.LimitReader(resp.Body, oauthclient.MaxTokenResponseBytes))
 	if err != nil {
 		return false, errs.Errorf("error reading refresh token response: %v", err)
 	}
@@ -344,8 +295,8 @@ func (m *MiddlewareJwt) RequiresScope(
 
 			var jwtInfo oauth.JwtInfo
 			var ok bool
-			if r.Context().Value(constants.ContextKeyJwtInfo) != nil {
-				jwtInfo, ok = r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+			if r.Context().Value(coreconstants.ContextKeyJwtInfo) != nil {
+				jwtInfo, ok = r.Context().Value(coreconstants.ContextKeyJwtInfo).(oauth.JwtInfo)
 				if !ok {
 					m.errorRenderer.InternalServerError(w, r,
 						errs.New("unable to cast the context value to JwtInfo in RequiresScope middleware"))
@@ -363,9 +314,9 @@ func (m *MiddlewareJwt) RequiresScope(
 					// User is not authenticated
 					// Redirect to the authorize endpoint
 					// The caller supplies the client id; this package names no
-					// module's identity. The admin console, the only module whose
-					// routes reach here, passes the constant it is seeded as, so a
-					// default here could only ever hide a caller that forgot (#285).
+					// module's identity. initRoutes passes the constant the admin
+					// console is seeded as, so a default here could only ever hide a
+					// caller that forgot (#285).
 					err := m.authHelper.RedirToAuthorize(w, r, m.clientID,
 						m.buildScopeString(scopesAnyOf),
 						m.baseURL+r.RequestURI)
@@ -393,8 +344,8 @@ func (m *MiddlewareJwt) buildScopeString(customScopes []string) string {
 		"openid",
 		"email",
 		"profile",
-		constants.AuthServerResourceIdentifier + ":" + constants.ManageAccountPermissionIdentifier,
-		constants.AuthServerResourceIdentifier + ":" + constants.ManagePermissionIdentifier,
+		coreconstants.AuthServerResourceIdentifier + ":" + coreconstants.ManageAccountPermissionIdentifier,
+		coreconstants.AuthServerResourceIdentifier + ":" + coreconstants.ManagePermissionIdentifier,
 	}
 
 	scopeMap := make(map[string]bool)

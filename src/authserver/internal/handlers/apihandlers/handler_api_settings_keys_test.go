@@ -12,7 +12,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/testutil"
@@ -61,7 +60,12 @@ const rotateKeysRequestId = "req-rotate-keys"
 
 func rotateRequest() *http.Request {
 	r := httptest.NewRequest(http.MethodPost, "/api/v1/admin/settings/keys/rotate", nil)
-	return r.WithContext(context.WithValue(r.Context(), middleware.RequestIDKey, rotateKeysRequestId))
+	r = r.WithContext(context.WithValue(r.Context(), middleware.RequestIDKey, rotateKeysRequestId))
+	// The validated bearer token the chain puts on the context, which is where the audit
+	// payload's "loggedInUser" comes from. It used to come from a mocked
+	// AuthHelper.GetLoggedInSubject, which is why nothing here noticed the real accessor read a
+	// session key no auth server middleware writes and returned "" at every such site (#385).
+	return setTokenContextWithClaims(r, map[string]interface{}{"sub": adminSubject})
 }
 
 // TestHandleAPISettingsKeysRotatePost_Success is the wiring test: the whole transition runs and the
@@ -70,9 +74,6 @@ func rotateRequest() *http.Request {
 func TestHandleAPISettingsKeysRotatePost_Success(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_audit.NewAuditLogger(t)
-	authHelper := mocks_handlers.NewAuthHelper(t)
-
-	const subject = "the-admin"
 
 	stub := stubRotateRead(database, []models.KeyPair{
 		signingKey(1, enums.KeyStatePrevious),
@@ -88,7 +89,6 @@ func TestHandleAPISettingsKeysRotatePost_Success(t *testing.T) {
 		return kp.State == enums.KeyStateNext.String()
 	})).Return(nil).Once()
 
-	authHelper.On("GetLoggedInSubject", mock.Anything).Return(subject)
 	var payload map[string]interface{}
 	auditLogger.On("Log", mock.Anything, audit.AuditRotatedKeys, mock.Anything).
 		Run(func(args mock.Arguments) {
@@ -96,12 +96,12 @@ func TestHandleAPISettingsKeysRotatePost_Success(t *testing.T) {
 		}).Return().Once()
 
 	rr := httptest.NewRecorder()
-	HandleAPISettingsKeysRotatePost(authHelper, database, auditLogger).ServeHTTP(rr, rotateRequest())
+	HandleAPISettingsKeysRotatePost(database, auditLogger).ServeHTTP(rr, rotateRequest())
 
 	assert.Equal(t, http.StatusOK, rr.Code)
 	assert.JSONEq(t, `{"success":true}`, rr.Body.String())
 	require.NotNil(t, payload)
-	assert.Equal(t, subject, payload["loggedInUser"])
+	assert.Equal(t, adminSubject, payload["loggedInUser"])
 	assert.NoError(t, stub.bodyErr, "the body asked the helper to commit")
 	database.AssertExpectations(t)
 	auditLogger.AssertExpectations(t)
@@ -113,7 +113,6 @@ func TestHandleAPISettingsKeysRotatePost_Success(t *testing.T) {
 func TestHandleAPISettingsKeysRotatePost_RotationInProgress(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_audit.NewAuditLogger(t)
-	authHelper := mocks_handlers.NewAuthHelper(t)
 
 	stub := stubRotateRead(database, []models.KeyPair{
 		signingKey(2, enums.KeyStateCurrent),
@@ -124,7 +123,7 @@ func TestHandleAPISettingsKeysRotatePost_RotationInProgress(t *testing.T) {
 		enums.KeyStateCurrent.String(), enums.KeyStatePrevious.String()).Return(false, nil).Once()
 
 	rr := httptest.NewRecorder()
-	HandleAPISettingsKeysRotatePost(authHelper, database, auditLogger).ServeHTTP(rr, rotateRequest())
+	HandleAPISettingsKeysRotatePost(database, auditLogger).ServeHTTP(rr, rotateRequest())
 
 	assert.Equal(t, http.StatusConflict, rr.Code)
 	body := decodeErrorBody(t, rr)
@@ -146,7 +145,6 @@ func TestHandleAPISettingsKeysRotatePost_RotationInProgress(t *testing.T) {
 func TestHandleAPISettingsKeysRotatePost_KeySetIncomplete(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_audit.NewAuditLogger(t)
-	authHelper := mocks_handlers.NewAuthHelper(t)
 
 	stub := stubRotateRead(database, []models.KeyPair{
 		signingKey(1, enums.KeyStatePrevious),
@@ -156,7 +154,7 @@ func TestHandleAPISettingsKeysRotatePost_KeySetIncomplete(t *testing.T) {
 	rr := httptest.NewRecorder()
 	capture := testutil.CaptureSlog(t)
 
-	HandleAPISettingsKeysRotatePost(authHelper, database, auditLogger).ServeHTTP(rr, rotateRequest())
+	HandleAPISettingsKeysRotatePost(database, auditLogger).ServeHTTP(rr, rotateRequest())
 
 	logged := capture.Text()
 
@@ -187,14 +185,13 @@ func TestHandleAPISettingsKeysRotatePost_KeySetIncomplete(t *testing.T) {
 func TestHandleAPISettingsKeysRotatePost_InternalError(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_audit.NewAuditLogger(t)
-	authHelper := mocks_handlers.NewAuthHelper(t)
 
 	expectRunInTransaction(database, rotateTx)
 	database.On("GetAllSigningKeys", rotateTx).
 		Return([]models.KeyPair(nil), assert.AnError).Once()
 
 	rr := httptest.NewRecorder()
-	HandleAPISettingsKeysRotatePost(authHelper, database, auditLogger).ServeHTTP(rr, rotateRequest())
+	HandleAPISettingsKeysRotatePost(database, auditLogger).ServeHTTP(rr, rotateRequest())
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
 	assert.Equal(t, "INTERNAL_SERVER_ERROR", decodeErrorBody(t, rr).ErrorCode)

@@ -15,7 +15,9 @@ import (
 	"time"
 
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/adminconsole/internal/constants"
+	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
+	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/leodip/goiabada/core/testutil"
@@ -23,7 +25,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	mock_middleware "github.com/leodip/goiabada/core/middleware/mocks"
+	mock_middleware "github.com/leodip/goiabada/adminconsole/internal/middleware/mocks"
 	mock_sessionstore "github.com/leodip/goiabada/core/sessionstore/mocks"
 )
 
@@ -35,417 +37,6 @@ type mockHTTPClient struct {
 func (m *mockHTTPClient) Do(req *http.Request) (*http.Response, error) {
 	args := m.Called(req)
 	return args.Get(0).(*http.Response), args.Error(1)
-}
-
-func TestJwtAuthorizationHeaderToContext_ValidBearerToken(t *testing.T) {
-	mockTokenParser := new(mock_middleware.TokenParser)
-	middleware := NewMiddlewareBearerToken(mockTokenParser)
-
-	expectedToken := &oauth.JwtToken{
-		TokenBase64: "validtoken",
-		Claims: map[string]interface{}{
-			"sub": "user",
-		},
-	}
-	mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "validtoken", mock.Anything, true).
-		Return(expectedToken, nil)
-
-	req := httptest.NewRequest("GET", "/", nil)
-	req.Header.Set("Authorization", "Bearer validtoken")
-
-	rr := httptest.NewRecorder()
-
-	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		token := r.Context().Value(constants.ContextKeyBearerToken)
-		assert.NotNil(t, token)
-		assert.IsType(t, oauth.JwtToken{}, token)
-		assert.Equal(t, "validtoken", token.(oauth.JwtToken).TokenBase64)
-		assert.Equal(t, "user", token.(oauth.JwtToken).Claims["sub"])
-	})
-
-	handler := middleware.JwtAuthorizationHeaderToContext()(nextHandler)
-	handler.ServeHTTP(rr, req)
-
-	mockTokenParser.AssertExpectations(t)
-}
-
-func TestJwtAuthorizationHeaderToContext_InvalidBearerToken(t *testing.T) {
-	mockTokenParser := new(mock_middleware.TokenParser)
-	middleware := NewMiddlewareBearerToken(mockTokenParser)
-
-	mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "invalidtoken", mock.Anything, true).
-		Return(nil, assert.AnError)
-
-	req := httptest.NewRequest("GET", "/", nil)
-	req.Header.Set("Authorization", "Bearer invalidtoken")
-
-	rr := httptest.NewRecorder()
-
-	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		token := r.Context().Value(constants.ContextKeyBearerToken)
-		assert.Nil(t, token)
-	})
-
-	handler := middleware.JwtAuthorizationHeaderToContext()(nextHandler)
-	handler.ServeHTTP(rr, req)
-
-	mockTokenParser.AssertExpectations(t)
-}
-
-func TestJwtAuthorizationHeaderToContext_NoBearerToken(t *testing.T) {
-	mockTokenParser := new(mock_middleware.TokenParser)
-	middleware := NewMiddlewareBearerToken(mockTokenParser)
-
-	req := httptest.NewRequest("GET", "/", nil)
-
-	rr := httptest.NewRecorder()
-
-	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		token := r.Context().Value(constants.ContextKeyBearerToken)
-		assert.Nil(t, token)
-	})
-
-	handler := middleware.JwtAuthorizationHeaderToContext()(nextHandler)
-	handler.ServeHTTP(rr, req)
-}
-
-func TestJwtAuthorizationHeaderToContext_InvalidAuthorizationHeader(t *testing.T) {
-	mockTokenParser := new(mock_middleware.TokenParser)
-	middleware := NewMiddlewareBearerToken(mockTokenParser)
-
-	req := httptest.NewRequest("GET", "/", nil)
-	req.Header.Set("Authorization", "NotBearer token")
-
-	rr := httptest.NewRecorder()
-
-	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		token := r.Context().Value(constants.ContextKeyBearerToken)
-		assert.Nil(t, token)
-	})
-
-	handler := middleware.JwtAuthorizationHeaderToContext()(nextHandler)
-	handler.ServeHTTP(rr, req)
-}
-
-// Tests for POST body access_token extraction (OIDC Core 1.0 Section 5.3.1)
-
-func TestJwtAuthorizationHeaderToContext_ValidPostBodyToken(t *testing.T) {
-	mockTokenParser := new(mock_middleware.TokenParser)
-	middleware := NewMiddlewareBearerToken(mockTokenParser)
-
-	expectedToken := &oauth.JwtToken{
-		TokenBase64: "validposttoken",
-		Claims: map[string]interface{}{
-			"sub": "user",
-		},
-	}
-	mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "validposttoken", mock.Anything, true).
-		Return(expectedToken, nil)
-
-	req := httptest.NewRequest("POST", "/userinfo", strings.NewReader("access_token=validposttoken"))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	rr := httptest.NewRecorder()
-
-	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		token := r.Context().Value(constants.ContextKeyBearerToken)
-		assert.NotNil(t, token)
-		assert.IsType(t, oauth.JwtToken{}, token)
-		assert.Equal(t, "validposttoken", token.(oauth.JwtToken).TokenBase64)
-		assert.Equal(t, "user", token.(oauth.JwtToken).Claims["sub"])
-	})
-
-	handler := middleware.JwtAuthorizationHeaderToContext()(nextHandler)
-	handler.ServeHTTP(rr, req)
-
-	mockTokenParser.AssertExpectations(t)
-}
-
-func TestJwtAuthorizationHeaderToContext_InvalidPostBodyToken(t *testing.T) {
-	mockTokenParser := new(mock_middleware.TokenParser)
-	middleware := NewMiddlewareBearerToken(mockTokenParser)
-
-	mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "invalidposttoken", mock.Anything, true).
-		Return(nil, assert.AnError)
-
-	req := httptest.NewRequest("POST", "/userinfo", strings.NewReader("access_token=invalidposttoken"))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	rr := httptest.NewRecorder()
-
-	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		token := r.Context().Value(constants.ContextKeyBearerToken)
-		assert.Nil(t, token)
-	})
-
-	handler := middleware.JwtAuthorizationHeaderToContext()(nextHandler)
-	handler.ServeHTTP(rr, req)
-
-	mockTokenParser.AssertExpectations(t)
-}
-
-func TestJwtAuthorizationHeaderToContext_HeaderTakesPrecedenceOverPostBody(t *testing.T) {
-	mockTokenParser := new(mock_middleware.TokenParser)
-	middleware := NewMiddlewareBearerToken(mockTokenParser)
-
-	expectedToken := &oauth.JwtToken{
-		TokenBase64: "headertoken",
-		Claims: map[string]interface{}{
-			"sub": "headeruser",
-		},
-	}
-	// Only the header token should be validated, not the body token
-	mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "headertoken", mock.Anything, true).
-		Return(expectedToken, nil)
-
-	req := httptest.NewRequest("POST", "/userinfo", strings.NewReader("access_token=bodytoken"))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.Header.Set("Authorization", "Bearer headertoken")
-
-	rr := httptest.NewRecorder()
-
-	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		token := r.Context().Value(constants.ContextKeyBearerToken)
-		assert.NotNil(t, token)
-		assert.IsType(t, oauth.JwtToken{}, token)
-		assert.Equal(t, "headertoken", token.(oauth.JwtToken).TokenBase64)
-		assert.Equal(t, "headeruser", token.(oauth.JwtToken).Claims["sub"])
-	})
-
-	handler := middleware.JwtAuthorizationHeaderToContext()(nextHandler)
-	handler.ServeHTTP(rr, req)
-
-	mockTokenParser.AssertExpectations(t)
-}
-
-func TestJwtAuthorizationHeaderToContext_PostBodyIgnoredForGetRequest(t *testing.T) {
-	mockTokenParser := new(mock_middleware.TokenParser)
-	middleware := NewMiddlewareBearerToken(mockTokenParser)
-
-	// GET request with access_token in query string should NOT extract the token
-	req := httptest.NewRequest("GET", "/userinfo?access_token=gettoken", nil)
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	rr := httptest.NewRecorder()
-
-	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		token := r.Context().Value(constants.ContextKeyBearerToken)
-		assert.Nil(t, token, "Token should not be extracted from GET request body/query")
-	})
-
-	handler := middleware.JwtAuthorizationHeaderToContext()(nextHandler)
-	handler.ServeHTTP(rr, req)
-
-	// Token parser should NOT be called for GET request with body token
-	mockTokenParser.AssertNotCalled(t, "DecodeAndValidateTokenString")
-}
-
-// A POST that carries the token only in its query is the one request where the two accessors
-// disagree: ParseForm merges the URL query behind the body, so r.FormValue would return the query
-// value here and put a token that has travelled in a request target into the context, while
-// r.PostFormValue returns "" and the request goes on unauthenticated. RFC 6750 section 2.3 says the
-// URI query method "has a high likelihood of being logged", and RFC 9700 section 4.3.2 makes it
-// "Clients MUST NOT pass access tokens in a URI query parameter".
-//
-// The GET case above does not pin this: it is refused by the method check two branches earlier and
-// never reaches the read at all. This is the case that fails if the accessor regresses (#333).
-func TestJwtAuthorizationHeaderToContext_PostQueryTokenIgnored(t *testing.T) {
-	mockTokenParser := new(mock_middleware.TokenParser)
-	middleware := NewMiddlewareBearerToken(mockTokenParser)
-
-	// A genuine form submission whose body does not carry the token, with the token in the query.
-	req := httptest.NewRequest("POST", "/userinfo?access_token=querytoken", strings.NewReader("other_param=value"))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	rr := httptest.NewRecorder()
-
-	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		token := r.Context().Value(constants.ContextKeyBearerToken)
-		assert.Nil(t, token, "Token should not be extracted from the URL query of a POST")
-	})
-
-	handler := middleware.JwtAuthorizationHeaderToContext()(nextHandler)
-	handler.ServeHTTP(rr, req)
-
-	// Token parser should NOT be called for a token that arrived in the request target
-	mockTokenParser.AssertNotCalled(t, "DecodeAndValidateTokenString")
-}
-
-func TestJwtAuthorizationHeaderToContext_PostBodyIgnoredForWrongContentType(t *testing.T) {
-	mockTokenParser := new(mock_middleware.TokenParser)
-	middleware := NewMiddlewareBearerToken(mockTokenParser)
-
-	req := httptest.NewRequest("POST", "/userinfo", strings.NewReader("access_token=jsontoken"))
-	req.Header.Set("Content-Type", "application/json")
-
-	rr := httptest.NewRecorder()
-
-	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		token := r.Context().Value(constants.ContextKeyBearerToken)
-		assert.Nil(t, token, "Token should not be extracted from POST with wrong Content-Type")
-	})
-
-	handler := middleware.JwtAuthorizationHeaderToContext()(nextHandler)
-	handler.ServeHTTP(rr, req)
-
-	// Token parser should NOT be called for wrong content type
-	mockTokenParser.AssertNotCalled(t, "DecodeAndValidateTokenString")
-}
-
-func TestJwtAuthorizationHeaderToContext_PostBodyEmptyAccessToken(t *testing.T) {
-	mockTokenParser := new(mock_middleware.TokenParser)
-	middleware := NewMiddlewareBearerToken(mockTokenParser)
-
-	req := httptest.NewRequest("POST", "/userinfo", strings.NewReader("access_token="))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	rr := httptest.NewRecorder()
-
-	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		token := r.Context().Value(constants.ContextKeyBearerToken)
-		assert.Nil(t, token, "Token should not be set for empty access_token")
-	})
-
-	handler := middleware.JwtAuthorizationHeaderToContext()(nextHandler)
-	handler.ServeHTTP(rr, req)
-
-	// Token parser should NOT be called for empty token
-	mockTokenParser.AssertNotCalled(t, "DecodeAndValidateTokenString")
-}
-
-func TestJwtAuthorizationHeaderToContext_PostBodyNoAccessTokenParameter(t *testing.T) {
-	mockTokenParser := new(mock_middleware.TokenParser)
-	middleware := NewMiddlewareBearerToken(mockTokenParser)
-
-	req := httptest.NewRequest("POST", "/userinfo", strings.NewReader("other_param=value"))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	rr := httptest.NewRecorder()
-
-	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		token := r.Context().Value(constants.ContextKeyBearerToken)
-		assert.Nil(t, token, "Token should not be set when access_token parameter is missing")
-	})
-
-	handler := middleware.JwtAuthorizationHeaderToContext()(nextHandler)
-	handler.ServeHTTP(rr, req)
-
-	// Token parser should NOT be called when access_token is missing
-	mockTokenParser.AssertNotCalled(t, "DecodeAndValidateTokenString")
-}
-
-func TestJwtAuthorizationHeaderToContext_PostBodyContentTypeWithCharset(t *testing.T) {
-	mockTokenParser := new(mock_middleware.TokenParser)
-	middleware := NewMiddlewareBearerToken(mockTokenParser)
-
-	expectedToken := &oauth.JwtToken{
-		TokenBase64: "charsettoken",
-		Claims: map[string]interface{}{
-			"sub": "user",
-		},
-	}
-	mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "charsettoken", mock.Anything, true).
-		Return(expectedToken, nil)
-
-	req := httptest.NewRequest("POST", "/userinfo", strings.NewReader("access_token=charsettoken"))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
-
-	rr := httptest.NewRecorder()
-
-	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		token := r.Context().Value(constants.ContextKeyBearerToken)
-		assert.NotNil(t, token)
-		assert.Equal(t, "charsettoken", token.(oauth.JwtToken).TokenBase64)
-	})
-
-	handler := middleware.JwtAuthorizationHeaderToContext()(nextHandler)
-	handler.ServeHTTP(rr, req)
-
-	mockTokenParser.AssertExpectations(t)
-}
-
-func TestJwtAuthorizationHeaderToContext_PostBodyWithOtherParameters(t *testing.T) {
-	mockTokenParser := new(mock_middleware.TokenParser)
-	middleware := NewMiddlewareBearerToken(mockTokenParser)
-
-	expectedToken := &oauth.JwtToken{
-		TokenBase64: "tokenwithotherparams",
-		Claims: map[string]interface{}{
-			"sub": "user",
-		},
-	}
-	mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "tokenwithotherparams", mock.Anything, true).
-		Return(expectedToken, nil)
-
-	req := httptest.NewRequest("POST", "/userinfo", strings.NewReader("param1=value1&access_token=tokenwithotherparams&param2=value2"))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	rr := httptest.NewRecorder()
-
-	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		token := r.Context().Value(constants.ContextKeyBearerToken)
-		assert.NotNil(t, token)
-		assert.Equal(t, "tokenwithotherparams", token.(oauth.JwtToken).TokenBase64)
-	})
-
-	handler := middleware.JwtAuthorizationHeaderToContext()(nextHandler)
-	handler.ServeHTTP(rr, req)
-
-	mockTokenParser.AssertExpectations(t)
-}
-
-func TestJwtAuthorizationHeaderToContext_EmptyBearerTokenInHeader(t *testing.T) {
-	mockTokenParser := new(mock_middleware.TokenParser)
-	middleware := NewMiddlewareBearerToken(mockTokenParser)
-
-	expectedToken := &oauth.JwtToken{
-		TokenBase64: "fallbacktoken",
-		Claims: map[string]interface{}{
-			"sub": "user",
-		},
-	}
-	mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "fallbacktoken", mock.Anything, true).
-		Return(expectedToken, nil)
-
-	// Empty Bearer token in header should fall back to POST body
-	req := httptest.NewRequest("POST", "/userinfo", strings.NewReader("access_token=fallbacktoken"))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.Header.Set("Authorization", "Bearer ")
-
-	rr := httptest.NewRecorder()
-
-	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		token := r.Context().Value(constants.ContextKeyBearerToken)
-		assert.NotNil(t, token)
-		assert.Equal(t, "fallbacktoken", token.(oauth.JwtToken).TokenBase64)
-	})
-
-	handler := middleware.JwtAuthorizationHeaderToContext()(nextHandler)
-	handler.ServeHTTP(rr, req)
-
-	mockTokenParser.AssertExpectations(t)
-}
-
-func TestJwtAuthorizationHeaderToContext_PutRequestIgnoresPostBody(t *testing.T) {
-	mockTokenParser := new(mock_middleware.TokenParser)
-	middleware := NewMiddlewareBearerToken(mockTokenParser)
-
-	// PUT request should NOT extract token from body
-	req := httptest.NewRequest("PUT", "/userinfo", strings.NewReader("access_token=puttoken"))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	rr := httptest.NewRecorder()
-
-	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		token := r.Context().Value(constants.ContextKeyBearerToken)
-		assert.Nil(t, token, "Token should not be extracted from PUT request body")
-	})
-
-	handler := middleware.JwtAuthorizationHeaderToContext()(nextHandler)
-	handler.ServeHTTP(rr, req)
-
-	// Token parser should NOT be called for PUT request
-	mockTokenParser.AssertNotCalled(t, "DecodeAndValidateTokenString")
 }
 
 func TestJwtSessionHandler_ValidSession(t *testing.T) {
@@ -485,7 +76,7 @@ func TestJwtSessionHandler_ValidSession(t *testing.T) {
 
 	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Validate that JwtInfo is set in the context
-		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		jwtInfo, ok := r.Context().Value(coreconstants.ContextKeyJwtInfo).(oauth.JwtInfo)
 		assert.True(t, ok, "JwtInfo should be set in the context")
 		assert.NotNil(t, jwtInfo, "JwtInfo should not be nil")
 
@@ -547,7 +138,7 @@ func TestJwtSessionHandler_NoJwtInSession(t *testing.T) {
 	mockSessionStore.On("Get", mock.Anything, testSessionName).Return(session, nil)
 
 	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		jwtInfo := r.Context().Value(constants.ContextKeyJwtInfo)
+		jwtInfo := r.Context().Value(coreconstants.ContextKeyJwtInfo)
 		assert.Nil(t, jwtInfo, "JwtInfo should not be set in the context")
 	})
 
@@ -583,7 +174,7 @@ func TestJwtSessionHandler_InvalidTokenInSession(t *testing.T) {
 	mockSessionStore.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		jwtInfo := r.Context().Value(constants.ContextKeyJwtInfo)
+		jwtInfo := r.Context().Value(coreconstants.ContextKeyJwtInfo)
 		assert.Nil(t, jwtInfo, "JwtInfo should not be set in the context")
 	})
 
@@ -754,7 +345,7 @@ func TestJwtSessionHandler_ValidRefreshToken(t *testing.T) {
 
 	// Create next handler
 	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		jwtInfo, ok := r.Context().Value(coreconstants.ContextKeyJwtInfo).(oauth.JwtInfo)
 		assert.True(t, ok, "JwtInfo should be set in the context")
 		assert.NotNil(t, jwtInfo, "JwtInfo should not be nil")
 		assert.Equal(t, "newvalidtoken", jwtInfo.TokenResponse.AccessToken)
@@ -930,7 +521,7 @@ func TestRequiresScope_Authorized(t *testing.T) {
 		TokenResponse: oauth.TokenResponse{AccessToken: "validtoken"},
 	}
 	ctx := req.Context()
-	ctx = context.WithValue(ctx, constants.ContextKeyJwtInfo, jwtInfo)
+	ctx = context.WithValue(ctx, coreconstants.ContextKeyJwtInfo, jwtInfo)
 	req = req.WithContext(ctx)
 
 	mockAuthHelper.On("IsAuthorizedToAccessResource", jwtInfo, []string{"required:scope"}).Return(true)
@@ -963,7 +554,7 @@ func TestRequiresScope_Unauthorized(t *testing.T) {
 		TokenResponse: oauth.TokenResponse{AccessToken: "validtoken"},
 	}
 	ctx := req.Context()
-	ctx = context.WithValue(ctx, constants.ContextKeyJwtInfo, jwtInfo)
+	ctx = context.WithValue(ctx, coreconstants.ContextKeyJwtInfo, jwtInfo)
 	req = req.WithContext(ctx)
 
 	mockAuthHelper.On("IsAuthorizedToAccessResource", jwtInfo, []string{"required:scope"}).Return(false)
@@ -982,7 +573,7 @@ func TestRequiresScope_Unauthorized(t *testing.T) {
 }
 
 // TestRequiresScope_Unauthenticated, _NoJwtInfo and _RedirectError construct with
-// constants.AdminConsoleClientIdentifier rather than "" on purpose: RequiresScope used to
+// coreconstants.AdminConsoleClientIdentifier rather than "" on purpose: RequiresScope used to
 // substitute that constant itself when the field was blank, so with "" these three asserted
 // the substitution and nothing about the caller. The middleware no longer names any module's
 // identity, and the argument here is what reaches RedirToAuthorize (#285).
@@ -992,19 +583,19 @@ func TestRequiresScope_Unauthenticated(t *testing.T) {
 	mockAuthHelper := new(mock_middleware.AuthHelper)
 	mockSessionStore := new(mock_sessionstore.Store)
 
-	middleware := NewMiddlewareJwt(mockSessionStore, testSessionName, mockTokenParser, stubIssuerReader{issuer: "https://example.com"}, mockAuthHelper, stubErrorRenderer{}, nil, "http://localhost:9090", "http://localhost:9091", constants.AdminConsoleClientIdentifier, "")
+	middleware := NewMiddlewareJwt(mockSessionStore, testSessionName, mockTokenParser, stubIssuerReader{issuer: "https://example.com"}, mockAuthHelper, stubErrorRenderer{}, nil, "http://localhost:9090", "http://localhost:9091", coreconstants.AdminConsoleClientIdentifier, "")
 
 	req := httptest.NewRequest("GET", "/", nil)
 	rr := httptest.NewRecorder()
 
 	jwtInfo := oauth.JwtInfo{}
 	ctx := req.Context()
-	ctx = context.WithValue(ctx, constants.ContextKeyJwtInfo, jwtInfo)
+	ctx = context.WithValue(ctx, coreconstants.ContextKeyJwtInfo, jwtInfo)
 	req = req.WithContext(ctx)
 
 	mockAuthHelper.On("IsAuthorizedToAccessResource", jwtInfo, []string{"required:scope"}).Return(false)
 	mockAuthHelper.On("IsAuthenticated", jwtInfo).Return(false)
-	mockAuthHelper.On("RedirToAuthorize", mock.Anything, mock.Anything, constants.AdminConsoleClientIdentifier, mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return(nil)
+	mockAuthHelper.On("RedirToAuthorize", mock.Anything, mock.Anything, coreconstants.AdminConsoleClientIdentifier, mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return(nil)
 
 	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t.Error("Next handler should not have been called")
@@ -1022,14 +613,14 @@ func TestRequiresScope_NoJwtInfo(t *testing.T) {
 	mockAuthHelper := new(mock_middleware.AuthHelper)
 	mockSessionStore := new(mock_sessionstore.Store)
 
-	middleware := NewMiddlewareJwt(mockSessionStore, testSessionName, mockTokenParser, stubIssuerReader{issuer: "https://example.com"}, mockAuthHelper, stubErrorRenderer{}, nil, "http://localhost:9090", "http://localhost:9091", constants.AdminConsoleClientIdentifier, "")
+	middleware := NewMiddlewareJwt(mockSessionStore, testSessionName, mockTokenParser, stubIssuerReader{issuer: "https://example.com"}, mockAuthHelper, stubErrorRenderer{}, nil, "http://localhost:9090", "http://localhost:9091", coreconstants.AdminConsoleClientIdentifier, "")
 
 	req := httptest.NewRequest("GET", "/", nil)
 	rr := httptest.NewRecorder()
 
 	mockAuthHelper.On("IsAuthorizedToAccessResource", oauth.JwtInfo{}, []string{"required:scope"}).Return(false)
 	mockAuthHelper.On("IsAuthenticated", oauth.JwtInfo{}).Return(false)
-	mockAuthHelper.On("RedirToAuthorize", mock.Anything, mock.Anything, constants.AdminConsoleClientIdentifier, mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return(nil)
+	mockAuthHelper.On("RedirToAuthorize", mock.Anything, mock.Anything, coreconstants.AdminConsoleClientIdentifier, mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return(nil)
 
 	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t.Error("Next handler should not have been called")
@@ -1047,19 +638,19 @@ func TestRequiresScope_RedirectError(t *testing.T) {
 	mockAuthHelper := new(mock_middleware.AuthHelper)
 	mockSessionStore := new(mock_sessionstore.Store)
 
-	middleware := NewMiddlewareJwt(mockSessionStore, testSessionName, mockTokenParser, stubIssuerReader{issuer: "https://example.com"}, mockAuthHelper, stubErrorRenderer{}, nil, "http://localhost:9090", "http://localhost:9091", constants.AdminConsoleClientIdentifier, "")
+	middleware := NewMiddlewareJwt(mockSessionStore, testSessionName, mockTokenParser, stubIssuerReader{issuer: "https://example.com"}, mockAuthHelper, stubErrorRenderer{}, nil, "http://localhost:9090", "http://localhost:9091", coreconstants.AdminConsoleClientIdentifier, "")
 
 	req := httptest.NewRequest("GET", "/", nil)
 	rr := httptest.NewRecorder()
 
 	jwtInfo := oauth.JwtInfo{}
 	ctx := req.Context()
-	ctx = context.WithValue(ctx, constants.ContextKeyJwtInfo, jwtInfo)
+	ctx = context.WithValue(ctx, coreconstants.ContextKeyJwtInfo, jwtInfo)
 	req = req.WithContext(ctx)
 
 	mockAuthHelper.On("IsAuthorizedToAccessResource", jwtInfo, []string{"required:scope"}).Return(false)
 	mockAuthHelper.On("IsAuthenticated", jwtInfo).Return(false)
-	mockAuthHelper.On("RedirToAuthorize", mock.Anything, mock.Anything, constants.AdminConsoleClientIdentifier, mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return(assert.AnError)
+	mockAuthHelper.On("RedirToAuthorize", mock.Anything, mock.Anything, coreconstants.AdminConsoleClientIdentifier, mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return(assert.AnError)
 
 	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t.Error("Next handler should not have been called")
@@ -1075,8 +666,8 @@ func TestRequiresScope_RedirectError(t *testing.T) {
 func TestBuildScopeString(t *testing.T) {
 	middleware := &MiddlewareJwt{}
 
-	manageAccountScope := constants.AuthServerResourceIdentifier + ":" + constants.ManageAccountPermissionIdentifier
-	manageScope := constants.AuthServerResourceIdentifier + ":" + constants.ManagePermissionIdentifier
+	manageAccountScope := coreconstants.AuthServerResourceIdentifier + ":" + coreconstants.ManageAccountPermissionIdentifier
+	manageScope := coreconstants.AuthServerResourceIdentifier + ":" + coreconstants.ManagePermissionIdentifier
 
 	tests := []struct {
 		name     string
@@ -1136,8 +727,8 @@ func TestBuildScopeString(t *testing.T) {
 func TestBuildScopeString_Consistency(t *testing.T) {
 	middleware := &MiddlewareJwt{}
 
-	manageAccountScope := constants.AuthServerResourceIdentifier + ":" + constants.ManageAccountPermissionIdentifier
-	manageScope := constants.AuthServerResourceIdentifier + ":" + constants.ManagePermissionIdentifier
+	manageAccountScope := coreconstants.AuthServerResourceIdentifier + ":" + coreconstants.ManageAccountPermissionIdentifier
+	manageScope := coreconstants.AuthServerResourceIdentifier + ":" + coreconstants.ManagePermissionIdentifier
 
 	input := []string{"scope1", "scope2", "scope3"}
 	expectedScopes := []string{
@@ -1169,8 +760,8 @@ func TestBuildScopeString_Consistency(t *testing.T) {
 func TestBuildScopeString_LargeInput(t *testing.T) {
 	middleware := &MiddlewareJwt{}
 
-	manageAccountScope := constants.AuthServerResourceIdentifier + ":" + constants.ManageAccountPermissionIdentifier
-	manageScope := constants.AuthServerResourceIdentifier + ":" + constants.ManagePermissionIdentifier
+	manageAccountScope := coreconstants.AuthServerResourceIdentifier + ":" + coreconstants.ManageAccountPermissionIdentifier
+	manageScope := coreconstants.AuthServerResourceIdentifier + ":" + coreconstants.ManagePermissionIdentifier
 
 	// Create a large input slice
 	input := make([]string, 1000)
@@ -1196,8 +787,8 @@ func TestBuildScopeString_LargeInput(t *testing.T) {
 func TestBuildScopeString_SpecialCharacters(t *testing.T) {
 	middleware := &MiddlewareJwt{}
 
-	manageAccountScope := constants.AuthServerResourceIdentifier + ":" + constants.ManageAccountPermissionIdentifier
-	manageScope := constants.AuthServerResourceIdentifier + ":" + constants.ManagePermissionIdentifier
+	manageAccountScope := coreconstants.AuthServerResourceIdentifier + ":" + coreconstants.ManageAccountPermissionIdentifier
+	manageScope := coreconstants.AuthServerResourceIdentifier + ":" + coreconstants.ManagePermissionIdentifier
 
 	input := []string{"scope:with:colons", "scope-with-dashes", "scope_with_underscores", "scope.with.dots"}
 	result := middleware.buildScopeString(input)
@@ -1248,7 +839,7 @@ func (b *countingRefreshBody) Close() error { return nil }
 func oversizedRefreshResponse() *countingRefreshBody {
 	prefix := `{"access_token":"newaccesstoken","refresh_token":"newrefreshtoken","scope":"`
 	suffix := `"}`
-	padding := oauth.MaxTokenResponseBytes + 1024 - len(prefix) - len(suffix)
+	padding := oauthclient.MaxTokenResponseBytes + 1024 - len(prefix) - len(suffix)
 	return &countingRefreshBody{remaining: []byte(prefix + strings.Repeat("x", padding) + suffix)}
 }
 
@@ -1281,7 +872,7 @@ func TestRefreshToken_ReadsAtMostTheCap(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "error parsing refresh token response",
 		"the answer reaches json.Unmarshal truncated rather than being refused outright")
-	assert.Equal(t, int64(oauth.MaxTokenResponseBytes), body.read,
+	assert.Equal(t, int64(oauthclient.MaxTokenResponseBytes), body.read,
 		"exactly the cap is read from a peer answering with more than it")
 
 	// The session is reached only after the parse succeeds, so an oversized
@@ -1430,9 +1021,9 @@ func TestJwtSessionHandler_RefreshesOnACancelledRequestContext(t *testing.T) {
 	// that one exists leaves dividing the production value by ten green, and the value is the
 	// whole of what bounds a peer that accepts the connection and never answers. The tolerance
 	// covers the round trip against the local server, which is milliseconds (#338).
-	assert.LessOrEqual(t, time.Until(transport.deadline), oauth.TokenExchangeTimeout,
+	assert.LessOrEqual(t, time.Until(transport.deadline), oauthclient.TokenExchangeTimeout,
 		"bounded by TokenExchangeTimeout")
-	assert.Greater(t, time.Until(transport.deadline), oauth.TokenExchangeTimeout-time.Second,
+	assert.Greater(t, time.Until(transport.deadline), oauthclient.TokenExchangeTimeout-time.Second,
 		"and by that value rather than by something shorter")
 
 	// And the writing half. Receiving the token is not the point; recording it is, and the

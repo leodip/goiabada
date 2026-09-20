@@ -12,7 +12,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/api"
-	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
 )
@@ -43,7 +42,7 @@ func RequireBearerTokenScope(requiredScope string) func(http.Handler) http.Handl
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Get token from context (set by JwtAuthorizationHeaderToContext middleware)
-			bearerTokenValue := r.Context().Value(coreconstants.ContextKeyBearerToken)
+			bearerTokenValue := r.Context().Value(constants.ContextKeyBearerToken)
 			if bearerTokenValue == nil {
 				emitAuthError(w, "ACCESS_TOKEN_REQUIRED", "Access token required.", http.StatusUnauthorized)
 				return
@@ -73,7 +72,7 @@ func RequireBearerTokenScopeAnyOf(requiredScopes []string) func(http.Handler) ht
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Get token from context (set by JwtAuthorizationHeaderToContext middleware)
-			bearerTokenValue := r.Context().Value(coreconstants.ContextKeyBearerToken)
+			bearerTokenValue := r.Context().Value(constants.ContextKeyBearerToken)
 			if bearerTokenValue == nil {
 				emitAuthError(w, "ACCESS_TOKEN_REQUIRED", "Access token required.", http.StatusUnauthorized)
 				return
@@ -140,7 +139,7 @@ func RequireUserBoundToken() func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Mirrors RequireBearerTokenScope exactly, so this guard introduces no new
 			// response shapes for the two "no usable token" cases.
-			bearerTokenValue := r.Context().Value(coreconstants.ContextKeyBearerToken)
+			bearerTokenValue := r.Context().Value(constants.ContextKeyBearerToken)
 			if bearerTokenValue == nil {
 				emitAuthError(w, "ACCESS_TOKEN_REQUIRED", "Access token required.", http.StatusUnauthorized)
 				return
@@ -210,13 +209,13 @@ func RequireUserBoundToken() func(http.Handler) http.Handler {
 // passes through when the request has no bearer token at all, since enforcing "must be
 // authenticated" belongs to a scope middleware running alongside this one.
 //
-// Reads coreconstants.ContextKeyBearerToken (set by JwtAuthorizationHeaderToContext),
+// Reads constants.ContextKeyBearerToken (set by JwtAuthorizationHeaderToContext),
 // not ContextKeyValidatedToken, so it works regardless of whether a scope
 // middleware ran first.
 func RequireValidSession(database data.Database) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			bearerTokenValue := r.Context().Value(coreconstants.ContextKeyBearerToken)
+			bearerTokenValue := r.Context().Value(constants.ContextKeyBearerToken)
 			if bearerTokenValue == nil {
 				next.ServeHTTP(w, r)
 				return

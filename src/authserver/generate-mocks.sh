@@ -9,10 +9,12 @@ echo "========================================"
 # The "//go:build !production" constraint on each mock comes from
 # template-data.mock-build-tags in the .mockery.yaml files, not from this script.
 #
-# adminconsole has no .mockery.yaml on purpose: it imports no mocks at all. If it
-# ever needs them, give it a config that writes inside adminconsole (for example
-# ./internal/handlers/mocks) and never into ../core/. Two configs writing the same
-# file means whichever module runs last silently wins.
+# Three modules have a config, and each writes inside itself with one deliberate
+# exception: authserver/.mockery.yaml writes the HttpHelper mock into
+# ../core/handlerhelpers/mocks, from authserver's own interface declaration. Never add
+# a second config writing a file another one writes -- whichever module runs last
+# silently wins. adminconsole gained its config in #385, when the JWT session
+# middleware and its two mocked ports moved there out of core/middleware.
 
 # Get the directory where this script is located
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
@@ -85,6 +87,19 @@ if [ -f .mockery.yaml ]; then
     echo "  ✓ Core mocks generated"
 else
     echo "  ✗ Error: .mockery.yaml not found in core/"
+    exit 1
+fi
+
+# Generate mocks for adminconsole
+echo ""
+echo "3. Generating adminconsole mocks..."
+echo "------------------------------------"
+cd "$SRC_DIR/adminconsole"
+if [ -f .mockery.yaml ]; then
+    mockery
+    echo "  ✓ Adminconsole mocks generated"
+else
+    echo "  ✗ Error: .mockery.yaml not found in adminconsole/"
     exit 1
 fi
 

@@ -49,7 +49,6 @@ func HandleAPISettingsGeneralGet(
 
 // HandleAPISettingsGeneralPut - PUT /api/v1/admin/settings/general
 func HandleAPISettingsGeneralPut(
-	authHelper handlers.AuthHelper,
 	database data.Database,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
@@ -147,7 +146,7 @@ func HandleAPISettingsGeneralPut(
 
 		// Audit log
 		auditLogger.Log(r.Context(), audit.AuditUpdatedGeneralSettings, map[string]interface{}{
-			"loggedInUser": authHelper.GetLoggedInSubject(r),
+			"loggedInUser": callerSubject(r),
 		})
 
 		resp := api.SettingsGeneralResponse{

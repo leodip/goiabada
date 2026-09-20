@@ -27,7 +27,7 @@ func TestHandleAPIResourcePermissionsPut_BuiltInPermissionMissingFromDB(t *testi
 	auditLogger := mocks_audit.NewAuditLogger(t)
 	identifierValidator := validators.NewIdentifierValidator()
 
-	handler := HandleAPIResourcePermissionsPut(database, nil, identifierValidator, auditLogger)
+	handler := HandleAPIResourcePermissionsPut(database, identifierValidator, auditLogger)
 
 	// System-level resource (authserver)
 	resource := &models.Resource{

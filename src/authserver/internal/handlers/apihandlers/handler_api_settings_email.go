@@ -51,7 +51,6 @@ func HandleAPISettingsEmailGet(
 
 // HandleAPISettingsEmailPut - PUT /api/v1/admin/settings/email
 func HandleAPISettingsEmailPut(
-	authHelper handlers.AuthHelper,
 	database data.Database,
 	emailValidator handlers.EmailValidator,
 	auditLogger handlers.AuditLogger,
@@ -86,7 +85,7 @@ func HandleAPISettingsEmailPut(
 			}
 
 			auditLogger.Log(r.Context(), audit.AuditUpdatedSMTPSettings, map[string]interface{}{
-				"loggedInUser": authHelper.GetLoggedInSubject(r),
+				"loggedInUser": callerSubject(r),
 			})
 
 			resp := api.SettingsEmailResponse{
@@ -202,7 +201,7 @@ func HandleAPISettingsEmailPut(
 		}
 
 		auditLogger.Log(r.Context(), audit.AuditUpdatedSMTPSettings, map[string]interface{}{
-			"loggedInUser": authHelper.GetLoggedInSubject(r),
+			"loggedInUser": callerSubject(r),
 		})
 
 		resp := api.SettingsEmailResponse{
@@ -223,7 +222,6 @@ func HandleAPISettingsEmailPut(
 func HandleAPISettingsEmailSendTestPost(
 	emailValidator handlers.EmailValidator,
 	emailSender handlers.EmailSender,
-	authHelper handlers.AuthHelper,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -264,7 +262,7 @@ func HandleAPISettingsEmailSendTestPost(
 		}
 
 		auditLogger.Log(r.Context(), audit.AuditSentTestEmail, map[string]interface{}{
-			"loggedInUser": authHelper.GetLoggedInSubject(r),
+			"loggedInUser": callerSubject(r),
 			"to":           req.To,
 		})
 

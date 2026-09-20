@@ -76,7 +76,6 @@ func HandleAPIPermissionsByResourceGet(
 // Replaces the full set of permission definitions for a resource.
 func HandleAPIResourcePermissionsPut(
 	database data.Database,
-	authHelper srvhandlers.AuthHelper,
 	identifierValidator *validators.IdentifierValidator,
 	auditLogger srvhandlers.AuditLogger,
 ) http.HandlerFunc {
@@ -285,7 +284,7 @@ func HandleAPIResourcePermissionsPut(
 		// Audit consolidated update
 		auditLogger.Log(r.Context(), audit.AuditUpdatedResourcePermissions, map[string]interface{}{
 			"resourceId":   resource.Id,
-			"loggedInUser": authHelper.GetLoggedInSubject(r),
+			"loggedInUser": callerSubject(r),
 		})
 
 		// Respond success

@@ -7,7 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/adminconsole/internal/constants"
+	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
@@ -15,7 +16,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	mock_middleware "github.com/leodip/goiabada/core/middleware/mocks"
+	mock_middleware "github.com/leodip/goiabada/adminconsole/internal/middleware/mocks"
 	mock_sessionstore "github.com/leodip/goiabada/core/sessionstore/mocks"
 )
 
@@ -155,7 +156,7 @@ func TestMiddlewareJwt_ServerErrorsRenderThePageAndKeepTheCauseOutOfTheResponse(
 
 				req := httptest.NewRequest(http.MethodGet, "/", nil)
 				req = req.WithContext(context.WithValue(req.Context(),
-					constants.ContextKeyJwtInfo, "not a JwtInfo"))
+					coreconstants.ContextKeyJwtInfo, "not a JwtInfo"))
 
 				return m.RequiresScope([]string{"required:scope"})(mustNotRun(t)), req
 			},
@@ -170,17 +171,17 @@ func TestMiddlewareJwt_ServerErrorsRenderThePageAndKeepTheCauseOutOfTheResponse(
 				helper.On("IsAuthorizedToAccessResource", jwtInfo, []string{"required:scope"}).Return(false)
 				helper.On("IsAuthenticated", jwtInfo).Return(false)
 				helper.On("RedirToAuthorize", mock.Anything, mock.Anything,
-					constants.AdminConsoleClientIdentifier, mock.AnythingOfType("string"),
+					coreconstants.AdminConsoleClientIdentifier, mock.AnythingOfType("string"),
 					mock.AnythingOfType("string")).Return(assert.AnError)
 
 				m := NewMiddlewareJwt(new(mock_sessionstore.Store), sessionName,
 					new(mock_middleware.TokenParser), stubIssuerReader{issuer: "https://this-deployment.example"}, helper, rec, nil,
 					"http://localhost:9090", "http://localhost:9091",
-					constants.AdminConsoleClientIdentifier, "")
+					coreconstants.AdminConsoleClientIdentifier, "")
 
 				req := httptest.NewRequest(http.MethodGet, "/", nil)
 				req = req.WithContext(context.WithValue(req.Context(),
-					constants.ContextKeyJwtInfo, jwtInfo))
+					coreconstants.ContextKeyJwtInfo, jwtInfo))
 
 				return m.RequiresScope([]string{"required:scope"})(mustNotRun(t)), req
 			},

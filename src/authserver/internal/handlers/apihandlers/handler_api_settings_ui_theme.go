@@ -37,7 +37,6 @@ func HandleAPISettingsUIThemeGet(
 
 // HandleAPISettingsUIThemePut - PUT /api/v1/admin/settings/ui-theme
 func HandleAPISettingsUIThemePut(
-	authHelper handlers.AuthHelper,
 	database data.Database,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
@@ -79,7 +78,7 @@ func HandleAPISettingsUIThemePut(
 
 		// Audit log old/new
 		auditLogger.Log(r.Context(), audit.AuditUpdatedUIThemeSettings, map[string]interface{}{
-			"loggedInUser": authHelper.GetLoggedInSubject(r),
+			"loggedInUser": callerSubject(r),
 			"oldUITheme":   oldTheme,
 			"newUITheme":   currentSettings.UITheme,
 		})
