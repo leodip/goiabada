@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/data"
@@ -148,7 +149,7 @@ func HandleAPIGroupAttributeCreatePost(
 			return
 		}
 
-		if err := validators.ValidateNoAngleBrackets(createReq.Value, i18n.ErrCodeAttributeValueAngleBrackets); err != nil {
+		if err := accountvalidation.ValidateNoAngleBrackets(createReq.Value, i18n.ErrCodeAttributeValueAngleBrackets); err != nil {
 			writeValidationError(w, r, err)
 			return
 		}
@@ -259,7 +260,7 @@ func HandleAPIGroupAttributeUpdatePut(
 			return
 		}
 
-		if err := validators.ValidateNoAngleBrackets(updateReq.Value, i18n.ErrCodeAttributeValueAngleBrackets); err != nil {
+		if err := accountvalidation.ValidateNoAngleBrackets(updateReq.Value, i18n.ErrCodeAttributeValueAngleBrackets); err != nil {
 			writeValidationError(w, r, err)
 			return
 		}

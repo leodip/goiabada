@@ -12,9 +12,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
 	mocks_handlerhelpers "github.com/leodip/goiabada/authserver/internal/handlerhelpers/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
-	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/testutil"
 )
 
@@ -40,7 +40,7 @@ func TestSlogConvention_AHandlerRecordCarriesTheRequestIdWithoutNamingIt(t *test
 	// The missing auth context is the shortest path from a request to a record: no database,
 	// no template, one Warn and a redirect. No InternalServerError expectation is set, so the
 	// mock fails this test if the handler takes the other branch.
-	authHelper.On("GetAuthContext", mock.Anything).Return(nil, customerrors.ErrNoAuthContext)
+	authHelper.On("GetAuthContext", mock.Anything).Return(nil, handlerhelpers.ErrNoAuthContext)
 
 	req := httptest.NewRequest(http.MethodGet, "/auth/level2", nil)
 	// The id the middleware will adopt. chi's RequestID takes X-Request-Id from the caller

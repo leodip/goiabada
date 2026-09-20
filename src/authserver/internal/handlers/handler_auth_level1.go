@@ -12,7 +12,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/data"
-	"github.com/leodip/goiabada/core/customerrors"
+	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/errs"
 )
@@ -25,7 +25,7 @@ func HandleAuthLevel1Get(
 
 		authContext, err := authHelper.GetAuthContext(r)
 		if err != nil {
-			if errors.Is(err, customerrors.ErrNoAuthContext) {
+			if errors.Is(err, handlerhelpers.ErrNoAuthContext) {
 				var profileUrl = GetProfileURL()
 				slog.WarnContext(r.Context(), "auth context is missing, redirecting", "redirect", profileUrl)
 				http.Redirect(w, r, profileUrl, http.StatusFound)
@@ -65,7 +65,7 @@ func HandleAuthLevel1CompletedGet(
 
 		authContext, err := authHelper.GetAuthContext(r)
 		if err != nil {
-			if errors.Is(err, customerrors.ErrNoAuthContext) {
+			if errors.Is(err, handlerhelpers.ErrNoAuthContext) {
 				var profileUrl = GetProfileURL()
 				slog.WarnContext(r.Context(), "auth context is missing, redirecting", "redirect", profileUrl)
 				http.Redirect(w, r, profileUrl, http.StatusFound)

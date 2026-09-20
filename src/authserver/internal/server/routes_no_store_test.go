@@ -128,7 +128,7 @@ func TestInitRoutes_EveryApiRouteRefusesToBeStored(t *testing.T) {
 // noStoreMiddlewareName is the compiler-assigned name of the closure MiddlewareNoStore returns,
 // minus the trailing instance suffix (".1", ".func1") which differs between a mounted instance
 // and a freshly constructed one.
-const noStoreMiddlewareName = "github.com/leodip/goiabada/core/middleware.MiddlewareNoStore"
+const noStoreMiddlewareName = "github.com/leodip/goiabada/authserver/internal/middleware.MiddlewareNoStore"
 
 // routeTestPathParam matches a chi path parameter, including the {id:[0-9]+} form.
 var routeTestPathParam = regexp.MustCompile(`\{[^}]+\}`)

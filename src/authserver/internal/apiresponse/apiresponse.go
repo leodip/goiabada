@@ -13,6 +13,7 @@ import (
 
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/errs"
 )
 
@@ -107,4 +108,19 @@ func LogInternalServerError(r *http.Request, err error, attrs ...any) string {
 	record = append(record, attrs...)
 	slog.ErrorContext(r.Context(), "internal server error", record...)
 	return requestId
+}
+
+// NewErrorDetailWithHttpStatusCodeAndWWWAuthenticate builds an ErrorDetail carrying a
+// WWW-Authenticate challenge. Per RFC 6749 section 5.2, a client that attempted to authenticate
+// through the Authorization header and failed must be answered 401 with that header, and per
+// RFC 6750 section 3 a bearer-token failure at a protected resource carries one too.
+//
+// It lives here rather than in core/customerrors because issuing a challenge is provider-side by
+// definition: the admin console is a client of this protocol and never emits one (#385 decision
+// 17). The result is still a *customerrors.ErrorDetail, so JsonError and errors.Is behave exactly
+// as they did when the four-argument constructor stood in core, entry for entry.
+func NewErrorDetailWithHttpStatusCodeAndWWWAuthenticate(code string, description string,
+	httpStatusCode int, wwwAuthenticate string) *customerrors.ErrorDetail {
+	return customerrors.NewErrorDetailWithHttpStatusCode(code, description, httpStatusCode).
+		WithWWWAuthenticate(wwwAuthenticate)
 }

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"errors"
+
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
@@ -6859,7 +6860,7 @@ func TestValidateTokenRequest_AuthorizationCode_RedirectURIStillRegistered(t *te
 		require.True(t, ok)
 		// Matched the way HandleTokenPost matches it, by value against the sentinel, because
 		// that equality is what ties the audit row to the wire message (#241 decision 10).
-		assert.True(t, errors.Is(err, customerrors.ErrCodeRedirectURIDeregistered))
+		assert.True(t, errors.Is(err, ErrCodeRedirectURIDeregistered))
 		assert.Equal(t, "invalid_grant", customErr.GetCode())
 		assert.Equal(t, http.StatusBadRequest, customErr.GetHttpStatusCode())
 		// Legible rather than the flat "Code is invalid." the refusals above it give. The
@@ -6878,7 +6879,7 @@ func TestValidateTokenRequest_AuthorizationCode_RedirectURIStillRegistered(t *te
 		assert.Nil(t, result)
 		// errors.Is alone: matching the sentinel already establishes the value is an
 		// *ErrorDetail carrying exactly its details, which is what ErrorDetail.Is compares.
-		assert.True(t, errors.Is(err, customerrors.ErrCodeRedirectURIDeregistered))
+		assert.True(t, errors.Is(err, ErrCodeRedirectURIDeregistered))
 	})
 
 	t.Run("a loopback code still matches its registered portless URI", func(t *testing.T) {

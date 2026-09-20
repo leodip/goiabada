@@ -3,7 +3,7 @@ package apihandlers
 import (
 	"strings"
 
-	"github.com/leodip/goiabada/core/stringutil"
+	"github.com/leodip/goiabada/authserver/internal/randomstring"
 )
 
 // generateEmailVerificationCode returns the code an email verification check compares
@@ -22,6 +22,6 @@ import (
 // one, so the format cannot drift between the code that is sent and the code that is
 // checked.
 func generateEmailVerificationCode() string {
-	return strings.ToUpper(stringutil.GenerateRandomLetterString(4)) +
-		stringutil.GenerateRandomNumberString(4)
+	return strings.ToUpper(randomstring.Letters(4)) +
+		randomstring.Digits(4)
 }

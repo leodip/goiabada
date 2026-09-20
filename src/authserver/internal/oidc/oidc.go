@@ -6,6 +6,10 @@
 // process that publishes both. WellKnownConfig is a contract with arbitrary OIDC
 // clients, not a contract between this server and the admin console, and the admin
 // console consumes nothing here (#360).
+//
+// dcr.go is here on that same test. RFC 7591 registration is OAuth rather than OIDC
+// proper, but both ends this server exposes are the OIDC-flavoured ones: /connect/register,
+// announced as registration_endpoint in the discovery document above (#385).
 package oidc
 
 import (

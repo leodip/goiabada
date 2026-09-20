@@ -28,8 +28,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/randomstring"
 	"github.com/leodip/goiabada/authserver/internal/uuidutil"
-	"github.com/leodip/goiabada/core/stringutil"
 )
 
 const (
@@ -89,7 +89,7 @@ func LetterN(n uint) string {
 	if n == 0 {
 		n = 1
 	}
-	return mustDraw(stringutil.GenerateRandomLetterString(int(n)), n, "LetterN")
+	return mustDraw(randomstring.Letters(int(n)), n, "LetterN")
 }
 
 // DigitN returns n characters drawn from [0-9]. It stands in for the phone
@@ -103,7 +103,7 @@ func DigitN(n uint) string {
 	if n == 0 {
 		n = 1
 	}
-	return mustDraw(stringutil.GenerateRandomNumberString(int(n)), n, "DigitN")
+	return mustDraw(randomstring.Digits(int(n)), n, "DigitN")
 }
 
 // Password returns an n-character password containing at least one lowercase

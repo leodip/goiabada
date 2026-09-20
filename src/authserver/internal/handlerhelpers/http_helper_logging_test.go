@@ -371,8 +371,9 @@ func TestJsonError_ReadsAWrappedErrorDetail(t *testing.T) {
 func TestJsonError_ReadsAWrappedErrorDetailsWWWAuthenticate(t *testing.T) {
 	httpHelper := NewHttpHelper(&mocks.TestFS{}, stubSettingsReader{})
 
-	detail := customerrors.NewErrorDetailWithHttpStatusCodeAndWWWAuthenticate("invalid_token",
-		"The access token is invalid.", http.StatusUnauthorized, "Bearer error=\"invalid_token\"")
+	detail := customerrors.NewErrorDetailWithHttpStatusCode("invalid_token",
+		"The access token is invalid.", http.StatusUnauthorized).
+		WithWWWAuthenticate("Bearer error=\"invalid_token\"")
 
 	router := errorRouter(func(w http.ResponseWriter, r *http.Request) {
 		httpHelper.JsonError(w, r, errs.Wrap(detail, "unable to read the token"))

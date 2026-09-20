@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/data"
@@ -17,7 +18,6 @@ import (
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
-	"github.com/leodip/goiabada/core/validators"
 )
 
 // HandleAPISettingsGeneralGet - GET /api/v1/admin/settings/general
@@ -72,7 +72,7 @@ func HandleAPISettingsGeneralPut(
 			return
 		}
 
-		if err := validators.ValidateNoAngleBrackets(req.AppName, i18n.ErrCodeSettingsAppNameAngleBrackets); err != nil {
+		if err := accountvalidation.ValidateNoAngleBrackets(req.AppName, i18n.ErrCodeSettingsAppNameAngleBrackets); err != nil {
 			writeValidationError(w, r, err)
 			return
 		}
@@ -112,7 +112,7 @@ func HandleAPISettingsGeneralPut(
 		// identifier branch's regex has already refused the character with its own message, while
 		// url.ParseRequestURI accepts "<" in a path or a host. The issuer is copied into the iss
 		// claim of every token this server signs (#275).
-		if err := validators.ValidateNoAngleBrackets(issuer, i18n.ErrCodeSettingsIssuerAngleBrackets); err != nil {
+		if err := accountvalidation.ValidateNoAngleBrackets(issuer, i18n.ErrCodeSettingsIssuerAngleBrackets); err != nil {
 			writeValidationError(w, r, err)
 			return
 		}

@@ -20,7 +20,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/usercreation"
 	"github.com/leodip/goiabada/authserver/internal/usersession"
 	coreconstants "github.com/leodip/goiabada/core/constants"
-	core_middleware "github.com/leodip/goiabada/core/middleware"
 	"github.com/leodip/goiabada/core/validators"
 )
 
@@ -132,7 +131,7 @@ func (s *Server) initRoutes(root chi.Router) {
 		// section 5.1's MUST reaches this group, and the 401 and 403 refusals below
 		// commit their status themselves: anything mounted behind the guards would
 		// never write the pair on a refusal (#247).
-		r.Use(core_middleware.MiddlewareNoStore())
+		r.Use(middleware.MiddlewareNoStore())
 		r.Use(middleware.APIDebugMiddleware())
 		r.Use(authHeaderToContext)
 		r.Use(middleware.RequireValidSession(s.database))
@@ -319,7 +318,7 @@ func (s *Server) initRoutes(root chi.Router) {
 	root.Route("/api/v1/account", func(r chi.Router) {
 		// FIRST in the group, for the same reason as the admin group above. GET
 		// /api/v1/account/otp/enrollment serves a TOTP enrolment seed (#247).
-		r.Use(core_middleware.MiddlewareNoStore())
+		r.Use(middleware.MiddlewareNoStore())
 		r.Use(middleware.APIDebugMiddleware())
 		r.Use(authHeaderToContext)
 		r.Use(middleware.RequireBearerTokenScope(coreconstants.AuthServerResourceIdentifier + ":" + coreconstants.ManageAccountPermissionIdentifier))
@@ -377,7 +376,7 @@ func (s *Server) initRoutes(root chi.Router) {
 		// FIRST in the group, for the same reason as the two groups above: every 200
 		// here carries session ciphertext, and RFC 6749 section 5.1's MUST covers "any
 		// response containing tokens, credentials, or other sensitive information".
-		r.Use(core_middleware.MiddlewareNoStore())
+		r.Use(middleware.MiddlewareNoStore())
 		// No APIDebugMiddleware here, and it is the only /api/v1 group without it. That
 		// middleware logs whole request and response bodies, redacting by field name, and
 		// this group's fields are called "id" and "data": neither matches its key set nor

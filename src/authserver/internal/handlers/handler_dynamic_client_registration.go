@@ -13,9 +13,9 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/urlutil"
 	"github.com/leodip/goiabada/authserver/internal/uuidutil"
-	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/stringutil"
@@ -39,9 +39,9 @@ func HandleDynamicClientRegistrationPost(
 		}
 
 		// 2. Parse request (RFC 7591 §3.1)
-		var req api.DynamicClientRegistrationRequest
+		var req oidc.DynamicClientRegistrationRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			writeDCRError(w, api.DCRErrorInvalidClientMetadata, "Invalid request body", http.StatusBadRequest)
+			writeDCRError(w, oidc.DCRErrorInvalidClientMetadata, "Invalid request body", http.StatusBadRequest)
 			return
 		}
 
@@ -50,13 +50,13 @@ func HandleDynamicClientRegistrationPost(
 
 		// 4. Validate request
 		if err := validateDCRRequest(&req); err != nil {
-			writeDCRError(w, api.DCRErrorInvalidClientMetadata, err.Error(), http.StatusBadRequest)
+			writeDCRError(w, oidc.DCRErrorInvalidClientMetadata, err.Error(), http.StatusBadRequest)
 			return
 		}
 
 		// 5. Validate redirect URIs (RFC 7591 §5)
 		if err := validateDCRRedirectURIs(&req); err != nil {
-			writeDCRError(w, api.DCRErrorInvalidRedirectURI, err.Error(), http.StatusBadRequest)
+			writeDCRError(w, oidc.DCRErrorInvalidRedirectURI, err.Error(), http.StatusBadRequest)
 			return
 		}
 
@@ -157,7 +157,7 @@ func HandleDynamicClientRegistrationPost(
 		})
 
 		// 13. Build response (RFC 7591 §3.2.1)
-		response := api.DynamicClientRegistrationResponse{
+		response := oidc.DynamicClientRegistrationResponse{
 			ClientID:                clientIdentifier,
 			ClientIDIssuedAt:        time.Now().Unix(),
 			ClientSecretExpiresAt:   0, // Never expires
@@ -182,7 +182,7 @@ func HandleDynamicClientRegistrationPost(
 }
 
 // applyDCRDefaults applies RFC 7591 §2 default values
-func applyDCRDefaults(req *api.DynamicClientRegistrationRequest) {
+func applyDCRDefaults(req *oidc.DynamicClientRegistrationRequest) {
 	// Default token_endpoint_auth_method (RFC 7591 §2)
 	if req.TokenEndpointAuthMethod == "" {
 		req.TokenEndpointAuthMethod = "client_secret_basic"
@@ -195,7 +195,7 @@ func applyDCRDefaults(req *api.DynamicClientRegistrationRequest) {
 }
 
 // validateDCRRequest validates request per RFC 7591 §2
-func validateDCRRequest(req *api.DynamicClientRegistrationRequest) error {
+func validateDCRRequest(req *oidc.DynamicClientRegistrationRequest) error {
 	// Validate token_endpoint_auth_method
 	allowedAuthMethods := map[string]bool{
 		"none":                true,
@@ -237,7 +237,7 @@ func validateDCRRequest(req *api.DynamicClientRegistrationRequest) error {
 }
 
 // validateDCRRedirectURIs validates redirect URIs per RFC 7591 §5
-func validateDCRRedirectURIs(req *api.DynamicClientRegistrationRequest) error {
+func validateDCRRedirectURIs(req *oidc.DynamicClientRegistrationRequest) error {
 	// Check if redirect URIs are required
 	requiresRedirectURIs := containsGrantType(req.GrantTypes, "authorization_code")
 
@@ -404,7 +404,7 @@ func writeDCRError(w http.ResponseWriter, errorCode, description string, statusC
 	w.Header().Set("Pragma", "no-cache")
 	w.WriteHeader(statusCode)
 
-	errorResp := api.DynamicClientRegistrationError{
+	errorResp := oidc.DynamicClientRegistrationError{
 		Error:            errorCode,
 		ErrorDescription: description,
 	}

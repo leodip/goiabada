@@ -74,21 +74,22 @@ func randomStringFromAlphabet(length int, alphabet string) string {
 // (#211).
 func GenerateSecurityRandomString(length int) string {
 	const chars = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-_."
-	return randomStringFromAlphabet(length, chars)
+	return RandomStringFromAlphabet(length, chars)
 }
 
-// GenerateRandomLetterString returns length characters drawn uniformly from
-// [A-Za-z]. Like GenerateSecurityRandomString, a CSPRNG failure ends the
-// process rather than this call (#211).
-func GenerateRandomLetterString(length int) string {
-	const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-	return randomStringFromAlphabet(length, letters)
-}
-
-// GenerateRandomNumberString returns length characters drawn uniformly from
-// [0-9]. Like GenerateSecurityRandomString, a CSPRNG failure ends the process
-// rather than this call (#211).
-func GenerateRandomNumberString(length int) string {
-	const chars = "0123456789"
-	return randomStringFromAlphabet(length, chars)
+// RandomStringFromAlphabet returns length characters drawn uniformly from alphabet,
+// using the system CSPRNG. A CSPRNG failure ends the process rather than this call
+// (#211).
+//
+// The domain is a BYTE alphabet of 1 to 256 bytes, indexed by byte, in which a
+// multi-byte rune is not a unit. Outside it the answer is "": a non-positive length, an
+// empty alphabet, or an alphabet above 256 bytes. That last bound is enforced here and
+// merely assumed below, which is the whole reason this wrapper exists: the rejection
+// limit is 256 - (256 % n), zero once n exceeds 256, so every byte is rejected and the
+// call never returns (#385).
+func RandomStringFromAlphabet(length int, alphabet string) string {
+	if len(alphabet) > 256 {
+		return ""
+	}
+	return randomStringFromAlphabet(length, alphabet)
 }

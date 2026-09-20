@@ -131,8 +131,9 @@ func TestNewErrorDetailWithHttpStatusCode_EdgeCases(t *testing.T) {
 // that every other key survives: a round-trip through the four-argument constructor reads correct
 // today and drops silently whatever is added later (#213).
 func TestErrorDetail_WithDescription(t *testing.T) {
-	original := NewErrorDetailWithHttpStatusCodeAndWWWAuthenticate(
-		"invalid_client", "Client authentication failed.", 401, `Basic realm="goiabada"`)
+	original := NewErrorDetailWithHttpStatusCode(
+		"invalid_client", "Client authentication failed.", 401).
+		WithWWWAuthenticate(`Basic realm="goiabada"`)
 
 	rewritten := original.WithDescription("Client authentication failed (conformed).")
 
@@ -155,5 +156,46 @@ func TestErrorDetail_WithDescription(t *testing.T) {
 	// comparison targets such as ErrUserDisabled.
 	if original.GetDescription() != "Client authentication failed." {
 		t.Errorf("Expected the receiver to keep its description, got %s", original.GetDescription())
+	}
+}
+
+// TestErrorDetail_WithWWWAuthenticate pins the sibling setter #385 added when the four-argument
+// constructor left core for authserver/internal/apiresponse. The move is only sound if the value
+// the composition builds is indistinguishable from what that constructor built, because three
+// sentinels are matched through Is and Is compares the number of details before comparing any of
+// them.
+func TestErrorDetail_WithWWWAuthenticate(t *testing.T) {
+	base := NewErrorDetailWithHttpStatusCode("invalid_client", "Client authentication failed.", 401)
+
+	withChallenge := base.WithWWWAuthenticate("Basic")
+
+	if withChallenge.GetWWWAuthenticate() != "Basic" {
+		t.Errorf("Expected the challenge to be set, got %q", withChallenge.GetWWWAuthenticate())
+	}
+	// Every other key travels, which is the clone doing its job.
+	if withChallenge.GetCode() != "invalid_client" {
+		t.Errorf("Expected code invalid_client, got %s", withChallenge.GetCode())
+	}
+	if withChallenge.GetDescription() != "Client authentication failed." {
+		t.Errorf("Expected the description to survive, got %s", withChallenge.GetDescription())
+	}
+	if withChallenge.GetHttpStatusCode() != 401 {
+		t.Errorf("Expected HTTP status code 401, got %d", withChallenge.GetHttpStatusCode())
+	}
+
+	// The receiver is untouched, which is what makes it safe to call on a package-level value.
+	if base.GetWWWAuthenticate() != "" {
+		t.Errorf("Expected the receiver to carry no challenge, got %q", base.GetWWWAuthenticate())
+	}
+
+	// An empty value adds no entry, rather than an entry holding "". Is compares len(details)
+	// first, so the two are different errors, and the deleted constructor carried this same
+	// guard: dropping it would make every non-challenge refusal built through this path stop
+	// matching its sentinel.
+	if base.WithWWWAuthenticate("").Is(base) != true {
+		t.Error("Expected an empty challenge to leave the detail equal to its receiver")
+	}
+	if base.Is(withChallenge) {
+		t.Error("Expected a detail carrying a challenge not to equal one without it")
 	}
 }

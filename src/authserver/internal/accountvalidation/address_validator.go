@@ -3,7 +3,6 @@ package accountvalidation
 import (
 	"github.com/leodip/goiabada/core/countries"
 	"github.com/leodip/goiabada/core/i18n"
-	"github.com/leodip/goiabada/core/validators"
 )
 
 type AddressValidator struct {
@@ -48,23 +47,23 @@ func (val *AddressValidator) ValidateAddress(input *ValidateAddressInput) error 
 	// Refuse "<" and ">" rather than stripping them, so an accepted address is
 	// stored exactly as it was sent (#275). Country is left to its alpha-2
 	// lookup below, which already excludes both characters.
-	if err := validators.ValidateNoAngleBrackets(input.AddressLine1, i18n.ErrCodeAddressAngleBrackets); err != nil {
+	if err := ValidateNoAngleBrackets(input.AddressLine1, i18n.ErrCodeAddressAngleBrackets); err != nil {
 		return err
 	}
 
-	if err := validators.ValidateNoAngleBrackets(input.AddressLine2, i18n.ErrCodeAddressAngleBrackets); err != nil {
+	if err := ValidateNoAngleBrackets(input.AddressLine2, i18n.ErrCodeAddressAngleBrackets); err != nil {
 		return err
 	}
 
-	if err := validators.ValidateNoAngleBrackets(input.AddressLocality, i18n.ErrCodeAddressAngleBrackets); err != nil {
+	if err := ValidateNoAngleBrackets(input.AddressLocality, i18n.ErrCodeAddressAngleBrackets); err != nil {
 		return err
 	}
 
-	if err := validators.ValidateNoAngleBrackets(input.AddressRegion, i18n.ErrCodeAddressAngleBrackets); err != nil {
+	if err := ValidateNoAngleBrackets(input.AddressRegion, i18n.ErrCodeAddressAngleBrackets); err != nil {
 		return err
 	}
 
-	if err := validators.ValidateNoAngleBrackets(input.AddressPostalCode, i18n.ErrCodeAddressAngleBrackets); err != nil {
+	if err := ValidateNoAngleBrackets(input.AddressPostalCode, i18n.ErrCodeAddressAngleBrackets); err != nil {
 		return err
 	}
 

@@ -25,7 +25,6 @@ import (
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
-	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/stringutil"
 )
 
@@ -1111,7 +1110,7 @@ func redirToClientWithError(w http.ResponseWriter, r *http.Request, database dat
 
 	// Per RFC 6749 4.2.2.1 and OIDC Core 3.2.2.5: implicit flow errors MUST be returned in fragment
 	// Determine if this is an implicit flow by checking response_type
-	rtInfo := oauth.ParseResponseType(input.responseType)
+	rtInfo := protocolvalidation.ParseResponseType(input.responseType)
 	isImplicitFlow := rtInfo.IsImplicitFlow()
 
 	// For implicit flow, default to fragment response mode

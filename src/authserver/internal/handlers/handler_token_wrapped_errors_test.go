@@ -82,7 +82,7 @@ func TestHandleTokenPost_WrappedUserDisabledStillAudits(t *testing.T) {
 	// validator returns it: ErrorDetail.Is is what makes errors.Is match this copy.
 	disabled := customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
 		"The user account is disabled.", http.StatusBadRequest)
-	require.ErrorIs(t, disabled, customerrors.ErrUserDisabled)
+	require.ErrorIs(t, disabled, protocolvalidation.ErrUserDisabled)
 
 	httpHelper, auditLogger, _, rr, req, handler := wrappedTokenRequest(t,
 		errs.Wrap(disabled, "unable to validate the token request"))
@@ -106,7 +106,7 @@ func TestHandleTokenPost_WrappedDeregisteredRedirectUriStillAudits(t *testing.T)
 	refusal := customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
 		"The redirect URI recorded on this authorization code is no longer registered on the client, so the code can no longer be redeemed.",
 		http.StatusBadRequest)
-	require.ErrorIs(t, refusal, customerrors.ErrCodeRedirectURIDeregistered)
+	require.ErrorIs(t, refusal, protocolvalidation.ErrCodeRedirectURIDeregistered)
 
 	httpHelper, auditLogger, _, rr, req, handler := wrappedTokenRequest(t,
 		errs.Wrap(refusal, "unable to validate the token request"))

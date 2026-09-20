@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
+	"github.com/leodip/goiabada/authserver/internal/apiresponse"
 	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/stretchr/testify/require"
@@ -30,6 +31,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 	"github.com/leodip/goiabada/core/customerrors"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -1997,6 +1999,40 @@ func TestJsonErrorConformed_GenericDescriptionMatchesSharedWriter(t *testing.T) 
 	assert.Equal(t, fromSharedWriter.Code, fromBoundary.Code)
 }
 
+// TestJsonErrorConformed_CarriesTheBasicChallengeThrough is the token endpoint's half of RFC 6749
+// section 5.2: a confidential client that presented Basic credentials and failed must be answered
+// 401 with a WWW-Authenticate header, and the eight sites in token_validator.go that build that
+// refusal all reach the wire through this boundary.
+//
+// Nothing pinned it until #385, and the gap is not academic. The conformance rebuild here reaches
+// the detail with errors.As and then hands JsonError errorDetail.WithDescription(...), which is a
+// FRESH *ErrorDetail: anything carrying the challenge outside that value, in a wrapper around it
+// or in a type of its own, is dropped at this line without a test going red. WithDescription
+// clones every key, which is why the header survives today, and this is what says so.
+func TestJsonErrorConformed_CarriesTheBasicChallengeThrough(t *testing.T) {
+	r := requestWithAdoptedRequestId(t, "goiabada/abc123-000042")
+	rec := httptest.NewRecorder()
+
+	// Byte for byte what token_validator.go returns when a confidential client's Basic
+	// credentials do not match.
+	refusal := apiresponse.NewErrorDetailWithHttpStatusCodeAndWWWAuthenticate("invalid_client",
+		"Client authentication failed. Please review your client_secret.",
+		http.StatusUnauthorized, "Basic")
+
+	jsonErrorConformed(handlerhelpers.NewHttpHelper(nil, authmiddleware.SettingsReader{}), rec, r,
+		errs.Wrap(refusal, "unable to validate the token request"))
+
+	assert.Equal(t, http.StatusUnauthorized, rec.Code)
+	assert.Equal(t, "Basic", rec.Result().Header.Get("WWW-Authenticate"),
+		"a failed Basic credential must still carry the challenge RFC 6749 section 5.2 requires")
+
+	var body map[string]string
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	assert.Equal(t, "invalid_client", body["error"])
+	assert.Equal(t, "Client authentication failed. Please review your client_secret.",
+		body["error_description"])
+}
+
 // withSettings puts resolved settings on a request, which the refresh arm's flow gate reads to
 // resolve a client left on "inherit". Every refresh fixture that reaches past replay containment
 // needs it, and needs a Client on its validation result beside it: a refresh token exists only
@@ -2304,7 +2340,7 @@ func TestHandleTokenPost_RedemptionRegistrationRefusalAudit(t *testing.T) {
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
-		refusal := customerrors.ErrCodeRedirectURIDeregistered
+		refusal := protocolvalidation.ErrCodeRedirectURIDeregistered
 		tokenValidator.On("ValidateTokenRequest", req.Context(),
 			mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).Return(nil, refusal)
 

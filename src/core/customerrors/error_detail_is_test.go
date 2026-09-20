@@ -6,11 +6,19 @@ import (
 	"testing"
 )
 
-// Is is what three of the four package-level sentinels are matched by, and the method it replaced
-// had no test at all. Every row here would have passed against IsError too, except the last two,
-// which are the reason the signature changed: a target of another type, and a sentinel reached
-// through a wrapper (#279 decision 6).
+// Is is what the auth server's grant sentinels are matched by, and the method it replaced had no
+// test at all. Every row here would have passed against IsError too, except the last two, which
+// are the reason the signature changed: a target of another type, and a sentinel reached through a
+// wrapper (#279 decision 6).
+//
+// The sentinels themselves are authserver/internal/protocolvalidation's and
+// authserver/internal/handlerhelpers' since #385, and core cannot import either, so they are
+// rebuilt here from the same constructor arguments. That costs nothing: the property under test is
+// that an equal value built separately matches, so a fixture built separately is the subject
+// rather than a stand-in for it.
 func TestErrorDetail_Is(t *testing.T) {
+	userDisabled := NewErrorDetailWithHttpStatusCode("invalid_grant", "The user account is disabled.", 400)
+	noAuthContext := NewErrorDetail("no_auth_context", "no auth context in session")
 	twoKeys := NewErrorDetail("invalid_grant", "The user account is disabled.")
 
 	tests := []struct {
@@ -22,40 +30,40 @@ func TestErrorDetail_Is(t *testing.T) {
 		{
 			name:   "an equal value built separately matches, which is the whole point",
 			err:    NewErrorDetailWithHttpStatusCode("invalid_grant", "The user account is disabled.", 400),
-			target: ErrUserDisabled,
+			target: userDisabled,
 			want:   true,
 		},
 		{
 			name:   "the sentinel matches itself",
-			err:    ErrNoAuthContext,
-			target: ErrNoAuthContext,
+			err:    noAuthContext,
+			target: noAuthContext,
 			want:   true,
 		},
 		{
 			name:   "a differing description does not match",
 			err:    NewErrorDetailWithHttpStatusCode("invalid_grant", "Client is disabled.", 400),
-			target: ErrUserDisabled,
+			target: userDisabled,
 			want:   false,
 		},
 		{
 			name:   "a differing code does not match",
 			err:    NewErrorDetailWithHttpStatusCode("invalid_request", "The user account is disabled.", 400),
-			target: ErrUserDisabled,
+			target: userDisabled,
 			want:   false,
 		},
 		{
 			// The two sentinels that share a code and a status and differ only in their text. The
 			// token endpoint charges an account's failure budget on one and not the other, so this
 			// row is the one keeping those two apart.
-			name:   "ErrClientDisabled is not ErrUserDisabled",
+			name:   "the client-disabled sentinel is not the user-disabled one",
 			err:    NewErrorDetailWithHttpStatusCode("invalid_grant", "Client is disabled.", 400),
-			target: ErrUserDisabled,
+			target: userDisabled,
 			want:   false,
 		},
 		{
 			name:   "a differing status code does not match, though code and description agree",
 			err:    NewErrorDetailWithHttpStatusCode("invalid_grant", "The user account is disabled.", 401),
-			target: ErrUserDisabled,
+			target: userDisabled,
 			want:   false,
 		},
 		{
@@ -63,18 +71,18 @@ func TestErrorDetail_Is(t *testing.T) {
 			// without that test a detail carrying no status would answer for one that carries 400.
 			name:   "a shorter detail does not match a longer one",
 			err:    twoKeys,
-			target: ErrUserDisabled,
+			target: userDisabled,
 			want:   false,
 		},
 		{
 			name:   "and not in the other direction either",
-			err:    ErrUserDisabled,
+			err:    userDisabled,
 			target: twoKeys,
 			want:   false,
 		},
 		{
 			name:   "a typed nil target is not this error",
-			err:    ErrUserDisabled,
+			err:    userDisabled,
 			target: (*ErrorDetail)(nil),
 			want:   false,
 		},
@@ -83,7 +91,7 @@ func TestErrorDetail_Is(t *testing.T) {
 			// caller had to have asserted the type first. errors.Is hands Is whatever the caller
 			// named, and answering true for an unrelated type would make every sentinel match it.
 			name:   "a target of another type is not this error",
-			err:    ErrUserDisabled,
+			err:    userDisabled,
 			target: errors.New("invalid_grant"),
 			want:   false,
 		},
@@ -110,11 +118,14 @@ func TestErrorDetail_Is_ThroughAWrapper(t *testing.T) {
 	rebuilt := NewErrorDetailWithHttpStatusCode("invalid_grant", "The user account is disabled.", 400)
 	wrapped := fmt.Errorf("unable to validate the token request: %w", rebuilt)
 
-	if !errors.Is(wrapped, ErrUserDisabled) {
-		t.Error("Expected a wrapped ErrUserDisabled to still match the sentinel")
+	userDisabled := NewErrorDetailWithHttpStatusCode("invalid_grant", "The user account is disabled.", 400)
+	clientDisabled := NewErrorDetailWithHttpStatusCode("invalid_grant", "Client is disabled.", 400)
+
+	if !errors.Is(wrapped, userDisabled) {
+		t.Error("Expected a wrapped user-disabled detail to still match the sentinel")
 	}
-	if errors.Is(wrapped, ErrClientDisabled) {
-		t.Error("Expected a wrapped ErrUserDisabled not to match a different sentinel")
+	if errors.Is(wrapped, clientDisabled) {
+		t.Error("Expected a wrapped user-disabled detail not to match a different sentinel")
 	}
 
 	var detail *ErrorDetail

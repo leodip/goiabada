@@ -174,7 +174,7 @@ func HandleTokenPost(
 				return
 			}
 			// Check if user is disabled and log audit event
-			if errors.Is(err, customerrors.ErrUserDisabled) {
+			if errors.Is(err, protocolvalidation.ErrUserDisabled) {
 				auditLogger.Log(r.Context(), audit.AuditUserDisabled, map[string]interface{}{
 					"clientId": input.ClientId,
 				})
@@ -193,7 +193,7 @@ func HandleTokenPost(
 			// validator discards the client model on failure. Unlike that event, this one is
 			// reached only below client authentication and PKCE, so the identifier here has
 			// been proved rather than merely asserted.
-			if errors.Is(err, customerrors.ErrCodeRedirectURIDeregistered) {
+			if errors.Is(err, protocolvalidation.ErrCodeRedirectURIDeregistered) {
 				auditLogger.Log(r.Context(), audit.AuditRedemptionRefusedRedirectURI, map[string]interface{}{
 					"clientIdentifier": input.ClientId,
 				})
@@ -249,7 +249,7 @@ func HandleTokenPost(
 			var errDetail *customerrors.ErrorDetail
 			if errors.As(err, &errDetail) &&
 				input.GrantType == "password" && errDetail.GetCode() == "invalid_grant" &&
-				!errors.Is(err, customerrors.ErrClientDisabled) {
+				!errors.Is(err, protocolvalidation.ErrClientDisabled) {
 
 				credentialFailures.RecordCredentialFailure(r)
 				auditLogger.Log(r.Context(), audit.AuditROPCAuthFailed, map[string]interface{}{

@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/data"
@@ -126,7 +127,7 @@ func HandleAPIResourcePermissionsPut(
 			rawDescription := strings.TrimSpace(req.Permissions[i].Description)
 
 			// Explicitly forbid HTML angle brackets in description
-			if err := validators.ValidateNoAngleBrackets(rawDescription,
+			if err := accountvalidation.ValidateNoAngleBrackets(rawDescription,
 				i18n.ErrCodeAdminResourcePermissionsDescriptionHtmlNotAllowed); err != nil {
 				writeValidationError(w, r, err)
 				return

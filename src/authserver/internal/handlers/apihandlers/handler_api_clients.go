@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/constants"
@@ -299,7 +300,7 @@ func HandleAPIClientCreatePost(
 			return
 		}
 
-		if err := validators.ValidateNoAngleBrackets(req.Description, i18n.ErrCodeDescriptionAngleBrackets); err != nil {
+		if err := accountvalidation.ValidateNoAngleBrackets(req.Description, i18n.ErrCodeDescriptionAngleBrackets); err != nil {
 			writeValidationError(w, r, err)
 			return
 		}
@@ -312,7 +313,7 @@ func HandleAPIClientCreatePost(
 			return
 		}
 
-		if err := validators.ValidateNoAngleBrackets(trimmedDisplayName, i18n.ErrCodeDisplayNameAngleBrackets); err != nil {
+		if err := accountvalidation.ValidateNoAngleBrackets(trimmedDisplayName, i18n.ErrCodeDisplayNameAngleBrackets); err != nil {
 			writeValidationError(w, r, err)
 			return
 		}
@@ -437,7 +438,7 @@ func HandleAPIClientUpdatePut(
 			return
 		}
 
-		if err := validators.ValidateNoAngleBrackets(updateReq.Description, i18n.ErrCodeDescriptionAngleBrackets); err != nil {
+		if err := accountvalidation.ValidateNoAngleBrackets(updateReq.Description, i18n.ErrCodeDescriptionAngleBrackets); err != nil {
 			writeValidationError(w, r, err)
 			return
 		}
@@ -542,7 +543,7 @@ func HandleAPIClientUpdatePut(
 			return
 		}
 
-		if err := validators.ValidateNoAngleBrackets(client.DisplayName, i18n.ErrCodeDisplayNameAngleBrackets); err != nil {
+		if err := accountvalidation.ValidateNoAngleBrackets(client.DisplayName, i18n.ErrCodeDisplayNameAngleBrackets); err != nil {
 			writeValidationError(w, r, err)
 			return
 		}
@@ -850,8 +851,8 @@ func HandleAPIClientRedirectURIsPut(
 		// (#250).
 		//
 		// These two flags are the complete enumeration of redirect-based flows here:
-		// oauth.ResponseTypeInfo.IsImplicitFlow treats any response type containing "code" as not
-		// implicit, so nothing outside the pair can produce a redirect.
+		// protocolvalidation.ResponseTypeInfo.IsImplicitFlow treats any response type containing
+		// "code" as not implicit, so nothing outside the pair can produce a redirect.
 		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
 		if !client.AuthorizationCodeEnabled && !client.IsImplicitGrantEnabled(settings.ImplicitFlowEnabled) {
 			writeJSONError(w, "Redirect URIs are used by the authorization code with PKCE flow and by the implicit flow, and neither is enabled for this client.", "VALIDATION_ERROR", http.StatusBadRequest)

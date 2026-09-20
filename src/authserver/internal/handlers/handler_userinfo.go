@@ -6,11 +6,11 @@ import (
 	"strings"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/leodip/goiabada/authserver/internal/apiresponse"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
-	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/errs"
 )
 
@@ -48,7 +48,7 @@ func HandleUserInfoGetPost(
 			// permitted but told the client to retry a request that can only fail again,
 			// where 401 tells it to obtain a new token, which is the whole point of the
 			// distinction (#279 decision 14).
-			httpHelper.JsonError(w, r, customerrors.NewErrorDetailWithHttpStatusCodeAndWWWAuthenticate(
+			httpHelper.JsonError(w, r, apiresponse.NewErrorDetailWithHttpStatusCodeAndWWWAuthenticate(
 				"invalid_token", "The user could not be found.", http.StatusUnauthorized,
 				`Bearer error="invalid_token"`))
 			return
@@ -62,7 +62,7 @@ func HandleUserInfoGetPost(
 			// 401 invalid_token, for the reason the not-found branch above gives: the
 			// token is no longer valid for this account and the client's remedy is a new
 			// one, not a retry (#279 decision 14).
-			httpHelper.JsonError(w, r, customerrors.NewErrorDetailWithHttpStatusCodeAndWWWAuthenticate(
+			httpHelper.JsonError(w, r, apiresponse.NewErrorDetailWithHttpStatusCodeAndWWWAuthenticate(
 				"invalid_token", "The user account is disabled.", http.StatusUnauthorized,
 				`Bearer error="invalid_token"`))
 			return

@@ -6,7 +6,6 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/constants"
-	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
@@ -29,7 +28,7 @@ func (s *AuthHelper) GetAuthContext(r *http.Request) (*ceremony.AuthContext, err
 	}
 	jsonData, ok := sess.Values[constants.SessionKeyAuthContext].(string)
 	if !ok {
-		return nil, customerrors.ErrNoAuthContext
+		return nil, ErrNoAuthContext
 	}
 
 	var authContext ceremony.AuthContext
