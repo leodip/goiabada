@@ -11,6 +11,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/stretchr/testify/assert"
@@ -33,7 +34,7 @@ func TestDCR_Disabled_Returns403(t *testing.T) {
 	}()
 
 	// Attempt to register a client
-	reqBody := api.DynamicClientRegistrationRequest{
+	reqBody := oidc.DynamicClientRegistrationRequest{
 		RedirectURIs: []string{"http://localhost:3000/callback"},
 		ClientName:   "Test Client",
 	}
@@ -43,7 +44,7 @@ func TestDCR_Disabled_Returns403(t *testing.T) {
 
 	assert.Equal(t, http.StatusForbidden, resp.StatusCode)
 
-	var errorResp api.DynamicClientRegistrationError
+	var errorResp oidc.DynamicClientRegistrationError
 	err = json.NewDecoder(resp.Body).Decode(&errorResp)
 	assert.NoError(t, err)
 	assert.Equal(t, "access_denied", errorResp.Error)
@@ -56,7 +57,7 @@ func TestDCR_PublicClient_MCP_UseCase_Success(t *testing.T) {
 	defer disableDCR(t)
 
 	// MCP client registration request
-	reqBody := api.DynamicClientRegistrationRequest{
+	reqBody := oidc.DynamicClientRegistrationRequest{
 		RedirectURIs:            []string{"http://localhost:8080/callback"},
 		TokenEndpointAuthMethod: "none", // Public client
 		GrantTypes:              []string{"authorization_code", "refresh_token"},
@@ -71,7 +72,7 @@ func TestDCR_PublicClient_MCP_UseCase_Success(t *testing.T) {
 	assert.Equal(t, "no-store", resp.Header.Get("Cache-Control"))
 	assert.Equal(t, "no-cache", resp.Header.Get("Pragma"))
 
-	var response api.DynamicClientRegistrationResponse
+	var response oidc.DynamicClientRegistrationResponse
 	err := json.NewDecoder(resp.Body).Decode(&response)
 	assert.NoError(t, err)
 
@@ -111,7 +112,7 @@ func TestDCR_ConfidentialClient_Success(t *testing.T) {
 	enableDCR(t)
 	defer disableDCR(t)
 
-	reqBody := api.DynamicClientRegistrationRequest{
+	reqBody := oidc.DynamicClientRegistrationRequest{
 		RedirectURIs:            []string{"https://app.example.com/callback"},
 		TokenEndpointAuthMethod: "client_secret_post",
 		GrantTypes:              []string{"authorization_code", "client_credentials", "refresh_token"},
@@ -123,7 +124,7 @@ func TestDCR_ConfidentialClient_Success(t *testing.T) {
 
 	assert.Equal(t, http.StatusCreated, resp.StatusCode)
 
-	var response api.DynamicClientRegistrationResponse
+	var response oidc.DynamicClientRegistrationResponse
 	err := json.NewDecoder(resp.Body).Decode(&response)
 	assert.NoError(t, err)
 
@@ -152,7 +153,7 @@ func TestDCR_DefaultValues_Applied(t *testing.T) {
 	defer disableDCR(t)
 
 	// Minimal request - no token_endpoint_auth_method, no grant_types
-	reqBody := api.DynamicClientRegistrationRequest{
+	reqBody := oidc.DynamicClientRegistrationRequest{
 		RedirectURIs: []string{"https://app.example.com/callback"},
 		ClientName:   "Minimal Client",
 	}
@@ -162,7 +163,7 @@ func TestDCR_DefaultValues_Applied(t *testing.T) {
 
 	assert.Equal(t, http.StatusCreated, resp.StatusCode)
 
-	var response api.DynamicClientRegistrationResponse
+	var response oidc.DynamicClientRegistrationResponse
 	err := json.NewDecoder(resp.Body).Decode(&response)
 	assert.NoError(t, err)
 
@@ -232,7 +233,7 @@ func TestDCR_RedirectURI_Validation(t *testing.T) {
 			redirectURIs:   []string{"https://app.example.com/callback"},
 			grantTypes:     []string{"authorization_code"},
 			expectedStatus: http.StatusBadRequest,
-			expectedError:  api.DCRErrorInvalidRedirectURI,
+			expectedError:  oidc.DCRErrorInvalidRedirectURI,
 		},
 		{
 			name:           "Public client - non-localhost HTTP rejected",
@@ -240,7 +241,7 @@ func TestDCR_RedirectURI_Validation(t *testing.T) {
 			redirectURIs:   []string{"http://example.com/callback"},
 			grantTypes:     []string{"authorization_code"},
 			expectedStatus: http.StatusBadRequest,
-			expectedError:  api.DCRErrorInvalidRedirectURI,
+			expectedError:  oidc.DCRErrorInvalidRedirectURI,
 		},
 		{
 			name:           "Confidential client - HTTPS allowed",
@@ -262,7 +263,7 @@ func TestDCR_RedirectURI_Validation(t *testing.T) {
 			redirectURIs:   []string{"http://example.com/callback"},
 			grantTypes:     []string{"authorization_code"},
 			expectedStatus: http.StatusBadRequest,
-			expectedError:  api.DCRErrorInvalidRedirectURI,
+			expectedError:  oidc.DCRErrorInvalidRedirectURI,
 		},
 		// Issue #105: the loopback host check was a prefix match, so any host merely
 		// starting with a loopback name was accepted. Both client types are covered here
@@ -277,7 +278,7 @@ func TestDCR_RedirectURI_Validation(t *testing.T) {
 			redirectURIs:   []string{"http://localhost.attacker.com/callback"},
 			grantTypes:     []string{"authorization_code"},
 			expectedStatus: http.StatusBadRequest,
-			expectedError:  api.DCRErrorInvalidRedirectURI,
+			expectedError:  oidc.DCRErrorInvalidRedirectURI,
 		},
 		{
 			name:           "Confidential client - host with a loopback prefix rejected",
@@ -285,7 +286,7 @@ func TestDCR_RedirectURI_Validation(t *testing.T) {
 			redirectURIs:   []string{"http://localhost.attacker.com/callback"},
 			grantTypes:     []string{"authorization_code"},
 			expectedStatus: http.StatusBadRequest,
-			expectedError:  api.DCRErrorInvalidRedirectURI,
+			expectedError:  oidc.DCRErrorInvalidRedirectURI,
 		},
 		{
 			name:           "Missing redirect_uris for authorization_code",
@@ -293,7 +294,7 @@ func TestDCR_RedirectURI_Validation(t *testing.T) {
 			redirectURIs:   []string{},
 			grantTypes:     []string{"authorization_code"},
 			expectedStatus: http.StatusBadRequest,
-			expectedError:  api.DCRErrorInvalidRedirectURI,
+			expectedError:  oidc.DCRErrorInvalidRedirectURI,
 		},
 		{
 			name:           "Client credentials - no redirect_uris required",
@@ -308,13 +309,13 @@ func TestDCR_RedirectURI_Validation(t *testing.T) {
 			redirectURIs:   []string{"not a valid uri"},
 			grantTypes:     []string{"authorization_code"},
 			expectedStatus: http.StatusBadRequest,
-			expectedError:  api.DCRErrorInvalidRedirectURI,
+			expectedError:  oidc.DCRErrorInvalidRedirectURI,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			reqBody := api.DynamicClientRegistrationRequest{
+			reqBody := oidc.DynamicClientRegistrationRequest{
 				RedirectURIs:            tc.redirectURIs,
 				TokenEndpointAuthMethod: tc.authMethod,
 				GrantTypes:              tc.grantTypes,
@@ -327,7 +328,7 @@ func TestDCR_RedirectURI_Validation(t *testing.T) {
 			assert.Equal(t, tc.expectedStatus, resp.StatusCode)
 
 			if tc.expectedStatus == http.StatusBadRequest {
-				var errorResp api.DynamicClientRegistrationError
+				var errorResp oidc.DynamicClientRegistrationError
 				err := json.NewDecoder(resp.Body).Decode(&errorResp)
 				assert.NoError(t, err)
 				assert.Equal(t, tc.expectedError, errorResp.Error)
@@ -356,25 +357,25 @@ func TestDCR_GrantType_Validation(t *testing.T) {
 			name:           "Unsupported grant type",
 			grantTypes:     []string{"password"},
 			expectedStatus: http.StatusBadRequest,
-			expectedError:  api.DCRErrorInvalidClientMetadata,
+			expectedError:  oidc.DCRErrorInvalidClientMetadata,
 		},
 		{
 			name:           "Unsupported implicit grant",
 			grantTypes:     []string{"implicit"},
 			expectedStatus: http.StatusBadRequest,
-			expectedError:  api.DCRErrorInvalidClientMetadata,
+			expectedError:  oidc.DCRErrorInvalidClientMetadata,
 		},
 		{
 			name:           "Mixed valid and invalid",
 			grantTypes:     []string{"authorization_code", "password"},
 			expectedStatus: http.StatusBadRequest,
-			expectedError:  api.DCRErrorInvalidClientMetadata,
+			expectedError:  oidc.DCRErrorInvalidClientMetadata,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			reqBody := api.DynamicClientRegistrationRequest{
+			reqBody := oidc.DynamicClientRegistrationRequest{
 				RedirectURIs:            []string{"https://app.example.com/callback"},
 				TokenEndpointAuthMethod: "client_secret_post",
 				GrantTypes:              tc.grantTypes,
@@ -387,7 +388,7 @@ func TestDCR_GrantType_Validation(t *testing.T) {
 			assert.Equal(t, tc.expectedStatus, resp.StatusCode)
 
 			if tc.expectedStatus == http.StatusBadRequest {
-				var errorResp api.DynamicClientRegistrationError
+				var errorResp oidc.DynamicClientRegistrationError
 				err := json.NewDecoder(resp.Body).Decode(&errorResp)
 				assert.NoError(t, err)
 				assert.Equal(t, tc.expectedError, errorResp.Error)
@@ -435,7 +436,7 @@ func TestDCR_TokenEndpointAuthMethod_Validation(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			reqBody := api.DynamicClientRegistrationRequest{
+			reqBody := oidc.DynamicClientRegistrationRequest{
 				RedirectURIs:            []string{"http://localhost:3000/callback"},
 				TokenEndpointAuthMethod: tc.authMethod,
 				GrantTypes:              []string{"authorization_code"},
@@ -480,7 +481,7 @@ func TestDCR_ClientName_Validation(t *testing.T) {
 			name:           "Too long (129 chars)",
 			clientName:     strings.Repeat("a", 129),
 			expectedStatus: http.StatusBadRequest,
-			expectedError:  api.DCRErrorInvalidClientMetadata,
+			expectedError:  oidc.DCRErrorInvalidClientMetadata,
 		},
 		// client_name lands in clients.description, which the admin API refuses angle
 		// brackets in, so this path refuses them too (#275).
@@ -488,13 +489,13 @@ func TestDCR_ClientName_Validation(t *testing.T) {
 			name:           "Markup is refused",
 			clientName:     "<script>alert(1)</script>",
 			expectedStatus: http.StatusBadRequest,
-			expectedError:  api.DCRErrorInvalidClientMetadata,
+			expectedError:  oidc.DCRErrorInvalidClientMetadata,
 		},
 		{
 			name:           "A bare closing bracket is refused",
 			clientName:     "Acme > Corp",
 			expectedStatus: http.StatusBadRequest,
-			expectedError:  api.DCRErrorInvalidClientMetadata,
+			expectedError:  oidc.DCRErrorInvalidClientMetadata,
 		},
 		// The accepted twin: ampersands and quotes are ordinary text and stay accepted.
 		{
@@ -506,7 +507,7 @@ func TestDCR_ClientName_Validation(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			reqBody := api.DynamicClientRegistrationRequest{
+			reqBody := oidc.DynamicClientRegistrationRequest{
 				RedirectURIs:            []string{"http://localhost:3000/callback"},
 				TokenEndpointAuthMethod: "none",
 				GrantTypes:              []string{"authorization_code"},
@@ -519,7 +520,7 @@ func TestDCR_ClientName_Validation(t *testing.T) {
 			assert.Equal(t, tc.expectedStatus, resp.StatusCode)
 
 			if tc.expectedStatus == http.StatusBadRequest {
-				var errorResp api.DynamicClientRegistrationError
+				var errorResp oidc.DynamicClientRegistrationError
 				err := json.NewDecoder(resp.Body).Decode(&errorResp)
 				assert.NoError(t, err)
 				assert.Equal(t, tc.expectedError, errorResp.Error)
@@ -589,7 +590,7 @@ func TestDCR_MultipleRedirectURIs(t *testing.T) {
 	enableDCR(t)
 	defer disableDCR(t)
 
-	reqBody := api.DynamicClientRegistrationRequest{
+	reqBody := oidc.DynamicClientRegistrationRequest{
 		RedirectURIs: []string{
 			"http://localhost:3000/callback",
 			"http://localhost:3001/callback",
@@ -605,7 +606,7 @@ func TestDCR_MultipleRedirectURIs(t *testing.T) {
 
 	assert.Equal(t, http.StatusCreated, resp.StatusCode)
 
-	var response api.DynamicClientRegistrationResponse
+	var response oidc.DynamicClientRegistrationResponse
 	err := json.NewDecoder(resp.Body).Decode(&response)
 	assert.NoError(t, err)
 
@@ -631,7 +632,7 @@ func TestDCR_ConfidentialClient_DefaultAcrLevel(t *testing.T) {
 	enableDCR(t)
 	defer disableDCR(t)
 
-	reqBody := api.DynamicClientRegistrationRequest{
+	reqBody := oidc.DynamicClientRegistrationRequest{
 		RedirectURIs:            []string{"https://app.example.com/callback"},
 		TokenEndpointAuthMethod: "client_secret_post",
 		GrantTypes:              []string{"authorization_code"},
@@ -643,7 +644,7 @@ func TestDCR_ConfidentialClient_DefaultAcrLevel(t *testing.T) {
 
 	assert.Equal(t, http.StatusCreated, resp.StatusCode)
 
-	var response api.DynamicClientRegistrationResponse
+	var response oidc.DynamicClientRegistrationResponse
 	err := json.NewDecoder(resp.Body).Decode(&response)
 	assert.NoError(t, err)
 
@@ -666,7 +667,7 @@ func TestDCR_ConfidentialClient_DefaultAcrLevel(t *testing.T) {
 // makeDCRRequest makes a DCR POST request without authentication (open registration)
 // require, not assert: returning a nil response here would surface as a SIGSEGV
 // in the caller instead of the real connectivity error.
-func makeDCRRequest(t *testing.T, body api.DynamicClientRegistrationRequest) *http.Response {
+func makeDCRRequest(t *testing.T, body oidc.DynamicClientRegistrationRequest) *http.Response {
 	jsonBody, err := json.Marshal(body)
 	require.NoError(t, err)
 
@@ -690,7 +691,7 @@ func makeDCRRequest(t *testing.T, body api.DynamicClientRegistrationRequest) *ht
 //
 // The caller owns the setting: call enableDCR before, and defer disableDCR.
 func registerDCRClient(t *testing.T, clientName string, redirectURI string) *models.Client {
-	resp := makeDCRRequest(t, api.DynamicClientRegistrationRequest{
+	resp := makeDCRRequest(t, oidc.DynamicClientRegistrationRequest{
 		RedirectURIs: []string{redirectURI},
 		ClientName:   clientName,
 	})
@@ -698,7 +699,7 @@ func registerDCRClient(t *testing.T, clientName string, redirectURI string) *mod
 
 	require.Equal(t, http.StatusCreated, resp.StatusCode)
 
-	var response api.DynamicClientRegistrationResponse
+	var response oidc.DynamicClientRegistrationResponse
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&response))
 
 	client, err := database.GetClientByClientIdentifier(nil, response.ClientID)
@@ -748,7 +749,7 @@ func TestDCR_PublicClient_PKCERequiredIsWrittenExplicitly(t *testing.T) {
 	register := func(t *testing.T, authMethod string, redirectURI string) *api.ClientResponse {
 		t.Helper()
 
-		resp := makeDCRRequest(t, api.DynamicClientRegistrationRequest{
+		resp := makeDCRRequest(t, oidc.DynamicClientRegistrationRequest{
 			RedirectURIs:            []string{redirectURI},
 			TokenEndpointAuthMethod: authMethod,
 			GrantTypes:              []string{"authorization_code"},
@@ -757,7 +758,7 @@ func TestDCR_PublicClient_PKCERequiredIsWrittenExplicitly(t *testing.T) {
 		defer func() { _ = resp.Body.Close() }()
 		require.Equal(t, http.StatusCreated, resp.StatusCode)
 
-		var registered api.DynamicClientRegistrationResponse
+		var registered oidc.DynamicClientRegistrationResponse
 		require.NoError(t, json.NewDecoder(resp.Body).Decode(&registered))
 
 		client, err := database.GetClientByClientIdentifier(nil, registered.ClientID)

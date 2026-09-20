@@ -17,6 +17,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
+	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/otp"
 	"github.com/leodip/goiabada/core/customerrors"
@@ -432,7 +433,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
-		authHelper.On("GetAuthContext", mock.Anything).Return(nil, customerrors.ErrNoAuthContext)
+		authHelper.On("GetAuthContext", mock.Anything).Return(nil, handlerhelpers.ErrNoAuthContext)
 
 		// No InternalServerError expectation is set, so the mock fails this subtest
 		// if the handler takes the other branch. Location is asserted against the

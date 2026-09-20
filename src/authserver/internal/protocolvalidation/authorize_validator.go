@@ -15,7 +15,6 @@ import (
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/i18n"
-	"github.com/leodip/goiabada/core/oauth"
 )
 
 type AuthorizeValidator struct {
@@ -136,7 +135,7 @@ func (val *AuthorizeValidator) ValidateClientAndRedirectURI(ctx context.Context,
 	// Parse response_type to determine which flow is being requested
 	// For implicit flow, we check later in ValidateRequest if it's actually enabled
 	// Here we just need to verify the client supports at least one of the requested flows
-	rtInfo := oauth.ParseResponseType(input.ResponseType)
+	rtInfo := ParseResponseType(input.ResponseType)
 
 	if rtInfo.IsImplicitFlow() {
 		// For implicit flow, we don't require AuthorizationCodeEnabled
@@ -250,7 +249,7 @@ func (val *AuthorizeValidator) ValidateRequest(input *ValidateRequestInput) erro
 	}
 
 	// Parse response_type (can be space-separated for OIDC, e.g., "id_token token")
-	rtInfo := oauth.ParseResponseType(input.ResponseType)
+	rtInfo := ParseResponseType(input.ResponseType)
 	isImplicitFlow := rtInfo.IsImplicitFlow()
 
 	// Validate response_type combinations

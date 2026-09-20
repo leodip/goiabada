@@ -1,4 +1,4 @@
-package oauth
+package protocolvalidation
 
 import "strings"
 

@@ -131,15 +131,6 @@ Notes on rows that are not self-evident:
   gone; what remains is the wire contract the admin console decodes. The mapping was once #349's
   alone, but moving it without the fields would have left every exception row below standing, so
   the two were one issue.
-- `core/validators` is kernel on the second half of the membership test rather than the first. One
-  of the two files it holds after #344 exports `ValidateNoAngleBrackets`, which fifteen sites in the
-  auth server call and the admin console never does. It stays because it is a four-line wrapper over
-  `ContainsAngleBrackets`, which both processes do call — one rule, packaged twice — and because the
-  row buys rule 2 over a package importing nothing but `strings`, `regexp` and `core/i18n`.
-- `core/oauth` is the largest split. The admin console is an OAuth client: it needs token response
-  values, PKCE and JWT/JWKS validation. It does not issue codes or tokens and does not rotate
-  signing keys. #338 drew that line: the provider half was `core/oauthprovider`, which #339 carried
-  to the auth server whole, as `authserver/internal/ceremony`, `issuance` and `signingkeys`.
 - `core/constants` is `kernel`, and it is the one package whose ownership is also recorded symbol
   by symbol, in the table below. Package granularity cannot hold it: a constant is a string, so an
   auth-server-only name declared there costs nothing at compile time and breaks none of the rules

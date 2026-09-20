@@ -15,9 +15,9 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/data"
+	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
-	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
 )
@@ -65,7 +65,7 @@ func HandleConsentGet(
 	return func(w http.ResponseWriter, r *http.Request) {
 		authContext, err := authHelper.GetAuthContext(r)
 		if err != nil {
-			if errors.Is(err, customerrors.ErrNoAuthContext) {
+			if errors.Is(err, handlerhelpers.ErrNoAuthContext) {
 				var profileUrl = GetProfileURL()
 				slog.WarnContext(r.Context(), "auth context is missing, redirecting", "redirect", profileUrl)
 				http.Redirect(w, r, profileUrl, http.StatusFound)
@@ -181,7 +181,7 @@ func HandleConsentPost(
 	return func(w http.ResponseWriter, r *http.Request) {
 		authContext, err := authHelper.GetAuthContext(r)
 		if err != nil {
-			if errors.Is(err, customerrors.ErrNoAuthContext) {
+			if errors.Is(err, handlerhelpers.ErrNoAuthContext) {
 				var profileUrl = GetProfileURL()
 				slog.WarnContext(r.Context(), "auth context is missing, redirecting", "redirect", profileUrl)
 				http.Redirect(w, r, profileUrl, http.StatusFound)

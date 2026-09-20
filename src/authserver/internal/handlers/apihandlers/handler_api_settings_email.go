@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/data"
@@ -20,7 +21,6 @@ import (
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
-	"github.com/leodip/goiabada/core/validators"
 )
 
 // HandleAPISettingsEmailGet - GET /api/v1/admin/settings/email
@@ -149,7 +149,7 @@ func HandleAPISettingsEmailPut(
 			return
 		}
 
-		if err := validators.ValidateNoAngleBrackets(req.SMTPFromName, i18n.ErrCodeSettingsSmtpFromNameAngleBrackets); err != nil {
+		if err := accountvalidation.ValidateNoAngleBrackets(req.SMTPFromName, i18n.ErrCodeSettingsSmtpFromNameAngleBrackets); err != nil {
 			writeValidationError(w, r, err)
 			return
 		}

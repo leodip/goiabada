@@ -119,11 +119,6 @@ command itself and fails on a tree it changed.
 | `core/api` | `CreateUserAttributeRequest` | both-apps | — |
 | `core/api` | `CreateUserAttributeResponse` | both-apps | — |
 | `core/api` | `CreateUserResponse` | both-apps | — |
-| `core/api` | `DCRErrorInvalidClientMetadata` | moving | #385 decision 8 moves the RFC 7591 registration types to `authserver/internal/oidc`, tags and error-code strings unchanged. |
-| `core/api` | `DCRErrorInvalidRedirectURI` | moving | #385 decision 8 moves the RFC 7591 registration types to `authserver/internal/oidc`, tags and error-code strings unchanged. |
-| `core/api` | `DynamicClientRegistrationError` | moving | #385 decision 8 moves the RFC 7591 registration types to `authserver/internal/oidc`, tags and error-code strings unchanged. |
-| `core/api` | `DynamicClientRegistrationRequest` | moving | #385 decision 8 moves the RFC 7591 registration types to `authserver/internal/oidc`, tags and error-code strings unchanged. |
-| `core/api` | `DynamicClientRegistrationResponse` | moving | #385 decision 8 moves the RFC 7591 registration types to `authserver/internal/oidc`, tags and error-code strings unchanged. |
 | `core/api` | `ErrorResponse` | both-apps | — |
 | `core/api` | `GenerateUserEmailVerificationCodeResponse` | contract | Admin API response DTO, which is what `core/api` is for. The auth server writes it and no admin console file reads it yet; #385 exempts this package by name. |
 | `core/api` | `GetAuditEventTypesResponse` | both-apps | — |
@@ -248,14 +243,9 @@ command itself and fails on a tree it changed.
 | `core/countries` | `ByAlpha2` | contract | The lookup half of the country table whose other half the admin console uses. Moving it would put one ISO 3166 dataset in two places. |
 | `core/countries` | `Country` | own-package | — |
 | `core/customerrors` | `ConformErrorDescription` | both-apps | — |
-| `core/customerrors` | `ErrClientDisabled` | moving | #385 moves it to `authserver/internal/protocolvalidation`; only the auth server ever emits it. |
-| `core/customerrors` | `ErrCodeRedirectURIDeregistered` | moving | #385 moves it to `authserver/internal/protocolvalidation`; only the auth server ever emits it. |
-| `core/customerrors` | `ErrNoAuthContext` | moving | #385 moves it to `authserver/internal/handlerhelpers`, beside the handler helper that returns it. |
-| `core/customerrors` | `ErrUserDisabled` | moving | #385 moves it to `authserver/internal/protocolvalidation`; only the auth server ever emits it. |
 | `core/customerrors` | `ErrorDetail` | both-apps | — |
 | `core/customerrors` | `NewErrorDetail` | contract | One of the two neutral `ErrorDetail` constructors. `NewErrorDetailWithHttpStatusCode` beside it is `both-apps`, and the pair is one API that both processes compile. |
 | `core/customerrors` | `NewErrorDetailWithHttpStatusCode` | both-apps | — |
-| `core/customerrors` | `NewErrorDetailWithHttpStatusCodeAndWWWAuthenticate` | moving | #385 decision 17 moves it to `authserver/internal/apiresponse`; it builds an RFC 6750 bearer-token error header, which is provider-side by definition. |
 | `core/enums` | `AcrLevel` | moving | #385 decision 6 moves it to `authserver/internal/models`, which carries it on a column the seeder writes. |
 | `core/enums` | `AcrLevel1` | moving | #385 decision 6 moves it to `authserver/internal/models`, which carries it on a column the seeder writes. |
 | `core/enums` | `AcrLevel2Mandatory` | moving | #385 decision 6 moves it to `authserver/internal/models`, which carries it on a column the seeder writes. |
@@ -405,7 +395,6 @@ command itself and fails on a tree it changed.
 | `core/middleware` | `CsrfPolicy` | both-apps | — |
 | `core/middleware` | `MiddlewareCookieReset` | both-apps | — |
 | `core/middleware` | `MiddlewareCsrf` | both-apps | — |
-| `core/middleware` | `MiddlewareNoStore` | moving | #385 moves the provider-side middleware to `authserver/internal/middleware`. |
 | `core/middleware` | `MiddlewareRealIP` | both-apps | — |
 | `core/middleware` | `MiddlewareRequestLogger` | both-apps | — |
 | `core/middleware` | `MiddlewareSecurityHeaders` | both-apps | — |
@@ -419,8 +408,6 @@ command itself and fails on a tree it changed.
 | `core/oauth` | `Jwks` | both-apps | — |
 | `core/oauth` | `JwtInfo` | both-apps | — |
 | `core/oauth` | `JwtToken` | both-apps | — |
-| `core/oauth` | `ParseResponseType` | moving | #385 moves `response_type` parsing to `authserver/internal/protocolvalidation`; it is provider-side. |
-| `core/oauth` | `ResponseTypeInfo` | moving | #385 moves `response_type` parsing to `authserver/internal/protocolvalidation`; it is provider-side. |
 | `core/oauth` | `TokenResponse` | both-apps | — |
 | `core/sessionstore` | `Backend` | both-apps | — |
 | `core/sessionstore` | `DecodeKeyPair` | both-apps | — |
@@ -443,9 +430,8 @@ command itself and fails on a tree it changed.
 | `core/sessionstore` | `TouchThreshold` | own-package | — |
 | `core/sessionstore/sessiontest` | `MemoryBackend` | test-support | Test support: the in-memory session backend nine test files across the two servers drive. Its own package precisely so no binary links it (#385). |
 | `core/sessionstore/sessiontest` | `NewMemoryBackend` | test-support | Test support: the in-memory session backend nine test files across the two servers drive. Its own package precisely so no binary links it (#385). |
-| `core/stringutil` | `GenerateRandomLetterString` | moving | #385 moves it beside its one production caller in `authserver/internal/handlers/apihandlers`. |
-| `core/stringutil` | `GenerateRandomNumberString` | moving | #385 moves it beside its one production caller in `authserver/internal/handlers/apihandlers`. |
 | `core/stringutil` | `GenerateSecurityRandomString` | both-apps | — |
+| `core/stringutil` | `RandomStringFromAlphabet` | own-package | — |
 | `core/testutil` | `Address` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
 | `core/testutil` | `AssertAgentDocs` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
 | `core/testutil` | `AssertArchitecture` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
@@ -479,4 +465,3 @@ command itself and fails on a tree it changed.
 | `core/validators` | `ContainsAngleBrackets` | both-apps | — |
 | `core/validators` | `IdentifierValidator` | own-package | — |
 | `core/validators` | `NewIdentifierValidator` | both-apps | — |
-| `core/validators` | `ValidateNoAngleBrackets` | moving | #385 decision 17 moves it to `authserver/internal/accountvalidation`; it wraps a shared rule in an error only the auth server emits. |

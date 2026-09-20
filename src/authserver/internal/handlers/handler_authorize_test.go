@@ -14,6 +14,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/constants"
+	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
@@ -863,11 +864,11 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		authHelper.On("SaveAuthContext", rr, req, mock.AnythingOfType("*ceremony.AuthContext")).Return(customerrors.ErrNoAuthContext)
+		authHelper.On("SaveAuthContext", rr, req, mock.AnythingOfType("*ceremony.AuthContext")).Return(handlerhelpers.ErrNoAuthContext)
 
 		// Expect the InternalServerError call
 		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
-			return err == customerrors.ErrNoAuthContext
+			return err == handlerhelpers.ErrNoAuthContext
 		})).Once()
 
 		handler.ServeHTTP(rr, req)

@@ -1,8 +1,7 @@
 // Package oauth is the OAuth2/OIDC surface both processes share: the value types that
-// cross the wire or a session (TokenResponse, JwtInfo, JwtToken, Jwk, Jwks), the PKCE
-// challenge helper and the response_type parser. It reaches no database and no
-// persistence type, which is what lets the admin console link it without linking a
-// driver.
+// cross the wire or a session (TokenResponse, JwtInfo, JwtToken, Jwk, Jwks) and the PKCE
+// challenge helper. It reaches no database and no persistence type, which is what lets
+// the admin console link it without linking a driver.
 //
 // The client side of the protocol is no longer here. The JWKS token parser, the
 // code-for-token exchanger and the two bounds they share went to
@@ -10,16 +9,16 @@
 // ceremony: one application speaks that half, so a shared package was hiding its
 // implementation.
 //
-// ParseResponseType sits here although only the auth server calls it. Its one other
-// caller was core/validators, which the admin console linked for unrelated helpers, so
-// moving this dependency-free file to the provider side would have dragged the data layer and
-// all four drivers into the admin console's binary. #344 removed that caller and nothing
-// in core names ParseResponseType any more, but the conclusion stands on the reason
-// beside it: since #339 put code and token issuance and key rotation under
-// authserver/internal, that edge is not merely expensive but refused, because core may
-// not import the auth server at all and ARCHITECTURE.md's module direction rule fails the
-// tier that tries. What belongs here is decided by what each binary ends up containing
-// rather than by which process names the symbol (#338, #339, #344).
+// What belongs here is what both binaries name. That is the rule #385 replaced the
+// earlier one with, and it is stricter: the old rule asked what each binary ends up
+// containing, so a symbol only the auth server called could stay as long as moving it
+// would have cost an import edge. response_type parsing stayed on exactly that argument
+// and is now in authserver/internal/protocolvalidation, where its only callers are.
+//
+// The cost the old rule was buying off has not gone away, and the answer to it is that a
+// symbol one process uses moves to that process rather than staying behind a cheaper
+// import. src/core/OWNERSHIP.md carries the per-symbol version of this, one row each,
+// and the tier refuses a new symbol here that neither application names (#385).
 package oauth
 
 import (

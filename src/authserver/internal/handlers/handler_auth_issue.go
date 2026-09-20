@@ -17,12 +17,12 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/data"
+	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
 	"github.com/leodip/goiabada/authserver/internal/issuance"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 	"github.com/leodip/goiabada/authserver/internal/urlutil"
-	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/errs"
-	"github.com/leodip/goiabada/core/oauth"
 )
 
 func HandleIssueGet(
@@ -39,7 +39,7 @@ func HandleIssueGet(
 	return func(w http.ResponseWriter, r *http.Request) {
 		authContext, err := authHelper.GetAuthContext(r)
 		if err != nil {
-			if errors.Is(err, customerrors.ErrNoAuthContext) {
+			if errors.Is(err, handlerhelpers.ErrNoAuthContext) {
 				var profileUrl = GetProfileURL()
 				slog.WarnContext(r.Context(), "auth context is missing, redirecting", "redirect", profileUrl)
 				http.Redirect(w, r, profileUrl, http.StatusFound)
@@ -266,7 +266,7 @@ func HandleIssueGet(
 		// this handler above it. The later backstops cannot cover that: a third-party
 		// resource server validating an already-signed token has no way to compare the
 		// session's owner against the token's subject (#133).
-		isImplicitFlow := oauth.ParseResponseType(authContext.ResponseType).IsImplicitFlow()
+		isImplicitFlow := protocolvalidation.ParseResponseType(authContext.ResponseType).IsImplicitFlow()
 
 		// nil for the requested max age, and that is decision 1 rather than an omission. max_age
 		// bounds the age of the AUTHENTICATION, which this ceremony already satisfied at
@@ -710,7 +710,7 @@ func handleImplicitFlow(
 	auditLogger AuditLogger,
 ) error {
 	// Determine what tokens to issue based on response_type
-	rtInfo := oauth.ParseResponseType(authContext.ResponseType)
+	rtInfo := protocolvalidation.ParseResponseType(authContext.ResponseType)
 	issueAccessToken := rtInfo.HasToken
 	issueIdToken := rtInfo.HasIdToken
 

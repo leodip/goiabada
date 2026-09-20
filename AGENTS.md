@@ -23,9 +23,9 @@ repository root. It is enforced rather than descriptive: see **Architecture guar
 
 ### Core (`src/core/`)
 - `api/` - The admin API wire contract: request and response DTOs, declarations only, importing no persistence model. The model-to-DTO mapping belongs to the auth server, in `internal/apimapping` (#350)
-- `oauth/` - The OAuth/OIDC values both processes share: token, JWT and JWKS types, the PKCE challenge helper, response_type parsing. The admin console's client of the protocol — JWKS parser, code exchanger, authorize redirect — is `adminconsole/internal/oauthclient` (#385)
+- `oauth/` - The OAuth/OIDC values both processes share: token, JWT and JWKS types, and the PKCE challenge helper. The admin console's client of the protocol — JWKS parser, code exchanger, authorize redirect — is `adminconsole/internal/oauthclient`; `response_type` parsing is the provider's and is in `authserver/internal/protocolvalidation` (#385)
 - There is no `handlerhelpers/` here: each application renders its own pages from its own `internal/handlerhelpers`, because the one shared renderer bound admin page data no auth server template could reach and parsed every template with a `FuncMap` of which the auth server calls four entries out of twenty-two (#385)
-- `validators/` - Identifier and angle-bracket validation, the two both applications use. The authorize and token validators live in `authserver/internal/protocolvalidation`, and the account validators — email, password, profile, address, phone — in `authserver/internal/accountvalidation` (#344)
+- `validators/` - Identifier validation and the angle-bracket predicate, the two rules both applications apply. `ValidateNoAngleBrackets`, which wraps the predicate in an error only the auth server emits, is in `authserver/internal/accountvalidation` beside the other account validators — email, password, profile, address, phone — and the authorize and token validators are in `authserver/internal/protocolvalidation` (#344, #385)
 - `constants/` - Permission identifiers, the version stamp, and the one session name both processes
   must agree on. No context key and no other session key: each process declares its own in
   `internal/constants`, and no row of `ARCHITECTURE.md`'s table here reads `kernel` any more (#351, #385)

@@ -48,7 +48,7 @@ SMTP settings, registration). Protocol token/authorize email errors stay in
 
 ## Angle brackets validator
 
-Emitted by `validators.ValidateNoAngleBrackets`, one code per field family. The
+Emitted by `accountvalidation.ValidateNoAngleBrackets`, one code per field family. The
 address family's code is in the address table above.
 
 | Code | Args | English message |

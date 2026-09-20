@@ -14,11 +14,11 @@ import (
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
 	mocks_handlerhelpers "github.com/leodip/goiabada/authserver/internal/handlerhelpers/mocks"
+	"github.com/leodip/goiabada/authserver/internal/oidc"
 
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
-	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -39,7 +39,7 @@ func TestDCR_AStorageFailureLogsOnceAndKeepsTheRFC7591Envelope(t *testing.T) {
 	database.On("CreateClient", (*sql.Tx)(nil), mock.Anything).
 		Return(errors.New("the disk is full")).Once()
 
-	body, err := json.Marshal(api.DynamicClientRegistrationRequest{
+	body, err := json.Marshal(oidc.DynamicClientRegistrationRequest{
 		ClientName:   "A Test Client",
 		RedirectURIs: []string{"https://client.example.com/callback"},
 	})

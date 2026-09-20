@@ -27,7 +27,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/ratelimit"
-	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/testutil"
@@ -1189,7 +1188,7 @@ func TestLimitOtp_PerUserAndMissingAuthContext(t *testing.T) {
 	}
 
 	t.Run("unreadable auth context reaches the handler", func(t *testing.T) {
-		m := newTestMiddleware(stubAuthHelper{err: customerrors.ErrNoAuthContext}, true)
+		m := newTestMiddleware(stubAuthHelper{err: handlerhelpers.ErrNoAuthContext}, true)
 		// Well past the budget: the pass-through is deliberately not
 		// bounded by this middleware, since there is no user to key a bucket on.
 		for i := 0; i < 20; i++ {

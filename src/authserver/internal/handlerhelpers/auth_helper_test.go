@@ -12,7 +12,6 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/constants"
-	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/leodip/goiabada/core/sessionstore/sessiontest"
 	"github.com/stretchr/testify/assert"
@@ -330,7 +329,7 @@ func TestClearAuthContext(t *testing.T) {
 
 		replayed := replayThroughJar(t, res, seedRes.Cookies())
 		_, err = helper.GetAuthContext(replayed)
-		assert.ErrorIs(t, err, customerrors.ErrNoAuthContext)
+		assert.ErrorIs(t, err, ErrNoAuthContext)
 		requireSessionDecoded(t, store, replayed)
 	})
 
@@ -371,7 +370,7 @@ func TestClearAuthContext(t *testing.T) {
 		// clear emptied, so the auth context is gone anyway.
 		replayed := replayThroughJar(t, res, seedRes.Cookies())
 		_, err = helper.GetAuthContext(replayed)
-		assert.ErrorIs(t, err, customerrors.ErrNoAuthContext)
+		assert.ErrorIs(t, err, ErrNoAuthContext)
 		// And the session still loads, which is what separates "the clear landed" from "the
 		// browser is holding something unreadable".
 		requireSessionDecoded(t, store, replayed)
@@ -406,7 +405,7 @@ func TestClearAuthContext(t *testing.T) {
 
 		replayed := replayThroughJar(t, res, nil)
 		_, err = helper.GetAuthContext(replayed)
-		assert.ErrorIs(t, err, customerrors.ErrNoAuthContext)
+		assert.ErrorIs(t, err, ErrNoAuthContext)
 		requireSessionDecoded(t, store, replayed)
 	})
 

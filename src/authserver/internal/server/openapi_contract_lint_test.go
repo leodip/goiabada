@@ -910,13 +910,15 @@ var schemasWithNoAPIStruct = map[string]string{
 // rather than merely true.
 var apiStructsWithNoSchema = map[string]string{
 	// Outside the document's declared scope. info.description scopes this file to the Admin
-	// API (/api/v1/admin/*) and the Account API (/api/v1/account/*); /connect/register is a
-	// protocol endpoint and is neither, which is also why TestOpenAPI_DescribesEveryAPIRoute
-	// scopes itself to /api/v1.
-	"DynamicClientRegistrationRequest":  "RFC 7591 registration at /connect/register, outside the Admin and Account API scope this document declares",
-	"DynamicClientRegistrationResponse": "RFC 7591 registration at /connect/register, outside the Admin and Account API scope this document declares",
-	"DynamicClientRegistrationError":    "RFC 7591 registration at /connect/register, outside the Admin and Account API scope this document declares",
-	"PublicSettingsResponse":            "the unauthenticated /api/public/settings, outside the Admin and Account API scope this document declares",
+	// API (/api/v1/admin/*) and the Account API (/api/v1/account/*); /api/public/settings is
+	// neither, which is also why TestOpenAPI_DescribesEveryAPIRoute scopes itself to /api/v1.
+	//
+	// The three RFC 7591 registration types were exempted here on the same ground until #385
+	// moved them to authserver/internal/oidc. The entries came out with them rather than
+	// staying: structFields reads src/core/api alone, so a struct that is no longer declared
+	// there is not a gap this map can be exempting, and the loop below fails an entry that
+	// names one.
+	"PublicSettingsResponse": "the unauthenticated /api/public/settings, outside the Admin and Account API scope this document declares",
 }
 
 func TestOpenAPI_SchemaPropertiesMatchTheAPIStructs(t *testing.T) {

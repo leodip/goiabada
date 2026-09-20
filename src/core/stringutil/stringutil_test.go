@@ -72,11 +72,7 @@ func TestRandomStringFromReader_NonPositiveLengthAndEmptyAlphabet(t *testing.T) 
 }
 
 func TestGenerators_LengthAndAlphabet(t *testing.T) {
-	const (
-		securityAlphabet = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-_."
-		letterAlphabet   = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-		numberAlphabet   = "0123456789"
-	)
+	const securityAlphabet = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-_."
 
 	cases := []struct {
 		name     string
@@ -84,8 +80,9 @@ func TestGenerators_LengthAndAlphabet(t *testing.T) {
 		alphabet string
 	}{
 		{"GenerateSecurityRandomString", GenerateSecurityRandomString, securityAlphabet},
-		{"GenerateRandomLetterString", GenerateRandomLetterString, letterAlphabet},
-		{"GenerateRandomNumberString", GenerateRandomNumberString, numberAlphabet},
+		{"RandomStringFromAlphabet", func(n int) string {
+			return RandomStringFromAlphabet(n, securityAlphabet)
+		}, securityAlphabet},
 	}
 
 	for _, c := range cases {
@@ -106,23 +103,6 @@ func TestGenerators_LengthAndAlphabet(t *testing.T) {
 				t.Errorf("%s(0) = %q, want \"\"", c.name, got)
 			}
 		})
-	}
-}
-
-// TestGenerateRandomLetterString_LettersOnly locks the #84 intent: the letter
-// generator must never emit digits (it feeds the alpha half of verification
-// codes, with the numeric half coming from GenerateRandomNumberString).
-func TestGenerateRandomLetterString_LettersOnly(t *testing.T) {
-	s := GenerateRandomLetterString(500)
-	if len(s) != 500 {
-		t.Fatalf("len = %d, want 500", len(s))
-	}
-	for i := 0; i < len(s); i++ {
-		c := s[i]
-		isLetter := (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
-		if !isLetter {
-			t.Fatalf("GenerateRandomLetterString emitted non-letter %q", c)
-		}
 	}
 }
 
@@ -197,26 +177,63 @@ func TestGenerateSecurityRandomString_CrashesIrrecoverablyOnReaderFailure(t *tes
 	}
 }
 
-// TestGenerateRandomNumberString_Distribution is a coarse, non-flaky sanity
-// check that every digit appears and no digit dominates, guarding against a
-// gross bias regression. Tolerance is deliberately wide.
-func TestGenerateRandomNumberString_Distribution(t *testing.T) {
-	const total = 200000
-	s := GenerateRandomNumberString(total)
-	if len(s) != total {
-		t.Fatalf("len = %d, want %d", len(s), total)
-	}
-
-	var counts [10]int
-	for i := 0; i < len(s); i++ {
-		counts[s[i]-'0']++
-	}
-
-	expected := total / 10 // 20000
-	lo, hi := expected*70/100, expected*130/100
-	for d, c := range counts {
-		if c < lo || c > hi {
-			t.Errorf("digit %d appeared %d times, outside [%d, %d]", d, c, lo, hi)
+// TestRandomStringFromAlphabet_Domain is the reason the exported wrapper exists. The private
+// sampler assumed an alphabet of at most 256 bytes, which was true of all three callers in this
+// repository; exporting it under a generic name publishes that assumption to callers who have
+// never read it, and the failure mode is not a wrong answer but a hang. The rejection limit is
+// 256 - (256 % n), which is 0 for n > 256, so every byte drawn is rejected and the loop inside
+// randomStringFromReader never advances.
+//
+// 256 is the last length that works and 257 the first that would spin, so both are rows here
+// rather than one. A regression makes this test hang rather than fail, and the tier's own
+// timeout is the backstop (#385).
+func TestRandomStringFromAlphabet_Domain(t *testing.T) {
+	alphabetOf := func(n int) string {
+		b := make([]byte, n)
+		for i := range b {
+			b[i] = byte(i % 256)
 		}
+		return string(b)
 	}
+
+	t.Run("a one-byte alphabet yields that byte", func(t *testing.T) {
+		if got := RandomStringFromAlphabet(4, "x"); got != "xxxx" {
+			t.Errorf("got %q, want %q", got, "xxxx")
+		}
+	})
+
+	t.Run("a 256-byte alphabet is inside the domain", func(t *testing.T) {
+		alphabet := alphabetOf(256)
+		got := RandomStringFromAlphabet(64, alphabet)
+		if len(got) != 64 {
+			t.Fatalf("len = %d, want 64", len(got))
+		}
+		// IndexByte rather than ContainsRune: the alphabet is bytes, and at 256 entries it
+		// holds every byte, so as a Go string it is not valid UTF-8 and rune decoding would
+		// answer for a replacement character instead of the byte that was drawn. That is the
+		// domain this wrapper documents, seen from the test side.
+		for i := 0; i < len(got); i++ {
+			if strings.IndexByte(alphabet, got[i]) < 0 {
+				t.Fatalf("produced byte %d, which is not in the alphabet", got[i])
+			}
+		}
+	})
+
+	t.Run("a 257-byte alphabet returns rather than spinning", func(t *testing.T) {
+		if got := RandomStringFromAlphabet(4, alphabetOf(257)); got != "" {
+			t.Errorf("got %q, want the empty string", got)
+		}
+	})
+
+	t.Run("the two pre-existing out-of-domain answers are unchanged", func(t *testing.T) {
+		if got := RandomStringFromAlphabet(0, "abc"); got != "" {
+			t.Errorf("length 0: got %q, want the empty string", got)
+		}
+		if got := RandomStringFromAlphabet(-1, "abc"); got != "" {
+			t.Errorf("length -1: got %q, want the empty string", got)
+		}
+		if got := RandomStringFromAlphabet(4, ""); got != "" {
+			t.Errorf("empty alphabet: got %q, want the empty string", got)
+		}
+	})
 }
