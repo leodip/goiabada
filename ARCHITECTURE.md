@@ -266,8 +266,8 @@ removes it. An exception is not a waiver: when the edge goes, the row must go wi
 fails until it does. That is how the epic burned down, and the table is empty because it finished.
 A row added here now is a debt taken on deliberately, not one inherited.
 
-Both ends name a package, never a module and never a parent. A row granting `core/handlerhelpers`
-an edge grants it to `core/handlerhelpers` alone: not to `core`, and not to `core/oauth`, which
+Both ends name a package, never a module and never a parent. A row granting `core/middleware`
+an edge grants it to `core/middleware` alone: not to `core`, and not to `core/oauth`, which
 would need a row of its own. A module-wide grant would let a second package acquire the same
 dependency in silence, and the count of rows is the only measure of how much is owed.
 
