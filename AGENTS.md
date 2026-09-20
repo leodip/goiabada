@@ -415,13 +415,15 @@ which is the only thing that catches an interface newly named in a config. Keyin
 `core/mocks/test_fs_mock.go`, which is hand-written, and the countries and timezones tables, which
 have generators of their own, out of it (#338).
 
-**Lint tier**: `./run-tests.sh --type lint` runs golangci-lint over the four modules with the
-command CI's Lint job uses, then regenerates the Tailwind CSS and the mocks and fails if either
-differs from what is committed; `all` includes it. It fails rather than skips when a binary is
-missing, and refuses `--race`. It is where `sloglint` holds most of the logging convention
-(pattern 8), which is why it is a tier of the script and not CI-only (#320). The two regeneration
-checks are here because each was CI-only and nothing local could see it: a template class that
-never reached `main.css` (#328) and sixteen mocks stale against their own pin (#338).
+**Lint tier**: `./run-tests.sh --type lint` runs golangci-lint and `unparam -exported` over the
+four modules with the commands CI's Lint job uses, then regenerates the Tailwind CSS and the mocks
+and fails if either differs from what is committed; `all` includes it. It fails rather than skips
+when a binary is missing, and refuses `--race`. It is where `sloglint` holds most of the logging
+convention (pattern 8), which is why it is a tier of the script and not CI-only (#320). The two
+regeneration checks are here because each was CI-only and nothing local could see it: a template
+class that never reached `main.css` (#328) and sixteen mocks stale against their own pin (#338).
+`unparam` joined them for the same reason: #385 moved an exported parse into the module whose two
+call sites discard its result, and only CI could see the finding (#385).
 
 **Migration source rules**: the authserver internal tier runs
 `TestMigrationSource_TheFourCommittedDirectories` in `src/authserver/internal/data`, which holds the
