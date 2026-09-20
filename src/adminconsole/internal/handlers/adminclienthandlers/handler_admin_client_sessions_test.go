@@ -13,9 +13,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
+	mocks_handlerhelpers "github.com/leodip/goiabada/adminconsole/internal/handlerhelpers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/core/api"
-	mocks_handler_helpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
 	"github.com/leodip/goiabada/core/oauth"
 )
 
@@ -63,7 +63,7 @@ func (c *clientSessionsApiClient) GetUserById(accessToken string, userId int64) 
 func TestHandleAdminClientUserSessionsGet_BindsTheRawUserAgent(t *testing.T) {
 	const header = `goiabada-d2-second-device`
 
-	httpHelper := mocks_handler_helpers.NewHttpHelper(t)
+	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper,
 		"/layouts/menu_layout.html", "/admin_clients_usersessions.html").Maybe()
@@ -97,7 +97,7 @@ func TestHandleAdminClientUserSessionsGet_BindsTheSessionInstants(t *testing.T) 
 	started := time.Date(2026, 9, 14, 21, 3, 0, 0, time.UTC)
 	lastAccessed := time.Date(2026, 9, 17, 8, 45, 0, 0, time.UTC)
 
-	httpHelper := mocks_handler_helpers.NewHttpHelper(t)
+	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper,
 		"/layouts/menu_layout.html", "/admin_clients_usersessions.html").Maybe()
@@ -130,7 +130,7 @@ func TestHandleAdminClientUserSessionsGet_BindsTheSessionInstants(t *testing.T) 
 // every case in this trio is: this is the second of the two recomputations #373 deleted, and one
 // of them left behind would be invisible to the other's test.
 func TestHandleAdminClientUserSessionsGet_BindsIsCurrentFromTheResponse(t *testing.T) {
-	httpHelper := mocks_handler_helpers.NewHttpHelper(t)
+	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_clients_usersessions.html").Maybe()
 
@@ -164,7 +164,7 @@ func TestHandleAdminClientUserSessionsGet_BindsIsCurrentFromTheResponse(t *testi
 // to fill the two columns below, so the read count is asserted rather than the columns alone:
 // filling them correctly while still making the calls would be the same page it was.
 func TestHandleAdminClientUserSessionsGet_FillsTheOwnerColumnsFromTheEnvelope(t *testing.T) {
-	httpHelper := mocks_handler_helpers.NewHttpHelper(t)
+	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_clients_usersessions.html").Maybe()
 
@@ -207,7 +207,7 @@ func TestHandleAdminClientUserSessionsGet_FillsTheOwnerColumnsFromTheEnvelope(t 
 // one record answers both rows. A page indexing users by position rather than by id would put
 // the wrong name on the second row, or none.
 func TestHandleAdminClientUserSessionsGet_OneOwnerAnswersEveryRowOfTheirs(t *testing.T) {
-	httpHelper := mocks_handler_helpers.NewHttpHelper(t)
+	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_clients_usersessions.html").Maybe()
 
@@ -241,7 +241,7 @@ func TestHandleAdminClientUserSessionsGet_OneOwnerAnswersEveryRowOfTheirs(t *tes
 // something it did not expect rather than a case the endpoint produces; the page showing the
 // device and the timestamps with a blank name beats the page not showing at all.
 func TestHandleAdminClientUserSessionsGet_AnAbsentOwnerLeavesTheColumnsEmpty(t *testing.T) {
-	httpHelper := mocks_handler_helpers.NewHttpHelper(t)
+	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_clients_usersessions.html").Maybe()
 
@@ -325,7 +325,7 @@ func TestHandleAdminClientUserSessionsPost_TheAnswerFollowsIsCurrentOnTheRow(t *
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			httpHelper := mocks_handler_helpers.NewHttpHelper(t)
+			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 			handlertest.ExpectEncodeJson(httpHelper).Once()
 
 			apiClient := &clientSessionsApiClient{
@@ -372,7 +372,7 @@ func TestHandleAdminClientUserSessionsPost_TheAnswerFollowsIsCurrentOnTheRow(t *
 // rather than swallowed. It swallowed the failure until #373, because the read was made only to
 // compare against a claim rather than to decide the answer.
 func TestHandleAdminClientUserSessionsPost_AListTheApiCannotReadStopsTheDelete(t *testing.T) {
-	httpHelper := mocks_handler_helpers.NewHttpHelper(t)
+	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 	var captured error
 	httpHelper.On("JsonError", mock.Anything, mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {

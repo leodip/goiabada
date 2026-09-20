@@ -13,3 +13,14 @@ type ctxKey string
 // Either process's type assertion panics on the other's value, so one declaration would
 // document a contract that does not exist (#351).
 const ContextKeySettings ctxKey = "Settings"
+
+// ContextKeyJwtInfo carries the browser session's token set, written by this module's JWT session
+// middleware and read by its renderer and its handlers.
+//
+// It was core/constants' last context key, kernel on the strength of one reader:
+// core/handlerhelpers/http_helper.go, which bound loggedInUser and isAdmin into every page's
+// template data. That renderer was this console's alone and #385 moved it here, so nothing outside
+// this module names the key any more and core declares no context key at all. The auth server
+// never wrote it: its chain installs the bearer-token middleware, which is why every audit row
+// read through it named nobody until #385 (#351, #385).
+const ContextKeyJwtInfo ctxKey = "JwtInfo"

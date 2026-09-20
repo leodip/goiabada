@@ -25,7 +25,7 @@ func HandleAccountEmailVerificationGet(
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		// Get JWT info to extract access token
-		jwtInfo, ok := r.Context().Value(coreconstants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
 		if !ok {
 			httpHelper.InternalServerError(w, r, errs.New("no JWT info found in context"))
 			return
@@ -82,7 +82,7 @@ func HandleAccountEmailSendVerificationPost(
 		result := EmailSendVerificationResult{}
 
 		// Get JWT info to extract access token
-		jwtInfo, ok := r.Context().Value(coreconstants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
 		if !ok {
 			httpHelper.JsonError(w, r, errs.New("no JWT info found in context"))
 			return
@@ -112,7 +112,7 @@ func HandleAccountEmailVerificationPost(
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		// Get JWT info for API calls and current profile rendering
-		jwtInfo, ok := r.Context().Value(coreconstants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
 		if !ok {
 			httpHelper.InternalServerError(w, r, errs.New("no JWT info found in context"))
 			return

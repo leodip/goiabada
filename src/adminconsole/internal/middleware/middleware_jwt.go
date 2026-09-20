@@ -172,7 +172,7 @@ func (m *MiddlewareJwt) JwtSessionHandler() func(http.Handler) http.Handler {
 						return
 					}
 
-					ctx = context.WithValue(ctx, coreconstants.ContextKeyJwtInfo, *jwtInfo)
+					ctx = context.WithValue(ctx, constants.ContextKeyJwtInfo, *jwtInfo)
 				}
 			}
 
@@ -295,8 +295,8 @@ func (m *MiddlewareJwt) RequiresScope(
 
 			var jwtInfo oauth.JwtInfo
 			var ok bool
-			if r.Context().Value(coreconstants.ContextKeyJwtInfo) != nil {
-				jwtInfo, ok = r.Context().Value(coreconstants.ContextKeyJwtInfo).(oauth.JwtInfo)
+			if r.Context().Value(constants.ContextKeyJwtInfo) != nil {
+				jwtInfo, ok = r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
 				if !ok {
 					m.errorRenderer.InternalServerError(w, r,
 						errs.New("unable to cast the context value to JwtInfo in RequiresScope middleware"))

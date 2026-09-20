@@ -10,9 +10,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
+	mocks_handlerhelpers "github.com/leodip/goiabada/adminconsole/internal/handlerhelpers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/core/api"
-	mocks_handler_helpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
 )
 
 // The value on constants.ContextKeySettings is api.PublicSettingsResponse, the same four-field
@@ -51,7 +51,7 @@ func publicSettings(smtpEnabled bool) *api.PublicSettingsResponse {
 func TestHandleAccountEmailGet_BindsSMTPEnabledFromTheSettingsCarrier(t *testing.T) {
 	for _, smtpEnabled := range []bool{true, false} {
 		t.Run(map[bool]string{true: "smtp enabled", false: "smtp disabled"}[smtpEnabled], func(t *testing.T) {
-			httpHelper := mocks_handler_helpers.NewHttpHelper(t)
+			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 			handlertest.RefuseInternalServerError(t, httpHelper)
 			handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/account_email.html").Once()
 
@@ -69,7 +69,7 @@ func TestHandleAccountEmailGet_BindsSMTPEnabledFromTheSettingsCarrier(t *testing
 }
 
 func TestHandleAccountEmailVerificationGet_BindsSMTPEnabledFromTheSettingsCarrier(t *testing.T) {
-	httpHelper := mocks_handler_helpers.NewHttpHelper(t)
+	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper,
 		"/layouts/menu_layout.html", "/account_email_verification.html").Once()
@@ -88,7 +88,7 @@ func TestHandleAccountEmailVerificationGet_BindsSMTPEnabledFromTheSettingsCarrie
 // because there is nothing to send a verification with. Without this row the case above is
 // satisfied by a handler that read the carrier once and ignored what it said.
 func TestHandleAccountEmailVerificationGet_RefusesWhenTheCarrierReportsSMTPOff(t *testing.T) {
-	httpHelper := mocks_handler_helpers.NewHttpHelper(t)
+	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 	var refusedWith error
 	httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) { refusedWith, _ = args.Get(2).(error) }).Once()

@@ -9,9 +9,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
+	mocks_handlerhelpers "github.com/leodip/goiabada/adminconsole/internal/handlerhelpers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/core/api"
-	mocks_handler_helpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
 	"github.com/leodip/goiabada/core/oauth"
 )
 
@@ -50,7 +50,7 @@ func logoutRequest() *http.Request {
 }
 
 func TestHandleAccountLogoutGet_AsksForTheFormPostModeAndRendersTheForm(t *testing.T) {
-	httpHelper := mocks_handler_helpers.NewHttpHelper(t)
+	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper,
 		"/layouts/no_menu_layout.html", "/account_logout_form_post.html").Once()
@@ -89,7 +89,7 @@ func TestHandleAccountLogoutGet_AsksForTheFormPostModeAndRendersTheForm(t *testi
 // shape whatever the request asked for. Before decision 2 the handler dereferenced the redirect
 // return unconditionally, so this is also the case that pins the nil check the form arm needed.
 func TestHandleAccountLogoutGet_StillFollowsARedirectResponse(t *testing.T) {
-	httpHelper := mocks_handler_helpers.NewHttpHelper(t)
+	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 
 	apiClient := &logoutApiClient{redirect: &api.AccountLogoutRedirectResponse{
@@ -107,7 +107,7 @@ func TestHandleAccountLogoutGet_StillFollowsARedirectResponse(t *testing.T) {
 // A visitor with no parsed tokens never reaches the API at all: the embedded interface would panic
 // on the call, so this case would fail loudly rather than quietly.
 func TestHandleAccountLogoutGet_WithoutTokensGoesHomeWithoutCallingTheAPI(t *testing.T) {
-	httpHelper := mocks_handler_helpers.NewHttpHelper(t)
+	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 
 	apiClient := &logoutApiClient{}

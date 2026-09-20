@@ -62,8 +62,8 @@ packages:
           pkgname: "mocks_handlers"
       HttpHelper:
         config:
-          dir: "../core/handlerhelpers/mocks"
-          pkgname: "mocks_handler_helpers"
+          dir: "./internal/handlerhelpers/mocks"
+          pkgname: "mocks_handlerhelpers"
       AuditLogger:
         config:
           dir: "./internal/audit/mocks"

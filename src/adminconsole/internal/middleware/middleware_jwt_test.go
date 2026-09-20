@@ -76,7 +76,7 @@ func TestJwtSessionHandler_ValidSession(t *testing.T) {
 
 	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Validate that JwtInfo is set in the context
-		jwtInfo, ok := r.Context().Value(coreconstants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
 		assert.True(t, ok, "JwtInfo should be set in the context")
 		assert.NotNil(t, jwtInfo, "JwtInfo should not be nil")
 
@@ -138,7 +138,7 @@ func TestJwtSessionHandler_NoJwtInSession(t *testing.T) {
 	mockSessionStore.On("Get", mock.Anything, testSessionName).Return(session, nil)
 
 	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		jwtInfo := r.Context().Value(coreconstants.ContextKeyJwtInfo)
+		jwtInfo := r.Context().Value(constants.ContextKeyJwtInfo)
 		assert.Nil(t, jwtInfo, "JwtInfo should not be set in the context")
 	})
 
@@ -174,7 +174,7 @@ func TestJwtSessionHandler_InvalidTokenInSession(t *testing.T) {
 	mockSessionStore.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		jwtInfo := r.Context().Value(coreconstants.ContextKeyJwtInfo)
+		jwtInfo := r.Context().Value(constants.ContextKeyJwtInfo)
 		assert.Nil(t, jwtInfo, "JwtInfo should not be set in the context")
 	})
 
@@ -345,7 +345,7 @@ func TestJwtSessionHandler_ValidRefreshToken(t *testing.T) {
 
 	// Create next handler
 	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		jwtInfo, ok := r.Context().Value(coreconstants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
 		assert.True(t, ok, "JwtInfo should be set in the context")
 		assert.NotNil(t, jwtInfo, "JwtInfo should not be nil")
 		assert.Equal(t, "newvalidtoken", jwtInfo.TokenResponse.AccessToken)
@@ -521,7 +521,7 @@ func TestRequiresScope_Authorized(t *testing.T) {
 		TokenResponse: oauth.TokenResponse{AccessToken: "validtoken"},
 	}
 	ctx := req.Context()
-	ctx = context.WithValue(ctx, coreconstants.ContextKeyJwtInfo, jwtInfo)
+	ctx = context.WithValue(ctx, constants.ContextKeyJwtInfo, jwtInfo)
 	req = req.WithContext(ctx)
 
 	mockAuthHelper.On("IsAuthorizedToAccessResource", jwtInfo, []string{"required:scope"}).Return(true)
@@ -554,7 +554,7 @@ func TestRequiresScope_Unauthorized(t *testing.T) {
 		TokenResponse: oauth.TokenResponse{AccessToken: "validtoken"},
 	}
 	ctx := req.Context()
-	ctx = context.WithValue(ctx, coreconstants.ContextKeyJwtInfo, jwtInfo)
+	ctx = context.WithValue(ctx, constants.ContextKeyJwtInfo, jwtInfo)
 	req = req.WithContext(ctx)
 
 	mockAuthHelper.On("IsAuthorizedToAccessResource", jwtInfo, []string{"required:scope"}).Return(false)
@@ -590,7 +590,7 @@ func TestRequiresScope_Unauthenticated(t *testing.T) {
 
 	jwtInfo := oauth.JwtInfo{}
 	ctx := req.Context()
-	ctx = context.WithValue(ctx, coreconstants.ContextKeyJwtInfo, jwtInfo)
+	ctx = context.WithValue(ctx, constants.ContextKeyJwtInfo, jwtInfo)
 	req = req.WithContext(ctx)
 
 	mockAuthHelper.On("IsAuthorizedToAccessResource", jwtInfo, []string{"required:scope"}).Return(false)
@@ -645,7 +645,7 @@ func TestRequiresScope_RedirectError(t *testing.T) {
 
 	jwtInfo := oauth.JwtInfo{}
 	ctx := req.Context()
-	ctx = context.WithValue(ctx, coreconstants.ContextKeyJwtInfo, jwtInfo)
+	ctx = context.WithValue(ctx, constants.ContextKeyJwtInfo, jwtInfo)
 	req = req.WithContext(ctx)
 
 	mockAuthHelper.On("IsAuthorizedToAccessResource", jwtInfo, []string{"required:scope"}).Return(false)

@@ -4,8 +4,8 @@ import (
 	"context"
 
 	"github.com/leodip/goiabada/authserver/internal/constants"
+	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
 	"github.com/leodip/goiabada/authserver/internal/models"
-	"github.com/leodip/goiabada/core/handlerhelpers"
 )
 
 type SettingsReader struct{}

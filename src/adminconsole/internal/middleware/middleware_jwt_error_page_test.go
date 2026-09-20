@@ -156,7 +156,7 @@ func TestMiddlewareJwt_ServerErrorsRenderThePageAndKeepTheCauseOutOfTheResponse(
 
 				req := httptest.NewRequest(http.MethodGet, "/", nil)
 				req = req.WithContext(context.WithValue(req.Context(),
-					coreconstants.ContextKeyJwtInfo, "not a JwtInfo"))
+					constants.ContextKeyJwtInfo, "not a JwtInfo"))
 
 				return m.RequiresScope([]string{"required:scope"})(mustNotRun(t)), req
 			},
@@ -181,7 +181,7 @@ func TestMiddlewareJwt_ServerErrorsRenderThePageAndKeepTheCauseOutOfTheResponse(
 
 				req := httptest.NewRequest(http.MethodGet, "/", nil)
 				req = req.WithContext(context.WithValue(req.Context(),
-					coreconstants.ContextKeyJwtInfo, jwtInfo))
+					constants.ContextKeyJwtInfo, jwtInfo))
 
 				return m.RequiresScope([]string{"required:scope"})(mustNotRun(t)), req
 			},

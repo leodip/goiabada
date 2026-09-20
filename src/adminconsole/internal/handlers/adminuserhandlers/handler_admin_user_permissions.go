@@ -8,9 +8,10 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
+	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/constants"
+	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
@@ -69,7 +70,7 @@ func HandleAdminUserPermissionsGet(
 
 		// Resources are already sorted in the API response
 
-		sess, err := httpSession.Get(r, constants.AdminConsoleSessionName)
+		sess, err := httpSession.Get(r, coreconstants.AdminConsoleSessionName)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
@@ -153,7 +154,7 @@ func HandleAdminUserPermissionsPost(
 			return
 		}
 
-		sess, err := httpSession.Get(r, constants.AdminConsoleSessionName)
+		sess, err := httpSession.Get(r, coreconstants.AdminConsoleSessionName)
 		if err != nil {
 			httpHelper.JsonError(w, r, err)
 			return

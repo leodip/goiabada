@@ -232,19 +232,18 @@ command itself and fails on a tree it changed.
 | `core/constants` | `AdminConsoleClientIdentifier` | both-apps | — |
 | `core/constants` | `AdminConsoleSessionName` | both-apps | — |
 | `core/constants` | `AdminReadPermissionIdentifier` | own-package | — |
-| `core/constants` | `AuthServerResourceIdentifier` | kernel | — |
+| `core/constants` | `AuthServerResourceIdentifier` | both-apps | — |
 | `core/constants` | `BrowserSessionsPermissionIdentifier` | both-apps | — |
-| `core/constants` | `BuildDate` | kernel | — |
+| `core/constants` | `BuildDate` | both-apps | — |
 | `core/constants` | `BuiltInAuthServerPermissionIdentifiers` | both-apps | — |
-| `core/constants` | `ContextKeyJwtInfo` | kernel | — |
-| `core/constants` | `GitCommit` | kernel | — |
+| `core/constants` | `GitCommit` | both-apps | — |
 | `core/constants` | `ManageAccountPermissionIdentifier` | both-apps | — |
 | `core/constants` | `ManageClientsPermissionIdentifier` | own-package | — |
-| `core/constants` | `ManagePermissionIdentifier` | kernel | — |
+| `core/constants` | `ManagePermissionIdentifier` | both-apps | — |
 | `core/constants` | `ManageSettingsPermissionIdentifier` | own-package | — |
 | `core/constants` | `ManageUsersPermissionIdentifier` | own-package | — |
 | `core/constants` | `UserinfoPermissionIdentifier` | both-apps | — |
-| `core/constants` | `Version` | kernel | — |
+| `core/constants` | `Version` | both-apps | — |
 | `core/countries` | `AllInfo` | both-apps | — |
 | `core/countries` | `ByAlpha2` | contract | The lookup half of the country table whose other half the admin console uses. Moving it would put one ISO 3166 dataset in two places. |
 | `core/countries` | `Country` | own-package | — |
@@ -253,7 +252,7 @@ command itself and fails on a tree it changed.
 | `core/customerrors` | `ErrCodeRedirectURIDeregistered` | moving | #385 moves it to `authserver/internal/protocolvalidation`; only the auth server ever emits it. |
 | `core/customerrors` | `ErrNoAuthContext` | moving | #385 moves it to `authserver/internal/handlerhelpers`, beside the handler helper that returns it. |
 | `core/customerrors` | `ErrUserDisabled` | moving | #385 moves it to `authserver/internal/protocolvalidation`; only the auth server ever emits it. |
-| `core/customerrors` | `ErrorDetail` | kernel | — |
+| `core/customerrors` | `ErrorDetail` | both-apps | — |
 | `core/customerrors` | `NewErrorDetail` | contract | One of the two neutral `ErrorDetail` constructors. `NewErrorDetailWithHttpStatusCode` beside it is `both-apps`, and the pair is one API that both processes compile. |
 | `core/customerrors` | `NewErrorDetailWithHttpStatusCode` | both-apps | — |
 | `core/customerrors` | `NewErrorDetailWithHttpStatusCodeAndWWWAuthenticate` | moving | #385 decision 17 moves it to `authserver/internal/apiresponse`; it builds an RFC 6750 bearer-token error header, which is provider-side by definition. |
@@ -302,12 +301,6 @@ command itself and fails on a tree it changed.
 | `core/errs` | `WithStack` | kernel | — |
 | `core/errs` | `Wrap` | kernel | — |
 | `core/errs` | `Wrapf` | kernel | — |
-| `core/handlerhelpers` | `GetFromUrlQueryOrFormPost` | own-package | — |
-| `core/handlerhelpers` | `HttpHelper` | own-package | — |
-| `core/handlerhelpers` | `LayoutSettings` | both-apps | — |
-| `core/handlerhelpers` | `LookupFromUrlQueryOrFormPost` | own-package | — |
-| `core/handlerhelpers` | `NewHttpHelper` | both-apps | — |
-| `core/handlerhelpers` | `SettingsReader` | reachable | — |
 | `core/hashutil` | `HashString` | both-apps | — |
 | `core/hashutil` | `VerifyStringHash` | kernel | — |
 | `core/i18n` | `Bundle` | own-package | — |
@@ -380,19 +373,19 @@ command itself and fails on a tree it changed.
 | `core/i18n` | `ErrCodeSettingsIssuerAngleBrackets` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
 | `core/i18n` | `ErrCodeSettingsSmtpFromNameAngleBrackets` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
 | `core/i18n` | `ErrCodeUserGroupsNotFound` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
-| `core/i18n` | `FormatDateTime` | kernel | — |
-| `core/i18n` | `FormatSince` | kernel | — |
+| `core/i18n` | `FormatDateTime` | contract | The rendering half of the message catalog both processes compile. Only the admin console's template functions call it today, the auth server's pages rendering no dates, reference labels or client-side string table; it stays because it reads the localizer and the bundle this package keeps private, so moving it would export the state #385 decision 11 exists to keep unexported, and would put one catalog behind two renderers. |
+| `core/i18n` | `FormatSince` | contract | The rendering half of the message catalog both processes compile. Only the admin console's template functions call it today, the auth server's pages rendering no dates, reference labels or client-side string table; it stays because it reads the localizer and the bundle this package keeps private, so moving it would export the state #385 decision 11 exists to keep unexported, and would put one catalog behind two renderers. |
 | `core/i18n` | `LoadBundle` | both-apps | — |
-| `core/i18n` | `LocaleLabel` | kernel | — |
-| `core/i18n` | `LocaleTag` | kernel | — |
+| `core/i18n` | `LocaleLabel` | contract | The rendering half of the message catalog both processes compile. Only the admin console's template functions call it today, the auth server's pages rendering no dates, reference labels or client-side string table; it stays because it reads the localizer and the bundle this package keeps private, so moving it would export the state #385 decision 11 exists to keep unexported, and would put one catalog behind two renderers. |
+| `core/i18n` | `LocaleTag` | both-apps | — |
 | `core/i18n` | `LocalizedError` | both-apps | — |
 | `core/i18n` | `Localizer` | own-package | — |
 | `core/i18n` | `MiddlewareLocale` | both-apps | — |
 | `core/i18n` | `NewLocalizedError` | kernel | — |
-| `core/i18n` | `Raw` | kernel | — |
-| `core/i18n` | `RefCountry` | kernel | — |
-| `core/i18n` | `RefPhoneCountry` | kernel | — |
-| `core/i18n` | `RefTimezone` | kernel | — |
+| `core/i18n` | `Raw` | contract | The rendering half of the message catalog both processes compile. Only the admin console's template functions call it today, the auth server's pages rendering no dates, reference labels or client-side string table; it stays because it reads the localizer and the bundle this package keeps private, so moving it would export the state #385 decision 11 exists to keep unexported, and would put one catalog behind two renderers. |
+| `core/i18n` | `RefCountry` | contract | The rendering half of the message catalog both processes compile. Only the admin console's template functions call it today, the auth server's pages rendering no dates, reference labels or client-side string table; it stays because it reads the localizer and the bundle this package keeps private, so moving it would export the state #385 decision 11 exists to keep unexported, and would put one catalog behind two renderers. |
+| `core/i18n` | `RefPhoneCountry` | contract | The rendering half of the message catalog both processes compile. Only the admin console's template functions call it today, the auth server's pages rendering no dates, reference labels or client-side string table; it stays because it reads the localizer and the bundle this package keeps private, so moving it would export the state #385 decision 11 exists to keep unexported, and would put one catalog behind two renderers. |
+| `core/i18n` | `RefTimezone` | contract | The rendering half of the message catalog both processes compile. Only the admin console's template functions call it today, the auth server's pages rendering no dates, reference labels or client-side string table; it stays because it reads the localizer and the bundle this package keeps private, so moving it would export the state #385 decision 11 exists to keep unexported, and would put one catalog behind two renderers. |
 | `core/i18n` | `ResolveRequestLocale` | kernel | — |
 | `core/i18n` | `SanitizeUILocales` | own-package | — |
 | `core/i18n` | `T` | kernel | — |
@@ -424,7 +417,7 @@ command itself and fails on a tree it changed.
 | `core/oauth` | `GeneratePKCECodeChallenge` | both-apps | — |
 | `core/oauth` | `Jwk` | both-apps | — |
 | `core/oauth` | `Jwks` | both-apps | — |
-| `core/oauth` | `JwtInfo` | kernel | — |
+| `core/oauth` | `JwtInfo` | both-apps | — |
 | `core/oauth` | `JwtToken` | both-apps | — |
 | `core/oauth` | `ParseResponseType` | moving | #385 moves `response_type` parsing to `authserver/internal/protocolvalidation`; it is provider-side. |
 | `core/oauth` | `ResponseTypeInfo` | moving | #385 moves `response_type` parsing to `authserver/internal/protocolvalidation`; it is provider-side. |
@@ -450,7 +443,6 @@ command itself and fails on a tree it changed.
 | `core/sessionstore` | `TouchThreshold` | own-package | — |
 | `core/sessionstore/sessiontest` | `MemoryBackend` | test-support | Test support: the in-memory session backend nine test files across the two servers drive. Its own package precisely so no binary links it (#385). |
 | `core/sessionstore/sessiontest` | `NewMemoryBackend` | test-support | Test support: the in-memory session backend nine test files across the two servers drive. Its own package precisely so no binary links it (#385). |
-| `core/stringutil` | `ConvertToString` | kernel | — |
 | `core/stringutil` | `GenerateRandomLetterString` | moving | #385 moves it beside its one production caller in `authserver/internal/handlers/apihandlers`. |
 | `core/stringutil` | `GenerateRandomNumberString` | moving | #385 moves it beside its one production caller in `authserver/internal/handlers/apihandlers`. |
 | `core/stringutil` | `GenerateSecurityRandomString` | both-apps | — |

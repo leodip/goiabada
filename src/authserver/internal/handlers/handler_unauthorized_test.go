@@ -5,7 +5,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	mocks_handlerhelpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
+	mocks_handlerhelpers "github.com/leodip/goiabada/authserver/internal/handlerhelpers/mocks"
 
 	"github.com/stretchr/testify/assert"
 )

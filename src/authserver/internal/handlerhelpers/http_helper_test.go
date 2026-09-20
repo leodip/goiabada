@@ -12,10 +12,8 @@ import (
 	"errors"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/mocks"
-	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -234,41 +232,20 @@ func TestRenderTemplateToBuffer(t *testing.T) {
 	}
 	httpHelper := NewHttpHelper(templateFS, stubSettingsReader{})
 
-	t.Run("Without ID Token", func(t *testing.T) {
+	// This renderer binds no loggedInUser and no isAdmin. Both were admin console page data
+	// living in the one core renderer both binaries used, and no auth server template binds
+	// either; #385 moved the enrichment that produced them into the console's own renderer. A
+	// template naming loggedInUser here takes the empty branch.
+	t.Run("No admin console page data is bound", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/", nil)
 		data := map[string]interface{}{}
 
 		buf, err := httpHelper.RenderTemplateToBuffer(req, "layouts/layout.html", "page.html", data)
 
-		assert.NoError(t, err)
-		assert.NotNil(t, buf)
+		require.NoError(t, err)
 		assert.Contains(t, buf.String(), "Hello, Guest!")
-	})
-
-	t.Run("With ID Token", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "/", nil)
-		ctx := req.Context()
-
-		// Mock JwtInfo with ID Token
-		jwtInfo := oauth.JwtInfo{
-			IdToken: &oauth.JwtToken{
-				Claims: map[string]interface{}{
-					"sub":  "user123",
-					"name": "Guest",
-				},
-			},
-		}
-		ctx = context.WithValue(ctx, constants.ContextKeyJwtInfo, jwtInfo)
-		req = req.WithContext(ctx)
-
-		data := map[string]interface{}{}
-
-		buf, err := httpHelper.RenderTemplateToBuffer(req, "layouts/layout.html", "page.html", data)
-
-		assert.NoError(t, err)
-		assert.NotNil(t, buf)
-		// With ID token containing "name" claim, it should render that name
-		assert.Contains(t, buf.String(), "Hello, Guest!")
+		assert.NotContains(t, data, "loggedInUser")
+		assert.NotContains(t, data, "isAdmin")
 	})
 
 	t.Run("Layout settings reach the template", func(t *testing.T) {

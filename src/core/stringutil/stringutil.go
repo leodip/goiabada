@@ -2,10 +2,7 @@ package stringutil
 
 import (
 	"crypto/rand"
-	"fmt"
 	"io"
-	"log/slog"
-	"strconv"
 )
 
 // randomStringFromReader returns a length-character string drawn uniformly from
@@ -86,26 +83,6 @@ func GenerateSecurityRandomString(length int) string {
 func GenerateRandomLetterString(length int) string {
 	const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 	return randomStringFromAlphabet(length, letters)
-}
-
-func ConvertToString(v interface{}) string {
-	switch val := v.(type) {
-	case int:
-		return strconv.Itoa(val)
-	case bool:
-		return strconv.FormatBool(val)
-	case string:
-		return val
-	case float64:
-		return strconv.FormatFloat(val, 'f', -1, 64)
-	default:
-		// The type rather than val, which is what this record has always claimed to carry and
-		// never did: "type" held the value itself, so an unconvertible value of an unknown
-		// type was written into the log under a key naming what it is not (#320 decision 3).
-		slog.Warn("unable to convert a value to a string, the type is not supported",
-			"type", fmt.Sprintf("%T", v))
-		return ""
-	}
 }
 
 // GenerateRandomNumberString returns length characters drawn uniformly from

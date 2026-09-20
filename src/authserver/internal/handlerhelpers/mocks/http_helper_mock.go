@@ -7,7 +7,7 @@
 
 //go:build !production
 
-package mocks_handler_helpers
+package mocks_handlerhelpers
 
 import (
 	"bytes"

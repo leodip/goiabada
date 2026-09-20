@@ -13,10 +13,10 @@ import (
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
+	mocks_handlerhelpers "github.com/leodip/goiabada/adminconsole/internal/handlerhelpers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/adminconsole/internal/pagination"
 	"github.com/leodip/goiabada/core/api"
-	mocks_handler_helpers "github.com/leodip/goiabada/core/handlerhelpers/mocks"
 	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/leodip/goiabada/core/sessionstore/sessiontest"
 )
@@ -144,7 +144,7 @@ func testStore() *sessionstore.ServerSideStore {
 // asked the API for. A 500 fails the test with the error it carried, since
 // answering 500 to a typed page is half of what is being fixed.
 func render(t *testing.T, handler http.HandlerFunc, template, rawPage string,
-	httpHelper *mocks_handler_helpers.HttpHelper) map[string]interface{} {
+	httpHelper *mocks_handlerhelpers.HttpHelper) map[string]interface{} {
 
 	t.Helper()
 
@@ -163,10 +163,10 @@ func render(t *testing.T, handler http.HandlerFunc, template, rawPage string,
 
 // newHelper is a helper mock that renders, and that fails the test rather than
 // the request if the handler reaches for a 500.
-func newHelper(t *testing.T) *mocks_handler_helpers.HttpHelper {
+func newHelper(t *testing.T) *mocks_handlerhelpers.HttpHelper {
 	t.Helper()
 
-	httpHelper := mocks_handler_helpers.NewHttpHelper(t)
+	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, mock.Anything, mock.Anything).Maybe()
 	return httpHelper
