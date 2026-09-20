@@ -371,7 +371,10 @@ allow is a failure, and so is an exception left standing for an edge that no lon
 issue that removes an edge has to remove its row with it (#332). A new top-level `core` package
 fails the tier until the table says where it belongs, and so does a new symbol in `core/constants`,
 whose row has to name the strongest of `kernel`, `both-apps`, `moving` and `contract` that the
-reference graph backs (#351).
+reference graph backs (#351). A fifth table lives in `src/core/OWNERSHIP.md`, one row per exported
+symbol any `core` package declares: `core/testutil.AssertSymbolOwnership` reads it from the same
+three tiers, four justifications are computed from the reference graph and three are asserted with
+a note the guard requires (#385).
 
 **Dead-interface guard**: the auth server and admin console unit tiers each run
 `TestHandlers_NoDeadInterfaces` over their own `internal/handlers` package, holding every interface
@@ -387,6 +390,12 @@ does not count at all, since an interface no code names is what dead means here 
 migrated database against the file for the engine it is running on. A migration therefore has one
 more step: `cd src/authserver && go run ./cmd/schemadump` inside the dev container, which
 regenerates all four files at once, and commit them. Skip it and CI goes red on every database job.
+
+**Core symbol ownership table**: `src/core/OWNERSHIP.md` has one row per exported symbol every
+`core` package declares, so adding or moving one has one more step:
+`cd src/core && go run ./cmd/ownershipdump`, and commit it. It refuses to invent a justification,
+so the answer is to move the symbol or to write `test-support`, `contract` or `moving` with the
+reason. The lint tier runs it and fails on a tree it changed.
 
 **Generated mocks**: the `*_mock.go` files are written by mockery, at the version `versions.yaml`
 pins as `tools.mockery`, and committed. Regenerate with `src/authserver/generate-mocks.sh` inside

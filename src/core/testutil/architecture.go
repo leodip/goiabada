@@ -227,6 +227,10 @@ func parseArchitectureDoc(doc string) (architectureTables, []string) {
 type docRow struct {
 	cells []string
 	line  int
+	// raw is the row exactly as the document writes it. splitRow strips backticks, which is right
+	// for the identifier cells every table here carries and wrong for the note column
+	// OWNERSHIP.md adds, where the cell is prose that cites them.
+	raw string
 }
 
 // tableUnder returns the body rows of the first markdown table following the heading, with the
@@ -262,7 +266,7 @@ func tableUnder(lines []string, heading string) ([]docRow, bool) {
 		if seen <= 2 {
 			continue
 		}
-		rows = append(rows, docRow{cells: splitRow(trimmed), line: i + 1})
+		rows = append(rows, docRow{cells: splitRow(trimmed), line: i + 1, raw: trimmed})
 	}
 	return rows, true
 }

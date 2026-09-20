@@ -14,8 +14,9 @@
 #                             integration   - end-to-end integration tests (per DB)
 #                             lint          - golangci-lint over the four modules, the
 #                                             command CI's Lint job runs per module, plus
-#                                             the check that the generated Tailwind CSS
-#                                             is committed
+#                                             checks that the generated Tailwind CSS, the
+#                                             mocks and the core symbol ownership table
+#                                             are committed
 #                             modules       - shorthand for internal+core+adminconsole
 #                             all           - everything (default), lint included
 #   -d, --db     <db>       Database to use for `data` and `integration` tests.
@@ -610,6 +611,38 @@ if should_run_lint; then
     fi
     gha_endgroup
     gha_summary_row "Generated mocks" "-" "pass" "$(fmt_duration $((SECONDS - start)))"
+
+    # src/core/OWNERSHIP.md carries one row per exported symbol every core package declares,
+    # and ownershipdump writes the four computed justifications from the reference graph. Every
+    # module's unit tier already holds the committed table to the tree through
+    # testutil.AssertSymbolOwnership, which is the semantic half. This is the other half: the
+    # formatting, the ordering and the note the tool would write, none of which the guard reads,
+    # so a hand-edited row that happens to say the right word still leaves the file different
+    # from what the tool produces. Same arrangement as the two checks above, and here for the
+    # same reason -- both of those were CI-only and nothing local could see them (#328, #338).
+    #
+    # Digests rather than git, because git cannot run in here: a worktree's .git names the main
+    # checkout by host path. A passing run writes the bytes that were already there; a failing
+    # one leaves the regenerated file in the tree on purpose, since committing it is the fix.
+    log="$LOG_DIR/00-lint-ownership.log"
+    echo "Checking the core symbol ownership table is committed... (log: $log)"
+    start=$SECONDS
+    gha_group "Core symbol ownership"
+    if ! (
+        sha256sum ../core/OWNERSHIP.md > "$LOG_DIR/ownership-before.sha256"
+        (cd ../core && go run ./cmd/ownershipdump) || exit 1
+        sha256sum ../core/OWNERSHIP.md > "$LOG_DIR/ownership-after.sha256"
+        if ! diff -u "$LOG_DIR/ownership-before.sha256" "$LOG_DIR/ownership-after.sha256"; then
+            echo "src/core/OWNERSHIP.md is not what ownershipdump produces; it has just been"
+            echo "regenerated in your tree -- review with git diff and commit it"
+            exit 1
+        fi
+    ) 2>&1 | tee "$log"; then
+        gha_summary_row "Core symbol ownership" "-" "FAIL" "$(fmt_duration $((SECONDS - start)))"
+        fail_with "Core symbol ownership" "$log"
+    fi
+    gha_endgroup
+    gha_summary_row "Core symbol ownership" "-" "pass" "$(fmt_duration $((SECONDS - start)))"
 fi
 
 if should_run_internal; then
