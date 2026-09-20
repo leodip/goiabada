@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leodip/goiabada/core/encryption"
+	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/stretchr/testify/assert"
 )
 

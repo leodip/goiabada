@@ -87,7 +87,6 @@ A row whose owner is not `kernel` names the issue that moves it. A `kernel` row 
 | `core/constants` | kernel | — |
 | `core/countries` | kernel | — |
 | `core/customerrors` | kernel | — |
-| `core/encryption` | authserver | #360 |
 | `core/enums` | kernel | — |
 | `core/errs` | kernel | — |
 | `core/handlerhelpers` | kernel | — |
@@ -98,8 +97,6 @@ A row whose owner is not `kernel` names the issue that moves it. A `kernel` row 
 | `core/middleware` | kernel | — |
 | `core/mocks` | kernel | — |
 | `core/oauth` | kernel | — |
-| `core/oidc` | authserver | #360 |
-| `core/rsautil` | authserver | #360 |
 | `core/sessionstore` | kernel | — |
 | `core/stringutil` | kernel | — |
 | `core/testutil` | kernel | — |

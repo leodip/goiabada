@@ -5,7 +5,7 @@ import (
 	"database/sql"
 
 	jwt "github.com/golang-jwt/jwt/v5"
-	"github.com/leodip/goiabada/core/encryption"
+	"github.com/leodip/goiabada/authserver/internal/encryption"
 )
 
 type KeyPair struct {

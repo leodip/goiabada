@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/leodip/goiabada/core/encryption"
+	"github.com/leodip/goiabada/authserver/internal/encryption"
 )
 
 type User struct {

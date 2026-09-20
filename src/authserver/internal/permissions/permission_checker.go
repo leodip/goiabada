@@ -5,8 +5,8 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/core/errs"
-	"github.com/leodip/goiabada/core/oidc"
 )
 
 type PermissionChecker struct {

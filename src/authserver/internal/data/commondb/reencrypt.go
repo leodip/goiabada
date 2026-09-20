@@ -5,7 +5,7 @@ import (
 	"database/sql"
 
 	"github.com/huandu/go-sqlbuilder"
-	"github.com/leodip/goiabada/core/encryption"
+	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/core/errs"
 )
 

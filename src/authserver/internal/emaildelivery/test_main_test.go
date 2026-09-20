@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/leodip/goiabada/core/encryption"
+	"github.com/leodip/goiabada/authserver/internal/encryption"
 )
 
 func TestMain(m *testing.M) {
