@@ -232,9 +232,6 @@
   .h-4\/5 {
     height: calc(4 / 5 * 100%);
   }
-  .h-5 {
-    height: calc(var(--spacing) * 5);
-  }
   .h-24 {
     height: calc(var(--spacing) * 24);
   }
@@ -252,9 +249,6 @@
   }
   .min-h-screen {
     min-height: 100vh;
-  }
-  .w-5 {
-    width: calc(var(--spacing) * 5);
   }
   .w-24 {
     width: calc(var(--spacing) * 24);
@@ -331,9 +325,6 @@
   }
   .text-right {
     text-align: right;
-  }
-  .align-middle {
-    vertical-align: middle;
   }
   .text-2xl {
     font-size: var(--text-2xl);
