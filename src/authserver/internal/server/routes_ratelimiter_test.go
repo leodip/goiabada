@@ -18,9 +18,9 @@ import (
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/otp"
+	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/web"
 	coreconstants "github.com/leodip/goiabada/core/constants"
-	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -132,7 +132,7 @@ func newRoutesTestServer(t *testing.T) *Server {
 	t.Helper()
 	withRateLimiterEnabled(t)
 
-	passwordHash, err := hashutil.HashPassword("the account's real password")
+	passwordHash, err := passwordhash.Hash("the account's real password")
 	assert.NoError(t, err)
 
 	database := mocks_data.NewDatabase(t)

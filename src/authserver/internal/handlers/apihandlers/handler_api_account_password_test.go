@@ -16,8 +16,8 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/core/enums"
-	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -77,7 +77,7 @@ func TestHandleAPIAccountPasswordPut_PreservesTheCallersSession(t *testing.T) {
 	const subject = "the-subject"
 	const callerSid = "sid-caller"
 
-	currentHash, err := hashutil.HashPassword(currentPassword)
+	currentHash, err := passwordhash.Hash(currentPassword)
 	require.NoError(t, err)
 	user := &models.User{Id: 42, Enabled: true, PasswordHash: currentHash}
 
@@ -131,7 +131,7 @@ func TestHandleAPIAccountPasswordPut_PreservesTheCallersSession(t *testing.T) {
 	database.AssertExpectations(t)
 	auditLogger.AssertExpectations(t)
 
-	assert.True(t, hashutil.VerifyPasswordHash(savedHash, newPassword))
+	assert.True(t, passwordhash.Verify(savedHash, newPassword))
 	database.AssertNotCalled(t, "UpdateUser", mock.Anything, mock.Anything)
 
 	// The audit payload, field by field. Asserted here rather than trusted because the event is
@@ -167,7 +167,7 @@ func TestHandleAPIAccountPasswordPut_SidlessBearerRevokesEverything(t *testing.T
 	const newPassword = "N3wP4ss!word"
 	const subject = "the-subject"
 
-	currentHash, err := hashutil.HashPassword(currentPassword)
+	currentHash, err := passwordhash.Hash(currentPassword)
 	require.NoError(t, err)
 
 	database.On("GetUserBySubject", (*sql.Tx)(nil), subject).
@@ -214,7 +214,7 @@ func TestHandleAPIAccountPasswordPut_RevocationFailureIsA500(t *testing.T) {
 	passwordValidator := accountvalidation.NewPasswordValidator()
 
 	const currentPassword = "0ldP4ss!word"
-	currentHash, err := hashutil.HashPassword(currentPassword)
+	currentHash, err := passwordhash.Hash(currentPassword)
 	require.NoError(t, err)
 
 	database.On("GetUserBySubject", (*sql.Tx)(nil), "the-subject").

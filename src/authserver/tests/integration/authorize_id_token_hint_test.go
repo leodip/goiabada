@@ -7,9 +7,9 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/enums"
-	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
@@ -29,7 +29,7 @@ func TestIdTokenHint_PromptLogin_MismatchedUser_BlocksAtIssuance(t *testing.T) {
 	// Step 1: Create User A and User B
 	// =========================================================================
 	passwordA := fake.Password(10)
-	passwordHashedA, err := hashutil.HashPassword(passwordA)
+	passwordHashedA, err := passwordhash.Hash(passwordA)
 	assert.NoError(t, err)
 
 	userA := &models.User{
@@ -42,7 +42,7 @@ func TestIdTokenHint_PromptLogin_MismatchedUser_BlocksAtIssuance(t *testing.T) {
 	assert.NoError(t, err)
 
 	passwordB := fake.Password(10)
-	passwordHashedB, err := hashutil.HashPassword(passwordB)
+	passwordHashedB, err := passwordhash.Hash(passwordB)
 	assert.NoError(t, err)
 
 	userB := &models.User{
@@ -251,7 +251,7 @@ func TestIdTokenHint_PromptLogin_MatchingUser_Success(t *testing.T) {
 	// Step 1: Create User A
 	// =========================================================================
 	password := fake.Password(10)
-	passwordHashed, err := hashutil.HashPassword(password)
+	passwordHashed, err := passwordhash.Hash(password)
 	assert.NoError(t, err)
 
 	user := &models.User{
@@ -441,7 +441,7 @@ func TestIdTokenHint_PromptLogin_MatchingUser_Success(t *testing.T) {
 func TestIdTokenHint_NoPrompt_MismatchedUser_BlocksAtIssuance(t *testing.T) {
 	// Create two users
 	passwordA := fake.Password(10)
-	passwordHashedA, err := hashutil.HashPassword(passwordA)
+	passwordHashedA, err := passwordhash.Hash(passwordA)
 	assert.NoError(t, err)
 
 	userA := &models.User{
@@ -454,7 +454,7 @@ func TestIdTokenHint_NoPrompt_MismatchedUser_BlocksAtIssuance(t *testing.T) {
 	assert.NoError(t, err)
 
 	passwordB := fake.Password(10)
-	passwordHashedB, err := hashutil.HashPassword(passwordB)
+	passwordHashedB, err := passwordhash.Hash(passwordB)
 	assert.NoError(t, err)
 
 	userB := &models.User{

@@ -8,8 +8,8 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/core/enums"
-	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/testutil/fake"
 )
 
@@ -92,7 +92,7 @@ func createSessionWithAcrLevel1AndPassword(t *testing.T) (*http.Client, *models.
 	}
 
 	password := fake.Password(8)
-	passwordHashed, err := hashutil.HashPassword(password)
+	passwordHashed, err := passwordhash.Hash(password)
 	if err != nil {
 		t.Fatal(err)
 	}

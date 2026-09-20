@@ -10,8 +10,8 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
@@ -64,7 +64,7 @@ func TestAPIUserPasswordPut_Success(t *testing.T) {
 	assert.NotEqual(t, "old-password-hash", updatedUser.PasswordHash)
 
 	// Verify new password can be validated
-	assert.True(t, hashutil.VerifyPasswordHash(updatedUser.PasswordHash, updateReq.NewPassword))
+	assert.True(t, passwordhash.Verify(updatedUser.PasswordHash, updateReq.NewPassword))
 }
 
 func TestAPIUserPasswordPut_ValidationError(t *testing.T) {

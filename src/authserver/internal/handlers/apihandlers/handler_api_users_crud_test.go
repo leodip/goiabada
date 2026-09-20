@@ -19,6 +19,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/usercreation"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/enums"
@@ -249,7 +250,7 @@ func TestHandleAPIUserPasswordPut_RevokesEverything(t *testing.T) {
 	database.AssertExpectations(t)
 	auditLogger.AssertExpectations(t)
 
-	assert.True(t, hashutil.VerifyPasswordHash(savedHash, newPassword))
+	assert.True(t, passwordhash.Verify(savedHash, newPassword))
 	database.AssertNotCalled(t, "UpdateUser", mock.Anything, mock.Anything)
 	// No exceptSid, so no sid-scoped query and nothing promoted.
 	database.AssertNotCalled(t, "GetRefreshTokensBySessionIdentifier", mock.Anything, mock.Anything)
@@ -646,7 +647,7 @@ func TestHandleAPIUserCreatePost_SetPasswordTypeMatrix(t *testing.T) {
 				// that it verifies, rather than that it is non-empty, is what separates this from
 				// the defect, where the row was created with an empty hash bcrypt refuses.
 				require.NotEmpty(t, gotPasswordHash, "the account must be created with a password")
-				assert.True(t, hashutil.VerifyPasswordHash(gotPasswordHash, tc.password),
+				assert.True(t, passwordhash.Verify(gotPasswordHash, tc.password),
 					"the stored hash must verify against the password the request carried")
 			}
 			if tc.wantEmail {
@@ -675,7 +676,7 @@ func TestHandleAPIUserCreatePost_SetPasswordTypeMatrix(t *testing.T) {
 // whether that account can be signed in to.
 func TestVerifyPasswordHash_AnEmptyHashAuthenticatesNothing(t *testing.T) {
 	for _, password := range []string{"", " ", "password123", "\x00"} {
-		assert.False(t, hashutil.VerifyPasswordHash("", password),
+		assert.False(t, passwordhash.Verify("", password),
 			"an account with no password hash must not authenticate with %q", password)
 	}
 }

@@ -19,6 +19,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/usercreation"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/encryption"
@@ -124,7 +125,7 @@ func HandleAPIUserPasswordPut(
 		}
 
 		// Hash password
-		passwordHash, err := hashutil.HashPassword(req.NewPassword)
+		passwordHash, err := passwordhash.Hash(req.NewPassword)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -377,7 +378,7 @@ func HandleAPIUserCreatePost(
 			}
 
 			// Hash password
-			passwordHash, err = hashutil.HashPassword(req.Password)
+			passwordHash, err = passwordhash.Hash(req.Password)
 			if err != nil {
 				writeInternalServerError(w, r, err)
 				return

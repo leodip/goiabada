@@ -9,8 +9,8 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/core/enums"
-	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
@@ -194,7 +194,7 @@ func TestPromptNone_ConsentRequired_ReturnsConsentRequired(t *testing.T) {
 
 	// Create user and session
 	password := fake.Password(8)
-	passwordHashed, err := hashutil.HashPassword(password)
+	passwordHashed, err := passwordhash.Hash(password)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -315,7 +315,7 @@ func walkDCRClientToConsentScreen(t *testing.T, clientName string) (*http.Client
 	redirectUri := &redirectURIs[0]
 
 	password := fake.Password(8)
-	passwordHashed, err := hashutil.HashPassword(password)
+	passwordHashed, err := passwordhash.Hash(password)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -909,7 +909,7 @@ func TestPromptNone_FullConsentCoverage(t *testing.T) {
 	}
 
 	password := fake.Password(8)
-	passwordHashed, err := hashutil.HashPassword(password)
+	passwordHashed, err := passwordhash.Hash(password)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1053,7 +1053,7 @@ func TestPromptNone_PartialConsentCoverage(t *testing.T) {
 	}
 
 	password := fake.Password(8)
-	passwordHashed, err := hashutil.HashPassword(password)
+	passwordHashed, err := passwordhash.Hash(password)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1176,7 +1176,7 @@ func TestPromptNone_OfflineAccessNotInConsent(t *testing.T) {
 	}
 
 	password := fake.Password(8)
-	passwordHashed, err := hashutil.HashPassword(password)
+	passwordHashed, err := passwordhash.Hash(password)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1308,7 +1308,7 @@ func TestPromptNone_OfflineAccessInConsent(t *testing.T) {
 	}
 
 	password := fake.Password(8)
-	passwordHashed, err := hashutil.HashPassword(password)
+	passwordHashed, err := passwordhash.Hash(password)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1452,7 +1452,7 @@ func TestPromptNone_RequestSubsetOfConsent(t *testing.T) {
 	}
 
 	password := fake.Password(8)
-	passwordHashed, err := hashutil.HashPassword(password)
+	passwordHashed, err := passwordhash.Hash(password)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1587,7 +1587,7 @@ func TestPromptNone_EffectiveScopesEmpty_ReturnsAccessDenied(t *testing.T) {
 	client, redirectUri := createTestClientAndRedirectURI(t)
 
 	password := fake.Password(8)
-	passwordHashed, err := hashutil.HashPassword(password)
+	passwordHashed, err := passwordhash.Hash(password)
 	if err != nil {
 		t.Fatal(err)
 	}

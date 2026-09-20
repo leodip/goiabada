@@ -4,8 +4,8 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/core/enums"
-	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 )
@@ -32,7 +32,7 @@ func TestConsent_ClientDisplay_ShowDisplayName(t *testing.T) {
 
 	// Create user
 	password := fake.Password(8)
-	passwordHashed, err := hashutil.HashPassword(password)
+	passwordHashed, err := passwordhash.Hash(password)
 	assert.NoError(t, err)
 
 	user := &models.User{
@@ -81,7 +81,7 @@ func TestConsent_ClientDisplay_ShowLogo_WithLogo(t *testing.T) {
 
 	// Create user
 	password := fake.Password(8)
-	passwordHashed, err := hashutil.HashPassword(password)
+	passwordHashed, err := passwordhash.Hash(password)
 	assert.NoError(t, err)
 
 	user := &models.User{
@@ -130,7 +130,7 @@ func TestConsent_ClientDisplay_ShowDescription(t *testing.T) {
 
 	// Create user
 	password := fake.Password(8)
-	passwordHashed, err := hashutil.HashPassword(password)
+	passwordHashed, err := passwordhash.Hash(password)
 	assert.NoError(t, err)
 
 	user := &models.User{
@@ -182,7 +182,7 @@ func TestConsent_ClientDisplay_AllEnabled(t *testing.T) {
 
 	// Create user
 	password := fake.Password(8)
-	passwordHashed, err := hashutil.HashPassword(password)
+	passwordHashed, err := passwordhash.Hash(password)
 	assert.NoError(t, err)
 
 	user := &models.User{
@@ -235,7 +235,7 @@ func TestConsent_ClientDisplay_AllDisabled(t *testing.T) {
 
 	// Create user
 	password := fake.Password(8)
-	passwordHashed, err := hashutil.HashPassword(password)
+	passwordHashed, err := passwordhash.Hash(password)
 	assert.NoError(t, err)
 
 	user := &models.User{

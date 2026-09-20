@@ -9,9 +9,9 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/enums"
-	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
@@ -306,7 +306,7 @@ func TestPromptNone_CodeExchange(t *testing.T) {
 	}
 
 	password := fake.Password(8)
-	passwordHashed, err := hashutil.HashPassword(password)
+	passwordHashed, err := passwordhash.Hash(password)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -459,7 +459,7 @@ func TestPromptNone_SubClaimConsistent(t *testing.T) {
 	}
 
 	password := fake.Password(8)
-	passwordHashed, err := hashutil.HashPassword(password)
+	passwordHashed, err := passwordhash.Hash(password)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -617,7 +617,7 @@ func TestPromptNone_AuthTimePreservedInToken(t *testing.T) {
 	}
 
 	password := fake.Password(8)
-	passwordHashed, err := hashutil.HashPassword(password)
+	passwordHashed, err := passwordhash.Hash(password)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -776,7 +776,7 @@ func TestPromptNone_PKCEWrongVerifier(t *testing.T) {
 	}
 
 	password := fake.Password(8)
-	passwordHashed, err := hashutil.HashPassword(password)
+	passwordHashed, err := passwordhash.Hash(password)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -926,7 +926,7 @@ func TestPromptNone_RefreshWithOfflineAccess(t *testing.T) {
 	}
 
 	password := fake.Password(8)
-	passwordHashed, err := hashutil.HashPassword(password)
+	passwordHashed, err := passwordhash.Hash(password)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1116,7 +1116,7 @@ func TestPromptNone_NoncePreserved(t *testing.T) {
 	}
 
 	password := fake.Password(8)
-	passwordHashed, err := hashutil.HashPassword(password)
+	passwordHashed, err := passwordhash.Hash(password)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1263,7 +1263,7 @@ func TestPromptNone_PKCESupported(t *testing.T) {
 	}
 
 	password := fake.Password(8)
-	passwordHashed, err := hashutil.HashPassword(password)
+	passwordHashed, err := passwordhash.Hash(password)
 	if err != nil {
 		t.Fatal(err)
 	}

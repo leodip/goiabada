@@ -15,6 +15,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/encryption"
@@ -1041,7 +1042,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 				"Invalid resource owner credentials.", http.StatusBadRequest)
 		}
 
-		if !hashutil.VerifyPasswordHash(user.PasswordHash, input.Password) {
+		if !passwordhash.Verify(user.PasswordHash, input.Password) {
 			return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
 				"Invalid resource owner credentials.", http.StatusBadRequest)
 		}

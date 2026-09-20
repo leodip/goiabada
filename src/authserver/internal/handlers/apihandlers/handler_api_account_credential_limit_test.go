@@ -16,8 +16,8 @@ import (
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/core/enums"
-	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -54,7 +54,7 @@ func newCredentialEnv(t *testing.T) *credentialEnv {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_audit.NewAuditLogger(t)
 
-	hash, err := hashutil.HashPassword(credentialPassword)
+	hash, err := passwordhash.Hash(credentialPassword)
 	require.NoError(t, err)
 	// OTPEnabled false, so the OTP route's enable branch is the one reached past the password
 	// check, and part way through an enrolment, so a wrong code there is refused for being wrong

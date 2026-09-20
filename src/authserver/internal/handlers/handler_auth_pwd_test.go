@@ -14,9 +14,9 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/enums"
-	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
@@ -728,7 +728,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		handler := HandleAuthPwdPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{})
 
 		password := "testpassword"
-		passwordHash, err := hashutil.HashPassword(password)
+		passwordHash, err := passwordhash.Hash(password)
 		assert.NoError(t, err)
 
 		form := url.Values{}
@@ -836,7 +836,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		handler := HandleAuthPwdPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{})
 
 		password := "testpassword"
-		passwordHash, err := hashutil.HashPassword(password)
+		passwordHash, err := passwordhash.Hash(password)
 		assert.NoError(t, err)
 
 		form := url.Values{}
@@ -909,7 +909,7 @@ func TestHandleAuthPwdPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 	const email = "victim@example.com"
 
 	password := "correct horse battery staple"
-	passwordHash, err := hashutil.HashPassword(password)
+	passwordHash, err := passwordhash.Hash(password)
 	assert.NoError(t, err)
 
 	knownAccount := func() *models.User {

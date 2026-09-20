@@ -15,8 +15,8 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/core/constants"
-	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -63,7 +63,7 @@ func makeMultipartRequest(t *testing.T, method, url, accessToken, fieldName stri
 // createTestUserForProfilePicture creates a user for profile picture tests
 func createTestUserForProfilePicture(t *testing.T) *models.User {
 	password := fake.Password(8)
-	passwordHashed, err := hashutil.HashPassword(password)
+	passwordHashed, err := passwordhash.Hash(password)
 	assert.NoError(t, err)
 
 	user := &models.User{

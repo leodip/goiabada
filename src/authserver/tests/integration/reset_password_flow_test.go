@@ -16,8 +16,8 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/core/enums"
-	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/testutil"
 )
 
@@ -74,7 +74,7 @@ func createResetTestUser(t *testing.T, email string) (*models.User, string) {
 	t.Helper()
 
 	password := fake.Password(12) + "aA1!"
-	passwordHashed, err := hashutil.HashPassword(password)
+	passwordHashed, err := passwordhash.Hash(password)
 	require.NoError(t, err)
 
 	user := &models.User{
@@ -326,9 +326,9 @@ func TestResetPassword_PlusAddressCompletesTheFlowFromTheEmailedLink(t *testing.
 	assert.Contains(t, bodyString(t, resp), resetSucceededText)
 
 	after := passwordHashOf(t, user.Id)
-	assert.True(t, hashutil.VerifyPasswordHash(after, newPassword),
+	assert.True(t, passwordhash.Verify(after, newPassword),
 		"the reset must have replaced the password hash")
-	assert.False(t, hashutil.VerifyPasswordHash(after, oldPassword))
+	assert.False(t, passwordhash.Verify(after, oldPassword))
 }
 
 // The replay case a cookie jar is needed to see. The marker lives in a client-side cookie, so
@@ -354,7 +354,7 @@ func TestResetPassword_ReplayedMarkerAfterCompletionIsRefused(t *testing.T) {
 	_ = resp.Body.Close()
 
 	hashAfterReset := passwordHashOf(t, user.Id)
-	require.True(t, hashutil.VerifyPasswordHash(hashAfterReset, newPassword))
+	require.True(t, passwordhash.Verify(hashAfterReset, newPassword))
 
 	attacker := clientCarrying(t, captured)
 
@@ -408,7 +408,7 @@ func TestResetPassword_MarkerIssuedBeforeANewerCodeIsRefused(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, postResp.StatusCode)
 	assert.Contains(t, postBody, resetCodeInvalidText)
 
-	assert.True(t, hashutil.VerifyPasswordHash(passwordHashOf(t, user.Id), oldPassword),
+	assert.True(t, passwordhash.Verify(passwordHashOf(t, user.Id), oldPassword),
 		"a marker superseded by a newer code must not change the password")
 }
 
@@ -465,14 +465,14 @@ func TestResetPassword_ASecondLinkDoesNotRetargetTheFormOnScreen(t *testing.T) {
 	assert.Contains(t, body, resetSucceededText)
 
 	victimHash := passwordHashOf(t, victim.Id)
-	assert.True(t, hashutil.VerifyPasswordHash(victimHash, newPassword),
+	assert.True(t, passwordhash.Verify(victimHash, newPassword),
 		"the password typed must land in the account whose link rendered the form")
-	assert.False(t, hashutil.VerifyPasswordHash(victimHash, victimOldPassword))
+	assert.False(t, passwordhash.Verify(victimHash, victimOldPassword))
 
 	otherHash := passwordHashOf(t, other.Id)
-	assert.True(t, hashutil.VerifyPasswordHash(otherHash, otherOldPassword),
+	assert.True(t, passwordhash.Verify(otherHash, otherOldPassword),
 		"the second account must be untouched")
-	assert.False(t, hashutil.VerifyPasswordHash(otherHash, newPassword))
+	assert.False(t, passwordhash.Verify(otherHash, newPassword))
 }
 
 // The retarget that survives every rule about WRITING the marker, and the reason the form
@@ -511,7 +511,7 @@ func TestResetPassword_AStaleFormIsRefusedOnceTheSessionHoldsAnotherContinuation
 	_ = resp.Body.Close()
 
 	victimHash := passwordHashOf(t, victim.Id)
-	require.True(t, hashutil.VerifyPasswordHash(victimHash, victimPassword))
+	require.True(t, passwordhash.Verify(victimHash, victimPassword))
 
 	// The slot is free now, so the other account's link takes it legitimately: this is not
 	// the refused second link, it is the session moving on.
@@ -529,9 +529,9 @@ func TestResetPassword_AStaleFormIsRefusedOnceTheSessionHoldsAnotherContinuation
 	assert.Contains(t, staleBody, resetCodeInvalidText)
 
 	otherHash := passwordHashOf(t, other.Id)
-	assert.True(t, hashutil.VerifyPasswordHash(otherHash, otherOldPassword),
+	assert.True(t, passwordhash.Verify(otherHash, otherOldPassword),
 		"a form rendered for one account must not write into the account the session moved on to")
-	assert.False(t, hashutil.VerifyPasswordHash(otherHash, typedInTheStaleTab))
+	assert.False(t, passwordhash.Verify(otherHash, typedInTheStaleTab))
 
 	// And the account the stale form did belong to is untouched too: its reset already
 	// completed, and this submission changed nothing.
@@ -574,8 +574,8 @@ func TestResetPassword_OneCopiedMarkerLeavesExactlyOnePasswordChange(t *testing.
 	assert.Contains(t, secondBody, resetCodeInvalidText)
 
 	after := passwordHashOf(t, user.Id)
-	assert.True(t, hashutil.VerifyPasswordHash(after, firstPassword),
+	assert.True(t, passwordhash.Verify(after, firstPassword),
 		"the winner's password must be the one that stands")
-	assert.False(t, hashutil.VerifyPasswordHash(after, secondPassword),
+	assert.False(t, passwordhash.Verify(after, secondPassword),
 		"the second submission of one marker must not overwrite the first")
 }

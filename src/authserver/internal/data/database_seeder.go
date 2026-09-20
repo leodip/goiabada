@@ -11,11 +11,11 @@ import (
 	"strings"
 
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/encryption"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/errs"
-	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/rsautil"
 	"github.com/leodip/goiabada/core/stringutil"
 	"github.com/leodip/goiabada/core/uuidutil"
@@ -228,7 +228,7 @@ func (ds *DatabaseSeeder) Seed() error {
 		adminPassword = defaultAdminPassword
 	}
 
-	passwordHash, _ := hashutil.HashPassword(adminPassword)
+	passwordHash, _ := passwordhash.Hash(adminPassword)
 
 	user := &models.User{
 		Subject: uuidutil.New(),
