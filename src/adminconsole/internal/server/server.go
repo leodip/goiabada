@@ -240,10 +240,12 @@ func (s *Server) initMiddleware() chi.Router {
 	// origin check down onto the application branch, where a route registered outside that
 	// branch would escape it.
 	//
-	// The pair takes no configuration: MiddlewareSkipCsrf marks the endpoints that are
-	// cross-origin by protocol, and MiddlewareCsrf refuses every other state-changing
-	// cross-origin request outright, trusting no origin but this deployment's own (#155).
-	s.router.Use(custom_middleware.MiddlewareSkipCsrf())
+	// MiddlewareSkipCsrf marks the endpoints that are cross-origin by protocol, and MiddlewareCsrf
+	// refuses every other state-changing cross-origin request outright, trusting no origin but this
+	// deployment's own (#155). MiddlewareCsrf takes no configuration; MiddlewareSkipCsrf takes this
+	// server's own exemption policy, which until #385 was a table in core naming both binaries'
+	// routes, so each exempted the other's.
+	s.router.Use(custom_middleware.MiddlewareSkipCsrf(csrfPolicy()))
 	s.router.Use(custom_middleware.MiddlewareCsrf())
 
 	// Everything below is on the application branch, not the root.
@@ -279,6 +281,48 @@ func (s *Server) initMiddleware() chi.Router {
 	slog.Info("finished initializing middleware")
 
 	return app
+}
+
+// csrfPolicy is the admin console's CSRF exemption policy: the endpoints this binary serves that
+// are cross-origin by protocol design, so the origin check cannot apply to them. Everything else it
+// mounts is a cookie-authenticated page, which is exactly what CSRF defends, so the list is short.
+//
+// Two entries where the auth server has seven, because this binary mounts three of the eleven
+// routes the shared table in core used to name: /auth/callback, /auth/logout and /static/. The
+// other eight were the auth server's, and exempting a route that does not exist here was never
+// deliberate (#385).
+//
+// That narrowing is this change's one observable difference, and it is a narrowing rather than a
+// break. For every route this server mounts, nothing changes. For a path it does not mount,
+// /auth/token say, a cross-origin unsafe-method request used to pass the origin check on the shared
+// exemption and reach chi for a 404 or a 405, and is now refused 403 by the origin check instead.
+// Safe methods are untouched, because http.CrossOriginProtection.Check only applies to unsafe ones,
+// and a 403 tells a cross-origin prober less about this deployment's route table than the 404 did.
+//
+// /auth/logout is likewise absent. This server mounts GET /auth/logout only, and GET is a safe
+// method the origin check never applies to, so the auth server's conditional entry for it would
+// exempt nothing here.
+func csrfPolicy() custom_middleware.CsrfPolicy {
+	return custom_middleware.CsrfPolicy{
+		// Matched EXACTLY, so a future sibling route is NOT silently exempted: it keeps full CSRF
+		// protection until it is deliberately added here.
+		ExactPaths: []string{
+			// The admin console's OAuth callback: a cross-site form_post carrying the auth code
+			// (POST), protected by the OAuth `state` parameter rather than by the origin check.
+			"/auth/callback",
+		},
+
+		// Whole subtrees where prefix inheritance is intentional, unlike the exact path above.
+		Prefixes: []string{
+			// Static assets, served with safe methods (GET/HEAD) only, which the origin check
+			// never applies to anyway; listed for clarity.
+			"/static/",
+		},
+
+		// No conditional entries. This server has no endpoint whose exemption depends on the
+		// request rather than only on its path; the auth server's /auth/logout predicate is the
+		// only one in the tree.
+	}
 }
 
 func (s *Server) serveStaticFiles(path string, root http.FileSystem) {

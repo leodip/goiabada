@@ -292,10 +292,12 @@ func (s *Server) initMiddleware() chi.Router {
 	// the locale lookup cost on every rejected request. Localizing it would mean resolving a
 	// locale this early for the sake of a response nobody normally sees.
 	//
-	// The pair takes no configuration: MiddlewareSkipCsrf marks the endpoints that are
-	// cross-origin by protocol, and MiddlewareCsrf refuses every other state-changing
-	// cross-origin request outright, trusting no origin but this deployment's own (#155).
-	s.router.Use(custom_middleware.MiddlewareSkipCsrf())
+	// MiddlewareSkipCsrf marks the endpoints that are cross-origin by protocol, and MiddlewareCsrf
+	// refuses every other state-changing cross-origin request outright, trusting no origin but this
+	// deployment's own (#155). MiddlewareCsrf takes no configuration; MiddlewareSkipCsrf takes this
+	// server's own exemption policy, which until #385 was a table in core naming both binaries'
+	// routes, so each exempted the other's.
+	s.router.Use(custom_middleware.MiddlewareSkipCsrf(csrfPolicy()))
 	s.router.Use(custom_middleware.MiddlewareCsrf())
 
 	// Everything below is on the application branch, not the root.
@@ -327,6 +329,72 @@ func (s *Server) initMiddleware() chi.Router {
 	slog.Info("finished initializing middleware")
 
 	return app
+}
+
+// csrfPolicy is the auth server's CSRF exemption policy: the endpoints this binary serves that are
+// cross-origin by protocol design, so the origin check cannot apply to them.
+//
+// There is no single property these share, and in particular they do NOT all authenticate the
+// caller, so each carries its own rationale rather than leaning on a shared one (#155). What core
+// owns is the matching and the three-way distinction between the shapes; what this server owns is
+// which of its own routes go in which shape (#385). A route absent from all three keeps full CSRF
+// protection.
+//
+// /auth/callback is deliberately not here. It is the admin console's OAuth callback and this binary
+// does not mount it; it was in the shared table this replaces, which is the kind of entry a
+// per-application policy exists to stop.
+func csrfPolicy() custom_middleware.CsrfPolicy {
+	return custom_middleware.CsrfPolicy{
+		// Matched EXACTLY, so a future sibling route (e.g. /auth/token-introspect or
+		// /userinfo-export) is NOT silently exempted: it keeps full CSRF protection until it is
+		// deliberately added here.
+		ExactPaths: []string{
+			// OAuth2 authorization endpoint (GET/POST). OIDC Core 3.1.2.1 requires both methods.
+			// It does consult the session cookie for SSO, so the exemption rests instead on a
+			// cross-site POST here reaching nothing a plain link would not: it starts a ceremony,
+			// and every state-changing step it leads to (password, OTP, consent) is itself
+			// origin-checked (#67).
+			"/auth/authorize",
+
+			// OAuth2 token endpoint (POST). A confidential client authenticates with its secret; a
+			// public client instead redeems a one-time code bound to its registered redirect URI
+			// and, when PKCE was used, to a code verifier. No session cookie is read either way.
+			"/auth/token",
+
+			// OIDC userinfo; bearer-token authenticated (GET/POST).
+			"/userinfo",
+
+			// Dynamic Client Registration (POST). Deliberately unauthenticated when enabled: it
+			// creates a client rather than acting on a signed-in user, so there is no user state
+			// for CSRF to reach. Disabled by default, rate limited.
+			"/connect/register",
+		},
+
+		// Whole subtrees where prefix inheritance is intentional, unlike the exact paths above.
+		Prefixes: []string{
+			// Bearer-token REST API surface. Every route authenticates via the Authorization
+			// header, never the session cookie, so new endpoints added under this prefix SHOULD
+			// inherit the exemption. Cookie-authenticated routes must never be mounted here.
+			"/api/",
+
+			// Static assets, served with safe methods (GET/HEAD) only, which the origin check
+			// never applies to anyway; listed for clarity.
+			"/static/",
+		},
+
+		// Endpoints whose exemption depends on the request rather than only on its path.
+		//
+		// This shape exists because an unconditional entry for /auth/logout would be a hole: any
+		// site could then POST to it with no hint and no token, and the handler treats a hintless
+		// POST as the confirmation of its consent page, so the End-User would be signed out
+		// without ever being asked.
+		Conditional: map[string]func(*http.Request) bool{
+			// RP-initiated logout, exempt only for a POST carrying an id_token_hint. See
+			// middleware.LogoutIdTokenHintPresent for why presence is the test and why it is read
+			// through the same function the logout handler classifies the parameter with (#109).
+			"/auth/logout": authserver_middleware.LogoutIdTokenHintPresent,
+		},
+	}
 }
 
 func (s *Server) serveStaticFiles(path string, root http.FileSystem) {

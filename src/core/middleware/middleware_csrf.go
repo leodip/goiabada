@@ -7,11 +7,10 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/leodip/goiabada/core/handlerhelpers"
 	"github.com/leodip/goiabada/core/i18n"
 )
 
-// csrfSkipContextKey marks a request that the exemption tables below have already cleared, so
+// csrfSkipContextKey marks a request that the application's CsrfPolicy has already cleared, so
 // MiddlewareCsrf can honour a decision MiddlewareSkipCsrf made earlier in the chain. It replaces
 // gorilla/csrf's UnsafeSkipCheck, which left with the library (#155).
 //
@@ -31,137 +30,125 @@ func csrfSkipped(r *http.Request) bool {
 	return skipped
 }
 
-// csrfExemptExactPaths lists individual endpoints that are cross-origin by protocol design, so the
-// origin check cannot apply to them. What stands in for it differs per endpoint, and stating that
-// per endpoint matters: there is no single property they share. In particular they do NOT all
-// authenticate the caller, and /auth/authorize does read the session cookie (#155).
+// CsrfPolicy is one application's set of endpoints that are cross-origin by protocol design, so
+// the origin check cannot apply to them. Each server declares its own at its composition root and
+// passes it to MiddlewareSkipCsrf; core owns the matching and owns none of the routes, because a
+// shared table means each binary exempts the other's endpoints, and the one that used to live here
+// had the admin console exempting /auth/authorize, /auth/token, /userinfo and /connect/register,
+// none of which it mounts, and the auth server exempting /auth/callback, which it does not (#385).
 //
-//	/auth/authorize   - OAuth2 authorization endpoint (GET/POST). OIDC Core 3.1.2.1 requires both
-//	                    methods. It does consult the session cookie for SSO, so the exemption rests
-//	                    instead on a cross-site POST here reaching nothing a plain link would not:
-//	                    it starts a ceremony, and every state-changing step it leads to (password,
-//	                    OTP, consent) is itself origin-checked (#67).
-//	/auth/token       - OAuth2 token endpoint (POST). A confidential client authenticates with its
-//	                    secret; a public client instead redeems a one-time code bound to its
-//	                    registered redirect URI and, when PKCE was used, to a code verifier. No
-//	                    session cookie is read either way.
-//	/auth/callback    - Admin-console OAuth callback: a cross-site form_post carrying
-//	                    the auth code, protected by the OAuth `state` parameter (POST).
-//	/userinfo         - OIDC userinfo; bearer-token authenticated (GET/POST).
-//	/connect/register - Dynamic Client Registration (POST). Deliberately unauthenticated when
-//	                    enabled: it creates a client rather than acting on a signed-in user, so
-//	                    there is no user state for CSRF to reach. Disabled by default, rate limited.
+// What stands in for the origin check differs per endpoint, and stating that per endpoint matters:
+// there is no single property the exempt set shares. In particular they do NOT all authenticate
+// the caller, and the auth server's /auth/authorize does read the session cookie (#155). Each
+// server's policy therefore carries a rationale comment per entry, and that is where they are.
 //
-// These are matched EXACTLY, not by prefix, so a future sibling route (e.g.
-// /auth/token-introspect or /userinfo-export) is NOT silently exempted: it keeps
-// full CSRF protection until it is deliberately added to this list.
-var csrfExemptExactPaths = map[string]bool{
-	"/auth/authorize":   true,
-	"/auth/token":       true,
-	"/auth/callback":    true,
-	"/userinfo":         true,
-	"/connect/register": true,
+// The three shapes are distinct on purpose, and the distinction is load-bearing rather than
+// stylistic:
+//
+//   - ExactPaths is matched EXACTLY, so a future sibling route (say /auth/token-introspect beside
+//     /auth/token, or /userinfo-export beside /userinfo) is NOT silently exempted: it keeps full
+//     CSRF protection until somebody deliberately adds it.
+//   - Prefixes inherit, and that inheritance is the point where it is used: a bearer-authenticated
+//     REST subtree wants new endpoints under it to be exempt without a fresh decision each time.
+//     A path is not a prefix, so listing one here where an exact entry was meant exempts every
+//     sibling that shares its text.
+//   - Conditional is what a prefix cannot express: the exemption depends on the request rather
+//     than only on its path. An unconditional entry where a conditional one was meant is a hole,
+//     which is exactly what the auth server's /auth/logout predicate exists to avoid.
+//
+// A collapse to one predicate per application was rejected for that reason (decision 5): the
+// reasoning above would then have to be re-established in each module, and an application writing
+// HasPrefix where it meant an exact match would get no help at all.
+//
+// The zero value exempts nothing, which is a usable policy and not a misconfiguration: a server
+// with no cross-origin binding supplies it and every state-changing request is origin-checked.
+type CsrfPolicy struct {
+	// ExactPaths are exempt when the request path equals one of them.
+	ExactPaths []string
+
+	// Prefixes are exempt when the request path begins with one of them. Write the trailing
+	// slash: "/api/" exempts /api/v1/users and not /api-internal.
+	Prefixes []string
+
+	// Conditional maps an exact path to the predicate that decides each request on that path.
+	// Consulted only when neither table above already exempted the path, so a predicate is never
+	// asked about a request that was exempt anyway.
+	Conditional map[string]func(*http.Request) bool
 }
 
-// csrfExemptPrefixes lists whole subtrees where prefix inheritance is
-// intentional (unlike the exact paths above):
-//
-//	/api/    - Bearer-token REST API surface. Every route authenticates via the
-//	           Authorization header, never the session cookie, so new endpoints
-//	           added under this prefix SHOULD inherit the exemption. Cookie-
-//	           authenticated routes must never be mounted here.
-//	/static/ - Static assets, served with safe methods (GET/HEAD) only, which the origin check
-//	           never applies to anyway; listed for clarity.
-var csrfExemptPrefixes = []string{
-	"/api/",
-	"/static/",
+// csrfSkipper is a policy compiled for matching: the exact paths as a set, so a lookup does not
+// scan, and the other two as they were given.
+type csrfSkipper struct {
+	exact       map[string]bool
+	prefixes    []string
+	conditional map[string]func(*http.Request) bool
 }
 
-// csrfConditionalExemptions lists endpoints whose exemption depends on the request rather than only
-// on its path. Matched EXACTLY, like csrfExemptExactPaths, and the predicate decides the rest; a
-// path absent from all three tables keeps full CSRF protection.
+// newCsrfSkipper compiles a policy and refuses the two shapes that are silently wrong.
 //
-//	/auth/logout - RP-initiated logout, exempt only for a POST carrying an id_token_hint. See
-//	               logoutIdTokenHintPresent.
-//
-// This table exists because an unconditional entry above would be a hole: any site could then POST
-// to /auth/logout with no hint and no token, and the handler treats a hintless POST as the
-// confirmation of its consent page, so the End-User would be signed out without ever being asked.
-var csrfConditionalExemptions = map[string]func(*http.Request) bool{
-	"/auth/logout": logoutIdTokenHintPresent,
-}
-
-// logoutIdTokenHintPresent reports whether this is a POST to the logout endpoint carrying an
-// id_token_hint, which is the one shape of /auth/logout that must work cross-site.
-//
-// OpenID Connect RP-Initiated Logout 1.0 section 2 is a MUST here: "OpenID Providers MUST support
-// the use of the HTTP GET and POST methods defined in RFC 7231". Without an exemption the origin
-// check rejects every cross-origin POST, so the binding exists for relying parties that cannot reach
-// it, and an RP that wants a self-submitting form to keep the ID token out of the URL has no way in.
-//
-// PRESENCE, not a value, and read through the same function the handler classifies the parameter
-// with. The two readings must agree in one direction above all: this saying "present" where the
-// handler reads "absent" would exempt a cross-site POST and then send it down the hintless branch,
-// which tears the whole session down with no consent. Sharing handlerhelpers'
-// LookupFromUrlQueryOrFormPost is what makes that agreement structural rather than a promise, and
-// it is why "id_token_hint=" is exempt here and Rejected there (#109).
-//
-// Presence alone is safe because middleware cannot judge whether a hint is genuine and the handler
-// does not trust it to: a POST whose hint fails to validate tears nothing down, it is answered with
-// a redirect to the GET binding and ends at the consent page. So the exemption buys an attacker a
-// consent page they cannot confirm, which is where a plain link to /auth/logout already lands.
-//
-// POST only. Everything the origin check refuses is a POST here in practice, and confining it means
-// the form parse below happens on one path and one method rather than on requests that have no
-// business being read.
-//
-// The admin console registers this same middleware and mounts only GET /auth/logout, so a POST
-// there is answered by chi with 405 before any handler runs. Exempting a route that does not exist
-// changes nothing; noted so the shared table does not read as an oversight.
-// Reading the body here does let a foreign origin have its body parsed before it is turned away,
-// where the origin check would otherwise have rejected it on the headers alone. That is inherent
-// to decision 9 rather than introduced by reading the body: the same origin need only move the hint
-// into the query to reach the handler, which parses the body itself to honour ui_locales. Go bounds
-// the parse the same way it bounds every other form endpoint here, and middleware_jwt already
-// parses forms on this side of the chain.
-func logoutIdTokenHintPresent(r *http.Request) bool {
-	if r.Method != http.MethodPost {
-		return false
+// It panics rather than returning an error because a policy is a literal at a composition root,
+// evaluated once at startup: both refusals are programming errors that no request can produce and
+// that no deployment can configure its way into, so failing to start is the whole of the correct
+// response. Answering them per request would instead mean a server that boots with a hole in it.
+func newCsrfSkipper(policy CsrfPolicy) csrfSkipper {
+	exact := make(map[string]bool, len(policy.ExactPaths))
+	for _, path := range policy.ExactPaths {
+		exact[path] = true
 	}
-	// Reads the query first and only then the body, so a hint in the query costs no parse. When it
-	// does parse, Go caches the result in r.PostForm and the handler's own r.FormValue reuses it,
-	// which is what stops this middleware consuming the body the handler is about to read.
-	_, present := handlerhelpers.LookupFromUrlQueryOrFormPost(r, "id_token_hint")
-	return present
+
+	for _, prefix := range policy.Prefixes {
+		// An empty prefix is a prefix of every path, so it turns the whole server off. It is what
+		// an unset constant or a dropped element of a slice literal looks like.
+		if prefix == "" {
+			panic("csrf policy: an empty prefix exempts every path on this server")
+		}
+	}
+
+	for path := range policy.Conditional {
+		// shouldSkip consults the exact set first, so a path in both is unconditionally exempt and
+		// its predicate is never called. That is precisely the hole a conditional entry exists to
+		// close: /auth/logout listed unconditionally would let any origin POST a logout with no
+		// hint, which the handler reads as the confirmation of its consent page (#109).
+		if exact[path] {
+			panic("csrf policy: " + path + " is listed both exactly and conditionally, so the exact entry " +
+				"wins and the predicate is never consulted, which exempts the path unconditionally; list it once")
+		}
+	}
+
+	return csrfSkipper{exact: exact, prefixes: policy.Prefixes, conditional: policy.Conditional}
 }
 
-// shouldSkipCsrf reports whether CSRF protection should be bypassed for this request. CSRF defends
-// the state-changing requests a browser makes on a signed-in person's behalf; the exempt paths are
+// shouldSkip reports whether CSRF protection should be bypassed for this request. CSRF defends the
+// state-changing requests a browser makes on a signed-in person's behalf; the exempt paths are
 // bindings a protocol requires to work cross-origin, or safe-method static assets, so enforcing the
 // origin check on them would break legitimate callers rather than stop an attacker. What replaces
-// it differs per endpoint: see csrfExemptExactPaths, csrfExemptPrefixes and
-// csrfConditionalExemptions for the rationale of each, and do not assume a shared one (#155).
+// it differs per endpoint, and the rationale for each is at the composition root that supplied it;
+// do not assume a shared one (#155).
 //
 // The path is passed in rather than read off the request because the caller has already resolved
 // chi's normalized RoutePath, which is what a trailing slash arrives as.
-func shouldSkipCsrf(r *http.Request, path string) bool {
-	if csrfExemptExactPaths[path] {
+func (s csrfSkipper) shouldSkip(r *http.Request, path string) bool {
+	if s.exact[path] {
 		return true
 	}
-	for _, prefix := range csrfExemptPrefixes {
+	for _, prefix := range s.prefixes {
 		if strings.HasPrefix(path, prefix) {
 			return true
 		}
 	}
 	// Last, so an unconditional entry always wins and no predicate is consulted, and with it no
 	// request body read, for a path that was exempt anyway.
-	if exempt, ok := csrfConditionalExemptions[path]; ok {
+	if exempt, ok := s.conditional[path]; ok {
 		return exempt(r)
 	}
 	return false
 }
 
-func MiddlewareSkipCsrf() func(next http.Handler) http.Handler {
+// MiddlewareSkipCsrf marks the requests policy exempts, for MiddlewareCsrf below to honour. The
+// policy is the caller's because the routes are: see CsrfPolicy.
+func MiddlewareSkipCsrf(policy CsrfPolicy) func(next http.Handler) http.Handler {
+	skipper := newCsrfSkipper(policy)
+
 	return func(next http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
 			// Resolve the effective request path: chi's StripSlashes middleware
@@ -173,7 +160,7 @@ func MiddlewareSkipCsrf() func(next http.Handler) http.Handler {
 				path = rctx.RoutePath
 			}
 
-			if shouldSkipCsrf(r, path) {
+			if skipper.shouldSkip(r, path) {
 				r = markCsrfSkipped(r)
 			}
 			next.ServeHTTP(w, r)
@@ -193,8 +180,8 @@ func MiddlewareSkipCsrf() func(next http.Handler) http.Handler {
 //     trusted list to hold, and an entry added speculatively would silently widen the boundary for
 //     whatever cross-origin POST someone adds next. Trusting a host across both schemes is exactly
 //     what CVE-2025-47909 was, so the absence is the point.
-//   - No AddInsecureBypassPattern. The exemption tables and MiddlewareSkipCsrf already own that
-//     decision, including the conditional /auth/logout predicate, which a pattern cannot express.
+//   - No AddInsecureBypassPattern. The application's CsrfPolicy and MiddlewareSkipCsrf already own
+//     that decision, including its conditional entries, which a pattern cannot express.
 //   - No session key and no cookie. There is no CSRF token: the origin is the whole control.
 //   - No cookie-secure flag. The check never consults the server's idea of its own scheme, so a
 //     plain-HTTP deployment needs no configuration to work.

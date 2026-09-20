@@ -5,7 +5,6 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"strings"
 	"testing"
 
@@ -14,290 +13,317 @@ import (
 	"github.com/leodip/goiabada/core/i18n"
 )
 
+// The fixture policy every matching test below drives, and it is deliberately not either
+// application's.
+//
+// core owns the matching and owns no route, so a test here naming /auth/token would be asserting
+// about a table this package no longer declares and could not fail when that table changed. The
+// concrete route tables moved to the binaries that supply them: the auth server's to
+// src/authserver/internal/server/server_csrf_test.go with its predicate's own table at
+// src/authserver/internal/middleware/middleware_csrf_test.go, and the admin console's to
+// src/adminconsole/internal/server/server_csrf_test.go. What is left here is the mechanism, which
+// is what this package is now responsible for (#385).
+//
+// The names are shaped so that every negative case differs from a positive one in exactly the thing
+// under test: /exact against /exact-extra and /exact/child, /prefix/ against /prefix-extra.
+func fixtureCsrfPolicy(conditional func(*http.Request) bool) CsrfPolicy {
+	return CsrfPolicy{
+		ExactPaths: []string{"/exact", "/other-exact"},
+		Prefixes:   []string{"/prefix/"},
+		Conditional: map[string]func(*http.Request) bool{
+			"/conditional": conditional,
+		},
+	}
+}
+
+// alwaysExempt and neverExempt are the two constant predicates the path-matching table uses, so a
+// conditional row fails on its path rather than on whatever a realistic predicate would have read.
+func alwaysExempt(*http.Request) bool { return true }
+
+func neverExempt(*http.Request) bool { return false }
+
 func TestMiddlewareSkipCsrf(t *testing.T) {
 	tests := []struct {
 		name string
-		// method defaults to GET, which is what every path-only row wants: the exemption those rows
-		// describe does not depend on the method.
-		method string
-		path   string
-		// body is sent as application/x-www-form-urlencoded when set, which is how a relying party
-		// serializes logout parameters into a POST per OpenID Connect Core's Form Serialization.
-		body string
-		skip bool
+		path string
+		// exemptWhenCalled is what the conditional predicate answers for this row. It only
+		// decides the two /conditional rows; every other row is settled before the predicate is
+		// reached, which the ordering test below asserts directly.
+		exemptWhenCalled bool
+		skip             bool
 	}{
-		// Exempt: exact-match endpoints (bearer/client-authenticated, no cookie).
-		{"Authorize exact", "", "/auth/authorize", "", true},
-		{"Token exact", "", "/auth/token", "", true},
-		{"Callback exact", "", "/auth/callback", "", true},
-		{"Userinfo exact", "", "/userinfo", "", true},
-		{"DCR register exact", "", "/connect/register", "", true},
+		// Exact: the path itself, and nothing that merely shares its text. These are the drift
+		// guards, and they are why ExactPaths is not a prefix list: a sibling route added beside an
+		// exempt one must keep full CSRF protection until somebody lists it deliberately.
+		{"the exact path is exempt", "/exact", false, true},
+		{"the second exact path is exempt", "/other-exact", false, true},
+		{"a suffixed sibling is not", "/exact-extra", false, false},
+		{"a child route is not", "/exact/child", false, false},
+		{"a parent route is not", "/", false, false},
+		{"a prefixed sibling is not", "/not/exact", false, false},
 
-		// Exempt: intentional subtree prefixes.
-		{"API admin subtree", "", "/api/v1/admin/users", "", true},
-		{"API account subtree", "", "/api/v1/account/profile", "", true},
-		{"API public settings", "", "/api/public/settings", "", true},
-		{"Static css", "", "/static/file.css", "", true},
-		{"Static nested js", "", "/static/js/app.js", "", true},
+		// Prefix: inheritance at any depth is the point, and the trailing slash is what bounds it.
+		{"a path directly under the prefix is exempt", "/prefix/thing", false, true},
+		{"a path nested under the prefix is exempt", "/prefix/a/b/c", false, true},
+		{"the prefix itself is exempt", "/prefix/", false, true},
+		{"the prefix without its trailing slash is not", "/prefix", false, false},
+		{"a path sharing the prefix's text is not", "/prefix-extra/thing", false, false},
 
-		// Drift guards: sibling routes under a formerly-prefixed path must NOT
-		// inherit the exemption now that single endpoints are matched exactly.
-		{"Token introspect not skipped", "", "/auth/token-introspect", "", false},
-		{"Tokeninfo not skipped", "", "/auth/tokeninfo", "", false},
-		{"Tokens not skipped", "", "/auth/tokens", "", false},
-		{"Userinfo export not skipped", "", "/userinfo-export", "", false},
-		{"Userinfo typo not skipped", "", "/userinfoo", "", false},
-		{"Connect register status not skipped", "", "/connect/register-status", "", false},
-		{"Connect bare not skipped", "", "/connect/", "", false},
-		{"Static without slash not skipped", "", "/static-secret", "", false},
-		{"Authorize-extra not skipped", "", "/auth/authorize-extra", "", false},
+		// Conditional: the predicate decides, and it is bound to its exact path the same way
+		// ExactPaths is, so the same signal on a neighbouring route exempts nothing.
+		{"the conditional path is exempt when the predicate says so", "/conditional", true, true},
+		{"the conditional path is not exempt when the predicate refuses", "/conditional", false, false},
+		{"a suffixed sibling of the conditional path is not", "/conditional-extra", true, false},
+		{"a child of the conditional path is not", "/conditional/child", true, false},
 
-		// Cookie-authenticated routes must keep CSRF protection.
-		{"Auth pwd protected", "", "/auth/pwd", "", false},
-		{"Auth otp protected", "", "/auth/otp", "", false},
-		{"Auth consent protected", "", "/auth/consent", "", false},
-		{"Auth logout protected", "", "/auth/logout", "", false},
-		{"Account register protected", "", "/account/register", "", false},
-		{"Account profile protected", "", "/account/profile", "", false},
-		{"Admin console page protected", "", "/admin/clients", "", false},
-		{"Forgot password protected", "", "/forgot-password", "", false},
-		{"Reset password protected", "", "/reset-password", "", false},
-		{"Root protected", "", "/", "", false},
-		{"Other path", "", "/other", "", false},
-
-		// The one conditional exemption: POST /auth/logout carrying an id_token_hint, which
-		// RP-Initiated Logout 1.0 section 2 makes a MUST ("OpenID Providers MUST support the use of
-		// the HTTP GET and POST methods defined in RFC 7231") and which the origin check otherwise
-		// refuses from every foreign origin (#109 decision 9).
-		//
-		// Both arrival routes, because a relying party may put the parameter in the query or
-		// serialize it into the body, and the handler reads both.
-		{"Logout POST with a hint in the query", http.MethodPost, "/auth/logout?id_token_hint=abc", "", true},
-		{"Logout POST with a hint in the body", http.MethodPost, "/auth/logout", "id_token_hint=abc", true},
-
-		// PRESENCE, not a value, and this pair is the reason the shared extractor exists. The
-		// handler classifies "id_token_hint=" as a hint that was supplied and cannot be confirmed,
-		// so it asks the End-User. Were this predicate to read the same parameter as no hint at all,
-		// the exempted POST would take the hintless branch instead, which is the confirmation of the
-		// consent page and tears the whole session down without asking anybody (#109 decision 13).
-		{"Logout POST with an empty hint in the query", http.MethodPost, "/auth/logout?id_token_hint=", "", true},
-		{"Logout POST with an empty hint in the body", http.MethodPost, "/auth/logout", "id_token_hint=", true},
-
-		// And the hintless POST keeps full protection, which is the whole reason the exemption is
-		// conditional: an unconditional entry would let any site force a logout from any origin.
-		{"Logout POST with no hint", http.MethodPost, "/auth/logout", "", false},
-		{"Logout POST with only other parameters", http.MethodPost, "/auth/logout", "state=abc&client_id=x", false},
-		{"Logout POST with a lookalike parameter", http.MethodPost, "/auth/logout?id_token_hintx=abc", "", false},
-		{"Logout POST with a lookalike parameter in the body", http.MethodPost, "/auth/logout", "id_token_hint_x=abc", false},
-
-		// Methods other than POST are not exempted even with a hint. GET is a safe method the
-		// origin check never applies to; PUT and DELETE are checked, and neither is routed here, so exempting them
-		// would widen the hole for a route that would have to be added deliberately.
-		{"Logout GET with a hint", http.MethodGet, "/auth/logout?id_token_hint=abc", "", false},
-		{"Logout PUT with a hint", http.MethodPut, "/auth/logout?id_token_hint=abc", "", false},
-		{"Logout DELETE with a hint", http.MethodDelete, "/auth/logout?id_token_hint=abc", "", false},
-
-		// The predicate is bound to its exact path, like the exact-match table above and for the same
-		// drift reason: an id_token_hint on any other endpoint exempts nothing.
-		{"Auth pwd POST with a hint", http.MethodPost, "/auth/pwd?id_token_hint=abc", "", false},
-		{"Logout sibling route with a hint", http.MethodPost, "/auth/logout-extra?id_token_hint=abc", "", false},
-		{"Logout prefix route with a hint", http.MethodPost, "/auth/logout/confirm?id_token_hint=abc", "", false},
+		// And a path in no table at all.
+		{"an unlisted path is not exempt", "/unlisted", true, false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			method := tt.method
-			if method == "" {
-				method = http.MethodGet
+			predicate := neverExempt
+			if tt.exemptWhenCalled {
+				predicate = alwaysExempt
 			}
-			var body io.Reader
-			if tt.body != "" {
-				body = strings.NewReader(tt.body)
-			}
-			req := httptest.NewRequest(method, tt.path, body)
-			if tt.body != "" {
-				req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-			}
-			rr := httptest.NewRecorder()
 
-			handler := MiddlewareSkipCsrf()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				skipValue := csrfSkipped(r)
-				if tt.skip {
-					if !skipValue {
-						t.Errorf("MiddlewareSkipCsrf() for path %s: expected CSRF check to be skipped, but it wasn't", tt.path)
-					}
-				} else {
-					if skipValue {
-						t.Errorf("MiddlewareSkipCsrf() for path %s: expected CSRF check not to be skipped, but it was", tt.path)
-					}
-				}
-			}))
+			var got bool
+			handler := MiddlewareSkipCsrf(fixtureCsrfPolicy(predicate))(
+				http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+					got = csrfSkipped(r)
+				}))
+			handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodPost, tt.path, nil))
 
-			handler.ServeHTTP(rr, req)
+			if got != tt.skip {
+				t.Errorf("path %s: exempted = %v, want %v", tt.path, got, tt.skip)
+			}
 		})
 	}
 }
 
-// TestMiddlewareSkipCsrf_LogoutBodySurvivesTheHintCheck is the case decision 9 names as the thing
-// that has to be pinned: looking for the hint in a POST body means parsing the form in middleware,
-// and a form parse consumes the request body.
-//
-// It survives because Go caches the parse in r.PostForm and r.Form, and the handler's r.FormValue
-// reads the cache rather than the socket. If it ever stopped surviving, the logout handler would see
-// a request with no ui_locales, no state and no post_logout_redirect_uri, which is a page in the
-// wrong language and a redirect that silently does not happen, so this asserts the siblings and not
-// only the hint itself.
-func TestMiddlewareSkipCsrf_LogoutBodySurvivesTheHintCheck(t *testing.T) {
-	body := url.Values{
-		"id_token_hint":            {"a.b.c"},
-		"post_logout_redirect_uri": {"https://rp.example/bye"},
-		"state":                    {"opaque+value/=="},
-		"ui_locales":               {"pt-BR"},
-	}
+// TestMiddlewareSkipCsrf_TheZeroPolicyExemptsNothing is the case that fails if the matching ever
+// grows a default. A server with no cross-origin binding supplies CsrfPolicy{} and must get the
+// origin check on everything; the paths below are the ones the table this replaced used to exempt
+// for every binary, which is the shape of the bug that would reintroduce them.
+func TestMiddlewareSkipCsrf_TheZeroPolicyExemptsNothing(t *testing.T) {
+	for _, path := range []string{"/", "/auth/authorize", "/auth/token", "/auth/callback",
+		"/userinfo", "/connect/register", "/api/v1/admin/users", "/static/app.css", "/auth/logout"} {
 
-	var seen url.Values
-	var skipped bool
-	handler := MiddlewareSkipCsrf()(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
-		skipped = csrfSkipped(r)
-		seen = url.Values{}
-		for _, key := range []string{"id_token_hint", "post_logout_redirect_uri", "state", "ui_locales"} {
-			seen.Set(key, r.FormValue(key))
-		}
-	}))
-
-	req := httptest.NewRequest(http.MethodPost, "/auth/logout", strings.NewReader(body.Encode()))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	handler.ServeHTTP(httptest.NewRecorder(), req)
-
-	if !skipped {
-		t.Fatal("a POST carrying an id_token_hint in its body must be exempted")
-	}
-	for key, want := range body {
-		if got := seen.Get(key); got != want[0] {
-			t.Errorf("handler read %s = %q after the middleware parsed the body, want %q", key, got, want[0])
-		}
-	}
-}
-
-// TestMiddlewareSkipCsrf_OtherPathsKeepAnUnreadBody is the boundary on the test above: the body is
-// read for the one path that has a predicate and for nothing else.
-//
-// It matters because the exempt prefixes include the whole /api/ subtree, whose handlers decode JSON
-// straight off r.Body. A predicate table that grew a prefix entry, or a parse hoisted out of the
-// predicate and up into the middleware, would leave those handlers reading an empty body and the
-// failure would look nothing like a CSRF change.
-func TestMiddlewareSkipCsrf_OtherPathsKeepAnUnreadBody(t *testing.T) {
-	const payload = `{"name":"unread"}`
-
-	for _, path := range []string{"/api/v1/admin/users", "/auth/token", "/auth/pwd", "/auth/logout-extra"} {
 		t.Run(path, func(t *testing.T) {
-			var got string
-			handler := MiddlewareSkipCsrf()(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
-				raw, err := io.ReadAll(r.Body)
-				if err != nil {
-					t.Fatalf("reading the body: %v", err)
-				}
-				got = string(raw)
-			}))
+			var got bool
+			handler := MiddlewareSkipCsrf(CsrfPolicy{})(
+				http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+					got = csrfSkipped(r)
+				}))
+			handler.ServeHTTP(httptest.NewRecorder(),
+				httptest.NewRequest(http.MethodPost, path, nil))
 
-			req := httptest.NewRequest(http.MethodPost, path, strings.NewReader(payload))
-			req.Header.Set("Content-Type", "application/json")
-			handler.ServeHTTP(httptest.NewRecorder(), req)
-
-			if got != payload {
-				t.Errorf("handler read %q from the body, want %q: the middleware consumed it", got, payload)
+			if got {
+				t.Errorf("path %s was exempted by an empty policy", path)
 			}
 		})
 	}
+}
+
+// TestMiddlewareSkipCsrf_OnlyTheConditionalPathConsultsThePredicate pins the ordering, which is
+// load-bearing rather than incidental: a predicate may read the request body, and the auth server's
+// does. A path an exact entry or a prefix already exempted must not reach one, or the /api/ subtree
+// would have its JSON body parsed by middleware before its handler decoded it, and the failure
+// would look nothing like a CSRF change.
+//
+// It counts calls rather than watching a body, so the assertion names the mechanism instead of a
+// side effect of it. The body-survival property belongs to the predicate that does the reading and
+// is asserted where that predicate lives, in the auth server.
+func TestMiddlewareSkipCsrf_OnlyTheConditionalPathConsultsThePredicate(t *testing.T) {
+	tests := []struct {
+		name      string
+		path      string
+		wantCalls int
+	}{
+		{"an exact path settles before the predicate", "/exact", 0},
+		{"a prefixed path settles before the predicate", "/prefix/thing", 0},
+		{"an unlisted path never reaches the predicate", "/unlisted", 0},
+		{"a sibling of the conditional path never reaches it", "/conditional-extra", 0},
+		{"the conditional path is the one that consults it", "/conditional", 1},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			calls := 0
+			predicate := func(*http.Request) bool {
+				calls++
+				return true
+			}
+
+			handler := MiddlewareSkipCsrf(fixtureCsrfPolicy(predicate))(
+				http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+			handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodPost, tt.path, nil))
+
+			if calls != tt.wantCalls {
+				t.Errorf("path %s: the predicate was consulted %d times, want %d", tt.path, calls, tt.wantCalls)
+			}
+		})
+	}
+}
+
+// TestMiddlewareSkipCsrf_RefusesASilentlyWrongPolicy covers the two shapes a policy value can
+// express that the package-level tables it replaces could not, and that no request could reveal.
+//
+// Both are refused at construction, which is a composition root evaluated once at startup, so the
+// failure is a server that does not boot rather than a server that boots with a hole in it.
+func TestMiddlewareSkipCsrf_RefusesASilentlyWrongPolicy(t *testing.T) {
+	// A path in both tables is unconditionally exempt, because shouldSkip consults the exact set
+	// first and the predicate is never called. That is the whole hole the conditional shape exists
+	// to close: /auth/logout exempt unconditionally lets any origin POST a hintless logout, which
+	// the handler reads as the confirmation of its consent page (#109, decision 5).
+	t.Run("a path listed both exactly and conditionally", func(t *testing.T) {
+		assertPanics(t, func() {
+			MiddlewareSkipCsrf(CsrfPolicy{
+				ExactPaths:  []string{"/auth/logout"},
+				Conditional: map[string]func(*http.Request) bool{"/auth/logout": neverExempt},
+			})
+		})
+	})
+
+	// An empty prefix is a prefix of every path, so it turns the origin check off for the whole
+	// server. It is what an unset constant or a dropped slice element looks like.
+	t.Run("an empty prefix", func(t *testing.T) {
+		assertPanics(t, func() {
+			MiddlewareSkipCsrf(CsrfPolicy{Prefixes: []string{"/static/", ""}})
+		})
+	})
+
+	// The other half, without which the two above are satisfied by a constructor that refuses
+	// everything: a policy naming the same path once, in each table, is accepted.
+	t.Run("a policy naming each path once is accepted", func(t *testing.T) {
+		defer func() {
+			if recovered := recover(); recovered != nil {
+				t.Fatalf("a well-formed policy panicked: %v", recovered)
+			}
+		}()
+		MiddlewareSkipCsrf(CsrfPolicy{
+			ExactPaths:  []string{"/auth/authorize"},
+			Prefixes:    []string{"/api/"},
+			Conditional: map[string]func(*http.Request) bool{"/auth/logout": neverExempt},
+		})
+	})
+}
+
+func assertPanics(t *testing.T, fn func()) {
+	t.Helper()
+	defer func() {
+		if recover() == nil {
+			t.Error("the policy was accepted, but it exempts more than it names")
+		}
+	}()
+	fn()
 }
 
 // TestMiddlewareSkipCsrf_CombinedChain mounts the production middleware chain
 // (StripSlashes -> MiddlewareSkipCsrf -> MiddlewareCsrf) onto a chi router and issues real
-// cross-origin POSTs. This proves the exemptions reach the enforcing middleware end-to-end,
-// beyond the context-flag check in TestMiddlewareSkipCsrf.
+// cross-origin POSTs. This proves the exemptions reach the enforcing middleware end-to-end, beyond
+// the context-flag check in TestMiddlewareSkipCsrf, and it is the only place the trailing-slash
+// form is exercised: chi's StripSlashes writes the normalized path to RouteContext.RoutePath rather
+// than to r.URL.Path, and MiddlewareSkipCsrf has to read it from there.
 //
-// Its table is unchanged by the move off gorilla/csrf (#155) and that is deliberate rather than
-// lucky: every row sends a foreign Origin with no Sec-Fetch-Site against httptest's default
-// example.com host, so each Forbidden row now fails the Origin-versus-Host comparison where it
-// used to fail the trusted list, and each OK row still passes on its exemption.
+// Over the fixture policy, like everything else here. Each binary's own chain test makes the same
+// claims about its own routes, which is where "this server exempts /auth/token" now belongs.
 func TestMiddlewareSkipCsrf_CombinedChain(t *testing.T) {
 	const foreignOrigin = "https://www.certification.openid.net"
 
-	newRouter := func() *chi.Mux {
+	newRouter := func(predicate func(*http.Request) bool) *chi.Mux {
 		r := chi.NewRouter()
 		r.Use(chimiddleware.StripSlashes)
-		r.Use(MiddlewareSkipCsrf())
+		r.Use(MiddlewareSkipCsrf(fixtureCsrfPolicy(predicate)))
 		r.Use(MiddlewareCsrf())
 
 		inner := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(http.StatusOK)
 		})
-		r.Post("/auth/authorize", inner)
-		r.Post("/auth/authorize-extra", inner)
-		r.Post("/auth/pwd", inner)
-		r.Post("/auth/token", inner)
-		r.Post("/auth/token-introspect", inner)
-		r.Post("/userinfo", inner)
-		r.Post("/userinfo-export", inner)
-		r.Post("/api/v1/admin/users", inner)
-		r.Post("/auth/logout", inner)
-		r.Post("/auth/logout-extra", inner)
+		r.Post("/exact", inner)
+		r.Post("/exact-extra", inner)
+		r.Post("/prefix/thing", inner)
+		r.Post("/prefix-extra/thing", inner)
+		r.Post("/conditional", inner)
+		r.Post("/conditional-extra", inner)
+		r.Post("/unlisted", inner)
 		return r
 	}
 
 	tests := []struct {
-		name       string
-		path       string
-		body       string
-		wantStatus int
+		name             string
+		path             string
+		exemptWhenCalled bool
+		wantStatus       int
 	}{
-		// Exempt endpoints let the foreign-origin POST through.
-		{"POST /auth/authorize foreign origin reaches handler", "/auth/authorize", "", http.StatusOK},
-		{"POST /auth/authorize/ trailing slash reaches handler", "/auth/authorize/", "", http.StatusOK},
-		{"POST /auth/token reaches handler", "/auth/token", "", http.StatusOK},
-		{"POST /userinfo reaches handler", "/userinfo", "", http.StatusOK},
-		{"POST /api/v1/admin/users reaches handler", "/api/v1/admin/users", "", http.StatusOK},
+		{"an exact path reaches the handler", "/exact", false, http.StatusOK},
+		{"its trailing-slash form reaches the handler", "/exact/", false, http.StatusOK},
+		{"a prefixed path reaches the handler", "/prefix/thing", false, http.StatusOK},
 
-		// Non-exempt routes are still blocked (403 origin invalid).
-		{"POST /auth/pwd foreign origin still blocked", "/auth/pwd", "", http.StatusForbidden},
-		{"POST /auth/authorize-extra not skipped", "/auth/authorize-extra", "", http.StatusForbidden},
-		{"POST /auth/token-introspect not skipped", "/auth/token-introspect", "", http.StatusForbidden},
-		{"POST /userinfo-export not skipped", "/userinfo-export", "", http.StatusForbidden},
+		{"a suffixed sibling is refused", "/exact-extra", false, http.StatusForbidden},
+		{"a path sharing the prefix's text is refused", "/prefix-extra/thing", false, http.StatusForbidden},
+		{"an unlisted path is refused", "/unlisted", false, http.StatusForbidden},
 
-		// The logout binding, which is what the exemption is for: a relying party POSTs a hint from
-		// its own origin and must reach the handler. Both arrival routes and the trailing-slash form,
-		// since the path the predicate is matched against comes from chi's StripSlashes.
-		{"POST /auth/logout with a hint in the query reaches handler", "/auth/logout?id_token_hint=abc", "", http.StatusOK},
-		{"POST /auth/logout with a hint in the body reaches handler", "/auth/logout", "id_token_hint=abc", http.StatusOK},
-		{"POST /auth/logout/ trailing slash with a hint reaches handler", "/auth/logout/?id_token_hint=abc", "", http.StatusOK},
-		{"POST /auth/logout with an empty hint reaches handler", "/auth/logout?id_token_hint=", "", http.StatusOK},
-
-		// And the shape the exemption must never cover. This is the case that makes the conditional
-		// table worth its complexity: an unconditional /auth/logout entry would answer this 200 and
-		// any site could force a logout (#109 decision 9).
-		{"POST /auth/logout with no hint is still blocked", "/auth/logout", "", http.StatusForbidden},
-		{"POST /auth/logout with only other parameters is still blocked", "/auth/logout", "state=abc", http.StatusForbidden},
-		{"POST /auth/logout-extra with a hint is still blocked", "/auth/logout-extra?id_token_hint=abc", "", http.StatusForbidden},
+		{"the conditional path reaches the handler when the predicate exempts it", "/conditional", true, http.StatusOK},
+		{"its trailing-slash form does too", "/conditional/", true, http.StatusOK},
+		{"and is refused when the predicate does not", "/conditional", false, http.StatusForbidden},
+		{"a sibling of it is refused even so", "/conditional-extra", true, http.StatusForbidden},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			router := newRouter()
-			var body io.Reader
-			if tt.body != "" {
-				body = strings.NewReader(tt.body)
+			predicate := neverExempt
+			if tt.exemptWhenCalled {
+				predicate = alwaysExempt
 			}
-			req := httptest.NewRequest(http.MethodPost, tt.path, body)
-			if tt.body != "" {
-				req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-			}
+
+			req := httptest.NewRequest(http.MethodPost, tt.path, strings.NewReader(""))
 			req.Header.Set("Origin", foreignOrigin)
 			rr := httptest.NewRecorder()
 
-			router.ServeHTTP(rr, req)
+			newRouter(predicate).ServeHTTP(rr, req)
 
 			if rr.Code != tt.wantStatus {
 				t.Errorf("path %s: got status %d, want %d", tt.path, rr.Code, tt.wantStatus)
+			}
+		})
+	}
+}
+
+// TestMiddlewareSkipCsrf_LeavesTheBodyForTheHandler is the boundary the ordering test states in
+// terms of calls, asserted in the terms that actually bite: the exempt prefixes on a real server
+// include a whole REST subtree whose handlers decode JSON straight off r.Body. Nothing in this
+// middleware may consume it.
+//
+// The conditional path is included with a predicate that does parse the form, which is what the
+// auth server's does, because Go caching the parse in r.PostForm is the only reason that is safe.
+func TestMiddlewareSkipCsrf_LeavesTheBodyForTheHandler(t *testing.T) {
+	const payload = "id_token_hint=a.b.c&state=opaque"
+
+	for _, path := range []string{"/exact", "/prefix/thing", "/unlisted", "/conditional"} {
+		t.Run(path, func(t *testing.T) {
+			parsingPredicate := func(r *http.Request) bool {
+				return r.FormValue("id_token_hint") != ""
+			}
+
+			var got string
+			handler := MiddlewareSkipCsrf(fixtureCsrfPolicy(parsingPredicate))(
+				http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+					// r.FormValue, because that is what a handler uses and it reads the cache the
+					// predicate populated. io.ReadAll would answer "" for the parsed case and say
+					// nothing about whether the handler can still see its parameters.
+					got = r.FormValue("id_token_hint") + "|" + r.FormValue("state")
+					if raw, err := io.ReadAll(r.Body); err == nil && len(raw) > 0 && got == "|" {
+						t.Errorf("the body arrived unparsed and unread as %q", raw)
+					}
+				}))
+
+			req := httptest.NewRequest(http.MethodPost, path, strings.NewReader(payload))
+			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			handler.ServeHTTP(httptest.NewRecorder(), req)
+
+			if got != "a.b.c|opaque" {
+				t.Errorf("the handler read %q, want %q: the middleware consumed the body", got, "a.b.c|opaque")
 			}
 		})
 	}

@@ -94,3 +94,131 @@ func TestInitMiddleware_CsrfIsRegistered(t *testing.T) {
 		}
 	})
 }
+
+// TestInitMiddleware_CsrfPolicy makes the claims about which of this binary's routes the origin
+// check applies to. Until #385 the exemption table lived in core and named both binaries' routes,
+// so the admin console exempted /auth/authorize, /auth/token, /userinfo and /connect/register,
+// none of which it mounts. The table is this server's policy now (csrfPolicy in server.go), and
+// these are the claims it owes (decision 5).
+//
+// The test above proves the middleware is mounted at all; this one proves what it decides. Both
+// are needed: a policy asserted in isolation passes against a middleware nobody wired up, and a
+// mounted middleware proves nothing about which routes it exempts.
+//
+// Every row is paired with a same-origin control differing only in the origin headers, so no 403
+// can be attributed to anything else in the chain.
+func TestInitMiddleware_CsrfPolicy(t *testing.T) {
+	tests := []struct {
+		name string
+		path string
+		// mounted mirrors whether this binary registers the path, and decides only what the
+		// same-origin control expects.
+		mounted             bool
+		wantCrossSiteStatus int
+	}{
+		// Claim 1: a mounted exempt route is still exempt. /auth/callback is the OAuth callback, a
+		// cross-site form_post carrying the auth code, protected by the OAuth `state` parameter
+		// rather than by the origin check. It is the only exact entry this server has.
+		{"POST /auth/callback is exempt", "/auth/callback", true, http.StatusOK},
+
+		// Claim 2: a mounted protected route is still refused. Every admin page is a
+		// cookie-authenticated form, which is exactly what CSRF defends.
+		{"POST /admin/clients is refused", "/admin/clients", true, http.StatusForbidden},
+		{"POST /account/profile is refused", "/account/profile", true, http.StatusForbidden},
+
+		// A sibling of the exempt route inherits nothing, because ExactPaths is matched exactly.
+		{"POST /auth/callback-extra is refused", "/auth/callback-extra", true, http.StatusForbidden},
+
+		// Claim 3, the one behaviour change. These are the auth server's endpoints. This binary
+		// mounts none of them, and the shared table in core exempted them for both, so a
+		// cross-origin POST used to pass the origin check here and reach chi for a 404. Each is
+		// refused 403 by the origin check now, which tells a prober less than the 404 did.
+		{"POST /auth/token is refused rather than routed", "/auth/token", false, http.StatusForbidden},
+		{"POST /auth/authorize is refused rather than routed", "/auth/authorize", false, http.StatusForbidden},
+		{"POST /userinfo is refused rather than routed", "/userinfo", false, http.StatusForbidden},
+		{"POST /connect/register is refused rather than routed", "/connect/register", false, http.StatusForbidden},
+		{"POST under the /api/ prefix is refused rather than routed", "/api/v1/admin/users", false, http.StatusForbidden},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rr := csrfProbe(t, tt.path, map[string]string{
+				"Origin":         "https://relying-party.example",
+				"Sec-Fetch-Site": "cross-site",
+			})
+
+			if rr.Code != tt.wantCrossSiteStatus {
+				t.Fatalf("cross-site POST %s: got status %d, want %d", tt.path, rr.Code, tt.wantCrossSiteStatus)
+			}
+			if tt.wantCrossSiteStatus == http.StatusForbidden {
+				// The catalog message, which is what attributes the 403 to the origin check rather
+				// than to a handler further down. The unmounted rows are the ones this matters
+				// most for: a 403 that was really a routing answer would read differently.
+				want := i18n.T(context.Background(), "error.csrf_refused")
+				if got := strings.TrimSpace(rr.Body.String()); got != want {
+					t.Errorf("body = %q, want the CSRF middleware's message %q", got, want)
+				}
+			}
+		})
+	}
+
+	// The control half. Same-origin, every row, so each 403 above is the origin check and not the
+	// router. On the unmounted rows it is load-bearing rather than hygienic: the 404 here is what
+	// the cross-origin request used to get, which is the behaviour change stated as a difference
+	// rather than asserted as a status.
+	for _, tt := range tests {
+		t.Run("same-origin control: "+tt.name, func(t *testing.T) {
+			rr := csrfProbe(t, tt.path, map[string]string{"Sec-Fetch-Site": "same-origin"})
+
+			want := http.StatusOK
+			if !tt.mounted {
+				want = http.StatusNotFound
+			}
+			if rr.Code != want {
+				t.Errorf("same-origin POST %s: got status %d, want %d", tt.path, rr.Code, want)
+			}
+		})
+	}
+}
+
+// csrfProbe drives the real chain through initMiddleware with probe handlers registered on the
+// root branch, which is where CSRF is mounted. The application branch adds the settings cache and
+// the cookie reset, neither of which has anything to say about the origin check, so staying off it
+// keeps a passing request at a deterministic 200 and needs no live auth server.
+//
+// The route set stands in for initRoutes rather than being it, and it is faithful in the way that
+// decides this test: the auth server's endpoints are absent, because this binary does not mount
+// them.
+func csrfProbe(t *testing.T, path string, headers map[string]string) *httptest.ResponseRecorder {
+	t.Helper()
+
+	const unreachableAuthServer = "http://127.0.0.1:1"
+
+	s := &Server{
+		router:        chi.NewRouter(),
+		sessionStore:  newTestSessionStore(),
+		settingsCache: cache.NewSettingsCache(unreachableAuthServer),
+	}
+	s.initMiddleware()
+
+	ok := func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) }
+	for _, mounted := range []string{
+		"/auth/callback",
+		"/auth/callback-extra",
+		"/admin/clients",
+		"/account/profile",
+	} {
+		s.router.Post(mounted, ok)
+	}
+
+	form := url.Values{"name": {"whatever"}}
+	req := httptest.NewRequest(http.MethodPost, path, strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	for name, value := range headers {
+		req.Header.Set(name, value)
+	}
+
+	rr := httptest.NewRecorder()
+	s.router.ServeHTTP(rr, req)
+	return rr
+}

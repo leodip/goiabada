@@ -305,7 +305,7 @@ command itself and fails on a tree it changed.
 | `core/handlerhelpers` | `GetFromUrlQueryOrFormPost` | own-package | — |
 | `core/handlerhelpers` | `HttpHelper` | own-package | — |
 | `core/handlerhelpers` | `LayoutSettings` | both-apps | — |
-| `core/handlerhelpers` | `LookupFromUrlQueryOrFormPost` | kernel | — |
+| `core/handlerhelpers` | `LookupFromUrlQueryOrFormPost` | own-package | — |
 | `core/handlerhelpers` | `NewHttpHelper` | both-apps | — |
 | `core/handlerhelpers` | `SettingsReader` | reachable | — |
 | `core/hashutil` | `HashString` | both-apps | — |
@@ -409,6 +409,7 @@ command itself and fails on a tree it changed.
 | `core/logging` | `TruncateCounted` | kernel | — |
 | `core/logging` | `TruncationMarker` | kernel | — |
 | `core/logging` | `WrapRequestID` | kernel | — |
+| `core/middleware` | `CsrfPolicy` | both-apps | — |
 | `core/middleware` | `MiddlewareCookieReset` | both-apps | — |
 | `core/middleware` | `MiddlewareCsrf` | both-apps | — |
 | `core/middleware` | `MiddlewareNoStore` | moving | #385 moves the provider-side middleware to `authserver/internal/middleware`. |
