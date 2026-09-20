@@ -1,3 +1,11 @@
+// Package oidc holds the OpenID Connect vocabulary the auth server publishes: which
+// scopes are OIDC's own rather than a resource permission, and the shape of the
+// discovery document served at /.well-known/openid-configuration.
+//
+// It belongs to the auth server rather than to the shared kernel because that is the
+// process that publishes both. WellKnownConfig is a contract with arbitrary OIDC
+// clients, not a contract between this server and the admin console, and the admin
+// console consumes nothing here (#360).
 package oidc
 
 import (
