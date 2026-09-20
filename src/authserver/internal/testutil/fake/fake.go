@@ -28,8 +28,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/uuidutil"
 	"github.com/leodip/goiabada/core/stringutil"
-	"github.com/leodip/goiabada/core/uuidutil"
 )
 
 const (

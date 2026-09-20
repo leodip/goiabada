@@ -8,7 +8,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/models"
-	"github.com/leodip/goiabada/core/testutil/fake"
+	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 )
 
 // TestTerminateUserSessionTx_SweepsAfterTheSessionRowIsDeleted is the data half of #139 decision 2.

@@ -8,7 +8,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/data/sqlitedb"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
-	"github.com/leodip/goiabada/core/testutil/fake"
+	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 )
 
 // TestRotateEncryptionKeyIfNeeded exercises env-to-env key rotation (issue #83):

@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/models"
-	"github.com/leodip/goiabada/core/testutil/fake"
+	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 )
 
 func TestCreateRedirectURI(t *testing.T) {

@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/models"
-	"github.com/leodip/goiabada/core/testutil/fake"
+	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 )
 
 // The association loaders in commondb had no direct data-layer tests: they are

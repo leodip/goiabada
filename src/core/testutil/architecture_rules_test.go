@@ -744,8 +744,14 @@ func TestArchitecture_NoIssueSpellings(t *testing.T) {
 
 // TestArchitecture_TheRealTreeIsHeldByItsExceptions proves the guard is connected to this
 // repository and not merely to its fixtures. The tree passes today because the tables were written
-// from it, so passing proves nothing on its own; removing one exception must make it fail, and the
-// finding must name the edge that exception was covering.
+// from it, so passing proves nothing on its own.
+//
+// #360 emptied the exception table, which left this test with nothing to drop, so the probe that
+// carries the proof is now the other direction of the same coupling — the one that still has
+// something to say at zero rows. Adding back the row the epic's last move deleted must be reported
+// as a row to delete, against the real import graph. The drop loop stays for whenever a row comes
+// back; at zero rows it runs zero times, and the probe above is why that is not a test which passes
+// by doing nothing.
 func TestArchitecture_TheRealTreeIsHeldByItsExceptions(t *testing.T) {
 	root := SourceRoot(t)
 
@@ -753,11 +759,25 @@ func TestArchitecture_TheRealTreeIsHeldByItsExceptions(t *testing.T) {
 	require.NoError(t, err)
 	tables, findings := parseArchitectureDoc(string(doc))
 	require.Empty(t, findings)
-	require.NotEmpty(t, tables.exceptions)
 
 	graph, err := buildImportGraph(root)
 	require.NoError(t, err)
 	require.Empty(t, checkArchitecture(tables, graph))
+
+	t.Run("an exception listed for an edge that no longer exists", func(t *testing.T) {
+		// The exact row #360 deleted when core/testutil/fake and core/uuidutil both moved to
+		// authserver/internal. Naming a stale edge rather than an invented one keeps the probe
+		// honest: this pair was a real violation until the move, so a guard that reported it
+		// from the row alone rather than from the graph would look identical here.
+		stale := exceptionRow{from: "core/testutil/fake", to: "core/uuidutil", issue: "#360", line: 1}
+		kept := architectureTables{owners: tables.owners, foreign: tables.foreign}
+		kept.exceptions = append(append(kept.exceptions, tables.exceptions...), stale)
+
+		findings := checkArchitecture(kept, graph)
+		require.Len(t, findings, 1)
+		assert.Contains(t, findings[0], "core/testutil/fake -> core/uuidutil")
+		assert.Contains(t, findings[0], "that edge no longer exists")
+	})
 
 	for _, dropped := range tables.exceptions {
 		t.Run(dropped.from+" -> "+dropped.to, func(t *testing.T) {

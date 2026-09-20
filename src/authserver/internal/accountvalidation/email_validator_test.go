@@ -7,8 +7,8 @@ import (
 	"errors"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/i18n"
-	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -68,7 +68,7 @@ func TestValidateEmailAddress(t *testing.T) {
 }
 
 // TestValidateEmailAddress_AcceptsEveryGeneratedAddress is the cross-check that
-// used to live in core/testutil/fake's own test, where it constructed this
+// used to live in the fake package's own test, where it constructed this
 // validator directly. Core may not import the auth server, so #344 inverted it
 // rather than dropping it or copying the pattern into core: the property is the
 // same, proven against the real validator, and it now sits in the package that

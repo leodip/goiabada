@@ -10,9 +10,9 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
+	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/enums"
 	"github.com/leodip/goiabada/core/oauth"
-	"github.com/leodip/goiabada/core/testutil/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -21,7 +21,7 @@ import (
 // RFC 8252 section 7.3: the client registers a portless http loopback redirect URI, then
 // presents an OS-assigned port at authorization time.
 //
-// The unit tests for this behaviour exercise a pure function (core/urlutil) and a mocked
+// The unit tests for this behaviour exercise a pure function (authserver/internal/urlutil) and a mocked
 // database (authserver/internal/protocolvalidation), so neither shows an ephemeral-port
 // callback actually completing. This does (#41).
 func TestToken_AuthCode_LoopbackEphemeralPort(t *testing.T) {

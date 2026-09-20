@@ -7,8 +7,8 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/enums"
-	"github.com/leodip/goiabada/core/testutil/fake"
 )
 
 func TestCreateClient(t *testing.T) {

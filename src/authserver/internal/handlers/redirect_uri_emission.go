@@ -4,8 +4,8 @@ import (
 	"context"
 	"log/slog"
 
+	"github.com/leodip/goiabada/authserver/internal/urlutil"
 	"github.com/leodip/goiabada/core/errs"
-	"github.com/leodip/goiabada/core/urlutil"
 )
 
 // checkRedirectURIEmittable is the last-resort assertion in front of every place this package

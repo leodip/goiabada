@@ -11,10 +11,10 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/useragent"
+	"github.com/leodip/goiabada/authserver/internal/uuidutil"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/stringutil"
-	"github.com/leodip/goiabada/core/uuidutil"
 )
 
 // ErrIssuingClientGone is returned by CreateAuthCode when the client the ceremony is issuing for

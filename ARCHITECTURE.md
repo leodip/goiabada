@@ -14,10 +14,10 @@ it becomes a cycle, so it is the kind of rule that decays silently. This reposit
 that lesson once about prose: `AssertAgentDocs` exists because the state machine documented in
 `CLAUDE.md` had moved underneath the description while every test stayed green (#252).
 
-The refactor that these rules were written for is the 16-issue Core Refactor epic. Its full
-checklist lives in [#332](https://github.com/leodip/goiabada/issues/332); every `moves in` and
-`cleared by` cell below names one of its issues. The epic was cut into 29 issues originally and
-regrouped into 16 on 2025-09-15, so a cell naming an issue outside that checklist is stale.
+The refactor that these rules were written for is the 16-issue Core Refactor epic, whose checklist
+is [#332](https://github.com/leodip/goiabada/issues/332), and it is finished: #360 moved the last
+authserver-only package out of `core`, so every `moves in` and `cleared by` cell reads `—` and the
+exception table below has no rows. A cell naming an issue again is a debt taken on since.
 
 ## Module graph
 
@@ -101,8 +101,6 @@ A row whose owner is not `kernel` names the issue that moves it. A `kernel` row 
 | `core/stringutil` | kernel | — |
 | `core/testutil` | kernel | — |
 | `core/timezones` | kernel | — |
-| `core/urlutil` | authserver | #360 |
-| `core/uuidutil` | authserver | #360 |
 | `core/validators` | kernel | — |
 
 Notes on rows that are not self-evident:
@@ -112,9 +110,10 @@ Notes on rows that are not self-evident:
   mock generator, but git has never tracked a file under it. A row for it fails the completeness
   rule, which is how this was found.
 - `core/mocks` and `core/testutil` are kernel because they are test support compiled into no binary.
-  They are still held to the kernel rule: `core/testutil/fake` imports `core/uuidutil` today, and
-  that is an exception below rather than a waiver, because #360 moves `uuidutil` and the edge has to
-  be noticed then.
+  They are still held to the kernel rule, and #360 is what made that hold rather than merely claim
+  it: `core/testutil/fake` imported `core/uuidutil` under an exception rather than a waiver, so the
+  edge was noticed when `uuidutil` moved, and `fake` moved with it to
+  `authserver/internal/testutil/fake`. No admin console file ever imported it.
 - `core/api` is declarations and nothing else. The model-aware `ToResponse` mapping left for
   `authserver/internal/apimapping` in #350, the model-typed fields became DTOs of its own, and the
   reverse `ToUser()`/`ToGroup()` methods the admin console's `apiclient` called at 32 sites are
@@ -243,23 +242,24 @@ above. Rule 5 reads production files because it is about what lands in a shipped
 
 Each row is one exact package edge that exists today and violates a rule above, with the issue that
 removes it. An exception is not a waiver: when the edge goes, the row must go with it, and the guard
-fails until it does. That is how the epic burns down — #335 already instructs its implementer to
-"remove the exact architecture exceptions introduced by #332 for these edges".
+fails until it does. That is how the epic burned down, and the table is empty because it finished.
+A row added here now is a debt taken on deliberately, not one inherited.
 
 Both ends name a package, never a module and never a parent. A row granting `core/handlerhelpers`
 an edge grants it to `core/handlerhelpers` alone: not to `core`, and not to `core/oauth`, which
 would need a row of its own. A module-wide grant would let a second package acquire the same
-dependency in silence, and the count of rows is the only measure of how much is left to do.
+dependency in silence, and the count of rows is the only measure of how much is owed.
 
 ### Temporary exceptions
 
 | from | to | issue |
 |---|---|---|
-| `core/testutil/fake` | `core/uuidutil` | #360 |
 
-One row, #360's. #350 owned ten of them and owns none now: `core/api` names
-`authserver/internal/models` nowhere, the admin console names it from no production package, and
-`AuthCodeReusedError` took the last edge with it to `authserver/internal/protocolvalidation`.
+No rows. The heading, the header and the separator stay because `parseArchitectureDoc` reads the
+table by name and an absent section fails differently from an empty one. #350 owned ten of these
+rows and #360 the last three: two for `core/hashutil`, settled by splitting the bcrypt half out to
+`authserver/internal/passwordhash` so what stayed is a SHA-256 helper both processes call, and one
+for `core/testutil/fake`, settled by moving it and `core/uuidutil` to the auth server together.
 
 ## Foreign modules the admin console must not compile
 
@@ -328,8 +328,8 @@ now that `otp` is the auth server's (#346), and the row states that it must not 
 The table is a declared list, not a discovery mechanism: it asserts these modules and says nothing
 about a dependency nobody has written a row for. Closing that would mean an allowlist of every
 module the admin console legitimately compiles, churned on every dependency change, which is a wider
-rule than #332 asks for. #360 is where the categories in its point 5 — database drivers, sqlbuilder,
-OTP and image libraries, provider-only crypto — are checked off, and each is listed here.
+rule than #332 asks for. #360 checked off the categories in its point 5 — database drivers,
+sqlbuilder, OTP and image libraries, provider-only crypto — and each is a row above, asserted `no`.
 
 ## The guard
 

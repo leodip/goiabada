@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/core/uuidutil"
+	"github.com/leodip/goiabada/authserver/internal/uuidutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -19,7 +19,7 @@ import (
 // pass with half the fix.
 //
 // The loopback host decision itself is owned by urlutil.IsLoopbackHost and its 38-row table
-// in src/core/urlutil/redirect_uri_test.go. What is pinned here is that this function
+// in src/authserver/internal/urlutil/redirect_uri_test.go. What is pinned here is that this function
 // consults it, plus everything else this function decides.
 func TestValidateRedirectURI(t *testing.T) {
 	tests := []struct {
