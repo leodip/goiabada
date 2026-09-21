@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/url"
@@ -74,7 +75,7 @@ func TestAPIClientWebOriginsPut_Success_AddRemoveAndNormalize(t *testing.T) {
 	assert.True(t, got[originC])
 
 	// Verify DB reflects the change
-	refreshed, err := database.GetClientById(nil, client.Id)
+	refreshed, err := database.GetClientById(context.Background(), nil, client.Id)
 	assert.NoError(t, err)
 	err = database.ClientLoadWebOrigins(nil, refreshed)
 	assert.NoError(t, err)
@@ -125,7 +126,7 @@ func TestAPIClientWebOriginsPut_AuthCodeDisabledAccepted(t *testing.T) {
 	assert.Equal(t, origin, updateResp.Client.WebOrigins[0].Origin)
 
 	// And it really landed, rather than being echoed back from the request.
-	refreshed, err := database.GetClientById(nil, client.Id)
+	refreshed, err := database.GetClientById(context.Background(), nil, client.Id)
 	assert.NoError(t, err)
 	err = database.ClientLoadWebOrigins(nil, refreshed)
 	assert.NoError(t, err)
@@ -180,7 +181,7 @@ func TestAPIClientWebOriginsPut_StoresTheCanonicalOrigin(t *testing.T) {
 			defer func() { _ = resp.Body.Close() }()
 			assert.Equal(t, http.StatusOK, resp.StatusCode)
 
-			refreshed, err := database.GetClientById(nil, client.Id)
+			refreshed, err := database.GetClientById(context.Background(), nil, client.Id)
 			assert.NoError(t, err)
 			err = database.ClientLoadWebOrigins(nil, refreshed)
 			assert.NoError(t, err)

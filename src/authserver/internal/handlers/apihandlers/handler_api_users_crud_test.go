@@ -112,11 +112,11 @@ func TestHandleAPIUserEnabledPut_RevocationConditionality(t *testing.T) {
 				if tc.transitioned {
 					database.On("IncrementUserAuthStateGeneration", mock.Anything, apiRevokeTx, userId).
 						Return(int64(4), nil).Once()
-					database.On("GetRefreshTokensByUserId", apiRevokeTx, userId).
+					database.On("GetRefreshTokensByUserId", mock.Anything, apiRevokeTx, userId).
 						Return([]*models.RefreshToken{}, nil).Once()
-					database.On("PromoteRefreshTokenGenerations", apiRevokeTx, []int64{}, int64(4)).
+					database.On("PromoteRefreshTokenGenerations", mock.Anything, apiRevokeTx, []int64{}, int64(4)).
 						Return(nil).Once()
-					database.On("GetUserSessionsByUserId", apiRevokeTx, userId).
+					database.On("GetUserSessionsByUserId", mock.Anything, apiRevokeTx, userId).
 						Return([]models.UserSession{}, nil).Once()
 				}
 			}
@@ -252,7 +252,7 @@ func TestHandleAPIUserPasswordPut_RevokesEverything(t *testing.T) {
 	assert.True(t, passwordhash.Verify(savedHash, newPassword))
 	database.AssertNotCalled(t, "UpdateUser", mock.Anything, mock.Anything, mock.Anything)
 	// No exceptSid, so no sid-scoped query and nothing promoted.
-	database.AssertNotCalled(t, "GetRefreshTokensBySessionIdentifier", mock.Anything, mock.Anything)
+	database.AssertNotCalled(t, "GetRefreshTokensBySessionIdentifier", mock.Anything, mock.Anything, mock.Anything)
 
 	require.NotNil(t, payload)
 	assert.Equal(t, "admin_password_set", payload["reason"])

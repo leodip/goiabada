@@ -1,6 +1,7 @@
 package usersession
 
 import (
+	"context"
 	"database/sql"
 	"net/http"
 	"net/http/httptest"
@@ -104,13 +105,13 @@ func (m *startSessionMocks) expectPersistThroughCommit(userId int64, existingSes
 
 	m.expectStoreRead()
 	expectRunInTransaction(m.db)
-	m.db.On("CreateUserSession", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		created := args.Get(1).(*models.UserSession)
+	m.db.On("CreateUserSession", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		created := args.Get(2).(*models.UserSession)
 		created.Id = 99 // stand in for the generated primary key
 		*captured = created
 	}).Return(nil).Once()
-	m.db.On("CreateUserSessionClient", mock.Anything, mock.Anything).Return(nil).Once()
-	m.db.On("GetUserSessionsByUserId", txSentinel, userId).Return(existingSessions, nil).Once()
+	m.db.On("CreateUserSessionClient", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+	m.db.On("GetUserSessionsByUserId", mock.Anything, txSentinel, userId).Return(existingSessions, nil).Once()
 
 	return captured
 }
@@ -213,13 +214,13 @@ func TestStartNewUserSession_RecordsTheClient(t *testing.T) {
 
 	var capturedClient *models.UserSessionClient
 	expectRunInTransaction(m.db)
-	m.db.On("CreateUserSession", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		args.Get(1).(*models.UserSession).Id = 99
+	m.db.On("CreateUserSession", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		args.Get(2).(*models.UserSession).Id = 99
 	}).Return(nil).Once()
-	m.db.On("CreateUserSessionClient", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		capturedClient = args.Get(1).(*models.UserSessionClient)
+	m.db.On("CreateUserSessionClient", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		capturedClient = args.Get(2).(*models.UserSessionClient)
 	}).Return(nil).Once()
-	m.db.On("GetUserSessionsByUserId", txSentinel, int64(123)).Return(nil, nil).Once()
+	m.db.On("GetUserSessionsByUserId", mock.Anything, txSentinel, int64(123)).Return(nil, nil).Once()
 	m.expectStoreRead()
 	m.store.On("Save", mock.Anything, mock.Anything, m.session).Return(nil).Once()
 
@@ -306,7 +307,7 @@ func TestStartNewUserSession_DeletesMatchingSessionFromSameDeviceAndIp(t *testin
 	}
 
 	m.expectSuccessfulPersist(123, []models.UserSession{stale})
-	m.db.On("DeleteUserSession", txSentinel, int64(42)).Return(nil).Once()
+	m.db.On("DeleteUserSession", mock.Anything, txSentinel, int64(42)).Return(nil).Once()
 
 	_, err := m.manager.StartNewUserSession(
 		httptest.NewRecorder(), req, 123, 7, "pwd", models.AcrLevel1.String(), 0, nil, someCredentialInstant())
@@ -332,7 +333,7 @@ func TestStartNewUserSession_DeletesAMatchingHeaderWhoseLabelsDiffer(t *testing.
 	}
 
 	m.expectSuccessfulPersist(123, []models.UserSession{stale})
-	m.db.On("DeleteUserSession", txSentinel, int64(42)).Return(nil).Once()
+	m.db.On("DeleteUserSession", mock.Anything, txSentinel, int64(42)).Return(nil).Once()
 
 	_, err := m.manager.StartNewUserSession(
 		httptest.NewRecorder(), req, 123, 7, "pwd", models.AcrLevel1.String(), 0, nil, someCredentialInstant())
@@ -356,7 +357,7 @@ func TestStartNewUserSession_AnEmptyHeaderMatchesAnEmptyHeader(t *testing.T) {
 	}
 
 	m.expectSuccessfulPersist(123, []models.UserSession{stale})
-	m.db.On("DeleteUserSession", txSentinel, int64(42)).Return(nil).Once()
+	m.db.On("DeleteUserSession", mock.Anything, txSentinel, int64(42)).Return(nil).Once()
 
 	_, err := m.manager.StartNewUserSession(
 		httptest.NewRecorder(), req, 123, 7, "pwd", models.AcrLevel1.String(), 0, nil, someCredentialInstant())
@@ -437,17 +438,17 @@ func TestStartNewUserSession_DoesNotDeleteTheSessionItJustCreated(t *testing.T) 
 
 	var newIdentifier string
 	expectRunInTransaction(m.db)
-	m.db.On("CreateUserSession", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		created := args.Get(1).(*models.UserSession)
+	m.db.On("CreateUserSession", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		created := args.Get(2).(*models.UserSession)
 		created.Id = 99
 		newIdentifier = created.SessionIdentifier
 	}).Return(nil).Once()
-	m.db.On("CreateUserSessionClient", mock.Anything, mock.Anything).Return(nil).Once()
+	m.db.On("CreateUserSessionClient", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 	// Return the freshly created session as if it were already persisted. The
 	// identifier is only known once CreateUserSession has run, so this is
 	// resolved lazily at call time.
-	m.db.On("GetUserSessionsByUserId", txSentinel, int64(123)).Return(
-		func(_ *sql.Tx, _ int64) ([]models.UserSession, error) {
+	m.db.On("GetUserSessionsByUserId", mock.Anything, txSentinel, int64(123)).Return(
+		func(_ context.Context, _ *sql.Tx, _ int64) ([]models.UserSession, error) {
 			return []models.UserSession{{
 				Id:                99,
 				SessionIdentifier: newIdentifier,
@@ -506,7 +507,7 @@ func TestStartNewUserSession_ErrorsPropagate(t *testing.T) {
 			setup: func(m *startSessionMocks) func(*testing.T) {
 				m.expectStoreRead()
 				expectRunInTransaction(m.db)
-				m.db.On("CreateUserSession", mock.Anything, mock.Anything).Return(dbErr).Once()
+				m.db.On("CreateUserSession", mock.Anything, mock.Anything, mock.Anything).Return(dbErr).Once()
 				return nil
 			},
 		},
@@ -515,8 +516,8 @@ func TestStartNewUserSession_ErrorsPropagate(t *testing.T) {
 			setup: func(m *startSessionMocks) func(*testing.T) {
 				m.expectStoreRead()
 				expectRunInTransaction(m.db)
-				m.db.On("CreateUserSession", mock.Anything, mock.Anything).Return(nil).Once()
-				m.db.On("CreateUserSessionClient", mock.Anything, mock.Anything).Return(dbErr).Once()
+				m.db.On("CreateUserSession", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+				m.db.On("CreateUserSessionClient", mock.Anything, mock.Anything, mock.Anything).Return(dbErr).Once()
 				return nil
 			},
 		},
@@ -525,9 +526,9 @@ func TestStartNewUserSession_ErrorsPropagate(t *testing.T) {
 			setup: func(m *startSessionMocks) func(*testing.T) {
 				m.expectStoreRead()
 				expectRunInTransactionThenFail(m.db, dbErr)
-				m.db.On("CreateUserSession", mock.Anything, mock.Anything).Return(nil).Once()
-				m.db.On("CreateUserSessionClient", mock.Anything, mock.Anything).Return(nil).Once()
-				m.db.On("GetUserSessionsByUserId", txSentinel, int64(123)).Return(nil, nil).Once()
+				m.db.On("CreateUserSession", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+				m.db.On("CreateUserSessionClient", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+				m.db.On("GetUserSessionsByUserId", mock.Anything, txSentinel, int64(123)).Return(nil, nil).Once()
 				return nil
 			},
 		},
@@ -540,9 +541,9 @@ func TestStartNewUserSession_ErrorsPropagate(t *testing.T) {
 			setup: func(m *startSessionMocks) func(*testing.T) {
 				m.expectStoreRead()
 				stub := expectRunInTransaction(m.db)
-				m.db.On("CreateUserSession", mock.Anything, mock.Anything).Return(nil).Once()
-				m.db.On("CreateUserSessionClient", mock.Anything, mock.Anything).Return(nil).Once()
-				m.db.On("GetUserSessionsByUserId", txSentinel, int64(123)).Return(nil, dbErr).Once()
+				m.db.On("CreateUserSession", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+				m.db.On("CreateUserSessionClient", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+				m.db.On("GetUserSessionsByUserId", mock.Anything, txSentinel, int64(123)).Return(nil, dbErr).Once()
 				return func(t *testing.T) {
 					assert.ErrorIs(t, stub.bodyErr, dbErr,
 						"the body must hand its error to RunInTransaction, which is what rolls the row back")
@@ -558,16 +559,16 @@ func TestStartNewUserSession_ErrorsPropagate(t *testing.T) {
 				req := newSessionRequest("192.168.1.50:54321", chromeUserAgent)
 				m.expectStoreRead()
 				stub := expectRunInTransaction(m.db)
-				m.db.On("CreateUserSession", mock.Anything, mock.Anything).Return(nil).Once()
-				m.db.On("CreateUserSessionClient", mock.Anything, mock.Anything).Return(nil).Once()
-				m.db.On("GetUserSessionsByUserId", txSentinel, int64(123)).Return([]models.UserSession{{
+				m.db.On("CreateUserSession", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+				m.db.On("CreateUserSessionClient", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+				m.db.On("GetUserSessionsByUserId", mock.Anything, txSentinel, int64(123)).Return([]models.UserSession{{
 					Id:                42,
 					SessionIdentifier: "an-older-session",
 					IpAddress:         "192.168.1.50",
 					// The new key, so the sweep still reaches the delete that fails here.
 					UserAgent: useragent.Raw(req),
 				}}, nil).Once()
-				m.db.On("DeleteUserSession", txSentinel, int64(42)).Return(dbErr).Once()
+				m.db.On("DeleteUserSession", mock.Anything, txSentinel, int64(42)).Return(dbErr).Once()
 				return func(t *testing.T) {
 					assert.ErrorIs(t, stub.bodyErr, dbErr,
 						"the body must hand its error to RunInTransaction, which is what rolls the row back")
@@ -582,7 +583,7 @@ func TestStartNewUserSession_ErrorsPropagate(t *testing.T) {
 			setup: func(m *startSessionMocks) func(*testing.T) {
 				m.expectPersistThroughCommit(123, nil)
 				m.store.On("Save", mock.Anything, mock.Anything, m.session).Return(errors.New("cannot write cookie")).Once()
-				m.db.On("DeleteUserSession", (*sql.Tx)(nil), int64(99)).Return(nil).Once()
+				m.db.On("DeleteUserSession", mock.Anything, (*sql.Tx)(nil), int64(99)).Return(nil).Once()
 				return nil
 			},
 		},
@@ -678,7 +679,7 @@ func TestStartNewUserSession_DeletesTheRowWhenTheRotationFails(t *testing.T) {
 	m.withRegeneratingStore(rotationErr)
 
 	m.expectPersistThroughCommit(123, nil)
-	m.db.On("DeleteUserSession", (*sql.Tx)(nil), int64(99)).Return(nil).Once()
+	m.db.On("DeleteUserSession", mock.Anything, (*sql.Tx)(nil), int64(99)).Return(nil).Once()
 
 	result, err := m.manager.StartNewUserSession(
 		httptest.NewRecorder(), newSessionRequest("192.168.1.50:54321", chromeUserAgent),
@@ -696,7 +697,7 @@ func TestStartNewUserSession_DeletesTheRowWhenTheSaveFails(t *testing.T) {
 
 	m.expectPersistThroughCommit(123, nil)
 	m.store.On("Save", mock.Anything, mock.Anything, m.session).Return(saveErr).Once()
-	m.db.On("DeleteUserSession", (*sql.Tx)(nil), int64(99)).Return(nil).Once()
+	m.db.On("DeleteUserSession", mock.Anything, (*sql.Tx)(nil), int64(99)).Return(nil).Once()
 
 	result, err := m.manager.StartNewUserSession(
 		httptest.NewRecorder(), newSessionRequest("192.168.1.50:54321", chromeUserAgent),
@@ -717,7 +718,7 @@ func TestStartNewUserSession_AFailedCompensationKeepsTheOriginalError(t *testing
 
 	m.expectPersistThroughCommit(123, nil)
 	m.store.On("Save", mock.Anything, mock.Anything, m.session).Return(saveErr).Once()
-	m.db.On("DeleteUserSession", (*sql.Tx)(nil), int64(99)).Return(deleteErr).Once()
+	m.db.On("DeleteUserSession", mock.Anything, (*sql.Tx)(nil), int64(99)).Return(deleteErr).Once()
 
 	result, err := m.manager.StartNewUserSession(
 		httptest.NewRecorder(), newSessionRequest("192.168.1.50:54321", chromeUserAgent),
@@ -932,10 +933,10 @@ func TestStartNewUserSession_RefusesAMissingCredentialInstant(t *testing.T) {
 			// counts below match each method's arity, because AssertNotCalled compares the
 			// whole argument list and a wrong count would match nothing and assert nothing.
 			m.db.AssertNotCalled(t, "RunInTransaction", mock.Anything, mock.Anything)
-			m.db.AssertNotCalled(t, "CreateUserSession", mock.Anything, mock.Anything)
-			m.db.AssertNotCalled(t, "CreateUserSessionClient", mock.Anything, mock.Anything)
-			m.db.AssertNotCalled(t, "GetUserSessionsByUserId", mock.Anything, mock.Anything)
-			m.db.AssertNotCalled(t, "DeleteUserSession", mock.Anything, mock.Anything)
+			m.db.AssertNotCalled(t, "CreateUserSession", mock.Anything, mock.Anything, mock.Anything)
+			m.db.AssertNotCalled(t, "CreateUserSessionClient", mock.Anything, mock.Anything, mock.Anything)
+			m.db.AssertNotCalled(t, "GetUserSessionsByUserId", mock.Anything, mock.Anything, mock.Anything)
+			m.db.AssertNotCalled(t, "DeleteUserSession", mock.Anything, mock.Anything, mock.Anything)
 			m.store.AssertNotCalled(t, "Get", mock.Anything, mock.Anything)
 			m.store.AssertNotCalled(t, "Save", mock.Anything, mock.Anything, mock.Anything)
 			assert.Empty(t, recorder.Header().Values("Set-Cookie"),

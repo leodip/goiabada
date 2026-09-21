@@ -175,3 +175,93 @@ func TestUserLoadPermissions_RefusesAnAlreadyCancelledContext(t *testing.T) {
 	assert.ErrorIs(t, err, context.Canceled)
 	assert.Empty(t, user.Permissions, "nothing was loaded onto the model")
 }
+
+// Stage 6 adds the session, token and code half. The three shapes above are repeated on the
+// methods this batch carries, because "the context reaches the driver" is a claim about each
+// method's own body: a batch that took the ctx into its signature and left a
+// context.Background() at its QuerySql would pass every other tier.
+
+// The read every request path makes. MiddlewareSessionIdentifier, /auth/authorize,
+// /auth/level1completed, /auth/completed, the token endpoint and the bearer-token middleware all
+// resolve a session identifier through this one method, so it is the read most worth being able
+// to abandon.
+func TestGetUserSessionBySessionIdentifier_RefusesAnAlreadyCancelledContext(t *testing.T) {
+	user := createTestUser(t)
+	session := createTestUserSession(t, user.Id)
+
+	got, err := database.GetUserSessionBySessionIdentifier(cancelled(), nil, session.SessionIdentifier)
+
+	require.Error(t, err, "a read must not be issued on behalf of a caller that is already gone")
+	assert.ErrorIs(t, err, context.Canceled, "and the reason must be matchable, not a sentence")
+	assert.Nil(t, got, "no row is returned alongside the refusal")
+}
+
+// The write half, and the second assertion is the one that matters: a method that took the
+// context and then issued the insert without it would fail on the row count rather than on the
+// error. CreateCode rather than any other insert because it is the one statement #139 orders
+// against a concurrent termination, so a code that appeared despite a refusal would be a code
+// outside that ordering.
+func TestCreateCode_RefusesAnAlreadyCancelledContextAndInsertsNothing(t *testing.T) {
+	user := createTestUser(t)
+	client := createTestClient(t)
+	random := fake.LetterN(8)
+
+	code := &models.Code{
+		ClientId:          client.Id,
+		UserId:            user.Id,
+		Code:              "cancelled_" + random,
+		CodeHash:          "cancelledhash_" + random,
+		RedirectURI:       "https://example.com/callback",
+		Scope:             "openid profile",
+		IpAddress:         "192.168.1.1",
+		UserAgent:         testUserAgent,
+		ResponseMode:      "query",
+		AuthenticatedAt:   time.Now().UTC().Truncate(time.Microsecond),
+		SessionIdentifier: "cancelledsession_" + random,
+		AcrLevel:          models.AcrLevel1.String(),
+		AuthMethods:       "pwd",
+	}
+
+	err := database.CreateCode(cancelled(), nil, code)
+
+	require.Error(t, err)
+	assert.ErrorIs(t, err, context.Canceled)
+
+	found, err := database.GetCodeByCodeHash(context.Background(), nil, code.CodeHash, false)
+	require.NoError(t, err, "the read that checks the table must itself succeed")
+	assert.Nil(t, found, "the refused insert wrote no row")
+}
+
+// A loader rather than a plain select: UserSessionLoadClients reaches the database through
+// GetUserSessionClientsByUserSessionId, so the context has to survive a hop inside commondb. It
+// is the shape the seven other Load* methods in this batch share.
+func TestUserSessionLoadClients_RefusesAnAlreadyCancelledContext(t *testing.T) {
+	user := createTestUser(t)
+	client := createTestClient(t)
+	session := createTestUserSessionWithClient(t, user.Id, client.Id)
+
+	err := database.UserSessionLoadClients(cancelled(), nil, session)
+
+	require.Error(t, err)
+	assert.ErrorIs(t, err, context.Canceled)
+	assert.Empty(t, session.Clients, "nothing was loaded onto the model")
+}
+
+// AcquireUserSessionRow is the acquisition #139's ordering rests on: issuance takes the session
+// row before inserting its code, so a termination committing in between cannot slip past. A
+// cancelled caller must be refused the row rather than told it is gone, because false and nil
+// is the answer that restarts the ceremony at level 1.
+func TestAcquireUserSessionRow_RefusesAnAlreadyCancelledContext(t *testing.T) {
+	user := createTestUser(t)
+	session := createTestUserSession(t, user.Id)
+
+	tx, err := database.BeginTransaction(context.Background())
+	require.NoError(t, err)
+	defer func() { _ = database.RollbackTransaction(tx) }()
+
+	live, err := database.AcquireUserSessionRow(cancelled(), tx, session.SessionIdentifier)
+
+	require.Error(t, err, "a refusal, not a report that the row is gone")
+	assert.ErrorIs(t, err, context.Canceled)
+	assert.False(t, live)
+}

@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"net/http"
 	"net/url"
 	"strings"
@@ -53,7 +54,7 @@ func TestPromptNone_ValidSession_SilentCodeIssuance(t *testing.T) {
 	httpClient, client, redirectUri, user := createSessionWithAcrLevel1(t)
 
 	// Get the session to check auth_time later
-	userSessions, err := database.GetUserSessionsByUserId(nil, user.Id)
+	userSessions, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -119,7 +120,7 @@ func TestPromptLogin_WithSession_ForcesReAuth(t *testing.T) {
 	httpClient, client, redirectUri, user, password := createSessionWithAcrLevel1AndPassword(t)
 
 	// Get original session
-	userSessions, err := database.GetUserSessionsByUserId(nil, user.Id)
+	userSessions, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
 	if err != nil {
 		t.Fatal(err)
 	}

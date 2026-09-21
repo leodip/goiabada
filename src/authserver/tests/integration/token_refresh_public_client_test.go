@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"net/url"
 	"testing"
 
@@ -54,7 +55,7 @@ func challengelessRefreshToken(t *testing.T, clientSecret string) (string, int64
 func TestToken_Refresh_ChallengelessGrant_RefusedOnceTheClientIsPublic(t *testing.T) {
 	refreshToken, clientId, clientIdentifier, destUrl := challengelessRefreshToken(t, fake.LetterN(32))
 
-	client, err := database.GetClientById(nil, clientId)
+	client, err := database.GetClientById(context.Background(), nil, clientId)
 	require.NoError(t, err)
 	client.IsPublic = true
 	client.ClientSecretEncrypted = nil

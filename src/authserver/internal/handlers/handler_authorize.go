@@ -258,7 +258,7 @@ func HandleAuthorizeGet(
 			}
 			sessionLookedUp = true
 
-			userSession, sessionLoadErr = database.GetUserSessionBySessionIdentifier(nil, sessionIdentifier)
+			userSession, sessionLoadErr = database.GetUserSessionBySessionIdentifier(r.Context(), nil, sessionIdentifier)
 			if sessionLoadErr != nil {
 				return false
 			}
@@ -537,7 +537,7 @@ func HandleAuthorizeGet(
 		// The user behind the session is loaded here, and not inside the closure, because the
 		// predicate needs only the session's own timestamps and this is the first point anything
 		// reads userSession.User. UserSessionLoadUser answers nil for a nil session.
-		err = database.UserSessionLoadUser(nil, userSession)
+		err = database.UserSessionLoadUser(r.Context(), nil, userSession)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
@@ -626,7 +626,7 @@ func handlePromptNone(w http.ResponseWriter, r *http.Request, httpHelper HttpHel
 	}
 
 	// 1. Check session exists
-	userSession, err := database.GetUserSessionBySessionIdentifier(nil, sessionIdentifier)
+	userSession, err := database.GetUserSessionBySessionIdentifier(r.Context(), nil, sessionIdentifier)
 	if err != nil {
 		httpHelper.InternalServerError(w, r, err)
 		return
@@ -638,7 +638,7 @@ func handlePromptNone(w http.ResponseWriter, r *http.Request, httpHelper HttpHel
 	}
 
 	// Load user for the session
-	err = database.UserSessionLoadUser(nil, userSession)
+	err = database.UserSessionLoadUser(r.Context(), nil, userSession)
 	if err != nil {
 		httpHelper.InternalServerError(w, r, err)
 		return

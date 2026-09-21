@@ -64,7 +64,7 @@ func expectSessionOwnerRead(database *mocks_data.Database, users ...models.User)
 // the per-session client rows are already on the fixtures, so UserSessionsLoadClients is a no-op
 // here and GetClientsByIds is the one query buildSessionDetails runs.
 func expectSessionListReads(database *mocks_data.Database, sessions []models.UserSession) {
-	database.On("UserSessionsLoadClients", (*sql.Tx)(nil), sessions).Return(nil).Once()
+	database.On("UserSessionsLoadClients", mock.Anything, (*sql.Tx)(nil), sessions).Return(nil).Once()
 	database.On("GetClientsByIds", mock.Anything, (*sql.Tx)(nil), mock.Anything).
 		Return([]models.Client{{Id: 5, ClientIdentifier: "portal"}}, nil).Once()
 }
@@ -79,7 +79,7 @@ func TestHandleAPIUserSessionsGet_ReadsTheCallersSidAndFilters(t *testing.T) {
 	sessions := []models.UserSession{now, mine, stale}
 
 	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), int64(42)).Return(&models.User{Id: 42}, nil).Once()
-	database.On("GetUserSessionsByUserId", (*sql.Tx)(nil), int64(42)).Return(sessions, nil).Once()
+	database.On("GetUserSessionsByUserId", mock.Anything, (*sql.Tx)(nil), int64(42)).Return(sessions, nil).Once()
 	expectSessionListReads(database, sessions)
 
 	req := sessionListRequest("/api/v1/admin/users/42/sessions", "sid-mine", nil)
@@ -105,7 +105,7 @@ func TestHandleAPIUserSessionsGet_NoSidOnTheTokenMarksNothingCurrent(t *testing.
 	sessions := []models.UserSession{liveSession(1, "sid-one", 5), liveSession(2, "", 5)}
 
 	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), int64(42)).Return(&models.User{Id: 42}, nil).Once()
-	database.On("GetUserSessionsByUserId", (*sql.Tx)(nil), int64(42)).Return(sessions, nil).Once()
+	database.On("GetUserSessionsByUserId", mock.Anything, (*sql.Tx)(nil), int64(42)).Return(sessions, nil).Once()
 	expectSessionListReads(database, sessions)
 
 	req := sessionListRequest("/api/v1/admin/users/42/sessions", "", nil)
@@ -128,8 +128,8 @@ func TestHandleAPIClientSessionsGet_ReadsTheCallersSidAndFilters(t *testing.T) {
 	stale.LastAccessed = stale.LastAccessed.Add(-48 * time.Hour)
 	sessions := []models.UserSession{liveSession(1, "sid-other", 5), mine, stale}
 
-	database.On("GetClientById", (*sql.Tx)(nil), int64(7)).Return(&models.Client{Id: 7}, nil).Once()
-	database.On("GetUserSessionsByClientIdPaginated", (*sql.Tx)(nil), int64(7), 1, 50).
+	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(&models.Client{Id: 7}, nil).Once()
+	database.On("GetUserSessionsByClientIdPaginated", mock.Anything, (*sql.Tx)(nil), int64(7), 1, 50).
 		Return(sessions, len(sessions), nil).Once()
 	expectSessionListReads(database, sessions)
 	expectSessionOwnerRead(database, models.User{Id: 42, Email: "someone@example.com"})
@@ -157,7 +157,7 @@ func TestHandleAPIAccountSessionsGet_ReadsTheCallersSidAndFilters(t *testing.T) 
 	sessions := []models.UserSession{liveSession(1, "sid-other", 5), mine, stale}
 
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), "the-user").Return(&models.User{Id: 42}, nil).Once()
-	database.On("GetUserSessionsByUserId", (*sql.Tx)(nil), int64(42)).Return(sessions, nil).Once()
+	database.On("GetUserSessionsByUserId", mock.Anything, (*sql.Tx)(nil), int64(42)).Return(sessions, nil).Once()
 	expectSessionListReads(database, sessions)
 
 	req := sessionListRequest("/api/v1/account/sessions", "sid-mine",

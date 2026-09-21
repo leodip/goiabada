@@ -35,14 +35,17 @@ type byIdReader struct {
 func byIdReaders() []byIdReader {
 	return []byIdReader{
 		{"GetClientById", func(tx *sql.Tx, id int64) (bool, error) {
-			v, err := database.GetClientById(tx, id)
+			v, err := database.GetClientById(context.Background(), tx, id)
 			return v != nil, err
 		}},
 		{"GetUserById", func(tx *sql.Tx, id int64) (bool, error) {
 			v, err := database.GetUserById(context.Background(), tx, id)
 			return v != nil, err
 		}},
-		{"GetCodeById", func(tx *sql.Tx, id int64) (bool, error) { v, err := database.GetCodeById(tx, id); return v != nil, err }},
+		{"GetCodeById", func(tx *sql.Tx, id int64) (bool, error) {
+			v, err := database.GetCodeById(context.Background(), tx, id)
+			return v != nil, err
+		}},
 		{"GetResourceById", func(tx *sql.Tx, id int64) (bool, error) {
 			v, err := database.GetResourceById(tx, id)
 			return v != nil, err
@@ -92,7 +95,7 @@ func byIdReaders() []byIdReader {
 			return v != nil, err
 		}},
 		{"GetUserSessionById", func(tx *sql.Tx, id int64) (bool, error) {
-			v, err := database.GetUserSessionById(tx, id)
+			v, err := database.GetUserSessionById(context.Background(), tx, id)
 			return v != nil, err
 		}},
 		{"GetUserConsentById", func(tx *sql.Tx, id int64) (bool, error) {
@@ -116,11 +119,11 @@ func byIdReaders() []byIdReader {
 			return v != nil, err
 		}},
 		{"GetRefreshTokenById", func(tx *sql.Tx, id int64) (bool, error) {
-			v, err := database.GetRefreshTokenById(tx, id)
+			v, err := database.GetRefreshTokenById(context.Background(), tx, id)
 			return v != nil, err
 		}},
 		{"GetUserSessionClientById", func(tx *sql.Tx, id int64) (bool, error) {
-			v, err := database.GetUserSessionClientById(tx, id)
+			v, err := database.GetUserSessionClientById(context.Background(), tx, id)
 			return v != nil, err
 		}},
 	}
@@ -183,7 +186,7 @@ func byValueReaders() []byValueReader {
 			return g != nil, err
 		}},
 		{"GetUserSessionBySessionIdentifier", randomUUID, func(tx *sql.Tx, v string) (bool, error) {
-			s, err := database.GetUserSessionBySessionIdentifier(tx, v)
+			s, err := database.GetUserSessionBySessionIdentifier(context.Background(), tx, v)
 			return s != nil, err
 		}},
 		{"GetPreRegistrationByEmail", func() string { return "missing_" + fake.LetterN(12) + "@example.com" },
@@ -192,11 +195,11 @@ func byValueReaders() []byValueReader {
 				return p != nil, err
 			}},
 		{"GetRefreshTokenByJti", randomUUID, func(tx *sql.Tx, v string) (bool, error) {
-			rt, err := database.GetRefreshTokenByJti(tx, v)
+			rt, err := database.GetRefreshTokenByJti(context.Background(), tx, v)
 			return rt != nil, err
 		}},
 		{"GetCodeByCodeHash", randomWord, func(tx *sql.Tx, v string) (bool, error) {
-			c, err := database.GetCodeByCodeHash(tx, v, false)
+			c, err := database.GetCodeByCodeHash(context.Background(), tx, v, false)
 			return c != nil, err
 		}},
 	}

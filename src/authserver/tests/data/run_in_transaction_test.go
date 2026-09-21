@@ -47,7 +47,7 @@ func TestRunInTransaction_ABodyThatReturnsNilIsCommittedAndItsRowsAreVisible(t *
 	require.NotZero(t, client.Id)
 	t.Cleanup(func() { _ = database.DeleteClient(nil, client.Id) })
 
-	got, err := database.GetClientById(nil, client.Id)
+	got, err := database.GetClientById(context.Background(), nil, client.Id)
 	require.NoError(t, err)
 	require.NotNil(t, got, "the row is visible through the pool after the helper returned, so it was committed")
 	assert.Equal(t, client.ClientIdentifier, got.ClientIdentifier)
@@ -63,7 +63,7 @@ func TestRunInTransaction_ABodyThatReturnsAnErrorIsRolledBackAndTheErrorComesBac
 		}
 		// Enlisted: the insert is visible on the transaction that made it, which is what a
 		// write handed nil instead of tx would not show from here, having autocommitted.
-		inside, err := database.GetClientById(tx, client.Id)
+		inside, err := database.GetClientById(context.Background(), tx, client.Id)
 		if err != nil {
 			return err
 		}
@@ -77,7 +77,7 @@ func TestRunInTransaction_ABodyThatReturnsAnErrorIsRolledBackAndTheErrorComesBac
 	assert.Equal(t, refused, err, "the body's error is returned as it was, not wrapped and not replaced")
 	require.NotZero(t, client.Id, "the insert ran before the body refused")
 
-	got, err := database.GetClientById(nil, client.Id)
+	got, err := database.GetClientById(context.Background(), nil, client.Id)
 	require.NoError(t, err)
 	assert.Nil(t, got, "the insert did not survive the rollback: the write was enlisted in the transaction the body was handed")
 }
@@ -150,7 +150,7 @@ func TestRunInTransaction_ARealDeadlockIsRerunAndBothPartiesFinish(t *testing.T)
 		"exactly one party was chosen as the victim and ran its body a second time; %d attempts in total", attempts.Load())
 
 	for _, row := range []*models.Client{rowA, rowB} {
-		got, err := database.GetClientById(nil, row.Id)
+		got, err := database.GetClientById(context.Background(), nil, row.Id)
 		require.NoError(t, err)
 		assert.NotNil(t, got, "both rows are still there after both parties committed")
 	}

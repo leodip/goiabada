@@ -105,16 +105,16 @@ func HandleAPIAccountLogoutRequestPost(
 			writeJSONError(w, "Current token lacks session identifier", "INVALID_SESSION", http.StatusUnauthorized)
 			return
 		}
-		userSession, err := database.GetUserSessionBySessionIdentifier(nil, sid)
+		userSession, err := database.GetUserSessionBySessionIdentifier(r.Context(), nil, sid)
 		if err != nil || userSession == nil {
 			writeJSONError(w, "Session not found", "INVALID_SESSION", http.StatusUnauthorized)
 			return
 		}
-		if err = database.UserSessionLoadClients(nil, userSession); err != nil {
+		if err = database.UserSessionLoadClients(r.Context(), nil, userSession); err != nil {
 			writeInternalServerError(w, r, err)
 			return
 		}
-		if err = database.UserSessionClientsLoadClients(nil, userSession.Clients); err != nil {
+		if err = database.UserSessionClientsLoadClients(r.Context(), nil, userSession.Clients); err != nil {
 			writeInternalServerError(w, r, err)
 			return
 		}

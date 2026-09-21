@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"net/http"
 	"net/url"
 	"testing"
@@ -80,7 +81,7 @@ func assertRefusedAsInvalidGrant(t *testing.T, status int, body map[string]inter
 func refreshTokenRowByJti(t *testing.T, refreshToken string) *models.RefreshToken {
 	t.Helper()
 
-	row, err := database.GetRefreshTokenByJti(nil, refreshTokenJti(t, refreshToken))
+	row, err := database.GetRefreshTokenByJti(context.Background(), nil, refreshTokenJti(t, refreshToken))
 	require.NoError(t, err)
 	require.NotNil(t, row, "the refresh token row must exist")
 	return row
@@ -184,7 +185,7 @@ func TestToken_Refresh_Replay_DoesNotContainOtherFamilies(t *testing.T) {
 	secretB := fake.Password(32)
 	clientB, redirectB, rawCodeB := codeOnSameSessionForNewClient(t, httpClient, secretB, "openid profile")
 
-	storedCodeA, err := database.GetCodeById(nil, codeA.Id)
+	storedCodeA, err := database.GetCodeById(context.Background(), nil, codeA.Id)
 	require.NoError(t, err)
 	storedCodeB := loadCodeFromDatabase(t, rawCodeB)
 	require.Equal(t, storedCodeA.SessionIdentifier, storedCodeB.SessionIdentifier,
@@ -290,7 +291,7 @@ func TestToken_Refresh_Replay_RepeatIsANoOp(t *testing.T) {
 	status, body := replayRefreshToken(t, httpClient, code.Client.ClientIdentifier, clientSecret, rt1)
 	assertRefusedAsInvalidGrant(t, status, body, "the first replay")
 
-	before, err := database.GetRefreshTokensByCodeId(nil, code.Id)
+	before, err := database.GetRefreshTokensByCodeId(context.Background(), nil, code.Id)
 	require.NoError(t, err)
 	require.NotEmpty(t, before)
 	snapshot := make(map[int64]models.RefreshToken, len(before))
@@ -305,7 +306,7 @@ func TestToken_Refresh_Replay_RepeatIsANoOp(t *testing.T) {
 	status, body = replayRefreshToken(t, httpClient, code.Client.ClientIdentifier, clientSecret, rt2)
 	assertRefusedAsInvalidGrant(t, status, body, "a replay of the contained successor")
 
-	after, err := database.GetRefreshTokensByCodeId(nil, code.Id)
+	after, err := database.GetRefreshTokensByCodeId(context.Background(), nil, code.Id)
 	require.NoError(t, err)
 	require.Len(t, after, len(before), "no row may be added or removed by a repeated replay")
 

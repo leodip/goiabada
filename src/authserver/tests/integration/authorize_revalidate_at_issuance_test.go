@@ -175,7 +175,7 @@ func TestSessionExpiredOnConsentScreen_NoCodeIsIssued(t *testing.T) {
 	parked := parkOnConsentScreen(t, "openid profile email", fake.LetterN(32), "code-verifier", nil)
 	defer func() { _ = parked.consentPage.Body.Close() }()
 
-	sessions, err := database.GetUserSessionsByUserId(nil, parked.user.Id)
+	sessions, err := database.GetUserSessionsByUserId(context.Background(), nil, parked.user.Id)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(sessions), "the ceremony should have created one session before consent")
 	session := &sessions[0]
@@ -187,7 +187,7 @@ func TestSessionExpiredOnConsentScreen_NoCodeIsIssued(t *testing.T) {
 	longAgo := time.Now().UTC().AddDate(-1, 0, 0)
 	session.Started = longAgo
 	session.LastAccessed = longAgo
-	err = database.UpdateUserSession(nil, session)
+	err = database.UpdateUserSession(context.Background(), nil, session)
 	assert.NoError(t, err)
 
 	resp := postConsent(t, parked.httpClient, parked.consentURL, parked.consentPage, []int{0, 1, 2, 3, 4})

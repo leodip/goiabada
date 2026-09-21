@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/url"
@@ -46,7 +47,7 @@ func TestAPIClientAuthenticationPut_ConfidentialToPublic_Success(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 	// Verify DB updates
-	refreshed, err := database.GetClientById(nil, client.Id)
+	refreshed, err := database.GetClientById(context.Background(), nil, client.Id)
 	assert.NoError(t, err)
 	assert.NotNil(t, refreshed)
 	assert.True(t, refreshed.IsPublic)
@@ -69,7 +70,7 @@ func TestAPIClientAuthenticationPut_PublicToConfidential_Success(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 	// Verify DB updates
-	refreshed, err := database.GetClientById(nil, client.Id)
+	refreshed, err := database.GetClientById(context.Background(), nil, client.Id)
 	assert.NoError(t, err)
 	assert.NotNil(t, refreshed)
 	assert.False(t, refreshed.IsPublic)

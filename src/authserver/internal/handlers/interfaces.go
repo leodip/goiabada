@@ -69,7 +69,7 @@ type AuthorizeValidator interface {
 }
 
 type CodeIssuer interface {
-	CreateAuthCode(tx *sql.Tx, input *issuance.CreateCodeInput) (*models.Code, error)
+	CreateAuthCode(ctx context.Context, tx *sql.Tx, input *issuance.CreateCodeInput) (*models.Code, error)
 }
 
 type UserSessionManager interface {

@@ -392,7 +392,7 @@ func TestAPIClientAuthenticationPut_FlipToPublic_ChildBornAfterTheFlipIsRejected
 	adminToken, _ := createAdminClientWithToken(t)
 	grant := createOfflineGrant(t)
 
-	parentRow, err := database.GetRefreshTokenByJti(nil, refreshTokenJti(t, grant.refreshToken))
+	parentRow, err := database.GetRefreshTokenByJti(context.Background(), nil, refreshTokenJti(t, grant.refreshToken))
 	require.NoError(t, err)
 	require.NotNil(t, parentRow, "the redeemed grant must have a refresh token row")
 
@@ -404,7 +404,7 @@ func TestAPIClientAuthenticationPut_FlipToPublic_ChildBornAfterTheFlipIsRejected
 	require.True(t, ok, "rotation must return a replacement refresh token: %v", rotated)
 
 	childJti := refreshTokenJti(t, childToken)
-	childRow, err := database.GetRefreshTokenByJti(nil, childJti)
+	childRow, err := database.GetRefreshTokenByJti(context.Background(), nil, childJti)
 	require.NoError(t, err)
 	require.NotNil(t, childRow, "the rotated child must have been persisted")
 
@@ -441,19 +441,19 @@ func TestAPIClientAuthenticationPut_FlipToPublic_ChildBornAfterTheFlipIsRejected
 	// marked. Nothing here fabricates a grant: the JWT was minted by the server, the row was
 	// written by rotation, the code was marked by the real PUT above, and the client really is
 	// public now.
-	swept, err := database.GetRefreshTokenByJti(nil, childJti)
+	swept, err := database.GetRefreshTokenByJti(context.Background(), nil, childJti)
 	require.NoError(t, err)
 	require.NotNil(t, swept)
 	require.True(t, swept.Revoked,
 		"the flip's sweep must have revoked the child that existed when it ran, or the fixture below means nothing")
 
 	swept.Revoked = false
-	require.NoError(t, database.UpdateRefreshToken(nil, swept))
-	relived, err := database.GetRefreshTokenByJti(nil, childJti)
+	require.NoError(t, database.UpdateRefreshToken(context.Background(), nil, swept))
+	relived, err := database.GetRefreshTokenByJti(context.Background(), nil, childJti)
 	require.NoError(t, err)
 	require.False(t, relived.Revoked, "the child must be live again, or this case proves nothing")
 
-	familyBefore, err := database.GetRefreshTokensByCodeId(nil, childRow.CodeId.Int64)
+	familyBefore, err := database.GetRefreshTokensByCodeId(context.Background(), nil, childRow.CodeId.Int64)
 	require.NoError(t, err)
 
 	// This is the presentation that would succeed under a sweep alone: the row is live, so the
@@ -466,7 +466,7 @@ func TestAPIClientAuthenticationPut_FlipToPublic_ChildBornAfterTheFlipIsRejected
 	assert.Empty(t, born["access_token"], "no access token may be issued for a revoked grant")
 	assert.Empty(t, born["refresh_token"], "no replacement may be issued for a revoked grant")
 
-	familyAfter, err := database.GetRefreshTokensByCodeId(nil, childRow.CodeId.Int64)
+	familyAfter, err := database.GetRefreshTokensByCodeId(context.Background(), nil, childRow.CodeId.Int64)
 	require.NoError(t, err)
 	assert.Len(t, familyAfter, len(familyBefore), "a refused presentation must mint no descendant")
 }

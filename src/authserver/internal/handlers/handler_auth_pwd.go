@@ -53,7 +53,7 @@ func HandleAuthPwdGet(
 		// try to get email from session
 		email := ""
 		if len(sessionIdentifier) > 0 {
-			userSession, err := database.GetUserSessionBySessionIdentifier(nil, sessionIdentifier)
+			userSession, err := database.GetUserSessionBySessionIdentifier(r.Context(), nil, sessionIdentifier)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
 				return

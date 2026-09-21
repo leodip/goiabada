@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"testing"
@@ -54,7 +55,7 @@ func TestMigration000046_UserSessionsUserAgent(t *testing.T) {
 	userId := seedUser000046(t, h)
 	legacy := seedSessionWithoutUserAgent000046(t, h, userId)
 
-	read, err := h.DB.GetUserSessionBySessionIdentifier(nil, legacy)
+	read, err := h.DB.GetUserSessionBySessionIdentifier(context.Background(), nil, legacy)
 	require.NoError(t, err, "read back the legacy session")
 	require.NotNil(t, read, "the legacy session must be there")
 	assert.Equal(t, "", read.UserAgent,
@@ -80,7 +81,7 @@ func TestMigration000046_UserSessionsUserAgent(t *testing.T) {
 	// unnamed one would have blocked the down, and a down that dropped it without the up putting
 	// it back would leave the column with no default at all.
 	roundTripped := seedSessionWithoutUserAgent000046(t, h, seedUser000046(t, h))
-	read, err = h.DB.GetUserSessionBySessionIdentifier(nil, roundTripped)
+	read, err = h.DB.GetUserSessionBySessionIdentifier(context.Background(), nil, roundTripped)
 	require.NoError(t, err, "read back the session seeded after the round trip")
 	require.NotNil(t, read)
 	assert.Equal(t, "", read.UserAgent, "the default must still apply after down then up")
@@ -133,9 +134,9 @@ func assertUserAgentRoundTrip000046(t *testing.T, h *isolatedDB, userId int64, n
 			UserAgent:         userAgent,
 			UserId:            userId,
 		}
-		require.NoErrorf(t, h.DB.CreateUserSession(nil, session), "create a session carrying %s", name)
+		require.NoErrorf(t, h.DB.CreateUserSession(context.Background(), nil, session), "create a session carrying %s", name)
 
-		read, err := h.DB.GetUserSessionBySessionIdentifier(nil, identifier)
+		read, err := h.DB.GetUserSessionBySessionIdentifier(context.Background(), nil, identifier)
 		require.NoErrorf(t, err, "read back the session carrying %s", name)
 		require.NotNil(t, read)
 

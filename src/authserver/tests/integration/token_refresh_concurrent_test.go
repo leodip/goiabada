@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"net/http"
@@ -131,14 +132,14 @@ func TestToken_Refresh_ConcurrentDoubleSpend_IssuesOnlyOnce(t *testing.T) {
 	assert.Equal(t, 1, successes, "exactly one concurrent presentation may succeed")
 
 	// The presented parent must be durably consumed.
-	storedParent, err := database.GetRefreshTokenByJti(nil, parentJti)
+	storedParent, err := database.GetRefreshTokenByJti(context.Background(), nil, parentJti)
 	require.NoError(t, err)
 	require.NotNil(t, storedParent, "the presented refresh token row must still exist")
 	assert.True(t, storedParent.Revoked, "the presented refresh token must be revoked after the race")
 
 	// Every descendant of this grant hangs off the same authorization code, so this is
 	// the whole family plus the parent.
-	family, err := database.GetRefreshTokensByCodeId(nil, code.Id)
+	family, err := database.GetRefreshTokensByCodeId(context.Background(), nil, code.Id)
 	require.NoError(t, err)
 
 	children := make([]*models.RefreshToken, 0, len(family))
@@ -215,7 +216,7 @@ func TestToken_Refresh_ChildOfATerminatedGrantIsBornRejected(t *testing.T) {
 	adminToken, _ := createAdminClientWithToken(t)
 	grant := createOfflineGrant(t)
 
-	parentRow, err := database.GetRefreshTokenByJti(nil, refreshTokenJti(t, grant.refreshToken))
+	parentRow, err := database.GetRefreshTokenByJti(context.Background(), nil, refreshTokenJti(t, grant.refreshToken))
 	require.NoError(t, err)
 	require.NotNil(t, parentRow, "the redeemed grant must have a refresh token row")
 
@@ -228,7 +229,7 @@ func TestToken_Refresh_ChildOfATerminatedGrantIsBornRejected(t *testing.T) {
 	grant.refreshToken = childToken
 
 	childJti := refreshTokenJti(t, childToken)
-	childRow, err := database.GetRefreshTokenByJti(nil, childJti)
+	childRow, err := database.GetRefreshTokenByJti(context.Background(), nil, childJti)
 	require.NoError(t, err)
 	require.NotNil(t, childRow, "the rotated child must have been persisted")
 
@@ -244,7 +245,7 @@ func TestToken_Refresh_ChildOfATerminatedGrantIsBornRejected(t *testing.T) {
 	require.Empty(t, childRow.SessionIdentifier,
 		"an offline token carries no session identifier of its own, which is why only the code can reach it")
 
-	session, err := database.GetUserSessionBySessionIdentifier(nil, grant.sessionIdentifier)
+	session, err := database.GetUserSessionBySessionIdentifier(context.Background(), nil, grant.sessionIdentifier)
 	require.NoError(t, err)
 	require.NotNil(t, session, "the ceremony's session must exist before it can be terminated")
 
@@ -278,19 +279,19 @@ func TestToken_Refresh_ChildOfATerminatedGrantIsBornRejected(t *testing.T) {
 	//
 	// The window cannot be driven from outside the server, which is why it is reconstructed here
 	// and only approached by the racing case below.
-	swept, err := database.GetRefreshTokenByJti(nil, childJti)
+	swept, err := database.GetRefreshTokenByJti(context.Background(), nil, childJti)
 	require.NoError(t, err)
 	require.NotNil(t, swept)
 	require.True(t, swept.Revoked,
 		"the termination sweep must have revoked the child that existed when it ran, or the fixture below means nothing")
 
 	swept.Revoked = false
-	require.NoError(t, database.UpdateRefreshToken(nil, swept))
-	relived, err := database.GetRefreshTokenByJti(nil, childJti)
+	require.NoError(t, database.UpdateRefreshToken(context.Background(), nil, swept))
+	relived, err := database.GetRefreshTokenByJti(context.Background(), nil, childJti)
 	require.NoError(t, err)
 	require.False(t, relived.Revoked, "the child must be live again, or this case proves nothing")
 
-	familyBefore, err := database.GetRefreshTokensByCodeId(nil, childRow.CodeId.Int64)
+	familyBefore, err := database.GetRefreshTokensByCodeId(context.Background(), nil, childRow.CodeId.Int64)
 	require.NoError(t, err)
 
 	// This is the presentation that would succeed without the marker: the row is live, so the
@@ -303,7 +304,7 @@ func TestToken_Refresh_ChildOfATerminatedGrantIsBornRejected(t *testing.T) {
 	assert.Empty(t, born["access_token"], "no access token may be issued for a terminated grant")
 	assert.Empty(t, born["refresh_token"], "no replacement may be issued for a terminated grant")
 
-	familyAfter, err := database.GetRefreshTokensByCodeId(nil, childRow.CodeId.Int64)
+	familyAfter, err := database.GetRefreshTokensByCodeId(context.Background(), nil, childRow.CodeId.Int64)
 	require.NoError(t, err)
 	assert.Len(t, familyAfter, len(familyBefore),
 		"a refused presentation must mint no descendant")
@@ -337,7 +338,7 @@ func TestToken_Refresh_RacingATermination_LeavesNoUsableDescendant(t *testing.T)
 	require.True(t, ok, "rotation must return a replacement refresh token: %v", warmup)
 	grant.refreshToken = racedToken
 
-	session, err := database.GetUserSessionBySessionIdentifier(nil, grant.sessionIdentifier)
+	session, err := database.GetUserSessionBySessionIdentifier(context.Background(), nil, grant.sessionIdentifier)
 	require.NoError(t, err)
 	require.NotNil(t, session)
 
@@ -400,7 +401,7 @@ func TestToken_Refresh_RacingATermination_LeavesNoUsableDescendant(t *testing.T)
 	}
 	require.Equal(t, http.StatusOK, deleteStatus, "the session must actually have been terminated")
 
-	gone, err := database.GetUserSessionBySessionIdentifier(nil, grant.sessionIdentifier)
+	gone, err := database.GetUserSessionBySessionIdentifier(context.Background(), nil, grant.sessionIdentifier)
 	require.NoError(t, err)
 	require.Nil(t, gone, "the session must be gone before anything below means anything")
 
@@ -441,7 +442,7 @@ func TestToken_Refresh_RacingATermination_LeavesNoUsableDescendant(t *testing.T)
 		// own interleaving, the child the sweep never saw, and then the marker is the only thing
 		// standing between it and a working grant. Read before presenting it, since the refusal
 		// below leaves the row alone.
-		row, rowErr := database.GetRefreshTokenByJti(nil, refreshTokenJti(t, replacement))
+		row, rowErr := database.GetRefreshTokenByJti(context.Background(), nil, refreshTokenJti(t, replacement))
 		require.NoError(t, rowErr)
 		require.NotNil(t, row, "a replacement the server handed out must have a row")
 		if row.Revoked {

@@ -122,7 +122,7 @@ func seedCode000026(t *testing.T, h *isolatedDB) int64 {
 		AcrLevel:            "1",
 		AuthMethods:         "pwd",
 	}
-	require.NoError(t, h.DB.CreateCode(nil, code), "seed code")
+	require.NoError(t, h.DB.CreateCode(context.Background(), nil, code), "seed code")
 
 	return code.Id
 }

@@ -60,7 +60,7 @@ func TestMiddlewareSessionIdentifier(t *testing.T) {
 		session.Values[constants.SessionKeySessionIdentifier] = "valid-session-id"
 		mockSessionStore.On("Get", mock.Anything, constants.AuthServerSessionName).Return(session, nil)
 
-		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, "valid-session-id").Return(&models.UserSession{}, nil)
+		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "valid-session-id").Return(&models.UserSession{}, nil)
 
 		middleware := MiddlewareSessionIdentifier(mockSessionStore, mockDB)
 
@@ -83,7 +83,7 @@ func TestMiddlewareSessionIdentifier(t *testing.T) {
 		session.Values[constants.SessionKeySessionIdentifier] = "invalid-session-id"
 		mockSessionStore.On("Get", mock.Anything, constants.AuthServerSessionName).Return(session, nil)
 
-		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, "invalid-session-id").Return(nil, nil)
+		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "invalid-session-id").Return(nil, nil)
 		mockSessionStore.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 		middleware := MiddlewareSessionIdentifier(mockSessionStore, mockDB)
@@ -108,7 +108,7 @@ func TestMiddlewareSessionIdentifier(t *testing.T) {
 		session.Values[constants.SessionKeyAuthContext] = `{"authState":"level1_password"}`
 		mockSessionStore.On("Get", mock.Anything, constants.AuthServerSessionName).Return(session, nil)
 
-		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, "invalid-session-id").Return(nil, nil)
+		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "invalid-session-id").Return(nil, nil)
 		mockSessionStore.On("Save", mock.Anything, mock.Anything, mock.MatchedBy(func(s *sessionstore.Session) bool {
 			// Verify session identifier was removed but auth context was preserved
 			_, hasSessionId := s.Values[constants.SessionKeySessionIdentifier]
@@ -136,7 +136,7 @@ func TestMiddlewareSessionIdentifier(t *testing.T) {
 		session.Values[constants.SessionKeySessionIdentifier] = "error-session-id"
 		mockSessionStore.On("Get", mock.Anything, constants.AuthServerSessionName).Return(session, nil)
 
-		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, "error-session-id").Return(nil, errors.New("database error"))
+		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "error-session-id").Return(nil, errors.New("database error"))
 
 		middleware := MiddlewareSessionIdentifier(mockSessionStore, mockDB)
 

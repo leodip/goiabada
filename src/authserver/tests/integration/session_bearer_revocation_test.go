@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"testing"
@@ -45,10 +46,10 @@ func TestSession_AdminAPI_DeletedSessionRejectsBearer(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp.StatusCode, "token should work before session deletion")
 
 	// Delete the underlying user session out from under the token.
-	session, err := database.GetUserSessionBySessionIdentifier(nil, sid)
+	session, err := database.GetUserSessionBySessionIdentifier(context.Background(), nil, sid)
 	assert.NoError(t, err)
 	assert.NotNil(t, session, "session should exist for sid %s", sid)
-	err = database.DeleteUserSession(nil, session.Id)
+	err = database.DeleteUserSession(context.Background(), nil, session.Id)
 	assert.NoError(t, err)
 
 	// Post-condition: same token now rejected with 401 invalid_token.
@@ -79,10 +80,10 @@ func TestSession_AccountAPI_DeletedSessionRejectsBearer(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp.StatusCode, "token should work before session deletion")
 
 	// Delete the underlying user session.
-	session, err := database.GetUserSessionBySessionIdentifier(nil, sid)
+	session, err := database.GetUserSessionBySessionIdentifier(context.Background(), nil, sid)
 	assert.NoError(t, err)
 	assert.NotNil(t, session, "session should exist for sid %s", sid)
-	err = database.DeleteUserSession(nil, session.Id)
+	err = database.DeleteUserSession(context.Background(), nil, session.Id)
 	assert.NoError(t, err)
 
 	// Post-condition: 401 invalid_token.

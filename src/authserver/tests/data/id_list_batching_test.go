@@ -214,7 +214,7 @@ func TestIdListLookups_MoreIdsThanOneStatementCanCarry(t *testing.T) {
 				})
 			},
 			answered: func(t *testing.T, ids []int64) []int64 {
-				sessionClients, err := database.GetUserSessionClientsByUserSessionIds(nil, ids)
+				sessionClients, err := database.GetUserSessionClientsByUserSessionIds(context.Background(), nil, ids)
 				requireNoLookupError(t, err)
 				found := make([]int64, 0, len(sessionClients))
 				for _, sessionClient := range sessionClients {
@@ -234,7 +234,7 @@ func TestIdListLookups_MoreIdsThanOneStatementCanCarry(t *testing.T) {
 				})
 			},
 			answered: func(t *testing.T, ids []int64) []int64 {
-				sessionClients, err := database.GetUserSessionsClientByIds(nil, ids)
+				sessionClients, err := database.GetUserSessionsClientByIds(context.Background(), nil, ids)
 				requireNoLookupError(t, err)
 				found := make([]int64, 0, len(sessionClients))
 				for _, sessionClient := range sessionClients {
@@ -253,7 +253,7 @@ func TestIdListLookups_MoreIdsThanOneStatementCanCarry(t *testing.T) {
 			answered: func(t *testing.T, ids []int64) []int64 {
 				const generation = int64(4242)
 				err := database.RunInTransaction(context.Background(), func(tx *sql.Tx) error {
-					return database.PromoteRefreshTokenGenerations(tx, ids, generation)
+					return database.PromoteRefreshTokenGenerations(context.Background(), tx, ids, generation)
 				})
 				requireNoLookupError(t, err)
 
@@ -262,7 +262,7 @@ func TestIdListLookups_MoreIdsThanOneStatementCanCarry(t *testing.T) {
 					if id >= absentIdBase {
 						continue
 					}
-					token, err := database.GetRefreshTokenById(nil, id)
+					token, err := database.GetRefreshTokenById(context.Background(), nil, id)
 					requireNoLookupError(t, err)
 					if token != nil && token.AuthStateGeneration == generation {
 						found = append(found, token.Id)

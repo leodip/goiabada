@@ -24,7 +24,7 @@ func HandleAPIUserSessionGet(
 		}
 
 		// Get user session from database
-		userSession, err := database.GetUserSessionBySessionIdentifier(nil, sessionIdentifier)
+		userSession, err := database.GetUserSessionBySessionIdentifier(r.Context(), nil, sessionIdentifier)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return

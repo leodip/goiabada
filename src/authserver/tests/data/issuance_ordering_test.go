@@ -26,7 +26,7 @@ type issuanceOutcome struct {
 // the insert run on the transaction production runs them on, rather than through a bare
 // CreateCode.
 func mintCode(db data.Database, tx *sql.Tx, client *models.Client, user *models.User, sessionIdentifier string) (*models.Code, error) {
-	return issuance.NewCodeIssuer(db).CreateAuthCode(tx, &issuance.CreateCodeInput{
+	return issuance.NewCodeIssuer(db).CreateAuthCode(context.Background(), tx, &issuance.CreateCodeInput{
 		AuthContext: ceremony.AuthContext{
 			ClientId:    client.ClientIdentifier,
 			UserId:      user.Id,
@@ -49,7 +49,7 @@ func mintCode(db data.Database, tx *sql.Tx, client *models.Client, user *models.
 // that production issues exactly this sequence in exactly this order, and this tier answers what
 // a mock cannot, what two real transactions of these shapes do to each other on a real catalog.
 func issuanceStatements(db data.Database, tx *sql.Tx, client *models.Client, user *models.User, sessionIdentifier string) issuanceOutcome {
-	live, err := db.AcquireUserSessionRow(tx, sessionIdentifier)
+	live, err := db.AcquireUserSessionRow(context.Background(), tx, sessionIdentifier)
 	if err != nil || !live {
 		return issuanceOutcome{live: live, err: err}
 	}
@@ -111,7 +111,7 @@ func runIssuanceOrderingAgainstTermination(t *testing.T, db data.Database, other
 		require.NoError(t, err, "opening the ceremony's transaction")
 		defer func() { _ = db.RollbackTransaction(tx) }()
 
-		live, err := db.AcquireUserSessionRow(tx, session.SessionIdentifier)
+		live, err := db.AcquireUserSessionRow(context.Background(), tx, session.SessionIdentifier)
 		require.NoError(t, err, "the ceremony takes the session row")
 		require.True(t, live, "the session row is still there when the ceremony takes it")
 
@@ -201,7 +201,7 @@ func runIssuanceOrderingAgainstTermination(t *testing.T, db data.Database, other
 		// And the catalog agrees: nothing of this session is left for a sweep to mark. A ceremony
 		// that inserted after the termination committed would leave exactly one unrevoked code
 		// here, on a session whose termination has already run.
-		leftBehind, err := db.RevokeCodesBySessionIdentifier(nil, session.SessionIdentifier)
+		leftBehind, err := db.RevokeCodesBySessionIdentifier(context.Background(), nil, session.SessionIdentifier)
 		require.NoError(t, err, "sweeping the terminated session once more")
 		assert.Zero(t, leftBehind, "no code of the terminated session may exist unrevoked")
 		assertSessionGoneOn(t, db, session.Id, "the terminated session")
@@ -213,13 +213,13 @@ func runIssuanceOrderingAgainstTermination(t *testing.T, db data.Database, other
 // ordering that needs the termination HELD OPEN across the other party's arrival cannot call it;
 // the ordering that does not is driven through the real function.
 func terminationStatements(db data.Database, tx *sql.Tx, session *models.UserSession) error {
-	if err := db.DeleteUserSession(tx, session.Id); err != nil {
+	if err := db.DeleteUserSession(context.Background(), tx, session.Id); err != nil {
 		return err
 	}
-	if _, err := db.RevokeCodesBySessionIdentifier(tx, session.SessionIdentifier); err != nil {
+	if _, err := db.RevokeCodesBySessionIdentifier(context.Background(), tx, session.SessionIdentifier); err != nil {
 		return err
 	}
-	tokens, err := db.GetRefreshTokensBySessionIdentifier(tx, session.SessionIdentifier)
+	tokens, err := db.GetRefreshTokensBySessionIdentifier(context.Background(), tx, session.SessionIdentifier)
 	if err != nil {
 		return err
 	}
@@ -228,7 +228,7 @@ func terminationStatements(db data.Database, tx *sql.Tx, session *models.UserSes
 			continue
 		}
 		rt.Revoked = true
-		if err := db.UpdateRefreshToken(tx, rt); err != nil {
+		if err := db.UpdateRefreshToken(context.Background(), tx, rt); err != nil {
 			return err
 		}
 	}
@@ -239,7 +239,7 @@ func terminationStatements(db data.Database, tx *sql.Tx, session *models.UserSes
 // does.
 func assertSessionGoneOn(t *testing.T, db data.Database, sessionId int64, what string) {
 	t.Helper()
-	session, err := db.GetUserSessionById(nil, sessionId)
+	session, err := db.GetUserSessionById(context.Background(), nil, sessionId)
 	require.NoErrorf(t, err, "reloading %s", what)
 	assert.Nilf(t, session, "%s must be gone", what)
 }

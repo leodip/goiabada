@@ -252,7 +252,7 @@ func HandleIssueGet(
 		// whole.
 		var ambientSession *models.UserSession
 		if sessionIdentifier != "" {
-			ambientSession, err = database.GetUserSessionBySessionIdentifier(nil, sessionIdentifier)
+			ambientSession, err = database.GetUserSessionBySessionIdentifier(r.Context(), nil, sessionIdentifier)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
 				return
@@ -460,7 +460,7 @@ func HandleIssueGet(
 			// ago and are not re-asked here: the only thing this narrower question misses is an idle
 			// timeout elapsing in the microseconds between the two, and buying that would cost a
 			// SELECT on every authorization code issued (#139 decision 7).
-			live, err := database.AcquireUserSessionRow(tx, sessionIdentifier)
+			live, err := database.AcquireUserSessionRow(r.Context(), tx, sessionIdentifier)
 			if err != nil {
 				return err
 			}
@@ -476,7 +476,7 @@ func HandleIssueGet(
 				return errIssuanceRefused
 			}
 
-			code, err = codeIssuer.CreateAuthCode(tx, createCodeInput)
+			code, err = codeIssuer.CreateAuthCode(r.Context(), tx, createCodeInput)
 			if err != nil {
 				// The client's registration went away under this ceremony, between the liveness
 				// read above the dispatch and the insert. Answered as the session-gone shape rather

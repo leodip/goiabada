@@ -210,17 +210,17 @@ func loadCodeFromDatabase(t *testing.T, codeVal string) *models.Code {
 	if err != nil {
 		t.Fatal(err)
 	}
-	code, err := database.GetCodeByCodeHash(nil, codeHash, false)
+	code, err := database.GetCodeByCodeHash(context.Background(), nil, codeHash, false)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = database.CodeLoadClient(nil, code)
+	err = database.CodeLoadClient(context.Background(), nil, code)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = database.CodeLoadUser(nil, code)
+	err = database.CodeLoadUser(context.Background(), nil, code)
 	if err != nil {
 		t.Fatal(err)
 	}

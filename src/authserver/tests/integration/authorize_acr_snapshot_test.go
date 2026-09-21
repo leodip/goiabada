@@ -130,7 +130,7 @@ func TestAcrSnapshot_ClientRaisedMidCeremonyDoesNotElevateTheAcr(t *testing.T) {
 	// The session the ceremony bound to carries the same level, so the next request on this browser
 	// is judged against what actually happened here too. A raise reaches that request through the
 	// client's row, where it now sits, and steps the user up properly.
-	sessions, err := database.GetUserSessionsByUserId(nil, user.Id)
+	sessions, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
 	require.NoError(t, err)
 	require.Len(t, sessions, 1)
 	assert.Equal(t, models.AcrLevel1.String(), sessions[0].AcrLevel,

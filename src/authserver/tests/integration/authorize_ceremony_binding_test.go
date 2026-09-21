@@ -85,7 +85,7 @@ func assertCeremonyMismatchPage(t *testing.T, resp *http.Response, what string) 
 func assertNothingWasCompleted(t *testing.T, userId int64) {
 	t.Helper()
 
-	sessions, err := database.GetUserSessionsByUserId(nil, userId)
+	sessions, err := database.GetUserSessionsByUserId(context.Background(), nil, userId)
 	if err != nil {
 		t.Fatal(err)
 	}

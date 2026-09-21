@@ -21,12 +21,12 @@ import (
 // this sequence in exactly this order, and this tier answers what a mock cannot, whether two real
 // transactions of these shapes wait for each other on a real catalog.
 func replayResponse(db data.Database, tx *sql.Tx, sessionIdentifier string) (bool, error) {
-	live, err := db.AcquireUserSessionRow(tx, sessionIdentifier)
+	live, err := db.AcquireUserSessionRow(context.Background(), tx, sessionIdentifier)
 	if err != nil {
 		return false, err
 	}
 
-	tokens, err := db.GetRefreshTokensBySessionIdentifier(tx, sessionIdentifier)
+	tokens, err := db.GetRefreshTokensBySessionIdentifier(context.Background(), tx, sessionIdentifier)
 	if err != nil {
 		return live, err
 	}
@@ -37,7 +37,7 @@ func replayResponse(db data.Database, tx *sql.Tx, sessionIdentifier string) (boo
 			continue
 		}
 		rt.Revoked = true
-		if err := db.UpdateRefreshToken(tx, rt); err != nil {
+		if err := db.UpdateRefreshToken(context.Background(), tx, rt); err != nil {
 			return live, err
 		}
 		revoked++
@@ -47,14 +47,14 @@ func replayResponse(db data.Database, tx *sql.Tx, sessionIdentifier string) (boo
 	if revoked == 0 {
 		return live, nil
 	}
-	session, err := db.GetUserSessionBySessionIdentifier(tx, sessionIdentifier)
+	session, err := db.GetUserSessionBySessionIdentifier(context.Background(), tx, sessionIdentifier)
 	if err != nil {
 		return live, err
 	}
 	if session == nil {
 		return live, nil
 	}
-	return live, db.DeleteUserSession(tx, session.Id)
+	return live, db.DeleteUserSession(context.Background(), tx, session.Id)
 }
 
 // TestLockOrder_ReplayResponseAgainstTermination measures the one order the replay response keeps

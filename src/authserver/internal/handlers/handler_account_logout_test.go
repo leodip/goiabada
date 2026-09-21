@@ -388,7 +388,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 		claims["exp"] = float64(time.Now().UTC().Add(-1 * time.Minute).Unix())
 
 		stubConfirmedHint(httpHelper, database, tokenParser, claims)
-		database.On("GetUserSessionBySessionIdentifier", mock.Anything, hintedSessionId).
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, hintedSessionId).
 			Return(nil, errors.New("the database is on fire"))
 
 		httpHelper.On("InternalServerError", mock.Anything, mock.Anything,
@@ -400,8 +400,8 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Equal(t, http.StatusInternalServerError, rr.Code)
-		database.AssertNotCalled(t, "DeleteUserSessionClient", mock.Anything, mock.Anything)
-		database.AssertNotCalled(t, "DeleteUserSession", mock.Anything, mock.Anything)
+		database.AssertNotCalled(t, "DeleteUserSessionClient", mock.Anything, mock.Anything, mock.Anything)
+		database.AssertNotCalled(t, "DeleteUserSession", mock.Anything, mock.Anything, mock.Anything)
 		httpHelper.AssertExpectations(t)
 	})
 
@@ -451,8 +451,8 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 		assert.Equal(t, hintedRegisteredURI, bound["postLogoutRedirectUri"],
 			"the target still travels, so the signed-out page can say a return was attempted and refused")
 		httpHelper.AssertNotCalled(t, "GetFromUrlQueryOrFormPost", mock.Anything, "client_id")
-		database.AssertNotCalled(t, "DeleteUserSessionClient", mock.Anything, mock.Anything)
-		database.AssertNotCalled(t, "DeleteUserSession", mock.Anything, mock.Anything)
+		database.AssertNotCalled(t, "DeleteUserSessionClient", mock.Anything, mock.Anything, mock.Anything)
+		database.AssertNotCalled(t, "DeleteUserSession", mock.Anything, mock.Anything, mock.Anything)
 		httpHelper.AssertExpectations(t)
 	})
 }
@@ -579,7 +579,7 @@ func TestHandleExistingSessionOnLogout(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		database.On("GetUserSessionBySessionIdentifier", mock.Anything, "test-session").
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test-session").
 			Return(nil, errors.New("lookup exploded"))
 
 		err := handleExistingSessionOnLogout(r, "test-session", &models.Client{}, database, auditLogger)
@@ -595,7 +595,7 @@ func TestHandleExistingSessionOnLogout(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		auditLogger := mocks_audit.NewAuditLogger(t)
 
-		database.On("GetUserSessionBySessionIdentifier", mock.Anything, "test-session").Return(nil, nil)
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test-session").Return(nil, nil)
 
 		err := handleExistingSessionOnLogout(r, "test-session", &models.Client{}, database, auditLogger)
 
@@ -635,10 +635,10 @@ func TestHandleExistingSessionOnLogout(t *testing.T) {
 			},
 		}
 
-		database.On("GetUserSessionBySessionIdentifier", mock.Anything, sessionIdentifier).Return(userSession, nil)
-		database.On("UserSessionLoadClients", mock.Anything, userSession).Return(nil)
-		database.On("UserSessionClientsLoadClients", mock.Anything, userSession.Clients).Return(nil)
-		database.On("DeleteUserSessionClient", mock.Anything, int64(1)).Return(nil)
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(userSession, nil)
+		database.On("UserSessionLoadClients", mock.Anything, mock.Anything, userSession).Return(nil)
+		database.On("UserSessionClientsLoadClients", mock.Anything, mock.Anything, userSession.Clients).Return(nil)
+		database.On("DeleteUserSessionClient", mock.Anything, mock.Anything, int64(1)).Return(nil)
 		// We don't expect DeleteUserSession to be called in this case
 
 		auditLogger.On("Log", mock.Anything, audit.AuditDeletedUserSessionClient, mock.Anything).Return()
@@ -672,11 +672,11 @@ func TestHandleExistingSessionOnLogout(t *testing.T) {
 			},
 		}
 
-		database.On("GetUserSessionBySessionIdentifier", mock.Anything, sessionIdentifier).Return(userSession, nil)
-		database.On("UserSessionLoadClients", mock.Anything, userSession).Return(nil)
-		database.On("UserSessionClientsLoadClients", mock.Anything, userSession.Clients).Return(nil)
-		database.On("DeleteUserSessionClient", mock.Anything, int64(1)).Return(nil)
-		database.On("DeleteUserSession", mock.Anything, int64(1)).Return(nil)
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(userSession, nil)
+		database.On("UserSessionLoadClients", mock.Anything, mock.Anything, userSession).Return(nil)
+		database.On("UserSessionClientsLoadClients", mock.Anything, mock.Anything, userSession.Clients).Return(nil)
+		database.On("DeleteUserSessionClient", mock.Anything, mock.Anything, int64(1)).Return(nil)
+		database.On("DeleteUserSession", mock.Anything, mock.Anything, int64(1)).Return(nil)
 
 		auditLogger.On("Log", mock.Anything, audit.AuditDeletedUserSessionClient, mock.Anything).Return()
 		auditLogger.On("Log", mock.Anything, audit.AuditLogout, mock.Anything).Return()
@@ -710,9 +710,9 @@ func TestHandleExistingSessionOnLogout(t *testing.T) {
 			},
 		}
 
-		database.On("GetUserSessionBySessionIdentifier", mock.Anything, sessionIdentifier).Return(userSession, nil)
-		database.On("UserSessionLoadClients", mock.Anything, userSession).Return(nil)
-		database.On("UserSessionClientsLoadClients", mock.Anything, userSession.Clients).Return(nil)
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(userSession, nil)
+		database.On("UserSessionLoadClients", mock.Anything, mock.Anything, userSession).Return(nil)
+		database.On("UserSessionClientsLoadClients", mock.Anything, mock.Anything, userSession.Clients).Return(nil)
 
 		err := handleExistingSessionOnLogout(r, sessionIdentifier, client, database, auditLogger)
 
@@ -853,11 +853,11 @@ func stubPerClientTeardown(
 		Clients: []models.UserSessionClient{{Id: 7, ClientId: client.Id, Client: *client}},
 	}
 
-	database.On("GetUserSessionBySessionIdentifier", mock.Anything, sessionIdentifier).Return(userSession, nil)
-	database.On("UserSessionLoadClients", mock.Anything, userSession).Return(nil)
-	database.On("UserSessionClientsLoadClients", mock.Anything, userSession.Clients).Return(nil)
-	database.On("DeleteUserSessionClient", mock.Anything, int64(7)).Return(nil)
-	database.On("DeleteUserSession", mock.Anything, int64(42)).Return(nil)
+	database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(userSession, nil)
+	database.On("UserSessionLoadClients", mock.Anything, mock.Anything, userSession).Return(nil)
+	database.On("UserSessionClientsLoadClients", mock.Anything, mock.Anything, userSession.Clients).Return(nil)
+	database.On("DeleteUserSessionClient", mock.Anything, mock.Anything, int64(7)).Return(nil)
+	database.On("DeleteUserSession", mock.Anything, mock.Anything, int64(42)).Return(nil)
 
 	auditLogger.On("Log", mock.Anything, audit.AuditDeletedUserSessionClient, mock.Anything).Return()
 	auditLogger.On("Log", mock.Anything, audit.AuditLogout, mock.Anything).Return()
@@ -955,8 +955,8 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 		httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, "post_logout_redirect_uri").Return("")
 
 		userSession := &models.UserSession{Id: 42, UserId: 123}
-		database.On("GetUserSessionBySessionIdentifier", mock.Anything, "test-session").Return(userSession, nil)
-		database.On("DeleteUserSession", mock.Anything, int64(42)).Return(nil)
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test-session").Return(userSession, nil)
+		database.On("DeleteUserSession", mock.Anything, mock.Anything, int64(42)).Return(nil)
 
 		auditLogger.On("Log", mock.Anything, audit.AuditDeletedUserSession, mock.MatchedBy(func(details map[string]interface{}) bool {
 			return details["userSessionId"] == int64(42) && loggedInUserIsPresentAndEmpty(details)
@@ -1012,8 +1012,8 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 		database.On("ClientLoadRedirectURIs", mock.Anything, client).Return(nil)
 
 		userSession := &models.UserSession{Id: 42, UserId: 123}
-		database.On("GetUserSessionBySessionIdentifier", mock.Anything, "test-session").Return(userSession, nil)
-		database.On("DeleteUserSession", mock.Anything, int64(42)).Return(nil)
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test-session").Return(userSession, nil)
+		database.On("DeleteUserSession", mock.Anything, mock.Anything, int64(42)).Return(nil)
 
 		auditLogger.On("Log", mock.Anything, mock.Anything, mock.Anything).Return()
 
@@ -1312,8 +1312,8 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 				}
 
 				userSession := &models.UserSession{Id: 42, UserId: 123}
-				database.On("GetUserSessionBySessionIdentifier", mock.Anything, "test-session").Return(userSession, nil)
-				database.On("DeleteUserSession", mock.Anything, int64(42)).Return(nil)
+				database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test-session").Return(userSession, nil)
+				database.On("DeleteUserSession", mock.Anything, mock.Anything, int64(42)).Return(nil)
 
 				auditLogger.On("Log", mock.Anything, audit.AuditDeletedUserSession, mock.MatchedBy(func(details map[string]interface{}) bool {
 					return details["userSessionId"] == int64(42) && loggedInUserIsPresentAndEmpty(details)
@@ -1353,7 +1353,7 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 			{
 				name: "the session lookup fails",
 				stubDB: func(database *mocks_data.Database) {
-					database.On("GetUserSessionBySessionIdentifier", mock.Anything, "test-session").
+					database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test-session").
 						Return(nil, errors.New("lookup exploded"))
 				},
 				errMsg: "lookup exploded",
@@ -1362,8 +1362,8 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 				name: "the delete fails",
 				stubDB: func(database *mocks_data.Database) {
 					userSession := &models.UserSession{Id: 42, UserId: 123}
-					database.On("GetUserSessionBySessionIdentifier", mock.Anything, "test-session").Return(userSession, nil)
-					database.On("DeleteUserSession", mock.Anything, int64(42)).Return(errors.New("delete exploded"))
+					database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test-session").Return(userSession, nil)
+					database.On("DeleteUserSession", mock.Anything, mock.Anything, int64(42)).Return(errors.New("delete exploded"))
 				},
 				errMsg: "delete exploded",
 			},
@@ -1419,7 +1419,7 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 				name:              "the session row is gone",
 				sessionIdentifier: "test-session",
 				stubDB: func(database *mocks_data.Database) {
-					database.On("GetUserSessionBySessionIdentifier", mock.Anything, "test-session").Return(nil, nil)
+					database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test-session").Return(nil, nil)
 				},
 			},
 		} {
@@ -1455,7 +1455,7 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 
 				assert.Equal(t, http.StatusOK, rr.Code)
 				assert.Empty(t, mockSession.Values, "the OP session cookie must be cleared")
-				database.AssertNotCalled(t, "DeleteUserSession", mock.Anything, mock.Anything)
+				database.AssertNotCalled(t, "DeleteUserSession", mock.Anything, mock.Anything, mock.Anything)
 				auditLogger.AssertNotCalled(t, "Log", mock.Anything, audit.AuditDeletedUserSession, mock.Anything)
 				auditLogger.AssertExpectations(t)
 			})
@@ -1589,8 +1589,8 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 		assert.False(t, clientIdCarried,
 			"a rejected hint's client_id must not survive, or it authorizes the redirect decision 15 denies")
 
-		database.AssertNotCalled(t, "DeleteUserSessionClient", mock.Anything, mock.Anything)
-		database.AssertNotCalled(t, "DeleteUserSession", mock.Anything, mock.Anything)
+		database.AssertNotCalled(t, "DeleteUserSessionClient", mock.Anything, mock.Anything, mock.Anything)
+		database.AssertNotCalled(t, "DeleteUserSession", mock.Anything, mock.Anything, mock.Anything)
 		httpSession.AssertNotCalled(t, "Save", mock.Anything, mock.Anything, mock.Anything)
 		httpHelper.AssertExpectations(t)
 	})
@@ -2022,7 +2022,7 @@ func TestClassifyIdTokenHint(t *testing.T) {
 	// Split from the client lookup so a row that stubs its own client, which the JWE rows do to give it
 	// a secret, can still reach the sid gate.
 	resolvesOwnedSessionRows := func(database *mocks_data.Database) {
-		database.On("GetUserSessionBySessionIdentifier", mock.Anything, theSessionId).
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, theSessionId).
 			Return(&models.UserSession{Id: 7, UserId: theUserDbId}, nil).Maybe()
 		database.On("GetUserBySubject", mock.Anything, mock.Anything, theSubject).
 			Return(&models.User{Id: theUserDbId}, nil).Maybe()
@@ -2038,7 +2038,7 @@ func TestClassifyIdTokenHint(t *testing.T) {
 	resolvesClientAndSession := func(userSession *models.UserSession, err error) func(*mocks_data.Database) {
 		return func(database *mocks_data.Database) {
 			resolvesClient(database)
-			database.On("GetUserSessionBySessionIdentifier", mock.Anything, theSessionId).Return(userSession, err)
+			database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, theSessionId).Return(userSession, err)
 			database.On("GetUserBySubject", mock.Anything, mock.Anything, theSubject).
 				Return(&models.User{Id: theUserDbId}, nil).Maybe()
 		}
@@ -2050,7 +2050,7 @@ func TestClassifyIdTokenHint(t *testing.T) {
 	resolvesOwnership := func(sessionUserId int64, user *models.User, userErr error) func(*mocks_data.Database) {
 		return func(database *mocks_data.Database) {
 			resolvesClient(database)
-			database.On("GetUserSessionBySessionIdentifier", mock.Anything, theSessionId).
+			database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, theSessionId).
 				Return(&models.UserSession{Id: 7, UserId: sessionUserId}, nil)
 			database.On("GetUserBySubject", mock.Anything, mock.Anything, theSubject).Return(user, userErr)
 		}
@@ -2416,7 +2416,7 @@ func TestClassifyIdTokenHint(t *testing.T) {
 			name: "sid names no session at all", gate: "session ownership",
 			stubDB: func(database *mocks_data.Database) {
 				resolvesClient(database)
-				database.On("GetUserSessionBySessionIdentifier", mock.Anything, theSessionId).Return(nil, nil)
+				database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, theSessionId).Return(nil, nil)
 			},
 			want: hintConfirmed, wantSid: theSessionId,
 		},
@@ -2426,7 +2426,7 @@ func TestClassifyIdTokenHint(t *testing.T) {
 			name: "the session lookup fails on a hint that has not expired", gate: "session ownership",
 			stubDB: func(database *mocks_data.Database) {
 				resolvesClient(database)
-				database.On("GetUserSessionBySessionIdentifier", mock.Anything, theSessionId).
+				database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, theSessionId).
 					Return(nil, errors.New("the database is on fire"))
 			},
 			want:    hintRejected,

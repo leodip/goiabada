@@ -190,7 +190,7 @@ func (d *CommonDatabase) SetClientPublic(tx *sql.Tx, clientId int64) (bool, erro
 	// rather than reported as the same thing. This read DECIDES NOTHING about the transition:
 	// that answer is already in hand above, and the row is held by the acquisition, so all this
 	// can observe is whether there is a client to have saved at all.
-	client, err := d.GetClientById(tx, clientId)
+	client, err := d.GetClientById(context.Background(), tx, clientId)
 	if err != nil {
 		return false, err
 	}
@@ -200,11 +200,11 @@ func (d *CommonDatabase) SetClientPublic(tx *sql.Tx, clientId int64) (bool, erro
 	return false, nil
 }
 
-func (d *CommonDatabase) getClientCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
+func (d *CommonDatabase) getClientCommon(ctx context.Context, tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
 	clientStruct *sqlbuilder.Struct) (*models.Client, error) {
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(context.Background(), tx, sql, args...)
+	rows, err := d.QuerySql(ctx, tx, sql, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -226,7 +226,7 @@ func (d *CommonDatabase) getClientCommon(tx *sql.Tx, selectBuilder *sqlbuilder.S
 	return nil, nil
 }
 
-func (d *CommonDatabase) GetClientById(tx *sql.Tx, clientId int64) (*models.Client, error) {
+func (d *CommonDatabase) GetClientById(ctx context.Context, tx *sql.Tx, clientId int64) (*models.Client, error) {
 
 	clientStruct := sqlbuilder.NewStruct(new(models.Client)).
 		For(d.Flavor)
@@ -234,7 +234,7 @@ func (d *CommonDatabase) GetClientById(tx *sql.Tx, clientId int64) (*models.Clie
 	selectBuilder := clientStruct.SelectFrom("clients")
 	selectBuilder.Where(selectBuilder.Equal("id", clientId))
 
-	client, err := d.getClientCommon(tx, selectBuilder, clientStruct)
+	client, err := d.getClientCommon(ctx, tx, selectBuilder, clientStruct)
 	if err != nil {
 		return nil, err
 	}
@@ -250,7 +250,7 @@ func (d *CommonDatabase) GetClientByClientIdentifier(tx *sql.Tx, clientIdentifie
 	selectBuilder := clientStruct.SelectFrom("clients")
 	selectBuilder.Where(selectBuilder.Equal("client_identifier", clientIdentifier))
 
-	client, err := d.getClientCommon(tx, selectBuilder, clientStruct)
+	client, err := d.getClientCommon(context.Background(), tx, selectBuilder, clientStruct)
 	if err != nil {
 		return nil, err
 	}
@@ -409,7 +409,7 @@ func (d *CommonDatabase) GetAllClients(tx *sql.Tx) ([]models.Client, error) {
 func (d *CommonDatabase) DeleteClient(tx *sql.Tx, clientId int64) error {
 
 	return d.inTransaction(context.Background(), tx, func(tx *sql.Tx) error {
-		if err := d.deleteRefreshTokensByColumn(tx, "client_id", clientId); err != nil {
+		if err := d.deleteRefreshTokensByColumn(context.Background(), tx, "client_id", clientId); err != nil {
 			return err
 		}
 

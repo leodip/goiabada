@@ -183,8 +183,8 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 			UserId:   1,
 			AcrLevel: models.AcrLevel1.String(),
 		}
-		database.On("GetUserSessionBySessionIdentifier", mock.Anything, sessionIdentifier).Return(userSession, nil)
-		database.On("UserSessionLoadUser", mock.Anything, userSession).Return(nil)
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(userSession, nil)
+		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, userSession).Return(nil)
 
 		client := &models.Client{
 			Id:               1,
@@ -239,8 +239,8 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 			UserId:   1,
 			AcrLevel: models.AcrLevel1.String(),
 		}
-		database.On("GetUserSessionBySessionIdentifier", mock.Anything, sessionIdentifier).Return(userSession, nil)
-		database.On("UserSessionLoadUser", mock.Anything, userSession).Return(nil)
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(userSession, nil)
+		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, userSession).Return(nil)
 
 		client := &models.Client{
 			Id:               1,
@@ -293,8 +293,8 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 			UserId:   1,
 			AcrLevel: models.AcrLevel1.String(),
 		}
-		database.On("GetUserSessionBySessionIdentifier", mock.Anything, sessionIdentifier).Return(userSession, nil)
-		database.On("UserSessionLoadUser", mock.Anything, userSession).Return(nil)
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(userSession, nil)
+		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, userSession).Return(nil)
 
 		client := &models.Client{
 			Id:               1,
@@ -355,8 +355,8 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 			OtpConfigGeneration: 0,
 			User:                models.User{Id: 1, OtpConfigGeneration: 1},
 		}
-		database.On("GetUserSessionBySessionIdentifier", mock.Anything, sessionIdentifier).Return(userSession, nil)
-		database.On("UserSessionLoadUser", mock.Anything, userSession).Return(nil)
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(userSession, nil)
+		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, userSession).Return(nil)
 
 		client := &models.Client{
 			Id:               1,
@@ -380,7 +380,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 		// closed the browser at the OTP form had already spent the re-prompt and the next
 		// ceremony let them through on a password alone. Deciding to ask must write nothing:
 		// the obligation is discharged at /auth/completed, once a ceremony has answered it.
-		database.AssertNotCalled(t, "UpdateUserSession", mock.Anything, mock.Anything)
+		database.AssertNotCalled(t, "UpdateUserSession", mock.Anything, mock.Anything, mock.Anything)
 		assert.EqualValues(t, 0, userSession.OtpConfigGeneration,
 			"the session's snapshot must not move in memory either")
 
@@ -505,8 +505,8 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 					OtpConfigGeneration: 0,
 					User:                models.User{Id: 1, OtpConfigGeneration: userGeneration},
 				}
-				database.On("GetUserSessionBySessionIdentifier", mock.Anything, sessionIdentifier).Return(userSession, nil)
-				database.On("UserSessionLoadUser", mock.Anything, userSession).Return(nil)
+				database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(userSession, nil)
+				database.On("UserSessionLoadUser", mock.Anything, mock.Anything, userSession).Return(nil)
 
 				client := &models.Client{
 					Id:               1,
@@ -533,7 +533,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 
 				// Every row, not only the moved ones: this handler writes nothing at all now,
 				// which is what stops an abandoned ceremony spending its re-prompt (#242).
-				database.AssertNotCalled(t, "UpdateUserSession", mock.Anything, mock.Anything)
+				database.AssertNotCalled(t, "UpdateUserSession", mock.Anything, mock.Anything, mock.Anything)
 
 				httpHelper.AssertExpectations(t)
 				authHelper.AssertExpectations(t)
@@ -631,8 +631,8 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 					OtpConfigGeneration: 0,
 					User:                models.User{Id: 1, OtpConfigGeneration: userGeneration},
 				}
-				database.On("GetUserSessionBySessionIdentifier", mock.Anything, sessionIdentifier).Return(userSession, nil)
-				database.On("UserSessionLoadUser", mock.Anything, userSession).Return(nil)
+				database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(userSession, nil)
+				database.On("UserSessionLoadUser", mock.Anything, mock.Anything, userSession).Return(nil)
 
 				client := &models.Client{
 					Id:               1,
@@ -658,7 +658,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 				assert.Equal(t, config.GetAuthServer().BaseURL+tt.expectedRedirect, rr.Header().Get("Location"), tt.description)
 				assert.EqualValues(t, 0, userSession.OtpConfigGeneration,
 					"the other user's session must not be modified in memory either")
-				database.AssertNotCalled(t, "UpdateUserSession", mock.Anything, mock.Anything)
+				database.AssertNotCalled(t, "UpdateUserSession", mock.Anything, mock.Anything, mock.Anything)
 
 				httpHelper.AssertExpectations(t)
 				authHelper.AssertExpectations(t)
@@ -857,8 +857,8 @@ func TestHandleAuthLevel1CompletedGet_DeliversADeferredError(t *testing.T) {
 			UserId:    1,
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
-		database.On("GetUserSessionBySessionIdentifier", mock.Anything, "sess-1").Return(nil, nil)
-		database.On("UserSessionLoadUser", mock.Anything, mock.Anything).Return(nil)
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "sess-1").Return(nil, nil)
+		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(
 			&models.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: models.AcrLevel1}, nil)
 		userSessionManager.On("HasValidUserSession", mock.Anything, mock.Anything, mock.Anything).Return(false)

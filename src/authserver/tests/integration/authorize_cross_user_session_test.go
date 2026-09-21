@@ -168,7 +168,7 @@ func createCrossUserBrowser(t *testing.T, defaultAcrLevel models.AcrLevel,
 	signInWithPassword(t, b.jar, crossUserAuthorizeUrl(b, aExtra),
 		userA.Email, passwordA, aPresentsOtp, otpSecretA)
 
-	sessionsA, err := database.GetUserSessionsByUserId(nil, userA.Id)
+	sessionsA, err := database.GetUserSessionsByUserId(context.Background(), nil, userA.Id)
 	require.NoError(t, err)
 	require.Len(t, sessionsA, 1, "user A should be signed in on exactly one session")
 	require.Equal(t, aSessionAcrLevel.String(), sessionsA[0].AcrLevel)
@@ -303,15 +303,15 @@ func assertCeremonyBoundToUserB(t *testing.T, b *crossUserBrowser, codeVal strin
 
 	// Decision 4: the browser changed hands, so the session it was carrying is ended rather than
 	// left orphaned with its grants alive and nobody able to reach it.
-	survivingA, err := database.GetUserSessionBySessionIdentifier(nil, b.sessionA.SessionIdentifier)
+	survivingA, err := database.GetUserSessionBySessionIdentifier(context.Background(), nil, b.sessionA.SessionIdentifier)
 	require.NoError(t, err)
 	assert.Nil(t, survivingA, "the previous user's session must be terminated, not left behind")
 
-	sessionsA, err := database.GetUserSessionsByUserId(nil, b.userA.Id)
+	sessionsA, err := database.GetUserSessionsByUserId(context.Background(), nil, b.userA.Id)
 	require.NoError(t, err)
 	assert.Empty(t, sessionsA, "the previous user should have no sessions left from this browser")
 
-	sessionsB, err := database.GetUserSessionsByUserId(nil, b.userB.Id)
+	sessionsB, err := database.GetUserSessionsByUserId(context.Background(), nil, b.userB.Id)
 	require.NoError(t, err)
 	require.Len(t, sessionsB, 1, "the authenticating user should hold exactly one session")
 	assert.Equal(t, code.SessionIdentifier, sessionsB[0].SessionIdentifier,

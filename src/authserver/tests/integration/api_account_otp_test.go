@@ -474,7 +474,7 @@ func seedExtraSessionForOTPTest(t *testing.T, userId int64) *models.UserSession 
 		OtpConfigGeneration: current.OtpConfigGeneration,
 		UserId:              userId,
 	}
-	if err := database.CreateUserSession(nil, session); err != nil {
+	if err := database.CreateUserSession(context.Background(), nil, session); err != nil {
 		t.Fatal(err)
 	}
 	return session
@@ -493,7 +493,7 @@ func assertEverySessionOwesAReprompt(t *testing.T, userId int64, atLeast int) {
 	user, err := database.GetUserById(context.Background(), nil, userId)
 	assert.NoError(t, err)
 
-	sessions, err := database.GetUserSessionsByUserId(nil, userId)
+	sessions, err := database.GetUserSessionsByUserId(context.Background(), nil, userId)
 	assert.NoError(t, err)
 	assert.GreaterOrEqual(t, len(sessions), atLeast,
 		"the fixture must leave at least %d sessions for this to be about reach at all", atLeast)
@@ -553,7 +553,7 @@ func TestAPIAccountOTPPut_Enable_AdvancesOtpConfigGeneration(t *testing.T) {
 	// Named explicitly as well as covered by the sweep above, because this is the row the
 	// mechanism this replaces could not reach: it was created before the call, its snapshot
 	// was current at that moment, and nothing about the request mentions it.
-	reloaded, err := database.GetUserSessionById(nil, extra.Id)
+	reloaded, err := database.GetUserSessionById(context.Background(), nil, extra.Id)
 	assert.NoError(t, err)
 	assert.NotEqual(t, after.OtpConfigGeneration, reloaded.OtpConfigGeneration,
 		"the user's other device must owe a re-prompt too")
@@ -593,7 +593,7 @@ func TestAPIAccountOTPPut_Disable_AdvancesOtpConfigGeneration(t *testing.T) {
 
 	assertEverySessionOwesAReprompt(t, userId, 2)
 
-	reloaded, err := database.GetUserSessionById(nil, extra.Id)
+	reloaded, err := database.GetUserSessionById(context.Background(), nil, extra.Id)
 	assert.NoError(t, err)
 	assert.NotEqual(t, after.OtpConfigGeneration, reloaded.OtpConfigGeneration,
 		"the user's other device must owe a re-prompt too")

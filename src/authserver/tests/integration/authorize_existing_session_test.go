@@ -18,7 +18,7 @@ import (
 func TestAuthorize_ExistingAcrLevel1Session_AcrLevel1Request(t *testing.T) {
 	httpClient, client, redirectUri, user := createSessionWithAcrLevel1(t)
 
-	userSessions, err := database.GetUserSessionsByUserId(nil, user.Id)
+	userSessions, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -59,7 +59,7 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel1Request(t *testing.T) {
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	userSessions, err = database.GetUserSessionsByUserId(nil, user.Id)
+	userSessions, err = database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,7 +99,7 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2OptionalRequest_OtpDisabled
 		t.Fatal(err)
 	}
 
-	userSessions, err := database.GetUserSessionsByUserId(nil, user.Id)
+	userSessions, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -144,7 +144,7 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2OptionalRequest_OtpDisabled
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	userSessions, err = database.GetUserSessionsByUserId(nil, user.Id)
+	userSessions, err = database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -193,7 +193,7 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2OptionalRequest_OtpEnabled(
 		t.Fatal(err)
 	}
 
-	userSessions, err := database.GetUserSessionsByUserId(nil, user.Id)
+	userSessions, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -249,7 +249,7 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2OptionalRequest_OtpEnabled(
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	userSessions, err = database.GetUserSessionsByUserId(nil, user.Id)
+	userSessions, err = database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -289,7 +289,7 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2MandatoryRequest_OtpDisable
 		t.Fatal(err)
 	}
 
-	userSessions, err := database.GetUserSessionsByUserId(nil, user.Id)
+	userSessions, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -346,7 +346,7 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2MandatoryRequest_OtpDisable
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	userSessions, err = database.GetUserSessionsByUserId(nil, user.Id)
+	userSessions, err = database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -396,7 +396,7 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2MandatoryRequest_OtpEnabled
 		t.Fatal(err)
 	}
 
-	userSessions, err := database.GetUserSessionsByUserId(nil, user.Id)
+	userSessions, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -452,7 +452,7 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2MandatoryRequest_OtpEnabled
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	userSessions, err = database.GetUserSessionsByUserId(nil, user.Id)
+	userSessions, err = database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -486,7 +486,7 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2MandatoryRequest_OtpEnabled
 func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel1Request(t *testing.T) {
 	httpClient, client, redirectUri, user := createSessionWithAcrLevel2Optional(t)
 
-	userSessions, err := database.GetUserSessionsByUserId(nil, user.Id)
+	userSessions, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -527,7 +527,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel1Request(t *testing.
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	userSessions, err = database.GetUserSessionsByUserId(nil, user.Id)
+	userSessions, err = database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -568,7 +568,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2OptionalRequest_Otp
 		t.Fatal(err)
 	}
 
-	userSessions, err := database.GetUserSessionsByUserId(nil, user.Id)
+	userSessions, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -609,7 +609,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2OptionalRequest_Otp
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	userSessions, err = database.GetUserSessionsByUserId(nil, user.Id)
+	userSessions, err = database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -662,7 +662,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2OptionalRequest_Otp
 		t.Fatal(err)
 	}
 
-	userSessions, err := database.GetUserSessionsByUserId(nil, user.Id)
+	userSessions, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -724,7 +724,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2OptionalRequest_Otp
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	userSessions, err = database.GetUserSessionsByUserId(nil, user.Id)
+	userSessions, err = database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -776,7 +776,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2MandatoryRequest_Ot
 		t.Fatal(err)
 	}
 
-	userSessions, err := database.GetUserSessionsByUserId(nil, user.Id)
+	userSessions, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -833,7 +833,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2MandatoryRequest_Ot
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	userSessions, err = database.GetUserSessionsByUserId(nil, user.Id)
+	userSessions, err = database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -891,7 +891,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2MandatoryRequest_Ot
 		t.Fatal(err)
 	}
 
-	userSessions, err := database.GetUserSessionsByUserId(nil, user.Id)
+	userSessions, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -947,7 +947,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2MandatoryRequest_Ot
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	userSessions, err = database.GetUserSessionsByUserId(nil, user.Id)
+	userSessions, err = database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -991,7 +991,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2MandatoryRequest_Ot
 func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel1Request(t *testing.T) {
 	httpClient, client, redirectUri, user := createSessionWithAcrLevel2Mandatory(t)
 
-	userSessions, err := database.GetUserSessionsByUserId(nil, user.Id)
+	userSessions, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1032,7 +1032,7 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel1Request(t *testing
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	userSessions, err = database.GetUserSessionsByUserId(nil, user.Id)
+	userSessions, err = database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1073,7 +1073,7 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2OptionalRequest_Ot
 		t.Fatal(err)
 	}
 
-	userSessions, err := database.GetUserSessionsByUserId(nil, user.Id)
+	userSessions, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1114,7 +1114,7 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2OptionalRequest_Ot
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	userSessions, err = database.GetUserSessionsByUserId(nil, user.Id)
+	userSessions, err = database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1160,7 +1160,7 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2OptionalRequest_Ot
 		t.Fatal("Expected user to have OTP enabled")
 	}
 
-	userSessions, err := database.GetUserSessionsByUserId(nil, user.Id)
+	userSessions, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1201,7 +1201,7 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2OptionalRequest_Ot
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	userSessions, err = database.GetUserSessionsByUserId(nil, user.Id)
+	userSessions, err = database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1260,7 +1260,7 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2MandatoryRequest_O
 		t.Fatal(err)
 	}
 
-	userSessions, err := database.GetUserSessionsByUserId(nil, user.Id)
+	userSessions, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1323,7 +1323,7 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2MandatoryRequest_O
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	userSessions, err = database.GetUserSessionsByUserId(nil, user.Id)
+	userSessions, err = database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1370,7 +1370,7 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2MandatoryRequest_O
 		t.Fatal("Expected user to have OTP enabled")
 	}
 
-	userSessions, err := database.GetUserSessionsByUserId(nil, user.Id)
+	userSessions, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1411,7 +1411,7 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2MandatoryRequest_O
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	userSessions, err = database.GetUserSessionsByUserId(nil, user.Id)
+	userSessions, err = database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -106,7 +106,7 @@ func TestHandleAuthPwdGet(t *testing.T) {
 				Email: "test@example.com",
 			},
 		}
-		database.On("GetUserSessionBySessionIdentifier", mock.Anything, sessionIdentifier).Return(userSession, nil)
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(userSession, nil)
 
 		client := &models.Client{
 			ClientIdentifier: "my-app",

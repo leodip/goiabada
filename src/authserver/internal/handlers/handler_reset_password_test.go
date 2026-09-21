@@ -1156,9 +1156,9 @@ func TestHandleResetPasswordPost_TransactionFailureHandling(t *testing.T) {
 			arrange: func(database *mocks_data.Database) {
 				database.On("IncrementUserAuthStateGeneration", mock.Anything, revokeTx, int64(1)).
 					Return(int64(4), nil).Once()
-				database.On("GetUserSessionsByUserId", revokeTx, int64(1)).
+				database.On("GetUserSessionsByUserId", mock.Anything, revokeTx, int64(1)).
 					Return([]models.UserSession{}, nil).Once()
-				database.On("GetRefreshTokensByUserId", revokeTx, int64(1)).
+				database.On("GetRefreshTokensByUserId", mock.Anything, revokeTx, int64(1)).
 					Return(nil, errors.New("discovery failed")).Once()
 			},
 		},
@@ -1171,12 +1171,12 @@ func TestHandleResetPasswordPost_TransactionFailureHandling(t *testing.T) {
 				second := &models.RefreshToken{Id: 2, RefreshTokenJti: "rt-2"}
 				database.On("IncrementUserAuthStateGeneration", mock.Anything, revokeTx, int64(1)).
 					Return(int64(4), nil).Once()
-				database.On("GetUserSessionsByUserId", revokeTx, int64(1)).
+				database.On("GetUserSessionsByUserId", mock.Anything, revokeTx, int64(1)).
 					Return([]models.UserSession{}, nil).Once()
-				database.On("GetRefreshTokensByUserId", revokeTx, int64(1)).
+				database.On("GetRefreshTokensByUserId", mock.Anything, revokeTx, int64(1)).
 					Return([]*models.RefreshToken{first, second}, nil).Once()
-				database.On("UpdateRefreshToken", revokeTx, first).Return(nil).Once()
-				database.On("UpdateRefreshToken", revokeTx, second).
+				database.On("UpdateRefreshToken", mock.Anything, revokeTx, first).Return(nil).Once()
+				database.On("UpdateRefreshToken", mock.Anything, revokeTx, second).
 					Return(errors.New("revoke failed")).Once()
 			},
 		},
@@ -1189,11 +1189,11 @@ func TestHandleResetPasswordPost_TransactionFailureHandling(t *testing.T) {
 			arrange: func(database *mocks_data.Database) {
 				database.On("IncrementUserAuthStateGeneration", mock.Anything, revokeTx, int64(1)).
 					Return(int64(4), nil).Once()
-				database.On("GetUserSessionsByUserId", revokeTx, int64(1)).
+				database.On("GetUserSessionsByUserId", mock.Anything, revokeTx, int64(1)).
 					Return([]models.UserSession{}, nil).Once()
-				database.On("GetRefreshTokensByUserId", revokeTx, int64(1)).
+				database.On("GetRefreshTokensByUserId", mock.Anything, revokeTx, int64(1)).
 					Return([]*models.RefreshToken{}, nil).Once()
-				database.On("PromoteRefreshTokenGenerations", revokeTx, []int64{}, int64(4)).
+				database.On("PromoteRefreshTokenGenerations", mock.Anything, revokeTx, []int64{}, int64(4)).
 					Return(nil).Once()
 			},
 			commitFails: true,

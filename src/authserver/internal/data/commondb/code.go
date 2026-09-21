@@ -10,7 +10,7 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 )
 
-func (d *CommonDatabase) CreateCode(tx *sql.Tx, code *models.Code) error {
+func (d *CommonDatabase) CreateCode(ctx context.Context, tx *sql.Tx, code *models.Code) error {
 
 	if code.ClientId == 0 {
 		return errs.New("client id must be greater than 0")
@@ -32,7 +32,7 @@ func (d *CommonDatabase) CreateCode(tx *sql.Tx, code *models.Code) error {
 
 	insertBuilder := codeStruct.WithoutTag("pk").InsertInto("codes", code)
 
-	id, err := d.insertReturningId(context.Background(), tx, insertBuilder, "code")
+	id, err := d.insertReturningId(ctx, tx, insertBuilder, "code")
 	if err != nil {
 		code.CreatedAt = originalCreatedAt
 		code.UpdatedAt = originalUpdatedAt
@@ -43,7 +43,7 @@ func (d *CommonDatabase) CreateCode(tx *sql.Tx, code *models.Code) error {
 	return nil
 }
 
-func (d *CommonDatabase) UpdateCode(tx *sql.Tx, code *models.Code) error {
+func (d *CommonDatabase) UpdateCode(ctx context.Context, tx *sql.Tx, code *models.Code) error {
 
 	if code.Id == 0 {
 		return errs.New("can't update code with id 0")
@@ -59,7 +59,7 @@ func (d *CommonDatabase) UpdateCode(tx *sql.Tx, code *models.Code) error {
 	updateBuilder.Where(updateBuilder.Equal("id", code.Id))
 
 	sql, args := updateBuilder.Build()
-	_, err := d.ExecSql(context.Background(), tx, sql, args...)
+	_, err := d.ExecSql(ctx, tx, sql, args...)
 	if err != nil {
 		code.UpdatedAt = originalUpdatedAt
 		return errs.Wrap(err, "unable to update code")
@@ -84,7 +84,7 @@ func (d *CommonDatabase) UpdateCode(tx *sql.Tx, code *models.Code) error {
 // already in progress (#129). Validation and claiming are separate steps, so a code
 // validated a moment before its session was terminated would otherwise still be
 // claimed and its tokens issued.
-func (d *CommonDatabase) MarkCodeAsUsed(tx *sql.Tx, codeId int64) (bool, error) {
+func (d *CommonDatabase) MarkCodeAsUsed(ctx context.Context, tx *sql.Tx, codeId int64) (bool, error) {
 
 	if codeId == 0 {
 		return false, errs.New("can't mark code with id 0 as used")
@@ -103,7 +103,7 @@ func (d *CommonDatabase) MarkCodeAsUsed(tx *sql.Tx, codeId int64) (bool, error) 
 	)
 
 	query, args := ub.BuildWithFlavor(d.Flavor)
-	result, err := d.ExecSql(context.Background(), tx, query, args...)
+	result, err := d.ExecSql(ctx, tx, query, args...)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to mark code as used")
 	}
@@ -131,7 +131,7 @@ func (d *CommonDatabase) MarkCodeAsUsed(tx *sql.Tx, codeId int64) (bool, error) 
 // An empty session identifier is rejected rather than treated as a filter. Every
 // user_sessions row carries a UUID, so an empty value means a caller bug, and
 // matching on it would sweep unrelated codes.
-func (d *CommonDatabase) RevokeCodesBySessionIdentifier(tx *sql.Tx, sessionIdentifier string) (int64, error) {
+func (d *CommonDatabase) RevokeCodesBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (int64, error) {
 
 	if sessionIdentifier == "" {
 		return 0, errs.New("can't revoke codes with an empty session identifier")
@@ -149,7 +149,7 @@ func (d *CommonDatabase) RevokeCodesBySessionIdentifier(tx *sql.Tx, sessionIdent
 	)
 
 	query, args := ub.BuildWithFlavor(d.Flavor)
-	result, err := d.ExecSql(context.Background(), tx, query, args...)
+	result, err := d.ExecSql(ctx, tx, query, args...)
 	if err != nil {
 		return 0, errs.Wrap(err, "unable to revoke codes by session identifier")
 	}
@@ -178,7 +178,7 @@ func (d *CommonDatabase) RevokeCodesBySessionIdentifier(tx *sql.Tx, sessionIdent
 // A zero client id is rejected rather than used as a filter. codes.client_id is NOT
 // NULL and no clients row carries id 0, so a zero can only be a caller bug, and a flip
 // must never be able to sweep on one.
-func (d *CommonDatabase) RevokeCodesByClientId(tx *sql.Tx, clientId int64) (int64, error) {
+func (d *CommonDatabase) RevokeCodesByClientId(ctx context.Context, tx *sql.Tx, clientId int64) (int64, error) {
 
 	if clientId == 0 {
 		return 0, errs.New("can't revoke codes with a client id of 0")
@@ -196,7 +196,7 @@ func (d *CommonDatabase) RevokeCodesByClientId(tx *sql.Tx, clientId int64) (int6
 	)
 
 	query, args := ub.BuildWithFlavor(d.Flavor)
-	result, err := d.ExecSql(context.Background(), tx, query, args...)
+	result, err := d.ExecSql(ctx, tx, query, args...)
 	if err != nil {
 		return 0, errs.Wrap(err, "unable to revoke codes by client id")
 	}
@@ -209,11 +209,11 @@ func (d *CommonDatabase) RevokeCodesByClientId(tx *sql.Tx, clientId int64) (int6
 	return rowsAffected, nil
 }
 
-func (d *CommonDatabase) getCodeCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
+func (d *CommonDatabase) getCodeCommon(ctx context.Context, tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
 	codeStruct *sqlbuilder.Struct) (*models.Code, error) {
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(context.Background(), tx, sql, args...)
+	rows, err := d.QuerySql(ctx, tx, sql, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -235,7 +235,7 @@ func (d *CommonDatabase) getCodeCommon(tx *sql.Tx, selectBuilder *sqlbuilder.Sel
 	return nil, nil
 }
 
-func (d *CommonDatabase) GetCodeById(tx *sql.Tx, codeId int64) (*models.Code, error) {
+func (d *CommonDatabase) GetCodeById(ctx context.Context, tx *sql.Tx, codeId int64) (*models.Code, error) {
 
 	codeStruct := sqlbuilder.NewStruct(new(models.Code)).
 		For(d.Flavor)
@@ -243,7 +243,7 @@ func (d *CommonDatabase) GetCodeById(tx *sql.Tx, codeId int64) (*models.Code, er
 	selectBuilder := codeStruct.SelectFrom("codes")
 	selectBuilder.Where(selectBuilder.Equal("id", codeId))
 
-	code, err := d.getCodeCommon(tx, selectBuilder, codeStruct)
+	code, err := d.getCodeCommon(ctx, tx, selectBuilder, codeStruct)
 	if err != nil {
 		return nil, err
 	}
@@ -251,13 +251,13 @@ func (d *CommonDatabase) GetCodeById(tx *sql.Tx, codeId int64) (*models.Code, er
 	return code, nil
 }
 
-func (d *CommonDatabase) CodeLoadClient(tx *sql.Tx, code *models.Code) error {
+func (d *CommonDatabase) CodeLoadClient(ctx context.Context, tx *sql.Tx, code *models.Code) error {
 
 	if code == nil {
 		return nil
 	}
 
-	client, err := d.GetClientById(tx, code.ClientId)
+	client, err := d.GetClientById(ctx, tx, code.ClientId)
 	if err != nil {
 		return errs.Wrap(err, "unable to load client")
 	}
@@ -268,13 +268,13 @@ func (d *CommonDatabase) CodeLoadClient(tx *sql.Tx, code *models.Code) error {
 	return nil
 }
 
-func (d *CommonDatabase) CodeLoadUser(tx *sql.Tx, code *models.Code) error {
+func (d *CommonDatabase) CodeLoadUser(ctx context.Context, tx *sql.Tx, code *models.Code) error {
 
 	if code == nil {
 		return nil
 	}
 
-	user, err := d.GetUserById(context.Background(), tx, code.UserId)
+	user, err := d.GetUserById(ctx, tx, code.UserId)
 	if err != nil {
 		return errs.Wrap(err, "unable to load user")
 	}
@@ -285,7 +285,7 @@ func (d *CommonDatabase) CodeLoadUser(tx *sql.Tx, code *models.Code) error {
 	return nil
 }
 
-func (d *CommonDatabase) GetCodeByCodeHash(tx *sql.Tx, codeHash string, used bool) (*models.Code, error) {
+func (d *CommonDatabase) GetCodeByCodeHash(ctx context.Context, tx *sql.Tx, codeHash string, used bool) (*models.Code, error) {
 	codeStruct := sqlbuilder.NewStruct(new(models.Code)).
 		For(d.Flavor)
 
@@ -293,7 +293,7 @@ func (d *CommonDatabase) GetCodeByCodeHash(tx *sql.Tx, codeHash string, used boo
 	selectBuilder.Where(selectBuilder.Equal("code_hash", codeHash))
 	selectBuilder.Where(selectBuilder.Equal("used", used))
 
-	code, err := d.getCodeCommon(tx, selectBuilder, codeStruct)
+	code, err := d.getCodeCommon(ctx, tx, selectBuilder, codeStruct)
 	if err != nil {
 		return nil, err
 	}
@@ -301,7 +301,7 @@ func (d *CommonDatabase) GetCodeByCodeHash(tx *sql.Tx, codeHash string, used boo
 	return code, nil
 }
 
-func (d *CommonDatabase) DeleteCode(tx *sql.Tx, codeId int64) error {
+func (d *CommonDatabase) DeleteCode(ctx context.Context, tx *sql.Tx, codeId int64) error {
 
 	clientStruct := sqlbuilder.NewStruct(new(models.Code)).
 		For(d.Flavor)
@@ -310,7 +310,7 @@ func (d *CommonDatabase) DeleteCode(tx *sql.Tx, codeId int64) error {
 	deleteBuilder.Where(deleteBuilder.Equal("id", codeId))
 
 	sql, args := deleteBuilder.Build()
-	_, err := d.ExecSql(context.Background(), tx, sql, args...)
+	_, err := d.ExecSql(ctx, tx, sql, args...)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete code")
 	}
@@ -352,7 +352,7 @@ func (d *CommonDatabase) DeleteCode(tx *sql.Tx, codeId int64) error {
 // than losing a marker: fk_refresh_tokens_code is ON DELETE CASCADE, so reaching a used
 // code with a live refresh token would delete the very descendant the marker exists to
 // reject.
-func (d *CommonDatabase) DeleteUsedCodesWithoutRefreshTokens(tx *sql.Tx, createdBefore time.Time) error {
+func (d *CommonDatabase) DeleteUsedCodesWithoutRefreshTokens(ctx context.Context, tx *sql.Tx, createdBefore time.Time) error {
 	deleteBuilder := d.Flavor.NewDeleteBuilder()
 	deleteBuilder.DeleteFrom("codes")
 	deleteBuilder.Where(
@@ -372,7 +372,7 @@ func (d *CommonDatabase) DeleteUsedCodesWithoutRefreshTokens(tx *sql.Tx, created
 	)
 
 	sql, args := deleteBuilder.Build()
-	_, err := d.ExecSql(context.Background(), tx, sql, args...)
+	_, err := d.ExecSql(ctx, tx, sql, args...)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete used codes without refresh tokens")
 	}

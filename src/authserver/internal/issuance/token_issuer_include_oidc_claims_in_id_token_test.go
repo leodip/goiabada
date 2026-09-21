@@ -467,21 +467,21 @@ func TestGenerateTokenResponseForAuthCode_IncludeOpenIDConnectClaimsInIdToken_Fu
 		FamilyName:    "User",
 	}
 
-	mockDB.On("CodeLoadClient", mock.Anything, code).Return(nil)
+	mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, code).Return(nil)
 	code.Client = *client
-	mockDB.On("CodeLoadUser", mock.Anything, code).Return(nil)
+	mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, code).Return(nil)
 	code.User = *user
 	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, &code.User).Return(nil)
 	mockDB.On("GroupsLoadAttributes", mock.Anything, code.User.Groups).Return(nil)
 	mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything, &code.User).Return(nil)
 	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, user.Id).Return(false, nil)
-	mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, sessionIdentifier).Return(&models.UserSession{
+	mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(&models.UserSession{
 		Id:           1,
 		UserId:       1,
 		Started:      now.Add(-30 * time.Minute),
 		LastAccessed: now.Add(-5 * time.Minute),
 	}, nil)
-	mockDB.On("CreateRefreshToken", mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil)
+	mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil)
 	mockDB.On("GetCurrentSigningKey", mock.Anything).Return(&models.KeyPair{
 		KeyIdentifier: "test-key-id",
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
@@ -574,21 +574,21 @@ func TestGenerateTokenResponseForAuthCode_IncludeOpenIDConnectClaimsInIdToken_Cl
 		FamilyName:    "User",
 	}
 
-	mockDB.On("CodeLoadClient", mock.Anything, code).Return(nil)
+	mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, code).Return(nil)
 	code.Client = *client
-	mockDB.On("CodeLoadUser", mock.Anything, code).Return(nil)
+	mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, code).Return(nil)
 	code.User = *user
 	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, &code.User).Return(nil)
 	mockDB.On("GroupsLoadAttributes", mock.Anything, code.User.Groups).Return(nil)
 	mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything, &code.User).Return(nil)
 	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, user.Id).Return(false, nil)
-	mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, sessionIdentifier).Return(&models.UserSession{
+	mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(&models.UserSession{
 		Id:           1,
 		UserId:       2,
 		Started:      now.Add(-30 * time.Minute),
 		LastAccessed: now.Add(-5 * time.Minute),
 	}, nil)
-	mockDB.On("CreateRefreshToken", mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil)
+	mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil)
 	mockDB.On("GetCurrentSigningKey", mock.Anything).Return(&models.KeyPair{
 		KeyIdentifier: "test-key-id",
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),

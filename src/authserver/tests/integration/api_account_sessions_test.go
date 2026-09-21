@@ -40,13 +40,13 @@ func TestAPIAccountSessionsGet_Success_IncludesIsCurrent(t *testing.T) {
 	s1 := createTestUserSession(t, user.Id, fake.UUID())
 	s2 := createTestUserSession(t, user.Id, fake.UUID())
 	defer func() {
-		_ = database.DeleteUserSession(nil, s1.Id)
-		_ = database.DeleteUserSession(nil, s2.Id)
+		_ = database.DeleteUserSession(context.Background(), nil, s1.Id)
+		_ = database.DeleteUserSession(context.Background(), nil, s2.Id)
 	}()
 
 	now := time.Now().UTC()
-	_ = database.CreateUserSessionClient(nil, &models.UserSessionClient{UserSessionId: s1.Id, ClientId: testClient.Id, Started: now.Add(-time.Hour), LastAccessed: now.Add(-5 * time.Minute)})
-	_ = database.CreateUserSessionClient(nil, &models.UserSessionClient{UserSessionId: s2.Id, ClientId: testClient.Id, Started: now.Add(-time.Hour), LastAccessed: now.Add(-5 * time.Minute)})
+	_ = database.CreateUserSessionClient(context.Background(), nil, &models.UserSessionClient{UserSessionId: s1.Id, ClientId: testClient.Id, Started: now.Add(-time.Hour), LastAccessed: now.Add(-5 * time.Minute)})
+	_ = database.CreateUserSessionClient(context.Background(), nil, &models.UserSessionClient{UserSessionId: s2.Id, ClientId: testClient.Id, Started: now.Add(-time.Hour), LastAccessed: now.Add(-5 * time.Minute)})
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/account/sessions"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
@@ -104,9 +104,9 @@ func TestAPIAccountSessionsGet_OnlyValidSessions(t *testing.T) {
 		DeviceOS:          "linux",
 		UserId:            user.Id,
 	}
-	err := database.CreateUserSession(nil, valid)
+	err := database.CreateUserSession(context.Background(), nil, valid)
 	assert.NoError(t, err)
-	defer func() { _ = database.DeleteUserSession(nil, valid.Id) }()
+	defer func() { _ = database.DeleteUserSession(context.Background(), nil, valid.Id) }()
 
 	expired := &models.UserSession{
 		SessionIdentifier: fake.UUID(),
@@ -121,9 +121,9 @@ func TestAPIAccountSessionsGet_OnlyValidSessions(t *testing.T) {
 		DeviceOS:          "linux",
 		UserId:            user.Id,
 	}
-	err = database.CreateUserSession(nil, expired)
+	err = database.CreateUserSession(context.Background(), nil, expired)
 	assert.NoError(t, err)
-	defer func() { _ = database.DeleteUserSession(nil, expired.Id) }()
+	defer func() { _ = database.DeleteUserSession(context.Background(), nil, expired.Id) }()
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/account/sessions"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
@@ -159,7 +159,7 @@ func TestAPIAccountSessionDelete_Success(t *testing.T) {
 	assert.True(t, out.Success)
 
 	// ensure deleted
-	s, err := database.GetUserSessionById(nil, session.Id)
+	s, err := database.GetUserSessionById(context.Background(), nil, session.Id)
 	assert.NoError(t, err)
 	assert.Nil(t, s)
 }
@@ -174,7 +174,7 @@ func TestAPIAccountSessionDelete_ForbiddenOnOtherUsersSession(t *testing.T) {
 	defer func() { _ = database.DeleteUser(context.Background(), nil, other.Id) }()
 
 	otherSession := createTestUserSession(t, other.Id, fake.UUID())
-	defer func() { _ = database.DeleteUserSession(nil, otherSession.Id) }()
+	defer func() { _ = database.DeleteUserSession(context.Background(), nil, otherSession.Id) }()
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/account/sessions/" + strconv.FormatInt(otherSession.Id, 10)
 	resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
@@ -200,7 +200,7 @@ func TestAPIAccountSessionDelete_TerminatesTheOfflineGrantsOfThatSession(t *test
 	require.NotEmpty(t, first["access_token"], "the grant should refresh before termination: %v", first)
 	grant.refreshToken = first["refresh_token"].(string)
 
-	session, err := database.GetUserSessionBySessionIdentifier(nil, grant.sessionIdentifier)
+	session, err := database.GetUserSessionBySessionIdentifier(context.Background(), nil, grant.sessionIdentifier)
 	require.NoError(t, err)
 	require.NotNil(t, session)
 
@@ -227,7 +227,7 @@ func TestAPIAccountSessionDelete_ForbiddenDoesNotTerminate(t *testing.T) {
 	require.NotEmpty(t, first["access_token"], "the victim's grant should refresh to begin with: %v", first)
 	victim.refreshToken = first["refresh_token"].(string)
 
-	session, err := database.GetUserSessionBySessionIdentifier(nil, victim.sessionIdentifier)
+	session, err := database.GetUserSessionBySessionIdentifier(context.Background(), nil, victim.sessionIdentifier)
 	require.NoError(t, err)
 	require.NotNil(t, session)
 
@@ -236,7 +236,7 @@ func TestAPIAccountSessionDelete_ForbiddenDoesNotTerminate(t *testing.T) {
 	defer func() { _ = resp.Body.Close() }()
 	require.Equal(t, http.StatusForbidden, resp.StatusCode)
 
-	stillThere, err := database.GetUserSessionById(nil, session.Id)
+	stillThere, err := database.GetUserSessionById(context.Background(), nil, session.Id)
 	require.NoError(t, err)
 	assert.NotNil(t, stillThere, "a refused request must not delete the session")
 

@@ -153,7 +153,7 @@ func TestPaginatedReads_AnOverflowingPageIsAnEmptyPage(t *testing.T) {
 
 		assertEmptyPagePastTheEnd(t, "GetUserSessionsByClientIdPaginated", 50,
 			func(page, pageSize int) (int, int, error) {
-				sessions, total, err := database.GetUserSessionsByClientIdPaginated(nil, client.Id, page, pageSize)
+				sessions, total, err := database.GetUserSessionsByClientIdPaginated(context.Background(), nil, client.Id, page, pageSize)
 				return len(sessions), total, err
 			})
 	})

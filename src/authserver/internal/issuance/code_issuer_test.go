@@ -1,6 +1,7 @@
 package issuance
 
 import (
+	"context"
 	"errors"
 	"strings"
 	"testing"
@@ -49,7 +50,7 @@ func TestCreateAuthCode(t *testing.T) {
 	}
 
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(testClient, nil)
-	mockDB.On("CreateCode", mock.Anything, mock.AnythingOfType("*models.Code")).Return(nil)
+	mockDB.On("CreateCode", mock.Anything, mock.Anything, mock.AnythingOfType("*models.Code")).Return(nil)
 
 	input := &CreateCodeInput{
 		AuthContext: ceremony.AuthContext{
@@ -71,7 +72,7 @@ func TestCreateAuthCode(t *testing.T) {
 		SessionIdentifier: "session123",
 	}
 
-	code, err := codeIssuer.CreateAuthCode(nil, input)
+	code, err := codeIssuer.CreateAuthCode(context.Background(), nil, input)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, code)
@@ -139,12 +140,12 @@ func TestCreateAuthCode_BoundsTheUserAgent(t *testing.T) {
 				&models.Client{Id: 1, ClientIdentifier: "test-client"}, nil)
 
 			var persisted string
-			mockDB.On("CreateCode", mock.Anything, mock.AnythingOfType("*models.Code")).Run(
+			mockDB.On("CreateCode", mock.Anything, mock.Anything, mock.AnythingOfType("*models.Code")).Run(
 				func(args mock.Arguments) {
-					persisted = args.Get(1).(*models.Code).UserAgent
+					persisted = args.Get(2).(*models.Code).UserAgent
 				}).Return(nil)
 
-			_, err := codeIssuer.CreateAuthCode(nil, &CreateCodeInput{
+			_, err := codeIssuer.CreateAuthCode(context.Background(), nil, &CreateCodeInput{
 				AuthContext: ceremony.AuthContext{
 					ClientId:       "test-client",
 					UserId:         123,
@@ -179,7 +180,7 @@ func TestCreateAuthCode_DefaultResponseMode(t *testing.T) {
 	}
 
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(testClient, nil)
-	mockDB.On("CreateCode", mock.Anything, mock.AnythingOfType("*models.Code")).Return(nil)
+	mockDB.On("CreateCode", mock.Anything, mock.Anything, mock.AnythingOfType("*models.Code")).Return(nil)
 
 	input := &CreateCodeInput{
 		AuthContext: ceremony.AuthContext{
@@ -190,7 +191,7 @@ func TestCreateAuthCode_DefaultResponseMode(t *testing.T) {
 		SessionIdentifier: "session123",
 	}
 
-	code, err := codeIssuer.CreateAuthCode(nil, input)
+	code, err := codeIssuer.CreateAuthCode(context.Background(), nil, input)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, code)
@@ -209,7 +210,7 @@ func TestCreateAuthCode_ScopeHandling(t *testing.T) {
 	}
 
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(testClient, nil)
-	mockDB.On("CreateCode", mock.Anything, mock.AnythingOfType("*models.Code")).Return(nil)
+	mockDB.On("CreateCode", mock.Anything, mock.Anything, mock.AnythingOfType("*models.Code")).Return(nil)
 
 	testCases := []struct {
 		name           string
@@ -249,7 +250,7 @@ func TestCreateAuthCode_ScopeHandling(t *testing.T) {
 				SessionIdentifier: "session123",
 			}
 
-			code, err := codeIssuer.CreateAuthCode(nil, input)
+			code, err := codeIssuer.CreateAuthCode(context.Background(), nil, input)
 
 			assert.NoError(t, err)
 			assert.NotNil(t, code)
@@ -270,7 +271,7 @@ func TestCreateAuthCode_DatabaseError(t *testing.T) {
 	}
 
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(testClient, nil)
-	mockDB.On("CreateCode", mock.Anything, mock.AnythingOfType("*models.Code")).Return(errors.New("database error"))
+	mockDB.On("CreateCode", mock.Anything, mock.Anything, mock.AnythingOfType("*models.Code")).Return(errors.New("database error"))
 
 	input := &CreateCodeInput{
 		AuthContext: ceremony.AuthContext{
@@ -280,7 +281,7 @@ func TestCreateAuthCode_DatabaseError(t *testing.T) {
 		SessionIdentifier: "session123",
 	}
 
-	code, err := codeIssuer.CreateAuthCode(nil, input)
+	code, err := codeIssuer.CreateAuthCode(context.Background(), nil, input)
 
 	assert.Error(t, err)
 	assert.Nil(t, code)
@@ -310,7 +311,7 @@ func TestCreateAuthCode_RefusesAMissingClient(t *testing.T) {
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, "deleted-client").
 		Return((*models.Client)(nil), nil)
 
-	code, err := codeIssuer.CreateAuthCode(nil, &CreateCodeInput{
+	code, err := codeIssuer.CreateAuthCode(context.Background(), nil, &CreateCodeInput{
 		AuthContext:       ceremony.AuthContext{ClientId: "deleted-client", UserId: 123},
 		SessionIdentifier: "session123",
 	})
@@ -321,6 +322,6 @@ func TestCreateAuthCode_RefusesAMissingClient(t *testing.T) {
 
 	// And nothing was written. The insert is what would bind a grant to a registration that is
 	// gone, and its foreign key would refuse it anyway, with an error nobody could branch on.
-	mockDB.AssertNotCalled(t, "CreateCode", mock.Anything, mock.Anything)
+	mockDB.AssertNotCalled(t, "CreateCode", mock.Anything, mock.Anything, mock.Anything)
 	mockDB.AssertExpectations(t)
 }

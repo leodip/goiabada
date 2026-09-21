@@ -21,14 +21,14 @@ import (
 //
 // The caller owns the transaction. Passing a nil tx is permitted and means no transaction,
 // following the data layer's convention, but every caller here supplies one.
-func revokeRefreshTokens(db data.Database, tx *sql.Tx, tokens []*models.RefreshToken) ([]string, error) {
+func revokeRefreshTokens(ctx context.Context, db data.Database, tx *sql.Tx, tokens []*models.RefreshToken) ([]string, error) {
 	revokedJtis := make([]string, 0, len(tokens))
 	for _, rt := range tokens {
 		if rt.Revoked {
 			continue
 		}
 		rt.Revoked = true
-		if err := db.UpdateRefreshToken(tx, rt); err != nil {
+		if err := db.UpdateRefreshToken(ctx, tx, rt); err != nil {
 			return nil, err
 		}
 		revokedJtis = append(revokedJtis, rt.RefreshTokenJti)
@@ -122,7 +122,7 @@ func RevokeUserAuthState(ctx context.Context, db data.Database, tx *sql.Tx, user
 	// operation: the codes carry auth_state_generation, so advancing it is what invalidates
 	// them, and a sweep that ran first would leave a gap in which a code issued under the old
 	// generation is still valid.
-	sessions, err := db.GetUserSessionsByUserId(tx, userId)
+	sessions, err := db.GetUserSessionsByUserId(ctx, tx, userId)
 	if err != nil {
 		return result, err
 	}
@@ -137,13 +137,13 @@ func RevokeUserAuthState(ctx context.Context, db data.Database, tx *sql.Tx, user
 	for i := range sessions {
 		session := sessions[i]
 		if exceptSid != "" && session.SessionIdentifier == exceptSid {
-			if err := db.PromoteUserSessionGeneration(tx, session.Id, newGeneration); err != nil {
+			if err := db.PromoteUserSessionGeneration(ctx, tx, session.Id, newGeneration); err != nil {
 				return result, err
 			}
 			preservedSessionFound = true
 			continue
 		}
-		if err := db.DeleteUserSession(tx, session.Id); err != nil {
+		if err := db.DeleteUserSession(ctx, tx, session.Id); err != nil {
 			return result, err
 		}
 		result.TerminatedSessionIdentifiers = append(result.TerminatedSessionIdentifiers,
@@ -166,7 +166,7 @@ func RevokeUserAuthState(ctx context.Context, db data.Database, tx *sql.Tx, user
 	// never worse, and on some engines better, but it does NOT close the race: a child
 	// committed outside this transaction's view keeps the old generation and is rejected on
 	// next use. Fail-closed, accepted as a residual in decision 16, tracked in #131.
-	tokens, err := db.GetRefreshTokensByUserId(tx, userId)
+	tokens, err := db.GetRefreshTokensByUserId(ctx, tx, userId)
 	if err != nil {
 		return result, err
 	}
@@ -182,7 +182,7 @@ func RevokeUserAuthState(ctx context.Context, db data.Database, tx *sql.Tx, user
 	promoteIds := []int64{}
 	if exceptSid != "" {
 		result.PreservedSessionIdentifier = exceptSid
-		preservedTokens, err := db.GetRefreshTokensBySessionIdentifier(tx, exceptSid)
+		preservedTokens, err := db.GetRefreshTokensBySessionIdentifier(ctx, tx, exceptSid)
 		if err != nil {
 			return result, err
 		}
@@ -203,7 +203,7 @@ func RevokeUserAuthState(ctx context.Context, db data.Database, tx *sql.Tx, user
 		toRevoke = append(toRevoke, rt)
 	}
 
-	revokedJtis, err := revokeRefreshTokens(db, tx, toRevoke)
+	revokedJtis, err := revokeRefreshTokens(ctx, db, tx, toRevoke)
 	if err != nil {
 		return result, err
 	}
@@ -212,7 +212,7 @@ func RevokeUserAuthState(ctx context.Context, db data.Database, tx *sql.Tx, user
 	// Promotion is what keeps the preserved session usable: its tokens carry the old
 	// generation, which the validator now rejects. An already-revoked token in this set stays
 	// revoked, because PromoteRefreshTokenGenerations only touches unrevoked rows.
-	if err := db.PromoteRefreshTokenGenerations(tx, promoteIds, newGeneration); err != nil {
+	if err := db.PromoteRefreshTokenGenerations(ctx, tx, promoteIds, newGeneration); err != nil {
 		return result, err
 	}
 
@@ -401,21 +401,21 @@ func TerminateUserSessionTx(ctx context.Context, db data.Database, userSession *
 		// First, and write 1 of the doc comment above is why: it is the statement that takes the
 		// session row, which is what orders this transaction against a ceremony minting a code
 		// for the session it is ending (#139).
-		if err := db.DeleteUserSession(tx, userSession.Id); err != nil {
+		if err := db.DeleteUserSession(ctx, tx, userSession.Id); err != nil {
 			return err
 		}
 
-		revokedCodeCount, err := db.RevokeCodesBySessionIdentifier(tx, userSession.SessionIdentifier)
+		revokedCodeCount, err := db.RevokeCodesBySessionIdentifier(ctx, tx, userSession.SessionIdentifier)
 		if err != nil {
 			return err
 		}
 
-		tokens, err := db.GetRefreshTokensBySessionIdentifier(tx, userSession.SessionIdentifier)
+		tokens, err := db.GetRefreshTokensBySessionIdentifier(ctx, tx, userSession.SessionIdentifier)
 		if err != nil {
 			return err
 		}
 
-		revokedJtis, err := revokeRefreshTokens(db, tx, tokens)
+		revokedJtis, err := revokeRefreshTokens(ctx, db, tx, tokens)
 		if err != nil {
 			return err
 		}
@@ -490,24 +490,24 @@ type ClientGrantRevocationResult struct {
 // RevokeUserAuthState states about its own: the contract is atomicity across a marker and a
 // multi-row sweep, so the transaction is a precondition of the whole operation rather than an
 // argument one nested call happens to care about.
-func RevokeClientGrants(db data.Database, tx *sql.Tx, clientId int64) (ClientGrantRevocationResult, error) {
+func RevokeClientGrants(ctx context.Context, db data.Database, tx *sql.Tx, clientId int64) (ClientGrantRevocationResult, error) {
 	result := ClientGrantRevocationResult{RevokedRefreshTokenJtis: []string{}}
 
 	if tx == nil {
 		return result, errs.New("revoking a client's grants requires a transaction: the code marker and the sweep must not be separable")
 	}
 
-	revokedCodeCount, err := db.RevokeCodesByClientId(tx, clientId)
+	revokedCodeCount, err := db.RevokeCodesByClientId(ctx, tx, clientId)
 	if err != nil {
 		return ClientGrantRevocationResult{}, err
 	}
 
-	tokens, err := db.GetRefreshTokensByClientId(tx, clientId)
+	tokens, err := db.GetRefreshTokensByClientId(ctx, tx, clientId)
 	if err != nil {
 		return ClientGrantRevocationResult{}, err
 	}
 
-	revokedJtis, err := revokeRefreshTokens(db, tx, tokens)
+	revokedJtis, err := revokeRefreshTokens(ctx, db, tx, tokens)
 	if err != nil {
 		return ClientGrantRevocationResult{}, err
 	}
@@ -574,7 +574,7 @@ func RevokeClientGrantsTx(ctx context.Context, db data.Database, clientId int64,
 
 		result = ClientGrantRevocationResult{RevokedRefreshTokenJtis: []string{}}
 		if revoke {
-			result, err = RevokeClientGrants(db, tx, clientId)
+			result, err = RevokeClientGrants(ctx, db, tx, clientId)
 			if err != nil {
 				return err
 			}

@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -19,7 +20,7 @@ func TestCreateUserSessionClient(t *testing.T) {
 		LastAccessed:  time.Now().UTC().Truncate(time.Millisecond),
 	}
 
-	err := database.CreateUserSessionClient(nil, userSessionClient)
+	err := database.CreateUserSessionClient(context.Background(), nil, userSessionClient)
 	if err != nil {
 		t.Fatalf("Failed to create user session client: %v", err)
 	}
@@ -34,7 +35,7 @@ func TestCreateUserSessionClient(t *testing.T) {
 		t.Error("Expected UpdatedAt to be set")
 	}
 
-	retrievedUserSessionClient, err := database.GetUserSessionClientById(nil, userSessionClient.Id)
+	retrievedUserSessionClient, err := database.GetUserSessionClientById(context.Background(), nil, userSessionClient.Id)
 	if err != nil {
 		t.Fatalf("Failed to retrieve created user session client: %v", err)
 	}
@@ -70,12 +71,12 @@ func TestUpdateUserSessionClient(t *testing.T) {
 
 	time.Sleep(timestampTick)
 
-	err := database.UpdateUserSessionClient(nil, updatedUserSessionClient)
+	err := database.UpdateUserSessionClient(context.Background(), nil, updatedUserSessionClient)
 	if err != nil {
 		t.Fatalf("Failed to update user session client: %v", err)
 	}
 
-	retrievedUserSessionClient, err := database.GetUserSessionClientById(nil, updatedUserSessionClient.Id)
+	retrievedUserSessionClient, err := database.GetUserSessionClientById(context.Background(), nil, updatedUserSessionClient.Id)
 	if err != nil {
 		t.Fatalf("Failed to retrieve updated user session client: %v", err)
 	}
@@ -105,7 +106,7 @@ func TestUpdateUserSessionClient(t *testing.T) {
 func TestGetUserSessionClientById(t *testing.T) {
 	userSessionClient := createTestUserSessionClient(t)
 
-	retrievedUserSessionClient, err := database.GetUserSessionClientById(nil, userSessionClient.Id)
+	retrievedUserSessionClient, err := database.GetUserSessionClientById(context.Background(), nil, userSessionClient.Id)
 	if err != nil {
 		t.Fatalf("Failed to get user session client by ID: %v", err)
 	}
@@ -117,7 +118,7 @@ func TestGetUserSessionClientById(t *testing.T) {
 		t.Errorf("Expected UserSessionId %d, got %d", userSessionClient.UserSessionId, retrievedUserSessionClient.UserSessionId)
 	}
 
-	nonExistentUserSessionClient, err := database.GetUserSessionClientById(nil, 99999)
+	nonExistentUserSessionClient, err := database.GetUserSessionClientById(context.Background(), nil, 99999)
 	if err != nil {
 		t.Errorf("Expected no error for non-existent user session client, got: %v", err)
 	}
@@ -135,7 +136,7 @@ func TestGetUserSessionClientsByUserSessionId(t *testing.T) {
 	userSessionClient1 := createTestUserSessionClientWithIds(t, userSession.Id, client1.Id)
 	userSessionClient2 := createTestUserSessionClientWithIds(t, userSession.Id, client2.Id)
 
-	userSessionClients, err := database.GetUserSessionClientsByUserSessionId(nil, userSession.Id)
+	userSessionClients, err := database.GetUserSessionClientsByUserSessionId(context.Background(), nil, userSession.Id)
 	if err != nil {
 		t.Fatalf("Failed to get user session clients by user session ID: %v", err)
 	}
@@ -163,12 +164,12 @@ func TestGetUserSessionClientsByUserSessionId(t *testing.T) {
 func TestDeleteUserSessionClient(t *testing.T) {
 	userSessionClient := createTestUserSessionClient(t)
 
-	err := database.DeleteUserSessionClient(nil, userSessionClient.Id)
+	err := database.DeleteUserSessionClient(context.Background(), nil, userSessionClient.Id)
 	if err != nil {
 		t.Fatalf("Failed to delete user session client: %v", err)
 	}
 
-	deletedUserSessionClient, err := database.GetUserSessionClientById(nil, userSessionClient.Id)
+	deletedUserSessionClient, err := database.GetUserSessionClientById(context.Background(), nil, userSessionClient.Id)
 	if err != nil {
 		t.Fatalf("Error while checking for deleted user session client: %v", err)
 	}
@@ -176,7 +177,7 @@ func TestDeleteUserSessionClient(t *testing.T) {
 		t.Errorf("User session client still exists after deletion")
 	}
 
-	err = database.DeleteUserSessionClient(nil, 99999)
+	err = database.DeleteUserSessionClient(context.Background(), nil, 99999)
 	if err != nil {
 		t.Errorf("Expected no error when deleting non-existent user session client, got: %v", err)
 	}
@@ -196,7 +197,7 @@ func createTestUserSessionClientWithIds(t *testing.T, userSessionId, clientId in
 		Started:       time.Now().UTC(),
 		LastAccessed:  time.Now().UTC(),
 	}
-	err := database.CreateUserSessionClient(nil, userSessionClient)
+	err := database.CreateUserSessionClient(context.Background(), nil, userSessionClient)
 	if err != nil {
 		t.Fatalf("Failed to create test user session client: %v", err)
 	}

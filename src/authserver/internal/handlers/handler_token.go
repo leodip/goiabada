@@ -291,7 +291,7 @@ func HandleTokenPost(
 			// A failed mint after a successful claim consumes the code (the client
 			// must re-authenticate): acceptable, since codes are one-time and 60s
 			// lived, and it is the price of never issuing two token sets from one code.
-			claimed, err := database.MarkCodeAsUsed(nil, validateResult.CodeEntity.Id)
+			claimed, err := database.MarkCodeAsUsed(r.Context(), nil, validateResult.CodeEntity.Id)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
 				return
@@ -369,7 +369,7 @@ func HandleTokenPost(
 				// landed after the winner's claim. That is RFC 9700 Section 4.14.2's
 				// strict model, and it is deliberate: no overlap window, because any
 				// window leaves the defining theft scenario uncontained.
-				revokedCount, err := database.RevokeRefreshTokenFamily(nil, refreshToken.FirstRefreshTokenJti)
+				revokedCount, err := database.RevokeRefreshTokenFamily(r.Context(), nil, refreshToken.FirstRefreshTokenJti)
 				if err != nil {
 					httpHelper.InternalServerError(w, r, err)
 					return
@@ -486,7 +486,7 @@ func HandleTokenPost(
 			// branch above instead. That is the strict rotation policy, chosen
 			// deliberately: the server cannot tell a delayed legitimate duplicate from
 			// a malicious replay from the token and the row alone.
-			claimed, err := database.MarkRefreshTokenAsRevoked(nil, refreshToken.Id)
+			claimed, err := database.MarkRefreshTokenAsRevoked(r.Context(), nil, refreshToken.Id)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
 				return
@@ -667,7 +667,7 @@ func revokeOnAuthCodeReuse(ctx context.Context, database data.Database, code *mo
 		// answer it returns. A code with no session identifier acquires nothing: no row carries an
 		// empty identifier, and the code-id-scoped fallback below touches no session row either.
 		if code.SessionIdentifier != "" {
-			if _, err := database.AcquireUserSessionRow(tx, code.SessionIdentifier); err != nil {
+			if _, err := database.AcquireUserSessionRow(ctx, tx, code.SessionIdentifier); err != nil {
 				return err
 			}
 		}
@@ -675,7 +675,7 @@ func revokeOnAuthCodeReuse(ctx context.Context, database data.Database, code *mo
 		var refreshTokens []*models.RefreshToken
 		var err error
 		if code.SessionIdentifier != "" {
-			refreshTokens, err = database.GetRefreshTokensBySessionIdentifier(tx, code.SessionIdentifier)
+			refreshTokens, err = database.GetRefreshTokensBySessionIdentifier(ctx, tx, code.SessionIdentifier)
 		} else {
 			// Defensive fallback: auth-code-flow codes always carry a session
 			// identifier today, but if a future change ever produces a
@@ -683,13 +683,13 @@ func revokeOnAuthCodeReuse(ctx context.Context, database data.Database, code *mo
 			// tokens directly linked to this code so reuse still has teeth.
 			slog.WarnContext(ctx, "auth code reuse on a code without a session identifier, falling back to code-id-scoped revocation",
 				"code_id", code.Id)
-			refreshTokens, err = database.GetRefreshTokensByCodeId(tx, code.Id)
+			refreshTokens, err = database.GetRefreshTokensByCodeId(ctx, tx, code.Id)
 		}
 		if err != nil {
 			return err
 		}
 
-		revokedJtis, err = revokeRefreshTokens(database, tx, refreshTokens)
+		revokedJtis, err = revokeRefreshTokens(ctx, database, tx, refreshTokens)
 		if err != nil {
 			return err
 		}
@@ -714,12 +714,12 @@ func revokeOnAuthCodeReuse(ctx context.Context, database data.Database, code *mo
 		// mint holds. Paying it is what buys the absence of the deadlock the acquisition's own
 		// comment describes. (#139)
 		if code.SessionIdentifier != "" && len(revokedJtis) > 0 {
-			session, err := database.GetUserSessionBySessionIdentifier(tx, code.SessionIdentifier)
+			session, err := database.GetUserSessionBySessionIdentifier(ctx, tx, code.SessionIdentifier)
 			if err != nil {
 				return err
 			}
 			if session != nil {
-				if err := database.DeleteUserSession(tx, session.Id); err != nil {
+				if err := database.DeleteUserSession(ctx, tx, session.Id); err != nil {
 					return err
 				}
 			}

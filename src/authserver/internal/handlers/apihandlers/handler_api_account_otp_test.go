@@ -278,8 +278,8 @@ func TestHandleAPIAccountOTPPut_Enable_CommitsBothWritesAtomically(t *testing.T)
 	// Part 1.3. The handler used to read the caller's own sid claim and flag that one session,
 	// so a token with no sid, which this request carries, reached no session at all. The counter
 	// above covers every session of this user, and it fires whether or not a sid is present.
-	database.AssertNotCalled(t, "GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything)
-	database.AssertNotCalled(t, "UpdateUserSession", mock.Anything, mock.Anything)
+	database.AssertNotCalled(t, "GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.Anything)
+	database.AssertNotCalled(t, "UpdateUserSession", mock.Anything, mock.Anything, mock.Anything)
 }
 
 // TestHandleAPIAccountOTPPut_Enable_CounterFailureRollsBack is the other half: the enable write

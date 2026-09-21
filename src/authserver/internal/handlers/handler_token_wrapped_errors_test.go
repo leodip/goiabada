@@ -137,8 +137,8 @@ func TestHandleTokenPost_WrappedAuthCodeReuseStillRevokes(t *testing.T) {
 		errs.Wrap(reuse, "unable to validate the token request"))
 
 	expectRunInTransaction(database, (*sql.Tx)(nil))
-	database.EXPECT().AcquireUserSessionRow(mock.Anything, "sid-reused").Return(true, nil).Once()
-	database.EXPECT().GetRefreshTokensBySessionIdentifier(mock.Anything, "sid-reused").
+	database.EXPECT().AcquireUserSessionRow(mock.Anything, mock.Anything, "sid-reused").Return(true, nil).Once()
+	database.EXPECT().GetRefreshTokensBySessionIdentifier(mock.Anything, mock.Anything, "sid-reused").
 		Return(nil, nil).Once()
 
 	var auditedCodeId int64

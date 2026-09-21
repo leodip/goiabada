@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"context"
 	"database/sql"
 	"testing"
 	"time"
@@ -62,9 +63,9 @@ func TestUpdateRefreshToken_TheKeysAreNotRewritten(t *testing.T) {
 	original.Scope = "rewritten_" + fake.LetterN(6)
 	original.Revoked = true
 
-	require.NoError(t, database.UpdateRefreshToken(nil, original))
+	require.NoError(t, database.UpdateRefreshToken(context.Background(), nil, original))
 
-	stored, err := database.GetRefreshTokenById(nil, original.Id)
+	stored, err := database.GetRefreshTokenById(context.Background(), nil, original.Id)
 	require.NoError(t, err)
 	require.NotNil(t, stored)
 
@@ -92,9 +93,9 @@ func TestUpdateUserSessionClient_TheKeysAreNotRewritten(t *testing.T) {
 	association.UserSessionId = otherSession.Id
 	association.LastAccessed = moved
 
-	require.NoError(t, database.UpdateUserSessionClient(nil, association))
+	require.NoError(t, database.UpdateUserSessionClient(context.Background(), nil, association))
 
-	stored, err := database.GetUserSessionClientById(nil, association.Id)
+	stored, err := database.GetUserSessionClientById(context.Background(), nil, association.Id)
 	require.NoError(t, err)
 	require.NotNil(t, stored)
 

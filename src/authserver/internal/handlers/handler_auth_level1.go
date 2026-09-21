@@ -112,13 +112,13 @@ func HandleAuthLevel1CompletedGet(
 			sessionIdentifier = r.Context().Value(constants.ContextKeySessionIdentifier).(string)
 		}
 
-		userSession, err := database.GetUserSessionBySessionIdentifier(nil, sessionIdentifier)
+		userSession, err := database.GetUserSessionBySessionIdentifier(r.Context(), nil, sessionIdentifier)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
 
-		err = database.UserSessionLoadUser(nil, userSession)
+		err = database.UserSessionLoadUser(r.Context(), nil, userSession)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return

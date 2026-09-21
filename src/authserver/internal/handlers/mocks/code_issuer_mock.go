@@ -10,6 +10,7 @@
 package mocks_handlers
 
 import (
+	"context"
 	"database/sql"
 
 	"github.com/leodip/goiabada/authserver/internal/issuance"
@@ -54,8 +55,8 @@ func (_m *CodeIssuer) EXPECT() *CodeIssuer_Expecter {
 }
 
 // CreateAuthCode provides a mock function for the type CodeIssuer
-func (_mock *CodeIssuer) CreateAuthCode(tx *sql.Tx, input *issuance.CreateCodeInput) (*models.Code, error) {
-	ret := _mock.Called(tx, input)
+func (_mock *CodeIssuer) CreateAuthCode(ctx context.Context, tx *sql.Tx, input *issuance.CreateCodeInput) (*models.Code, error) {
+	ret := _mock.Called(ctx, tx, input)
 
 	if len(ret) == 0 {
 		panic("no return value specified for CreateAuthCode")
@@ -63,18 +64,18 @@ func (_mock *CodeIssuer) CreateAuthCode(tx *sql.Tx, input *issuance.CreateCodeIn
 
 	var r0 *models.Code
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, *issuance.CreateCodeInput) (*models.Code, error)); ok {
-		return returnFunc(tx, input)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, *issuance.CreateCodeInput) (*models.Code, error)); ok {
+		return returnFunc(ctx, tx, input)
 	}
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, *issuance.CreateCodeInput) *models.Code); ok {
-		r0 = returnFunc(tx, input)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, *issuance.CreateCodeInput) *models.Code); ok {
+		r0 = returnFunc(ctx, tx, input)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*models.Code)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(*sql.Tx, *issuance.CreateCodeInput) error); ok {
-		r1 = returnFunc(tx, input)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, *issuance.CreateCodeInput) error); ok {
+		r1 = returnFunc(ctx, tx, input)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -87,25 +88,31 @@ type CodeIssuer_CreateAuthCode_Call struct {
 }
 
 // CreateAuthCode is a helper method to define mock.On call
+//   - ctx context.Context
 //   - tx *sql.Tx
 //   - input *issuance.CreateCodeInput
-func (_e *CodeIssuer_Expecter) CreateAuthCode(tx any, input any) *CodeIssuer_CreateAuthCode_Call {
-	return &CodeIssuer_CreateAuthCode_Call{Call: _e.mock.On("CreateAuthCode", tx, input)}
+func (_e *CodeIssuer_Expecter) CreateAuthCode(ctx any, tx any, input any) *CodeIssuer_CreateAuthCode_Call {
+	return &CodeIssuer_CreateAuthCode_Call{Call: _e.mock.On("CreateAuthCode", ctx, tx, input)}
 }
 
-func (_c *CodeIssuer_CreateAuthCode_Call) Run(run func(tx *sql.Tx, input *issuance.CreateCodeInput)) *CodeIssuer_CreateAuthCode_Call {
+func (_c *CodeIssuer_CreateAuthCode_Call) Run(run func(ctx context.Context, tx *sql.Tx, input *issuance.CreateCodeInput)) *CodeIssuer_CreateAuthCode_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *sql.Tx
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(*sql.Tx)
+			arg0 = args[0].(context.Context)
 		}
-		var arg1 *issuance.CreateCodeInput
+		var arg1 *sql.Tx
 		if args[1] != nil {
-			arg1 = args[1].(*issuance.CreateCodeInput)
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 *issuance.CreateCodeInput
+		if args[2] != nil {
+			arg2 = args[2].(*issuance.CreateCodeInput)
 		}
 		run(
 			arg0,
 			arg1,
+			arg2,
 		)
 	})
 	return _c
@@ -116,7 +123,7 @@ func (_c *CodeIssuer_CreateAuthCode_Call) Return(code *models.Code, err error) *
 	return _c
 }
 
-func (_c *CodeIssuer_CreateAuthCode_Call) RunAndReturn(run func(tx *sql.Tx, input *issuance.CreateCodeInput) (*models.Code, error)) *CodeIssuer_CreateAuthCode_Call {
+func (_c *CodeIssuer_CreateAuthCode_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, input *issuance.CreateCodeInput) (*models.Code, error)) *CodeIssuer_CreateAuthCode_Call {
 	_c.Call.Return(run)
 	return _c
 }

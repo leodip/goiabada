@@ -373,10 +373,10 @@ func TestAPIUserSessionGet_Success(t *testing.T) {
 		DeviceOS:          "linux",
 		UserId:            testUser.Id,
 	}
-	err = database.CreateUserSession(nil, testSession)
+	err = database.CreateUserSession(context.Background(), nil, testSession)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUserSession(nil, testSession.Id)
+		_ = database.DeleteUserSession(context.Background(), nil, testSession.Id)
 	}()
 
 	// Test: Get user session

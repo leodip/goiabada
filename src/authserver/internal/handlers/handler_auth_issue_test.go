@@ -171,7 +171,7 @@ func TestHandleIssueGet(t *testing.T) {
 			RedirectURI: "https://example.com/callback",
 			State:       "test-state",
 		}
-		codeIssuer.On("CreateAuthCode", issuanceTx, mock.MatchedBy(func(input *issuance.CreateCodeInput) bool {
+		codeIssuer.On("CreateAuthCode", mock.Anything, issuanceTx, mock.MatchedBy(func(input *issuance.CreateCodeInput) bool {
 			return reflect.DeepEqual(input.AuthContext, *authContext) &&
 				input.SessionIdentifier == liveSessionIdentifier
 		})).Return(mockCode, nil)
@@ -270,7 +270,7 @@ func TestHandleIssueGet(t *testing.T) {
 		assert.Equal(t, ceremony.AuthStateRequiresLevel1, savedAuthContext.AuthState)
 
 		// No lookup either: with nothing to resolve there is no question to ask the database.
-		database.AssertNotCalled(t, "GetUserSessionBySessionIdentifier")
+		database.AssertNotCalled(t, "GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.Anything)
 
 		httpHelper.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
@@ -308,7 +308,7 @@ func TestHandleIssueGet(t *testing.T) {
 		}
 		authHelper.On("GetAuthContext", req).Return(authContext, nil)
 
-		database.On("GetUserSessionBySessionIdentifier", (*sql.Tx)(nil), liveSessionIdentifier).Return(nil, nil)
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, (*sql.Tx)(nil), liveSessionIdentifier).Return(nil, nil)
 
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateRequiresLevel1
@@ -609,7 +609,7 @@ func TestHandleIssueGet(t *testing.T) {
 		// A database fault must not read as a terminated session, and must not read as a
 		// live one either: no code is minted and no restart is offered.
 		dbError := errs.New("session lookup failed")
-		database.On("GetUserSessionBySessionIdentifier", (*sql.Tx)(nil), liveSessionIdentifier).Return(nil, dbError)
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, (*sql.Tx)(nil), liveSessionIdentifier).Return(nil, dbError)
 
 		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err == dbError
@@ -662,7 +662,7 @@ func TestHandleIssueGet(t *testing.T) {
 			RedirectURI: "https://example.com/callback",
 			State:       "test-state",
 		}
-		codeIssuer.On("CreateAuthCode", issuanceTx, mock.Anything).Return(mockCode, nil)
+		codeIssuer.On("CreateAuthCode", mock.Anything, issuanceTx, mock.Anything).Return(mockCode, nil)
 
 		// The commit is where the insert becomes durable, so a failure here leaves the code row's
 		// fate indeterminate and the client must be told nothing rather than handed a code that
@@ -670,7 +670,7 @@ func TestHandleIssueGet(t *testing.T) {
 		// reason, which is why neither the audit nor the clear runs (#139).
 		commitError := errs.New("commit failed")
 		expectRunInTransactionThenFail(database, issuanceTx, commitError)
-		database.On("AcquireUserSessionRow", issuanceTx, liveSessionIdentifier).Return(true, nil).Once()
+		database.On("AcquireUserSessionRow", mock.Anything, issuanceTx, liveSessionIdentifier).Return(true, nil).Once()
 
 		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err == commitError
@@ -762,9 +762,9 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 			return func(mock.Arguments) { order = append(order, what) }
 		}
 		expectRunInTransaction(database, issuanceTx, func(edge string) { order = append(order, edge) })
-		database.On("AcquireUserSessionRow", issuanceTx, liveSessionIdentifier).
+		database.On("AcquireUserSessionRow", mock.Anything, issuanceTx, liveSessionIdentifier).
 			Run(note("session row")).Return(true, nil).Once()
-		codeIssuer.On("CreateAuthCode", issuanceTx, mock.Anything).Run(note("insert")).
+		codeIssuer.On("CreateAuthCode", mock.Anything, issuanceTx, mock.Anything).Run(note("insert")).
 			Return(&models.Code{Id: 1, Code: "test-code", ClientId: 1,
 				RedirectURI: "https://example.com/callback", State: "test-state"}, nil)
 
@@ -821,7 +821,7 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 				order = append(order, "rollback")
 			}
 		})
-		database.On("AcquireUserSessionRow", issuanceTx, liveSessionIdentifier).Return(false, nil).Once()
+		database.On("AcquireUserSessionRow", mock.Anything, issuanceTx, liveSessionIdentifier).Return(false, nil).Once()
 
 		var savedAuthContext *ceremony.AuthContext
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
@@ -896,8 +896,8 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 				order = append(order, "rollback")
 			}
 		})
-		database.On("AcquireUserSessionRow", issuanceTx, liveSessionIdentifier).Return(true, nil).Once()
-		codeIssuer.On("CreateAuthCode", issuanceTx, mock.Anything).
+		database.On("AcquireUserSessionRow", mock.Anything, issuanceTx, liveSessionIdentifier).Return(true, nil).Once()
+		codeIssuer.On("CreateAuthCode", mock.Anything, issuanceTx, mock.Anything).
 			Return(nil, errs.WithStack(issuance.ErrIssuingClientGone)).Once()
 
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
@@ -954,8 +954,8 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 
 		boom := errs.New("the insert failed")
 		stub := expectRunInTransaction(database, issuanceTx)
-		database.On("AcquireUserSessionRow", issuanceTx, liveSessionIdentifier).Return(true, nil).Once()
-		codeIssuer.On("CreateAuthCode", issuanceTx, mock.Anything).Return(nil, boom).Once()
+		database.On("AcquireUserSessionRow", mock.Anything, issuanceTx, liveSessionIdentifier).Return(true, nil).Once()
+		codeIssuer.On("CreateAuthCode", mock.Anything, issuanceTx, mock.Anything).Return(nil, boom).Once()
 		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return errors.Is(err, boom)
 		})).Return()
@@ -997,7 +997,7 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 		stubLiveSession(database, 123)
 
 		stub := expectRunInTransaction(database, issuanceTx)
-		database.On("AcquireUserSessionRow", issuanceTx, liveSessionIdentifier).Return(false, nil).Once()
+		database.On("AcquireUserSessionRow", mock.Anything, issuanceTx, liveSessionIdentifier).Return(false, nil).Once()
 		authHelper.On("ClearAuthContext", rr, req).Return(nil)
 
 		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
@@ -1047,7 +1047,7 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 				name: "the session row acquisition fails",
 				setup: func(database *mocks_data.Database) *runInTransactionStub {
 					stub := expectRunInTransaction(database, issuanceTx)
-					database.On("AcquireUserSessionRow", issuanceTx, liveSessionIdentifier).
+					database.On("AcquireUserSessionRow", mock.Anything, issuanceTx, liveSessionIdentifier).
 						Return(false, boom).Once()
 					return stub
 				},
@@ -1195,7 +1195,7 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 			assert.NotContains(t, location, "code=")
 			assert.NotContains(t, location, "access_token=")
 			assert.NotContains(t, location, "id_token=")
-			codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything, mock.Anything)
+			codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything, mock.Anything, mock.Anything)
 			tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForImplicit")
 
 			assertWarnedForeignSession(t, logs, authContext.UserId)
@@ -1276,7 +1276,7 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 			assert.NotContains(t, location, "code=")
 			assert.NotContains(t, location, "access_token=")
 
-			codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything, mock.Anything)
+			codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything, mock.Anything, mock.Anything)
 			tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForImplicit")
 
 			assertWarnedForeignSession(t, logs, authContext.UserId)
@@ -1408,7 +1408,7 @@ func TestHandleIssueGet_ImplicitAmbientSessionVanished(t *testing.T) {
 
 		// Non-empty identifier, no row. The carve-out asks about the identifier, so it does
 		// not apply here, and OwnsSession(nil) is false.
-		database.On("GetUserSessionBySessionIdentifier", (*sql.Tx)(nil), liveSessionIdentifier).Return(nil, nil)
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, (*sql.Tx)(nil), liveSessionIdentifier).Return(nil, nil)
 
 		var savedAuthContext *ceremony.AuthContext
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
@@ -1469,7 +1469,7 @@ func TestHandleIssueGet_ImplicitAmbientSessionVanished(t *testing.T) {
 		authHelper.On("GetAuthContext", req).Return(authContext, nil)
 		stubClientProvenanceLookup(database)
 
-		database.On("GetUserSessionBySessionIdentifier", (*sql.Tx)(nil), liveSessionIdentifier).Return(nil, nil)
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, (*sql.Tx)(nil), liveSessionIdentifier).Return(nil, nil)
 		authHelper.On("ClearAuthContext", rr, req).Return(nil)
 
 		armIssueGate(database, userSessionManager, permissionChecker, authContext.RedirectURI)
@@ -1517,7 +1517,7 @@ func requestWithSessionIdentifier(t *testing.T, sessionIdentifier string) *http.
 // #129 stage 6; #133 added the owner comparison, so the caller has to say which user the row
 // belongs to and a subtest that wants the gate to pass has to name its own ceremony's user.
 func stubLiveSession(database *mocks_data.Database, ownerUserId int64) {
-	database.On("GetUserSessionBySessionIdentifier", (*sql.Tx)(nil), liveSessionIdentifier).
+	database.On("GetUserSessionBySessionIdentifier", mock.Anything, (*sql.Tx)(nil), liveSessionIdentifier).
 		Return(&models.UserSession{Id: 55, SessionIdentifier: liveSessionIdentifier, UserId: ownerUserId}, nil)
 }
 
@@ -1535,7 +1535,7 @@ var issuanceTx = &sql.Tx{}
 // is the opposite one.
 func stubIssuanceTransaction(database *mocks_data.Database) {
 	expectRunInTransaction(database, issuanceTx)
-	database.On("AcquireUserSessionRow", issuanceTx, liveSessionIdentifier).Return(true, nil).Once()
+	database.On("AcquireUserSessionRow", mock.Anything, issuanceTx, liveSessionIdentifier).Return(true, nil).Once()
 }
 
 // The records are read whole rather than as rendered text, because two of the properties decision
@@ -3339,7 +3339,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 			RedirectURI: "https://example.com/callback",
 			State:       "test-state",
 		}
-		codeIssuer.On("CreateAuthCode", mock.Anything, mock.MatchedBy(func(input *issuance.CreateCodeInput) bool {
+		codeIssuer.On("CreateAuthCode", mock.Anything, mock.Anything, mock.MatchedBy(func(input *issuance.CreateCodeInput) bool {
 			return reflect.DeepEqual(input.AuthContext, *authContext)
 		})).Return(mockCode, nil)
 
@@ -3443,7 +3443,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 			"the auth context must be cleared before the client response is committed, or the browser keeps a ready_to_issue_code context to replay")
 
 		// Verify CreateAuthCode was NEVER called
-		codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything, mock.Anything)
+		codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything, mock.Anything, mock.Anything)
 
 		// Verify all other expectations
 		httpHelper.AssertExpectations(t)
@@ -3513,7 +3513,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		assert.NotContains(t, location, "login_required")
 		assert.NotContains(t, location, "code=")
 
-		codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything, mock.Anything)
+		codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything, mock.Anything, mock.Anything)
 
 		httpHelper.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
@@ -3707,7 +3707,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 			RedirectURI: "https://example.com/callback",
 			State:       "test-state",
 		}
-		codeIssuer.On("CreateAuthCode", mock.Anything, mock.MatchedBy(func(input *issuance.CreateCodeInput) bool {
+		codeIssuer.On("CreateAuthCode", mock.Anything, mock.Anything, mock.MatchedBy(func(input *issuance.CreateCodeInput) bool {
 			return reflect.DeepEqual(input.AuthContext, *authContext)
 		})).Return(mockCode, nil)
 
@@ -3813,7 +3813,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		assert.Equal(t, userASubject, savedAuthContext.IdTokenHintSub, "IdTokenHintSub should persist from authorize request")
 		assert.Equal(t, int64(99), savedAuthContext.UserId, "UserId should be set to authenticated user (user B)")
 
-		codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything, mock.Anything)
+		codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything, mock.Anything, mock.Anything)
 
 		httpHelper.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
@@ -3927,7 +3927,7 @@ func TestHandleIssueGet_RedirectURIRecheck(t *testing.T) {
 
 			// Everything below the gate, armed as a pass so that a row reaching it gets there on
 			// its own merits. A refused row touches none of these, which is why they are Maybe().
-			database.On("GetUserSessionBySessionIdentifier", (*sql.Tx)(nil), liveSessionIdentifier).
+			database.On("GetUserSessionBySessionIdentifier", mock.Anything, (*sql.Tx)(nil), liveSessionIdentifier).
 				Return(&models.UserSession{Id: 55, SessionIdentifier: liveSessionIdentifier, UserId: 123}, nil).Maybe()
 			userSessionManager.On("HasValidUserSession", mock.Anything, mock.Anything, mock.Anything).Return(true).Maybe()
 			database.On("GetUserById", mock.Anything, mock.Anything, int64(123)).
@@ -3937,7 +3937,7 @@ func TestHandleIssueGet_RedirectURIRecheck(t *testing.T) {
 			authHelper.On("ClearAuthContext", rr, req).Return(nil)
 
 			if tc.wantIssued {
-				codeIssuer.On("CreateAuthCode", mock.Anything, mock.Anything).
+				codeIssuer.On("CreateAuthCode", mock.Anything, mock.Anything, mock.Anything).
 					Return(&models.Code{Id: 1, Code: "test-code", ClientId: 1, RedirectURI: tc.requested, State: "test-state"}, nil)
 				stubIssuanceTransaction(database)
 				auditLogger.On("Log", mock.Anything, audit.AuditCreatedAuthCode, mock.Anything).Return()
@@ -3960,7 +3960,7 @@ func TestHandleIssueGet_RedirectURIRecheck(t *testing.T) {
 			} else {
 				assert.Empty(t, location,
 					"a withheld redirect must never become a Location: %s", tc.why)
-				codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything, mock.Anything)
+				codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything, mock.Anything, mock.Anything)
 				tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForImplicit",
 					mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 			}
@@ -4130,7 +4130,7 @@ func TestHandleIssueGet_ExpiredAmbientSession(t *testing.T) {
 			assert.Equal(t, http.StatusFound, rr.Code)
 			location := rr.Header().Get("Location")
 			assert.NotContains(t, location, "code=", "no code may be minted on an expired session")
-			codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything, mock.Anything)
+			codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything, mock.Anything, mock.Anything)
 
 			if tc.silent {
 				assert.Contains(t, location, "https://example.com/callback")
@@ -4269,7 +4269,7 @@ func TestHandleIssueGet_ScopeRefilter(t *testing.T) {
 			authHelper.On("ClearAuthContext", rr, req).Return(nil)
 
 			if tc.wantIssued {
-				codeIssuer.On("CreateAuthCode", mock.Anything, mock.MatchedBy(func(input *issuance.CreateCodeInput) bool {
+				codeIssuer.On("CreateAuthCode", mock.Anything, mock.Anything, mock.MatchedBy(func(input *issuance.CreateCodeInput) bool {
 					return input.AuthContext.Scope == tc.wantScope &&
 						input.AuthContext.ConsentedScope == tc.wantConsented
 				})).Return(&models.Code{Id: 1, Code: "test-code", ClientId: 1,
@@ -4296,7 +4296,7 @@ func TestHandleIssueGet_ScopeRefilter(t *testing.T) {
 				assert.Contains(t, location, "error=access_denied", tc.why)
 				assert.Contains(t, location, "not+authorized+to+access+any+of+the+requested+scopes")
 				assert.NotContains(t, location, "code=")
-				codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything, mock.Anything)
+				codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything, mock.Anything, mock.Anything)
 			}
 
 			// Whichever way it went, the field the issuer does NOT read is untouched.
@@ -4352,7 +4352,7 @@ func TestHandleIssueGet_TheLiveChecksFailClosedOnAStorageError(t *testing.T) {
 						args.Get(1).(*models.Client).RedirectURIs =
 							[]models.RedirectURI{{URI: "https://example.com/callback"}}
 					}).Return(nil)
-				database.On("GetUserSessionBySessionIdentifier", (*sql.Tx)(nil), liveSessionIdentifier).
+				database.On("GetUserSessionBySessionIdentifier", mock.Anything, (*sql.Tx)(nil), liveSessionIdentifier).
 					Return(&models.UserSession{Id: 55, SessionIdentifier: liveSessionIdentifier, UserId: 123}, nil)
 				database.On("GetUserById", mock.Anything, mock.Anything, int64(123)).
 					Return(&models.User{Id: 123, Subject: fake.UUID(), Enabled: true}, nil)
@@ -4500,7 +4500,7 @@ func TestHandleIssueGet_RedirectURIRefusalSurvivesItsOwnFailures(t *testing.T) {
 		// rather than passing as though the refusal had been shown.
 		assert.Empty(t, rr.Header().Get("Location"),
 			"a withheld redirect must never become a Location, least of all because the clear failed")
-		codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything, mock.Anything)
+		codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything, mock.Anything, mock.Anything)
 		tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForImplicit",
 			mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 
@@ -4564,7 +4564,7 @@ func TestHandleIssueGet_RedirectURIRefusalSurvivesItsOwnFailures(t *testing.T) {
 
 		assert.Empty(t, rr.Header().Get("Location"),
 			"a failure to render the refusal must not become a redirect to the deregistered host")
-		codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything, mock.Anything)
+		codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything, mock.Anything, mock.Anything)
 
 		httpHelper.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
@@ -4666,7 +4666,7 @@ func TestHandleIssueGet_ScopeRefusalSurvivesItsOwnFailures(t *testing.T) {
 			"the ordinary refusal's code must not stand in for one the server could not complete")
 		assert.NotContains(t, location, "code=")
 
-		codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything, mock.Anything)
+		codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything, mock.Anything, mock.Anything)
 
 		httpHelper.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
@@ -4712,7 +4712,7 @@ func TestHandleIssueGet_ScopeRefusalSurvivesItsOwnFailures(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Empty(t, rr.Result().Header.Get("Location"))
-		codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything, mock.Anything)
+		codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything, mock.Anything, mock.Anything)
 
 		httpHelper.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
@@ -4755,7 +4755,7 @@ func TestHandleIssueGet_ScopeRefusalSurvivesItsOwnFailures(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.Empty(t, rr.Result().Header.Get("Location"))
-		codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything, mock.Anything)
+		codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything, mock.Anything, mock.Anything)
 
 		httpHelper.AssertExpectations(t)
 		authHelper.AssertExpectations(t)

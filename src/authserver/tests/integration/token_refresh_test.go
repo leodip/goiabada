@@ -746,7 +746,7 @@ func TestToken_Refresh_TokenMarkedAsUsed(t *testing.T) {
 	}
 
 	// Verify that the original refresh token is now marked as used (revoked)
-	revokedRefreshToken, err := database.GetRefreshTokenByJti(nil, jti)
+	revokedRefreshToken, err := database.GetRefreshTokenByJti(context.Background(), nil, jti)
 	assert.NoError(t, err)
 	assert.NotNil(t, revokedRefreshToken)
 	assert.True(t, revokedRefreshToken.Revoked, "The original refresh token should be marked as revoked after use")
@@ -779,9 +779,9 @@ func TestToken_Refresh_MissingRowIsInvalidGrant(t *testing.T) {
 		code.Code, code.RedirectURI, "code-verifier")
 
 	row := refreshTokenRowByJti(t, refreshToken)
-	require.NoError(t, database.DeleteRefreshToken(nil, row.Id))
+	require.NoError(t, database.DeleteRefreshToken(context.Background(), nil, row.Id))
 
-	gone, err := database.GetRefreshTokenByJti(nil, refreshTokenJti(t, refreshToken))
+	gone, err := database.GetRefreshTokenByJti(context.Background(), nil, refreshTokenJti(t, refreshToken))
 	require.NoError(t, err)
 	require.Nil(t, gone, "the fixture must actually remove the row")
 

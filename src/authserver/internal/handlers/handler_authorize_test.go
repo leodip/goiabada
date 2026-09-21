@@ -65,7 +65,7 @@ func stubRegisteredRedirectURI(database *mocks_data.Database, registered ...stri
 }
 
 func stubAuthenticatedBrowser(database *mocks_data.Database, userSessionManager *mocks_handlers.UserSessionManager) {
-	database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything).
+	database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.Anything).
 		Return(&models.UserSession{Id: 1, UserId: 1}, nil)
 	userSessionManager.On("HasValidUserSession", mock.Anything, mock.Anything, mock.Anything).
 		Return(true)
@@ -133,8 +133,8 @@ func TestHandleAuthorizeGet(t *testing.T) {
 				AuthStateGeneration: 9,
 			},
 		}
-		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.AnythingOfType("string")).Return(userSession, nil)
-		database.On("UserSessionLoadUser", mock.Anything, userSession).Return(nil)
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.AnythingOfType("string")).Return(userSession, nil)
+		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, userSession).Return(nil)
 
 		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
 
@@ -208,9 +208,9 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authorizeValidator.On("ValidateScopes", "openid").Return(nil)
 		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
 
-		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.AnythingOfType("string")).Return(nil, nil)
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.AnythingOfType("string")).Return(nil, nil)
 
-		database.On("UserSessionLoadUser", mock.Anything, (*models.UserSession)(nil)).Return(nil)
+		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, (*models.UserSession)(nil)).Return(nil)
 
 		userSessionManager.On("HasValidUserSession", mock.Anything, (*models.UserSession)(nil), mock.AnythingOfType("*int")).Return(false)
 
@@ -822,8 +822,8 @@ func TestHandleAuthorizeGet(t *testing.T) {
 				Enabled: false,
 			},
 		}
-		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.AnythingOfType("string")).Return(userSession, nil)
-		database.On("UserSessionLoadUser", mock.Anything, userSession).Return(nil)
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.AnythingOfType("string")).Return(userSession, nil)
+		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, userSession).Return(nil)
 
 		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
 
@@ -932,8 +932,8 @@ func TestHandleAuthorizeGet(t *testing.T) {
 				Enabled: true,
 			},
 		}
-		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.AnythingOfType("string")).Return(userSession, nil)
-		database.On("UserSessionLoadUser", mock.Anything, userSession).Return(nil)
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.AnythingOfType("string")).Return(userSession, nil)
+		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, userSession).Return(nil)
 
 		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
 
@@ -1011,8 +1011,8 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authorizeValidator.On("ValidateScopes", "openid").Return(nil)
 		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
 
-		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.AnythingOfType("string")).Return(nil, nil)
-		database.On("UserSessionLoadUser", mock.Anything, (*models.UserSession)(nil)).Return(nil)
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.AnythingOfType("string")).Return(nil, nil)
+		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, (*models.UserSession)(nil)).Return(nil)
 		userSessionManager.On("HasValidUserSession", mock.Anything, (*models.UserSession)(nil), mock.AnythingOfType("*int")).Return(false)
 
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
@@ -1159,8 +1159,8 @@ func TestHandleAuthorizeGet(t *testing.T) {
 			return hasUILocales(ac)
 		})).Return(nil)
 
-		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything).Return(nil, nil)
-		database.On("UserSessionLoadUser", mock.Anything, (*models.UserSession)(nil)).Return(nil)
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
+		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, (*models.UserSession)(nil)).Return(nil)
 		userSessionManager.On("HasValidUserSession", mock.Anything, (*models.UserSession)(nil), mock.Anything).Return(false)
 
 		handler.ServeHTTP(rr, req)
@@ -1230,8 +1230,8 @@ func TestHandleAuthorizeGet(t *testing.T) {
 			return hasUILocales(ac)
 		})).Return(nil)
 
-		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything).Return(nil, nil)
-		database.On("UserSessionLoadUser", mock.Anything, (*models.UserSession)(nil)).Return(nil)
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
+		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, (*models.UserSession)(nil)).Return(nil)
 		userSessionManager.On("HasValidUserSession", mock.Anything, (*models.UserSession)(nil), mock.Anything).Return(false)
 
 		handler.ServeHTTP(rr, req)
@@ -2282,8 +2282,8 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 		authorizeValidator.On("ValidateScopes", "openid").Return(nil)
 		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
 
-		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.AnythingOfType("string")).Return(nil, nil)
-		database.On("UserSessionLoadUser", mock.Anything, (*models.UserSession)(nil)).Return(nil)
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.AnythingOfType("string")).Return(nil, nil)
+		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, (*models.UserSession)(nil)).Return(nil)
 
 		userSessionManager.On("HasValidUserSession", mock.Anything, (*models.UserSession)(nil), mock.AnythingOfType("*int")).Return(false)
 
@@ -2352,8 +2352,8 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 		authorizeValidator.On("ValidateScopes", "openid").Return(nil)
 		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
 
-		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.AnythingOfType("string")).Return(nil, nil)
-		database.On("UserSessionLoadUser", mock.Anything, (*models.UserSession)(nil)).Return(nil)
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.AnythingOfType("string")).Return(nil, nil)
+		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, (*models.UserSession)(nil)).Return(nil)
 
 		userSessionManager.On("HasValidUserSession", mock.Anything, (*models.UserSession)(nil), mock.AnythingOfType("*int")).Return(false)
 
@@ -2485,8 +2485,8 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 		authorizeValidator.On("ValidateScopes", "openid").Return(nil)
 		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
 
-		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.AnythingOfType("string")).Return(nil, nil)
-		database.On("UserSessionLoadUser", mock.Anything, (*models.UserSession)(nil)).Return(nil)
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.AnythingOfType("string")).Return(nil, nil)
+		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, (*models.UserSession)(nil)).Return(nil)
 
 		userSessionManager.On("HasValidUserSession", mock.Anything, (*models.UserSession)(nil), mock.AnythingOfType("*int")).Return(false)
 
@@ -2779,8 +2779,8 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 				Subject: userSubject,
 			},
 		}
-		database.On("GetUserSessionBySessionIdentifier", mock.Anything, "session-123").Return(userSession, nil)
-		database.On("UserSessionLoadUser", mock.Anything, userSession).Return(nil)
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "session-123").Return(userSession, nil)
+		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, userSession).Return(nil)
 
 		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
 
@@ -2871,8 +2871,8 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 				Subject: userSubject,
 			},
 		}
-		database.On("GetUserSessionBySessionIdentifier", mock.Anything, "session-123").Return(userSession, nil)
-		database.On("UserSessionLoadUser", mock.Anything, userSession).Return(nil)
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "session-123").Return(userSession, nil)
+		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, userSession).Return(nil)
 
 		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
 
@@ -2965,8 +2965,8 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 				Subject: sessionSubject,
 			},
 		}
-		database.On("GetUserSessionBySessionIdentifier", mock.Anything, "session-456").Return(userSession, nil)
-		database.On("UserSessionLoadUser", mock.Anything, userSession).Return(nil)
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "session-456").Return(userSession, nil)
+		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, userSession).Return(nil)
 
 		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
 
@@ -3066,8 +3066,8 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 				AuthStateGeneration: 9,
 			},
 		}
-		database.On("GetUserSessionBySessionIdentifier", mock.Anything, "session-789").Return(userSession, nil)
-		database.On("UserSessionLoadUser", mock.Anything, userSession).Return(nil)
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "session-789").Return(userSession, nil)
+		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, userSession).Return(nil)
 
 		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
 
@@ -3172,8 +3172,8 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 				Subject: sessionSubject,
 			},
 		}
-		database.On("GetUserSessionBySessionIdentifier", mock.Anything, "session-999").Return(userSession, nil)
-		database.On("UserSessionLoadUser", mock.Anything, userSession).Return(nil)
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "session-999").Return(userSession, nil)
+		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, userSession).Return(nil)
 
 		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
 
@@ -3268,8 +3268,8 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 				Subject: sessionSubject,
 			},
 		}
-		database.On("GetUserSessionBySessionIdentifier", mock.Anything, "session-999").Return(userSession, nil)
-		database.On("UserSessionLoadUser", mock.Anything, userSession).Return(nil)
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "session-999").Return(userSession, nil)
+		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, userSession).Return(nil)
 
 		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
 
@@ -3370,8 +3370,8 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 				Subject: sessionSubject,
 			},
 		}
-		database.On("GetUserSessionBySessionIdentifier", mock.Anything, "session-999").Return(userSession, nil)
-		database.On("UserSessionLoadUser", mock.Anything, userSession).Return(nil)
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "session-999").Return(userSession, nil)
+		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, userSession).Return(nil)
 
 		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
 
@@ -3464,8 +3464,8 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 				Subject: sessionSubject,
 			},
 		}
-		database.On("GetUserSessionBySessionIdentifier", mock.Anything, "session-999").Return(userSession, nil)
-		database.On("UserSessionLoadUser", mock.Anything, userSession).Return(nil)
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "session-999").Return(userSession, nil)
+		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, userSession).Return(nil)
 
 		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
 
@@ -3826,7 +3826,7 @@ func TestHandleAuthorizeGet_AuthenticateBeforeRedirect_RoutingTable(t *testing.T
 			// Maybe, because whether the session is looked up at all is the point of half these
 			// rows: the clauses that read nothing are evaluated first, so a request that is
 			// silent, or whose redirect would be withheld anyway, never queries.
-			database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything).
+			database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.Anything).
 				Return(&models.UserSession{Id: 1, UserId: 1}, nil).Maybe()
 			userSessionManager.On("HasValidUserSession", mock.Anything, mock.Anything, mock.Anything).
 				Return(tc.hasSession).Maybe()
@@ -3938,7 +3938,7 @@ func TestHandleAuthorizeGet_SessionLookupIsLazyAndFailsClosed(t *testing.T) {
 					"Invalid scope format: 'bogus'.", http.StatusBadRequest)).Maybe()
 
 			lookupErr := errors.New("the session store is unreachable")
-			database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything).
+			database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.Anything).
 				Return(nil, lookupErr).Maybe()
 
 			switch tc.want {
@@ -4024,7 +4024,7 @@ func TestHandleAuthorizeGet_ParkedDescriptionIsConformed(t *testing.T) {
 	authorizeValidator.On("ValidateScopes", "openid 💣").Return(
 		customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope",
 			"Invalid scope format: '💣'.", http.StatusBadRequest))
-	database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything).Return(nil, nil)
+	database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
 	userSessionManager.On("HasValidUserSession", mock.Anything, mock.Anything, mock.Anything).Return(false)
 
 	handler.ServeHTTP(rr, req)
@@ -4141,7 +4141,7 @@ func TestHandleAuthorizeGet_RegistrationReadDisagreesWithItself(t *testing.T) {
 			tc.firstRead(database)
 			tc.secondRead(database)
 
-			database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything).
+			database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.Anything).
 				Return(&models.UserSession{Id: 1, UserId: 1}, nil).Maybe()
 			userSessionManager.On("HasValidUserSession", mock.Anything, mock.Anything, mock.Anything).
 				Return(tc.hasSession).Maybe()

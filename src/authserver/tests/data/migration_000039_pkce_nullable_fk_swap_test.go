@@ -420,7 +420,7 @@ func seedCode000039(t *testing.T, h *isolatedDB, client *models.Client, user *mo
 		Revoked:             true,
 		AuthStateGeneration: 7,
 	}
-	require.NoError(t, h.DB.CreateCode(nil, code), "seed code")
+	require.NoError(t, h.DB.CreateCode(context.Background(), nil, code), "seed code")
 	return code
 }
 
@@ -443,7 +443,7 @@ func seedRefreshToken000039(t *testing.T, h *isolatedDB, shape models.RefreshTok
 	token.Revoked = true
 	token.AuthStateGeneration = 11
 
-	require.NoError(t, h.DB.CreateRefreshToken(nil, &token), "seed refresh token")
+	require.NoError(t, h.DB.CreateRefreshToken(context.Background(), nil, &token), "seed refresh token")
 	return &token
 }
 
@@ -469,7 +469,7 @@ func createChallengelessCode000039(t *testing.T, h *isolatedDB, client *models.C
 		AcrLevel:            "urn:goiabada:level1",
 		AuthMethods:         "pwd",
 	}
-	err := h.DB.CreateCode(nil, code)
+	err := h.DB.CreateCode(context.Background(), nil, code)
 	if err == nil && out != nil {
 		*out = *code
 	}
@@ -478,7 +478,7 @@ func createChallengelessCode000039(t *testing.T, h *isolatedDB, client *models.C
 
 func readCode000039(t *testing.T, h *isolatedDB, id int64) *models.Code {
 	t.Helper()
-	code, err := h.DB.GetCodeById(nil, id)
+	code, err := h.DB.GetCodeById(context.Background(), nil, id)
 	require.NoErrorf(t, err, "read code %d back", id)
 	require.NotNilf(t, code, "code %d is gone", id)
 	return code
@@ -486,7 +486,7 @@ func readCode000039(t *testing.T, h *isolatedDB, id int64) *models.Code {
 
 func readRefreshToken000039(t *testing.T, h *isolatedDB, id int64) *models.RefreshToken {
 	t.Helper()
-	token, err := h.DB.GetRefreshTokenById(nil, id)
+	token, err := h.DB.GetRefreshTokenById(context.Background(), nil, id)
 	require.NoErrorf(t, err, "read refresh token %d back", id)
 	require.NotNilf(t, token, "refresh token %d is gone", id)
 	return token

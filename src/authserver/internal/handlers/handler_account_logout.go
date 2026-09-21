@@ -430,7 +430,7 @@ func classifyIdTokenHint(
 	// One lookup, read by the expiry-tolerance branch below and by the ownership gate after it. It
 	// used to sit inside that branch, so a hint that had not expired never loaded the session at all
 	// and there was nothing to compare its sub against.
-	userSession, err := database.GetUserSessionBySessionIdentifier(nil, sessionIdentifier)
+	userSession, err := database.GetUserSessionBySessionIdentifier(r.Context(), nil, sessionIdentifier)
 	if err != nil {
 		// Propagated rather than read as "no such session". A database failure and a row that is
 		// not there have different answers, and conflating them would decide whether an expired
@@ -511,7 +511,7 @@ func handleExistingSessionOnLogout(
 	database data.Database,
 	auditLogger AuditLogger,
 ) error {
-	userSession, err := database.GetUserSessionBySessionIdentifier(nil, sessionIdentifier)
+	userSession, err := database.GetUserSessionBySessionIdentifier(r.Context(), nil, sessionIdentifier)
 	if err != nil {
 		return err
 	}
@@ -519,19 +519,19 @@ func handleExistingSessionOnLogout(
 		return nil
 	}
 
-	err = database.UserSessionLoadClients(nil, userSession)
+	err = database.UserSessionLoadClients(r.Context(), nil, userSession)
 	if err != nil {
 		return err
 	}
 
-	err = database.UserSessionClientsLoadClients(nil, userSession.Clients)
+	err = database.UserSessionClientsLoadClients(r.Context(), nil, userSession.Clients)
 	if err != nil {
 		return err
 	}
 
 	for idx, sessionClient := range userSession.Clients {
 		if sessionClient.Client.ClientIdentifier == client.ClientIdentifier {
-			err = database.DeleteUserSessionClient(nil, userSession.Clients[idx].Id)
+			err = database.DeleteUserSessionClient(r.Context(), nil, userSession.Clients[idx].Id)
 			if err != nil {
 				return err
 			}
@@ -549,7 +549,7 @@ func handleExistingSessionOnLogout(
 			})
 
 			if len(userSession.Clients) == 1 {
-				err = database.DeleteUserSession(nil, userSession.Id)
+				err = database.DeleteUserSession(r.Context(), nil, userSession.Id)
 				if err != nil {
 					return err
 				}
@@ -784,7 +784,7 @@ func deleteWholeUserSession(
 	database data.Database,
 	auditLogger AuditLogger,
 ) (int64, error) {
-	userSession, err := database.GetUserSessionBySessionIdentifier(nil, sessionIdentifier)
+	userSession, err := database.GetUserSessionBySessionIdentifier(r.Context(), nil, sessionIdentifier)
 	if err != nil {
 		return 0, err
 	}
@@ -792,7 +792,7 @@ func deleteWholeUserSession(
 		return 0, nil
 	}
 
-	if err := database.DeleteUserSession(nil, userSession.Id); err != nil {
+	if err := database.DeleteUserSession(r.Context(), nil, userSession.Id); err != nil {
 		return 0, err
 	}
 
