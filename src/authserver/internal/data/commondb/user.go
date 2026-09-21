@@ -25,19 +25,11 @@ func (d *CommonDatabase) CreateUser(tx *sql.Tx, user *models.User) error {
 
 	insertBuilder := userStruct.WithoutTag("pk").InsertInto("users", user)
 
-	sql, args := insertBuilder.Build()
-	result, err := d.ExecSql(tx, sql, args...)
+	id, err := d.insertReturningId(tx, insertBuilder, "user")
 	if err != nil {
 		user.CreatedAt = originalCreatedAt
 		user.UpdatedAt = originalUpdatedAt
-		return errs.Wrap(err, "unable to insert user")
-	}
-
-	id, err := result.LastInsertId()
-	if err != nil {
-		user.CreatedAt = originalCreatedAt
-		user.UpdatedAt = originalUpdatedAt
-		return errs.Wrap(err, "unable to get last insert id")
+		return err
 	}
 
 	user.Id = id

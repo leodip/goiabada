@@ -5,48 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/huandu/go-sqlbuilder"
-	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/errs"
 )
-
-func (d *PostgresDatabase) CreateAuditLog(tx *sql.Tx, auditLog *models.AuditLog) error {
-	if auditLog.AuditEvent == "" {
-		return errs.New("can't create audit log with empty audit_event")
-	}
-
-	// Always set CreatedAt to current time (ignore any incoming value)
-	auditLog.CreatedAt = time.Now().UTC()
-
-	auditLogStruct := sqlbuilder.NewStruct(new(models.AuditLog)).
-		For(sqlbuilder.PostgreSQL)
-
-	insertBuilder := auditLogStruct.WithoutTag("pk").InsertInto("audit_logs", auditLog)
-	sqlStr, args := insertBuilder.Build()
-	sqlStr = sqlStr + " RETURNING id"
-
-	rows, err := d.QuerySql(tx, sqlStr, args...)
-	if err != nil {
-		return errs.Wrap(err, "unable to insert audit log")
-	}
-	defer func() { _ = rows.Close() }()
-
-	if rows.Next() {
-		err = rows.Scan(&auditLog.Id)
-		if err != nil {
-			return errs.Wrap(err, "unable to scan audit log id")
-		}
-	}
-
-	// The driver can defer a constraint violation to the result set rather than
-	// returning it from the query, in which case Next() simply reports no row.
-	// Without this the insert would look like a success with id 0.
-	if err := rows.Err(); err != nil {
-		return d.WrapSQLError(err, "unable to insert audit log")
-	}
-
-	return nil
-}
 
 func (d *PostgresDatabase) DeleteOldAuditLogs(tx *sql.Tx, cutoff time.Time, maxDeletions int) (int, error) {
 	// PostgreSQL doesn't support LIMIT on DELETE directly

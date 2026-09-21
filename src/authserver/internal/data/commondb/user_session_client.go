@@ -23,19 +23,11 @@ func (d *CommonDatabase) CreateUserSessionClient(tx *sql.Tx, userSessionClient *
 
 	insertBuilder := userSessionClientStruct.WithoutTag("pk").InsertInto("user_session_clients", userSessionClient)
 
-	sql, args := insertBuilder.Build()
-	result, err := d.ExecSql(tx, sql, args...)
+	id, err := d.insertReturningId(tx, insertBuilder, "userSessionClient")
 	if err != nil {
 		userSessionClient.CreatedAt = originalCreatedAt
 		userSessionClient.UpdatedAt = originalUpdatedAt
-		return errs.Wrap(err, "unable to insert userSessionClient")
-	}
-
-	id, err := result.LastInsertId()
-	if err != nil {
-		userSessionClient.CreatedAt = originalCreatedAt
-		userSessionClient.UpdatedAt = originalUpdatedAt
-		return errs.Wrap(err, "unable to get last insert id")
+		return err
 	}
 
 	userSessionClient.Id = id

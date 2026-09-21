@@ -27,19 +27,11 @@ func (d *CommonDatabase) CreateUserSession(tx *sql.Tx, userSession *models.UserS
 
 	insertBuilder := userSessionStruct.WithoutTag("pk").InsertInto("user_sessions", userSession)
 
-	sql, args := insertBuilder.Build()
-	result, err := d.ExecSql(tx, sql, args...)
+	id, err := d.insertReturningId(tx, insertBuilder, "userSession")
 	if err != nil {
 		userSession.CreatedAt = originalCreatedAt
 		userSession.UpdatedAt = originalUpdatedAt
-		return errs.Wrap(err, "unable to insert userSession")
-	}
-
-	id, err := result.LastInsertId()
-	if err != nil {
-		userSession.CreatedAt = originalCreatedAt
-		userSession.UpdatedAt = originalUpdatedAt
-		return errs.Wrap(err, "unable to get last insert id")
+		return err
 	}
 
 	userSession.Id = id

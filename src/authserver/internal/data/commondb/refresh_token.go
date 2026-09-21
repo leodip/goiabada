@@ -23,19 +23,11 @@ func (d *CommonDatabase) CreateRefreshToken(tx *sql.Tx, refreshToken *models.Ref
 
 	insertBuilder := refreshTokenStruct.WithoutTag("pk").InsertInto("refresh_tokens", refreshToken)
 
-	sql, args := insertBuilder.Build()
-	result, err := d.ExecSql(tx, sql, args...)
+	id, err := d.insertReturningId(tx, insertBuilder, "refreshToken")
 	if err != nil {
 		refreshToken.CreatedAt = originalCreatedAt
 		refreshToken.UpdatedAt = originalUpdatedAt
-		return errs.Wrap(err, "unable to insert refreshToken")
-	}
-
-	id, err := result.LastInsertId()
-	if err != nil {
-		refreshToken.CreatedAt = originalCreatedAt
-		refreshToken.UpdatedAt = originalUpdatedAt
-		return errs.Wrap(err, "unable to get last insert id")
+		return err
 	}
 
 	refreshToken.Id = id

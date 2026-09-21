@@ -27,8 +27,8 @@ import (
 // the 801 hand-written delegations.
 //
 // WHAT THAT COSTS, measured rather than imagined. commondb.BackfillLowercaseEmails called
-// d.CreateAuditLog to record a forced logout. CreateAuditLog ends at result.LastInsertId(),
-// which is exactly why the two engines override it with RETURNING id and OUTPUT INSERTED.id:
+// d.CreateAuditLog to record a forced logout. CreateAuditLog ended at result.LastInsertId(),
+// which is exactly why the two engines overrode it with RETURNING id and OUTPUT INSERTED.id:
 // pgx's stdlib wrapper and go-mssqldb both refuse that call. So on PostgreSQL and SQL Server the
 // audit row landed and committed, the id read then failed, and the pass logged
 // "failed to persist audit log to database" over a row that was in fact persisted. Every test
@@ -44,6 +44,11 @@ import (
 // right method name), and invisible to the whole four-engine test suite unless a test happens to
 // assert on log output. A caller that actually used the returned id would get a hard error
 // rather than a false alarm.
+//
+// THAT PARTICULAR DIVERGENCE IS GONE, and the guard is not. #416 gave CommonDatabase an
+// InsertReturningIdSQL hook, so the id an INSERT reports comes back through one shared helper and
+// the fifty Create* overrides that carried the difference were deleted. A self-call to
+// CreateAuditLog is safe today. The next divergent method is what this reads for.
 //
 // THE BOUNDARY, stated because it decides what this file is worth. It compares method NAMES: a
 // name any dialect declares at all is treated as divergent, and this package may not take it on
@@ -165,8 +170,8 @@ type selfCall struct {
 //
 // The over-approximation also runs the other way, since a selector is matched by name alone: a
 // FIELD on CommonDatabase sharing a name with a divergent dialect method would be reported. There
-// are five fields (DB, Flavor, logSQL, IsDeadlock, IsUniqueViolation), none of them a method name
-// on any dialect, so the case
+// are six fields (DB, Flavor, logSQL, IsDeadlock, IsUniqueViolation, InsertReturningIdSQL), none
+// of them a method name on any dialect, so the case
 // is theoretical today and a false report would name a line and be dismissed in a second.
 func selfCalls(t *testing.T, dir string) []selfCall {
 	t.Helper()

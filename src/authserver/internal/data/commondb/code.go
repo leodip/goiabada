@@ -31,19 +31,11 @@ func (d *CommonDatabase) CreateCode(tx *sql.Tx, code *models.Code) error {
 
 	insertBuilder := codeStruct.WithoutTag("pk").InsertInto("codes", code)
 
-	sql, args := insertBuilder.Build()
-	result, err := d.ExecSql(tx, sql, args...)
+	id, err := d.insertReturningId(tx, insertBuilder, "code")
 	if err != nil {
 		code.CreatedAt = originalCreatedAt
 		code.UpdatedAt = originalUpdatedAt
-		return errs.Wrap(err, "unable to insert code")
-	}
-
-	id, err := result.LastInsertId()
-	if err != nil {
-		code.CreatedAt = originalCreatedAt
-		code.UpdatedAt = originalUpdatedAt
-		return errs.Wrap(err, "unable to get last insert id")
+		return err
 	}
 
 	code.Id = id

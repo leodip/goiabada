@@ -23,19 +23,11 @@ func (d *CommonDatabase) CreateClient(tx *sql.Tx, client *models.Client) error {
 
 	insertBuilder := clientStruct.WithoutTag("pk").InsertInto("clients", client)
 
-	sql, args := insertBuilder.Build()
-	result, err := d.ExecSql(tx, sql, args...)
+	id, err := d.insertReturningId(tx, insertBuilder, "client")
 	if err != nil {
 		client.CreatedAt = originalCreatedAt
 		client.UpdatedAt = originalUpdatedAt
-		return errs.Wrap(err, "unable to insert client")
-	}
-
-	id, err := result.LastInsertId()
-	if err != nil {
-		client.CreatedAt = originalCreatedAt
-		client.UpdatedAt = originalUpdatedAt
-		return errs.Wrap(err, "unable to get last insert id")
+		return err
 	}
 
 	client.Id = id

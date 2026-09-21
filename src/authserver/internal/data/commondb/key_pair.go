@@ -23,19 +23,11 @@ func (d *CommonDatabase) CreateKeyPair(tx *sql.Tx, keyPair *models.KeyPair) erro
 
 	insertBuilder := keyPairStruct.WithoutTag("pk").InsertInto("key_pairs", keyPair)
 
-	sql, args := insertBuilder.Build()
-	result, err := d.ExecSql(tx, sql, args...)
+	id, err := d.insertReturningId(tx, insertBuilder, "keyPair")
 	if err != nil {
 		keyPair.CreatedAt = originalCreatedAt
 		keyPair.UpdatedAt = originalUpdatedAt
-		return errs.Wrap(err, "unable to insert keyPair")
-	}
-
-	id, err := result.LastInsertId()
-	if err != nil {
-		keyPair.CreatedAt = originalCreatedAt
-		keyPair.UpdatedAt = originalUpdatedAt
-		return errs.Wrap(err, "unable to get last insert id")
+		return err
 	}
 
 	keyPair.Id = id

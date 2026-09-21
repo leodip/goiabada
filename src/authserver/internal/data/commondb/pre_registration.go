@@ -23,19 +23,11 @@ func (d *CommonDatabase) CreatePreRegistration(tx *sql.Tx, preRegistration *mode
 
 	insertBuilder := preRegistrationStruct.WithoutTag("pk").InsertInto("pre_registrations", preRegistration)
 
-	sql, args := insertBuilder.Build()
-	result, err := d.ExecSql(tx, sql, args...)
+	id, err := d.insertReturningId(tx, insertBuilder, "preRegistration")
 	if err != nil {
 		preRegistration.CreatedAt = originalCreatedAt
 		preRegistration.UpdatedAt = originalUpdatedAt
-		return errs.Wrap(err, "unable to insert preRegistration")
-	}
-
-	id, err := result.LastInsertId()
-	if err != nil {
-		preRegistration.CreatedAt = originalCreatedAt
-		preRegistration.UpdatedAt = originalUpdatedAt
-		return errs.Wrap(err, "unable to get last insert id")
+		return err
 	}
 
 	preRegistration.Id = id

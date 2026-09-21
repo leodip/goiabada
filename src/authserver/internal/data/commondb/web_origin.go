@@ -25,17 +25,10 @@ func (d *CommonDatabase) CreateWebOrigin(tx *sql.Tx, webOrigin *models.WebOrigin
 
 	insertBuilder := webOriginStruct.WithoutTag("pk").InsertInto("web_origins", webOrigin)
 
-	sql, args := insertBuilder.Build()
-	result, err := d.ExecSql(tx, sql, args...)
+	id, err := d.insertReturningId(tx, insertBuilder, "webOrigin")
 	if err != nil {
 		webOrigin.CreatedAt = originalCreatedAt
-		return errs.Wrap(err, "unable to insert webOrigin")
-	}
-
-	id, err := result.LastInsertId()
-	if err != nil {
-		webOrigin.CreatedAt = originalCreatedAt
-		return errs.Wrap(err, "unable to get last insert id")
+		return err
 	}
 
 	webOrigin.Id = id

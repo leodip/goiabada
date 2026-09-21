@@ -40,19 +40,11 @@ func (d *CommonDatabase) CreateBrowserSession(tx *sql.Tx, browserSession *models
 
 	insertBuilder := browserSessionStruct.WithoutTag("pk").InsertInto("browser_sessions", browserSession)
 
-	sql, args := insertBuilder.Build()
-	result, err := d.ExecSql(tx, sql, args...)
+	id, err := d.insertReturningId(tx, insertBuilder, "browser session")
 	if err != nil {
 		browserSession.CreatedAt = originalCreatedAt
 		browserSession.UpdatedAt = originalUpdatedAt
-		return errs.Wrap(err, "unable to insert browser session")
-	}
-
-	id, err := result.LastInsertId()
-	if err != nil {
-		browserSession.CreatedAt = originalCreatedAt
-		browserSession.UpdatedAt = originalUpdatedAt
-		return errs.Wrap(err, "unable to get last insert id")
+		return err
 	}
 
 	browserSession.Id = id

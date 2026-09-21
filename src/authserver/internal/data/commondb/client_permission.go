@@ -31,19 +31,11 @@ func (d *CommonDatabase) CreateClientPermission(tx *sql.Tx, clientPermission *mo
 
 	insertBuilder := clientPermissionStruct.WithoutTag("pk").InsertInto("clients_permissions", clientPermission)
 
-	sql, args := insertBuilder.Build()
-	result, err := d.ExecSql(tx, sql, args...)
+	id, err := d.insertReturningId(tx, insertBuilder, "clientPermission")
 	if err != nil {
 		clientPermission.CreatedAt = originalCreatedAt
 		clientPermission.UpdatedAt = originalUpdatedAt
-		return errs.Wrap(err, "unable to insert clientPermission")
-	}
-
-	id, err := result.LastInsertId()
-	if err != nil {
-		clientPermission.CreatedAt = originalCreatedAt
-		clientPermission.UpdatedAt = originalUpdatedAt
-		return errs.Wrap(err, "unable to get last insert id")
+		return err
 	}
 
 	clientPermission.Id = id

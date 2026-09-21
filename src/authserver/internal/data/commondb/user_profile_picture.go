@@ -27,19 +27,11 @@ func (d *CommonDatabase) CreateUserProfilePicture(tx *sql.Tx, profilePicture *mo
 
 	insertBuilder := profilePictureStruct.WithoutTag("pk").InsertInto("user_profile_pictures", profilePicture)
 
-	sql, args := insertBuilder.Build()
-	result, err := d.ExecSql(tx, sql, args...)
+	id, err := d.insertReturningId(tx, insertBuilder, "profile picture")
 	if err != nil {
 		profilePicture.CreatedAt = originalCreatedAt
 		profilePicture.UpdatedAt = originalUpdatedAt
-		return errs.Wrap(err, "unable to insert profile picture")
-	}
-
-	id, err := result.LastInsertId()
-	if err != nil {
-		profilePicture.CreatedAt = originalCreatedAt
-		profilePicture.UpdatedAt = originalUpdatedAt
-		return errs.Wrap(err, "unable to get last insert id")
+		return err
 	}
 
 	profilePicture.Id = id

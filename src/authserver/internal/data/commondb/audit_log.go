@@ -23,15 +23,9 @@ func (d *CommonDatabase) CreateAuditLog(tx *sql.Tx, auditLog *models.AuditLog) e
 
 	insertBuilder := auditLogStruct.WithoutTag("pk").InsertInto("audit_logs", auditLog)
 
-	sql, args := insertBuilder.Build()
-	result, err := d.ExecSql(tx, sql, args...)
+	id, err := d.insertReturningId(tx, insertBuilder, "audit log")
 	if err != nil {
-		return errs.Wrap(err, "unable to insert audit log")
-	}
-
-	id, err := result.LastInsertId()
-	if err != nil {
-		return errs.Wrap(err, "unable to get last insert id")
+		return err
 	}
 
 	auditLog.Id = id

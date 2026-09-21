@@ -27,19 +27,11 @@ func (d *CommonDatabase) CreateUserAttribute(tx *sql.Tx, userAttribute *models.U
 
 	insertBuilder := userAttributeStruct.WithoutTag("pk").InsertInto("user_attributes", userAttribute)
 
-	sql, args := insertBuilder.Build()
-	result, err := d.ExecSql(tx, sql, args...)
+	id, err := d.insertReturningId(tx, insertBuilder, "userAttribute")
 	if err != nil {
 		userAttribute.CreatedAt = originalCreatedAt
 		userAttribute.UpdatedAt = originalUpdatedAt
-		return errs.Wrap(err, "unable to insert userAttribute")
-	}
-
-	id, err := result.LastInsertId()
-	if err != nil {
-		userAttribute.CreatedAt = originalCreatedAt
-		userAttribute.UpdatedAt = originalUpdatedAt
-		return errs.Wrap(err, "unable to get last insert id")
+		return err
 	}
 
 	userAttribute.Id = id

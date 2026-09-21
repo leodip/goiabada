@@ -23,19 +23,11 @@ func (d *CommonDatabase) CreateSettings(tx *sql.Tx, settings *models.Settings) e
 
 	insertBuilder := settingsStruct.WithoutTag("pk").InsertInto("settings", settings)
 
-	sql, args := insertBuilder.Build()
-	result, err := d.ExecSql(tx, sql, args...)
+	id, err := d.insertReturningId(tx, insertBuilder, "settings")
 	if err != nil {
 		settings.CreatedAt = originalCreatedAt
 		settings.UpdatedAt = originalUpdatedAt
-		return errs.Wrap(err, "unable to insert settings")
-	}
-
-	id, err := result.LastInsertId()
-	if err != nil {
-		settings.CreatedAt = originalCreatedAt
-		settings.UpdatedAt = originalUpdatedAt
-		return errs.Wrap(err, "unable to get last insert id")
+		return err
 	}
 
 	settings.Id = id
