@@ -27,7 +27,7 @@ import (
 )
 
 type PermissionChecker interface {
-	UserHasScopePermission(userId int64, scope string) (bool, error)
+	UserHasScopePermission(ctx context.Context, userId int64, scope string) (bool, error)
 }
 
 type TokenParser interface {
@@ -858,7 +858,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 		}
 
 		sub := refreshTokenInfo.GetStringClaim("sub")
-		user, err := val.database.GetUserBySubject(nil, sub)
+		user, err := val.database.GetUserBySubject(ctx, nil, sub)
 		if err != nil {
 			return nil, err
 		}
@@ -886,7 +886,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 		var scopesFromConsent []string
 		consentCheckRequired := !isROPCToken && (client.ConsentRequired || refreshTokenType == "Offline")
 		if consentCheckRequired {
-			consent, err := val.database.GetConsentByUserIdAndClientId(nil, tokenUserId, tokenClientId)
+			consent, err := val.database.GetConsentByUserIdAndClientId(ctx, nil, tokenUserId, tokenClientId)
 			if err != nil {
 				return nil, err
 			}
@@ -941,7 +941,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 			isInjectedUserInfoScope := storedScopeHasOidcScope && inputScopeStr == userInfoScope
 			if !oidc.IsIdTokenScope(inputScopeStr) && !oidc.IsOfflineAccessScope(inputScopeStr) &&
 				!isInjectedUserInfoScope {
-				userHasPermission, err := val.permissionChecker.UserHasScopePermission(user.Id, inputScopeStr)
+				userHasPermission, err := val.permissionChecker.UserHasScopePermission(ctx, user.Id, inputScopeStr)
 				if err != nil {
 					return nil, err
 				}
@@ -1034,7 +1034,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 		// invalid_grant into invalid_request, and only invalid_grant is a guess against an
 		// account.
 		username := strings.ToLower(strings.TrimSpace(input.Username))
-		user, err := val.database.GetUserByEmail(nil, username)
+		user, err := val.database.GetUserByEmail(ctx, nil, username)
 		if err != nil {
 			return nil, err
 		}
@@ -1064,17 +1064,17 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 
 		// Validate scopes - follow authorization code flow pattern
 		// Note: consent_required is BYPASSED for ROPC (user providing credentials = implicit consent)
-		err = val.database.UserLoadPermissions(nil, user)
+		err = val.database.UserLoadPermissions(ctx, nil, user)
 		if err != nil {
 			return nil, err
 		}
 
-		err = val.database.UserLoadGroups(nil, user)
+		err = val.database.UserLoadGroups(ctx, nil, user)
 		if err != nil {
 			return nil, err
 		}
 
-		validatedScope, err := val.validateROPCScopes(input.Scope, user)
+		validatedScope, err := val.validateROPCScopes(ctx, input.Scope, user)
 		if err != nil {
 			return nil, err
 		}
@@ -1237,7 +1237,7 @@ func (val *TokenValidator) validateClientCredentialsScopes(scope string, client 
 // OIDC scopes (openid, profile, email, etc.) and offline_access are allowed.
 // Resource scopes (resource:permission) require the user to have the permission.
 // Note: consent_required is BYPASSED for ROPC - user providing credentials = implicit consent.
-func (val *TokenValidator) validateROPCScopes(scope string, user *models.User) (string, error) {
+func (val *TokenValidator) validateROPCScopes(ctx context.Context, scope string, user *models.User) (string, error) {
 	if len(scope) == 0 {
 		// Default to openid scope if none provided
 		return "openid", nil
@@ -1285,7 +1285,7 @@ func (val *TokenValidator) validateROPCScopes(scope string, user *models.User) (
 		}
 
 		// Check if user has this permission (directly or via groups)
-		userHasPermission, err := val.permissionChecker.UserHasScopePermission(user.Id, scopeStr)
+		userHasPermission, err := val.permissionChecker.UserHasScopePermission(ctx, user.Id, scopeStr)
 		if err != nil {
 			return "", err
 		}

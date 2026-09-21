@@ -158,7 +158,7 @@ func HandleIssueGet(
 		var user *models.User
 
 		if authContext.IdTokenHintSub != "" {
-			user, err = database.GetUserById(nil, authContext.UserId)
+			user, err = database.GetUserById(r.Context(), nil, authContext.UserId)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
 				return
@@ -331,7 +331,7 @@ func HandleIssueGet(
 		// none of it, and below the registration gate so the refusal here is safe to deliver by
 		// redirect.
 		if user == nil {
-			user, err = database.GetUserById(nil, authContext.UserId)
+			user, err = database.GetUserById(r.Context(), nil, authContext.UserId)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
 				return
@@ -351,7 +351,7 @@ func HandleIssueGet(
 		if authContext.ConsentedScope != "" {
 			scopeField = &authContext.ConsentedScope
 		}
-		effectiveScope, err := permissionChecker.FilterOutScopesWhereUserIsNotAuthorized(*scopeField, user)
+		effectiveScope, err := permissionChecker.FilterOutScopesWhereUserIsNotAuthorized(r.Context(), *scopeField, user)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return

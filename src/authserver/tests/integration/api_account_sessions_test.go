@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -168,9 +169,9 @@ func TestAPIAccountSessionDelete_ForbiddenOnOtherUsersSession(t *testing.T) {
 
 	// Create another user and a session for them
 	other := &models.User{Subject: fake.UUID(), Enabled: true, Email: "other-" + fake.UUID()[:8] + "@acctsess.test"}
-	err := database.CreateUser(nil, other)
+	err := database.CreateUser(context.Background(), nil, other)
 	assert.NoError(t, err)
-	defer func() { _ = database.DeleteUser(nil, other.Id) }()
+	defer func() { _ = database.DeleteUser(context.Background(), nil, other.Id) }()
 
 	otherSession := createTestUserSession(t, other.Id, fake.UUID())
 	defer func() { _ = database.DeleteUserSession(nil, otherSession.Id) }()

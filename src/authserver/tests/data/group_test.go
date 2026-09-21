@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"context"
 	"strings"
 	"testing"
 	"time"
@@ -382,12 +383,12 @@ func TestGetGroupMembersPaginated_EnlistsInTheCallersTransaction(t *testing.T) {
 		GivenName: "TxMember" + fake.LetterN(6),
 		Email:     fake.LetterN(12) + "@example.com",
 	}
-	if err := database.CreateUser(tx, user); err != nil {
+	if err := database.CreateUser(context.Background(), tx, user); err != nil {
 		t.Fatalf("Failed to create user inside the transaction: %v", err)
 	}
 
 	userGroup := &models.UserGroup{UserId: user.Id, GroupId: group.Id}
-	if err := database.CreateUserGroup(tx, userGroup); err != nil {
+	if err := database.CreateUserGroup(context.Background(), tx, userGroup); err != nil {
 		t.Fatalf("Failed to create users_groups row inside the transaction: %v", err)
 	}
 

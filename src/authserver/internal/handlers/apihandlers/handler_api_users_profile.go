@@ -49,7 +49,7 @@ func HandleAPIUserProfilePut(
 		}
 
 		// Get user from database
-		user, err := database.GetUserById(nil, userId)
+		user, err := database.GetUserById(r.Context(), nil, userId)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -80,7 +80,7 @@ func HandleAPIUserProfilePut(
 			Subject:             user.Subject,
 		}
 
-		err = profileValidator.ValidateProfile(input)
+		err = profileValidator.ValidateProfile(r.Context(), input)
 		if err != nil {
 			writeValidationError(w, r, err)
 			return
@@ -120,7 +120,7 @@ func HandleAPIUserProfilePut(
 		user.Locale = input.Locale
 
 		// Update user in database
-		err = database.UpdateUser(nil, user)
+		err = database.UpdateUser(r.Context(), nil, user)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -179,7 +179,7 @@ func HandleAPIUserAddressPut(
 		}
 
 		// Get user from database
-		user, err := database.GetUserById(nil, userId)
+		user, err := database.GetUserById(r.Context(), nil, userId)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -215,7 +215,7 @@ func HandleAPIUserAddressPut(
 		user.AddressCountry = input.AddressCountry
 
 		// Update user in database
-		err = database.UpdateUser(nil, user)
+		err = database.UpdateUser(r.Context(), nil, user)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return

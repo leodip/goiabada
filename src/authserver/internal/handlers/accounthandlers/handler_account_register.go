@@ -115,7 +115,7 @@ func HandleAccountRegisterPost(
 
 		alreadyRegisteredMessage := i18n.NewLocalizedError(i18n.ErrCodeEmailAlreadyRegistered, nil).Localize(r.Context())
 
-		user, err := database.GetUserByEmail(nil, email)
+		user, err := database.GetUserByEmail(r.Context(), nil, email)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return

@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -87,11 +88,11 @@ func TestAPIUsersSearch_WithQuery(t *testing.T) {
 		FamilyName:    "TestUser",
 		EmailVerified: true,
 	}
-	err := database.CreateUser(nil, user1)
+	err := database.CreateUser(context.Background(), nil, user1)
 	assert.NoError(t, err)
 
 	defer func() {
-		_ = database.DeleteUser(nil, user1.Id)
+		_ = database.DeleteUser(context.Background(), nil, user1.Id)
 	}()
 
 	// Debug: Verify test user was created
@@ -363,7 +364,7 @@ func TestAPIUsersSearch_MultiplePages(t *testing.T) {
 			FamilyName:    "User" + n,
 			EmailVerified: true,
 		}
-		err := database.CreateUser(nil, user)
+		err := database.CreateUser(context.Background(), nil, user)
 		require.NoError(t, err)
 		testUsers = append(testUsers, user)
 	}
@@ -444,7 +445,7 @@ func createTestUsersWithSuffix(t *testing.T, suffix string) []*models.User {
 		FamilyName:    "Doe",
 		EmailVerified: true,
 	}
-	err := database.CreateUser(nil, user1)
+	err := database.CreateUser(context.Background(), nil, user1)
 	require.NoError(t, err)
 	users = append(users, user1)
 
@@ -457,7 +458,7 @@ func createTestUsersWithSuffix(t *testing.T, suffix string) []*models.User {
 		FamilyName:    "Smith",
 		EmailVerified: true,
 	}
-	err = database.CreateUser(nil, user2)
+	err = database.CreateUser(context.Background(), nil, user2)
 	require.NoError(t, err)
 	users = append(users, user2)
 
@@ -470,7 +471,7 @@ func createTestUsersWithSuffix(t *testing.T, suffix string) []*models.User {
 		FamilyName:    "User",
 		EmailVerified: false,
 	}
-	err = database.CreateUser(nil, user3)
+	err = database.CreateUser(context.Background(), nil, user3)
 	require.NoError(t, err)
 	users = append(users, user3)
 

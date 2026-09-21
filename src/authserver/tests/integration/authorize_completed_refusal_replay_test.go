@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/url"
@@ -66,7 +67,7 @@ func TestAuthCompleted_DisabledUserRefusal_CannotBeReplayed(t *testing.T) {
 		PasswordHash: passwordHashed,
 	}
 
-	err = database.CreateUser(nil, user)
+	err = database.CreateUser(context.Background(), nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -110,7 +111,7 @@ func TestAuthCompleted_DisabledUserRefusal_CannotBeReplayed(t *testing.T) {
 	// here rather than up front: this is the only window in which /auth/completed sees a disabled
 	// user.
 	user.Enabled = false
-	err = database.UpdateUser(nil, user)
+	err = database.UpdateUser(context.Background(), nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -179,7 +180,7 @@ func TestAuthCompleted_NoAuthorizedScopesRefusal_CannotBeReplayed(t *testing.T) 
 		PasswordHash: passwordHashed,
 	}
 
-	err = database.CreateUser(nil, user)
+	err = database.CreateUser(context.Background(), nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -130,7 +130,7 @@ func (t *TokenIssuer) GenerateTokenResponseForAuthCode(ctx context.Context,
 		return nil, err
 	}
 
-	err = t.database.UserLoadGroups(nil, &code.User)
+	err = t.database.UserLoadGroups(ctx, nil, &code.User)
 	if err != nil {
 		return nil, err
 	}
@@ -140,13 +140,13 @@ func (t *TokenIssuer) GenerateTokenResponseForAuthCode(ctx context.Context,
 		return nil, err
 	}
 
-	err = t.database.UserLoadAttributes(nil, &code.User)
+	err = t.database.UserLoadAttributes(ctx, nil, &code.User)
 	if err != nil {
 		return nil, err
 	}
 
 	// nil parent: this is the initial code exchange, so the code is the authorizing credential.
-	accessTokenStr, scopeFromAccessToken, err := t.generateAccessToken(settings, code, code.Scope, now, privKey, keyPair.KeyIdentifier, nil)
+	accessTokenStr, scopeFromAccessToken, err := t.generateAccessToken(ctx, settings, code, code.Scope, now, privKey, keyPair.KeyIdentifier, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -157,7 +157,7 @@ func (t *TokenIssuer) GenerateTokenResponseForAuthCode(ctx context.Context,
 
 	scopes := strings.Split(code.Scope, " ")
 	if slices.Contains(scopes, "openid") {
-		idTokenStr, err := t.generateIdToken(settings, code, code.Scope, now, privKey, keyPair.KeyIdentifier)
+		idTokenStr, err := t.generateIdToken(ctx, settings, code, code.Scope, now, privKey, keyPair.KeyIdentifier)
 		if err != nil {
 			return nil, err
 		}
@@ -184,7 +184,7 @@ func (t *TokenIssuer) GenerateTokenResponseForAuthCode(ctx context.Context,
 // (the token may have been promoted while the code was not), and its scope can differ
 // from the request's, since a caller may down-scope offline_access away without the
 // grant ceasing to be offline (#106 decisions 9 and 13).
-func (t *TokenIssuer) generateAccessToken(settings *models.Settings, code *models.Code, scope string,
+func (t *TokenIssuer) generateAccessToken(ctx context.Context, settings *models.Settings, code *models.Code, scope string,
 	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string,
 	parentRefreshToken *models.RefreshToken) (string, string, error) {
 
@@ -199,7 +199,7 @@ func (t *TokenIssuer) generateAccessToken(settings *models.Settings, code *model
 		input.GrantIsOffline = parentRefreshToken.RefreshTokenType == offlineRefreshTokenType
 	}
 
-	return t.generateAccessTokenCore(settings, input, now, signingKey, keyIdentifier)
+	return t.generateAccessTokenCore(ctx, settings, input, now, signingKey, keyIdentifier)
 }
 
 // grantIsOffline reports whether an authorization-code grant is offline, from the
@@ -210,12 +210,12 @@ func grantIsOffline(authorizedScope string, sessionIdentifier string) bool {
 		sessionIdentifier == ""
 }
 
-func (t *TokenIssuer) generateIdToken(settings *models.Settings, code *models.Code, scope string,
+func (t *TokenIssuer) generateIdToken(ctx context.Context, settings *models.Settings, code *models.Code, scope string,
 	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string) (string, error) {
 
 	input := t.createTokenInputFromCode(code)
 	input.Scope = scope // Use the provided scope (may differ from code.Scope for refresh)
-	return t.generateIdTokenCore(settings, input, now, signingKey, keyIdentifier)
+	return t.generateIdTokenCore(ctx, settings, input, now, signingKey, keyIdentifier)
 }
 
 func (t *TokenIssuer) generateRefreshToken(settings *models.Settings, code *models.Code, scope string,
@@ -487,7 +487,7 @@ func (t *TokenIssuer) GenerateTokenResponseForRefresh(ctx context.Context, input
 		return nil, err
 	}
 
-	err = t.database.UserLoadGroups(nil, &input.Code.User)
+	err = t.database.UserLoadGroups(ctx, nil, &input.Code.User)
 	if err != nil {
 		return nil, err
 	}
@@ -497,13 +497,13 @@ func (t *TokenIssuer) GenerateTokenResponseForRefresh(ctx context.Context, input
 		return nil, err
 	}
 
-	err = t.database.UserLoadAttributes(nil, &input.Code.User)
+	err = t.database.UserLoadAttributes(ctx, nil, &input.Code.User)
 	if err != nil {
 		return nil, err
 	}
 
 	// The PARENT refresh token is the authorizing credential here, not the code.
-	accessTokenStr, scopeFromAccessToken, err := t.generateAccessToken(settings, input.Code, scopeToUse, now, privKey, keyPair.KeyIdentifier, input.RefreshToken)
+	accessTokenStr, scopeFromAccessToken, err := t.generateAccessToken(ctx, settings, input.Code, scopeToUse, now, privKey, keyPair.KeyIdentifier, input.RefreshToken)
 	if err != nil {
 		return nil, err
 	}
@@ -514,7 +514,7 @@ func (t *TokenIssuer) GenerateTokenResponseForRefresh(ctx context.Context, input
 
 	scopes := strings.Split(scopeToUse, " ")
 	if slices.Contains(scopes, "openid") {
-		idTokenStr, err := t.generateIdToken(settings, input.Code, scopeToUse, now, privKey, keyPair.KeyIdentifier)
+		idTokenStr, err := t.generateIdToken(ctx, settings, input.Code, scopeToUse, now, privKey, keyPair.KeyIdentifier)
 		if err != nil {
 			return nil, err
 		}
@@ -580,7 +580,7 @@ func (t *TokenIssuer) GenerateTokenResponseForRefreshROPC(ctx context.Context, i
 	now := time.Now().UTC()
 
 	// Load user groups and attributes for token claims
-	err = t.database.UserLoadGroups(nil, &input.RefreshToken.User)
+	err = t.database.UserLoadGroups(ctx, nil, &input.RefreshToken.User)
 	if err != nil {
 		return nil, err
 	}
@@ -590,7 +590,7 @@ func (t *TokenIssuer) GenerateTokenResponseForRefreshROPC(ctx context.Context, i
 		return nil, err
 	}
 
-	err = t.database.UserLoadAttributes(nil, &input.RefreshToken.User)
+	err = t.database.UserLoadAttributes(ctx, nil, &input.RefreshToken.User)
 	if err != nil {
 		return nil, err
 	}
@@ -605,7 +605,7 @@ func (t *TokenIssuer) GenerateTokenResponseForRefreshROPC(ctx context.Context, i
 	// access_token -----------------------------------------------------------------------
 
 	// The parent refresh token authorizes this, not the reloaded user.
-	accessTokenStr, scopeFromAccessToken, err := t.generateROPCAccessToken(settings, ropcInput, scopeToUse, now, privKey, keyPair.KeyIdentifier, input.RefreshToken)
+	accessTokenStr, scopeFromAccessToken, err := t.generateROPCAccessToken(ctx, settings, ropcInput, scopeToUse, now, privKey, keyPair.KeyIdentifier, input.RefreshToken)
 	if err != nil {
 		return nil, err
 	}
@@ -616,7 +616,7 @@ func (t *TokenIssuer) GenerateTokenResponseForRefreshROPC(ctx context.Context, i
 
 	scopes := strings.Split(scopeToUse, " ")
 	if slices.Contains(scopes, "openid") {
-		idTokenStr, err := t.generateROPCIdToken(settings, ropcInput, scopeToUse, now, privKey, keyPair.KeyIdentifier)
+		idTokenStr, err := t.generateROPCIdToken(ctx, settings, ropcInput, scopeToUse, now, privKey, keyPair.KeyIdentifier)
 		if err != nil {
 			return nil, err
 		}
@@ -645,7 +645,7 @@ func (t *TokenIssuer) addClaimIfNotEmpty(claims jwt.MapClaims, claimName string,
 
 // addOpenIdConnectClaimsFromUser adds OIDC claims to token claims using user data directly.
 // This is the unified version used by all OAuth flows (auth code, implicit, ROPC).
-func (t *TokenIssuer) addOpenIdConnectClaimsFromUser(claims jwt.MapClaims, user *models.User, scopes []string) {
+func (t *TokenIssuer) addOpenIdConnectClaimsFromUser(ctx context.Context, claims jwt.MapClaims, user *models.User, scopes []string) {
 
 	if len(scopes) > 1 || (len(scopes) == 1 && scopes[0] != "openid") {
 		claims["updated_at"] = user.UpdatedAt.Time.UTC().Unix()
@@ -668,7 +668,7 @@ func (t *TokenIssuer) addOpenIdConnectClaimsFromUser(claims jwt.MapClaims, user 
 		t.addClaimIfNotEmpty(claims, "locale", user.Locale)
 
 		// Add picture claim if user has a profile picture
-		hasPicture, err := t.database.UserHasProfilePicture(nil, user.Id)
+		hasPicture, err := t.database.UserHasProfilePicture(ctx, nil, user.Id)
 		if err == nil && hasPicture {
 			claims["picture"] = fmt.Sprintf("%v/userinfo/picture/%v", t.baseURL, user.Subject)
 		}
@@ -691,7 +691,7 @@ func (t *TokenIssuer) addOpenIdConnectClaimsFromUser(claims jwt.MapClaims, user 
 
 // generateAccessTokenCore creates an access token using the unified TokenGenerationInput.
 // This is the single implementation used by all OAuth flows (auth code, implicit, ROPC).
-func (t *TokenIssuer) generateAccessTokenCore(settings *models.Settings, input *TokenGenerationInput,
+func (t *TokenIssuer) generateAccessTokenCore(ctx context.Context, settings *models.Settings, input *TokenGenerationInput,
 	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string) (string, string, error) {
 
 	claims := make(jwt.MapClaims)
@@ -785,7 +785,7 @@ func (t *TokenIssuer) generateAccessTokenCore(settings *models.Settings, input *
 	}
 
 	if slices.Contains(scopes, "openid") && includeOpenIDConnectClaimsInAccessToken {
-		t.addOpenIdConnectClaimsFromUser(claims, input.User, scopes)
+		t.addOpenIdConnectClaimsFromUser(ctx, claims, input.User, scopes)
 	}
 
 	// groups (using IncludeInAccessToken filter)
@@ -833,7 +833,7 @@ func (t *TokenIssuer) generateAccessTokenCore(settings *models.Settings, input *
 
 // generateIdTokenCore creates an id_token using the unified TokenGenerationInput.
 // This is the single implementation used by all OAuth flows (auth code, implicit, ROPC).
-func (t *TokenIssuer) generateIdTokenCore(settings *models.Settings, input *TokenGenerationInput,
+func (t *TokenIssuer) generateIdTokenCore(ctx context.Context, settings *models.Settings, input *TokenGenerationInput,
 	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string) (string, error) {
 
 	claims := make(jwt.MapClaims)
@@ -889,7 +889,7 @@ func (t *TokenIssuer) generateIdTokenCore(settings *models.Settings, input *Toke
 	}
 
 	if includeOpenIDConnectClaimsInIdToken {
-		t.addOpenIdConnectClaimsFromUser(claims, input.User, scopes)
+		t.addOpenIdConnectClaimsFromUser(ctx, claims, input.User, scopes)
 	}
 
 	// groups (using IncludeInIdToken filter)
@@ -1043,7 +1043,7 @@ func (t *TokenIssuer) GenerateTokenResponseForImplicit(ctx context.Context,
 	now := time.Now().UTC()
 
 	// Load user groups and attributes for token claims
-	err = t.database.UserLoadGroups(nil, input.User)
+	err = t.database.UserLoadGroups(ctx, nil, input.User)
 	if err != nil {
 		return nil, err
 	}
@@ -1053,14 +1053,14 @@ func (t *TokenIssuer) GenerateTokenResponseForImplicit(ctx context.Context,
 		return nil, err
 	}
 
-	err = t.database.UserLoadAttributes(nil, input.User)
+	err = t.database.UserLoadAttributes(ctx, nil, input.User)
 	if err != nil {
 		return nil, err
 	}
 
 	// Generate access token if requested (response_type contains "token")
 	if issueAccessToken {
-		accessToken, scopeFromToken, err := t.generateImplicitAccessToken(settings, input, now, privKey, keyPair.KeyIdentifier)
+		accessToken, scopeFromToken, err := t.generateImplicitAccessToken(ctx, settings, input, now, privKey, keyPair.KeyIdentifier)
 		if err != nil {
 			return nil, err
 		}
@@ -1071,7 +1071,7 @@ func (t *TokenIssuer) GenerateTokenResponseForImplicit(ctx context.Context,
 	// Generate id_token if requested (response_type contains "id_token")
 	if issueIdToken {
 		// For id_token token response, include at_hash in id_token (OIDC Core 3.2.2.10)
-		idToken, err := t.generateImplicitIdToken(settings, input, now, privKey, keyPair.KeyIdentifier, response.AccessToken)
+		idToken, err := t.generateImplicitIdToken(ctx, settings, input, now, privKey, keyPair.KeyIdentifier, response.AccessToken)
 		if err != nil {
 			return nil, err
 		}
@@ -1087,21 +1087,21 @@ func (t *TokenIssuer) GenerateTokenResponseForImplicit(ctx context.Context,
 }
 
 // generateImplicitAccessToken creates an access token for implicit flow.
-func (t *TokenIssuer) generateImplicitAccessToken(settings *models.Settings, input *ImplicitGrantInput,
+func (t *TokenIssuer) generateImplicitAccessToken(ctx context.Context, settings *models.Settings, input *ImplicitGrantInput,
 	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string) (string, string, error) {
 
 	tokenInput := t.createTokenInputFromImplicit(input)
-	return t.generateAccessTokenCore(settings, tokenInput, now, signingKey, keyIdentifier)
+	return t.generateAccessTokenCore(ctx, settings, tokenInput, now, signingKey, keyIdentifier)
 }
 
 // generateImplicitIdToken creates an id_token for implicit flow.
 // Per OIDC Core 3.2.2.10, at_hash is REQUIRED when id_token is issued alongside access_token.
-func (t *TokenIssuer) generateImplicitIdToken(settings *models.Settings, input *ImplicitGrantInput,
+func (t *TokenIssuer) generateImplicitIdToken(ctx context.Context, settings *models.Settings, input *ImplicitGrantInput,
 	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string, accessToken string) (string, error) {
 
 	tokenInput := t.createTokenInputFromImplicit(input)
 	tokenInput.AccessToken = accessToken // For at_hash claim
-	return t.generateIdTokenCore(settings, tokenInput, now, signingKey, keyIdentifier)
+	return t.generateIdTokenCore(ctx, settings, tokenInput, now, signingKey, keyIdentifier)
 }
 
 // calculateAtHash computes the at_hash claim per OIDC Core 3.2.2.10
@@ -1177,7 +1177,7 @@ func (t *TokenIssuer) GenerateTokenResponseForROPC(ctx context.Context,
 	now := time.Now().UTC()
 
 	// Load user groups and attributes for token claims
-	err = t.database.UserLoadGroups(nil, input.User)
+	err = t.database.UserLoadGroups(ctx, nil, input.User)
 	if err != nil {
 		return nil, err
 	}
@@ -1187,14 +1187,14 @@ func (t *TokenIssuer) GenerateTokenResponseForROPC(ctx context.Context,
 		return nil, err
 	}
 
-	err = t.database.UserLoadAttributes(nil, input.User)
+	err = t.database.UserLoadAttributes(ctx, nil, input.User)
 	if err != nil {
 		return nil, err
 	}
 
 	// Generate access token
 	// nil parent: initial password grant, so the validated User snapshot is the source.
-	accessTokenStr, scopeFromAccessToken, err := t.generateROPCAccessToken(settings, input, input.Scope, now, privKey, keyPair.KeyIdentifier, nil)
+	accessTokenStr, scopeFromAccessToken, err := t.generateROPCAccessToken(ctx, settings, input, input.Scope, now, privKey, keyPair.KeyIdentifier, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -1204,7 +1204,7 @@ func (t *TokenIssuer) GenerateTokenResponseForROPC(ctx context.Context,
 	// Generate id_token if openid scope is present
 	scopes := strings.Split(input.Scope, " ")
 	if slices.Contains(scopes, "openid") {
-		idTokenStr, err := t.generateROPCIdToken(settings, input, input.Scope, now, privKey, keyPair.KeyIdentifier)
+		idTokenStr, err := t.generateROPCIdToken(ctx, settings, input, input.Scope, now, privKey, keyPair.KeyIdentifier)
 		if err != nil {
 			return nil, err
 		}
@@ -1245,7 +1245,7 @@ func (t *TokenIssuer) GenerateTokenResponseForROPC(ctx context.Context,
 // generation with the current one, laundering it forward (#106 decision 13).
 //
 // ROPC grants are always offline, so no access token here ever carries sid.
-func (t *TokenIssuer) generateROPCAccessToken(settings *models.Settings, input *ROPCGrantInput, scope string,
+func (t *TokenIssuer) generateROPCAccessToken(ctx context.Context, settings *models.Settings, input *ROPCGrantInput, scope string,
 	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string,
 	parentRefreshToken *models.RefreshToken) (string, string, error) {
 
@@ -1259,16 +1259,16 @@ func (t *TokenIssuer) generateROPCAccessToken(settings *models.Settings, input *
 		tokenInput.AuthStateGeneration = parentRefreshToken.AuthStateGeneration
 	}
 
-	return t.generateAccessTokenCore(settings, tokenInput, now, signingKey, keyIdentifier)
+	return t.generateAccessTokenCore(ctx, settings, tokenInput, now, signingKey, keyIdentifier)
 }
 
 // generateROPCIdToken creates an id_token for ROPC flow.
-func (t *TokenIssuer) generateROPCIdToken(settings *models.Settings, input *ROPCGrantInput, scope string,
+func (t *TokenIssuer) generateROPCIdToken(ctx context.Context, settings *models.Settings, input *ROPCGrantInput, scope string,
 	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string) (string, error) {
 
 	tokenInput := t.createTokenInputFromROPC(input, now)
 	tokenInput.Scope = scope // Use the provided scope
-	return t.generateIdTokenCore(settings, tokenInput, now, signingKey, keyIdentifier)
+	return t.generateIdTokenCore(ctx, settings, tokenInput, now, signingKey, keyIdentifier)
 }
 
 // generateRefreshTokenForROPC creates a refresh token specifically for ROPC flow.

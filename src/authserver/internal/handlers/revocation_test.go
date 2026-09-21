@@ -106,7 +106,7 @@ func TestRevokeUserAuthState_PreservingASession(t *testing.T) {
 	db := mocks_data.NewDatabase(t)
 	tokens := revocationFixture()
 
-	db.On("IncrementUserAuthStateGeneration", revokeTx, revokeUserId).
+	db.On("IncrementUserAuthStateGeneration", mock.Anything, revokeTx, revokeUserId).
 		Return(revokeNewGeneration, nil).Once()
 
 	// The sid-scoped query, which is the ONLY thing that can identify token 2 as belonging
@@ -165,7 +165,7 @@ func TestRevokeUserAuthState_RevokingEverything(t *testing.T) {
 	db := mocks_data.NewDatabase(t)
 	tokens := revocationFixture()
 
-	db.On("IncrementUserAuthStateGeneration", revokeTx, revokeUserId).
+	db.On("IncrementUserAuthStateGeneration", mock.Anything, revokeTx, revokeUserId).
 		Return(revokeNewGeneration, nil).Once()
 	db.On("GetRefreshTokensByUserId", revokeTx, revokeUserId).
 		Return(tokens, nil).Once()
@@ -247,7 +247,7 @@ func TestRevokeUserAuthState_RequiresATransaction(t *testing.T) {
 func TestRevokeUserAuthState_UnknownUser(t *testing.T) {
 	db := mocks_data.NewDatabase(t)
 	notFound := errors.New("user not found when incrementing auth state generation")
-	db.On("IncrementUserAuthStateGeneration", revokeTx, revokeUserId).
+	db.On("IncrementUserAuthStateGeneration", mock.Anything, revokeTx, revokeUserId).
 		Return(int64(0), notFound).Once()
 
 	result, err := RevokeUserAuthState(context.Background(), db, revokeTx, revokeUserId, "")
@@ -272,7 +272,7 @@ func TestRevokeUserAuthState_UnknownUser(t *testing.T) {
 func TestRevokeUserAuthState_OldGenerationIsDerivedFromTheIncrement(t *testing.T) {
 	db := mocks_data.NewDatabase(t)
 
-	db.On("IncrementUserAuthStateGeneration", revokeTx, revokeUserId).Return(int64(9), nil).Once()
+	db.On("IncrementUserAuthStateGeneration", mock.Anything, revokeTx, revokeUserId).Return(int64(9), nil).Once()
 	db.On("GetRefreshTokensByUserId", revokeTx, revokeUserId).
 		Return([]*models.RefreshToken{}, nil).Once()
 	db.On("PromoteRefreshTokenGenerations", revokeTx, []int64{}, int64(9)).Return(nil).Once()
@@ -286,7 +286,7 @@ func TestRevokeUserAuthState_OldGenerationIsDerivedFromTheIncrement(t *testing.T
 	assert.Equal(t, int64(8), result.OldGeneration)
 	// The user is never read separately. A GetUserById call would fail on the strict mock,
 	// which is what keeps the racy pre-read from coming back.
-	db.AssertNotCalled(t, "GetUserById", mock.Anything, mock.Anything)
+	db.AssertNotCalled(t, "GetUserById", mock.Anything, mock.Anything, mock.Anything)
 }
 
 // TestRevokeUserAuthState_ChildCommittedBetweenTheDiscoveryQueries covers a refresh racing the
@@ -321,7 +321,7 @@ func TestRevokeUserAuthState_ChildCommittedBetweenTheDiscoveryQueries(t *testing
 		PreviousRefreshTokenJti: "rt-parent", AuthStateGeneration: revokeOldGeneration,
 	}
 
-	db.On("IncrementUserAuthStateGeneration", revokeTx, revokeUserId).
+	db.On("IncrementUserAuthStateGeneration", mock.Anything, revokeTx, revokeUserId).
 		Return(revokeNewGeneration, nil).Once()
 	db.On("GetRefreshTokensByUserId", revokeTx, revokeUserId).
 		Return([]*models.RefreshToken{parent}, nil).Once()
@@ -379,7 +379,7 @@ func TestRevokeUserAuthState_PreservedSessionAlreadyReaped(t *testing.T) {
 		CodeId: sql.NullInt64{Int64: 12, Valid: true}, AuthStateGeneration: revokeOldGeneration,
 	}
 
-	db.On("IncrementUserAuthStateGeneration", revokeTx, revokeUserId).
+	db.On("IncrementUserAuthStateGeneration", mock.Anything, revokeTx, revokeUserId).
 		Return(revokeNewGeneration, nil).Once()
 	db.On("GetRefreshTokensBySessionIdentifier", revokeTx, revokeKeepSid).
 		Return([]*models.RefreshToken{offline}, nil).Once()
@@ -579,7 +579,7 @@ func TestTerminateUserSessionTx_RevokesTheGrantsOfTheSession(t *testing.T) {
 	// must not advance the user's generation nor sweep user-scoped tokens: either would sign out
 	// every other device that user has, which is the opposite of what the action means and the
 	// reason #129 exists separately from #106.
-	db.AssertNotCalled(t, "IncrementUserAuthStateGeneration", mock.Anything, mock.Anything)
+	db.AssertNotCalled(t, "IncrementUserAuthStateGeneration", mock.Anything, mock.Anything, mock.Anything)
 	db.AssertNotCalled(t, "GetRefreshTokensByUserId", mock.Anything, mock.Anything)
 	db.AssertNotCalled(t, "PromoteRefreshTokenGenerations", mock.Anything, mock.Anything, mock.Anything)
 }
@@ -783,7 +783,7 @@ func assertNotAttempted(t *testing.T, db *mocks_data.Database, methods ...string
 // RevokeUserAuthState's precondition.
 func stubRevocationSweepTx(database *mocks_data.Database, userId int64, newGeneration int64) {
 	expectRunInTransaction(database, revokeTx)
-	database.On("IncrementUserAuthStateGeneration", revokeTx, userId).
+	database.On("IncrementUserAuthStateGeneration", mock.Anything, revokeTx, userId).
 		Return(newGeneration, nil).Once()
 	database.On("GetRefreshTokensByUserId", revokeTx, userId).
 		Return([]*models.RefreshToken{}, nil).Once()
@@ -885,7 +885,7 @@ func TestRevokeClientGrants_MarksTheCodesThenSweepsTheTokens(t *testing.T) {
 	// RevokeUserAuthState. A client-scoped action must not advance anybody's generation, must not
 	// delete a session, and must not sweep by user: each would sign the client's users out of
 	// every OTHER client they hold, which is the collateral damage decision 4 exists to avoid.
-	db.AssertNotCalled(t, "IncrementUserAuthStateGeneration", mock.Anything, mock.Anything)
+	db.AssertNotCalled(t, "IncrementUserAuthStateGeneration", mock.Anything, mock.Anything, mock.Anything)
 	db.AssertNotCalled(t, "DeleteUserSession", mock.Anything, mock.Anything)
 	db.AssertNotCalled(t, "GetUserSessionsByUserId", mock.Anything, mock.Anything)
 	db.AssertNotCalled(t, "GetRefreshTokensByUserId", mock.Anything, mock.Anything)
@@ -1133,7 +1133,7 @@ func TestRevokeUserAuthState_TakesTheSessionRowsBeforeTheTokenSweep(t *testing.T
 		db := mocks_data.NewDatabase(t)
 		token := &models.RefreshToken{Id: 1, RefreshTokenJti: "rt-1"}
 
-		db.On("IncrementUserAuthStateGeneration", revokeTx, revokeUserId).
+		db.On("IncrementUserAuthStateGeneration", mock.Anything, revokeTx, revokeUserId).
 			Return(revokeNewGeneration, nil).Once()
 		db.On("GetUserSessionsByUserId", revokeTx, revokeUserId).Return([]models.UserSession{
 			{Id: 10, SessionIdentifier: revokeKeepSid},
@@ -1171,7 +1171,7 @@ func TestRevokeUserAuthState_TakesTheSessionRowsBeforeTheTokenSweep(t *testing.T
 	t.Run("several sessions are taken in ascending id order", func(t *testing.T) {
 		db := mocks_data.NewDatabase(t)
 
-		db.On("IncrementUserAuthStateGeneration", revokeTx, revokeUserId).
+		db.On("IncrementUserAuthStateGeneration", mock.Anything, revokeTx, revokeUserId).
 			Return(revokeNewGeneration, nil).Once()
 		// The order the engine chose to return them in. GetUserSessionsByUserId carries no
 		// ORDER BY, so this is a shape it really can produce.

@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -22,7 +23,7 @@ func TestCreateUserAttribute(t *testing.T) {
 		t.Error("Expected UpdatedAt to be set")
 	}
 
-	retrievedAttr, err := database.GetUserAttributeById(nil, attr.Id)
+	retrievedAttr, err := database.GetUserAttributeById(context.Background(), nil, attr.Id)
 	if err != nil {
 		t.Fatalf("Failed to retrieve created user attribute: %v", err)
 	}
@@ -55,12 +56,12 @@ func TestUpdateUserAttribute(t *testing.T) {
 
 	time.Sleep(timestampTick)
 
-	err := database.UpdateUserAttribute(nil, attr)
+	err := database.UpdateUserAttribute(context.Background(), nil, attr)
 	if err != nil {
 		t.Fatalf("Failed to update user attribute: %v", err)
 	}
 
-	updatedAttr, err := database.GetUserAttributeById(nil, attr.Id)
+	updatedAttr, err := database.GetUserAttributeById(context.Background(), nil, attr.Id)
 	if err != nil {
 		t.Fatalf("Failed to retrieve updated user attribute: %v", err)
 	}
@@ -86,7 +87,7 @@ func TestGetUserAttributeById(t *testing.T) {
 	user := createTestUser(t)
 	attr := createTestUserAttribute(t, user.Id)
 
-	retrievedAttr, err := database.GetUserAttributeById(nil, attr.Id)
+	retrievedAttr, err := database.GetUserAttributeById(context.Background(), nil, attr.Id)
 	if err != nil {
 		t.Fatalf("Failed to get user attribute by ID: %v", err)
 	}
@@ -98,7 +99,7 @@ func TestGetUserAttributeById(t *testing.T) {
 		t.Errorf("Expected Key %s, got %s", attr.Key, retrievedAttr.Key)
 	}
 
-	nonExistentAttr, err := database.GetUserAttributeById(nil, 99999)
+	nonExistentAttr, err := database.GetUserAttributeById(context.Background(), nil, 99999)
 	if err != nil {
 		t.Errorf("Expected no error for non-existent user attribute, got: %v", err)
 	}
@@ -112,7 +113,7 @@ func TestGetUserAttributesByUserId(t *testing.T) {
 	attr1 := createTestUserAttribute(t, user.Id)
 	attr2 := createTestUserAttribute(t, user.Id)
 
-	attrs, err := database.GetUserAttributesByUserId(nil, user.Id)
+	attrs, err := database.GetUserAttributesByUserId(context.Background(), nil, user.Id)
 	if err != nil {
 		t.Fatalf("Failed to get user attributes by user ID: %v", err)
 	}
@@ -141,12 +142,12 @@ func TestDeleteUserAttribute(t *testing.T) {
 	user := createTestUser(t)
 	attr := createTestUserAttribute(t, user.Id)
 
-	err := database.DeleteUserAttribute(nil, attr.Id)
+	err := database.DeleteUserAttribute(context.Background(), nil, attr.Id)
 	if err != nil {
 		t.Fatalf("Failed to delete user attribute: %v", err)
 	}
 
-	deletedAttr, err := database.GetUserAttributeById(nil, attr.Id)
+	deletedAttr, err := database.GetUserAttributeById(context.Background(), nil, attr.Id)
 	if err != nil {
 		t.Fatalf("Error while checking for deleted user attribute: %v", err)
 	}
@@ -154,7 +155,7 @@ func TestDeleteUserAttribute(t *testing.T) {
 		t.Errorf("User attribute still exists after deletion")
 	}
 
-	err = database.DeleteUserAttribute(nil, 99999)
+	err = database.DeleteUserAttribute(context.Background(), nil, 99999)
 	if err != nil {
 		t.Errorf("Expected no error when deleting non-existent user attribute, got: %v", err)
 	}
@@ -168,7 +169,7 @@ func createTestUserAttribute(t *testing.T, userId int64) *models.UserAttribute {
 		IncludeInAccessToken: fake.Bool(),
 		UserId:               userId,
 	}
-	err := database.CreateUserAttribute(nil, attr)
+	err := database.CreateUserAttribute(context.Background(), nil, attr)
 	if err != nil {
 		t.Fatalf("Failed to create test user attribute: %v", err)
 	}

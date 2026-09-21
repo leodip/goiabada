@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"strings"
 	"testing"
 	"time"
@@ -53,7 +54,7 @@ func TestAuthOtp_EnrolmentReloadRendersTheSameSecret(t *testing.T) {
 	assertRedirect(t, resp, "/auth/completed")
 	_ = resp.Body.Close()
 
-	enrolled, err := database.GetUserById(nil, user.Id)
+	enrolled, err := database.GetUserById(context.Background(), nil, user.Id)
 	if err != nil {
 		t.Fatal(err)
 	}

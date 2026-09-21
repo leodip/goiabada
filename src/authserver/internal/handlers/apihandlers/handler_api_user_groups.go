@@ -56,7 +56,7 @@ func HandleAPIUserGroupsGet(
 			return
 		}
 
-		user, err := database.GetUserById(nil, id)
+		user, err := database.GetUserById(r.Context(), nil, id)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting user by ID for groups"), "user_id", id)
 			return
@@ -66,7 +66,7 @@ func HandleAPIUserGroupsGet(
 			return
 		}
 
-		err = database.UserLoadGroups(nil, user)
+		err = database.UserLoadGroups(r.Context(), nil, user)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error loading user groups"), "user_id", user.Id)
 			return
@@ -125,7 +125,7 @@ func HandleAPIUserGroupsPut(
 			return
 		}
 
-		user, err := database.GetUserById(nil, id)
+		user, err := database.GetUserById(r.Context(), nil, id)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting user by ID for groups"), "user_id", id)
 			return
@@ -150,7 +150,7 @@ func HandleAPIUserGroupsPut(
 		}
 
 		// Load current user groups
-		err = database.UserLoadGroups(nil, user)
+		err = database.UserLoadGroups(r.Context(), nil, user)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error loading current user groups for update"), "user_id", user.Id)
 			return
@@ -173,7 +173,7 @@ func HandleAPIUserGroupsPut(
 		// Add groups that are in requested but not in current
 		for _, groupId := range request.GroupIds {
 			if !currentGroupIds[groupId] {
-				err = database.CreateUserGroup(nil, &models.UserGroup{
+				err = database.CreateUserGroup(r.Context(), nil, &models.UserGroup{
 					UserId:  user.Id,
 					GroupId: groupId,
 				})
@@ -193,13 +193,13 @@ func HandleAPIUserGroupsPut(
 		// Remove groups that are in current but not in requested
 		for _, grp := range user.Groups {
 			if !requestedGroupIds[grp.Id] {
-				userGroup, err := database.GetUserGroupByUserIdAndGroupId(nil, user.Id, grp.Id)
+				userGroup, err := database.GetUserGroupByUserIdAndGroupId(r.Context(), nil, user.Id, grp.Id)
 				if err != nil {
 					writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting user group relationship for removal"), "user_id", user.Id, "group_id", grp.Id)
 					return
 				}
 				if userGroup != nil {
-					err = database.DeleteUserGroup(nil, userGroup.Id)
+					err = database.DeleteUserGroup(r.Context(), nil, userGroup.Id)
 					if err != nil {
 						writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error deleting user group membership"), "user_group_id", userGroup.Id, "user_id", user.Id, "group_id", grp.Id)
 						return
@@ -215,7 +215,7 @@ func HandleAPIUserGroupsPut(
 		}
 
 		// Reload user groups to get updated state
-		err = database.UserLoadGroups(nil, user)
+		err = database.UserLoadGroups(r.Context(), nil, user)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error reloading user groups after update"), "user_id", user.Id)
 			return

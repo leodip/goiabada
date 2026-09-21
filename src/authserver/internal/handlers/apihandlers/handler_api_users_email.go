@@ -47,7 +47,7 @@ func HandleAPIUserEmailPut(
 		}
 
 		// Get user from database
-		user, err := database.GetUserById(nil, userId)
+		user, err := database.GetUserById(r.Context(), nil, userId)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -65,7 +65,7 @@ func HandleAPIUserEmailPut(
 			Subject:           user.Subject,
 		}
 
-		err = emailValidator.ValidateEmailUpdate(input)
+		err = emailValidator.ValidateEmailUpdate(r.Context(), input)
 		if err != nil {
 			writeValidationError(w, r, err)
 			return
@@ -78,7 +78,7 @@ func HandleAPIUserEmailPut(
 		user.EmailVerificationCodeIssuedAt = sql.NullTime{Valid: false}
 
 		// Update user in database
-		err = database.UpdateUser(nil, user)
+		err = database.UpdateUser(r.Context(), nil, user)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return

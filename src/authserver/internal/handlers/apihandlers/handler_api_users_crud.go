@@ -50,7 +50,7 @@ func HandleAPIUserGet(
 		}
 
 		// Get user from database
-		user, err := database.GetUserById(nil, userId)
+		user, err := database.GetUserById(r.Context(), nil, userId)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -107,7 +107,7 @@ func HandleAPIUserPasswordPut(
 		}
 
 		// Get existing user
-		user, err := database.GetUserById(nil, userId)
+		user, err := database.GetUserById(r.Context(), nil, userId)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -139,7 +139,7 @@ func HandleAPIUserPasswordPut(
 		// Narrow write, not a full-row UpdateUser: the model was loaded before validation, so
 		// writing every column back would undo a concurrent disable (decision 14).
 		result, err := handlers.RevokeUserAuthStateTx(r.Context(), database, user.Id, "", func(tx *sql.Tx) error {
-			return database.SetUserPasswordHash(tx, user.Id, passwordHash)
+			return database.SetUserPasswordHash(r.Context(), tx, user.Id, passwordHash)
 		})
 		if err != nil {
 			writeInternalServerError(w, r, err)
@@ -162,7 +162,7 @@ func HandleAPIUserPasswordPut(
 			handlers.RevocationReasonAdminPasswordSet, loggedInUser, result)
 
 		// Get the updated user to return
-		updatedUser, err := database.GetUserById(nil, userId)
+		updatedUser, err := database.GetUserById(r.Context(), nil, userId)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -213,7 +213,7 @@ func HandleAPIUserOTPPut(
 		}
 
 		// Get existing user
-		user, err := database.GetUserById(nil, userId)
+		user, err := database.GetUserById(r.Context(), nil, userId)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -244,7 +244,7 @@ func HandleAPIUserOTPPut(
 		})
 
 		// Get the updated user to return
-		updatedUser, err := database.GetUserById(nil, userId)
+		updatedUser, err := database.GetUserById(r.Context(), nil, userId)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -307,7 +307,7 @@ func HandleAPIUserCreatePost(
 		}
 
 		// Check for duplicate email
-		existingUser, err := database.GetUserByEmail(nil, req.Email)
+		existingUser, err := database.GetUserByEmail(r.Context(), nil, req.Email)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -456,7 +456,7 @@ func HandleAPIUserCreatePost(
 			createdUser.ForgotPasswordCodeHash = verificationCodeHash
 			utcNow := time.Now().UTC()
 			createdUser.ForgotPasswordCodeIssuedAt = sql.NullTime{Time: utcNow, Valid: true}
-			err = database.UpdateUser(nil, createdUser)
+			err = database.UpdateUser(r.Context(), nil, createdUser)
 			if err != nil {
 				writeInternalServerError(w, r, err)
 				return
@@ -540,7 +540,7 @@ func HandleAPIUserEnabledPut(
 		}
 
 		// Get existing user
-		user, err := database.GetUserById(nil, userId)
+		user, err := database.GetUserById(r.Context(), nil, userId)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -579,7 +579,7 @@ func HandleAPIUserEnabledPut(
 		disableWithRevocation := func() (handlers.RevocationResult, bool, error) {
 			var result handlers.RevocationResult
 			err := database.RunInTransaction(r.Context(), func(tx *sql.Tx) error {
-				transitioned, err := database.TrySetUserEnabled(tx, userId, true, false)
+				transitioned, err := database.TrySetUserEnabled(r.Context(), tx, userId, true, false)
 				if err != nil {
 					return err
 				}
@@ -608,7 +608,7 @@ func HandleAPIUserEnabledPut(
 		if req.Enabled {
 			// Enabling. Narrow write, no revocation, no new event. Uses the same
 			// compare-and-set so this direction does not stay on the full-row UpdateUser.
-			if _, err = database.TrySetUserEnabled(nil, userId, false, true); err != nil {
+			if _, err = database.TrySetUserEnabled(r.Context(), nil, userId, false, true); err != nil {
 				writeInternalServerError(w, r, err)
 				return
 			}
@@ -634,7 +634,7 @@ func HandleAPIUserEnabledPut(
 		}
 
 		// Get the updated user to return
-		updatedUser, err := database.GetUserById(nil, userId)
+		updatedUser, err := database.GetUserById(r.Context(), nil, userId)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -672,7 +672,7 @@ func HandleAPIUserDelete(
 		}
 
 		// Check if user exists before deleting
-		user, err := database.GetUserById(nil, userId)
+		user, err := database.GetUserById(r.Context(), nil, userId)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -684,7 +684,7 @@ func HandleAPIUserDelete(
 		}
 
 		// Delete user from database
-		err = database.DeleteUser(nil, userId)
+		err = database.DeleteUser(r.Context(), nil, userId)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return

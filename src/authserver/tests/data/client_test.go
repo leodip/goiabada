@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"context"
 	"strings"
 	"testing"
 	"time"
@@ -624,7 +625,7 @@ func TestGetClientsByIds(t *testing.T) {
 	}
 
 	// Test retrieving all created clients
-	retrievedClients, err := database.GetClientsByIds(nil, clientIds)
+	retrievedClients, err := database.GetClientsByIds(context.Background(), nil, clientIds)
 	if err != nil {
 		t.Fatalf("Failed to retrieve clients by IDs: %v", err)
 	}
@@ -663,7 +664,7 @@ func TestGetClientsByIds(t *testing.T) {
 
 	// Test retrieving a subset of clients
 	subsetIds := clientIds[:2]
-	subsetClients, err := database.GetClientsByIds(nil, subsetIds)
+	subsetClients, err := database.GetClientsByIds(context.Background(), nil, subsetIds)
 	if err != nil {
 		t.Fatalf("Failed to retrieve subset of clients: %v", err)
 	}
@@ -676,7 +677,7 @@ func TestGetClientsByIds(t *testing.T) {
 	mixedIds := make([]int64, len(clientIds[:2]), len(clientIds[:2])+1)
 	copy(mixedIds, clientIds[:2])
 	mixedIds = append(mixedIds, nonExistentId)
-	mixedClients, err := database.GetClientsByIds(nil, mixedIds)
+	mixedClients, err := database.GetClientsByIds(context.Background(), nil, mixedIds)
 	if err != nil {
 		t.Fatalf("Failed to retrieve clients with mixed existing and non-existing IDs: %v", err)
 	}
@@ -685,7 +686,7 @@ func TestGetClientsByIds(t *testing.T) {
 	}
 
 	// Test with empty slice of IDs
-	emptyClients, err := database.GetClientsByIds(nil, []int64{})
+	emptyClients, err := database.GetClientsByIds(context.Background(), nil, []int64{})
 	if err != nil {
 		t.Errorf("Expected no error for empty ID slice, got: %v", err)
 	}
@@ -694,7 +695,7 @@ func TestGetClientsByIds(t *testing.T) {
 	}
 
 	// Test with nil slice of IDs
-	nilClients, err := database.GetClientsByIds(nil, nil)
+	nilClients, err := database.GetClientsByIds(context.Background(), nil, nil)
 	if err != nil {
 		t.Errorf("Expected no error for nil ID slice, got: %v", err)
 	}
@@ -757,7 +758,7 @@ func TestGetClientsByIds_MoreIdsThanOneStatementCanCarry(t *testing.T) {
 				ids[position] = realIds[i]
 			}
 
-			clients, err := database.GetClientsByIds(nil, ids)
+			clients, err := database.GetClientsByIds(context.Background(), nil, ids)
 			if err != nil {
 				t.Fatalf("Failed to retrieve %d clients by ids: %v", testCase.total, err)
 			}
@@ -834,7 +835,7 @@ func TestGetClientsByIds_ARepeatedIdOnEitherSideOfABatchBoundary(t *testing.T) {
 				ids[position] = client.Id
 			}
 
-			clients, err := database.GetClientsByIds(nil, ids)
+			clients, err := database.GetClientsByIds(context.Background(), nil, ids)
 			if err != nil {
 				t.Fatalf("Failed to retrieve clients by ids: %v", err)
 			}

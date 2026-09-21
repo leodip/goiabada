@@ -81,7 +81,7 @@ func HandleConsentGet(
 			return
 		}
 
-		user, err := database.GetUserById(nil, authContext.UserId)
+		user, err := database.GetUserById(r.Context(), nil, authContext.UserId)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
@@ -101,7 +101,7 @@ func HandleConsentGet(
 			return
 		}
 
-		consent, err := database.GetConsentByUserIdAndClientId(nil, user.Id, client.Id)
+		consent, err := database.GetConsentByUserIdAndClientId(r.Context(), nil, user.Id, client.Id)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
@@ -292,7 +292,7 @@ func HandleConsentPost(
 					return
 				}
 
-				user, err := database.GetUserById(nil, authContext.UserId)
+				user, err := database.GetUserById(r.Context(), nil, authContext.UserId)
 				if err != nil {
 					httpHelper.InternalServerError(w, r, err)
 					return
@@ -313,7 +313,7 @@ func HandleConsentPost(
 				//
 				// Above the consent row load rather than beside the join below, so a selection
 				// the filter empties refuses without reading or writing anything.
-				grantedScope, err := permissionChecker.FilterOutScopesWhereUserIsNotAuthorized(
+				grantedScope, err := permissionChecker.FilterOutScopesWhereUserIsNotAuthorized(r.Context(),
 					strings.Join(grantedScopes, " "), user)
 				if err != nil {
 					httpHelper.InternalServerError(w, r, err)
@@ -364,7 +364,7 @@ func HandleConsentPost(
 					return
 				}
 
-				consent, err := database.GetConsentByUserIdAndClientId(nil, user.Id, client.Id)
+				consent, err := database.GetConsentByUserIdAndClientId(r.Context(), nil, user.Id, client.Id)
 				if err != nil {
 					httpHelper.InternalServerError(w, r, err)
 					return
@@ -385,13 +385,13 @@ func HandleConsentPost(
 				consent.Scope = grantedScope
 
 				if consent.Id > 0 {
-					err = database.UpdateUserConsent(nil, consent)
+					err = database.UpdateUserConsent(r.Context(), nil, consent)
 					if err != nil {
 						httpHelper.InternalServerError(w, r, err)
 						return
 					}
 				} else {
-					err = database.CreateUserConsent(nil, consent)
+					err = database.CreateUserConsent(r.Context(), nil, consent)
 					if err != nil {
 						httpHelper.InternalServerError(w, r, err)
 						return

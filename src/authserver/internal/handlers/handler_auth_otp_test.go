@@ -151,7 +151,7 @@ func TestHandleAuthOtpGet(t *testing.T) {
 			Id:         1,
 			OTPEnabled: true,
 		}
-		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
+		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
 		client := &models.Client{
 			ClientIdentifier: "test-client",
@@ -244,7 +244,7 @@ func TestHandleAuthOtpGet(t *testing.T) {
 			OTPEnabled: false,
 			Email:      "test@example.com",
 		}
-		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
+		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
 		client := &models.Client{
 			ClientIdentifier: "test-client",
@@ -350,7 +350,7 @@ func TestHandleAuthOtpGet(t *testing.T) {
 			OTPEnabled: false,
 			Email:      "test@example.com",
 		}
-		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
+		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
 		client := &models.Client{
 			ClientIdentifier: "test-client",
@@ -599,7 +599,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-		database.On("GetUserById", mock.Anything, int64(1)).Return(nil, nil)
+		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(nil, nil)
 
 		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err.Error() == "user not found"
@@ -640,7 +640,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 			Id:      1,
 			Enabled: false,
 		}
-		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
+		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
 		client := &models.Client{
 			ClientIdentifier: "test-client",
@@ -687,7 +687,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 			Id:      1,
 			Enabled: true,
 		}
-		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
+		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
 		client := &models.Client{
 			ClientIdentifier: "test-client",
@@ -749,7 +749,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 			OTPEnabled:         true,
 			OTPSecretEncrypted: encryptOTPForTest(t, key.Secret()),
 		}
-		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
+		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
 		client := &models.Client{
 			ClientIdentifier: "test-client",
@@ -805,7 +805,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 			OTPEnabled:         true,
 			OTPSecretEncrypted: encryptOTPForTest(t, "test-secret"),
 		}
-		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
+		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
 		client := &models.Client{
 			ClientIdentifier: "test-client",
@@ -858,7 +858,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 
 		authContext.OTPKeyURL = otpTestKeyURL("test-secret")
 
-		database.On("GetUserById", mock.Anything, int64(1)).
+		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).
 			Return(&models.User{Id: 1, Enabled: true, OTPEnabled: false}, nil)
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").
 			Return(&models.Client{ClientIdentifier: "test-client"}, nil)
@@ -917,7 +917,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 			Enabled:    true,
 			OTPEnabled: false,
 		}
-		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
+		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
 		client := &models.Client{
 			ClientIdentifier: "test-client",
@@ -981,7 +981,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 			OTPEnabled:         true,
 			OTPSecretEncrypted: encryptOTPForTest(t, otpSecret),
 		}
-		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
+		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
 		client := &models.Client{
 			ClientIdentifier: "test-client",
@@ -991,7 +991,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		// requireOTPEnabled is matched exactly rather than with mock.Anything: true is what
 		// makes a verification claim assert an enrolled authenticator (#111 decision 10),
 		// and passing false here would go unnoticed otherwise.
-		database.On("TryConsumeUserOTPStep", mock.Anything, int64(1), mock.Anything, true).
+		database.On("TryConsumeUserOTPStep", mock.Anything, mock.Anything, int64(1), mock.Anything, true).
 			Return(true, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.AuditAuthSuccessOtp, mock.Anything).Return()
@@ -1071,7 +1071,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 			Enabled:    true,
 			OTPEnabled: false,
 		}
-		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
+		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
 		client := &models.Client{
 			ClientIdentifier: "test-client",
@@ -1081,7 +1081,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		// false, because enrollment claims before the enable write and otp_enabled is
 		// still off at that point (#111 decision 10). Matched exactly for the reason the
 		// verification subtest above matches true.
-		database.On("TryConsumeUserOTPStep", mock.Anything, int64(1), mock.Anything, false).
+		database.On("TryConsumeUserOTPStep", mock.Anything, mock.Anything, int64(1), mock.Anything, false).
 			Return(true, nil)
 
 		// The enable write and the counter advance commit together, so there is no state in
@@ -1090,7 +1090,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		// carrying a nil tx and fail as an unexpected call.
 		var calls []string
 		expectRunInTransaction(database, otpEnrolTx, func(edge string) { calls = append(calls, edge) })
-		database.On("UpdateUser", otpEnrolTx, mock.MatchedBy(func(u *models.User) bool {
+		database.On("UpdateUser", mock.Anything, otpEnrolTx, mock.MatchedBy(func(u *models.User) bool {
 			// The secret must be stored encrypted. There is no plaintext column any more: migration
 			// 000048 dropped users.otp_secret (#98).
 			if u.Id != 1 || !u.OTPEnabled || len(u.OTPSecretEncrypted) == 0 {
@@ -1100,9 +1100,9 @@ func TestHandleAuthOtpPost(t *testing.T) {
 			return err == nil && decrypted == otpSecret
 		})).Return(nil).
 			Run(func(mock.Arguments) { calls = append(calls, "update") }).Once()
-		database.On("IncrementUserOtpConfigGeneration", otpEnrolTx, int64(1)).Return(int64(6), nil).
+		database.On("IncrementUserOtpConfigGeneration", mock.Anything, otpEnrolTx, int64(1)).Return(int64(6), nil).
 			Run(func(mock.Arguments) { calls = append(calls, "increment") }).Once()
-		database.On("ClearPendingOTPEnrollment", otpEnrolTx, int64(1)).Return(nil).
+		database.On("ClearPendingOTPEnrollment", mock.Anything, otpEnrolTx, int64(1)).Return(nil).
 			Run(func(mock.Arguments) { calls = append(calls, "clear") }).Once()
 
 		auditLogger.On("Log", mock.Anything, audit.AuditEnabledOTP, mock.Anything).Return()
@@ -1199,7 +1199,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 			Enabled:    true,
 			OTPEnabled: false,
 		}
-		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
+		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
 		client := &models.Client{
 			ClientIdentifier: "test-client",
@@ -1208,12 +1208,12 @@ func TestHandleAuthOtpPost(t *testing.T) {
 
 		// The claim succeeds and the enable write then fails, which is the ordering §4
 		// asks for: a burned code and a retry beats OTP left enabled on a refused request.
-		database.On("TryConsumeUserOTPStep", mock.Anything, int64(1), mock.Anything, false).
+		database.On("TryConsumeUserOTPStep", mock.Anything, mock.Anything, int64(1), mock.Anything, false).
 			Return(true, nil)
 
 		updateError := errors.New("failed to update user")
 		stub := expectRunInTransaction(database, otpEnrolTx)
-		database.On("UpdateUser", otpEnrolTx, mock.Anything).Return(updateError).Once()
+		database.On("UpdateUser", mock.Anything, otpEnrolTx, mock.Anything).Return(updateError).Once()
 
 		httpHelper.On("InternalServerError", rr, req, updateError).Return()
 
@@ -1222,7 +1222,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		// Neither is registered, so reaching either would already fail. Saying so explicitly is
 		// the point: a failed enable rolls back whole, and the counter must not move for an
 		// authenticator that was never established.
-		database.AssertNotCalled(t, "IncrementUserOtpConfigGeneration", mock.Anything, mock.Anything)
+		database.AssertNotCalled(t, "IncrementUserOtpConfigGeneration", mock.Anything, mock.Anything, mock.Anything)
 		assert.ErrorIs(t, stub.bodyErr, updateError, "the body hands its error to the helper, which rolls back")
 
 		httpHelper.AssertExpectations(t)
@@ -1271,18 +1271,18 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		authContext.OTPKeyURL = otpTestKeyURL(key.Secret())
 
 		user := &models.User{Id: 1, Enabled: true, OTPEnabled: false}
-		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
+		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
 		client := &models.Client{ClientIdentifier: "test-client"}
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
 
-		database.On("TryConsumeUserOTPStep", mock.Anything, int64(1), mock.Anything, false).
+		database.On("TryConsumeUserOTPStep", mock.Anything, mock.Anything, int64(1), mock.Anything, false).
 			Return(true, nil)
 
 		incrementError := errors.New("the database is unwell")
 		stub := expectRunInTransaction(database, otpEnrolTx)
-		database.On("UpdateUser", otpEnrolTx, mock.Anything).Return(nil).Once()
-		database.On("IncrementUserOtpConfigGeneration", otpEnrolTx, int64(1)).
+		database.On("UpdateUser", mock.Anything, otpEnrolTx, mock.Anything).Return(nil).Once()
+		database.On("IncrementUserOtpConfigGeneration", mock.Anything, otpEnrolTx, int64(1)).
 			Return(int64(0), incrementError).Once()
 
 		// The clear sits after the increment inside the transaction, so a failed increment must
@@ -1293,7 +1293,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		handler.ServeHTTP(rr, req)
 
 		assert.ErrorIs(t, stub.bodyErr, incrementError, "the body hands its error to the helper, which rolls back")
-		database.AssertNotCalled(t, "ClearPendingOTPEnrollment", mock.Anything, mock.Anything)
+		database.AssertNotCalled(t, "ClearPendingOTPEnrollment", mock.Anything, mock.Anything, mock.Anything)
 		// Nothing is audited as an enrollment that did not happen, and the ceremony does not
 		// advance: no auth method is added and no context is saved.
 		auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
@@ -1345,7 +1345,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 			OTPEnabled:         true,
 			OTPSecretEncrypted: encryptOTPForTest(t, key.Secret()),
 		}
-		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
+		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
 		client := &models.Client{
 			ClientIdentifier: "test-client",
@@ -1356,7 +1356,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		// what refuses it. That is the whole point of the case: without the claim this is
 		// an ordinary successful authentication.
 		expectedStep := time.Now().UTC().Unix() / otp.StepSeconds
-		database.On("TryConsumeUserOTPStep", mock.Anything, int64(1), mock.Anything, true).
+		database.On("TryConsumeUserOTPStep", mock.Anything, mock.Anything, int64(1), mock.Anything, true).
 			Return(false, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.AuditOTPCodeReplayDetected,
@@ -1432,7 +1432,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 			OTPEnabled:         true,
 			OTPSecretEncrypted: encryptOTPForTest(t, key.Secret()),
 		}
-		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
+		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
 		client := &models.Client{
 			ClientIdentifier: "test-client",
@@ -1443,7 +1443,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		// answer: "not consumed" would refuse valid codes for the duration of the fault,
 		// and "consumed" would accept replays through it.
 		consumeError := errors.New("failed to consume the OTP step")
-		database.On("TryConsumeUserOTPStep", mock.Anything, int64(1), mock.Anything, true).
+		database.On("TryConsumeUserOTPStep", mock.Anything, mock.Anything, int64(1), mock.Anything, true).
 			Return(false, consumeError)
 
 		httpHelper.On("InternalServerError", rr, req, consumeError).Return()
@@ -1493,7 +1493,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 			Enabled:    false,
 			OTPEnabled: true,
 		}
-		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
+		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
 		client := &models.Client{
 			ClientIdentifier: "test-client",
@@ -1561,12 +1561,12 @@ func TestHandleAuthOtpPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 			template = "/auth_otp_enrollment.html"
 		}
 
-		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
+		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").
 			Return(&models.Client{ClientIdentifier: "test-client"}, nil)
 		// requireOTPEnabled mirrors enrolled: the enrolled half asserts an authenticator and
 		// the enrollment half establishes one (#111 decision 10).
-		database.On("TryConsumeUserOTPStep", mock.Anything, int64(1), mock.Anything, enrolled).
+		database.On("TryConsumeUserOTPStep", mock.Anything, mock.Anything, int64(1), mock.Anything, enrolled).
 			Return(consumed, nil).Maybe()
 		auditLogger.On("Log", mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
 		httpHelper.On("RenderTemplate", mock.Anything, mock.Anything, "/layouts/auth_layout.html",

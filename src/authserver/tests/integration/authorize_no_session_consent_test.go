@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -55,7 +56,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ConsentIsFu
 		PasswordHash: passwordHashed,
 	}
 
-	err = database.CreateUser(nil, user)
+	err = database.CreateUser(context.Background(), nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -141,7 +142,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ConsentIsFu
 	assert.Equal(t, ceremony.AuthMethodPassword.String(), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 
-	consent, err := database.GetConsentByUserIdAndClientId(nil, user.Id, client.Id)
+	consent, err := database.GetConsentByUserIdAndClientId(context.Background(), nil, user.Id, client.Id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -190,7 +191,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ConsentIsPa
 		PasswordHash: passwordHashed,
 	}
 
-	err = database.CreateUser(nil, user)
+	err = database.CreateUser(context.Background(), nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -279,7 +280,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ConsentIsPa
 	assert.Equal(t, ceremony.AuthMethodPassword.String(), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 
-	consent, err := database.GetConsentByUserIdAndClientId(nil, user.Id, client.Id)
+	consent, err := database.GetConsentByUserIdAndClientId(context.Background(), nil, user.Id, client.Id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -329,7 +330,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIs
 		OTPEnabled:   false,
 	}
 
-	err = database.CreateUser(nil, user)
+	err = database.CreateUser(context.Background(), nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -419,7 +420,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIs
 	assert.Equal(t, ceremony.AuthMethodPassword.String(), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 
-	consent, err := database.GetConsentByUserIdAndClientId(nil, user.Id, client.Id)
+	consent, err := database.GetConsentByUserIdAndClientId(context.Background(), nil, user.Id, client.Id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -469,7 +470,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIs
 		OTPEnabled:   false,
 	}
 
-	err = database.CreateUser(nil, user)
+	err = database.CreateUser(context.Background(), nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -563,7 +564,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIs
 	assert.Equal(t, ceremony.AuthMethodPassword.String(), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 
-	consent, err := database.GetConsentByUserIdAndClientId(nil, user.Id, client.Id)
+	consent, err := database.GetConsentByUserIdAndClientId(context.Background(), nil, user.Id, client.Id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -623,7 +624,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsR
 		OTPEnabled:         true,
 	}
 
-	err = database.CreateUser(nil, user)
+	err = database.CreateUser(context.Background(), nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -724,7 +725,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsR
 	assert.Equal(t, fmt.Sprintf("%s %s", ceremony.AuthMethodPassword.String(), ceremony.AuthMethodOTP.String()), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 
-	consent, err := database.GetConsentByUserIdAndClientId(nil, user.Id, client.Id)
+	consent, err := database.GetConsentByUserIdAndClientId(context.Background(), nil, user.Id, client.Id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -784,7 +785,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsR
 		OTPEnabled:         true,
 	}
 
-	err = database.CreateUser(nil, user)
+	err = database.CreateUser(context.Background(), nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -889,7 +890,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsR
 	assert.Equal(t, fmt.Sprintf("%s %s", ceremony.AuthMethodPassword.String(), ceremony.AuthMethodOTP.String()), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 
-	consent, err := database.GetConsentByUserIdAndClientId(nil, user.Id, client.Id)
+	consent, err := database.GetConsentByUserIdAndClientId(context.Background(), nil, user.Id, client.Id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -940,7 +941,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 		OTPEnabled:   false,
 	}
 
-	err = database.CreateUser(nil, user)
+	err = database.CreateUser(context.Background(), nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1042,7 +1043,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 	assert.Equal(t, fmt.Sprintf("%s %s", ceremony.AuthMethodPassword.String(), ceremony.AuthMethodOTP.String()), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 
-	consent, err := database.GetConsentByUserIdAndClientId(nil, user.Id, client.Id)
+	consent, err := database.GetConsentByUserIdAndClientId(context.Background(), nil, user.Id, client.Id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1093,7 +1094,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 		OTPEnabled:   false,
 	}
 
-	err = database.CreateUser(nil, user)
+	err = database.CreateUser(context.Background(), nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1199,7 +1200,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 	assert.Equal(t, fmt.Sprintf("%s %s", ceremony.AuthMethodPassword.String(), ceremony.AuthMethodOTP.String()), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 
-	consent, err := database.GetConsentByUserIdAndClientId(nil, user.Id, client.Id)
+	consent, err := database.GetConsentByUserIdAndClientId(context.Background(), nil, user.Id, client.Id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1259,7 +1260,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 		OTPEnabled:         true,
 	}
 
-	err = database.CreateUser(nil, user)
+	err = database.CreateUser(context.Background(), nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1360,7 +1361,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 	assert.Equal(t, fmt.Sprintf("%s %s", ceremony.AuthMethodPassword.String(), ceremony.AuthMethodOTP.String()), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 
-	consent, err := database.GetConsentByUserIdAndClientId(nil, user.Id, client.Id)
+	consent, err := database.GetConsentByUserIdAndClientId(context.Background(), nil, user.Id, client.Id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1420,7 +1421,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 		OTPEnabled:         true,
 	}
 
-	err = database.CreateUser(nil, user)
+	err = database.CreateUser(context.Background(), nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1525,7 +1526,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 	assert.Equal(t, fmt.Sprintf("%s %s", ceremony.AuthMethodPassword.String(), ceremony.AuthMethodOTP.String()), code.AuthMethods)
 	assert.Equal(t, false, code.Used)
 
-	consent, err := database.GetConsentByUserIdAndClientId(nil, user.Id, client.Id)
+	consent, err := database.GetConsentByUserIdAndClientId(context.Background(), nil, user.Id, client.Id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1574,7 +1575,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ConsentIsCa
 		PasswordHash: passwordHashed,
 	}
 
-	err = database.CreateUser(nil, user)
+	err = database.CreateUser(context.Background(), nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1705,7 +1706,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIs
 		OTPEnabled:   false,
 	}
 
-	err = database.CreateUser(nil, user)
+	err = database.CreateUser(context.Background(), nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1833,7 +1834,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsR
 		OTPEnabled:         true,
 	}
 
-	err = database.CreateUser(nil, user)
+	err = database.CreateUser(context.Background(), nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1963,7 +1964,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 		OTPEnabled:   false,
 	}
 
-	err = database.CreateUser(nil, user)
+	err = database.CreateUser(context.Background(), nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2103,7 +2104,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 		OTPEnabled:         true,
 	}
 
-	err = database.CreateUser(nil, user)
+	err = database.CreateUser(context.Background(), nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2236,7 +2237,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ElevenScope
 		PasswordHash: passwordHashed,
 	}
 
-	err = database.CreateUser(nil, user)
+	err = database.CreateUser(context.Background(), nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2324,7 +2325,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsRequired_ElevenScope
 	assert.Equal(t, user.Id, code.User.Id)
 	assert.Equal(t, false, code.Used)
 
-	consent, err := database.GetConsentByUserIdAndClientId(nil, user.Id, client.Id)
+	consent, err := database.GetConsentByUserIdAndClientId(context.Background(), nil, user.Id, client.Id)
 	if err != nil {
 		t.Fatal(err)
 	}

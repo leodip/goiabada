@@ -57,7 +57,7 @@ func expectSessionOwnerRead(database *mocks_data.Database, users ...models.User)
 	for _, user := range users {
 		byId[user.Id] = user
 	}
-	database.On("GetUsersByIds", (*sql.Tx)(nil), mock.Anything).Return(byId, nil).Once()
+	database.On("GetUsersByIds", mock.Anything, (*sql.Tx)(nil), mock.Anything).Return(byId, nil).Once()
 }
 
 // expectSessionListReads registers the reads every list handler makes once it has its sessions:
@@ -65,7 +65,7 @@ func expectSessionOwnerRead(database *mocks_data.Database, users ...models.User)
 // here and GetClientsByIds is the one query buildSessionDetails runs.
 func expectSessionListReads(database *mocks_data.Database, sessions []models.UserSession) {
 	database.On("UserSessionsLoadClients", (*sql.Tx)(nil), sessions).Return(nil).Once()
-	database.On("GetClientsByIds", (*sql.Tx)(nil), mock.Anything).
+	database.On("GetClientsByIds", mock.Anything, (*sql.Tx)(nil), mock.Anything).
 		Return([]models.Client{{Id: 5, ClientIdentifier: "portal"}}, nil).Once()
 }
 
@@ -78,7 +78,7 @@ func TestHandleAPIUserSessionsGet_ReadsTheCallersSidAndFilters(t *testing.T) {
 	stale.LastAccessed = stale.LastAccessed.Add(-48 * time.Hour)
 	sessions := []models.UserSession{now, mine, stale}
 
-	database.On("GetUserById", (*sql.Tx)(nil), int64(42)).Return(&models.User{Id: 42}, nil).Once()
+	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), int64(42)).Return(&models.User{Id: 42}, nil).Once()
 	database.On("GetUserSessionsByUserId", (*sql.Tx)(nil), int64(42)).Return(sessions, nil).Once()
 	expectSessionListReads(database, sessions)
 
@@ -104,7 +104,7 @@ func TestHandleAPIUserSessionsGet_NoSidOnTheTokenMarksNothingCurrent(t *testing.
 
 	sessions := []models.UserSession{liveSession(1, "sid-one", 5), liveSession(2, "", 5)}
 
-	database.On("GetUserById", (*sql.Tx)(nil), int64(42)).Return(&models.User{Id: 42}, nil).Once()
+	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), int64(42)).Return(&models.User{Id: 42}, nil).Once()
 	database.On("GetUserSessionsByUserId", (*sql.Tx)(nil), int64(42)).Return(sessions, nil).Once()
 	expectSessionListReads(database, sessions)
 
@@ -156,7 +156,7 @@ func TestHandleAPIAccountSessionsGet_ReadsTheCallersSidAndFilters(t *testing.T) 
 	stale.LastAccessed = stale.LastAccessed.Add(-48 * time.Hour)
 	sessions := []models.UserSession{liveSession(1, "sid-other", 5), mine, stale}
 
-	database.On("GetUserBySubject", (*sql.Tx)(nil), "the-user").Return(&models.User{Id: 42}, nil).Once()
+	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), "the-user").Return(&models.User{Id: 42}, nil).Once()
 	database.On("GetUserSessionsByUserId", (*sql.Tx)(nil), int64(42)).Return(sessions, nil).Once()
 	expectSessionListReads(database, sessions)
 

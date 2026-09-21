@@ -1,6 +1,7 @@
 package apihandlers
 
 import (
+	"context"
 	"net/http"
 	"strconv"
 
@@ -91,13 +92,13 @@ func HandleAPIClientSessionsGet(
 			currentSid = jwtToken.GetStringClaim("sid")
 		}
 
-		sessions, err := buildSessionDetails(database, userSessions, settings, currentSid)
+		sessions, err := buildSessionDetails(r.Context(), database, userSessions, settings, currentSid)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
 		}
 
-		users, err := sessionOwners(database, sessions)
+		users, err := sessionOwners(r.Context(), database, sessions)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -125,7 +126,7 @@ func HandleAPIClientSessionsGet(
 // missing, for the reason loadSessionClients refuses a client id with no row: user_sessions.user_id
 // is a non-null foreign key, so an unresolvable one is a broken row and a page rendering a blank
 // email in its place would hide it.
-func sessionOwners(database data.Database, sessions []api.UserSessionDetailResponse) ([]api.SessionOwnerResponse, error) {
+func sessionOwners(ctx context.Context, database data.Database, sessions []api.UserSessionDetailResponse) ([]api.SessionOwnerResponse, error) {
 	userIds := make([]int64, 0, len(sessions))
 	seen := make(map[int64]bool, len(sessions))
 	for _, session := range sessions {
@@ -138,7 +139,7 @@ func sessionOwners(database data.Database, sessions []api.UserSessionDetailRespo
 		return []api.SessionOwnerResponse{}, nil
 	}
 
-	usersById, err := database.GetUsersByIds(nil, userIds)
+	usersById, err := database.GetUsersByIds(ctx, nil, userIds)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to get users by ids")
 	}

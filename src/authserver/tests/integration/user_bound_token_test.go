@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -68,7 +69,7 @@ func createUserWithSubject(t *testing.T, subject string) (*models.User, string) 
 		GivenName:    fake.FirstName(),
 		FamilyName:   fake.LastName(),
 	}
-	err = database.CreateUser(nil, user)
+	err = database.CreateUser(context.Background(), nil, user)
 	require.NoError(t, err)
 
 	return user, password
@@ -176,7 +177,7 @@ func TestUserBoundToken_ClientCredentialsCannotActAsUser(t *testing.T) {
 
 		// Asserting the status alone would still pass against a guard placed after the
 		// mutation, so check the data.
-		persisted, err := database.GetUserById(nil, accountUser.Id)
+		persisted, err := database.GetUserById(context.Background(), nil, accountUser.Id)
 		require.NoError(t, err)
 		assert.Equal(t, originalEmail, persisted.Email,
 			"the user's email must not have been modified")
@@ -238,7 +239,7 @@ func TestUserBoundToken_EveryUserTokenPathStillWorks(t *testing.T) {
 			t.Fatalf("expected 200, got %d. body: %s", resp.StatusCode, string(body))
 		}
 
-		persisted, err := database.GetUserById(nil, user.Id)
+		persisted, err := database.GetUserById(context.Background(), nil, user.Id)
 		require.NoError(t, err)
 		assert.Equal(t, newEmail, persisted.Email)
 	}
@@ -345,7 +346,7 @@ func userAccessTokenViaROPC(t *testing.T) (string, *models.User, string) {
 	passwordHashed, err := passwordhash.Hash(password)
 	require.NoError(t, err)
 	user.PasswordHash = passwordHashed
-	err = database.UpdateUser(nil, user)
+	err = database.UpdateUser(context.Background(), nil, user)
 	require.NoError(t, err)
 
 	// ROPC checks the USER holds each requested resource permission, so manage-account has to be

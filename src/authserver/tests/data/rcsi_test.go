@@ -293,7 +293,7 @@ func TestRCSI_TheFixtureIsTheDatabaseUnderTest(t *testing.T) {
 
 	user := createTestUserOn(t, f.primary)
 
-	mine, err := f.primary.GetUserById(nil, user.Id)
+	mine, err := f.primary.GetUserById(context.Background(), nil, user.Id)
 	require.NoError(t, err, "reloading the seeded user on the fixture's own handle")
 	require.NotNil(t, mine, "a row seeded on the fixture must be visible there")
 	require.Equal(t, user.Subject, mine.Subject)
@@ -301,7 +301,7 @@ func TestRCSI_TheFixtureIsTheDatabaseUnderTest(t *testing.T) {
 	// The same id on the shared database is either absent or a different user. Both are correct
 	// answers; what would be wrong is finding THIS user, which is what a seeder left on the
 	// package handle would produce.
-	theirs, err := database.GetUserById(nil, user.Id)
+	theirs, err := database.GetUserById(context.Background(), nil, user.Id)
 	require.NoError(t, err, "reloading the same id on the package handle")
 	if theirs != nil {
 		require.NotEqual(t, user.Subject, theirs.Subject,

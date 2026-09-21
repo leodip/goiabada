@@ -20,7 +20,7 @@ func HandleProfilePictureGet(
 			return
 		}
 
-		user, err := database.GetUserBySubject(nil, subject)
+		user, err := database.GetUserBySubject(r.Context(), nil, subject)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
@@ -31,7 +31,7 @@ func HandleProfilePictureGet(
 			return
 		}
 
-		profilePicture, err := database.GetUserProfilePictureByUserId(nil, user.Id)
+		profilePicture, err := database.GetUserProfilePictureByUserId(r.Context(), nil, user.Id)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return

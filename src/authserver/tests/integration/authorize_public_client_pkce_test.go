@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"net/http"
 	"net/url"
 	"testing"
@@ -70,7 +71,7 @@ func newPublicPKCEClient(t *testing.T, pkceRequired *bool) (*models.Client, stri
 		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
-	require.NoError(t, database.CreateUser(nil, user))
+	require.NoError(t, database.CreateUser(context.Background(), nil, user))
 
 	return client, redirectURI, user, password
 }

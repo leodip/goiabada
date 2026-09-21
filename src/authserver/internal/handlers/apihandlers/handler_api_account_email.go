@@ -43,7 +43,7 @@ func HandleAPIAccountEmailPut(
 		}
 
 		// Load user
-		user, err := database.GetUserBySubject(nil, subject)
+		user, err := database.GetUserBySubject(r.Context(), nil, subject)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -55,7 +55,7 @@ func HandleAPIAccountEmailPut(
 
 		// Validate email (server-side rules; confirmation is a UI concern)
 		email := strings.ToLower(strings.TrimSpace(req.Email))
-		if err := emailValidator.ValidateEmailChange(email, user.Subject); err != nil {
+		if err := emailValidator.ValidateEmailChange(r.Context(), email, user.Subject); err != nil {
 			writeValidationError(w, r, err)
 			return
 		}
@@ -66,7 +66,7 @@ func HandleAPIAccountEmailPut(
 		user.EmailVerificationCodeEncrypted = nil
 		user.EmailVerificationCodeIssuedAt = sql.NullTime{Valid: false}
 
-		if err := database.UpdateUser(nil, user); err != nil {
+		if err := database.UpdateUser(r.Context(), nil, user); err != nil {
 			writeInternalServerError(w, r, err)
 			return
 		}

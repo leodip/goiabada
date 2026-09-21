@@ -40,11 +40,11 @@ func EnableUserOTPTx(ctx context.Context, database data.Database, user *models.U
 	// unchanged on every attempt, and generation is the committing attempt's.
 	var generation int64
 	err := database.RunInTransaction(ctx, func(tx *sql.Tx) error {
-		if err := database.UpdateUser(tx, user); err != nil {
+		if err := database.UpdateUser(ctx, tx, user); err != nil {
 			return err
 		}
 		var err error
-		generation, err = database.IncrementUserOtpConfigGeneration(tx, user.Id)
+		generation, err = database.IncrementUserOtpConfigGeneration(ctx, tx, user.Id)
 		if err != nil {
 			return err
 		}
@@ -58,7 +58,7 @@ func EnableUserOTPTx(ctx context.Context, database data.Database, user *models.U
 		// enrollment and whose clear is therefore a no-op. Putting it here rather than at the account
 		// API's own enable branch is what makes "an enabled authenticator has no pending seed behind
 		// it" a property of the transaction rather than of one caller (#247).
-		if err := database.ClearPendingOTPEnrollment(tx, user.Id); err != nil {
+		if err := database.ClearPendingOTPEnrollment(ctx, tx, user.Id); err != nil {
 			return err
 		}
 		return nil

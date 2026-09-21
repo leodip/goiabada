@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"net/url"
 	"testing"
 
@@ -65,7 +66,7 @@ func createROPCUser(t *testing.T, password string) *models.User {
 		FamilyName:   fake.LastName(),
 	}
 
-	err = database.CreateUser(nil, user)
+	err = database.CreateUser(context.Background(), nil, user)
 	assert.Nil(t, err)
 
 	return user
@@ -407,7 +408,7 @@ func TestROPC_DisabledUser(t *testing.T) {
 		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
-	err = database.CreateUser(nil, user)
+	err = database.CreateUser(context.Background(), nil, user)
 	assert.Nil(t, err)
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
@@ -577,7 +578,7 @@ func TestROPC_UserWith2FAEnabled(t *testing.T) {
 		OTPEnabled:         true, // 2FA enabled
 		OTPSecretEncrypted: encryptOTPSecretForTest(t, "JBSWY3DPEHPK3PXP"),
 	}
-	err = database.CreateUser(nil, user)
+	err = database.CreateUser(context.Background(), nil, user)
 	assert.Nil(t, err)
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"

@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/url"
@@ -196,7 +197,7 @@ func TestAPIClientAuthenticationPut_FlipToPublic_LeavesTheUsersOtherClientAlone(
 		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
-	require.NoError(t, database.CreateUser(nil, user))
+	require.NoError(t, database.CreateUser(context.Background(), nil, user))
 
 	flippedSecret := fake.LetterN(32)
 	flippedClient, flippedCode := createAuthCode(t, flippedSecret, "openid profile email",

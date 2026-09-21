@@ -72,12 +72,12 @@ func (uc *UserCreator) CreateUser(ctx context.Context, input *CreateUserInput) (
 	// CreateUser assigns onto user is reassigned by the next attempt before the permission
 	// insert reads it.
 	err = uc.database.RunInTransaction(ctx, func(tx *sql.Tx) error {
-		if err := uc.database.CreateUser(tx, user); err != nil {
+		if err := uc.database.CreateUser(ctx, tx, user); err != nil {
 			return err
 		}
 
 		for _, permission := range user.Permissions {
-			err := uc.database.CreateUserPermission(tx, &models.UserPermission{
+			err := uc.database.CreateUserPermission(ctx, tx, &models.UserPermission{
 				UserId:       user.Id,
 				PermissionId: permission.Id,
 			})

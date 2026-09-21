@@ -82,7 +82,7 @@ func TestHandleAPIUserProfilePictureGet_UserNotFound(t *testing.T) {
 	req = setChiURLParam(req, "id", "123")
 	rr := httptest.NewRecorder()
 
-	database.On("GetUserById", (*sql.Tx)(nil), int64(123)).Return(nil, nil)
+	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(nil, nil)
 
 	handler.ServeHTTP(rr, req)
 
@@ -108,8 +108,8 @@ func TestHandleAPIUserProfilePictureGet_HasPicture(t *testing.T) {
 	req = setChiURLParam(req, "id", "123")
 	rr := httptest.NewRecorder()
 
-	database.On("GetUserById", (*sql.Tx)(nil), int64(123)).Return(user, nil)
-	database.On("UserHasProfilePicture", (*sql.Tx)(nil), int64(123)).Return(true, nil)
+	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(user, nil)
+	database.On("UserHasProfilePicture", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(true, nil)
 
 	handler.ServeHTTP(rr, req)
 
@@ -136,8 +136,8 @@ func TestHandleAPIUserProfilePictureGet_NoPicture(t *testing.T) {
 	req = setChiURLParam(req, "id", "123")
 	rr := httptest.NewRecorder()
 
-	database.On("GetUserById", (*sql.Tx)(nil), int64(123)).Return(user, nil)
-	database.On("UserHasProfilePicture", (*sql.Tx)(nil), int64(123)).Return(false, nil)
+	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(user, nil)
+	database.On("UserHasProfilePicture", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(false, nil)
 
 	handler.ServeHTTP(rr, req)
 
@@ -203,7 +203,7 @@ func TestHandleAPIUserProfilePicturePost_UserNotFound(t *testing.T) {
 	req = setChiURLParam(req, "id", "123")
 	rr := httptest.NewRecorder()
 
-	database.On("GetUserById", (*sql.Tx)(nil), int64(123)).Return(nil, nil)
+	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(nil, nil)
 
 	handler.ServeHTTP(rr, req)
 
@@ -232,7 +232,7 @@ func TestHandleAPIUserProfilePicturePost_InvalidImage(t *testing.T) {
 	req = setChiURLParam(req, "id", "123")
 	rr := httptest.NewRecorder()
 
-	database.On("GetUserById", (*sql.Tx)(nil), int64(123)).Return(user, nil)
+	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(user, nil)
 
 	handler.ServeHTTP(rr, req)
 
@@ -261,9 +261,9 @@ func TestHandleAPIUserProfilePicturePost_CreateNew(t *testing.T) {
 	req = setTokenContextWithClaims(req, map[string]interface{}{"sub": adminSub})
 	rr := httptest.NewRecorder()
 
-	database.On("GetUserById", (*sql.Tx)(nil), int64(123)).Return(user, nil)
-	database.On("GetUserProfilePictureByUserId", (*sql.Tx)(nil), int64(123)).Return(nil, nil)
-	database.On("CreateUserProfilePicture", (*sql.Tx)(nil), mock.MatchedBy(func(pp *models.UserProfilePicture) bool {
+	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(user, nil)
+	database.On("GetUserProfilePictureByUserId", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(nil, nil)
+	database.On("CreateUserProfilePicture", mock.Anything, (*sql.Tx)(nil), mock.MatchedBy(func(pp *models.UserProfilePicture) bool {
 		return pp.UserId == int64(123) && pp.ContentType == "image/png"
 	})).Return(nil)
 
@@ -308,9 +308,9 @@ func TestHandleAPIUserProfilePicturePost_UpdateExisting(t *testing.T) {
 	req = setTokenContextWithClaims(req, map[string]interface{}{"sub": adminSub})
 	rr := httptest.NewRecorder()
 
-	database.On("GetUserById", (*sql.Tx)(nil), int64(123)).Return(user, nil)
-	database.On("GetUserProfilePictureByUserId", (*sql.Tx)(nil), int64(123)).Return(existingPicture, nil)
-	database.On("UpdateUserProfilePicture", (*sql.Tx)(nil), mock.MatchedBy(func(pp *models.UserProfilePicture) bool {
+	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(user, nil)
+	database.On("GetUserProfilePictureByUserId", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(existingPicture, nil)
+	database.On("UpdateUserProfilePicture", mock.Anything, (*sql.Tx)(nil), mock.MatchedBy(func(pp *models.UserProfilePicture) bool {
 		return pp.Id == existingPicture.Id && pp.ContentType == "image/png"
 	})).Return(nil)
 
@@ -380,7 +380,7 @@ func TestHandleAPIUserProfilePictureDelete_UserNotFound(t *testing.T) {
 	req = setChiURLParam(req, "id", "123")
 	rr := httptest.NewRecorder()
 
-	database.On("GetUserById", (*sql.Tx)(nil), int64(123)).Return(nil, nil)
+	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(nil, nil)
 
 	handler.ServeHTTP(rr, req)
 
@@ -409,8 +409,8 @@ func TestHandleAPIUserProfilePictureDelete_Success(t *testing.T) {
 	req = setTokenContextWithClaims(req, map[string]interface{}{"sub": adminSub})
 	rr := httptest.NewRecorder()
 
-	database.On("GetUserById", (*sql.Tx)(nil), int64(123)).Return(user, nil)
-	database.On("DeleteUserProfilePicture", (*sql.Tx)(nil), int64(123)).Return(nil)
+	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(user, nil)
+	database.On("DeleteUserProfilePicture", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(nil)
 
 	auditLogger.On("Log", mock.Anything, audit.AuditDeletedUserProfilePicture, mock.MatchedBy(func(details map[string]interface{}) bool {
 		return details["userId"] == user.Id && details["loggedInUser"] == adminSub
@@ -442,8 +442,8 @@ func TestHandleAPIUserProfilePictureDelete_DatabaseError(t *testing.T) {
 	req = setChiURLParam(req, "id", "123")
 	rr := httptest.NewRecorder()
 
-	database.On("GetUserById", (*sql.Tx)(nil), int64(123)).Return(user, nil)
-	database.On("DeleteUserProfilePicture", (*sql.Tx)(nil), int64(123)).Return(assert.AnError)
+	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(user, nil)
+	database.On("DeleteUserProfilePicture", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(assert.AnError)
 
 	handler.ServeHTTP(rr, req)
 

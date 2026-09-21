@@ -1,6 +1,7 @@
 package apihandlers
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"testing"
@@ -61,14 +62,14 @@ func TestBuildSessionDetails_LoadsEveryClientInOneQuery(t *testing.T) {
 	}
 
 	var gotClientIds []int64
-	database.On("GetClientsByIds", (*sql.Tx)(nil), mock.Anything).
-		Run(func(args mock.Arguments) { gotClientIds = args.Get(1).([]int64) }).
+	database.On("GetClientsByIds", mock.Anything, (*sql.Tx)(nil), mock.Anything).
+		Run(func(args mock.Arguments) { gotClientIds = args.Get(2).([]int64) }).
 		Return([]models.Client{
 			{Id: 5, ClientIdentifier: "portal"},
 			{Id: 6, ClientIdentifier: "backoffice"},
 		}, nil).Once()
 
-	details, err := buildSessionDetails(database, sessions, sessionSettings, "")
+	details, err := buildSessionDetails(context.Background(), database, sessions, sessionSettings, "")
 
 	require.NoError(t, err)
 	require.Len(t, details, 3)
@@ -88,7 +89,7 @@ func TestBuildSessionDetails_LoadsEveryClientInOneQuery(t *testing.T) {
 func TestBuildSessionDetails_NoClientsRunsNoQuery(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 
-	details, err := buildSessionDetails(database, []models.UserSession{liveSession(1, "sid-1")}, sessionSettings, "")
+	details, err := buildSessionDetails(context.Background(), database, []models.UserSession{liveSession(1, "sid-1")}, sessionSettings, "")
 
 	require.NoError(t, err)
 	require.Len(t, details, 1)
@@ -112,11 +113,11 @@ func TestBuildSessionDetails_DropsSessionsThatAreNoLongerValid(t *testing.T) {
 	sessions := []models.UserSession{liveSession(1, "sid-live", 5), idle, expired}
 
 	var gotClientIds []int64
-	database.On("GetClientsByIds", (*sql.Tx)(nil), mock.Anything).
-		Run(func(args mock.Arguments) { gotClientIds = args.Get(1).([]int64) }).
+	database.On("GetClientsByIds", mock.Anything, (*sql.Tx)(nil), mock.Anything).
+		Run(func(args mock.Arguments) { gotClientIds = args.Get(2).([]int64) }).
 		Return([]models.Client{{Id: 5, ClientIdentifier: "portal"}}, nil).Once()
 
-	details, err := buildSessionDetails(database, sessions, sessionSettings, "")
+	details, err := buildSessionDetails(context.Background(), database, sessions, sessionSettings, "")
 
 	require.NoError(t, err)
 	require.Len(t, details, 1)
@@ -133,7 +134,7 @@ func TestBuildSessionDetails_DropsSessionsThatAreNoLongerValid(t *testing.T) {
 func TestBuildSessionDetails_PassesTheCallersSidThrough(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 
-	details, err := buildSessionDetails(database,
+	details, err := buildSessionDetails(context.Background(), database,
 		[]models.UserSession{liveSession(1, "sid-1"), liveSession(2, "sid-2")},
 		sessionSettings, "sid-2")
 
@@ -148,10 +149,10 @@ func TestBuildSessionDetails_PassesTheCallersSidThrough(t *testing.T) {
 func TestBuildSessionDetails_SurfacesTheClientQueryError(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 
-	database.On("GetClientsByIds", (*sql.Tx)(nil), mock.Anything).
+	database.On("GetClientsByIds", mock.Anything, (*sql.Tx)(nil), mock.Anything).
 		Return(nil, errors.New("connection reset")).Once()
 
-	details, err := buildSessionDetails(database,
+	details, err := buildSessionDetails(context.Background(), database,
 		[]models.UserSession{liveSession(1, "sid-1", 5)}, sessionSettings, "")
 
 	require.Error(t, err)
@@ -165,10 +166,10 @@ func TestBuildSessionDetails_SurfacesTheClientQueryError(t *testing.T) {
 func TestBuildSessionDetails_RefusesAClientIdWithNoRow(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 
-	database.On("GetClientsByIds", (*sql.Tx)(nil), mock.Anything).
+	database.On("GetClientsByIds", mock.Anything, (*sql.Tx)(nil), mock.Anything).
 		Return([]models.Client{{Id: 5, ClientIdentifier: "portal"}}, nil).Once()
 
-	details, err := buildSessionDetails(database,
+	details, err := buildSessionDetails(context.Background(), database,
 		[]models.UserSession{liveSession(1, "sid-1", 5, 99)}, sessionSettings, "")
 
 	require.Error(t, err)
@@ -181,9 +182,29 @@ func TestBuildSessionDetails_RefusesAClientIdWithNoRow(t *testing.T) {
 func TestBuildSessionDetails_EmptyListIsAnEmptySlice(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 
-	details, err := buildSessionDetails(database, nil, sessionSettings, "")
+	details, err := buildSessionDetails(context.Background(), database, nil, sessionSettings, "")
 
 	require.NoError(t, err)
 	require.NotNil(t, details)
 	assert.Empty(t, details)
+}
+
+// TestBuildSessionDetails_LoadsClientsUnderTheCallersContext is the second half of the same
+// claim, and seam 4's arm for the one read this file makes. The union query is the most
+// expensive thing these three endpoints do, so it is also the one most worth abandoning when the
+// caller is gone; a builder that manufactured its own context would issue it regardless.
+func TestBuildSessionDetails_LoadsClientsUnderTheCallersContext(t *testing.T) {
+	type marker struct{}
+	ctx := context.WithValue(context.Background(), marker{}, "the caller's own")
+
+	database := mocks_data.NewDatabase(t)
+	database.On("GetClientsByIds", mock.MatchedBy(func(got context.Context) bool {
+		return got.Value(marker{}) == "the caller's own"
+	}), (*sql.Tx)(nil), mock.Anything).
+		Return([]models.Client{{Id: 5, ClientIdentifier: "portal"}}, nil).Once()
+
+	_, err := buildSessionDetails(ctx, database, []models.UserSession{liveSession(1, "sid-1", 5)}, sessionSettings, "")
+
+	require.NoError(t, err)
+	database.AssertExpectations(t)
 }

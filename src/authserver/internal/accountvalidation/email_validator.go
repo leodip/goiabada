@@ -1,6 +1,7 @@
 package accountvalidation
 
 import (
+	"context"
 	"regexp"
 
 	"github.com/leodip/goiabada/authserver/internal/data"
@@ -52,7 +53,7 @@ func (val *EmailValidator) ValidateEmailAddress(emailAddress string) error {
 	return nil
 }
 
-func (val *EmailValidator) ValidateEmailUpdate(input *ValidateEmailInput) error {
+func (val *EmailValidator) ValidateEmailUpdate(ctx context.Context, input *ValidateEmailInput) error {
 
 	// i18n surface: C — admin/account API.
 	if len(input.Email) == 0 {
@@ -71,7 +72,7 @@ func (val *EmailValidator) ValidateEmailUpdate(input *ValidateEmailInput) error 
 		return i18n.NewLocalizedError(i18n.ErrCodeEmailConfirmationMismatch, nil)
 	}
 
-	user, err := val.database.GetUserBySubject(nil, input.Subject)
+	user, err := val.database.GetUserBySubject(ctx, nil, input.Subject)
 	if err != nil {
 		return err
 	}
@@ -82,7 +83,7 @@ func (val *EmailValidator) ValidateEmailUpdate(input *ValidateEmailInput) error 
 		return errs.New("subject not found: " + input.Subject)
 	}
 
-	userByEmail, err := val.database.GetUserByEmail(nil, input.Email)
+	userByEmail, err := val.database.GetUserByEmail(ctx, nil, input.Email)
 	if err != nil {
 		return err
 	}
@@ -97,7 +98,7 @@ func (val *EmailValidator) ValidateEmailUpdate(input *ValidateEmailInput) error 
 // ValidateEmailChange validates an email change for a given subject without
 // relying on a confirmation field (confirmation is a UI concern).
 // It checks presence, format, max length and uniqueness across users.
-func (val *EmailValidator) ValidateEmailChange(email string, subject string) error {
+func (val *EmailValidator) ValidateEmailChange(ctx context.Context, email string, subject string) error {
 	// i18n surface: C — admin/account API.
 	if len(email) == 0 {
 		return i18n.NewLocalizedError(i18n.ErrCodeEmailRequired, nil)
@@ -111,7 +112,7 @@ func (val *EmailValidator) ValidateEmailChange(email string, subject string) err
 		return i18n.NewLocalizedError(i18n.ErrCodeEmailTooLong, map[string]any{"max": 60})
 	}
 
-	user, err := val.database.GetUserBySubject(nil, subject)
+	user, err := val.database.GetUserBySubject(ctx, nil, subject)
 	if err != nil {
 		return err
 	}
@@ -125,7 +126,7 @@ func (val *EmailValidator) ValidateEmailChange(email string, subject string) err
 		return errs.New("subject not found: " + subject)
 	}
 
-	userByEmail, err := val.database.GetUserByEmail(nil, email)
+	userByEmail, err := val.database.GetUserByEmail(ctx, nil, email)
 	if err != nil {
 		return err
 	}

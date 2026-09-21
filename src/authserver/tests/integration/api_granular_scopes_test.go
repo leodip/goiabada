@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -91,10 +92,10 @@ func TestGranularScopes_AdminReadCanOnlyReadUserEndpoints(t *testing.T) {
 		Email:     fake.Email(),
 		GivenName: "TestUser",
 	}
-	err := database.CreateUser(nil, testUser)
+	err := database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
 	baseURL := config.GetAuthServer().BaseURL
@@ -238,10 +239,10 @@ func TestGranularScopes_ManageUsersCanAccessUserEndpointsOnly(t *testing.T) {
 		Email:     fake.Email(),
 		GivenName: "TestUser",
 	}
-	err := database.CreateUser(nil, testUser)
+	err := database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
 	// Create a test client
@@ -297,10 +298,10 @@ func TestGranularScopes_ManageClientsCanAccessClientEndpointsOnly(t *testing.T) 
 		Email:     fake.Email(),
 		GivenName: "TestUser",
 	}
-	err := database.CreateUser(nil, testUser)
+	err := database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
 	// Create a test client
@@ -356,10 +357,10 @@ func TestGranularScopes_ManageSettingsCanAccessSettingsEndpointsOnly(t *testing.
 		Email:     fake.Email(),
 		GivenName: "TestUser",
 	}
-	err := database.CreateUser(nil, testUser)
+	err := database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
 	baseURL := config.GetAuthServer().BaseURL
@@ -401,10 +402,10 @@ func TestGranularScopes_ManageCanAccessAllEndpoints(t *testing.T) {
 		Email:     fake.Email(),
 		GivenName: "TestUser",
 	}
-	err := database.CreateUser(nil, testUser)
+	err := database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
 	// Create a test client
@@ -610,10 +611,10 @@ func TestGranularScopes_UserPermissionsRequireUsersScope(t *testing.T) {
 		Email:     fake.Email(),
 		GivenName: "TestUser",
 	}
-	err := database.CreateUser(nil, testUser)
+	err := database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
 	baseURL := config.GetAuthServer().BaseURL
@@ -727,7 +728,7 @@ func TestGranularScopes_WriteOperationsRequireSpecificScopes(t *testing.T) {
 			var result map[string]interface{}
 			_ = json.NewDecoder(resp.Body).Decode(&result)
 			if userId, ok := result["id"].(float64); ok {
-				_ = database.DeleteUser(nil, int64(userId))
+				_ = database.DeleteUser(context.Background(), nil, int64(userId))
 			}
 		}
 		_ = resp.Body.Close()

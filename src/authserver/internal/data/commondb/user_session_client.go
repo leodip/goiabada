@@ -97,7 +97,7 @@ func (d *CommonDatabase) UserSessionClientsLoadClients(tx *sql.Tx, userSessionCl
 		clientIds = append(clientIds, userSessionClient.ClientId)
 	}
 
-	clients, err := d.GetClientsByIds(tx, clientIds)
+	clients, err := d.GetClientsByIds(context.Background(), tx, clientIds)
 	if err != nil {
 		return errs.Wrap(err, "unable to get clients by ids")
 	}

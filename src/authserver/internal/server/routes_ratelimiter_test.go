@@ -137,7 +137,7 @@ func newRoutesTestServer(t *testing.T) *Server {
 
 	database := mocks_data.NewDatabase(t)
 	database.On("GetSettingsById", mock.Anything, int64(1)).Return(routesTestSettings(), nil).Maybe()
-	database.On("GetUserBySubject", mock.Anything, routesTestSubject).Return(&models.User{
+	database.On("GetUserBySubject", mock.Anything, mock.Anything, routesTestSubject).Return(&models.User{
 		Id:           1,
 		Enabled:      true,
 		Subject:      routesTestSubject,
@@ -149,10 +149,10 @@ func newRoutesTestServer(t *testing.T) *Server {
 	}, nil).Maybe()
 	// /forgot-password looks the address up before deciding what to render. No account
 	// means no mail is sent, which keeps these cases about the limiter alone.
-	database.On("GetUserByEmail", mock.Anything, mock.Anything).Return((*models.User)(nil), nil).Maybe()
+	database.On("GetUserByEmail", mock.Anything, mock.Anything, mock.Anything).Return((*models.User)(nil), nil).Maybe()
 	// What the OTP step reads: the user the auth context names, not yet enrolled, and the
 	// client whose branding the form carries.
-	database.On("GetUserById", mock.Anything, int64(1)).
+	database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).
 		Return(&models.User{Id: 1, Enabled: true, OTPEnabled: false}, nil).Maybe()
 	database.On("GetClientByClientIdentifier", mock.Anything, routesTestClientId).
 		Return(&models.Client{Id: 1, ClientIdentifier: routesTestClientId}, nil).Maybe()

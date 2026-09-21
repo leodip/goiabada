@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -173,7 +174,7 @@ func newRegisteredQueryClient(t *testing.T) (*models.Client, *models.User, strin
 		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
-	err = database.CreateUser(nil, user)
+	err = database.CreateUser(context.Background(), nil, user)
 	require.NoError(t, err)
 
 	return client, user, password

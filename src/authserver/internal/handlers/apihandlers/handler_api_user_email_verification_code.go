@@ -35,7 +35,7 @@ func HandleAPIUserEmailVerificationCodePost(
 			return
 		}
 
-		user, err := database.GetUserById(nil, userId)
+		user, err := database.GetUserById(r.Context(), nil, userId)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -56,7 +56,7 @@ func HandleAPIUserEmailVerificationCodePost(
 		user.EmailVerified = false
 		user.EmailVerificationCodeEncrypted = encrypted
 		user.EmailVerificationCodeIssuedAt = sql.NullTime{Time: issuedAt, Valid: true}
-		if err := database.UpdateUser(nil, user); err != nil {
+		if err := database.UpdateUser(r.Context(), nil, user); err != nil {
 			writeInternalServerError(w, r, err)
 			return
 		}

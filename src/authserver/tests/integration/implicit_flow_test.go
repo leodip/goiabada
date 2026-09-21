@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/base64"
 	"net/http"
@@ -99,7 +100,7 @@ func createTestUserForImplicit(t *testing.T) (*models.User, string) {
 		PasswordHash: passwordHashed,
 	}
 
-	err = database.CreateUser(nil, user)
+	err = database.CreateUser(context.Background(), nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}

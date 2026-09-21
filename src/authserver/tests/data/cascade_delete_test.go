@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"context"
 	"database/sql"
 	"testing"
 	"time"
@@ -88,9 +89,9 @@ func TestDeleteUser_ROPCRefreshTokenDoesNotBlockDeletion(t *testing.T) {
 	client := createTestClient(t)
 	refreshToken := createROPCRefreshToken(t, user.Id, client.Id)
 
-	require.NoError(t, database.DeleteUser(nil, user.Id), "DeleteUser with a ROPC-issued refresh token")
+	require.NoError(t, database.DeleteUser(context.Background(), nil, user.Id), "DeleteUser with a ROPC-issued refresh token")
 
-	deletedUser, err := database.GetUserById(nil, user.Id)
+	deletedUser, err := database.GetUserById(context.Background(), nil, user.Id)
 	require.NoError(t, err, "GetUserById")
 	assert.Nil(t, deletedUser, "user must be gone")
 	assert.False(t, refreshTokenExists(t, refreshToken.Id),
@@ -142,9 +143,9 @@ func TestDeleteUser_RemovesAllDependentRows(t *testing.T) {
 	require.Len(t, sessionClients, 1, "expected the session to have one client row")
 	sessionClientId := sessionClients[0].Id
 
-	require.NoError(t, database.DeleteUser(nil, user.Id), "DeleteUser")
+	require.NoError(t, database.DeleteUser(context.Background(), nil, user.Id), "DeleteUser")
 
-	deletedUser, err := database.GetUserById(nil, user.Id)
+	deletedUser, err := database.GetUserById(context.Background(), nil, user.Id)
 	require.NoError(t, err, "GetUserById")
 	require.Nil(t, deletedUser, "user must be gone")
 
@@ -160,12 +161,12 @@ func TestDeleteUser_RemovesAllDependentRows(t *testing.T) {
 		"refresh_tokens must cascade from codes (auth-code-shaped)")
 
 	// user_attributes
-	deletedAttribute, err := database.GetUserAttributeById(nil, attribute.Id)
+	deletedAttribute, err := database.GetUserAttributeById(context.Background(), nil, attribute.Id)
 	assert.NoError(t, err, "GetUserAttributeById")
 	assert.Nil(t, deletedAttribute, "user_attributes must cascade from users")
 
 	// user_consents
-	deletedConsent, err := database.GetUserConsentById(nil, consent.Id)
+	deletedConsent, err := database.GetUserConsentById(context.Background(), nil, consent.Id)
 	assert.NoError(t, err, "GetUserConsentById")
 	assert.Nil(t, deletedConsent, "user_consents must cascade from users")
 
@@ -180,17 +181,17 @@ func TestDeleteUser_RemovesAllDependentRows(t *testing.T) {
 	assert.Nil(t, deletedSessionClient, "user_session_clients must cascade from user_sessions")
 
 	// users_groups
-	deletedUserGroup, err := database.GetUserGroupById(nil, userGroup.Id)
+	deletedUserGroup, err := database.GetUserGroupById(context.Background(), nil, userGroup.Id)
 	assert.NoError(t, err, "GetUserGroupById")
 	assert.Nil(t, deletedUserGroup, "users_groups must cascade from users")
 
 	// users_permissions
-	deletedUserPermission, err := database.GetUserPermissionById(nil, userPermission.Id)
+	deletedUserPermission, err := database.GetUserPermissionById(context.Background(), nil, userPermission.Id)
 	assert.NoError(t, err, "GetUserPermissionById")
 	assert.Nil(t, deletedUserPermission, "users_permissions must cascade from users")
 
 	// user_profile_pictures
-	deletedPicture, err := database.GetUserProfilePictureByUserId(nil, user.Id)
+	deletedPicture, err := database.GetUserProfilePictureByUserId(context.Background(), nil, user.Id)
 	assert.NoError(t, err, "GetUserProfilePictureByUserId")
 	assert.Nil(t, deletedPicture, "user_profile_pictures must cascade from users")
 	assert.NotZero(t, profilePicture.Id, "sanity: the fixture was created")
@@ -233,7 +234,7 @@ func TestDeleteClient_RemovesAllDependentRows(t *testing.T) {
 		ClientId: client.Id,
 		Scope:    "openid profile",
 	}
-	require.NoError(t, database.CreateUserConsent(nil, consent), "CreateUserConsent")
+	require.NoError(t, database.CreateUserConsent(context.Background(), nil, consent), "CreateUserConsent")
 
 	session := createTestUserSessionWithClient(t, user.Id, client.Id)
 	sessionClients, err := database.GetUserSessionClientsByUserSessionId(nil, session.Id)
@@ -278,7 +279,7 @@ func TestDeleteClient_RemovesAllDependentRows(t *testing.T) {
 	assert.Nil(t, deletedClientPermission, "clients_permissions must cascade from clients")
 
 	// user_consents
-	deletedConsent, err := database.GetUserConsentById(nil, consent.Id)
+	deletedConsent, err := database.GetUserConsentById(context.Background(), nil, consent.Id)
 	assert.NoError(t, err, "GetUserConsentById")
 	assert.Nil(t, deletedConsent, "user_consents must cascade from clients")
 
@@ -288,7 +289,7 @@ func TestDeleteClient_RemovesAllDependentRows(t *testing.T) {
 	assert.Nil(t, deletedSessionClient, "user_session_clients must cascade from clients")
 
 	// The user, its session and the permission are independent of the client.
-	survivingUser, err := database.GetUserById(nil, user.Id)
+	survivingUser, err := database.GetUserById(context.Background(), nil, user.Id)
 	assert.NoError(t, err, "GetUserById")
 	assert.NotNil(t, survivingUser, "deleting a client must not delete the user")
 	survivingSession, err := database.GetUserSessionById(nil, session.Id)

@@ -2,6 +2,7 @@ package datatests
 
 import (
 	"bytes"
+	"context"
 	"image"
 	"image/color"
 	"image/png"
@@ -39,7 +40,7 @@ func TestCreateUserProfilePicture(t *testing.T) {
 		t.Error("Expected UpdatedAt to be set")
 	}
 
-	retrieved, err := database.GetUserProfilePictureByUserId(nil, user.Id)
+	retrieved, err := database.GetUserProfilePictureByUserId(context.Background(), nil, user.Id)
 	if err != nil {
 		t.Fatalf("Failed to retrieve created profile picture: %v", err)
 	}
@@ -65,7 +66,7 @@ func TestCreateUserProfilePicture_ZeroUserId(t *testing.T) {
 		ContentType: "image/png",
 	}
 
-	err := database.CreateUserProfilePicture(nil, profilePicture)
+	err := database.CreateUserProfilePicture(context.Background(), nil, profilePicture)
 	if err == nil {
 		t.Error("Expected error when creating profile picture with zero UserId")
 	}
@@ -82,12 +83,12 @@ func TestUpdateUserProfilePicture(t *testing.T) {
 
 	time.Sleep(timestampTick)
 
-	err := database.UpdateUserProfilePicture(nil, profilePicture)
+	err := database.UpdateUserProfilePicture(context.Background(), nil, profilePicture)
 	if err != nil {
 		t.Fatalf("Failed to update profile picture: %v", err)
 	}
 
-	updated, err := database.GetUserProfilePictureByUserId(nil, user.Id)
+	updated, err := database.GetUserProfilePictureByUserId(context.Background(), nil, user.Id)
 	if err != nil {
 		t.Fatalf("Failed to retrieve updated profile picture: %v", err)
 	}
@@ -111,7 +112,7 @@ func TestUpdateUserProfilePicture_ZeroId(t *testing.T) {
 		ContentType: "image/png",
 	}
 
-	err := database.UpdateUserProfilePicture(nil, profilePicture)
+	err := database.UpdateUserProfilePicture(context.Background(), nil, profilePicture)
 	if err == nil {
 		t.Error("Expected error when updating profile picture with zero ID")
 	}
@@ -121,7 +122,7 @@ func TestGetUserProfilePictureByUserId(t *testing.T) {
 	user := createTestUser(t)
 	profilePicture := createTestUserProfilePicture(t, user.Id)
 
-	retrieved, err := database.GetUserProfilePictureByUserId(nil, user.Id)
+	retrieved, err := database.GetUserProfilePictureByUserId(context.Background(), nil, user.Id)
 	if err != nil {
 		t.Fatalf("Failed to get profile picture by user ID: %v", err)
 	}
@@ -139,7 +140,7 @@ func TestGetUserProfilePictureByUserId(t *testing.T) {
 
 func TestGetUserProfilePictureByUserId_NotFound(t *testing.T) {
 	// Use a user ID that doesn't have a profile picture
-	retrieved, err := database.GetUserProfilePictureByUserId(nil, 99999999)
+	retrieved, err := database.GetUserProfilePictureByUserId(context.Background(), nil, 99999999)
 	if err != nil {
 		t.Errorf("Expected no error for non-existent profile picture, got: %v", err)
 	}
@@ -153,7 +154,7 @@ func TestDeleteUserProfilePicture(t *testing.T) {
 	_ = createTestUserProfilePicture(t, user.Id)
 
 	// Verify it exists
-	exists, err := database.UserHasProfilePicture(nil, user.Id)
+	exists, err := database.UserHasProfilePicture(context.Background(), nil, user.Id)
 	if err != nil {
 		t.Fatalf("Failed to check if user has profile picture: %v", err)
 	}
@@ -162,13 +163,13 @@ func TestDeleteUserProfilePicture(t *testing.T) {
 	}
 
 	// Delete it
-	err = database.DeleteUserProfilePicture(nil, user.Id)
+	err = database.DeleteUserProfilePicture(context.Background(), nil, user.Id)
 	if err != nil {
 		t.Fatalf("Failed to delete profile picture: %v", err)
 	}
 
 	// Verify it's gone
-	deleted, err := database.GetUserProfilePictureByUserId(nil, user.Id)
+	deleted, err := database.GetUserProfilePictureByUserId(context.Background(), nil, user.Id)
 	if err != nil {
 		t.Fatalf("Error while checking for deleted profile picture: %v", err)
 	}
@@ -179,7 +180,7 @@ func TestDeleteUserProfilePicture(t *testing.T) {
 
 func TestDeleteUserProfilePicture_NotExist(t *testing.T) {
 	// Deleting a non-existent profile picture should not return an error
-	err := database.DeleteUserProfilePicture(nil, 99999999)
+	err := database.DeleteUserProfilePicture(context.Background(), nil, 99999999)
 	if err != nil {
 		t.Errorf("Expected no error when deleting non-existent profile picture, got: %v", err)
 	}
@@ -189,7 +190,7 @@ func TestUserHasProfilePicture_True(t *testing.T) {
 	user := createTestUser(t)
 	_ = createTestUserProfilePicture(t, user.Id)
 
-	hasPicture, err := database.UserHasProfilePicture(nil, user.Id)
+	hasPicture, err := database.UserHasProfilePicture(context.Background(), nil, user.Id)
 	if err != nil {
 		t.Fatalf("Failed to check if user has profile picture: %v", err)
 	}
@@ -202,7 +203,7 @@ func TestUserHasProfilePicture_False(t *testing.T) {
 	user := createTestUser(t)
 	// Don't create a profile picture for this user
 
-	hasPicture, err := database.UserHasProfilePicture(nil, user.Id)
+	hasPicture, err := database.UserHasProfilePicture(context.Background(), nil, user.Id)
 	if err != nil {
 		t.Fatalf("Failed to check if user has profile picture: %v", err)
 	}
@@ -212,7 +213,7 @@ func TestUserHasProfilePicture_False(t *testing.T) {
 }
 
 func TestUserHasProfilePicture_NonExistentUser(t *testing.T) {
-	hasPicture, err := database.UserHasProfilePicture(nil, 99999999)
+	hasPicture, err := database.UserHasProfilePicture(context.Background(), nil, 99999999)
 	if err != nil {
 		t.Fatalf("Failed to check if user has profile picture: %v", err)
 	}
@@ -234,7 +235,7 @@ func TestUserProfilePicture_MultipleUsers(t *testing.T) {
 		Picture:     picture1Data,
 		ContentType: "image/png",
 	}
-	err := database.CreateUserProfilePicture(nil, picture1)
+	err := database.CreateUserProfilePicture(context.Background(), nil, picture1)
 	if err != nil {
 		t.Fatalf("Failed to create profile picture for user1: %v", err)
 	}
@@ -244,13 +245,13 @@ func TestUserProfilePicture_MultipleUsers(t *testing.T) {
 		Picture:     picture2Data,
 		ContentType: "image/png",
 	}
-	err = database.CreateUserProfilePicture(nil, picture2)
+	err = database.CreateUserProfilePicture(context.Background(), nil, picture2)
 	if err != nil {
 		t.Fatalf("Failed to create profile picture for user2: %v", err)
 	}
 
 	// Verify each user has their own picture
-	retrieved1, err := database.GetUserProfilePictureByUserId(nil, user1.Id)
+	retrieved1, err := database.GetUserProfilePictureByUserId(context.Background(), nil, user1.Id)
 	if err != nil {
 		t.Fatalf("Failed to get profile picture for user1: %v", err)
 	}
@@ -258,7 +259,7 @@ func TestUserProfilePicture_MultipleUsers(t *testing.T) {
 		t.Error("User1's picture data doesn't match")
 	}
 
-	retrieved2, err := database.GetUserProfilePictureByUserId(nil, user2.Id)
+	retrieved2, err := database.GetUserProfilePictureByUserId(context.Background(), nil, user2.Id)
 	if err != nil {
 		t.Fatalf("Failed to get profile picture for user2: %v", err)
 	}
@@ -267,12 +268,12 @@ func TestUserProfilePicture_MultipleUsers(t *testing.T) {
 	}
 
 	// Deleting user1's picture shouldn't affect user2's picture
-	err = database.DeleteUserProfilePicture(nil, user1.Id)
+	err = database.DeleteUserProfilePicture(context.Background(), nil, user1.Id)
 	if err != nil {
 		t.Fatalf("Failed to delete user1's profile picture: %v", err)
 	}
 
-	user2StillHasPicture, err := database.UserHasProfilePicture(nil, user2.Id)
+	user2StillHasPicture, err := database.UserHasProfilePicture(context.Background(), nil, user2.Id)
 	if err != nil {
 		t.Fatalf("Failed to check if user2 has profile picture: %v", err)
 	}
@@ -293,12 +294,12 @@ func TestUserProfilePicture_LargePictureData(t *testing.T) {
 		ContentType: "image/png",
 	}
 
-	err := database.CreateUserProfilePicture(nil, profilePicture)
+	err := database.CreateUserProfilePicture(context.Background(), nil, profilePicture)
 	if err != nil {
 		t.Fatalf("Failed to create profile picture with large data: %v", err)
 	}
 
-	retrieved, err := database.GetUserProfilePictureByUserId(nil, user.Id)
+	retrieved, err := database.GetUserProfilePictureByUserId(context.Background(), nil, user.Id)
 	if err != nil {
 		t.Fatalf("Failed to retrieve large profile picture: %v", err)
 	}
@@ -315,7 +316,7 @@ func createTestUserProfilePicture(t *testing.T, userId int64) *models.UserProfil
 		Picture:     pictureData,
 		ContentType: "image/png",
 	}
-	err := database.CreateUserProfilePicture(nil, profilePicture)
+	err := database.CreateUserProfilePicture(context.Background(), nil, profilePicture)
 	if err != nil {
 		t.Fatalf("Failed to create test profile picture: %v", err)
 	}

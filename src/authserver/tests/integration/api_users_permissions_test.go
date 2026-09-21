@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -27,10 +28,10 @@ func TestAPIUserPermissionsGet_Success(t *testing.T) {
 		FamilyName:    "User",
 		EmailVerified: true,
 	}
-	err := database.CreateUser(nil, testUser)
+	err := database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
 	// Setup: Create test resource and permissions
@@ -50,8 +51,8 @@ func TestAPIUserPermissionsGet_Success(t *testing.T) {
 	userPerm1 := createTestUserPermission(t, testUser.Id, perm1.Id)
 	userPerm2 := createTestUserPermission(t, testUser.Id, perm2.Id)
 	defer func() {
-		_ = database.DeleteUserPermission(nil, userPerm1.Id)
-		_ = database.DeleteUserPermission(nil, userPerm2.Id)
+		_ = database.DeleteUserPermission(context.Background(), nil, userPerm1.Id)
+		_ = database.DeleteUserPermission(context.Background(), nil, userPerm2.Id)
 	}()
 
 	// Test: Get user permissions
@@ -134,10 +135,10 @@ func TestAPIUserPermissionsGet_NoPermissions(t *testing.T) {
 		GivenName:  "Test",
 		FamilyName: "User",
 	}
-	err := database.CreateUser(nil, testUser)
+	err := database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
 	// Test: Get user permissions for user with no permissions
@@ -167,10 +168,10 @@ func TestAPIUserPermissionsGet_Unauthorized(t *testing.T) {
 		GivenName:  "Test",
 		FamilyName: "User",
 	}
-	err := database.CreateUser(nil, testUser)
+	err := database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
 	// Test: Request without access token
@@ -201,10 +202,10 @@ func TestAPIUserPermissionsPut_Success(t *testing.T) {
 		FamilyName:    "User",
 		EmailVerified: true,
 	}
-	err := database.CreateUser(nil, testUser)
+	err := database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
 	// Setup: Create test resource and permissions
@@ -225,7 +226,7 @@ func TestAPIUserPermissionsPut_Success(t *testing.T) {
 	// Setup: Initially assign one permission
 	initialUserPerm := createTestUserPermission(t, testUser.Id, perm1.Id)
 	defer func() {
-		_ = database.DeleteUserPermission(nil, initialUserPerm.Id)
+		_ = database.DeleteUserPermission(context.Background(), nil, initialUserPerm.Id)
 	}()
 
 	// Test: Update user permissions (replace with two different permissions)
@@ -248,7 +249,7 @@ func TestAPIUserPermissionsPut_Success(t *testing.T) {
 	assert.True(t, updateResponse.Success)
 
 	// Verify changes were persisted: Load user permissions
-	err = database.UserLoadPermissions(nil, testUser)
+	err = database.UserLoadPermissions(context.Background(), nil, testUser)
 	assert.NoError(t, err)
 
 	// Assert: Should have exactly 2 permissions (perm2 and perm3)
@@ -276,10 +277,10 @@ func TestAPIUserPermissionsPut_RemoveAllPermissions(t *testing.T) {
 		GivenName:  "Test",
 		FamilyName: "User",
 	}
-	err := database.CreateUser(nil, testUser)
+	err := database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
 	// Setup: Create test resource and permission
@@ -315,12 +316,12 @@ func TestAPIUserPermissionsPut_RemoveAllPermissions(t *testing.T) {
 	assert.True(t, updateResponse.Success)
 
 	// Verify permission was removed
-	err = database.UserLoadPermissions(nil, testUser)
+	err = database.UserLoadPermissions(context.Background(), nil, testUser)
 	assert.NoError(t, err)
 	assert.Len(t, testUser.Permissions, 0)
 
 	// Verify the UserPermission record was deleted
-	deletedUserPerm, err := database.GetUserPermissionById(nil, userPerm.Id)
+	deletedUserPerm, err := database.GetUserPermissionById(context.Background(), nil, userPerm.Id)
 	assert.NoError(t, err)
 	assert.Nil(t, deletedUserPerm)
 }
@@ -354,10 +355,10 @@ func TestAPIUserPermissionsPut_PermissionNotFound(t *testing.T) {
 		GivenName:  "Test",
 		FamilyName: "User",
 	}
-	err := database.CreateUser(nil, testUser)
+	err := database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
 	// Test: Update with non-existent permission
@@ -385,10 +386,10 @@ func TestAPIUserPermissionsPut_InvalidRequestBody(t *testing.T) {
 		GivenName:  "Test",
 		FamilyName: "User",
 	}
-	err := database.CreateUser(nil, testUser)
+	err := database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
 	// Test: Invalid JSON
@@ -416,10 +417,10 @@ func TestAPIUserPermissionsPut_Unauthorized(t *testing.T) {
 		GivenName:  "Test",
 		FamilyName: "User",
 	}
-	err := database.CreateUser(nil, testUser)
+	err := database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
 	// Test: Request without access token
@@ -442,7 +443,7 @@ func createTestUserPermission(t *testing.T, userId, permissionId int64) *models.
 		UserId:       userId,
 		PermissionId: permissionId,
 	}
-	err := database.CreateUserPermission(nil, userPermission)
+	err := database.CreateUserPermission(context.Background(), nil, userPermission)
 	assert.NoError(t, err)
 	return userPermission
 }

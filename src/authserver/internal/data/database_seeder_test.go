@@ -1,6 +1,7 @@
 package data
 
 import (
+	"context"
 	"log/slog"
 	"strings"
 	"testing"
@@ -60,7 +61,7 @@ func TestBootstrapEnvContent_CarriesEveryRemainingCredential(t *testing.T) {
 func TestLogBootstrapCredentialsGenerated_IsOneRecordNamingTheFile(t *testing.T) {
 	logs := testutil.CaptureSlog(t)
 
-	logBootstrapCredentialsGenerated("/bootstrap/bootstrap.env")
+	logBootstrapCredentialsGenerated(context.Background(), "/bootstrap/bootstrap.env")
 
 	records := logs.Records()
 	require.Len(t, records, 1, "one record, where the banner wrote twelve")

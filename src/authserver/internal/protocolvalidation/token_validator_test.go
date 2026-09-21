@@ -2248,7 +2248,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 				Id: 9, SessionIdentifier: "sid-1", UserId: grantUserId,
 				Started: now.Add(-10 * time.Minute), LastAccessed: now,
 			}, nil).Once()
-		mockDB.On("GetUserBySubject", mock.Anything, "user_subject").Return(&user, nil).Once()
+		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "user_subject").Return(&user, nil).Once()
 
 		result, err := validator.ValidateTokenRequest(ctx, input)
 
@@ -3109,8 +3109,8 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockDB.On("GetRefreshTokenByJti", mock.Anything, "valid_offline_jti").Return(refreshToken, nil)
 		mockDB.On("RefreshTokenLoadCode", mock.Anything, refreshToken).Return(nil)
 		mockDB.On("CodeLoadUser", mock.Anything, &refreshToken.Code).Return(nil)
-		mockDB.On("GetUserBySubject", mock.Anything, "user123").Return(&models.User{Id: 1, Enabled: true}, nil)
-		mockDB.On("GetConsentByUserIdAndClientId", mock.Anything, int64(1), int64(1)).Return(userConsent, nil)
+		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "user123").Return(&models.User{Id: 1, Enabled: true}, nil)
+		mockDB.On("GetConsentByUserIdAndClientId", mock.Anything, mock.Anything, int64(1), int64(1)).Return(userConsent, nil)
 
 		result, err := validator.ValidateTokenRequest(ctx, input)
 
@@ -3185,9 +3185,9 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockDB.On("GetRefreshTokenByJti", mock.Anything, "valid_offline_jti").Return(refreshToken, nil)
 		mockDB.On("RefreshTokenLoadCode", mock.Anything, refreshToken).Return(nil)
 		mockDB.On("CodeLoadUser", mock.Anything, &refreshToken.Code).Return(nil)
-		mockDB.On("GetUserBySubject", mock.Anything, "user123").Return(&models.User{Id: 1, Enabled: true}, nil)
+		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "user123").Return(&models.User{Id: 1, Enabled: true}, nil)
 		// The refresh carries four scopes; the consent lookup must run once, not once per scope.
-		mockDB.On("GetConsentByUserIdAndClientId", mock.Anything, int64(1), int64(1)).Return(userConsent, nil).Times(1)
+		mockDB.On("GetConsentByUserIdAndClientId", mock.Anything, mock.Anything, int64(1), int64(1)).Return(userConsent, nil).Times(1)
 
 		result, err := validator.ValidateTokenRequest(ctx, input)
 
@@ -3265,8 +3265,8 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockDB.On("RefreshTokenLoadCode", mock.Anything, refreshToken).Return(nil)
 		mockDB.On("CodeLoadUser", mock.Anything, &refreshToken.Code).Return(nil)
 		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, "test_session").Return(userSession, nil)
-		mockDB.On("GetUserBySubject", mock.Anything, "user123").Return(&models.User{Id: 1, Enabled: true}, nil)
-		mockPermissionChecker.On("UserHasScopePermission", int64(1), "srv1:read").Return(true, nil)
+		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "user123").Return(&models.User{Id: 1, Enabled: true}, nil)
+		mockPermissionChecker.On("UserHasScopePermission", mock.Anything, int64(1), "srv1:read").Return(true, nil)
 
 		result, err := validator.ValidateTokenRequest(ctx, input)
 
@@ -3346,8 +3346,8 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockDB.On("RefreshTokenLoadCode", mock.Anything, refreshToken).Return(nil)
 		mockDB.On("CodeLoadUser", mock.Anything, &refreshToken.Code).Return(nil)
 		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, "test_session").Return(userSession, nil)
-		mockDB.On("GetUserBySubject", mock.Anything, "user123").Return(&models.User{Id: 1, Enabled: true}, nil)
-		mockDB.On("GetConsentByUserIdAndClientId", mock.Anything, int64(1), int64(1)).Return(nil, nil) // Consent not found
+		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "user123").Return(&models.User{Id: 1, Enabled: true}, nil)
+		mockDB.On("GetConsentByUserIdAndClientId", mock.Anything, mock.Anything, int64(1), int64(1)).Return(nil, nil) // Consent not found
 
 		result, err := validator.ValidateTokenRequest(ctx, input)
 
@@ -3436,8 +3436,8 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockDB.On("RefreshTokenLoadCode", mock.Anything, refreshToken).Return(nil)
 		mockDB.On("CodeLoadUser", mock.Anything, &refreshToken.Code).Return(nil)
 		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, "test_session").Return(userSession, nil)
-		mockDB.On("GetUserBySubject", mock.Anything, "user123").Return(&models.User{Id: 1, Enabled: true}, nil)
-		mockDB.On("GetConsentByUserIdAndClientId", mock.Anything, int64(1), int64(1)).Return(userConsent, nil)
+		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "user123").Return(&models.User{Id: 1, Enabled: true}, nil)
+		mockDB.On("GetConsentByUserIdAndClientId", mock.Anything, mock.Anything, int64(1), int64(1)).Return(userConsent, nil)
 
 		result, err := validator.ValidateTokenRequest(ctx, input)
 
@@ -3518,8 +3518,8 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockDB.On("RefreshTokenLoadCode", mock.Anything, refreshToken).Return(nil)
 		mockDB.On("CodeLoadUser", mock.Anything, &refreshToken.Code).Return(nil)
 		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, "test_session").Return(userSession, nil)
-		mockDB.On("GetUserBySubject", mock.Anything, "user123").Return(&models.User{Id: 1, Enabled: true}, nil)
-		mockPermissionChecker.On("UserHasScopePermission", int64(1), "resource:read").Return(false, nil) // Permission revoked
+		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "user123").Return(&models.User{Id: 1, Enabled: true}, nil)
+		mockPermissionChecker.On("UserHasScopePermission", mock.Anything, int64(1), "resource:read").Return(false, nil) // Permission revoked
 
 		result, err := validator.ValidateTokenRequest(ctx, input)
 
@@ -4081,7 +4081,7 @@ func publicClientChallengelessRefresh(t *testing.T, storedChallenge sql.NullStri
 			Id: 9, SessionIdentifier: "sid-1", UserId: grantUserId,
 			Started: now.Add(-10 * time.Minute), LastAccessed: now,
 		}, nil).Maybe()
-	mockDB.On("GetUserBySubject", mock.Anything, "user_subject").Return(&user, nil).Maybe()
+	mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "user_subject").Return(&user, nil).Maybe()
 
 	return validator, input, ctx
 }
@@ -4210,9 +4210,9 @@ func TestValidateTokenRequest_ROPC_Success(t *testing.T) {
 	}
 
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, "ropc-client").Return(client, nil).Once()
-	mockDB.On("GetUserByEmail", mock.Anything, "user@example.com").Return(user, nil).Once()
-	mockDB.On("UserLoadPermissions", mock.Anything, user).Return(nil).Once()
-	mockDB.On("UserLoadGroups", mock.Anything, user).Return(nil).Once()
+	mockDB.On("GetUserByEmail", mock.Anything, mock.Anything, "user@example.com").Return(user, nil).Once()
+	mockDB.On("UserLoadPermissions", mock.Anything, mock.Anything, user).Return(nil).Once()
+	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(nil).Once()
 
 	result, err := validator.ValidateTokenRequest(ctx, input)
 
@@ -4299,9 +4299,9 @@ func TestValidateTokenRequest_ROPC_ClientOverrideEnabled(t *testing.T) {
 	}
 
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, "ropc-client").Return(client, nil).Once()
-	mockDB.On("GetUserByEmail", mock.Anything, "user@example.com").Return(user, nil).Once()
-	mockDB.On("UserLoadPermissions", mock.Anything, user).Return(nil).Once()
-	mockDB.On("UserLoadGroups", mock.Anything, user).Return(nil).Once()
+	mockDB.On("GetUserByEmail", mock.Anything, mock.Anything, "user@example.com").Return(user, nil).Once()
+	mockDB.On("UserLoadPermissions", mock.Anything, mock.Anything, user).Return(nil).Once()
+	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(nil).Once()
 
 	result, err := validator.ValidateTokenRequest(ctx, input)
 
@@ -4502,7 +4502,7 @@ func TestValidateTokenRequest_ROPC_UserNotFound(t *testing.T) {
 	}
 
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, "ropc-client").Return(client, nil).Once()
-	mockDB.On("GetUserByEmail", mock.Anything, "nonexistent@example.com").Return(nil, nil).Once()
+	mockDB.On("GetUserByEmail", mock.Anything, mock.Anything, "nonexistent@example.com").Return(nil, nil).Once()
 
 	result, err := validator.ValidateTokenRequest(ctx, input)
 
@@ -4552,7 +4552,7 @@ func TestValidateTokenRequest_ROPC_UsernameNormalizedForLookup(t *testing.T) {
 	}
 
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, "ropc-client").Return(client, nil).Once()
-	mockDB.On("GetUserByEmail", mock.Anything, "bob@example.com").Return(nil, nil).Once()
+	mockDB.On("GetUserByEmail", mock.Anything, mock.Anything, "bob@example.com").Return(nil, nil).Once()
 
 	result, err := validator.ValidateTokenRequest(ctx, input)
 
@@ -4597,7 +4597,7 @@ func TestValidateTokenRequest_ROPC_WhitespaceOnlyUsernameIsInvalidGrant(t *testi
 	}
 
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, "ropc-client").Return(client, nil).Once()
-	mockDB.On("GetUserByEmail", mock.Anything, "").Return(nil, nil).Once()
+	mockDB.On("GetUserByEmail", mock.Anything, mock.Anything, "").Return(nil, nil).Once()
 
 	result, err := validator.ValidateTokenRequest(ctx, input)
 
@@ -4644,7 +4644,7 @@ func TestValidateTokenRequest_ROPC_InvalidPassword(t *testing.T) {
 	}
 
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, "ropc-client").Return(client, nil).Once()
-	mockDB.On("GetUserByEmail", mock.Anything, "user@example.com").Return(user, nil).Once()
+	mockDB.On("GetUserByEmail", mock.Anything, mock.Anything, "user@example.com").Return(user, nil).Once()
 
 	result, err := validator.ValidateTokenRequest(ctx, input)
 
@@ -4693,7 +4693,7 @@ func TestValidateTokenRequest_ROPC_UserDisabled(t *testing.T) {
 	}
 
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, "ropc-client").Return(client, nil).Once()
-	mockDB.On("GetUserByEmail", mock.Anything, "user@example.com").Return(user, nil).Once()
+	mockDB.On("GetUserByEmail", mock.Anything, mock.Anything, "user@example.com").Return(user, nil).Once()
 
 	result, err := validator.ValidateTokenRequest(ctx, input)
 
@@ -4743,7 +4743,7 @@ func TestValidateTokenRequest_ROPC_UserWith2FA(t *testing.T) {
 	}
 
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, "ropc-client").Return(client, nil).Once()
-	mockDB.On("GetUserByEmail", mock.Anything, "user@example.com").Return(user, nil).Once()
+	mockDB.On("GetUserByEmail", mock.Anything, mock.Anything, "user@example.com").Return(user, nil).Once()
 
 	result, err := validator.ValidateTokenRequest(ctx, input)
 
@@ -4885,9 +4885,9 @@ func TestValidateTokenRequest_ROPC_ConfidentialClient_Success(t *testing.T) {
 	}
 
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, "ropc-client").Return(client, nil).Once()
-	mockDB.On("GetUserByEmail", mock.Anything, "user@example.com").Return(user, nil).Once()
-	mockDB.On("UserLoadPermissions", mock.Anything, user).Return(nil).Once()
-	mockDB.On("UserLoadGroups", mock.Anything, user).Return(nil).Once()
+	mockDB.On("GetUserByEmail", mock.Anything, mock.Anything, "user@example.com").Return(user, nil).Once()
+	mockDB.On("UserLoadPermissions", mock.Anything, mock.Anything, user).Return(nil).Once()
+	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(nil).Once()
 
 	result, err := validator.ValidateTokenRequest(ctx, input)
 
@@ -4936,9 +4936,9 @@ func TestValidateTokenRequest_ROPC_EmptyScope_DefaultsToOpenId(t *testing.T) {
 	}
 
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, "ropc-client").Return(client, nil).Once()
-	mockDB.On("GetUserByEmail", mock.Anything, "user@example.com").Return(user, nil).Once()
-	mockDB.On("UserLoadPermissions", mock.Anything, user).Return(nil).Once()
-	mockDB.On("UserLoadGroups", mock.Anything, user).Return(nil).Once()
+	mockDB.On("GetUserByEmail", mock.Anything, mock.Anything, "user@example.com").Return(user, nil).Once()
+	mockDB.On("UserLoadPermissions", mock.Anything, mock.Anything, user).Return(nil).Once()
+	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(nil).Once()
 
 	result, err := validator.ValidateTokenRequest(ctx, input)
 
@@ -4985,9 +4985,9 @@ func TestValidateTokenRequest_ROPC_WithOfflineAccess(t *testing.T) {
 	}
 
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, "ropc-client").Return(client, nil).Once()
-	mockDB.On("GetUserByEmail", mock.Anything, "user@example.com").Return(user, nil).Once()
-	mockDB.On("UserLoadPermissions", mock.Anything, user).Return(nil).Once()
-	mockDB.On("UserLoadGroups", mock.Anything, user).Return(nil).Once()
+	mockDB.On("GetUserByEmail", mock.Anything, mock.Anything, "user@example.com").Return(user, nil).Once()
+	mockDB.On("UserLoadPermissions", mock.Anything, mock.Anything, user).Return(nil).Once()
+	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(nil).Once()
 
 	result, err := validator.ValidateTokenRequest(ctx, input)
 
@@ -5034,9 +5034,9 @@ func TestValidateTokenRequest_ROPC_InvalidScopeFormat(t *testing.T) {
 	}
 
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, "ropc-client").Return(client, nil).Once()
-	mockDB.On("GetUserByEmail", mock.Anything, "user@example.com").Return(user, nil).Once()
-	mockDB.On("UserLoadPermissions", mock.Anything, user).Return(nil).Once()
-	mockDB.On("UserLoadGroups", mock.Anything, user).Return(nil).Once()
+	mockDB.On("GetUserByEmail", mock.Anything, mock.Anything, "user@example.com").Return(user, nil).Once()
+	mockDB.On("UserLoadPermissions", mock.Anything, mock.Anything, user).Return(nil).Once()
+	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(nil).Once()
 
 	result, err := validator.ValidateTokenRequest(ctx, input)
 
@@ -5096,12 +5096,12 @@ func TestValidateTokenRequest_ROPC_ResourcePermission_Success(t *testing.T) {
 	}
 
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, "ropc-client").Return(client, nil).Once()
-	mockDB.On("GetUserByEmail", mock.Anything, "user@example.com").Return(user, nil).Once()
-	mockDB.On("UserLoadPermissions", mock.Anything, user).Return(nil).Once()
-	mockDB.On("UserLoadGroups", mock.Anything, user).Return(nil).Once()
+	mockDB.On("GetUserByEmail", mock.Anything, mock.Anything, "user@example.com").Return(user, nil).Once()
+	mockDB.On("UserLoadPermissions", mock.Anything, mock.Anything, user).Return(nil).Once()
+	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(nil).Once()
 	mockDB.On("GetResourceByResourceIdentifier", mock.Anything, "api").Return(resource, nil).Once()
 	mockDB.On("GetPermissionsByResourceId", mock.Anything, int64(1)).Return(permissions, nil).Once()
-	mockPermissionChecker.On("UserHasScopePermission", int64(1), "api:read").Return(true, nil).Once()
+	mockPermissionChecker.On("UserHasScopePermission", mock.Anything, int64(1), "api:read").Return(true, nil).Once()
 
 	result, err := validator.ValidateTokenRequest(ctx, input)
 
@@ -5157,12 +5157,12 @@ func TestValidateTokenRequest_ROPC_ResourcePermission_UserLacksPermission(t *tes
 	}
 
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, "ropc-client").Return(client, nil).Once()
-	mockDB.On("GetUserByEmail", mock.Anything, "user@example.com").Return(user, nil).Once()
-	mockDB.On("UserLoadPermissions", mock.Anything, user).Return(nil).Once()
-	mockDB.On("UserLoadGroups", mock.Anything, user).Return(nil).Once()
+	mockDB.On("GetUserByEmail", mock.Anything, mock.Anything, "user@example.com").Return(user, nil).Once()
+	mockDB.On("UserLoadPermissions", mock.Anything, mock.Anything, user).Return(nil).Once()
+	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(nil).Once()
 	mockDB.On("GetResourceByResourceIdentifier", mock.Anything, "api").Return(resource, nil).Once()
 	mockDB.On("GetPermissionsByResourceId", mock.Anything, int64(1)).Return(permissions, nil).Once()
-	mockPermissionChecker.On("UserHasScopePermission", int64(1), "api:read").Return(false, nil).Once()
+	mockPermissionChecker.On("UserHasScopePermission", mock.Anything, int64(1), "api:read").Return(false, nil).Once()
 
 	result, err := validator.ValidateTokenRequest(ctx, input)
 
@@ -5232,9 +5232,9 @@ func TestValidateTokenRequest_ROPC_ResourcePermission_ResolutionFailures(t *test
 			}
 
 			mockDB.On("GetClientByClientIdentifier", mock.Anything, "ropc-client").Return(client, nil).Once()
-			mockDB.On("GetUserByEmail", mock.Anything, "user@example.com").Return(user, nil).Once()
-			mockDB.On("UserLoadPermissions", mock.Anything, user).Return(nil).Once()
-			mockDB.On("UserLoadGroups", mock.Anything, user).Return(nil).Once()
+			mockDB.On("GetUserByEmail", mock.Anything, mock.Anything, "user@example.com").Return(user, nil).Once()
+			mockDB.On("UserLoadPermissions", mock.Anything, mock.Anything, user).Return(nil).Once()
+			mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(nil).Once()
 			tc.setup(mockDB)
 
 			result, err := validator.ValidateTokenRequest(ctx, &ValidateTokenRequestInput{
@@ -5370,13 +5370,13 @@ func TestValidateTokenRequest_RefreshToken_ROPC_InjectedUserInfoScope(t *testing
 			mockDB.On("GetRefreshTokenByJti", mock.Anything, "ropc_jti").Return(refreshToken, nil)
 			mockDB.On("RefreshTokenLoadUser", mock.Anything, refreshToken).Return(nil)
 			mockDB.On("RefreshTokenLoadClient", mock.Anything, refreshToken).Return(nil)
-			mockDB.On("GetUserBySubject", mock.Anything, "ropc_user_subject").Return(&user, nil)
+			mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "ropc_user_subject").Return(&user, nil)
 
 			// The user holds nothing. In the accepted case the scope must never be looked up at
 			// all, so no UserHasScopePermission expectation is registered: mocks_handlers.NewPermissionChecker(t)
 			// fails the test if an unexpected call is made, which is what proves the skip happened.
 			if !tc.wantAccepted {
-				mockPermissionChecker.On("UserHasScopePermission", int64(7), userInfoScope).Return(false, nil)
+				mockPermissionChecker.On("UserHasScopePermission", mock.Anything, int64(7), userInfoScope).Return(false, nil)
 			}
 
 			result, err := validator.ValidateTokenRequest(ctx, input)
@@ -5655,7 +5655,7 @@ func TestValidateTokenRequest_AuthStateGeneration(t *testing.T) {
 							Id: 9, SessionIdentifier: "sid-1", UserId: 7,
 							Started: now.Add(-10 * time.Minute), LastAccessed: now,
 						}, nil)
-					mockDB.On("GetUserBySubject", mock.Anything, "user_subject").Return(&user, nil)
+					mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "user_subject").Return(&user, nil)
 				}
 
 				result, err := validator.ValidateTokenRequest(ctx, &ValidateTokenRequestInput{
@@ -5724,7 +5724,7 @@ func TestValidateTokenRequest_AuthStateGeneration(t *testing.T) {
 				mockDB.On("RefreshTokenLoadUser", mock.Anything, refreshToken).Return(nil)
 				mockDB.On("RefreshTokenLoadClient", mock.Anything, refreshToken).Return(nil)
 				if tc.wantAccepted {
-					mockDB.On("GetUserBySubject", mock.Anything, "ropc_user_subject").Return(&user, nil)
+					mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "ropc_user_subject").Return(&user, nil)
 				}
 
 				result, err := validator.ValidateTokenRequest(ctx, &ValidateTokenRequestInput{
@@ -6199,11 +6199,11 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 			// measures what it was written to measure.
 			mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, "sid-1").
 				Return(&models.UserSession{SessionIdentifier: "sid-1", UserId: 7}, nil)
-			mockDB.On("GetUserBySubject", mock.Anything, "user_subject").Return(&user, nil)
+			mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "user_subject").Return(&user, nil)
 			// An Offline refresh always re-checks consent, whatever the client's
 			// ConsentRequired says, so the accepted path needs a live consent row covering
 			// the scopes. None of the rejection rows reach this far.
-			mockDB.On("GetConsentByUserIdAndClientId", mock.Anything, int64(7), int64(1)).
+			mockDB.On("GetConsentByUserIdAndClientId", mock.Anything, mock.Anything, int64(7), int64(1)).
 				Return(&models.UserConsent{UserId: 7, ClientId: 1, Scope: "openid offline_access"}, nil)
 
 			result, err := validator.ValidateTokenRequest(ctx, &ValidateTokenRequestInput{
@@ -6282,7 +6282,7 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 		mockDB.On("GetRefreshTokenByJti", mock.Anything, "ropc_jti").Return(refreshToken, nil)
 		mockDB.On("RefreshTokenLoadUser", mock.Anything, refreshToken).Return(nil)
 		mockDB.On("RefreshTokenLoadClient", mock.Anything, refreshToken).Return(nil)
-		mockDB.On("GetUserBySubject", mock.Anything, "ropc_user_subject").Return(&user, nil)
+		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "ropc_user_subject").Return(&user, nil)
 
 		result, err := validator.ValidateTokenRequest(ctx, &ValidateTokenRequestInput{
 			GrantType:    "refresh_token",
@@ -6379,7 +6379,7 @@ func TestValidateTokenRequest_RefreshToken_SessionOwnership(t *testing.T) {
 		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, "session_of_interest").
 			Return(userSession, nil)
 		// Only reached once the session is accepted, so the refusing subtest never calls it.
-		mockDB.On("GetUserBySubject", mock.Anything, "user123").
+		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "user123").
 			Return(&models.User{Id: grantUserId, Enabled: true}, nil).Maybe()
 
 		input := &ValidateTokenRequestInput{
@@ -6665,8 +6665,8 @@ func TestValidateTokenRequest_OfflineRefreshToken_SessionOwnership(t *testing.T)
 
 		// Only the accepted rows reach these two: an Offline refresh always re-checks
 		// consent, whatever the client's ConsentRequired says.
-		mockDB.On("GetUserBySubject", mock.Anything, "user_subject").Return(&user, nil).Maybe()
-		mockDB.On("GetConsentByUserIdAndClientId", mock.Anything, grantUserId, int64(1)).
+		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "user_subject").Return(&user, nil).Maybe()
+		mockDB.On("GetConsentByUserIdAndClientId", mock.Anything, mock.Anything, grantUserId, int64(1)).
 			Return(&models.UserConsent{UserId: grantUserId, ClientId: 1, Scope: "openid offline_access"}, nil).Maybe()
 
 		input := &ValidateTokenRequestInput{
@@ -7039,7 +7039,7 @@ func TestValidateTokenRequest_RefreshToken_SubjectResolvesToNoUser(t *testing.T)
 			mockDB.On("RefreshTokenLoadClient", mock.Anything, refreshToken).Return(nil)
 
 			// The row the whole test is about: a signed, live refresh token whose sub names nothing.
-			mockDB.On("GetUserBySubject", mock.Anything, "orphaned_subject").Return(nil, nil)
+			mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "orphaned_subject").Return(nil, nil)
 
 			result, err := validator.ValidateTokenRequest(ctx, input)
 

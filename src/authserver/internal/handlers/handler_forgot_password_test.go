@@ -135,7 +135,7 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		database.On("GetUserByEmail", mock.Anything, "nonexistent@example.com").Return(nil, nil)
+		database.On("GetUserByEmail", mock.Anything, mock.Anything, "nonexistent@example.com").Return(nil, nil)
 
 		httpHelper.On("RenderTemplate",
 			rr,
@@ -182,8 +182,8 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 			Id:    1,
 			Email: "existing@example.com",
 		}
-		database.On("GetUserByEmail", mock.Anything, "existing@example.com").Return(user, nil)
-		database.On("UpdateUser", mock.Anything, mock.MatchedBy(func(u *models.User) bool {
+		database.On("GetUserByEmail", mock.Anything, mock.Anything, "existing@example.com").Return(user, nil)
+		database.On("UpdateUser", mock.Anything, mock.Anything, mock.MatchedBy(func(u *models.User) bool {
 			return u.Id == 1 && u.ForgotPasswordCodeEncrypted != nil && u.ForgotPasswordCodeIssuedAt.Valid
 		})).Return(nil)
 

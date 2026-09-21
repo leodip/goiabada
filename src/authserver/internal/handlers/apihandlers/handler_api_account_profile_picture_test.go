@@ -119,7 +119,7 @@ func TestHandleAPIAccountProfilePictureGet_UserNotFound(t *testing.T) {
 	req = setTokenContext(req, sub)
 	rr := httptest.NewRecorder()
 
-	database.On("GetUserBySubject", (*sql.Tx)(nil), sub).Return(nil, nil)
+	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), sub).Return(nil, nil)
 
 	handler.ServeHTTP(rr, req)
 
@@ -138,8 +138,8 @@ func TestHandleAPIAccountProfilePictureGet_HasPicture(t *testing.T) {
 	rr := httptest.NewRecorder()
 
 	user := &models.User{Id: 1, Subject: sub, Enabled: true}
-	database.On("GetUserBySubject", (*sql.Tx)(nil), sub).Return(user, nil)
-	database.On("UserHasProfilePicture", (*sql.Tx)(nil), user.Id).Return(true, nil)
+	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), sub).Return(user, nil)
+	database.On("UserHasProfilePicture", mock.Anything, (*sql.Tx)(nil), user.Id).Return(true, nil)
 
 	handler.ServeHTTP(rr, req)
 
@@ -165,8 +165,8 @@ func TestHandleAPIAccountProfilePictureGet_NoPicture(t *testing.T) {
 	rr := httptest.NewRecorder()
 
 	user := &models.User{Id: 1, Subject: sub, Enabled: true}
-	database.On("GetUserBySubject", (*sql.Tx)(nil), sub).Return(user, nil)
-	database.On("UserHasProfilePicture", (*sql.Tx)(nil), user.Id).Return(false, nil)
+	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), sub).Return(user, nil)
+	database.On("UserHasProfilePicture", mock.Anything, (*sql.Tx)(nil), user.Id).Return(false, nil)
 
 	handler.ServeHTTP(rr, req)
 
@@ -208,7 +208,7 @@ func TestHandleAPIAccountProfilePicturePost_UserNotFound(t *testing.T) {
 	req = setTokenContext(req, sub)
 	rr := httptest.NewRecorder()
 
-	database.On("GetUserBySubject", (*sql.Tx)(nil), sub).Return(nil, nil)
+	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), sub).Return(nil, nil)
 
 	handler.ServeHTTP(rr, req)
 
@@ -230,7 +230,7 @@ func TestHandleAPIAccountProfilePicturePost_NoFile(t *testing.T) {
 	req = setTokenContext(req, sub)
 	rr := httptest.NewRecorder()
 
-	database.On("GetUserBySubject", (*sql.Tx)(nil), sub).Return(user, nil)
+	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), sub).Return(user, nil)
 
 	handler.ServeHTTP(rr, req)
 
@@ -253,7 +253,7 @@ func TestHandleAPIAccountProfilePicturePost_InvalidImage(t *testing.T) {
 	req = setTokenContext(req, sub)
 	rr := httptest.NewRecorder()
 
-	database.On("GetUserBySubject", (*sql.Tx)(nil), sub).Return(user, nil)
+	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), sub).Return(user, nil)
 
 	handler.ServeHTTP(rr, req)
 
@@ -280,9 +280,9 @@ func TestHandleAPIAccountProfilePicturePost_CreateNew(t *testing.T) {
 	req = setTokenContext(req, sub)
 	rr := httptest.NewRecorder()
 
-	database.On("GetUserBySubject", (*sql.Tx)(nil), sub).Return(user, nil)
-	database.On("GetUserProfilePictureByUserId", (*sql.Tx)(nil), user.Id).Return(nil, nil)
-	database.On("CreateUserProfilePicture", (*sql.Tx)(nil), mock.MatchedBy(func(pp *models.UserProfilePicture) bool {
+	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), sub).Return(user, nil)
+	database.On("GetUserProfilePictureByUserId", mock.Anything, (*sql.Tx)(nil), user.Id).Return(nil, nil)
+	database.On("CreateUserProfilePicture", mock.Anything, (*sql.Tx)(nil), mock.MatchedBy(func(pp *models.UserProfilePicture) bool {
 		return pp.UserId == user.Id && pp.ContentType == "image/png"
 	})).Return(nil)
 
@@ -325,9 +325,9 @@ func TestHandleAPIAccountProfilePicturePost_UpdateExisting(t *testing.T) {
 	req = setTokenContext(req, sub)
 	rr := httptest.NewRecorder()
 
-	database.On("GetUserBySubject", (*sql.Tx)(nil), sub).Return(user, nil)
-	database.On("GetUserProfilePictureByUserId", (*sql.Tx)(nil), user.Id).Return(existingPicture, nil)
-	database.On("UpdateUserProfilePicture", (*sql.Tx)(nil), mock.MatchedBy(func(pp *models.UserProfilePicture) bool {
+	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), sub).Return(user, nil)
+	database.On("GetUserProfilePictureByUserId", mock.Anything, (*sql.Tx)(nil), user.Id).Return(existingPicture, nil)
+	database.On("UpdateUserProfilePicture", mock.Anything, (*sql.Tx)(nil), mock.MatchedBy(func(pp *models.UserProfilePicture) bool {
 		return pp.Id == existingPicture.Id && pp.ContentType == "image/png"
 	})).Return(nil)
 
@@ -373,7 +373,7 @@ func TestHandleAPIAccountProfilePictureDelete_UserNotFound(t *testing.T) {
 	req = setTokenContext(req, sub)
 	rr := httptest.NewRecorder()
 
-	database.On("GetUserBySubject", (*sql.Tx)(nil), sub).Return(nil, nil)
+	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), sub).Return(nil, nil)
 
 	handler.ServeHTTP(rr, req)
 
@@ -394,8 +394,8 @@ func TestHandleAPIAccountProfilePictureDelete_Success(t *testing.T) {
 	req = setTokenContext(req, sub)
 	rr := httptest.NewRecorder()
 
-	database.On("GetUserBySubject", (*sql.Tx)(nil), sub).Return(user, nil)
-	database.On("DeleteUserProfilePicture", (*sql.Tx)(nil), user.Id).Return(nil)
+	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), sub).Return(user, nil)
+	database.On("DeleteUserProfilePicture", mock.Anything, (*sql.Tx)(nil), user.Id).Return(nil)
 
 	auditLogger.On("Log", mock.Anything, audit.AuditDeletedOwnProfilePicture, mock.MatchedBy(func(details map[string]interface{}) bool {
 		return details["userId"] == user.Id
@@ -425,7 +425,7 @@ func TestHandleAPIAccountProfilePictureDelete_GetUserFails_JSON500(t *testing.T)
 	req = setTokenContext(req, sub)
 	rr := httptest.NewRecorder()
 
-	database.On("GetUserBySubject", (*sql.Tx)(nil), sub).Return(nil, assert.AnError)
+	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), sub).Return(nil, assert.AnError)
 
 	handler.ServeHTTP(rr, req)
 
@@ -447,8 +447,8 @@ func TestHandleAPIAccountProfilePictureDelete_DatabaseError(t *testing.T) {
 	req = setTokenContext(req, sub)
 	rr := httptest.NewRecorder()
 
-	database.On("GetUserBySubject", (*sql.Tx)(nil), sub).Return(user, nil)
-	database.On("DeleteUserProfilePicture", (*sql.Tx)(nil), user.Id).Return(assert.AnError)
+	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), sub).Return(user, nil)
+	database.On("DeleteUserProfilePicture", mock.Anything, (*sql.Tx)(nil), user.Id).Return(assert.AnError)
 
 	handler.ServeHTTP(rr, req)
 

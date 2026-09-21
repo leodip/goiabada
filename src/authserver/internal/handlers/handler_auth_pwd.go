@@ -212,7 +212,7 @@ func HandleAuthPwdPost(
 			return
 		}
 
-		user, err := database.GetUserByEmail(nil, email)
+		user, err := database.GetUserByEmail(r.Context(), nil, email)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return

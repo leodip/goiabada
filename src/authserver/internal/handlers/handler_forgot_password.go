@@ -58,7 +58,7 @@ func HandleForgotPasswordPost(
 			return
 		}
 
-		user, err := database.GetUserByEmail(nil, email)
+		user, err := database.GetUserByEmail(r.Context(), nil, email)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
@@ -86,7 +86,7 @@ func HandleForgotPasswordPost(
 			user.ForgotPasswordCodeHash = verificationCodeHash
 			utcNow := time.Now().UTC()
 			user.ForgotPasswordCodeIssuedAt = sql.NullTime{Time: utcNow, Valid: true}
-			err = database.UpdateUser(nil, user)
+			err = database.UpdateUser(r.Context(), nil, user)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
 				return

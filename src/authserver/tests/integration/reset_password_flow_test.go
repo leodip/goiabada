@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -83,7 +84,7 @@ func createResetTestUser(t *testing.T, email string) (*models.User, string) {
 		Email:        email,
 		PasswordHash: passwordHashed,
 	}
-	require.NoError(t, database.CreateUser(nil, user))
+	require.NoError(t, database.CreateUser(context.Background(), nil, user))
 	return user, password
 }
 
@@ -285,7 +286,7 @@ func clientCarrying(t *testing.T, cookies []*http.Cookie) *http.Client {
 func passwordHashOf(t *testing.T, userId int64) string {
 	t.Helper()
 
-	user, err := database.GetUserById(nil, userId)
+	user, err := database.GetUserById(context.Background(), nil, userId)
 	require.NoError(t, err)
 	require.NotNil(t, user)
 	return user.PasswordHash

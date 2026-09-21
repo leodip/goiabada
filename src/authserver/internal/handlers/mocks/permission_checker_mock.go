@@ -10,6 +10,8 @@
 package mocks_handlers
 
 import (
+	"context"
+
 	"github.com/leodip/goiabada/authserver/internal/models"
 	mock "github.com/stretchr/testify/mock"
 )
@@ -51,8 +53,8 @@ func (_m *PermissionChecker) EXPECT() *PermissionChecker_Expecter {
 }
 
 // FilterOutScopesWhereUserIsNotAuthorized provides a mock function for the type PermissionChecker
-func (_mock *PermissionChecker) FilterOutScopesWhereUserIsNotAuthorized(scope string, user *models.User) (string, error) {
-	ret := _mock.Called(scope, user)
+func (_mock *PermissionChecker) FilterOutScopesWhereUserIsNotAuthorized(ctx context.Context, scope string, user *models.User) (string, error) {
+	ret := _mock.Called(ctx, scope, user)
 
 	if len(ret) == 0 {
 		panic("no return value specified for FilterOutScopesWhereUserIsNotAuthorized")
@@ -60,16 +62,16 @@ func (_mock *PermissionChecker) FilterOutScopesWhereUserIsNotAuthorized(scope st
 
 	var r0 string
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(string, *models.User) (string, error)); ok {
-		return returnFunc(scope, user)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, *models.User) (string, error)); ok {
+		return returnFunc(ctx, scope, user)
 	}
-	if returnFunc, ok := ret.Get(0).(func(string, *models.User) string); ok {
-		r0 = returnFunc(scope, user)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, *models.User) string); ok {
+		r0 = returnFunc(ctx, scope, user)
 	} else {
 		r0 = ret.Get(0).(string)
 	}
-	if returnFunc, ok := ret.Get(1).(func(string, *models.User) error); ok {
-		r1 = returnFunc(scope, user)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, *models.User) error); ok {
+		r1 = returnFunc(ctx, scope, user)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -82,25 +84,31 @@ type PermissionChecker_FilterOutScopesWhereUserIsNotAuthorized_Call struct {
 }
 
 // FilterOutScopesWhereUserIsNotAuthorized is a helper method to define mock.On call
+//   - ctx context.Context
 //   - scope string
 //   - user *models.User
-func (_e *PermissionChecker_Expecter) FilterOutScopesWhereUserIsNotAuthorized(scope any, user any) *PermissionChecker_FilterOutScopesWhereUserIsNotAuthorized_Call {
-	return &PermissionChecker_FilterOutScopesWhereUserIsNotAuthorized_Call{Call: _e.mock.On("FilterOutScopesWhereUserIsNotAuthorized", scope, user)}
+func (_e *PermissionChecker_Expecter) FilterOutScopesWhereUserIsNotAuthorized(ctx any, scope any, user any) *PermissionChecker_FilterOutScopesWhereUserIsNotAuthorized_Call {
+	return &PermissionChecker_FilterOutScopesWhereUserIsNotAuthorized_Call{Call: _e.mock.On("FilterOutScopesWhereUserIsNotAuthorized", ctx, scope, user)}
 }
 
-func (_c *PermissionChecker_FilterOutScopesWhereUserIsNotAuthorized_Call) Run(run func(scope string, user *models.User)) *PermissionChecker_FilterOutScopesWhereUserIsNotAuthorized_Call {
+func (_c *PermissionChecker_FilterOutScopesWhereUserIsNotAuthorized_Call) Run(run func(ctx context.Context, scope string, user *models.User)) *PermissionChecker_FilterOutScopesWhereUserIsNotAuthorized_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 string
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(string)
+			arg0 = args[0].(context.Context)
 		}
-		var arg1 *models.User
+		var arg1 string
 		if args[1] != nil {
-			arg1 = args[1].(*models.User)
+			arg1 = args[1].(string)
+		}
+		var arg2 *models.User
+		if args[2] != nil {
+			arg2 = args[2].(*models.User)
 		}
 		run(
 			arg0,
 			arg1,
+			arg2,
 		)
 	})
 	return _c
@@ -111,14 +119,14 @@ func (_c *PermissionChecker_FilterOutScopesWhereUserIsNotAuthorized_Call) Return
 	return _c
 }
 
-func (_c *PermissionChecker_FilterOutScopesWhereUserIsNotAuthorized_Call) RunAndReturn(run func(scope string, user *models.User) (string, error)) *PermissionChecker_FilterOutScopesWhereUserIsNotAuthorized_Call {
+func (_c *PermissionChecker_FilterOutScopesWhereUserIsNotAuthorized_Call) RunAndReturn(run func(ctx context.Context, scope string, user *models.User) (string, error)) *PermissionChecker_FilterOutScopesWhereUserIsNotAuthorized_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // UserHasScopePermission provides a mock function for the type PermissionChecker
-func (_mock *PermissionChecker) UserHasScopePermission(userId int64, scope string) (bool, error) {
-	ret := _mock.Called(userId, scope)
+func (_mock *PermissionChecker) UserHasScopePermission(ctx context.Context, userId int64, scope string) (bool, error) {
+	ret := _mock.Called(ctx, userId, scope)
 
 	if len(ret) == 0 {
 		panic("no return value specified for UserHasScopePermission")
@@ -126,16 +134,16 @@ func (_mock *PermissionChecker) UserHasScopePermission(userId int64, scope strin
 
 	var r0 bool
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(int64, string) (bool, error)); ok {
-		return returnFunc(userId, scope)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int64, string) (bool, error)); ok {
+		return returnFunc(ctx, userId, scope)
 	}
-	if returnFunc, ok := ret.Get(0).(func(int64, string) bool); ok {
-		r0 = returnFunc(userId, scope)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int64, string) bool); ok {
+		r0 = returnFunc(ctx, userId, scope)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
-	if returnFunc, ok := ret.Get(1).(func(int64, string) error); ok {
-		r1 = returnFunc(userId, scope)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, int64, string) error); ok {
+		r1 = returnFunc(ctx, userId, scope)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -148,25 +156,31 @@ type PermissionChecker_UserHasScopePermission_Call struct {
 }
 
 // UserHasScopePermission is a helper method to define mock.On call
+//   - ctx context.Context
 //   - userId int64
 //   - scope string
-func (_e *PermissionChecker_Expecter) UserHasScopePermission(userId any, scope any) *PermissionChecker_UserHasScopePermission_Call {
-	return &PermissionChecker_UserHasScopePermission_Call{Call: _e.mock.On("UserHasScopePermission", userId, scope)}
+func (_e *PermissionChecker_Expecter) UserHasScopePermission(ctx any, userId any, scope any) *PermissionChecker_UserHasScopePermission_Call {
+	return &PermissionChecker_UserHasScopePermission_Call{Call: _e.mock.On("UserHasScopePermission", ctx, userId, scope)}
 }
 
-func (_c *PermissionChecker_UserHasScopePermission_Call) Run(run func(userId int64, scope string)) *PermissionChecker_UserHasScopePermission_Call {
+func (_c *PermissionChecker_UserHasScopePermission_Call) Run(run func(ctx context.Context, userId int64, scope string)) *PermissionChecker_UserHasScopePermission_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 int64
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(int64)
+			arg0 = args[0].(context.Context)
 		}
-		var arg1 string
+		var arg1 int64
 		if args[1] != nil {
-			arg1 = args[1].(string)
+			arg1 = args[1].(int64)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
 		}
 		run(
 			arg0,
 			arg1,
+			arg2,
 		)
 	})
 	return _c
@@ -177,7 +191,7 @@ func (_c *PermissionChecker_UserHasScopePermission_Call) Return(b bool, err erro
 	return _c
 }
 
-func (_c *PermissionChecker_UserHasScopePermission_Call) RunAndReturn(run func(userId int64, scope string) (bool, error)) *PermissionChecker_UserHasScopePermission_Call {
+func (_c *PermissionChecker_UserHasScopePermission_Call) RunAndReturn(run func(ctx context.Context, userId int64, scope string) (bool, error)) *PermissionChecker_UserHasScopePermission_Call {
 	_c.Call.Return(run)
 	return _c
 }

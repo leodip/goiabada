@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"net/http"
@@ -359,7 +360,7 @@ func createAuthCodeWithUserProfile(t *testing.T, clientSecret string, scope stri
 		AddressCountry:      "US",
 	}
 
-	err = database.CreateUser(nil, user)
+	err = database.CreateUser(context.Background(), nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}

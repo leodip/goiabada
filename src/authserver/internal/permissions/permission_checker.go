@@ -1,6 +1,7 @@
 package permissions
 
 import (
+	"context"
 	"strings"
 
 	"github.com/leodip/goiabada/authserver/internal/data"
@@ -19,8 +20,8 @@ func NewPermissionChecker(database data.Database) *PermissionChecker {
 	}
 }
 
-func (pc *PermissionChecker) UserHasScopePermission(userId int64, scope string) (bool, error) {
-	user, err := pc.database.GetUserById(nil, userId)
+func (pc *PermissionChecker) UserHasScopePermission(ctx context.Context, userId int64, scope string) (bool, error) {
+	user, err := pc.database.GetUserById(ctx, nil, userId)
 	if err != nil {
 		return false, err
 	}
@@ -28,12 +29,12 @@ func (pc *PermissionChecker) UserHasScopePermission(userId int64, scope string) 
 		return false, nil
 	}
 
-	err = pc.database.UserLoadPermissions(nil, user)
+	err = pc.database.UserLoadPermissions(ctx, nil, user)
 	if err != nil {
 		return false, err
 	}
 
-	err = pc.database.UserLoadGroups(nil, user)
+	err = pc.database.UserLoadGroups(ctx, nil, user)
 	if err != nil {
 		return false, err
 	}
@@ -105,7 +106,7 @@ func (pc *PermissionChecker) UserHasScopePermission(userId int64, scope string) 
 	return false, nil
 }
 
-func (pc *PermissionChecker) FilterOutScopesWhereUserIsNotAuthorized(scope string, user *models.User) (string, error) {
+func (pc *PermissionChecker) FilterOutScopesWhereUserIsNotAuthorized(ctx context.Context, scope string, user *models.User) (string, error) {
 
 	if user == nil {
 		return "", errs.New("user is nil")
@@ -131,7 +132,7 @@ func (pc *PermissionChecker) FilterOutScopesWhereUserIsNotAuthorized(scope strin
 			return "", errs.New("invalid scope format: " + scopeStr)
 		} else {
 
-			userHasPermission, err := pc.UserHasScopePermission(user.Id, scopeStr)
+			userHasPermission, err := pc.UserHasScopePermission(ctx, user.Id, scopeStr)
 			if err != nil {
 				return "", err
 			}

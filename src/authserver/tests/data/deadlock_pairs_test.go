@@ -174,7 +174,7 @@ func TestDeadlockRetry_CredentialSweepAgainstIssuance(t *testing.T) {
 	sweepDone := make(chan error, 1)
 	go func() {
 		_, err := handlers.RevokeUserAuthStateTx(context.Background(), pDB, user.Id, "", func(tx *sql.Tx) error {
-			return pDB.SetUserPasswordHash(tx, user.Id, newHash)
+			return pDB.SetUserPasswordHash(context.Background(), tx, user.Id, newHash)
 		})
 		sweepDone <- err
 	}()
@@ -229,7 +229,7 @@ func TestDeadlockRetry_CredentialSweepAgainstIssuance(t *testing.T) {
 
 	// End state, deterministic on every engine: the password is the sweep's, and the session the
 	// sweep swept is gone.
-	reloaded, err := database.GetUserById(nil, user.Id)
+	reloaded, err := database.GetUserById(context.Background(), nil, user.Id)
 	require.NoError(t, err)
 	require.NotNil(t, reloaded, "the credential sweep does not delete the user")
 	assert.Equal(t, newHash, reloaded.PasswordHash, "the password hash is the one the sweep wrote")
@@ -295,7 +295,7 @@ func TestDeadlockRetry_DeleteUserAgainstCredentialSweep(t *testing.T) {
 	sweepDone := make(chan sweepResult, 1)
 	go func() {
 		result, err := handlers.RevokeUserAuthStateTx(context.Background(), pDB, user.Id, "", func(tx *sql.Tx) error {
-			return pDB.SetUserPasswordHash(tx, user.Id, newHash)
+			return pDB.SetUserPasswordHash(context.Background(), tx, user.Id, newHash)
 		})
 		sweepDone <- sweepResult{result: result, err: err}
 	}()
@@ -304,7 +304,7 @@ func TestDeadlockRetry_DeleteUserAgainstCredentialSweep(t *testing.T) {
 
 	deleteUser := goBlocked(t, "DeleteUser", sweepTx, func(reached func()) error {
 		reached()
-		return other.DeleteUser(nil, user.Id)
+		return other.DeleteUser(context.Background(), nil, user.Id)
 	})
 
 	deleteUser.requireBlocked(t) // DeleteUser holds the session rows and waits for the users row
@@ -319,7 +319,7 @@ func TestDeadlockRetry_DeleteUserAgainstCredentialSweep(t *testing.T) {
 
 	// The user is gone on every engine and either winner: DeleteUser removes it, and if the sweep
 	// won first, DeleteUser's rerun removes it after.
-	gone, err := database.GetUserById(nil, user.Id)
+	gone, err := database.GetUserById(context.Background(), nil, user.Id)
 	require.NoError(t, err)
 	assert.Nil(t, gone, "the user is gone: DeleteUser removed it whichever party the engine aborted")
 

@@ -76,7 +76,7 @@ func HandleAPIUserPhonePut(
 		}
 
 		// Get user from database
-		user, err := database.GetUserById(nil, userId)
+		user, err := database.GetUserById(r.Context(), nil, userId)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -134,7 +134,7 @@ func HandleAPIUserPhonePut(
 		}
 
 		// Update user in database
-		err = database.UpdateUser(nil, user)
+		err = database.UpdateUser(r.Context(), nil, user)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return

@@ -122,7 +122,7 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 			OTPEnabled:          true,
 			OtpConfigGeneration: 4,
 		}
-		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
+		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateLevel2OTP &&
@@ -168,7 +168,7 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 			OTPEnabled:          false,
 			OtpConfigGeneration: 4,
 		}
-		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
+		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
 		// **The skip arm captures too**, and that is the case worth pinning: a user who has
 		// removed their authenticator answers the level 2 question by having nothing to
@@ -218,7 +218,7 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 			Id:                  1,
 			OtpConfigGeneration: 4,
 		}
-		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
+		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateLevel2OTP &&
@@ -264,7 +264,7 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
 
-		database.On("GetUserById", mock.Anything, int64(1)).Return(nil, nil)
+		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(nil, nil)
 
 		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err.Error() == "user not found"
@@ -309,7 +309,7 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		user := &models.User{
 			Id: 1,
 		}
-		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
+		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
 		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err.Error() == "invalid targetAcrLevel: urn:goiabada:level1"

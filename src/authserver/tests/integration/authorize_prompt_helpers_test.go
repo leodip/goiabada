@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/url"
@@ -103,7 +104,7 @@ func createSessionWithAcrLevel1AndPassword(t *testing.T) (*http.Client, *models.
 		PasswordHash: passwordHashed,
 	}
 
-	err = database.CreateUser(nil, user)
+	err = database.CreateUser(context.Background(), nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}

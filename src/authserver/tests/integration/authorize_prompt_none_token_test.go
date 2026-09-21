@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"database/sql"
 	"net/http"
 	"net/url"
@@ -316,7 +317,7 @@ func TestPromptNone_CodeExchange(t *testing.T) {
 		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
-	err = database.CreateUser(nil, user)
+	err = database.CreateUser(context.Background(), nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -469,7 +470,7 @@ func TestPromptNone_SubClaimConsistent(t *testing.T) {
 		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
-	err = database.CreateUser(nil, user)
+	err = database.CreateUser(context.Background(), nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -627,7 +628,7 @@ func TestPromptNone_AuthTimePreservedInToken(t *testing.T) {
 		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
-	err = database.CreateUser(nil, user)
+	err = database.CreateUser(context.Background(), nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -786,7 +787,7 @@ func TestPromptNone_PKCEWrongVerifier(t *testing.T) {
 		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
-	err = database.CreateUser(nil, user)
+	err = database.CreateUser(context.Background(), nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -936,7 +937,7 @@ func TestPromptNone_RefreshWithOfflineAccess(t *testing.T) {
 		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
-	err = database.CreateUser(nil, user)
+	err = database.CreateUser(context.Background(), nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -948,7 +949,7 @@ func TestPromptNone_RefreshWithOfflineAccess(t *testing.T) {
 		Scope:     "openid profile offline_access",
 		GrantedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true},
 	}
-	err = database.CreateUserConsent(nil, consent)
+	err = database.CreateUserConsent(context.Background(), nil, consent)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1126,7 +1127,7 @@ func TestPromptNone_NoncePreserved(t *testing.T) {
 		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
-	err = database.CreateUser(nil, user)
+	err = database.CreateUser(context.Background(), nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1273,7 +1274,7 @@ func TestPromptNone_PKCESupported(t *testing.T) {
 		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
-	err = database.CreateUser(nil, user)
+	err = database.CreateUser(context.Background(), nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}

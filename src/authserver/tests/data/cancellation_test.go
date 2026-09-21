@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -119,4 +121,57 @@ func TestBeginTransaction_OnSqliteABlockedOpenReturnsOnItsDeadline(t *testing.T)
 		"the deadline is what ended the wait, and it must be matchable: got %v", result.err)
 	assert.Nil(t, result.tx)
 	assert.Less(t, time.Since(started), 5*time.Second)
+}
+
+// The three cases above reach BeginTx. The three below reach the statements themselves, which is
+// the half of seam 2 that stage 5 adds: the 57 identity methods now carry the caller's context
+// down to QuerySql and ExecSql, and nothing but a real driver says whether it arrives.
+//
+// They run on all four engines. An already-cancelled context is the one cancellation every
+// driver answers identically, because database/sql refuses the call before the driver is reached
+// at all (probe/cancel.out), and that is exactly the claim being made: the context is consulted,
+// not carried and dropped.
+
+func TestGetUserById_RefusesAnAlreadyCancelledContext(t *testing.T) {
+	user := createTestUser(t)
+
+	got, err := database.GetUserById(cancelled(), nil, user.Id)
+
+	require.Error(t, err, "a read must not be issued on behalf of a caller that is already gone")
+	assert.ErrorIs(t, err, context.Canceled, "and the reason must be matchable, not a sentence")
+	assert.Nil(t, got, "no row is returned alongside the refusal")
+}
+
+// The write half, and the assertion that matters is the second one: a refused statement must
+// leave the table as it was. A method that took the context and then issued the insert without
+// it would fail this on the row count, not on the error.
+func TestCreateUser_RefusesAnAlreadyCancelledContextAndInsertsNothing(t *testing.T) {
+	user := &models.User{
+		Enabled:  true,
+		Subject:  fake.UUID(),
+		Username: fake.Username(),
+		Email:    fake.Email(),
+	}
+
+	err := database.CreateUser(cancelled(), nil, user)
+
+	require.Error(t, err)
+	assert.ErrorIs(t, err, context.Canceled)
+
+	found, err := database.GetUserByEmail(context.Background(), nil, user.Email)
+	require.NoError(t, err, "the read that checks the table must itself succeed")
+	assert.Nil(t, found, "the refused insert wrote no row")
+}
+
+// A loader rather than a plain select, because UserLoadPermissions reaches the database through
+// GetUserPermissionsByUserId and then through GetPermissionsByIds: the context has to survive two
+// hops inside commondb, which is the shape the other four loaders share.
+func TestUserLoadPermissions_RefusesAnAlreadyCancelledContext(t *testing.T) {
+	user := createTestUser(t)
+
+	err := database.UserLoadPermissions(cancelled(), nil, user)
+
+	require.Error(t, err)
+	assert.ErrorIs(t, err, context.Canceled)
+	assert.Empty(t, user.Permissions, "nothing was loaded onto the model")
 }

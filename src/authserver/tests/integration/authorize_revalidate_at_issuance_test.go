@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"net/http"
 	"net/url"
 	"strings"
@@ -86,7 +87,7 @@ func parkOnConsentScreen(t *testing.T, requestScope string, clientSecret string,
 		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
-	err = database.CreateUser(nil, user)
+	err = database.CreateUser(context.Background(), nil, user)
 	assert.NoError(t, err)
 
 	for _, scope := range grantScopes {
@@ -100,7 +101,7 @@ func parkOnConsentScreen(t *testing.T, requestScope string, clientSecret string,
 		granted := false
 		for i := range permissions {
 			if permissions[i].PermissionIdentifier == parts[1] {
-				err = database.CreateUserPermission(nil,
+				err = database.CreateUserPermission(context.Background(), nil,
 					&models.UserPermission{UserId: user.Id, PermissionId: permissions[i].Id})
 				assert.NoError(t, err)
 				granted = true
@@ -236,12 +237,12 @@ func TestPermissionRevokedOnConsentScreen_TokenLosesTheScope(t *testing.T) {
 
 	// The window: the consent is recorded, the ceremony is one hop from a code, and the
 	// administrator takes the write permission away.
-	permissions, err := database.GetUserPermissionsByUserId(nil, parked.user.Id)
+	permissions, err := database.GetUserPermissionsByUserId(context.Background(), nil, parked.user.Id)
 	assert.NoError(t, err)
 	revoked := false
 	for _, permission := range permissions {
 		if permission.PermissionId == writePermission.Id {
-			err = database.DeleteUserPermission(nil, permission.Id)
+			err = database.DeleteUserPermission(context.Background(), nil, permission.Id)
 			assert.NoError(t, err)
 			revoked = true
 		}
@@ -277,7 +278,7 @@ func TestPermissionRevokedOnConsentScreen_TokenLosesTheScope(t *testing.T) {
 	// when they ticked the box, so the record is a true account of what they agreed to; it grants
 	// nothing on its own, because every reader pairs it with a live permission check. The filter
 	// on the consent submission has a different window, which its own case covers.
-	consent, err := database.GetConsentByUserIdAndClientId(nil, parked.user.Id, parked.client.Id)
+	consent, err := database.GetConsentByUserIdAndClientId(context.Background(), nil, parked.user.Id, parked.client.Id)
 	assert.NoError(t, err)
 	assert.NotNil(t, consent)
 	assert.Contains(t, consent.Scope, writeScope,
@@ -414,12 +415,12 @@ func TestPermissionRevokedBeforeConsentSubmission_ConsentRecordNeverHasIt(t *tes
 
 	// The window: the consent screen is rendered and on it, with both boxes offered, and the
 	// administrator takes the write permission away before the user clicks Submit.
-	permissions, err := database.GetUserPermissionsByUserId(nil, parked.user.Id)
+	permissions, err := database.GetUserPermissionsByUserId(context.Background(), nil, parked.user.Id)
 	assert.NoError(t, err)
 	revoked := false
 	for _, permission := range permissions {
 		if permission.PermissionId == writePermission.Id {
-			err = database.DeleteUserPermission(nil, permission.Id)
+			err = database.DeleteUserPermission(context.Background(), nil, permission.Id)
 			assert.NoError(t, err)
 			revoked = true
 		}
@@ -456,7 +457,7 @@ func TestPermissionRevokedBeforeConsentSubmission_ConsentRecordNeverHasIt(t *tes
 		"a permission revoked before the consent submission must not reach the client")
 
 	// The half this case exists for, and the half its sibling asserts the opposite of.
-	consent, err := database.GetConsentByUserIdAndClientId(nil, parked.user.Id, parked.client.Id)
+	consent, err := database.GetConsentByUserIdAndClientId(context.Background(), nil, parked.user.Id, parked.client.Id)
 	assert.NoError(t, err)
 	assert.NotNil(t, consent)
 	assert.Contains(t, consent.Scope, readScope)

@@ -100,7 +100,7 @@ func RevokeUserAuthState(ctx context.Context, db data.Database, tx *sql.Tx, user
 	//
 	// An unknown user needs no separate lookup either: IncrementUserAuthStateGeneration
 	// requires exactly one affected row and errors otherwise.
-	newGeneration, err := db.IncrementUserAuthStateGeneration(tx, userId)
+	newGeneration, err := db.IncrementUserAuthStateGeneration(ctx, tx, userId)
 	if err != nil {
 		return result, err
 	}

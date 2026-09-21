@@ -340,7 +340,7 @@ func HandleAuthCompletedGet(
 			return
 		}
 
-		user, err := database.GetUserById(nil, authContext.UserId)
+		user, err := database.GetUserById(r.Context(), nil, authContext.UserId)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
@@ -388,7 +388,7 @@ func HandleAuthCompletedGet(
 
 		// we'll first find out what is the effective scope,
 		// by filtering out the scopes where the user is not authorized
-		effectiveScope, err := permissionChecker.FilterOutScopesWhereUserIsNotAuthorized(authContext.Scope, user)
+		effectiveScope, err := permissionChecker.FilterOutScopesWhereUserIsNotAuthorized(r.Context(), authContext.Scope, user)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return

@@ -2,6 +2,7 @@ package datatests
 
 import (
 	"bytes"
+	"context"
 	"path/filepath"
 	"testing"
 
@@ -100,7 +101,7 @@ func TestRotateEncryptionKeyIfNeeded(t *testing.T) {
 		ForgotPasswordCodeEncrypted:          encA(forgotCode),
 		OtpEnrollmentSecretEncrypted:         encA(otpEnrolment),
 	}
-	if err := db.CreateUser(nil, user); err != nil {
+	if err := db.CreateUser(context.Background(), nil, user); err != nil {
 		t.Fatalf("CreateUser: %v", err)
 	}
 	preReg := &models.PreRegistration{
@@ -171,7 +172,7 @@ func TestRotateEncryptionKeyIfNeeded(t *testing.T) {
 	}
 	rekeyed("clients.client_secret_encrypted", gotClient.ClientSecretEncrypted, clientSec)
 
-	gotUser, err := db.GetUserById(nil, user.Id)
+	gotUser, err := db.GetUserById(context.Background(), nil, user.Id)
 	if err != nil {
 		t.Fatalf("GetUserById: %v", err)
 	}

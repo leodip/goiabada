@@ -35,7 +35,7 @@ func HandleAPIUserProfilePicturePost(
 		}
 
 		// Get user from database
-		user, err := database.GetUserById(nil, userId)
+		user, err := database.GetUserById(r.Context(), nil, userId)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -85,7 +85,7 @@ func HandleAPIUserProfilePicturePost(
 		}
 
 		// Check if user already has a profile picture
-		existingPicture, err := database.GetUserProfilePictureByUserId(nil, userId)
+		existingPicture, err := database.GetUserProfilePictureByUserId(r.Context(), nil, userId)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -95,7 +95,7 @@ func HandleAPIUserProfilePicturePost(
 			// Update existing picture
 			existingPicture.Picture = data
 			existingPicture.ContentType = result.ContentType
-			err = database.UpdateUserProfilePicture(nil, existingPicture)
+			err = database.UpdateUserProfilePicture(r.Context(), nil, existingPicture)
 		} else {
 			// Create new picture
 			profilePicture := &models.UserProfilePicture{
@@ -103,7 +103,7 @@ func HandleAPIUserProfilePicturePost(
 				Picture:     data,
 				ContentType: result.ContentType,
 			}
-			err = database.CreateUserProfilePicture(nil, profilePicture)
+			err = database.CreateUserProfilePicture(r.Context(), nil, profilePicture)
 		}
 
 		if err != nil {
@@ -154,7 +154,7 @@ func HandleAPIUserProfilePictureDelete(
 		}
 
 		// Get user from database
-		user, err := database.GetUserById(nil, userId)
+		user, err := database.GetUserById(r.Context(), nil, userId)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -166,7 +166,7 @@ func HandleAPIUserProfilePictureDelete(
 		}
 
 		// Delete the profile picture
-		err = database.DeleteUserProfilePicture(nil, userId)
+		err = database.DeleteUserProfilePicture(r.Context(), nil, userId)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -213,7 +213,7 @@ func HandleAPIUserProfilePictureGet(
 		}
 
 		// Get user from database
-		user, err := database.GetUserById(nil, userId)
+		user, err := database.GetUserById(r.Context(), nil, userId)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -225,7 +225,7 @@ func HandleAPIUserProfilePictureGet(
 		}
 
 		// Check if user has profile picture
-		hasPicture, err := database.UserHasProfilePicture(nil, userId)
+		hasPicture, err := database.UserHasProfilePicture(r.Context(), nil, userId)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return

@@ -88,9 +88,9 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			Id:      1,
 			Enabled: true,
 		}
-		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
+		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
-		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", "openid profile", user).Return("openid profile", nil)
+		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, "openid profile", user).Return("openid profile", nil)
 
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateReadyToIssueCode &&
@@ -284,9 +284,9 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			Return(newSession, nil)
 
 		user := &models.User{Id: 2, Enabled: true}
-		database.On("GetUserById", mock.Anything, int64(2)).Return(user, nil)
+		database.On("GetUserById", mock.Anything, mock.Anything, int64(2)).Return(user, nil)
 
-		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", "openid profile", user).Return("openid profile", nil)
+		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, "openid profile", user).Return("openid profile", nil)
 
 		// level1, the target, rather than the maximum taken with the other user's
 		// level2_mandatory. This is the assertion the higher ambient ACR above exists for.
@@ -432,9 +432,9 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			models.AcrLevel1.String(), int64(3), (*int64)(nil), &pwdAuthTime).Return(newSession, nil)
 
 		user := &models.User{Id: 2, Enabled: true}
-		database.On("GetUserById", mock.Anything, int64(2)).Return(user, nil)
+		database.On("GetUserById", mock.Anything, mock.Anything, int64(2)).Return(user, nil)
 
-		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", "openid profile", user).Return("openid profile", nil)
+		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, "openid profile", user).Return("openid profile", nil)
 
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateReadyToIssueCode &&
@@ -531,9 +531,9 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			models.AcrLevel1.String(), int64(3), (*int64)(nil), &pwdAuthTime).Return(newSession, nil)
 
 		user := &models.User{Id: 1, Enabled: true}
-		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
+		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
-		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", "openid profile", user).Return("openid profile", nil)
+		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, "openid profile", user).Return("openid profile", nil)
 
 		// The same-user half of decision 3: the expired row's level2_mandatory does not raise
 		// the acr of a token bound to the level1 session this ceremony just created.
@@ -859,9 +859,9 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			Id:      1,
 			Enabled: true,
 		}
-		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
+		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
-		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", "openid profile", user).Return("openid profile", nil)
+		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, "openid profile", user).Return("openid profile", nil)
 
 		// And the context carries that same instant onward, which is what /auth/issue stamps
 		// onto the code and the token issuer then signs as auth_time.
@@ -955,9 +955,9 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			Id:      1,
 			Enabled: true,
 		}
-		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
+		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
-		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", "openid profile", user).Return("openid profile", nil)
+		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, "openid profile", user).Return("openid profile", nil)
 
 		// The session's existing AuthTime is carried forward rather than replaced.
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
@@ -1054,9 +1054,9 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			Id:      1,
 			Enabled: true,
 		}
-		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
+		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
-		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", "openid profile", user).Return("openid profile", nil)
+		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, "openid profile", user).Return("openid profile", nil)
 
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateReadyToIssueCode &&
@@ -1156,9 +1156,9 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger.On("Log", mock.Anything, audit.AuditBumpedUserSession, mock.Anything).Return()
 
 		user := &models.User{Id: 1, Enabled: true}
-		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
+		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
-		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", "openid profile", user).Return("openid profile", nil)
+		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, "openid profile", user).Return("openid profile", nil)
 
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateReadyToIssueCode
@@ -1248,9 +1248,9 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger.On("Log", mock.Anything, audit.AuditBumpedUserSession, mock.Anything).Return()
 
 		user := &models.User{Id: 1, Enabled: true}
-		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
+		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
-		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", "openid profile", user).Return("openid profile", nil)
+		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, "openid profile", user).Return("openid profile", nil)
 
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateReadyToIssueCode
@@ -1339,9 +1339,9 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger.On("Log", mock.Anything, audit.AuditBumpedUserSession, mock.Anything).Return()
 
 		user := &models.User{Id: 1, Enabled: true}
-		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
+		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
-		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", "openid profile", user).Return("openid profile", nil)
+		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, "openid profile", user).Return("openid profile", nil)
 
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateReadyToIssueCode
@@ -1427,9 +1427,9 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger.On("Log", mock.Anything, audit.AuditStartedNewUserSesson, mock.Anything).Return()
 
 		user := &models.User{Id: 1, Enabled: true}
-		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
+		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
-		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", "openid profile", user).Return("openid profile", nil)
+		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, "openid profile", user).Return("openid profile", nil)
 
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateReadyToIssueCode
@@ -1610,7 +1610,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			Id:      1,
 			Enabled: false,
 		}
-		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
+		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.AuditUserDisabled, mock.Anything).Return()
 
@@ -1706,7 +1706,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			Id:      1,
 			Enabled: false,
 		}
-		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
+		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.AuditUserDisabled, mock.Anything).Return()
 
@@ -1800,7 +1800,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			Id:      1,
 			Enabled: false,
 		}
-		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
+		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.AuditUserDisabled, mock.Anything).Return()
 
@@ -1890,7 +1890,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			Id:      1,
 			Enabled: false,
 		}
-		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
+		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.AuditUserDisabled, mock.Anything).Return()
 
@@ -1978,10 +1978,10 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			Id:      1,
 			Enabled: true,
 		}
-		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
+		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
 		// Simulate the scope being filtered to an empty string
-		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", "openid profile", user).Return("", nil)
+		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, "openid profile", user).Return("", nil)
 
 		// Same sentinel as the disabled-user case, for the second refusal in this handler.
 		const clearedContextCookie = "cleared-auth-context"
@@ -2072,9 +2072,9 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			Id:      1,
 			Enabled: true,
 		}
-		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
+		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
-		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", "openid profile", user).Return("", nil)
+		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, "openid profile", user).Return("", nil)
 
 		authHelper.On("ClearAuthContext", rr, req).Return(errors.New("the session store is unreachable"))
 
@@ -2159,9 +2159,9 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			Id:      1,
 			Enabled: true,
 		}
-		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
+		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
-		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", "openid profile", user).Return("", nil)
+		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, "openid profile", user).Return("", nil)
 
 		authHelper.On("ClearAuthContext", rr, req).Return(errors.New("the session store is unreachable"))
 
@@ -2244,9 +2244,9 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			Id:      1,
 			Enabled: true,
 		}
-		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
+		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
-		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", "openid profile", user).Return("", nil)
+		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, "openid profile", user).Return("", nil)
 
 		// The clear succeeds and it is the ordinary refusal that cannot be committed. Before
 		// this change the handler carried on into the clear after answering the 500, which is
@@ -2337,9 +2337,9 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			Id:      1,
 			Enabled: true,
 		}
-		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
+		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
-		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", "openid profile", user).Return("openid profile", nil)
+		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, "openid profile", user).Return("openid profile", nil)
 
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateRequiresConsent &&
@@ -2425,9 +2425,9 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			Id:      1,
 			Enabled: true,
 		}
-		database.On("GetUserById", mock.Anything, int64(1)).Return(user, nil)
+		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
-		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", "openid profile offline_access", user).Return("openid profile offline_access", nil)
+		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, "openid profile offline_access", user).Return("openid profile offline_access", nil)
 
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateRequiresConsent &&

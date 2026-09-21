@@ -293,7 +293,7 @@ func (d *CommonDatabase) ClientLoadWebOrigins(tx *sql.Tx, client *models.Client)
 	return nil
 }
 
-func (d *CommonDatabase) GetClientsByIds(tx *sql.Tx, clientIds []int64) ([]models.Client, error) {
+func (d *CommonDatabase) GetClientsByIds(ctx context.Context, tx *sql.Tx, clientIds []int64) ([]models.Client, error) {
 
 	if len(clientIds) == 0 {
 		return []models.Client{}, nil
@@ -309,7 +309,7 @@ func (d *CommonDatabase) GetClientsByIds(tx *sql.Tx, clientIds []int64) ([]model
 		selectBuilder.Where(selectBuilder.In("id", sqlbuilder.Flatten(batch)...))
 
 		sql, args := selectBuilder.Build()
-		rows, err := d.QuerySql(context.Background(), tx, sql, args...)
+		rows, err := d.QuerySql(ctx, tx, sql, args...)
 		if err != nil {
 			return errs.Wrap(err, "unable to query database")
 		}

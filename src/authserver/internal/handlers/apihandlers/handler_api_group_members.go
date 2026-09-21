@@ -117,7 +117,7 @@ func HandleAPIGroupMemberAddPost(
 		}
 
 		// Validate user exists
-		user, err := database.GetUserById(nil, addReq.UserId)
+		user, err := database.GetUserById(r.Context(), nil, addReq.UserId)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting user by ID for group member add"), "user_id", addReq.UserId, "group_id", groupId)
 			return
@@ -128,7 +128,7 @@ func HandleAPIGroupMemberAddPost(
 		}
 
 		// Check if user is already in the group
-		existingUserGroup, err := database.GetUserGroupByUserIdAndGroupId(nil, user.Id, group.Id)
+		existingUserGroup, err := database.GetUserGroupByUserIdAndGroupId(r.Context(), nil, user.Id, group.Id)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error checking existing group membership"), "user_id", user.Id, "group_id", group.Id)
 			return
@@ -139,7 +139,7 @@ func HandleAPIGroupMemberAddPost(
 		}
 
 		// Add user to group
-		err = database.CreateUserGroup(nil, &models.UserGroup{
+		err = database.CreateUserGroup(r.Context(), nil, &models.UserGroup{
 			UserId:  user.Id,
 			GroupId: group.Id,
 		})
@@ -207,7 +207,7 @@ func HandleAPIGroupMemberDelete(
 		}
 
 		// Validate user exists
-		user, err := database.GetUserById(nil, userId)
+		user, err := database.GetUserById(r.Context(), nil, userId)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting user by ID for group member delete"), "user_id", userId, "group_id", groupId)
 			return
@@ -218,7 +218,7 @@ func HandleAPIGroupMemberDelete(
 		}
 
 		// Check if user is in the group
-		userGroup, err := database.GetUserGroupByUserIdAndGroupId(nil, user.Id, group.Id)
+		userGroup, err := database.GetUserGroupByUserIdAndGroupId(r.Context(), nil, user.Id, group.Id)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error checking group membership for delete"), "user_id", user.Id, "group_id", group.Id)
 			return
@@ -229,7 +229,7 @@ func HandleAPIGroupMemberDelete(
 		}
 
 		// Remove user from group
-		err = database.DeleteUserGroup(nil, userGroup.Id)
+		err = database.DeleteUserGroup(r.Context(), nil, userGroup.Id)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error deleting user group membership"), "user_group_id", userGroup.Id, "user_id", user.Id, "group_id", group.Id)
 			return

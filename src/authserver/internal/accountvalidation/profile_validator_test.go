@@ -1,12 +1,14 @@
 package accountvalidation
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"testing"
 	"time"
 
 	"errors"
+
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
@@ -172,10 +174,10 @@ func TestValidateProfile_UnresolvableSubjectReturnsError(t *testing.T) {
 			mockDB := mocks_data.NewDatabase(t)
 			validator := NewProfileValidator(mockDB)
 
-			mockDB.On("GetUserBySubject", mock.Anything, "unknown-subject").Return(nil, nil).Once()
+			mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "unknown-subject").Return(nil, nil).Once()
 			tc.usernameLookup(mockDB)
 
-			err := validator.ValidateProfile(&ValidateProfileInput{
+			err := validator.ValidateProfile(context.Background(), &ValidateProfileInput{
 				Username: "jdoe",
 				Subject:  "unknown-subject",
 			})
@@ -249,7 +251,7 @@ func TestValidateProfile_EmptyInputIsValid(t *testing.T) {
 
 	// With no username there is no database lookup at all; NewDatabase(t) would
 	// fail the test if one happened.
-	err := validator.ValidateProfile(&ValidateProfileInput{})
+	err := validator.ValidateProfile(context.Background(), &ValidateProfileInput{})
 
 	assert.NoError(t, err)
 }
@@ -294,10 +296,10 @@ func TestValidateProfile_UsernameFormat(t *testing.T) {
 			// The format check runs after the uniqueness lookups, so both are
 			// always reached when a username is present.
 			user := &models.User{Id: 1, Subject: subject}
-			mockDB.On("GetUserBySubject", mock.Anything, subject).Return(user, nil).Once()
-			mockDB.On("GetUserByUsername", mock.Anything, tc.username).Return(nil, nil).Once()
+			mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, subject).Return(user, nil).Once()
+			mockDB.On("GetUserByUsername", mock.Anything, mock.Anything, tc.username).Return(nil, nil).Once()
 
-			err := validator.ValidateProfile(&ValidateProfileInput{
+			err := validator.ValidateProfile(context.Background(), &ValidateProfileInput{
 				Username: tc.username,
 				Subject:  subject,
 			})
@@ -318,12 +320,12 @@ func TestValidateProfile_UsernameTakenByAnotherUser(t *testing.T) {
 	subject := fake.UUID()
 	otherSubject := fake.UUID()
 
-	mockDB.On("GetUserBySubject", mock.Anything, subject).Return(
+	mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, subject).Return(
 		&models.User{Id: 1, Subject: subject}, nil).Once()
-	mockDB.On("GetUserByUsername", mock.Anything, "jdoe").Return(
+	mockDB.On("GetUserByUsername", mock.Anything, mock.Anything, "jdoe").Return(
 		&models.User{Id: 2, Subject: otherSubject}, nil).Once()
 
-	err := validator.ValidateProfile(&ValidateProfileInput{
+	err := validator.ValidateProfile(context.Background(), &ValidateProfileInput{
 		Username: "jdoe",
 		Subject:  subject,
 	})
@@ -340,10 +342,10 @@ func TestValidateProfile_UsernameOwnedBySameUserIsAllowed(t *testing.T) {
 	subject := fake.UUID()
 	user := &models.User{Id: 1, Subject: subject}
 
-	mockDB.On("GetUserBySubject", mock.Anything, subject).Return(user, nil).Once()
-	mockDB.On("GetUserByUsername", mock.Anything, "jdoe").Return(user, nil).Once()
+	mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, subject).Return(user, nil).Once()
+	mockDB.On("GetUserByUsername", mock.Anything, mock.Anything, "jdoe").Return(user, nil).Once()
 
-	err := validator.ValidateProfile(&ValidateProfileInput{
+	err := validator.ValidateProfile(context.Background(), &ValidateProfileInput{
 		Username: "jdoe",
 		Subject:  subject,
 	})
@@ -359,9 +361,9 @@ func TestValidateProfile_UsernameLookupErrorsPropagate(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 		validator := NewProfileValidator(mockDB)
 
-		mockDB.On("GetUserBySubject", mock.Anything, subject).Return(nil, dbErr).Once()
+		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, subject).Return(nil, dbErr).Once()
 
-		err := validator.ValidateProfile(&ValidateProfileInput{
+		err := validator.ValidateProfile(context.Background(), &ValidateProfileInput{
 			Username: "jdoe",
 			Subject:  subject,
 		})
@@ -375,11 +377,11 @@ func TestValidateProfile_UsernameLookupErrorsPropagate(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 		validator := NewProfileValidator(mockDB)
 
-		mockDB.On("GetUserBySubject", mock.Anything, subject).Return(
+		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, subject).Return(
 			&models.User{Id: 1, Subject: subject}, nil).Once()
-		mockDB.On("GetUserByUsername", mock.Anything, "jdoe").Return(nil, dbErr).Once()
+		mockDB.On("GetUserByUsername", mock.Anything, mock.Anything, "jdoe").Return(nil, dbErr).Once()
 
-		err := validator.ValidateProfile(&ValidateProfileInput{
+		err := validator.ValidateProfile(context.Background(), &ValidateProfileInput{
 			Username: "jdoe",
 			Subject:  subject,
 		})
@@ -423,7 +425,7 @@ func TestValidateProfile_NameFieldsReportTheirOwnCode(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			validator := NewProfileValidator(mocks_data.NewDatabase(t))
 
-			err := validator.ValidateProfile(&tc.input)
+			err := validator.ValidateProfile(context.Background(), &tc.input)
 
 			assertLocalizedError(t, err, tc.expectedCode, profileErrorMessages[tc.expectedCode])
 		})
@@ -435,7 +437,7 @@ func TestValidateProfile_NameFieldsReportTheirOwnCode(t *testing.T) {
 func TestValidateProfile_NameFieldsAreCheckedInOrder(t *testing.T) {
 	validator := NewProfileValidator(mocks_data.NewDatabase(t))
 
-	err := validator.ValidateProfile(&ValidateProfileInput{
+	err := validator.ValidateProfile(context.Background(), &ValidateProfileInput{
 		GivenName:  "J",
 		MiddleName: "Q1",
 		FamilyName: "Doe_",
@@ -448,7 +450,7 @@ func TestValidateProfile_NameFieldsAreCheckedInOrder(t *testing.T) {
 func TestValidateProfile_ValidNamesPass(t *testing.T) {
 	validator := NewProfileValidator(mocks_data.NewDatabase(t))
 
-	err := validator.ValidateProfile(&ValidateProfileInput{
+	err := validator.ValidateProfile(context.Background(), &ValidateProfileInput{
 		GivenName:  "Jane",
 		MiddleName: "Mary-Anne",
 		FamilyName: "O'Brien",
@@ -483,7 +485,7 @@ func TestValidateProfile_Nickname(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			validator := NewProfileValidator(mocks_data.NewDatabase(t))
 
-			err := validator.ValidateProfile(&ValidateProfileInput{Nickname: tc.nickname})
+			err := validator.ValidateProfile(context.Background(), &ValidateProfileInput{Nickname: tc.nickname})
 
 			if tc.expectedCode == "" {
 				assert.NoError(t, err)
@@ -520,7 +522,7 @@ func TestValidateProfile_Website(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			validator := NewProfileValidator(mocks_data.NewDatabase(t))
 
-			err := validator.ValidateProfile(&ValidateProfileInput{Website: tc.website})
+			err := validator.ValidateProfile(context.Background(), &ValidateProfileInput{Website: tc.website})
 
 			if tc.expectedCode == "" {
 				assert.NoError(t, err)
@@ -540,7 +542,7 @@ func TestValidateProfile_WebsiteTooLong(t *testing.T) {
 	longWebsite := "https://example.com/" + strings.Repeat("a", 80)
 	assert.Greater(t, len(longWebsite), 96)
 
-	err := validator.ValidateProfile(&ValidateProfileInput{Website: longWebsite})
+	err := validator.ValidateProfile(context.Background(), &ValidateProfileInput{Website: longWebsite})
 
 	assertLocalizedError(t, err, i18n.ErrCodeProfileWebsiteTooLong,
 		"Please ensure the website URL is no longer than 96 characters.")
@@ -559,7 +561,7 @@ func TestValidateProfile_WebsiteAtTheLengthLimitIsAccepted(t *testing.T) {
 	website := prefix + strings.Repeat("a", 96-len(prefix))
 	assert.Len(t, website, 96)
 
-	err := validator.ValidateProfile(&ValidateProfileInput{Website: website})
+	err := validator.ValidateProfile(context.Background(), &ValidateProfileInput{Website: website})
 
 	assert.NoError(t, err)
 }
@@ -589,7 +591,7 @@ func TestValidateProfile_Gender(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			validator := NewProfileValidator(mocks_data.NewDatabase(t))
 
-			err := validator.ValidateProfile(&ValidateProfileInput{Gender: tc.gender})
+			err := validator.ValidateProfile(context.Background(), &ValidateProfileInput{Gender: tc.gender})
 
 			if tc.expectedCode == "" {
 				assert.NoError(t, err)
@@ -627,7 +629,7 @@ func TestValidateProfile_DateOfBirthFormat(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			validator := NewProfileValidator(mocks_data.NewDatabase(t))
 
-			err := validator.ValidateProfile(&ValidateProfileInput{DateOfBirth: tc.dob})
+			err := validator.ValidateProfile(context.Background(), &ValidateProfileInput{DateOfBirth: tc.dob})
 
 			if tc.expectedCode == "" {
 				assert.NoError(t, err)
@@ -652,7 +654,7 @@ func TestValidateProfile_DateOfBirthInTheFuture(t *testing.T) {
 
 	dayAfterTomorrow := time.Now().UTC().AddDate(0, 0, 2).Format("2006-01-02")
 
-	err := validator.ValidateProfile(&ValidateProfileInput{DateOfBirth: dayAfterTomorrow})
+	err := validator.ValidateProfile(context.Background(), &ValidateProfileInput{DateOfBirth: dayAfterTomorrow})
 
 	assertLocalizedError(t, err, i18n.ErrCodeProfileDobInFuture,
 		profileErrorMessages[i18n.ErrCodeProfileDobInFuture])
@@ -683,7 +685,7 @@ func TestValidateProfile_DateOfBirthTimezoneToleranceBoundary(t *testing.T) {
 			validator := NewProfileValidator(mocks_data.NewDatabase(t))
 			date := utcNow.AddDate(0, 0, tc.daysAhead).Format("2006-01-02")
 
-			err := validator.ValidateProfile(&ValidateProfileInput{DateOfBirth: date})
+			err := validator.ValidateProfile(context.Background(), &ValidateProfileInput{DateOfBirth: date})
 
 			if tc.wantReject {
 				assertLocalizedError(t, err, i18n.ErrCodeProfileDobInFuture,
@@ -705,7 +707,7 @@ func TestValidateProfile_DateOfBirthTodayIsAccepted(t *testing.T) {
 
 	today := time.Now().UTC().Format("2006-01-02")
 
-	err := validator.ValidateProfile(&ValidateProfileInput{DateOfBirth: today})
+	err := validator.ValidateProfile(context.Background(), &ValidateProfileInput{DateOfBirth: today})
 
 	assert.NoError(t, err)
 }
@@ -717,7 +719,7 @@ func TestValidateProfile_DateOfBirthLocalTodayIsAccepted(t *testing.T) {
 
 	localToday := time.Now().Format("2006-01-02")
 
-	err := validator.ValidateProfile(&ValidateProfileInput{DateOfBirth: localToday})
+	err := validator.ValidateProfile(context.Background(), &ValidateProfileInput{DateOfBirth: localToday})
 
 	assert.NoError(t, err)
 }
@@ -727,7 +729,7 @@ func TestValidateProfile_DateOfBirthYesterdayIsAccepted(t *testing.T) {
 
 	yesterday := time.Now().UTC().AddDate(0, 0, -1).Format("2006-01-02")
 
-	err := validator.ValidateProfile(&ValidateProfileInput{DateOfBirth: yesterday})
+	err := validator.ValidateProfile(context.Background(), &ValidateProfileInput{DateOfBirth: yesterday})
 
 	assert.NoError(t, err)
 }
@@ -737,7 +739,7 @@ func TestValidateProfile_DateOfBirthYesterdayIsAccepted(t *testing.T) {
 func TestValidateProfile_DateOfBirthWellInThePastIsAccepted(t *testing.T) {
 	validator := NewProfileValidator(mocks_data.NewDatabase(t))
 
-	err := validator.ValidateProfile(&ValidateProfileInput{DateOfBirth: "1990-05-15"})
+	err := validator.ValidateProfile(context.Background(), &ValidateProfileInput{DateOfBirth: "1990-05-15"})
 
 	assert.NoError(t, err)
 }
@@ -754,13 +756,13 @@ func TestValidateProfile_ZoneInfo(t *testing.T) {
 	validator := NewProfileValidator(mocks_data.NewDatabase(t))
 
 	t.Run("a zone from the catalog is accepted", func(t *testing.T) {
-		err := validator.ValidateProfile(&ValidateProfileInput{ZoneInfo: "America/Sao_Paulo"})
+		err := validator.ValidateProfile(context.Background(), &ValidateProfileInput{ZoneInfo: "America/Sao_Paulo"})
 
 		assert.NoError(t, err)
 	})
 
 	t.Run("empty is allowed", func(t *testing.T) {
-		err := validator.ValidateProfile(&ValidateProfileInput{ZoneInfo: ""})
+		err := validator.ValidateProfile(context.Background(), &ValidateProfileInput{ZoneInfo: ""})
 
 		assert.NoError(t, err)
 	})
@@ -768,7 +770,7 @@ func TestValidateProfile_ZoneInfo(t *testing.T) {
 	t.Run("rejections", func(t *testing.T) {
 		for _, zone := range []string{"Not/AZone", "UTC+3", "america/sao_paulo", "Sao_Paulo"} {
 			t.Run(zone, func(t *testing.T) {
-				err := validator.ValidateProfile(&ValidateProfileInput{ZoneInfo: zone})
+				err := validator.ValidateProfile(context.Background(), &ValidateProfileInput{ZoneInfo: zone})
 
 				assertLocalizedError(t, err, i18n.ErrCodeProfileZoneInfoInvalid,
 					profileErrorMessages[i18n.ErrCodeProfileZoneInfoInvalid])
@@ -781,13 +783,13 @@ func TestValidateProfile_Locale(t *testing.T) {
 	validator := NewProfileValidator(mocks_data.NewDatabase(t))
 
 	t.Run("a locale from the catalog is accepted", func(t *testing.T) {
-		err := validator.ValidateProfile(&ValidateProfileInput{Locale: "pt-BR"})
+		err := validator.ValidateProfile(context.Background(), &ValidateProfileInput{Locale: "pt-BR"})
 
 		assert.NoError(t, err)
 	})
 
 	t.Run("empty is allowed", func(t *testing.T) {
-		err := validator.ValidateProfile(&ValidateProfileInput{Locale: ""})
+		err := validator.ValidateProfile(context.Background(), &ValidateProfileInput{Locale: ""})
 
 		assert.NoError(t, err)
 	})
@@ -795,7 +797,7 @@ func TestValidateProfile_Locale(t *testing.T) {
 	t.Run("rejections", func(t *testing.T) {
 		for _, locale := range []string{"xx-XX", "not-a-locale", "PT-br", "pt_BR"} {
 			t.Run(locale, func(t *testing.T) {
-				err := validator.ValidateProfile(&ValidateProfileInput{Locale: locale})
+				err := validator.ValidateProfile(context.Background(), &ValidateProfileInput{Locale: locale})
 
 				assertLocalizedError(t, err, i18n.ErrCodeProfileLocaleInvalid,
 					profileErrorMessages[i18n.ErrCodeProfileLocaleInvalid])
@@ -815,10 +817,10 @@ func TestValidateProfile_FullyPopulatedValidProfile(t *testing.T) {
 	subject := fake.UUID()
 	user := &models.User{Id: 1, Subject: subject}
 
-	mockDB.On("GetUserBySubject", mock.Anything, subject).Return(user, nil).Once()
-	mockDB.On("GetUserByUsername", mock.Anything, "jdoe").Return(user, nil).Once()
+	mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, subject).Return(user, nil).Once()
+	mockDB.On("GetUserByUsername", mock.Anything, mock.Anything, "jdoe").Return(user, nil).Once()
 
-	err := validator.ValidateProfile(&ValidateProfileInput{
+	err := validator.ValidateProfile(context.Background(), &ValidateProfileInput{
 		Username:            "jdoe",
 		GivenName:           "Jane",
 		MiddleName:          "Mary",
@@ -841,7 +843,7 @@ func TestValidateProfile_FullyPopulatedValidProfile(t *testing.T) {
 func TestValidateProfile_ZoneInfoCountryNameIsNotValidated(t *testing.T) {
 	validator := NewProfileValidator(mocks_data.NewDatabase(t))
 
-	err := validator.ValidateProfile(&ValidateProfileInput{
+	err := validator.ValidateProfile(context.Background(), &ValidateProfileInput{
 		ZoneInfoCountryName: "Not A Real Country",
 	})
 

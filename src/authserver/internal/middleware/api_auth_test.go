@@ -897,7 +897,7 @@ func TestRequireValidSession(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 
 		now := time.Now().UTC()
-		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything).
+		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, mock.Anything).
 			Return(&models.User{Id: 1, Enabled: true}, nil).Maybe()
 		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, "sid-abc").
 			Return(&models.UserSession{
@@ -935,7 +935,7 @@ func TestRequireValidSession(t *testing.T) {
 	t.Run("returns 401 invalid_token when session has been deleted", func(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 
-		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything).
+		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, mock.Anything).
 			Return(&models.User{Id: 1, Enabled: true}, nil).Maybe()
 		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, "sid-deleted").
 			Return(nil, nil)
@@ -971,7 +971,7 @@ func TestRequireValidSession(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 
 		now := time.Now().UTC()
-		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything).
+		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, mock.Anything).
 			Return(&models.User{Id: 1, Enabled: true}, nil).Maybe()
 		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, "sid-expired").
 			Return(&models.UserSession{
@@ -1015,7 +1015,7 @@ func TestRequireValidSession(t *testing.T) {
 		// JWT past us, so we fail closed with a 500.
 		mockDB := mocks_data.NewDatabase(t)
 
-		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything).
+		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, mock.Anything).
 			Return(&models.User{Id: 1, Enabled: true}, nil).Maybe()
 		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, "sid-no-settings").
 			Return(&models.UserSession{
@@ -1054,7 +1054,7 @@ func TestRequireValidSession(t *testing.T) {
 	t.Run("returns 500 when settings is wrong type in context", func(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 
-		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything).
+		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, mock.Anything).
 			Return(&models.User{Id: 1, Enabled: true}, nil).Maybe()
 		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, "sid-bad-settings").
 			Return(&models.UserSession{
@@ -1093,7 +1093,7 @@ func TestRequireValidSession(t *testing.T) {
 	t.Run("returns 500 when database lookup fails", func(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 
-		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything).
+		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, mock.Anything).
 			Return(&models.User{Id: 1, Enabled: true}, nil).Maybe()
 		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, "sid-boom").
 			Return(nil, errors.New("connection refused"))
@@ -1127,7 +1127,7 @@ func TestRequireValidSession(t *testing.T) {
 	t.Run("body matches WWW-Authenticate description on rejection", func(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 
-		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything).
+		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, mock.Anything).
 			Return(&models.User{Id: 1, Enabled: true}, nil).Maybe()
 		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, "sid-x").
 			Return(nil, nil)
@@ -1471,16 +1471,16 @@ func TestRequireValidSession_Table(t *testing.T) {
 				strings.TrimSpace(fmt.Sprint(tc.claims["sub"])) != "" {
 				switch {
 				case tc.userErrs:
-					mockDB.On("GetUserBySubject", mock.Anything, mock.Anything).
+					mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, mock.Anything).
 						Return(nil, assert.AnError)
 				case tc.userNil:
-					mockDB.On("GetUserBySubject", mock.Anything, mock.Anything).Return(nil, nil)
+					mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
 				default:
 					user := tc.userState
 					if user == nil {
 						user = &models.User{Id: 1, Enabled: true}
 					}
-					mockDB.On("GetUserBySubject", mock.Anything, mock.Anything).Return(user, nil)
+					mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, mock.Anything).Return(user, nil)
 				}
 			}
 
@@ -1771,7 +1771,7 @@ func TestRequireValidSession_AFiveHundredCarriesTheRequestIdAndLogsOnce(t *testi
 	const requestId = "req-bearer-1"
 
 	mockDB := mocks_data.NewDatabase(t)
-	mockDB.On("GetUserBySubject", (*sql.Tx)(nil), "user-1").
+	mockDB.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), "user-1").
 		Return(&models.User{Id: 1, Subject: "user-1", Enabled: true}, nil)
 	mockDB.On("GetUserSessionBySessionIdentifier", (*sql.Tx)(nil), "sid-boom").
 		Return(nil, errors.New("the database is down"))
@@ -1805,4 +1805,77 @@ func TestRequireValidSession_AFiveHundredCarriesTheRequestIdAndLogsOnce(t *testi
 	assert.Contains(t, logged, "the database is down")
 	assert.Contains(t, logged, "request_id="+requestId)
 	assert.Contains(t, logged, "sid=sid-boom", "the site's own attribute survives the move")
+}
+
+// TestRequireValidSession_ReadsTheUserUnderTheRequestsContext is the middleware arm of #386's
+// seam 4. The middleware holds no context of its own, only the request, so the read it makes has
+// to reach for r.Context(); a context.Background() here would be the uncorrelated record the
+// acceptance criterion forbids below a request boundary, and would also outlive the request it
+// serves.
+//
+// The accept arm matches on chi's request id, which nothing but this request's context carries.
+// The reject arm is a token with no auth_time -- client_credentials, no user -- which reaches no
+// port at all, so there is no context to get wrong.
+func TestRequireValidSession_ReadsTheUserUnderTheRequestsContext(t *testing.T) {
+	const requestId = "goiabada/req-valid-session-1"
+
+	requestWithId := func() *http.Request {
+		req := httptest.NewRequest(http.MethodGet, "/test", nil)
+		ctx := context.WithValue(req.Context(), chimiddleware.RequestIDKey, requestId)
+		ctx = context.WithValue(ctx, constants.ContextKeySettings, &models.Settings{
+			UserSessionIdleTimeoutInSeconds: 3600,
+			UserSessionMaxLifetimeInSeconds: 86400,
+		})
+		return req.WithContext(ctx)
+	}
+
+	t.Run("a user token reads the subject under the request's own context", func(t *testing.T) {
+		mockDB := mocks_data.NewDatabase(t)
+
+		now := time.Now().UTC()
+		mockDB.On("GetUserBySubject", mock.MatchedBy(func(ctx context.Context) bool {
+			return chimiddleware.GetReqID(ctx) == requestId
+		}), mock.Anything, "user-1").Return(&models.User{Id: 1, Enabled: true}, nil).Once()
+		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, "sid-abc").
+			Return(&models.UserSession{
+				SessionIdentifier: "sid-abc",
+				UserId:            1,
+				Started:           now.Add(-1 * time.Hour),
+				LastAccessed:      now.Add(-5 * time.Minute),
+			}, nil).Once()
+
+		req := requestWithId()
+		req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeyBearerToken, oauth.JwtToken{
+			Claims: map[string]interface{}{"sid": "sid-abc", "auth_time": float64(1), "sub": "user-1"},
+		}))
+
+		rr := httptest.NewRecorder()
+		nextCalled := false
+		RequireValidSession(mockDB)(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+			nextCalled = true
+		})).ServeHTTP(rr, req)
+
+		assert.True(t, nextCalled)
+		assert.Equal(t, http.StatusOK, rr.Code)
+		mockDB.AssertExpectations(t)
+	})
+
+	t.Run("a client_credentials token reaches no port", func(t *testing.T) {
+		mockDB := mocks_data.NewDatabase(t)
+
+		req := requestWithId()
+		req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeyBearerToken, oauth.JwtToken{
+			Claims: map[string]interface{}{"sub": "client-1"},
+		}))
+
+		rr := httptest.NewRecorder()
+		nextCalled := false
+		RequireValidSession(mockDB)(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+			nextCalled = true
+		})).ServeHTTP(rr, req)
+
+		assert.True(t, nextCalled)
+		assert.Equal(t, http.StatusOK, rr.Code)
+		mockDB.AssertNotCalled(t, "GetUserBySubject", mock.Anything, mock.Anything, mock.Anything)
+	})
 }

@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -27,10 +28,10 @@ func TestAPIUserProfilePut_Success(t *testing.T) {
 		FamilyName:    "User",
 		EmailVerified: true,
 	}
-	err := database.CreateUser(nil, testUser)
+	err := database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
 	// Test: Update user profile
@@ -74,7 +75,7 @@ func TestAPIUserProfilePut_Success(t *testing.T) {
 	assert.Equal(t, updateReq.Locale, updateResponse.User.Locale)
 
 	// Verify changes were persisted to database
-	updatedUser, err := database.GetUserById(nil, testUser.Id)
+	updatedUser, err := database.GetUserById(context.Background(), nil, testUser.Id)
 	assert.NoError(t, err)
 	assert.NotNil(t, updatedUser)
 	assert.Equal(t, updateReq.Username, updatedUser.Username)
@@ -96,10 +97,10 @@ func TestAPIUserProfilePut_PartialUpdate(t *testing.T) {
 		FamilyName: "User",
 		Username:   "originaluser",
 	}
-	err := database.CreateUser(nil, testUser)
+	err := database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
 	// Test: Update only some fields
@@ -142,10 +143,10 @@ func TestAPIUserProfilePut_InvalidGender(t *testing.T) {
 		GivenName:  "Test",
 		FamilyName: "User",
 	}
-	err := database.CreateUser(nil, testUser)
+	err := database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
 	// Test: Update with invalid gender value
@@ -175,10 +176,10 @@ func TestAPIUserProfilePut_ValidGender(t *testing.T) {
 		GivenName:  "Test",
 		FamilyName: "User",
 	}
-	err := database.CreateUser(nil, testUser)
+	err := database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
 	testCases := []struct {
@@ -229,10 +230,10 @@ func TestAPIUserProfilePut_InvalidDateOfBirth(t *testing.T) {
 		GivenName:  "Test",
 		FamilyName: "User",
 	}
-	err := database.CreateUser(nil, testUser)
+	err := database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
 	// Test: Update with invalid date of birth format
@@ -310,10 +311,10 @@ func TestAPIUserProfilePut_InvalidRequestBody(t *testing.T) {
 		GivenName:  "Test",
 		FamilyName: "User",
 	}
-	err := database.CreateUser(nil, testUser)
+	err := database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
 	// Test: Invalid JSON
@@ -341,10 +342,10 @@ func TestAPIUserProfilePut_Unauthorized(t *testing.T) {
 		GivenName:  "Test",
 		FamilyName: "User",
 	}
-	err := database.CreateUser(nil, testUser)
+	err := database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
 	// Test: Request without access token
@@ -375,10 +376,10 @@ func TestAPIUserAddressPut_Success(t *testing.T) {
 		FamilyName:    "User",
 		EmailVerified: true,
 	}
-	err := database.CreateUser(nil, testUser)
+	err := database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
 	// Test: Update user address
@@ -413,7 +414,7 @@ func TestAPIUserAddressPut_Success(t *testing.T) {
 	assert.Equal(t, updateReq.AddressCountry, updateResponse.User.AddressCountry)
 
 	// Verify changes were persisted to database
-	updatedUser, err := database.GetUserById(nil, testUser.Id)
+	updatedUser, err := database.GetUserById(context.Background(), nil, testUser.Id)
 	assert.NoError(t, err)
 	assert.NotNil(t, updatedUser)
 	assert.Equal(t, updateReq.AddressLine1, updatedUser.AddressLine1)
@@ -439,10 +440,10 @@ func TestAPIUserAddressPut_PartialAddress(t *testing.T) {
 		AddressLocality:   "Old City",
 		AddressPostalCode: "00000",
 	}
-	err := database.CreateUser(nil, testUser)
+	err := database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
 	// Test: Update only some address fields
@@ -489,10 +490,10 @@ func TestAPIUserAddressPut_ClearAllFields(t *testing.T) {
 		AddressLocality:   "Test City",
 		AddressPostalCode: "12345",
 	}
-	err := database.CreateUser(nil, testUser)
+	err := database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
 	// Test: Clear all address fields
@@ -536,10 +537,10 @@ func TestAPIUserAddressPut_AngleBracketsRefused(t *testing.T) {
 		FamilyName:    "User",
 		EmailVerified: true,
 	}
-	err := database.CreateUser(nil, testUser)
+	err := database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
 	updateReq := api.UpdateUserAddressRequest{
@@ -559,7 +560,7 @@ func TestAPIUserAddressPut_AngleBracketsRefused(t *testing.T) {
 	assert.Equal(t, "Address fields cannot contain the characters < or >.", errResp.ErrorDescription)
 
 	// Assert: Nothing was written
-	unchanged, err := database.GetUserById(nil, testUser.Id)
+	unchanged, err := database.GetUserById(context.Background(), nil, testUser.Id)
 	assert.NoError(t, err)
 	assert.Equal(t, "", unchanged.AddressLine1)
 }
@@ -579,10 +580,10 @@ func TestAPIUserAddressPut_AmpersandAndQuotesStoredVerbatim(t *testing.T) {
 		FamilyName:    "User",
 		EmailVerified: true,
 	}
-	err := database.CreateUser(nil, testUser)
+	err := database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
 	line1 := `O'Brien & Sons, "The Mews"`
@@ -601,7 +602,7 @@ func TestAPIUserAddressPut_AmpersandAndQuotesStoredVerbatim(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, line1, updateResponse.User.AddressLine1)
 
-	stored, err := database.GetUserById(nil, testUser.Id)
+	stored, err := database.GetUserById(context.Background(), nil, testUser.Id)
 	assert.NoError(t, err)
 	assert.Equal(t, line1, stored.AddressLine1)
 }
@@ -664,10 +665,10 @@ func TestAPIUserAddressPut_InvalidRequestBody(t *testing.T) {
 		GivenName:  "Test",
 		FamilyName: "User",
 	}
-	err := database.CreateUser(nil, testUser)
+	err := database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
 	// Test: Invalid JSON
@@ -695,10 +696,10 @@ func TestAPIUserAddressPut_Unauthorized(t *testing.T) {
 		GivenName:  "Test",
 		FamilyName: "User",
 	}
-	err := database.CreateUser(nil, testUser)
+	err := database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
 	// Test: Request without access token

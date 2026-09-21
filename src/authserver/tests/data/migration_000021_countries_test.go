@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"strings"
@@ -256,7 +257,7 @@ func seedMigrationFixture(t *testing.T, h *isolatedDB, f migFixture) int64 {
 		u.PhoneNumberVerificationCodeEncrypted = []byte("PENDINGCODE12345")
 		u.PhoneNumberVerificationCodeIssuedAt = sql.NullTime{Time: time.Now().UTC().Truncate(time.Second), Valid: true}
 	}
-	require.NoErrorf(t, h.DB.CreateUser(nil, u), "%s: CreateUser", f.label)
+	require.NoErrorf(t, h.DB.CreateUser(context.Background(), nil, u), "%s: CreateUser", f.label)
 
 	// Apply NULL injections that CreateUser (Go string -> '') cannot produce.
 	var sets []string
@@ -286,7 +287,7 @@ func assertMigration000021(t *testing.T, h *isolatedDB, fixtures []migFixture, i
 		// Every row must remain loadable via GetUserById (commondb scans the
 		// plain-string columns, which cannot hold SQL NULL) -- this proves the
 		// NULL normalization worked.
-		u, err := h.DB.GetUserById(nil, ids[f.label])
+		u, err := h.DB.GetUserById(context.Background(), nil, ids[f.label])
 		require.NoErrorf(t, err, "%s [%s]: GetUserById", f.label, phase)
 		require.NotNilf(t, u, "%s [%s]: user nil", f.label, phase)
 

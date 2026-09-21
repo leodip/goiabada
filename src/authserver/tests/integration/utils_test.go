@@ -287,7 +287,7 @@ func assignPermissionToUser(t *testing.T, userId int64, permissionId int64) {
 		UserId:       userId,
 		PermissionId: permissionId,
 	}
-	err := database.CreateUserPermission(nil, userPermission)
+	err := database.CreateUserPermission(context.Background(), nil, userPermission)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -384,7 +384,7 @@ func createSessionWithAcrLevel1(t *testing.T) (*http.Client, *models.Client, *mo
 		PasswordHash: passwordHashed,
 	}
 
-	err = database.CreateUser(nil, user)
+	err = database.CreateUser(context.Background(), nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -493,7 +493,7 @@ func createSessionWithAcrLevel2Optional(t *testing.T) (*http.Client, *models.Cli
 		PasswordHash: passwordHashed,
 	}
 
-	err = database.CreateUser(nil, user)
+	err = database.CreateUser(context.Background(), nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -617,7 +617,7 @@ func createSessionWithAcrLevel2Mandatory(t *testing.T) (*http.Client, *models.Cl
 		OTPEnabled:         true,
 	}
 
-	err = database.CreateUser(nil, user)
+	err = database.CreateUser(context.Background(), nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -798,7 +798,7 @@ func createAuthCode(t *testing.T, clientSecret string, scope string, opts ...aut
 			PasswordHash: passwordHashed,
 		}
 
-		err = database.CreateUser(nil, user)
+		err = database.CreateUser(context.Background(), nil, user)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -904,7 +904,7 @@ func createAuthCodeEnsuringUserScope(t *testing.T, clientSecret string, scope st
 	}
 
 	user := &models.User{Subject: fake.UUID(), Enabled: true, Email: fake.Email(), PasswordHash: passwordHashed}
-	err = database.CreateUser(nil, user)
+	err = database.CreateUser(context.Background(), nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -943,7 +943,7 @@ func createAuthCodeEnsuringUserScope(t *testing.T, clientSecret string, scope st
 		if sel == nil {
 			t.Fatalf("permission not found: %s:%s", resourceIdentifier, permissionIdentifier)
 		}
-		err = database.CreateUserPermission(nil, &models.UserPermission{UserId: user.Id, PermissionId: sel.Id})
+		err = database.CreateUserPermission(context.Background(), nil, &models.UserPermission{UserId: user.Id, PermissionId: sel.Id})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1210,7 +1210,7 @@ func createTestResource(t *testing.T, identifier, description string) *models.Re
 
 // deleteTestUsers removes fixture users and reports a delete that did nothing.
 //
-// The tier's older idiom was `_ = database.DeleteUser(nil, user.Id)`, which
+// The tier's older idiom was `_ = database.DeleteUser(context.Background(), nil, user.Id)`, which
 // hides the two ways a cleanup silently fails to clean up: an insert that never
 // happened leaves Id == 0, so the delete matches no row, and an engine that
 // refuses the delete says so only in the error. Either way the rows stay, and
@@ -1222,7 +1222,7 @@ func deleteTestUsers(t *testing.T, users []*models.User) {
 			continue
 		}
 		assert.NotZero(t, user.Id, "fixture user %q was never created, so cleanup cannot delete it", user.Email)
-		assert.NoError(t, database.DeleteUser(nil, user.Id), "unable to delete fixture user %q", user.Email)
+		assert.NoError(t, database.DeleteUser(context.Background(), nil, user.Id), "unable to delete fixture user %q", user.Email)
 	}
 }
 

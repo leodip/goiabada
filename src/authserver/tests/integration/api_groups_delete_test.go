@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -52,17 +53,17 @@ func TestAPIGroupDelete_SuccessWithMembers(t *testing.T) {
 		FamilyName:    "User",
 		EmailVerified: true,
 	}
-	err := database.CreateUser(nil, testUser)
+	err := database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
 	userGroup := &models.UserGroup{
 		UserId:  testUser.Id,
 		GroupId: testGroup.Id,
 	}
-	err = database.CreateUserGroup(nil, userGroup)
+	err = database.CreateUserGroup(context.Background(), nil, userGroup)
 	assert.NoError(t, err)
 	// Note: UserGroup should be automatically deleted when group is deleted
 
@@ -80,7 +81,7 @@ func TestAPIGroupDelete_SuccessWithMembers(t *testing.T) {
 	assert.Nil(t, deletedGroup, "Group should be deleted from database")
 
 	// Verify user-group relationship was also deleted
-	userGroups, err := database.GetUserGroupsByUserId(nil, testUser.Id)
+	userGroups, err := database.GetUserGroupsByUserId(context.Background(), nil, testUser.Id)
 	assert.NoError(t, err)
 	// Should not contain our deleted group
 	for _, ug := range userGroups {

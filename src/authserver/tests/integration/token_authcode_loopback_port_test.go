@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/url"
@@ -64,7 +65,7 @@ func TestToken_AuthCode_LoopbackEphemeralPort(t *testing.T) {
 		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
-	err = database.CreateUser(nil, user)
+	err = database.CreateUser(context.Background(), nil, user)
 	require.NoError(t, err)
 
 	codeVerifier := "code-verifier"

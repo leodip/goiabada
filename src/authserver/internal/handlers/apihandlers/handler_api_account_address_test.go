@@ -48,7 +48,7 @@ func TestHandleAPIAccountAddressPut_ADatabaseFailureIsOneLoggedFiveHundred(t *te
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_audit.NewAuditLogger(t)
 
-	database.On("GetUserBySubject", (*sql.Tx)(nil), "the-subject").
+	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), "the-subject").
 		Return(nil, errors.New("the database is down")).Once()
 
 	rr := httptest.NewRecorder()
@@ -83,8 +83,8 @@ func TestHandleAPIAccountAddressPut_ASuccessWritesTheWholeBody(t *testing.T) {
 	auditLogger := mocks_audit.NewAuditLogger(t)
 
 	user := &models.User{Id: 42, Subject: "the-subject"}
-	database.On("GetUserBySubject", (*sql.Tx)(nil), "the-subject").Return(user, nil).Once()
-	database.On("UpdateUser", (*sql.Tx)(nil), mock.Anything).Return(nil).Once()
+	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), "the-subject").Return(user, nil).Once()
+	database.On("UpdateUser", mock.Anything, (*sql.Tx)(nil), mock.Anything).Return(nil).Once()
 	auditLogger.On("Log", mock.Anything, audit.AuditUpdatedOwnAddress, mock.Anything).Return().Once()
 
 	rr := httptest.NewRecorder()

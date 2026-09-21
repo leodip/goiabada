@@ -50,7 +50,7 @@ func HandleAPIAccountEmailVerificationSendPost(
 			return
 		}
 
-		user, err := database.GetUserBySubject(nil, subject)
+		user, err := database.GetUserBySubject(r.Context(), nil, subject)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "Failed to get user by subject in email verification send (first call)"), "subject", subject)
 			return
@@ -87,7 +87,7 @@ func HandleAPIAccountEmailVerificationSendPost(
 		}
 		user.EmailVerificationCodeEncrypted = encrypted
 		user.EmailVerificationCodeIssuedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
-		if err := database.UpdateUser(nil, user); err != nil {
+		if err := database.UpdateUser(r.Context(), nil, user); err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "Failed to update user with verification code"), "user_id", user.Id)
 			return
 		}
@@ -164,7 +164,7 @@ func HandleAPIAccountEmailVerificationPost(
 		}
 		code := strings.TrimSpace(req.VerificationCode)
 
-		user, err := database.GetUserBySubject(nil, subject)
+		user, err := database.GetUserBySubject(r.Context(), nil, subject)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -221,7 +221,7 @@ func HandleAPIAccountEmailVerificationPost(
 		user.EmailVerified = true
 		user.EmailVerificationCodeEncrypted = nil
 		user.EmailVerificationCodeIssuedAt = sql.NullTime{Valid: false}
-		if err := database.UpdateUser(nil, user); err != nil {
+		if err := database.UpdateUser(r.Context(), nil, user); err != nil {
 			writeInternalServerError(w, r, err)
 			return
 		}

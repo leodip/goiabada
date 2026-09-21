@@ -3071,7 +3071,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 
 		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
 
-		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", "openid", mock.MatchedBy(func(u *models.User) bool {
+		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, "openid", mock.MatchedBy(func(u *models.User) bool {
 			return u.Id == 789
 		})).Return("openid", nil)
 

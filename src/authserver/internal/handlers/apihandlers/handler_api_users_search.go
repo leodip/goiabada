@@ -45,7 +45,7 @@ func HandleAPIUsersSearchGet(
 		}
 
 		// Search users
-		users, total, err := database.SearchUsersPaginated(nil, query, page, size)
+		users, total, err := database.SearchUsersPaginated(r.Context(), nil, query, page, size)
 		if err != nil {
 			// Through FieldForLog because query is client-chosen and unbounded on the wire:
 			// raw, a multi-kilobyte search term lands whole on the record with whatever control
@@ -81,7 +81,7 @@ func HandleAPIUsersSearchGet(
 			}
 
 			// Load groups for all users to check membership
-			err = database.UsersLoadGroups(nil, users)
+			err = database.UsersLoadGroups(r.Context(), nil, users)
 			if err != nil {
 				writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: failed to load user groups"), "user_count", len(users), "query", logging.FieldForLog(query), "page", page)
 				return
@@ -144,7 +144,7 @@ func HandleAPIUsersSearchGet(
 			}
 
 			// Load permissions for all users to check if they have permId
-			if err := database.UsersLoadPermissions(nil, users); err != nil {
+			if err := database.UsersLoadPermissions(r.Context(), nil, users); err != nil {
 				writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: failed to load user permissions"), "user_count", len(users))
 				return
 			}

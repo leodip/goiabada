@@ -27,7 +27,7 @@ import (
 // alone passes on two engines and fails on the other two, and only this tier can tell.
 func TestCreateUser_DuplicateEmailIsErrUniqueViolation(t *testing.T) {
 	first := createTestUser(t)
-	defer func() { _ = database.DeleteUser(nil, first.Id) }()
+	defer func() { _ = database.DeleteUser(context.Background(), nil, first.Id) }()
 
 	// Everything else about the second user is fresh, so the email is the only key it can
 	// collide on.
@@ -37,9 +37,9 @@ func TestCreateUser_DuplicateEmailIsErrUniqueViolation(t *testing.T) {
 		Email:   first.Email,
 	}
 
-	err := database.CreateUser(nil, second)
+	err := database.CreateUser(context.Background(), nil, second)
 	if err == nil {
-		_ = database.DeleteUser(nil, second.Id)
+		_ = database.DeleteUser(context.Background(), nil, second.Id)
 		t.Fatal("a second user on a taken email was accepted; users.email is supposed to be unique")
 	}
 	if !errors.Is(err, data.ErrUniqueViolation) {
@@ -68,9 +68,9 @@ func TestInsert_AnUnrelatedConstraintIsNotErrUniqueViolation(t *testing.T) {
 		UserId: 999999999, // no such user
 	}
 
-	err := database.CreateUserAttribute(nil, attribute)
+	err := database.CreateUserAttribute(context.Background(), nil, attribute)
 	if err == nil {
-		_ = database.DeleteUserAttribute(nil, attribute.Id)
+		_ = database.DeleteUserAttribute(context.Background(), nil, attribute.Id)
 		t.Fatal("a user attribute for a non-existent user was accepted; the foreign key on " +
 			"user_attributes.user_id is supposed to refuse it")
 	}
@@ -90,7 +90,7 @@ func TestInsert_AnUnrelatedConstraintIsNotErrUniqueViolation(t *testing.T) {
 // error inside a transaction is rolled back and the caller sees only the wrapping.
 func TestCreateUser_DuplicateEmailInsideATransactionIsErrUniqueViolation(t *testing.T) {
 	first := createTestUser(t)
-	defer func() { _ = database.DeleteUser(nil, first.Id) }()
+	defer func() { _ = database.DeleteUser(context.Background(), nil, first.Id) }()
 
 	second := &models.User{
 		Enabled: true,
@@ -99,10 +99,10 @@ func TestCreateUser_DuplicateEmailInsideATransactionIsErrUniqueViolation(t *test
 	}
 
 	err := database.RunInTransaction(context.Background(), func(tx *sql.Tx) error {
-		return database.CreateUser(tx, second)
+		return database.CreateUser(context.Background(), tx, second)
 	})
 	if err == nil {
-		_ = database.DeleteUser(nil, second.Id)
+		_ = database.DeleteUser(context.Background(), nil, second.Id)
 		t.Fatal("a second user on a taken email was accepted inside a transaction")
 	}
 	if !errors.Is(err, data.ErrUniqueViolation) {

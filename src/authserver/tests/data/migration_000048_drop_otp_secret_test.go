@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"context"
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/data/schemadump"
@@ -82,7 +83,7 @@ func TestMigration000048_DropOtpSecret(t *testing.T) {
 		OTPEnabled:         true,
 		OTPSecretEncrypted: encrypted,
 	}
-	require.NoErrorf(t, h.DB.CreateUser(nil, user), "seed a user at 000047 on %s", dbType())
+	require.NoErrorf(t, h.DB.CreateUser(context.Background(), nil, user), "seed a user at 000047 on %s", dbType())
 
 	require.NoErrorf(t, h.Migrator.Migrate(dropOtpSecret000048), "apply 000048 on %s", dbType())
 
@@ -102,7 +103,7 @@ func TestMigration000048_DropOtpSecret(t *testing.T) {
 
 	// 2. The row survives with its seed readable. Through the ORM, which is what every production
 	// read of a seed goes through.
-	got, err := h.DB.GetUserById(nil, user.Id)
+	got, err := h.DB.GetUserById(context.Background(), nil, user.Id)
 	require.NoErrorf(t, err, "read users.id=%d back after the drop on %s", user.Id, dbType())
 	require.NotNilf(t, got, "users.id=%d is gone; this migration deletes no rows", user.Id)
 	assert.Truef(t, got.OTPEnabled, "the drop must not disturb otp_enabled on %s", dbType())
@@ -133,7 +134,7 @@ func TestMigration000048_DropOtpSecret(t *testing.T) {
 
 	// The shape only. The values are not restored and the file says so: the plaintext seeds are
 	// recorded nowhere else, so the re-added column reads NULL or empty for every row.
-	rolledBack, err := h.DB.GetUserById(nil, user.Id)
+	rolledBack, err := h.DB.GetUserById(context.Background(), nil, user.Id)
 	require.NoError(t, err)
 	require.NotNil(t, rolledBack)
 	stillDecrypts, err := rolledBack.GetOTPSecret()

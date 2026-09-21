@@ -1,6 +1,7 @@
 package apihandlers
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"net/http"
@@ -35,15 +36,15 @@ func TestSessionOwners_AreNormalizedAndFetchedInOneQuery(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 
 	var asked []int64
-	database.On("GetUsersByIds", (*sql.Tx)(nil), mock.Anything).
-		Run(func(args mock.Arguments) { asked = args.Get(1).([]int64) }).
+	database.On("GetUsersByIds", mock.Anything, (*sql.Tx)(nil), mock.Anything).
+		Run(func(args mock.Arguments) { asked = args.Get(2).([]int64) }).
 		Return(map[int64]models.User{
 			7: {Id: 7, Email: "jane@example.com", GivenName: "Jane"},
 			9: {Id: 9, Email: "sam@example.com", GivenName: "Sam"},
 		}, nil).
 		Once()
 
-	owners, err := sessionOwners(database, []api.UserSessionDetailResponse{
+	owners, err := sessionOwners(context.Background(), database, []api.UserSessionDetailResponse{
 		ownerSession(1, 7), ownerSession(2, 9), ownerSession(3, 7),
 	})
 	require.NoError(t, err)
@@ -59,7 +60,7 @@ func TestSessionOwners_AreNormalizedAndFetchedInOneQuery(t *testing.T) {
 // bytes.
 func TestSessionOwners_FollowTheOrderTheSessionsFirstNameThem(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	database.On("GetUsersByIds", (*sql.Tx)(nil), mock.Anything).
+	database.On("GetUsersByIds", mock.Anything, (*sql.Tx)(nil), mock.Anything).
 		Return(map[int64]models.User{
 			7:  {Id: 7, GivenName: "Jane"},
 			9:  {Id: 9, GivenName: "Sam"},
@@ -67,7 +68,7 @@ func TestSessionOwners_FollowTheOrderTheSessionsFirstNameThem(t *testing.T) {
 		}, nil).
 		Once()
 
-	owners, err := sessionOwners(database, []api.UserSessionDetailResponse{
+	owners, err := sessionOwners(context.Background(), database, []api.UserSessionDetailResponse{
 		ownerSession(1, 11), ownerSession(2, 7), ownerSession(3, 11), ownerSession(4, 9),
 	})
 	require.NoError(t, err)
@@ -82,7 +83,7 @@ func TestSessionOwners_FollowTheOrderTheSessionsFirstNameThem(t *testing.T) {
 func TestSessionOwners_AnEmptyPageAsksNothingAndIsNeverNil(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 
-	owners, err := sessionOwners(database, []api.UserSessionDetailResponse{})
+	owners, err := sessionOwners(context.Background(), database, []api.UserSessionDetailResponse{})
 	require.NoError(t, err)
 	require.NotNil(t, owners)
 	assert.Len(t, owners, 0)
@@ -91,7 +92,7 @@ func TestSessionOwners_AnEmptyPageAsksNothingAndIsNeverNil(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "[]", string(marshalled))
 
-	database.AssertNotCalled(t, "GetUsersByIds", mock.Anything, mock.Anything)
+	database.AssertNotCalled(t, "GetUsersByIds", mock.Anything, mock.Anything, mock.Anything)
 }
 
 // A session naming a user with no row is a broken row: user_sessions.user_id is a non-null
@@ -100,10 +101,10 @@ func TestSessionOwners_AnEmptyPageAsksNothingAndIsNeverNil(t *testing.T) {
 // loadSessionClients makes for a client id with no row.
 func TestSessionOwners_AUserWithNoRowIsRefused(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	database.On("GetUsersByIds", (*sql.Tx)(nil), mock.Anything).
+	database.On("GetUsersByIds", mock.Anything, (*sql.Tx)(nil), mock.Anything).
 		Return(map[int64]models.User{7: {Id: 7}}, nil).Once()
 
-	owners, err := sessionOwners(database, []api.UserSessionDetailResponse{
+	owners, err := sessionOwners(context.Background(), database, []api.UserSessionDetailResponse{
 		ownerSession(1, 7), ownerSession(2, 9),
 	})
 	require.Error(t, err)
@@ -113,10 +114,10 @@ func TestSessionOwners_AUserWithNoRowIsRefused(t *testing.T) {
 
 func TestSessionOwners_ADatabaseFailureIsAnError(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	database.On("GetUsersByIds", (*sql.Tx)(nil), mock.Anything).
+	database.On("GetUsersByIds", mock.Anything, (*sql.Tx)(nil), mock.Anything).
 		Return(map[int64]models.User(nil), errs.New("the database is down")).Once()
 
-	owners, err := sessionOwners(database, []api.UserSessionDetailResponse{ownerSession(1, 7)})
+	owners, err := sessionOwners(context.Background(), database, []api.UserSessionDetailResponse{ownerSession(1, 7)})
 	require.Error(t, err)
 	assert.Nil(t, owners, "an error must not be answered with an empty list the caller would publish")
 }

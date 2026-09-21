@@ -31,7 +31,7 @@ func HandleAPIAccountConsentsGet(
 			return
 		}
 
-		user, err := database.GetUserBySubject(nil, subject)
+		user, err := database.GetUserBySubject(r.Context(), nil, subject)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -41,13 +41,13 @@ func HandleAPIAccountConsentsGet(
 			return
 		}
 
-		consents, err := database.GetConsentsByUserId(nil, user.Id)
+		consents, err := database.GetConsentsByUserId(r.Context(), nil, user.Id)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
 		}
 
-		if err := database.UserConsentsLoadClients(nil, consents); err != nil {
+		if err := database.UserConsentsLoadClients(r.Context(), nil, consents); err != nil {
 			writeInternalServerError(w, r, err)
 			return
 		}
@@ -74,7 +74,7 @@ func HandleAPIAccountConsentDelete(
 			return
 		}
 
-		user, err := database.GetUserBySubject(nil, subject)
+		user, err := database.GetUserBySubject(r.Context(), nil, subject)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -95,7 +95,7 @@ func HandleAPIAccountConsentDelete(
 			return
 		}
 
-		consent, err := database.GetUserConsentById(nil, consentId)
+		consent, err := database.GetUserConsentById(r.Context(), nil, consentId)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -111,7 +111,7 @@ func HandleAPIAccountConsentDelete(
 			return
 		}
 
-		if err := database.DeleteUserConsent(nil, consentId); err != nil {
+		if err := database.DeleteUserConsent(r.Context(), nil, consentId); err != nil {
 			writeInternalServerError(w, r, err)
 			return
 		}

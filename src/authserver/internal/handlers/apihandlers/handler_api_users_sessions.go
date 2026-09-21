@@ -35,7 +35,7 @@ func HandleAPIUserSessionsGet(
 		}
 
 		// Check if user exists
-		user, err := database.GetUserById(nil, id)
+		user, err := database.GetUserById(r.Context(), nil, id)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -70,7 +70,7 @@ func HandleAPIUserSessionsGet(
 			currentSid = jwtToken.GetStringClaim("sid")
 		}
 
-		sessions, err := buildSessionDetails(database, userSessions, settings, currentSid)
+		sessions, err := buildSessionDetails(r.Context(), database, userSessions, settings, currentSid)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return

@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -29,10 +30,10 @@ func TestAPIUserSessionsGet_Success(t *testing.T) {
 		FamilyName:    "User",
 		EmailVerified: true,
 	}
-	err := database.CreateUser(nil, testUser)
+	err := database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
 	// Setup: Create test client (inline createTestClientForSessions)
@@ -127,10 +128,10 @@ func TestAPIUserSessionsGet_EmptySessions(t *testing.T) {
 		FamilyName:    "User",
 		EmailVerified: true,
 	}
-	err := database.CreateUser(nil, testUser)
+	err := database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
 	// Test: Get user sessions for user with no sessions
@@ -197,10 +198,10 @@ func TestAPIUserSessionsGet_Unauthorized(t *testing.T) {
 		GivenName:  "Test",
 		FamilyName: "User",
 	}
-	err := database.CreateUser(nil, testUser)
+	err := database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
 	// Test: Request without access token
@@ -230,10 +231,10 @@ func TestAPIUserSessionsGet_SessionsWithNoClients(t *testing.T) {
 		FamilyName:    "User",
 		EmailVerified: true,
 	}
-	err := database.CreateUser(nil, testUser)
+	err := database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
 	// Setup: Create test session without client relationship
@@ -274,10 +275,10 @@ func TestAPIUserSessionDelete_Success(t *testing.T) {
 		FamilyName:    "User",
 		EmailVerified: true,
 	}
-	err := database.CreateUser(nil, testUser)
+	err := database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
 	// Setup: Create test session
@@ -404,10 +405,10 @@ func TestAPIUserSessionDelete_Unauthorized(t *testing.T) {
 		GivenName:  "Test",
 		FamilyName: "User",
 	}
-	err := database.CreateUser(nil, testUser)
+	err := database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
 	session := createTestUserSession(t, testUser.Id, fake.UUID())
@@ -443,10 +444,10 @@ func TestAPIUserSessionDelete_InvalidToken(t *testing.T) {
 		GivenName:  "Test",
 		FamilyName: "User",
 	}
-	err := database.CreateUser(nil, testUser)
+	err := database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
 	session := createTestUserSession(t, testUser.Id, fake.UUID())
@@ -482,10 +483,10 @@ func TestAPIUserSessionsGet_OnlyValidSessions(t *testing.T) {
 		FamilyName:    "User",
 		EmailVerified: true,
 	}
-	err := database.CreateUser(nil, testUser)
+	err := database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
 	// Setup: Create a valid session (recently accessed)

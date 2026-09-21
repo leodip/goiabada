@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -207,8 +208,8 @@ func TestAPIUserSessionsGet_AClientCredentialsTokenMarksNothingCurrent(t *testin
 		Email:         uniqueEmail("nocurrent@sessions.test"),
 		EmailVerified: true,
 	}
-	require.NoError(t, database.CreateUser(nil, testUser))
-	defer func() { _ = database.DeleteUser(nil, testUser.Id) }()
+	require.NoError(t, database.CreateUser(context.Background(), nil, testUser))
+	defer func() { _ = database.DeleteUser(context.Background(), nil, testUser.Id) }()
 
 	s1 := createTestUserSession(t, testUser.Id, fake.UUID())
 	s2 := createTestUserSession(t, testUser.Id, fake.UUID())

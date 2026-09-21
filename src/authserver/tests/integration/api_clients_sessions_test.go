@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -43,9 +44,9 @@ func TestAPIClientSessionsGet_Success(t *testing.T) {
 		FamilyName:    "User",
 		EmailVerified: true,
 	}
-	err = database.CreateUser(nil, testUser)
+	err = database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
-	defer func() { _ = database.DeleteUser(nil, testUser.Id) }()
+	defer func() { _ = database.DeleteUser(context.Background(), nil, testUser.Id) }()
 
 	// Create sessions
 	s1 := createTestUserSession(t, testUser.Id, fake.UUID())
@@ -232,9 +233,9 @@ func TestAPIClientSessionsGet_OnlyValidSessions(t *testing.T) {
 		FamilyName:    "User",
 		EmailVerified: true,
 	}
-	err = database.CreateUser(nil, testUser)
+	err = database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
-	defer func() { _ = database.DeleteUser(nil, testUser.Id) }()
+	defer func() { _ = database.DeleteUser(context.Background(), nil, testUser.Id) }()
 
 	// Valid session
 	valid := &models.UserSession{
@@ -321,9 +322,9 @@ func TestAPIClientSessionsGet_PaginationDefaultAndCap(t *testing.T) {
 		FamilyName:    "User",
 		EmailVerified: true,
 	}
-	err = database.CreateUser(nil, testUser)
+	err = database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
-	defer func() { _ = database.DeleteUser(nil, testUser.Id) }()
+	defer func() { _ = database.DeleteUser(context.Background(), nil, testUser.Id) }()
 
 	// Create many valid sessions (e.g., 120)
 	total := 120
@@ -415,9 +416,9 @@ func TestAPIClientSessionsGet_UsersAreNormalizedAndCarryOnlyTheOwnerFields(t *te
 		Nickname:      "jd",
 		EmailVerified: true,
 	}
-	err = database.CreateUser(nil, first)
+	err = database.CreateUser(context.Background(), nil, first)
 	require.NoError(t, err)
-	defer func() { _ = database.DeleteUser(nil, first.Id) }()
+	defer func() { _ = database.DeleteUser(context.Background(), nil, first.Id) }()
 
 	second := &models.User{
 		Subject:       fake.UUID(),
@@ -427,9 +428,9 @@ func TestAPIClientSessionsGet_UsersAreNormalizedAndCarryOnlyTheOwnerFields(t *te
 		FamilyName:    "Reed",
 		EmailVerified: true,
 	}
-	err = database.CreateUser(nil, second)
+	err = database.CreateUser(context.Background(), nil, second)
 	require.NoError(t, err)
-	defer func() { _ = database.DeleteUser(nil, second.Id) }()
+	defer func() { _ = database.DeleteUser(context.Background(), nil, second.Id) }()
 
 	now := time.Now().UTC()
 	for _, userId := range []int64{first.Id, first.Id, second.Id} {
