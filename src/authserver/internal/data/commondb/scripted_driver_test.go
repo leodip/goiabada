@@ -13,6 +13,7 @@ import (
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/leodip/goiabada/core/testutil"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // The scripted driver: a database/sql driver that answers every query with the rows it was given
@@ -190,6 +191,41 @@ func (t *scriptedTx) Rollback() error {
 	t.c.d.openTx--
 	t.c.d.rollbacks++
 	return popScriptedErr(&t.c.d.rollbackErrs)
+}
+
+// scriptedCounts is the driver's transaction counters as they stood at one moment, read under
+// its mutex.
+//
+// Reading the fields directly is a race as soon as a test binds a cancellable context to a
+// transaction: database/sql starts a goroutine at BeginTx that rolls the transaction back when
+// the context is done, so Commit's and Rollback's counters can be written after
+// RunInTransaction has returned and while the test is asserting on them. Every read goes
+// through here so the trap cannot come back with the next cancellation case (#386).
+type scriptedCounts struct {
+	openTx    int
+	commits   int
+	rollbacks int
+}
+
+func (d *scriptedDriver) counts() scriptedCounts {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return scriptedCounts{openTx: d.openTx, commits: d.commits, rollbacks: d.rollbacks}
+}
+
+// settled waits for the driver to hold no open transaction and then answers with its counters,
+// which is how a test whose transaction database/sql rolled back on its own goroutine reads
+// numbers that have stopped moving. A test holding no open transaction finds it true at once and
+// waits for nothing; a test that deliberately leaves one open reads counts() instead.
+func (d *scriptedDriver) settled(t *testing.T) scriptedCounts {
+	t.Helper()
+	var last scriptedCounts
+	require.Eventuallyf(t, func() bool {
+		last = d.counts()
+		return last.openTx == 0
+	}, 2*time.Second, time.Millisecond,
+		"the driver still holds an open transaction, so its counters are still moving")
+	return last
 }
 
 // popScriptedErr takes the next scripted outcome off a queue, nil once it is empty. Caller
