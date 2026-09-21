@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 )
 
 func TestCreateUserPermission(t *testing.T) {
@@ -334,4 +335,66 @@ func createTestUserPermissionWithUserAndPermission(t *testing.T, userId, permiss
 		t.Fatalf("Failed to create test user permission: %v", err)
 	}
 	return userPermission
+}
+
+// TestGetUsersByPermissionIdPaginated_EnlistsInTheCallersTransaction pins #413's fourth site: the
+// count query beside the page passed nil where the page took the caller's transaction, so the two
+// halves of one answer were read on two connections.
+//
+// The rows are created inside the transaction for the reason ClientLoadPermissions' case gives.
+func TestGetUsersByPermissionIdPaginated_EnlistsInTheCallersTransaction(t *testing.T) {
+	tx := beginTx(t)
+
+	resource := &models.Resource{
+		ResourceIdentifier: "tx_resource_" + fake.LetterN(8),
+		Description:        "Transaction pass-through resource",
+	}
+	if err := database.CreateResource(tx, resource); err != nil {
+		t.Fatalf("Failed to create resource inside the transaction: %v", err)
+	}
+
+	permission := &models.Permission{
+		PermissionIdentifier: "tx_permission_" + fake.LetterN(8),
+		Description:          "Transaction pass-through permission",
+		ResourceId:           resource.Id,
+	}
+	if err := database.CreatePermission(tx, permission); err != nil {
+		t.Fatalf("Failed to create permission inside the transaction: %v", err)
+	}
+
+	user := &models.User{
+		Enabled:   true,
+		Subject:   fake.UUID(),
+		Username:  "u" + fake.LetterN(12),
+		GivenName: "TxHolder" + fake.LetterN(6),
+		Email:     fake.LetterN(12) + "@example.com",
+	}
+	if err := database.CreateUser(tx, user); err != nil {
+		t.Fatalf("Failed to create user inside the transaction: %v", err)
+	}
+
+	userPermission := &models.UserPermission{UserId: user.Id, PermissionId: permission.Id}
+	if err := database.CreateUserPermission(tx, userPermission); err != nil {
+		t.Fatalf("Failed to create users_permissions row inside the transaction: %v", err)
+	}
+
+	users, total, err := database.GetUsersByPermissionIdPaginated(tx, permission.Id, 1, 10)
+	if err != nil {
+		t.Fatalf("GetUsersByPermissionIdPaginated through the transaction: %v", err)
+	}
+
+	if len(users) != 1 {
+		t.Fatalf("Expected the transaction's own user, got %d", len(users))
+	}
+	if users[0].Id != user.Id {
+		t.Errorf("Expected user %d, got %d", user.Id, users[0].Id)
+	}
+	if total != 1 {
+		t.Errorf("Expected a total of 1 to agree with the one user on the page, got %d: "+
+			"the count query ran outside the caller's transaction (#413)", total)
+	}
+
+	if err := database.RollbackTransaction(tx); err != nil {
+		t.Fatalf("RollbackTransaction: %v", err)
+	}
 }

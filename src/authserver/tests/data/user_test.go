@@ -1837,3 +1837,45 @@ func createUserWithEmail(t *testing.T, email string) *models.User {
 	}
 	return user
 }
+
+// TestSearchUsersPaginated_EnlistsInTheCallersTransaction pins #413's third site: the count query
+// beside the search passed nil where the search itself took the caller's transaction, so the two
+// halves of one answer were read on two connections.
+//
+// The user is created inside the transaction for the reason ClientLoadPermissions' case gives,
+// and the given name is unique so the search matches exactly this row and no other run's.
+func TestSearchUsersPaginated_EnlistsInTheCallersTransaction(t *testing.T) {
+	tx := beginTx(t)
+
+	givenName := "TxSearch" + fake.LetterN(12)
+	user := &models.User{
+		Enabled:   true,
+		Subject:   fake.UUID(),
+		Username:  "u" + fake.LetterN(12),
+		GivenName: givenName,
+		Email:     fake.LetterN(12) + "@example.com",
+	}
+	if err := database.CreateUser(tx, user); err != nil {
+		t.Fatalf("Failed to create user inside the transaction: %v", err)
+	}
+
+	users, total, err := database.SearchUsersPaginated(tx, givenName, 1, 10)
+	if err != nil {
+		t.Fatalf("SearchUsersPaginated through the transaction: %v", err)
+	}
+
+	if len(users) != 1 {
+		t.Fatalf("Expected the transaction's own user, got %d", len(users))
+	}
+	if users[0].Id != user.Id {
+		t.Errorf("Expected user %d, got %d", user.Id, users[0].Id)
+	}
+	if total != 1 {
+		t.Errorf("Expected a total of 1 to agree with the one user on the page, got %d: "+
+			"the count query ran outside the caller's transaction (#413)", total)
+	}
+
+	if err := database.RollbackTransaction(tx); err != nil {
+		t.Fatalf("RollbackTransaction: %v", err)
+	}
+}

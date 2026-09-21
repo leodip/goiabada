@@ -1825,3 +1825,67 @@ func newCaseTestClient(t *testing.T, identifier string) *models.Client {
 		DefaultAcrLevel:                         models.AcrLevel1,
 	}
 }
+
+// TestClientLoadPermissions_EnlistsInTheCallersTransaction pins the first of #413's five sites.
+// ClientLoadPermissions holds a tx, loads the join rows through it, and then passed nil to
+// GetPermissionsByIds, so the permissions themselves were read outside the caller's transaction.
+//
+// Every row here is created inside the transaction on purpose. Created before it, the escaped
+// read finds them anyway and the case passes with the defect still in place, which is the shape
+// of test this bug survived for as long as it did.
+//
+// On SQLite the case is also the self-deadlock proof: that pool is SetMaxOpenConns(1), so the
+// escaped read asks for a second connection while its own caller holds the only one, and never
+// returns rather than returning something wrong.
+func TestClientLoadPermissions_EnlistsInTheCallersTransaction(t *testing.T) {
+	tx := beginTx(t)
+
+	resource := &models.Resource{
+		ResourceIdentifier: "tx_resource_" + fake.LetterN(8),
+		Description:        "Transaction pass-through resource",
+	}
+	if err := database.CreateResource(tx, resource); err != nil {
+		t.Fatalf("Failed to create resource inside the transaction: %v", err)
+	}
+
+	permission := &models.Permission{
+		PermissionIdentifier: "tx_permission_" + fake.LetterN(8),
+		Description:          "Transaction pass-through permission",
+		ResourceId:           resource.Id,
+	}
+	if err := database.CreatePermission(tx, permission); err != nil {
+		t.Fatalf("Failed to create permission inside the transaction: %v", err)
+	}
+
+	client := &models.Client{
+		ClientIdentifier: "tx_client_" + fake.LetterN(8),
+		Description:      "Transaction pass-through client",
+	}
+	if err := database.CreateClient(tx, client); err != nil {
+		t.Fatalf("Failed to create client inside the transaction: %v", err)
+	}
+
+	clientPermission := &models.ClientPermission{
+		ClientId:     client.Id,
+		PermissionId: permission.Id,
+	}
+	if err := database.CreateClientPermission(tx, clientPermission); err != nil {
+		t.Fatalf("Failed to create client permission inside the transaction: %v", err)
+	}
+
+	if err := database.ClientLoadPermissions(tx, client); err != nil {
+		t.Fatalf("ClientLoadPermissions through the transaction: %v", err)
+	}
+
+	if len(client.Permissions) != 1 {
+		t.Fatalf("Expected the transaction's own permission to be loaded, got %d permission(s): "+
+			"the read ran outside the caller's transaction (#413)", len(client.Permissions))
+	}
+	if client.Permissions[0].Id != permission.Id {
+		t.Errorf("Expected permission %d, got %d", permission.Id, client.Permissions[0].Id)
+	}
+
+	if err := database.RollbackTransaction(tx); err != nil {
+		t.Fatalf("RollbackTransaction: %v", err)
+	}
+}

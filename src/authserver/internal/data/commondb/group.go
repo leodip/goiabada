@@ -422,7 +422,7 @@ func (d *CommonDatabase) GetGroupMembersPaginated(tx *sql.Tx, groupId int64, pag
 	selectBuilder.Where(selectBuilder.Equal("users_groups.group_id", groupId))
 
 	sql, args = selectBuilder.Build()
-	rows2, err := d.QuerySql(nil, sql, args...)
+	rows2, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
 		return nil, 0, errs.Wrap(err, "unable to query database")
 	}
