@@ -1,6 +1,7 @@
 package commondb
 
 import (
+	"context"
 	"database/sql"
 	"time"
 
@@ -23,7 +24,7 @@ func (d *CommonDatabase) CreateAuditLog(tx *sql.Tx, auditLog *models.AuditLog) e
 
 	insertBuilder := auditLogStruct.WithoutTag("pk").InsertInto("audit_logs", auditLog)
 
-	id, err := d.insertReturningId(tx, insertBuilder, "audit log")
+	id, err := d.insertReturningId(context.Background(), tx, insertBuilder, "audit log")
 	if err != nil {
 		return err
 	}
@@ -41,7 +42,7 @@ func (d *CommonDatabase) DeleteOldAuditLogs(tx *sql.Tx, cutoff time.Time, maxDel
 	deleteBuilder.Limit(maxDeletions)
 
 	sql, args := deleteBuilder.Build()
-	result, err := d.ExecSql(tx, sql, args...)
+	result, err := d.ExecSql(context.Background(), tx, sql, args...)
 	if err != nil {
 		return 0, errs.Wrap(err, "unable to delete old audit logs")
 	}
@@ -85,7 +86,7 @@ func (d *CommonDatabase) GetAuditLogsPaginated(tx *sql.Tx, page int, pageSize in
 	selectBuilder.Offset(offset)
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(tx, sql, args...)
+	rows, err := d.QuerySql(context.Background(), tx, sql, args...)
 	if err != nil {
 		return nil, 0, errs.Wrap(err, "unable to query database")
 	}
@@ -131,7 +132,7 @@ func (d *CommonDatabase) GetAuditLogsPaginated(tx *sql.Tx, page int, pageSize in
 	}
 
 	countSql, countArgs := countBuilder.Build()
-	countRows, err := d.QuerySql(tx, countSql, countArgs...)
+	countRows, err := d.QuerySql(context.Background(), tx, countSql, countArgs...)
 	if err != nil {
 		return nil, 0, errs.Wrap(err, "unable to query count")
 	}

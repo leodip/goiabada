@@ -1,6 +1,7 @@
 package commondb
 
 import (
+	"context"
 	"database/sql"
 	"time"
 
@@ -31,7 +32,7 @@ func (d *CommonDatabase) CreateUserConsent(tx *sql.Tx, userConsent *models.UserC
 
 	insertBuilder := userConsentStruct.WithoutTag("pk").InsertInto("user_consents", userConsent)
 
-	id, err := d.insertReturningId(tx, insertBuilder, "userConsent")
+	id, err := d.insertReturningId(context.Background(), tx, insertBuilder, "userConsent")
 	if err != nil {
 		userConsent.CreatedAt = originalCreatedAt
 		userConsent.UpdatedAt = originalUpdatedAt
@@ -58,7 +59,7 @@ func (d *CommonDatabase) UpdateUserConsent(tx *sql.Tx, userConsent *models.UserC
 	updateBuilder.Where(updateBuilder.Equal("id", userConsent.Id))
 
 	sql, args := updateBuilder.Build()
-	_, err := d.ExecSql(tx, sql, args...)
+	_, err := d.ExecSql(context.Background(), tx, sql, args...)
 	if err != nil {
 		userConsent.UpdatedAt = originalUpdatedAt
 		return errs.Wrap(err, "unable to update userConsent")
@@ -71,7 +72,7 @@ func (d *CommonDatabase) getUserConsentCommon(tx *sql.Tx, selectBuilder *sqlbuil
 	userConsentStruct *sqlbuilder.Struct) (*models.UserConsent, error) {
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(tx, sql, args...)
+	rows, err := d.QuerySql(context.Background(), tx, sql, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -167,7 +168,7 @@ func (d *CommonDatabase) GetConsentsByUserId(tx *sql.Tx, userId int64) ([]models
 	selectBuilder.Where(selectBuilder.Equal("user_id", userId))
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(tx, sql, args...)
+	rows, err := d.QuerySql(context.Background(), tx, sql, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -200,7 +201,7 @@ func (d *CommonDatabase) DeleteUserConsent(tx *sql.Tx, userConsentId int64) erro
 	deleteBuilder.Where(deleteBuilder.Equal("id", userConsentId))
 
 	sql, args := deleteBuilder.Build()
-	_, err := d.ExecSql(tx, sql, args...)
+	_, err := d.ExecSql(context.Background(), tx, sql, args...)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete userConsent")
 	}
@@ -215,7 +216,7 @@ func (d *CommonDatabase) DeleteAllUserConsent(tx *sql.Tx) error {
 	deleteBuilder := userConsentStruct.DeleteFrom("user_consents")
 
 	sql, args := deleteBuilder.Build()
-	_, err := d.ExecSql(tx, sql, args...)
+	_, err := d.ExecSql(context.Background(), tx, sql, args...)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete userConsent")
 	}

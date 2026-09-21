@@ -106,7 +106,7 @@ func TestHandleAPIAccountSessionDelete_ForbiddenDoesNotTerminate(t *testing.T) {
 
 	assert.Equal(t, http.StatusForbidden, rr.Code)
 	database.AssertExpectations(t)
-	database.AssertNotCalled(t, "RunInTransaction", mock.Anything)
+	database.AssertNotCalled(t, "RunInTransaction", mock.Anything, mock.Anything)
 	database.AssertNotCalled(t, "RevokeCodesBySessionIdentifier", mock.Anything, mock.Anything)
 	database.AssertNotCalled(t, "DeleteUserSession", mock.Anything, mock.Anything)
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)

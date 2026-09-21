@@ -1,6 +1,7 @@
 package commondb
 
 import (
+	"context"
 	"database/sql"
 	"time"
 
@@ -31,7 +32,7 @@ func (d *CommonDatabase) CreateCode(tx *sql.Tx, code *models.Code) error {
 
 	insertBuilder := codeStruct.WithoutTag("pk").InsertInto("codes", code)
 
-	id, err := d.insertReturningId(tx, insertBuilder, "code")
+	id, err := d.insertReturningId(context.Background(), tx, insertBuilder, "code")
 	if err != nil {
 		code.CreatedAt = originalCreatedAt
 		code.UpdatedAt = originalUpdatedAt
@@ -58,7 +59,7 @@ func (d *CommonDatabase) UpdateCode(tx *sql.Tx, code *models.Code) error {
 	updateBuilder.Where(updateBuilder.Equal("id", code.Id))
 
 	sql, args := updateBuilder.Build()
-	_, err := d.ExecSql(tx, sql, args...)
+	_, err := d.ExecSql(context.Background(), tx, sql, args...)
 	if err != nil {
 		code.UpdatedAt = originalUpdatedAt
 		return errs.Wrap(err, "unable to update code")
@@ -102,7 +103,7 @@ func (d *CommonDatabase) MarkCodeAsUsed(tx *sql.Tx, codeId int64) (bool, error) 
 	)
 
 	query, args := ub.BuildWithFlavor(d.Flavor)
-	result, err := d.ExecSql(tx, query, args...)
+	result, err := d.ExecSql(context.Background(), tx, query, args...)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to mark code as used")
 	}
@@ -148,7 +149,7 @@ func (d *CommonDatabase) RevokeCodesBySessionIdentifier(tx *sql.Tx, sessionIdent
 	)
 
 	query, args := ub.BuildWithFlavor(d.Flavor)
-	result, err := d.ExecSql(tx, query, args...)
+	result, err := d.ExecSql(context.Background(), tx, query, args...)
 	if err != nil {
 		return 0, errs.Wrap(err, "unable to revoke codes by session identifier")
 	}
@@ -195,7 +196,7 @@ func (d *CommonDatabase) RevokeCodesByClientId(tx *sql.Tx, clientId int64) (int6
 	)
 
 	query, args := ub.BuildWithFlavor(d.Flavor)
-	result, err := d.ExecSql(tx, query, args...)
+	result, err := d.ExecSql(context.Background(), tx, query, args...)
 	if err != nil {
 		return 0, errs.Wrap(err, "unable to revoke codes by client id")
 	}
@@ -212,7 +213,7 @@ func (d *CommonDatabase) getCodeCommon(tx *sql.Tx, selectBuilder *sqlbuilder.Sel
 	codeStruct *sqlbuilder.Struct) (*models.Code, error) {
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(tx, sql, args...)
+	rows, err := d.QuerySql(context.Background(), tx, sql, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -309,7 +310,7 @@ func (d *CommonDatabase) DeleteCode(tx *sql.Tx, codeId int64) error {
 	deleteBuilder.Where(deleteBuilder.Equal("id", codeId))
 
 	sql, args := deleteBuilder.Build()
-	_, err := d.ExecSql(tx, sql, args...)
+	_, err := d.ExecSql(context.Background(), tx, sql, args...)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete code")
 	}
@@ -371,7 +372,7 @@ func (d *CommonDatabase) DeleteUsedCodesWithoutRefreshTokens(tx *sql.Tx, created
 	)
 
 	sql, args := deleteBuilder.Build()
-	_, err := d.ExecSql(tx, sql, args...)
+	_, err := d.ExecSql(context.Background(), tx, sql, args...)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete used codes without refresh tokens")
 	}

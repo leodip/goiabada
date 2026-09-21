@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"context"
 	"database/sql"
 	"testing"
 
@@ -106,7 +107,7 @@ func runIssuanceOrderingAgainstTermination(t *testing.T, db data.Database, other
 		user := createTestUserOn(t, db)
 		session := createTestUserSessionOn(t, db, user.Id)
 
-		tx, err := db.BeginTransaction()
+		tx, err := db.BeginTransaction(context.Background())
 		require.NoError(t, err, "opening the ceremony's transaction")
 		defer func() { _ = db.RollbackTransaction(tx) }()
 
@@ -122,7 +123,7 @@ func runIssuanceOrderingAgainstTermination(t *testing.T, db data.Database, other
 		}
 		termination := goBlocked(t, "the termination", tx, func(reached func()) terminationOutcome {
 			reached()
-			result, err := handlers.TerminateUserSessionTx(other, session)
+			result, err := handlers.TerminateUserSessionTx(context.Background(), other, session)
 			return terminationOutcome{result: result, err: err}
 		})
 
@@ -157,7 +158,7 @@ func runIssuanceOrderingAgainstTermination(t *testing.T, db data.Database, other
 		// TerminateUserSessionTx owns and commits its own transaction, so an ordering that needs
 		// the termination HELD OPEN across the ceremony's arrival replays its statements by hand;
 		// the other subtest drives the real function.
-		tx, err := db.BeginTransaction()
+		tx, err := db.BeginTransaction(context.Background())
 		require.NoError(t, err, "opening the termination's transaction")
 		defer func() { _ = db.RollbackTransaction(tx) }()
 
@@ -165,7 +166,7 @@ func runIssuanceOrderingAgainstTermination(t *testing.T, db data.Database, other
 			"the termination's statements on a session nothing else has touched yet")
 
 		ceremony := goBlocked(t, "the ceremony", tx, func(reached func()) issuanceOutcome {
-			otherTx, err := other.BeginTransaction()
+			otherTx, err := other.BeginTransaction(context.Background())
 			if err != nil {
 				reached()
 				return issuanceOutcome{err: err}

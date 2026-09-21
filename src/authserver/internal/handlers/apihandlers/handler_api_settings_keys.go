@@ -88,7 +88,7 @@ func HandleAPISettingsKeysRotatePost(
 	rotator := signingkeys.NewSigningKeyRotator(database)
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		err := rotator.Rotate()
+		err := rotator.Rotate(r.Context())
 
 		switch {
 		case err == nil:

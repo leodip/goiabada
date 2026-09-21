@@ -93,7 +93,7 @@ type TokenValidator interface {
 }
 
 type UserCreator interface {
-	CreateUser(input *usercreation.CreateUserInput) (*models.User, error)
+	CreateUser(ctx context.Context, input *usercreation.CreateUserInput) (*models.User, error)
 }
 
 type TokenParser interface {

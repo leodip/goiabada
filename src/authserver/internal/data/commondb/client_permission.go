@@ -1,6 +1,7 @@
 package commondb
 
 import (
+	"context"
 	"database/sql"
 	"time"
 
@@ -31,7 +32,7 @@ func (d *CommonDatabase) CreateClientPermission(tx *sql.Tx, clientPermission *mo
 
 	insertBuilder := clientPermissionStruct.WithoutTag("pk").InsertInto("clients_permissions", clientPermission)
 
-	id, err := d.insertReturningId(tx, insertBuilder, "clientPermission")
+	id, err := d.insertReturningId(context.Background(), tx, insertBuilder, "clientPermission")
 	if err != nil {
 		clientPermission.CreatedAt = originalCreatedAt
 		clientPermission.UpdatedAt = originalUpdatedAt
@@ -58,7 +59,7 @@ func (d *CommonDatabase) UpdateClientPermission(tx *sql.Tx, clientPermission *mo
 	updateBuilder.Where(updateBuilder.Equal("id", clientPermission.Id))
 
 	sql, args := updateBuilder.Build()
-	_, err := d.ExecSql(tx, sql, args...)
+	_, err := d.ExecSql(context.Background(), tx, sql, args...)
 	if err != nil {
 		clientPermission.UpdatedAt = originalUpdatedAt
 		return errs.Wrap(err, "unable to update clientPermission")
@@ -71,7 +72,7 @@ func (d *CommonDatabase) getClientPermissionCommon(tx *sql.Tx, selectBuilder *sq
 	clientPermissionStruct *sqlbuilder.Struct) (*models.ClientPermission, error) {
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(tx, sql, args...)
+	rows, err := d.QuerySql(context.Background(), tx, sql, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -135,7 +136,7 @@ func (d *CommonDatabase) GetClientPermissionsByClientId(tx *sql.Tx, clientId int
 	selectBuilder.Where(selectBuilder.Equal("client_id", clientId))
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(tx, sql, args...)
+	rows, err := d.QuerySql(context.Background(), tx, sql, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -168,7 +169,7 @@ func (d *CommonDatabase) DeleteClientPermission(tx *sql.Tx, clientPermissionId i
 	deleteBuilder.Where(deleteBuilder.Equal("id", clientPermissionId))
 
 	sql, args := deleteBuilder.Build()
-	_, err := d.ExecSql(tx, sql, args...)
+	_, err := d.ExecSql(context.Background(), tx, sql, args...)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete clientPermission")
 	}

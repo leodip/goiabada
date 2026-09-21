@@ -455,7 +455,7 @@ func HandleIssueGet(
 		// that committed minted, and the audit event, the context clear and the redirect all wait
 		// below for the helper to return.
 		var code *models.Code
-		err = database.RunInTransaction(func(tx *sql.Tx) error {
+		err = database.RunInTransaction(r.Context(), func(tx *sql.Tx) error {
 			// Existence only, deliberately. Ownership and the two timeouts were asked a few statements
 			// ago and are not re-asked here: the only thing this narrower question misses is an idle
 			// timeout elapsing in the microseconds between the two, and buying that would cost a

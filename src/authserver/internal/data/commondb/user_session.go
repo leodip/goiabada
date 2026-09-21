@@ -1,6 +1,7 @@
 package commondb
 
 import (
+	"context"
 	"database/sql"
 	"time"
 
@@ -27,7 +28,7 @@ func (d *CommonDatabase) CreateUserSession(tx *sql.Tx, userSession *models.UserS
 
 	insertBuilder := userSessionStruct.WithoutTag("pk").InsertInto("user_sessions", userSession)
 
-	id, err := d.insertReturningId(tx, insertBuilder, "userSession")
+	id, err := d.insertReturningId(context.Background(), tx, insertBuilder, "userSession")
 	if err != nil {
 		userSession.CreatedAt = originalCreatedAt
 		userSession.UpdatedAt = originalUpdatedAt
@@ -54,7 +55,7 @@ func (d *CommonDatabase) UpdateUserSession(tx *sql.Tx, userSession *models.UserS
 	updateBuilder.Where(updateBuilder.Equal("id", userSession.Id))
 
 	sql, args := updateBuilder.Build()
-	_, err := d.ExecSql(tx, sql, args...)
+	_, err := d.ExecSql(context.Background(), tx, sql, args...)
 	if err != nil {
 		userSession.UpdatedAt = originalUpdatedAt
 		return errs.Wrap(err, "unable to update userSession")
@@ -67,7 +68,7 @@ func (d *CommonDatabase) getUserSessionCommon(tx *sql.Tx, selectBuilder *sqlbuil
 	userSessionStruct *sqlbuilder.Struct) (*models.UserSession, error) {
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(tx, sql, args...)
+	rows, err := d.QuerySql(context.Background(), tx, sql, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -152,7 +153,7 @@ func (d *CommonDatabase) GetUserSessionsByClientIdPaginated(tx *sql.Tx, clientId
 	selectBuilder.Limit(pageSize)
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(tx, sql, args...)
+	rows, err := d.QuerySql(context.Background(), tx, sql, args...)
 	if err != nil {
 		return nil, 0, errs.Wrap(err, "unable to query database")
 	}
@@ -175,7 +176,7 @@ func (d *CommonDatabase) GetUserSessionsByClientIdPaginated(tx *sql.Tx, clientId
 	selectBuilder.Where(selectBuilder.Equal("user_session_clients.client_id", clientId))
 
 	sql, args = selectBuilder.Build()
-	rows2, err := d.QuerySql(tx, sql, args...)
+	rows2, err := d.QuerySql(context.Background(), tx, sql, args...)
 	if err != nil {
 		return nil, 0, errs.Wrap(err, "unable to query database")
 	}
@@ -300,7 +301,7 @@ func (d *CommonDatabase) GetUserSessionsByUserId(tx *sql.Tx, userId int64) ([]mo
 	selectBuilder.Where(selectBuilder.Equal("user_id", userId))
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(tx, sql, args...)
+	rows, err := d.QuerySql(context.Background(), tx, sql, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -333,7 +334,7 @@ func (d *CommonDatabase) DeleteUserSession(tx *sql.Tx, userSessionId int64) erro
 	deleteBuilder.Where(deleteBuilder.Equal("id", userSessionId))
 
 	sql, args := deleteBuilder.Build()
-	_, err := d.ExecSql(tx, sql, args...)
+	_, err := d.ExecSql(context.Background(), tx, sql, args...)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete userSession")
 	}
@@ -377,7 +378,7 @@ func (d *CommonDatabase) AcquireUserSessionRow(tx *sql.Tx, sessionIdentifier str
 	acquire.Where(acquire.Equal("session_identifier", sessionIdentifier))
 
 	query, args := acquire.BuildWithFlavor(d.Flavor)
-	result, err := d.ExecSql(tx, query, args...)
+	result, err := d.ExecSql(context.Background(), tx, query, args...)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to acquire user session row")
 	}
@@ -403,7 +404,7 @@ func (d *CommonDatabase) DeleteIdleSessions(tx *sql.Tx, idleTimeout time.Duratio
 	)
 
 	sql, args := deleteBuilder.Build()
-	_, err := d.ExecSql(tx, sql, args...)
+	_, err := d.ExecSql(context.Background(), tx, sql, args...)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete idle sessions")
 	}
@@ -420,7 +421,7 @@ func (d *CommonDatabase) DeleteExpiredSessions(tx *sql.Tx, maxLifetime time.Dura
 	)
 
 	sql, args := deleteBuilder.Build()
-	_, err := d.ExecSql(tx, sql, args...)
+	_, err := d.ExecSql(context.Background(), tx, sql, args...)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete expired sessions")
 	}
@@ -450,7 +451,7 @@ func (d *CommonDatabase) PromoteUserSessionGeneration(tx *sql.Tx, userSessionId 
 	ub.Where(ub.Equal("id", userSessionId))
 
 	query, args := ub.BuildWithFlavor(d.Flavor)
-	result, err := d.ExecSql(tx, query, args...)
+	result, err := d.ExecSql(context.Background(), tx, query, args...)
 	if err != nil {
 		return errs.Wrap(err, "unable to promote user session generation")
 	}
@@ -497,7 +498,7 @@ func (d *CommonDatabase) PromoteUserSessionOtpConfigGeneration(tx *sql.Tx, userS
 	ub.Where(ub.Equal("id", userSessionId))
 
 	query, args := ub.BuildWithFlavor(d.Flavor)
-	result, err := d.ExecSql(tx, query, args...)
+	result, err := d.ExecSql(context.Background(), tx, query, args...)
 	if err != nil {
 		return errs.Wrap(err, "unable to promote user session otp config generation")
 	}

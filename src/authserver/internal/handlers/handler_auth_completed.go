@@ -249,7 +249,7 @@ func HandleAuthCompletedGet(
 			// arrived here. A failure returns 500 with the browser still cookied to the old
 			// session and no new session and no code minted, which is the fail-closed direction.
 			if userSession != nil && !sessionBelongsToCeremony {
-				terminationResult, err := TerminateUserSessionTx(database, userSession)
+				terminationResult, err := TerminateUserSessionTx(r.Context(), database, userSession)
 				if err != nil {
 					httpHelper.InternalServerError(w, r, err)
 					return

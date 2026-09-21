@@ -1,6 +1,7 @@
 package commondb
 
 import (
+	"context"
 	"database/sql"
 	"time"
 
@@ -23,7 +24,7 @@ func (d *CommonDatabase) CreateSettings(tx *sql.Tx, settings *models.Settings) e
 
 	insertBuilder := settingsStruct.WithoutTag("pk").InsertInto("settings", settings)
 
-	id, err := d.insertReturningId(tx, insertBuilder, "settings")
+	id, err := d.insertReturningId(context.Background(), tx, insertBuilder, "settings")
 	if err != nil {
 		settings.CreatedAt = originalCreatedAt
 		settings.UpdatedAt = originalUpdatedAt
@@ -50,7 +51,7 @@ func (d *CommonDatabase) UpdateSettings(tx *sql.Tx, settings *models.Settings) e
 	updateBuilder.Where(updateBuilder.Equal("id", settings.Id))
 
 	sql, args := updateBuilder.Build()
-	_, err := d.ExecSql(tx, sql, args...)
+	_, err := d.ExecSql(context.Background(), tx, sql, args...)
 	if err != nil {
 		settings.UpdatedAt = originalUpdatedAt
 		return errs.Wrap(err, "unable to update settings")
@@ -63,7 +64,7 @@ func (d *CommonDatabase) getSettingsCommon(tx *sql.Tx, selectBuilder *sqlbuilder
 	settingsStruct *sqlbuilder.Struct) (*models.Settings, error) {
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(tx, sql, args...)
+	rows, err := d.QuerySql(context.Background(), tx, sql, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -136,7 +137,7 @@ func (d *CommonDatabase) TryClaimCleanupRun(tx *sql.Tx, now time.Time, claimable
 	)
 
 	query, args := ub.BuildWithFlavor(d.Flavor)
-	result, err := d.ExecSql(tx, query, args...)
+	result, err := d.ExecSql(context.Background(), tx, query, args...)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to claim the cleanup run")
 	}

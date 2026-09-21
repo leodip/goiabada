@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -38,7 +39,7 @@ func TestIncrementUserOtpConfigGeneration(t *testing.T) {
 	// By one, and the returned value is the one that landed. The read-back rather than
 	// computing the successor in Go is what makes this true under a concurrent increment, and
 	// the browser enrollment promotes exactly this number onto the session it creates.
-	tx, err := database.BeginTransaction()
+	tx, err := database.BeginTransaction(context.Background())
 	require.NoError(t, err, "BeginTransaction")
 	got, err := database.IncrementUserOtpConfigGeneration(tx, moved.Id)
 	require.NoError(t, err, "IncrementUserOtpConfigGeneration")
@@ -51,7 +52,7 @@ func TestIncrementUserOtpConfigGeneration(t *testing.T) {
 
 	// Twice more, so "by one" is a property rather than a coincidence of starting at 0.
 	for want := int64(2); want <= 3; want++ {
-		tx, err := database.BeginTransaction()
+		tx, err := database.BeginTransaction(context.Background())
 		require.NoError(t, err, "BeginTransaction")
 		got, err := database.IncrementUserOtpConfigGeneration(tx, moved.Id)
 		require.NoError(t, err, "IncrementUserOtpConfigGeneration")
@@ -71,7 +72,7 @@ func TestIncrementUserOtpConfigGeneration(t *testing.T) {
 	// Id 0 is refused. Nothing has that id, so an unguarded call would match no row, and the
 	// rowsAffected check below would report it as "user not found" anyway; refusing it up front
 	// names the mistake rather than the symptom.
-	tx, err = database.BeginTransaction()
+	tx, err = database.BeginTransaction(context.Background())
 	require.NoError(t, err, "BeginTransaction")
 	_, err = database.IncrementUserOtpConfigGeneration(tx, 0)
 	assert.Error(t, err, "user id 0 must be refused")
@@ -80,7 +81,7 @@ func TestIncrementUserOtpConfigGeneration(t *testing.T) {
 	// An id that matches no row is an error, not a no-op. The caller is establishing or
 	// removing an authenticator and the counter is what tells every session about it; a silent
 	// success would commit the authenticator change with nobody informed.
-	tx, err = database.BeginTransaction()
+	tx, err = database.BeginTransaction(context.Background())
 	require.NoError(t, err, "BeginTransaction")
 	_, err = database.IncrementUserOtpConfigGeneration(tx, bystander.Id+1_000_000)
 	assert.Error(t, err, "an unknown user id must be refused")
@@ -95,7 +96,7 @@ func TestIncrementUserOtpConfigGeneration(t *testing.T) {
 func TestIncrementUserOtpConfigGeneration_EnlistsInTheCallersTransaction(t *testing.T) {
 	user := createTestUser(t)
 
-	tx, err := database.BeginTransaction()
+	tx, err := database.BeginTransaction(context.Background())
 	require.NoError(t, err, "BeginTransaction")
 
 	got, err := database.IncrementUserOtpConfigGeneration(tx, user.Id)
@@ -153,7 +154,7 @@ func TestPromoteUserSessionOtpConfigGeneration_EnlistsInTheCallersTransaction(t 
 	user := createTestUser(t)
 	session := createTestUserSession(t, user.Id)
 
-	tx, err := database.BeginTransaction()
+	tx, err := database.BeginTransaction(context.Background())
 	require.NoError(t, err, "BeginTransaction")
 
 	require.NoError(t, database.PromoteUserSessionOtpConfigGeneration(tx, session.Id, 7),
@@ -179,7 +180,7 @@ func TestPromoteUserSessionOtpConfigGeneration_EnlistsInTheCallersTransaction(t 
 func TestUpdateUser_DoesNotClobberOtpConfigGeneration(t *testing.T) {
 	user := createTestUser(t)
 
-	tx, err := database.BeginTransaction()
+	tx, err := database.BeginTransaction(context.Background())
 	require.NoError(t, err, "BeginTransaction")
 	_, err = database.IncrementUserOtpConfigGeneration(tx, user.Id)
 	require.NoError(t, err, "IncrementUserOtpConfigGeneration")

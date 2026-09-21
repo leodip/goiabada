@@ -10,6 +10,7 @@
 package mocks_data
 
 import (
+	"context"
 	"database/sql"
 	"time"
 
@@ -177,8 +178,8 @@ func (_c *Database_AcquireUserSessionRow_Call) RunAndReturn(run func(tx *sql.Tx,
 }
 
 // BeginTransaction provides a mock function for the type Database
-func (_mock *Database) BeginTransaction() (*sql.Tx, error) {
-	ret := _mock.Called()
+func (_mock *Database) BeginTransaction(ctx context.Context) (*sql.Tx, error) {
+	ret := _mock.Called(ctx)
 
 	if len(ret) == 0 {
 		panic("no return value specified for BeginTransaction")
@@ -186,18 +187,18 @@ func (_mock *Database) BeginTransaction() (*sql.Tx, error) {
 
 	var r0 *sql.Tx
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func() (*sql.Tx, error)); ok {
-		return returnFunc()
+	if returnFunc, ok := ret.Get(0).(func(context.Context) (*sql.Tx, error)); ok {
+		return returnFunc(ctx)
 	}
-	if returnFunc, ok := ret.Get(0).(func() *sql.Tx); ok {
-		r0 = returnFunc()
+	if returnFunc, ok := ret.Get(0).(func(context.Context) *sql.Tx); ok {
+		r0 = returnFunc(ctx)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*sql.Tx)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func() error); ok {
-		r1 = returnFunc()
+	if returnFunc, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = returnFunc(ctx)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -210,13 +211,20 @@ type Database_BeginTransaction_Call struct {
 }
 
 // BeginTransaction is a helper method to define mock.On call
-func (_e *Database_Expecter) BeginTransaction() *Database_BeginTransaction_Call {
-	return &Database_BeginTransaction_Call{Call: _e.mock.On("BeginTransaction")}
+//   - ctx context.Context
+func (_e *Database_Expecter) BeginTransaction(ctx any) *Database_BeginTransaction_Call {
+	return &Database_BeginTransaction_Call{Call: _e.mock.On("BeginTransaction", ctx)}
 }
 
-func (_c *Database_BeginTransaction_Call) Run(run func()) *Database_BeginTransaction_Call {
+func (_c *Database_BeginTransaction_Call) Run(run func(ctx context.Context)) *Database_BeginTransaction_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run()
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		run(
+			arg0,
+		)
 	})
 	return _c
 }
@@ -226,7 +234,7 @@ func (_c *Database_BeginTransaction_Call) Return(tx *sql.Tx, err error) *Databas
 	return _c
 }
 
-func (_c *Database_BeginTransaction_Call) RunAndReturn(run func() (*sql.Tx, error)) *Database_BeginTransaction_Call {
+func (_c *Database_BeginTransaction_Call) RunAndReturn(run func(ctx context.Context) (*sql.Tx, error)) *Database_BeginTransaction_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -10696,16 +10704,16 @@ func (_c *Database_RotateEncryptionKeyIfNeeded_Call) RunAndReturn(run func(curre
 }
 
 // RunInTransaction provides a mock function for the type Database
-func (_mock *Database) RunInTransaction(fn func(tx *sql.Tx) error) error {
-	ret := _mock.Called(fn)
+func (_mock *Database) RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error {
+	ret := _mock.Called(ctx, fn)
 
 	if len(ret) == 0 {
 		panic("no return value specified for RunInTransaction")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(func(tx *sql.Tx) error) error); ok {
-		r0 = returnFunc(fn)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, func(tx *sql.Tx) error) error); ok {
+		r0 = returnFunc(ctx, fn)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -10718,19 +10726,25 @@ type Database_RunInTransaction_Call struct {
 }
 
 // RunInTransaction is a helper method to define mock.On call
+//   - ctx context.Context
 //   - fn func(tx *sql.Tx) error
-func (_e *Database_Expecter) RunInTransaction(fn any) *Database_RunInTransaction_Call {
-	return &Database_RunInTransaction_Call{Call: _e.mock.On("RunInTransaction", fn)}
+func (_e *Database_Expecter) RunInTransaction(ctx any, fn any) *Database_RunInTransaction_Call {
+	return &Database_RunInTransaction_Call{Call: _e.mock.On("RunInTransaction", ctx, fn)}
 }
 
-func (_c *Database_RunInTransaction_Call) Run(run func(fn func(tx *sql.Tx) error)) *Database_RunInTransaction_Call {
+func (_c *Database_RunInTransaction_Call) Run(run func(ctx context.Context, fn func(tx *sql.Tx) error)) *Database_RunInTransaction_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 func(tx *sql.Tx) error
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(func(tx *sql.Tx) error)
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 func(tx *sql.Tx) error
+		if args[1] != nil {
+			arg1 = args[1].(func(tx *sql.Tx) error)
 		}
 		run(
 			arg0,
+			arg1,
 		)
 	})
 	return _c
@@ -10741,7 +10755,7 @@ func (_c *Database_RunInTransaction_Call) Return(err error) *Database_RunInTrans
 	return _c
 }
 
-func (_c *Database_RunInTransaction_Call) RunAndReturn(run func(fn func(tx *sql.Tx) error) error) *Database_RunInTransaction_Call {
+func (_c *Database_RunInTransaction_Call) RunAndReturn(run func(ctx context.Context, fn func(tx *sql.Tx) error) error) *Database_RunInTransaction_Call {
 	_c.Call.Return(run)
 	return _c
 }

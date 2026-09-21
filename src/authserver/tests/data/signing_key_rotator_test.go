@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -39,7 +40,7 @@ func seedOneKeyPerState(t *testing.T) (previous, current, next *models.KeyPair) 
 func TestSigningKeyRotator_Rotate_MovesEveryKeyOneStep(t *testing.T) {
 	previous, current, next := seedOneKeyPerState(t)
 
-	if err := signingkeys.NewSigningKeyRotator(database).Rotate(); err != nil {
+	if err := signingkeys.NewSigningKeyRotator(database).Rotate(context.Background()); err != nil {
 		t.Fatalf("Rotate failed: %v", err)
 	}
 
@@ -138,7 +139,7 @@ func TestSigningKeyRotator_Rotate_RefusesWithNoNextKeyAndKeepsThePrevious(t *tes
 	previous, current, _ := seedOneKeyPerState(t)
 	clearKeyPairState(t, models.KeyStateNext.String())
 
-	err := signingkeys.NewSigningKeyRotator(database).Rotate()
+	err := signingkeys.NewSigningKeyRotator(database).Rotate(context.Background())
 	if err == nil {
 		t.Fatal("Expected the rotation to be refused")
 	}

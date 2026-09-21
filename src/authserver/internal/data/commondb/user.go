@@ -1,6 +1,7 @@
 package commondb
 
 import (
+	"context"
 	"database/sql"
 	"sort"
 	"strings"
@@ -25,7 +26,7 @@ func (d *CommonDatabase) CreateUser(tx *sql.Tx, user *models.User) error {
 
 	insertBuilder := userStruct.WithoutTag("pk").InsertInto("users", user)
 
-	id, err := d.insertReturningId(tx, insertBuilder, "user")
+	id, err := d.insertReturningId(context.Background(), tx, insertBuilder, "user")
 	if err != nil {
 		user.CreatedAt = originalCreatedAt
 		user.UpdatedAt = originalUpdatedAt
@@ -52,7 +53,7 @@ func (d *CommonDatabase) UpdateUser(tx *sql.Tx, user *models.User) error {
 	updateBuilder.Where(updateBuilder.Equal("id", user.Id))
 
 	sql, args := updateBuilder.Build()
-	_, err := d.ExecSql(tx, sql, args...)
+	_, err := d.ExecSql(context.Background(), tx, sql, args...)
 	if err != nil {
 		user.UpdatedAt = originalUpdatedAt
 		return errs.Wrap(err, "unable to update user")
@@ -65,7 +66,7 @@ func (d *CommonDatabase) getUserCommon(tx *sql.Tx, selectBuilder *sqlbuilder.Sel
 	userStruct *sqlbuilder.Struct) (*models.User, error) {
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(tx, sql, args...)
+	rows, err := d.QuerySql(context.Background(), tx, sql, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -103,7 +104,7 @@ func (d *CommonDatabase) GetUsersByIds(tx *sql.Tx, userIds []int64) (map[int64]m
 		selectBuilder.Where(selectBuilder.In("id", sqlbuilder.Flatten(batch)...))
 
 		sql, args := selectBuilder.Build()
-		rows, err := d.QuerySql(tx, sql, args...)
+		rows, err := d.QuerySql(context.Background(), tx, sql, args...)
 		if err != nil {
 			return errs.Wrap(err, "unable to query database")
 		}
@@ -505,7 +506,7 @@ func (d *CommonDatabase) SearchUsersPaginated(tx *sql.Tx, query string, page int
 	selectBuilder.Limit(pageSize)
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(tx, sql, args...)
+	rows, err := d.QuerySql(context.Background(), tx, sql, args...)
 	if err != nil {
 		return nil, 0, errs.Wrap(err, "unable to query database")
 	}
@@ -533,7 +534,7 @@ func (d *CommonDatabase) SearchUsersPaginated(tx *sql.Tx, query string, page int
 	}
 
 	sql, args = selectBuilder.Build()
-	rows2, err := d.QuerySql(tx, sql, args...)
+	rows2, err := d.QuerySql(context.Background(), tx, sql, args...)
 	if err != nil {
 		return nil, 0, errs.Wrap(err, "unable to query database")
 	}
@@ -576,7 +577,7 @@ func (d *CommonDatabase) SearchUsersPaginated(tx *sql.Tx, query string, page int
 // victim rather than by an ordering here.
 func (d *CommonDatabase) DeleteUser(tx *sql.Tx, userId int64) error {
 
-	return d.inTransaction(tx, func(tx *sql.Tx) error {
+	return d.inTransaction(context.Background(), tx, func(tx *sql.Tx) error {
 		sessions, err := d.GetUserSessionsByUserId(tx, userId)
 		if err != nil {
 			return err
@@ -605,7 +606,7 @@ func (d *CommonDatabase) DeleteUser(tx *sql.Tx, userId int64) error {
 		deleteBuilder.Where(deleteBuilder.Equal("id", userId))
 
 		sql, args := deleteBuilder.Build()
-		_, err = d.ExecSql(tx, sql, args...)
+		_, err = d.ExecSql(context.Background(), tx, sql, args...)
 		if err != nil {
 			return errs.Wrap(err, "unable to delete user")
 		}
@@ -651,7 +652,7 @@ func (d *CommonDatabase) IncrementUserAuthStateGeneration(tx *sql.Tx, userId int
 	ub.Where(ub.Equal("id", userId))
 
 	query, args := ub.BuildWithFlavor(d.Flavor)
-	result, err := d.ExecSql(tx, query, args...)
+	result, err := d.ExecSql(context.Background(), tx, query, args...)
 	if err != nil {
 		return 0, errs.Wrap(err, "unable to increment user auth state generation")
 	}
@@ -672,7 +673,7 @@ func (d *CommonDatabase) IncrementUserAuthStateGeneration(tx *sql.Tx, userId int
 	query, args = sb.BuildWithFlavor(d.Flavor)
 
 	var generation int64
-	rows, err := d.QuerySql(tx, query, args...)
+	rows, err := d.QuerySql(context.Background(), tx, query, args...)
 	if err != nil {
 		return 0, errs.Wrap(err, "unable to read back user auth state generation")
 	}
@@ -719,7 +720,7 @@ func (d *CommonDatabase) IncrementUserOtpConfigGeneration(tx *sql.Tx, userId int
 	ub.Where(ub.Equal("id", userId))
 
 	query, args := ub.BuildWithFlavor(d.Flavor)
-	result, err := d.ExecSql(tx, query, args...)
+	result, err := d.ExecSql(context.Background(), tx, query, args...)
 	if err != nil {
 		return 0, errs.Wrap(err, "unable to increment user otp config generation")
 	}
@@ -742,7 +743,7 @@ func (d *CommonDatabase) IncrementUserOtpConfigGeneration(tx *sql.Tx, userId int
 	query, args = sb.BuildWithFlavor(d.Flavor)
 
 	var generation int64
-	rows, err := d.QuerySql(tx, query, args...)
+	rows, err := d.QuerySql(context.Background(), tx, query, args...)
 	if err != nil {
 		return 0, errs.Wrap(err, "unable to read back user otp config generation")
 	}
@@ -793,7 +794,7 @@ func (d *CommonDatabase) SetUserPasswordHash(tx *sql.Tx, userId int64, passwordH
 	ub.Where(ub.Equal("id", userId))
 
 	query, args := ub.BuildWithFlavor(d.Flavor)
-	_, err := d.ExecSql(tx, query, args...)
+	_, err := d.ExecSql(context.Background(), tx, query, args...)
 	if err != nil {
 		return errs.Wrap(err, "unable to set user password hash")
 	}
@@ -864,7 +865,7 @@ func (d *CommonDatabase) TryConsumeForgotPasswordCode(tx *sql.Tx, userId int64, 
 	)
 
 	query, args := ub.BuildWithFlavor(d.Flavor)
-	result, err := d.ExecSql(tx, query, args...)
+	result, err := d.ExecSql(context.Background(), tx, query, args...)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to consume forgot password code")
 	}
@@ -912,7 +913,7 @@ func (d *CommonDatabase) TrySetUserEnabled(tx *sql.Tx, userId int64, expected bo
 	)
 
 	query, args := ub.BuildWithFlavor(d.Flavor)
-	result, err := d.ExecSql(tx, query, args...)
+	result, err := d.ExecSql(context.Background(), tx, query, args...)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to set user enabled")
 	}
@@ -990,7 +991,7 @@ func (d *CommonDatabase) TryConsumeUserOTPStep(tx *sql.Tx, userId int64, step in
 	ub.Where(predicates...)
 
 	query, args := ub.BuildWithFlavor(d.Flavor)
-	result, err := d.ExecSql(tx, query, args...)
+	result, err := d.ExecSql(context.Background(), tx, query, args...)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to consume user OTP step")
 	}
@@ -1036,7 +1037,7 @@ func (d *CommonDatabase) ResetUserOTPStep(tx *sql.Tx, userId int64) error {
 	ub.Where(ub.Equal("id", userId))
 
 	query, args := ub.BuildWithFlavor(d.Flavor)
-	_, err := d.ExecSql(tx, query, args...)
+	_, err := d.ExecSql(context.Background(), tx, query, args...)
 	if err != nil {
 		return errs.Wrap(err, "unable to reset user OTP step")
 	}
@@ -1120,7 +1121,7 @@ func (d *CommonDatabase) TryInstallPendingOTPEnrollment(tx *sql.Tx, userId int64
 	)
 
 	query, args := ub.BuildWithFlavor(d.Flavor)
-	result, err := d.ExecSql(tx, query, args...)
+	result, err := d.ExecSql(context.Background(), tx, query, args...)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to install pending OTP enrollment")
 	}
@@ -1162,7 +1163,7 @@ func (d *CommonDatabase) ClearPendingOTPEnrollment(tx *sql.Tx, userId int64) err
 	ub.Where(ub.Equal("id", userId))
 
 	query, args := ub.BuildWithFlavor(d.Flavor)
-	_, err := d.ExecSql(tx, query, args...)
+	_, err := d.ExecSql(context.Background(), tx, query, args...)
 	if err != nil {
 		return errs.Wrap(err, "unable to clear pending OTP enrollment")
 	}

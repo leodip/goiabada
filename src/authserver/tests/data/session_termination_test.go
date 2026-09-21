@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"context"
 	"database/sql"
 	"testing"
 	"time"
@@ -48,7 +49,7 @@ func TestTerminateUserSessionTx_SweepsAfterTheSessionRowIsDeleted(t *testing.T) 
 	otherCode := createTestCodeInSession(t, client.Id, user.Id, otherSession.SessionIdentifier)
 	otherToken := createTokenOfCode(t, client.Id, user.Id, otherCode.Id, otherSession.SessionIdentifier)
 
-	result, err := handlers.TerminateUserSessionTx(database, session)
+	result, err := handlers.TerminateUserSessionTx(context.Background(), database, session)
 	if err != nil {
 		t.Fatalf("TerminateUserSessionTx returned error: %v", err)
 	}

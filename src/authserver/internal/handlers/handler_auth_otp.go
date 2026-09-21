@@ -396,7 +396,7 @@ func HandleAuthOtpPost(
 			// The user write and the OTP configuration generation's advance commit together,
 			// so there is no state in which the authenticator is on and no session knows
 			// (#242 decision 2).
-			enrolledGeneration, err := EnableUserOTPTx(database, user)
+			enrolledGeneration, err := EnableUserOTPTx(r.Context(), database, user)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
 				return

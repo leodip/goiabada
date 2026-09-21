@@ -43,12 +43,12 @@ import (
 //
 // WHAT THE FOLLOW-UP DRAFT ALSO RAISED, AND WHY IT IS NOT REACHABLE. SNAPSHOT isolation reports a
 // write-write conflict as error 3960, an abort rather than a wait, and nothing in the repository
-// handles 3960. It cannot arrive: commondb.BeginTransaction calls d.DB.Begin(), which is BeginTx
-// with sql.LevelDefault, and no code anywhere sets a transaction isolation level. A transaction
-// runs under SNAPSHOT only if the client asks for it, so ALLOW_SNAPSHOT_ISOLATION ON alone changes
-// nothing for Goiabada whatever an operator sets it to. RCSI is different, and is the whole of the
-// real exposure, because it changes what READ COMMITTED means without the application asking for
-// anything.
+// handles 3960. It cannot arrive: commondb.BeginTransaction calls d.DB.BeginTx(ctx, nil), whose
+// nil options are sql.LevelDefault, and no code anywhere sets a transaction isolation level. A
+// transaction runs under SNAPSHOT only if the client asks for it, so ALLOW_SNAPSHOT_ISOLATION ON
+// alone changes nothing for Goiabada whatever an operator sets it to. RCSI is different, and is
+// the whole of the real exposure, because it changes what READ COMMITTED means without the
+// application asking for anything.
 //
 // THE STOPPING RULE. If a measurement here contradicts the expectation above, the answer is not a
 // fix invented on the spot: either the ordering needs a primitive that does not depend on

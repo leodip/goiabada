@@ -1,6 +1,7 @@
 package commondb
 
 import (
+	"context"
 	"database/sql"
 	"time"
 
@@ -27,7 +28,7 @@ func (d *CommonDatabase) CreateClientLogo(tx *sql.Tx, clientLogo *models.ClientL
 
 	insertBuilder := clientLogoStruct.WithoutTag("pk").InsertInto("client_logos", clientLogo)
 
-	id, err := d.insertReturningId(tx, insertBuilder, "client logo")
+	id, err := d.insertReturningId(context.Background(), tx, insertBuilder, "client logo")
 	if err != nil {
 		clientLogo.CreatedAt = originalCreatedAt
 		clientLogo.UpdatedAt = originalUpdatedAt
@@ -54,7 +55,7 @@ func (d *CommonDatabase) UpdateClientLogo(tx *sql.Tx, clientLogo *models.ClientL
 	updateBuilder.Where(updateBuilder.Equal("id", clientLogo.Id))
 
 	sql, args := updateBuilder.Build()
-	_, err := d.ExecSql(tx, sql, args...)
+	_, err := d.ExecSql(context.Background(), tx, sql, args...)
 	if err != nil {
 		clientLogo.UpdatedAt = originalUpdatedAt
 		return errs.Wrap(err, "unable to update client logo")
@@ -72,7 +73,7 @@ func (d *CommonDatabase) GetClientLogoByClientId(tx *sql.Tx, clientId int64) (*m
 	selectBuilder.Where(selectBuilder.Equal("client_id", clientId))
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(tx, sql, args...)
+	rows, err := d.QuerySql(context.Background(), tx, sql, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -103,7 +104,7 @@ func (d *CommonDatabase) DeleteClientLogo(tx *sql.Tx, clientId int64) error {
 	deleteBuilder.Where(deleteBuilder.Equal("client_id", clientId))
 
 	sql, args := deleteBuilder.Build()
-	_, err := d.ExecSql(tx, sql, args...)
+	_, err := d.ExecSql(context.Background(), tx, sql, args...)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete client logo")
 	}
@@ -119,7 +120,7 @@ func (d *CommonDatabase) ClientHasLogo(tx *sql.Tx, clientId int64) (bool, error)
 	selectBuilder.Limit(1)
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(tx, sql, args...)
+	rows, err := d.QuerySql(context.Background(), tx, sql, args...)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to query database")
 	}

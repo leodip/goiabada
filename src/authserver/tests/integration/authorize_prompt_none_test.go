@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"database/sql"
 	"net/http"
 	"net/url"
@@ -1713,7 +1714,7 @@ func TestPromptNone_InvalidScope(t *testing.T) {
 func advanceOtpConfigGeneration(t *testing.T, userId int64) {
 	t.Helper()
 
-	tx, err := database.BeginTransaction()
+	tx, err := database.BeginTransaction(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}

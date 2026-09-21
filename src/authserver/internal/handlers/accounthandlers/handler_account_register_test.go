@@ -645,7 +645,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 		database.On("GetPreRegistrationByEmail", mock.Anything, "test@example.com").Return(nil, nil)
 		passwordValidator.On("ValidatePassword", mock.Anything, "password123").Return(nil)
 
-		userCreator.On("CreateUser", mock.MatchedBy(func(input *usercreation.CreateUserInput) bool {
+		userCreator.On("CreateUser", mock.Anything, mock.MatchedBy(func(input *usercreation.CreateUserInput) bool {
 			return input.Email == "test@example.com" && !input.EmailVerified
 		})).Return(&models.User{}, nil)
 
@@ -708,7 +708,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 		database.On("GetPreRegistrationByEmail", mock.Anything, "test@example.com").Return(nil, nil)
 		passwordValidator.On("ValidatePassword", mock.Anything, "password123").Return(nil)
 
-		userCreator.On("CreateUser", mock.MatchedBy(func(input *usercreation.CreateUserInput) bool {
+		userCreator.On("CreateUser", mock.Anything, mock.MatchedBy(func(input *usercreation.CreateUserInput) bool {
 			return input.Email == "test@example.com" && !input.EmailVerified
 		})).Return(&models.User{}, nil)
 

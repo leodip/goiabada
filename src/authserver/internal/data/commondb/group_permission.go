@@ -1,6 +1,7 @@
 package commondb
 
 import (
+	"context"
 	"database/sql"
 	"time"
 
@@ -31,7 +32,7 @@ func (d *CommonDatabase) CreateGroupPermission(tx *sql.Tx, groupPermission *mode
 
 	insertBuilder := groupPermissionStruct.WithoutTag("pk").InsertInto("groups_permissions", groupPermission)
 
-	id, err := d.insertReturningId(tx, insertBuilder, "groupPermission")
+	id, err := d.insertReturningId(context.Background(), tx, insertBuilder, "groupPermission")
 	if err != nil {
 		groupPermission.CreatedAt = originalCreatedAt
 		groupPermission.UpdatedAt = originalUpdatedAt
@@ -58,7 +59,7 @@ func (d *CommonDatabase) UpdateGroupPermission(tx *sql.Tx, groupPermission *mode
 	updateBuilder.Where(updateBuilder.Equal("id", groupPermission.Id))
 
 	sql, args := updateBuilder.Build()
-	_, err := d.ExecSql(tx, sql, args...)
+	_, err := d.ExecSql(context.Background(), tx, sql, args...)
 	if err != nil {
 		groupPermission.UpdatedAt = originalUpdatedAt
 		return errs.Wrap(err, "unable to update groupPermission")
@@ -71,7 +72,7 @@ func (d *CommonDatabase) getGroupPermissionCommon(tx *sql.Tx, selectBuilder *sql
 	groupPermissionStruct *sqlbuilder.Struct) (*models.GroupPermission, error) {
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(tx, sql, args...)
+	rows, err := d.QuerySql(context.Background(), tx, sql, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -102,7 +103,7 @@ func (d *CommonDatabase) GetGroupPermissionsByGroupId(tx *sql.Tx, groupId int64)
 	selectBuilder.Where(selectBuilder.Equal("group_id", groupId))
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(tx, sql, args...)
+	rows, err := d.QuerySql(context.Background(), tx, sql, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -142,7 +143,7 @@ func (d *CommonDatabase) GetGroupPermissionsByGroupIds(tx *sql.Tx, groupIds []in
 		selectBuilder.Where(selectBuilder.In("group_id", sqlbuilder.Flatten(batch)...))
 
 		sql, args := selectBuilder.Build()
-		rows, err := d.QuerySql(tx, sql, args...)
+		rows, err := d.QuerySql(context.Background(), tx, sql, args...)
 		if err != nil {
 			return errs.Wrap(err, "unable to query database")
 		}
@@ -213,7 +214,7 @@ func (d *CommonDatabase) DeleteGroupPermission(tx *sql.Tx, groupPermissionId int
 	deleteBuilder.Where(deleteBuilder.Equal("id", groupPermissionId))
 
 	sql, args := deleteBuilder.Build()
-	_, err := d.ExecSql(tx, sql, args...)
+	_, err := d.ExecSql(context.Background(), tx, sql, args...)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete groupPermission")
 	}

@@ -1,6 +1,7 @@
 package commondb
 
 import (
+	"context"
 	"database/sql"
 	"time"
 
@@ -23,7 +24,7 @@ func (d *CommonDatabase) CreateRefreshToken(tx *sql.Tx, refreshToken *models.Ref
 
 	insertBuilder := refreshTokenStruct.WithoutTag("pk").InsertInto("refresh_tokens", refreshToken)
 
-	id, err := d.insertReturningId(tx, insertBuilder, "refreshToken")
+	id, err := d.insertReturningId(context.Background(), tx, insertBuilder, "refreshToken")
 	if err != nil {
 		refreshToken.CreatedAt = originalCreatedAt
 		refreshToken.UpdatedAt = originalUpdatedAt
@@ -50,7 +51,7 @@ func (d *CommonDatabase) UpdateRefreshToken(tx *sql.Tx, refreshToken *models.Ref
 	updateBuilder.Where(updateBuilder.Equal("id", refreshToken.Id))
 
 	sql, args := updateBuilder.Build()
-	_, err := d.ExecSql(tx, sql, args...)
+	_, err := d.ExecSql(context.Background(), tx, sql, args...)
 	if err != nil {
 		refreshToken.UpdatedAt = originalUpdatedAt
 		return errs.Wrap(err, "unable to update refreshToken")
@@ -93,7 +94,7 @@ func (d *CommonDatabase) MarkRefreshTokenAsRevoked(tx *sql.Tx, refreshTokenId in
 	)
 
 	query, args := ub.BuildWithFlavor(d.Flavor)
-	result, err := d.ExecSql(tx, query, args...)
+	result, err := d.ExecSql(context.Background(), tx, query, args...)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to mark refresh token as revoked")
 	}
@@ -145,7 +146,7 @@ func (d *CommonDatabase) RevokeRefreshTokenFamily(tx *sql.Tx, firstRefreshTokenJ
 	)
 
 	query, args := ub.BuildWithFlavor(d.Flavor)
-	result, err := d.ExecSql(tx, query, args...)
+	result, err := d.ExecSql(context.Background(), tx, query, args...)
 	if err != nil {
 		return 0, errs.Wrap(err, "unable to revoke refresh token family")
 	}
@@ -162,7 +163,7 @@ func (d *CommonDatabase) getRefreshTokenCommon(tx *sql.Tx, selectBuilder *sqlbui
 	refreshTokenStruct *sqlbuilder.Struct) (*models.RefreshToken, error) {
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(tx, sql, args...)
+	rows, err := d.QuerySql(context.Background(), tx, sql, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -296,7 +297,7 @@ func (d *CommonDatabase) GetRefreshTokensByCodeId(tx *sql.Tx, codeId int64) ([]*
 	selectBuilder.Where(selectBuilder.Equal("code_id", codeId))
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(tx, sql, args...)
+	rows, err := d.QuerySql(context.Background(), tx, sql, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -341,7 +342,7 @@ func (d *CommonDatabase) GetRefreshTokensBySessionIdentifier(tx *sql.Tx, session
 	selectBuilder.Where(selectBuilder.Equal("codes.session_identifier", sessionIdentifier))
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(tx, sql, args...)
+	rows, err := d.QuerySql(context.Background(), tx, sql, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -374,7 +375,7 @@ func (d *CommonDatabase) DeleteRefreshToken(tx *sql.Tx, refreshTokenId int64) er
 	deleteBuilder.Where(deleteBuilder.Equal("id", refreshTokenId))
 
 	sql, args := deleteBuilder.Build()
-	_, err := d.ExecSql(tx, sql, args...)
+	_, err := d.ExecSql(context.Background(), tx, sql, args...)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete refreshToken")
 	}
@@ -409,7 +410,7 @@ func (d *CommonDatabase) deleteRefreshTokensByColumn(tx *sql.Tx, column string, 
 	deleteBuilder.Where(deleteBuilder.Equal(column, value))
 
 	sql, args := deleteBuilder.Build()
-	_, err := d.ExecSql(tx, sql, args...)
+	_, err := d.ExecSql(context.Background(), tx, sql, args...)
 	if err != nil {
 		return errs.Wrapf(err, "unable to delete refresh tokens by %v", column)
 	}
@@ -454,7 +455,7 @@ func (d *CommonDatabase) DeleteExpiredRefreshTokens(tx *sql.Tx) error {
 	)
 
 	sql, args := deleteBuilder.Build()
-	_, err := d.ExecSql(tx, sql, args...)
+	_, err := d.ExecSql(context.Background(), tx, sql, args...)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete expired refresh tokens")
 	}
@@ -493,7 +494,7 @@ func (d *CommonDatabase) GetRefreshTokensByUserId(tx *sql.Tx, userId int64) ([]*
 	direct.Where(direct.Equal("refresh_tokens.user_id", userId))
 
 	sql, args := d.Flavor.NewUnionBuilder().UnionAll(viaCode, direct).BuildWithFlavor(d.Flavor)
-	rows, err := d.QuerySql(tx, sql, args...)
+	rows, err := d.QuerySql(context.Background(), tx, sql, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -551,7 +552,7 @@ func (d *CommonDatabase) GetRefreshTokensByClientId(tx *sql.Tx, clientId int64) 
 	direct.Where(direct.Equal("refresh_tokens.client_id", clientId))
 
 	sql, args := d.Flavor.NewUnionBuilder().UnionAll(viaCode, direct).BuildWithFlavor(d.Flavor)
-	rows, err := d.QuerySql(tx, sql, args...)
+	rows, err := d.QuerySql(context.Background(), tx, sql, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -619,7 +620,7 @@ func (d *CommonDatabase) PromoteRefreshTokenGenerations(tx *sql.Tx, refreshToken
 		)
 
 		sql, args := ub.BuildWithFlavor(d.Flavor)
-		_, err := d.ExecSql(tx, sql, args...)
+		_, err := d.ExecSql(context.Background(), tx, sql, args...)
 		if err != nil {
 			return errs.Wrap(err, "unable to promote refresh token generations")
 		}

@@ -1,6 +1,7 @@
 package postgresdb
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"time"
@@ -13,7 +14,7 @@ func (d *PostgresDatabase) DeleteOldAuditLogs(tx *sql.Tx, cutoff time.Time, maxD
 	// Use subquery: DELETE FROM audit_logs WHERE id IN (SELECT id FROM audit_logs WHERE created_at < ? LIMIT ?)
 	sqlStr := fmt.Sprintf(`DELETE FROM audit_logs WHERE id IN (SELECT id FROM audit_logs WHERE created_at < $1 LIMIT %d)`, maxDeletions)
 
-	result, err := d.ExecSql(tx, sqlStr, cutoff)
+	result, err := d.ExecSql(context.Background(), tx, sqlStr, cutoff)
 	if err != nil {
 		return 0, errs.Wrap(err, "unable to delete old audit logs")
 	}

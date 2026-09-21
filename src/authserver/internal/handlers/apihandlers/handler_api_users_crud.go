@@ -232,7 +232,7 @@ func HandleAPIUserOTPPut(
 		// Disable OTP. Clearing the secret, turning otp_enabled off and resetting the
 		// consumed-step marker are one atomic operation, shared with the account API's disable
 		// branch (#111 decisions 4 and 13); disableUserOTP carries the reasoning.
-		err = disableUserOTP(database, user)
+		err = disableUserOTP(r.Context(), database, user)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -391,7 +391,7 @@ func HandleAPIUserCreatePost(
 		req.FamilyName = strings.TrimSpace(req.FamilyName)
 
 		// Create user using UserCreator
-		createdUser, err := userCreator.CreateUser(&usercreation.CreateUserInput{
+		createdUser, err := userCreator.CreateUser(r.Context(), &usercreation.CreateUserInput{
 			Email:         req.Email,
 			EmailVerified: req.EmailVerified,
 			PasswordHash:  passwordHash,
@@ -578,7 +578,7 @@ func HandleAPIUserEnabledPut(
 		// attempt, and the sweep reads the sessions and tokens afresh.
 		disableWithRevocation := func() (handlers.RevocationResult, bool, error) {
 			var result handlers.RevocationResult
-			err := database.RunInTransaction(func(tx *sql.Tx) error {
+			err := database.RunInTransaction(r.Context(), func(tx *sql.Tx) error {
 				transitioned, err := database.TrySetUserEnabled(tx, userId, true, false)
 				if err != nil {
 					return err

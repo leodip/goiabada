@@ -967,7 +967,7 @@ func TestHandleResetPasswordPost_MarkerRejectionsDoNotChangeThePassword(t *testi
 			httpHelper.AssertExpectations(t)
 			database.AssertExpectations(t)
 			auditLogger.AssertExpectations(t)
-			database.AssertNotCalled(t, "RunInTransaction", mock.Anything)
+			database.AssertNotCalled(t, "RunInTransaction", mock.Anything, mock.Anything)
 		})
 	}
 }

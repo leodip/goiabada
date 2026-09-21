@@ -1,6 +1,7 @@
 package commondb
 
 import (
+	"context"
 	"database/sql"
 	"log/slog"
 	"strings"
@@ -46,7 +47,7 @@ func TestCommonDatabaseLog_ExecSqlWritesOneRecordAndNoBoundValue(t *testing.T) {
 	logs := testutil.CaptureSlog(t)
 	database := loggingDB(t, true)
 
-	_, err := database.ExecSql(nil, `INSERT INTO secrets (value) VALUES (?)`, boundSentinel)
+	_, err := database.ExecSql(context.Background(), nil, `INSERT INTO secrets (value) VALUES (?)`, boundSentinel)
 	require.NoError(t, err)
 
 	records := logs.Records()
@@ -63,7 +64,7 @@ func TestCommonDatabaseLog_QuerySqlWritesOneRecordAndNoBoundValue(t *testing.T) 
 	logs := testutil.CaptureSlog(t)
 	database := loggingDB(t, true)
 
-	rows, err := database.QuerySql(nil, `SELECT id FROM secrets WHERE value = ?`, boundSentinel)
+	rows, err := database.QuerySql(context.Background(), nil, `SELECT id FROM secrets WHERE value = ?`, boundSentinel)
 	require.NoError(t, err)
 	require.NoError(t, rows.Close())
 
@@ -80,9 +81,9 @@ func TestCommonDatabaseLog_WritesNothingWhenLogSqlIsOff(t *testing.T) {
 	logs := testutil.CaptureSlog(t)
 	database := loggingDB(t, false)
 
-	_, err := database.ExecSql(nil, `INSERT INTO secrets (value) VALUES (?)`, boundSentinel)
+	_, err := database.ExecSql(context.Background(), nil, `INSERT INTO secrets (value) VALUES (?)`, boundSentinel)
 	require.NoError(t, err)
-	rows, err := database.QuerySql(nil, `SELECT id FROM secrets WHERE value = ?`, boundSentinel)
+	rows, err := database.QuerySql(context.Background(), nil, `SELECT id FROM secrets WHERE value = ?`, boundSentinel)
 	require.NoError(t, err)
 	require.NoError(t, rows.Close())
 
@@ -97,7 +98,7 @@ func TestCommonDatabaseLog_LogsTheStatementTextAsWritten(t *testing.T) {
 	logs := testutil.CaptureSlog(t)
 	database := loggingDB(t, true)
 
-	_, err := database.ExecSql(nil, `INSERT INTO secrets (value) VALUES ('literal')`)
+	_, err := database.ExecSql(context.Background(), nil, `INSERT INTO secrets (value) VALUES ('literal')`)
 	require.NoError(t, err)
 
 	require.Len(t, logs.Records(), 1)

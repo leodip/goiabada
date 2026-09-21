@@ -1,6 +1,7 @@
 package commondb
 
 import (
+	"context"
 	"database/sql"
 	"time"
 
@@ -40,7 +41,7 @@ func (d *CommonDatabase) CreateBrowserSession(tx *sql.Tx, browserSession *models
 
 	insertBuilder := browserSessionStruct.WithoutTag("pk").InsertInto("browser_sessions", browserSession)
 
-	id, err := d.insertReturningId(tx, insertBuilder, "browser session")
+	id, err := d.insertReturningId(context.Background(), tx, insertBuilder, "browser session")
 	if err != nil {
 		browserSession.CreatedAt = originalCreatedAt
 		browserSession.UpdatedAt = originalUpdatedAt
@@ -86,7 +87,7 @@ func (d *CommonDatabase) GetBrowserSessionByOwnerAndSessionIdHash(tx *sql.Tx, ow
 	)
 
 	query, args := selectBuilder.Build()
-	rows, err := d.QuerySql(tx, query, args...)
+	rows, err := d.QuerySql(context.Background(), tx, query, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -155,7 +156,7 @@ func (d *CommonDatabase) UpdateBrowserSessionData(tx *sql.Tx, owner, sessionIdHa
 	)
 
 	query, args := ub.BuildWithFlavor(d.Flavor)
-	result, err := d.ExecSql(tx, query, args...)
+	result, err := d.ExecSql(context.Background(), tx, query, args...)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to update browser session data")
 	}
@@ -204,7 +205,7 @@ func (d *CommonDatabase) TouchBrowserSession(tx *sql.Tx, owner, sessionIdHash st
 	)
 
 	query, args := ub.BuildWithFlavor(d.Flavor)
-	result, err := d.ExecSql(tx, query, args...)
+	result, err := d.ExecSql(context.Background(), tx, query, args...)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to touch browser session")
 	}
@@ -264,7 +265,7 @@ func (d *CommonDatabase) DeleteBrowserSession(tx *sql.Tx, owner, sessionIdHash s
 	)
 
 	sql, args := deleteBuilder.Build()
-	_, err := d.ExecSql(tx, sql, args...)
+	_, err := d.ExecSql(context.Background(), tx, sql, args...)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete browser session")
 	}
@@ -285,7 +286,7 @@ func (d *CommonDatabase) DeleteExpiredBrowserSessions(tx *sql.Tx, now time.Time)
 	deleteBuilder.Where(deleteBuilder.LessThan("expires_at", now))
 
 	sql, args := deleteBuilder.Build()
-	_, err := d.ExecSql(tx, sql, args...)
+	_, err := d.ExecSql(context.Background(), tx, sql, args...)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete expired browser sessions")
 	}

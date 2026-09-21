@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"context"
 	"sync"
 	"testing"
 	"time"
@@ -411,7 +412,7 @@ func TestUpdateKeyPairState_EnlistsInCallersTransaction(t *testing.T) {
 	keyPair := createKeyPairInState(t, current)
 	clearKeyPairState(t, previous)
 
-	tx, err := database.BeginTransaction()
+	tx, err := database.BeginTransaction(context.Background())
 	if err != nil {
 		t.Fatalf("Failed to begin transaction: %v", err)
 	}
@@ -463,7 +464,7 @@ func TestUpdateKeyPairState_StorageFailureIsAnError(t *testing.T) {
 	keyPair := createKeyPairInState(t, current)
 	clearKeyPairState(t, previous)
 
-	tx, err := database.BeginTransaction()
+	tx, err := database.BeginTransaction(context.Background())
 	if err != nil {
 		t.Fatalf("Failed to begin transaction: %v", err)
 	}
@@ -532,7 +533,7 @@ func TestUpdateKeyPairState_Concurrent(t *testing.T) {
 			<-start
 
 			began := time.Now()
-			tx, err := database.BeginTransaction()
+			tx, err := database.BeginTransaction(context.Background())
 			if err != nil {
 				outcomes[i] = outcome{err: err, span: time.Since(began)}
 				return

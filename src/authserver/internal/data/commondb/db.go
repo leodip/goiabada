@@ -1,6 +1,7 @@
 package commondb
 
 import (
+	"context"
 	"database/sql"
 	"log/slog"
 	"time"
@@ -70,12 +71,16 @@ func NewCommonDatabase(db *sql.DB, flavor sqlbuilder.Flavor, logSQL bool) *Commo
 	}
 }
 
-func (d *CommonDatabase) BeginTransaction() (*sql.Tx, error) {
+func (d *CommonDatabase) BeginTransaction(ctx context.Context) (*sql.Tx, error) {
 	if d.logSQL {
-		slog.Info("beginning transaction")
+		slog.InfoContext(ctx, "beginning transaction")
 	}
 
-	tx, err := d.DB.Begin()
+	// BeginTx with nil options, which is sql.LevelDefault and read-write: no code in this
+	// repository asks for an isolation level, and the context is here so that a caller who has
+	// given up stops waiting for a connection the pool has not got. On SQLite, whose pool is
+	// one connection, that wait is the whole of #413's self-deadlock (#386).
+	tx, err := d.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to begin transaction")
 	}
@@ -114,7 +119,21 @@ var runInTransactionBackoff = [...]time.Duration{25 * time.Millisecond, 100 * ti
 // sleep is the pause between attempts, a seam so a test can record the durations REQUESTED
 // rather than time the wall clock, where a scheduler stall longer than the gap between the two
 // values reverses the comparison on a correct helper.
-var sleep = time.Sleep
+//
+// It takes the context and returns its error because the pause has to be interruptible: a caller
+// that is already gone should not be held for another 100ms and then handed a fresh transaction.
+// time.Sleep cannot be interrupted, so the wait is a select on ctx.Done(); the seam is still this
+// variable, and a test that wants the real wait keeps it.
+var sleep = func(ctx context.Context, d time.Duration) error {
+	timer := time.NewTimer(d)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
+}
 
 // RunInTransaction opens a transaction, runs fn on it, and commits when fn returns nil or
 // rolls back when it does not. Every transaction owner in the repository opens its transaction
@@ -146,18 +165,24 @@ var sleep = time.Sleep
 // Rollback failures on the error path are logged and never returned: MySQL has already rolled a
 // deadlock victim back server-side and says so, and returning that would replace the error the
 // caller needs with a bookkeeping one.
-func (d *CommonDatabase) RunInTransaction(fn func(tx *sql.Tx) error) error {
+func (d *CommonDatabase) RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error {
 	const attempts = 3
 
 	var lastDeadlock error
 	for attempt := 1; attempt <= attempts; attempt++ {
+		if err := ctx.Err(); err != nil {
+			return abandoned(err, lastDeadlock)
+		}
+
 		if attempt > 1 {
-			sleep(runInTransactionBackoff[attempt-2])
-			slog.Warn("rerunning a transaction the engine aborted as a deadlock victim",
+			if err := sleep(ctx, runInTransactionBackoff[attempt-2]); err != nil {
+				return abandoned(err, lastDeadlock)
+			}
+			slog.WarnContext(ctx, "rerunning a transaction the engine aborted as a deadlock victim",
 				"attempt", attempt, "error", lastDeadlock)
 		}
 
-		err := d.runTransactionOnce(fn)
+		err := d.runTransactionOnce(ctx, fn)
 		if err == nil {
 			return nil
 		}
@@ -170,11 +195,32 @@ func (d *CommonDatabase) RunInTransaction(fn func(tx *sql.Tx) error) error {
 	return errs.Wrapf(lastDeadlock, "transaction aborted as a deadlock victim on all %d attempts", attempts)
 }
 
+// abandoned is what a cancelled run returns: the context's error, joined to the deadlock that was
+// the reason the helper was about to try again when there was one.
+//
+// The context error wins because it is the one that decided the outcome -- the caller is gone, and
+// nothing below chose that. The deadlock is joined rather than dropped because losing it leaves a
+// record saying only "cancelled" for a transaction the engine had been aborting, which is the one
+// fact worth keeping. Both stay reachable: errors.Is answers for context.Canceled and
+// context.DeadlineExceeded, and errors.Is and errors.As still reach the engine's own abort
+// (#386 decision 13).
+//
+// A cancellation arriving INSIDE fn does not come through here. The statement's own context error
+// is not a deadlock, so the loop returns it unchanged after one attempt, which is the same answer
+// by the ordinary path.
+func abandoned(ctxErr error, lastDeadlock error) error {
+	if lastDeadlock != nil {
+		return errs.Wrap(errs.Join(ctxErr, lastDeadlock),
+			"transaction abandoned after the engine aborted it as a deadlock victim")
+	}
+	return errs.Wrap(ctxErr, "transaction abandoned")
+}
+
 // runTransactionOnce is one attempt. Its own function so the rollback is deferred, which is
 // what makes a panicking fn leave no open transaction behind: the connection goes back to the
 // pool clean instead of holding its locks until the pool closes it.
-func (d *CommonDatabase) runTransactionOnce(fn func(tx *sql.Tx) error) error {
-	tx, err := d.BeginTransaction()
+func (d *CommonDatabase) runTransactionOnce(ctx context.Context, fn func(tx *sql.Tx) error) error {
+	tx, err := d.BeginTransaction(ctx)
 	if err != nil {
 		return err
 	}
@@ -188,7 +234,7 @@ func (d *CommonDatabase) runTransactionOnce(fn func(tx *sql.Tx) error) error {
 			return
 		}
 		if rollbackErr := d.RollbackTransaction(tx); rollbackErr != nil {
-			slog.Warn("rolling back a failed transaction reported an error, which is ignored because the transaction's own error is the one the caller needs",
+			slog.WarnContext(ctx, "rolling back a failed transaction reported an error, which is ignored because the transaction's own error is the one the caller needs",
 				"error", rollbackErr)
 		}
 	}()
@@ -249,12 +295,12 @@ func (d *CommonDatabase) WrapSQLError(err error, msg string) error {
 // through RunInTransaction, so a deadlock reruns fn; handed one, it is a nested callee
 // and returns the error to the owner, whose rerun covers the whole body rather than
 // this piece of it.
-func (d *CommonDatabase) inTransaction(tx *sql.Tx, fn func(tx *sql.Tx) error) error {
+func (d *CommonDatabase) inTransaction(ctx context.Context, tx *sql.Tx, fn func(tx *sql.Tx) error) error {
 	if tx != nil {
 		return fn(tx)
 	}
 
-	return d.RunInTransaction(fn)
+	return d.RunInTransaction(ctx, fn)
 }
 
 // Log writes one record per statement when GOIABADA_AUTHSERVER_LOG_SQL is on.
@@ -267,25 +313,25 @@ func (d *CommonDatabase) inTransaction(tx *sql.Tx, fn func(tx *sql.Tx) error) er
 // what it writes (#145, #159), and a flag an operator turns on to see which
 // queries run should not be the one path that publishes what they ran with.
 // Restore the arguments and the log carries credentials in the clear (#320).
-func (d *CommonDatabase) Log(sql string) {
+func (d *CommonDatabase) Log(ctx context.Context, sql string) {
 	if d.logSQL {
-		slog.Info("sql", "statement", sql)
+		slog.InfoContext(ctx, "sql", "statement", sql)
 	}
 }
 
-func (d *CommonDatabase) ExecSql(tx *sql.Tx, sql string, args ...any) (sql.Result, error) {
+func (d *CommonDatabase) ExecSql(ctx context.Context, tx *sql.Tx, sql string, args ...any) (sql.Result, error) {
 
-	d.Log(sql)
+	d.Log(ctx, sql)
 
 	if tx != nil {
-		result, err := tx.Exec(sql, args...)
+		result, err := tx.ExecContext(ctx, sql, args...)
 		if err != nil {
 			return nil, d.WrapSQLError(err, "unable to execute SQL")
 		}
 		return result, nil
 	}
 
-	result, err := d.DB.Exec(sql, args...)
+	result, err := d.DB.ExecContext(ctx, sql, args...)
 	if err != nil {
 		return nil, d.WrapSQLError(err, "unable to execute SQL")
 	}
@@ -302,18 +348,18 @@ func (d *CommonDatabase) ExecSql(tx *sql.Tx, sql string, args ...any) (sql.Resul
 // without the check a failed read is indistinguishable from a legitimate absence.
 // For the getters behind permission and session lookups, that is the wrong
 // direction to fail in.
-func (d *CommonDatabase) QuerySql(tx *sql.Tx, sql string, args ...any) (*sql.Rows, error) {
-	d.Log(sql)
+func (d *CommonDatabase) QuerySql(ctx context.Context, tx *sql.Tx, sql string, args ...any) (*sql.Rows, error) {
+	d.Log(ctx, sql)
 
 	if tx != nil {
-		result, err := tx.Query(sql, args...)
+		result, err := tx.QueryContext(ctx, sql, args...)
 		if err != nil {
 			return nil, d.WrapSQLError(err, "unable to execute SQL")
 		}
 		return result, nil
 	}
 
-	rows, err := d.DB.Query(sql, args...)
+	rows, err := d.DB.QueryContext(ctx, sql, args...)
 	if err != nil {
 		return nil, d.WrapSQLError(err, "unable to execute SQL")
 	}
@@ -338,13 +384,13 @@ func (d *CommonDatabase) QuerySql(tx *sql.Tx, sql string, args ...any) (*sql.Row
 // rather than 500 -- would be unreachable on exactly the two engines that take this arm. It goes
 // through WrapSQLError rather than errs.Wrap for that reason; the failure QuerySql itself returns
 // has already been through WrapSQLError (#279).
-func (d *CommonDatabase) insertReturningId(tx *sql.Tx, insertBuilder *sqlbuilder.InsertBuilder,
-	noun string) (int64, error) {
+func (d *CommonDatabase) insertReturningId(ctx context.Context, tx *sql.Tx,
+	insertBuilder *sqlbuilder.InsertBuilder, noun string) (int64, error) {
 
 	statement, args := insertBuilder.Build()
 
 	if d.InsertReturningIdSQL == nil {
-		result, err := d.ExecSql(tx, statement, args...)
+		result, err := d.ExecSql(ctx, tx, statement, args...)
 		if err != nil {
 			return 0, errs.Wrap(err, "unable to insert "+noun)
 		}
@@ -361,7 +407,7 @@ func (d *CommonDatabase) insertReturningId(tx *sql.Tx, insertBuilder *sqlbuilder
 		return 0, err
 	}
 
-	rows, err := d.QuerySql(tx, statement, args...)
+	rows, err := d.QuerySql(ctx, tx, statement, args...)
 	if err != nil {
 		return 0, errs.Wrap(err, "unable to insert "+noun)
 	}

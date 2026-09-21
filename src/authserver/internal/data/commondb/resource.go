@@ -1,6 +1,7 @@
 package commondb
 
 import (
+	"context"
 	"database/sql"
 	"time"
 
@@ -23,7 +24,7 @@ func (d *CommonDatabase) CreateResource(tx *sql.Tx, resource *models.Resource) e
 
 	insertBuilder := resourceStruct.WithoutTag("pk").InsertInto("resources", resource)
 
-	id, err := d.insertReturningId(tx, insertBuilder, "resource")
+	id, err := d.insertReturningId(context.Background(), tx, insertBuilder, "resource")
 	if err != nil {
 		resource.CreatedAt = originalCreatedAt
 		resource.UpdatedAt = originalUpdatedAt
@@ -50,7 +51,7 @@ func (d *CommonDatabase) UpdateResource(tx *sql.Tx, resource *models.Resource) e
 	updateBuilder.Where(updateBuilder.Equal("id", resource.Id))
 
 	sql, args := updateBuilder.Build()
-	_, err := d.ExecSql(tx, sql, args...)
+	_, err := d.ExecSql(context.Background(), tx, sql, args...)
 	if err != nil {
 		resource.UpdatedAt = originalUpdatedAt
 		return errs.Wrap(err, "unable to update resource")
@@ -63,7 +64,7 @@ func (d *CommonDatabase) getResourceCommon(tx *sql.Tx, selectBuilder *sqlbuilder
 	resourceStruct *sqlbuilder.Struct) (*models.Resource, error) {
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(tx, sql, args...)
+	rows, err := d.QuerySql(context.Background(), tx, sql, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -139,7 +140,7 @@ func (d *CommonDatabase) GetResourcesByIds(tx *sql.Tx, resourceIds []int64) ([]m
 		selectBuilder.Where(selectBuilder.In("id", sqlbuilder.Flatten(batch)...))
 
 		sql, args := selectBuilder.Build()
-		rows, err := d.QuerySql(tx, sql, args...)
+		rows, err := d.QuerySql(context.Background(), tx, sql, args...)
 		if err != nil {
 			return errs.Wrap(err, "unable to query database")
 		}
@@ -175,7 +176,7 @@ func (d *CommonDatabase) GetAllResources(tx *sql.Tx) ([]models.Resource, error) 
 	selectBuilder := resourceStruct.SelectFrom("resources")
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(tx, sql, args...)
+	rows, err := d.QuerySql(context.Background(), tx, sql, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -208,7 +209,7 @@ func (d *CommonDatabase) DeleteResource(tx *sql.Tx, resourceId int64) error {
 	deleteBuilder.Where(deleteBuilder.Equal("id", resourceId))
 
 	sql, args := deleteBuilder.Build()
-	_, err := d.ExecSql(tx, sql, args...)
+	_, err := d.ExecSql(context.Background(), tx, sql, args...)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete resource")
 	}

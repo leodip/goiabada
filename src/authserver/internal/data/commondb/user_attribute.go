@@ -1,6 +1,7 @@
 package commondb
 
 import (
+	"context"
 	"database/sql"
 	"time"
 
@@ -27,7 +28,7 @@ func (d *CommonDatabase) CreateUserAttribute(tx *sql.Tx, userAttribute *models.U
 
 	insertBuilder := userAttributeStruct.WithoutTag("pk").InsertInto("user_attributes", userAttribute)
 
-	id, err := d.insertReturningId(tx, insertBuilder, "userAttribute")
+	id, err := d.insertReturningId(context.Background(), tx, insertBuilder, "userAttribute")
 	if err != nil {
 		userAttribute.CreatedAt = originalCreatedAt
 		userAttribute.UpdatedAt = originalUpdatedAt
@@ -54,7 +55,7 @@ func (d *CommonDatabase) UpdateUserAttribute(tx *sql.Tx, userAttribute *models.U
 	updateBuilder.Where(updateBuilder.Equal("id", userAttribute.Id))
 
 	sql, args := updateBuilder.Build()
-	_, err := d.ExecSql(tx, sql, args...)
+	_, err := d.ExecSql(context.Background(), tx, sql, args...)
 	if err != nil {
 		userAttribute.UpdatedAt = originalUpdatedAt
 		return errs.Wrap(err, "unable to update userAttribute")
@@ -67,7 +68,7 @@ func (d *CommonDatabase) getUserAttributeCommon(tx *sql.Tx, selectBuilder *sqlbu
 	userAttributeStruct *sqlbuilder.Struct) (*models.UserAttribute, error) {
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(tx, sql, args...)
+	rows, err := d.QuerySql(context.Background(), tx, sql, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -114,7 +115,7 @@ func (d *CommonDatabase) GetUserAttributesByUserId(tx *sql.Tx, userId int64) ([]
 	selectBuilder.Where(selectBuilder.Equal("user_id", userId))
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(tx, sql, args...)
+	rows, err := d.QuerySql(context.Background(), tx, sql, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -147,7 +148,7 @@ func (d *CommonDatabase) DeleteUserAttribute(tx *sql.Tx, userAttributeId int64) 
 	deleteBuilder.Where(deleteBuilder.Equal("id", userAttributeId))
 
 	sql, args := deleteBuilder.Build()
-	_, err := d.ExecSql(tx, sql, args...)
+	_, err := d.ExecSql(context.Background(), tx, sql, args...)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete userAttribute")
 	}

@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -37,13 +38,13 @@ func unrelatedContention(t *testing.T) (release func()) {
 	// a row somebody holds, and AcquireClientRow is one unconditional single-row UPDATE inside
 	// the caller's transaction.
 	bystander := createTestClient(t)
-	holder, err := database.BeginTransaction()
+	holder, err := database.BeginTransaction(context.Background())
 	require.NoError(t, err, "opening the unrelated holder's transaction")
 	require.NoError(t, database.AcquireClientRow(holder, bystander.Id), "the unrelated holder takes its row")
 
 	waiterDone := make(chan error, 1)
 	go func() {
-		tx, err := other.BeginTransaction()
+		tx, err := other.BeginTransaction(context.Background())
 		if err != nil {
 			waiterDone <- err
 			return
@@ -84,7 +85,7 @@ func TestBlockedParty_UnrelatedContentionIsNotThisParty(t *testing.T) {
 	secondDatabase(t) // before anything is held: see secondDatabase for why
 
 	client := createTestClient(t)
-	tx, err := database.BeginTransaction()
+	tx, err := database.BeginTransaction(context.Background())
 	require.NoError(t, err, "opening the foreground transaction")
 	defer func() { _ = database.RollbackTransaction(tx) }()
 	require.NoError(t, database.AcquireClientRow(tx, client.Id), "the foreground takes its row")
@@ -115,7 +116,7 @@ func TestBlockedParty_AWaitBehindTheForegroundIsReported(t *testing.T) {
 
 	other := secondDatabase(t)
 	client := createTestClient(t)
-	tx, err := database.BeginTransaction()
+	tx, err := database.BeginTransaction(context.Background())
 	require.NoError(t, err, "opening the foreground transaction")
 	defer func() { _ = database.RollbackTransaction(tx) }()
 	require.NoError(t, database.AcquireClientRow(tx, client.Id), "the foreground takes its row")
@@ -126,7 +127,7 @@ func TestBlockedParty_AWaitBehindTheForegroundIsReported(t *testing.T) {
 	defer release()
 
 	party := goBlocked(t, "a party that wants the held row", tx, func(reached func()) error {
-		otherTx, err := other.BeginTransaction()
+		otherTx, err := other.BeginTransaction(context.Background())
 		if err != nil {
 			reached()
 			return err
@@ -151,11 +152,11 @@ func TestBlockedParty_IdentityIsTheTransactionsOwnConnection(t *testing.T) {
 		t.Skip("SQLite's pool has one connection, so two transactions on it cannot be open at once")
 	}
 
-	first, err := database.BeginTransaction()
+	first, err := database.BeginTransaction(context.Background())
 	require.NoError(t, err)
 	defer func() { _ = database.RollbackTransaction(first) }()
 	require.NoError(t, database.AcquireClientRow(first, createTestClient(t).Id))
-	second, err := database.BeginTransaction()
+	second, err := database.BeginTransaction(context.Background())
 	require.NoError(t, err)
 	defer func() { _ = database.RollbackTransaction(second) }()
 	require.NoError(t, database.AcquireClientRow(second, createTestClient(t).Id))

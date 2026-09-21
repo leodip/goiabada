@@ -540,7 +540,7 @@ func TestTerminateUserSessionTx_RevokesTheGrantsOfTheSession(t *testing.T) {
 	db.On("UpdateRefreshToken", revokeTx, tokens[0]).Return(nil).Once()
 	db.On("UpdateRefreshToken", revokeTx, tokens[1]).Return(nil).Once()
 
-	result, err := TerminateUserSessionTx(db, terminatedSession())
+	result, err := TerminateUserSessionTx(context.Background(), db, terminatedSession())
 	require.NoError(t, err)
 
 	// The count is the sweep's own, reported as-is: it is what the audit event carries, and
@@ -596,7 +596,7 @@ func TestTerminateUserSessionTx_NothingToRevoke(t *testing.T) {
 	db.On("GetRefreshTokensBySessionIdentifier", revokeTx, terminateSid).
 		Return([]*models.RefreshToken{}, nil).Once()
 
-	result, err := TerminateUserSessionTx(db, terminatedSession())
+	result, err := TerminateUserSessionTx(context.Background(), db, terminatedSession())
 	require.NoError(t, err)
 
 	assert.Equal(t, int64(0), result.RevokedCodeCount)
@@ -615,7 +615,7 @@ func TestTerminateUserSessionTx_RejectsAnUnusableSession(t *testing.T) {
 	t.Run("nil session", func(t *testing.T) {
 		db := mocks_data.NewDatabase(t)
 
-		result, err := TerminateUserSessionTx(db, nil)
+		result, err := TerminateUserSessionTx(context.Background(), db, nil)
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "requires the session to terminate")
@@ -628,7 +628,7 @@ func TestTerminateUserSessionTx_RejectsAnUnusableSession(t *testing.T) {
 		session := terminatedSession()
 		session.SessionIdentifier = ""
 
-		result, err := TerminateUserSessionTx(db, session)
+		result, err := TerminateUserSessionTx(context.Background(), db, session)
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "requires a session identifier")
@@ -744,7 +744,7 @@ func TestTerminateUserSessionTx_AnyFailureYieldsTheZeroResult(t *testing.T) {
 			db := mocks_data.NewDatabase(t)
 			tc.setup(db)
 
-			result, err := TerminateUserSessionTx(db, terminatedSession())
+			result, err := TerminateUserSessionTx(context.Background(), db, terminatedSession())
 
 			require.ErrorIs(t, err, boom)
 			assert.Equal(t, TerminationResult{}, result)
@@ -941,7 +941,7 @@ func TestRevokeClientGrantsTx_WritesAndRevokesInOneTransaction(t *testing.T) {
 		Return([]*models.RefreshToken{}, nil).Once()
 
 	var wroteWith *sql.Tx
-	result, err := RevokeClientGrantsTx(db, revokeClientId, func(tx *sql.Tx) (bool, error) {
+	result, err := RevokeClientGrantsTx(context.Background(), db, revokeClientId, func(tx *sql.Tx) (bool, error) {
 		wroteWith = tx
 		return true, nil
 	})
@@ -976,7 +976,7 @@ func TestRevokeClientGrantsTx_AWriteThatIsNotATransitionCommitsAndRevokesNothing
 	expectRunInTransaction(db, revokeTx)
 
 	wrote := false
-	result, err := RevokeClientGrantsTx(db, revokeClientId, func(tx *sql.Tx) (bool, error) {
+	result, err := RevokeClientGrantsTx(context.Background(), db, revokeClientId, func(tx *sql.Tx) (bool, error) {
 		wrote = true
 		return false, nil
 	})
@@ -1090,7 +1090,7 @@ func TestRevokeClientGrantsTx_AnyFailureYieldsTheZeroResult(t *testing.T) {
 				write = func(tx *sql.Tx) (bool, error) { return true, nil }
 			}
 
-			result, err := RevokeClientGrantsTx(db, revokeClientId, write)
+			result, err := RevokeClientGrantsTx(context.Background(), db, revokeClientId, write)
 
 			require.ErrorIs(t, err, boom)
 			assert.Equal(t, ClientGrantRevocationResult{}, result,

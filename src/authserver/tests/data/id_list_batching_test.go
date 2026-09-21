@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"context"
 	"database/sql"
 	"testing"
 )
@@ -251,7 +252,7 @@ func TestIdListLookups_MoreIdsThanOneStatementCanCarry(t *testing.T) {
 			},
 			answered: func(t *testing.T, ids []int64) []int64 {
 				const generation = int64(4242)
-				err := database.RunInTransaction(func(tx *sql.Tx) error {
+				err := database.RunInTransaction(context.Background(), func(tx *sql.Tx) error {
 					return database.PromoteRefreshTokenGenerations(tx, ids, generation)
 				})
 				requireNoLookupError(t, err)

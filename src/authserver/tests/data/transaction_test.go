@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"context"
 	"database/sql"
 	"testing"
 
@@ -35,7 +36,7 @@ func newTestGroup() *models.Group {
 // explicitly without leaking one on an early t.Fatal.
 func beginTx(t *testing.T) *sql.Tx {
 	t.Helper()
-	tx, err := database.BeginTransaction()
+	tx, err := database.BeginTransaction(context.Background())
 	require.NoError(t, err, "BeginTransaction")
 	require.NotNil(t, tx, "BeginTransaction returned a nil transaction")
 	t.Cleanup(func() { _ = tx.Rollback() })

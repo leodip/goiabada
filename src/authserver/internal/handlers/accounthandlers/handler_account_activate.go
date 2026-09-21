@@ -208,7 +208,7 @@ func handleActivationCleanHop(httpHelper handlers.HttpHelper, httpSession sessio
 		return
 	}
 
-	createdUser, err := userCreator.CreateUser(&usercreation.CreateUserInput{
+	createdUser, err := userCreator.CreateUser(r.Context(), &usercreation.CreateUserInput{
 		Email:         preRegistration.Email,
 		EmailVerified: true,
 		PasswordHash:  preRegistration.PasswordHash,
