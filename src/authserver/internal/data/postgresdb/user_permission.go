@@ -33,7 +33,7 @@ func (d *PostgresDatabase) CreateUserPermission(tx *sql.Tx, userPermission *mode
 	sql, args := insertBuilder.Build()
 	sql = sql + " RETURNING id"
 
-	rows, err := d.CommonDB.QuerySql(tx, sql, args...)
+	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
 		userPermission.CreatedAt = originalCreatedAt
 		userPermission.UpdatedAt = originalUpdatedAt
@@ -56,36 +56,8 @@ func (d *PostgresDatabase) CreateUserPermission(tx *sql.Tx, userPermission *mode
 	if err := rows.Err(); err != nil {
 		userPermission.CreatedAt = originalCreatedAt
 		userPermission.UpdatedAt = originalUpdatedAt
-		return d.CommonDB.WrapSQLError(err, "unable to insert userPermission")
+		return d.WrapSQLError(err, "unable to insert userPermission")
 	}
 
 	return nil
-}
-
-func (d *PostgresDatabase) UpdateUserPermission(tx *sql.Tx, userPermission *models.UserPermission) error {
-	return d.CommonDB.UpdateUserPermission(tx, userPermission)
-}
-
-func (d *PostgresDatabase) GetUserPermissionById(tx *sql.Tx, userPermissionId int64) (*models.UserPermission, error) {
-	return d.CommonDB.GetUserPermissionById(tx, userPermissionId)
-}
-
-func (d *PostgresDatabase) GetUserPermissionsByUserIds(tx *sql.Tx, userIds []int64) ([]models.UserPermission, error) {
-	return d.CommonDB.GetUserPermissionsByUserIds(tx, userIds)
-}
-
-func (d *PostgresDatabase) GetUserPermissionsByUserId(tx *sql.Tx, userId int64) ([]models.UserPermission, error) {
-	return d.CommonDB.GetUserPermissionsByUserId(tx, userId)
-}
-
-func (d *PostgresDatabase) GetUserPermissionByUserIdAndPermissionId(tx *sql.Tx, userId, permissionId int64) (*models.UserPermission, error) {
-	return d.CommonDB.GetUserPermissionByUserIdAndPermissionId(tx, userId, permissionId)
-}
-
-func (d *PostgresDatabase) GetUsersByPermissionIdPaginated(tx *sql.Tx, permissionId int64, page int, pageSize int) ([]models.User, int, error) {
-	return d.CommonDB.GetUsersByPermissionIdPaginated(tx, permissionId, page, pageSize)
-}
-
-func (d *PostgresDatabase) DeleteUserPermission(tx *sql.Tx, userPermissionId int64) error {
-	return d.CommonDB.DeleteUserPermission(tx, userPermissionId)
 }

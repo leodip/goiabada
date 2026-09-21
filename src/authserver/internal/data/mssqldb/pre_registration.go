@@ -30,7 +30,7 @@ func (d *MsSQLDatabase) CreatePreRegistration(tx *sql.Tx, preRegistration *model
 	}
 	sql = parts[0] + "OUTPUT INSERTED.id VALUES" + parts[1]
 
-	rows, err := d.CommonDB.QuerySql(tx, sql, args...)
+	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
 		preRegistration.CreatedAt = originalCreatedAt
 		preRegistration.UpdatedAt = originalUpdatedAt
@@ -53,28 +53,8 @@ func (d *MsSQLDatabase) CreatePreRegistration(tx *sql.Tx, preRegistration *model
 	if err := rows.Err(); err != nil {
 		preRegistration.CreatedAt = originalCreatedAt
 		preRegistration.UpdatedAt = originalUpdatedAt
-		return d.CommonDB.WrapSQLError(err, "unable to insert preRegistration")
+		return d.WrapSQLError(err, "unable to insert preRegistration")
 	}
 
 	return nil
-}
-
-func (d *MsSQLDatabase) UpdatePreRegistration(tx *sql.Tx, preRegistration *models.PreRegistration) error {
-	return d.CommonDB.UpdatePreRegistration(tx, preRegistration)
-}
-
-func (d *MsSQLDatabase) GetPreRegistrationById(tx *sql.Tx, preRegistrationId int64) (*models.PreRegistration, error) {
-	return d.CommonDB.GetPreRegistrationById(tx, preRegistrationId)
-}
-
-func (d *MsSQLDatabase) DeletePreRegistration(tx *sql.Tx, preRegistrationId int64) error {
-	return d.CommonDB.DeletePreRegistration(tx, preRegistrationId)
-}
-
-func (d *MsSQLDatabase) GetPreRegistrationByVerificationCodeHash(tx *sql.Tx, codeHash string) (*models.PreRegistration, error) {
-	return d.CommonDB.GetPreRegistrationByVerificationCodeHash(tx, codeHash)
-}
-
-func (d *MsSQLDatabase) GetPreRegistrationByEmail(tx *sql.Tx, email string) (*models.PreRegistration, error) {
-	return d.CommonDB.GetPreRegistrationByEmail(tx, email)
 }

@@ -29,7 +29,7 @@ func (d *PostgresDatabase) CreateGroupAttribute(tx *sql.Tx, groupAttribute *mode
 	sql, args := insertBuilder.Build()
 	sql = sql + " RETURNING id"
 
-	rows, err := d.CommonDB.QuerySql(tx, sql, args...)
+	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
 		groupAttribute.CreatedAt = originalCreatedAt
 		groupAttribute.UpdatedAt = originalUpdatedAt
@@ -52,28 +52,8 @@ func (d *PostgresDatabase) CreateGroupAttribute(tx *sql.Tx, groupAttribute *mode
 	if err := rows.Err(); err != nil {
 		groupAttribute.CreatedAt = originalCreatedAt
 		groupAttribute.UpdatedAt = originalUpdatedAt
-		return d.CommonDB.WrapSQLError(err, "unable to insert groupAttribute")
+		return d.WrapSQLError(err, "unable to insert groupAttribute")
 	}
 
 	return nil
-}
-
-func (d *PostgresDatabase) UpdateGroupAttribute(tx *sql.Tx, groupAttribute *models.GroupAttribute) error {
-	return d.CommonDB.UpdateGroupAttribute(tx, groupAttribute)
-}
-
-func (d *PostgresDatabase) GetGroupAttributeById(tx *sql.Tx, groupAttributeId int64) (*models.GroupAttribute, error) {
-	return d.CommonDB.GetGroupAttributeById(tx, groupAttributeId)
-}
-
-func (d *PostgresDatabase) GetGroupAttributesByGroupIds(tx *sql.Tx, groupIds []int64) ([]models.GroupAttribute, error) {
-	return d.CommonDB.GetGroupAttributesByGroupIds(tx, groupIds)
-}
-
-func (d *PostgresDatabase) GetGroupAttributesByGroupId(tx *sql.Tx, groupId int64) ([]models.GroupAttribute, error) {
-	return d.CommonDB.GetGroupAttributesByGroupId(tx, groupId)
-}
-
-func (d *PostgresDatabase) DeleteGroupAttribute(tx *sql.Tx, groupAttributeId int64) error {
-	return d.CommonDB.DeleteGroupAttribute(tx, groupAttributeId)
 }

@@ -25,7 +25,7 @@ func (d *PostgresDatabase) CreateAuditLog(tx *sql.Tx, auditLog *models.AuditLog)
 	sqlStr, args := insertBuilder.Build()
 	sqlStr = sqlStr + " RETURNING id"
 
-	rows, err := d.CommonDB.QuerySql(tx, sqlStr, args...)
+	rows, err := d.QuerySql(tx, sqlStr, args...)
 	if err != nil {
 		return errs.Wrap(err, "unable to insert audit log")
 	}
@@ -42,7 +42,7 @@ func (d *PostgresDatabase) CreateAuditLog(tx *sql.Tx, auditLog *models.AuditLog)
 	// returning it from the query, in which case Next() simply reports no row.
 	// Without this the insert would look like a success with id 0.
 	if err := rows.Err(); err != nil {
-		return d.CommonDB.WrapSQLError(err, "unable to insert audit log")
+		return d.WrapSQLError(err, "unable to insert audit log")
 	}
 
 	return nil
@@ -53,7 +53,7 @@ func (d *PostgresDatabase) DeleteOldAuditLogs(tx *sql.Tx, cutoff time.Time, maxD
 	// Use subquery: DELETE FROM audit_logs WHERE id IN (SELECT id FROM audit_logs WHERE created_at < ? LIMIT ?)
 	sqlStr := fmt.Sprintf(`DELETE FROM audit_logs WHERE id IN (SELECT id FROM audit_logs WHERE created_at < $1 LIMIT %d)`, maxDeletions)
 
-	result, err := d.CommonDB.ExecSql(tx, sqlStr, cutoff)
+	result, err := d.ExecSql(tx, sqlStr, cutoff)
 	if err != nil {
 		return 0, errs.Wrap(err, "unable to delete old audit logs")
 	}
@@ -64,9 +64,4 @@ func (d *PostgresDatabase) DeleteOldAuditLogs(tx *sql.Tx, cutoff time.Time, maxD
 	}
 
 	return int(rowsAffected), nil
-}
-
-func (d *PostgresDatabase) GetAuditLogsPaginated(tx *sql.Tx, page int, pageSize int, auditEvent string,
-	requestId string) ([]models.AuditLog, int, error) {
-	return d.CommonDB.GetAuditLogsPaginated(tx, page, pageSize, auditEvent, requestId)
 }

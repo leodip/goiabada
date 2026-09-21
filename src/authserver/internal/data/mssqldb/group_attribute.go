@@ -34,7 +34,7 @@ func (d *MsSQLDatabase) CreateGroupAttribute(tx *sql.Tx, groupAttribute *models.
 	}
 	sql = parts[0] + "OUTPUT INSERTED.id VALUES" + parts[1]
 
-	rows, err := d.CommonDB.QuerySql(tx, sql, args...)
+	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
 		groupAttribute.CreatedAt = originalCreatedAt
 		groupAttribute.UpdatedAt = originalUpdatedAt
@@ -57,28 +57,8 @@ func (d *MsSQLDatabase) CreateGroupAttribute(tx *sql.Tx, groupAttribute *models.
 	if err := rows.Err(); err != nil {
 		groupAttribute.CreatedAt = originalCreatedAt
 		groupAttribute.UpdatedAt = originalUpdatedAt
-		return d.CommonDB.WrapSQLError(err, "unable to insert groupAttribute")
+		return d.WrapSQLError(err, "unable to insert groupAttribute")
 	}
 
 	return nil
-}
-
-func (d *MsSQLDatabase) UpdateGroupAttribute(tx *sql.Tx, groupAttribute *models.GroupAttribute) error {
-	return d.CommonDB.UpdateGroupAttribute(tx, groupAttribute)
-}
-
-func (d *MsSQLDatabase) GetGroupAttributeById(tx *sql.Tx, groupAttributeId int64) (*models.GroupAttribute, error) {
-	return d.CommonDB.GetGroupAttributeById(tx, groupAttributeId)
-}
-
-func (d *MsSQLDatabase) GetGroupAttributesByGroupIds(tx *sql.Tx, groupIds []int64) ([]models.GroupAttribute, error) {
-	return d.CommonDB.GetGroupAttributesByGroupIds(tx, groupIds)
-}
-
-func (d *MsSQLDatabase) GetGroupAttributesByGroupId(tx *sql.Tx, groupId int64) ([]models.GroupAttribute, error) {
-	return d.CommonDB.GetGroupAttributesByGroupId(tx, groupId)
-}
-
-func (d *MsSQLDatabase) DeleteGroupAttribute(tx *sql.Tx, groupAttributeId int64) error {
-	return d.CommonDB.DeleteGroupAttribute(tx, groupAttributeId)
 }

@@ -32,7 +32,7 @@ func (d *MsSQLDatabase) CreateRedirectURI(tx *sql.Tx, redirectURI *models.Redire
 	}
 	sql = parts[0] + "OUTPUT INSERTED.id VALUES" + parts[1]
 
-	rows, err := d.CommonDB.QuerySql(tx, sql, args...)
+	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
 		redirectURI.CreatedAt = originalCreatedAt
 		return errs.Wrap(err, "unable to insert redirectURI")
@@ -52,20 +52,8 @@ func (d *MsSQLDatabase) CreateRedirectURI(tx *sql.Tx, redirectURI *models.Redire
 	// Without this the insert would look like a success with id 0.
 	if err := rows.Err(); err != nil {
 		redirectURI.CreatedAt = originalCreatedAt
-		return d.CommonDB.WrapSQLError(err, "unable to insert redirectURI")
+		return d.WrapSQLError(err, "unable to insert redirectURI")
 	}
 
 	return nil
-}
-
-func (d *MsSQLDatabase) GetRedirectURIById(tx *sql.Tx, redirectURIId int64) (*models.RedirectURI, error) {
-	return d.CommonDB.GetRedirectURIById(tx, redirectURIId)
-}
-
-func (d *MsSQLDatabase) GetRedirectURIsByClientId(tx *sql.Tx, clientId int64) ([]models.RedirectURI, error) {
-	return d.CommonDB.GetRedirectURIsByClientId(tx, clientId)
-}
-
-func (d *MsSQLDatabase) DeleteRedirectURI(tx *sql.Tx, redirectURIId int64) error {
-	return d.CommonDB.DeleteRedirectURI(tx, redirectURIId)
 }

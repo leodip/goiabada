@@ -34,7 +34,7 @@ func (d *MsSQLDatabase) CreatePermission(tx *sql.Tx, permission *models.Permissi
 	}
 	sql = parts[0] + "OUTPUT INSERTED.id VALUES" + parts[1]
 
-	rows, err := d.CommonDB.QuerySql(tx, sql, args...)
+	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
 		permission.CreatedAt = originalCreatedAt
 		permission.UpdatedAt = originalUpdatedAt
@@ -57,32 +57,8 @@ func (d *MsSQLDatabase) CreatePermission(tx *sql.Tx, permission *models.Permissi
 	if err := rows.Err(); err != nil {
 		permission.CreatedAt = originalCreatedAt
 		permission.UpdatedAt = originalUpdatedAt
-		return d.CommonDB.WrapSQLError(err, "unable to insert permission")
+		return d.WrapSQLError(err, "unable to insert permission")
 	}
 
 	return nil
-}
-
-func (d *MsSQLDatabase) UpdatePermission(tx *sql.Tx, permission *models.Permission) error {
-	return d.CommonDB.UpdatePermission(tx, permission)
-}
-
-func (d *MsSQLDatabase) GetPermissionById(tx *sql.Tx, permissionId int64) (*models.Permission, error) {
-	return d.CommonDB.GetPermissionById(tx, permissionId)
-}
-
-func (d *MsSQLDatabase) GetPermissionsByResourceId(tx *sql.Tx, resourceId int64) ([]models.Permission, error) {
-	return d.CommonDB.GetPermissionsByResourceId(tx, resourceId)
-}
-
-func (d *MsSQLDatabase) PermissionsLoadResources(tx *sql.Tx, permissions []models.Permission) error {
-	return d.CommonDB.PermissionsLoadResources(tx, permissions)
-}
-
-func (d *MsSQLDatabase) GetPermissionsByIds(tx *sql.Tx, permissionIds []int64) ([]models.Permission, error) {
-	return d.CommonDB.GetPermissionsByIds(tx, permissionIds)
-}
-
-func (d *MsSQLDatabase) DeletePermission(tx *sql.Tx, permissionId int64) error {
-	return d.CommonDB.DeletePermission(tx, permissionId)
 }

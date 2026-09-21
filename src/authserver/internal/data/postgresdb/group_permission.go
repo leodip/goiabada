@@ -33,7 +33,7 @@ func (d *PostgresDatabase) CreateGroupPermission(tx *sql.Tx, groupPermission *mo
 	sql, args := insertBuilder.Build()
 	sql = sql + " RETURNING id"
 
-	rows, err := d.CommonDB.QuerySql(tx, sql, args...)
+	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
 		groupPermission.CreatedAt = originalCreatedAt
 		groupPermission.UpdatedAt = originalUpdatedAt
@@ -56,32 +56,8 @@ func (d *PostgresDatabase) CreateGroupPermission(tx *sql.Tx, groupPermission *mo
 	if err := rows.Err(); err != nil {
 		groupPermission.CreatedAt = originalCreatedAt
 		groupPermission.UpdatedAt = originalUpdatedAt
-		return d.CommonDB.WrapSQLError(err, "unable to insert groupPermission")
+		return d.WrapSQLError(err, "unable to insert groupPermission")
 	}
 
 	return nil
-}
-
-func (d *PostgresDatabase) UpdateGroupPermission(tx *sql.Tx, groupPermission *models.GroupPermission) error {
-	return d.CommonDB.UpdateGroupPermission(tx, groupPermission)
-}
-
-func (d *PostgresDatabase) GetGroupPermissionsByGroupId(tx *sql.Tx, groupId int64) ([]models.GroupPermission, error) {
-	return d.CommonDB.GetGroupPermissionsByGroupId(tx, groupId)
-}
-
-func (d *PostgresDatabase) GetGroupPermissionsByGroupIds(tx *sql.Tx, groupIds []int64) ([]models.GroupPermission, error) {
-	return d.CommonDB.GetGroupPermissionsByGroupIds(tx, groupIds)
-}
-
-func (d *PostgresDatabase) GetGroupPermissionById(tx *sql.Tx, groupPermissionId int64) (*models.GroupPermission, error) {
-	return d.CommonDB.GetGroupPermissionById(tx, groupPermissionId)
-}
-
-func (d *PostgresDatabase) GetGroupPermissionByGroupIdAndPermissionId(tx *sql.Tx, groupId, permissionId int64) (*models.GroupPermission, error) {
-	return d.CommonDB.GetGroupPermissionByGroupIdAndPermissionId(tx, groupId, permissionId)
-}
-
-func (d *PostgresDatabase) DeleteGroupPermission(tx *sql.Tx, groupPermissionId int64) error {
-	return d.CommonDB.DeleteGroupPermission(tx, groupPermissionId)
 }

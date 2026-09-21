@@ -32,7 +32,7 @@ func (d *MsSQLDatabase) CreateWebOrigin(tx *sql.Tx, webOrigin *models.WebOrigin)
 	}
 	sql = parts[0] + "OUTPUT INSERTED.id VALUES" + parts[1]
 
-	rows, err := d.CommonDB.QuerySql(tx, sql, args...)
+	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
 		webOrigin.CreatedAt = originalCreatedAt
 		return errs.Wrap(err, "unable to insert webOrigin")
@@ -52,28 +52,8 @@ func (d *MsSQLDatabase) CreateWebOrigin(tx *sql.Tx, webOrigin *models.WebOrigin)
 	// Without this the insert would look like a success with id 0.
 	if err := rows.Err(); err != nil {
 		webOrigin.CreatedAt = originalCreatedAt
-		return d.CommonDB.WrapSQLError(err, "unable to insert webOrigin")
+		return d.WrapSQLError(err, "unable to insert webOrigin")
 	}
 
 	return nil
-}
-
-func (d *MsSQLDatabase) GetWebOriginById(tx *sql.Tx, webOriginId int64) (*models.WebOrigin, error) {
-	return d.CommonDB.GetWebOriginById(tx, webOriginId)
-}
-
-func (d *MsSQLDatabase) GetWebOriginsByClientId(tx *sql.Tx, clientId int64) ([]models.WebOrigin, error) {
-	return d.CommonDB.GetWebOriginsByClientId(tx, clientId)
-}
-
-func (d *MsSQLDatabase) GetAllWebOrigins(tx *sql.Tx) ([]models.WebOrigin, error) {
-	return d.CommonDB.GetAllWebOrigins(tx)
-}
-
-func (d *MsSQLDatabase) WebOriginExists(tx *sql.Tx, origin string) (bool, error) {
-	return d.CommonDB.WebOriginExists(tx, origin)
-}
-
-func (d *MsSQLDatabase) DeleteWebOrigin(tx *sql.Tx, webOriginId int64) error {
-	return d.CommonDB.DeleteWebOrigin(tx, webOriginId)
 }

@@ -20,9 +20,11 @@ import (
 //go:embed migrations/*.sql
 var sqliteMigrationsFs embed.FS
 
+// SQLiteDatabase declares only the methods SQLite needs its own SQL for; the rest are promoted
+// from the embedded common implementation. See commondb.CommonDatabase for what embedding does
+// and does not buy (#416).
 type SQLiteDatabase struct {
-	DB       *sql.DB
-	CommonDB *commondb.CommonDatabase
+	*commondb.CommonDatabase
 }
 
 type DatabaseConfig struct {
@@ -121,19 +123,10 @@ func NewSQLiteDatabase(dbConfig *DatabaseConfig, logSQL bool) (*SQLiteDatabase, 
 	commonDb.IsDeadlock = isDeadlock
 	commonDb.IsUniqueViolation = isUniqueViolation
 	sqliteDb := SQLiteDatabase{
-		DB:       db,
-		CommonDB: commonDb,
+		CommonDatabase: commonDb,
 	}
 
 	return &sqliteDb, nil
-}
-
-func (d *SQLiteDatabase) BeginTransaction() (*sql.Tx, error) {
-	return d.CommonDB.BeginTransaction()
-}
-
-func (d *SQLiteDatabase) RunInTransaction(fn func(tx *sql.Tx) error) error {
-	return d.CommonDB.RunInTransaction(fn)
 }
 
 // isDeadlock is SQLite's half of RunInTransaction's classifier, and it is always false: the
@@ -182,14 +175,6 @@ func isUniqueViolation(err error) bool {
 		return true
 	}
 	return false
-}
-
-func (d *SQLiteDatabase) CommitTransaction(tx *sql.Tx) error {
-	return d.CommonDB.CommitTransaction(tx)
-}
-
-func (d *SQLiteDatabase) RollbackTransaction(tx *sql.Tx) error {
-	return d.CommonDB.RollbackTransaction(tx)
 }
 
 // schemaMigrationsTableDDL pins the shape of the version table the runner keeps, which
@@ -278,8 +263,4 @@ func (d *SQLiteDatabase) Migrate() error {
 	}
 
 	return nil
-}
-
-func (d *SQLiteDatabase) IsEmpty() (bool, error) {
-	return d.CommonDB.IsEmpty()
 }

@@ -19,9 +19,11 @@ import (
 //go:embed migrations/*.sql
 var mysqlMigrationsFs embed.FS
 
+// MySQLDatabase declares only the methods MySQL needs its own SQL for; the rest are promoted
+// from the embedded common implementation. See commondb.CommonDatabase for what embedding does
+// and does not buy (#416).
 type MySQLDatabase struct {
-	DB       *sql.DB
-	CommonDB *commondb.CommonDatabase
+	*commondb.CommonDatabase
 	dbConfig *DatabaseConfig
 }
 
@@ -118,19 +120,10 @@ func NewMySQLDatabase(dbConfig *DatabaseConfig, logSQL bool) (*MySQLDatabase, er
 	commonDb.IsUniqueViolation = isUniqueViolation
 
 	mysqlDb := MySQLDatabase{
-		DB:       db,
-		CommonDB: commonDb,
-		dbConfig: dbConfig,
+		CommonDatabase: commonDb,
+		dbConfig:       dbConfig,
 	}
 	return &mysqlDb, nil
-}
-
-func (d *MySQLDatabase) BeginTransaction() (*sql.Tx, error) {
-	return d.CommonDB.BeginTransaction()
-}
-
-func (d *MySQLDatabase) RunInTransaction(fn func(tx *sql.Tx) error) error {
-	return d.CommonDB.RunInTransaction(fn)
 }
 
 // isDeadlock is MySQL's half of RunInTransaction's classifier: error 1213, ER_LOCK_DEADLOCK,
@@ -154,14 +147,6 @@ const mysqlDuplicateEntry = 1062
 func isUniqueViolation(err error) bool {
 	var mysqlErr *mysqldriver.MySQLError
 	return errors.As(err, &mysqlErr) && mysqlErr.Number == mysqlDuplicateEntry
-}
-
-func (d *MySQLDatabase) CommitTransaction(tx *sql.Tx) error {
-	return d.CommonDB.CommitTransaction(tx)
-}
-
-func (d *MySQLDatabase) RollbackTransaction(tx *sql.Tx) error {
-	return d.CommonDB.RollbackTransaction(tx)
 }
 
 // schemaMigrationsTableDDL pins the shape of the version table the runner keeps, which
@@ -228,10 +213,6 @@ func (d *MySQLDatabase) Migrate() error {
 	}
 
 	return nil
-}
-
-func (d *MySQLDatabase) IsEmpty() (bool, error) {
-	return d.CommonDB.IsEmpty()
 }
 
 // quoteIdentifier wraps name in the backticks MySQL spells an identifier with, doubling any

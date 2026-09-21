@@ -28,7 +28,7 @@ func (d *PostgresDatabase) CreateClientLogo(tx *sql.Tx, clientLogo *models.Clien
 	sqlStr, args := insertBuilder.Build()
 	sqlStr = sqlStr + " RETURNING id"
 
-	rows, err := d.CommonDB.QuerySql(tx, sqlStr, args...)
+	rows, err := d.QuerySql(tx, sqlStr, args...)
 	if err != nil {
 		clientLogo.CreatedAt = originalCreatedAt
 		clientLogo.UpdatedAt = originalUpdatedAt
@@ -51,24 +51,8 @@ func (d *PostgresDatabase) CreateClientLogo(tx *sql.Tx, clientLogo *models.Clien
 	if err := rows.Err(); err != nil {
 		clientLogo.CreatedAt = originalCreatedAt
 		clientLogo.UpdatedAt = originalUpdatedAt
-		return d.CommonDB.WrapSQLError(err, "unable to insert client logo")
+		return d.WrapSQLError(err, "unable to insert client logo")
 	}
 
 	return nil
-}
-
-func (d *PostgresDatabase) UpdateClientLogo(tx *sql.Tx, clientLogo *models.ClientLogo) error {
-	return d.CommonDB.UpdateClientLogo(tx, clientLogo)
-}
-
-func (d *PostgresDatabase) GetClientLogoByClientId(tx *sql.Tx, clientId int64) (*models.ClientLogo, error) {
-	return d.CommonDB.GetClientLogoByClientId(tx, clientId)
-}
-
-func (d *PostgresDatabase) DeleteClientLogo(tx *sql.Tx, clientId int64) error {
-	return d.CommonDB.DeleteClientLogo(tx, clientId)
-}
-
-func (d *PostgresDatabase) ClientHasLogo(tx *sql.Tx, clientId int64) (bool, error) {
-	return d.CommonDB.ClientHasLogo(tx, clientId)
 }

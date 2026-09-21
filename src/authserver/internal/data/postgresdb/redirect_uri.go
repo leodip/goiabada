@@ -27,7 +27,7 @@ func (d *PostgresDatabase) CreateRedirectURI(tx *sql.Tx, redirectURI *models.Red
 	sql, args := insertBuilder.Build()
 	sql = sql + " RETURNING id"
 
-	rows, err := d.CommonDB.QuerySql(tx, sql, args...)
+	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
 		redirectURI.CreatedAt = originalCreatedAt
 		return errs.Wrap(err, "unable to insert redirectURI")
@@ -47,20 +47,8 @@ func (d *PostgresDatabase) CreateRedirectURI(tx *sql.Tx, redirectURI *models.Red
 	// Without this the insert would look like a success with id 0.
 	if err := rows.Err(); err != nil {
 		redirectURI.CreatedAt = originalCreatedAt
-		return d.CommonDB.WrapSQLError(err, "unable to insert redirectURI")
+		return d.WrapSQLError(err, "unable to insert redirectURI")
 	}
 
 	return nil
-}
-
-func (d *PostgresDatabase) GetRedirectURIById(tx *sql.Tx, redirectURIId int64) (*models.RedirectURI, error) {
-	return d.CommonDB.GetRedirectURIById(tx, redirectURIId)
-}
-
-func (d *PostgresDatabase) GetRedirectURIsByClientId(tx *sql.Tx, clientId int64) ([]models.RedirectURI, error) {
-	return d.CommonDB.GetRedirectURIsByClientId(tx, clientId)
-}
-
-func (d *PostgresDatabase) DeleteRedirectURI(tx *sql.Tx, redirectURIId int64) error {
-	return d.CommonDB.DeleteRedirectURI(tx, redirectURIId)
 }

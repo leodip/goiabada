@@ -25,7 +25,7 @@ func (d *PostgresDatabase) CreateSettings(tx *sql.Tx, settings *models.Settings)
 	sql, args := insertBuilder.Build()
 	sql = sql + " RETURNING id"
 
-	rows, err := d.CommonDB.QuerySql(tx, sql, args...)
+	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
 		settings.CreatedAt = originalCreatedAt
 		settings.UpdatedAt = originalUpdatedAt
@@ -48,20 +48,8 @@ func (d *PostgresDatabase) CreateSettings(tx *sql.Tx, settings *models.Settings)
 	if err := rows.Err(); err != nil {
 		settings.CreatedAt = originalCreatedAt
 		settings.UpdatedAt = originalUpdatedAt
-		return d.CommonDB.WrapSQLError(err, "unable to insert settings")
+		return d.WrapSQLError(err, "unable to insert settings")
 	}
 
 	return nil
-}
-
-func (d *PostgresDatabase) UpdateSettings(tx *sql.Tx, settings *models.Settings) error {
-	return d.CommonDB.UpdateSettings(tx, settings)
-}
-
-func (d *PostgresDatabase) GetSettingsById(tx *sql.Tx, settingsId int64) (*models.Settings, error) {
-	return d.CommonDB.GetSettingsById(tx, settingsId)
-}
-
-func (d *PostgresDatabase) TryClaimCleanupRun(tx *sql.Tx, now time.Time, claimableBefore time.Time) (bool, error) {
-	return d.CommonDB.TryClaimCleanupRun(tx, now, claimableBefore)
 }

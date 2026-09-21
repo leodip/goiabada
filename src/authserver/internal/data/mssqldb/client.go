@@ -30,7 +30,7 @@ func (d *MsSQLDatabase) CreateClient(tx *sql.Tx, client *models.Client) error {
 	}
 	sql = parts[0] + "OUTPUT INSERTED.id VALUES" + parts[1]
 
-	rows, err := d.CommonDB.QuerySql(tx, sql, args...)
+	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
 		client.CreatedAt = originalCreatedAt
 		client.UpdatedAt = originalUpdatedAt
@@ -53,52 +53,8 @@ func (d *MsSQLDatabase) CreateClient(tx *sql.Tx, client *models.Client) error {
 	if err := rows.Err(); err != nil {
 		client.CreatedAt = originalCreatedAt
 		client.UpdatedAt = originalUpdatedAt
-		return d.CommonDB.WrapSQLError(err, "unable to insert client")
+		return d.WrapSQLError(err, "unable to insert client")
 	}
 
 	return nil
-}
-
-func (d *MsSQLDatabase) UpdateClient(tx *sql.Tx, client *models.Client) error {
-	return d.CommonDB.UpdateClient(tx, client)
-}
-
-func (d *MsSQLDatabase) SetClientPublic(tx *sql.Tx, clientId int64) (bool, error) {
-	return d.CommonDB.SetClientPublic(tx, clientId)
-}
-
-func (d *MsSQLDatabase) AcquireClientRow(tx *sql.Tx, clientId int64) error {
-	return d.CommonDB.AcquireClientRow(tx, clientId)
-}
-
-func (d *MsSQLDatabase) GetClientById(tx *sql.Tx, clientId int64) (*models.Client, error) {
-	return d.CommonDB.GetClientById(tx, clientId)
-}
-
-func (d *MsSQLDatabase) GetClientByClientIdentifier(tx *sql.Tx, clientIdentifier string) (*models.Client, error) {
-	return d.CommonDB.GetClientByClientIdentifier(tx, clientIdentifier)
-}
-
-func (d *MsSQLDatabase) ClientLoadRedirectURIs(tx *sql.Tx, client *models.Client) error {
-	return d.CommonDB.ClientLoadRedirectURIs(tx, client)
-}
-
-func (d *MsSQLDatabase) ClientLoadWebOrigins(tx *sql.Tx, client *models.Client) error {
-	return d.CommonDB.ClientLoadWebOrigins(tx, client)
-}
-
-func (d *MsSQLDatabase) GetClientsByIds(tx *sql.Tx, clientIds []int64) ([]models.Client, error) {
-	return d.CommonDB.GetClientsByIds(tx, clientIds)
-}
-
-func (d *MsSQLDatabase) ClientLoadPermissions(tx *sql.Tx, client *models.Client) error {
-	return d.CommonDB.ClientLoadPermissions(tx, client)
-}
-
-func (d *MsSQLDatabase) GetAllClients(tx *sql.Tx) ([]models.Client, error) {
-	return d.CommonDB.GetAllClients(tx)
-}
-
-func (d *MsSQLDatabase) DeleteClient(tx *sql.Tx, clientId int64) error {
-	return d.CommonDB.DeleteClient(tx, clientId)
 }

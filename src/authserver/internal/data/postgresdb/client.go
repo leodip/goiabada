@@ -25,7 +25,7 @@ func (d *PostgresDatabase) CreateClient(tx *sql.Tx, client *models.Client) error
 	sql, args := insertBuilder.Build()
 	sql = sql + " RETURNING id"
 
-	rows, err := d.CommonDB.QuerySql(tx, sql, args...)
+	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
 		client.CreatedAt = originalCreatedAt
 		client.UpdatedAt = originalUpdatedAt
@@ -48,52 +48,8 @@ func (d *PostgresDatabase) CreateClient(tx *sql.Tx, client *models.Client) error
 	if err := rows.Err(); err != nil {
 		client.CreatedAt = originalCreatedAt
 		client.UpdatedAt = originalUpdatedAt
-		return d.CommonDB.WrapSQLError(err, "unable to insert client")
+		return d.WrapSQLError(err, "unable to insert client")
 	}
 
 	return nil
-}
-
-func (d *PostgresDatabase) UpdateClient(tx *sql.Tx, client *models.Client) error {
-	return d.CommonDB.UpdateClient(tx, client)
-}
-
-func (d *PostgresDatabase) SetClientPublic(tx *sql.Tx, clientId int64) (bool, error) {
-	return d.CommonDB.SetClientPublic(tx, clientId)
-}
-
-func (d *PostgresDatabase) AcquireClientRow(tx *sql.Tx, clientId int64) error {
-	return d.CommonDB.AcquireClientRow(tx, clientId)
-}
-
-func (d *PostgresDatabase) GetClientById(tx *sql.Tx, clientId int64) (*models.Client, error) {
-	return d.CommonDB.GetClientById(tx, clientId)
-}
-
-func (d *PostgresDatabase) GetClientByClientIdentifier(tx *sql.Tx, clientIdentifier string) (*models.Client, error) {
-	return d.CommonDB.GetClientByClientIdentifier(tx, clientIdentifier)
-}
-
-func (d *PostgresDatabase) ClientLoadRedirectURIs(tx *sql.Tx, client *models.Client) error {
-	return d.CommonDB.ClientLoadRedirectURIs(tx, client)
-}
-
-func (d *PostgresDatabase) ClientLoadWebOrigins(tx *sql.Tx, client *models.Client) error {
-	return d.CommonDB.ClientLoadWebOrigins(tx, client)
-}
-
-func (d *PostgresDatabase) GetClientsByIds(tx *sql.Tx, clientIds []int64) ([]models.Client, error) {
-	return d.CommonDB.GetClientsByIds(tx, clientIds)
-}
-
-func (d *PostgresDatabase) ClientLoadPermissions(tx *sql.Tx, client *models.Client) error {
-	return d.CommonDB.ClientLoadPermissions(tx, client)
-}
-
-func (d *PostgresDatabase) GetAllClients(tx *sql.Tx) ([]models.Client, error) {
-	return d.CommonDB.GetAllClients(tx)
-}
-
-func (d *PostgresDatabase) DeleteClient(tx *sql.Tx, clientId int64) error {
-	return d.CommonDB.DeleteClient(tx, clientId)
 }

@@ -30,7 +30,7 @@ func (d *MsSQLDatabase) CreateGroup(tx *sql.Tx, group *models.Group) error {
 	}
 	sql = parts[0] + "OUTPUT INSERTED.id VALUES" + parts[1]
 
-	rows, err := d.CommonDB.QuerySql(tx, sql, args...)
+	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
 		group.CreatedAt = originalCreatedAt
 		group.UpdatedAt = originalUpdatedAt
@@ -53,56 +53,8 @@ func (d *MsSQLDatabase) CreateGroup(tx *sql.Tx, group *models.Group) error {
 	if err := rows.Err(); err != nil {
 		group.CreatedAt = originalCreatedAt
 		group.UpdatedAt = originalUpdatedAt
-		return d.CommonDB.WrapSQLError(err, "unable to insert group")
+		return d.WrapSQLError(err, "unable to insert group")
 	}
 
 	return nil
-}
-
-func (d *MsSQLDatabase) UpdateGroup(tx *sql.Tx, group *models.Group) error {
-	return d.CommonDB.UpdateGroup(tx, group)
-}
-
-func (d *MsSQLDatabase) GetGroupById(tx *sql.Tx, groupId int64) (*models.Group, error) {
-	return d.CommonDB.GetGroupById(tx, groupId)
-}
-
-func (d *MsSQLDatabase) GetGroupsByIds(tx *sql.Tx, groupIds []int64) ([]models.Group, error) {
-	return d.CommonDB.GetGroupsByIds(tx, groupIds)
-}
-
-func (d *MsSQLDatabase) GroupLoadPermissions(tx *sql.Tx, group *models.Group) error {
-	return d.CommonDB.GroupLoadPermissions(tx, group)
-}
-
-func (d *MsSQLDatabase) GroupsLoadPermissions(tx *sql.Tx, groups []models.Group) error {
-	return d.CommonDB.GroupsLoadPermissions(tx, groups)
-}
-
-func (d *MsSQLDatabase) GroupsLoadAttributes(tx *sql.Tx, groups []models.Group) error {
-	return d.CommonDB.GroupsLoadAttributes(tx, groups)
-}
-
-func (d *MsSQLDatabase) GetGroupByGroupIdentifier(tx *sql.Tx, groupIdentifier string) (*models.Group, error) {
-	return d.CommonDB.GetGroupByGroupIdentifier(tx, groupIdentifier)
-}
-
-func (d *MsSQLDatabase) GetAllGroups(tx *sql.Tx) ([]models.Group, error) {
-	return d.CommonDB.GetAllGroups(tx)
-}
-
-func (d *MsSQLDatabase) GetAllGroupsPaginated(tx *sql.Tx, page int, pageSize int) ([]models.Group, int, error) {
-	return d.CommonDB.GetAllGroupsPaginated(tx, page, pageSize)
-}
-
-func (d *MsSQLDatabase) GetGroupMembersPaginated(tx *sql.Tx, groupId int64, page int, pageSize int) ([]models.User, int, error) {
-	return d.CommonDB.GetGroupMembersPaginated(tx, groupId, page, pageSize)
-}
-
-func (d *MsSQLDatabase) CountGroupMembers(tx *sql.Tx, groupId int64) (int, error) {
-	return d.CommonDB.CountGroupMembers(tx, groupId)
-}
-
-func (d *MsSQLDatabase) DeleteGroup(tx *sql.Tx, groupId int64) error {
-	return d.CommonDB.DeleteGroup(tx, groupId)
 }

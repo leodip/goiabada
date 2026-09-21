@@ -30,7 +30,7 @@ func (d *MsSQLDatabase) CreateSettings(tx *sql.Tx, settings *models.Settings) er
 	}
 	sql = parts[0] + "OUTPUT INSERTED.id VALUES" + parts[1]
 
-	rows, err := d.CommonDB.QuerySql(tx, sql, args...)
+	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
 		settings.CreatedAt = originalCreatedAt
 		settings.UpdatedAt = originalUpdatedAt
@@ -53,20 +53,8 @@ func (d *MsSQLDatabase) CreateSettings(tx *sql.Tx, settings *models.Settings) er
 	if err := rows.Err(); err != nil {
 		settings.CreatedAt = originalCreatedAt
 		settings.UpdatedAt = originalUpdatedAt
-		return d.CommonDB.WrapSQLError(err, "unable to insert settings")
+		return d.WrapSQLError(err, "unable to insert settings")
 	}
 
 	return nil
-}
-
-func (d *MsSQLDatabase) UpdateSettings(tx *sql.Tx, settings *models.Settings) error {
-	return d.CommonDB.UpdateSettings(tx, settings)
-}
-
-func (d *MsSQLDatabase) GetSettingsById(tx *sql.Tx, settingsId int64) (*models.Settings, error) {
-	return d.CommonDB.GetSettingsById(tx, settingsId)
-}
-
-func (d *MsSQLDatabase) TryClaimCleanupRun(tx *sql.Tx, now time.Time, claimableBefore time.Time) (bool, error) {
-	return d.CommonDB.TryClaimCleanupRun(tx, now, claimableBefore)
 }

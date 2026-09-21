@@ -9,6 +9,21 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 )
 
+// CommonDatabase is the one implementation of the Database interface, and the four engine
+// adapters embed it rather than delegating to it method by method. Each adapter declares only
+// the methods its engine needs different SQL for; every other method is promoted from here, so
+// a query is written once and a signature changes once (#416).
+//
+// WHAT EMBEDDING DOES NOT BUY, stated because the shape invites the opposite belief: dynamic
+// dispatch. A call this package makes on its own receiver resolves to the implementation below
+// at compile time, whatever engine is running, so it never reaches the adapter's override even
+// when the override is the only version that works on that engine.
+// TestCommonDatabase_NoSelfCallToAnOverriddenMethod refuses that call, and #283 is the one that
+// shipped: an audit insert that ended at LastInsertId, which two of the four drivers refuse.
+//
+// The compiler still holds each adapter to the whole interface, so an engine cannot lose a
+// method by omission; what it cannot check is that a method promoted from here is right for
+// that engine.
 type CommonDatabase struct {
 	DB     *sql.DB
 	Flavor sqlbuilder.Flavor
