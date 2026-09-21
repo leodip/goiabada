@@ -1113,3 +1113,80 @@ func TestUpdateUserSession_TheOwnerIsNotRewritten(t *testing.T) {
 		t.Errorf("Expected the ordinary columns to have been written, DeviceName %q, got %q", userSession.DeviceName, stored.DeviceName)
 	}
 }
+
+// TestGetUserSessionsByClientIdPaginated_EnlistsInTheCallersTransaction pins the last of #413's
+// five sites: the count query beside the page passed nil where the page took the caller's
+// transaction, so the two halves of one answer were read on two connections.
+//
+// The rows are created inside the transaction for the reason ClientLoadPermissions' case gives.
+func TestGetUserSessionsByClientIdPaginated_EnlistsInTheCallersTransaction(t *testing.T) {
+	tx := beginTx(t)
+
+	client := &models.Client{
+		ClientIdentifier: "tx_client_" + fake.LetterN(8),
+		Description:      "Transaction pass-through client",
+	}
+	if err := database.CreateClient(tx, client); err != nil {
+		t.Fatalf("Failed to create client inside the transaction: %v", err)
+	}
+
+	user := &models.User{
+		Enabled:   true,
+		Subject:   fake.UUID(),
+		Username:  "u" + fake.LetterN(12),
+		GivenName: "TxSession" + fake.LetterN(6),
+		Email:     fake.LetterN(12) + "@example.com",
+	}
+	if err := database.CreateUser(tx, user); err != nil {
+		t.Fatalf("Failed to create user inside the transaction: %v", err)
+	}
+
+	now := time.Now().UTC().Truncate(time.Microsecond)
+	userSession := &models.UserSession{
+		SessionIdentifier: fake.UUID(),
+		Started:           now,
+		LastAccessed:      now,
+		AuthMethods:       "pwd",
+		AcrLevel:          models.AcrLevel1.String(),
+		AuthTime:          now,
+		IpAddress:         fake.IPv4Address(),
+		DeviceName:        fake.Name(),
+		DeviceType:        "desktop",
+		DeviceOS:          "Windows",
+		UserAgent:         testUserAgent,
+		UserId:            user.Id,
+	}
+	if err := database.CreateUserSession(tx, userSession); err != nil {
+		t.Fatalf("Failed to create user session inside the transaction: %v", err)
+	}
+
+	userSessionClient := &models.UserSessionClient{
+		UserSessionId: userSession.Id,
+		ClientId:      client.Id,
+		Started:       now,
+		LastAccessed:  now,
+	}
+	if err := database.CreateUserSessionClient(tx, userSessionClient); err != nil {
+		t.Fatalf("Failed to create user_session_clients row inside the transaction: %v", err)
+	}
+
+	sessions, total, err := database.GetUserSessionsByClientIdPaginated(tx, client.Id, 1, 10)
+	if err != nil {
+		t.Fatalf("GetUserSessionsByClientIdPaginated through the transaction: %v", err)
+	}
+
+	if len(sessions) != 1 {
+		t.Fatalf("Expected the transaction's own session, got %d", len(sessions))
+	}
+	if sessions[0].Id != userSession.Id {
+		t.Errorf("Expected user session %d, got %d", userSession.Id, sessions[0].Id)
+	}
+	if total != 1 {
+		t.Errorf("Expected a total of 1 to agree with the one session on the page, got %d: "+
+			"the count query ran outside the caller's transaction (#413)", total)
+	}
+
+	if err := database.RollbackTransaction(tx); err != nil {
+		t.Fatalf("RollbackTransaction: %v", err)
+	}
+}

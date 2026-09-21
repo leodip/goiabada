@@ -183,7 +183,7 @@ func (d *CommonDatabase) GetUserSessionsByClientIdPaginated(tx *sql.Tx, clientId
 	selectBuilder.Where(selectBuilder.Equal("user_session_clients.client_id", clientId))
 
 	sql, args = selectBuilder.Build()
-	rows2, err := d.QuerySql(nil, sql, args...)
+	rows2, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
 		return nil, 0, errs.Wrap(err, "unable to query database")
 	}

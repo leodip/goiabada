@@ -357,3 +357,57 @@ func TestGetGroupByGroupIdentifierIsCaseSensitive(t *testing.T) {
 		}
 	}
 }
+
+// TestGetGroupMembersPaginated_EnlistsInTheCallersTransaction pins #413's second site. The page
+// query already took the caller's transaction; the count query beside it passed nil, so the two
+// halves of one answer were read on two connections. That is the defect's exact shape: a total
+// that disagrees with the page it accompanies.
+//
+// The rows are created inside the transaction for the reason ClientLoadPermissions' case gives.
+func TestGetGroupMembersPaginated_EnlistsInTheCallersTransaction(t *testing.T) {
+	tx := beginTx(t)
+
+	group := &models.Group{
+		GroupIdentifier: "TxGroup_" + fake.LetterN(8),
+		Description:     "Transaction pass-through group",
+	}
+	if err := database.CreateGroup(tx, group); err != nil {
+		t.Fatalf("Failed to create group inside the transaction: %v", err)
+	}
+
+	user := &models.User{
+		Enabled:   true,
+		Subject:   fake.UUID(),
+		Username:  "u" + fake.LetterN(12),
+		GivenName: "TxMember" + fake.LetterN(6),
+		Email:     fake.LetterN(12) + "@example.com",
+	}
+	if err := database.CreateUser(tx, user); err != nil {
+		t.Fatalf("Failed to create user inside the transaction: %v", err)
+	}
+
+	userGroup := &models.UserGroup{UserId: user.Id, GroupId: group.Id}
+	if err := database.CreateUserGroup(tx, userGroup); err != nil {
+		t.Fatalf("Failed to create users_groups row inside the transaction: %v", err)
+	}
+
+	members, total, err := database.GetGroupMembersPaginated(tx, group.Id, 1, 10)
+	if err != nil {
+		t.Fatalf("GetGroupMembersPaginated through the transaction: %v", err)
+	}
+
+	if len(members) != 1 {
+		t.Fatalf("Expected the transaction's own member, got %d", len(members))
+	}
+	if members[0].Id != user.Id {
+		t.Errorf("Expected user %d, got %d", user.Id, members[0].Id)
+	}
+	if total != 1 {
+		t.Errorf("Expected a total of 1 to agree with the one member on the page, got %d: "+
+			"the count query ran outside the caller's transaction (#413)", total)
+	}
+
+	if err := database.RollbackTransaction(tx); err != nil {
+		t.Fatalf("RollbackTransaction: %v", err)
+	}
+}

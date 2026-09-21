@@ -363,7 +363,7 @@ func (d *CommonDatabase) ClientLoadPermissions(tx *sql.Tx, client *models.Client
 		permissionIds = append(permissionIds, clientPermission.PermissionId)
 	}
 
-	client.Permissions, err = d.GetPermissionsByIds(nil, permissionIds)
+	client.Permissions, err = d.GetPermissionsByIds(tx, permissionIds)
 	if err != nil {
 		return err
 	}

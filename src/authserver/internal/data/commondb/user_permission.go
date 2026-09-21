@@ -262,7 +262,7 @@ func (d *CommonDatabase) GetUsersByPermissionIdPaginated(tx *sql.Tx, permissionI
 	selectBuilder.Where(selectBuilder.Equal("users_permissions.permission_id", permissionId))
 
 	sql, args = selectBuilder.Build()
-	rows2, err := d.QuerySql(nil, sql, args...)
+	rows2, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
 		return nil, 0, errs.Wrap(err, "unable to query database")
 	}
