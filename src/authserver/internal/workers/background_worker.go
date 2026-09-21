@@ -128,7 +128,7 @@ func (w *Worker) run(ctx context.Context) {
 // calls live here rather than inline in run so the pairing is one thing a test can exercise
 // without waiting out the startup delay (#266 decision 19).
 func (w *Worker) poll(ctx context.Context) {
-	w.reapBrowserSessions()
+	w.reapBrowserSessions(ctx)
 	w.runIfClaimed(ctx)
 }
 
@@ -149,9 +149,9 @@ func (w *Worker) poll(ctx context.Context) {
 // running it in the same instant do the same harmless thing; the used-code sweep beside it
 // races the token endpoint's foreign key, which is what usedCodeCleanupGrace exists for.
 // Do not move this call into performTask (#266 decision 19).
-func (w *Worker) reapBrowserSessions() {
-	if err := w.database.DeleteExpiredBrowserSessions(nil, time.Now().UTC()); err != nil {
-		slog.Error("unable to delete expired browser sessions", "error", err)
+func (w *Worker) reapBrowserSessions(ctx context.Context) {
+	if err := w.database.DeleteExpiredBrowserSessions(ctx, nil, time.Now().UTC()); err != nil {
+		slog.ErrorContext(ctx, "unable to delete expired browser sessions", "error", err)
 	}
 }
 
@@ -205,7 +205,7 @@ func (w *Worker) performTask(ctx context.Context) {
 
 	// Revoked rows are deliberately NOT swept here. They are the replay-detection
 	// signal, retained until the token itself expires (#128).
-	err := w.database.DeleteExpiredRefreshTokens(nil)
+	err := w.database.DeleteExpiredRefreshTokens(ctx, nil)
 	if err != nil {
 		slog.ErrorContext(ctx, "unable to delete expired refresh tokens", "error", err)
 	} else {
@@ -216,7 +216,7 @@ func (w *Worker) performTask(ctx context.Context) {
 		return
 	}
 
-	err = w.database.DeleteUsedCodesWithoutRefreshTokens(nil, time.Now().UTC().Add(-usedCodeCleanupGrace))
+	err = w.database.DeleteUsedCodesWithoutRefreshTokens(ctx, nil, time.Now().UTC().Add(-usedCodeCleanupGrace))
 	if err != nil {
 		slog.ErrorContext(ctx, "unable to delete used codes without refresh tokens", "error", err)
 	} else {
@@ -240,7 +240,7 @@ func (w *Worker) performTask(ctx context.Context) {
 		return
 	}
 
-	err = w.database.DeleteIdleSessions(nil, time.Duration(settings.UserSessionIdleTimeoutInSeconds)*time.Second)
+	err = w.database.DeleteIdleSessions(ctx, nil, time.Duration(settings.UserSessionIdleTimeoutInSeconds)*time.Second)
 	if err != nil {
 		slog.ErrorContext(ctx, "unable to delete idle sessions", "error", err)
 	} else {
@@ -252,7 +252,7 @@ func (w *Worker) performTask(ctx context.Context) {
 		return
 	}
 
-	err = w.database.DeleteExpiredSessions(nil, time.Duration(settings.UserSessionMaxLifetimeInSeconds)*time.Second)
+	err = w.database.DeleteExpiredSessions(ctx, nil, time.Duration(settings.UserSessionMaxLifetimeInSeconds)*time.Second)
 	if err != nil {
 		slog.ErrorContext(ctx, "unable to delete expired sessions", "error", err)
 	} else {

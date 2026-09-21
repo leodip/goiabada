@@ -166,7 +166,7 @@ func TestRotateEncryptionKeyIfNeeded(t *testing.T) {
 			len(gotSettings.AESEncryptionKeyLegacy))
 	}
 
-	gotClient, err := db.GetClientById(nil, client.Id)
+	gotClient, err := db.GetClientById(context.Background(), nil, client.Id)
 	if err != nil {
 		t.Fatalf("GetClientById: %v", err)
 	}
@@ -265,7 +265,7 @@ func TestRotateEncryptionKeyIfNeeded_PlaintextPemFailsClosed(t *testing.T) {
 	if !bytes.Equal(keys[0].PrivateKeyPEM, []byte(pemPlain)) {
 		t.Error("the plaintext PEM was rewritten by a rotation that reported failure")
 	}
-	gotClient, err := db.GetClientById(nil, client.Id)
+	gotClient, err := db.GetClientById(context.Background(), nil, client.Id)
 	if err != nil {
 		t.Fatalf("GetClientById: %v", err)
 	}

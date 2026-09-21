@@ -63,7 +63,7 @@ func adminUserTokenReachingAllThree(t *testing.T) (string, *models.User, *models
 	sid := extractSidClaim(t, accessToken)
 	require.NotEmpty(t, sid, "a user-bound auth-code token must carry a sid claim")
 
-	session, err := database.GetUserSessionBySessionIdentifier(nil, sid)
+	session, err := database.GetUserSessionBySessionIdentifier(context.Background(), nil, sid)
 	require.NoError(t, err)
 	require.NotNil(t, session, "the token's sid must name a live session")
 
@@ -88,7 +88,7 @@ func TestAPISessionLists_PublishNoPresentationFields(t *testing.T) {
 	defer func() { _ = database.DeleteClient(nil, testClient.Id) }()
 
 	now := time.Now().UTC()
-	require.NoError(t, database.CreateUserSessionClient(nil, &models.UserSessionClient{
+	require.NoError(t, database.CreateUserSessionClient(context.Background(), nil, &models.UserSessionClient{
 		UserSessionId: session.Id,
 		ClientId:      testClient.Id,
 		Started:       now.Add(-time.Hour),
@@ -142,7 +142,7 @@ func TestAPISessionLists_IsCurrentIsTrueOnAllThreeEndpoints(t *testing.T) {
 	defer func() { _ = database.DeleteClient(nil, testClient.Id) }()
 
 	now := time.Now().UTC()
-	require.NoError(t, database.CreateUserSessionClient(nil, &models.UserSessionClient{
+	require.NoError(t, database.CreateUserSessionClient(context.Background(), nil, &models.UserSessionClient{
 		UserSessionId: session.Id,
 		ClientId:      testClient.Id,
 		Started:       now.Add(-time.Hour),
@@ -152,8 +152,8 @@ func TestAPISessionLists_IsCurrentIsTrueOnAllThreeEndpoints(t *testing.T) {
 	// A second live session for the same user, which the token does not name. Without it a
 	// producer that set isCurrent true on every row would pass.
 	other := createTestUserSession(t, user.Id, fake.UUID())
-	defer func() { _ = database.DeleteUserSession(nil, other.Id) }()
-	require.NoError(t, database.CreateUserSessionClient(nil, &models.UserSessionClient{
+	defer func() { _ = database.DeleteUserSession(context.Background(), nil, other.Id) }()
+	require.NoError(t, database.CreateUserSessionClient(context.Background(), nil, &models.UserSessionClient{
 		UserSessionId: other.Id,
 		ClientId:      testClient.Id,
 		Started:       now.Add(-time.Hour),
@@ -214,8 +214,8 @@ func TestAPIUserSessionsGet_AClientCredentialsTokenMarksNothingCurrent(t *testin
 	s1 := createTestUserSession(t, testUser.Id, fake.UUID())
 	s2 := createTestUserSession(t, testUser.Id, fake.UUID())
 	defer func() {
-		_ = database.DeleteUserSession(nil, s1.Id)
-		_ = database.DeleteUserSession(nil, s2.Id)
+		_ = database.DeleteUserSession(context.Background(), nil, s1.Id)
+		_ = database.DeleteUserSession(context.Background(), nil, s2.Id)
 	}()
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/sessions"

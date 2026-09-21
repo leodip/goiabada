@@ -578,7 +578,7 @@ func (d *CommonDatabase) SearchUsersPaginated(ctx context.Context, tx *sql.Tx, q
 func (d *CommonDatabase) DeleteUser(ctx context.Context, tx *sql.Tx, userId int64) error {
 
 	return d.inTransaction(ctx, tx, func(tx *sql.Tx) error {
-		sessions, err := d.GetUserSessionsByUserId(tx, userId)
+		sessions, err := d.GetUserSessionsByUserId(ctx, tx, userId)
 		if err != nil {
 			return err
 		}
@@ -590,12 +590,12 @@ func (d *CommonDatabase) DeleteUser(ctx context.Context, tx *sql.Tx, userId int6
 		sort.Slice(sessions, func(i, j int) bool { return sessions[i].Id < sessions[j].Id })
 
 		for i := range sessions {
-			if err := d.DeleteUserSession(tx, sessions[i].Id); err != nil {
+			if err := d.DeleteUserSession(ctx, tx, sessions[i].Id); err != nil {
 				return err
 			}
 		}
 
-		if err := d.deleteRefreshTokensByColumn(tx, "user_id", userId); err != nil {
+		if err := d.deleteRefreshTokensByColumn(ctx, tx, "user_id", userId); err != nil {
 			return err
 		}
 

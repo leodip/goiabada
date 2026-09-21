@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/url"
@@ -53,7 +54,7 @@ func TestAPIClientOAuth2FlowsPut_Success_PublicClient_ForcesNoClientCredentials(
 	assert.False(t, updateResp.Client.ClientCredentialsEnabled)
 
 	// Verify DB persisted: auth code enabled, client credentials forced false
-	refreshed, err := database.GetClientById(nil, client.Id)
+	refreshed, err := database.GetClientById(context.Background(), nil, client.Id)
 	assert.NoError(t, err)
 	assert.True(t, refreshed.AuthorizationCodeEnabled)
 	assert.True(t, refreshed.IsPublic)
@@ -95,7 +96,7 @@ func TestAPIClientOAuth2FlowsPut_Success_ConfidentialClient_ToggleBoth(t *testin
 	assert.False(t, updateResp.Client.AuthorizationCodeEnabled)
 	assert.True(t, updateResp.Client.ClientCredentialsEnabled)
 
-	refreshed, err := database.GetClientById(nil, client.Id)
+	refreshed, err := database.GetClientById(context.Background(), nil, client.Id)
 	assert.NoError(t, err)
 	assert.False(t, refreshed.AuthorizationCodeEnabled)
 	assert.True(t, refreshed.ClientCredentialsEnabled)
@@ -307,7 +308,7 @@ func TestAPIClientOAuth2FlowsPut_BothDisabledAllowed(t *testing.T) {
 	assert.False(t, updateResp.Client.ClientCredentialsEnabled)
 
 	// DB should reflect both disabled
-	refreshed, err := database.GetClientById(nil, client.Id)
+	refreshed, err := database.GetClientById(context.Background(), nil, client.Id)
 	assert.NoError(t, err)
 	assert.False(t, refreshed.AuthorizationCodeEnabled)
 	assert.False(t, refreshed.ClientCredentialsEnabled)
@@ -345,7 +346,7 @@ func TestAPIClientOAuth2FlowsPut_ImplicitGrantEnabled_UseGlobalSetting(t *testin
 	assert.NoError(t, err)
 
 	// DB should have nil (use global)
-	refreshed, err := database.GetClientById(nil, client.Id)
+	refreshed, err := database.GetClientById(context.Background(), nil, client.Id)
 	assert.NoError(t, err)
 	assert.Nil(t, refreshed.ImplicitGrantEnabled, "ImplicitGrantEnabled should be nil (use global)")
 }
@@ -381,7 +382,7 @@ func TestAPIClientOAuth2FlowsPut_ImplicitGrantEnabled_ExplicitEnable(t *testing.
 	assert.NoError(t, err)
 
 	// DB should have true
-	refreshed, err := database.GetClientById(nil, client.Id)
+	refreshed, err := database.GetClientById(context.Background(), nil, client.Id)
 	assert.NoError(t, err)
 	assert.NotNil(t, refreshed.ImplicitGrantEnabled, "ImplicitGrantEnabled should not be nil")
 	assert.True(t, *refreshed.ImplicitGrantEnabled, "ImplicitGrantEnabled should be true")
@@ -420,7 +421,7 @@ func TestAPIClientOAuth2FlowsPut_ImplicitGrantEnabled_ExplicitDisable(t *testing
 	assert.NoError(t, err)
 
 	// DB should have false
-	refreshed, err := database.GetClientById(nil, client.Id)
+	refreshed, err := database.GetClientById(context.Background(), nil, client.Id)
 	assert.NoError(t, err)
 	assert.NotNil(t, refreshed.ImplicitGrantEnabled, "ImplicitGrantEnabled should not be nil")
 	assert.False(t, *refreshed.ImplicitGrantEnabled, "ImplicitGrantEnabled should be false")
@@ -457,7 +458,7 @@ func TestAPIClientOAuth2FlowsPut_PKCERequired_TriState(t *testing.T) {
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
-	refreshed, err := database.GetClientById(nil, client.Id)
+	refreshed, err := database.GetClientById(context.Background(), nil, client.Id)
 	assert.NoError(t, err)
 	assert.NotNil(t, refreshed.PKCERequired)
 	assert.True(t, *refreshed.PKCERequired, "PKCERequired should be true")
@@ -472,7 +473,7 @@ func TestAPIClientOAuth2FlowsPut_PKCERequired_TriState(t *testing.T) {
 	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp2.StatusCode)
 
-	refreshed2, err := database.GetClientById(nil, client.Id)
+	refreshed2, err := database.GetClientById(context.Background(), nil, client.Id)
 	assert.NoError(t, err)
 	assert.NotNil(t, refreshed2.PKCERequired)
 	assert.False(t, *refreshed2.PKCERequired, "PKCERequired should be false")
@@ -486,7 +487,7 @@ func TestAPIClientOAuth2FlowsPut_PKCERequired_TriState(t *testing.T) {
 	defer func() { _ = resp3.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp3.StatusCode)
 
-	refreshed3, err := database.GetClientById(nil, client.Id)
+	refreshed3, err := database.GetClientById(context.Background(), nil, client.Id)
 	assert.NoError(t, err)
 	assert.Nil(t, refreshed3.PKCERequired, "PKCERequired should be nil (use global)")
 }
@@ -585,7 +586,7 @@ func TestAPIClientOAuth2FlowsPut_ImplicitOnly_NoAuthCode(t *testing.T) {
 	assert.False(t, updateResp.Client.AuthorizationCodeEnabled)
 
 	// DB should reflect settings
-	refreshed, err := database.GetClientById(nil, client.Id)
+	refreshed, err := database.GetClientById(context.Background(), nil, client.Id)
 	assert.NoError(t, err)
 	assert.False(t, refreshed.AuthorizationCodeEnabled)
 	assert.NotNil(t, refreshed.ImplicitGrantEnabled)
@@ -624,7 +625,7 @@ func TestAPIClientOAuth2FlowsPut_ROPCEnabled_UseGlobalSetting(t *testing.T) {
 	assert.NoError(t, err)
 
 	// DB should have nil (use global)
-	refreshed, err := database.GetClientById(nil, client.Id)
+	refreshed, err := database.GetClientById(context.Background(), nil, client.Id)
 	assert.NoError(t, err)
 	assert.Nil(t, refreshed.ResourceOwnerPasswordCredentialsEnabled, "ResourceOwnerPasswordCredentialsEnabled should be nil (use global)")
 }
@@ -660,7 +661,7 @@ func TestAPIClientOAuth2FlowsPut_ROPCEnabled_ExplicitEnable(t *testing.T) {
 	assert.NoError(t, err)
 
 	// DB should have true
-	refreshed, err := database.GetClientById(nil, client.Id)
+	refreshed, err := database.GetClientById(context.Background(), nil, client.Id)
 	assert.NoError(t, err)
 	assert.NotNil(t, refreshed.ResourceOwnerPasswordCredentialsEnabled, "ResourceOwnerPasswordCredentialsEnabled should not be nil")
 	assert.True(t, *refreshed.ResourceOwnerPasswordCredentialsEnabled, "ResourceOwnerPasswordCredentialsEnabled should be true")
@@ -699,7 +700,7 @@ func TestAPIClientOAuth2FlowsPut_ROPCEnabled_ExplicitDisable(t *testing.T) {
 	assert.NoError(t, err)
 
 	// DB should have false
-	refreshed, err := database.GetClientById(nil, client.Id)
+	refreshed, err := database.GetClientById(context.Background(), nil, client.Id)
 	assert.NoError(t, err)
 	assert.NotNil(t, refreshed.ResourceOwnerPasswordCredentialsEnabled, "ResourceOwnerPasswordCredentialsEnabled should not be nil")
 	assert.False(t, *refreshed.ResourceOwnerPasswordCredentialsEnabled, "ResourceOwnerPasswordCredentialsEnabled should be false")
@@ -731,7 +732,7 @@ func TestAPIClientOAuth2FlowsPut_ROPCEnabled_TriState(t *testing.T) {
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
-	refreshed, err := database.GetClientById(nil, client.Id)
+	refreshed, err := database.GetClientById(context.Background(), nil, client.Id)
 	assert.NoError(t, err)
 	assert.NotNil(t, refreshed.ResourceOwnerPasswordCredentialsEnabled)
 	assert.True(t, *refreshed.ResourceOwnerPasswordCredentialsEnabled, "ResourceOwnerPasswordCredentialsEnabled should be true")
@@ -746,7 +747,7 @@ func TestAPIClientOAuth2FlowsPut_ROPCEnabled_TriState(t *testing.T) {
 	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp2.StatusCode)
 
-	refreshed2, err := database.GetClientById(nil, client.Id)
+	refreshed2, err := database.GetClientById(context.Background(), nil, client.Id)
 	assert.NoError(t, err)
 	assert.NotNil(t, refreshed2.ResourceOwnerPasswordCredentialsEnabled)
 	assert.False(t, *refreshed2.ResourceOwnerPasswordCredentialsEnabled, "ResourceOwnerPasswordCredentialsEnabled should be false")
@@ -760,7 +761,7 @@ func TestAPIClientOAuth2FlowsPut_ROPCEnabled_TriState(t *testing.T) {
 	defer func() { _ = resp3.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp3.StatusCode)
 
-	refreshed3, err := database.GetClientById(nil, client.Id)
+	refreshed3, err := database.GetClientById(context.Background(), nil, client.Id)
 	assert.NoError(t, err)
 	assert.Nil(t, refreshed3.ResourceOwnerPasswordCredentialsEnabled, "ResourceOwnerPasswordCredentialsEnabled should be nil (use global)")
 }
@@ -801,7 +802,7 @@ func TestAPIClientOAuth2FlowsPut_ROPCOnly_NoOtherFlows(t *testing.T) {
 	assert.False(t, updateResp.Client.ClientCredentialsEnabled)
 
 	// DB should reflect settings
-	refreshed, err := database.GetClientById(nil, client.Id)
+	refreshed, err := database.GetClientById(context.Background(), nil, client.Id)
 	assert.NoError(t, err)
 	assert.False(t, refreshed.AuthorizationCodeEnabled)
 	assert.False(t, refreshed.ClientCredentialsEnabled)

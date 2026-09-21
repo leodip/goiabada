@@ -130,8 +130,8 @@ func TestHandleAPIClientSessionsGet_AnswersTheSessionsWithTheirOwners(t *testing
 
 	sessions := []models.UserSession{liveSession(1, "sid-one", 5), liveSession(2, "sid-two", 5)}
 
-	database.On("GetClientById", (*sql.Tx)(nil), int64(7)).Return(&models.Client{Id: 7}, nil).Once()
-	database.On("GetUserSessionsByClientIdPaginated", (*sql.Tx)(nil), int64(7), 1, 50).
+	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(&models.Client{Id: 7}, nil).Once()
+	database.On("GetUserSessionsByClientIdPaginated", mock.Anything, (*sql.Tx)(nil), int64(7), 1, 50).
 		Return(sessions, len(sessions), nil).Once()
 	expectSessionListReads(database, sessions)
 	expectSessionOwnerRead(database, models.User{

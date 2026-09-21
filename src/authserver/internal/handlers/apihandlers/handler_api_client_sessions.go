@@ -42,7 +42,7 @@ func HandleAPIClientSessionsGet(
 		}
 
 		// Ensure client exists
-		client, err := database.GetClientById(nil, clientId)
+		client, err := database.GetClientById(r.Context(), nil, clientId)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -70,14 +70,14 @@ func HandleAPIClientSessionsGet(
 		}
 
 		// Fetch sessions linked to the client
-		userSessions, _, err := database.GetUserSessionsByClientIdPaginated(nil, client.Id, page, size)
+		userSessions, _, err := database.GetUserSessionsByClientIdPaginated(r.Context(), nil, client.Id, page, size)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
 		}
 
 		// Load the clients each session authorized; buildSessionDetails hydrates them.
-		if err := database.UserSessionsLoadClients(nil, userSessions); err != nil {
+		if err := database.UserSessionsLoadClients(r.Context(), nil, userSessions); err != nil {
 			writeInternalServerError(w, r, err)
 			return
 		}

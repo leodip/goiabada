@@ -146,18 +146,18 @@ func (u *UserSessionManager) StartNewUserSession(w http.ResponseWriter, r *http.
 	// browser did have (#198). Only the browser-store write below is left after the commit, and it
 	// is compensated rather than prevented: see abandonUserSession.
 	err = u.database.RunInTransaction(r.Context(), func(tx *sql.Tx) error {
-		if err := u.database.CreateUserSession(tx, userSession); err != nil {
+		if err := u.database.CreateUserSession(r.Context(), tx, userSession); err != nil {
 			return err
 		}
 
 		for _, client := range userSession.Clients {
 			client.UserSessionId = userSession.Id
-			if err := u.database.CreateUserSessionClient(tx, &client); err != nil {
+			if err := u.database.CreateUserSessionClient(r.Context(), tx, &client); err != nil {
 				return err
 			}
 		}
 
-		allUserSessions, err := u.database.GetUserSessionsByUserId(tx, userId)
+		allUserSessions, err := u.database.GetUserSessionsByUserId(r.Context(), tx, userId)
 		if err != nil {
 			return err
 		}
@@ -179,7 +179,7 @@ func (u *UserSessionManager) StartNewUserSession(w http.ResponseWriter, r *http.
 			if us.SessionIdentifier != userSession.SessionIdentifier &&
 				us.UserAgent == userSession.UserAgent &&
 				us.IpAddress == ipWithoutPort {
-				if err := u.database.DeleteUserSession(tx, us.Id); err != nil {
+				if err := u.database.DeleteUserSession(r.Context(), tx, us.Id); err != nil {
 					return err
 				}
 			}
@@ -223,14 +223,14 @@ func (u *UserSessionManager) StartNewUserSession(w http.ResponseWriter, r *http.
 	// changes no outcome an attacker could use.
 	if regenerator, ok := u.sessionStore.(sessionstore.Regenerator); ok {
 		if err := regenerator.Regenerate(w, r, sess); err != nil {
-			return nil, u.abandonUserSession(userSession, errs.Wrap(err, "unable to rotate the browser session identifier"))
+			return nil, u.abandonUserSession(r.Context(), userSession, errs.Wrap(err, "unable to rotate the browser session identifier"))
 		}
 		return userSession, nil
 	}
 
 	err = u.sessionStore.Save(r, w, sess)
 	if err != nil {
-		return nil, u.abandonUserSession(userSession, err)
+		return nil, u.abandonUserSession(r.Context(), userSession, err)
 	}
 
 	return userSession, nil
@@ -255,8 +255,8 @@ func (u *UserSessionManager) StartNewUserSession(w http.ResponseWriter, r *http.
 // browser-store write staged inside the transaction, which it cannot be while a rerun can double
 // the Set-Cookie. Revisit if the store gains a two-phase write that can be prepared before the
 // commit and completed after it (#198).
-func (u *UserSessionManager) abandonUserSession(userSession *models.UserSession, cause error) error {
-	if err := u.database.DeleteUserSession(nil, userSession.Id); err != nil {
+func (u *UserSessionManager) abandonUserSession(ctx context.Context, userSession *models.UserSession, cause error) error {
+	if err := u.database.DeleteUserSession(ctx, nil, userSession.Id); err != nil {
 		return errs.Join(cause, errs.Wrap(err,
 			"unable to delete the user session left behind by a failed browser session write"))
 	}
@@ -279,14 +279,14 @@ func (u *UserSessionManager) abandonUserSession(userSession *models.UserSession,
 func (u *UserSessionManager) BumpUserSession(r *http.Request, sessionIdentifier string, clientId int64,
 	authMethods string, acrLevel string) (*models.UserSession, error) {
 
-	userSession, err := u.database.GetUserSessionBySessionIdentifier(nil, sessionIdentifier)
+	userSession, err := u.database.GetUserSessionBySessionIdentifier(r.Context(), nil, sessionIdentifier)
 	if err != nil {
 		return nil, err
 	}
 
 	if userSession != nil {
 
-		err = u.database.UserSessionLoadClients(nil, userSession)
+		err = u.database.UserSessionLoadClients(r.Context(), nil, userSession)
 		if err != nil {
 			return nil, err
 		}
@@ -350,20 +350,20 @@ func (u *UserSessionManager) BumpUserSession(r *http.Request, sessionIdentifier 
 		// from client.Id on a copy, so an attempt that inserted leaves the slice as it found it
 		// and the rerun decides the same way.
 		err = u.database.RunInTransaction(r.Context(), func(tx *sql.Tx) error {
-			if err := u.database.UpdateUserSession(tx, userSession); err != nil {
+			if err := u.database.UpdateUserSession(r.Context(), tx, userSession); err != nil {
 				return err
 			}
 
 			for _, client := range userSession.Clients {
 				if client.Id > 0 {
 					// update
-					if err := u.database.UpdateUserSessionClient(tx, &client); err != nil {
+					if err := u.database.UpdateUserSessionClient(r.Context(), tx, &client); err != nil {
 						return err
 					}
 				} else {
 					// insert new
 					client.UserSessionId = userSession.Id
-					if err := u.database.CreateUserSessionClient(tx, &client); err != nil {
+					if err := u.database.CreateUserSessionClient(r.Context(), tx, &client); err != nil {
 						return err
 					}
 				}

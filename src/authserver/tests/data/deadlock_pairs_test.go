@@ -119,9 +119,9 @@ type pausedBeforeSessionDelete struct {
 	b *barrier
 }
 
-func (d pausedBeforeSessionDelete) DeleteUserSession(tx *sql.Tx, userSessionId int64) error {
+func (d pausedBeforeSessionDelete) DeleteUserSession(ctx context.Context, tx *sql.Tx, userSessionId int64) error {
 	d.b.arriveBefore(tx)
-	return d.Database.DeleteUserSession(tx, userSessionId)
+	return d.Database.DeleteUserSession(ctx, tx, userSessionId)
 }
 
 // pausedBeforeTokenUpdate parks the termination after it has taken the session row and the codes
@@ -133,9 +133,9 @@ type pausedBeforeTokenUpdate struct {
 	b *barrier
 }
 
-func (d pausedBeforeTokenUpdate) UpdateRefreshToken(tx *sql.Tx, refreshToken *models.RefreshToken) error {
+func (d pausedBeforeTokenUpdate) UpdateRefreshToken(ctx context.Context, tx *sql.Tx, refreshToken *models.RefreshToken) error {
 	d.b.arriveBefore(tx)
-	return d.Database.UpdateRefreshToken(tx, refreshToken)
+	return d.Database.UpdateRefreshToken(ctx, tx, refreshToken)
 }
 
 func skipIfSQLite(t *testing.T) {
@@ -195,7 +195,7 @@ func TestDeadlockRetry_CredentialSweepAgainstIssuance(t *testing.T) {
 			// assertions below refuse. RunInTransaction's doc comment names this hazard.
 			out = issuanceOut{}
 
-			live, err := other.AcquireUserSessionRow(tx, session.SessionIdentifier)
+			live, err := other.AcquireUserSessionRow(context.Background(), tx, session.SessionIdentifier)
 			if err != nil {
 				return err
 			}
@@ -243,7 +243,7 @@ func TestDeadlockRetry_CredentialSweepAgainstIssuance(t *testing.T) {
 	if out.live {
 		require.NotNil(t, out.code, "a ceremony that found the session live minted a code")
 
-		minted, err := database.GetCodeById(nil, out.code.Id)
+		minted, err := database.GetCodeById(context.Background(), nil, out.code.Id)
 		require.NoError(t, err)
 		require.NotNil(t, minted, "the code issuance committed is in the catalog")
 		assert.Equal(t, session.SessionIdentifier, minted.SessionIdentifier,
@@ -385,11 +385,11 @@ func TestDeadlockRetry_DeleteClientAgainstTermination(t *testing.T) {
 
 	// End state, deterministic: the client is gone, its cascade took the code and the token, and
 	// the termination deleted the session.
-	goneClient, err := database.GetClientById(nil, client.Id)
+	goneClient, err := database.GetClientById(context.Background(), nil, client.Id)
 	require.NoError(t, err)
 	assert.Nil(t, goneClient, "the client is gone")
 
-	goneToken, err := database.GetRefreshTokenById(nil, token.Id)
+	goneToken, err := database.GetRefreshTokenById(context.Background(), nil, token.Id)
 	require.NoError(t, err)
 	assert.Nil(t, goneToken, "the client's refresh token is gone")
 

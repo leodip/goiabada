@@ -63,7 +63,7 @@ func TestTerminateUserSessionTx_SweepsAfterTheSessionRowIsDeleted(t *testing.T) 
 	}
 
 	// The row is gone, which is what the first statement did.
-	gone, err := database.GetUserSessionById(nil, session.Id)
+	gone, err := database.GetUserSessionById(context.Background(), nil, session.Id)
 	if err != nil {
 		t.Fatalf("GetUserSessionById after terminating: %v", err)
 	}
@@ -80,7 +80,7 @@ func TestTerminateUserSessionTx_SweepsAfterTheSessionRowIsDeleted(t *testing.T) 
 	assertCodeRevoked(t, otherCode.Id, false, "a code of an unrelated session")
 	assertTokenRevoked(t, otherToken.Id, false, "a token of an unrelated session")
 
-	stillThere, err := database.GetUserSessionById(nil, otherSession.Id)
+	stillThere, err := database.GetUserSessionById(context.Background(), nil, otherSession.Id)
 	if err != nil {
 		t.Fatalf("GetUserSessionById for the unrelated session: %v", err)
 	}
@@ -115,7 +115,7 @@ func createTokenOfCodeOn(t *testing.T, db data.Database, clientId, userId, codeI
 		ExpiresAt:         sql.NullTime{Time: time.Now().UTC().Add(time.Hour).Truncate(time.Microsecond), Valid: true},
 		MaxLifetime:       sql.NullTime{Time: time.Now().UTC().Add(24 * time.Hour).Truncate(time.Microsecond), Valid: true},
 	}
-	if err := db.CreateRefreshToken(nil, token); err != nil {
+	if err := db.CreateRefreshToken(context.Background(), nil, token); err != nil {
 		t.Fatalf("Failed to create test refresh token: %v", err)
 	}
 	return token
@@ -133,7 +133,7 @@ func assertTokenRevoked(t *testing.T, tokenId int64, want bool, what string) {
 // does.
 func assertTokenRevokedOn(t *testing.T, db data.Database, tokenId int64, want bool, what string) {
 	t.Helper()
-	token, err := db.GetRefreshTokenById(nil, tokenId)
+	token, err := db.GetRefreshTokenById(context.Background(), nil, tokenId)
 	if err != nil {
 		t.Fatalf("Failed to reload refresh token %d: %v", tokenId, err)
 	}

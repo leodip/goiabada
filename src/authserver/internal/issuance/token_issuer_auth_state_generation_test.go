@@ -300,8 +300,8 @@ func TestPersistedGeneration_Stamping(t *testing.T) {
 			Return(&models.Client{Id: 1, ClientIdentifier: "test-client"}, nil)
 
 		var captured *models.Code
-		mockDB.On("CreateCode", mock.Anything, mock.Anything).
-			Run(func(args mock.Arguments) { captured = args.Get(1).(*models.Code) }).
+		mockDB.On("CreateCode", mock.Anything, mock.Anything, mock.Anything).
+			Run(func(args mock.Arguments) { captured = args.Get(2).(*models.Code) }).
 			Return(nil)
 
 		input := &CreateCodeInput{SessionIdentifier: sid}
@@ -312,7 +312,7 @@ func TestPersistedGeneration_Stamping(t *testing.T) {
 		input.ResponseMode = "query"
 		input.AuthStateGeneration = 7 // the user is at 9; reading the user would emit 9
 
-		_, err := issuer.CreateAuthCode(nil, input)
+		_, err := issuer.CreateAuthCode(context.Background(), nil, input)
 		require.NoError(t, err, "CreateAuthCode")
 		require.NotNil(t, captured, "CreateCode was never called")
 		assert.EqualValues(t, 7, captured.AuthStateGeneration,
@@ -327,11 +327,11 @@ func TestPersistedGeneration_Stamping(t *testing.T) {
 		code := generationTestCode("openid offline_access", sid, 7, 9)
 
 		var captured *models.RefreshToken
-		mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything).
-			Run(func(args mock.Arguments) { captured = args.Get(1).(*models.RefreshToken) }).
+		mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.Anything).
+			Run(func(args mock.Arguments) { captured = args.Get(2).(*models.RefreshToken) }).
 			Return(nil)
 
-		_, _, err := issuer.generateRefreshToken(settings, code, code.Scope, now, privKey, "test-kid", nil)
+		_, _, err := issuer.generateRefreshToken(context.Background(), settings, code, code.Scope, now, privKey, "test-kid", nil)
 		require.NoError(t, err, "generateRefreshToken")
 		require.NotNil(t, captured, "CreateRefreshToken was never called")
 		assert.EqualValues(t, 7, captured.AuthStateGeneration)
@@ -353,11 +353,11 @@ func TestPersistedGeneration_Stamping(t *testing.T) {
 		}
 
 		var captured *models.RefreshToken
-		mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything).
-			Run(func(args mock.Arguments) { captured = args.Get(1).(*models.RefreshToken) }).
+		mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.Anything).
+			Run(func(args mock.Arguments) { captured = args.Get(2).(*models.RefreshToken) }).
 			Return(nil)
 
-		_, _, err := issuer.generateRefreshToken(settings, code, code.Scope, now, privKey, "test-kid", parent)
+		_, _, err := issuer.generateRefreshToken(context.Background(), settings, code, code.Scope, now, privKey, "test-kid", parent)
 		require.NoError(t, err, "generateRefreshToken")
 		require.NotNil(t, captured, "CreateRefreshToken was never called")
 		assert.EqualValues(t, 7, captured.AuthStateGeneration)
@@ -374,11 +374,11 @@ func TestPersistedGeneration_Stamping(t *testing.T) {
 		}
 
 		var captured *models.RefreshToken
-		mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything).
-			Run(func(args mock.Arguments) { captured = args.Get(1).(*models.RefreshToken) }).
+		mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.Anything).
+			Run(func(args mock.Arguments) { captured = args.Get(2).(*models.RefreshToken) }).
 			Return(nil)
 
-		_, _, err := issuer.generateRefreshTokenForROPC(settings, input, input.Scope, now, privKey, "test-kid", nil)
+		_, _, err := issuer.generateRefreshTokenForROPC(context.Background(), settings, input, input.Scope, now, privKey, "test-kid", nil)
 		require.NoError(t, err, "generateRefreshTokenForROPC")
 		require.NotNil(t, captured, "CreateRefreshToken was never called")
 		assert.EqualValues(t, 7, captured.AuthStateGeneration)
@@ -404,11 +404,11 @@ func TestPersistedGeneration_Stamping(t *testing.T) {
 		}
 
 		var captured *models.RefreshToken
-		mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything).
-			Run(func(args mock.Arguments) { captured = args.Get(1).(*models.RefreshToken) }).
+		mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.Anything).
+			Run(func(args mock.Arguments) { captured = args.Get(2).(*models.RefreshToken) }).
 			Return(nil)
 
-		_, _, err := issuer.generateRefreshTokenForROPC(settings, input, input.Scope, now, privKey, "test-kid", parent)
+		_, _, err := issuer.generateRefreshTokenForROPC(context.Background(), settings, input, input.Scope, now, privKey, "test-kid", parent)
 		require.NoError(t, err, "generateRefreshTokenForROPC")
 		require.NotNil(t, captured, "CreateRefreshToken was never called")
 		assert.EqualValues(t, 7, captured.AuthStateGeneration)

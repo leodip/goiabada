@@ -52,13 +52,13 @@ func HandleAuthCompletedGet(
 			sessionIdentifier = r.Context().Value(constants.ContextKeySessionIdentifier).(string)
 		}
 
-		userSession, err := database.GetUserSessionBySessionIdentifier(nil, sessionIdentifier)
+		userSession, err := database.GetUserSessionBySessionIdentifier(r.Context(), nil, sessionIdentifier)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
 
-		err = database.UserSessionLoadUser(nil, userSession)
+		err = database.UserSessionLoadUser(r.Context(), nil, userSession)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
@@ -151,7 +151,7 @@ func HandleAuthCompletedGet(
 				// (#252 decision 8). userReallyAuthenticated is exactly the guard that makes
 				// the dereference safe: non-nil and non-zero.
 				bumpedSession.AuthTime = authContext.AuthenticatedAt.UTC()
-				err = database.UpdateUserSession(nil, bumpedSession)
+				err = database.UpdateUserSession(r.Context(), nil, bumpedSession)
 				if err != nil {
 					httpHelper.InternalServerError(w, r, err)
 					return
@@ -183,7 +183,7 @@ func HandleAuthCompletedGet(
 			// predicate /auth/level1completed uses to decide the step-up, so the two agree by
 			// construction (#242 decision 3).
 			if authContext.OtpConfigGeneration != nil && targetAcrLevel.IsHigherThan(models.AcrLevel1) {
-				err = database.PromoteUserSessionOtpConfigGeneration(nil, bumpedSession.Id,
+				err = database.PromoteUserSessionOtpConfigGeneration(r.Context(), nil, bumpedSession.Id,
 					*authContext.OtpConfigGeneration)
 				if err != nil {
 					httpHelper.InternalServerError(w, r, err)

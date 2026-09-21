@@ -121,13 +121,13 @@ func TestPromoteUserSessionOtpConfigGeneration(t *testing.T) {
 	unnamed := createTestUserSession(t, user.Id)
 
 	reload := func(id int64) int64 {
-		us, err := database.GetUserSessionById(nil, id)
+		us, err := database.GetUserSessionById(context.Background(), nil, id)
 		require.NoError(t, err, "reload user session %d", id)
 		require.NotNil(t, us, "user session %d vanished", id)
 		return us.OtpConfigGeneration
 	}
 
-	require.NoError(t, database.PromoteUserSessionOtpConfigGeneration(nil, named.Id, 7),
+	require.NoError(t, database.PromoteUserSessionOtpConfigGeneration(context.Background(), nil, named.Id, 7),
 		"PromoteUserSessionOtpConfigGeneration")
 
 	assert.EqualValues(t, 7, reload(named.Id))
@@ -135,13 +135,13 @@ func TestPromoteUserSessionOtpConfigGeneration(t *testing.T) {
 		"the promotion is keyed on one session id: another device of the same user has not "+
 			"answered this ceremony's level 2 question and must keep owing its re-prompt")
 
-	assert.Error(t, database.PromoteUserSessionOtpConfigGeneration(nil, 0, 7),
+	assert.Error(t, database.PromoteUserSessionOtpConfigGeneration(context.Background(), nil, 0, 7),
 		"user session id 0 must be refused")
 
 	// A promotion that matched nothing is an error rather than a no-op, as for
 	// PromoteUserSessionGeneration: the ceremony has just answered the level 2 question, and
 	// failing to record that silently leaves the session re-prompted on every later request.
-	assert.Error(t, database.PromoteUserSessionOtpConfigGeneration(nil, unnamed.Id+1_000_000, 7),
+	assert.Error(t, database.PromoteUserSessionOtpConfigGeneration(context.Background(), nil, unnamed.Id+1_000_000, 7),
 		"an unknown user session id must be refused")
 	assert.EqualValues(t, 0, reload(unnamed.Id), "the refused calls must not have moved anything")
 }
@@ -157,12 +157,12 @@ func TestPromoteUserSessionOtpConfigGeneration_EnlistsInTheCallersTransaction(t 
 	tx, err := database.BeginTransaction(context.Background())
 	require.NoError(t, err, "BeginTransaction")
 
-	require.NoError(t, database.PromoteUserSessionOtpConfigGeneration(tx, session.Id, 7),
+	require.NoError(t, database.PromoteUserSessionOtpConfigGeneration(context.Background(), tx, session.Id, 7),
 		"PromoteUserSessionOtpConfigGeneration")
 
 	require.NoError(t, database.RollbackTransaction(tx), "RollbackTransaction")
 
-	after, err := database.GetUserSessionById(nil, session.Id)
+	after, err := database.GetUserSessionById(context.Background(), nil, session.Id)
 	require.NoError(t, err, "reload user session")
 	require.NotNil(t, after)
 	assert.EqualValues(t, 0, after.OtpConfigGeneration,

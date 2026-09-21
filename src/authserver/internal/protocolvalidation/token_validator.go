@@ -149,7 +149,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 		if err != nil {
 			return nil, err
 		}
-		codeEntity, err := val.database.GetCodeByCodeHash(nil, codeHash, false)
+		codeEntity, err := val.database.GetCodeByCodeHash(ctx, nil, codeHash, false)
 		if err != nil {
 			return nil, err
 		}
@@ -161,7 +161,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 		// victim's session by replaying observed codes with wrong credentials.
 		wasReused := false
 		if codeEntity == nil {
-			codeEntity, err = val.database.GetCodeByCodeHash(nil, codeHash, true)
+			codeEntity, err = val.database.GetCodeByCodeHash(ctx, nil, codeHash, true)
 			if err != nil {
 				return nil, err
 			}
@@ -177,12 +177,12 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 				http.StatusBadRequest)
 		}
 
-		err = val.database.CodeLoadClient(nil, codeEntity)
+		err = val.database.CodeLoadClient(ctx, nil, codeEntity)
 		if err != nil {
 			return nil, err
 		}
 
-		err = val.database.CodeLoadUser(nil, codeEntity)
+		err = val.database.CodeLoadUser(ctx, nil, codeEntity)
 		if err != nil {
 			return nil, err
 		}
@@ -354,7 +354,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 		// Both columns compared are NOT NULL, so the zero-equals-zero vacuity that an
 		// incomplete test fixture can produce cannot arise against a real database.
 		if codeEntity.SessionIdentifier != "" {
-			codeSession, err := val.database.GetUserSessionBySessionIdentifier(nil, codeEntity.SessionIdentifier)
+			codeSession, err := val.database.GetUserSessionBySessionIdentifier(ctx, nil, codeEntity.SessionIdentifier)
 			if err != nil {
 				return nil, err
 			}
@@ -568,7 +568,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 			return nil, errs.New("the refresh token is invalid because it does not contain a jti claim")
 		}
 
-		refreshToken, err := val.database.GetRefreshTokenByJti(nil, jti)
+		refreshToken, err := val.database.GetRefreshTokenByJti(ctx, nil, jti)
 		if err != nil {
 			return nil, err
 		}
@@ -598,11 +598,11 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 
 		if isROPCToken {
 			// ROPC refresh token - load User and Client directly from RefreshToken
-			err = val.database.RefreshTokenLoadUser(nil, refreshToken)
+			err = val.database.RefreshTokenLoadUser(ctx, nil, refreshToken)
 			if err != nil {
 				return nil, err
 			}
-			err = val.database.RefreshTokenLoadClient(nil, refreshToken)
+			err = val.database.RefreshTokenLoadClient(ctx, nil, refreshToken)
 			if err != nil {
 				return nil, err
 			}
@@ -624,12 +624,12 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 			}
 		} else {
 			// Auth code flow refresh token - load Code and User from Code
-			err = val.database.RefreshTokenLoadCode(nil, refreshToken)
+			err = val.database.RefreshTokenLoadCode(ctx, nil, refreshToken)
 			if err != nil {
 				return nil, err
 			}
 
-			err = val.database.CodeLoadUser(nil, &refreshToken.Code)
+			err = val.database.CodeLoadUser(ctx, nil, &refreshToken.Code)
 			if err != nil {
 				return nil, err
 			}
@@ -713,7 +713,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 			// this is a normal refresh token
 			// check the associated user session to see if it's still valid
 
-			userSession, err := val.database.GetUserSessionBySessionIdentifier(nil, refreshToken.SessionIdentifier)
+			userSession, err := val.database.GetUserSessionBySessionIdentifier(ctx, nil, refreshToken.SessionIdentifier)
 			if err != nil {
 				return nil, err
 			}
@@ -782,7 +782,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 			// above: code_id is NULL, refreshToken.Code is the zero value, and there was never
 			// a session to own the grant.
 			if !isROPCToken && refreshToken.Code.SessionIdentifier != "" {
-				codeSession, err := val.database.GetUserSessionBySessionIdentifier(nil, refreshToken.Code.SessionIdentifier)
+				codeSession, err := val.database.GetUserSessionBySessionIdentifier(ctx, nil, refreshToken.Code.SessionIdentifier)
 				if err != nil {
 					return nil, err
 				}

@@ -84,7 +84,7 @@ func newBrowserSession(owner string, now time.Time, ttl time.Duration) *models.B
 func createTestBrowserSession(t *testing.T, owner string, now time.Time, ttl time.Duration) *models.BrowserSession {
 	t.Helper()
 	bs := newBrowserSession(owner, now, ttl)
-	require.NoError(t, database.CreateBrowserSession(nil, bs), "CreateBrowserSession")
+	require.NoError(t, database.CreateBrowserSession(context.Background(), nil, bs), "CreateBrowserSession")
 	require.NotZero(t, bs.Id, "CreateBrowserSession must report the id it inserted")
 	return bs
 }
@@ -98,10 +98,10 @@ func TestBrowserSession_CreateAndLoad(t *testing.T) {
 	// project cannot promise ends up in a cookie; it has to end up somewhere.
 	bs.Data = strings.Repeat("x", 64*1024)
 
-	require.NoError(t, database.CreateBrowserSession(nil, bs), "CreateBrowserSession")
+	require.NoError(t, database.CreateBrowserSession(context.Background(), nil, bs), "CreateBrowserSession")
 	require.NotZero(t, bs.Id)
 
-	loaded, err := database.GetBrowserSessionByOwnerAndSessionIdHash(nil, bs.Owner, bs.SessionIdHash, now)
+	loaded, err := database.GetBrowserSessionByOwnerAndSessionIdHash(context.Background(), nil, bs.Owner, bs.SessionIdHash, now)
 	require.NoError(t, err, "GetBrowserSessionByOwnerAndSessionIdHash")
 	require.NotNil(t, loaded, "a live session must be found")
 
@@ -116,7 +116,7 @@ func TestBrowserSession_CreateAndLoad(t *testing.T) {
 
 	// A hash no row carries is nil and no error: "there is no such session" and "I could
 	// not ask" are different answers, and only the first is a fresh session.
-	missing, err := database.GetBrowserSessionByOwnerAndSessionIdHash(nil, bs.Owner, sha256Hex("nobody"), now)
+	missing, err := database.GetBrowserSessionByOwnerAndSessionIdHash(context.Background(), nil, bs.Owner, sha256Hex("nobody"), now)
 	require.NoError(t, err, "an absent session is not an error")
 	assert.Nil(t, missing)
 }
@@ -148,7 +148,7 @@ func TestBrowserSession_ColumnHoldsTheHashAndNeverTheIdentifier(t *testing.T) {
 
 	// And the read path does not carry it back either, so nothing downstream can come to
 	// depend on a value that is not stored.
-	loaded, err := database.GetBrowserSessionByOwnerAndSessionIdHash(nil, bs.Owner, bs.SessionIdHash, now)
+	loaded, err := database.GetBrowserSessionByOwnerAndSessionIdHash(context.Background(), nil, bs.Owner, bs.SessionIdHash, now)
 	require.NoError(t, err)
 	require.NotNil(t, loaded)
 	assert.Empty(t, loaded.SessionId, "a loaded session has no plaintext identifier to give")
@@ -174,40 +174,40 @@ func TestBrowserSession_TwoOwnersMayHoldTheSameHash(t *testing.T) {
 		Data: "admin console contents", LastAccessed: now, ExpiresAt: now.Add(time.Hour),
 	}
 
-	require.NoError(t, database.CreateBrowserSession(nil, authServer),
+	require.NoError(t, database.CreateBrowserSession(context.Background(), nil, authServer),
 		"the unique index is on (owner, session_id_hash), so one hash under two owners is allowed")
-	require.NoError(t, database.CreateBrowserSession(nil, adminConsole))
+	require.NoError(t, database.CreateBrowserSession(context.Background(), nil, adminConsole))
 
-	loadedAuthServer, err := database.GetBrowserSessionByOwnerAndSessionIdHash(nil, ownerAuthServer, hash, now)
+	loadedAuthServer, err := database.GetBrowserSessionByOwnerAndSessionIdHash(context.Background(), nil, ownerAuthServer, hash, now)
 	require.NoError(t, err)
 	require.NotNil(t, loadedAuthServer)
 	assert.Equal(t, "auth server contents", loadedAuthServer.Data,
 		"each owner must load its own row and never the other's")
 
-	loadedAdminConsole, err := database.GetBrowserSessionByOwnerAndSessionIdHash(nil, ownerAdminConsole, hash, now)
+	loadedAdminConsole, err := database.GetBrowserSessionByOwnerAndSessionIdHash(context.Background(), nil, ownerAdminConsole, hash, now)
 	require.NoError(t, err)
 	require.NotNil(t, loadedAdminConsole)
 	assert.Equal(t, "admin console contents", loadedAdminConsole.Data)
 
 	// And a write under one owner does not reach the other's row.
-	moved, err := database.UpdateBrowserSessionData(nil, ownerAdminConsole, hash, "rewritten", now, now.Add(2*time.Hour))
+	moved, err := database.UpdateBrowserSessionData(context.Background(), nil, ownerAdminConsole, hash, "rewritten", now, now.Add(2*time.Hour))
 	require.NoError(t, err)
 	assert.True(t, moved)
 
-	loadedAuthServer, err = database.GetBrowserSessionByOwnerAndSessionIdHash(nil, ownerAuthServer, hash, now)
+	loadedAuthServer, err = database.GetBrowserSessionByOwnerAndSessionIdHash(context.Background(), nil, ownerAuthServer, hash, now)
 	require.NoError(t, err)
 	require.NotNil(t, loadedAuthServer)
 	assert.Equal(t, "auth server contents", loadedAuthServer.Data,
 		"a write scoped to one owner must leave the other owner's row alone")
 
 	// A delete is scoped the same way.
-	require.NoError(t, database.DeleteBrowserSession(nil, ownerAdminConsole, hash))
+	require.NoError(t, database.DeleteBrowserSession(context.Background(), nil, ownerAdminConsole, hash))
 
-	gone, err := database.GetBrowserSessionByOwnerAndSessionIdHash(nil, ownerAdminConsole, hash, now)
+	gone, err := database.GetBrowserSessionByOwnerAndSessionIdHash(context.Background(), nil, ownerAdminConsole, hash, now)
 	require.NoError(t, err)
 	assert.Nil(t, gone)
 
-	survivor, err := database.GetBrowserSessionByOwnerAndSessionIdHash(nil, ownerAuthServer, hash, now)
+	survivor, err := database.GetBrowserSessionByOwnerAndSessionIdHash(context.Background(), nil, ownerAuthServer, hash, now)
 	require.NoError(t, err)
 	assert.NotNil(t, survivor, "deleting one owner's session must not delete the other's")
 }
@@ -220,7 +220,7 @@ func TestBrowserSession_UniqueOwnerAndSessionIdHash(t *testing.T) {
 		Owner: existing.Owner, SessionId: existing.SessionId, SessionIdHash: existing.SessionIdHash,
 		Data: "second row", LastAccessed: now, ExpiresAt: now.Add(time.Hour),
 	}
-	assert.Error(t, database.CreateBrowserSession(nil, duplicate),
+	assert.Error(t, database.CreateBrowserSession(context.Background(), nil, duplicate),
 		"two sessions of one owner must not share a session_id_hash")
 }
 
@@ -232,24 +232,24 @@ func TestBrowserSession_UpdateAndTouchReportTransitions(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	bs := createTestBrowserSession(t, ownerAuthServer, now, time.Hour)
 
-	moved, err := database.UpdateBrowserSessionData(nil, bs.Owner, bs.SessionIdHash, "new contents",
+	moved, err := database.UpdateBrowserSessionData(context.Background(), nil, bs.Owner, bs.SessionIdHash, "new contents",
 		now.Add(time.Minute), now.Add(3*time.Hour))
 	require.NoError(t, err, "UpdateBrowserSessionData")
 	assert.True(t, moved, "a live row transitions")
 
-	loaded, err := database.GetBrowserSessionByOwnerAndSessionIdHash(nil, bs.Owner, bs.SessionIdHash, now)
+	loaded, err := database.GetBrowserSessionByOwnerAndSessionIdHash(context.Background(), nil, bs.Owner, bs.SessionIdHash, now)
 	require.NoError(t, err)
 	require.NotNil(t, loaded)
 	assert.Equal(t, "new contents", loaded.Data)
 	assert.WithinDuration(t, now.Add(time.Minute), loaded.LastAccessed, time.Second)
 	assert.WithinDuration(t, now.Add(3*time.Hour), loaded.ExpiresAt, time.Second)
 
-	touched, err := database.TouchBrowserSession(nil, bs.Owner, bs.SessionIdHash,
+	touched, err := database.TouchBrowserSession(context.Background(), nil, bs.Owner, bs.SessionIdHash,
 		now.Add(2*time.Minute), now.Add(5*time.Hour))
 	require.NoError(t, err, "TouchBrowserSession")
 	assert.True(t, touched)
 
-	loaded, err = database.GetBrowserSessionByOwnerAndSessionIdHash(nil, bs.Owner, bs.SessionIdHash, now)
+	loaded, err = database.GetBrowserSessionByOwnerAndSessionIdHash(context.Background(), nil, bs.Owner, bs.SessionIdHash, now)
 	require.NoError(t, err)
 	require.NotNil(t, loaded)
 	assert.Equal(t, "new contents", loaded.Data, "a touch must not disturb the contents")
@@ -261,11 +261,11 @@ func TestBrowserSession_UpdateAndTouchReportTransitions(t *testing.T) {
 	// simply nothing to write.
 	absent := sha256Hex("no such session")
 
-	moved, err = database.UpdateBrowserSessionData(nil, bs.Owner, absent, "x", now, now.Add(time.Hour))
+	moved, err = database.UpdateBrowserSessionData(context.Background(), nil, bs.Owner, absent, "x", now, now.Add(time.Hour))
 	require.NoError(t, err)
 	assert.False(t, moved, "no row transitions for a hash no row carries")
 
-	touched, err = database.TouchBrowserSession(nil, bs.Owner, absent, now, now.Add(time.Hour))
+	touched, err = database.TouchBrowserSession(context.Background(), nil, bs.Owner, absent, now, now.Add(time.Hour))
 	require.NoError(t, err)
 	assert.False(t, touched)
 }
@@ -293,17 +293,17 @@ func TestBrowserSession_TouchTwiceWithOneClockStillReportsLive(t *testing.T) {
 	stamp := now.Add(time.Minute)
 	expires := now.Add(2 * time.Hour)
 
-	first, err := database.TouchBrowserSession(nil, bs.Owner, bs.SessionIdHash, stamp, expires)
+	first, err := database.TouchBrowserSession(context.Background(), nil, bs.Owner, bs.SessionIdHash, stamp, expires)
 	require.NoError(t, err, "TouchBrowserSession")
 	assert.True(t, first, "a live row transitions")
 
 	// Byte for byte the same write, which is what two requests sharing a microsecond do.
-	second, err := database.TouchBrowserSession(nil, bs.Owner, bs.SessionIdHash, stamp, expires)
+	second, err := database.TouchBrowserSession(context.Background(), nil, bs.Owner, bs.SessionIdHash, stamp, expires)
 	require.NoError(t, err, "TouchBrowserSession")
 	assert.True(t, second,
 		"a row that is plainly there reports live even when the write changed nothing")
 
-	loaded, err := database.GetBrowserSessionByOwnerAndSessionIdHash(nil, bs.Owner, bs.SessionIdHash, now)
+	loaded, err := database.GetBrowserSessionByOwnerAndSessionIdHash(context.Background(), nil, bs.Owner, bs.SessionIdHash, now)
 	require.NoError(t, err)
 	require.NotNil(t, loaded, "and the row is still there to be read")
 	assert.WithinDuration(t, stamp, loaded.LastAccessed, time.Second)
@@ -311,7 +311,7 @@ func TestBrowserSession_TouchTwiceWithOneClockStillReportsLive(t *testing.T) {
 	// An expired row still answers false, so confirming existence has not turned the
 	// liveness answer into "the hash is known".
 	expired := createTestBrowserSession(t, ownerAuthServer, now.Add(-2*time.Hour), time.Hour)
-	touched, err := database.TouchBrowserSession(nil, expired.Owner, expired.SessionIdHash, now, now.Add(time.Hour))
+	touched, err := database.TouchBrowserSession(context.Background(), nil, expired.Owner, expired.SessionIdHash, now, now.Add(time.Hour))
 	require.NoError(t, err)
 	assert.False(t, touched, "an expired row is not live, however the count is read")
 }
@@ -321,20 +321,20 @@ func TestBrowserSession_DeleteRemovesOnlyTheNamedSession(t *testing.T) {
 	target := createTestBrowserSession(t, ownerAuthServer, now, time.Hour)
 	bystander := createTestBrowserSession(t, ownerAuthServer, now, time.Hour)
 
-	require.NoError(t, database.DeleteBrowserSession(nil, target.Owner, target.SessionIdHash),
+	require.NoError(t, database.DeleteBrowserSession(context.Background(), nil, target.Owner, target.SessionIdHash),
 		"DeleteBrowserSession")
 
-	gone, err := database.GetBrowserSessionByOwnerAndSessionIdHash(nil, target.Owner, target.SessionIdHash, now)
+	gone, err := database.GetBrowserSessionByOwnerAndSessionIdHash(context.Background(), nil, target.Owner, target.SessionIdHash, now)
 	require.NoError(t, err)
 	assert.Nil(t, gone)
 
-	survivor, err := database.GetBrowserSessionByOwnerAndSessionIdHash(nil, bystander.Owner, bystander.SessionIdHash, now)
+	survivor, err := database.GetBrowserSessionByOwnerAndSessionIdHash(context.Background(), nil, bystander.Owner, bystander.SessionIdHash, now)
 	require.NoError(t, err)
 	assert.NotNil(t, survivor, "the delete is keyed on one (owner, hash) and must reach no other row")
 
 	// Deleting a session that is already gone is not an error: logout and identifier
 	// rotation can both arrive at a row somebody else already removed.
-	assert.NoError(t, database.DeleteBrowserSession(nil, target.Owner, target.SessionIdHash))
+	assert.NoError(t, database.DeleteBrowserSession(context.Background(), nil, target.Owner, target.SessionIdHash))
 }
 
 // TestBrowserSession_DeleteExpired asserts the reaper's predicate on both sides in one
@@ -346,21 +346,21 @@ func TestBrowserSession_DeleteExpired(t *testing.T) {
 	alive := createTestBrowserSession(t, ownerAuthServer, now, time.Hour)                  // expires in an hour
 	deadOther := createTestBrowserSession(t, ownerAdminConsole, now.Add(-2*time.Hour), time.Hour)
 
-	require.NoError(t, database.DeleteExpiredBrowserSessions(nil, now), "DeleteExpiredBrowserSessions")
+	require.NoError(t, database.DeleteExpiredBrowserSessions(context.Background(), nil, now), "DeleteExpiredBrowserSessions")
 
 	// Read the reaped rows back at a time before their own expiry, so what is asserted is
 	// that the row is GONE rather than merely unreadable.
 	early := now.Add(-3 * time.Hour)
 
-	reaped, err := database.GetBrowserSessionByOwnerAndSessionIdHash(nil, dead.Owner, dead.SessionIdHash, early)
+	reaped, err := database.GetBrowserSessionByOwnerAndSessionIdHash(context.Background(), nil, dead.Owner, dead.SessionIdHash, early)
 	require.NoError(t, err)
 	assert.Nil(t, reaped, "an expired row must be deleted")
 
-	reapedOther, err := database.GetBrowserSessionByOwnerAndSessionIdHash(nil, deadOther.Owner, deadOther.SessionIdHash, early)
+	reapedOther, err := database.GetBrowserSessionByOwnerAndSessionIdHash(context.Background(), nil, deadOther.Owner, deadOther.SessionIdHash, early)
 	require.NoError(t, err)
 	assert.Nil(t, reapedOther, "the reap crosses both owners")
 
-	survivor, err := database.GetBrowserSessionByOwnerAndSessionIdHash(nil, alive.Owner, alive.SessionIdHash, now)
+	survivor, err := database.GetBrowserSessionByOwnerAndSessionIdHash(context.Background(), nil, alive.Owner, alive.SessionIdHash, now)
 	require.NoError(t, err)
 	assert.NotNil(t, survivor, "a row whose expires_at is still in the future must survive the sweep")
 }
@@ -383,28 +383,28 @@ func TestBrowserSession_ExpiredRowIsAbsentAndCannotBeRevived(t *testing.T) {
 	justAfter := expiry.Add(time.Second)
 
 	// A second before the deadline all three calls succeed.
-	live, err := database.GetBrowserSessionByOwnerAndSessionIdHash(nil, bs.Owner, bs.SessionIdHash, justBefore)
+	live, err := database.GetBrowserSessionByOwnerAndSessionIdHash(context.Background(), nil, bs.Owner, bs.SessionIdHash, justBefore)
 	require.NoError(t, err)
 	require.NotNil(t, live, "one second before its expiry the session is still live")
 
-	touched, err := database.TouchBrowserSession(nil, bs.Owner, bs.SessionIdHash, justBefore, expiry)
+	touched, err := database.TouchBrowserSession(context.Background(), nil, bs.Owner, bs.SessionIdHash, justBefore, expiry)
 	require.NoError(t, err)
 	assert.True(t, touched, "a live session can be touched")
 
-	moved, err := database.UpdateBrowserSessionData(nil, bs.Owner, bs.SessionIdHash, "still live", justBefore, expiry)
+	moved, err := database.UpdateBrowserSessionData(context.Background(), nil, bs.Owner, bs.SessionIdHash, "still live", justBefore, expiry)
 	require.NoError(t, err)
 	assert.True(t, moved, "a live session can be written")
 
 	// A second after it, none of them do, and neither write moves the deadline.
-	expired, err := database.GetBrowserSessionByOwnerAndSessionIdHash(nil, bs.Owner, bs.SessionIdHash, justAfter)
+	expired, err := database.GetBrowserSessionByOwnerAndSessionIdHash(context.Background(), nil, bs.Owner, bs.SessionIdHash, justAfter)
 	require.NoError(t, err, "an expired row is absent, not an error")
 	assert.Nil(t, expired, "one second after its expiry the session reads as absent")
 
-	touched, err = database.TouchBrowserSession(nil, bs.Owner, bs.SessionIdHash, justAfter, justAfter.Add(time.Hour))
+	touched, err = database.TouchBrowserSession(context.Background(), nil, bs.Owner, bs.SessionIdHash, justAfter, justAfter.Add(time.Hour))
 	require.NoError(t, err)
 	assert.False(t, touched, "an expired session cannot be touched back to life")
 
-	moved, err = database.UpdateBrowserSessionData(nil, bs.Owner, bs.SessionIdHash, "revived",
+	moved, err = database.UpdateBrowserSessionData(context.Background(), nil, bs.Owner, bs.SessionIdHash, "revived",
 		justAfter, justAfter.Add(time.Hour))
 	require.NoError(t, err)
 	assert.False(t, moved, "an expired session cannot be written back to life")
@@ -418,7 +418,7 @@ func TestBrowserSession_ExpiredRowIsAbsentAndCannotBeRevived(t *testing.T) {
 	require.NoError(t, row.Scan(&data))
 	assert.Equal(t, "still live", data, "the refused writes must have left the row alone")
 
-	stillExpired, err := database.GetBrowserSessionByOwnerAndSessionIdHash(nil, bs.Owner, bs.SessionIdHash, justAfter)
+	stillExpired, err := database.GetBrowserSessionByOwnerAndSessionIdHash(context.Background(), nil, bs.Owner, bs.SessionIdHash, justAfter)
 	require.NoError(t, err)
 	assert.Nil(t, stillExpired, "the refused writes must not have moved expires_at forward")
 }
@@ -451,42 +451,42 @@ func TestBrowserSession_StorageFailuresAreErrors(t *testing.T) {
 
 	t.Run("CreateBrowserSession", func(t *testing.T) {
 		bs := newBrowserSession(ownerAuthServer, now, time.Hour)
-		assert.Error(t, database.CreateBrowserSession(deadTx(t), bs))
+		assert.Error(t, database.CreateBrowserSession(context.Background(), deadTx(t), bs))
 		assert.Zero(t, bs.Id, "a failed insert must report no id")
 	})
 
 	t.Run("GetBrowserSessionByOwnerAndSessionIdHash", func(t *testing.T) {
-		got, err := database.GetBrowserSessionByOwnerAndSessionIdHash(deadTx(t),
+		got, err := database.GetBrowserSessionByOwnerAndSessionIdHash(context.Background(), deadTx(t),
 			existing.Owner, existing.SessionIdHash, now)
 		assert.Error(t, err, "a lookup that could not run is an error, not an absent session")
 		assert.Nil(t, got)
 	})
 
 	t.Run("UpdateBrowserSessionData", func(t *testing.T) {
-		moved, err := database.UpdateBrowserSessionData(deadTx(t),
+		moved, err := database.UpdateBrowserSessionData(context.Background(), deadTx(t),
 			existing.Owner, existing.SessionIdHash, "x", now, now.Add(time.Hour))
 		assert.Error(t, err)
 		assert.False(t, moved, "a failed statement must not report a transition")
 	})
 
 	t.Run("TouchBrowserSession", func(t *testing.T) {
-		touched, err := database.TouchBrowserSession(deadTx(t),
+		touched, err := database.TouchBrowserSession(context.Background(), deadTx(t),
 			existing.Owner, existing.SessionIdHash, now, now.Add(time.Hour))
 		assert.Error(t, err)
 		assert.False(t, touched)
 	})
 
 	t.Run("DeleteBrowserSession", func(t *testing.T) {
-		assert.Error(t, database.DeleteBrowserSession(deadTx(t), existing.Owner, existing.SessionIdHash))
+		assert.Error(t, database.DeleteBrowserSession(context.Background(), deadTx(t), existing.Owner, existing.SessionIdHash))
 	})
 
 	t.Run("DeleteExpiredBrowserSessions", func(t *testing.T) {
-		assert.Error(t, database.DeleteExpiredBrowserSessions(deadTx(t), now))
+		assert.Error(t, database.DeleteExpiredBrowserSessions(context.Background(), deadTx(t), now))
 	})
 
 	// The row the failing statements named is untouched, so none of them reported a
 	// failure after doing the work anyway.
-	survivor, err := database.GetBrowserSessionByOwnerAndSessionIdHash(nil, existing.Owner, existing.SessionIdHash, now)
+	survivor, err := database.GetBrowserSessionByOwnerAndSessionIdHash(context.Background(), nil, existing.Owner, existing.SessionIdHash, now)
 	require.NoError(t, err)
 	require.NotNil(t, survivor, "the failed delete must not have removed the row")
 	assert.Equal(t, existing.Data, survivor.Data, "the failed update must not have rewritten it")
@@ -505,35 +505,35 @@ func TestBrowserSession_EmptyKeyPartsAreRefused(t *testing.T) {
 	// caller bug. Matching on one would return somebody else's row, or sweep rows the
 	// caller never named.
 	bs := newBrowserSession("", now, time.Hour)
-	assert.Error(t, database.CreateBrowserSession(nil, bs), "an empty owner must be refused")
+	assert.Error(t, database.CreateBrowserSession(context.Background(), nil, bs), "an empty owner must be refused")
 
 	bs = newBrowserSession(ownerAuthServer, now, time.Hour)
 	bs.SessionIdHash = ""
-	assert.Error(t, database.CreateBrowserSession(nil, bs), "an empty session id hash must be refused")
+	assert.Error(t, database.CreateBrowserSession(context.Background(), nil, bs), "an empty session id hash must be refused")
 
-	got, err := database.GetBrowserSessionByOwnerAndSessionIdHash(nil, "", hash, now)
+	got, err := database.GetBrowserSessionByOwnerAndSessionIdHash(context.Background(), nil, "", hash, now)
 	assert.Error(t, err)
 	assert.Nil(t, got)
-	got, err = database.GetBrowserSessionByOwnerAndSessionIdHash(nil, ownerAuthServer, "", now)
+	got, err = database.GetBrowserSessionByOwnerAndSessionIdHash(context.Background(), nil, ownerAuthServer, "", now)
 	assert.Error(t, err)
 	assert.Nil(t, got)
 
-	moved, err := database.UpdateBrowserSessionData(nil, "", hash, "x", now, now.Add(time.Hour))
+	moved, err := database.UpdateBrowserSessionData(context.Background(), nil, "", hash, "x", now, now.Add(time.Hour))
 	assert.Error(t, err)
 	assert.False(t, moved)
-	moved, err = database.UpdateBrowserSessionData(nil, ownerAuthServer, "", "x", now, now.Add(time.Hour))
+	moved, err = database.UpdateBrowserSessionData(context.Background(), nil, ownerAuthServer, "", "x", now, now.Add(time.Hour))
 	assert.Error(t, err)
 	assert.False(t, moved)
 
-	touched, err := database.TouchBrowserSession(nil, "", hash, now, now.Add(time.Hour))
+	touched, err := database.TouchBrowserSession(context.Background(), nil, "", hash, now, now.Add(time.Hour))
 	assert.Error(t, err)
 	assert.False(t, touched)
-	touched, err = database.TouchBrowserSession(nil, ownerAuthServer, "", now, now.Add(time.Hour))
+	touched, err = database.TouchBrowserSession(context.Background(), nil, ownerAuthServer, "", now, now.Add(time.Hour))
 	assert.Error(t, err)
 	assert.False(t, touched)
 
-	assert.Error(t, database.DeleteBrowserSession(nil, "", hash))
-	assert.Error(t, database.DeleteBrowserSession(nil, ownerAuthServer, ""))
+	assert.Error(t, database.DeleteBrowserSession(context.Background(), nil, "", hash))
+	assert.Error(t, database.DeleteBrowserSession(context.Background(), nil, ownerAuthServer, ""))
 }
 
 // TestBrowserSession_EnlistsInTheCallersTransaction is testing.md section 4's second
@@ -553,15 +553,15 @@ func TestBrowserSession_EnlistsInTheCallersTransaction(t *testing.T) {
 		tx, err := database.BeginTransaction(context.Background())
 		require.NoError(t, err, "BeginTransaction")
 
-		require.NoError(t, database.CreateBrowserSession(tx, bs), "CreateBrowserSession")
+		require.NoError(t, database.CreateBrowserSession(context.Background(), tx, bs), "CreateBrowserSession")
 
-		inside, err := database.GetBrowserSessionByOwnerAndSessionIdHash(tx, bs.Owner, bs.SessionIdHash, now)
+		inside, err := database.GetBrowserSessionByOwnerAndSessionIdHash(context.Background(), tx, bs.Owner, bs.SessionIdHash, now)
 		require.NoError(t, err)
 		assert.NotNil(t, inside, "inside the transaction the insert is visible to its own read-back")
 
 		require.NoError(t, database.RollbackTransaction(tx), "RollbackTransaction")
 
-		after, err := database.GetBrowserSessionByOwnerAndSessionIdHash(nil, bs.Owner, bs.SessionIdHash, now)
+		after, err := database.GetBrowserSessionByOwnerAndSessionIdHash(context.Background(), nil, bs.Owner, bs.SessionIdHash, now)
 		require.NoError(t, err)
 		assert.Nil(t, after, "a rolled back transaction must leave no row; if this is found, "+
 			"the insert ran outside the caller's transaction")
@@ -573,14 +573,14 @@ func TestBrowserSession_EnlistsInTheCallersTransaction(t *testing.T) {
 		tx, err := database.BeginTransaction(context.Background())
 		require.NoError(t, err, "BeginTransaction")
 
-		moved, err := database.UpdateBrowserSessionData(tx, bs.Owner, bs.SessionIdHash, "rewritten",
+		moved, err := database.UpdateBrowserSessionData(context.Background(), tx, bs.Owner, bs.SessionIdHash, "rewritten",
 			now, now.Add(2*time.Hour))
 		require.NoError(t, err)
 		require.True(t, moved)
 
 		require.NoError(t, database.RollbackTransaction(tx), "RollbackTransaction")
 
-		after, err := database.GetBrowserSessionByOwnerAndSessionIdHash(nil, bs.Owner, bs.SessionIdHash, now)
+		after, err := database.GetBrowserSessionByOwnerAndSessionIdHash(context.Background(), nil, bs.Owner, bs.SessionIdHash, now)
 		require.NoError(t, err)
 		require.NotNil(t, after)
 		assert.Equal(t, bs.Data, after.Data, "a rolled back transaction must leave the contents where they were")
@@ -592,10 +592,10 @@ func TestBrowserSession_EnlistsInTheCallersTransaction(t *testing.T) {
 		tx, err := database.BeginTransaction(context.Background())
 		require.NoError(t, err, "BeginTransaction")
 
-		require.NoError(t, database.DeleteBrowserSession(tx, bs.Owner, bs.SessionIdHash))
+		require.NoError(t, database.DeleteBrowserSession(context.Background(), tx, bs.Owner, bs.SessionIdHash))
 		require.NoError(t, database.RollbackTransaction(tx), "RollbackTransaction")
 
-		after, err := database.GetBrowserSessionByOwnerAndSessionIdHash(nil, bs.Owner, bs.SessionIdHash, now)
+		after, err := database.GetBrowserSessionByOwnerAndSessionIdHash(context.Background(), nil, bs.Owner, bs.SessionIdHash, now)
 		require.NoError(t, err)
 		assert.NotNil(t, after, "a rolled back delete must leave the row in place")
 	})

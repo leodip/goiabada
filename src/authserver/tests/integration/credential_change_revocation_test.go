@@ -263,7 +263,7 @@ func secondOfflineGrantForSameUser(t *testing.T, base *offlineGrant, password st
 	// session_identifier column is empty.
 	codeHash, err := hashutil.HashString(code)
 	require.NoError(t, err)
-	codeEntity, err := database.GetCodeByCodeHash(nil, codeHash, false)
+	codeEntity, err := database.GetCodeByCodeHash(context.Background(), nil, codeHash, false)
 	require.NoError(t, err)
 	require.NotNil(t, codeEntity)
 	require.NotEmpty(t, codeEntity.SessionIdentifier)
@@ -427,7 +427,7 @@ func createOfflineGrant(t *testing.T) *offlineGrant {
 	// carry it, which is the whole reason the sweep needs a sid-scoped query (finding 3).
 	codeHash, err := hashutil.HashString(code)
 	require.NoError(t, err)
-	codeEntity, err := database.GetCodeByCodeHash(nil, codeHash, false)
+	codeEntity, err := database.GetCodeByCodeHash(context.Background(), nil, codeHash, false)
 	require.NoError(t, err)
 	require.NotNil(t, codeEntity)
 	sessionIdentifier := codeEntity.SessionIdentifier
@@ -549,10 +549,10 @@ func TestCredentialChange_OfflineGrantWithNoSessionStopsRefreshing(t *testing.T)
 	grant.refreshToken = first["refresh_token"].(string)
 
 	// Reap the session, leaving the offline grant with no session row at all.
-	session, err := database.GetUserSessionBySessionIdentifier(nil, grant.sessionIdentifier)
+	session, err := database.GetUserSessionBySessionIdentifier(context.Background(), nil, grant.sessionIdentifier)
 	require.NoError(t, err)
 	require.NotNil(t, session)
-	require.NoError(t, database.DeleteUserSession(nil, session.Id))
+	require.NoError(t, database.DeleteUserSession(context.Background(), nil, session.Id))
 
 	before := generationOf(t, grant.user.Id)
 	resetPasswordFor(t, grant.user, "R3setP4ss!word")
@@ -600,7 +600,7 @@ func TestCredentialChange_ROPCGrantStopsRefreshing(t *testing.T) {
 	// generation rejection from a revoked-token rejection.
 	childJti := claimString(t, child, "jti")
 	require.NotEmpty(t, childJti)
-	childRow, err := database.GetRefreshTokenByJti(nil, childJti)
+	childRow, err := database.GetRefreshTokenByJti(context.Background(), nil, childJti)
 	require.NoError(t, err)
 	require.NotNil(t, childRow)
 	require.False(t, childRow.Revoked, "the child must be unspent before the reset")
@@ -676,14 +676,14 @@ func TestCredentialChange_SelfServicePreservesTheCallersSession(t *testing.T) {
 	assert.NotEmpty(t, preserved["access_token"],
 		"the caller's own session and its offline tokens must survive: %v", preserved)
 
-	session, err := database.GetUserSessionBySessionIdentifier(nil, grant.sessionIdentifier)
+	session, err := database.GetUserSessionBySessionIdentifier(context.Background(), nil, grant.sessionIdentifier)
 	require.NoError(t, err)
 	require.NotNil(t, session, "the caller's session must not be deleted")
 	assert.Equal(t, generationOf(t, grant.user.Id), session.AuthStateGeneration,
 		"the preserved session must be promoted to the new generation")
 
 	// TERMINATED: the same user's other session. This is the half the plan calls central.
-	otherSession, err := database.GetUserSessionBySessionIdentifier(nil, otherSid)
+	otherSession, err := database.GetUserSessionBySessionIdentifier(context.Background(), nil, otherSid)
 	require.NoError(t, err)
 	assert.Nil(t, otherSession, "the user's other session must be deleted")
 
@@ -783,10 +783,10 @@ func TestCredentialChange_OfflineTokenWorksAfterSessionDeletion(t *testing.T) {
 	require.Empty(t, extractSidClaim(t, grant.accessToken),
 		"an access token on an offline grant must not carry a sid (decision 9)")
 
-	session, err := database.GetUserSessionBySessionIdentifier(nil, grant.sessionIdentifier)
+	session, err := database.GetUserSessionBySessionIdentifier(context.Background(), nil, grant.sessionIdentifier)
 	require.NoError(t, err)
 	require.NotNil(t, session)
-	require.NoError(t, database.DeleteUserSession(nil, session.Id))
+	require.NoError(t, database.DeleteUserSession(context.Background(), nil, session.Id))
 
 	resp := makeAPIRequest(t, "GET", config.GetAuthServer().BaseURL+"/userinfo", grant.accessToken, nil)
 	body, _ := io.ReadAll(resp.Body)
@@ -879,7 +879,7 @@ func TestCredentialChange_PreservedFamilyKeepsRotating(t *testing.T) {
 	childJti := claimString(t, childJwt, "jti")
 	require.NotEmpty(t, childJti)
 
-	child, err := database.GetRefreshTokenByJti(nil, childJti)
+	child, err := database.GetRefreshTokenByJti(context.Background(), nil, childJti)
 	require.NoError(t, err)
 	require.NotNil(t, child)
 	assert.Equal(t, generation, child.AuthStateGeneration,
@@ -888,7 +888,7 @@ func TestCredentialChange_PreservedFamilyKeepsRotating(t *testing.T) {
 	// The parent was promoted by the sweep and then revoked by the rotation, which is the
 	// expected end state for a rotated family member.
 	parentJti := claimString(t, grant.refreshToken, "jti")
-	parent, err := database.GetRefreshTokenByJti(nil, parentJti)
+	parent, err := database.GetRefreshTokenByJti(context.Background(), nil, parentJti)
 	require.NoError(t, err)
 	require.NotNil(t, parent)
 	assert.Equal(t, generation, parent.AuthStateGeneration,
@@ -927,7 +927,7 @@ func TestCredentialChange_ResidualRacingChildIsFailClosed(t *testing.T) {
 	require.Equal(t, beforeGeneration+1, afterGeneration)
 
 	jti := claimString(t, grant.refreshToken, "jti")
-	row, err := database.GetRefreshTokenByJti(nil, jti)
+	row, err := database.GetRefreshTokenByJti(context.Background(), nil, jti)
 	require.NoError(t, err)
 	require.NotNil(t, row)
 	require.True(t, row.Revoked, "the sweep should have revoked it")
@@ -937,10 +937,10 @@ func TestCredentialChange_ResidualRacingChildIsFailClosed(t *testing.T) {
 	// rows; it is used here to move the value DOWN, which is a test tool rather than a production
 	// path.
 	row.Revoked = false
-	require.NoError(t, database.UpdateRefreshToken(nil, row))
-	require.NoError(t, database.PromoteRefreshTokenGenerations(nil, []int64{row.Id}, beforeGeneration))
+	require.NoError(t, database.UpdateRefreshToken(context.Background(), nil, row))
+	require.NoError(t, database.PromoteRefreshTokenGenerations(context.Background(), nil, []int64{row.Id}, beforeGeneration))
 
-	check, err := database.GetRefreshTokenByJti(nil, jti)
+	check, err := database.GetRefreshTokenByJti(context.Background(), nil, jti)
 	require.NoError(t, err)
 	require.False(t, check.Revoked, "the fixture must be unrevoked, or the rejection proves nothing")
 	require.Equal(t, beforeGeneration, check.AuthStateGeneration,

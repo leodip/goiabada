@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"context"
 	"database/sql"
 	"testing"
 	"time"
@@ -37,13 +38,13 @@ func TestCreateCode(t *testing.T) {
 		Used:                false,
 	}
 
-	err := database.CreateCode(nil, code)
+	err := database.CreateCode(context.Background(), nil, code)
 	if err != nil {
 		t.Fatalf("Failed to create code: %v", err)
 	}
 
 	// Verify the code was created
-	createdCode, err := database.GetCodeById(nil, code.Id)
+	createdCode, err := database.GetCodeById(context.Background(), nil, code.Id)
 	if err != nil {
 		t.Fatalf("Failed to retrieve created code: %v", err)
 	}
@@ -112,7 +113,7 @@ func TestCreateCode(t *testing.T) {
 		ClientId: 0,
 		UserId:   user.Id,
 	}
-	err = database.CreateCode(nil, invalidCode)
+	err = database.CreateCode(context.Background(), nil, invalidCode)
 	if err == nil {
 		t.Errorf("Expected error when creating code with invalid client ID, got nil")
 	}
@@ -122,7 +123,7 @@ func TestCreateCode(t *testing.T) {
 		ClientId: client.Id,
 		UserId:   0,
 	}
-	err = database.CreateCode(nil, invalidCode)
+	err = database.CreateCode(context.Background(), nil, invalidCode)
 	if err == nil {
 		t.Errorf("Expected error when creating code with invalid user ID, got nil")
 	}
@@ -146,13 +147,13 @@ func TestUpdateCode(t *testing.T) {
 
 	time.Sleep(timestampTick) // Ensure some time passes before update
 
-	err := database.UpdateCode(nil, code)
+	err := database.UpdateCode(context.Background(), nil, code)
 	if err != nil {
 		t.Fatalf("Failed to update code: %v", err)
 	}
 
 	// Fetch the updated code
-	updatedCode, err := database.GetCodeById(nil, code.Id)
+	updatedCode, err := database.GetCodeById(context.Background(), nil, code.Id)
 	if err != nil {
 		t.Fatalf("Failed to retrieve updated code: %v", err)
 	}
@@ -202,7 +203,7 @@ func TestMarkCodeAsUsed(t *testing.T) {
 	}
 
 	// First claim wins: the compare-and-set flips used=false -> true.
-	claimed, err := database.MarkCodeAsUsed(nil, code.Id)
+	claimed, err := database.MarkCodeAsUsed(context.Background(), nil, code.Id)
 	if err != nil {
 		t.Fatalf("first MarkCodeAsUsed returned error: %v", err)
 	}
@@ -211,7 +212,7 @@ func TestMarkCodeAsUsed(t *testing.T) {
 	}
 
 	// The row is actually marked used in the database.
-	reloaded, err := database.GetCodeById(nil, code.Id)
+	reloaded, err := database.GetCodeById(context.Background(), nil, code.Id)
 	if err != nil {
 		t.Fatalf("failed to reload code: %v", err)
 	}
@@ -222,7 +223,7 @@ func TestMarkCodeAsUsed(t *testing.T) {
 	// Second claim loses: the WHERE used=false predicate no longer matches, so no
 	// row is affected. This is exactly what stops a concurrent request from
 	// redeeming the same code a second time.
-	claimed, err = database.MarkCodeAsUsed(nil, code.Id)
+	claimed, err = database.MarkCodeAsUsed(context.Background(), nil, code.Id)
 	if err != nil {
 		t.Fatalf("second MarkCodeAsUsed returned error: %v", err)
 	}
@@ -231,7 +232,7 @@ func TestMarkCodeAsUsed(t *testing.T) {
 	}
 
 	// A non-existent code affects zero rows: claimed=false, and no error.
-	claimed, err = database.MarkCodeAsUsed(nil, 999999999)
+	claimed, err = database.MarkCodeAsUsed(context.Background(), nil, 999999999)
 	if err != nil {
 		t.Fatalf("MarkCodeAsUsed for a missing code returned error: %v", err)
 	}
@@ -240,7 +241,7 @@ func TestMarkCodeAsUsed(t *testing.T) {
 	}
 
 	// Guard: id 0 is rejected outright.
-	if _, err := database.MarkCodeAsUsed(nil, 0); err == nil {
+	if _, err := database.MarkCodeAsUsed(context.Background(), nil, 0); err == nil {
 		t.Errorf("MarkCodeAsUsed with id 0 must return an error")
 	}
 
@@ -250,10 +251,10 @@ func TestMarkCodeAsUsed(t *testing.T) {
 	// Keep BOTH this case and the already-used one above: either alone still passes
 	// with the other term deleted from the predicate.
 	revoked := createTestCode(t, client.Id, user.Id)
-	if _, err := database.RevokeCodesBySessionIdentifier(nil, revoked.SessionIdentifier); err != nil {
+	if _, err := database.RevokeCodesBySessionIdentifier(context.Background(), nil, revoked.SessionIdentifier); err != nil {
 		t.Fatalf("failed to revoke the code's session: %v", err)
 	}
-	claimed, err = database.MarkCodeAsUsed(nil, revoked.Id)
+	claimed, err = database.MarkCodeAsUsed(context.Background(), nil, revoked.Id)
 	if err != nil {
 		t.Fatalf("MarkCodeAsUsed for a revoked code returned error: %v", err)
 	}
@@ -262,7 +263,7 @@ func TestMarkCodeAsUsed(t *testing.T) {
 	}
 
 	// And it stays unused, so nothing downstream can read it as redeemed.
-	unclaimed, err := database.GetCodeById(nil, revoked.Id)
+	unclaimed, err := database.GetCodeById(context.Background(), nil, revoked.Id)
 	if err != nil {
 		t.Fatalf("failed to reload the revoked code: %v", err)
 	}
@@ -278,7 +279,7 @@ func TestGetCodeById(t *testing.T) {
 	code := createTestCode(t, client.Id, user.Id)
 
 	// Retrieve the code
-	retrievedCode, err := database.GetCodeById(nil, code.Id)
+	retrievedCode, err := database.GetCodeById(context.Background(), nil, code.Id)
 	if err != nil {
 		t.Fatalf("Failed to retrieve code by ID: %v", err)
 	}
@@ -346,7 +347,7 @@ func TestGetCodeById(t *testing.T) {
 	}
 
 	// Test retrieving a non-existent code
-	nonExistentCode, err := database.GetCodeById(nil, 99999)
+	nonExistentCode, err := database.GetCodeById(context.Background(), nil, 99999)
 	if err != nil {
 		t.Errorf("Expected no error for non-existent code, got: %v", err)
 	}
@@ -362,7 +363,7 @@ func TestCodeLoadClient(t *testing.T) {
 	code := createTestCode(t, client.Id, user.Id)
 
 	// Load client for the code
-	err := database.CodeLoadClient(nil, code)
+	err := database.CodeLoadClient(context.Background(), nil, code)
 	if err != nil {
 		t.Fatalf("Failed to load client for code: %v", err)
 	}
@@ -376,14 +377,14 @@ func TestCodeLoadClient(t *testing.T) {
 	}
 
 	// Test loading client for nil code
-	err = database.CodeLoadClient(nil, nil)
+	err = database.CodeLoadClient(context.Background(), nil, nil)
 	if err != nil {
 		t.Errorf("Expected no error when loading client for nil code, got: %v", err)
 	}
 
 	// Test loading client for code with non-existent client
 	codeWithNonExistentClient := &models.Code{ClientId: 99999}
-	err = database.CodeLoadClient(nil, codeWithNonExistentClient)
+	err = database.CodeLoadClient(context.Background(), nil, codeWithNonExistentClient)
 	if err != nil {
 		t.Errorf("Expected no error when loading non-existent client, got: %v", err)
 	}
@@ -399,7 +400,7 @@ func TestCodeLoadUser(t *testing.T) {
 	code := createTestCode(t, client.Id, user.Id)
 
 	// Load user for the code
-	err := database.CodeLoadUser(nil, code)
+	err := database.CodeLoadUser(context.Background(), nil, code)
 	if err != nil {
 		t.Fatalf("Failed to load user for code: %v", err)
 	}
@@ -413,14 +414,14 @@ func TestCodeLoadUser(t *testing.T) {
 	}
 
 	// Test loading user for nil code
-	err = database.CodeLoadUser(nil, nil)
+	err = database.CodeLoadUser(context.Background(), nil, nil)
 	if err != nil {
 		t.Errorf("Expected no error when loading user for nil code, got: %v", err)
 	}
 
 	// Test loading user for code with non-existent user
 	codeWithNonExistentUser := &models.Code{UserId: 99999}
-	err = database.CodeLoadUser(nil, codeWithNonExistentUser)
+	err = database.CodeLoadUser(context.Background(), nil, codeWithNonExistentUser)
 	if err != nil {
 		t.Errorf("Expected no error when loading non-existent user, got: %v", err)
 	}
@@ -436,7 +437,7 @@ func TestGetCodeByCodeHash(t *testing.T) {
 	code := createTestCode(t, client.Id, user.Id)
 
 	// Retrieve the code by code hash
-	retrievedCode, err := database.GetCodeByCodeHash(nil, code.CodeHash, false)
+	retrievedCode, err := database.GetCodeByCodeHash(context.Background(), nil, code.CodeHash, false)
 	if err != nil {
 		t.Fatalf("Failed to retrieve code by code hash: %v", err)
 	}
@@ -453,7 +454,7 @@ func TestGetCodeByCodeHash(t *testing.T) {
 	}
 
 	// Test retrieving a non-existent code
-	nonExistentCode, err := database.GetCodeByCodeHash(nil, "non_existent_hash", false)
+	nonExistentCode, err := database.GetCodeByCodeHash(context.Background(), nil, "non_existent_hash", false)
 	if err != nil {
 		t.Errorf("Expected no error for non-existent code, got: %v", err)
 	}
@@ -463,12 +464,12 @@ func TestGetCodeByCodeHash(t *testing.T) {
 
 	// Test retrieving a used code
 	code.Used = true
-	err = database.UpdateCode(nil, code)
+	err = database.UpdateCode(context.Background(), nil, code)
 	if err != nil {
 		t.Fatalf("Failed to update code: %v", err)
 	}
 
-	usedCode, err := database.GetCodeByCodeHash(nil, code.CodeHash, true)
+	usedCode, err := database.GetCodeByCodeHash(context.Background(), nil, code.CodeHash, true)
 	if err != nil {
 		t.Fatalf("Failed to retrieve used code: %v", err)
 	}
@@ -487,13 +488,13 @@ func TestDeleteCode(t *testing.T) {
 	code := createTestCode(t, client.Id, user.Id)
 
 	// Delete the code
-	err := database.DeleteCode(nil, code.Id)
+	err := database.DeleteCode(context.Background(), nil, code.Id)
 	if err != nil {
 		t.Fatalf("Failed to delete code: %v", err)
 	}
 
 	// Try to retrieve the deleted code
-	deletedCode, err := database.GetCodeById(nil, code.Id)
+	deletedCode, err := database.GetCodeById(context.Background(), nil, code.Id)
 	if err != nil {
 		t.Fatalf("Error while checking for deleted code: %v", err)
 	}
@@ -502,7 +503,7 @@ func TestDeleteCode(t *testing.T) {
 	}
 
 	// Test deleting a non-existent code
-	err = database.DeleteCode(nil, 99999)
+	err = database.DeleteCode(context.Background(), nil, 99999)
 	if err != nil {
 		t.Errorf("Expected no error when deleting non-existent code, got: %v", err)
 	}
@@ -536,7 +537,7 @@ func createTestCodeOn(t *testing.T, db data.Database, clientId, userId int64) *m
 		AuthMethods:         "password",
 		Used:                false,
 	}
-	err := db.CreateCode(nil, code)
+	err := db.CreateCode(context.Background(), nil, code)
 	if err != nil {
 		t.Fatalf("Failed to create test code: %v", err)
 	}
@@ -550,7 +551,7 @@ func TestDeleteUsedCodesWithoutRefreshTokens(t *testing.T) {
 	// Test Case 1: Used code without refresh token should be deleted
 	code1 := createTestCode(t, client.Id, user.Id)
 	code1.Used = true
-	err := database.UpdateCode(nil, code1)
+	err := database.UpdateCode(context.Background(), nil, code1)
 	if err != nil {
 		t.Fatalf("Failed to update code1 as used: %v", err)
 	}
@@ -558,7 +559,7 @@ func TestDeleteUsedCodesWithoutRefreshTokens(t *testing.T) {
 	// Test Case 2: Used code with refresh token should not be deleted
 	code2 := createTestCode(t, client.Id, user.Id)
 	code2.Used = true
-	err = database.UpdateCode(nil, code2)
+	err = database.UpdateCode(context.Background(), nil, code2)
 	if err != nil {
 		t.Fatalf("Failed to update code2 as used: %v", err)
 	}
@@ -575,7 +576,7 @@ func TestDeleteUsedCodesWithoutRefreshTokens(t *testing.T) {
 		MaxLifetime:       sql.NullTime{Time: time.Now().UTC().Add(24 * time.Hour), Valid: true},
 		Revoked:           false,
 	}
-	err = database.CreateRefreshToken(nil, refreshToken)
+	err = database.CreateRefreshToken(context.Background(), nil, refreshToken)
 	if err != nil {
 		t.Fatalf("Failed to create refresh token: %v", err)
 	}
@@ -587,13 +588,13 @@ func TestDeleteUsedCodesWithoutRefreshTokens(t *testing.T) {
 	// Cutoff in the future, so every code qualifies on age and these assertions keep
 	// testing what they were written to test: the used/refresh-token predicate. The age
 	// cutoff itself is covered by TestDeleteUsedCodesWithoutRefreshTokens_AgeCutoff.
-	err = database.DeleteUsedCodesWithoutRefreshTokens(nil, time.Now().UTC().Add(time.Hour))
+	err = database.DeleteUsedCodesWithoutRefreshTokens(context.Background(), nil, time.Now().UTC().Add(time.Hour))
 	if err != nil {
 		t.Fatalf("Failed to delete used codes without refresh tokens: %v", err)
 	}
 
 	// Verify Test Case 1: Used code without refresh token should be deleted
-	deletedCode1, err := database.GetCodeById(nil, code1.Id)
+	deletedCode1, err := database.GetCodeById(context.Background(), nil, code1.Id)
 	if err != nil {
 		t.Fatalf("Error checking deleted code1: %v", err)
 	}
@@ -602,7 +603,7 @@ func TestDeleteUsedCodesWithoutRefreshTokens(t *testing.T) {
 	}
 
 	// Verify Test Case 2: Used code with refresh token should still exist
-	remainingCode2, err := database.GetCodeById(nil, code2.Id)
+	remainingCode2, err := database.GetCodeById(context.Background(), nil, code2.Id)
 	if err != nil {
 		t.Fatalf("Error checking code2: %v", err)
 	}
@@ -611,7 +612,7 @@ func TestDeleteUsedCodesWithoutRefreshTokens(t *testing.T) {
 	}
 
 	// Verify Test Case 3: Unused code should still exist
-	remainingCode3, err := database.GetCodeById(nil, code3.Id)
+	remainingCode3, err := database.GetCodeById(context.Background(), nil, code3.Id)
 	if err != nil {
 		t.Fatalf("Error checking code3: %v", err)
 	}
@@ -624,7 +625,7 @@ func TestDeleteUsedCodesWithoutRefreshTokens(t *testing.T) {
 	// deletes it solely because it is past both expires_at and max_lifetime.
 	code4 := createTestCode(t, client.Id, user.Id)
 	code4.Used = true
-	err = database.UpdateCode(nil, code4)
+	err = database.UpdateCode(context.Background(), nil, code4)
 	if err != nil {
 		t.Fatalf("Failed to update code4 as used: %v", err)
 	}
@@ -641,25 +642,25 @@ func TestDeleteUsedCodesWithoutRefreshTokens(t *testing.T) {
 		MaxLifetime:       sql.NullTime{Time: time.Now().UTC().Add(-1 * time.Hour), Valid: true},
 		Revoked:           true,
 	}
-	err = database.CreateRefreshToken(nil, revokedRefreshToken)
+	err = database.CreateRefreshToken(context.Background(), nil, revokedRefreshToken)
 	if err != nil {
 		t.Fatalf("Failed to create revoked refresh token: %v", err)
 	}
 
 	// Delete expired refresh tokens first
-	err = database.DeleteExpiredRefreshTokens(nil)
+	err = database.DeleteExpiredRefreshTokens(context.Background(), nil)
 	if err != nil {
 		t.Fatalf("Failed to delete expired refresh tokens: %v", err)
 	}
 
 	// Then delete used codes without valid refresh tokens. Future cutoff, as above.
-	err = database.DeleteUsedCodesWithoutRefreshTokens(nil, time.Now().UTC().Add(time.Hour))
+	err = database.DeleteUsedCodesWithoutRefreshTokens(context.Background(), nil, time.Now().UTC().Add(time.Hour))
 	if err != nil {
 		t.Fatalf("Failed to delete used codes without refresh tokens: %v", err)
 	}
 
 	// Verify code4 was deleted after its refresh token was removed
-	remainingCode4, err := database.GetCodeById(nil, code4.Id)
+	remainingCode4, err := database.GetCodeById(context.Background(), nil, code4.Id)
 	if err != nil {
 		t.Fatalf("Error checking code4: %v", err)
 	}
@@ -688,18 +689,18 @@ func TestDeleteUsedCodesWithoutRefreshTokens_AgeCutoff(t *testing.T) {
 	// A code in exactly the mid-redemption state: used, no refresh token yet.
 	code := createTestCode(t, client.Id, user.Id)
 	code.Used = true
-	if err := database.UpdateCode(nil, code); err != nil {
+	if err := database.UpdateCode(context.Background(), nil, code); err != nil {
 		t.Fatalf("Failed to mark code as used: %v", err)
 	}
 
 	// Sweep with the cutoff the worker uses. The code was created seconds ago, so it is
 	// newer than the cutoff and must be left alone.
 	cutoff := time.Now().UTC().Add(-5 * time.Minute)
-	if err := database.DeleteUsedCodesWithoutRefreshTokens(nil, cutoff); err != nil {
+	if err := database.DeleteUsedCodesWithoutRefreshTokens(context.Background(), nil, cutoff); err != nil {
 		t.Fatalf("Failed to run the sweep: %v", err)
 	}
 
-	survived, err := database.GetCodeById(nil, code.Id)
+	survived, err := database.GetCodeById(context.Background(), nil, code.Id)
 	if err != nil {
 		t.Fatalf("Error re-reading the code: %v", err)
 	}
@@ -711,10 +712,10 @@ func TestDeleteUsedCodesWithoutRefreshTokens_AgeCutoff(t *testing.T) {
 
 	// The same code once it is genuinely past the cutoff: no longer redeemable, so it can
 	// never gain a refresh token, and the sweep must reap it.
-	if err := database.DeleteUsedCodesWithoutRefreshTokens(nil, time.Now().UTC().Add(time.Hour)); err != nil {
+	if err := database.DeleteUsedCodesWithoutRefreshTokens(context.Background(), nil, time.Now().UTC().Add(time.Hour)); err != nil {
 		t.Fatalf("Failed to run the sweep with a future cutoff: %v", err)
 	}
-	reaped, err := database.GetCodeById(nil, code.Id)
+	reaped, err := database.GetCodeById(context.Background(), nil, code.Id)
 	if err != nil {
 		t.Fatalf("Error re-reading the code: %v", err)
 	}
@@ -729,7 +730,7 @@ func TestDeleteUsedCodesWithoutRefreshTokens_AgeCutoff(t *testing.T) {
 // alone.
 func revokeCodesOf(t *testing.T, code *models.Code) {
 	t.Helper()
-	if _, err := database.RevokeCodesBySessionIdentifier(nil, code.SessionIdentifier); err != nil {
+	if _, err := database.RevokeCodesBySessionIdentifier(context.Background(), nil, code.SessionIdentifier); err != nil {
 		t.Fatalf("Failed to revoke the session of code %d: %v", code.Id, err)
 	}
 	assertCodeRevoked(t, code.Id, true, "the code the fixture just revoked")
@@ -742,7 +743,7 @@ func revokeCodesOf(t *testing.T, code *models.Code) {
 func markCodeUsed(t *testing.T, code *models.Code) {
 	t.Helper()
 	code.Used = true
-	if err := database.UpdateCode(nil, code); err != nil {
+	if err := database.UpdateCode(context.Background(), nil, code); err != nil {
 		t.Fatalf("Failed to mark code %d as used: %v", code.Id, err)
 	}
 }
@@ -751,7 +752,7 @@ func markCodeUsed(t *testing.T, code *models.Code) {
 // contract is about.
 func assertCodeExists(t *testing.T, codeId int64, want bool, what string) {
 	t.Helper()
-	code, err := database.GetCodeById(nil, codeId)
+	code, err := database.GetCodeById(context.Background(), nil, codeId)
 	if err != nil {
 		t.Fatalf("Failed to re-read code %d: %v", codeId, err)
 	}
@@ -804,7 +805,7 @@ func TestDeleteUsedCodesWithoutRefreshTokens_RevokedUnused(t *testing.T) {
 		MaxLifetime:       sql.NullTime{Time: time.Now().UTC().Add(24 * time.Hour), Valid: true},
 		Revoked:           false,
 	}
-	if err := database.CreateRefreshToken(nil, racingChild); err != nil {
+	if err := database.CreateRefreshToken(context.Background(), nil, racingChild); err != nil {
 		t.Fatalf("Failed to create the descendant refresh token: %v", err)
 	}
 
@@ -823,7 +824,7 @@ func TestDeleteUsedCodesWithoutRefreshTokens_RevokedUnused(t *testing.T) {
 	// All four were created seconds ago, so all four must survive. This is the only
 	// assertion here that fails if the extension drops the shared created_at term, or
 	// states it per branch and gets one of them wrong.
-	if err := database.DeleteUsedCodesWithoutRefreshTokens(nil, time.Now().UTC().Add(-5*time.Minute)); err != nil {
+	if err := database.DeleteUsedCodesWithoutRefreshTokens(context.Background(), nil, time.Now().UTC().Add(-5*time.Minute)); err != nil {
 		t.Fatalf("Failed to run the sweep with the worker's cutoff: %v", err)
 	}
 	assertCodeExists(t, revokedUnused.Id, true, "a revoked, unredeemed code newer than the cutoff")
@@ -833,7 +834,7 @@ func TestDeleteUsedCodesWithoutRefreshTokens_RevokedUnused(t *testing.T) {
 
 	// Then a cutoff every row is past, so the remaining assertions are about the
 	// used/revoked predicate rather than about age.
-	if err := database.DeleteUsedCodesWithoutRefreshTokens(nil, time.Now().UTC().Add(time.Hour)); err != nil {
+	if err := database.DeleteUsedCodesWithoutRefreshTokens(context.Background(), nil, time.Now().UTC().Add(time.Hour)); err != nil {
 		t.Fatalf("Failed to run the sweep with a future cutoff: %v", err)
 	}
 	assertCodeExists(t, revokedUnused.Id, false, "a revoked, unredeemed code past the cutoff")
@@ -875,11 +876,11 @@ func TestDeleteUsedCodesWithoutRefreshTokens_RevokedUnusedWithRopcTokenPresent(t
 		ExpiresAt:         sql.NullTime{Time: time.Now().UTC().Add(time.Hour), Valid: true},
 		MaxLifetime:       sql.NullTime{Time: time.Now().UTC().Add(24 * time.Hour), Valid: true},
 	}
-	if err := database.CreateRefreshToken(nil, ropcToken); err != nil {
+	if err := database.CreateRefreshToken(context.Background(), nil, ropcToken); err != nil {
 		t.Fatalf("Failed to create the ROPC refresh token: %v", err)
 	}
 	t.Cleanup(func() {
-		if err := database.DeleteRefreshToken(nil, ropcToken.Id); err != nil {
+		if err := database.DeleteRefreshToken(context.Background(), nil, ropcToken.Id); err != nil {
 			t.Errorf("Failed to remove the ROPC refresh token: %v", err)
 		}
 	})
@@ -887,7 +888,7 @@ func TestDeleteUsedCodesWithoutRefreshTokens_RevokedUnusedWithRopcTokenPresent(t
 	revokedUnused := createTestCode(t, client.Id, user.Id)
 	revokeCodesOf(t, revokedUnused)
 
-	if err := database.DeleteUsedCodesWithoutRefreshTokens(nil, time.Now().UTC().Add(time.Hour)); err != nil {
+	if err := database.DeleteUsedCodesWithoutRefreshTokens(context.Background(), nil, time.Now().UTC().Add(time.Hour)); err != nil {
 		t.Fatalf("Failed to run the sweep: %v", err)
 	}
 	assertCodeExists(t, revokedUnused.Id, false,
@@ -907,11 +908,11 @@ func TestUpdateCode_DoesNotClobberAuthStateGeneration(t *testing.T) {
 	code.AuthStateGeneration = 7
 	code.Id = 0
 	code.CodeHash = "genhash_" + fake.LetterN(8)
-	if err := database.CreateCode(nil, code); err != nil {
+	if err := database.CreateCode(context.Background(), nil, code); err != nil {
 		t.Fatalf("Failed to create code with a generation: %v", err)
 	}
 
-	created, err := database.GetCodeById(nil, code.Id)
+	created, err := database.GetCodeById(context.Background(), nil, code.Id)
 	if err != nil {
 		t.Fatalf("Failed to reload created code: %v", err)
 	}
@@ -922,11 +923,11 @@ func TestUpdateCode_DoesNotClobberAuthStateGeneration(t *testing.T) {
 
 	created.AuthStateGeneration = 0
 	created.Used = true
-	if err := database.UpdateCode(nil, created); err != nil {
+	if err := database.UpdateCode(context.Background(), nil, created); err != nil {
 		t.Fatalf("Failed to update code: %v", err)
 	}
 
-	after, err := database.GetCodeById(nil, code.Id)
+	after, err := database.GetCodeById(context.Background(), nil, code.Id)
 	if err != nil {
 		t.Fatalf("Failed to reload updated code: %v", err)
 	}
@@ -953,7 +954,7 @@ func createTestCodeInSessionOn(t *testing.T, db data.Database, clientId, userId 
 	t.Helper()
 	code := createTestCodeOn(t, db, clientId, userId)
 	code.SessionIdentifier = sessionIdentifier
-	if err := db.UpdateCode(nil, code); err != nil {
+	if err := db.UpdateCode(context.Background(), nil, code); err != nil {
 		t.Fatalf("Failed to bind test code to session %q: %v", sessionIdentifier, err)
 	}
 	return code
@@ -971,7 +972,7 @@ func assertCodeRevoked(t *testing.T, codeId int64, want bool, what string) {
 // visibility check exists to catch (#139 stage 8).
 func assertCodeRevokedOn(t *testing.T, db data.Database, codeId int64, want bool, what string) {
 	t.Helper()
-	code, err := db.GetCodeById(nil, codeId)
+	code, err := db.GetCodeById(context.Background(), nil, codeId)
 	if err != nil {
 		t.Fatalf("Failed to reload code %d: %v", codeId, err)
 	}
@@ -998,7 +999,7 @@ func TestRevokeCodesBySessionIdentifier(t *testing.T) {
 
 	// Every code of the target session transitions, and the count says how many. The
 	// count is what the audit event reports, so it is part of the contract.
-	count, err := database.RevokeCodesBySessionIdentifier(nil, sessionA)
+	count, err := database.RevokeCodesBySessionIdentifier(context.Background(), nil, sessionA)
 	if err != nil {
 		t.Fatalf("RevokeCodesBySessionIdentifier returned error: %v", err)
 	}
@@ -1017,7 +1018,7 @@ func TestRevokeCodesBySessionIdentifier(t *testing.T) {
 	// matched. MySQL reports changed rows, so without `revoked = false` in the
 	// predicate the updated_at assignment alone would make this return 2 there and 0
 	// on the other three engines.
-	count, err = database.RevokeCodesBySessionIdentifier(nil, sessionA)
+	count, err = database.RevokeCodesBySessionIdentifier(context.Background(), nil, sessionA)
 	if err != nil {
 		t.Fatalf("second RevokeCodesBySessionIdentifier returned error: %v", err)
 	}
@@ -1027,7 +1028,7 @@ func TestRevokeCodesBySessionIdentifier(t *testing.T) {
 	assertCodeRevoked(t, first.Id, true, "a code after its session was revoked twice")
 
 	// An unknown session identifier is not an error, it simply matches nothing.
-	count, err = database.RevokeCodesBySessionIdentifier(nil, "revoke_missing_"+fake.LetterN(8))
+	count, err = database.RevokeCodesBySessionIdentifier(context.Background(), nil, "revoke_missing_"+fake.LetterN(8))
 	if err != nil {
 		t.Fatalf("RevokeCodesBySessionIdentifier for an unknown session returned error: %v", err)
 	}
@@ -1038,7 +1039,7 @@ func TestRevokeCodesBySessionIdentifier(t *testing.T) {
 	// An empty identifier is rejected outright rather than used as a filter. Every
 	// user_sessions row carries a UUID, so an empty value means a caller bug, and
 	// matching on it would sweep codes that belong to no session under termination.
-	if _, err := database.RevokeCodesBySessionIdentifier(nil, ""); err == nil {
+	if _, err := database.RevokeCodesBySessionIdentifier(context.Background(), nil, ""); err == nil {
 		t.Error("an empty session identifier must return an error")
 	}
 	assertCodeRevoked(t, unrelated.Id, false,
@@ -1059,7 +1060,7 @@ func TestRevokeCodesBySessionIdentifier_TransactionAndFailurePath(t *testing.T) 
 	code := createTestCodeInSession(t, client.Id, user.Id, session)
 
 	tx := beginTx(t)
-	count, err := database.RevokeCodesBySessionIdentifier(tx, session)
+	count, err := database.RevokeCodesBySessionIdentifier(context.Background(), tx, session)
 	if err != nil {
 		t.Fatalf("RevokeCodesBySessionIdentifier in a transaction returned error: %v", err)
 	}
@@ -1077,7 +1078,7 @@ func TestRevokeCodesBySessionIdentifier_TransactionAndFailurePath(t *testing.T) 
 	assertCodeRevoked(t, code.Id, false, "a code revoked inside a rolled-back transaction")
 
 	// The failure path, forced by the same finished transaction.
-	count, err = database.RevokeCodesBySessionIdentifier(tx, session)
+	count, err = database.RevokeCodesBySessionIdentifier(context.Background(), tx, session)
 	if err == nil {
 		t.Error("a statement that cannot run must return an error, not a benign zero count")
 	}
@@ -1104,7 +1105,7 @@ func TestRevokeCodesByClientId(t *testing.T) {
 
 	// Every code of the flipped client transitions, and the count says how many. The
 	// count is what the audit event reports, so it is part of the contract.
-	count, err := database.RevokeCodesByClientId(nil, client.Id)
+	count, err := database.RevokeCodesByClientId(context.Background(), nil, client.Id)
 	if err != nil {
 		t.Fatalf("RevokeCodesByClientId returned error: %v", err)
 	}
@@ -1123,7 +1124,7 @@ func TestRevokeCodesByClientId(t *testing.T) {
 	// matched. MySQL reports changed rows, so without `revoked = false` in the predicate
 	// the updated_at assignment alone would make a second flip report the client's whole
 	// code history as newly revoked.
-	count, err = database.RevokeCodesByClientId(nil, client.Id)
+	count, err = database.RevokeCodesByClientId(context.Background(), nil, client.Id)
 	if err != nil {
 		t.Fatalf("second RevokeCodesByClientId returned error: %v", err)
 	}
@@ -1134,7 +1135,7 @@ func TestRevokeCodesByClientId(t *testing.T) {
 
 	// A client with no codes is not an error, it simply matches nothing.
 	emptyClient := createTestClient(t)
-	count, err = database.RevokeCodesByClientId(nil, emptyClient.Id)
+	count, err = database.RevokeCodesByClientId(context.Background(), nil, emptyClient.Id)
 	if err != nil {
 		t.Fatalf("RevokeCodesByClientId for a client with no codes returned error: %v", err)
 	}
@@ -1144,7 +1145,7 @@ func TestRevokeCodesByClientId(t *testing.T) {
 
 	// A zero client id is rejected outright rather than used as a filter. codes.client_id
 	// is NOT NULL and no clients row carries id 0, so a zero can only be a caller bug.
-	if _, err := database.RevokeCodesByClientId(nil, 0); err == nil {
+	if _, err := database.RevokeCodesByClientId(context.Background(), nil, 0); err == nil {
 		t.Error("a zero client id must return an error")
 	}
 	assertCodeRevoked(t, unrelated.Id, false,
@@ -1165,7 +1166,7 @@ func TestRevokeCodesByClientId_TransactionAndFailurePath(t *testing.T) {
 	code := createTestCode(t, client.Id, user.Id)
 
 	tx := beginTx(t)
-	count, err := database.RevokeCodesByClientId(tx, client.Id)
+	count, err := database.RevokeCodesByClientId(context.Background(), tx, client.Id)
 	if err != nil {
 		t.Fatalf("RevokeCodesByClientId in a transaction returned error: %v", err)
 	}
@@ -1183,7 +1184,7 @@ func TestRevokeCodesByClientId_TransactionAndFailurePath(t *testing.T) {
 	assertCodeRevoked(t, code.Id, false, "a code revoked inside a rolled-back transaction")
 
 	// The failure path, forced by the same finished transaction.
-	count, err = database.RevokeCodesByClientId(tx, client.Id)
+	count, err = database.RevokeCodesByClientId(context.Background(), tx, client.Id)
 	if err == nil {
 		t.Error("a statement that cannot run must return an error, not a benign zero count")
 	}
@@ -1203,18 +1204,18 @@ func TestUpdateCode_DoesNotClobberRevoked(t *testing.T) {
 	user := createTestUser(t)
 	code := createTestCode(t, client.Id, user.Id)
 
-	if _, err := database.RevokeCodesBySessionIdentifier(nil, code.SessionIdentifier); err != nil {
+	if _, err := database.RevokeCodesBySessionIdentifier(context.Background(), nil, code.SessionIdentifier); err != nil {
 		t.Fatalf("Failed to revoke the code's session: %v", err)
 	}
 
 	// The in-memory copy still reads Revoked = false, exactly as a handler that loaded
 	// the code before the termination would.
 	code.Used = true
-	if err := database.UpdateCode(nil, code); err != nil {
+	if err := database.UpdateCode(context.Background(), nil, code); err != nil {
 		t.Fatalf("Failed to update code: %v", err)
 	}
 
-	after, err := database.GetCodeById(nil, code.Id)
+	after, err := database.GetCodeById(context.Background(), nil, code.Id)
 	if err != nil {
 		t.Fatalf("Failed to reload updated code: %v", err)
 	}

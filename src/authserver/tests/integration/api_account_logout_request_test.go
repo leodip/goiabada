@@ -2,6 +2,7 @@ package integrationtests
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -121,7 +122,7 @@ func TestLogout_WithIdTokenHint_NoRedirectTarget_LogsTheUserOut(t *testing.T) {
 	grant := createOfflineGrant(t)
 	idToken, _ := sessionBoundGrantOnSameSession(t, grant)
 
-	before, err := database.GetUserSessionBySessionIdentifier(nil, grant.sessionIdentifier)
+	before, err := database.GetUserSessionBySessionIdentifier(context.Background(), nil, grant.sessionIdentifier)
 	require.NoError(t, err)
 	require.NotNil(t, before, "the ceremony should have left a session row to tear down")
 
@@ -136,7 +137,7 @@ func TestLogout_WithIdTokenHint_NoRedirectTarget_LogsTheUserOut(t *testing.T) {
 	// saying nothing.
 	assertSignedOutPage(t, resp, signedOutEnglish, false)
 
-	after, err := database.GetUserSessionBySessionIdentifier(nil, grant.sessionIdentifier)
+	after, err := database.GetUserSessionBySessionIdentifier(context.Background(), nil, grant.sessionIdentifier)
 	require.NoError(t, err)
 	assert.Nil(t, after, "a hinted logout with no redirect target must still tear the session down")
 }
@@ -166,7 +167,7 @@ func TestLogout_WithEncryptedIdTokenHint_LogsTheUserOut(t *testing.T) {
 	require.Equal(t, 5, len(strings.Split(hint, ".")),
 		"the hint must reach the endpoint as a compact JWE, or it takes the plain-token path instead")
 
-	before, err := database.GetUserSessionBySessionIdentifier(nil, grant.sessionIdentifier)
+	before, err := database.GetUserSessionBySessionIdentifier(context.Background(), nil, grant.sessionIdentifier)
 	require.NoError(t, err)
 	require.NotNil(t, before, "the ceremony should have left a session row to tear down")
 
@@ -181,7 +182,7 @@ func TestLogout_WithEncryptedIdTokenHint_LogsTheUserOut(t *testing.T) {
 	assert.Empty(t, resp.Header.Get("Location"), "no target was asked for, so there is nothing to redirect to")
 	assertSignedOutPage(t, resp, signedOutEnglish, false)
 
-	after, err := database.GetUserSessionBySessionIdentifier(nil, grant.sessionIdentifier)
+	after, err := database.GetUserSessionBySessionIdentifier(context.Background(), nil, grant.sessionIdentifier)
 	require.NoError(t, err)
 	assert.Nil(t, after, "a confirmed encrypted hint must tear the session down like any other")
 }
@@ -213,7 +214,7 @@ func TestLogout_EncryptedIdTokenHint_WrongSecret_AsksTheEndUserAndRefusesTheRedi
 		"a hint encrypted under the wrong secret earns no redirect, however good the client_id beside it looks")
 	assertSignedOutPage(t, resp, signedOutEnglish, true)
 
-	gone, err := database.GetUserSessionBySessionIdentifier(nil, grant.sessionIdentifier)
+	gone, err := database.GetUserSessionBySessionIdentifier(context.Background(), nil, grant.sessionIdentifier)
 	require.NoError(t, err)
 	assert.Nil(t, gone, "the consent page precedes the teardown, it does not replace it")
 }
@@ -247,7 +248,7 @@ func TestLogout_RejectedHint_AsksTheEndUserAndRefusesTheRedirect(t *testing.T) {
 		"a rejected hint earns no redirect, however good the client_id beside it looks")
 	assertSignedOutPage(t, resp, signedOutEnglish, true)
 
-	gone, err := database.GetUserSessionBySessionIdentifier(nil, grant.sessionIdentifier)
+	gone, err := database.GetUserSessionBySessionIdentifier(context.Background(), nil, grant.sessionIdentifier)
 	require.NoError(t, err)
 	assert.Nil(t, gone, "the consent page precedes the teardown, it does not replace it")
 }
@@ -339,7 +340,7 @@ func TestLogout_WithIdTokenHint_OtherClientOnSession_KeepsSessionBoundTokensWork
 	grant := createOfflineGrant(t)
 	idToken, sessionBoundRefresh := sessionBoundGrantOnSameSession(t, grant)
 
-	session, err := database.GetUserSessionBySessionIdentifier(nil, grant.sessionIdentifier)
+	session, err := database.GetUserSessionBySessionIdentifier(context.Background(), nil, grant.sessionIdentifier)
 	require.NoError(t, err)
 	require.NotNil(t, session)
 
@@ -357,7 +358,7 @@ func TestLogout_WithIdTokenHint_OtherClientOnSession_KeepsSessionBoundTokensWork
 	defer func() { _ = database.DeleteClient(nil, otherClient.Id) }()
 
 	now := time.Now().UTC()
-	require.NoError(t, database.CreateUserSessionClient(nil, &models.UserSessionClient{
+	require.NoError(t, database.CreateUserSessionClient(context.Background(), nil, &models.UserSessionClient{
 		UserSessionId: session.Id,
 		ClientId:      otherClient.Id,
 		Started:       now.Add(-time.Hour),
@@ -917,7 +918,7 @@ func TestLogout_Hintless_DeletesTheSessionRowAndSparesOfflineGrants(t *testing.T
 	require.NotEmpty(t, first["access_token"], "the grant should refresh before logout: %v", first)
 	grant.refreshToken = first["refresh_token"].(string)
 
-	before, err := database.GetUserSessionBySessionIdentifier(nil, grant.sessionIdentifier)
+	before, err := database.GetUserSessionBySessionIdentifier(context.Background(), nil, grant.sessionIdentifier)
 	require.NoError(t, err)
 	require.NotNil(t, before, "the ceremony should have left a session row to tear down")
 
@@ -928,7 +929,7 @@ func TestLogout_Hintless_DeletesTheSessionRowAndSparesOfflineGrants(t *testing.T
 		"with no post_logout_redirect_uri the confirmation ends on the signed-out page")
 	assertSignedOutPage(t, resp, signedOutEnglish, false)
 
-	after, err := database.GetUserSessionBySessionIdentifier(nil, grant.sessionIdentifier)
+	after, err := database.GetUserSessionBySessionIdentifier(context.Background(), nil, grant.sessionIdentifier)
 	require.NoError(t, err)
 	assert.Nil(t, after, "confirming the consent page must delete the session row, not just clear the cookie")
 
@@ -968,7 +969,7 @@ func TestLogout_Hintless_ClientIdAuthorizesTheRedirect(t *testing.T) {
 	assert.NotContains(t, location.RawQuery, "sid=",
 		"RP-Initiated Logout defines state and nothing else on the way back, decision 5")
 
-	gone, err := database.GetUserSessionBySessionIdentifier(nil, grant.sessionIdentifier)
+	gone, err := database.GetUserSessionBySessionIdentifier(context.Background(), nil, grant.sessionIdentifier)
 	require.NoError(t, err)
 	assert.Nil(t, gone, "the redirect does not replace the teardown, it follows it")
 }
@@ -1042,7 +1043,7 @@ func TestLogout_Hintless_UnregisteredTargetIsDeclinedButTheLogoutHappens(t *test
 	assert.Empty(t, resp.Header.Get("Location"), "a target that fails validation must never be redirected to")
 	assertSignedOutPage(t, resp, signedOutEnglish, true)
 
-	gone, err := database.GetUserSessionBySessionIdentifier(nil, grant.sessionIdentifier)
+	gone, err := database.GetUserSessionBySessionIdentifier(context.Background(), nil, grant.sessionIdentifier)
 	require.NoError(t, err)
 	assert.Nil(t, gone, "the teardown reads nothing the redirect resolution produced")
 }
@@ -1152,7 +1153,7 @@ func TestLogout_CrossOriginPost_WithHintInTheBody_LogsTheUserOut(t *testing.T) {
 	idToken, _ := sessionBoundGrantOnSameSession(t, grant)
 	state := fake.LetterN(8)
 
-	before, err := database.GetUserSessionBySessionIdentifier(nil, grant.sessionIdentifier)
+	before, err := database.GetUserSessionBySessionIdentifier(context.Background(), nil, grant.sessionIdentifier)
 	require.NoError(t, err)
 	require.NotNil(t, before, "the ceremony should have left a session row to tear down")
 
@@ -1174,7 +1175,7 @@ func TestLogout_CrossOriginPost_WithHintInTheBody_LogsTheUserOut(t *testing.T) {
 	assert.Equal(t, state, location.Query().Get("state"),
 		"state travelled in the body too, so it is the second reading of the same property")
 
-	after, err := database.GetUserSessionBySessionIdentifier(nil, grant.sessionIdentifier)
+	after, err := database.GetUserSessionBySessionIdentifier(context.Background(), nil, grant.sessionIdentifier)
 	require.NoError(t, err)
 	assert.Nil(t, after,
 		"a confirmed hint tears the session down on the POST binding exactly as it does on the GET one")
@@ -1198,7 +1199,7 @@ func TestLogout_CrossOriginPost_ConfirmedHint_WithoutTheSessionCookie(t *testing
 	grant := createOfflineGrant(t)
 	idToken, _ := sessionBoundGrantOnSameSession(t, grant)
 
-	before, err := database.GetUserSessionBySessionIdentifier(nil, grant.sessionIdentifier)
+	before, err := database.GetUserSessionBySessionIdentifier(context.Background(), nil, grant.sessionIdentifier)
 	require.NoError(t, err)
 	require.NotNil(t, before, "the ceremony should have left a session row to tear down")
 
@@ -1222,7 +1223,7 @@ func TestLogout_CrossOriginPost_ConfirmedHint_WithoutTheSessionCookie(t *testing
 		"no post_logout_redirect_uri was sent, so a confirmed hint ends at the signed-out page")
 	assertSignedOutPage(t, resp, signedOutEnglish, false)
 
-	after, err := database.GetUserSessionBySessionIdentifier(nil, grant.sessionIdentifier)
+	after, err := database.GetUserSessionBySessionIdentifier(context.Background(), nil, grant.sessionIdentifier)
 	require.NoError(t, err)
 	assert.Nil(t, after,
 		"the hint's signed sid names the session, so the teardown does not need the browser's cookie")
@@ -1249,7 +1250,7 @@ func TestLogout_CrossOriginPost_WithoutHint_IsRefused(t *testing.T) {
 	assert.Equal(t, http.StatusForbidden, resp.StatusCode,
 		"a cross-site POST with no id_token_hint has no claim on the exemption")
 
-	survived, err := database.GetUserSessionBySessionIdentifier(nil, grant.sessionIdentifier)
+	survived, err := database.GetUserSessionBySessionIdentifier(context.Background(), nil, grant.sessionIdentifier)
 	require.NoError(t, err)
 	assert.NotNil(t, survived, "a refused request must tear nothing down")
 }
@@ -1309,7 +1310,7 @@ func TestLogout_CrossOriginPost_RejectedHint_ReachesASubmittableConsentPage(t *t
 	assert.NotContains(t, location.RawQuery, "client_id",
 		"client_id authorizes the redirect on a hintless request, which is what a rejected hint must not earn")
 
-	stillThere, err := database.GetUserSessionBySessionIdentifier(nil, grant.sessionIdentifier)
+	stillThere, err := database.GetUserSessionBySessionIdentifier(context.Background(), nil, grant.sessionIdentifier)
 	require.NoError(t, err)
 	require.NotNil(t, stillThere,
 		"the consent page precedes the teardown: an unconfirmable hint must not tear anything down before the End-User is asked")
@@ -1328,7 +1329,7 @@ func TestLogout_CrossOriginPost_RejectedHint_ReachesASubmittableConsentPage(t *t
 		"a rejected hint earns no redirect, and dropping client_id is what enforces that here")
 	assertSignedOutPage(t, confirmed, signedOutEnglish, true)
 
-	gone, err := database.GetUserSessionBySessionIdentifier(nil, grant.sessionIdentifier)
+	gone, err := database.GetUserSessionBySessionIdentifier(context.Background(), nil, grant.sessionIdentifier)
 	require.NoError(t, err)
 	assert.Nil(t, gone, "once the End-User confirms, the logout happens")
 }
@@ -1374,7 +1375,7 @@ func TestLogout_CrossOriginPost_EmptyHint_ExemptsAndIsStillRejected(t *testing.T
 			assert.Equal(t, http.StatusSeeOther, resp.StatusCode,
 				"and the handler reads that same empty parameter as a hint it cannot confirm, so it asks the End-User")
 
-			survived, err := database.GetUserSessionBySessionIdentifier(nil, grant.sessionIdentifier)
+			survived, err := database.GetUserSessionBySessionIdentifier(context.Background(), nil, grant.sessionIdentifier)
 			require.NoError(t, err)
 			assert.NotNil(t, survived,
 				"an exempted POST whose hint cannot be confirmed must tear nothing down before the End-User is asked")

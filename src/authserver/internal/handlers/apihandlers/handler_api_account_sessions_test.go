@@ -44,7 +44,7 @@ func TestHandleAPIAccountSessionDelete_TerminatesAndAuditsBothEvents(t *testing.
 	user := &models.User{Id: 42, Enabled: true}
 	userSession := &models.UserSession{Id: 100, SessionIdentifier: "sid-own", UserId: 42}
 
-	database.On("GetUserSessionById", (*sql.Tx)(nil), int64(100)).Return(userSession, nil).Once()
+	database.On("GetUserSessionById", mock.Anything, (*sql.Tx)(nil), int64(100)).Return(userSession, nil).Once()
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), subject).Return(user, nil).Once()
 	stubTermination(database, userSession, 1, []*models.RefreshToken{
 		{Id: 1, RefreshTokenJti: "rt-live"},
@@ -95,7 +95,7 @@ func TestHandleAPIAccountSessionDelete_ForbiddenDoesNotTerminate(t *testing.T) {
 
 	const subject = "the-user"
 	// The session belongs to user 7; the caller is user 42.
-	database.On("GetUserSessionById", (*sql.Tx)(nil), int64(100)).
+	database.On("GetUserSessionById", mock.Anything, (*sql.Tx)(nil), int64(100)).
 		Return(&models.UserSession{Id: 100, SessionIdentifier: "sid-someone-else", UserId: 7}, nil).Once()
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), subject).
 		Return(&models.User{Id: 42, Enabled: true}, nil).Once()
@@ -107,8 +107,8 @@ func TestHandleAPIAccountSessionDelete_ForbiddenDoesNotTerminate(t *testing.T) {
 	assert.Equal(t, http.StatusForbidden, rr.Code)
 	database.AssertExpectations(t)
 	database.AssertNotCalled(t, "RunInTransaction", mock.Anything, mock.Anything)
-	database.AssertNotCalled(t, "RevokeCodesBySessionIdentifier", mock.Anything, mock.Anything)
-	database.AssertNotCalled(t, "DeleteUserSession", mock.Anything, mock.Anything)
+	database.AssertNotCalled(t, "RevokeCodesBySessionIdentifier", mock.Anything, mock.Anything, mock.Anything)
+	database.AssertNotCalled(t, "DeleteUserSession", mock.Anything, mock.Anything, mock.Anything)
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 }
 
@@ -120,13 +120,13 @@ func TestHandleAPIAccountSessionDelete_TerminationFailureIsA500(t *testing.T) {
 	auditLogger := mocks_audit.NewAuditLogger(t)
 
 	const subject = "the-user"
-	database.On("GetUserSessionById", (*sql.Tx)(nil), int64(100)).
+	database.On("GetUserSessionById", mock.Anything, (*sql.Tx)(nil), int64(100)).
 		Return(&models.UserSession{Id: 100, SessionIdentifier: "sid-own", UserId: 42}, nil).Once()
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), subject).
 		Return(&models.User{Id: 42, Enabled: true}, nil).Once()
 	// The deletion, which since #139 is the first write inside the termination transaction.
 	stub := expectRunInTransaction(database, apiTerminateTx)
-	database.On("DeleteUserSession", apiTerminateTx, int64(100)).
+	database.On("DeleteUserSession", mock.Anything, apiTerminateTx, int64(100)).
 		Return(errors.New("the session delete failed")).Once()
 
 	rr := httptest.NewRecorder()

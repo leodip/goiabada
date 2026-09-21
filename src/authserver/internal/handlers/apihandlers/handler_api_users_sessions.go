@@ -46,14 +46,14 @@ func HandleAPIUserSessionsGet(
 		}
 
 		// Get user sessions
-		userSessions, err := database.GetUserSessionsByUserId(nil, user.Id)
+		userSessions, err := database.GetUserSessionsByUserId(r.Context(), nil, user.Id)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
 		}
 
 		// Load the clients each session authorized; buildSessionDetails hydrates them.
-		err = database.UserSessionsLoadClients(nil, userSessions)
+		err = database.UserSessionsLoadClients(r.Context(), nil, userSessions)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -107,7 +107,7 @@ func HandleAPIUserSessionDelete(
 		}
 
 		// Check if session exists
-		userSession, err := database.GetUserSessionById(nil, sessionId)
+		userSession, err := database.GetUserSessionById(r.Context(), nil, sessionId)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return

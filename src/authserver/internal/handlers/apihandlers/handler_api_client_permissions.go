@@ -32,7 +32,7 @@ func HandleAPIClientPermissionsGet(
 			return
 		}
 
-		client, err := database.GetClientById(nil, id)
+		client, err := database.GetClientById(r.Context(), nil, id)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting client by ID for permissions"), "client_id", id)
 			return
@@ -83,7 +83,7 @@ func HandleAPIClientPermissionsPut(
 			return
 		}
 
-		client, err := database.GetClientById(nil, id)
+		client, err := database.GetClientById(r.Context(), nil, id)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting client by ID for permissions update"), "client_id", id)
 			return

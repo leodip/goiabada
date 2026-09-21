@@ -52,17 +52,17 @@ func TestAPIClientSessionsGet_Success(t *testing.T) {
 	s1 := createTestUserSession(t, testUser.Id, fake.UUID())
 	s2 := createTestUserSession(t, testUser.Id, fake.UUID())
 	defer func() {
-		_ = database.DeleteUserSession(nil, s1.Id)
-		_ = database.DeleteUserSession(nil, s2.Id)
+		_ = database.DeleteUserSession(context.Background(), nil, s1.Id)
+		_ = database.DeleteUserSession(context.Background(), nil, s2.Id)
 	}()
 
 	// Link sessions to client
 	now := time.Now().UTC()
 	usc1 := &models.UserSessionClient{UserSessionId: s1.Id, ClientId: testClient.Id, Started: now.Add(-time.Hour), LastAccessed: now.Add(-time.Minute * 5)}
-	err = database.CreateUserSessionClient(nil, usc1)
+	err = database.CreateUserSessionClient(context.Background(), nil, usc1)
 	assert.NoError(t, err)
 	usc2 := &models.UserSessionClient{UserSessionId: s2.Id, ClientId: testClient.Id, Started: now.Add(-time.Hour), LastAccessed: now.Add(-time.Minute * 5)}
-	err = database.CreateUserSessionClient(nil, usc2)
+	err = database.CreateUserSessionClient(context.Background(), nil, usc2)
 	assert.NoError(t, err)
 
 	// Call endpoint
@@ -251,9 +251,9 @@ func TestAPIClientSessionsGet_OnlyValidSessions(t *testing.T) {
 		DeviceOS:          "linux",
 		UserId:            testUser.Id,
 	}
-	err = database.CreateUserSession(nil, valid)
+	err = database.CreateUserSession(context.Background(), nil, valid)
 	assert.NoError(t, err)
-	defer func() { _ = database.DeleteUserSession(nil, valid.Id) }()
+	defer func() { _ = database.DeleteUserSession(context.Background(), nil, valid.Id) }()
 
 	// Expired session
 	expired := &models.UserSession{
@@ -269,15 +269,15 @@ func TestAPIClientSessionsGet_OnlyValidSessions(t *testing.T) {
 		DeviceOS:          "linux",
 		UserId:            testUser.Id,
 	}
-	err = database.CreateUserSession(nil, expired)
+	err = database.CreateUserSession(context.Background(), nil, expired)
 	assert.NoError(t, err)
-	defer func() { _ = database.DeleteUserSession(nil, expired.Id) }()
+	defer func() { _ = database.DeleteUserSession(context.Background(), nil, expired.Id) }()
 
 	// Link both to client
 	now := time.Now().UTC()
-	err = database.CreateUserSessionClient(nil, &models.UserSessionClient{UserSessionId: valid.Id, ClientId: testClient.Id, Started: now.Add(-time.Hour), LastAccessed: now.Add(-5 * time.Minute)})
+	err = database.CreateUserSessionClient(context.Background(), nil, &models.UserSessionClient{UserSessionId: valid.Id, ClientId: testClient.Id, Started: now.Add(-time.Hour), LastAccessed: now.Add(-5 * time.Minute)})
 	assert.NoError(t, err)
-	err = database.CreateUserSessionClient(nil, &models.UserSessionClient{UserSessionId: expired.Id, ClientId: testClient.Id, Started: now.Add(-26 * time.Hour), LastAccessed: now.Add(-25 * time.Hour)})
+	err = database.CreateUserSessionClient(context.Background(), nil, &models.UserSessionClient{UserSessionId: expired.Id, ClientId: testClient.Id, Started: now.Add(-26 * time.Hour), LastAccessed: now.Add(-25 * time.Hour)})
 	assert.NoError(t, err)
 
 	// Call endpoint
@@ -344,17 +344,17 @@ func TestAPIClientSessionsGet_PaginationDefaultAndCap(t *testing.T) {
 			DeviceOS:          "linux",
 			UserId:            testUser.Id,
 		}
-		err := database.CreateUserSession(nil, s)
+		err := database.CreateUserSession(context.Background(), nil, s)
 		assert.NoError(t, err)
 		sessions = append(sessions, s)
 		// Link to client
 		usc := &models.UserSessionClient{UserSessionId: s.Id, ClientId: testClient.Id, Started: now.Add(-time.Hour), LastAccessed: now.Add(-time.Minute * 5)}
-		err = database.CreateUserSessionClient(nil, usc)
+		err = database.CreateUserSessionClient(context.Background(), nil, usc)
 		assert.NoError(t, err)
 	}
 	defer func() {
 		for _, s := range sessions {
-			_ = database.DeleteUserSession(nil, s.Id)
+			_ = database.DeleteUserSession(context.Background(), nil, s.Id)
 		}
 	}()
 
@@ -435,9 +435,9 @@ func TestAPIClientSessionsGet_UsersAreNormalizedAndCarryOnlyTheOwnerFields(t *te
 	now := time.Now().UTC()
 	for _, userId := range []int64{first.Id, first.Id, second.Id} {
 		session := createTestUserSession(t, userId, fake.UUID())
-		defer func(id int64) { _ = database.DeleteUserSession(nil, id) }(session.Id)
+		defer func(id int64) { _ = database.DeleteUserSession(context.Background(), nil, id) }(session.Id)
 
-		err = database.CreateUserSessionClient(nil, &models.UserSessionClient{
+		err = database.CreateUserSessionClient(context.Background(), nil, &models.UserSessionClient{
 			UserSessionId: session.Id, ClientId: testClient.Id,
 			Started: now.Add(-time.Hour), LastAccessed: now.Add(-5 * time.Minute),
 		})

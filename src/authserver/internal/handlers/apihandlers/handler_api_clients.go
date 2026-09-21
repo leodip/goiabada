@@ -77,7 +77,7 @@ func updateClientNotOwningAuthenticationMode(ctx context.Context, database data.
 			return err
 		}
 
-		current, err := database.GetClientById(tx, client.Id)
+		current, err := database.GetClientById(ctx, tx, client.Id)
 		if err != nil {
 			return err
 		}
@@ -175,7 +175,7 @@ func HandleAPIClientGet(
 			return
 		}
 
-		client, err := database.GetClientById(nil, id)
+		client, err := database.GetClientById(r.Context(), nil, id)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting client by ID"), "client_id", id)
 			return
@@ -241,7 +241,7 @@ func HandleAPIClientDelete(
 			return
 		}
 
-		client, err := database.GetClientById(nil, id)
+		client, err := database.GetClientById(r.Context(), nil, id)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting client by ID for deletion"), "client_id", id)
 			return
@@ -409,7 +409,7 @@ func HandleAPIClientUpdatePut(
 			return
 		}
 
-		client, err := database.GetClientById(nil, id)
+		client, err := database.GetClientById(r.Context(), nil, id)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting client by ID for update"), "client_id", id)
 			return
@@ -612,7 +612,7 @@ func HandleAPIClientAuthenticationPut(
 			return
 		}
 
-		client, err := database.GetClientById(nil, id)
+		client, err := database.GetClientById(r.Context(), nil, id)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting client by ID for authentication update"), "client_id", id)
 			return
@@ -756,7 +756,7 @@ func HandleAPIClientOAuth2FlowsPut(
 			return
 		}
 
-		client, err := database.GetClientById(nil, id)
+		client, err := database.GetClientById(r.Context(), nil, id)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting client by ID for oauth2 flows update"), "client_id", id)
 			return
@@ -831,7 +831,7 @@ func HandleAPIClientRedirectURIsPut(
 			return
 		}
 
-		client, err := database.GetClientById(nil, id)
+		client, err := database.GetClientById(r.Context(), nil, id)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting client by ID for redirect URIs update"), "client_id", id)
 			return
@@ -990,7 +990,7 @@ func HandleAPIClientWebOriginsPut(
 			return
 		}
 
-		client, err := database.GetClientById(nil, id)
+		client, err := database.GetClientById(r.Context(), nil, id)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting client by ID for web origins update"), "client_id", id)
 			return
@@ -1190,7 +1190,7 @@ func HandleAPIClientTokensPut(
 			return
 		}
 
-		client, err := database.GetClientById(nil, id)
+		client, err := database.GetClientById(r.Context(), nil, id)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting client by ID for tokens update"), "client_id", id)
 			return

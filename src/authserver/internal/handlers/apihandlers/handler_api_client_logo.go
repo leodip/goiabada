@@ -35,7 +35,7 @@ func HandleAPIClientLogoPost(
 		}
 
 		// Get client from database
-		client, err := database.GetClientById(nil, clientId)
+		client, err := database.GetClientById(r.Context(), nil, clientId)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -154,7 +154,7 @@ func HandleAPIClientLogoDelete(
 		}
 
 		// Get client from database
-		client, err := database.GetClientById(nil, clientId)
+		client, err := database.GetClientById(r.Context(), nil, clientId)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -213,7 +213,7 @@ func HandleAPIClientLogoGet(
 		}
 
 		// Get client from database
-		client, err := database.GetClientById(nil, clientId)
+		client, err := database.GetClientById(r.Context(), nil, clientId)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return

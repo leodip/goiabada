@@ -627,7 +627,7 @@ func TestUserSessionClientsLoadClients(t *testing.T) {
 
 	sessionClients := []models.UserSessionClient{*sessionClientA, *sessionClientB}
 
-	if err := database.UserSessionClientsLoadClients(nil, sessionClients); err != nil {
+	if err := database.UserSessionClientsLoadClients(context.Background(), nil, sessionClients); err != nil {
 		t.Fatalf("UserSessionClientsLoadClients failed: %v", err)
 	}
 
@@ -644,10 +644,10 @@ func TestUserSessionClientsLoadClients(t *testing.T) {
 }
 
 func TestUserSessionClientsLoadClients_NilAndEmptySlices(t *testing.T) {
-	if err := database.UserSessionClientsLoadClients(nil, nil); err != nil {
+	if err := database.UserSessionClientsLoadClients(context.Background(), nil, nil); err != nil {
 		t.Errorf("UserSessionClientsLoadClients(nil) should be a no-op, got: %v", err)
 	}
-	if err := database.UserSessionClientsLoadClients(nil, []models.UserSessionClient{}); err != nil {
+	if err := database.UserSessionClientsLoadClients(context.Background(), nil, []models.UserSessionClient{}); err != nil {
 		t.Errorf("UserSessionClientsLoadClients(empty) should be a no-op, got: %v", err)
 	}
 }
@@ -661,7 +661,7 @@ func TestGetUserSessionsClientByIds(t *testing.T) {
 	sessionClientA := createTestUserSessionClientWithIds(t, userSession.Id, clientA.Id)
 	sessionClientB := createTestUserSessionClientWithIds(t, userSession.Id, clientB.Id)
 
-	result, err := database.GetUserSessionsClientByIds(nil, []int64{sessionClientA.Id, sessionClientB.Id})
+	result, err := database.GetUserSessionsClientByIds(context.Background(), nil, []int64{sessionClientA.Id, sessionClientB.Id})
 	if err != nil {
 		t.Fatalf("GetUserSessionsClientByIds failed: %v", err)
 	}
@@ -683,7 +683,7 @@ func TestGetUserSessionsClientByIds(t *testing.T) {
 }
 
 func TestGetUserSessionsClientByIds_EmptyInput(t *testing.T) {
-	result, err := database.GetUserSessionsClientByIds(nil, []int64{})
+	result, err := database.GetUserSessionsClientByIds(context.Background(), nil, []int64{})
 	if err != nil {
 		t.Fatalf("GetUserSessionsClientByIds(empty) failed: %v", err)
 	}
@@ -691,7 +691,7 @@ func TestGetUserSessionsClientByIds_EmptyInput(t *testing.T) {
 		t.Errorf("Expected nil for an empty id list, got %+v", result)
 	}
 
-	result, err = database.GetUserSessionsClientByIds(nil, nil)
+	result, err = database.GetUserSessionsClientByIds(context.Background(), nil, nil)
 	if err != nil {
 		t.Fatalf("GetUserSessionsClientByIds(nil) failed: %v", err)
 	}
@@ -720,7 +720,7 @@ func TestGetUserSessionClientsByUserSessionIds(t *testing.T) {
 	scB1 := createTestUserSessionClientWithIds(t, sessionB.Id, clientA.Id)
 	scC1 := createTestUserSessionClientWithIds(t, sessionC.Id, clientA.Id)
 
-	result, err := database.GetUserSessionClientsByUserSessionIds(nil, []int64{sessionA.Id, sessionB.Id})
+	result, err := database.GetUserSessionClientsByUserSessionIds(context.Background(), nil, []int64{sessionA.Id, sessionB.Id})
 	if err != nil {
 		t.Fatalf("GetUserSessionClientsByUserSessionIds failed: %v", err)
 	}
@@ -765,7 +765,7 @@ func TestGetUserSessionClientsByUserSessionIds_SessionWithNoClients(t *testing.T
 	client := createTestClient(t)
 	sc := createTestUserSessionClientWithIds(t, withClient.Id, client.Id)
 
-	result, err := database.GetUserSessionClientsByUserSessionIds(nil, []int64{withClient.Id, withoutClient.Id})
+	result, err := database.GetUserSessionClientsByUserSessionIds(context.Background(), nil, []int64{withClient.Id, withoutClient.Id})
 	if err != nil {
 		t.Fatalf("GetUserSessionClientsByUserSessionIds failed: %v", err)
 	}
@@ -787,7 +787,7 @@ func TestGetUserSessionClientsByUserSessionIds_UnknownIdIsSkipped(t *testing.T) 
 	client := createTestClient(t)
 	sc := createTestUserSessionClientWithIds(t, userSession.Id, client.Id)
 
-	result, err := database.GetUserSessionClientsByUserSessionIds(nil, []int64{userSession.Id, 999999999})
+	result, err := database.GetUserSessionClientsByUserSessionIds(context.Background(), nil, []int64{userSession.Id, 999999999})
 	if err != nil {
 		t.Fatalf("GetUserSessionClientsByUserSessionIds failed: %v", err)
 	}
@@ -798,7 +798,7 @@ func TestGetUserSessionClientsByUserSessionIds_UnknownIdIsSkipped(t *testing.T) 
 }
 
 func TestGetUserSessionClientsByUserSessionIds_EmptyInput(t *testing.T) {
-	result, err := database.GetUserSessionClientsByUserSessionIds(nil, []int64{})
+	result, err := database.GetUserSessionClientsByUserSessionIds(context.Background(), nil, []int64{})
 	if err != nil {
 		t.Fatalf("GetUserSessionClientsByUserSessionIds(empty) failed: %v", err)
 	}
@@ -806,7 +806,7 @@ func TestGetUserSessionClientsByUserSessionIds_EmptyInput(t *testing.T) {
 		t.Errorf("Expected nil for an empty id list, got %+v", result)
 	}
 
-	result, err = database.GetUserSessionClientsByUserSessionIds(nil, nil)
+	result, err = database.GetUserSessionClientsByUserSessionIds(context.Background(), nil, nil)
 	if err != nil {
 		t.Fatalf("GetUserSessionClientsByUserSessionIds(nil) failed: %v", err)
 	}

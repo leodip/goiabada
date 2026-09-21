@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/url"
@@ -49,7 +50,7 @@ func TestAPIClientTokensPut_Success(t *testing.T) {
 	assert.Equal(t, req.IncludeOpenIDConnectClaimsInAccessToken, updateResp.Client.IncludeOpenIDConnectClaimsInAccessToken)
 	assert.Equal(t, req.IncludeOpenIDConnectClaimsInIdToken, updateResp.Client.IncludeOpenIDConnectClaimsInIdToken)
 
-	refreshed, err2 := database.GetClientById(nil, client.Id)
+	refreshed, err2 := database.GetClientById(context.Background(), nil, client.Id)
 	assert.NoError(t, err2)
 	assert.NotNil(t, refreshed)
 	assert.Equal(t, req.TokenExpirationInSeconds, refreshed.TokenExpirationInSeconds)

@@ -96,7 +96,7 @@ func (t *TokenIssuer) GenerateTokenResponseForAuthCode(ctx context.Context,
 
 	settings := ctx.Value(constants.ContextKeySettings).(*models.Settings)
 
-	err := t.database.CodeLoadClient(nil, code)
+	err := t.database.CodeLoadClient(ctx, nil, code)
 	if err != nil {
 		return nil, err
 	}
@@ -125,7 +125,7 @@ func (t *TokenIssuer) GenerateTokenResponseForAuthCode(ctx context.Context,
 
 	// access_token -----------------------------------------------------------------------
 
-	err = t.database.CodeLoadUser(nil, code)
+	err = t.database.CodeLoadUser(ctx, nil, code)
 	if err != nil {
 		return nil, err
 	}
@@ -166,7 +166,7 @@ func (t *TokenIssuer) GenerateTokenResponseForAuthCode(ctx context.Context,
 
 	// refresh_token ----------------------------------------------------------------------
 
-	refreshToken, refreshExpiresIn, err := t.generateRefreshToken(settings, code, scopeFromAccessToken, now, privKey, keyPair.KeyIdentifier, nil)
+	refreshToken, refreshExpiresIn, err := t.generateRefreshToken(ctx, settings, code, scopeFromAccessToken, now, privKey, keyPair.KeyIdentifier, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -218,7 +218,7 @@ func (t *TokenIssuer) generateIdToken(ctx context.Context, settings *models.Sett
 	return t.generateIdTokenCore(ctx, settings, input, now, signingKey, keyIdentifier)
 }
 
-func (t *TokenIssuer) generateRefreshToken(settings *models.Settings, code *models.Code, scope string,
+func (t *TokenIssuer) generateRefreshToken(ctx context.Context, settings *models.Settings, code *models.Code, scope string,
 	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string, refreshToken *models.RefreshToken) (string, int64, error) {
 
 	claims := make(jwt.MapClaims)
@@ -244,7 +244,7 @@ func (t *TokenIssuer) generateRefreshToken(settings *models.Settings, code *mode
 			return "", 0, err
 		}
 
-		maxLifetime, err := t.getRefreshTokenMaxLifetime("Offline", now, settings,
+		maxLifetime, err := t.getRefreshTokenMaxLifetime(ctx, "Offline", now, settings,
 			&code.Client, code.SessionIdentifier)
 		if err != nil {
 			return "", 0, err
@@ -271,7 +271,7 @@ func (t *TokenIssuer) generateRefreshToken(settings *models.Settings, code *mode
 			return "", 0, err
 		}
 
-		maxLifetime, err := t.getRefreshTokenMaxLifetime("Refresh", now, settings, &code.Client, code.SessionIdentifier)
+		maxLifetime, err := t.getRefreshTokenMaxLifetime(ctx, "Refresh", now, settings, &code.Client, code.SessionIdentifier)
 		if err != nil {
 			return "", 0, err
 		}
@@ -315,7 +315,7 @@ func (t *TokenIssuer) generateRefreshToken(settings *models.Settings, code *mode
 	} else {
 		refreshTokenEntity.SessionIdentifier = claims["sid"].(string)
 	}
-	err := t.database.CreateRefreshToken(nil, refreshTokenEntity)
+	err := t.database.CreateRefreshToken(ctx, nil, refreshTokenEntity)
 	if err != nil {
 		return "", 0, err
 	}
@@ -349,7 +349,7 @@ func (t *TokenIssuer) getRefreshTokenExpiration(refreshTokenType string, now tim
 	return 0, errs.Errorf("invalid refresh token type: %v", refreshTokenType)
 }
 
-func (t *TokenIssuer) getRefreshTokenMaxLifetime(refreshTokenType string, now time.Time, settings *models.Settings,
+func (t *TokenIssuer) getRefreshTokenMaxLifetime(ctx context.Context, refreshTokenType string, now time.Time, settings *models.Settings,
 	client *models.Client, sessionIdentifier string) (int64, error) {
 	switch refreshTokenType {
 	case "Offline":
@@ -360,7 +360,7 @@ func (t *TokenIssuer) getRefreshTokenMaxLifetime(refreshTokenType string, now ti
 		maxLifetime := now.Add(time.Duration(time.Second * time.Duration(maxLifetimeInSeconds))).Unix()
 		return maxLifetime, nil
 	case "Refresh":
-		userSession, err := t.database.GetUserSessionBySessionIdentifier(nil, sessionIdentifier)
+		userSession, err := t.database.GetUserSessionBySessionIdentifier(ctx, nil, sessionIdentifier)
 		if err != nil {
 			return 0, err
 		}
@@ -448,7 +448,7 @@ func (t *TokenIssuer) GenerateTokenResponseForRefresh(ctx context.Context, input
 
 	settings := ctx.Value(constants.ContextKeySettings).(*models.Settings)
 
-	err := t.database.CodeLoadClient(nil, input.Code)
+	err := t.database.CodeLoadClient(ctx, nil, input.Code)
 	if err != nil {
 		return nil, err
 	}
@@ -482,7 +482,7 @@ func (t *TokenIssuer) GenerateTokenResponseForRefresh(ctx context.Context, input
 
 	// access_token -----------------------------------------------------------------------
 
-	err = t.database.CodeLoadUser(nil, input.Code)
+	err = t.database.CodeLoadUser(ctx, nil, input.Code)
 	if err != nil {
 		return nil, err
 	}
@@ -525,7 +525,7 @@ func (t *TokenIssuer) GenerateTokenResponseForRefresh(ctx context.Context, input
 
 	// RFC 6749 Section 6: New refresh token scope MUST be identical to the original refresh token's scope
 	originalRefreshTokenScope := input.RefreshToken.Scope
-	refreshToken, refreshExpiresIn, err := t.generateRefreshToken(settings, input.Code, originalRefreshTokenScope, now, privKey, keyPair.KeyIdentifier, input.RefreshToken)
+	refreshToken, refreshExpiresIn, err := t.generateRefreshToken(ctx, settings, input.Code, originalRefreshTokenScope, now, privKey, keyPair.KeyIdentifier, input.RefreshToken)
 	if err != nil {
 		return nil, err
 	}
@@ -542,12 +542,12 @@ func (t *TokenIssuer) GenerateTokenResponseForRefreshROPC(ctx context.Context, i
 	settings := ctx.Value(constants.ContextKeySettings).(*models.Settings)
 
 	// Load the User and Client from the refresh token
-	err := t.database.RefreshTokenLoadUser(nil, input.RefreshToken)
+	err := t.database.RefreshTokenLoadUser(ctx, nil, input.RefreshToken)
 	if err != nil {
 		return nil, err
 	}
 
-	err = t.database.RefreshTokenLoadClient(nil, input.RefreshToken)
+	err = t.database.RefreshTokenLoadClient(ctx, nil, input.RefreshToken)
 	if err != nil {
 		return nil, err
 	}
@@ -627,7 +627,7 @@ func (t *TokenIssuer) GenerateTokenResponseForRefreshROPC(ctx context.Context, i
 
 	// RFC 6749 Section 6: New refresh token scope MUST be identical to the original refresh token's scope
 	originalRefreshTokenScope := input.RefreshToken.Scope
-	refreshToken, refreshExpiresIn, err := t.generateRefreshTokenForROPC(settings, ropcInput, originalRefreshTokenScope, now, privKey, keyPair.KeyIdentifier, input.RefreshToken)
+	refreshToken, refreshExpiresIn, err := t.generateRefreshTokenForROPC(ctx, settings, ropcInput, originalRefreshTokenScope, now, privKey, keyPair.KeyIdentifier, input.RefreshToken)
 	if err != nil {
 		return nil, err
 	}
@@ -1225,7 +1225,7 @@ func (t *TokenIssuer) GenerateTokenResponseForROPC(ctx context.Context,
 	// deliberately left alone: nothing reads RefreshToken.Scope for that grant, because the
 	// validator consults refreshToken.Code.Scope instead (token_validator.go). Changing it would
 	// be an untested behaviour change to a working path.
-	refreshToken, refreshExpiresIn, err := t.generateRefreshTokenForROPC(settings, input, input.Scope, now, privKey, keyPair.KeyIdentifier, nil)
+	refreshToken, refreshExpiresIn, err := t.generateRefreshTokenForROPC(ctx, settings, input, input.Scope, now, privKey, keyPair.KeyIdentifier, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -1274,7 +1274,7 @@ func (t *TokenIssuer) generateROPCIdToken(ctx context.Context, settings *models.
 // generateRefreshTokenForROPC creates a refresh token specifically for ROPC flow.
 // Unlike auth code flow, ROPC tokens store UserId and ClientId directly on the RefreshToken
 // instead of referencing a Code entity.
-func (t *TokenIssuer) generateRefreshTokenForROPC(settings *models.Settings, input *ROPCGrantInput, scope string,
+func (t *TokenIssuer) generateRefreshTokenForROPC(ctx context.Context, settings *models.Settings, input *ROPCGrantInput, scope string,
 	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string, previousRefreshToken *models.RefreshToken) (string, int64, error) {
 
 	claims := make(jwt.MapClaims)
@@ -1338,7 +1338,7 @@ func (t *TokenIssuer) generateRefreshTokenForROPC(settings *models.Settings, inp
 		refreshTokenEntity.AuthStateGeneration = input.User.AuthStateGeneration
 	}
 
-	err = t.database.CreateRefreshToken(nil, refreshTokenEntity)
+	err = t.database.CreateRefreshToken(ctx, nil, refreshTokenEntity)
 	if err != nil {
 		return "", 0, err
 	}

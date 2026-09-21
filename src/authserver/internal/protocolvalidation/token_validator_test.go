@@ -273,9 +273,9 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		}
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil).Once()
-		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.AnythingOfType("string"), false).Return(codeEntity, nil).Once()
-		mockDB.On("CodeLoadClient", mock.Anything, codeEntity).Return(nil).Once()
-		mockDB.On("CodeLoadUser", mock.Anything, codeEntity).Return(nil).Once()
+		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.Anything, mock.AnythingOfType("string"), false).Return(codeEntity, nil).Once()
+		mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
+		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
 
 		result, err := validator.ValidateTokenRequest(ctx, input)
 
@@ -314,9 +314,9 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		}
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil).Once()
-		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.AnythingOfType("string"), false).Return(nil, nil).Once()
+		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.Anything, mock.AnythingOfType("string"), false).Return(nil, nil).Once()
 		// Reuse-detection retry: validator now consults used codes too. Both miss = genuinely unknown.
-		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.AnythingOfType("string"), true).Return(nil, nil).Once()
+		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.Anything, mock.AnythingOfType("string"), true).Return(nil, nil).Once()
 
 		result, err := validator.ValidateTokenRequest(ctx, input)
 
@@ -360,7 +360,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		}
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil).Once()
-		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.AnythingOfType("string"), false).Return(codeEntity, nil).Once()
+		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.Anything, mock.AnythingOfType("string"), false).Return(codeEntity, nil).Once()
 
 		result, err := validator.ValidateTokenRequest(ctx, input)
 
@@ -407,9 +407,9 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		}
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil).Once()
-		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.AnythingOfType("string"), false).Return(codeEntity, nil).Once()
-		mockDB.On("CodeLoadClient", mock.Anything, codeEntity).Return(nil).Once()
-		mockDB.On("CodeLoadUser", mock.Anything, codeEntity).Return(nil).Once()
+		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.Anything, mock.AnythingOfType("string"), false).Return(codeEntity, nil).Once()
+		mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
+		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
 
 		result, err := validator.ValidateTokenRequest(ctx, input)
 
@@ -459,9 +459,9 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		}
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil).Once()
-		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.AnythingOfType("string"), false).Return(codeEntity, nil).Once()
-		mockDB.On("CodeLoadClient", mock.Anything, codeEntity).Return(nil).Once()
-		mockDB.On("CodeLoadUser", mock.Anything, codeEntity).Return(nil).Once()
+		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.Anything, mock.AnythingOfType("string"), false).Return(codeEntity, nil).Once()
+		mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
+		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
 
 		result, err := validator.ValidateTokenRequest(ctx, input)
 
@@ -515,9 +515,9 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		}
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil).Once()
-		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.AnythingOfType("string"), false).Return(codeEntity, nil).Once()
-		mockDB.On("CodeLoadClient", mock.Anything, codeEntity).Return(nil).Once()
-		mockDB.On("CodeLoadUser", mock.Anything, codeEntity).Return(nil).Once()
+		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.Anything, mock.AnythingOfType("string"), false).Return(codeEntity, nil).Once()
+		mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
+		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
 
 		result, err := validator.ValidateTokenRequest(ctx, input)
 
@@ -572,9 +572,9 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		}
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil).Once()
-		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.AnythingOfType("string"), false).Return(codeEntity, nil).Once()
-		mockDB.On("CodeLoadClient", mock.Anything, codeEntity).Return(nil).Once()
-		mockDB.On("CodeLoadUser", mock.Anything, codeEntity).Return(nil).Once()
+		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.Anything, mock.AnythingOfType("string"), false).Return(codeEntity, nil).Once()
+		mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
+		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
 
 		result, err := validator.ValidateTokenRequest(ctx, input)
 
@@ -631,9 +631,9 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		}
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, "non_public_client").Return(client, nil).Once()
-		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.AnythingOfType("string"), false).Return(codeEntity, nil).Once()
-		mockDB.On("CodeLoadClient", mock.Anything, codeEntity).Return(nil).Once()
-		mockDB.On("CodeLoadUser", mock.Anything, codeEntity).Return(nil).Once()
+		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.Anything, mock.AnythingOfType("string"), false).Return(codeEntity, nil).Once()
+		mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
+		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
 
 		result, err := validator.ValidateTokenRequest(ctx, input)
 
@@ -697,9 +697,9 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		}
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, "confidential_client").Return(client, nil).Once()
-		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.AnythingOfType("string"), false).Return(codeEntity, nil).Once()
-		mockDB.On("CodeLoadClient", mock.Anything, codeEntity).Return(nil).Once()
-		mockDB.On("CodeLoadUser", mock.Anything, codeEntity).Return(nil).Once()
+		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.Anything, mock.AnythingOfType("string"), false).Return(codeEntity, nil).Once()
+		mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
+		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
 
 		result, err := validator.ValidateTokenRequest(ctx, input)
 
@@ -758,9 +758,9 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		}
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, "public_client").Return(client, nil).Once()
-		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.AnythingOfType("string"), false).Return(codeEntity, nil).Once()
-		mockDB.On("CodeLoadClient", mock.Anything, codeEntity).Return(nil).Once()
-		mockDB.On("CodeLoadUser", mock.Anything, codeEntity).Return(nil).Once()
+		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.Anything, mock.AnythingOfType("string"), false).Return(codeEntity, nil).Once()
+		mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
+		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
 
 		result, err := validator.ValidateTokenRequest(ctx, input)
 
@@ -815,9 +815,9 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		}
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, "valid_client").Return(client, nil).Once()
-		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.AnythingOfType("string"), false).Return(codeEntity, nil).Once()
-		mockDB.On("CodeLoadClient", mock.Anything, codeEntity).Return(nil).Once()
-		mockDB.On("CodeLoadUser", mock.Anything, codeEntity).Return(nil).Once()
+		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.Anything, mock.AnythingOfType("string"), false).Return(codeEntity, nil).Once()
+		mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
+		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
 		expectRedirectURIStillRegistered(mockDB, "https://example.com/callback")
 
 		result, err := validator.ValidateTokenRequest(ctx, input)
@@ -871,9 +871,9 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		}
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, "public_client").Return(client, nil).Once()
-		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.AnythingOfType("string"), false).Return(codeEntity, nil).Once()
-		mockDB.On("CodeLoadClient", mock.Anything, codeEntity).Return(nil).Once()
-		mockDB.On("CodeLoadUser", mock.Anything, codeEntity).Return(nil).Once()
+		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.Anything, mock.AnythingOfType("string"), false).Return(codeEntity, nil).Once()
+		mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
+		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
 		expectRedirectURIStillRegistered(mockDB, "https://example.com/public-client/callback")
 
 		result, err := validator.ValidateTokenRequest(ctx, input)
@@ -957,10 +957,10 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 		codeEntity := reusedCodeFixture(client, true)
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil).Once()
-		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.AnythingOfType("string"), false).Return(nil, nil).Once()
-		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.AnythingOfType("string"), true).Return(codeEntity, nil).Once()
-		mockDB.On("CodeLoadClient", mock.Anything, codeEntity).Return(nil).Once()
-		mockDB.On("CodeLoadUser", mock.Anything, codeEntity).Return(nil).Once()
+		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.Anything, mock.AnythingOfType("string"), false).Return(nil, nil).Once()
+		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.Anything, mock.AnythingOfType("string"), true).Return(codeEntity, nil).Once()
+		mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
+		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
 
 		result, err := validator.ValidateTokenRequest(ctx, input)
 
@@ -1011,10 +1011,10 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 		codeEntity := reusedCodeFixture(client, false)
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, "confidential_client").Return(client, nil).Once()
-		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.AnythingOfType("string"), false).Return(nil, nil).Once()
-		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.AnythingOfType("string"), true).Return(codeEntity, nil).Once()
-		mockDB.On("CodeLoadClient", mock.Anything, codeEntity).Return(nil).Once()
-		mockDB.On("CodeLoadUser", mock.Anything, codeEntity).Return(nil).Once()
+		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.Anything, mock.AnythingOfType("string"), false).Return(nil, nil).Once()
+		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.Anything, mock.AnythingOfType("string"), true).Return(codeEntity, nil).Once()
+		mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
+		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
 
 		result, err := validator.ValidateTokenRequest(ctx, input)
 
@@ -1055,10 +1055,10 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 		codeEntity.User.Enabled = false // would normally trigger ErrUserDisabled
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil).Once()
-		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.AnythingOfType("string"), false).Return(nil, nil).Once()
-		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.AnythingOfType("string"), true).Return(codeEntity, nil).Once()
-		mockDB.On("CodeLoadClient", mock.Anything, codeEntity).Return(nil).Once()
-		mockDB.On("CodeLoadUser", mock.Anything, codeEntity).Return(nil).Once()
+		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.Anything, mock.AnythingOfType("string"), false).Return(nil, nil).Once()
+		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.Anything, mock.AnythingOfType("string"), true).Return(codeEntity, nil).Once()
+		mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
+		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
 
 		_, err := validator.ValidateTokenRequest(ctx, input)
 
@@ -1104,10 +1104,10 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 		codeEntity := reusedCodeFixture(victimClient, true)
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, "attacker_client").Return(attackerClient, nil).Once()
-		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.AnythingOfType("string"), false).Return(nil, nil).Once()
-		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.AnythingOfType("string"), true).Return(codeEntity, nil).Once()
-		mockDB.On("CodeLoadClient", mock.Anything, codeEntity).Return(nil).Once()
-		mockDB.On("CodeLoadUser", mock.Anything, codeEntity).Return(nil).Once()
+		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.Anything, mock.AnythingOfType("string"), false).Return(nil, nil).Once()
+		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.Anything, mock.AnythingOfType("string"), true).Return(codeEntity, nil).Once()
+		mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
+		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
 
 		_, err := validator.ValidateTokenRequest(ctx, input)
 
@@ -1148,8 +1148,8 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 		codeEntity := reusedCodeFixture(client, true)
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil).Once()
-		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.AnythingOfType("string"), false).Return(nil, nil).Once()
-		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.AnythingOfType("string"), true).Return(codeEntity, nil).Once()
+		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.Anything, mock.AnythingOfType("string"), false).Return(nil, nil).Once()
+		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.Anything, mock.AnythingOfType("string"), true).Return(codeEntity, nil).Once()
 
 		_, err := validator.ValidateTokenRequest(ctx, input)
 
@@ -1195,10 +1195,10 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 		codeEntity := reusedCodeFixture(client, false)
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, "confidential_client").Return(client, nil).Once()
-		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.AnythingOfType("string"), false).Return(nil, nil).Once()
-		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.AnythingOfType("string"), true).Return(codeEntity, nil).Once()
-		mockDB.On("CodeLoadClient", mock.Anything, codeEntity).Return(nil).Once()
-		mockDB.On("CodeLoadUser", mock.Anything, codeEntity).Return(nil).Once()
+		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.Anything, mock.AnythingOfType("string"), false).Return(nil, nil).Once()
+		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.Anything, mock.AnythingOfType("string"), true).Return(codeEntity, nil).Once()
+		mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
+		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
 
 		_, err = validator.ValidateTokenRequest(ctx, input)
 
@@ -1243,10 +1243,10 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 		codeEntity := reusedCodeFixture(client, false)
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, "confidential_client").Return(client, nil).Once()
-		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.AnythingOfType("string"), false).Return(nil, nil).Once()
-		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.AnythingOfType("string"), true).Return(codeEntity, nil).Once()
-		mockDB.On("CodeLoadClient", mock.Anything, codeEntity).Return(nil).Once()
-		mockDB.On("CodeLoadUser", mock.Anything, codeEntity).Return(nil).Once()
+		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.Anything, mock.AnythingOfType("string"), false).Return(nil, nil).Once()
+		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.Anything, mock.AnythingOfType("string"), true).Return(codeEntity, nil).Once()
+		mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
+		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
 
 		_, err = validator.ValidateTokenRequest(ctx, input)
 
@@ -1286,10 +1286,10 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 		codeEntity := reusedCodeFixture(client, true)
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil).Once()
-		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.AnythingOfType("string"), false).Return(nil, nil).Once()
-		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.AnythingOfType("string"), true).Return(codeEntity, nil).Once()
-		mockDB.On("CodeLoadClient", mock.Anything, codeEntity).Return(nil).Once()
-		mockDB.On("CodeLoadUser", mock.Anything, codeEntity).Return(nil).Once()
+		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.Anything, mock.AnythingOfType("string"), false).Return(nil, nil).Once()
+		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.Anything, mock.AnythingOfType("string"), true).Return(codeEntity, nil).Once()
+		mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
+		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
 
 		_, err := validator.ValidateTokenRequest(ctx, input)
 
@@ -1328,8 +1328,8 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 		}
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil).Once()
-		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.AnythingOfType("string"), false).Return(nil, nil).Once()
-		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.AnythingOfType("string"), true).Return(nil, nil).Once()
+		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.Anything, mock.AnythingOfType("string"), false).Return(nil, nil).Once()
+		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.Anything, mock.AnythingOfType("string"), true).Return(nil, nil).Once()
 
 		_, err := validator.ValidateTokenRequest(ctx, input)
 
@@ -2240,10 +2240,10 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 			Return(&oauth.JwtToken{Claims: jwt.MapClaims{
 				"jti": "some_jti", "typ": "Refresh", "sub": "user_subject",
 			}}, nil).Once()
-		mockDB.On("GetRefreshTokenByJti", mock.Anything, "some_jti").Return(refreshToken, nil).Once()
-		mockDB.On("RefreshTokenLoadCode", mock.Anything, refreshToken).Return(nil).Once()
-		mockDB.On("CodeLoadUser", mock.Anything, &refreshToken.Code).Return(nil).Once()
-		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, "sid-1").
+		mockDB.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, "some_jti").Return(refreshToken, nil).Once()
+		mockDB.On("RefreshTokenLoadCode", mock.Anything, mock.Anything, refreshToken).Return(nil).Once()
+		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, &refreshToken.Code).Return(nil).Once()
+		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "sid-1").
 			Return(&models.UserSession{
 				Id: 9, SessionIdentifier: "sid-1", UserId: grantUserId,
 				Started: now.Add(-10 * time.Minute), LastAccessed: now,
@@ -2481,7 +2481,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		}
 		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "non_existent_refresh_token", (*rsa.PublicKey)(nil), true).
 			Return(mockJwtToken, nil).Once()
-		mockDB.On("GetRefreshTokenByJti", (*sql.Tx)(nil), "non_existent_jti").Return(nil, nil).Once()
+		mockDB.On("GetRefreshTokenByJti", mock.Anything, (*sql.Tx)(nil), "non_existent_jti").Return(nil, nil).Once()
 
 		result, err := validator.ValidateTokenRequest(ctx, input)
 
@@ -2550,9 +2550,9 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil)
 		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "mismatched_refresh_token", (*rsa.PublicKey)(nil), true).Return(refreshTokenJwt, nil)
-		mockDB.On("GetRefreshTokenByJti", mock.Anything, "mismatched_jti").Return(refreshToken, nil)
-		mockDB.On("RefreshTokenLoadCode", mock.Anything, refreshToken).Return(nil)
-		mockDB.On("CodeLoadUser", mock.Anything, &refreshToken.Code).Return(nil)
+		mockDB.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, "mismatched_jti").Return(refreshToken, nil)
+		mockDB.On("RefreshTokenLoadCode", mock.Anything, mock.Anything, refreshToken).Return(nil)
+		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, &refreshToken.Code).Return(nil)
 
 		result, err := validator.ValidateTokenRequest(ctx, input)
 
@@ -2612,9 +2612,9 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil)
 		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "disabled_user_refresh_token", (*rsa.PublicKey)(nil), true).Return(refreshTokenJwt, nil)
-		mockDB.On("GetRefreshTokenByJti", mock.Anything, "disabled_user_jti").Return(refreshToken, nil)
-		mockDB.On("RefreshTokenLoadCode", mock.Anything, refreshToken).Return(nil)
-		mockDB.On("CodeLoadUser", mock.Anything, &refreshToken.Code).Return(nil)
+		mockDB.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, "disabled_user_jti").Return(refreshToken, nil)
+		mockDB.On("RefreshTokenLoadCode", mock.Anything, mock.Anything, refreshToken).Return(nil)
+		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, &refreshToken.Code).Return(nil)
 
 		result, err := validator.ValidateTokenRequest(ctx, input)
 
@@ -2681,10 +2681,10 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil)
 		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "nil_session_refresh_token", (*rsa.PublicKey)(nil), true).Return(refreshTokenJwt, nil)
-		mockDB.On("GetRefreshTokenByJti", mock.Anything, "nil_session_jti").Return(refreshToken, nil)
-		mockDB.On("RefreshTokenLoadCode", mock.Anything, refreshToken).Return(nil)
-		mockDB.On("CodeLoadUser", mock.Anything, &refreshToken.Code).Return(nil)
-		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, "non_existent_session").Return(nil, nil)
+		mockDB.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, "nil_session_jti").Return(refreshToken, nil)
+		mockDB.On("RefreshTokenLoadCode", mock.Anything, mock.Anything, refreshToken).Return(nil)
+		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, &refreshToken.Code).Return(nil)
+		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "non_existent_session").Return(nil, nil)
 
 		result, err := validator.ValidateTokenRequest(ctx, input)
 
@@ -2758,10 +2758,10 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil)
 		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "invalid_session_refresh_token", (*rsa.PublicKey)(nil), true).Return(refreshTokenJwt, nil)
-		mockDB.On("GetRefreshTokenByJti", mock.Anything, "invalid_session_jti").Return(refreshToken, nil)
-		mockDB.On("RefreshTokenLoadCode", mock.Anything, refreshToken).Return(nil)
-		mockDB.On("CodeLoadUser", mock.Anything, &refreshToken.Code).Return(nil)
-		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, "expired_session").Return(expiredSession, nil)
+		mockDB.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, "invalid_session_jti").Return(refreshToken, nil)
+		mockDB.On("RefreshTokenLoadCode", mock.Anything, mock.Anything, refreshToken).Return(nil)
+		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, &refreshToken.Code).Return(nil)
+		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "expired_session").Return(expiredSession, nil)
 
 		result, err := validator.ValidateTokenRequest(ctx, input)
 
@@ -2826,9 +2826,9 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil)
 		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "expired_offline_refresh_token", (*rsa.PublicKey)(nil), true).Return(refreshTokenJwt, nil)
-		mockDB.On("GetRefreshTokenByJti", mock.Anything, "expired_offline_jti").Return(refreshToken, nil)
-		mockDB.On("RefreshTokenLoadCode", mock.Anything, refreshToken).Return(nil)
-		mockDB.On("CodeLoadUser", mock.Anything, &refreshToken.Code).Return(nil)
+		mockDB.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, "expired_offline_jti").Return(refreshToken, nil)
+		mockDB.On("RefreshTokenLoadCode", mock.Anything, mock.Anything, refreshToken).Return(nil)
+		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, &refreshToken.Code).Return(nil)
 
 		result, err := validator.ValidateTokenRequest(ctx, input)
 
@@ -2892,9 +2892,9 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil)
 		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "invalid_offline_refresh_token", (*rsa.PublicKey)(nil), true).Return(refreshTokenJwt, nil)
-		mockDB.On("GetRefreshTokenByJti", mock.Anything, "invalid_offline_jti").Return(refreshToken, nil)
-		mockDB.On("RefreshTokenLoadCode", mock.Anything, refreshToken).Return(nil)
-		mockDB.On("CodeLoadUser", mock.Anything, &refreshToken.Code).Return(nil)
+		mockDB.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, "invalid_offline_jti").Return(refreshToken, nil)
+		mockDB.On("RefreshTokenLoadCode", mock.Anything, mock.Anything, refreshToken).Return(nil)
+		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, &refreshToken.Code).Return(nil)
 
 		result, err := validator.ValidateTokenRequest(ctx, input)
 
@@ -2953,9 +2953,9 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil)
 		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "invalid_typ_refresh_token", (*rsa.PublicKey)(nil), true).Return(refreshTokenJwt, nil)
-		mockDB.On("GetRefreshTokenByJti", mock.Anything, "invalid_typ_jti").Return(refreshToken, nil)
-		mockDB.On("RefreshTokenLoadCode", mock.Anything, refreshToken).Return(nil)
-		mockDB.On("CodeLoadUser", mock.Anything, &refreshToken.Code).Return(nil)
+		mockDB.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, "invalid_typ_jti").Return(refreshToken, nil)
+		mockDB.On("RefreshTokenLoadCode", mock.Anything, mock.Anything, refreshToken).Return(nil)
+		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, &refreshToken.Code).Return(nil)
 
 		result, err := validator.ValidateTokenRequest(ctx, input)
 
@@ -3028,10 +3028,10 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil)
 		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "invalid_scope_refresh_token", (*rsa.PublicKey)(nil), true).Return(refreshTokenJwt, nil)
-		mockDB.On("GetRefreshTokenByJti", mock.Anything, "invalid_scope_jti").Return(refreshToken, nil)
-		mockDB.On("RefreshTokenLoadCode", mock.Anything, refreshToken).Return(nil)
-		mockDB.On("CodeLoadUser", mock.Anything, &refreshToken.Code).Return(nil)
-		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, "test_session").Return(userSession, nil)
+		mockDB.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, "invalid_scope_jti").Return(refreshToken, nil)
+		mockDB.On("RefreshTokenLoadCode", mock.Anything, mock.Anything, refreshToken).Return(nil)
+		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, &refreshToken.Code).Return(nil)
+		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test_session").Return(userSession, nil)
 
 		result, err := validator.ValidateTokenRequest(ctx, input)
 
@@ -3106,9 +3106,9 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil)
 		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "valid_offline_refresh_token", (*rsa.PublicKey)(nil), true).Return(refreshTokenJwt, nil)
-		mockDB.On("GetRefreshTokenByJti", mock.Anything, "valid_offline_jti").Return(refreshToken, nil)
-		mockDB.On("RefreshTokenLoadCode", mock.Anything, refreshToken).Return(nil)
-		mockDB.On("CodeLoadUser", mock.Anything, &refreshToken.Code).Return(nil)
+		mockDB.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, "valid_offline_jti").Return(refreshToken, nil)
+		mockDB.On("RefreshTokenLoadCode", mock.Anything, mock.Anything, refreshToken).Return(nil)
+		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, &refreshToken.Code).Return(nil)
 		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "user123").Return(&models.User{Id: 1, Enabled: true}, nil)
 		mockDB.On("GetConsentByUserIdAndClientId", mock.Anything, mock.Anything, int64(1), int64(1)).Return(userConsent, nil)
 
@@ -3182,9 +3182,9 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil)
 		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "valid_offline_refresh_token", (*rsa.PublicKey)(nil), true).Return(refreshTokenJwt, nil)
-		mockDB.On("GetRefreshTokenByJti", mock.Anything, "valid_offline_jti").Return(refreshToken, nil)
-		mockDB.On("RefreshTokenLoadCode", mock.Anything, refreshToken).Return(nil)
-		mockDB.On("CodeLoadUser", mock.Anything, &refreshToken.Code).Return(nil)
+		mockDB.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, "valid_offline_jti").Return(refreshToken, nil)
+		mockDB.On("RefreshTokenLoadCode", mock.Anything, mock.Anything, refreshToken).Return(nil)
+		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, &refreshToken.Code).Return(nil)
 		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "user123").Return(&models.User{Id: 1, Enabled: true}, nil)
 		// The refresh carries four scopes; the consent lookup must run once, not once per scope.
 		mockDB.On("GetConsentByUserIdAndClientId", mock.Anything, mock.Anything, int64(1), int64(1)).Return(userConsent, nil).Times(1)
@@ -3261,10 +3261,10 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil)
 		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "valid_refresh_token", (*rsa.PublicKey)(nil), true).Return(refreshTokenJwt, nil)
-		mockDB.On("GetRefreshTokenByJti", mock.Anything, "valid_refresh_jti").Return(refreshToken, nil)
-		mockDB.On("RefreshTokenLoadCode", mock.Anything, refreshToken).Return(nil)
-		mockDB.On("CodeLoadUser", mock.Anything, &refreshToken.Code).Return(nil)
-		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, "test_session").Return(userSession, nil)
+		mockDB.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, "valid_refresh_jti").Return(refreshToken, nil)
+		mockDB.On("RefreshTokenLoadCode", mock.Anything, mock.Anything, refreshToken).Return(nil)
+		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, &refreshToken.Code).Return(nil)
+		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test_session").Return(userSession, nil)
 		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "user123").Return(&models.User{Id: 1, Enabled: true}, nil)
 		mockPermissionChecker.On("UserHasScopePermission", mock.Anything, int64(1), "srv1:read").Return(true, nil)
 
@@ -3342,10 +3342,10 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil)
 		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "revoked_consent_refresh_token", (*rsa.PublicKey)(nil), true).Return(refreshTokenJwt, nil)
-		mockDB.On("GetRefreshTokenByJti", mock.Anything, "revoked_consent_jti").Return(refreshToken, nil)
-		mockDB.On("RefreshTokenLoadCode", mock.Anything, refreshToken).Return(nil)
-		mockDB.On("CodeLoadUser", mock.Anything, &refreshToken.Code).Return(nil)
-		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, "test_session").Return(userSession, nil)
+		mockDB.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, "revoked_consent_jti").Return(refreshToken, nil)
+		mockDB.On("RefreshTokenLoadCode", mock.Anything, mock.Anything, refreshToken).Return(nil)
+		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, &refreshToken.Code).Return(nil)
+		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test_session").Return(userSession, nil)
 		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "user123").Return(&models.User{Id: 1, Enabled: true}, nil)
 		mockDB.On("GetConsentByUserIdAndClientId", mock.Anything, mock.Anything, int64(1), int64(1)).Return(nil, nil) // Consent not found
 
@@ -3432,10 +3432,10 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil)
 		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "partial_consent_refresh_token", (*rsa.PublicKey)(nil), true).Return(refreshTokenJwt, nil)
-		mockDB.On("GetRefreshTokenByJti", mock.Anything, "partial_consent_jti").Return(refreshToken, nil)
-		mockDB.On("RefreshTokenLoadCode", mock.Anything, refreshToken).Return(nil)
-		mockDB.On("CodeLoadUser", mock.Anything, &refreshToken.Code).Return(nil)
-		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, "test_session").Return(userSession, nil)
+		mockDB.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, "partial_consent_jti").Return(refreshToken, nil)
+		mockDB.On("RefreshTokenLoadCode", mock.Anything, mock.Anything, refreshToken).Return(nil)
+		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, &refreshToken.Code).Return(nil)
+		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test_session").Return(userSession, nil)
 		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "user123").Return(&models.User{Id: 1, Enabled: true}, nil)
 		mockDB.On("GetConsentByUserIdAndClientId", mock.Anything, mock.Anything, int64(1), int64(1)).Return(userConsent, nil)
 
@@ -3514,10 +3514,10 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil)
 		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "revoked_permission_refresh_token", (*rsa.PublicKey)(nil), true).Return(refreshTokenJwt, nil)
-		mockDB.On("GetRefreshTokenByJti", mock.Anything, "revoked_permission_jti").Return(refreshToken, nil)
-		mockDB.On("RefreshTokenLoadCode", mock.Anything, refreshToken).Return(nil)
-		mockDB.On("CodeLoadUser", mock.Anything, &refreshToken.Code).Return(nil)
-		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, "test_session").Return(userSession, nil)
+		mockDB.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, "revoked_permission_jti").Return(refreshToken, nil)
+		mockDB.On("RefreshTokenLoadCode", mock.Anything, mock.Anything, refreshToken).Return(nil)
+		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, &refreshToken.Code).Return(nil)
+		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test_session").Return(userSession, nil)
 		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "user123").Return(&models.User{Id: 1, Enabled: true}, nil)
 		mockPermissionChecker.On("UserHasScopePermission", mock.Anything, int64(1), "resource:read").Return(false, nil) // Permission revoked
 
@@ -3592,9 +3592,9 @@ func TestValidateTokenRequest_PKCE_NoPKCEUsed_NoVerifierProvided_Success(t *test
 	}
 
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil).Once()
-	mockDB.On("GetCodeByCodeHash", mock.Anything, mock.AnythingOfType("string"), false).Return(codeEntity, nil).Once()
-	mockDB.On("CodeLoadClient", mock.Anything, codeEntity).Return(nil).Once()
-	mockDB.On("CodeLoadUser", mock.Anything, codeEntity).Return(nil).Once()
+	mockDB.On("GetCodeByCodeHash", mock.Anything, mock.Anything, mock.AnythingOfType("string"), false).Return(codeEntity, nil).Once()
+	mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
+	mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
 	expectRedirectURIStillRegistered(mockDB, "https://example.com/callback")
 
 	result, err := validator.ValidateTokenRequest(ctx, input)
@@ -3659,9 +3659,9 @@ func TestValidateTokenRequest_PKCE_NoPKCEUsed_VerifierProvided_Fails(t *testing.
 	}
 
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil).Once()
-	mockDB.On("GetCodeByCodeHash", mock.Anything, mock.AnythingOfType("string"), false).Return(codeEntity, nil).Once()
-	mockDB.On("CodeLoadClient", mock.Anything, codeEntity).Return(nil).Once()
-	mockDB.On("CodeLoadUser", mock.Anything, codeEntity).Return(nil).Once()
+	mockDB.On("GetCodeByCodeHash", mock.Anything, mock.Anything, mock.AnythingOfType("string"), false).Return(codeEntity, nil).Once()
+	mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
+	mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
 
 	result, err := validator.ValidateTokenRequest(ctx, input)
 
@@ -3722,9 +3722,9 @@ func TestValidateTokenRequest_PKCE_PKCEUsed_ValidVerifier_Success(t *testing.T) 
 	}
 
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil).Once()
-	mockDB.On("GetCodeByCodeHash", mock.Anything, mock.AnythingOfType("string"), false).Return(codeEntity, nil).Once()
-	mockDB.On("CodeLoadClient", mock.Anything, codeEntity).Return(nil).Once()
-	mockDB.On("CodeLoadUser", mock.Anything, codeEntity).Return(nil).Once()
+	mockDB.On("GetCodeByCodeHash", mock.Anything, mock.Anything, mock.AnythingOfType("string"), false).Return(codeEntity, nil).Once()
+	mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
+	mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
 	expectRedirectURIStillRegistered(mockDB, "https://example.com/callback")
 
 	result, err := validator.ValidateTokenRequest(ctx, input)
@@ -3779,9 +3779,9 @@ func TestValidateTokenRequest_PKCE_PKCEUsed_NoVerifier_Fails(t *testing.T) {
 	}
 
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil).Once()
-	mockDB.On("GetCodeByCodeHash", mock.Anything, mock.AnythingOfType("string"), false).Return(codeEntity, nil).Once()
-	mockDB.On("CodeLoadClient", mock.Anything, codeEntity).Return(nil).Once()
-	mockDB.On("CodeLoadUser", mock.Anything, codeEntity).Return(nil).Once()
+	mockDB.On("GetCodeByCodeHash", mock.Anything, mock.Anything, mock.AnythingOfType("string"), false).Return(codeEntity, nil).Once()
+	mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
+	mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
 
 	result, err := validator.ValidateTokenRequest(ctx, input)
 
@@ -3843,9 +3843,9 @@ func TestValidateTokenRequest_PKCE_PKCEUsed_WrongVerifier_Fails(t *testing.T) {
 	}
 
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil).Once()
-	mockDB.On("GetCodeByCodeHash", mock.Anything, mock.AnythingOfType("string"), false).Return(codeEntity, nil).Once()
-	mockDB.On("CodeLoadClient", mock.Anything, codeEntity).Return(nil).Once()
-	mockDB.On("CodeLoadUser", mock.Anything, codeEntity).Return(nil).Once()
+	mockDB.On("GetCodeByCodeHash", mock.Anything, mock.Anything, mock.AnythingOfType("string"), false).Return(codeEntity, nil).Once()
+	mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
+	mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
 
 	result, err := validator.ValidateTokenRequest(ctx, input)
 
@@ -3910,9 +3910,9 @@ func TestValidateTokenRequest_PKCE_EmptyStringCodeChallenge_TreatedAsNoPKCE(t *t
 	}
 
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil).Once()
-	mockDB.On("GetCodeByCodeHash", mock.Anything, mock.AnythingOfType("string"), false).Return(codeEntity, nil).Once()
-	mockDB.On("CodeLoadClient", mock.Anything, codeEntity).Return(nil).Once()
-	mockDB.On("CodeLoadUser", mock.Anything, codeEntity).Return(nil).Once()
+	mockDB.On("GetCodeByCodeHash", mock.Anything, mock.Anything, mock.AnythingOfType("string"), false).Return(codeEntity, nil).Once()
+	mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
+	mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
 	expectRedirectURIStillRegistered(mockDB, "https://example.com/callback")
 
 	result, err := validator.ValidateTokenRequest(ctx, input)
@@ -3961,10 +3961,10 @@ func publicClientChallengelessCode(t *testing.T, storedChallenge sql.NullString,
 	}
 
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil).Once()
-	mockDB.On("GetCodeByCodeHash", mock.Anything, mock.AnythingOfType("string"), false).
+	mockDB.On("GetCodeByCodeHash", mock.Anything, mock.Anything, mock.AnythingOfType("string"), false).
 		Return(codeEntity, nil).Once()
-	mockDB.On("CodeLoadClient", mock.Anything, codeEntity).Return(nil).Once()
-	mockDB.On("CodeLoadUser", mock.Anything, codeEntity).Return(nil).Once()
+	mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
+	mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
 
 	input := &ValidateTokenRequestInput{
 		GrantType:   "authorization_code",
@@ -4071,12 +4071,12 @@ func publicClientChallengelessRefresh(t *testing.T, storedChallenge sql.NullStri
 		Return(&oauth.JwtToken{Claims: jwt.MapClaims{
 			"jti": "the-jti", "typ": "Refresh", "sub": "user_subject",
 		}}, nil)
-	mockDB.On("GetRefreshTokenByJti", mock.Anything, "the-jti").Return(refreshToken, nil)
-	mockDB.On("RefreshTokenLoadCode", mock.Anything, refreshToken).Return(nil)
-	mockDB.On("CodeLoadUser", mock.Anything, &refreshToken.Code).Return(nil)
+	mockDB.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, "the-jti").Return(refreshToken, nil)
+	mockDB.On("RefreshTokenLoadCode", mock.Anything, mock.Anything, refreshToken).Return(nil)
+	mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, &refreshToken.Code).Return(nil)
 	// Only the accepted row reaches these two.
 	now := time.Now().UTC()
-	mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, "sid-1").
+	mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "sid-1").
 		Return(&models.UserSession{
 			Id: 9, SessionIdentifier: "sid-1", UserId: grantUserId,
 			Started: now.Add(-10 * time.Minute), LastAccessed: now,
@@ -5367,9 +5367,9 @@ func TestValidateTokenRequest_RefreshToken_ROPC_InjectedUserInfoScope(t *testing
 			mockDB.On("GetClientByClientIdentifier", mock.Anything, "ropc_client").Return(client, nil)
 			mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "ropc_refresh_token", (*rsa.PublicKey)(nil), true).
 				Return(refreshTokenJwt, nil)
-			mockDB.On("GetRefreshTokenByJti", mock.Anything, "ropc_jti").Return(refreshToken, nil)
-			mockDB.On("RefreshTokenLoadUser", mock.Anything, refreshToken).Return(nil)
-			mockDB.On("RefreshTokenLoadClient", mock.Anything, refreshToken).Return(nil)
+			mockDB.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, "ropc_jti").Return(refreshToken, nil)
+			mockDB.On("RefreshTokenLoadUser", mock.Anything, mock.Anything, refreshToken).Return(nil)
+			mockDB.On("RefreshTokenLoadClient", mock.Anything, mock.Anything, refreshToken).Return(nil)
 			mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "ropc_user_subject").Return(&user, nil)
 
 			// The user holds nothing. In the accepted case the scope must never be looked up at
@@ -5554,11 +5554,11 @@ func TestValidateTokenRequest_AuthStateGeneration(t *testing.T) {
 				}
 
 				mockDB.On("GetClientByClientIdentifier", mock.Anything, "test_client").Return(client, nil)
-				mockDB.On("GetCodeByCodeHash", mock.Anything, mock.Anything, false).Return(code, nil)
+				mockDB.On("GetCodeByCodeHash", mock.Anything, mock.Anything, mock.Anything, false).Return(code, nil)
 				// No-ops: Client and User are already populated on the fixture above, and the
 				// loaders are what the validator calls before reaching the generation check.
-				mockDB.On("CodeLoadClient", mock.Anything, code).Return(nil)
-				mockDB.On("CodeLoadUser", mock.Anything, code).Return(nil)
+				mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, code).Return(nil)
+				mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, code).Return(nil)
 				expectRedirectURIStillRegistered(mockDB, "https://example.com/cb")
 
 				result, err := validator.ValidateTokenRequest(ctx, &ValidateTokenRequestInput{
@@ -5644,13 +5644,13 @@ func TestValidateTokenRequest_AuthStateGeneration(t *testing.T) {
 					Return(&oauth.JwtToken{Claims: jwt.MapClaims{
 						"jti": "the-jti", "typ": "Refresh", "sub": "user_subject",
 					}}, nil)
-				mockDB.On("GetRefreshTokenByJti", mock.Anything, "the-jti").Return(refreshToken, nil)
-				mockDB.On("RefreshTokenLoadCode", mock.Anything, refreshToken).Return(nil)
-				mockDB.On("CodeLoadUser", mock.Anything, &refreshToken.Code).Return(nil)
+				mockDB.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, "the-jti").Return(refreshToken, nil)
+				mockDB.On("RefreshTokenLoadCode", mock.Anything, mock.Anything, refreshToken).Return(nil)
+				mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, &refreshToken.Code).Return(nil)
 
 				if tc.wantAccepted {
 					now := time.Now().UTC()
-					mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, "sid-1").
+					mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "sid-1").
 						Return(&models.UserSession{
 							Id: 9, SessionIdentifier: "sid-1", UserId: 7,
 							Started: now.Add(-10 * time.Minute), LastAccessed: now,
@@ -5720,9 +5720,9 @@ func TestValidateTokenRequest_AuthStateGeneration(t *testing.T) {
 						"jti": "ropc_jti", "typ": "Offline", "sub": "ropc_user_subject",
 						"offline_access_max_lifetime": float64(time.Now().UTC().Add(24 * time.Hour).Unix()),
 					}}, nil)
-				mockDB.On("GetRefreshTokenByJti", mock.Anything, "ropc_jti").Return(refreshToken, nil)
-				mockDB.On("RefreshTokenLoadUser", mock.Anything, refreshToken).Return(nil)
-				mockDB.On("RefreshTokenLoadClient", mock.Anything, refreshToken).Return(nil)
+				mockDB.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, "ropc_jti").Return(refreshToken, nil)
+				mockDB.On("RefreshTokenLoadUser", mock.Anything, mock.Anything, refreshToken).Return(nil)
+				mockDB.On("RefreshTokenLoadClient", mock.Anything, mock.Anything, refreshToken).Return(nil)
 				if tc.wantAccepted {
 					mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "ropc_user_subject").Return(&user, nil)
 				}
@@ -5810,7 +5810,7 @@ func TestValidateTokenRequest_RefreshToken_ExpiryPrecedesTheLookup(t *testing.T)
 	assert.Equal(t, http.StatusBadRequest, detail.GetHttpStatusCode())
 
 	// Structurally redundant today, kept as a guard. See the doc comment.
-	mockDB.AssertNotCalled(t, "GetRefreshTokenByJti", mock.Anything, mock.Anything)
+	mockDB.AssertNotCalled(t, "GetRefreshTokenByJti", mock.Anything, mock.Anything, mock.Anything)
 
 	mockDB.AssertExpectations(t)
 	mockTokenParser.AssertExpectations(t)
@@ -5864,9 +5864,9 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 			}
 
 			mockDB.On("GetClientByClientIdentifier", mock.Anything, "test_client").Return(client, nil)
-			mockDB.On("GetCodeByCodeHash", mock.Anything, mock.Anything, false).Return(code, nil)
-			mockDB.On("CodeLoadClient", mock.Anything, code).Return(nil)
-			mockDB.On("CodeLoadUser", mock.Anything, code).Return(nil)
+			mockDB.On("GetCodeByCodeHash", mock.Anything, mock.Anything, mock.Anything, false).Return(code, nil)
+			mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, code).Return(nil)
+			mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, code).Return(nil)
 
 			result, err := validator.ValidateTokenRequest(ctx, &ValidateTokenRequestInput{
 				GrantType:    "authorization_code",
@@ -5910,9 +5910,9 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 			}
 
 			mockDB.On("GetClientByClientIdentifier", mock.Anything, "test_client").Return(client, nil)
-			mockDB.On("GetCodeByCodeHash", mock.Anything, mock.Anything, false).Return(code, nil)
-			mockDB.On("CodeLoadClient", mock.Anything, code).Return(nil)
-			mockDB.On("CodeLoadUser", mock.Anything, code).Return(nil)
+			mockDB.On("GetCodeByCodeHash", mock.Anything, mock.Anything, mock.Anything, false).Return(code, nil)
+			mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, code).Return(nil)
+			mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, code).Return(nil)
 			expectRedirectURIStillRegistered(mockDB, "https://example.com/cb")
 
 			result, err := validator.ValidateTokenRequest(ctx, &ValidateTokenRequestInput{
@@ -5947,9 +5947,9 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 			}
 
 			mockDB.On("GetClientByClientIdentifier", mock.Anything, "test_client").Return(client, nil)
-			mockDB.On("GetCodeByCodeHash", mock.Anything, mock.Anything, false).Return(code, nil)
-			mockDB.On("CodeLoadClient", mock.Anything, code).Return(nil)
-			mockDB.On("CodeLoadUser", mock.Anything, code).Return(nil)
+			mockDB.On("GetCodeByCodeHash", mock.Anything, mock.Anything, mock.Anything, false).Return(code, nil)
+			mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, code).Return(nil)
+			mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, code).Return(nil)
 
 			result, err := validator.ValidateTokenRequest(ctx, &ValidateTokenRequestInput{
 				GrantType:    "authorization_code",
@@ -5991,9 +5991,9 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 			}
 
 			mockDB.On("GetClientByClientIdentifier", mock.Anything, "test_client").Return(client, nil)
-			mockDB.On("GetCodeByCodeHash", mock.Anything, mock.Anything, false).Return(code, nil)
-			mockDB.On("CodeLoadClient", mock.Anything, code).Return(nil)
-			mockDB.On("CodeLoadUser", mock.Anything, code).Return(nil)
+			mockDB.On("GetCodeByCodeHash", mock.Anything, mock.Anything, mock.Anything, false).Return(code, nil)
+			mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, code).Return(nil)
+			mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, code).Return(nil)
 
 			result, err := validator.ValidateTokenRequest(ctx, &ValidateTokenRequestInput{
 				GrantType:   "authorization_code",
@@ -6043,9 +6043,9 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 			}
 
 			mockDB.On("GetClientByClientIdentifier", mock.Anything, "test_client").Return(client, nil)
-			mockDB.On("GetCodeByCodeHash", mock.Anything, mock.Anything, false).Return(code, nil)
-			mockDB.On("CodeLoadClient", mock.Anything, code).Return(nil)
-			mockDB.On("CodeLoadUser", mock.Anything, code).Return(nil)
+			mockDB.On("GetCodeByCodeHash", mock.Anything, mock.Anything, mock.Anything, false).Return(code, nil)
+			mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, code).Return(nil)
+			mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, code).Return(nil)
 
 			result, err := validator.ValidateTokenRequest(ctx, &ValidateTokenRequestInput{
 				GrantType:    "authorization_code",
@@ -6092,10 +6092,10 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 
 			mockDB.On("GetClientByClientIdentifier", mock.Anything, "test_client").Return(client, nil)
 			// Not among unused codes, then found among used ones: that is the reuse path.
-			mockDB.On("GetCodeByCodeHash", mock.Anything, mock.Anything, false).Return(nil, nil)
-			mockDB.On("GetCodeByCodeHash", mock.Anything, mock.Anything, true).Return(code, nil)
-			mockDB.On("CodeLoadClient", mock.Anything, code).Return(nil)
-			mockDB.On("CodeLoadUser", mock.Anything, code).Return(nil)
+			mockDB.On("GetCodeByCodeHash", mock.Anything, mock.Anything, mock.Anything, false).Return(nil, nil)
+			mockDB.On("GetCodeByCodeHash", mock.Anything, mock.Anything, mock.Anything, true).Return(code, nil)
+			mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, code).Return(nil)
+			mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, code).Return(nil)
 
 			result, err := validator.ValidateTokenRequest(ctx, &ValidateTokenRequestInput{
 				GrantType:    "authorization_code",
@@ -6162,9 +6162,9 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 			mockDB.On("GetClientByClientIdentifier", mock.Anything, "test_client").Return(client, nil)
 			mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "the-refresh-token", (*rsa.PublicKey)(nil), true).
 				Return(offlineClaims(), nil)
-			mockDB.On("GetRefreshTokenByJti", mock.Anything, "the-jti").Return(refreshToken, nil)
-			mockDB.On("RefreshTokenLoadCode", mock.Anything, refreshToken).Return(nil)
-			mockDB.On("CodeLoadUser", mock.Anything, &refreshToken.Code).Return(nil)
+			mockDB.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, "the-jti").Return(refreshToken, nil)
+			mockDB.On("RefreshTokenLoadCode", mock.Anything, mock.Anything, refreshToken).Return(nil)
+			mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, &refreshToken.Code).Return(nil)
 
 			result, err := validator.ValidateTokenRequest(ctx, &ValidateTokenRequestInput{
 				GrantType:    "refresh_token",
@@ -6191,13 +6191,13 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 			mockDB.On("GetClientByClientIdentifier", mock.Anything, "test_client").Return(client, nil)
 			mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "the-refresh-token", (*rsa.PublicKey)(nil), true).
 				Return(offlineClaims(), nil)
-			mockDB.On("GetRefreshTokenByJti", mock.Anything, "the-jti").Return(refreshToken, nil)
-			mockDB.On("RefreshTokenLoadCode", mock.Anything, refreshToken).Return(nil)
-			mockDB.On("CodeLoadUser", mock.Anything, &refreshToken.Code).Return(nil)
+			mockDB.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, "the-jti").Return(refreshToken, nil)
+			mockDB.On("RefreshTokenLoadCode", mock.Anything, mock.Anything, refreshToken).Return(nil)
+			mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, &refreshToken.Code).Return(nil)
 			// #133's ownership check on the Offline arm looks the code's session up. It
 			// belongs to user 7, the grant's own user, so it accepts and the row still
 			// measures what it was written to measure.
-			mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, "sid-1").
+			mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "sid-1").
 				Return(&models.UserSession{SessionIdentifier: "sid-1", UserId: 7}, nil)
 			mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "user_subject").Return(&user, nil)
 			// An Offline refresh always re-checks consent, whatever the client's
@@ -6228,9 +6228,9 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 			mockDB.On("GetClientByClientIdentifier", mock.Anything, "test_client").Return(client, nil)
 			mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "the-refresh-token", (*rsa.PublicKey)(nil), true).
 				Return(offlineClaims(), nil)
-			mockDB.On("GetRefreshTokenByJti", mock.Anything, "the-jti").Return(refreshToken, nil)
-			mockDB.On("RefreshTokenLoadCode", mock.Anything, refreshToken).Return(nil)
-			mockDB.On("CodeLoadUser", mock.Anything, &refreshToken.Code).Return(nil)
+			mockDB.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, "the-jti").Return(refreshToken, nil)
+			mockDB.On("RefreshTokenLoadCode", mock.Anything, mock.Anything, refreshToken).Return(nil)
+			mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, &refreshToken.Code).Return(nil)
 
 			result, err := validator.ValidateTokenRequest(ctx, &ValidateTokenRequestInput{
 				GrantType:    "refresh_token",
@@ -6279,9 +6279,9 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 				"jti": "ropc_jti", "typ": "Offline", "sub": "ropc_user_subject",
 				"offline_access_max_lifetime": float64(time.Now().UTC().Add(24 * time.Hour).Unix()),
 			}}, nil)
-		mockDB.On("GetRefreshTokenByJti", mock.Anything, "ropc_jti").Return(refreshToken, nil)
-		mockDB.On("RefreshTokenLoadUser", mock.Anything, refreshToken).Return(nil)
-		mockDB.On("RefreshTokenLoadClient", mock.Anything, refreshToken).Return(nil)
+		mockDB.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, "ropc_jti").Return(refreshToken, nil)
+		mockDB.On("RefreshTokenLoadUser", mock.Anything, mock.Anything, refreshToken).Return(nil)
+		mockDB.On("RefreshTokenLoadClient", mock.Anything, mock.Anything, refreshToken).Return(nil)
 		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "ropc_user_subject").Return(&user, nil)
 
 		result, err := validator.ValidateTokenRequest(ctx, &ValidateTokenRequestInput{
@@ -6373,10 +6373,10 @@ func TestValidateTokenRequest_RefreshToken_SessionOwnership(t *testing.T) {
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil)
 		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "ownership_refresh_token", (*rsa.PublicKey)(nil), true).
 			Return(refreshTokenJwt, nil)
-		mockDB.On("GetRefreshTokenByJti", mock.Anything, "ownership_jti").Return(refreshToken, nil)
-		mockDB.On("RefreshTokenLoadCode", mock.Anything, refreshToken).Return(nil)
-		mockDB.On("CodeLoadUser", mock.Anything, &refreshToken.Code).Return(nil)
-		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, "session_of_interest").
+		mockDB.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, "ownership_jti").Return(refreshToken, nil)
+		mockDB.On("RefreshTokenLoadCode", mock.Anything, mock.Anything, refreshToken).Return(nil)
+		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, &refreshToken.Code).Return(nil)
+		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "session_of_interest").
 			Return(userSession, nil)
 		// Only reached once the session is accepted, so the refusing subtest never calls it.
 		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "user123").
@@ -6487,19 +6487,19 @@ func TestValidateTokenRequest_AuthorizationCode_SessionOwnership(t *testing.T) {
 		}
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil).Once()
-		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.AnythingOfType("string"), false).
+		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.Anything, mock.AnythingOfType("string"), false).
 			Return(codeEntity, nil).Once()
-		mockDB.On("CodeLoadClient", mock.Anything, codeEntity).Return(nil).Once()
-		mockDB.On("CodeLoadUser", mock.Anything, codeEntity).Return(nil).Once()
+		mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
+		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
 		expectRedirectURIStillRegistered(mockDB, "https://example.com/callback")
 
 		switch {
 		case lookupErr != nil:
-			mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, sid).Return(nil, lookupErr).Once()
+			mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sid).Return(nil, lookupErr).Once()
 		case sessionOwner == nil:
-			mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, sid).Return(nil, nil).Once()
+			mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sid).Return(nil, nil).Once()
 		default:
-			mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, sid).
+			mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sid).
 				Return(&models.UserSession{SessionIdentifier: sid, UserId: *sessionOwner}, nil).Once()
 		}
 
@@ -6646,20 +6646,20 @@ func TestValidateTokenRequest_OfflineRefreshToken_SessionOwnership(t *testing.T)
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, "test_client").Return(client, nil)
 		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "the-refresh-token", (*rsa.PublicKey)(nil), true).
 			Return(offlineClaims, nil)
-		mockDB.On("GetRefreshTokenByJti", mock.Anything, "the-jti").Return(refreshToken, nil)
-		mockDB.On("RefreshTokenLoadCode", mock.Anything, refreshToken).Return(nil)
-		mockDB.On("CodeLoadUser", mock.Anything, &refreshToken.Code).Return(nil)
+		mockDB.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, "the-jti").Return(refreshToken, nil)
+		mockDB.On("RefreshTokenLoadCode", mock.Anything, mock.Anything, refreshToken).Return(nil)
+		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, &refreshToken.Code).Return(nil)
 
 		switch {
 		case expired:
 			// Deliberately no expectation. mocks_data.Database is strict, so a lookup here
 			// fails the test, which is the whole assertion.
 		case lookupErr != nil:
-			mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, sid).Return(nil, lookupErr).Once()
+			mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sid).Return(nil, lookupErr).Once()
 		case sessionOwner == nil:
-			mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, sid).Return(nil, nil).Once()
+			mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sid).Return(nil, nil).Once()
 		default:
-			mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, sid).
+			mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sid).
 				Return(&models.UserSession{SessionIdentifier: sid, UserId: *sessionOwner}, nil).Once()
 		}
 
@@ -6807,10 +6807,10 @@ func TestValidateTokenRequest_AuthorizationCode_RedirectURIStillRegistered(t *te
 		}
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, "client1").Return(client, nil).Once()
-		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.AnythingOfType("string"), false).
+		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.Anything, mock.AnythingOfType("string"), false).
 			Return(codeEntity, nil).Once()
-		mockDB.On("CodeLoadClient", mock.Anything, codeEntity).Return(nil).Once()
-		mockDB.On("CodeLoadUser", mock.Anything, codeEntity).Return(nil).Once()
+		mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
+		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
 
 		// registered nil means the caller does not expect the load to happen at all, which is
 		// what the two ordering cases assert: a strict mockery double fails the test if the
@@ -7034,9 +7034,9 @@ func TestValidateTokenRequest_RefreshToken_SubjectResolvesToNoUser(t *testing.T)
 			mockDB.On("GetClientByClientIdentifier", mock.Anything, "ropc_client").Return(client, nil)
 			mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "ropc_refresh_token", (*rsa.PublicKey)(nil), true).
 				Return(refreshTokenJwt, nil)
-			mockDB.On("GetRefreshTokenByJti", mock.Anything, "ropc_jti").Return(refreshToken, nil)
-			mockDB.On("RefreshTokenLoadUser", mock.Anything, refreshToken).Return(nil)
-			mockDB.On("RefreshTokenLoadClient", mock.Anything, refreshToken).Return(nil)
+			mockDB.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, "ropc_jti").Return(refreshToken, nil)
+			mockDB.On("RefreshTokenLoadUser", mock.Anything, mock.Anything, refreshToken).Return(nil)
+			mockDB.On("RefreshTokenLoadClient", mock.Anything, mock.Anything, refreshToken).Return(nil)
 
 			// The row the whole test is about: a signed, live refresh token whose sub names nothing.
 			mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "orphaned_subject").Return(nil, nil)

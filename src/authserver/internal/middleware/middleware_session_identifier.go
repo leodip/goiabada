@@ -30,7 +30,7 @@ func MiddlewareSessionIdentifier(sessionStore sessionstore.Store, database data.
 			if sess.Values[constants.SessionKeySessionIdentifier] != nil {
 				sessionIdentifier := sess.Values[constants.SessionKeySessionIdentifier].(string)
 
-				userSession, err := database.GetUserSessionBySessionIdentifier(nil, sessionIdentifier)
+				userSession, err := database.GetUserSessionBySessionIdentifier(r.Context(), nil, sessionIdentifier)
 				if err != nil {
 					slog.ErrorContext(ctx, "unable to get the user session", "error", err)
 					http.Error(w, errorMsg, http.StatusInternalServerError)

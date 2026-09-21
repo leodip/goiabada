@@ -6,7 +6,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
+	"github.com/leodip/goiabada/authserver/internal/constants"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/stretchr/testify/mock"
@@ -64,4 +66,55 @@ func TestHandleAPIUsersSearchGet_ConflictingAnnotationsReachNoAnnotationPort(t *
 	require.Equal(t, http.StatusBadRequest, rr.Code)
 	database.AssertNotCalled(t, "GetUserGroupsByUserIds", mock.Anything, mock.Anything, mock.Anything)
 	database.AssertNotCalled(t, "GetUserPermissionsByUserIds", mock.Anything, mock.Anything, mock.Anything)
+}
+
+// Stage 6 adds the session half. The admin API's session pages are the widest reads in this
+// package: one user's sessions, one client's sessions, each hydrating every client behind them,
+// and each of them now issued on behalf of the request that asked.
+
+// apiSessionsRequest is apiRequestCarryingId plus the chi id parameter and the settings the
+// session handlers read, which is everything HandleAPIUserSessionsGet needs before its first query.
+func apiSessionsRequest(userId string) *http.Request {
+	req := apiRequestCarryingId("/api/v1/admin/users/" + userId + "/sessions")
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("id", userId)
+	ctx := context.WithValue(req.Context(), chi.RouteCtxKey, rctx)
+	ctx = context.WithValue(ctx, constants.ContextKeySettings, &models.Settings{
+		UserSessionIdleTimeoutInSeconds: 3600,
+		UserSessionMaxLifetimeInSeconds: 86400,
+	})
+	return req.WithContext(ctx)
+}
+
+// The accept arm: all three reads -- the user, its sessions, and the clients those sessions
+// authorized -- carry the request's own context, including the loader, which reaches the database
+// a second time inside commondb.
+func TestHandleAPIUserSessionsGet_ReadsSessionsUnderTheRequestsContext(t *testing.T) {
+	database := mocks_data.NewDatabase(t)
+
+	database.On("GetUserById", theApiRequestsContext(), mock.Anything, int64(7)).
+		Return(&models.User{Id: 7, Subject: "sub-7"}, nil).Once()
+	database.On("GetUserSessionsByUserId", theApiRequestsContext(), mock.Anything, int64(7)).
+		Return([]models.UserSession{}, nil).Once()
+	database.On("UserSessionsLoadClients", theApiRequestsContext(), mock.Anything, mock.Anything).
+		Return(nil).Once()
+
+	rr := httptest.NewRecorder()
+	HandleAPIUserSessionsGet(database).ServeHTTP(rr, apiSessionsRequest("7"))
+
+	require.Equal(t, http.StatusOK, rr.Code)
+	database.AssertExpectations(t)
+}
+
+// The reject arm: an id that is not a number is refused before the first query, so no session
+// port is reached at all and there is no context to get wrong.
+func TestHandleAPIUserSessionsGet_MalformedIdReachesNoSessionPort(t *testing.T) {
+	database := mocks_data.NewDatabase(t)
+
+	rr := httptest.NewRecorder()
+	HandleAPIUserSessionsGet(database).ServeHTTP(rr, apiSessionsRequest("not-a-number"))
+
+	require.Equal(t, http.StatusBadRequest, rr.Code)
+	database.AssertNotCalled(t, "GetUserSessionsByUserId", mock.Anything, mock.Anything, mock.Anything)
+	database.AssertNotCalled(t, "UserSessionsLoadClients", mock.Anything, mock.Anything, mock.Anything)
 }

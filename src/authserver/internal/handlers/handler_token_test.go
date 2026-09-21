@@ -117,7 +117,7 @@ func TestHandleTokenPost(t *testing.T) {
 			Return(validationResult, nil)
 
 		// Code is claimed successfully, but token generation then fails.
-		database.On("MarkCodeAsUsed", (*sql.Tx)(nil), mockCode.Id).Return(true, nil)
+		database.On("MarkCodeAsUsed", mock.Anything, (*sql.Tx)(nil), mockCode.Id).Return(true, nil)
 
 		tokenIssuer.On("GenerateTokenResponseForAuthCode", req.Context(), mockCode).
 			Return(nil, customerrors.NewErrorDetailWithHttpStatusCode("server_error", "Failed to generate token", http.StatusInternalServerError))
@@ -159,7 +159,7 @@ func TestHandleTokenPost(t *testing.T) {
 			Return(validationResult, nil)
 
 		// Claiming the code errors out. Tokens must NOT be generated.
-		database.On("MarkCodeAsUsed", (*sql.Tx)(nil), mockCode.Id).
+		database.On("MarkCodeAsUsed", mock.Anything, (*sql.Tx)(nil), mockCode.Id).
 			Return(false, customerrors.NewErrorDetailWithHttpStatusCode("server_error", "Failed to mark code as used", http.StatusInternalServerError))
 
 		httpHelper.On("InternalServerError",
@@ -206,7 +206,7 @@ func TestHandleTokenPost(t *testing.T) {
 			ExpiresIn:   3600,
 		}
 		// Code is claimed atomically before minting; only the winner proceeds.
-		database.On("MarkCodeAsUsed", (*sql.Tx)(nil), mockCode.Id).Return(true, nil)
+		database.On("MarkCodeAsUsed", mock.Anything, (*sql.Tx)(nil), mockCode.Id).Return(true, nil)
 
 		tokenIssuer.On("GenerateTokenResponseForAuthCode", req.Context(), mockCode).
 			Return(mockTokenResponse, nil)
@@ -303,7 +303,7 @@ func TestHandleTokenPost(t *testing.T) {
 
 		// Containment runs but finds nothing live, which is the idempotent no-op an
 		// already-swept family produces. Zero count means no audit event (#128).
-		database.On("RevokeRefreshTokenFamily", (*sql.Tx)(nil), "family-1").Return(int64(0), nil)
+		database.On("RevokeRefreshTokenFamily", mock.Anything, (*sql.Tx)(nil), "family-1").Return(int64(0), nil)
 
 		httpHelper.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err.(*customerrors.ErrorDetail).GetCode() == "invalid_grant" &&
@@ -344,7 +344,7 @@ func TestHandleTokenPost(t *testing.T) {
 		tokenValidator.On("ValidateTokenRequest", req.Context(), mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
 			Return(validationResult, nil)
 
-		database.On("MarkRefreshTokenAsRevoked", (*sql.Tx)(nil), int64(1)).
+		database.On("MarkRefreshTokenAsRevoked", mock.Anything, (*sql.Tx)(nil), int64(1)).
 			Return(false, customerrors.NewErrorDetailWithHttpStatusCode("server_error", "Failed to claim refresh token", http.StatusInternalServerError))
 
 		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
@@ -386,7 +386,7 @@ func TestHandleTokenPost(t *testing.T) {
 		tokenValidator.On("ValidateTokenRequest", req.Context(), mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
 			Return(validationResult, nil)
 
-		database.On("MarkRefreshTokenAsRevoked", (*sql.Tx)(nil), int64(1)).
+		database.On("MarkRefreshTokenAsRevoked", mock.Anything, (*sql.Tx)(nil), int64(1)).
 			Return(true, nil)
 
 		tokenIssuer.On("GenerateTokenResponseForRefresh", req.Context(), mock.AnythingOfType("*issuance.GenerateTokenForRefreshInput")).
@@ -447,7 +447,7 @@ func TestHandleTokenPost(t *testing.T) {
 		tokenValidator.On("ValidateTokenRequest", req.Context(), mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
 			Return(validationResult, nil)
 
-		database.On("MarkRefreshTokenAsRevoked", (*sql.Tx)(nil), int64(1)).
+		database.On("MarkRefreshTokenAsRevoked", mock.Anything, (*sql.Tx)(nil), int64(1)).
 			Return(true, nil)
 
 		mockTokenResponse := &oauth.TokenResponse{
@@ -530,7 +530,7 @@ func TestHandleTokenPost(t *testing.T) {
 		tokenValidator.On("ValidateTokenRequest", req.Context(), mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
 			Return(validationResult, nil)
 
-		database.On("MarkRefreshTokenAsRevoked", (*sql.Tx)(nil), int64(1)).
+		database.On("MarkRefreshTokenAsRevoked", mock.Anything, (*sql.Tx)(nil), int64(1)).
 			Return(true, nil)
 
 		mockTokenResponse := &oauth.TokenResponse{
@@ -598,7 +598,7 @@ func TestHandleTokenPost(t *testing.T) {
 		tokenValidator.AssertExpectations(t)
 
 		// Ensure that other methods were not called
-		database.AssertNotCalled(t, "UpdateRefreshToken")
+		database.AssertNotCalled(t, "UpdateRefreshToken", mock.Anything, mock.Anything, mock.Anything)
 		tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForAuthCode")
 		tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForClientCred")
 		tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForRefresh")
@@ -901,11 +901,11 @@ func TestHandleTokenPost_AuthCodeReuse_RevokeFailureReturns500(t *testing.T) {
 
 	// The session row is taken first, ahead of the grants that hang off it (#139). Stubbed as
 	// succeeding so this case still fails where it means to, at the token read below.
-	database.On("AcquireUserSessionRow", (*sql.Tx)(nil), "sid-reused").
+	database.On("AcquireUserSessionRow", mock.Anything, (*sql.Tx)(nil), "sid-reused").
 		Return(true, nil).Once()
 
 	dbErr := errors.New("connection refused")
-	database.On("GetRefreshTokensBySessionIdentifier", (*sql.Tx)(nil), "sid-reused").
+	database.On("GetRefreshTokensBySessionIdentifier", mock.Anything, (*sql.Tx)(nil), "sid-reused").
 		Return(nil, dbErr).Once()
 
 	httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
@@ -1008,7 +1008,7 @@ func TestHandleTokenPost_AuthCode_ConcurrentDoubleSpendLoses(t *testing.T) {
 		Return(validationResult, nil)
 
 	// This request loses the race: the code was already claimed concurrently.
-	database.On("MarkCodeAsUsed", (*sql.Tx)(nil), racedCode.Id).Return(false, nil)
+	database.On("MarkCodeAsUsed", mock.Anything, (*sql.Tx)(nil), racedCode.Id).Return(false, nil)
 
 	httpHelper.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
 		detail, ok := err.(*customerrors.ErrorDetail)
@@ -1025,7 +1025,7 @@ func TestHandleTokenPost_AuthCode_ConcurrentDoubleSpendLoses(t *testing.T) {
 	// transaction, no session teardown, no reuse audit.
 	tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForAuthCode", mock.Anything, mock.Anything)
 	database.AssertNotCalled(t, "RunInTransaction", mock.Anything, mock.Anything)
-	database.AssertNotCalled(t, "DeleteUserSession", mock.Anything, mock.Anything)
+	database.AssertNotCalled(t, "DeleteUserSession", mock.Anything, mock.Anything, mock.Anything)
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 }
 
@@ -1078,7 +1078,7 @@ func TestHandleTokenPost_Refresh_ConcurrentDoubleSpendLoses(t *testing.T) {
 
 	// This request loses the race: the row stopped being live between the validation
 	// read and the claim.
-	database.On("MarkRefreshTokenAsRevoked", (*sql.Tx)(nil), racedToken.Id).Return(false, nil)
+	database.On("MarkRefreshTokenAsRevoked", mock.Anything, (*sql.Tx)(nil), racedToken.Id).Return(false, nil)
 
 	httpHelper.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
 		detail, ok := err.(*customerrors.ErrorDetail)
@@ -1095,7 +1095,7 @@ func TestHandleTokenPost_Refresh_ConcurrentDoubleSpendLoses(t *testing.T) {
 	// audit anything.
 	tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForRefresh", mock.Anything, mock.Anything)
 	tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForRefreshROPC", mock.Anything, mock.Anything)
-	database.AssertNotCalled(t, "RevokeRefreshTokenFamily", mock.Anything, mock.Anything)
+	database.AssertNotCalled(t, "RevokeRefreshTokenFamily", mock.Anything, mock.Anything, mock.Anything)
 	userSessionManager.AssertNotCalled(t, "BumpUserSession", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 }
@@ -1178,7 +1178,7 @@ func TestHandleTokenPost_Refresh_Replay_AuditsContainment(t *testing.T) {
 				Return(tc.result, nil)
 
 			// Two live members transitioned, so this is a real containment.
-			database.On("RevokeRefreshTokenFamily", (*sql.Tx)(nil), familyJti).Return(int64(2), nil)
+			database.On("RevokeRefreshTokenFamily", mock.Anything, (*sql.Tx)(nil), familyJti).Return(int64(2), nil)
 
 			var logged []map[string]interface{}
 			auditLogger.On("Log", mock.Anything, audit.AuditRefreshTokenReplayDetected, mock.AnythingOfType("map[string]interface {}")).
@@ -1250,7 +1250,7 @@ func TestHandleTokenPost_Refresh_Replay_ContainmentErrorReturns500(t *testing.T)
 	tokenValidator.On("ValidateTokenRequest", req.Context(), mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
 		Return(validationResult, nil)
 
-	database.On("RevokeRefreshTokenFamily", (*sql.Tx)(nil), "jti-family").
+	database.On("RevokeRefreshTokenFamily", mock.Anything, (*sql.Tx)(nil), "jti-family").
 		Return(int64(0), customerrors.NewErrorDetailWithHttpStatusCode("server_error", "Failed to contain family", http.StatusInternalServerError))
 
 	httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
@@ -2169,7 +2169,7 @@ func TestHandleTokenPost_Refresh_FlowGate(t *testing.T) {
 			if tc.wantRefusal == "" {
 				// Accepted: the request reaches the claim, and loses it, which is as far as a
 				// test about the gate needs to go.
-				database.On("MarkRefreshTokenAsRevoked", (*sql.Tx)(nil), liveToken.Id).Return(false, nil).Once()
+				database.On("MarkRefreshTokenAsRevoked", mock.Anything, (*sql.Tx)(nil), liveToken.Id).Return(false, nil).Once()
 				httpHelper.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
 					detail, ok := err.(*customerrors.ErrorDetail)
 					return ok && detail.GetCode() == "invalid_grant"
@@ -2192,9 +2192,9 @@ func TestHandleTokenPost_Refresh_FlowGate(t *testing.T) {
 			if tc.wantRefusal != "" {
 				// A refused token is not spent. The operator may turn the switch back on, and a
 				// live token should still be live when they do.
-				database.AssertNotCalled(t, "MarkRefreshTokenAsRevoked", mock.Anything, mock.Anything)
+				database.AssertNotCalled(t, "MarkRefreshTokenAsRevoked", mock.Anything, mock.Anything, mock.Anything)
 				// The gate is not containment: nothing is cascaded and nothing is audited.
-				database.AssertNotCalled(t, "RevokeRefreshTokenFamily", mock.Anything, mock.Anything)
+				database.AssertNotCalled(t, "RevokeRefreshTokenFamily", mock.Anything, mock.Anything, mock.Anything)
 				auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 			}
 			tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForRefresh", mock.Anything, mock.Anything)
@@ -2276,7 +2276,7 @@ func TestHandleTokenPost_Refresh_ContainmentPrecedesFlowGate(t *testing.T) {
 			tokenValidator.On("ValidateTokenRequest", req.Context(), mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
 				Return(result, nil)
 
-			database.On("RevokeRefreshTokenFamily", (*sql.Tx)(nil), "jti-family").Return(int64(2), nil).Once()
+			database.On("RevokeRefreshTokenFamily", mock.Anything, (*sql.Tx)(nil), "jti-family").Return(int64(2), nil).Once()
 
 			var logged []map[string]interface{}
 			auditLogger.On("Log", mock.Anything, audit.AuditRefreshTokenReplayDetected, mock.AnythingOfType("map[string]interface {}")).
@@ -2303,7 +2303,7 @@ func TestHandleTokenPost_Refresh_ContainmentPrecedesFlowGate(t *testing.T) {
 
 			// The flow gate must not have answered: it sits below containment, and a replay
 			// never reaches it.
-			database.AssertNotCalled(t, "MarkRefreshTokenAsRevoked", mock.Anything, mock.Anything)
+			database.AssertNotCalled(t, "MarkRefreshTokenAsRevoked", mock.Anything, mock.Anything, mock.Anything)
 		})
 	}
 }
@@ -2406,13 +2406,13 @@ func TestRevokeOnAuthCodeReuse_TakesTheSessionRowFirst(t *testing.T) {
 		token := &models.RefreshToken{Id: 1, RefreshTokenJti: "rt-1"}
 
 		expectRunInTransaction(db, tx)
-		db.On("AcquireUserSessionRow", tx, sid).Return(true, nil).Once()
-		db.On("GetRefreshTokensBySessionIdentifier", tx, sid).
+		db.On("AcquireUserSessionRow", mock.Anything, tx, sid).Return(true, nil).Once()
+		db.On("GetRefreshTokensBySessionIdentifier", mock.Anything, tx, sid).
 			Return([]*models.RefreshToken{token}, nil).Once()
-		db.On("UpdateRefreshToken", tx, token).Return(nil).Once()
-		db.On("GetUserSessionBySessionIdentifier", tx, sid).
+		db.On("UpdateRefreshToken", mock.Anything, tx, token).Return(nil).Once()
+		db.On("GetUserSessionBySessionIdentifier", mock.Anything, tx, sid).
 			Return(&models.UserSession{Id: 9, SessionIdentifier: sid}, nil).Once()
-		db.On("DeleteUserSession", tx, int64(9)).Return(nil).Once()
+		db.On("DeleteUserSession", mock.Anything, tx, int64(9)).Return(nil).Once()
 
 		jtis, err := revokeOnAuthCodeReuse(context.Background(), db, &models.Code{Id: 42, SessionIdentifier: sid})
 
@@ -2439,11 +2439,11 @@ func TestRevokeOnAuthCodeReuse_TakesTheSessionRowFirst(t *testing.T) {
 		expectRunInTransaction(db, tx)
 		// The row is already gone, which is ordinary: an offline grant's tokens are designed
 		// to outlive their session, and the background reapers remove idle sessions routinely.
-		db.On("AcquireUserSessionRow", tx, sid).Return(false, nil).Once()
-		db.On("GetRefreshTokensBySessionIdentifier", tx, sid).
+		db.On("AcquireUserSessionRow", mock.Anything, tx, sid).Return(false, nil).Once()
+		db.On("GetRefreshTokensBySessionIdentifier", mock.Anything, tx, sid).
 			Return([]*models.RefreshToken{token}, nil).Once()
-		db.On("UpdateRefreshToken", tx, token).Return(nil).Once()
-		db.On("GetUserSessionBySessionIdentifier", tx, sid).Return(nil, nil).Once()
+		db.On("UpdateRefreshToken", mock.Anything, tx, token).Return(nil).Once()
+		db.On("GetUserSessionBySessionIdentifier", mock.Anything, tx, sid).Return(nil, nil).Once()
 
 		jtis, err := revokeOnAuthCodeReuse(context.Background(), db, &models.Code{Id: 42, SessionIdentifier: sid})
 
@@ -2459,14 +2459,14 @@ func TestRevokeOnAuthCodeReuse_TakesTheSessionRowFirst(t *testing.T) {
 		boom := errors.New("connection refused")
 
 		stub := expectRunInTransaction(db, tx)
-		db.On("AcquireUserSessionRow", tx, sid).Return(false, boom).Once()
+		db.On("AcquireUserSessionRow", mock.Anything, tx, sid).Return(false, boom).Once()
 
 		jtis, err := revokeOnAuthCodeReuse(context.Background(), db, &models.Code{Id: 42, SessionIdentifier: sid})
 
 		require.ErrorIs(t, err, boom,
 			"a statement that did not run has not established anything, so the caller gets a 500")
 		assert.Nil(t, jtis)
-		db.AssertNotCalled(t, "GetRefreshTokensBySessionIdentifier", mock.Anything, mock.Anything)
+		db.AssertNotCalled(t, "GetRefreshTokensBySessionIdentifier", mock.Anything, mock.Anything, mock.Anything)
 		assert.ErrorIs(t, stub.bodyErr, boom, "the body hands its error to the helper, which rolls back")
 	})
 
@@ -2476,9 +2476,9 @@ func TestRevokeOnAuthCodeReuse_TakesTheSessionRowFirst(t *testing.T) {
 		token := &models.RefreshToken{Id: 1, RefreshTokenJti: "rt-1"}
 
 		expectRunInTransaction(db, tx)
-		db.On("GetRefreshTokensByCodeId", tx, int64(42)).
+		db.On("GetRefreshTokensByCodeId", mock.Anything, tx, int64(42)).
 			Return([]*models.RefreshToken{token}, nil).Once()
-		db.On("UpdateRefreshToken", tx, token).Return(nil).Once()
+		db.On("UpdateRefreshToken", mock.Anything, tx, token).Return(nil).Once()
 
 		jtis, err := revokeOnAuthCodeReuse(context.Background(), db, &models.Code{Id: 42})
 
@@ -2486,7 +2486,7 @@ func TestRevokeOnAuthCodeReuse_TakesTheSessionRowFirst(t *testing.T) {
 		assert.Equal(t, []string{"rt-1"}, jtis)
 		// No row carries an empty session identifier, so the statement would refuse the
 		// argument, and the code-id-scoped fallback writes no session row to order against.
-		db.AssertNotCalled(t, "AcquireUserSessionRow", mock.Anything, mock.Anything)
+		db.AssertNotCalled(t, "AcquireUserSessionRow", mock.Anything, mock.Anything, mock.Anything)
 	})
 
 	t.Run("#77's guard survives the acquisition", func(t *testing.T) {
@@ -2494,8 +2494,8 @@ func TestRevokeOnAuthCodeReuse_TakesTheSessionRowFirst(t *testing.T) {
 		tx := &sql.Tx{}
 
 		expectRunInTransaction(db, tx)
-		db.On("AcquireUserSessionRow", tx, sid).Return(true, nil).Once()
-		db.On("GetRefreshTokensBySessionIdentifier", tx, sid).
+		db.On("AcquireUserSessionRow", mock.Anything, tx, sid).Return(true, nil).Once()
+		db.On("GetRefreshTokensBySessionIdentifier", mock.Anything, tx, sid).
 			Return([]*models.RefreshToken{{Id: 1, RefreshTokenJti: "rt-1", Revoked: true}}, nil).Once()
 
 		jtis, err := revokeOnAuthCodeReuse(context.Background(), db, &models.Code{Id: 42, SessionIdentifier: sid})
@@ -2506,7 +2506,7 @@ func TestRevokeOnAuthCodeReuse_TakesTheSessionRowFirst(t *testing.T) {
 		// the winner's session row in place. It HOLDS that row for the rest of the
 		// transaction, which is what the acquisition's comment is about, but it still must
 		// not delete it.
-		db.AssertNotCalled(t, "DeleteUserSession", mock.Anything, mock.Anything)
-		db.AssertNotCalled(t, "GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything)
+		db.AssertNotCalled(t, "DeleteUserSession", mock.Anything, mock.Anything, mock.Anything)
+		db.AssertNotCalled(t, "GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.Anything)
 	})
 }

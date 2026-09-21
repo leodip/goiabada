@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"context"
 	"database/sql"
 	"testing"
 	"time"
@@ -22,7 +23,7 @@ func TestCreateRefreshToken(t *testing.T) {
 		t.Error("Expected UpdatedAt to be set")
 	}
 
-	retrievedRefreshToken, err := database.GetRefreshTokenById(nil, refreshToken.Id)
+	retrievedRefreshToken, err := database.GetRefreshTokenById(context.Background(), nil, refreshToken.Id)
 	if err != nil {
 		t.Fatalf("Failed to retrieve created refresh token: %v", err)
 	}
@@ -52,12 +53,12 @@ func TestUpdateRefreshToken(t *testing.T) {
 
 	time.Sleep(timestampTick)
 
-	err := database.UpdateRefreshToken(nil, refreshToken)
+	err := database.UpdateRefreshToken(context.Background(), nil, refreshToken)
 	if err != nil {
 		t.Fatalf("Failed to update refresh token: %v", err)
 	}
 
-	updatedRefreshToken, err := database.GetRefreshTokenById(nil, refreshToken.Id)
+	updatedRefreshToken, err := database.GetRefreshTokenById(context.Background(), nil, refreshToken.Id)
 	if err != nil {
 		t.Fatalf("Failed to retrieve updated refresh token: %v", err)
 	}
@@ -108,14 +109,14 @@ func TestUpdateRefreshToken(t *testing.T) {
 func TestGetRefreshTokenById(t *testing.T) {
 	refreshToken := createTestRefreshToken(t)
 
-	retrievedRefreshToken, err := database.GetRefreshTokenById(nil, refreshToken.Id)
+	retrievedRefreshToken, err := database.GetRefreshTokenById(context.Background(), nil, refreshToken.Id)
 	if err != nil {
 		t.Fatalf("Failed to get refresh token by ID: %v", err)
 	}
 
 	compareRefreshTokens(t, refreshToken, retrievedRefreshToken)
 
-	nonExistentRefreshToken, err := database.GetRefreshTokenById(nil, 99999)
+	nonExistentRefreshToken, err := database.GetRefreshTokenById(context.Background(), nil, 99999)
 	if err != nil {
 		t.Errorf("Expected no error for non-existent refresh token, got: %v", err)
 	}
@@ -127,7 +128,7 @@ func TestGetRefreshTokenById(t *testing.T) {
 func TestRefreshTokenLoadCode(t *testing.T) {
 	refreshToken := createTestRefreshToken(t)
 
-	err := database.RefreshTokenLoadCode(nil, refreshToken)
+	err := database.RefreshTokenLoadCode(context.Background(), nil, refreshToken)
 	if err != nil {
 		t.Fatalf("Failed to load code for refresh token: %v", err)
 	}
@@ -140,7 +141,7 @@ func TestRefreshTokenLoadCode(t *testing.T) {
 func TestRefreshTokenLoadUser(t *testing.T) {
 	refreshToken := createTestRefreshToken(t)
 
-	err := database.RefreshTokenLoadUser(nil, refreshToken)
+	err := database.RefreshTokenLoadUser(context.Background(), nil, refreshToken)
 	if err != nil {
 		t.Fatalf("Failed to load user for refresh token: %v", err)
 	}
@@ -152,12 +153,12 @@ func TestRefreshTokenLoadUser(t *testing.T) {
 	// Test loading user for refresh token with nil UserId
 	refreshTokenNoUser := createTestRefreshToken(t)
 	refreshTokenNoUser.UserId = sql.NullInt64{Valid: false}
-	err = database.UpdateRefreshToken(nil, refreshTokenNoUser)
+	err = database.UpdateRefreshToken(context.Background(), nil, refreshTokenNoUser)
 	if err != nil {
 		t.Fatalf("Failed to update refresh token: %v", err)
 	}
 
-	err = database.RefreshTokenLoadUser(nil, refreshTokenNoUser)
+	err = database.RefreshTokenLoadUser(context.Background(), nil, refreshTokenNoUser)
 	if err != nil {
 		t.Fatalf("Failed to load user for refresh token with nil UserId: %v", err)
 	}
@@ -166,7 +167,7 @@ func TestRefreshTokenLoadUser(t *testing.T) {
 func TestRefreshTokenLoadClient(t *testing.T) {
 	refreshToken := createTestRefreshToken(t)
 
-	err := database.RefreshTokenLoadClient(nil, refreshToken)
+	err := database.RefreshTokenLoadClient(context.Background(), nil, refreshToken)
 	if err != nil {
 		t.Fatalf("Failed to load client for refresh token: %v", err)
 	}
@@ -178,12 +179,12 @@ func TestRefreshTokenLoadClient(t *testing.T) {
 	// Test loading client for refresh token with nil ClientId
 	refreshTokenNoClient := createTestRefreshToken(t)
 	refreshTokenNoClient.ClientId = sql.NullInt64{Valid: false}
-	err = database.UpdateRefreshToken(nil, refreshTokenNoClient)
+	err = database.UpdateRefreshToken(context.Background(), nil, refreshTokenNoClient)
 	if err != nil {
 		t.Fatalf("Failed to update refresh token: %v", err)
 	}
 
-	err = database.RefreshTokenLoadClient(nil, refreshTokenNoClient)
+	err = database.RefreshTokenLoadClient(context.Background(), nil, refreshTokenNoClient)
 	if err != nil {
 		t.Fatalf("Failed to load client for refresh token with nil ClientId: %v", err)
 	}
@@ -192,14 +193,14 @@ func TestRefreshTokenLoadClient(t *testing.T) {
 func TestGetRefreshTokenByJti(t *testing.T) {
 	refreshToken := createTestRefreshToken(t)
 
-	retrievedRefreshToken, err := database.GetRefreshTokenByJti(nil, refreshToken.RefreshTokenJti)
+	retrievedRefreshToken, err := database.GetRefreshTokenByJti(context.Background(), nil, refreshToken.RefreshTokenJti)
 	if err != nil {
 		t.Fatalf("Failed to get refresh token by JTI: %v", err)
 	}
 
 	compareRefreshTokens(t, refreshToken, retrievedRefreshToken)
 
-	nonExistentRefreshToken, err := database.GetRefreshTokenByJti(nil, "non_existent_jti")
+	nonExistentRefreshToken, err := database.GetRefreshTokenByJti(context.Background(), nil, "non_existent_jti")
 	if err != nil {
 		t.Errorf("Expected no error for non-existent refresh token, got: %v", err)
 	}
@@ -211,12 +212,12 @@ func TestGetRefreshTokenByJti(t *testing.T) {
 func TestDeleteRefreshToken(t *testing.T) {
 	refreshToken := createTestRefreshToken(t)
 
-	err := database.DeleteRefreshToken(nil, refreshToken.Id)
+	err := database.DeleteRefreshToken(context.Background(), nil, refreshToken.Id)
 	if err != nil {
 		t.Fatalf("Failed to delete refresh token: %v", err)
 	}
 
-	deletedRefreshToken, err := database.GetRefreshTokenById(nil, refreshToken.Id)
+	deletedRefreshToken, err := database.GetRefreshTokenById(context.Background(), nil, refreshToken.Id)
 	if err != nil {
 		t.Fatalf("Error while checking for deleted refresh token: %v", err)
 	}
@@ -224,7 +225,7 @@ func TestDeleteRefreshToken(t *testing.T) {
 		t.Errorf("Refresh token still exists after deletion")
 	}
 
-	err = database.DeleteRefreshToken(nil, 99999)
+	err = database.DeleteRefreshToken(context.Background(), nil, 99999)
 	if err != nil {
 		t.Errorf("Expected no error when deleting non-existent refresh token, got: %v", err)
 	}
@@ -247,7 +248,7 @@ func createTestRefreshToken(t *testing.T) *models.RefreshToken {
 		MaxLifetime:       sql.NullTime{Time: time.Now().UTC().Add(24 * time.Hour).Truncate(time.Microsecond), Valid: true},
 		Revoked:           false,
 	}
-	err := database.CreateRefreshToken(nil, refreshToken)
+	err := database.CreateRefreshToken(context.Background(), nil, refreshToken)
 	if err != nil {
 		t.Fatalf("Failed to create test refresh token: %v", err)
 	}
@@ -312,7 +313,7 @@ func TestGetRefreshTokensByCodeId(t *testing.T) {
 		IssuedAt:         sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true},
 		ExpiresAt:        sql.NullTime{Time: time.Now().UTC().Add(time.Hour).Truncate(time.Microsecond), Valid: true},
 	}
-	if err := database.CreateRefreshToken(nil, rt1); err != nil {
+	if err := database.CreateRefreshToken(context.Background(), nil, rt1); err != nil {
 		t.Fatalf("Failed to create rt1: %v", err)
 	}
 
@@ -324,7 +325,7 @@ func TestGetRefreshTokensByCodeId(t *testing.T) {
 		IssuedAt:         sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true},
 		ExpiresAt:        sql.NullTime{Time: time.Now().UTC().Add(time.Hour).Truncate(time.Microsecond), Valid: true},
 	}
-	if err := database.CreateRefreshToken(nil, rt2); err != nil {
+	if err := database.CreateRefreshToken(context.Background(), nil, rt2); err != nil {
 		t.Fatalf("Failed to create rt2: %v", err)
 	}
 
@@ -338,11 +339,11 @@ func TestGetRefreshTokensByCodeId(t *testing.T) {
 		IssuedAt:         sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true},
 		ExpiresAt:        sql.NullTime{Time: time.Now().UTC().Add(time.Hour).Truncate(time.Microsecond), Valid: true},
 	}
-	if err := database.CreateRefreshToken(nil, rtOther); err != nil {
+	if err := database.CreateRefreshToken(context.Background(), nil, rtOther); err != nil {
 		t.Fatalf("Failed to create rtOther: %v", err)
 	}
 
-	got, err := database.GetRefreshTokensByCodeId(nil, code.Id)
+	got, err := database.GetRefreshTokensByCodeId(context.Background(), nil, code.Id)
 	if err != nil {
 		t.Fatalf("GetRefreshTokensByCodeId failed: %v", err)
 	}
@@ -358,7 +359,7 @@ func TestGetRefreshTokensByCodeId(t *testing.T) {
 	}
 
 	// Unknown code id returns empty.
-	gotEmpty, err := database.GetRefreshTokensByCodeId(nil, 99999999)
+	gotEmpty, err := database.GetRefreshTokensByCodeId(context.Background(), nil, 99999999)
 	if err != nil {
 		t.Fatalf("GetRefreshTokensByCodeId(unknown) failed: %v", err)
 	}
@@ -393,7 +394,7 @@ func TestGetRefreshTokensBySessionIdentifier(t *testing.T) {
 		AuthMethods:         "pwd",
 		Used:                true,
 	}
-	if err := database.CreateCode(nil, codeA); err != nil {
+	if err := database.CreateCode(context.Background(), nil, codeA); err != nil {
 		t.Fatalf("Failed to create codeA: %v", err)
 	}
 
@@ -415,7 +416,7 @@ func TestGetRefreshTokensBySessionIdentifier(t *testing.T) {
 		AuthMethods:         "pwd",
 		Used:                true,
 	}
-	if err := database.CreateCode(nil, codeB); err != nil {
+	if err := database.CreateCode(context.Background(), nil, codeB); err != nil {
 		t.Fatalf("Failed to create codeB: %v", err)
 	}
 
@@ -429,7 +430,7 @@ func TestGetRefreshTokensBySessionIdentifier(t *testing.T) {
 		IssuedAt:          sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true},
 		ExpiresAt:         sql.NullTime{Time: time.Now().UTC().Add(time.Hour).Truncate(time.Microsecond), Valid: true},
 	}
-	if err := database.CreateRefreshToken(nil, rtOnline); err != nil {
+	if err := database.CreateRefreshToken(context.Background(), nil, rtOnline); err != nil {
 		t.Fatalf("Failed to create rtOnline: %v", err)
 	}
 
@@ -442,7 +443,7 @@ func TestGetRefreshTokensBySessionIdentifier(t *testing.T) {
 		IssuedAt:         sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true},
 		ExpiresAt:        sql.NullTime{Time: time.Now().UTC().Add(time.Hour).Truncate(time.Microsecond), Valid: true},
 	}
-	if err := database.CreateRefreshToken(nil, rtOffline); err != nil {
+	if err := database.CreateRefreshToken(context.Background(), nil, rtOffline); err != nil {
 		t.Fatalf("Failed to create rtOffline: %v", err)
 	}
 
@@ -465,7 +466,7 @@ func TestGetRefreshTokensBySessionIdentifier(t *testing.T) {
 		AuthMethods:         "pwd",
 		Used:                true,
 	}
-	if err := database.CreateCode(nil, unrelatedCode); err != nil {
+	if err := database.CreateCode(context.Background(), nil, unrelatedCode); err != nil {
 		t.Fatalf("Failed to create unrelatedCode: %v", err)
 	}
 	rtUnrelated := &models.RefreshToken{
@@ -476,11 +477,11 @@ func TestGetRefreshTokensBySessionIdentifier(t *testing.T) {
 		IssuedAt:         sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true},
 		ExpiresAt:        sql.NullTime{Time: time.Now().UTC().Add(time.Hour).Truncate(time.Microsecond), Valid: true},
 	}
-	if err := database.CreateRefreshToken(nil, rtUnrelated); err != nil {
+	if err := database.CreateRefreshToken(context.Background(), nil, rtUnrelated); err != nil {
 		t.Fatalf("Failed to create rtUnrelated: %v", err)
 	}
 
-	got, err := database.GetRefreshTokensBySessionIdentifier(nil, sessionId)
+	got, err := database.GetRefreshTokensBySessionIdentifier(context.Background(), nil, sessionId)
 	if err != nil {
 		t.Fatalf("GetRefreshTokensBySessionIdentifier failed: %v", err)
 	}
@@ -499,7 +500,7 @@ func TestGetRefreshTokensBySessionIdentifier(t *testing.T) {
 	}
 
 	// Unknown session identifier returns empty.
-	gotEmpty, err := database.GetRefreshTokensBySessionIdentifier(nil, "no-such-session-"+fake.LetterN(8))
+	gotEmpty, err := database.GetRefreshTokensBySessionIdentifier(context.Background(), nil, "no-such-session-"+fake.LetterN(8))
 	if err != nil {
 		t.Fatalf("GetRefreshTokensBySessionIdentifier(unknown) failed: %v", err)
 	}
@@ -511,7 +512,7 @@ func TestGetRefreshTokensBySessionIdentifier(t *testing.T) {
 func TestGetRefreshTokensBySessionIdentifier_RejectsEmpty(t *testing.T) {
 	// Defends against over-revocation: if the caller passes an empty string,
 	// the JOIN would otherwise match every code with an empty session_identifier.
-	got, err := database.GetRefreshTokensBySessionIdentifier(nil, "")
+	got, err := database.GetRefreshTokensBySessionIdentifier(context.Background(), nil, "")
 	if err != nil {
 		t.Fatalf("Expected no error for empty session identifier, got: %v", err)
 	}
@@ -597,7 +598,7 @@ func TestDeleteExpiredRefreshTokens(t *testing.T) {
 		rt.Revoked = tc.revoked
 		rt.ExpiresAt = tc.expiresAt
 		rt.MaxLifetime = tc.maxLifetime
-		if err := database.UpdateRefreshToken(nil, rt); err != nil {
+		if err := database.UpdateRefreshToken(context.Background(), nil, rt); err != nil {
 			t.Fatalf("failed to seed %q: %v", tc.name, err)
 		}
 		ids[i] = rt.Id
@@ -605,12 +606,12 @@ func TestDeleteExpiredRefreshTokens(t *testing.T) {
 
 	// One sweep for the whole table: the cases must not be able to influence each other
 	// through repeated deletes.
-	if err := database.DeleteExpiredRefreshTokens(nil); err != nil {
+	if err := database.DeleteExpiredRefreshTokens(context.Background(), nil); err != nil {
 		t.Fatalf("DeleteExpiredRefreshTokens failed: %v", err)
 	}
 
 	for i, tc := range testCases {
-		row, err := database.GetRefreshTokenById(nil, ids[i])
+		row, err := database.GetRefreshTokenById(context.Background(), nil, ids[i])
 		if err != nil {
 			t.Fatalf("error checking %q: %v", tc.name, err)
 		}
@@ -637,11 +638,11 @@ func TestUpdateRefreshToken_DoesNotClobberAuthStateGeneration(t *testing.T) {
 	refreshToken.AuthStateGeneration = 7
 	refreshToken.Id = 0
 	refreshToken.RefreshTokenJti = fake.UUID()
-	if err := database.CreateRefreshToken(nil, refreshToken); err != nil {
+	if err := database.CreateRefreshToken(context.Background(), nil, refreshToken); err != nil {
 		t.Fatalf("Failed to create refresh token with a generation: %v", err)
 	}
 
-	created, err := database.GetRefreshTokenById(nil, refreshToken.Id)
+	created, err := database.GetRefreshTokenById(context.Background(), nil, refreshToken.Id)
 	if err != nil {
 		t.Fatalf("Failed to reload created refresh token: %v", err)
 	}
@@ -652,11 +653,11 @@ func TestUpdateRefreshToken_DoesNotClobberAuthStateGeneration(t *testing.T) {
 
 	created.AuthStateGeneration = 0
 	created.Revoked = true
-	if err := database.UpdateRefreshToken(nil, created); err != nil {
+	if err := database.UpdateRefreshToken(context.Background(), nil, created); err != nil {
 		t.Fatalf("Failed to update refresh token: %v", err)
 	}
 
-	after, err := database.GetRefreshTokenById(nil, refreshToken.Id)
+	after, err := database.GetRefreshTokenById(context.Background(), nil, refreshToken.Id)
 	if err != nil {
 		t.Fatalf("Failed to reload updated refresh token: %v", err)
 	}
@@ -707,7 +708,7 @@ func TestGetRefreshTokensByUserId(t *testing.T) {
 			AuthMethods:         "pwd",
 			Used:                true,
 		}
-		if err := database.CreateCode(nil, code); err != nil {
+		if err := database.CreateCode(context.Background(), nil, code); err != nil {
 			t.Fatalf("Failed to create code: %v", err)
 		}
 		return code
@@ -718,7 +719,7 @@ func TestGetRefreshTokensByUserId(t *testing.T) {
 		rt.Scope = "openid"
 		rt.IssuedAt = sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true}
 		rt.ExpiresAt = sql.NullTime{Time: time.Now().UTC().Add(time.Hour).Truncate(time.Microsecond), Valid: true}
-		if err := database.CreateRefreshToken(nil, rt); err != nil {
+		if err := database.CreateRefreshToken(context.Background(), nil, rt); err != nil {
 			t.Fatalf("Failed to create refresh token: %v", err)
 		}
 		return rt
@@ -750,7 +751,7 @@ func TestGetRefreshTokensByUserId(t *testing.T) {
 		RefreshTokenType: "Offline",
 		MaxLifetime:      sql.NullTime{Time: time.Now().UTC().Add(24 * time.Hour).Truncate(time.Microsecond), Valid: true},
 	})
-	if err := database.DeleteUserSession(nil, reapedSession.Id); err != nil {
+	if err := database.DeleteUserSession(context.Background(), nil, reapedSession.Id); err != nil {
 		t.Fatalf("Failed to delete the session being reaped: %v", err)
 	}
 
@@ -773,7 +774,7 @@ func TestGetRefreshTokensByUserId(t *testing.T) {
 		AuthenticatedAt:   time.Now().UTC().Truncate(time.Microsecond),
 		SessionIdentifier: "sess_o_" + fake.LetterN(8), AcrLevel: "1", AuthMethods: "pwd", Used: true,
 	}
-	if err := database.CreateCode(nil, otherCode); err != nil {
+	if err := database.CreateCode(context.Background(), nil, otherCode); err != nil {
 		t.Fatalf("Failed to create the other user's code: %v", err)
 	}
 	otherViaCode := newToken(&models.RefreshToken{
@@ -786,7 +787,7 @@ func TestGetRefreshTokensByUserId(t *testing.T) {
 		RefreshTokenType: "Offline",
 	})
 
-	got, err := database.GetRefreshTokensByUserId(nil, user.Id)
+	got, err := database.GetRefreshTokensByUserId(context.Background(), nil, user.Id)
 	if err != nil {
 		t.Fatalf("GetRefreshTokensByUserId failed: %v", err)
 	}
@@ -832,7 +833,7 @@ func TestGetRefreshTokensByUserId(t *testing.T) {
 func TestGetRefreshTokensByUserId_NoTokens(t *testing.T) {
 	user := createTestUser(t)
 
-	got, err := database.GetRefreshTokensByUserId(nil, user.Id)
+	got, err := database.GetRefreshTokensByUserId(context.Background(), nil, user.Id)
 	if err != nil {
 		t.Fatalf("GetRefreshTokensByUserId failed: %v", err)
 	}
@@ -840,7 +841,7 @@ func TestGetRefreshTokensByUserId_NoTokens(t *testing.T) {
 		t.Errorf("expected no tokens for a fresh user, got %d", len(got))
 	}
 
-	got, err = database.GetRefreshTokensByUserId(nil, 0)
+	got, err = database.GetRefreshTokensByUserId(context.Background(), nil, 0)
 	if err != nil {
 		t.Fatalf("GetRefreshTokensByUserId(0) should not error: %v", err)
 	}
@@ -872,7 +873,7 @@ func TestGetRefreshTokensByClientId(t *testing.T) {
 		rt.Scope = "openid"
 		rt.IssuedAt = sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true}
 		rt.ExpiresAt = sql.NullTime{Time: time.Now().UTC().Add(time.Hour).Truncate(time.Microsecond), Valid: true}
-		if err := database.CreateRefreshToken(nil, rt); err != nil {
+		if err := database.CreateRefreshToken(context.Background(), nil, rt); err != nil {
 			t.Fatalf("Failed to create refresh token: %v", err)
 		}
 		return rt
@@ -911,7 +912,7 @@ func TestGetRefreshTokensByClientId(t *testing.T) {
 		MaxLifetime:      sql.NullTime{Time: time.Now().UTC().Add(24 * time.Hour).Truncate(time.Microsecond), Valid: true},
 	})
 
-	got, err := database.GetRefreshTokensByClientId(nil, client.Id)
+	got, err := database.GetRefreshTokensByClientId(context.Background(), nil, client.Id)
 	if err != nil {
 		t.Fatalf("GetRefreshTokensByClientId failed: %v", err)
 	}
@@ -957,7 +958,7 @@ func TestGetRefreshTokensByClientId(t *testing.T) {
 func TestGetRefreshTokensByClientId_NoTokens(t *testing.T) {
 	client := createTestClient(t)
 
-	got, err := database.GetRefreshTokensByClientId(nil, client.Id)
+	got, err := database.GetRefreshTokensByClientId(context.Background(), nil, client.Id)
 	if err != nil {
 		t.Fatalf("GetRefreshTokensByClientId failed: %v", err)
 	}
@@ -965,7 +966,7 @@ func TestGetRefreshTokensByClientId_NoTokens(t *testing.T) {
 		t.Errorf("expected no tokens for a fresh client, got %d", len(got))
 	}
 
-	got, err = database.GetRefreshTokensByClientId(nil, 0)
+	got, err = database.GetRefreshTokensByClientId(context.Background(), nil, 0)
 	if err != nil {
 		t.Fatalf("GetRefreshTokensByClientId(0) should not error: %v", err)
 	}
@@ -1007,7 +1008,7 @@ func TestGetRefreshTokensByClientId_TransactionAndFailurePath(t *testing.T) {
 		AcrLevel:            "1",
 		AuthMethods:         "pwd",
 	}
-	if err := database.CreateCode(tx, code); err != nil {
+	if err := database.CreateCode(context.Background(), tx, code); err != nil {
 		t.Fatalf("CreateCode in a transaction: %v", err)
 	}
 	refreshToken := &models.RefreshToken{
@@ -1019,13 +1020,13 @@ func TestGetRefreshTokensByClientId_TransactionAndFailurePath(t *testing.T) {
 		IssuedAt:          sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true},
 		ExpiresAt:         sql.NullTime{Time: time.Now().UTC().Add(time.Hour).Truncate(time.Microsecond), Valid: true},
 	}
-	if err := database.CreateRefreshToken(tx, refreshToken); err != nil {
+	if err := database.CreateRefreshToken(context.Background(), tx, refreshToken); err != nil {
 		t.Fatalf("CreateRefreshToken in a transaction: %v", err)
 	}
 
 	// Neither row is committed, so only a query enlisted in this transaction can see
 	// them. A query through the pool returns nothing here.
-	got, err := database.GetRefreshTokensByClientId(tx, client.Id)
+	got, err := database.GetRefreshTokensByClientId(context.Background(), tx, client.Id)
 	if err != nil {
 		t.Fatalf("GetRefreshTokensByClientId in a transaction returned error: %v", err)
 	}
@@ -1038,7 +1039,7 @@ func TestGetRefreshTokensByClientId_TransactionAndFailurePath(t *testing.T) {
 	}
 
 	// The failure path, forced by the same finished transaction.
-	got, err = database.GetRefreshTokensByClientId(tx, client.Id)
+	got, err = database.GetRefreshTokensByClientId(context.Background(), tx, client.Id)
 	if err == nil {
 		t.Error("a query that cannot run must return an error, not a benign empty slice")
 	}
@@ -1059,16 +1060,16 @@ func TestPromoteRefreshTokenGenerations(t *testing.T) {
 	revoked := createTestRefreshToken(t)
 
 	revoked.Revoked = true
-	if err := database.UpdateRefreshToken(nil, revoked); err != nil {
+	if err := database.UpdateRefreshToken(context.Background(), nil, revoked); err != nil {
 		t.Fatalf("Failed to revoke a token: %v", err)
 	}
 
-	if err := database.PromoteRefreshTokenGenerations(nil, []int64{named.Id, revoked.Id}, 7); err != nil {
+	if err := database.PromoteRefreshTokenGenerations(context.Background(), nil, []int64{named.Id, revoked.Id}, 7); err != nil {
 		t.Fatalf("PromoteRefreshTokenGenerations failed: %v", err)
 	}
 
 	reload := func(id int64) *models.RefreshToken {
-		rt, err := database.GetRefreshTokenById(nil, id)
+		rt, err := database.GetRefreshTokenById(context.Background(), nil, id)
 		if err != nil {
 			t.Fatalf("Failed to reload refresh token %d: %v", id, err)
 		}
@@ -1086,7 +1087,7 @@ func TestPromoteRefreshTokenGenerations(t *testing.T) {
 	}
 
 	// Empty list: no error, and nothing changes.
-	if err := database.PromoteRefreshTokenGenerations(nil, nil, 9); err != nil {
+	if err := database.PromoteRefreshTokenGenerations(context.Background(), nil, nil, 9); err != nil {
 		t.Fatalf("PromoteRefreshTokenGenerations with an empty list must be a no-op, got: %v", err)
 	}
 	if got := reload(unnamed.Id).AuthStateGeneration; got != 0 {
@@ -1106,7 +1107,7 @@ func TestMarkRefreshTokenAsRevoked(t *testing.T) {
 	}
 
 	// First claim wins: the compare-and-set flips revoked=false -> true.
-	claimed, err := database.MarkRefreshTokenAsRevoked(nil, rt.Id)
+	claimed, err := database.MarkRefreshTokenAsRevoked(context.Background(), nil, rt.Id)
 	if err != nil {
 		t.Fatalf("first MarkRefreshTokenAsRevoked returned error: %v", err)
 	}
@@ -1114,7 +1115,7 @@ func TestMarkRefreshTokenAsRevoked(t *testing.T) {
 		t.Fatalf("first MarkRefreshTokenAsRevoked should claim the token, got claimed=false")
 	}
 
-	reloaded, err := database.GetRefreshTokenById(nil, rt.Id)
+	reloaded, err := database.GetRefreshTokenById(context.Background(), nil, rt.Id)
 	if err != nil {
 		t.Fatalf("failed to reload refresh token: %v", err)
 	}
@@ -1125,7 +1126,7 @@ func TestMarkRefreshTokenAsRevoked(t *testing.T) {
 	// Second claim loses: the WHERE revoked=false predicate no longer matches. This
 	// is what stops two concurrent presentations of one refresh token from each
 	// minting a token set.
-	claimed, err = database.MarkRefreshTokenAsRevoked(nil, rt.Id)
+	claimed, err = database.MarkRefreshTokenAsRevoked(context.Background(), nil, rt.Id)
 	if err != nil {
 		t.Fatalf("second MarkRefreshTokenAsRevoked returned error: %v", err)
 	}
@@ -1138,10 +1139,10 @@ func TestMarkRefreshTokenAsRevoked(t *testing.T) {
 	// revocation or a family cascade produces.
 	other := createTestRefreshToken(t)
 	other.Revoked = true
-	if err := database.UpdateRefreshToken(nil, other); err != nil {
+	if err := database.UpdateRefreshToken(context.Background(), nil, other); err != nil {
 		t.Fatalf("failed to revoke a token by another path: %v", err)
 	}
-	claimed, err = database.MarkRefreshTokenAsRevoked(nil, other.Id)
+	claimed, err = database.MarkRefreshTokenAsRevoked(context.Background(), nil, other.Id)
 	if err != nil {
 		t.Fatalf("MarkRefreshTokenAsRevoked on an externally revoked token returned error: %v", err)
 	}
@@ -1151,7 +1152,7 @@ func TestMarkRefreshTokenAsRevoked(t *testing.T) {
 
 	// A non-existent id affects zero rows: claimed=false, and no error. Reporting it
 	// as an error would make a deleted row indistinguishable from a broken query.
-	claimed, err = database.MarkRefreshTokenAsRevoked(nil, 999999999)
+	claimed, err = database.MarkRefreshTokenAsRevoked(context.Background(), nil, 999999999)
 	if err != nil {
 		t.Fatalf("MarkRefreshTokenAsRevoked for a missing token returned error: %v", err)
 	}
@@ -1163,7 +1164,7 @@ func TestMarkRefreshTokenAsRevoked(t *testing.T) {
 	// claimed=false. The bare SQL affects zero rows for id 0, so asserting false here
 	// would pass with the guard deleted and would be indistinguishable from the
 	// missing-id case above. The guard is the only thing under test.
-	_, err = database.MarkRefreshTokenAsRevoked(nil, 0)
+	_, err = database.MarkRefreshTokenAsRevoked(context.Background(), nil, 0)
 	if err == nil {
 		t.Errorf("MarkRefreshTokenAsRevoked(0) must return an error")
 	}
@@ -1180,11 +1181,11 @@ func TestMarkRefreshTokenAsRevoked(t *testing.T) {
 func TestMarkRefreshTokenAsRevoked_DoesNotClobberAuthStateGeneration(t *testing.T) {
 	rt := createTestRefreshToken(t)
 
-	if err := database.PromoteRefreshTokenGenerations(nil, []int64{rt.Id}, 5); err != nil {
+	if err := database.PromoteRefreshTokenGenerations(context.Background(), nil, []int64{rt.Id}, 5); err != nil {
 		t.Fatalf("failed to set the token's generation: %v", err)
 	}
 
-	claimed, err := database.MarkRefreshTokenAsRevoked(nil, rt.Id)
+	claimed, err := database.MarkRefreshTokenAsRevoked(context.Background(), nil, rt.Id)
 	if err != nil {
 		t.Fatalf("MarkRefreshTokenAsRevoked returned error: %v", err)
 	}
@@ -1192,7 +1193,7 @@ func TestMarkRefreshTokenAsRevoked_DoesNotClobberAuthStateGeneration(t *testing.
 		t.Fatalf("expected to claim a live token")
 	}
 
-	reloaded, err := database.GetRefreshTokenById(nil, rt.Id)
+	reloaded, err := database.GetRefreshTokenById(context.Background(), nil, rt.Id)
 	if err != nil {
 		t.Fatalf("failed to reload refresh token: %v", err)
 	}
@@ -1240,7 +1241,7 @@ func seedFamilyToken(t *testing.T, spec familyTokenSpec) *models.RefreshToken {
 		rt.ClientId = sql.NullInt64{Int64: spec.ClientId, Valid: true}
 	}
 
-	if err := database.CreateRefreshToken(nil, rt); err != nil {
+	if err := database.CreateRefreshToken(context.Background(), nil, rt); err != nil {
 		t.Fatalf("failed to seed family token: %v", err)
 	}
 	return rt
@@ -1271,7 +1272,7 @@ func seedCodeOnSession(t *testing.T, clientId, userId int64, sessionIdentifier s
 		AuthMethods:         "pwd",
 		Used:                true,
 	}
-	if err := database.CreateCode(nil, code); err != nil {
+	if err := database.CreateCode(context.Background(), nil, code); err != nil {
 		t.Fatalf("failed to create code on session %s: %v", sessionIdentifier, err)
 	}
 	return code
@@ -1280,7 +1281,7 @@ func seedCodeOnSession(t *testing.T, clientId, userId int64, sessionIdentifier s
 // refreshTokenIsRevoked reloads a row and reports its revoked flag.
 func refreshTokenIsRevoked(t *testing.T, id int64) bool {
 	t.Helper()
-	rt, err := database.GetRefreshTokenById(nil, id)
+	rt, err := database.GetRefreshTokenById(context.Background(), nil, id)
 	if err != nil {
 		t.Fatalf("failed to reload refresh token %d: %v", id, err)
 	}
@@ -1304,7 +1305,7 @@ func TestRevokeRefreshTokenFamily(t *testing.T) {
 		parent := seedFamilyToken(t, familyTokenSpec{FamilyJti: family, CodeId: code.Id, Revoked: true})
 		child := seedFamilyToken(t, familyTokenSpec{FamilyJti: family, CodeId: code.Id})
 
-		count, err := database.RevokeRefreshTokenFamily(nil, family)
+		count, err := database.RevokeRefreshTokenFamily(context.Background(), nil, family)
 		if err != nil {
 			t.Fatalf("RevokeRefreshTokenFamily failed: %v", err)
 		}
@@ -1331,7 +1332,7 @@ func TestRevokeRefreshTokenFamily(t *testing.T) {
 		childA := seedFamilyToken(t, familyTokenSpec{FamilyJti: family, CodeId: code.Id})
 		childB := seedFamilyToken(t, familyTokenSpec{FamilyJti: family, CodeId: code.Id})
 
-		count, err := database.RevokeRefreshTokenFamily(nil, family)
+		count, err := database.RevokeRefreshTokenFamily(context.Background(), nil, family)
 		if err != nil {
 			t.Fatalf("RevokeRefreshTokenFamily failed: %v", err)
 		}
@@ -1354,7 +1355,7 @@ func TestRevokeRefreshTokenFamily(t *testing.T) {
 		seedFamilyToken(t, familyTokenSpec{FamilyJti: family, CodeId: code.Id, Revoked: true})
 		seedFamilyToken(t, familyTokenSpec{FamilyJti: family, CodeId: code.Id, Revoked: true})
 
-		count, err := database.RevokeRefreshTokenFamily(nil, family)
+		count, err := database.RevokeRefreshTokenFamily(context.Background(), nil, family)
 		if err != nil {
 			t.Fatalf("RevokeRefreshTokenFamily failed: %v", err)
 		}
@@ -1370,7 +1371,7 @@ func TestRevokeRefreshTokenFamily(t *testing.T) {
 
 		bystander := seedFamilyToken(t, familyTokenSpec{FamilyJti: fake.UUID(), CodeId: code.Id})
 
-		count, err := database.RevokeRefreshTokenFamily(nil, "no-such-family-"+fake.UUID())
+		count, err := database.RevokeRefreshTokenFamily(context.Background(), nil, "no-such-family-"+fake.UUID())
 		if err != nil {
 			t.Fatalf("RevokeRefreshTokenFamily failed: %v", err)
 		}
@@ -1406,7 +1407,7 @@ func TestRevokeRefreshTokenFamily(t *testing.T) {
 		childB := seedFamilyToken(t, familyTokenSpec{
 			FamilyJti: familyB, CodeId: codeB.Id, SessionIdentifier: sessionId})
 
-		count, err := database.RevokeRefreshTokenFamily(nil, familyA)
+		count, err := database.RevokeRefreshTokenFamily(context.Background(), nil, familyA)
 		if err != nil {
 			t.Fatalf("RevokeRefreshTokenFamily failed: %v", err)
 		}
@@ -1439,7 +1440,7 @@ func TestRevokeRefreshTokenFamily(t *testing.T) {
 			t.Fatalf("the ROPC fixture must leave code_id NULL")
 		}
 
-		count, err := database.RevokeRefreshTokenFamily(nil, family)
+		count, err := database.RevokeRefreshTokenFamily(context.Background(), nil, family)
 		if err != nil {
 			t.Fatalf("RevokeRefreshTokenFamily failed: %v", err)
 		}
@@ -1465,7 +1466,7 @@ func TestRevokeRefreshTokenFamily(t *testing.T) {
 
 		emptyFamily := seedFamilyToken(t, familyTokenSpec{FamilyJti: "", CodeId: code.Id})
 
-		count, err := database.RevokeRefreshTokenFamily(nil, "")
+		count, err := database.RevokeRefreshTokenFamily(context.Background(), nil, "")
 		if err == nil {
 			t.Errorf("RevokeRefreshTokenFamily(\"\") must return an error, got count=%d", count)
 		}

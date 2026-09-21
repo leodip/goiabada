@@ -899,7 +899,7 @@ func TestRequireValidSession(t *testing.T) {
 		now := time.Now().UTC()
 		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, mock.Anything).
 			Return(&models.User{Id: 1, Enabled: true}, nil).Maybe()
-		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, "sid-abc").
+		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "sid-abc").
 			Return(&models.UserSession{
 				SessionIdentifier: "sid-abc",
 				UserId:            1, // the same user the sub resolves to; see the owner check
@@ -937,7 +937,7 @@ func TestRequireValidSession(t *testing.T) {
 
 		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, mock.Anything).
 			Return(&models.User{Id: 1, Enabled: true}, nil).Maybe()
-		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, "sid-deleted").
+		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "sid-deleted").
 			Return(nil, nil)
 
 		token := oauth.JwtToken{
@@ -973,7 +973,7 @@ func TestRequireValidSession(t *testing.T) {
 		now := time.Now().UTC()
 		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, mock.Anything).
 			Return(&models.User{Id: 1, Enabled: true}, nil).Maybe()
-		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, "sid-expired").
+		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "sid-expired").
 			Return(&models.UserSession{
 				SessionIdentifier: "sid-expired",
 				UserId:            1, // owned by the caller, so expiry is what refuses it
@@ -1017,7 +1017,7 @@ func TestRequireValidSession(t *testing.T) {
 
 		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, mock.Anything).
 			Return(&models.User{Id: 1, Enabled: true}, nil).Maybe()
-		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, "sid-no-settings").
+		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "sid-no-settings").
 			Return(&models.UserSession{
 				SessionIdentifier: "sid-no-settings",
 				UserId:            1, // owned by the caller, so the settings gate is what fails
@@ -1056,7 +1056,7 @@ func TestRequireValidSession(t *testing.T) {
 
 		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, mock.Anything).
 			Return(&models.User{Id: 1, Enabled: true}, nil).Maybe()
-		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, "sid-bad-settings").
+		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "sid-bad-settings").
 			Return(&models.UserSession{
 				SessionIdentifier: "sid-bad-settings",
 				UserId:            1, // owned by the caller, so the settings gate is what fails
@@ -1095,7 +1095,7 @@ func TestRequireValidSession(t *testing.T) {
 
 		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, mock.Anything).
 			Return(&models.User{Id: 1, Enabled: true}, nil).Maybe()
-		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, "sid-boom").
+		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "sid-boom").
 			Return(nil, errors.New("connection refused"))
 
 		token := oauth.JwtToken{
@@ -1129,7 +1129,7 @@ func TestRequireValidSession(t *testing.T) {
 
 		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, mock.Anything).
 			Return(&models.User{Id: 1, Enabled: true}, nil).Maybe()
-		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, "sid-x").
+		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "sid-x").
 			Return(nil, nil)
 
 		token := oauth.JwtToken{
@@ -1487,10 +1487,10 @@ func TestRequireValidSession_Table(t *testing.T) {
 			if tc.session != nil {
 				switch {
 				case tc.session.lookupErrs:
-					mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, sid).
+					mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sid).
 						Return(nil, assert.AnError)
 				case tc.session.missing:
-					mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, sid).
+					mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sid).
 						Return(nil, nil)
 				default:
 					lastAccessed := now.Add(-5 * time.Minute)
@@ -1502,7 +1502,7 @@ func TestRequireValidSession_Table(t *testing.T) {
 					if tc.session.foreign {
 						owner = callerId + 1
 					}
-					mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, sid).
+					mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sid).
 						Return(&models.UserSession{
 							Id:                  9,
 							SessionIdentifier:   sid,
@@ -1773,7 +1773,7 @@ func TestRequireValidSession_AFiveHundredCarriesTheRequestIdAndLogsOnce(t *testi
 	mockDB := mocks_data.NewDatabase(t)
 	mockDB.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), "user-1").
 		Return(&models.User{Id: 1, Subject: "user-1", Enabled: true}, nil)
-	mockDB.On("GetUserSessionBySessionIdentifier", (*sql.Tx)(nil), "sid-boom").
+	mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, (*sql.Tx)(nil), "sid-boom").
 		Return(nil, errors.New("the database is down"))
 
 	token := oauth.JwtToken{Claims: map[string]interface{}{
@@ -1836,7 +1836,7 @@ func TestRequireValidSession_ReadsTheUserUnderTheRequestsContext(t *testing.T) {
 		mockDB.On("GetUserBySubject", mock.MatchedBy(func(ctx context.Context) bool {
 			return chimiddleware.GetReqID(ctx) == requestId
 		}), mock.Anything, "user-1").Return(&models.User{Id: 1, Enabled: true}, nil).Once()
-		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, "sid-abc").
+		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "sid-abc").
 			Return(&models.UserSession{
 				SessionIdentifier: "sid-abc",
 				UserId:            1,

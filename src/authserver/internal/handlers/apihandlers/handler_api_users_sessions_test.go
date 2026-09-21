@@ -37,20 +37,20 @@ func stubTermination(database *mocks_data.Database, userSession *models.UserSess
 	revokedCodeCount int64, tokens []*models.RefreshToken) {
 
 	expectRunInTransaction(database, apiTerminateTx)
-	database.On("RevokeCodesBySessionIdentifier", apiTerminateTx, userSession.SessionIdentifier).
+	database.On("RevokeCodesBySessionIdentifier", mock.Anything, apiTerminateTx, userSession.SessionIdentifier).
 		Return(revokedCodeCount, nil).Once()
-	database.On("GetRefreshTokensBySessionIdentifier", apiTerminateTx, userSession.SessionIdentifier).
+	database.On("GetRefreshTokensBySessionIdentifier", mock.Anything, apiTerminateTx, userSession.SessionIdentifier).
 		Return(tokens, nil).Once()
 	for i := range tokens {
 		if tokens[i].Revoked {
 			continue
 		}
 		jti := tokens[i].RefreshTokenJti
-		database.On("UpdateRefreshToken", apiTerminateTx, mock.MatchedBy(func(rt *models.RefreshToken) bool {
+		database.On("UpdateRefreshToken", mock.Anything, apiTerminateTx, mock.MatchedBy(func(rt *models.RefreshToken) bool {
 			return rt.RefreshTokenJti == jti
 		})).Return(nil).Once()
 	}
-	database.On("DeleteUserSession", apiTerminateTx, userSession.Id).Return(nil).Once()
+	database.On("DeleteUserSession", mock.Anything, apiTerminateTx, userSession.Id).Return(nil).Once()
 }
 
 // adminSessionDeleteRequest builds the DELETE with the chi URL parameter the handler reads and
@@ -75,7 +75,7 @@ func TestHandleAPIUserSessionDelete_TerminatesAndAuditsBothEvents(t *testing.T) 
 
 	userSession := &models.UserSession{Id: 100, SessionIdentifier: "sid-terminated", UserId: 42}
 
-	database.On("GetUserSessionById", (*sql.Tx)(nil), int64(100)).Return(userSession, nil).Once()
+	database.On("GetUserSessionById", mock.Anything, (*sql.Tx)(nil), int64(100)).Return(userSession, nil).Once()
 	// One live token and one already revoked, so the JTI list below proves the payload reports what
 	// this call TRANSITIONED rather than what the session held.
 	stubTermination(database, userSession, 3, []*models.RefreshToken{
@@ -141,7 +141,7 @@ func TestHandleAPIUserSessionDelete_NoTokenAuditsAnEmptySubject(t *testing.T) {
 
 	userSession := &models.UserSession{Id: 100, SessionIdentifier: "sid-terminated", UserId: 42}
 
-	database.On("GetUserSessionById", (*sql.Tx)(nil), int64(100)).Return(userSession, nil).Once()
+	database.On("GetUserSessionById", mock.Anything, (*sql.Tx)(nil), int64(100)).Return(userSession, nil).Once()
 	stubTermination(database, userSession, 0, []*models.RefreshToken{})
 
 	var payloads []map[string]interface{}
@@ -175,10 +175,10 @@ func TestHandleAPIUserSessionDelete_TerminationFailureIsA500(t *testing.T) {
 
 	userSession := &models.UserSession{Id: 100, SessionIdentifier: "sid-terminated", UserId: 42}
 
-	database.On("GetUserSessionById", (*sql.Tx)(nil), int64(100)).Return(userSession, nil).Once()
+	database.On("GetUserSessionById", mock.Anything, (*sql.Tx)(nil), int64(100)).Return(userSession, nil).Once()
 	// The deletion, which since #139 is the first write inside the termination transaction.
 	stub := expectRunInTransaction(database, apiTerminateTx)
-	database.On("DeleteUserSession", apiTerminateTx, userSession.Id).
+	database.On("DeleteUserSession", mock.Anything, apiTerminateTx, userSession.Id).
 		Return(errors.New("the session delete failed")).Once()
 
 	rr := httptest.NewRecorder()
@@ -201,7 +201,7 @@ func TestHandleAPIUserSessionDelete_NotFoundDoesNotTerminate(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_audit.NewAuditLogger(t)
 
-	database.On("GetUserSessionById", (*sql.Tx)(nil), int64(999)).Return(nil, nil).Once()
+	database.On("GetUserSessionById", mock.Anything, (*sql.Tx)(nil), int64(999)).Return(nil, nil).Once()
 
 	rr := httptest.NewRecorder()
 	handler := HandleAPIUserSessionDelete(database, auditLogger)

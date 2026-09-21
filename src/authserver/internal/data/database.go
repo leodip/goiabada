@@ -64,7 +64,7 @@ type Database interface {
 	// A transaction is required: without one the statement autocommits and the row is
 	// released before the read even runs.
 	AcquireClientRow(tx *sql.Tx, clientId int64) error
-	GetClientById(tx *sql.Tx, clientId int64) (*models.Client, error)
+	GetClientById(ctx context.Context, tx *sql.Tx, clientId int64) (*models.Client, error)
 	GetClientsByIds(ctx context.Context, tx *sql.Tx, clientIds []int64) ([]models.Client, error)
 	GetClientByClientIdentifier(tx *sql.Tx, clientIdentifier string) (*models.Client, error)
 	GetAllClients(tx *sql.Tx) ([]models.Client, error)
@@ -165,8 +165,8 @@ type Database interface {
 	UsersLoadPermissions(ctx context.Context, tx *sql.Tx, users []models.User) error
 	UserLoadAttributes(ctx context.Context, tx *sql.Tx, user *models.User) error
 
-	CreateCode(tx *sql.Tx, code *models.Code) error
-	UpdateCode(tx *sql.Tx, code *models.Code) error
+	CreateCode(ctx context.Context, tx *sql.Tx, code *models.Code) error
+	UpdateCode(ctx context.Context, tx *sql.Tx, code *models.Code) error
 	// MarkCodeAsUsed atomically flips a code from unused to used and reports
 	// whether this call is the one that made the transition. It is the guard
 	// against double-spending a single authorization code (see #77). A revoked
@@ -174,13 +174,13 @@ type Database interface {
 	// just before its session was terminated (see #129). False means no row
 	// transitioned, whether used, revoked or missing, and never specifically
 	// reuse: that is the validator's finding, not this one's.
-	MarkCodeAsUsed(tx *sql.Tx, codeId int64) (bool, error)
+	MarkCodeAsUsed(ctx context.Context, tx *sql.Tx, codeId int64) (bool, error)
 	// RevokeCodesBySessionIdentifier marks every not-yet-revoked code of one session
 	// revoked and reports how many rows it transitioned. Ending a session durably
 	// cuts off the grants that session authorized, and marking the code reaches
 	// every refresh token descended from it, present and future, because a rotated
 	// child inherits its parent's code_id (see #129).
-	RevokeCodesBySessionIdentifier(tx *sql.Tx, sessionIdentifier string) (int64, error)
+	RevokeCodesBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (int64, error)
 	// RevokeCodesByClientId marks every not-yet-revoked code of one client revoked and
 	// reports how many rows it transitioned. It is the durable half of flipping a
 	// client from confidential to public: marking the code reaches every refresh token
@@ -188,12 +188,12 @@ type Database interface {
 	// parent's code_id, so a token inserted after this statement committed is born
 	// already rejected. The count is what this call transitioned and not what the
 	// client has, so a second flip reports 0 (see #245).
-	RevokeCodesByClientId(tx *sql.Tx, clientId int64) (int64, error)
-	GetCodeById(tx *sql.Tx, codeId int64) (*models.Code, error)
-	GetCodeByCodeHash(tx *sql.Tx, codeHash string, used bool) (*models.Code, error)
-	DeleteCode(tx *sql.Tx, codeId int64) error
-	CodeLoadClient(tx *sql.Tx, code *models.Code) error
-	CodeLoadUser(tx *sql.Tx, code *models.Code) error
+	RevokeCodesByClientId(ctx context.Context, tx *sql.Tx, clientId int64) (int64, error)
+	GetCodeById(ctx context.Context, tx *sql.Tx, codeId int64) (*models.Code, error)
+	GetCodeByCodeHash(ctx context.Context, tx *sql.Tx, codeHash string, used bool) (*models.Code, error)
+	DeleteCode(ctx context.Context, tx *sql.Tx, codeId int64) error
+	CodeLoadClient(ctx context.Context, tx *sql.Tx, code *models.Code) error
+	CodeLoadUser(ctx context.Context, tx *sql.Tx, code *models.Code) error
 	// DeleteUsedCodesWithoutRefreshTokens reaps codes that can no longer produce
 	// anything: those redeemed but never followed by a refresh token, and those
 	// revoked while still unredeemed, which is what ending a session leaves behind
@@ -210,7 +210,7 @@ type Database interface {
 	// A revoked code that WAS redeemed is deliberately out of reach here while any
 	// refresh token still references it, because that marker is what rejects the
 	// token.
-	DeleteUsedCodesWithoutRefreshTokens(tx *sql.Tx, createdBefore time.Time) error
+	DeleteUsedCodesWithoutRefreshTokens(ctx context.Context, tx *sql.Tx, createdBefore time.Time) error
 
 	CreateResource(tx *sql.Tx, resource *models.Resource) error
 	UpdateResource(tx *sql.Tx, resource *models.Resource) error
@@ -325,13 +325,13 @@ type Database interface {
 	GetClientPermissionsByClientId(tx *sql.Tx, clientId int64) ([]models.ClientPermission, error)
 	DeleteClientPermission(tx *sql.Tx, clientPermissionId int64) error
 
-	CreateUserSession(tx *sql.Tx, userSession *models.UserSession) error
-	UpdateUserSession(tx *sql.Tx, userSession *models.UserSession) error
-	GetUserSessionById(tx *sql.Tx, userSessionId int64) (*models.UserSession, error)
-	GetUserSessionBySessionIdentifier(tx *sql.Tx, sessionIdentifier string) (*models.UserSession, error)
-	GetUserSessionsByClientIdPaginated(tx *sql.Tx, clientId int64, page int, pageSize int) ([]models.UserSession, int, error)
-	GetUserSessionsByUserId(tx *sql.Tx, userId int64) ([]models.UserSession, error)
-	DeleteUserSession(tx *sql.Tx, userSessionId int64) error
+	CreateUserSession(ctx context.Context, tx *sql.Tx, userSession *models.UserSession) error
+	UpdateUserSession(ctx context.Context, tx *sql.Tx, userSession *models.UserSession) error
+	GetUserSessionById(ctx context.Context, tx *sql.Tx, userSessionId int64) (*models.UserSession, error)
+	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*models.UserSession, error)
+	GetUserSessionsByClientIdPaginated(ctx context.Context, tx *sql.Tx, clientId int64, page int, pageSize int) ([]models.UserSession, int, error)
+	GetUserSessionsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]models.UserSession, error)
+	DeleteUserSession(ctx context.Context, tx *sql.Tx, userSessionId int64) error
 	// AcquireUserSessionRow takes the session's row inside the caller's transaction and
 	// holds it until that transaction ends, the way AcquireClientRow does for a client
 	// (#245). It keys on the session identifier because that is what a ceremony holds,
@@ -353,13 +353,13 @@ type Database interface {
 	// released before the caller can use it, which is the whole of what this buys. An
 	// empty session identifier is refused, because no row carries one and the statement
 	// would otherwise report "gone" for every session there is.
-	AcquireUserSessionRow(tx *sql.Tx, sessionIdentifier string) (bool, error)
+	AcquireUserSessionRow(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (bool, error)
 	// PromoteUserSessionGeneration moves one session to a new authentication
 	// generation. Narrow because BumpUserSession writes the whole row on every
 	// request and would otherwise undo the promotion (#106). Errors if no row matched:
 	// a caller preserving a session and its tokens together must not have half of that
 	// silently succeed.
-	PromoteUserSessionGeneration(tx *sql.Tx, userSessionId int64, generation int64) error
+	PromoteUserSessionGeneration(ctx context.Context, tx *sql.Tx, userSessionId int64, generation int64) error
 	// PromoteUserSessionOtpConfigGeneration records that this session has satisfied the
 	// level 2 question against the given OTP configuration generation. Narrow for the
 	// reason PromoteUserSessionGeneration is: BumpUserSession writes the whole row on
@@ -370,13 +370,13 @@ type Database interface {
 	// in the ceremony rather than read live: an authenticator change landing between
 	// /auth/level2 and here must not be discharged by a ceremony that never saw it
 	// (#242, #106 decision 11).
-	PromoteUserSessionOtpConfigGeneration(tx *sql.Tx, userSessionId int64, generation int64) error
-	UserSessionLoadUser(tx *sql.Tx, userSession *models.UserSession) error
-	UserSessionsLoadUsers(tx *sql.Tx, userSessions []models.UserSession) error
-	UserSessionLoadClients(tx *sql.Tx, userSession *models.UserSession) error
-	UserSessionsLoadClients(tx *sql.Tx, userSessions []models.UserSession) error
-	DeleteIdleSessions(tx *sql.Tx, idleTimeout time.Duration) error
-	DeleteExpiredSessions(tx *sql.Tx, maxLifetime time.Duration) error
+	PromoteUserSessionOtpConfigGeneration(ctx context.Context, tx *sql.Tx, userSessionId int64, generation int64) error
+	UserSessionLoadUser(ctx context.Context, tx *sql.Tx, userSession *models.UserSession) error
+	UserSessionsLoadUsers(ctx context.Context, tx *sql.Tx, userSessions []models.UserSession) error
+	UserSessionLoadClients(ctx context.Context, tx *sql.Tx, userSession *models.UserSession) error
+	UserSessionsLoadClients(ctx context.Context, tx *sql.Tx, userSessions []models.UserSession) error
+	DeleteIdleSessions(ctx context.Context, tx *sql.Tx, idleTimeout time.Duration) error
+	DeleteExpiredSessions(ctx context.Context, tx *sql.Tx, maxLifetime time.Duration) error
 
 	// A browser session is the state the session cookie used to carry. The cookie now
 	// holds an opaque identifier and the row holds everything else (#266).
@@ -384,7 +384,7 @@ type Database interface {
 	// Every method is keyed on (owner, sessionIdHash) rather than on the surrogate id,
 	// because the store never holds the id: it has an identifier from a cookie and the
 	// name of the application asking. That pair is the table's unique index.
-	CreateBrowserSession(tx *sql.Tx, browserSession *models.BrowserSession) error
+	CreateBrowserSession(ctx context.Context, tx *sql.Tx, browserSession *models.BrowserSession) error
 	// GetBrowserSessionByOwnerAndSessionIdHash returns the live session, or nil if there
 	// is none. `now` is an active-expiry predicate and not a hint: the statement matches
 	// only expires_at > now, so an expired row reads as absent whether or not the reaper
@@ -396,7 +396,7 @@ type Database interface {
 	// such session", which is a fresh session, and an error is "I could not ask", which
 	// is a refused request. Collapsing the second into the first would silently sign
 	// everyone out during any database interruption.
-	GetBrowserSessionByOwnerAndSessionIdHash(tx *sql.Tx, owner, sessionIdHash string, now time.Time) (*models.BrowserSession, error)
+	GetBrowserSessionByOwnerAndSessionIdHash(ctx context.Context, tx *sql.Tx, owner, sessionIdHash string, now time.Time) (*models.BrowserSession, error)
 	// UpdateBrowserSessionData replaces one session's contents and moves its deadlines.
 	// Narrow rather than the house's full-row Update<Model> because it sits on a
 	// per-request path and because the caller holds no id, the reason
@@ -406,17 +406,17 @@ type Database interface {
 	// session is gone or expired, which is what lets the caller tell "written" from "the
 	// row is no longer there". The expires_at > now term is in the WHERE for the reason
 	// it is in the read, so a write can never touch an expired row back to life.
-	UpdateBrowserSessionData(tx *sql.Tx, owner, sessionIdHash, data string, now, expiresAt time.Time) (bool, error)
+	UpdateBrowserSessionData(ctx context.Context, tx *sql.Tx, owner, sessionIdHash, data string, now, expiresAt time.Time) (bool, error)
 	// TouchBrowserSession records that a live session was used, and reports whether a row
 	// transitioned. It moves expires_at as well as last_accessed: the idle window is
 	// expressed in expires_at, so a touch that left it alone would never extend the
 	// session and the idle timeout would behave as an absolute one.
-	TouchBrowserSession(tx *sql.Tx, owner, sessionIdHash string, now, expiresAt time.Time) (bool, error)
-	DeleteBrowserSession(tx *sql.Tx, owner, sessionIdHash string) error
+	TouchBrowserSession(ctx context.Context, tx *sql.Tx, owner, sessionIdHash string, now, expiresAt time.Time) (bool, error)
+	DeleteBrowserSession(ctx context.Context, tx *sql.Tx, owner, sessionIdHash string) error
 	// DeleteExpiredBrowserSessions reaps on expires_at alone, across both owners. The
 	// row was already unusable before this ran, by the predicate above; this is what
 	// stops the table growing.
-	DeleteExpiredBrowserSessions(tx *sql.Tx, now time.Time) error
+	DeleteExpiredBrowserSessions(ctx context.Context, tx *sql.Tx, now time.Time) error
 
 	CreateUserConsent(ctx context.Context, tx *sql.Tx, userConsent *models.UserConsent) error
 	UpdateUserConsent(ctx context.Context, tx *sql.Tx, userConsent *models.UserConsent) error
@@ -462,29 +462,29 @@ type Database interface {
 	GetGroupPermissionsByGroupId(tx *sql.Tx, groupId int64) ([]models.GroupPermission, error)
 	DeleteGroupPermission(tx *sql.Tx, groupPermissionId int64) error
 
-	CreateRefreshToken(tx *sql.Tx, refreshToken *models.RefreshToken) error
-	UpdateRefreshToken(tx *sql.Tx, refreshToken *models.RefreshToken) error
+	CreateRefreshToken(ctx context.Context, tx *sql.Tx, refreshToken *models.RefreshToken) error
+	UpdateRefreshToken(ctx context.Context, tx *sql.Tx, refreshToken *models.RefreshToken) error
 	// MarkRefreshTokenAsRevoked atomically flips a refresh token from live to revoked
 	// and reports whether this call is the one that made the transition. It is the
 	// guard against double-spending a single refresh token, for the same reason
 	// MarkCodeAsUsed guards an authorization code (#128).
-	MarkRefreshTokenAsRevoked(tx *sql.Tx, refreshTokenId int64) (bool, error)
+	MarkRefreshTokenAsRevoked(ctx context.Context, tx *sql.Tx, refreshTokenId int64) (bool, error)
 	// RevokeRefreshTokenFamily revokes every currently live member of one rotation
 	// family, identified by the first_refresh_token_jti its members share, and returns
 	// the exact number of rows it moved from live to revoked. An empty identifier is an
 	// error rather than a no-op, since on a revocation path it can only be a caller
 	// bug (#128).
-	RevokeRefreshTokenFamily(tx *sql.Tx, firstRefreshTokenJti string) (int64, error)
-	GetRefreshTokenById(tx *sql.Tx, refreshTokenId int64) (*models.RefreshToken, error)
-	GetRefreshTokenByJti(tx *sql.Tx, jti string) (*models.RefreshToken, error)
-	GetRefreshTokensByCodeId(tx *sql.Tx, codeId int64) ([]*models.RefreshToken, error)
-	GetRefreshTokensBySessionIdentifier(tx *sql.Tx, sessionIdentifier string) ([]*models.RefreshToken, error)
+	RevokeRefreshTokenFamily(ctx context.Context, tx *sql.Tx, firstRefreshTokenJti string) (int64, error)
+	GetRefreshTokenById(ctx context.Context, tx *sql.Tx, refreshTokenId int64) (*models.RefreshToken, error)
+	GetRefreshTokenByJti(ctx context.Context, tx *sql.Tx, jti string) (*models.RefreshToken, error)
+	GetRefreshTokensByCodeId(ctx context.Context, tx *sql.Tx, codeId int64) ([]*models.RefreshToken, error)
+	GetRefreshTokensBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) ([]*models.RefreshToken, error)
 	// GetRefreshTokensByUserId returns every refresh token belonging to a user,
 	// through either linkage shape: codes.user_id for the authorization code flow and
 	// refresh_tokens.user_id for ROPC. GetRefreshTokensBySessionIdentifier cannot
 	// substitute for it, because that query joins through codes and so excludes ROPC
 	// rows, and because it needs a live session row to supply the identifier (#106).
-	GetRefreshTokensByUserId(tx *sql.Tx, userId int64) ([]*models.RefreshToken, error)
+	GetRefreshTokensByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]*models.RefreshToken, error)
 	// GetRefreshTokensByClientId returns every refresh token belonging to a client,
 	// through either linkage shape: codes.client_id for the authorization code flow,
 	// where refresh_tokens.client_id is null, and refresh_tokens.client_id for ROPC,
@@ -493,29 +493,29 @@ type Database interface {
 	// query: it joins through codes and so excludes ROPC rows, and it needs a live
 	// session row to supply the identifier. Used by the confidential-to-public flip,
 	// which must reach every grant the client holds however it was issued (#245).
-	GetRefreshTokensByClientId(tx *sql.Tx, clientId int64) ([]*models.RefreshToken, error)
+	GetRefreshTokensByClientId(ctx context.Context, tx *sql.Tx, clientId int64) ([]*models.RefreshToken, error)
 	// PromoteRefreshTokenGenerations moves the named, unrevoked refresh tokens to a
 	// new authentication generation. An empty id list is a no-op (#106).
-	PromoteRefreshTokenGenerations(tx *sql.Tx, refreshTokenIds []int64, generation int64) error
-	DeleteRefreshToken(tx *sql.Tx, refreshTokenId int64) error
-	RefreshTokenLoadCode(tx *sql.Tx, refreshToken *models.RefreshToken) error
-	RefreshTokenLoadUser(tx *sql.Tx, refreshToken *models.RefreshToken) error
-	RefreshTokenLoadClient(tx *sql.Tx, refreshToken *models.RefreshToken) error
+	PromoteRefreshTokenGenerations(ctx context.Context, tx *sql.Tx, refreshTokenIds []int64, generation int64) error
+	DeleteRefreshToken(ctx context.Context, tx *sql.Tx, refreshTokenId int64) error
+	RefreshTokenLoadCode(ctx context.Context, tx *sql.Tx, refreshToken *models.RefreshToken) error
+	RefreshTokenLoadUser(ctx context.Context, tx *sql.Tx, refreshToken *models.RefreshToken) error
+	RefreshTokenLoadClient(ctx context.Context, tx *sql.Tx, refreshToken *models.RefreshToken) error
 	// DeleteExpiredRefreshTokens deletes refresh tokens the protocol can no longer
 	// accept, by expires_at or max_lifetime. Being revoked is NOT a reason to delete
 	// a row: a revoked row is the replay-detection signal, and reaping it early means
 	// a replay is refused but never detected and its live family never contained
 	// (#128, RFC 9700 Section 4.14.2).
-	DeleteExpiredRefreshTokens(tx *sql.Tx) error
+	DeleteExpiredRefreshTokens(ctx context.Context, tx *sql.Tx) error
 
-	CreateUserSessionClient(tx *sql.Tx, userSessionClient *models.UserSessionClient) error
-	UpdateUserSessionClient(tx *sql.Tx, userSessionClient *models.UserSessionClient) error
-	GetUserSessionClientById(tx *sql.Tx, userSessionClientId int64) (*models.UserSessionClient, error)
-	GetUserSessionsClientByIds(tx *sql.Tx, userSessionClientIds []int64) ([]models.UserSessionClient, error)
-	GetUserSessionClientsByUserSessionId(tx *sql.Tx, userSessionId int64) ([]models.UserSessionClient, error)
-	GetUserSessionClientsByUserSessionIds(tx *sql.Tx, userSessionIds []int64) ([]models.UserSessionClient, error)
-	DeleteUserSessionClient(tx *sql.Tx, userSessionClientId int64) error
-	UserSessionClientsLoadClients(tx *sql.Tx, userSessionClients []models.UserSessionClient) error
+	CreateUserSessionClient(ctx context.Context, tx *sql.Tx, userSessionClient *models.UserSessionClient) error
+	UpdateUserSessionClient(ctx context.Context, tx *sql.Tx, userSessionClient *models.UserSessionClient) error
+	GetUserSessionClientById(ctx context.Context, tx *sql.Tx, userSessionClientId int64) (*models.UserSessionClient, error)
+	GetUserSessionsClientByIds(ctx context.Context, tx *sql.Tx, userSessionClientIds []int64) ([]models.UserSessionClient, error)
+	GetUserSessionClientsByUserSessionId(ctx context.Context, tx *sql.Tx, userSessionId int64) ([]models.UserSessionClient, error)
+	GetUserSessionClientsByUserSessionIds(ctx context.Context, tx *sql.Tx, userSessionIds []int64) ([]models.UserSessionClient, error)
+	DeleteUserSessionClient(ctx context.Context, tx *sql.Tx, userSessionClientId int64) error
+	UserSessionClientsLoadClients(ctx context.Context, tx *sql.Tx, userSessionClients []models.UserSessionClient) error
 }
 
 // ErrUniqueViolation is the sentinel a write reports when the engine refused it because a unique

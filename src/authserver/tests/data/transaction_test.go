@@ -146,7 +146,7 @@ func TestTransaction_RollbackUndoesMultiStatementDelete(t *testing.T) {
 	require.NoError(t, err, "GetUserById after rollback")
 	assert.NotNil(t, restoredUser, "the user must survive a rolled-back delete")
 
-	restoredToken, err := database.GetRefreshTokenById(nil, refreshToken.Id)
+	restoredToken, err := database.GetRefreshTokenById(context.Background(), nil, refreshToken.Id)
 	require.NoError(t, err, "GetRefreshTokenById after rollback")
 	assert.NotNil(t, restoredToken,
 		"the refresh token deleted by the same call must survive the rollback too")
@@ -167,7 +167,7 @@ func TestTransaction_CommitAppliesMultiStatementDelete(t *testing.T) {
 	require.NoError(t, err, "GetUserById after commit")
 	assert.Nil(t, deletedUser, "the user must be gone after the commit")
 
-	deletedToken, err := database.GetRefreshTokenById(nil, refreshToken.Id)
+	deletedToken, err := database.GetRefreshTokenById(context.Background(), nil, refreshToken.Id)
 	require.NoError(t, err, "GetRefreshTokenById after commit")
 	assert.Nil(t, deletedToken, "the refresh token must be gone after the commit")
 }

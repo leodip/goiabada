@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/url"
@@ -54,7 +55,7 @@ func TestAPIClientUpdatePut_Success(t *testing.T) {
 	assert.Equal(t, updateReq.DefaultAcrLevel, updateResp.Client.DefaultAcrLevel)
 
 	// Verify DB persisted changes
-	refreshed, err2 := database.GetClientById(nil, client.Id)
+	refreshed, err2 := database.GetClientById(context.Background(), nil, client.Id)
 	assert.NoError(t, err2)
 	assert.NotNil(t, refreshed)
 	assert.Equal(t, updateReq.ClientIdentifier, refreshed.ClientIdentifier)
@@ -383,7 +384,7 @@ func TestAPIClientUpdatePut_SelfRegisteredClientIdentifierChangeBlocked(t *testi
 
 	// The refusal has to leave the row alone as well as answer 400: a guard that rejects the
 	// response after writing the rename would report a block it did not perform.
-	refreshed, err := database.GetClientById(nil, client.Id)
+	refreshed, err := database.GetClientById(context.Background(), nil, client.Id)
 	assert.NoError(t, err)
 	assert.Equal(t, client.ClientIdentifier, refreshed.ClientIdentifier)
 	assert.Equal(t, client.Description, refreshed.Description,
@@ -428,7 +429,7 @@ func TestAPIClientUpdatePut_SelfRegisteredClientRemainsEditable(t *testing.T) {
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
-	refreshed, err := database.GetClientById(nil, client.Id)
+	refreshed, err := database.GetClientById(context.Background(), nil, client.Id)
 	assert.NoError(t, err)
 	assert.False(t, refreshed.ConsentRequired, "an administrator can still untick consent for a client they reviewed")
 	assert.Equal(t, "Reviewed Portal", refreshed.DisplayName)
@@ -477,7 +478,7 @@ func TestAPIClientUpdatePut_WebsiteURLValidation(t *testing.T) {
 				assert.Equal(t, tc.websiteURL, updateResp.Client.WebsiteURL)
 
 				// Verify DB persistence
-				refreshed, err := database.GetClientById(nil, client.Id)
+				refreshed, err := database.GetClientById(context.Background(), nil, client.Id)
 				assert.NoError(t, err)
 				assert.Equal(t, tc.websiteURL, refreshed.WebsiteURL)
 			} else {
@@ -626,7 +627,7 @@ func TestAPIClientUpdatePut_AngleBracketsRejected(t *testing.T) {
 			assert.Equal(t, tc.wantCode, errResp.ErrorCode)
 
 			// Refused before the write, so the row is untouched.
-			stored, err := database.GetClientById(nil, client.Id)
+			stored, err := database.GetClientById(context.Background(), nil, client.Id)
 			assert.NoError(t, err)
 			assert.Equal(t, client.Description, stored.Description)
 			assert.Equal(t, client.DisplayName, stored.DisplayName)
@@ -660,7 +661,7 @@ func TestAPIClientUpdatePut_AmpersandsAndQuotesStoredVerbatim(t *testing.T) {
 	assert.Equal(t, `R&D "phase 2"`, updateResp.Client.Description)
 	assert.Equal(t, `Tom & Jerry`, updateResp.Client.DisplayName)
 
-	stored, err := database.GetClientById(nil, client.Id)
+	stored, err := database.GetClientById(context.Background(), nil, client.Id)
 	assert.NoError(t, err)
 	assert.Equal(t, `R&D "phase 2"`, stored.Description)
 	assert.Equal(t, `Tom & Jerry`, stored.DisplayName)

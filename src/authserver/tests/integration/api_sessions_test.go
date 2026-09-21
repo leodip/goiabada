@@ -2,6 +2,7 @@ package integrationtests
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
@@ -48,7 +49,7 @@ func hashTestSessionId(id string) string {
 // createBrowserSessionFixture writes a row the endpoint would not produce: one already
 // expired, or one belonging to the other application.
 func createBrowserSessionFixture(t *testing.T, owner, id string, expiresAt time.Time) {
-	err := database.CreateBrowserSession(nil, &models.BrowserSession{
+	err := database.CreateBrowserSession(context.Background(), nil, &models.BrowserSession{
 		Owner:         owner,
 		SessionId:     id,
 		SessionIdHash: hashTestSessionId(id),
@@ -115,7 +116,7 @@ func TestAPISessions_RoundTrip(t *testing.T) {
 
 	id := newTestSessionId(t)
 	defer func() {
-		_ = database.DeleteBrowserSession(nil, coreconstants.AdminConsoleSessionName, hashTestSessionId(id))
+		_ = database.DeleteBrowserSession(context.Background(), nil, coreconstants.AdminConsoleSessionName, hashTestSessionId(id))
 	}()
 
 	// Create. An unauthenticated session gets the flat pre-authentication lifetime, which
@@ -193,7 +194,7 @@ func TestAPISessions_ExpiredSessionIsNotFound(t *testing.T) {
 	id := newTestSessionId(t)
 	createBrowserSessionFixture(t, coreconstants.AdminConsoleSessionName, id, time.Now().UTC().Add(-time.Minute))
 	defer func() {
-		_ = database.DeleteBrowserSession(nil, coreconstants.AdminConsoleSessionName, hashTestSessionId(id))
+		_ = database.DeleteBrowserSession(context.Background(), nil, coreconstants.AdminConsoleSessionName, hashTestSessionId(id))
 	}()
 
 	for _, operation := range []string{"load", "update", "touch"} {
@@ -217,7 +218,7 @@ func TestAPISessions_AuthServerSessionIsNotFound(t *testing.T) {
 	id := newTestSessionId(t)
 	createBrowserSessionFixture(t, constants.AuthServerSessionName, id, time.Now().UTC().Add(time.Hour))
 	defer func() {
-		_ = database.DeleteBrowserSession(nil, constants.AuthServerSessionName, hashTestSessionId(id))
+		_ = database.DeleteBrowserSession(context.Background(), nil, constants.AuthServerSessionName, hashTestSessionId(id))
 	}()
 
 	// The row is live and the identifier is correct. Only the owner differs.
@@ -236,7 +237,7 @@ func TestAPISessions_AuthServerSessionIsNotFound(t *testing.T) {
 	defer func() { _ = deleted.Body.Close() }()
 	assert.Equal(t, http.StatusNoContent, deleted.StatusCode)
 
-	survivor, err := database.GetBrowserSessionByOwnerAndSessionIdHash(nil,
+	survivor, err := database.GetBrowserSessionByOwnerAndSessionIdHash(context.Background(), nil,
 		constants.AuthServerSessionName, hashTestSessionId(id), time.Now().UTC())
 	assert.NoError(t, err)
 	assert.NotNil(t, survivor, "deleting through the admin console's endpoint must not reach an auth server session")

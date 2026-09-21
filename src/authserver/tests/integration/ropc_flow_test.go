@@ -711,7 +711,7 @@ func TestROPC_RefreshToken_OpenIdOnly(t *testing.T) {
 
 	jti, ok := refreshClaims["jti"].(string)
 	assert.True(t, ok)
-	persisted, err := database.GetRefreshTokenByJti(nil, jti)
+	persisted, err := database.GetRefreshTokenByJti(context.Background(), nil, jti)
 	assert.NoError(t, err)
 	if assert.NotNil(t, persisted, "the refresh token should be persisted") {
 		assert.Equal(t, "openid", persisted.Scope,

@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"net/http"
 	"net/url"
 	"testing"
@@ -256,7 +257,7 @@ func TestToken_AuthCode_SuccessPath(t *testing.T) {
 	assert.NotNil(t, data["id_token"])
 
 	// Verify that the code has been marked as used
-	usedCode, err := database.GetCodeById(nil, code.Id)
+	usedCode, err := database.GetCodeById(context.Background(), nil, code.Id)
 	assert.NoError(t, err)
 	assert.True(t, usedCode.Used)
 }
@@ -287,7 +288,7 @@ func TestToken_AuthCode_CodeReuse_ReturnsInvalidGrant(t *testing.T) {
 	assert.Equal(t, "Code is invalid.", second["error_description"])
 
 	// Code remains marked as used.
-	stored, err := database.GetCodeById(nil, code.Id)
+	stored, err := database.GetCodeById(context.Background(), nil, code.Id)
 	assert.NoError(t, err)
 	assert.True(t, stored.Used)
 }

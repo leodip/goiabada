@@ -600,7 +600,7 @@ func TestPromptNone_OtpConfigChanged_ReturnsInteractionRequired(t *testing.T) {
 	}
 
 	// Move the user's OTP configuration generation, leaving the session's snapshot behind it.
-	userSessions, err := database.GetUserSessionsByUserId(nil, user.Id)
+	userSessions, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -666,7 +666,7 @@ func TestPromptNone_OtpConfigChanged_RefusalWritesNothing(t *testing.T) {
 
 	advanceOtpConfigGeneration(t, user.Id)
 
-	userSessions, err := database.GetUserSessionsByUserId(nil, user.Id)
+	userSessions, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -703,7 +703,7 @@ func TestPromptNone_OtpConfigChanged_RefusalWritesNothing(t *testing.T) {
 		"and so must an identical second one. A refusal is a read: no interaction happened, so "+
 			"nothing may be discharged by it")
 
-	after, err := database.GetUserSessionsByUserId(nil, user.Id)
+	after, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -717,7 +717,7 @@ func TestPromptNone_OtpConfigChangedLevel1Target_Success(t *testing.T) {
 	httpClient, client, redirectUri, user := createSessionWithAcrLevel1(t)
 
 	// Move the user's OTP configuration generation, leaving the session's snapshot behind it.
-	userSessions, err := database.GetUserSessionsByUserId(nil, user.Id)
+	userSessions, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -824,7 +824,7 @@ func TestPromptNone_SessionBumped_Success(t *testing.T) {
 	httpClient, client, redirectUri, user := createSessionWithAcrLevel1(t)
 
 	// Get original LastAccessed
-	userSessions, err := database.GetUserSessionsByUserId(nil, user.Id)
+	userSessions, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -870,7 +870,7 @@ func TestPromptNone_SessionBumped_Success(t *testing.T) {
 	assert.NotEmpty(t, codeVal, "code should be present")
 
 	// Check that session was bumped
-	userSessions, err = database.GetUserSessionsByUserId(nil, user.Id)
+	userSessions, err = database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -38,11 +38,11 @@ func stubSweep(database *mocks_data.Database, userId int64, newGeneration int64)
 	expectRunInTransaction(database, apiRevokeTx)
 	database.On("IncrementUserAuthStateGeneration", mock.Anything, apiRevokeTx, userId).
 		Return(newGeneration, nil).Once()
-	database.On("GetRefreshTokensByUserId", apiRevokeTx, userId).
+	database.On("GetRefreshTokensByUserId", mock.Anything, apiRevokeTx, userId).
 		Return([]*models.RefreshToken{}, nil).Once()
-	database.On("PromoteRefreshTokenGenerations", apiRevokeTx, []int64{}, newGeneration).
+	database.On("PromoteRefreshTokenGenerations", mock.Anything, apiRevokeTx, []int64{}, newGeneration).
 		Return(nil).Once()
-	database.On("GetUserSessionsByUserId", apiRevokeTx, userId).
+	database.On("GetUserSessionsByUserId", mock.Anything, apiRevokeTx, userId).
 		Return([]models.UserSession{}, nil).Once()
 }
 
@@ -94,24 +94,24 @@ func TestHandleAPIAccountPasswordPut_PreservesTheCallersSession(t *testing.T) {
 	expectRunInTransaction(database, apiRevokeTx)
 	database.On("IncrementUserAuthStateGeneration", mock.Anything, apiRevokeTx, int64(42)).
 		Return(int64(8), nil).Once()
-	database.On("GetRefreshTokensByUserId", apiRevokeTx, int64(42)).
+	database.On("GetRefreshTokensByUserId", mock.Anything, apiRevokeTx, int64(42)).
 		Return([]*models.RefreshToken{
 			{Id: 1, RefreshTokenJti: "rt-keep", SessionIdentifier: callerSid},
 			{Id: 2, RefreshTokenJti: "rt-other", SessionIdentifier: "sid-other"},
 		}, nil).Once()
-	database.On("GetRefreshTokensBySessionIdentifier", apiRevokeTx, callerSid).
+	database.On("GetRefreshTokensBySessionIdentifier", mock.Anything, apiRevokeTx, callerSid).
 		Return([]*models.RefreshToken{{Id: 1, RefreshTokenJti: "rt-keep", SessionIdentifier: callerSid}}, nil).Once()
-	database.On("UpdateRefreshToken", apiRevokeTx, mock.MatchedBy(func(rt *models.RefreshToken) bool {
+	database.On("UpdateRefreshToken", mock.Anything, apiRevokeTx, mock.MatchedBy(func(rt *models.RefreshToken) bool {
 		return rt.Id == 2
 	})).Return(nil).Once()
-	database.On("PromoteRefreshTokenGenerations", apiRevokeTx, []int64{1}, int64(8)).Return(nil).Once()
-	database.On("GetUserSessionsByUserId", apiRevokeTx, int64(42)).
+	database.On("PromoteRefreshTokenGenerations", mock.Anything, apiRevokeTx, []int64{1}, int64(8)).Return(nil).Once()
+	database.On("GetUserSessionsByUserId", mock.Anything, apiRevokeTx, int64(42)).
 		Return([]models.UserSession{
 			{Id: 100, SessionIdentifier: callerSid},
 			{Id: 200, SessionIdentifier: "sid-other"},
 		}, nil).Once()
-	database.On("PromoteUserSessionGeneration", apiRevokeTx, int64(100), int64(8)).Return(nil).Once()
-	database.On("DeleteUserSession", apiRevokeTx, int64(200)).Return(nil).Once()
+	database.On("PromoteUserSessionGeneration", mock.Anything, apiRevokeTx, int64(100), int64(8)).Return(nil).Once()
+	database.On("DeleteUserSession", mock.Anything, apiRevokeTx, int64(200)).Return(nil).Once()
 
 	auditLogger.On("Log", mock.Anything, audit.AuditChangedPassword, mock.Anything).Return().Once()
 	var payload map[string]interface{}
@@ -192,8 +192,8 @@ func TestHandleAPIAccountPasswordPut_SidlessBearerRevokesEverything(t *testing.T
 
 	// No sid-scoped query, which is what an empty exceptSid means. The strict mock enforces it:
 	// no such expectation is registered, so a call would fail the test.
-	database.AssertNotCalled(t, "GetRefreshTokensBySessionIdentifier", mock.Anything, mock.Anything)
-	database.AssertNotCalled(t, "PromoteUserSessionGeneration", mock.Anything, mock.Anything, mock.Anything)
+	database.AssertNotCalled(t, "GetRefreshTokensBySessionIdentifier", mock.Anything, mock.Anything, mock.Anything)
+	database.AssertNotCalled(t, "PromoteUserSessionGeneration", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 
 	// Present and "", never absent and never JSON null (finding 8). Asserting the key exists
 	// separately from its value is the only way to tell those apart in a map[string]interface{}.

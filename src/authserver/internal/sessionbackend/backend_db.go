@@ -46,7 +46,7 @@ func newBackend(database data.Database, owner string) *dbBackend {
 }
 
 func (b *dbBackend) Load(ctx context.Context, id string) (*sessionstore.Record, error) {
-	browserSession, err := b.database.GetBrowserSessionByOwnerAndSessionIdHash(nil, b.owner,
+	browserSession, err := b.database.GetBrowserSessionByOwnerAndSessionIdHash(ctx, nil, b.owner,
 		hashSessionId(id), b.now())
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to read the browser session")
@@ -83,7 +83,7 @@ func (b *dbBackend) Create(ctx context.Context, id string, data []byte, authenti
 		ExpiresAt:     expiresAt,
 	}
 
-	if err := b.database.CreateBrowserSession(nil, browserSession); err != nil {
+	if err := b.database.CreateBrowserSession(ctx, nil, browserSession); err != nil {
 		return time.Time{}, errs.Wrap(err, "unable to create the browser session")
 	}
 
@@ -99,7 +99,7 @@ func (b *dbBackend) Update(ctx context.Context, id string, data []byte, authenti
 		return time.Time{}, err
 	}
 
-	updated, err := b.database.UpdateBrowserSessionData(nil, b.owner, hash, string(data), now, expiresAt)
+	updated, err := b.database.UpdateBrowserSessionData(ctx, nil, b.owner, hash, string(data), now, expiresAt)
 	if err != nil {
 		return time.Time{}, errs.Wrap(err, "unable to update the browser session")
 	}
@@ -119,7 +119,7 @@ func (b *dbBackend) Touch(ctx context.Context, id string, authenticated bool) (t
 		return time.Time{}, err
 	}
 
-	touched, err := b.database.TouchBrowserSession(nil, b.owner, hash, now, expiresAt)
+	touched, err := b.database.TouchBrowserSession(ctx, nil, b.owner, hash, now, expiresAt)
 	if err != nil {
 		return time.Time{}, errs.Wrap(err, "unable to touch the browser session")
 	}
@@ -131,7 +131,7 @@ func (b *dbBackend) Touch(ctx context.Context, id string, authenticated bool) (t
 }
 
 func (b *dbBackend) Delete(ctx context.Context, id string) error {
-	if err := b.database.DeleteBrowserSession(nil, b.owner, hashSessionId(id)); err != nil {
+	if err := b.database.DeleteBrowserSession(ctx, nil, b.owner, hashSessionId(id)); err != nil {
 		return errs.Wrap(err, "unable to delete the browser session")
 	}
 	return nil
@@ -158,7 +158,7 @@ func (b *dbBackend) expiryFor(ctx context.Context, hash string, authenticated bo
 		return time.Time{}, err
 	}
 
-	browserSession, err := b.database.GetBrowserSessionByOwnerAndSessionIdHash(nil, b.owner, hash, now)
+	browserSession, err := b.database.GetBrowserSessionByOwnerAndSessionIdHash(ctx, nil, b.owner, hash, now)
 	if err != nil {
 		return time.Time{}, errs.Wrap(err, "unable to read the browser session")
 	}

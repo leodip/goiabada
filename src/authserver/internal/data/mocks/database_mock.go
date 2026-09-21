@@ -112,8 +112,8 @@ func (_c *Database_AcquireClientRow_Call) RunAndReturn(run func(tx *sql.Tx, clie
 }
 
 // AcquireUserSessionRow provides a mock function for the type Database
-func (_mock *Database) AcquireUserSessionRow(tx *sql.Tx, sessionIdentifier string) (bool, error) {
-	ret := _mock.Called(tx, sessionIdentifier)
+func (_mock *Database) AcquireUserSessionRow(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (bool, error) {
+	ret := _mock.Called(ctx, tx, sessionIdentifier)
 
 	if len(ret) == 0 {
 		panic("no return value specified for AcquireUserSessionRow")
@@ -121,16 +121,16 @@ func (_mock *Database) AcquireUserSessionRow(tx *sql.Tx, sessionIdentifier strin
 
 	var r0 bool
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, string) (bool, error)); ok {
-		return returnFunc(tx, sessionIdentifier)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, string) (bool, error)); ok {
+		return returnFunc(ctx, tx, sessionIdentifier)
 	}
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, string) bool); ok {
-		r0 = returnFunc(tx, sessionIdentifier)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, string) bool); ok {
+		r0 = returnFunc(ctx, tx, sessionIdentifier)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
-	if returnFunc, ok := ret.Get(1).(func(*sql.Tx, string) error); ok {
-		r1 = returnFunc(tx, sessionIdentifier)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, string) error); ok {
+		r1 = returnFunc(ctx, tx, sessionIdentifier)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -143,25 +143,31 @@ type Database_AcquireUserSessionRow_Call struct {
 }
 
 // AcquireUserSessionRow is a helper method to define mock.On call
+//   - ctx context.Context
 //   - tx *sql.Tx
 //   - sessionIdentifier string
-func (_e *Database_Expecter) AcquireUserSessionRow(tx any, sessionIdentifier any) *Database_AcquireUserSessionRow_Call {
-	return &Database_AcquireUserSessionRow_Call{Call: _e.mock.On("AcquireUserSessionRow", tx, sessionIdentifier)}
+func (_e *Database_Expecter) AcquireUserSessionRow(ctx any, tx any, sessionIdentifier any) *Database_AcquireUserSessionRow_Call {
+	return &Database_AcquireUserSessionRow_Call{Call: _e.mock.On("AcquireUserSessionRow", ctx, tx, sessionIdentifier)}
 }
 
-func (_c *Database_AcquireUserSessionRow_Call) Run(run func(tx *sql.Tx, sessionIdentifier string)) *Database_AcquireUserSessionRow_Call {
+func (_c *Database_AcquireUserSessionRow_Call) Run(run func(ctx context.Context, tx *sql.Tx, sessionIdentifier string)) *Database_AcquireUserSessionRow_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *sql.Tx
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(*sql.Tx)
+			arg0 = args[0].(context.Context)
 		}
-		var arg1 string
+		var arg1 *sql.Tx
 		if args[1] != nil {
-			arg1 = args[1].(string)
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
 		}
 		run(
 			arg0,
 			arg1,
+			arg2,
 		)
 	})
 	return _c
@@ -172,7 +178,7 @@ func (_c *Database_AcquireUserSessionRow_Call) Return(b bool, err error) *Databa
 	return _c
 }
 
-func (_c *Database_AcquireUserSessionRow_Call) RunAndReturn(run func(tx *sql.Tx, sessionIdentifier string) (bool, error)) *Database_AcquireUserSessionRow_Call {
+func (_c *Database_AcquireUserSessionRow_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (bool, error)) *Database_AcquireUserSessionRow_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -540,16 +546,16 @@ func (_c *Database_ClientLoadWebOrigins_Call) RunAndReturn(run func(tx *sql.Tx, 
 }
 
 // CodeLoadClient provides a mock function for the type Database
-func (_mock *Database) CodeLoadClient(tx *sql.Tx, code *models.Code) error {
-	ret := _mock.Called(tx, code)
+func (_mock *Database) CodeLoadClient(ctx context.Context, tx *sql.Tx, code *models.Code) error {
+	ret := _mock.Called(ctx, tx, code)
 
 	if len(ret) == 0 {
 		panic("no return value specified for CodeLoadClient")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, *models.Code) error); ok {
-		r0 = returnFunc(tx, code)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, *models.Code) error); ok {
+		r0 = returnFunc(ctx, tx, code)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -562,25 +568,31 @@ type Database_CodeLoadClient_Call struct {
 }
 
 // CodeLoadClient is a helper method to define mock.On call
+//   - ctx context.Context
 //   - tx *sql.Tx
 //   - code *models.Code
-func (_e *Database_Expecter) CodeLoadClient(tx any, code any) *Database_CodeLoadClient_Call {
-	return &Database_CodeLoadClient_Call{Call: _e.mock.On("CodeLoadClient", tx, code)}
+func (_e *Database_Expecter) CodeLoadClient(ctx any, tx any, code any) *Database_CodeLoadClient_Call {
+	return &Database_CodeLoadClient_Call{Call: _e.mock.On("CodeLoadClient", ctx, tx, code)}
 }
 
-func (_c *Database_CodeLoadClient_Call) Run(run func(tx *sql.Tx, code *models.Code)) *Database_CodeLoadClient_Call {
+func (_c *Database_CodeLoadClient_Call) Run(run func(ctx context.Context, tx *sql.Tx, code *models.Code)) *Database_CodeLoadClient_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *sql.Tx
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(*sql.Tx)
+			arg0 = args[0].(context.Context)
 		}
-		var arg1 *models.Code
+		var arg1 *sql.Tx
 		if args[1] != nil {
-			arg1 = args[1].(*models.Code)
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 *models.Code
+		if args[2] != nil {
+			arg2 = args[2].(*models.Code)
 		}
 		run(
 			arg0,
 			arg1,
+			arg2,
 		)
 	})
 	return _c
@@ -591,22 +603,22 @@ func (_c *Database_CodeLoadClient_Call) Return(err error) *Database_CodeLoadClie
 	return _c
 }
 
-func (_c *Database_CodeLoadClient_Call) RunAndReturn(run func(tx *sql.Tx, code *models.Code) error) *Database_CodeLoadClient_Call {
+func (_c *Database_CodeLoadClient_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, code *models.Code) error) *Database_CodeLoadClient_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // CodeLoadUser provides a mock function for the type Database
-func (_mock *Database) CodeLoadUser(tx *sql.Tx, code *models.Code) error {
-	ret := _mock.Called(tx, code)
+func (_mock *Database) CodeLoadUser(ctx context.Context, tx *sql.Tx, code *models.Code) error {
+	ret := _mock.Called(ctx, tx, code)
 
 	if len(ret) == 0 {
 		panic("no return value specified for CodeLoadUser")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, *models.Code) error); ok {
-		r0 = returnFunc(tx, code)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, *models.Code) error); ok {
+		r0 = returnFunc(ctx, tx, code)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -619,25 +631,31 @@ type Database_CodeLoadUser_Call struct {
 }
 
 // CodeLoadUser is a helper method to define mock.On call
+//   - ctx context.Context
 //   - tx *sql.Tx
 //   - code *models.Code
-func (_e *Database_Expecter) CodeLoadUser(tx any, code any) *Database_CodeLoadUser_Call {
-	return &Database_CodeLoadUser_Call{Call: _e.mock.On("CodeLoadUser", tx, code)}
+func (_e *Database_Expecter) CodeLoadUser(ctx any, tx any, code any) *Database_CodeLoadUser_Call {
+	return &Database_CodeLoadUser_Call{Call: _e.mock.On("CodeLoadUser", ctx, tx, code)}
 }
 
-func (_c *Database_CodeLoadUser_Call) Run(run func(tx *sql.Tx, code *models.Code)) *Database_CodeLoadUser_Call {
+func (_c *Database_CodeLoadUser_Call) Run(run func(ctx context.Context, tx *sql.Tx, code *models.Code)) *Database_CodeLoadUser_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *sql.Tx
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(*sql.Tx)
+			arg0 = args[0].(context.Context)
 		}
-		var arg1 *models.Code
+		var arg1 *sql.Tx
 		if args[1] != nil {
-			arg1 = args[1].(*models.Code)
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 *models.Code
+		if args[2] != nil {
+			arg2 = args[2].(*models.Code)
 		}
 		run(
 			arg0,
 			arg1,
+			arg2,
 		)
 	})
 	return _c
@@ -648,7 +666,7 @@ func (_c *Database_CodeLoadUser_Call) Return(err error) *Database_CodeLoadUser_C
 	return _c
 }
 
-func (_c *Database_CodeLoadUser_Call) RunAndReturn(run func(tx *sql.Tx, code *models.Code) error) *Database_CodeLoadUser_Call {
+func (_c *Database_CodeLoadUser_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, code *models.Code) error) *Database_CodeLoadUser_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -828,16 +846,16 @@ func (_c *Database_CreateAuditLog_Call) RunAndReturn(run func(tx *sql.Tx, auditL
 }
 
 // CreateBrowserSession provides a mock function for the type Database
-func (_mock *Database) CreateBrowserSession(tx *sql.Tx, browserSession *models.BrowserSession) error {
-	ret := _mock.Called(tx, browserSession)
+func (_mock *Database) CreateBrowserSession(ctx context.Context, tx *sql.Tx, browserSession *models.BrowserSession) error {
+	ret := _mock.Called(ctx, tx, browserSession)
 
 	if len(ret) == 0 {
 		panic("no return value specified for CreateBrowserSession")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, *models.BrowserSession) error); ok {
-		r0 = returnFunc(tx, browserSession)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, *models.BrowserSession) error); ok {
+		r0 = returnFunc(ctx, tx, browserSession)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -850,25 +868,31 @@ type Database_CreateBrowserSession_Call struct {
 }
 
 // CreateBrowserSession is a helper method to define mock.On call
+//   - ctx context.Context
 //   - tx *sql.Tx
 //   - browserSession *models.BrowserSession
-func (_e *Database_Expecter) CreateBrowserSession(tx any, browserSession any) *Database_CreateBrowserSession_Call {
-	return &Database_CreateBrowserSession_Call{Call: _e.mock.On("CreateBrowserSession", tx, browserSession)}
+func (_e *Database_Expecter) CreateBrowserSession(ctx any, tx any, browserSession any) *Database_CreateBrowserSession_Call {
+	return &Database_CreateBrowserSession_Call{Call: _e.mock.On("CreateBrowserSession", ctx, tx, browserSession)}
 }
 
-func (_c *Database_CreateBrowserSession_Call) Run(run func(tx *sql.Tx, browserSession *models.BrowserSession)) *Database_CreateBrowserSession_Call {
+func (_c *Database_CreateBrowserSession_Call) Run(run func(ctx context.Context, tx *sql.Tx, browserSession *models.BrowserSession)) *Database_CreateBrowserSession_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *sql.Tx
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(*sql.Tx)
+			arg0 = args[0].(context.Context)
 		}
-		var arg1 *models.BrowserSession
+		var arg1 *sql.Tx
 		if args[1] != nil {
-			arg1 = args[1].(*models.BrowserSession)
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 *models.BrowserSession
+		if args[2] != nil {
+			arg2 = args[2].(*models.BrowserSession)
 		}
 		run(
 			arg0,
 			arg1,
+			arg2,
 		)
 	})
 	return _c
@@ -879,7 +903,7 @@ func (_c *Database_CreateBrowserSession_Call) Return(err error) *Database_Create
 	return _c
 }
 
-func (_c *Database_CreateBrowserSession_Call) RunAndReturn(run func(tx *sql.Tx, browserSession *models.BrowserSession) error) *Database_CreateBrowserSession_Call {
+func (_c *Database_CreateBrowserSession_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, browserSession *models.BrowserSession) error) *Database_CreateBrowserSession_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1056,16 +1080,16 @@ func (_c *Database_CreateClientPermission_Call) RunAndReturn(run func(tx *sql.Tx
 }
 
 // CreateCode provides a mock function for the type Database
-func (_mock *Database) CreateCode(tx *sql.Tx, code *models.Code) error {
-	ret := _mock.Called(tx, code)
+func (_mock *Database) CreateCode(ctx context.Context, tx *sql.Tx, code *models.Code) error {
+	ret := _mock.Called(ctx, tx, code)
 
 	if len(ret) == 0 {
 		panic("no return value specified for CreateCode")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, *models.Code) error); ok {
-		r0 = returnFunc(tx, code)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, *models.Code) error); ok {
+		r0 = returnFunc(ctx, tx, code)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -1078,25 +1102,31 @@ type Database_CreateCode_Call struct {
 }
 
 // CreateCode is a helper method to define mock.On call
+//   - ctx context.Context
 //   - tx *sql.Tx
 //   - code *models.Code
-func (_e *Database_Expecter) CreateCode(tx any, code any) *Database_CreateCode_Call {
-	return &Database_CreateCode_Call{Call: _e.mock.On("CreateCode", tx, code)}
+func (_e *Database_Expecter) CreateCode(ctx any, tx any, code any) *Database_CreateCode_Call {
+	return &Database_CreateCode_Call{Call: _e.mock.On("CreateCode", ctx, tx, code)}
 }
 
-func (_c *Database_CreateCode_Call) Run(run func(tx *sql.Tx, code *models.Code)) *Database_CreateCode_Call {
+func (_c *Database_CreateCode_Call) Run(run func(ctx context.Context, tx *sql.Tx, code *models.Code)) *Database_CreateCode_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *sql.Tx
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(*sql.Tx)
+			arg0 = args[0].(context.Context)
 		}
-		var arg1 *models.Code
+		var arg1 *sql.Tx
 		if args[1] != nil {
-			arg1 = args[1].(*models.Code)
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 *models.Code
+		if args[2] != nil {
+			arg2 = args[2].(*models.Code)
 		}
 		run(
 			arg0,
 			arg1,
+			arg2,
 		)
 	})
 	return _c
@@ -1107,7 +1137,7 @@ func (_c *Database_CreateCode_Call) Return(err error) *Database_CreateCode_Call 
 	return _c
 }
 
-func (_c *Database_CreateCode_Call) RunAndReturn(run func(tx *sql.Tx, code *models.Code) error) *Database_CreateCode_Call {
+func (_c *Database_CreateCode_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, code *models.Code) error) *Database_CreateCode_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1512,16 +1542,16 @@ func (_c *Database_CreateRedirectURI_Call) RunAndReturn(run func(tx *sql.Tx, red
 }
 
 // CreateRefreshToken provides a mock function for the type Database
-func (_mock *Database) CreateRefreshToken(tx *sql.Tx, refreshToken *models.RefreshToken) error {
-	ret := _mock.Called(tx, refreshToken)
+func (_mock *Database) CreateRefreshToken(ctx context.Context, tx *sql.Tx, refreshToken *models.RefreshToken) error {
+	ret := _mock.Called(ctx, tx, refreshToken)
 
 	if len(ret) == 0 {
 		panic("no return value specified for CreateRefreshToken")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, *models.RefreshToken) error); ok {
-		r0 = returnFunc(tx, refreshToken)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, *models.RefreshToken) error); ok {
+		r0 = returnFunc(ctx, tx, refreshToken)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -1534,25 +1564,31 @@ type Database_CreateRefreshToken_Call struct {
 }
 
 // CreateRefreshToken is a helper method to define mock.On call
+//   - ctx context.Context
 //   - tx *sql.Tx
 //   - refreshToken *models.RefreshToken
-func (_e *Database_Expecter) CreateRefreshToken(tx any, refreshToken any) *Database_CreateRefreshToken_Call {
-	return &Database_CreateRefreshToken_Call{Call: _e.mock.On("CreateRefreshToken", tx, refreshToken)}
+func (_e *Database_Expecter) CreateRefreshToken(ctx any, tx any, refreshToken any) *Database_CreateRefreshToken_Call {
+	return &Database_CreateRefreshToken_Call{Call: _e.mock.On("CreateRefreshToken", ctx, tx, refreshToken)}
 }
 
-func (_c *Database_CreateRefreshToken_Call) Run(run func(tx *sql.Tx, refreshToken *models.RefreshToken)) *Database_CreateRefreshToken_Call {
+func (_c *Database_CreateRefreshToken_Call) Run(run func(ctx context.Context, tx *sql.Tx, refreshToken *models.RefreshToken)) *Database_CreateRefreshToken_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *sql.Tx
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(*sql.Tx)
+			arg0 = args[0].(context.Context)
 		}
-		var arg1 *models.RefreshToken
+		var arg1 *sql.Tx
 		if args[1] != nil {
-			arg1 = args[1].(*models.RefreshToken)
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 *models.RefreshToken
+		if args[2] != nil {
+			arg2 = args[2].(*models.RefreshToken)
 		}
 		run(
 			arg0,
 			arg1,
+			arg2,
 		)
 	})
 	return _c
@@ -1563,7 +1599,7 @@ func (_c *Database_CreateRefreshToken_Call) Return(err error) *Database_CreateRe
 	return _c
 }
 
-func (_c *Database_CreateRefreshToken_Call) RunAndReturn(run func(tx *sql.Tx, refreshToken *models.RefreshToken) error) *Database_CreateRefreshToken_Call {
+func (_c *Database_CreateRefreshToken_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, refreshToken *models.RefreshToken) error) *Database_CreateRefreshToken_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -2061,16 +2097,16 @@ func (_c *Database_CreateUserProfilePicture_Call) RunAndReturn(run func(ctx cont
 }
 
 // CreateUserSession provides a mock function for the type Database
-func (_mock *Database) CreateUserSession(tx *sql.Tx, userSession *models.UserSession) error {
-	ret := _mock.Called(tx, userSession)
+func (_mock *Database) CreateUserSession(ctx context.Context, tx *sql.Tx, userSession *models.UserSession) error {
+	ret := _mock.Called(ctx, tx, userSession)
 
 	if len(ret) == 0 {
 		panic("no return value specified for CreateUserSession")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, *models.UserSession) error); ok {
-		r0 = returnFunc(tx, userSession)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, *models.UserSession) error); ok {
+		r0 = returnFunc(ctx, tx, userSession)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -2083,25 +2119,31 @@ type Database_CreateUserSession_Call struct {
 }
 
 // CreateUserSession is a helper method to define mock.On call
+//   - ctx context.Context
 //   - tx *sql.Tx
 //   - userSession *models.UserSession
-func (_e *Database_Expecter) CreateUserSession(tx any, userSession any) *Database_CreateUserSession_Call {
-	return &Database_CreateUserSession_Call{Call: _e.mock.On("CreateUserSession", tx, userSession)}
+func (_e *Database_Expecter) CreateUserSession(ctx any, tx any, userSession any) *Database_CreateUserSession_Call {
+	return &Database_CreateUserSession_Call{Call: _e.mock.On("CreateUserSession", ctx, tx, userSession)}
 }
 
-func (_c *Database_CreateUserSession_Call) Run(run func(tx *sql.Tx, userSession *models.UserSession)) *Database_CreateUserSession_Call {
+func (_c *Database_CreateUserSession_Call) Run(run func(ctx context.Context, tx *sql.Tx, userSession *models.UserSession)) *Database_CreateUserSession_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *sql.Tx
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(*sql.Tx)
+			arg0 = args[0].(context.Context)
 		}
-		var arg1 *models.UserSession
+		var arg1 *sql.Tx
 		if args[1] != nil {
-			arg1 = args[1].(*models.UserSession)
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 *models.UserSession
+		if args[2] != nil {
+			arg2 = args[2].(*models.UserSession)
 		}
 		run(
 			arg0,
 			arg1,
+			arg2,
 		)
 	})
 	return _c
@@ -2112,22 +2154,22 @@ func (_c *Database_CreateUserSession_Call) Return(err error) *Database_CreateUse
 	return _c
 }
 
-func (_c *Database_CreateUserSession_Call) RunAndReturn(run func(tx *sql.Tx, userSession *models.UserSession) error) *Database_CreateUserSession_Call {
+func (_c *Database_CreateUserSession_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, userSession *models.UserSession) error) *Database_CreateUserSession_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // CreateUserSessionClient provides a mock function for the type Database
-func (_mock *Database) CreateUserSessionClient(tx *sql.Tx, userSessionClient *models.UserSessionClient) error {
-	ret := _mock.Called(tx, userSessionClient)
+func (_mock *Database) CreateUserSessionClient(ctx context.Context, tx *sql.Tx, userSessionClient *models.UserSessionClient) error {
+	ret := _mock.Called(ctx, tx, userSessionClient)
 
 	if len(ret) == 0 {
 		panic("no return value specified for CreateUserSessionClient")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, *models.UserSessionClient) error); ok {
-		r0 = returnFunc(tx, userSessionClient)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, *models.UserSessionClient) error); ok {
+		r0 = returnFunc(ctx, tx, userSessionClient)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -2140,25 +2182,31 @@ type Database_CreateUserSessionClient_Call struct {
 }
 
 // CreateUserSessionClient is a helper method to define mock.On call
+//   - ctx context.Context
 //   - tx *sql.Tx
 //   - userSessionClient *models.UserSessionClient
-func (_e *Database_Expecter) CreateUserSessionClient(tx any, userSessionClient any) *Database_CreateUserSessionClient_Call {
-	return &Database_CreateUserSessionClient_Call{Call: _e.mock.On("CreateUserSessionClient", tx, userSessionClient)}
+func (_e *Database_Expecter) CreateUserSessionClient(ctx any, tx any, userSessionClient any) *Database_CreateUserSessionClient_Call {
+	return &Database_CreateUserSessionClient_Call{Call: _e.mock.On("CreateUserSessionClient", ctx, tx, userSessionClient)}
 }
 
-func (_c *Database_CreateUserSessionClient_Call) Run(run func(tx *sql.Tx, userSessionClient *models.UserSessionClient)) *Database_CreateUserSessionClient_Call {
+func (_c *Database_CreateUserSessionClient_Call) Run(run func(ctx context.Context, tx *sql.Tx, userSessionClient *models.UserSessionClient)) *Database_CreateUserSessionClient_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *sql.Tx
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(*sql.Tx)
+			arg0 = args[0].(context.Context)
 		}
-		var arg1 *models.UserSessionClient
+		var arg1 *sql.Tx
 		if args[1] != nil {
-			arg1 = args[1].(*models.UserSessionClient)
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 *models.UserSessionClient
+		if args[2] != nil {
+			arg2 = args[2].(*models.UserSessionClient)
 		}
 		run(
 			arg0,
 			arg1,
+			arg2,
 		)
 	})
 	return _c
@@ -2169,7 +2217,7 @@ func (_c *Database_CreateUserSessionClient_Call) Return(err error) *Database_Cre
 	return _c
 }
 
-func (_c *Database_CreateUserSessionClient_Call) RunAndReturn(run func(tx *sql.Tx, userSessionClient *models.UserSessionClient) error) *Database_CreateUserSessionClient_Call {
+func (_c *Database_CreateUserSessionClient_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, userSessionClient *models.UserSessionClient) error) *Database_CreateUserSessionClient_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -2289,16 +2337,16 @@ func (_c *Database_DeleteAllUserConsent_Call) RunAndReturn(run func(ctx context.
 }
 
 // DeleteBrowserSession provides a mock function for the type Database
-func (_mock *Database) DeleteBrowserSession(tx *sql.Tx, owner string, sessionIdHash string) error {
-	ret := _mock.Called(tx, owner, sessionIdHash)
+func (_mock *Database) DeleteBrowserSession(ctx context.Context, tx *sql.Tx, owner string, sessionIdHash string) error {
+	ret := _mock.Called(ctx, tx, owner, sessionIdHash)
 
 	if len(ret) == 0 {
 		panic("no return value specified for DeleteBrowserSession")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, string, string) error); ok {
-		r0 = returnFunc(tx, owner, sessionIdHash)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, string, string) error); ok {
+		r0 = returnFunc(ctx, tx, owner, sessionIdHash)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -2311,31 +2359,37 @@ type Database_DeleteBrowserSession_Call struct {
 }
 
 // DeleteBrowserSession is a helper method to define mock.On call
+//   - ctx context.Context
 //   - tx *sql.Tx
 //   - owner string
 //   - sessionIdHash string
-func (_e *Database_Expecter) DeleteBrowserSession(tx any, owner any, sessionIdHash any) *Database_DeleteBrowserSession_Call {
-	return &Database_DeleteBrowserSession_Call{Call: _e.mock.On("DeleteBrowserSession", tx, owner, sessionIdHash)}
+func (_e *Database_Expecter) DeleteBrowserSession(ctx any, tx any, owner any, sessionIdHash any) *Database_DeleteBrowserSession_Call {
+	return &Database_DeleteBrowserSession_Call{Call: _e.mock.On("DeleteBrowserSession", ctx, tx, owner, sessionIdHash)}
 }
 
-func (_c *Database_DeleteBrowserSession_Call) Run(run func(tx *sql.Tx, owner string, sessionIdHash string)) *Database_DeleteBrowserSession_Call {
+func (_c *Database_DeleteBrowserSession_Call) Run(run func(ctx context.Context, tx *sql.Tx, owner string, sessionIdHash string)) *Database_DeleteBrowserSession_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *sql.Tx
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(*sql.Tx)
+			arg0 = args[0].(context.Context)
 		}
-		var arg1 string
+		var arg1 *sql.Tx
 		if args[1] != nil {
-			arg1 = args[1].(string)
+			arg1 = args[1].(*sql.Tx)
 		}
 		var arg2 string
 		if args[2] != nil {
 			arg2 = args[2].(string)
 		}
+		var arg3 string
+		if args[3] != nil {
+			arg3 = args[3].(string)
+		}
 		run(
 			arg0,
 			arg1,
 			arg2,
+			arg3,
 		)
 	})
 	return _c
@@ -2346,7 +2400,7 @@ func (_c *Database_DeleteBrowserSession_Call) Return(err error) *Database_Delete
 	return _c
 }
 
-func (_c *Database_DeleteBrowserSession_Call) RunAndReturn(run func(tx *sql.Tx, owner string, sessionIdHash string) error) *Database_DeleteBrowserSession_Call {
+func (_c *Database_DeleteBrowserSession_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, owner string, sessionIdHash string) error) *Database_DeleteBrowserSession_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -2523,16 +2577,16 @@ func (_c *Database_DeleteClientPermission_Call) RunAndReturn(run func(tx *sql.Tx
 }
 
 // DeleteCode provides a mock function for the type Database
-func (_mock *Database) DeleteCode(tx *sql.Tx, codeId int64) error {
-	ret := _mock.Called(tx, codeId)
+func (_mock *Database) DeleteCode(ctx context.Context, tx *sql.Tx, codeId int64) error {
+	ret := _mock.Called(ctx, tx, codeId)
 
 	if len(ret) == 0 {
 		panic("no return value specified for DeleteCode")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64) error); ok {
-		r0 = returnFunc(tx, codeId)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64) error); ok {
+		r0 = returnFunc(ctx, tx, codeId)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -2545,25 +2599,31 @@ type Database_DeleteCode_Call struct {
 }
 
 // DeleteCode is a helper method to define mock.On call
+//   - ctx context.Context
 //   - tx *sql.Tx
 //   - codeId int64
-func (_e *Database_Expecter) DeleteCode(tx any, codeId any) *Database_DeleteCode_Call {
-	return &Database_DeleteCode_Call{Call: _e.mock.On("DeleteCode", tx, codeId)}
+func (_e *Database_Expecter) DeleteCode(ctx any, tx any, codeId any) *Database_DeleteCode_Call {
+	return &Database_DeleteCode_Call{Call: _e.mock.On("DeleteCode", ctx, tx, codeId)}
 }
 
-func (_c *Database_DeleteCode_Call) Run(run func(tx *sql.Tx, codeId int64)) *Database_DeleteCode_Call {
+func (_c *Database_DeleteCode_Call) Run(run func(ctx context.Context, tx *sql.Tx, codeId int64)) *Database_DeleteCode_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *sql.Tx
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(*sql.Tx)
+			arg0 = args[0].(context.Context)
 		}
-		var arg1 int64
+		var arg1 *sql.Tx
 		if args[1] != nil {
-			arg1 = args[1].(int64)
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 int64
+		if args[2] != nil {
+			arg2 = args[2].(int64)
 		}
 		run(
 			arg0,
 			arg1,
+			arg2,
 		)
 	})
 	return _c
@@ -2574,22 +2634,22 @@ func (_c *Database_DeleteCode_Call) Return(err error) *Database_DeleteCode_Call 
 	return _c
 }
 
-func (_c *Database_DeleteCode_Call) RunAndReturn(run func(tx *sql.Tx, codeId int64) error) *Database_DeleteCode_Call {
+func (_c *Database_DeleteCode_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, codeId int64) error) *Database_DeleteCode_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // DeleteExpiredBrowserSessions provides a mock function for the type Database
-func (_mock *Database) DeleteExpiredBrowserSessions(tx *sql.Tx, now time.Time) error {
-	ret := _mock.Called(tx, now)
+func (_mock *Database) DeleteExpiredBrowserSessions(ctx context.Context, tx *sql.Tx, now time.Time) error {
+	ret := _mock.Called(ctx, tx, now)
 
 	if len(ret) == 0 {
 		panic("no return value specified for DeleteExpiredBrowserSessions")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, time.Time) error); ok {
-		r0 = returnFunc(tx, now)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, time.Time) error); ok {
+		r0 = returnFunc(ctx, tx, now)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -2602,25 +2662,31 @@ type Database_DeleteExpiredBrowserSessions_Call struct {
 }
 
 // DeleteExpiredBrowserSessions is a helper method to define mock.On call
+//   - ctx context.Context
 //   - tx *sql.Tx
 //   - now time.Time
-func (_e *Database_Expecter) DeleteExpiredBrowserSessions(tx any, now any) *Database_DeleteExpiredBrowserSessions_Call {
-	return &Database_DeleteExpiredBrowserSessions_Call{Call: _e.mock.On("DeleteExpiredBrowserSessions", tx, now)}
+func (_e *Database_Expecter) DeleteExpiredBrowserSessions(ctx any, tx any, now any) *Database_DeleteExpiredBrowserSessions_Call {
+	return &Database_DeleteExpiredBrowserSessions_Call{Call: _e.mock.On("DeleteExpiredBrowserSessions", ctx, tx, now)}
 }
 
-func (_c *Database_DeleteExpiredBrowserSessions_Call) Run(run func(tx *sql.Tx, now time.Time)) *Database_DeleteExpiredBrowserSessions_Call {
+func (_c *Database_DeleteExpiredBrowserSessions_Call) Run(run func(ctx context.Context, tx *sql.Tx, now time.Time)) *Database_DeleteExpiredBrowserSessions_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *sql.Tx
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(*sql.Tx)
+			arg0 = args[0].(context.Context)
 		}
-		var arg1 time.Time
+		var arg1 *sql.Tx
 		if args[1] != nil {
-			arg1 = args[1].(time.Time)
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 time.Time
+		if args[2] != nil {
+			arg2 = args[2].(time.Time)
 		}
 		run(
 			arg0,
 			arg1,
+			arg2,
 		)
 	})
 	return _c
@@ -2631,22 +2697,22 @@ func (_c *Database_DeleteExpiredBrowserSessions_Call) Return(err error) *Databas
 	return _c
 }
 
-func (_c *Database_DeleteExpiredBrowserSessions_Call) RunAndReturn(run func(tx *sql.Tx, now time.Time) error) *Database_DeleteExpiredBrowserSessions_Call {
+func (_c *Database_DeleteExpiredBrowserSessions_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, now time.Time) error) *Database_DeleteExpiredBrowserSessions_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // DeleteExpiredRefreshTokens provides a mock function for the type Database
-func (_mock *Database) DeleteExpiredRefreshTokens(tx *sql.Tx) error {
-	ret := _mock.Called(tx)
+func (_mock *Database) DeleteExpiredRefreshTokens(ctx context.Context, tx *sql.Tx) error {
+	ret := _mock.Called(ctx, tx)
 
 	if len(ret) == 0 {
 		panic("no return value specified for DeleteExpiredRefreshTokens")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx) error); ok {
-		r0 = returnFunc(tx)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx) error); ok {
+		r0 = returnFunc(ctx, tx)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -2659,19 +2725,25 @@ type Database_DeleteExpiredRefreshTokens_Call struct {
 }
 
 // DeleteExpiredRefreshTokens is a helper method to define mock.On call
+//   - ctx context.Context
 //   - tx *sql.Tx
-func (_e *Database_Expecter) DeleteExpiredRefreshTokens(tx any) *Database_DeleteExpiredRefreshTokens_Call {
-	return &Database_DeleteExpiredRefreshTokens_Call{Call: _e.mock.On("DeleteExpiredRefreshTokens", tx)}
+func (_e *Database_Expecter) DeleteExpiredRefreshTokens(ctx any, tx any) *Database_DeleteExpiredRefreshTokens_Call {
+	return &Database_DeleteExpiredRefreshTokens_Call{Call: _e.mock.On("DeleteExpiredRefreshTokens", ctx, tx)}
 }
 
-func (_c *Database_DeleteExpiredRefreshTokens_Call) Run(run func(tx *sql.Tx)) *Database_DeleteExpiredRefreshTokens_Call {
+func (_c *Database_DeleteExpiredRefreshTokens_Call) Run(run func(ctx context.Context, tx *sql.Tx)) *Database_DeleteExpiredRefreshTokens_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *sql.Tx
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(*sql.Tx)
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
 		}
 		run(
 			arg0,
+			arg1,
 		)
 	})
 	return _c
@@ -2682,22 +2754,22 @@ func (_c *Database_DeleteExpiredRefreshTokens_Call) Return(err error) *Database_
 	return _c
 }
 
-func (_c *Database_DeleteExpiredRefreshTokens_Call) RunAndReturn(run func(tx *sql.Tx) error) *Database_DeleteExpiredRefreshTokens_Call {
+func (_c *Database_DeleteExpiredRefreshTokens_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx) error) *Database_DeleteExpiredRefreshTokens_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // DeleteExpiredSessions provides a mock function for the type Database
-func (_mock *Database) DeleteExpiredSessions(tx *sql.Tx, maxLifetime time.Duration) error {
-	ret := _mock.Called(tx, maxLifetime)
+func (_mock *Database) DeleteExpiredSessions(ctx context.Context, tx *sql.Tx, maxLifetime time.Duration) error {
+	ret := _mock.Called(ctx, tx, maxLifetime)
 
 	if len(ret) == 0 {
 		panic("no return value specified for DeleteExpiredSessions")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, time.Duration) error); ok {
-		r0 = returnFunc(tx, maxLifetime)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, time.Duration) error); ok {
+		r0 = returnFunc(ctx, tx, maxLifetime)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -2710,25 +2782,31 @@ type Database_DeleteExpiredSessions_Call struct {
 }
 
 // DeleteExpiredSessions is a helper method to define mock.On call
+//   - ctx context.Context
 //   - tx *sql.Tx
 //   - maxLifetime time.Duration
-func (_e *Database_Expecter) DeleteExpiredSessions(tx any, maxLifetime any) *Database_DeleteExpiredSessions_Call {
-	return &Database_DeleteExpiredSessions_Call{Call: _e.mock.On("DeleteExpiredSessions", tx, maxLifetime)}
+func (_e *Database_Expecter) DeleteExpiredSessions(ctx any, tx any, maxLifetime any) *Database_DeleteExpiredSessions_Call {
+	return &Database_DeleteExpiredSessions_Call{Call: _e.mock.On("DeleteExpiredSessions", ctx, tx, maxLifetime)}
 }
 
-func (_c *Database_DeleteExpiredSessions_Call) Run(run func(tx *sql.Tx, maxLifetime time.Duration)) *Database_DeleteExpiredSessions_Call {
+func (_c *Database_DeleteExpiredSessions_Call) Run(run func(ctx context.Context, tx *sql.Tx, maxLifetime time.Duration)) *Database_DeleteExpiredSessions_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *sql.Tx
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(*sql.Tx)
+			arg0 = args[0].(context.Context)
 		}
-		var arg1 time.Duration
+		var arg1 *sql.Tx
 		if args[1] != nil {
-			arg1 = args[1].(time.Duration)
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 time.Duration
+		if args[2] != nil {
+			arg2 = args[2].(time.Duration)
 		}
 		run(
 			arg0,
 			arg1,
+			arg2,
 		)
 	})
 	return _c
@@ -2739,7 +2817,7 @@ func (_c *Database_DeleteExpiredSessions_Call) Return(err error) *Database_Delet
 	return _c
 }
 
-func (_c *Database_DeleteExpiredSessions_Call) RunAndReturn(run func(tx *sql.Tx, maxLifetime time.Duration) error) *Database_DeleteExpiredSessions_Call {
+func (_c *Database_DeleteExpiredSessions_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, maxLifetime time.Duration) error) *Database_DeleteExpiredSessions_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -2916,16 +2994,16 @@ func (_c *Database_DeleteGroupPermission_Call) RunAndReturn(run func(tx *sql.Tx,
 }
 
 // DeleteIdleSessions provides a mock function for the type Database
-func (_mock *Database) DeleteIdleSessions(tx *sql.Tx, idleTimeout time.Duration) error {
-	ret := _mock.Called(tx, idleTimeout)
+func (_mock *Database) DeleteIdleSessions(ctx context.Context, tx *sql.Tx, idleTimeout time.Duration) error {
+	ret := _mock.Called(ctx, tx, idleTimeout)
 
 	if len(ret) == 0 {
 		panic("no return value specified for DeleteIdleSessions")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, time.Duration) error); ok {
-		r0 = returnFunc(tx, idleTimeout)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, time.Duration) error); ok {
+		r0 = returnFunc(ctx, tx, idleTimeout)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -2938,25 +3016,31 @@ type Database_DeleteIdleSessions_Call struct {
 }
 
 // DeleteIdleSessions is a helper method to define mock.On call
+//   - ctx context.Context
 //   - tx *sql.Tx
 //   - idleTimeout time.Duration
-func (_e *Database_Expecter) DeleteIdleSessions(tx any, idleTimeout any) *Database_DeleteIdleSessions_Call {
-	return &Database_DeleteIdleSessions_Call{Call: _e.mock.On("DeleteIdleSessions", tx, idleTimeout)}
+func (_e *Database_Expecter) DeleteIdleSessions(ctx any, tx any, idleTimeout any) *Database_DeleteIdleSessions_Call {
+	return &Database_DeleteIdleSessions_Call{Call: _e.mock.On("DeleteIdleSessions", ctx, tx, idleTimeout)}
 }
 
-func (_c *Database_DeleteIdleSessions_Call) Run(run func(tx *sql.Tx, idleTimeout time.Duration)) *Database_DeleteIdleSessions_Call {
+func (_c *Database_DeleteIdleSessions_Call) Run(run func(ctx context.Context, tx *sql.Tx, idleTimeout time.Duration)) *Database_DeleteIdleSessions_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *sql.Tx
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(*sql.Tx)
+			arg0 = args[0].(context.Context)
 		}
-		var arg1 time.Duration
+		var arg1 *sql.Tx
 		if args[1] != nil {
-			arg1 = args[1].(time.Duration)
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 time.Duration
+		if args[2] != nil {
+			arg2 = args[2].(time.Duration)
 		}
 		run(
 			arg0,
 			arg1,
+			arg2,
 		)
 	})
 	return _c
@@ -2967,7 +3051,7 @@ func (_c *Database_DeleteIdleSessions_Call) Return(err error) *Database_DeleteId
 	return _c
 }
 
-func (_c *Database_DeleteIdleSessions_Call) RunAndReturn(run func(tx *sql.Tx, idleTimeout time.Duration) error) *Database_DeleteIdleSessions_Call {
+func (_c *Database_DeleteIdleSessions_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, idleTimeout time.Duration) error) *Database_DeleteIdleSessions_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -3273,16 +3357,16 @@ func (_c *Database_DeleteRedirectURI_Call) RunAndReturn(run func(tx *sql.Tx, red
 }
 
 // DeleteRefreshToken provides a mock function for the type Database
-func (_mock *Database) DeleteRefreshToken(tx *sql.Tx, refreshTokenId int64) error {
-	ret := _mock.Called(tx, refreshTokenId)
+func (_mock *Database) DeleteRefreshToken(ctx context.Context, tx *sql.Tx, refreshTokenId int64) error {
+	ret := _mock.Called(ctx, tx, refreshTokenId)
 
 	if len(ret) == 0 {
 		panic("no return value specified for DeleteRefreshToken")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64) error); ok {
-		r0 = returnFunc(tx, refreshTokenId)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64) error); ok {
+		r0 = returnFunc(ctx, tx, refreshTokenId)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -3295,25 +3379,31 @@ type Database_DeleteRefreshToken_Call struct {
 }
 
 // DeleteRefreshToken is a helper method to define mock.On call
+//   - ctx context.Context
 //   - tx *sql.Tx
 //   - refreshTokenId int64
-func (_e *Database_Expecter) DeleteRefreshToken(tx any, refreshTokenId any) *Database_DeleteRefreshToken_Call {
-	return &Database_DeleteRefreshToken_Call{Call: _e.mock.On("DeleteRefreshToken", tx, refreshTokenId)}
+func (_e *Database_Expecter) DeleteRefreshToken(ctx any, tx any, refreshTokenId any) *Database_DeleteRefreshToken_Call {
+	return &Database_DeleteRefreshToken_Call{Call: _e.mock.On("DeleteRefreshToken", ctx, tx, refreshTokenId)}
 }
 
-func (_c *Database_DeleteRefreshToken_Call) Run(run func(tx *sql.Tx, refreshTokenId int64)) *Database_DeleteRefreshToken_Call {
+func (_c *Database_DeleteRefreshToken_Call) Run(run func(ctx context.Context, tx *sql.Tx, refreshTokenId int64)) *Database_DeleteRefreshToken_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *sql.Tx
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(*sql.Tx)
+			arg0 = args[0].(context.Context)
 		}
-		var arg1 int64
+		var arg1 *sql.Tx
 		if args[1] != nil {
-			arg1 = args[1].(int64)
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 int64
+		if args[2] != nil {
+			arg2 = args[2].(int64)
 		}
 		run(
 			arg0,
 			arg1,
+			arg2,
 		)
 	})
 	return _c
@@ -3324,7 +3414,7 @@ func (_c *Database_DeleteRefreshToken_Call) Return(err error) *Database_DeleteRe
 	return _c
 }
 
-func (_c *Database_DeleteRefreshToken_Call) RunAndReturn(run func(tx *sql.Tx, refreshTokenId int64) error) *Database_DeleteRefreshToken_Call {
+func (_c *Database_DeleteRefreshToken_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, refreshTokenId int64) error) *Database_DeleteRefreshToken_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -3387,16 +3477,16 @@ func (_c *Database_DeleteResource_Call) RunAndReturn(run func(tx *sql.Tx, resour
 }
 
 // DeleteUsedCodesWithoutRefreshTokens provides a mock function for the type Database
-func (_mock *Database) DeleteUsedCodesWithoutRefreshTokens(tx *sql.Tx, createdBefore time.Time) error {
-	ret := _mock.Called(tx, createdBefore)
+func (_mock *Database) DeleteUsedCodesWithoutRefreshTokens(ctx context.Context, tx *sql.Tx, createdBefore time.Time) error {
+	ret := _mock.Called(ctx, tx, createdBefore)
 
 	if len(ret) == 0 {
 		panic("no return value specified for DeleteUsedCodesWithoutRefreshTokens")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, time.Time) error); ok {
-		r0 = returnFunc(tx, createdBefore)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, time.Time) error); ok {
+		r0 = returnFunc(ctx, tx, createdBefore)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -3409,25 +3499,31 @@ type Database_DeleteUsedCodesWithoutRefreshTokens_Call struct {
 }
 
 // DeleteUsedCodesWithoutRefreshTokens is a helper method to define mock.On call
+//   - ctx context.Context
 //   - tx *sql.Tx
 //   - createdBefore time.Time
-func (_e *Database_Expecter) DeleteUsedCodesWithoutRefreshTokens(tx any, createdBefore any) *Database_DeleteUsedCodesWithoutRefreshTokens_Call {
-	return &Database_DeleteUsedCodesWithoutRefreshTokens_Call{Call: _e.mock.On("DeleteUsedCodesWithoutRefreshTokens", tx, createdBefore)}
+func (_e *Database_Expecter) DeleteUsedCodesWithoutRefreshTokens(ctx any, tx any, createdBefore any) *Database_DeleteUsedCodesWithoutRefreshTokens_Call {
+	return &Database_DeleteUsedCodesWithoutRefreshTokens_Call{Call: _e.mock.On("DeleteUsedCodesWithoutRefreshTokens", ctx, tx, createdBefore)}
 }
 
-func (_c *Database_DeleteUsedCodesWithoutRefreshTokens_Call) Run(run func(tx *sql.Tx, createdBefore time.Time)) *Database_DeleteUsedCodesWithoutRefreshTokens_Call {
+func (_c *Database_DeleteUsedCodesWithoutRefreshTokens_Call) Run(run func(ctx context.Context, tx *sql.Tx, createdBefore time.Time)) *Database_DeleteUsedCodesWithoutRefreshTokens_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *sql.Tx
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(*sql.Tx)
+			arg0 = args[0].(context.Context)
 		}
-		var arg1 time.Time
+		var arg1 *sql.Tx
 		if args[1] != nil {
-			arg1 = args[1].(time.Time)
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 time.Time
+		if args[2] != nil {
+			arg2 = args[2].(time.Time)
 		}
 		run(
 			arg0,
 			arg1,
+			arg2,
 		)
 	})
 	return _c
@@ -3438,7 +3534,7 @@ func (_c *Database_DeleteUsedCodesWithoutRefreshTokens_Call) Return(err error) *
 	return _c
 }
 
-func (_c *Database_DeleteUsedCodesWithoutRefreshTokens_Call) RunAndReturn(run func(tx *sql.Tx, createdBefore time.Time) error) *Database_DeleteUsedCodesWithoutRefreshTokens_Call {
+func (_c *Database_DeleteUsedCodesWithoutRefreshTokens_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, createdBefore time.Time) error) *Database_DeleteUsedCodesWithoutRefreshTokens_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -3822,16 +3918,16 @@ func (_c *Database_DeleteUserProfilePicture_Call) RunAndReturn(run func(ctx cont
 }
 
 // DeleteUserSession provides a mock function for the type Database
-func (_mock *Database) DeleteUserSession(tx *sql.Tx, userSessionId int64) error {
-	ret := _mock.Called(tx, userSessionId)
+func (_mock *Database) DeleteUserSession(ctx context.Context, tx *sql.Tx, userSessionId int64) error {
+	ret := _mock.Called(ctx, tx, userSessionId)
 
 	if len(ret) == 0 {
 		panic("no return value specified for DeleteUserSession")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64) error); ok {
-		r0 = returnFunc(tx, userSessionId)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64) error); ok {
+		r0 = returnFunc(ctx, tx, userSessionId)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -3844,25 +3940,31 @@ type Database_DeleteUserSession_Call struct {
 }
 
 // DeleteUserSession is a helper method to define mock.On call
+//   - ctx context.Context
 //   - tx *sql.Tx
 //   - userSessionId int64
-func (_e *Database_Expecter) DeleteUserSession(tx any, userSessionId any) *Database_DeleteUserSession_Call {
-	return &Database_DeleteUserSession_Call{Call: _e.mock.On("DeleteUserSession", tx, userSessionId)}
+func (_e *Database_Expecter) DeleteUserSession(ctx any, tx any, userSessionId any) *Database_DeleteUserSession_Call {
+	return &Database_DeleteUserSession_Call{Call: _e.mock.On("DeleteUserSession", ctx, tx, userSessionId)}
 }
 
-func (_c *Database_DeleteUserSession_Call) Run(run func(tx *sql.Tx, userSessionId int64)) *Database_DeleteUserSession_Call {
+func (_c *Database_DeleteUserSession_Call) Run(run func(ctx context.Context, tx *sql.Tx, userSessionId int64)) *Database_DeleteUserSession_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *sql.Tx
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(*sql.Tx)
+			arg0 = args[0].(context.Context)
 		}
-		var arg1 int64
+		var arg1 *sql.Tx
 		if args[1] != nil {
-			arg1 = args[1].(int64)
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 int64
+		if args[2] != nil {
+			arg2 = args[2].(int64)
 		}
 		run(
 			arg0,
 			arg1,
+			arg2,
 		)
 	})
 	return _c
@@ -3873,22 +3975,22 @@ func (_c *Database_DeleteUserSession_Call) Return(err error) *Database_DeleteUse
 	return _c
 }
 
-func (_c *Database_DeleteUserSession_Call) RunAndReturn(run func(tx *sql.Tx, userSessionId int64) error) *Database_DeleteUserSession_Call {
+func (_c *Database_DeleteUserSession_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, userSessionId int64) error) *Database_DeleteUserSession_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // DeleteUserSessionClient provides a mock function for the type Database
-func (_mock *Database) DeleteUserSessionClient(tx *sql.Tx, userSessionClientId int64) error {
-	ret := _mock.Called(tx, userSessionClientId)
+func (_mock *Database) DeleteUserSessionClient(ctx context.Context, tx *sql.Tx, userSessionClientId int64) error {
+	ret := _mock.Called(ctx, tx, userSessionClientId)
 
 	if len(ret) == 0 {
 		panic("no return value specified for DeleteUserSessionClient")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64) error); ok {
-		r0 = returnFunc(tx, userSessionClientId)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64) error); ok {
+		r0 = returnFunc(ctx, tx, userSessionClientId)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -3901,25 +4003,31 @@ type Database_DeleteUserSessionClient_Call struct {
 }
 
 // DeleteUserSessionClient is a helper method to define mock.On call
+//   - ctx context.Context
 //   - tx *sql.Tx
 //   - userSessionClientId int64
-func (_e *Database_Expecter) DeleteUserSessionClient(tx any, userSessionClientId any) *Database_DeleteUserSessionClient_Call {
-	return &Database_DeleteUserSessionClient_Call{Call: _e.mock.On("DeleteUserSessionClient", tx, userSessionClientId)}
+func (_e *Database_Expecter) DeleteUserSessionClient(ctx any, tx any, userSessionClientId any) *Database_DeleteUserSessionClient_Call {
+	return &Database_DeleteUserSessionClient_Call{Call: _e.mock.On("DeleteUserSessionClient", ctx, tx, userSessionClientId)}
 }
 
-func (_c *Database_DeleteUserSessionClient_Call) Run(run func(tx *sql.Tx, userSessionClientId int64)) *Database_DeleteUserSessionClient_Call {
+func (_c *Database_DeleteUserSessionClient_Call) Run(run func(ctx context.Context, tx *sql.Tx, userSessionClientId int64)) *Database_DeleteUserSessionClient_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *sql.Tx
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(*sql.Tx)
+			arg0 = args[0].(context.Context)
 		}
-		var arg1 int64
+		var arg1 *sql.Tx
 		if args[1] != nil {
-			arg1 = args[1].(int64)
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 int64
+		if args[2] != nil {
+			arg2 = args[2].(int64)
 		}
 		run(
 			arg0,
 			arg1,
+			arg2,
 		)
 	})
 	return _c
@@ -3930,7 +4038,7 @@ func (_c *Database_DeleteUserSessionClient_Call) Return(err error) *Database_Del
 	return _c
 }
 
-func (_c *Database_DeleteUserSessionClient_Call) RunAndReturn(run func(tx *sql.Tx, userSessionClientId int64) error) *Database_DeleteUserSessionClient_Call {
+func (_c *Database_DeleteUserSessionClient_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, userSessionClientId int64) error) *Database_DeleteUserSessionClient_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -4475,8 +4583,8 @@ func (_c *Database_GetAuditLogsPaginated_Call) RunAndReturn(run func(tx *sql.Tx,
 }
 
 // GetBrowserSessionByOwnerAndSessionIdHash provides a mock function for the type Database
-func (_mock *Database) GetBrowserSessionByOwnerAndSessionIdHash(tx *sql.Tx, owner string, sessionIdHash string, now time.Time) (*models.BrowserSession, error) {
-	ret := _mock.Called(tx, owner, sessionIdHash, now)
+func (_mock *Database) GetBrowserSessionByOwnerAndSessionIdHash(ctx context.Context, tx *sql.Tx, owner string, sessionIdHash string, now time.Time) (*models.BrowserSession, error) {
+	ret := _mock.Called(ctx, tx, owner, sessionIdHash, now)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetBrowserSessionByOwnerAndSessionIdHash")
@@ -4484,18 +4592,18 @@ func (_mock *Database) GetBrowserSessionByOwnerAndSessionIdHash(tx *sql.Tx, owne
 
 	var r0 *models.BrowserSession
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, string, string, time.Time) (*models.BrowserSession, error)); ok {
-		return returnFunc(tx, owner, sessionIdHash, now)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, string, string, time.Time) (*models.BrowserSession, error)); ok {
+		return returnFunc(ctx, tx, owner, sessionIdHash, now)
 	}
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, string, string, time.Time) *models.BrowserSession); ok {
-		r0 = returnFunc(tx, owner, sessionIdHash, now)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, string, string, time.Time) *models.BrowserSession); ok {
+		r0 = returnFunc(ctx, tx, owner, sessionIdHash, now)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*models.BrowserSession)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(*sql.Tx, string, string, time.Time) error); ok {
-		r1 = returnFunc(tx, owner, sessionIdHash, now)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, string, string, time.Time) error); ok {
+		r1 = returnFunc(ctx, tx, owner, sessionIdHash, now)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -4508,37 +4616,43 @@ type Database_GetBrowserSessionByOwnerAndSessionIdHash_Call struct {
 }
 
 // GetBrowserSessionByOwnerAndSessionIdHash is a helper method to define mock.On call
+//   - ctx context.Context
 //   - tx *sql.Tx
 //   - owner string
 //   - sessionIdHash string
 //   - now time.Time
-func (_e *Database_Expecter) GetBrowserSessionByOwnerAndSessionIdHash(tx any, owner any, sessionIdHash any, now any) *Database_GetBrowserSessionByOwnerAndSessionIdHash_Call {
-	return &Database_GetBrowserSessionByOwnerAndSessionIdHash_Call{Call: _e.mock.On("GetBrowserSessionByOwnerAndSessionIdHash", tx, owner, sessionIdHash, now)}
+func (_e *Database_Expecter) GetBrowserSessionByOwnerAndSessionIdHash(ctx any, tx any, owner any, sessionIdHash any, now any) *Database_GetBrowserSessionByOwnerAndSessionIdHash_Call {
+	return &Database_GetBrowserSessionByOwnerAndSessionIdHash_Call{Call: _e.mock.On("GetBrowserSessionByOwnerAndSessionIdHash", ctx, tx, owner, sessionIdHash, now)}
 }
 
-func (_c *Database_GetBrowserSessionByOwnerAndSessionIdHash_Call) Run(run func(tx *sql.Tx, owner string, sessionIdHash string, now time.Time)) *Database_GetBrowserSessionByOwnerAndSessionIdHash_Call {
+func (_c *Database_GetBrowserSessionByOwnerAndSessionIdHash_Call) Run(run func(ctx context.Context, tx *sql.Tx, owner string, sessionIdHash string, now time.Time)) *Database_GetBrowserSessionByOwnerAndSessionIdHash_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *sql.Tx
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(*sql.Tx)
+			arg0 = args[0].(context.Context)
 		}
-		var arg1 string
+		var arg1 *sql.Tx
 		if args[1] != nil {
-			arg1 = args[1].(string)
+			arg1 = args[1].(*sql.Tx)
 		}
 		var arg2 string
 		if args[2] != nil {
 			arg2 = args[2].(string)
 		}
-		var arg3 time.Time
+		var arg3 string
 		if args[3] != nil {
-			arg3 = args[3].(time.Time)
+			arg3 = args[3].(string)
+		}
+		var arg4 time.Time
+		if args[4] != nil {
+			arg4 = args[4].(time.Time)
 		}
 		run(
 			arg0,
 			arg1,
 			arg2,
 			arg3,
+			arg4,
 		)
 	})
 	return _c
@@ -4549,7 +4663,7 @@ func (_c *Database_GetBrowserSessionByOwnerAndSessionIdHash_Call) Return(browser
 	return _c
 }
 
-func (_c *Database_GetBrowserSessionByOwnerAndSessionIdHash_Call) RunAndReturn(run func(tx *sql.Tx, owner string, sessionIdHash string, now time.Time) (*models.BrowserSession, error)) *Database_GetBrowserSessionByOwnerAndSessionIdHash_Call {
+func (_c *Database_GetBrowserSessionByOwnerAndSessionIdHash_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, owner string, sessionIdHash string, now time.Time) (*models.BrowserSession, error)) *Database_GetBrowserSessionByOwnerAndSessionIdHash_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -4623,8 +4737,8 @@ func (_c *Database_GetClientByClientIdentifier_Call) RunAndReturn(run func(tx *s
 }
 
 // GetClientById provides a mock function for the type Database
-func (_mock *Database) GetClientById(tx *sql.Tx, clientId int64) (*models.Client, error) {
-	ret := _mock.Called(tx, clientId)
+func (_mock *Database) GetClientById(ctx context.Context, tx *sql.Tx, clientId int64) (*models.Client, error) {
+	ret := _mock.Called(ctx, tx, clientId)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetClientById")
@@ -4632,18 +4746,18 @@ func (_mock *Database) GetClientById(tx *sql.Tx, clientId int64) (*models.Client
 
 	var r0 *models.Client
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64) (*models.Client, error)); ok {
-		return returnFunc(tx, clientId)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64) (*models.Client, error)); ok {
+		return returnFunc(ctx, tx, clientId)
 	}
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64) *models.Client); ok {
-		r0 = returnFunc(tx, clientId)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64) *models.Client); ok {
+		r0 = returnFunc(ctx, tx, clientId)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*models.Client)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(*sql.Tx, int64) error); ok {
-		r1 = returnFunc(tx, clientId)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, int64) error); ok {
+		r1 = returnFunc(ctx, tx, clientId)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -4656,25 +4770,31 @@ type Database_GetClientById_Call struct {
 }
 
 // GetClientById is a helper method to define mock.On call
+//   - ctx context.Context
 //   - tx *sql.Tx
 //   - clientId int64
-func (_e *Database_Expecter) GetClientById(tx any, clientId any) *Database_GetClientById_Call {
-	return &Database_GetClientById_Call{Call: _e.mock.On("GetClientById", tx, clientId)}
+func (_e *Database_Expecter) GetClientById(ctx any, tx any, clientId any) *Database_GetClientById_Call {
+	return &Database_GetClientById_Call{Call: _e.mock.On("GetClientById", ctx, tx, clientId)}
 }
 
-func (_c *Database_GetClientById_Call) Run(run func(tx *sql.Tx, clientId int64)) *Database_GetClientById_Call {
+func (_c *Database_GetClientById_Call) Run(run func(ctx context.Context, tx *sql.Tx, clientId int64)) *Database_GetClientById_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *sql.Tx
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(*sql.Tx)
+			arg0 = args[0].(context.Context)
 		}
-		var arg1 int64
+		var arg1 *sql.Tx
 		if args[1] != nil {
-			arg1 = args[1].(int64)
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 int64
+		if args[2] != nil {
+			arg2 = args[2].(int64)
 		}
 		run(
 			arg0,
 			arg1,
+			arg2,
 		)
 	})
 	return _c
@@ -4685,7 +4805,7 @@ func (_c *Database_GetClientById_Call) Return(client *models.Client, err error) 
 	return _c
 }
 
-func (_c *Database_GetClientById_Call) RunAndReturn(run func(tx *sql.Tx, clientId int64) (*models.Client, error)) *Database_GetClientById_Call {
+func (_c *Database_GetClientById_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, clientId int64) (*models.Client, error)) *Database_GetClientById_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -5043,8 +5163,8 @@ func (_c *Database_GetClientsByIds_Call) RunAndReturn(run func(ctx context.Conte
 }
 
 // GetCodeByCodeHash provides a mock function for the type Database
-func (_mock *Database) GetCodeByCodeHash(tx *sql.Tx, codeHash string, used bool) (*models.Code, error) {
-	ret := _mock.Called(tx, codeHash, used)
+func (_mock *Database) GetCodeByCodeHash(ctx context.Context, tx *sql.Tx, codeHash string, used bool) (*models.Code, error) {
+	ret := _mock.Called(ctx, tx, codeHash, used)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetCodeByCodeHash")
@@ -5052,18 +5172,18 @@ func (_mock *Database) GetCodeByCodeHash(tx *sql.Tx, codeHash string, used bool)
 
 	var r0 *models.Code
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, string, bool) (*models.Code, error)); ok {
-		return returnFunc(tx, codeHash, used)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, string, bool) (*models.Code, error)); ok {
+		return returnFunc(ctx, tx, codeHash, used)
 	}
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, string, bool) *models.Code); ok {
-		r0 = returnFunc(tx, codeHash, used)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, string, bool) *models.Code); ok {
+		r0 = returnFunc(ctx, tx, codeHash, used)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*models.Code)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(*sql.Tx, string, bool) error); ok {
-		r1 = returnFunc(tx, codeHash, used)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, string, bool) error); ok {
+		r1 = returnFunc(ctx, tx, codeHash, used)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -5076,31 +5196,37 @@ type Database_GetCodeByCodeHash_Call struct {
 }
 
 // GetCodeByCodeHash is a helper method to define mock.On call
+//   - ctx context.Context
 //   - tx *sql.Tx
 //   - codeHash string
 //   - used bool
-func (_e *Database_Expecter) GetCodeByCodeHash(tx any, codeHash any, used any) *Database_GetCodeByCodeHash_Call {
-	return &Database_GetCodeByCodeHash_Call{Call: _e.mock.On("GetCodeByCodeHash", tx, codeHash, used)}
+func (_e *Database_Expecter) GetCodeByCodeHash(ctx any, tx any, codeHash any, used any) *Database_GetCodeByCodeHash_Call {
+	return &Database_GetCodeByCodeHash_Call{Call: _e.mock.On("GetCodeByCodeHash", ctx, tx, codeHash, used)}
 }
 
-func (_c *Database_GetCodeByCodeHash_Call) Run(run func(tx *sql.Tx, codeHash string, used bool)) *Database_GetCodeByCodeHash_Call {
+func (_c *Database_GetCodeByCodeHash_Call) Run(run func(ctx context.Context, tx *sql.Tx, codeHash string, used bool)) *Database_GetCodeByCodeHash_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *sql.Tx
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(*sql.Tx)
+			arg0 = args[0].(context.Context)
 		}
-		var arg1 string
+		var arg1 *sql.Tx
 		if args[1] != nil {
-			arg1 = args[1].(string)
+			arg1 = args[1].(*sql.Tx)
 		}
-		var arg2 bool
+		var arg2 string
 		if args[2] != nil {
-			arg2 = args[2].(bool)
+			arg2 = args[2].(string)
+		}
+		var arg3 bool
+		if args[3] != nil {
+			arg3 = args[3].(bool)
 		}
 		run(
 			arg0,
 			arg1,
 			arg2,
+			arg3,
 		)
 	})
 	return _c
@@ -5111,14 +5237,14 @@ func (_c *Database_GetCodeByCodeHash_Call) Return(code *models.Code, err error) 
 	return _c
 }
 
-func (_c *Database_GetCodeByCodeHash_Call) RunAndReturn(run func(tx *sql.Tx, codeHash string, used bool) (*models.Code, error)) *Database_GetCodeByCodeHash_Call {
+func (_c *Database_GetCodeByCodeHash_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, codeHash string, used bool) (*models.Code, error)) *Database_GetCodeByCodeHash_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // GetCodeById provides a mock function for the type Database
-func (_mock *Database) GetCodeById(tx *sql.Tx, codeId int64) (*models.Code, error) {
-	ret := _mock.Called(tx, codeId)
+func (_mock *Database) GetCodeById(ctx context.Context, tx *sql.Tx, codeId int64) (*models.Code, error) {
+	ret := _mock.Called(ctx, tx, codeId)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetCodeById")
@@ -5126,18 +5252,18 @@ func (_mock *Database) GetCodeById(tx *sql.Tx, codeId int64) (*models.Code, erro
 
 	var r0 *models.Code
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64) (*models.Code, error)); ok {
-		return returnFunc(tx, codeId)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64) (*models.Code, error)); ok {
+		return returnFunc(ctx, tx, codeId)
 	}
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64) *models.Code); ok {
-		r0 = returnFunc(tx, codeId)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64) *models.Code); ok {
+		r0 = returnFunc(ctx, tx, codeId)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*models.Code)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(*sql.Tx, int64) error); ok {
-		r1 = returnFunc(tx, codeId)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, int64) error); ok {
+		r1 = returnFunc(ctx, tx, codeId)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -5150,25 +5276,31 @@ type Database_GetCodeById_Call struct {
 }
 
 // GetCodeById is a helper method to define mock.On call
+//   - ctx context.Context
 //   - tx *sql.Tx
 //   - codeId int64
-func (_e *Database_Expecter) GetCodeById(tx any, codeId any) *Database_GetCodeById_Call {
-	return &Database_GetCodeById_Call{Call: _e.mock.On("GetCodeById", tx, codeId)}
+func (_e *Database_Expecter) GetCodeById(ctx any, tx any, codeId any) *Database_GetCodeById_Call {
+	return &Database_GetCodeById_Call{Call: _e.mock.On("GetCodeById", ctx, tx, codeId)}
 }
 
-func (_c *Database_GetCodeById_Call) Run(run func(tx *sql.Tx, codeId int64)) *Database_GetCodeById_Call {
+func (_c *Database_GetCodeById_Call) Run(run func(ctx context.Context, tx *sql.Tx, codeId int64)) *Database_GetCodeById_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *sql.Tx
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(*sql.Tx)
+			arg0 = args[0].(context.Context)
 		}
-		var arg1 int64
+		var arg1 *sql.Tx
 		if args[1] != nil {
-			arg1 = args[1].(int64)
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 int64
+		if args[2] != nil {
+			arg2 = args[2].(int64)
 		}
 		run(
 			arg0,
 			arg1,
+			arg2,
 		)
 	})
 	return _c
@@ -5179,7 +5311,7 @@ func (_c *Database_GetCodeById_Call) Return(code *models.Code, err error) *Datab
 	return _c
 }
 
-func (_c *Database_GetCodeById_Call) RunAndReturn(run func(tx *sql.Tx, codeId int64) (*models.Code, error)) *Database_GetCodeById_Call {
+func (_c *Database_GetCodeById_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, codeId int64) (*models.Code, error)) *Database_GetCodeById_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -6785,8 +6917,8 @@ func (_c *Database_GetRedirectURIsByClientId_Call) RunAndReturn(run func(tx *sql
 }
 
 // GetRefreshTokenById provides a mock function for the type Database
-func (_mock *Database) GetRefreshTokenById(tx *sql.Tx, refreshTokenId int64) (*models.RefreshToken, error) {
-	ret := _mock.Called(tx, refreshTokenId)
+func (_mock *Database) GetRefreshTokenById(ctx context.Context, tx *sql.Tx, refreshTokenId int64) (*models.RefreshToken, error) {
+	ret := _mock.Called(ctx, tx, refreshTokenId)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetRefreshTokenById")
@@ -6794,18 +6926,18 @@ func (_mock *Database) GetRefreshTokenById(tx *sql.Tx, refreshTokenId int64) (*m
 
 	var r0 *models.RefreshToken
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64) (*models.RefreshToken, error)); ok {
-		return returnFunc(tx, refreshTokenId)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64) (*models.RefreshToken, error)); ok {
+		return returnFunc(ctx, tx, refreshTokenId)
 	}
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64) *models.RefreshToken); ok {
-		r0 = returnFunc(tx, refreshTokenId)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64) *models.RefreshToken); ok {
+		r0 = returnFunc(ctx, tx, refreshTokenId)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*models.RefreshToken)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(*sql.Tx, int64) error); ok {
-		r1 = returnFunc(tx, refreshTokenId)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, int64) error); ok {
+		r1 = returnFunc(ctx, tx, refreshTokenId)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -6818,25 +6950,31 @@ type Database_GetRefreshTokenById_Call struct {
 }
 
 // GetRefreshTokenById is a helper method to define mock.On call
+//   - ctx context.Context
 //   - tx *sql.Tx
 //   - refreshTokenId int64
-func (_e *Database_Expecter) GetRefreshTokenById(tx any, refreshTokenId any) *Database_GetRefreshTokenById_Call {
-	return &Database_GetRefreshTokenById_Call{Call: _e.mock.On("GetRefreshTokenById", tx, refreshTokenId)}
+func (_e *Database_Expecter) GetRefreshTokenById(ctx any, tx any, refreshTokenId any) *Database_GetRefreshTokenById_Call {
+	return &Database_GetRefreshTokenById_Call{Call: _e.mock.On("GetRefreshTokenById", ctx, tx, refreshTokenId)}
 }
 
-func (_c *Database_GetRefreshTokenById_Call) Run(run func(tx *sql.Tx, refreshTokenId int64)) *Database_GetRefreshTokenById_Call {
+func (_c *Database_GetRefreshTokenById_Call) Run(run func(ctx context.Context, tx *sql.Tx, refreshTokenId int64)) *Database_GetRefreshTokenById_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *sql.Tx
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(*sql.Tx)
+			arg0 = args[0].(context.Context)
 		}
-		var arg1 int64
+		var arg1 *sql.Tx
 		if args[1] != nil {
-			arg1 = args[1].(int64)
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 int64
+		if args[2] != nil {
+			arg2 = args[2].(int64)
 		}
 		run(
 			arg0,
 			arg1,
+			arg2,
 		)
 	})
 	return _c
@@ -6847,14 +6985,14 @@ func (_c *Database_GetRefreshTokenById_Call) Return(refreshToken *models.Refresh
 	return _c
 }
 
-func (_c *Database_GetRefreshTokenById_Call) RunAndReturn(run func(tx *sql.Tx, refreshTokenId int64) (*models.RefreshToken, error)) *Database_GetRefreshTokenById_Call {
+func (_c *Database_GetRefreshTokenById_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, refreshTokenId int64) (*models.RefreshToken, error)) *Database_GetRefreshTokenById_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // GetRefreshTokenByJti provides a mock function for the type Database
-func (_mock *Database) GetRefreshTokenByJti(tx *sql.Tx, jti string) (*models.RefreshToken, error) {
-	ret := _mock.Called(tx, jti)
+func (_mock *Database) GetRefreshTokenByJti(ctx context.Context, tx *sql.Tx, jti string) (*models.RefreshToken, error) {
+	ret := _mock.Called(ctx, tx, jti)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetRefreshTokenByJti")
@@ -6862,18 +7000,18 @@ func (_mock *Database) GetRefreshTokenByJti(tx *sql.Tx, jti string) (*models.Ref
 
 	var r0 *models.RefreshToken
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, string) (*models.RefreshToken, error)); ok {
-		return returnFunc(tx, jti)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, string) (*models.RefreshToken, error)); ok {
+		return returnFunc(ctx, tx, jti)
 	}
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, string) *models.RefreshToken); ok {
-		r0 = returnFunc(tx, jti)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, string) *models.RefreshToken); ok {
+		r0 = returnFunc(ctx, tx, jti)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*models.RefreshToken)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(*sql.Tx, string) error); ok {
-		r1 = returnFunc(tx, jti)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, string) error); ok {
+		r1 = returnFunc(ctx, tx, jti)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -6886,25 +7024,31 @@ type Database_GetRefreshTokenByJti_Call struct {
 }
 
 // GetRefreshTokenByJti is a helper method to define mock.On call
+//   - ctx context.Context
 //   - tx *sql.Tx
 //   - jti string
-func (_e *Database_Expecter) GetRefreshTokenByJti(tx any, jti any) *Database_GetRefreshTokenByJti_Call {
-	return &Database_GetRefreshTokenByJti_Call{Call: _e.mock.On("GetRefreshTokenByJti", tx, jti)}
+func (_e *Database_Expecter) GetRefreshTokenByJti(ctx any, tx any, jti any) *Database_GetRefreshTokenByJti_Call {
+	return &Database_GetRefreshTokenByJti_Call{Call: _e.mock.On("GetRefreshTokenByJti", ctx, tx, jti)}
 }
 
-func (_c *Database_GetRefreshTokenByJti_Call) Run(run func(tx *sql.Tx, jti string)) *Database_GetRefreshTokenByJti_Call {
+func (_c *Database_GetRefreshTokenByJti_Call) Run(run func(ctx context.Context, tx *sql.Tx, jti string)) *Database_GetRefreshTokenByJti_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *sql.Tx
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(*sql.Tx)
+			arg0 = args[0].(context.Context)
 		}
-		var arg1 string
+		var arg1 *sql.Tx
 		if args[1] != nil {
-			arg1 = args[1].(string)
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
 		}
 		run(
 			arg0,
 			arg1,
+			arg2,
 		)
 	})
 	return _c
@@ -6915,14 +7059,14 @@ func (_c *Database_GetRefreshTokenByJti_Call) Return(refreshToken *models.Refres
 	return _c
 }
 
-func (_c *Database_GetRefreshTokenByJti_Call) RunAndReturn(run func(tx *sql.Tx, jti string) (*models.RefreshToken, error)) *Database_GetRefreshTokenByJti_Call {
+func (_c *Database_GetRefreshTokenByJti_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, jti string) (*models.RefreshToken, error)) *Database_GetRefreshTokenByJti_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // GetRefreshTokensByClientId provides a mock function for the type Database
-func (_mock *Database) GetRefreshTokensByClientId(tx *sql.Tx, clientId int64) ([]*models.RefreshToken, error) {
-	ret := _mock.Called(tx, clientId)
+func (_mock *Database) GetRefreshTokensByClientId(ctx context.Context, tx *sql.Tx, clientId int64) ([]*models.RefreshToken, error) {
+	ret := _mock.Called(ctx, tx, clientId)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetRefreshTokensByClientId")
@@ -6930,18 +7074,18 @@ func (_mock *Database) GetRefreshTokensByClientId(tx *sql.Tx, clientId int64) ([
 
 	var r0 []*models.RefreshToken
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64) ([]*models.RefreshToken, error)); ok {
-		return returnFunc(tx, clientId)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64) ([]*models.RefreshToken, error)); ok {
+		return returnFunc(ctx, tx, clientId)
 	}
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64) []*models.RefreshToken); ok {
-		r0 = returnFunc(tx, clientId)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64) []*models.RefreshToken); ok {
+		r0 = returnFunc(ctx, tx, clientId)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]*models.RefreshToken)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(*sql.Tx, int64) error); ok {
-		r1 = returnFunc(tx, clientId)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, int64) error); ok {
+		r1 = returnFunc(ctx, tx, clientId)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -6954,25 +7098,31 @@ type Database_GetRefreshTokensByClientId_Call struct {
 }
 
 // GetRefreshTokensByClientId is a helper method to define mock.On call
+//   - ctx context.Context
 //   - tx *sql.Tx
 //   - clientId int64
-func (_e *Database_Expecter) GetRefreshTokensByClientId(tx any, clientId any) *Database_GetRefreshTokensByClientId_Call {
-	return &Database_GetRefreshTokensByClientId_Call{Call: _e.mock.On("GetRefreshTokensByClientId", tx, clientId)}
+func (_e *Database_Expecter) GetRefreshTokensByClientId(ctx any, tx any, clientId any) *Database_GetRefreshTokensByClientId_Call {
+	return &Database_GetRefreshTokensByClientId_Call{Call: _e.mock.On("GetRefreshTokensByClientId", ctx, tx, clientId)}
 }
 
-func (_c *Database_GetRefreshTokensByClientId_Call) Run(run func(tx *sql.Tx, clientId int64)) *Database_GetRefreshTokensByClientId_Call {
+func (_c *Database_GetRefreshTokensByClientId_Call) Run(run func(ctx context.Context, tx *sql.Tx, clientId int64)) *Database_GetRefreshTokensByClientId_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *sql.Tx
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(*sql.Tx)
+			arg0 = args[0].(context.Context)
 		}
-		var arg1 int64
+		var arg1 *sql.Tx
 		if args[1] != nil {
-			arg1 = args[1].(int64)
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 int64
+		if args[2] != nil {
+			arg2 = args[2].(int64)
 		}
 		run(
 			arg0,
 			arg1,
+			arg2,
 		)
 	})
 	return _c
@@ -6983,14 +7133,14 @@ func (_c *Database_GetRefreshTokensByClientId_Call) Return(refreshTokens []*mode
 	return _c
 }
 
-func (_c *Database_GetRefreshTokensByClientId_Call) RunAndReturn(run func(tx *sql.Tx, clientId int64) ([]*models.RefreshToken, error)) *Database_GetRefreshTokensByClientId_Call {
+func (_c *Database_GetRefreshTokensByClientId_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, clientId int64) ([]*models.RefreshToken, error)) *Database_GetRefreshTokensByClientId_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // GetRefreshTokensByCodeId provides a mock function for the type Database
-func (_mock *Database) GetRefreshTokensByCodeId(tx *sql.Tx, codeId int64) ([]*models.RefreshToken, error) {
-	ret := _mock.Called(tx, codeId)
+func (_mock *Database) GetRefreshTokensByCodeId(ctx context.Context, tx *sql.Tx, codeId int64) ([]*models.RefreshToken, error) {
+	ret := _mock.Called(ctx, tx, codeId)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetRefreshTokensByCodeId")
@@ -6998,18 +7148,18 @@ func (_mock *Database) GetRefreshTokensByCodeId(tx *sql.Tx, codeId int64) ([]*mo
 
 	var r0 []*models.RefreshToken
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64) ([]*models.RefreshToken, error)); ok {
-		return returnFunc(tx, codeId)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64) ([]*models.RefreshToken, error)); ok {
+		return returnFunc(ctx, tx, codeId)
 	}
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64) []*models.RefreshToken); ok {
-		r0 = returnFunc(tx, codeId)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64) []*models.RefreshToken); ok {
+		r0 = returnFunc(ctx, tx, codeId)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]*models.RefreshToken)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(*sql.Tx, int64) error); ok {
-		r1 = returnFunc(tx, codeId)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, int64) error); ok {
+		r1 = returnFunc(ctx, tx, codeId)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -7022,25 +7172,31 @@ type Database_GetRefreshTokensByCodeId_Call struct {
 }
 
 // GetRefreshTokensByCodeId is a helper method to define mock.On call
+//   - ctx context.Context
 //   - tx *sql.Tx
 //   - codeId int64
-func (_e *Database_Expecter) GetRefreshTokensByCodeId(tx any, codeId any) *Database_GetRefreshTokensByCodeId_Call {
-	return &Database_GetRefreshTokensByCodeId_Call{Call: _e.mock.On("GetRefreshTokensByCodeId", tx, codeId)}
+func (_e *Database_Expecter) GetRefreshTokensByCodeId(ctx any, tx any, codeId any) *Database_GetRefreshTokensByCodeId_Call {
+	return &Database_GetRefreshTokensByCodeId_Call{Call: _e.mock.On("GetRefreshTokensByCodeId", ctx, tx, codeId)}
 }
 
-func (_c *Database_GetRefreshTokensByCodeId_Call) Run(run func(tx *sql.Tx, codeId int64)) *Database_GetRefreshTokensByCodeId_Call {
+func (_c *Database_GetRefreshTokensByCodeId_Call) Run(run func(ctx context.Context, tx *sql.Tx, codeId int64)) *Database_GetRefreshTokensByCodeId_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *sql.Tx
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(*sql.Tx)
+			arg0 = args[0].(context.Context)
 		}
-		var arg1 int64
+		var arg1 *sql.Tx
 		if args[1] != nil {
-			arg1 = args[1].(int64)
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 int64
+		if args[2] != nil {
+			arg2 = args[2].(int64)
 		}
 		run(
 			arg0,
 			arg1,
+			arg2,
 		)
 	})
 	return _c
@@ -7051,14 +7207,14 @@ func (_c *Database_GetRefreshTokensByCodeId_Call) Return(refreshTokens []*models
 	return _c
 }
 
-func (_c *Database_GetRefreshTokensByCodeId_Call) RunAndReturn(run func(tx *sql.Tx, codeId int64) ([]*models.RefreshToken, error)) *Database_GetRefreshTokensByCodeId_Call {
+func (_c *Database_GetRefreshTokensByCodeId_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, codeId int64) ([]*models.RefreshToken, error)) *Database_GetRefreshTokensByCodeId_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // GetRefreshTokensBySessionIdentifier provides a mock function for the type Database
-func (_mock *Database) GetRefreshTokensBySessionIdentifier(tx *sql.Tx, sessionIdentifier string) ([]*models.RefreshToken, error) {
-	ret := _mock.Called(tx, sessionIdentifier)
+func (_mock *Database) GetRefreshTokensBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) ([]*models.RefreshToken, error) {
+	ret := _mock.Called(ctx, tx, sessionIdentifier)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetRefreshTokensBySessionIdentifier")
@@ -7066,18 +7222,18 @@ func (_mock *Database) GetRefreshTokensBySessionIdentifier(tx *sql.Tx, sessionId
 
 	var r0 []*models.RefreshToken
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, string) ([]*models.RefreshToken, error)); ok {
-		return returnFunc(tx, sessionIdentifier)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, string) ([]*models.RefreshToken, error)); ok {
+		return returnFunc(ctx, tx, sessionIdentifier)
 	}
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, string) []*models.RefreshToken); ok {
-		r0 = returnFunc(tx, sessionIdentifier)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, string) []*models.RefreshToken); ok {
+		r0 = returnFunc(ctx, tx, sessionIdentifier)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]*models.RefreshToken)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(*sql.Tx, string) error); ok {
-		r1 = returnFunc(tx, sessionIdentifier)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, string) error); ok {
+		r1 = returnFunc(ctx, tx, sessionIdentifier)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -7090,25 +7246,31 @@ type Database_GetRefreshTokensBySessionIdentifier_Call struct {
 }
 
 // GetRefreshTokensBySessionIdentifier is a helper method to define mock.On call
+//   - ctx context.Context
 //   - tx *sql.Tx
 //   - sessionIdentifier string
-func (_e *Database_Expecter) GetRefreshTokensBySessionIdentifier(tx any, sessionIdentifier any) *Database_GetRefreshTokensBySessionIdentifier_Call {
-	return &Database_GetRefreshTokensBySessionIdentifier_Call{Call: _e.mock.On("GetRefreshTokensBySessionIdentifier", tx, sessionIdentifier)}
+func (_e *Database_Expecter) GetRefreshTokensBySessionIdentifier(ctx any, tx any, sessionIdentifier any) *Database_GetRefreshTokensBySessionIdentifier_Call {
+	return &Database_GetRefreshTokensBySessionIdentifier_Call{Call: _e.mock.On("GetRefreshTokensBySessionIdentifier", ctx, tx, sessionIdentifier)}
 }
 
-func (_c *Database_GetRefreshTokensBySessionIdentifier_Call) Run(run func(tx *sql.Tx, sessionIdentifier string)) *Database_GetRefreshTokensBySessionIdentifier_Call {
+func (_c *Database_GetRefreshTokensBySessionIdentifier_Call) Run(run func(ctx context.Context, tx *sql.Tx, sessionIdentifier string)) *Database_GetRefreshTokensBySessionIdentifier_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *sql.Tx
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(*sql.Tx)
+			arg0 = args[0].(context.Context)
 		}
-		var arg1 string
+		var arg1 *sql.Tx
 		if args[1] != nil {
-			arg1 = args[1].(string)
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
 		}
 		run(
 			arg0,
 			arg1,
+			arg2,
 		)
 	})
 	return _c
@@ -7119,14 +7281,14 @@ func (_c *Database_GetRefreshTokensBySessionIdentifier_Call) Return(refreshToken
 	return _c
 }
 
-func (_c *Database_GetRefreshTokensBySessionIdentifier_Call) RunAndReturn(run func(tx *sql.Tx, sessionIdentifier string) ([]*models.RefreshToken, error)) *Database_GetRefreshTokensBySessionIdentifier_Call {
+func (_c *Database_GetRefreshTokensBySessionIdentifier_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, sessionIdentifier string) ([]*models.RefreshToken, error)) *Database_GetRefreshTokensBySessionIdentifier_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // GetRefreshTokensByUserId provides a mock function for the type Database
-func (_mock *Database) GetRefreshTokensByUserId(tx *sql.Tx, userId int64) ([]*models.RefreshToken, error) {
-	ret := _mock.Called(tx, userId)
+func (_mock *Database) GetRefreshTokensByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]*models.RefreshToken, error) {
+	ret := _mock.Called(ctx, tx, userId)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetRefreshTokensByUserId")
@@ -7134,18 +7296,18 @@ func (_mock *Database) GetRefreshTokensByUserId(tx *sql.Tx, userId int64) ([]*mo
 
 	var r0 []*models.RefreshToken
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64) ([]*models.RefreshToken, error)); ok {
-		return returnFunc(tx, userId)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64) ([]*models.RefreshToken, error)); ok {
+		return returnFunc(ctx, tx, userId)
 	}
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64) []*models.RefreshToken); ok {
-		r0 = returnFunc(tx, userId)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64) []*models.RefreshToken); ok {
+		r0 = returnFunc(ctx, tx, userId)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]*models.RefreshToken)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(*sql.Tx, int64) error); ok {
-		r1 = returnFunc(tx, userId)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, int64) error); ok {
+		r1 = returnFunc(ctx, tx, userId)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -7158,25 +7320,31 @@ type Database_GetRefreshTokensByUserId_Call struct {
 }
 
 // GetRefreshTokensByUserId is a helper method to define mock.On call
+//   - ctx context.Context
 //   - tx *sql.Tx
 //   - userId int64
-func (_e *Database_Expecter) GetRefreshTokensByUserId(tx any, userId any) *Database_GetRefreshTokensByUserId_Call {
-	return &Database_GetRefreshTokensByUserId_Call{Call: _e.mock.On("GetRefreshTokensByUserId", tx, userId)}
+func (_e *Database_Expecter) GetRefreshTokensByUserId(ctx any, tx any, userId any) *Database_GetRefreshTokensByUserId_Call {
+	return &Database_GetRefreshTokensByUserId_Call{Call: _e.mock.On("GetRefreshTokensByUserId", ctx, tx, userId)}
 }
 
-func (_c *Database_GetRefreshTokensByUserId_Call) Run(run func(tx *sql.Tx, userId int64)) *Database_GetRefreshTokensByUserId_Call {
+func (_c *Database_GetRefreshTokensByUserId_Call) Run(run func(ctx context.Context, tx *sql.Tx, userId int64)) *Database_GetRefreshTokensByUserId_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *sql.Tx
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(*sql.Tx)
+			arg0 = args[0].(context.Context)
 		}
-		var arg1 int64
+		var arg1 *sql.Tx
 		if args[1] != nil {
-			arg1 = args[1].(int64)
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 int64
+		if args[2] != nil {
+			arg2 = args[2].(int64)
 		}
 		run(
 			arg0,
 			arg1,
+			arg2,
 		)
 	})
 	return _c
@@ -7187,7 +7355,7 @@ func (_c *Database_GetRefreshTokensByUserId_Call) Return(refreshTokens []*models
 	return _c
 }
 
-func (_c *Database_GetRefreshTokensByUserId_Call) RunAndReturn(run func(tx *sql.Tx, userId int64) ([]*models.RefreshToken, error)) *Database_GetRefreshTokensByUserId_Call {
+func (_c *Database_GetRefreshTokensByUserId_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, userId int64) ([]*models.RefreshToken, error)) *Database_GetRefreshTokensByUserId_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -8735,8 +8903,8 @@ func (_c *Database_GetUserProfilePictureByUserId_Call) RunAndReturn(run func(ctx
 }
 
 // GetUserSessionById provides a mock function for the type Database
-func (_mock *Database) GetUserSessionById(tx *sql.Tx, userSessionId int64) (*models.UserSession, error) {
-	ret := _mock.Called(tx, userSessionId)
+func (_mock *Database) GetUserSessionById(ctx context.Context, tx *sql.Tx, userSessionId int64) (*models.UserSession, error) {
+	ret := _mock.Called(ctx, tx, userSessionId)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetUserSessionById")
@@ -8744,18 +8912,18 @@ func (_mock *Database) GetUserSessionById(tx *sql.Tx, userSessionId int64) (*mod
 
 	var r0 *models.UserSession
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64) (*models.UserSession, error)); ok {
-		return returnFunc(tx, userSessionId)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64) (*models.UserSession, error)); ok {
+		return returnFunc(ctx, tx, userSessionId)
 	}
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64) *models.UserSession); ok {
-		r0 = returnFunc(tx, userSessionId)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64) *models.UserSession); ok {
+		r0 = returnFunc(ctx, tx, userSessionId)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*models.UserSession)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(*sql.Tx, int64) error); ok {
-		r1 = returnFunc(tx, userSessionId)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, int64) error); ok {
+		r1 = returnFunc(ctx, tx, userSessionId)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -8768,25 +8936,31 @@ type Database_GetUserSessionById_Call struct {
 }
 
 // GetUserSessionById is a helper method to define mock.On call
+//   - ctx context.Context
 //   - tx *sql.Tx
 //   - userSessionId int64
-func (_e *Database_Expecter) GetUserSessionById(tx any, userSessionId any) *Database_GetUserSessionById_Call {
-	return &Database_GetUserSessionById_Call{Call: _e.mock.On("GetUserSessionById", tx, userSessionId)}
+func (_e *Database_Expecter) GetUserSessionById(ctx any, tx any, userSessionId any) *Database_GetUserSessionById_Call {
+	return &Database_GetUserSessionById_Call{Call: _e.mock.On("GetUserSessionById", ctx, tx, userSessionId)}
 }
 
-func (_c *Database_GetUserSessionById_Call) Run(run func(tx *sql.Tx, userSessionId int64)) *Database_GetUserSessionById_Call {
+func (_c *Database_GetUserSessionById_Call) Run(run func(ctx context.Context, tx *sql.Tx, userSessionId int64)) *Database_GetUserSessionById_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *sql.Tx
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(*sql.Tx)
+			arg0 = args[0].(context.Context)
 		}
-		var arg1 int64
+		var arg1 *sql.Tx
 		if args[1] != nil {
-			arg1 = args[1].(int64)
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 int64
+		if args[2] != nil {
+			arg2 = args[2].(int64)
 		}
 		run(
 			arg0,
 			arg1,
+			arg2,
 		)
 	})
 	return _c
@@ -8797,14 +8971,14 @@ func (_c *Database_GetUserSessionById_Call) Return(userSession *models.UserSessi
 	return _c
 }
 
-func (_c *Database_GetUserSessionById_Call) RunAndReturn(run func(tx *sql.Tx, userSessionId int64) (*models.UserSession, error)) *Database_GetUserSessionById_Call {
+func (_c *Database_GetUserSessionById_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, userSessionId int64) (*models.UserSession, error)) *Database_GetUserSessionById_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // GetUserSessionBySessionIdentifier provides a mock function for the type Database
-func (_mock *Database) GetUserSessionBySessionIdentifier(tx *sql.Tx, sessionIdentifier string) (*models.UserSession, error) {
-	ret := _mock.Called(tx, sessionIdentifier)
+func (_mock *Database) GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*models.UserSession, error) {
+	ret := _mock.Called(ctx, tx, sessionIdentifier)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetUserSessionBySessionIdentifier")
@@ -8812,18 +8986,18 @@ func (_mock *Database) GetUserSessionBySessionIdentifier(tx *sql.Tx, sessionIden
 
 	var r0 *models.UserSession
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, string) (*models.UserSession, error)); ok {
-		return returnFunc(tx, sessionIdentifier)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, string) (*models.UserSession, error)); ok {
+		return returnFunc(ctx, tx, sessionIdentifier)
 	}
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, string) *models.UserSession); ok {
-		r0 = returnFunc(tx, sessionIdentifier)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, string) *models.UserSession); ok {
+		r0 = returnFunc(ctx, tx, sessionIdentifier)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*models.UserSession)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(*sql.Tx, string) error); ok {
-		r1 = returnFunc(tx, sessionIdentifier)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, string) error); ok {
+		r1 = returnFunc(ctx, tx, sessionIdentifier)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -8836,25 +9010,31 @@ type Database_GetUserSessionBySessionIdentifier_Call struct {
 }
 
 // GetUserSessionBySessionIdentifier is a helper method to define mock.On call
+//   - ctx context.Context
 //   - tx *sql.Tx
 //   - sessionIdentifier string
-func (_e *Database_Expecter) GetUserSessionBySessionIdentifier(tx any, sessionIdentifier any) *Database_GetUserSessionBySessionIdentifier_Call {
-	return &Database_GetUserSessionBySessionIdentifier_Call{Call: _e.mock.On("GetUserSessionBySessionIdentifier", tx, sessionIdentifier)}
+func (_e *Database_Expecter) GetUserSessionBySessionIdentifier(ctx any, tx any, sessionIdentifier any) *Database_GetUserSessionBySessionIdentifier_Call {
+	return &Database_GetUserSessionBySessionIdentifier_Call{Call: _e.mock.On("GetUserSessionBySessionIdentifier", ctx, tx, sessionIdentifier)}
 }
 
-func (_c *Database_GetUserSessionBySessionIdentifier_Call) Run(run func(tx *sql.Tx, sessionIdentifier string)) *Database_GetUserSessionBySessionIdentifier_Call {
+func (_c *Database_GetUserSessionBySessionIdentifier_Call) Run(run func(ctx context.Context, tx *sql.Tx, sessionIdentifier string)) *Database_GetUserSessionBySessionIdentifier_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *sql.Tx
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(*sql.Tx)
+			arg0 = args[0].(context.Context)
 		}
-		var arg1 string
+		var arg1 *sql.Tx
 		if args[1] != nil {
-			arg1 = args[1].(string)
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
 		}
 		run(
 			arg0,
 			arg1,
+			arg2,
 		)
 	})
 	return _c
@@ -8865,14 +9045,14 @@ func (_c *Database_GetUserSessionBySessionIdentifier_Call) Return(userSession *m
 	return _c
 }
 
-func (_c *Database_GetUserSessionBySessionIdentifier_Call) RunAndReturn(run func(tx *sql.Tx, sessionIdentifier string) (*models.UserSession, error)) *Database_GetUserSessionBySessionIdentifier_Call {
+func (_c *Database_GetUserSessionBySessionIdentifier_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*models.UserSession, error)) *Database_GetUserSessionBySessionIdentifier_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // GetUserSessionClientById provides a mock function for the type Database
-func (_mock *Database) GetUserSessionClientById(tx *sql.Tx, userSessionClientId int64) (*models.UserSessionClient, error) {
-	ret := _mock.Called(tx, userSessionClientId)
+func (_mock *Database) GetUserSessionClientById(ctx context.Context, tx *sql.Tx, userSessionClientId int64) (*models.UserSessionClient, error) {
+	ret := _mock.Called(ctx, tx, userSessionClientId)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetUserSessionClientById")
@@ -8880,18 +9060,18 @@ func (_mock *Database) GetUserSessionClientById(tx *sql.Tx, userSessionClientId 
 
 	var r0 *models.UserSessionClient
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64) (*models.UserSessionClient, error)); ok {
-		return returnFunc(tx, userSessionClientId)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64) (*models.UserSessionClient, error)); ok {
+		return returnFunc(ctx, tx, userSessionClientId)
 	}
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64) *models.UserSessionClient); ok {
-		r0 = returnFunc(tx, userSessionClientId)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64) *models.UserSessionClient); ok {
+		r0 = returnFunc(ctx, tx, userSessionClientId)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*models.UserSessionClient)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(*sql.Tx, int64) error); ok {
-		r1 = returnFunc(tx, userSessionClientId)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, int64) error); ok {
+		r1 = returnFunc(ctx, tx, userSessionClientId)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -8904,25 +9084,31 @@ type Database_GetUserSessionClientById_Call struct {
 }
 
 // GetUserSessionClientById is a helper method to define mock.On call
+//   - ctx context.Context
 //   - tx *sql.Tx
 //   - userSessionClientId int64
-func (_e *Database_Expecter) GetUserSessionClientById(tx any, userSessionClientId any) *Database_GetUserSessionClientById_Call {
-	return &Database_GetUserSessionClientById_Call{Call: _e.mock.On("GetUserSessionClientById", tx, userSessionClientId)}
+func (_e *Database_Expecter) GetUserSessionClientById(ctx any, tx any, userSessionClientId any) *Database_GetUserSessionClientById_Call {
+	return &Database_GetUserSessionClientById_Call{Call: _e.mock.On("GetUserSessionClientById", ctx, tx, userSessionClientId)}
 }
 
-func (_c *Database_GetUserSessionClientById_Call) Run(run func(tx *sql.Tx, userSessionClientId int64)) *Database_GetUserSessionClientById_Call {
+func (_c *Database_GetUserSessionClientById_Call) Run(run func(ctx context.Context, tx *sql.Tx, userSessionClientId int64)) *Database_GetUserSessionClientById_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *sql.Tx
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(*sql.Tx)
+			arg0 = args[0].(context.Context)
 		}
-		var arg1 int64
+		var arg1 *sql.Tx
 		if args[1] != nil {
-			arg1 = args[1].(int64)
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 int64
+		if args[2] != nil {
+			arg2 = args[2].(int64)
 		}
 		run(
 			arg0,
 			arg1,
+			arg2,
 		)
 	})
 	return _c
@@ -8933,14 +9119,14 @@ func (_c *Database_GetUserSessionClientById_Call) Return(userSessionClient *mode
 	return _c
 }
 
-func (_c *Database_GetUserSessionClientById_Call) RunAndReturn(run func(tx *sql.Tx, userSessionClientId int64) (*models.UserSessionClient, error)) *Database_GetUserSessionClientById_Call {
+func (_c *Database_GetUserSessionClientById_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, userSessionClientId int64) (*models.UserSessionClient, error)) *Database_GetUserSessionClientById_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // GetUserSessionClientsByUserSessionId provides a mock function for the type Database
-func (_mock *Database) GetUserSessionClientsByUserSessionId(tx *sql.Tx, userSessionId int64) ([]models.UserSessionClient, error) {
-	ret := _mock.Called(tx, userSessionId)
+func (_mock *Database) GetUserSessionClientsByUserSessionId(ctx context.Context, tx *sql.Tx, userSessionId int64) ([]models.UserSessionClient, error) {
+	ret := _mock.Called(ctx, tx, userSessionId)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetUserSessionClientsByUserSessionId")
@@ -8948,18 +9134,18 @@ func (_mock *Database) GetUserSessionClientsByUserSessionId(tx *sql.Tx, userSess
 
 	var r0 []models.UserSessionClient
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64) ([]models.UserSessionClient, error)); ok {
-		return returnFunc(tx, userSessionId)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64) ([]models.UserSessionClient, error)); ok {
+		return returnFunc(ctx, tx, userSessionId)
 	}
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64) []models.UserSessionClient); ok {
-		r0 = returnFunc(tx, userSessionId)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64) []models.UserSessionClient); ok {
+		r0 = returnFunc(ctx, tx, userSessionId)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]models.UserSessionClient)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(*sql.Tx, int64) error); ok {
-		r1 = returnFunc(tx, userSessionId)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, int64) error); ok {
+		r1 = returnFunc(ctx, tx, userSessionId)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -8972,25 +9158,31 @@ type Database_GetUserSessionClientsByUserSessionId_Call struct {
 }
 
 // GetUserSessionClientsByUserSessionId is a helper method to define mock.On call
+//   - ctx context.Context
 //   - tx *sql.Tx
 //   - userSessionId int64
-func (_e *Database_Expecter) GetUserSessionClientsByUserSessionId(tx any, userSessionId any) *Database_GetUserSessionClientsByUserSessionId_Call {
-	return &Database_GetUserSessionClientsByUserSessionId_Call{Call: _e.mock.On("GetUserSessionClientsByUserSessionId", tx, userSessionId)}
+func (_e *Database_Expecter) GetUserSessionClientsByUserSessionId(ctx any, tx any, userSessionId any) *Database_GetUserSessionClientsByUserSessionId_Call {
+	return &Database_GetUserSessionClientsByUserSessionId_Call{Call: _e.mock.On("GetUserSessionClientsByUserSessionId", ctx, tx, userSessionId)}
 }
 
-func (_c *Database_GetUserSessionClientsByUserSessionId_Call) Run(run func(tx *sql.Tx, userSessionId int64)) *Database_GetUserSessionClientsByUserSessionId_Call {
+func (_c *Database_GetUserSessionClientsByUserSessionId_Call) Run(run func(ctx context.Context, tx *sql.Tx, userSessionId int64)) *Database_GetUserSessionClientsByUserSessionId_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *sql.Tx
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(*sql.Tx)
+			arg0 = args[0].(context.Context)
 		}
-		var arg1 int64
+		var arg1 *sql.Tx
 		if args[1] != nil {
-			arg1 = args[1].(int64)
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 int64
+		if args[2] != nil {
+			arg2 = args[2].(int64)
 		}
 		run(
 			arg0,
 			arg1,
+			arg2,
 		)
 	})
 	return _c
@@ -9001,14 +9193,14 @@ func (_c *Database_GetUserSessionClientsByUserSessionId_Call) Return(userSession
 	return _c
 }
 
-func (_c *Database_GetUserSessionClientsByUserSessionId_Call) RunAndReturn(run func(tx *sql.Tx, userSessionId int64) ([]models.UserSessionClient, error)) *Database_GetUserSessionClientsByUserSessionId_Call {
+func (_c *Database_GetUserSessionClientsByUserSessionId_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, userSessionId int64) ([]models.UserSessionClient, error)) *Database_GetUserSessionClientsByUserSessionId_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // GetUserSessionClientsByUserSessionIds provides a mock function for the type Database
-func (_mock *Database) GetUserSessionClientsByUserSessionIds(tx *sql.Tx, userSessionIds []int64) ([]models.UserSessionClient, error) {
-	ret := _mock.Called(tx, userSessionIds)
+func (_mock *Database) GetUserSessionClientsByUserSessionIds(ctx context.Context, tx *sql.Tx, userSessionIds []int64) ([]models.UserSessionClient, error) {
+	ret := _mock.Called(ctx, tx, userSessionIds)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetUserSessionClientsByUserSessionIds")
@@ -9016,18 +9208,18 @@ func (_mock *Database) GetUserSessionClientsByUserSessionIds(tx *sql.Tx, userSes
 
 	var r0 []models.UserSessionClient
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, []int64) ([]models.UserSessionClient, error)); ok {
-		return returnFunc(tx, userSessionIds)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, []int64) ([]models.UserSessionClient, error)); ok {
+		return returnFunc(ctx, tx, userSessionIds)
 	}
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, []int64) []models.UserSessionClient); ok {
-		r0 = returnFunc(tx, userSessionIds)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, []int64) []models.UserSessionClient); ok {
+		r0 = returnFunc(ctx, tx, userSessionIds)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]models.UserSessionClient)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(*sql.Tx, []int64) error); ok {
-		r1 = returnFunc(tx, userSessionIds)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, []int64) error); ok {
+		r1 = returnFunc(ctx, tx, userSessionIds)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -9040,25 +9232,31 @@ type Database_GetUserSessionClientsByUserSessionIds_Call struct {
 }
 
 // GetUserSessionClientsByUserSessionIds is a helper method to define mock.On call
+//   - ctx context.Context
 //   - tx *sql.Tx
 //   - userSessionIds []int64
-func (_e *Database_Expecter) GetUserSessionClientsByUserSessionIds(tx any, userSessionIds any) *Database_GetUserSessionClientsByUserSessionIds_Call {
-	return &Database_GetUserSessionClientsByUserSessionIds_Call{Call: _e.mock.On("GetUserSessionClientsByUserSessionIds", tx, userSessionIds)}
+func (_e *Database_Expecter) GetUserSessionClientsByUserSessionIds(ctx any, tx any, userSessionIds any) *Database_GetUserSessionClientsByUserSessionIds_Call {
+	return &Database_GetUserSessionClientsByUserSessionIds_Call{Call: _e.mock.On("GetUserSessionClientsByUserSessionIds", ctx, tx, userSessionIds)}
 }
 
-func (_c *Database_GetUserSessionClientsByUserSessionIds_Call) Run(run func(tx *sql.Tx, userSessionIds []int64)) *Database_GetUserSessionClientsByUserSessionIds_Call {
+func (_c *Database_GetUserSessionClientsByUserSessionIds_Call) Run(run func(ctx context.Context, tx *sql.Tx, userSessionIds []int64)) *Database_GetUserSessionClientsByUserSessionIds_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *sql.Tx
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(*sql.Tx)
+			arg0 = args[0].(context.Context)
 		}
-		var arg1 []int64
+		var arg1 *sql.Tx
 		if args[1] != nil {
-			arg1 = args[1].([]int64)
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 []int64
+		if args[2] != nil {
+			arg2 = args[2].([]int64)
 		}
 		run(
 			arg0,
 			arg1,
+			arg2,
 		)
 	})
 	return _c
@@ -9069,14 +9267,14 @@ func (_c *Database_GetUserSessionClientsByUserSessionIds_Call) Return(userSessio
 	return _c
 }
 
-func (_c *Database_GetUserSessionClientsByUserSessionIds_Call) RunAndReturn(run func(tx *sql.Tx, userSessionIds []int64) ([]models.UserSessionClient, error)) *Database_GetUserSessionClientsByUserSessionIds_Call {
+func (_c *Database_GetUserSessionClientsByUserSessionIds_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, userSessionIds []int64) ([]models.UserSessionClient, error)) *Database_GetUserSessionClientsByUserSessionIds_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // GetUserSessionsByClientIdPaginated provides a mock function for the type Database
-func (_mock *Database) GetUserSessionsByClientIdPaginated(tx *sql.Tx, clientId int64, page int, pageSize int) ([]models.UserSession, int, error) {
-	ret := _mock.Called(tx, clientId, page, pageSize)
+func (_mock *Database) GetUserSessionsByClientIdPaginated(ctx context.Context, tx *sql.Tx, clientId int64, page int, pageSize int) ([]models.UserSession, int, error) {
+	ret := _mock.Called(ctx, tx, clientId, page, pageSize)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetUserSessionsByClientIdPaginated")
@@ -9085,23 +9283,23 @@ func (_mock *Database) GetUserSessionsByClientIdPaginated(tx *sql.Tx, clientId i
 	var r0 []models.UserSession
 	var r1 int
 	var r2 error
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64, int, int) ([]models.UserSession, int, error)); ok {
-		return returnFunc(tx, clientId, page, pageSize)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64, int, int) ([]models.UserSession, int, error)); ok {
+		return returnFunc(ctx, tx, clientId, page, pageSize)
 	}
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64, int, int) []models.UserSession); ok {
-		r0 = returnFunc(tx, clientId, page, pageSize)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64, int, int) []models.UserSession); ok {
+		r0 = returnFunc(ctx, tx, clientId, page, pageSize)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]models.UserSession)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(*sql.Tx, int64, int, int) int); ok {
-		r1 = returnFunc(tx, clientId, page, pageSize)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, int64, int, int) int); ok {
+		r1 = returnFunc(ctx, tx, clientId, page, pageSize)
 	} else {
 		r1 = ret.Get(1).(int)
 	}
-	if returnFunc, ok := ret.Get(2).(func(*sql.Tx, int64, int, int) error); ok {
-		r2 = returnFunc(tx, clientId, page, pageSize)
+	if returnFunc, ok := ret.Get(2).(func(context.Context, *sql.Tx, int64, int, int) error); ok {
+		r2 = returnFunc(ctx, tx, clientId, page, pageSize)
 	} else {
 		r2 = ret.Error(2)
 	}
@@ -9114,37 +9312,43 @@ type Database_GetUserSessionsByClientIdPaginated_Call struct {
 }
 
 // GetUserSessionsByClientIdPaginated is a helper method to define mock.On call
+//   - ctx context.Context
 //   - tx *sql.Tx
 //   - clientId int64
 //   - page int
 //   - pageSize int
-func (_e *Database_Expecter) GetUserSessionsByClientIdPaginated(tx any, clientId any, page any, pageSize any) *Database_GetUserSessionsByClientIdPaginated_Call {
-	return &Database_GetUserSessionsByClientIdPaginated_Call{Call: _e.mock.On("GetUserSessionsByClientIdPaginated", tx, clientId, page, pageSize)}
+func (_e *Database_Expecter) GetUserSessionsByClientIdPaginated(ctx any, tx any, clientId any, page any, pageSize any) *Database_GetUserSessionsByClientIdPaginated_Call {
+	return &Database_GetUserSessionsByClientIdPaginated_Call{Call: _e.mock.On("GetUserSessionsByClientIdPaginated", ctx, tx, clientId, page, pageSize)}
 }
 
-func (_c *Database_GetUserSessionsByClientIdPaginated_Call) Run(run func(tx *sql.Tx, clientId int64, page int, pageSize int)) *Database_GetUserSessionsByClientIdPaginated_Call {
+func (_c *Database_GetUserSessionsByClientIdPaginated_Call) Run(run func(ctx context.Context, tx *sql.Tx, clientId int64, page int, pageSize int)) *Database_GetUserSessionsByClientIdPaginated_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *sql.Tx
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(*sql.Tx)
+			arg0 = args[0].(context.Context)
 		}
-		var arg1 int64
+		var arg1 *sql.Tx
 		if args[1] != nil {
-			arg1 = args[1].(int64)
+			arg1 = args[1].(*sql.Tx)
 		}
-		var arg2 int
+		var arg2 int64
 		if args[2] != nil {
-			arg2 = args[2].(int)
+			arg2 = args[2].(int64)
 		}
 		var arg3 int
 		if args[3] != nil {
 			arg3 = args[3].(int)
+		}
+		var arg4 int
+		if args[4] != nil {
+			arg4 = args[4].(int)
 		}
 		run(
 			arg0,
 			arg1,
 			arg2,
 			arg3,
+			arg4,
 		)
 	})
 	return _c
@@ -9155,14 +9359,14 @@ func (_c *Database_GetUserSessionsByClientIdPaginated_Call) Return(userSessions 
 	return _c
 }
 
-func (_c *Database_GetUserSessionsByClientIdPaginated_Call) RunAndReturn(run func(tx *sql.Tx, clientId int64, page int, pageSize int) ([]models.UserSession, int, error)) *Database_GetUserSessionsByClientIdPaginated_Call {
+func (_c *Database_GetUserSessionsByClientIdPaginated_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, clientId int64, page int, pageSize int) ([]models.UserSession, int, error)) *Database_GetUserSessionsByClientIdPaginated_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // GetUserSessionsByUserId provides a mock function for the type Database
-func (_mock *Database) GetUserSessionsByUserId(tx *sql.Tx, userId int64) ([]models.UserSession, error) {
-	ret := _mock.Called(tx, userId)
+func (_mock *Database) GetUserSessionsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]models.UserSession, error) {
+	ret := _mock.Called(ctx, tx, userId)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetUserSessionsByUserId")
@@ -9170,18 +9374,18 @@ func (_mock *Database) GetUserSessionsByUserId(tx *sql.Tx, userId int64) ([]mode
 
 	var r0 []models.UserSession
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64) ([]models.UserSession, error)); ok {
-		return returnFunc(tx, userId)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64) ([]models.UserSession, error)); ok {
+		return returnFunc(ctx, tx, userId)
 	}
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64) []models.UserSession); ok {
-		r0 = returnFunc(tx, userId)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64) []models.UserSession); ok {
+		r0 = returnFunc(ctx, tx, userId)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]models.UserSession)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(*sql.Tx, int64) error); ok {
-		r1 = returnFunc(tx, userId)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, int64) error); ok {
+		r1 = returnFunc(ctx, tx, userId)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -9194,25 +9398,31 @@ type Database_GetUserSessionsByUserId_Call struct {
 }
 
 // GetUserSessionsByUserId is a helper method to define mock.On call
+//   - ctx context.Context
 //   - tx *sql.Tx
 //   - userId int64
-func (_e *Database_Expecter) GetUserSessionsByUserId(tx any, userId any) *Database_GetUserSessionsByUserId_Call {
-	return &Database_GetUserSessionsByUserId_Call{Call: _e.mock.On("GetUserSessionsByUserId", tx, userId)}
+func (_e *Database_Expecter) GetUserSessionsByUserId(ctx any, tx any, userId any) *Database_GetUserSessionsByUserId_Call {
+	return &Database_GetUserSessionsByUserId_Call{Call: _e.mock.On("GetUserSessionsByUserId", ctx, tx, userId)}
 }
 
-func (_c *Database_GetUserSessionsByUserId_Call) Run(run func(tx *sql.Tx, userId int64)) *Database_GetUserSessionsByUserId_Call {
+func (_c *Database_GetUserSessionsByUserId_Call) Run(run func(ctx context.Context, tx *sql.Tx, userId int64)) *Database_GetUserSessionsByUserId_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *sql.Tx
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(*sql.Tx)
+			arg0 = args[0].(context.Context)
 		}
-		var arg1 int64
+		var arg1 *sql.Tx
 		if args[1] != nil {
-			arg1 = args[1].(int64)
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 int64
+		if args[2] != nil {
+			arg2 = args[2].(int64)
 		}
 		run(
 			arg0,
 			arg1,
+			arg2,
 		)
 	})
 	return _c
@@ -9223,14 +9433,14 @@ func (_c *Database_GetUserSessionsByUserId_Call) Return(userSessions []models.Us
 	return _c
 }
 
-func (_c *Database_GetUserSessionsByUserId_Call) RunAndReturn(run func(tx *sql.Tx, userId int64) ([]models.UserSession, error)) *Database_GetUserSessionsByUserId_Call {
+func (_c *Database_GetUserSessionsByUserId_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, userId int64) ([]models.UserSession, error)) *Database_GetUserSessionsByUserId_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // GetUserSessionsClientByIds provides a mock function for the type Database
-func (_mock *Database) GetUserSessionsClientByIds(tx *sql.Tx, userSessionClientIds []int64) ([]models.UserSessionClient, error) {
-	ret := _mock.Called(tx, userSessionClientIds)
+func (_mock *Database) GetUserSessionsClientByIds(ctx context.Context, tx *sql.Tx, userSessionClientIds []int64) ([]models.UserSessionClient, error) {
+	ret := _mock.Called(ctx, tx, userSessionClientIds)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetUserSessionsClientByIds")
@@ -9238,18 +9448,18 @@ func (_mock *Database) GetUserSessionsClientByIds(tx *sql.Tx, userSessionClientI
 
 	var r0 []models.UserSessionClient
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, []int64) ([]models.UserSessionClient, error)); ok {
-		return returnFunc(tx, userSessionClientIds)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, []int64) ([]models.UserSessionClient, error)); ok {
+		return returnFunc(ctx, tx, userSessionClientIds)
 	}
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, []int64) []models.UserSessionClient); ok {
-		r0 = returnFunc(tx, userSessionClientIds)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, []int64) []models.UserSessionClient); ok {
+		r0 = returnFunc(ctx, tx, userSessionClientIds)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]models.UserSessionClient)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(*sql.Tx, []int64) error); ok {
-		r1 = returnFunc(tx, userSessionClientIds)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, []int64) error); ok {
+		r1 = returnFunc(ctx, tx, userSessionClientIds)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -9262,25 +9472,31 @@ type Database_GetUserSessionsClientByIds_Call struct {
 }
 
 // GetUserSessionsClientByIds is a helper method to define mock.On call
+//   - ctx context.Context
 //   - tx *sql.Tx
 //   - userSessionClientIds []int64
-func (_e *Database_Expecter) GetUserSessionsClientByIds(tx any, userSessionClientIds any) *Database_GetUserSessionsClientByIds_Call {
-	return &Database_GetUserSessionsClientByIds_Call{Call: _e.mock.On("GetUserSessionsClientByIds", tx, userSessionClientIds)}
+func (_e *Database_Expecter) GetUserSessionsClientByIds(ctx any, tx any, userSessionClientIds any) *Database_GetUserSessionsClientByIds_Call {
+	return &Database_GetUserSessionsClientByIds_Call{Call: _e.mock.On("GetUserSessionsClientByIds", ctx, tx, userSessionClientIds)}
 }
 
-func (_c *Database_GetUserSessionsClientByIds_Call) Run(run func(tx *sql.Tx, userSessionClientIds []int64)) *Database_GetUserSessionsClientByIds_Call {
+func (_c *Database_GetUserSessionsClientByIds_Call) Run(run func(ctx context.Context, tx *sql.Tx, userSessionClientIds []int64)) *Database_GetUserSessionsClientByIds_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *sql.Tx
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(*sql.Tx)
+			arg0 = args[0].(context.Context)
 		}
-		var arg1 []int64
+		var arg1 *sql.Tx
 		if args[1] != nil {
-			arg1 = args[1].([]int64)
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 []int64
+		if args[2] != nil {
+			arg2 = args[2].([]int64)
 		}
 		run(
 			arg0,
 			arg1,
+			arg2,
 		)
 	})
 	return _c
@@ -9291,7 +9507,7 @@ func (_c *Database_GetUserSessionsClientByIds_Call) Return(userSessionClients []
 	return _c
 }
 
-func (_c *Database_GetUserSessionsClientByIds_Call) RunAndReturn(run func(tx *sql.Tx, userSessionClientIds []int64) ([]models.UserSessionClient, error)) *Database_GetUserSessionsClientByIds_Call {
+func (_c *Database_GetUserSessionsClientByIds_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, userSessionClientIds []int64) ([]models.UserSessionClient, error)) *Database_GetUserSessionsClientByIds_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -9967,8 +10183,8 @@ func (_c *Database_IsEmpty_Call) RunAndReturn(run func() (bool, error)) *Databas
 }
 
 // MarkCodeAsUsed provides a mock function for the type Database
-func (_mock *Database) MarkCodeAsUsed(tx *sql.Tx, codeId int64) (bool, error) {
-	ret := _mock.Called(tx, codeId)
+func (_mock *Database) MarkCodeAsUsed(ctx context.Context, tx *sql.Tx, codeId int64) (bool, error) {
+	ret := _mock.Called(ctx, tx, codeId)
 
 	if len(ret) == 0 {
 		panic("no return value specified for MarkCodeAsUsed")
@@ -9976,16 +10192,16 @@ func (_mock *Database) MarkCodeAsUsed(tx *sql.Tx, codeId int64) (bool, error) {
 
 	var r0 bool
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64) (bool, error)); ok {
-		return returnFunc(tx, codeId)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64) (bool, error)); ok {
+		return returnFunc(ctx, tx, codeId)
 	}
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64) bool); ok {
-		r0 = returnFunc(tx, codeId)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64) bool); ok {
+		r0 = returnFunc(ctx, tx, codeId)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
-	if returnFunc, ok := ret.Get(1).(func(*sql.Tx, int64) error); ok {
-		r1 = returnFunc(tx, codeId)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, int64) error); ok {
+		r1 = returnFunc(ctx, tx, codeId)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -9998,25 +10214,31 @@ type Database_MarkCodeAsUsed_Call struct {
 }
 
 // MarkCodeAsUsed is a helper method to define mock.On call
+//   - ctx context.Context
 //   - tx *sql.Tx
 //   - codeId int64
-func (_e *Database_Expecter) MarkCodeAsUsed(tx any, codeId any) *Database_MarkCodeAsUsed_Call {
-	return &Database_MarkCodeAsUsed_Call{Call: _e.mock.On("MarkCodeAsUsed", tx, codeId)}
+func (_e *Database_Expecter) MarkCodeAsUsed(ctx any, tx any, codeId any) *Database_MarkCodeAsUsed_Call {
+	return &Database_MarkCodeAsUsed_Call{Call: _e.mock.On("MarkCodeAsUsed", ctx, tx, codeId)}
 }
 
-func (_c *Database_MarkCodeAsUsed_Call) Run(run func(tx *sql.Tx, codeId int64)) *Database_MarkCodeAsUsed_Call {
+func (_c *Database_MarkCodeAsUsed_Call) Run(run func(ctx context.Context, tx *sql.Tx, codeId int64)) *Database_MarkCodeAsUsed_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *sql.Tx
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(*sql.Tx)
+			arg0 = args[0].(context.Context)
 		}
-		var arg1 int64
+		var arg1 *sql.Tx
 		if args[1] != nil {
-			arg1 = args[1].(int64)
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 int64
+		if args[2] != nil {
+			arg2 = args[2].(int64)
 		}
 		run(
 			arg0,
 			arg1,
+			arg2,
 		)
 	})
 	return _c
@@ -10027,14 +10249,14 @@ func (_c *Database_MarkCodeAsUsed_Call) Return(b bool, err error) *Database_Mark
 	return _c
 }
 
-func (_c *Database_MarkCodeAsUsed_Call) RunAndReturn(run func(tx *sql.Tx, codeId int64) (bool, error)) *Database_MarkCodeAsUsed_Call {
+func (_c *Database_MarkCodeAsUsed_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, codeId int64) (bool, error)) *Database_MarkCodeAsUsed_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // MarkRefreshTokenAsRevoked provides a mock function for the type Database
-func (_mock *Database) MarkRefreshTokenAsRevoked(tx *sql.Tx, refreshTokenId int64) (bool, error) {
-	ret := _mock.Called(tx, refreshTokenId)
+func (_mock *Database) MarkRefreshTokenAsRevoked(ctx context.Context, tx *sql.Tx, refreshTokenId int64) (bool, error) {
+	ret := _mock.Called(ctx, tx, refreshTokenId)
 
 	if len(ret) == 0 {
 		panic("no return value specified for MarkRefreshTokenAsRevoked")
@@ -10042,16 +10264,16 @@ func (_mock *Database) MarkRefreshTokenAsRevoked(tx *sql.Tx, refreshTokenId int6
 
 	var r0 bool
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64) (bool, error)); ok {
-		return returnFunc(tx, refreshTokenId)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64) (bool, error)); ok {
+		return returnFunc(ctx, tx, refreshTokenId)
 	}
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64) bool); ok {
-		r0 = returnFunc(tx, refreshTokenId)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64) bool); ok {
+		r0 = returnFunc(ctx, tx, refreshTokenId)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
-	if returnFunc, ok := ret.Get(1).(func(*sql.Tx, int64) error); ok {
-		r1 = returnFunc(tx, refreshTokenId)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, int64) error); ok {
+		r1 = returnFunc(ctx, tx, refreshTokenId)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -10064,25 +10286,31 @@ type Database_MarkRefreshTokenAsRevoked_Call struct {
 }
 
 // MarkRefreshTokenAsRevoked is a helper method to define mock.On call
+//   - ctx context.Context
 //   - tx *sql.Tx
 //   - refreshTokenId int64
-func (_e *Database_Expecter) MarkRefreshTokenAsRevoked(tx any, refreshTokenId any) *Database_MarkRefreshTokenAsRevoked_Call {
-	return &Database_MarkRefreshTokenAsRevoked_Call{Call: _e.mock.On("MarkRefreshTokenAsRevoked", tx, refreshTokenId)}
+func (_e *Database_Expecter) MarkRefreshTokenAsRevoked(ctx any, tx any, refreshTokenId any) *Database_MarkRefreshTokenAsRevoked_Call {
+	return &Database_MarkRefreshTokenAsRevoked_Call{Call: _e.mock.On("MarkRefreshTokenAsRevoked", ctx, tx, refreshTokenId)}
 }
 
-func (_c *Database_MarkRefreshTokenAsRevoked_Call) Run(run func(tx *sql.Tx, refreshTokenId int64)) *Database_MarkRefreshTokenAsRevoked_Call {
+func (_c *Database_MarkRefreshTokenAsRevoked_Call) Run(run func(ctx context.Context, tx *sql.Tx, refreshTokenId int64)) *Database_MarkRefreshTokenAsRevoked_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *sql.Tx
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(*sql.Tx)
+			arg0 = args[0].(context.Context)
 		}
-		var arg1 int64
+		var arg1 *sql.Tx
 		if args[1] != nil {
-			arg1 = args[1].(int64)
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 int64
+		if args[2] != nil {
+			arg2 = args[2].(int64)
 		}
 		run(
 			arg0,
 			arg1,
+			arg2,
 		)
 	})
 	return _c
@@ -10093,7 +10321,7 @@ func (_c *Database_MarkRefreshTokenAsRevoked_Call) Return(b bool, err error) *Da
 	return _c
 }
 
-func (_c *Database_MarkRefreshTokenAsRevoked_Call) RunAndReturn(run func(tx *sql.Tx, refreshTokenId int64) (bool, error)) *Database_MarkRefreshTokenAsRevoked_Call {
+func (_c *Database_MarkRefreshTokenAsRevoked_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, refreshTokenId int64) (bool, error)) *Database_MarkRefreshTokenAsRevoked_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -10200,16 +10428,16 @@ func (_c *Database_PermissionsLoadResources_Call) RunAndReturn(run func(tx *sql.
 }
 
 // PromoteRefreshTokenGenerations provides a mock function for the type Database
-func (_mock *Database) PromoteRefreshTokenGenerations(tx *sql.Tx, refreshTokenIds []int64, generation int64) error {
-	ret := _mock.Called(tx, refreshTokenIds, generation)
+func (_mock *Database) PromoteRefreshTokenGenerations(ctx context.Context, tx *sql.Tx, refreshTokenIds []int64, generation int64) error {
+	ret := _mock.Called(ctx, tx, refreshTokenIds, generation)
 
 	if len(ret) == 0 {
 		panic("no return value specified for PromoteRefreshTokenGenerations")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, []int64, int64) error); ok {
-		r0 = returnFunc(tx, refreshTokenIds, generation)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, []int64, int64) error); ok {
+		r0 = returnFunc(ctx, tx, refreshTokenIds, generation)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -10222,31 +10450,37 @@ type Database_PromoteRefreshTokenGenerations_Call struct {
 }
 
 // PromoteRefreshTokenGenerations is a helper method to define mock.On call
+//   - ctx context.Context
 //   - tx *sql.Tx
 //   - refreshTokenIds []int64
 //   - generation int64
-func (_e *Database_Expecter) PromoteRefreshTokenGenerations(tx any, refreshTokenIds any, generation any) *Database_PromoteRefreshTokenGenerations_Call {
-	return &Database_PromoteRefreshTokenGenerations_Call{Call: _e.mock.On("PromoteRefreshTokenGenerations", tx, refreshTokenIds, generation)}
+func (_e *Database_Expecter) PromoteRefreshTokenGenerations(ctx any, tx any, refreshTokenIds any, generation any) *Database_PromoteRefreshTokenGenerations_Call {
+	return &Database_PromoteRefreshTokenGenerations_Call{Call: _e.mock.On("PromoteRefreshTokenGenerations", ctx, tx, refreshTokenIds, generation)}
 }
 
-func (_c *Database_PromoteRefreshTokenGenerations_Call) Run(run func(tx *sql.Tx, refreshTokenIds []int64, generation int64)) *Database_PromoteRefreshTokenGenerations_Call {
+func (_c *Database_PromoteRefreshTokenGenerations_Call) Run(run func(ctx context.Context, tx *sql.Tx, refreshTokenIds []int64, generation int64)) *Database_PromoteRefreshTokenGenerations_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *sql.Tx
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(*sql.Tx)
+			arg0 = args[0].(context.Context)
 		}
-		var arg1 []int64
+		var arg1 *sql.Tx
 		if args[1] != nil {
-			arg1 = args[1].([]int64)
+			arg1 = args[1].(*sql.Tx)
 		}
-		var arg2 int64
+		var arg2 []int64
 		if args[2] != nil {
-			arg2 = args[2].(int64)
+			arg2 = args[2].([]int64)
+		}
+		var arg3 int64
+		if args[3] != nil {
+			arg3 = args[3].(int64)
 		}
 		run(
 			arg0,
 			arg1,
 			arg2,
+			arg3,
 		)
 	})
 	return _c
@@ -10257,22 +10491,22 @@ func (_c *Database_PromoteRefreshTokenGenerations_Call) Return(err error) *Datab
 	return _c
 }
 
-func (_c *Database_PromoteRefreshTokenGenerations_Call) RunAndReturn(run func(tx *sql.Tx, refreshTokenIds []int64, generation int64) error) *Database_PromoteRefreshTokenGenerations_Call {
+func (_c *Database_PromoteRefreshTokenGenerations_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, refreshTokenIds []int64, generation int64) error) *Database_PromoteRefreshTokenGenerations_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // PromoteUserSessionGeneration provides a mock function for the type Database
-func (_mock *Database) PromoteUserSessionGeneration(tx *sql.Tx, userSessionId int64, generation int64) error {
-	ret := _mock.Called(tx, userSessionId, generation)
+func (_mock *Database) PromoteUserSessionGeneration(ctx context.Context, tx *sql.Tx, userSessionId int64, generation int64) error {
+	ret := _mock.Called(ctx, tx, userSessionId, generation)
 
 	if len(ret) == 0 {
 		panic("no return value specified for PromoteUserSessionGeneration")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64, int64) error); ok {
-		r0 = returnFunc(tx, userSessionId, generation)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64, int64) error); ok {
+		r0 = returnFunc(ctx, tx, userSessionId, generation)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -10285,31 +10519,37 @@ type Database_PromoteUserSessionGeneration_Call struct {
 }
 
 // PromoteUserSessionGeneration is a helper method to define mock.On call
+//   - ctx context.Context
 //   - tx *sql.Tx
 //   - userSessionId int64
 //   - generation int64
-func (_e *Database_Expecter) PromoteUserSessionGeneration(tx any, userSessionId any, generation any) *Database_PromoteUserSessionGeneration_Call {
-	return &Database_PromoteUserSessionGeneration_Call{Call: _e.mock.On("PromoteUserSessionGeneration", tx, userSessionId, generation)}
+func (_e *Database_Expecter) PromoteUserSessionGeneration(ctx any, tx any, userSessionId any, generation any) *Database_PromoteUserSessionGeneration_Call {
+	return &Database_PromoteUserSessionGeneration_Call{Call: _e.mock.On("PromoteUserSessionGeneration", ctx, tx, userSessionId, generation)}
 }
 
-func (_c *Database_PromoteUserSessionGeneration_Call) Run(run func(tx *sql.Tx, userSessionId int64, generation int64)) *Database_PromoteUserSessionGeneration_Call {
+func (_c *Database_PromoteUserSessionGeneration_Call) Run(run func(ctx context.Context, tx *sql.Tx, userSessionId int64, generation int64)) *Database_PromoteUserSessionGeneration_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *sql.Tx
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(*sql.Tx)
+			arg0 = args[0].(context.Context)
 		}
-		var arg1 int64
+		var arg1 *sql.Tx
 		if args[1] != nil {
-			arg1 = args[1].(int64)
+			arg1 = args[1].(*sql.Tx)
 		}
 		var arg2 int64
 		if args[2] != nil {
 			arg2 = args[2].(int64)
 		}
+		var arg3 int64
+		if args[3] != nil {
+			arg3 = args[3].(int64)
+		}
 		run(
 			arg0,
 			arg1,
 			arg2,
+			arg3,
 		)
 	})
 	return _c
@@ -10320,22 +10560,22 @@ func (_c *Database_PromoteUserSessionGeneration_Call) Return(err error) *Databas
 	return _c
 }
 
-func (_c *Database_PromoteUserSessionGeneration_Call) RunAndReturn(run func(tx *sql.Tx, userSessionId int64, generation int64) error) *Database_PromoteUserSessionGeneration_Call {
+func (_c *Database_PromoteUserSessionGeneration_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, userSessionId int64, generation int64) error) *Database_PromoteUserSessionGeneration_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // PromoteUserSessionOtpConfigGeneration provides a mock function for the type Database
-func (_mock *Database) PromoteUserSessionOtpConfigGeneration(tx *sql.Tx, userSessionId int64, generation int64) error {
-	ret := _mock.Called(tx, userSessionId, generation)
+func (_mock *Database) PromoteUserSessionOtpConfigGeneration(ctx context.Context, tx *sql.Tx, userSessionId int64, generation int64) error {
+	ret := _mock.Called(ctx, tx, userSessionId, generation)
 
 	if len(ret) == 0 {
 		panic("no return value specified for PromoteUserSessionOtpConfigGeneration")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64, int64) error); ok {
-		r0 = returnFunc(tx, userSessionId, generation)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64, int64) error); ok {
+		r0 = returnFunc(ctx, tx, userSessionId, generation)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -10348,31 +10588,37 @@ type Database_PromoteUserSessionOtpConfigGeneration_Call struct {
 }
 
 // PromoteUserSessionOtpConfigGeneration is a helper method to define mock.On call
+//   - ctx context.Context
 //   - tx *sql.Tx
 //   - userSessionId int64
 //   - generation int64
-func (_e *Database_Expecter) PromoteUserSessionOtpConfigGeneration(tx any, userSessionId any, generation any) *Database_PromoteUserSessionOtpConfigGeneration_Call {
-	return &Database_PromoteUserSessionOtpConfigGeneration_Call{Call: _e.mock.On("PromoteUserSessionOtpConfigGeneration", tx, userSessionId, generation)}
+func (_e *Database_Expecter) PromoteUserSessionOtpConfigGeneration(ctx any, tx any, userSessionId any, generation any) *Database_PromoteUserSessionOtpConfigGeneration_Call {
+	return &Database_PromoteUserSessionOtpConfigGeneration_Call{Call: _e.mock.On("PromoteUserSessionOtpConfigGeneration", ctx, tx, userSessionId, generation)}
 }
 
-func (_c *Database_PromoteUserSessionOtpConfigGeneration_Call) Run(run func(tx *sql.Tx, userSessionId int64, generation int64)) *Database_PromoteUserSessionOtpConfigGeneration_Call {
+func (_c *Database_PromoteUserSessionOtpConfigGeneration_Call) Run(run func(ctx context.Context, tx *sql.Tx, userSessionId int64, generation int64)) *Database_PromoteUserSessionOtpConfigGeneration_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *sql.Tx
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(*sql.Tx)
+			arg0 = args[0].(context.Context)
 		}
-		var arg1 int64
+		var arg1 *sql.Tx
 		if args[1] != nil {
-			arg1 = args[1].(int64)
+			arg1 = args[1].(*sql.Tx)
 		}
 		var arg2 int64
 		if args[2] != nil {
 			arg2 = args[2].(int64)
 		}
+		var arg3 int64
+		if args[3] != nil {
+			arg3 = args[3].(int64)
+		}
 		run(
 			arg0,
 			arg1,
 			arg2,
+			arg3,
 		)
 	})
 	return _c
@@ -10383,22 +10629,22 @@ func (_c *Database_PromoteUserSessionOtpConfigGeneration_Call) Return(err error)
 	return _c
 }
 
-func (_c *Database_PromoteUserSessionOtpConfigGeneration_Call) RunAndReturn(run func(tx *sql.Tx, userSessionId int64, generation int64) error) *Database_PromoteUserSessionOtpConfigGeneration_Call {
+func (_c *Database_PromoteUserSessionOtpConfigGeneration_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, userSessionId int64, generation int64) error) *Database_PromoteUserSessionOtpConfigGeneration_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // RefreshTokenLoadClient provides a mock function for the type Database
-func (_mock *Database) RefreshTokenLoadClient(tx *sql.Tx, refreshToken *models.RefreshToken) error {
-	ret := _mock.Called(tx, refreshToken)
+func (_mock *Database) RefreshTokenLoadClient(ctx context.Context, tx *sql.Tx, refreshToken *models.RefreshToken) error {
+	ret := _mock.Called(ctx, tx, refreshToken)
 
 	if len(ret) == 0 {
 		panic("no return value specified for RefreshTokenLoadClient")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, *models.RefreshToken) error); ok {
-		r0 = returnFunc(tx, refreshToken)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, *models.RefreshToken) error); ok {
+		r0 = returnFunc(ctx, tx, refreshToken)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -10411,25 +10657,31 @@ type Database_RefreshTokenLoadClient_Call struct {
 }
 
 // RefreshTokenLoadClient is a helper method to define mock.On call
+//   - ctx context.Context
 //   - tx *sql.Tx
 //   - refreshToken *models.RefreshToken
-func (_e *Database_Expecter) RefreshTokenLoadClient(tx any, refreshToken any) *Database_RefreshTokenLoadClient_Call {
-	return &Database_RefreshTokenLoadClient_Call{Call: _e.mock.On("RefreshTokenLoadClient", tx, refreshToken)}
+func (_e *Database_Expecter) RefreshTokenLoadClient(ctx any, tx any, refreshToken any) *Database_RefreshTokenLoadClient_Call {
+	return &Database_RefreshTokenLoadClient_Call{Call: _e.mock.On("RefreshTokenLoadClient", ctx, tx, refreshToken)}
 }
 
-func (_c *Database_RefreshTokenLoadClient_Call) Run(run func(tx *sql.Tx, refreshToken *models.RefreshToken)) *Database_RefreshTokenLoadClient_Call {
+func (_c *Database_RefreshTokenLoadClient_Call) Run(run func(ctx context.Context, tx *sql.Tx, refreshToken *models.RefreshToken)) *Database_RefreshTokenLoadClient_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *sql.Tx
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(*sql.Tx)
+			arg0 = args[0].(context.Context)
 		}
-		var arg1 *models.RefreshToken
+		var arg1 *sql.Tx
 		if args[1] != nil {
-			arg1 = args[1].(*models.RefreshToken)
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 *models.RefreshToken
+		if args[2] != nil {
+			arg2 = args[2].(*models.RefreshToken)
 		}
 		run(
 			arg0,
 			arg1,
+			arg2,
 		)
 	})
 	return _c
@@ -10440,22 +10692,22 @@ func (_c *Database_RefreshTokenLoadClient_Call) Return(err error) *Database_Refr
 	return _c
 }
 
-func (_c *Database_RefreshTokenLoadClient_Call) RunAndReturn(run func(tx *sql.Tx, refreshToken *models.RefreshToken) error) *Database_RefreshTokenLoadClient_Call {
+func (_c *Database_RefreshTokenLoadClient_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, refreshToken *models.RefreshToken) error) *Database_RefreshTokenLoadClient_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // RefreshTokenLoadCode provides a mock function for the type Database
-func (_mock *Database) RefreshTokenLoadCode(tx *sql.Tx, refreshToken *models.RefreshToken) error {
-	ret := _mock.Called(tx, refreshToken)
+func (_mock *Database) RefreshTokenLoadCode(ctx context.Context, tx *sql.Tx, refreshToken *models.RefreshToken) error {
+	ret := _mock.Called(ctx, tx, refreshToken)
 
 	if len(ret) == 0 {
 		panic("no return value specified for RefreshTokenLoadCode")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, *models.RefreshToken) error); ok {
-		r0 = returnFunc(tx, refreshToken)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, *models.RefreshToken) error); ok {
+		r0 = returnFunc(ctx, tx, refreshToken)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -10468,25 +10720,31 @@ type Database_RefreshTokenLoadCode_Call struct {
 }
 
 // RefreshTokenLoadCode is a helper method to define mock.On call
+//   - ctx context.Context
 //   - tx *sql.Tx
 //   - refreshToken *models.RefreshToken
-func (_e *Database_Expecter) RefreshTokenLoadCode(tx any, refreshToken any) *Database_RefreshTokenLoadCode_Call {
-	return &Database_RefreshTokenLoadCode_Call{Call: _e.mock.On("RefreshTokenLoadCode", tx, refreshToken)}
+func (_e *Database_Expecter) RefreshTokenLoadCode(ctx any, tx any, refreshToken any) *Database_RefreshTokenLoadCode_Call {
+	return &Database_RefreshTokenLoadCode_Call{Call: _e.mock.On("RefreshTokenLoadCode", ctx, tx, refreshToken)}
 }
 
-func (_c *Database_RefreshTokenLoadCode_Call) Run(run func(tx *sql.Tx, refreshToken *models.RefreshToken)) *Database_RefreshTokenLoadCode_Call {
+func (_c *Database_RefreshTokenLoadCode_Call) Run(run func(ctx context.Context, tx *sql.Tx, refreshToken *models.RefreshToken)) *Database_RefreshTokenLoadCode_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *sql.Tx
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(*sql.Tx)
+			arg0 = args[0].(context.Context)
 		}
-		var arg1 *models.RefreshToken
+		var arg1 *sql.Tx
 		if args[1] != nil {
-			arg1 = args[1].(*models.RefreshToken)
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 *models.RefreshToken
+		if args[2] != nil {
+			arg2 = args[2].(*models.RefreshToken)
 		}
 		run(
 			arg0,
 			arg1,
+			arg2,
 		)
 	})
 	return _c
@@ -10497,22 +10755,22 @@ func (_c *Database_RefreshTokenLoadCode_Call) Return(err error) *Database_Refres
 	return _c
 }
 
-func (_c *Database_RefreshTokenLoadCode_Call) RunAndReturn(run func(tx *sql.Tx, refreshToken *models.RefreshToken) error) *Database_RefreshTokenLoadCode_Call {
+func (_c *Database_RefreshTokenLoadCode_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, refreshToken *models.RefreshToken) error) *Database_RefreshTokenLoadCode_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // RefreshTokenLoadUser provides a mock function for the type Database
-func (_mock *Database) RefreshTokenLoadUser(tx *sql.Tx, refreshToken *models.RefreshToken) error {
-	ret := _mock.Called(tx, refreshToken)
+func (_mock *Database) RefreshTokenLoadUser(ctx context.Context, tx *sql.Tx, refreshToken *models.RefreshToken) error {
+	ret := _mock.Called(ctx, tx, refreshToken)
 
 	if len(ret) == 0 {
 		panic("no return value specified for RefreshTokenLoadUser")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, *models.RefreshToken) error); ok {
-		r0 = returnFunc(tx, refreshToken)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, *models.RefreshToken) error); ok {
+		r0 = returnFunc(ctx, tx, refreshToken)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -10525,25 +10783,31 @@ type Database_RefreshTokenLoadUser_Call struct {
 }
 
 // RefreshTokenLoadUser is a helper method to define mock.On call
+//   - ctx context.Context
 //   - tx *sql.Tx
 //   - refreshToken *models.RefreshToken
-func (_e *Database_Expecter) RefreshTokenLoadUser(tx any, refreshToken any) *Database_RefreshTokenLoadUser_Call {
-	return &Database_RefreshTokenLoadUser_Call{Call: _e.mock.On("RefreshTokenLoadUser", tx, refreshToken)}
+func (_e *Database_Expecter) RefreshTokenLoadUser(ctx any, tx any, refreshToken any) *Database_RefreshTokenLoadUser_Call {
+	return &Database_RefreshTokenLoadUser_Call{Call: _e.mock.On("RefreshTokenLoadUser", ctx, tx, refreshToken)}
 }
 
-func (_c *Database_RefreshTokenLoadUser_Call) Run(run func(tx *sql.Tx, refreshToken *models.RefreshToken)) *Database_RefreshTokenLoadUser_Call {
+func (_c *Database_RefreshTokenLoadUser_Call) Run(run func(ctx context.Context, tx *sql.Tx, refreshToken *models.RefreshToken)) *Database_RefreshTokenLoadUser_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *sql.Tx
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(*sql.Tx)
+			arg0 = args[0].(context.Context)
 		}
-		var arg1 *models.RefreshToken
+		var arg1 *sql.Tx
 		if args[1] != nil {
-			arg1 = args[1].(*models.RefreshToken)
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 *models.RefreshToken
+		if args[2] != nil {
+			arg2 = args[2].(*models.RefreshToken)
 		}
 		run(
 			arg0,
 			arg1,
+			arg2,
 		)
 	})
 	return _c
@@ -10554,7 +10818,7 @@ func (_c *Database_RefreshTokenLoadUser_Call) Return(err error) *Database_Refres
 	return _c
 }
 
-func (_c *Database_RefreshTokenLoadUser_Call) RunAndReturn(run func(tx *sql.Tx, refreshToken *models.RefreshToken) error) *Database_RefreshTokenLoadUser_Call {
+func (_c *Database_RefreshTokenLoadUser_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, refreshToken *models.RefreshToken) error) *Database_RefreshTokenLoadUser_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -10623,8 +10887,8 @@ func (_c *Database_ResetUserOTPStep_Call) RunAndReturn(run func(ctx context.Cont
 }
 
 // RevokeCodesByClientId provides a mock function for the type Database
-func (_mock *Database) RevokeCodesByClientId(tx *sql.Tx, clientId int64) (int64, error) {
-	ret := _mock.Called(tx, clientId)
+func (_mock *Database) RevokeCodesByClientId(ctx context.Context, tx *sql.Tx, clientId int64) (int64, error) {
+	ret := _mock.Called(ctx, tx, clientId)
 
 	if len(ret) == 0 {
 		panic("no return value specified for RevokeCodesByClientId")
@@ -10632,16 +10896,16 @@ func (_mock *Database) RevokeCodesByClientId(tx *sql.Tx, clientId int64) (int64,
 
 	var r0 int64
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64) (int64, error)); ok {
-		return returnFunc(tx, clientId)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64) (int64, error)); ok {
+		return returnFunc(ctx, tx, clientId)
 	}
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, int64) int64); ok {
-		r0 = returnFunc(tx, clientId)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, int64) int64); ok {
+		r0 = returnFunc(ctx, tx, clientId)
 	} else {
 		r0 = ret.Get(0).(int64)
 	}
-	if returnFunc, ok := ret.Get(1).(func(*sql.Tx, int64) error); ok {
-		r1 = returnFunc(tx, clientId)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, int64) error); ok {
+		r1 = returnFunc(ctx, tx, clientId)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -10654,25 +10918,31 @@ type Database_RevokeCodesByClientId_Call struct {
 }
 
 // RevokeCodesByClientId is a helper method to define mock.On call
+//   - ctx context.Context
 //   - tx *sql.Tx
 //   - clientId int64
-func (_e *Database_Expecter) RevokeCodesByClientId(tx any, clientId any) *Database_RevokeCodesByClientId_Call {
-	return &Database_RevokeCodesByClientId_Call{Call: _e.mock.On("RevokeCodesByClientId", tx, clientId)}
+func (_e *Database_Expecter) RevokeCodesByClientId(ctx any, tx any, clientId any) *Database_RevokeCodesByClientId_Call {
+	return &Database_RevokeCodesByClientId_Call{Call: _e.mock.On("RevokeCodesByClientId", ctx, tx, clientId)}
 }
 
-func (_c *Database_RevokeCodesByClientId_Call) Run(run func(tx *sql.Tx, clientId int64)) *Database_RevokeCodesByClientId_Call {
+func (_c *Database_RevokeCodesByClientId_Call) Run(run func(ctx context.Context, tx *sql.Tx, clientId int64)) *Database_RevokeCodesByClientId_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *sql.Tx
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(*sql.Tx)
+			arg0 = args[0].(context.Context)
 		}
-		var arg1 int64
+		var arg1 *sql.Tx
 		if args[1] != nil {
-			arg1 = args[1].(int64)
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 int64
+		if args[2] != nil {
+			arg2 = args[2].(int64)
 		}
 		run(
 			arg0,
 			arg1,
+			arg2,
 		)
 	})
 	return _c
@@ -10683,14 +10953,14 @@ func (_c *Database_RevokeCodesByClientId_Call) Return(n int64, err error) *Datab
 	return _c
 }
 
-func (_c *Database_RevokeCodesByClientId_Call) RunAndReturn(run func(tx *sql.Tx, clientId int64) (int64, error)) *Database_RevokeCodesByClientId_Call {
+func (_c *Database_RevokeCodesByClientId_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, clientId int64) (int64, error)) *Database_RevokeCodesByClientId_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // RevokeCodesBySessionIdentifier provides a mock function for the type Database
-func (_mock *Database) RevokeCodesBySessionIdentifier(tx *sql.Tx, sessionIdentifier string) (int64, error) {
-	ret := _mock.Called(tx, sessionIdentifier)
+func (_mock *Database) RevokeCodesBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (int64, error) {
+	ret := _mock.Called(ctx, tx, sessionIdentifier)
 
 	if len(ret) == 0 {
 		panic("no return value specified for RevokeCodesBySessionIdentifier")
@@ -10698,16 +10968,16 @@ func (_mock *Database) RevokeCodesBySessionIdentifier(tx *sql.Tx, sessionIdentif
 
 	var r0 int64
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, string) (int64, error)); ok {
-		return returnFunc(tx, sessionIdentifier)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, string) (int64, error)); ok {
+		return returnFunc(ctx, tx, sessionIdentifier)
 	}
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, string) int64); ok {
-		r0 = returnFunc(tx, sessionIdentifier)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, string) int64); ok {
+		r0 = returnFunc(ctx, tx, sessionIdentifier)
 	} else {
 		r0 = ret.Get(0).(int64)
 	}
-	if returnFunc, ok := ret.Get(1).(func(*sql.Tx, string) error); ok {
-		r1 = returnFunc(tx, sessionIdentifier)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, string) error); ok {
+		r1 = returnFunc(ctx, tx, sessionIdentifier)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -10720,25 +10990,31 @@ type Database_RevokeCodesBySessionIdentifier_Call struct {
 }
 
 // RevokeCodesBySessionIdentifier is a helper method to define mock.On call
+//   - ctx context.Context
 //   - tx *sql.Tx
 //   - sessionIdentifier string
-func (_e *Database_Expecter) RevokeCodesBySessionIdentifier(tx any, sessionIdentifier any) *Database_RevokeCodesBySessionIdentifier_Call {
-	return &Database_RevokeCodesBySessionIdentifier_Call{Call: _e.mock.On("RevokeCodesBySessionIdentifier", tx, sessionIdentifier)}
+func (_e *Database_Expecter) RevokeCodesBySessionIdentifier(ctx any, tx any, sessionIdentifier any) *Database_RevokeCodesBySessionIdentifier_Call {
+	return &Database_RevokeCodesBySessionIdentifier_Call{Call: _e.mock.On("RevokeCodesBySessionIdentifier", ctx, tx, sessionIdentifier)}
 }
 
-func (_c *Database_RevokeCodesBySessionIdentifier_Call) Run(run func(tx *sql.Tx, sessionIdentifier string)) *Database_RevokeCodesBySessionIdentifier_Call {
+func (_c *Database_RevokeCodesBySessionIdentifier_Call) Run(run func(ctx context.Context, tx *sql.Tx, sessionIdentifier string)) *Database_RevokeCodesBySessionIdentifier_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *sql.Tx
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(*sql.Tx)
+			arg0 = args[0].(context.Context)
 		}
-		var arg1 string
+		var arg1 *sql.Tx
 		if args[1] != nil {
-			arg1 = args[1].(string)
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
 		}
 		run(
 			arg0,
 			arg1,
+			arg2,
 		)
 	})
 	return _c
@@ -10749,14 +11025,14 @@ func (_c *Database_RevokeCodesBySessionIdentifier_Call) Return(n int64, err erro
 	return _c
 }
 
-func (_c *Database_RevokeCodesBySessionIdentifier_Call) RunAndReturn(run func(tx *sql.Tx, sessionIdentifier string) (int64, error)) *Database_RevokeCodesBySessionIdentifier_Call {
+func (_c *Database_RevokeCodesBySessionIdentifier_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (int64, error)) *Database_RevokeCodesBySessionIdentifier_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // RevokeRefreshTokenFamily provides a mock function for the type Database
-func (_mock *Database) RevokeRefreshTokenFamily(tx *sql.Tx, firstRefreshTokenJti string) (int64, error) {
-	ret := _mock.Called(tx, firstRefreshTokenJti)
+func (_mock *Database) RevokeRefreshTokenFamily(ctx context.Context, tx *sql.Tx, firstRefreshTokenJti string) (int64, error) {
+	ret := _mock.Called(ctx, tx, firstRefreshTokenJti)
 
 	if len(ret) == 0 {
 		panic("no return value specified for RevokeRefreshTokenFamily")
@@ -10764,16 +11040,16 @@ func (_mock *Database) RevokeRefreshTokenFamily(tx *sql.Tx, firstRefreshTokenJti
 
 	var r0 int64
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, string) (int64, error)); ok {
-		return returnFunc(tx, firstRefreshTokenJti)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, string) (int64, error)); ok {
+		return returnFunc(ctx, tx, firstRefreshTokenJti)
 	}
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, string) int64); ok {
-		r0 = returnFunc(tx, firstRefreshTokenJti)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, string) int64); ok {
+		r0 = returnFunc(ctx, tx, firstRefreshTokenJti)
 	} else {
 		r0 = ret.Get(0).(int64)
 	}
-	if returnFunc, ok := ret.Get(1).(func(*sql.Tx, string) error); ok {
-		r1 = returnFunc(tx, firstRefreshTokenJti)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, string) error); ok {
+		r1 = returnFunc(ctx, tx, firstRefreshTokenJti)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -10786,25 +11062,31 @@ type Database_RevokeRefreshTokenFamily_Call struct {
 }
 
 // RevokeRefreshTokenFamily is a helper method to define mock.On call
+//   - ctx context.Context
 //   - tx *sql.Tx
 //   - firstRefreshTokenJti string
-func (_e *Database_Expecter) RevokeRefreshTokenFamily(tx any, firstRefreshTokenJti any) *Database_RevokeRefreshTokenFamily_Call {
-	return &Database_RevokeRefreshTokenFamily_Call{Call: _e.mock.On("RevokeRefreshTokenFamily", tx, firstRefreshTokenJti)}
+func (_e *Database_Expecter) RevokeRefreshTokenFamily(ctx any, tx any, firstRefreshTokenJti any) *Database_RevokeRefreshTokenFamily_Call {
+	return &Database_RevokeRefreshTokenFamily_Call{Call: _e.mock.On("RevokeRefreshTokenFamily", ctx, tx, firstRefreshTokenJti)}
 }
 
-func (_c *Database_RevokeRefreshTokenFamily_Call) Run(run func(tx *sql.Tx, firstRefreshTokenJti string)) *Database_RevokeRefreshTokenFamily_Call {
+func (_c *Database_RevokeRefreshTokenFamily_Call) Run(run func(ctx context.Context, tx *sql.Tx, firstRefreshTokenJti string)) *Database_RevokeRefreshTokenFamily_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *sql.Tx
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(*sql.Tx)
+			arg0 = args[0].(context.Context)
 		}
-		var arg1 string
+		var arg1 *sql.Tx
 		if args[1] != nil {
-			arg1 = args[1].(string)
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
 		}
 		run(
 			arg0,
 			arg1,
+			arg2,
 		)
 	})
 	return _c
@@ -10815,7 +11097,7 @@ func (_c *Database_RevokeRefreshTokenFamily_Call) Return(n int64, err error) *Da
 	return _c
 }
 
-func (_c *Database_RevokeRefreshTokenFamily_Call) RunAndReturn(run func(tx *sql.Tx, firstRefreshTokenJti string) (int64, error)) *Database_RevokeRefreshTokenFamily_Call {
+func (_c *Database_RevokeRefreshTokenFamily_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, firstRefreshTokenJti string) (int64, error)) *Database_RevokeRefreshTokenFamily_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -11277,8 +11559,8 @@ func (_c *Database_SetUserPasswordHash_Call) RunAndReturn(run func(ctx context.C
 }
 
 // TouchBrowserSession provides a mock function for the type Database
-func (_mock *Database) TouchBrowserSession(tx *sql.Tx, owner string, sessionIdHash string, now time.Time, expiresAt time.Time) (bool, error) {
-	ret := _mock.Called(tx, owner, sessionIdHash, now, expiresAt)
+func (_mock *Database) TouchBrowserSession(ctx context.Context, tx *sql.Tx, owner string, sessionIdHash string, now time.Time, expiresAt time.Time) (bool, error) {
+	ret := _mock.Called(ctx, tx, owner, sessionIdHash, now, expiresAt)
 
 	if len(ret) == 0 {
 		panic("no return value specified for TouchBrowserSession")
@@ -11286,16 +11568,16 @@ func (_mock *Database) TouchBrowserSession(tx *sql.Tx, owner string, sessionIdHa
 
 	var r0 bool
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, string, string, time.Time, time.Time) (bool, error)); ok {
-		return returnFunc(tx, owner, sessionIdHash, now, expiresAt)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, string, string, time.Time, time.Time) (bool, error)); ok {
+		return returnFunc(ctx, tx, owner, sessionIdHash, now, expiresAt)
 	}
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, string, string, time.Time, time.Time) bool); ok {
-		r0 = returnFunc(tx, owner, sessionIdHash, now, expiresAt)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, string, string, time.Time, time.Time) bool); ok {
+		r0 = returnFunc(ctx, tx, owner, sessionIdHash, now, expiresAt)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
-	if returnFunc, ok := ret.Get(1).(func(*sql.Tx, string, string, time.Time, time.Time) error); ok {
-		r1 = returnFunc(tx, owner, sessionIdHash, now, expiresAt)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, string, string, time.Time, time.Time) error); ok {
+		r1 = returnFunc(ctx, tx, owner, sessionIdHash, now, expiresAt)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -11308,36 +11590,41 @@ type Database_TouchBrowserSession_Call struct {
 }
 
 // TouchBrowserSession is a helper method to define mock.On call
+//   - ctx context.Context
 //   - tx *sql.Tx
 //   - owner string
 //   - sessionIdHash string
 //   - now time.Time
 //   - expiresAt time.Time
-func (_e *Database_Expecter) TouchBrowserSession(tx any, owner any, sessionIdHash any, now any, expiresAt any) *Database_TouchBrowserSession_Call {
-	return &Database_TouchBrowserSession_Call{Call: _e.mock.On("TouchBrowserSession", tx, owner, sessionIdHash, now, expiresAt)}
+func (_e *Database_Expecter) TouchBrowserSession(ctx any, tx any, owner any, sessionIdHash any, now any, expiresAt any) *Database_TouchBrowserSession_Call {
+	return &Database_TouchBrowserSession_Call{Call: _e.mock.On("TouchBrowserSession", ctx, tx, owner, sessionIdHash, now, expiresAt)}
 }
 
-func (_c *Database_TouchBrowserSession_Call) Run(run func(tx *sql.Tx, owner string, sessionIdHash string, now time.Time, expiresAt time.Time)) *Database_TouchBrowserSession_Call {
+func (_c *Database_TouchBrowserSession_Call) Run(run func(ctx context.Context, tx *sql.Tx, owner string, sessionIdHash string, now time.Time, expiresAt time.Time)) *Database_TouchBrowserSession_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *sql.Tx
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(*sql.Tx)
+			arg0 = args[0].(context.Context)
 		}
-		var arg1 string
+		var arg1 *sql.Tx
 		if args[1] != nil {
-			arg1 = args[1].(string)
+			arg1 = args[1].(*sql.Tx)
 		}
 		var arg2 string
 		if args[2] != nil {
 			arg2 = args[2].(string)
 		}
-		var arg3 time.Time
+		var arg3 string
 		if args[3] != nil {
-			arg3 = args[3].(time.Time)
+			arg3 = args[3].(string)
 		}
 		var arg4 time.Time
 		if args[4] != nil {
 			arg4 = args[4].(time.Time)
+		}
+		var arg5 time.Time
+		if args[5] != nil {
+			arg5 = args[5].(time.Time)
 		}
 		run(
 			arg0,
@@ -11345,6 +11632,7 @@ func (_c *Database_TouchBrowserSession_Call) Run(run func(tx *sql.Tx, owner stri
 			arg2,
 			arg3,
 			arg4,
+			arg5,
 		)
 	})
 	return _c
@@ -11355,7 +11643,7 @@ func (_c *Database_TouchBrowserSession_Call) Return(b bool, err error) *Database
 	return _c
 }
 
-func (_c *Database_TouchBrowserSession_Call) RunAndReturn(run func(tx *sql.Tx, owner string, sessionIdHash string, now time.Time, expiresAt time.Time) (bool, error)) *Database_TouchBrowserSession_Call {
+func (_c *Database_TouchBrowserSession_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, owner string, sessionIdHash string, now time.Time, expiresAt time.Time) (bool, error)) *Database_TouchBrowserSession_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -11775,8 +12063,8 @@ func (_c *Database_TrySetUserEnabled_Call) RunAndReturn(run func(ctx context.Con
 }
 
 // UpdateBrowserSessionData provides a mock function for the type Database
-func (_mock *Database) UpdateBrowserSessionData(tx *sql.Tx, owner string, sessionIdHash string, data string, now time.Time, expiresAt time.Time) (bool, error) {
-	ret := _mock.Called(tx, owner, sessionIdHash, data, now, expiresAt)
+func (_mock *Database) UpdateBrowserSessionData(ctx context.Context, tx *sql.Tx, owner string, sessionIdHash string, data string, now time.Time, expiresAt time.Time) (bool, error) {
+	ret := _mock.Called(ctx, tx, owner, sessionIdHash, data, now, expiresAt)
 
 	if len(ret) == 0 {
 		panic("no return value specified for UpdateBrowserSessionData")
@@ -11784,16 +12072,16 @@ func (_mock *Database) UpdateBrowserSessionData(tx *sql.Tx, owner string, sessio
 
 	var r0 bool
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, string, string, string, time.Time, time.Time) (bool, error)); ok {
-		return returnFunc(tx, owner, sessionIdHash, data, now, expiresAt)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, string, string, string, time.Time, time.Time) (bool, error)); ok {
+		return returnFunc(ctx, tx, owner, sessionIdHash, data, now, expiresAt)
 	}
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, string, string, string, time.Time, time.Time) bool); ok {
-		r0 = returnFunc(tx, owner, sessionIdHash, data, now, expiresAt)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, string, string, string, time.Time, time.Time) bool); ok {
+		r0 = returnFunc(ctx, tx, owner, sessionIdHash, data, now, expiresAt)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
-	if returnFunc, ok := ret.Get(1).(func(*sql.Tx, string, string, string, time.Time, time.Time) error); ok {
-		r1 = returnFunc(tx, owner, sessionIdHash, data, now, expiresAt)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, string, string, string, time.Time, time.Time) error); ok {
+		r1 = returnFunc(ctx, tx, owner, sessionIdHash, data, now, expiresAt)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -11806,25 +12094,26 @@ type Database_UpdateBrowserSessionData_Call struct {
 }
 
 // UpdateBrowserSessionData is a helper method to define mock.On call
+//   - ctx context.Context
 //   - tx *sql.Tx
 //   - owner string
 //   - sessionIdHash string
 //   - data string
 //   - now time.Time
 //   - expiresAt time.Time
-func (_e *Database_Expecter) UpdateBrowserSessionData(tx any, owner any, sessionIdHash any, data any, now any, expiresAt any) *Database_UpdateBrowserSessionData_Call {
-	return &Database_UpdateBrowserSessionData_Call{Call: _e.mock.On("UpdateBrowserSessionData", tx, owner, sessionIdHash, data, now, expiresAt)}
+func (_e *Database_Expecter) UpdateBrowserSessionData(ctx any, tx any, owner any, sessionIdHash any, data any, now any, expiresAt any) *Database_UpdateBrowserSessionData_Call {
+	return &Database_UpdateBrowserSessionData_Call{Call: _e.mock.On("UpdateBrowserSessionData", ctx, tx, owner, sessionIdHash, data, now, expiresAt)}
 }
 
-func (_c *Database_UpdateBrowserSessionData_Call) Run(run func(tx *sql.Tx, owner string, sessionIdHash string, data string, now time.Time, expiresAt time.Time)) *Database_UpdateBrowserSessionData_Call {
+func (_c *Database_UpdateBrowserSessionData_Call) Run(run func(ctx context.Context, tx *sql.Tx, owner string, sessionIdHash string, data string, now time.Time, expiresAt time.Time)) *Database_UpdateBrowserSessionData_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *sql.Tx
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(*sql.Tx)
+			arg0 = args[0].(context.Context)
 		}
-		var arg1 string
+		var arg1 *sql.Tx
 		if args[1] != nil {
-			arg1 = args[1].(string)
+			arg1 = args[1].(*sql.Tx)
 		}
 		var arg2 string
 		if args[2] != nil {
@@ -11834,13 +12123,17 @@ func (_c *Database_UpdateBrowserSessionData_Call) Run(run func(tx *sql.Tx, owner
 		if args[3] != nil {
 			arg3 = args[3].(string)
 		}
-		var arg4 time.Time
+		var arg4 string
 		if args[4] != nil {
-			arg4 = args[4].(time.Time)
+			arg4 = args[4].(string)
 		}
 		var arg5 time.Time
 		if args[5] != nil {
 			arg5 = args[5].(time.Time)
+		}
+		var arg6 time.Time
+		if args[6] != nil {
+			arg6 = args[6].(time.Time)
 		}
 		run(
 			arg0,
@@ -11849,6 +12142,7 @@ func (_c *Database_UpdateBrowserSessionData_Call) Run(run func(tx *sql.Tx, owner
 			arg3,
 			arg4,
 			arg5,
+			arg6,
 		)
 	})
 	return _c
@@ -11859,7 +12153,7 @@ func (_c *Database_UpdateBrowserSessionData_Call) Return(b bool, err error) *Dat
 	return _c
 }
 
-func (_c *Database_UpdateBrowserSessionData_Call) RunAndReturn(run func(tx *sql.Tx, owner string, sessionIdHash string, data string, now time.Time, expiresAt time.Time) (bool, error)) *Database_UpdateBrowserSessionData_Call {
+func (_c *Database_UpdateBrowserSessionData_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, owner string, sessionIdHash string, data string, now time.Time, expiresAt time.Time) (bool, error)) *Database_UpdateBrowserSessionData_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -12036,16 +12330,16 @@ func (_c *Database_UpdateClientPermission_Call) RunAndReturn(run func(tx *sql.Tx
 }
 
 // UpdateCode provides a mock function for the type Database
-func (_mock *Database) UpdateCode(tx *sql.Tx, code *models.Code) error {
-	ret := _mock.Called(tx, code)
+func (_mock *Database) UpdateCode(ctx context.Context, tx *sql.Tx, code *models.Code) error {
+	ret := _mock.Called(ctx, tx, code)
 
 	if len(ret) == 0 {
 		panic("no return value specified for UpdateCode")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, *models.Code) error); ok {
-		r0 = returnFunc(tx, code)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, *models.Code) error); ok {
+		r0 = returnFunc(ctx, tx, code)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -12058,25 +12352,31 @@ type Database_UpdateCode_Call struct {
 }
 
 // UpdateCode is a helper method to define mock.On call
+//   - ctx context.Context
 //   - tx *sql.Tx
 //   - code *models.Code
-func (_e *Database_Expecter) UpdateCode(tx any, code any) *Database_UpdateCode_Call {
-	return &Database_UpdateCode_Call{Call: _e.mock.On("UpdateCode", tx, code)}
+func (_e *Database_Expecter) UpdateCode(ctx any, tx any, code any) *Database_UpdateCode_Call {
+	return &Database_UpdateCode_Call{Call: _e.mock.On("UpdateCode", ctx, tx, code)}
 }
 
-func (_c *Database_UpdateCode_Call) Run(run func(tx *sql.Tx, code *models.Code)) *Database_UpdateCode_Call {
+func (_c *Database_UpdateCode_Call) Run(run func(ctx context.Context, tx *sql.Tx, code *models.Code)) *Database_UpdateCode_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *sql.Tx
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(*sql.Tx)
+			arg0 = args[0].(context.Context)
 		}
-		var arg1 *models.Code
+		var arg1 *sql.Tx
 		if args[1] != nil {
-			arg1 = args[1].(*models.Code)
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 *models.Code
+		if args[2] != nil {
+			arg2 = args[2].(*models.Code)
 		}
 		run(
 			arg0,
 			arg1,
+			arg2,
 		)
 	})
 	return _c
@@ -12087,7 +12387,7 @@ func (_c *Database_UpdateCode_Call) Return(err error) *Database_UpdateCode_Call 
 	return _c
 }
 
-func (_c *Database_UpdateCode_Call) RunAndReturn(run func(tx *sql.Tx, code *models.Code) error) *Database_UpdateCode_Call {
+func (_c *Database_UpdateCode_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, code *models.Code) error) *Database_UpdateCode_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -12513,16 +12813,16 @@ func (_c *Database_UpdatePreRegistration_Call) RunAndReturn(run func(tx *sql.Tx,
 }
 
 // UpdateRefreshToken provides a mock function for the type Database
-func (_mock *Database) UpdateRefreshToken(tx *sql.Tx, refreshToken *models.RefreshToken) error {
-	ret := _mock.Called(tx, refreshToken)
+func (_mock *Database) UpdateRefreshToken(ctx context.Context, tx *sql.Tx, refreshToken *models.RefreshToken) error {
+	ret := _mock.Called(ctx, tx, refreshToken)
 
 	if len(ret) == 0 {
 		panic("no return value specified for UpdateRefreshToken")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, *models.RefreshToken) error); ok {
-		r0 = returnFunc(tx, refreshToken)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, *models.RefreshToken) error); ok {
+		r0 = returnFunc(ctx, tx, refreshToken)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -12535,25 +12835,31 @@ type Database_UpdateRefreshToken_Call struct {
 }
 
 // UpdateRefreshToken is a helper method to define mock.On call
+//   - ctx context.Context
 //   - tx *sql.Tx
 //   - refreshToken *models.RefreshToken
-func (_e *Database_Expecter) UpdateRefreshToken(tx any, refreshToken any) *Database_UpdateRefreshToken_Call {
-	return &Database_UpdateRefreshToken_Call{Call: _e.mock.On("UpdateRefreshToken", tx, refreshToken)}
+func (_e *Database_Expecter) UpdateRefreshToken(ctx any, tx any, refreshToken any) *Database_UpdateRefreshToken_Call {
+	return &Database_UpdateRefreshToken_Call{Call: _e.mock.On("UpdateRefreshToken", ctx, tx, refreshToken)}
 }
 
-func (_c *Database_UpdateRefreshToken_Call) Run(run func(tx *sql.Tx, refreshToken *models.RefreshToken)) *Database_UpdateRefreshToken_Call {
+func (_c *Database_UpdateRefreshToken_Call) Run(run func(ctx context.Context, tx *sql.Tx, refreshToken *models.RefreshToken)) *Database_UpdateRefreshToken_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *sql.Tx
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(*sql.Tx)
+			arg0 = args[0].(context.Context)
 		}
-		var arg1 *models.RefreshToken
+		var arg1 *sql.Tx
 		if args[1] != nil {
-			arg1 = args[1].(*models.RefreshToken)
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 *models.RefreshToken
+		if args[2] != nil {
+			arg2 = args[2].(*models.RefreshToken)
 		}
 		run(
 			arg0,
 			arg1,
+			arg2,
 		)
 	})
 	return _c
@@ -12564,7 +12870,7 @@ func (_c *Database_UpdateRefreshToken_Call) Return(err error) *Database_UpdateRe
 	return _c
 }
 
-func (_c *Database_UpdateRefreshToken_Call) RunAndReturn(run func(tx *sql.Tx, refreshToken *models.RefreshToken) error) *Database_UpdateRefreshToken_Call {
+func (_c *Database_UpdateRefreshToken_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, refreshToken *models.RefreshToken) error) *Database_UpdateRefreshToken_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -13062,16 +13368,16 @@ func (_c *Database_UpdateUserProfilePicture_Call) RunAndReturn(run func(ctx cont
 }
 
 // UpdateUserSession provides a mock function for the type Database
-func (_mock *Database) UpdateUserSession(tx *sql.Tx, userSession *models.UserSession) error {
-	ret := _mock.Called(tx, userSession)
+func (_mock *Database) UpdateUserSession(ctx context.Context, tx *sql.Tx, userSession *models.UserSession) error {
+	ret := _mock.Called(ctx, tx, userSession)
 
 	if len(ret) == 0 {
 		panic("no return value specified for UpdateUserSession")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, *models.UserSession) error); ok {
-		r0 = returnFunc(tx, userSession)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, *models.UserSession) error); ok {
+		r0 = returnFunc(ctx, tx, userSession)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -13084,25 +13390,31 @@ type Database_UpdateUserSession_Call struct {
 }
 
 // UpdateUserSession is a helper method to define mock.On call
+//   - ctx context.Context
 //   - tx *sql.Tx
 //   - userSession *models.UserSession
-func (_e *Database_Expecter) UpdateUserSession(tx any, userSession any) *Database_UpdateUserSession_Call {
-	return &Database_UpdateUserSession_Call{Call: _e.mock.On("UpdateUserSession", tx, userSession)}
+func (_e *Database_Expecter) UpdateUserSession(ctx any, tx any, userSession any) *Database_UpdateUserSession_Call {
+	return &Database_UpdateUserSession_Call{Call: _e.mock.On("UpdateUserSession", ctx, tx, userSession)}
 }
 
-func (_c *Database_UpdateUserSession_Call) Run(run func(tx *sql.Tx, userSession *models.UserSession)) *Database_UpdateUserSession_Call {
+func (_c *Database_UpdateUserSession_Call) Run(run func(ctx context.Context, tx *sql.Tx, userSession *models.UserSession)) *Database_UpdateUserSession_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *sql.Tx
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(*sql.Tx)
+			arg0 = args[0].(context.Context)
 		}
-		var arg1 *models.UserSession
+		var arg1 *sql.Tx
 		if args[1] != nil {
-			arg1 = args[1].(*models.UserSession)
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 *models.UserSession
+		if args[2] != nil {
+			arg2 = args[2].(*models.UserSession)
 		}
 		run(
 			arg0,
 			arg1,
+			arg2,
 		)
 	})
 	return _c
@@ -13113,22 +13425,22 @@ func (_c *Database_UpdateUserSession_Call) Return(err error) *Database_UpdateUse
 	return _c
 }
 
-func (_c *Database_UpdateUserSession_Call) RunAndReturn(run func(tx *sql.Tx, userSession *models.UserSession) error) *Database_UpdateUserSession_Call {
+func (_c *Database_UpdateUserSession_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, userSession *models.UserSession) error) *Database_UpdateUserSession_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // UpdateUserSessionClient provides a mock function for the type Database
-func (_mock *Database) UpdateUserSessionClient(tx *sql.Tx, userSessionClient *models.UserSessionClient) error {
-	ret := _mock.Called(tx, userSessionClient)
+func (_mock *Database) UpdateUserSessionClient(ctx context.Context, tx *sql.Tx, userSessionClient *models.UserSessionClient) error {
+	ret := _mock.Called(ctx, tx, userSessionClient)
 
 	if len(ret) == 0 {
 		panic("no return value specified for UpdateUserSessionClient")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, *models.UserSessionClient) error); ok {
-		r0 = returnFunc(tx, userSessionClient)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, *models.UserSessionClient) error); ok {
+		r0 = returnFunc(ctx, tx, userSessionClient)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -13141,25 +13453,31 @@ type Database_UpdateUserSessionClient_Call struct {
 }
 
 // UpdateUserSessionClient is a helper method to define mock.On call
+//   - ctx context.Context
 //   - tx *sql.Tx
 //   - userSessionClient *models.UserSessionClient
-func (_e *Database_Expecter) UpdateUserSessionClient(tx any, userSessionClient any) *Database_UpdateUserSessionClient_Call {
-	return &Database_UpdateUserSessionClient_Call{Call: _e.mock.On("UpdateUserSessionClient", tx, userSessionClient)}
+func (_e *Database_Expecter) UpdateUserSessionClient(ctx any, tx any, userSessionClient any) *Database_UpdateUserSessionClient_Call {
+	return &Database_UpdateUserSessionClient_Call{Call: _e.mock.On("UpdateUserSessionClient", ctx, tx, userSessionClient)}
 }
 
-func (_c *Database_UpdateUserSessionClient_Call) Run(run func(tx *sql.Tx, userSessionClient *models.UserSessionClient)) *Database_UpdateUserSessionClient_Call {
+func (_c *Database_UpdateUserSessionClient_Call) Run(run func(ctx context.Context, tx *sql.Tx, userSessionClient *models.UserSessionClient)) *Database_UpdateUserSessionClient_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *sql.Tx
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(*sql.Tx)
+			arg0 = args[0].(context.Context)
 		}
-		var arg1 *models.UserSessionClient
+		var arg1 *sql.Tx
 		if args[1] != nil {
-			arg1 = args[1].(*models.UserSessionClient)
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 *models.UserSessionClient
+		if args[2] != nil {
+			arg2 = args[2].(*models.UserSessionClient)
 		}
 		run(
 			arg0,
 			arg1,
+			arg2,
 		)
 	})
 	return _c
@@ -13170,7 +13488,7 @@ func (_c *Database_UpdateUserSessionClient_Call) Return(err error) *Database_Upd
 	return _c
 }
 
-func (_c *Database_UpdateUserSessionClient_Call) RunAndReturn(run func(tx *sql.Tx, userSessionClient *models.UserSessionClient) error) *Database_UpdateUserSessionClient_Call {
+func (_c *Database_UpdateUserSessionClient_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, userSessionClient *models.UserSessionClient) error) *Database_UpdateUserSessionClient_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -13500,16 +13818,16 @@ func (_c *Database_UserLoadPermissions_Call) RunAndReturn(run func(ctx context.C
 }
 
 // UserSessionClientsLoadClients provides a mock function for the type Database
-func (_mock *Database) UserSessionClientsLoadClients(tx *sql.Tx, userSessionClients []models.UserSessionClient) error {
-	ret := _mock.Called(tx, userSessionClients)
+func (_mock *Database) UserSessionClientsLoadClients(ctx context.Context, tx *sql.Tx, userSessionClients []models.UserSessionClient) error {
+	ret := _mock.Called(ctx, tx, userSessionClients)
 
 	if len(ret) == 0 {
 		panic("no return value specified for UserSessionClientsLoadClients")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, []models.UserSessionClient) error); ok {
-		r0 = returnFunc(tx, userSessionClients)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, []models.UserSessionClient) error); ok {
+		r0 = returnFunc(ctx, tx, userSessionClients)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -13522,25 +13840,31 @@ type Database_UserSessionClientsLoadClients_Call struct {
 }
 
 // UserSessionClientsLoadClients is a helper method to define mock.On call
+//   - ctx context.Context
 //   - tx *sql.Tx
 //   - userSessionClients []models.UserSessionClient
-func (_e *Database_Expecter) UserSessionClientsLoadClients(tx any, userSessionClients any) *Database_UserSessionClientsLoadClients_Call {
-	return &Database_UserSessionClientsLoadClients_Call{Call: _e.mock.On("UserSessionClientsLoadClients", tx, userSessionClients)}
+func (_e *Database_Expecter) UserSessionClientsLoadClients(ctx any, tx any, userSessionClients any) *Database_UserSessionClientsLoadClients_Call {
+	return &Database_UserSessionClientsLoadClients_Call{Call: _e.mock.On("UserSessionClientsLoadClients", ctx, tx, userSessionClients)}
 }
 
-func (_c *Database_UserSessionClientsLoadClients_Call) Run(run func(tx *sql.Tx, userSessionClients []models.UserSessionClient)) *Database_UserSessionClientsLoadClients_Call {
+func (_c *Database_UserSessionClientsLoadClients_Call) Run(run func(ctx context.Context, tx *sql.Tx, userSessionClients []models.UserSessionClient)) *Database_UserSessionClientsLoadClients_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *sql.Tx
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(*sql.Tx)
+			arg0 = args[0].(context.Context)
 		}
-		var arg1 []models.UserSessionClient
+		var arg1 *sql.Tx
 		if args[1] != nil {
-			arg1 = args[1].([]models.UserSessionClient)
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 []models.UserSessionClient
+		if args[2] != nil {
+			arg2 = args[2].([]models.UserSessionClient)
 		}
 		run(
 			arg0,
 			arg1,
+			arg2,
 		)
 	})
 	return _c
@@ -13551,22 +13875,22 @@ func (_c *Database_UserSessionClientsLoadClients_Call) Return(err error) *Databa
 	return _c
 }
 
-func (_c *Database_UserSessionClientsLoadClients_Call) RunAndReturn(run func(tx *sql.Tx, userSessionClients []models.UserSessionClient) error) *Database_UserSessionClientsLoadClients_Call {
+func (_c *Database_UserSessionClientsLoadClients_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, userSessionClients []models.UserSessionClient) error) *Database_UserSessionClientsLoadClients_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // UserSessionLoadClients provides a mock function for the type Database
-func (_mock *Database) UserSessionLoadClients(tx *sql.Tx, userSession *models.UserSession) error {
-	ret := _mock.Called(tx, userSession)
+func (_mock *Database) UserSessionLoadClients(ctx context.Context, tx *sql.Tx, userSession *models.UserSession) error {
+	ret := _mock.Called(ctx, tx, userSession)
 
 	if len(ret) == 0 {
 		panic("no return value specified for UserSessionLoadClients")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, *models.UserSession) error); ok {
-		r0 = returnFunc(tx, userSession)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, *models.UserSession) error); ok {
+		r0 = returnFunc(ctx, tx, userSession)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -13579,25 +13903,31 @@ type Database_UserSessionLoadClients_Call struct {
 }
 
 // UserSessionLoadClients is a helper method to define mock.On call
+//   - ctx context.Context
 //   - tx *sql.Tx
 //   - userSession *models.UserSession
-func (_e *Database_Expecter) UserSessionLoadClients(tx any, userSession any) *Database_UserSessionLoadClients_Call {
-	return &Database_UserSessionLoadClients_Call{Call: _e.mock.On("UserSessionLoadClients", tx, userSession)}
+func (_e *Database_Expecter) UserSessionLoadClients(ctx any, tx any, userSession any) *Database_UserSessionLoadClients_Call {
+	return &Database_UserSessionLoadClients_Call{Call: _e.mock.On("UserSessionLoadClients", ctx, tx, userSession)}
 }
 
-func (_c *Database_UserSessionLoadClients_Call) Run(run func(tx *sql.Tx, userSession *models.UserSession)) *Database_UserSessionLoadClients_Call {
+func (_c *Database_UserSessionLoadClients_Call) Run(run func(ctx context.Context, tx *sql.Tx, userSession *models.UserSession)) *Database_UserSessionLoadClients_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *sql.Tx
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(*sql.Tx)
+			arg0 = args[0].(context.Context)
 		}
-		var arg1 *models.UserSession
+		var arg1 *sql.Tx
 		if args[1] != nil {
-			arg1 = args[1].(*models.UserSession)
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 *models.UserSession
+		if args[2] != nil {
+			arg2 = args[2].(*models.UserSession)
 		}
 		run(
 			arg0,
 			arg1,
+			arg2,
 		)
 	})
 	return _c
@@ -13608,22 +13938,22 @@ func (_c *Database_UserSessionLoadClients_Call) Return(err error) *Database_User
 	return _c
 }
 
-func (_c *Database_UserSessionLoadClients_Call) RunAndReturn(run func(tx *sql.Tx, userSession *models.UserSession) error) *Database_UserSessionLoadClients_Call {
+func (_c *Database_UserSessionLoadClients_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, userSession *models.UserSession) error) *Database_UserSessionLoadClients_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // UserSessionLoadUser provides a mock function for the type Database
-func (_mock *Database) UserSessionLoadUser(tx *sql.Tx, userSession *models.UserSession) error {
-	ret := _mock.Called(tx, userSession)
+func (_mock *Database) UserSessionLoadUser(ctx context.Context, tx *sql.Tx, userSession *models.UserSession) error {
+	ret := _mock.Called(ctx, tx, userSession)
 
 	if len(ret) == 0 {
 		panic("no return value specified for UserSessionLoadUser")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, *models.UserSession) error); ok {
-		r0 = returnFunc(tx, userSession)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, *models.UserSession) error); ok {
+		r0 = returnFunc(ctx, tx, userSession)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -13636,25 +13966,31 @@ type Database_UserSessionLoadUser_Call struct {
 }
 
 // UserSessionLoadUser is a helper method to define mock.On call
+//   - ctx context.Context
 //   - tx *sql.Tx
 //   - userSession *models.UserSession
-func (_e *Database_Expecter) UserSessionLoadUser(tx any, userSession any) *Database_UserSessionLoadUser_Call {
-	return &Database_UserSessionLoadUser_Call{Call: _e.mock.On("UserSessionLoadUser", tx, userSession)}
+func (_e *Database_Expecter) UserSessionLoadUser(ctx any, tx any, userSession any) *Database_UserSessionLoadUser_Call {
+	return &Database_UserSessionLoadUser_Call{Call: _e.mock.On("UserSessionLoadUser", ctx, tx, userSession)}
 }
 
-func (_c *Database_UserSessionLoadUser_Call) Run(run func(tx *sql.Tx, userSession *models.UserSession)) *Database_UserSessionLoadUser_Call {
+func (_c *Database_UserSessionLoadUser_Call) Run(run func(ctx context.Context, tx *sql.Tx, userSession *models.UserSession)) *Database_UserSessionLoadUser_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *sql.Tx
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(*sql.Tx)
+			arg0 = args[0].(context.Context)
 		}
-		var arg1 *models.UserSession
+		var arg1 *sql.Tx
 		if args[1] != nil {
-			arg1 = args[1].(*models.UserSession)
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 *models.UserSession
+		if args[2] != nil {
+			arg2 = args[2].(*models.UserSession)
 		}
 		run(
 			arg0,
 			arg1,
+			arg2,
 		)
 	})
 	return _c
@@ -13665,22 +14001,22 @@ func (_c *Database_UserSessionLoadUser_Call) Return(err error) *Database_UserSes
 	return _c
 }
 
-func (_c *Database_UserSessionLoadUser_Call) RunAndReturn(run func(tx *sql.Tx, userSession *models.UserSession) error) *Database_UserSessionLoadUser_Call {
+func (_c *Database_UserSessionLoadUser_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, userSession *models.UserSession) error) *Database_UserSessionLoadUser_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // UserSessionsLoadClients provides a mock function for the type Database
-func (_mock *Database) UserSessionsLoadClients(tx *sql.Tx, userSessions []models.UserSession) error {
-	ret := _mock.Called(tx, userSessions)
+func (_mock *Database) UserSessionsLoadClients(ctx context.Context, tx *sql.Tx, userSessions []models.UserSession) error {
+	ret := _mock.Called(ctx, tx, userSessions)
 
 	if len(ret) == 0 {
 		panic("no return value specified for UserSessionsLoadClients")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, []models.UserSession) error); ok {
-		r0 = returnFunc(tx, userSessions)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, []models.UserSession) error); ok {
+		r0 = returnFunc(ctx, tx, userSessions)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -13693,25 +14029,31 @@ type Database_UserSessionsLoadClients_Call struct {
 }
 
 // UserSessionsLoadClients is a helper method to define mock.On call
+//   - ctx context.Context
 //   - tx *sql.Tx
 //   - userSessions []models.UserSession
-func (_e *Database_Expecter) UserSessionsLoadClients(tx any, userSessions any) *Database_UserSessionsLoadClients_Call {
-	return &Database_UserSessionsLoadClients_Call{Call: _e.mock.On("UserSessionsLoadClients", tx, userSessions)}
+func (_e *Database_Expecter) UserSessionsLoadClients(ctx any, tx any, userSessions any) *Database_UserSessionsLoadClients_Call {
+	return &Database_UserSessionsLoadClients_Call{Call: _e.mock.On("UserSessionsLoadClients", ctx, tx, userSessions)}
 }
 
-func (_c *Database_UserSessionsLoadClients_Call) Run(run func(tx *sql.Tx, userSessions []models.UserSession)) *Database_UserSessionsLoadClients_Call {
+func (_c *Database_UserSessionsLoadClients_Call) Run(run func(ctx context.Context, tx *sql.Tx, userSessions []models.UserSession)) *Database_UserSessionsLoadClients_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *sql.Tx
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(*sql.Tx)
+			arg0 = args[0].(context.Context)
 		}
-		var arg1 []models.UserSession
+		var arg1 *sql.Tx
 		if args[1] != nil {
-			arg1 = args[1].([]models.UserSession)
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 []models.UserSession
+		if args[2] != nil {
+			arg2 = args[2].([]models.UserSession)
 		}
 		run(
 			arg0,
 			arg1,
+			arg2,
 		)
 	})
 	return _c
@@ -13722,22 +14064,22 @@ func (_c *Database_UserSessionsLoadClients_Call) Return(err error) *Database_Use
 	return _c
 }
 
-func (_c *Database_UserSessionsLoadClients_Call) RunAndReturn(run func(tx *sql.Tx, userSessions []models.UserSession) error) *Database_UserSessionsLoadClients_Call {
+func (_c *Database_UserSessionsLoadClients_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, userSessions []models.UserSession) error) *Database_UserSessionsLoadClients_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // UserSessionsLoadUsers provides a mock function for the type Database
-func (_mock *Database) UserSessionsLoadUsers(tx *sql.Tx, userSessions []models.UserSession) error {
-	ret := _mock.Called(tx, userSessions)
+func (_mock *Database) UserSessionsLoadUsers(ctx context.Context, tx *sql.Tx, userSessions []models.UserSession) error {
+	ret := _mock.Called(ctx, tx, userSessions)
 
 	if len(ret) == 0 {
 		panic("no return value specified for UserSessionsLoadUsers")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(*sql.Tx, []models.UserSession) error); ok {
-		r0 = returnFunc(tx, userSessions)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, []models.UserSession) error); ok {
+		r0 = returnFunc(ctx, tx, userSessions)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -13750,25 +14092,31 @@ type Database_UserSessionsLoadUsers_Call struct {
 }
 
 // UserSessionsLoadUsers is a helper method to define mock.On call
+//   - ctx context.Context
 //   - tx *sql.Tx
 //   - userSessions []models.UserSession
-func (_e *Database_Expecter) UserSessionsLoadUsers(tx any, userSessions any) *Database_UserSessionsLoadUsers_Call {
-	return &Database_UserSessionsLoadUsers_Call{Call: _e.mock.On("UserSessionsLoadUsers", tx, userSessions)}
+func (_e *Database_Expecter) UserSessionsLoadUsers(ctx any, tx any, userSessions any) *Database_UserSessionsLoadUsers_Call {
+	return &Database_UserSessionsLoadUsers_Call{Call: _e.mock.On("UserSessionsLoadUsers", ctx, tx, userSessions)}
 }
 
-func (_c *Database_UserSessionsLoadUsers_Call) Run(run func(tx *sql.Tx, userSessions []models.UserSession)) *Database_UserSessionsLoadUsers_Call {
+func (_c *Database_UserSessionsLoadUsers_Call) Run(run func(ctx context.Context, tx *sql.Tx, userSessions []models.UserSession)) *Database_UserSessionsLoadUsers_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *sql.Tx
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(*sql.Tx)
+			arg0 = args[0].(context.Context)
 		}
-		var arg1 []models.UserSession
+		var arg1 *sql.Tx
 		if args[1] != nil {
-			arg1 = args[1].([]models.UserSession)
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 []models.UserSession
+		if args[2] != nil {
+			arg2 = args[2].([]models.UserSession)
 		}
 		run(
 			arg0,
 			arg1,
+			arg2,
 		)
 	})
 	return _c
@@ -13779,7 +14127,7 @@ func (_c *Database_UserSessionsLoadUsers_Call) Return(err error) *Database_UserS
 	return _c
 }
 
-func (_c *Database_UserSessionsLoadUsers_Call) RunAndReturn(run func(tx *sql.Tx, userSessions []models.UserSession) error) *Database_UserSessionsLoadUsers_Call {
+func (_c *Database_UserSessionsLoadUsers_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, userSessions []models.UserSession) error) *Database_UserSessionsLoadUsers_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -140,7 +140,7 @@ func TestUpdateClient(t *testing.T) {
 	}
 
 	// Retrieve the updated client
-	retrievedClient, err := database.GetClientById(nil, originalClient.Id)
+	retrievedClient, err := database.GetClientById(context.Background(), nil, originalClient.Id)
 	if err != nil {
 		t.Fatalf("Failed to retrieve updated client: %v", err)
 	}
@@ -213,7 +213,7 @@ func TestUpdateClient(t *testing.T) {
 		t.Fatalf("Failed to update client second time: %v", err)
 	}
 
-	retrievedClientAgain, err := database.GetClientById(nil, originalClient.Id)
+	retrievedClientAgain, err := database.GetClientById(context.Background(), nil, originalClient.Id)
 	if err != nil {
 		t.Fatalf("Failed to retrieve updated client second time: %v", err)
 	}
@@ -247,7 +247,7 @@ func TestGetClientById(t *testing.T) {
 	}
 
 	// Test retrieving the client
-	retrievedClient, err := database.GetClientById(nil, client.Id)
+	retrievedClient, err := database.GetClientById(context.Background(), nil, client.Id)
 	if err != nil {
 		t.Fatalf("Failed to retrieve client by ID: %v", err)
 	}
@@ -304,7 +304,7 @@ func TestGetClientById(t *testing.T) {
 
 	// Test retrieving a non-existent client
 	nonExistentId := client.Id + 10000 // Assuming this ID doesn't exist
-	nonExistentClient, err := database.GetClientById(nil, nonExistentId)
+	nonExistentClient, err := database.GetClientById(context.Background(), nil, nonExistentId)
 	if err != nil {
 		t.Errorf("Expected no error for non-existent client, got: %v", err)
 	}
@@ -313,7 +313,7 @@ func TestGetClientById(t *testing.T) {
 	}
 
 	// Test with invalid ID (e.g., negative ID)
-	invalidClient, err := database.GetClientById(nil, -1)
+	invalidClient, err := database.GetClientById(context.Background(), nil, -1)
 	if err != nil {
 		t.Errorf("Expected no error for invalid client ID, got: %v", err)
 	}
@@ -1181,7 +1181,7 @@ func TestDeleteClient(t *testing.T) {
 	}
 
 	// Verify that the client has been deleted
-	deletedClient, err := database.GetClientById(nil, client.Id)
+	deletedClient, err := database.GetClientById(context.Background(), nil, client.Id)
 	if err != nil {
 		t.Fatalf("Error while checking for deleted client: %v", err)
 	}
@@ -1274,7 +1274,7 @@ func TestClientNullableOverrideFields(t *testing.T) {
 		t.Fatalf("Failed to create client with nil overrides: %v", err)
 	}
 
-	retrievedClient, err := database.GetClientById(nil, clientWithNilOverrides.Id)
+	retrievedClient, err := database.GetClientById(context.Background(), nil, clientWithNilOverrides.Id)
 	if err != nil {
 		t.Fatalf("Failed to retrieve client with nil overrides: %v", err)
 	}
@@ -1319,7 +1319,7 @@ func TestClientNullableOverrideFields(t *testing.T) {
 		t.Fatalf("Failed to create client with true overrides: %v", err)
 	}
 
-	retrievedClientTrue, err := database.GetClientById(nil, clientWithTrueOverrides.Id)
+	retrievedClientTrue, err := database.GetClientById(context.Background(), nil, clientWithTrueOverrides.Id)
 	if err != nil {
 		t.Fatalf("Failed to retrieve client with true overrides: %v", err)
 	}
@@ -1364,7 +1364,7 @@ func TestClientNullableOverrideFields(t *testing.T) {
 		t.Fatalf("Failed to create client with false overrides: %v", err)
 	}
 
-	retrievedClientFalse, err := database.GetClientById(nil, clientWithFalseOverrides.Id)
+	retrievedClientFalse, err := database.GetClientById(context.Background(), nil, clientWithFalseOverrides.Id)
 	if err != nil {
 		t.Fatalf("Failed to retrieve client with false overrides: %v", err)
 	}
@@ -1393,7 +1393,7 @@ func TestClientNullableOverrideFields(t *testing.T) {
 		t.Fatalf("Failed to update client override fields: %v", err)
 	}
 
-	retrievedUpdatedClient, err := database.GetClientById(nil, clientWithNilOverrides.Id)
+	retrievedUpdatedClient, err := database.GetClientById(context.Background(), nil, clientWithNilOverrides.Id)
 	if err != nil {
 		t.Fatalf("Failed to retrieve updated client: %v", err)
 	}
@@ -1419,7 +1419,7 @@ func TestClientNullableOverrideFields(t *testing.T) {
 		t.Fatalf("Failed to update client override fields back to nil: %v", err)
 	}
 
-	retrievedResetClient, err := database.GetClientById(nil, clientWithNilOverrides.Id)
+	retrievedResetClient, err := database.GetClientById(context.Background(), nil, clientWithNilOverrides.Id)
 	if err != nil {
 		t.Fatalf("Failed to retrieve reset client: %v", err)
 	}
@@ -1460,7 +1460,7 @@ func TestSetClientPublic(t *testing.T) {
 
 	// The column really moved. Reporting the transition without performing it would leave the
 	// flip revoking the grants of a client that is still confidential.
-	stored, err := database.GetClientById(nil, client.Id)
+	stored, err := database.GetClientById(context.Background(), nil, client.Id)
 	if err != nil {
 		t.Fatalf("GetClientById: %v", err)
 	}
@@ -1588,7 +1588,7 @@ func TestSetClientPublic_ClassifiesAgainstACommittedConcurrentWrite(t *testing.T
 	if err := database.CommitTransaction(saver); err != nil {
 		t.Fatalf("committing the save: %v", err)
 	}
-	stored, err := database.GetClientById(nil, client.Id)
+	stored, err := database.GetClientById(context.Background(), nil, client.Id)
 	if err != nil {
 		t.Fatalf("GetClientById: %v", err)
 	}
@@ -1610,7 +1610,7 @@ func TestAcquireClientRow(t *testing.T) {
 
 	// Nothing about the client changes. The callers of this run their own write afterwards, so
 	// an acquisition that altered a column would be corrupting the row it was asked to protect.
-	held, err := database.GetClientById(tx, client.Id)
+	held, err := database.GetClientById(context.Background(), tx, client.Id)
 	if err != nil {
 		t.Fatalf("GetClientById inside the transaction: %v", err)
 	}
@@ -1705,7 +1705,7 @@ func TestAcquireClientRow_MakesALaterReadSeeAConcurrentCommit(t *testing.T) {
 			done <- outcome{nil, err}
 			return
 		}
-		refreshed, err := database.GetClientById(saver, client.Id)
+		refreshed, err := database.GetClientById(context.Background(), saver, client.Id)
 		done <- outcome{refreshed, err}
 	}()
 

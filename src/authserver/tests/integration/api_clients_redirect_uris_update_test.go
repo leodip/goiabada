@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/url"
@@ -73,7 +74,7 @@ func TestAPIClientRedirectURIsPut_Success_AddRemoveAndTrim(t *testing.T) {
 	assert.True(t, got[uriC])
 
 	// Verify DB reflects the change
-	refreshed, err := database.GetClientById(nil, client.Id)
+	refreshed, err := database.GetClientById(context.Background(), nil, client.Id)
 	assert.NoError(t, err)
 	err = database.ClientLoadRedirectURIs(nil, refreshed)
 	assert.NoError(t, err)

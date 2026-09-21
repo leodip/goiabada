@@ -1,6 +1,7 @@
 package issuance
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"regexp"
@@ -50,7 +51,7 @@ func NewCodeIssuer(database data.Database) *CodeIssuer {
 // client lookup has to join it because sqlitedb sets SetMaxOpenConns(1), so a nil-transaction read
 // issued while tx holds the single connection waits for a connection tx itself owns. That is a
 // hang rather than an error, so neither statement may be reverted to nil (#139).
-func (ci *CodeIssuer) CreateAuthCode(tx *sql.Tx, input *CreateCodeInput) (*models.Code, error) {
+func (ci *CodeIssuer) CreateAuthCode(ctx context.Context, tx *sql.Tx, input *CreateCodeInput) (*models.Code, error) {
 
 	responseMode := input.ResponseMode
 	if responseMode == "" {
@@ -131,7 +132,7 @@ func (ci *CodeIssuer) CreateAuthCode(tx *sql.Tx, input *CreateCodeInput) (*model
 		AuthStateGeneration: input.AuthStateGeneration,
 	}
 
-	err = ci.database.CreateCode(tx, code)
+	err = ci.database.CreateCode(ctx, tx, code)
 	if err != nil {
 		return nil, err
 	}

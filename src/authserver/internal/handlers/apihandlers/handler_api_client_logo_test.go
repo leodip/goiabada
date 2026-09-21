@@ -65,7 +65,7 @@ func TestHandleAPIClientLogoGet_ClientNotFound(t *testing.T) {
 	req = setChiURLParam(req, "id", "123")
 	rr := httptest.NewRecorder()
 
-	database.On("GetClientById", (*sql.Tx)(nil), int64(123)).Return(nil, nil)
+	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(nil, nil)
 
 	handler.ServeHTTP(rr, req)
 
@@ -90,7 +90,7 @@ func TestHandleAPIClientLogoGet_HasLogo(t *testing.T) {
 	req = setChiURLParam(req, "id", "123")
 	rr := httptest.NewRecorder()
 
-	database.On("GetClientById", (*sql.Tx)(nil), int64(123)).Return(client, nil)
+	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(client, nil)
 	database.On("ClientHasLogo", (*sql.Tx)(nil), int64(123)).Return(true, nil)
 
 	handler.ServeHTTP(rr, req)
@@ -117,7 +117,7 @@ func TestHandleAPIClientLogoGet_NoLogo(t *testing.T) {
 	req = setChiURLParam(req, "id", "123")
 	rr := httptest.NewRecorder()
 
-	database.On("GetClientById", (*sql.Tx)(nil), int64(123)).Return(client, nil)
+	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(client, nil)
 	database.On("ClientHasLogo", (*sql.Tx)(nil), int64(123)).Return(false, nil)
 
 	handler.ServeHTTP(rr, req)
@@ -188,7 +188,7 @@ func TestHandleAPIClientLogoPost_ClientNotFound(t *testing.T) {
 	req = setChiURLParam(req, "id", "123")
 	rr := httptest.NewRecorder()
 
-	database.On("GetClientById", (*sql.Tx)(nil), int64(123)).Return(nil, nil)
+	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(nil, nil)
 
 	handler.ServeHTTP(rr, req)
 
@@ -216,7 +216,7 @@ func TestHandleAPIClientLogoPost_InvalidImage(t *testing.T) {
 	req = setChiURLParam(req, "id", "123")
 	rr := httptest.NewRecorder()
 
-	database.On("GetClientById", (*sql.Tx)(nil), int64(123)).Return(client, nil)
+	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(client, nil)
 
 	handler.ServeHTTP(rr, req)
 
@@ -244,7 +244,7 @@ func TestHandleAPIClientLogoPost_CreateNew(t *testing.T) {
 	req = setTokenContextWithClaims(req, map[string]interface{}{"sub": adminSub})
 	rr := httptest.NewRecorder()
 
-	database.On("GetClientById", (*sql.Tx)(nil), int64(123)).Return(client, nil)
+	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(client, nil)
 	database.On("GetClientLogoByClientId", (*sql.Tx)(nil), int64(123)).Return(nil, nil)
 	database.On("CreateClientLogo", (*sql.Tx)(nil), mock.MatchedBy(func(cl *models.ClientLogo) bool {
 		return cl.ClientId == int64(123) && cl.ContentType == "image/png"
@@ -290,7 +290,7 @@ func TestHandleAPIClientLogoPost_UpdateExisting(t *testing.T) {
 	req = setTokenContextWithClaims(req, map[string]interface{}{"sub": adminSub})
 	rr := httptest.NewRecorder()
 
-	database.On("GetClientById", (*sql.Tx)(nil), int64(123)).Return(client, nil)
+	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(client, nil)
 	database.On("GetClientLogoByClientId", (*sql.Tx)(nil), int64(123)).Return(existingLogo, nil)
 	database.On("UpdateClientLogo", (*sql.Tx)(nil), mock.MatchedBy(func(cl *models.ClientLogo) bool {
 		return cl.Id == existingLogo.Id && cl.ContentType == "image/png"
@@ -366,7 +366,7 @@ func TestHandleAPIClientLogoDelete_ClientNotFound(t *testing.T) {
 	req = setChiURLParam(req, "id", "123")
 	rr := httptest.NewRecorder()
 
-	database.On("GetClientById", (*sql.Tx)(nil), int64(123)).Return(nil, nil)
+	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(nil, nil)
 
 	handler.ServeHTTP(rr, req)
 
@@ -394,7 +394,7 @@ func TestHandleAPIClientLogoDelete_Success(t *testing.T) {
 	req = setTokenContextWithClaims(req, map[string]interface{}{"sub": adminSub})
 	rr := httptest.NewRecorder()
 
-	database.On("GetClientById", (*sql.Tx)(nil), int64(123)).Return(client, nil)
+	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(client, nil)
 	database.On("DeleteClientLogo", (*sql.Tx)(nil), int64(123)).Return(nil)
 
 	auditLogger.On("Log", mock.Anything, audit.AuditDeletedClientLogo, mock.MatchedBy(func(details map[string]interface{}) bool {
@@ -426,7 +426,7 @@ func TestHandleAPIClientLogoDelete_DatabaseError(t *testing.T) {
 	req = setChiURLParam(req, "id", "123")
 	rr := httptest.NewRecorder()
 
-	database.On("GetClientById", (*sql.Tx)(nil), int64(123)).Return(client, nil)
+	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(client, nil)
 	database.On("DeleteClientLogo", (*sql.Tx)(nil), int64(123)).Return(assert.AnError)
 
 	handler.ServeHTTP(rr, req)

@@ -70,7 +70,7 @@ func TestUpdateClientNotOwningAuthenticationMode_TakesTheModeFromTheRowNotTheCal
 	secret := []byte("the-secret-another-request-just-set")
 	expectRunInTransaction(database, clientUpdateTx)
 	database.On("AcquireClientRow", clientUpdateTx, int64(7)).Return(nil).Once()
-	database.On("GetClientById", clientUpdateTx, int64(7)).
+	database.On("GetClientById", mock.Anything, clientUpdateTx, int64(7)).
 		Return(&models.Client{Id: 7, IsPublic: false, ClientSecretEncrypted: secret}, nil).Once()
 	var written *models.Client
 	database.On("UpdateClient", clientUpdateTx, mock.Anything).
@@ -115,7 +115,7 @@ func TestUpdateClientNotOwningAuthenticationMode_ReappliesThePublicInvariantsAga
 	expectRunInTransaction(database, clientUpdateTx)
 	database.On("AcquireClientRow", clientUpdateTx, int64(7)).Return(nil).Once()
 	// The row is public; the caller below thinks it is confidential.
-	database.On("GetClientById", clientUpdateTx, int64(7)).
+	database.On("GetClientById", mock.Anything, clientUpdateTx, int64(7)).
 		Return(&models.Client{Id: 7, IsPublic: true}, nil).Once()
 	var written *models.Client
 	database.On("UpdateClient", clientUpdateTx, mock.Anything).
@@ -152,7 +152,7 @@ func TestUpdateClientNotOwningAuthenticationMode_LeavesAConfidentialClientsFlows
 
 	expectRunInTransaction(database, clientUpdateTx)
 	database.On("AcquireClientRow", clientUpdateTx, int64(7)).Return(nil).Once()
-	database.On("GetClientById", clientUpdateTx, int64(7)).
+	database.On("GetClientById", mock.Anything, clientUpdateTx, int64(7)).
 		Return(&models.Client{Id: 7, IsPublic: false}, nil).Once()
 	var written *models.Client
 	database.On("UpdateClient", clientUpdateTx, mock.Anything).
@@ -182,7 +182,7 @@ func TestUpdateClientNotOwningAuthenticationMode_ADisappearedClientIsAnErrorNotA
 
 	stub := expectRunInTransaction(database, clientUpdateTx)
 	database.On("AcquireClientRow", clientUpdateTx, int64(7)).Return(nil).Once()
-	database.On("GetClientById", clientUpdateTx, int64(7)).Return(nil, nil).Once()
+	database.On("GetClientById", mock.Anything, clientUpdateTx, int64(7)).Return(nil, nil).Once()
 
 	err := updateClientNotOwningAuthenticationMode(context.Background(), database, &models.Client{Id: 7})
 	require.Error(t, err)
@@ -226,7 +226,7 @@ func TestHandleAPIClientAuthenticationPut_ClassifiesTheFlipAgainstTheRow(t *test
 	auditLogger := mocks_audit.NewAuditLogger(t)
 
 	// The snapshot the handler works from: already public.
-	database.On("GetClientById", (*sql.Tx)(nil), int64(7)).
+	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).
 		Return(&models.Client{Id: 7, IsPublic: true}, nil).Once()
 	// What the write reports when it runs: it really did make the client public, because another
 	// request got there first with confidential mode and the grants it issued are the ones at
@@ -234,8 +234,8 @@ func TestHandleAPIClientAuthenticationPut_ClassifiesTheFlipAgainstTheRow(t *test
 	expectRunInTransaction(database, clientUpdateTx)
 	database.On("SetClientPublic", clientUpdateTx, int64(7)).Return(true, nil).Once()
 	database.On("UpdateClient", clientUpdateTx, mock.Anything).Return(nil).Once()
-	database.On("RevokeCodesByClientId", clientUpdateTx, int64(7)).Return(int64(2), nil).Once()
-	database.On("GetRefreshTokensByClientId", clientUpdateTx, int64(7)).
+	database.On("RevokeCodesByClientId", mock.Anything, clientUpdateTx, int64(7)).Return(int64(2), nil).Once()
+	database.On("GetRefreshTokensByClientId", mock.Anything, clientUpdateTx, int64(7)).
 		Return([]*models.RefreshToken{}, nil).Once()
 	stubClientResponseLoads(database)
 
@@ -273,7 +273,7 @@ func TestHandleAPIClientAuthenticationPut_AFailedClassificationRevokesNothingAnd
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_audit.NewAuditLogger(t)
 
-	database.On("GetClientById", (*sql.Tx)(nil), int64(7)).
+	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).
 		Return(&models.Client{Id: 7, IsPublic: false, ClientSecretEncrypted: []byte("secret")}, nil).Once()
 	stub := expectRunInTransaction(database, clientUpdateTx)
 	database.On("SetClientPublic", clientUpdateTx, int64(7)).
@@ -302,7 +302,7 @@ func TestHandleAPIClientAuthenticationPut_ASaveOfAnAlreadyPublicClientRevokesNot
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_audit.NewAuditLogger(t)
 
-	database.On("GetClientById", (*sql.Tx)(nil), int64(7)).
+	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).
 		Return(&models.Client{Id: 7, IsPublic: true}, nil).Once()
 	expectRunInTransaction(database, clientUpdateTx)
 	database.On("SetClientPublic", clientUpdateTx, int64(7)).Return(false, nil).Once()
@@ -372,7 +372,7 @@ func TestHandleAPIClientWebOriginsPut_SavesInOneTransactionUnderTheRowAcquisitio
 	auditLogger := mocks_audit.NewAuditLogger(t)
 
 	client := &models.Client{Id: 7, AuthorizationCodeEnabled: false}
-	database.On("GetClientById", (*sql.Tx)(nil), int64(7)).Return(client, nil).Once()
+	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(client, nil).Once()
 
 	expectRunInTransaction(database, clientUpdateTx)
 	database.On("AcquireClientRow", clientUpdateTx, int64(7)).Return(nil).Once()
@@ -418,7 +418,7 @@ func TestHandleAPIClientWebOriginsPut_AFailedWriteCommitsNothing(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_audit.NewAuditLogger(t)
 
-	database.On("GetClientById", (*sql.Tx)(nil), int64(7)).
+	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).
 		Return(&models.Client{Id: 7, AuthorizationCodeEnabled: true}, nil).Once()
 	diskFull := errors.New("the disk is full")
 	stub := expectRunInTransaction(database, clientUpdateTx)
@@ -454,7 +454,7 @@ func TestHandleAPIClientWebOriginsPut_AFailedLoadIsAnsweredAsALoadFailure(t *tes
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_audit.NewAuditLogger(t)
 
-	database.On("GetClientById", (*sql.Tx)(nil), int64(7)).
+	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).
 		Return(&models.Client{Id: 7, AuthorizationCodeEnabled: true}, nil).Once()
 	loadErr := errors.New("the read failed")
 	stub := expectRunInTransaction(database, clientUpdateTx)
@@ -489,7 +489,7 @@ func TestHandleAPIClientWebOriginsPut_ARerunAttemptAnswersOnce(t *testing.T) {
 	auditLogger := mocks_audit.NewAuditLogger(t)
 
 	client := &models.Client{Id: 7, AuthorizationCodeEnabled: true}
-	database.On("GetClientById", (*sql.Tx)(nil), int64(7)).Return(client, nil).Once()
+	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(client, nil).Once()
 
 	deadlock := errors.New("Error 1213: Deadlock found when trying to get lock")
 	attempts := 0
@@ -535,7 +535,7 @@ func TestHandleAPIClientWebOriginsPut_AnExhaustedRetryIsOneFiveHundred(t *testin
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_audit.NewAuditLogger(t)
 
-	database.On("GetClientById", (*sql.Tx)(nil), int64(7)).
+	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).
 		Return(&models.Client{Id: 7, AuthorizationCodeEnabled: true}, nil).Once()
 	exhausted := errors.New("transaction aborted as a deadlock victim on all 3 attempts")
 	expectRunInTransactionRefused(database, exhausted)
@@ -562,7 +562,7 @@ func TestHandleAPIClientWebOriginsPut_AnOverlongOriginIsRefusedNotStored(t *test
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_audit.NewAuditLogger(t)
 
-	database.On("GetClientById", (*sql.Tx)(nil), int64(7)).
+	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).
 		Return(&models.Client{Id: 7, AuthorizationCodeEnabled: true}, nil).Once()
 
 	// "https://" plus a host of repeated 63-character labels, canonical and over the cap.

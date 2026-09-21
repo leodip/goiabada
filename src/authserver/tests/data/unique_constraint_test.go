@@ -99,7 +99,7 @@ func TestUnique_CodeHash(t *testing.T) {
 	duplicate := *existing
 	duplicate.Id = 0
 	duplicate.Code = "other_" + fake.LetterN(6)
-	err := database.CreateCode(nil, &duplicate)
+	err := database.CreateCode(context.Background(), nil, &duplicate)
 	assert.Error(t, err, "two codes must not share a code_hash")
 }
 
@@ -136,7 +136,7 @@ func TestUnique_RefreshTokenJti(t *testing.T) {
 		ExpiresAt:        sql.NullTime{Time: now.Add(time.Hour), Valid: true},
 		MaxLifetime:      sql.NullTime{Time: now.Add(24 * time.Hour), Valid: true},
 	}
-	err := database.CreateRefreshToken(nil, duplicate)
+	err := database.CreateRefreshToken(context.Background(), nil, duplicate)
 	assert.Error(t, err, "two refresh tokens must not share a jti")
 }
 
@@ -154,7 +154,7 @@ func TestUnique_UserSessionSessionIdentifier(t *testing.T) {
 		AuthTime:          now,
 		UserId:            user.Id,
 	}
-	err := database.CreateUserSession(nil, duplicate)
+	err := database.CreateUserSession(context.Background(), nil, duplicate)
 	assert.Error(t, err, "two user sessions must not share a session_identifier")
 }
 

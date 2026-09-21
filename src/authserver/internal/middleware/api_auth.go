@@ -276,7 +276,7 @@ func RequireValidSession(database data.Database) func(http.Handler) http.Handler
 				return
 			}
 
-			session, err := database.GetUserSessionBySessionIdentifier(nil, sid)
+			session, err := database.GetUserSessionBySessionIdentifier(r.Context(), nil, sid)
 			if err != nil {
 				apiresponse.WriteInternalServerError(w, r,
 					errs.Wrap(err, "failed to look up user session for bearer token validation"), "sid", sid)

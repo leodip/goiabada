@@ -10,7 +10,7 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 )
 
-func (d *CommonDatabase) CreateUserSession(tx *sql.Tx, userSession *models.UserSession) error {
+func (d *CommonDatabase) CreateUserSession(ctx context.Context, tx *sql.Tx, userSession *models.UserSession) error {
 
 	if userSession.UserId == 0 {
 		return errs.New("user id must be greater than 0")
@@ -28,7 +28,7 @@ func (d *CommonDatabase) CreateUserSession(tx *sql.Tx, userSession *models.UserS
 
 	insertBuilder := userSessionStruct.WithoutTag("pk").InsertInto("user_sessions", userSession)
 
-	id, err := d.insertReturningId(context.Background(), tx, insertBuilder, "userSession")
+	id, err := d.insertReturningId(ctx, tx, insertBuilder, "userSession")
 	if err != nil {
 		userSession.CreatedAt = originalCreatedAt
 		userSession.UpdatedAt = originalUpdatedAt
@@ -39,7 +39,7 @@ func (d *CommonDatabase) CreateUserSession(tx *sql.Tx, userSession *models.UserS
 	return nil
 }
 
-func (d *CommonDatabase) UpdateUserSession(tx *sql.Tx, userSession *models.UserSession) error {
+func (d *CommonDatabase) UpdateUserSession(ctx context.Context, tx *sql.Tx, userSession *models.UserSession) error {
 
 	if userSession.Id == 0 {
 		return errs.New("can't update userSession with id 0")
@@ -55,7 +55,7 @@ func (d *CommonDatabase) UpdateUserSession(tx *sql.Tx, userSession *models.UserS
 	updateBuilder.Where(updateBuilder.Equal("id", userSession.Id))
 
 	sql, args := updateBuilder.Build()
-	_, err := d.ExecSql(context.Background(), tx, sql, args...)
+	_, err := d.ExecSql(ctx, tx, sql, args...)
 	if err != nil {
 		userSession.UpdatedAt = originalUpdatedAt
 		return errs.Wrap(err, "unable to update userSession")
@@ -64,11 +64,11 @@ func (d *CommonDatabase) UpdateUserSession(tx *sql.Tx, userSession *models.UserS
 	return nil
 }
 
-func (d *CommonDatabase) getUserSessionCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
+func (d *CommonDatabase) getUserSessionCommon(ctx context.Context, tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
 	userSessionStruct *sqlbuilder.Struct) (*models.UserSession, error) {
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(context.Background(), tx, sql, args...)
+	rows, err := d.QuerySql(ctx, tx, sql, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -90,7 +90,7 @@ func (d *CommonDatabase) getUserSessionCommon(tx *sql.Tx, selectBuilder *sqlbuil
 	return nil, nil
 }
 
-func (d *CommonDatabase) GetUserSessionById(tx *sql.Tx, userSessionId int64) (*models.UserSession, error) {
+func (d *CommonDatabase) GetUserSessionById(ctx context.Context, tx *sql.Tx, userSessionId int64) (*models.UserSession, error) {
 
 	userSessionStruct := sqlbuilder.NewStruct(new(models.UserSession)).
 		For(d.Flavor)
@@ -98,7 +98,7 @@ func (d *CommonDatabase) GetUserSessionById(tx *sql.Tx, userSessionId int64) (*m
 	selectBuilder := userSessionStruct.SelectFrom("user_sessions")
 	selectBuilder.Where(selectBuilder.Equal("id", userSessionId))
 
-	userSession, err := d.getUserSessionCommon(tx, selectBuilder, userSessionStruct)
+	userSession, err := d.getUserSessionCommon(ctx, tx, selectBuilder, userSessionStruct)
 	if err != nil {
 		return nil, err
 	}
@@ -106,7 +106,7 @@ func (d *CommonDatabase) GetUserSessionById(tx *sql.Tx, userSessionId int64) (*m
 	return userSession, nil
 }
 
-func (d *CommonDatabase) GetUserSessionBySessionIdentifier(tx *sql.Tx, sessionIdentifier string) (*models.UserSession, error) {
+func (d *CommonDatabase) GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*models.UserSession, error) {
 
 	if sessionIdentifier == "" {
 		return nil, nil
@@ -118,7 +118,7 @@ func (d *CommonDatabase) GetUserSessionBySessionIdentifier(tx *sql.Tx, sessionId
 	selectBuilder := userSessionStruct.SelectFrom("user_sessions")
 	selectBuilder.Where(selectBuilder.Equal("session_identifier", sessionIdentifier))
 
-	userSession, err := d.getUserSessionCommon(tx, selectBuilder, userSessionStruct)
+	userSession, err := d.getUserSessionCommon(ctx, tx, selectBuilder, userSessionStruct)
 	if err != nil {
 		return nil, err
 	}
@@ -126,7 +126,7 @@ func (d *CommonDatabase) GetUserSessionBySessionIdentifier(tx *sql.Tx, sessionId
 	return userSession, nil
 }
 
-func (d *CommonDatabase) GetUserSessionsByClientIdPaginated(tx *sql.Tx, clientId int64, page int, pageSize int) ([]models.UserSession, int, error) {
+func (d *CommonDatabase) GetUserSessionsByClientIdPaginated(ctx context.Context, tx *sql.Tx, clientId int64, page int, pageSize int) ([]models.UserSession, int, error) {
 	if clientId <= 0 {
 		return nil, 0, errs.New("client id must be greater than 0")
 	}
@@ -153,7 +153,7 @@ func (d *CommonDatabase) GetUserSessionsByClientIdPaginated(tx *sql.Tx, clientId
 	selectBuilder.Limit(pageSize)
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(context.Background(), tx, sql, args...)
+	rows, err := d.QuerySql(ctx, tx, sql, args...)
 	if err != nil {
 		return nil, 0, errs.Wrap(err, "unable to query database")
 	}
@@ -176,7 +176,7 @@ func (d *CommonDatabase) GetUserSessionsByClientIdPaginated(tx *sql.Tx, clientId
 	selectBuilder.Where(selectBuilder.Equal("user_session_clients.client_id", clientId))
 
 	sql, args = selectBuilder.Build()
-	rows2, err := d.QuerySql(context.Background(), tx, sql, args...)
+	rows2, err := d.QuerySql(ctx, tx, sql, args...)
 	if err != nil {
 		return nil, 0, errs.Wrap(err, "unable to query database")
 	}
@@ -200,7 +200,7 @@ func (d *CommonDatabase) GetUserSessionsByClientIdPaginated(tx *sql.Tx, clientId
 	return userSessions, total, nil
 }
 
-func (d *CommonDatabase) UserSessionsLoadUsers(tx *sql.Tx, userSessions []models.UserSession) error {
+func (d *CommonDatabase) UserSessionsLoadUsers(ctx context.Context, tx *sql.Tx, userSessions []models.UserSession) error {
 
 	if userSessions == nil {
 		return nil
@@ -211,7 +211,7 @@ func (d *CommonDatabase) UserSessionsLoadUsers(tx *sql.Tx, userSessions []models
 		userIds = append(userIds, userSession.UserId)
 	}
 
-	users, err := d.GetUsersByIds(context.Background(), tx, userIds)
+	users, err := d.GetUsersByIds(ctx, tx, userIds)
 	if err != nil {
 		return errs.Wrap(err, "unable to load users")
 	}
@@ -232,7 +232,7 @@ func (d *CommonDatabase) UserSessionsLoadUsers(tx *sql.Tx, userSessions []models
 	return nil
 }
 
-func (d *CommonDatabase) UserSessionsLoadClients(tx *sql.Tx, userSessions []models.UserSession) error {
+func (d *CommonDatabase) UserSessionsLoadClients(ctx context.Context, tx *sql.Tx, userSessions []models.UserSession) error {
 	if userSessions == nil {
 		return nil
 	}
@@ -242,7 +242,7 @@ func (d *CommonDatabase) UserSessionsLoadClients(tx *sql.Tx, userSessions []mode
 		userSessionIds = append(userSessionIds, userSession.Id)
 	}
 
-	userSessionClients, err := d.GetUserSessionClientsByUserSessionIds(tx, userSessionIds)
+	userSessionClients, err := d.GetUserSessionClientsByUserSessionIds(ctx, tx, userSessionIds)
 	if err != nil {
 		return errs.Wrap(err, "unable to load userSessionClients")
 	}
@@ -259,13 +259,13 @@ func (d *CommonDatabase) UserSessionsLoadClients(tx *sql.Tx, userSessions []mode
 	return nil
 }
 
-func (d *CommonDatabase) UserSessionLoadClients(tx *sql.Tx, userSession *models.UserSession) error {
+func (d *CommonDatabase) UserSessionLoadClients(ctx context.Context, tx *sql.Tx, userSession *models.UserSession) error {
 
 	if userSession == nil {
 		return nil
 	}
 
-	userSessionClients, err := d.GetUserSessionClientsByUserSessionId(tx, userSession.Id)
+	userSessionClients, err := d.GetUserSessionClientsByUserSessionId(ctx, tx, userSession.Id)
 	if err != nil {
 		return errs.Wrap(err, "unable to load userSessionClients")
 	}
@@ -275,13 +275,13 @@ func (d *CommonDatabase) UserSessionLoadClients(tx *sql.Tx, userSession *models.
 	return nil
 }
 
-func (d *CommonDatabase) UserSessionLoadUser(tx *sql.Tx, userSession *models.UserSession) error {
+func (d *CommonDatabase) UserSessionLoadUser(ctx context.Context, tx *sql.Tx, userSession *models.UserSession) error {
 
 	if userSession == nil {
 		return nil
 	}
 
-	user, err := d.GetUserById(context.Background(), tx, userSession.UserId)
+	user, err := d.GetUserById(ctx, tx, userSession.UserId)
 	if err != nil {
 		return errs.Wrap(err, "unable to load user")
 	}
@@ -292,7 +292,7 @@ func (d *CommonDatabase) UserSessionLoadUser(tx *sql.Tx, userSession *models.Use
 	return nil
 }
 
-func (d *CommonDatabase) GetUserSessionsByUserId(tx *sql.Tx, userId int64) ([]models.UserSession, error) {
+func (d *CommonDatabase) GetUserSessionsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]models.UserSession, error) {
 
 	userSessionStruct := sqlbuilder.NewStruct(new(models.UserSession)).
 		For(d.Flavor)
@@ -301,7 +301,7 @@ func (d *CommonDatabase) GetUserSessionsByUserId(tx *sql.Tx, userId int64) ([]mo
 	selectBuilder.Where(selectBuilder.Equal("user_id", userId))
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(context.Background(), tx, sql, args...)
+	rows, err := d.QuerySql(ctx, tx, sql, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -325,7 +325,7 @@ func (d *CommonDatabase) GetUserSessionsByUserId(tx *sql.Tx, userId int64) ([]mo
 	return userSessions, nil
 }
 
-func (d *CommonDatabase) DeleteUserSession(tx *sql.Tx, userSessionId int64) error {
+func (d *CommonDatabase) DeleteUserSession(ctx context.Context, tx *sql.Tx, userSessionId int64) error {
 
 	userSessionStruct := sqlbuilder.NewStruct(new(models.UserSession)).
 		For(d.Flavor)
@@ -334,7 +334,7 @@ func (d *CommonDatabase) DeleteUserSession(tx *sql.Tx, userSessionId int64) erro
 	deleteBuilder.Where(deleteBuilder.Equal("id", userSessionId))
 
 	sql, args := deleteBuilder.Build()
-	_, err := d.ExecSql(context.Background(), tx, sql, args...)
+	_, err := d.ExecSql(ctx, tx, sql, args...)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete userSession")
 	}
@@ -357,7 +357,7 @@ func (d *CommonDatabase) DeleteUserSession(tx *sql.Tx, userSessionId int64) erro
 // It keys on the session identifier rather than the id because that is what a ceremony holds. The
 // column is UNIQUE on all four engines, so the statement is a single-row lock everywhere, which is
 // what AcquireClientRow relies on for its own key (#245).
-func (d *CommonDatabase) AcquireUserSessionRow(tx *sql.Tx, sessionIdentifier string) (bool, error) {
+func (d *CommonDatabase) AcquireUserSessionRow(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (bool, error) {
 
 	// The transaction is required for AcquireClientRow's stated reason: without one the statement
 	// autocommits and releases the row before the caller can use it, which is the whole of what
@@ -378,7 +378,7 @@ func (d *CommonDatabase) AcquireUserSessionRow(tx *sql.Tx, sessionIdentifier str
 	acquire.Where(acquire.Equal("session_identifier", sessionIdentifier))
 
 	query, args := acquire.BuildWithFlavor(d.Flavor)
-	result, err := d.ExecSql(context.Background(), tx, query, args...)
+	result, err := d.ExecSql(ctx, tx, query, args...)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to acquire user session row")
 	}
@@ -396,7 +396,7 @@ func (d *CommonDatabase) AcquireUserSessionRow(tx *sql.Tx, sessionIdentifier str
 }
 
 // Deletes user sessions that have been idle longer than the specified timeout
-func (d *CommonDatabase) DeleteIdleSessions(tx *sql.Tx, idleTimeout time.Duration) error {
+func (d *CommonDatabase) DeleteIdleSessions(ctx context.Context, tx *sql.Tx, idleTimeout time.Duration) error {
 	deleteBuilder := d.Flavor.NewDeleteBuilder()
 	deleteBuilder.DeleteFrom("user_sessions")
 	deleteBuilder.Where(
@@ -404,7 +404,7 @@ func (d *CommonDatabase) DeleteIdleSessions(tx *sql.Tx, idleTimeout time.Duratio
 	)
 
 	sql, args := deleteBuilder.Build()
-	_, err := d.ExecSql(context.Background(), tx, sql, args...)
+	_, err := d.ExecSql(ctx, tx, sql, args...)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete idle sessions")
 	}
@@ -413,7 +413,7 @@ func (d *CommonDatabase) DeleteIdleSessions(tx *sql.Tx, idleTimeout time.Duratio
 }
 
 // Deletes user sessions that have existed longer than the specified maximum lifetime
-func (d *CommonDatabase) DeleteExpiredSessions(tx *sql.Tx, maxLifetime time.Duration) error {
+func (d *CommonDatabase) DeleteExpiredSessions(ctx context.Context, tx *sql.Tx, maxLifetime time.Duration) error {
 	deleteBuilder := d.Flavor.NewDeleteBuilder()
 	deleteBuilder.DeleteFrom("user_sessions")
 	deleteBuilder.Where(
@@ -421,7 +421,7 @@ func (d *CommonDatabase) DeleteExpiredSessions(tx *sql.Tx, maxLifetime time.Dura
 	)
 
 	sql, args := deleteBuilder.Build()
-	_, err := d.ExecSql(context.Background(), tx, sql, args...)
+	_, err := d.ExecSql(ctx, tx, sql, args...)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete expired sessions")
 	}
@@ -436,7 +436,7 @@ func (d *CommonDatabase) DeleteExpiredSessions(tx *sql.Tx, maxLifetime time.Dura
 // session this promotion exists to serve: BumpUserSession writes the whole row on
 // every request, so if the column were in the ordinary update set the first bump after
 // a password change would undo the promotion and sign the user out. (#106)
-func (d *CommonDatabase) PromoteUserSessionGeneration(tx *sql.Tx, userSessionId int64, generation int64) error {
+func (d *CommonDatabase) PromoteUserSessionGeneration(ctx context.Context, tx *sql.Tx, userSessionId int64, generation int64) error {
 
 	if userSessionId == 0 {
 		return errs.New("can't promote the generation of user session with id 0")
@@ -451,7 +451,7 @@ func (d *CommonDatabase) PromoteUserSessionGeneration(tx *sql.Tx, userSessionId 
 	ub.Where(ub.Equal("id", userSessionId))
 
 	query, args := ub.BuildWithFlavor(d.Flavor)
-	result, err := d.ExecSql(context.Background(), tx, query, args...)
+	result, err := d.ExecSql(ctx, tx, query, args...)
 	if err != nil {
 		return errs.Wrap(err, "unable to promote user session generation")
 	}
@@ -483,7 +483,7 @@ func (d *CommonDatabase) PromoteUserSessionGeneration(tx *sql.Tx, userSessionId 
 // Called from /auth/completed and nowhere else, with a value captured earlier in the
 // ceremony. Reading the counter live here instead would launder an authenticator change
 // that landed after the ceremony asked its level 2 question (#242, #106 decision 11).
-func (d *CommonDatabase) PromoteUserSessionOtpConfigGeneration(tx *sql.Tx, userSessionId int64, generation int64) error {
+func (d *CommonDatabase) PromoteUserSessionOtpConfigGeneration(ctx context.Context, tx *sql.Tx, userSessionId int64, generation int64) error {
 
 	if userSessionId == 0 {
 		return errs.New("can't promote the otp config generation of user session with id 0")
@@ -498,7 +498,7 @@ func (d *CommonDatabase) PromoteUserSessionOtpConfigGeneration(tx *sql.Tx, userS
 	ub.Where(ub.Equal("id", userSessionId))
 
 	query, args := ub.BuildWithFlavor(d.Flavor)
-	result, err := d.ExecSql(context.Background(), tx, query, args...)
+	result, err := d.ExecSql(ctx, tx, query, args...)
 	if err != nil {
 		return errs.Wrap(err, "unable to promote user session otp config generation")
 	}
