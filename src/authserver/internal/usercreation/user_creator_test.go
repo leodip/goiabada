@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"errors"
+
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/constants"
@@ -44,12 +45,12 @@ func TestUserCreator_CreateUser_WritesTheUserAndItsAccountPermissionInOneTransac
 
 	var calls []string
 	stub := expectRunInTransaction(db)
-	db.On("CreateUser", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		created := args.Get(1).(*models.User)
+	db.On("CreateUser", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		created := args.Get(2).(*models.User)
 		created.Id = 77 // stand in for the generated primary key
 		calls = append(calls, "user row")
 	}).Return(nil).Once()
-	db.On("CreateUserPermission", mock.Anything, mock.MatchedBy(func(up *models.UserPermission) bool {
+	db.On("CreateUserPermission", mock.Anything, mock.Anything, mock.MatchedBy(func(up *models.UserPermission) bool {
 		return up.UserId == 77 && up.PermissionId == accountPermissionId
 	})).Run(func(mock.Arguments) { calls = append(calls, "permission row") }).Return(nil).Once()
 
@@ -84,14 +85,14 @@ func TestUserCreator_CreateUser_AFailedUserInsertReachesTheHelperAndWritesNoPerm
 
 	boom := errors.New("the engine refused the insert")
 	stub := expectRunInTransaction(db)
-	db.On("CreateUser", mock.Anything, mock.Anything).Return(boom).Once()
+	db.On("CreateUser", mock.Anything, mock.Anything, mock.Anything).Return(boom).Once()
 
 	user, err := NewUserCreator(db).CreateUser(context.Background(), &CreateUserInput{Email: "ada@example.com"})
 
 	require.ErrorIs(t, err, boom)
 	assert.Nil(t, user, "no user is returned alongside an error")
 	assert.ErrorIs(t, stub.bodyErr, boom, "the body handed the failure to the helper, which rolls back")
-	db.AssertNotCalled(t, "CreateUserPermission", mock.Anything, mock.Anything)
+	db.AssertNotCalled(t, "CreateUserPermission", mock.Anything, mock.Anything, mock.Anything)
 }
 
 func TestUserCreator_CreateUser_ATransactionThatCannotOpenIsReported(t *testing.T) {
@@ -105,7 +106,7 @@ func TestUserCreator_CreateUser_ATransactionThatCannotOpenIsReported(t *testing.
 
 	require.ErrorIs(t, err, boom)
 	assert.Nil(t, user)
-	db.AssertNotCalled(t, "CreateUser", mock.Anything, mock.Anything)
+	db.AssertNotCalled(t, "CreateUser", mock.Anything, mock.Anything, mock.Anything)
 }
 
 func TestUserCreator_CreateUser_RefusesWithoutTheAccountPermissionBeforeAnyTransaction(t *testing.T) {
@@ -139,12 +140,12 @@ func TestUserCreator_CreateUser_TheBodyIsSafeToRerun(t *testing.T) {
 
 	ids := []int64{77, 78}
 	var permissionUserIds []int64
-	db.On("CreateUser", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		args.Get(1).(*models.User).Id = ids[0]
+	db.On("CreateUser", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		args.Get(2).(*models.User).Id = ids[0]
 		ids = ids[1:]
 	}).Return(nil).Twice()
-	db.On("CreateUserPermission", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		permissionUserIds = append(permissionUserIds, args.Get(1).(*models.UserPermission).UserId)
+	db.On("CreateUserPermission", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		permissionUserIds = append(permissionUserIds, args.Get(2).(*models.UserPermission).UserId)
 	}).Return(nil).Twice()
 
 	user, err := NewUserCreator(db).CreateUser(context.Background(), &CreateUserInput{Email: "ada@example.com"})

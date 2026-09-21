@@ -119,7 +119,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		req = req.WithContext(ctx)
 		rr := httptest.NewRecorder()
 
-		database.On("GetUserBySubject", (*sql.Tx)(nil), "user123").Return(nil, nil)
+		database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), "user123").Return(nil, nil)
 
 		httpHelper.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
 			return isUserInfoInvalidToken(err, "The user could not be found.")
@@ -152,7 +152,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		rr := httptest.NewRecorder()
 
 		user := &models.User{Id: 1, Subject: sub, Enabled: false}
-		database.On("GetUserBySubject", (*sql.Tx)(nil), sub).Return(user, nil)
+		database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), sub).Return(user, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.AuditUserDisabled, mock.MatchedBy(func(details map[string]interface{}) bool {
 			return details["userId"] == user.Id
@@ -228,11 +228,11 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 			Attributes:          []models.UserAttribute{userAttr},
 		}
 
-		database.On("GetUserBySubject", (*sql.Tx)(nil), sub).Return(user, nil)
-		database.On("UserLoadGroups", (*sql.Tx)(nil), user).Return(nil)
+		database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), sub).Return(user, nil)
+		database.On("UserLoadGroups", mock.Anything, (*sql.Tx)(nil), user).Return(nil)
 		database.On("GroupsLoadAttributes", (*sql.Tx)(nil), user.Groups).Return(nil)
-		database.On("UserLoadAttributes", (*sql.Tx)(nil), user).Return(nil)
-		database.On("UserHasProfilePicture", (*sql.Tx)(nil), user.Id).Return(false, nil)
+		database.On("UserLoadAttributes", mock.Anything, (*sql.Tx)(nil), user).Return(nil)
+		database.On("UserHasProfilePicture", mock.Anything, (*sql.Tx)(nil), user.Id).Return(false, nil)
 
 		httpHelper.On("EncodeJson", rr, req, mock.MatchedBy(func(claims map[string]interface{}) bool {
 			assert.Equal(t, sub, claims["sub"])
@@ -331,7 +331,7 @@ func TestHandleUserInfoGetPost_RefusalsAreInvalidTokenOnTheWire(t *testing.T) {
 			req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeyValidatedToken, jwtToken))
 			rr := httptest.NewRecorder()
 
-			database.On("GetUserBySubject", (*sql.Tx)(nil), "user123").Return(test.user, nil)
+			database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), "user123").Return(test.user, nil)
 			if test.user != nil {
 				auditLogger.On("Log", mock.Anything, audit.AuditUserDisabled, mock.Anything).Return()
 			}

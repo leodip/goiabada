@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"net/http"
 	"net/url"
 	"testing"
@@ -98,7 +99,7 @@ func TestAuthTime_IsTheInstantTheCredentialWasAccepted(t *testing.T) {
 		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
-	if err := database.CreateUser(nil, user); err != nil {
+	if err := database.CreateUser(context.Background(), nil, user); err != nil {
 		t.Fatal(err)
 	}
 

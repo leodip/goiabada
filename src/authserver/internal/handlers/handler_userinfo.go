@@ -34,7 +34,7 @@ func HandleUserInfoGetPost(
 			return
 		}
 
-		user, err := database.GetUserBySubject(nil, sub)
+		user, err := database.GetUserBySubject(r.Context(), nil, sub)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
@@ -68,7 +68,7 @@ func HandleUserInfoGetPost(
 			return
 		}
 
-		err = database.UserLoadGroups(nil, user)
+		err = database.UserLoadGroups(r.Context(), nil, user)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
@@ -80,7 +80,7 @@ func HandleUserInfoGetPost(
 			return
 		}
 
-		err = database.UserLoadAttributes(nil, user)
+		err = database.UserLoadAttributes(r.Context(), nil, user)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
@@ -113,7 +113,7 @@ func HandleUserInfoGetPost(
 			claims["updated_at"] = user.UpdatedAt.Time.UTC().Unix()
 
 			// Add picture claim if user has a profile picture
-			hasPicture, pictureErr := database.UserHasProfilePicture(nil, user.Id)
+			hasPicture, pictureErr := database.UserHasProfilePicture(r.Context(), nil, user.Id)
 			if pictureErr == nil && hasPicture {
 				claims["picture"] = fmt.Sprintf("%v/userinfo/picture/%v", config.GetAuthServer().BaseURL, user.Subject)
 			}

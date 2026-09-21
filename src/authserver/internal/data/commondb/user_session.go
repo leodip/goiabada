@@ -211,7 +211,7 @@ func (d *CommonDatabase) UserSessionsLoadUsers(tx *sql.Tx, userSessions []models
 		userIds = append(userIds, userSession.UserId)
 	}
 
-	users, err := d.GetUsersByIds(tx, userIds)
+	users, err := d.GetUsersByIds(context.Background(), tx, userIds)
 	if err != nil {
 		return errs.Wrap(err, "unable to load users")
 	}
@@ -281,7 +281,7 @@ func (d *CommonDatabase) UserSessionLoadUser(tx *sql.Tx, userSession *models.Use
 		return nil
 	}
 
-	user, err := d.GetUserById(tx, userSession.UserId)
+	user, err := d.GetUserById(context.Background(), tx, userSession.UserId)
 	if err != nil {
 		return errs.Wrap(err, "unable to load user")
 	}

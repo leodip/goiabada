@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -103,10 +104,10 @@ func TestAPIUserPhonePut_Success(t *testing.T) {
 		FamilyName:    "User",
 		EmailVerified: true,
 	}
-	err := database.CreateUser(nil, testUser)
+	err := database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
 	// Test: Update user phone
@@ -137,7 +138,7 @@ func TestAPIUserPhonePut_Success(t *testing.T) {
 	assert.Equal(t, "+1", updateResponse.User.PhoneNumberCountryCallingCode)
 
 	// Verify changes were persisted to database
-	updatedUser, err := database.GetUserById(nil, testUser.Id)
+	updatedUser, err := database.GetUserById(context.Background(), nil, testUser.Id)
 	assert.NoError(t, err)
 	assert.NotNil(t, updatedUser)
 	assert.Equal(t, updateReq.PhoneCountryUniqueId, updatedUser.PhoneNumberCountryUniqueId)
@@ -164,10 +165,10 @@ func TestAPIUserPhonePut_ClearPhoneNumber(t *testing.T) {
 		PhoneNumber:                   "555-999-8888",
 		PhoneNumberVerified:           true,
 	}
-	err := database.CreateUser(nil, testUser)
+	err := database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
 	// Test: Clear phone number by setting empty values
@@ -196,7 +197,7 @@ func TestAPIUserPhonePut_ClearPhoneNumber(t *testing.T) {
 	assert.False(t, updateResponse.User.PhoneNumberVerified)
 
 	// Verify changes were persisted to database
-	updatedUser, err := database.GetUserById(nil, testUser.Id)
+	updatedUser, err := database.GetUserById(context.Background(), nil, testUser.Id)
 	assert.NoError(t, err)
 	assert.Empty(t, updatedUser.PhoneNumberCountryUniqueId)
 	assert.Empty(t, updatedUser.PhoneNumberCountryCallingCode)
@@ -217,10 +218,10 @@ func TestAPIUserPhonePut_ValidationErrors(t *testing.T) {
 		FamilyName:    "User",
 		EmailVerified: true,
 	}
-	err := database.CreateUser(nil, testUser)
+	err := database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
 	testCases := []struct {
@@ -358,10 +359,10 @@ func TestAPIUserPhonePut_InvalidRequestBody(t *testing.T) {
 		FamilyName:    "User",
 		EmailVerified: true,
 	}
-	err := database.CreateUser(nil, testUser)
+	err := database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
 	// Test: Invalid JSON
@@ -390,10 +391,10 @@ func TestAPIUserPhonePut_Unauthorized(t *testing.T) {
 		FamilyName:    "User",
 		EmailVerified: true,
 	}
-	err := database.CreateUser(nil, testUser)
+	err := database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
 	// Test: Request without access token
@@ -423,10 +424,10 @@ func TestAPIUserPhonePut_PhoneNumberVerifiedAutoCleared(t *testing.T) {
 		FamilyName:    "User",
 		EmailVerified: true,
 	}
-	err := database.CreateUser(nil, testUser)
+	err := database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
 	// Test: Set phone number verified to true but clear the phone number
@@ -453,7 +454,7 @@ func TestAPIUserPhonePut_PhoneNumberVerifiedAutoCleared(t *testing.T) {
 	assert.False(t, updateResponse.User.PhoneNumberVerified)
 
 	// Verify in database
-	updatedUser, err := database.GetUserById(nil, testUser.Id)
+	updatedUser, err := database.GetUserById(context.Background(), nil, testUser.Id)
 	assert.NoError(t, err)
 	assert.False(t, updatedUser.PhoneNumberVerified)
 }

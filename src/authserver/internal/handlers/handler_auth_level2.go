@@ -51,7 +51,7 @@ func HandleAuthLevel2Get(
 			return
 		}
 
-		user, err := database.GetUserById(nil, authContext.UserId)
+		user, err := database.GetUserById(r.Context(), nil, authContext.UserId)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return

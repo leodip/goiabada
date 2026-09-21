@@ -133,10 +133,10 @@ func TestGenerateTokenResponseForAuthCode_FullOpenIDConnect(t *testing.T) {
 	code.Client = *client
 	mockDB.On("CodeLoadUser", mock.Anything, code).Return(nil)
 	code.User = *user
-	mockDB.On("UserLoadGroups", mock.Anything, &code.User).Return(nil)
+	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, &code.User).Return(nil)
 	mockDB.On("GroupsLoadAttributes", mock.Anything, code.User.Groups).Return(nil)
-	mockDB.On("UserLoadAttributes", mock.Anything, &code.User).Return(nil)
-	mockDB.On("UserHasProfilePicture", mock.Anything, user.Id).Return(false, nil)
+	mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything, &code.User).Return(nil)
+	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, user.Id).Return(false, nil)
 	mockDB.On("CreateRefreshToken", mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil)
 	mockDB.On("GetCurrentSigningKey", mock.Anything).Return(&models.KeyPair{
 		KeyIdentifier: "test-key-id",
@@ -348,9 +348,9 @@ func TestGenerateTokenResponseForAuthCode_MinimalScope(t *testing.T) {
 	code.Client = *client
 	mockDB.On("CodeLoadUser", mock.Anything, code).Return(nil)
 	code.User = *user
-	mockDB.On("UserLoadGroups", mock.Anything, &code.User).Return(nil)
+	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, &code.User).Return(nil)
 	mockDB.On("GroupsLoadAttributes", mock.Anything, code.User.Groups).Return(nil)
-	mockDB.On("UserLoadAttributes", mock.Anything, &code.User).Return(nil)
+	mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything, &code.User).Return(nil)
 	mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, sessionIdentifier).Return(&models.UserSession{
 		Id:           1,
 		UserId:       1,
@@ -499,10 +499,10 @@ func TestGenerateTokenResponseForAuthCode_ClientOverrideAndMixedScopes(t *testin
 	code.Client = *client
 	mockDB.On("CodeLoadUser", mock.Anything, code).Return(nil)
 	code.User = *user
-	mockDB.On("UserLoadGroups", mock.Anything, &code.User).Return(nil)
+	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, &code.User).Return(nil)
 	mockDB.On("GroupsLoadAttributes", mock.Anything, code.User.Groups).Return(nil)
-	mockDB.On("UserLoadAttributes", mock.Anything, &code.User).Return(nil)
-	mockDB.On("UserHasProfilePicture", mock.Anything, user.Id).Return(false, nil)
+	mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything, &code.User).Return(nil)
+	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, user.Id).Return(false, nil)
 	mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, sessionIdentifier).Return(&models.UserSession{
 		Id:           1,
 		UserId:       3,
@@ -663,9 +663,9 @@ func TestGenerateTokenResponseForAuthCode_ClientOverrideAndCustomScope(t *testin
 	code.Client = *client
 	mockDB.On("CodeLoadUser", mock.Anything, code).Return(nil)
 	code.User = *user
-	mockDB.On("UserLoadGroups", mock.Anything, &code.User).Return(nil)
+	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, &code.User).Return(nil)
 	mockDB.On("GroupsLoadAttributes", mock.Anything, code.User.Groups).Return(nil)
-	mockDB.On("UserLoadAttributes", mock.Anything, &code.User).Return(nil)
+	mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything, &code.User).Return(nil)
 	mockDB.On("CreateRefreshToken", mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil)
 	mockDB.On("GetCurrentSigningKey", mock.Anything).Return(&models.KeyPair{
 		KeyIdentifier: "test-key-id",
@@ -777,9 +777,9 @@ func TestGenerateTokenResponseForAuthCode_CustomScope(t *testing.T) {
 	code.Client = *client
 	mockDB.On("CodeLoadUser", mock.Anything, code).Return(nil)
 	code.User = *user
-	mockDB.On("UserLoadGroups", mock.Anything, &code.User).Return(nil)
+	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, &code.User).Return(nil)
 	mockDB.On("GroupsLoadAttributes", mock.Anything, code.User.Groups).Return(nil)
-	mockDB.On("UserLoadAttributes", mock.Anything, &code.User).Return(nil)
+	mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything, &code.User).Return(nil)
 	mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, sessionIdentifier).Return(&models.UserSession{
 		Id:           1,
 		UserId:       5,
@@ -894,9 +894,9 @@ func TestGenerateAccessToken(t *testing.T) {
 	code.Client = *client
 	code.User = *user
 
-	mockDB.On("UserHasProfilePicture", mock.Anything, user.Id).Return(false, nil)
+	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, user.Id).Return(false, nil)
 
-	accessToken, scope, err := tokenIssuer.generateAccessToken(settings, code, code.Scope, now, privKey, "test-key-id", nil)
+	accessToken, scope, err := tokenIssuer.generateAccessToken(context.Background(), settings, code, code.Scope, now, privKey, "test-key-id", nil)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, accessToken)
 	assert.Equal(t, "openid profile email authserver:userinfo", scope)
@@ -975,7 +975,7 @@ func TestGenerateAccessToken_CustomScope(t *testing.T) {
 	code.Client = *client
 	code.User = *user
 
-	accessToken, scope, err := tokenIssuer.generateAccessToken(settings, code, code.Scope, now, privKey, "test-key-id", nil)
+	accessToken, scope, err := tokenIssuer.generateAccessToken(context.Background(), settings, code, code.Scope, now, privKey, "test-key-id", nil)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, accessToken)
 	assert.Equal(t, "resource1:read resource2:write", scope)
@@ -1068,9 +1068,9 @@ func TestGenerateAccessToken_WithGroupsAndAttributes(t *testing.T) {
 	code.Client = *client
 	code.User = *user
 
-	mockDB.On("UserHasProfilePicture", mock.Anything, user.Id).Return(false, nil)
+	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, user.Id).Return(false, nil)
 
-	accessToken, scope, err := tokenIssuer.generateAccessToken(settings, code, code.Scope, now, privKey, "test-key-id", nil)
+	accessToken, scope, err := tokenIssuer.generateAccessToken(context.Background(), settings, code, code.Scope, now, privKey, "test-key-id", nil)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, accessToken)
 	assert.Equal(t, "openid profile email groups attributes authserver:userinfo", scope)
@@ -1161,7 +1161,7 @@ func TestGenerateAccessToken_InvalidScope(t *testing.T) {
 	code.Client = *client
 	code.User = *user
 
-	_, _, err = tokenIssuer.generateAccessToken(settings, code, code.Scope, now, privKey, "test-key-id", nil)
+	_, _, err = tokenIssuer.generateAccessToken(context.Background(), settings, code, code.Scope, now, privKey, "test-key-id", nil)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid scope")
 }
@@ -1239,9 +1239,9 @@ func TestGenerateIdToken_FullScope(t *testing.T) {
 	code.Client = *client
 	code.User = *user
 
-	mockDB.On("UserHasProfilePicture", mock.Anything, user.Id).Return(false, nil)
+	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, user.Id).Return(false, nil)
 
-	idToken, err := tokenIssuer.generateIdToken(settings, code, code.Scope, now, privKey, "test-key-id")
+	idToken, err := tokenIssuer.generateIdToken(context.Background(), settings, code, code.Scope, now, privKey, "test-key-id")
 	assert.NoError(t, err)
 	assert.NotEmpty(t, idToken)
 
@@ -1340,7 +1340,7 @@ func TestGenerateIdToken_MinimalScope(t *testing.T) {
 	code.Client = *client
 	code.User = *user
 
-	idToken, err := tokenIssuer.generateIdToken(settings, code, code.Scope, now, privKey, "test-key-id")
+	idToken, err := tokenIssuer.generateIdToken(context.Background(), settings, code, code.Scope, now, privKey, "test-key-id")
 	assert.NoError(t, err)
 	assert.NotEmpty(t, idToken)
 
@@ -1420,9 +1420,9 @@ func TestGenerateIdToken_ClientOverride(t *testing.T) {
 	code.Client = *client
 	code.User = *user
 
-	mockDB.On("UserHasProfilePicture", mock.Anything, user.Id).Return(false, nil)
+	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, user.Id).Return(false, nil)
 
-	idToken, err := tokenIssuer.generateIdToken(settings, code, code.Scope, now, privKey, "test-key-id")
+	idToken, err := tokenIssuer.generateIdToken(context.Background(), settings, code, code.Scope, now, privKey, "test-key-id")
 	assert.NoError(t, err)
 	assert.NotEmpty(t, idToken)
 
@@ -2118,10 +2118,10 @@ func TestGenerateTokenResponseForRefresh(t *testing.T) {
 	code.Client = *client
 	mockDB.On("CodeLoadUser", mock.Anything, code).Return(nil)
 	code.User = *user
-	mockDB.On("UserLoadGroups", mock.Anything, &code.User).Return(nil)
+	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, &code.User).Return(nil)
 	mockDB.On("GroupsLoadAttributes", mock.Anything, code.User.Groups).Return(nil)
-	mockDB.On("UserLoadAttributes", mock.Anything, &code.User).Return(nil)
-	mockDB.On("UserHasProfilePicture", mock.Anything, user.Id).Return(false, nil)
+	mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything, &code.User).Return(nil)
+	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, user.Id).Return(false, nil)
 	var capturedRefreshToken *models.RefreshToken
 	mockDB.On("CreateRefreshToken", mock.Anything, mock.AnythingOfType("*models.RefreshToken")).
 		Run(func(args mock.Arguments) {
@@ -2330,9 +2330,9 @@ func TestGenerateTokenResponseForRefresh_Offline_NoIdToken(t *testing.T) {
 	code.Client = *client
 	mockDB.On("CodeLoadUser", mock.Anything, code).Return(nil)
 	code.User = *user
-	mockDB.On("UserLoadGroups", mock.Anything, &code.User).Return(nil)
+	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, &code.User).Return(nil)
 	mockDB.On("GroupsLoadAttributes", mock.Anything, code.User.Groups).Return(nil)
-	mockDB.On("UserLoadAttributes", mock.Anything, &code.User).Return(nil)
+	mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything, &code.User).Return(nil)
 	var capturedRefreshToken *models.RefreshToken
 	mockDB.On("CreateRefreshToken", mock.Anything, mock.AnythingOfType("*models.RefreshToken")).
 		Run(func(args mock.Arguments) {
@@ -2441,7 +2441,7 @@ func TestAddOpenIdConnectClaimsFromUser(t *testing.T) {
 	now := time.Now().UTC()
 
 	// Set up mock for profile picture check - it will be called for tests with profile scope
-	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything).Return(false, nil).Maybe()
+	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
 
 	testCases := []struct {
 		name     string
@@ -2571,7 +2571,7 @@ func TestAddOpenIdConnectClaimsFromUser(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			claims := make(jwt.MapClaims)
 
-			tokenIssuer.addOpenIdConnectClaimsFromUser(claims, tc.user, tc.scopes)
+			tokenIssuer.addOpenIdConnectClaimsFromUser(context.Background(), claims, tc.user, tc.scopes)
 
 			for key, expectedValue := range tc.expected {
 				assert.Equal(t, expectedValue, claims[key], "Mismatch for claim: %s", key)
@@ -2746,9 +2746,9 @@ func TestGenerateTokenResponseForImplicit_AccessTokenOnly(t *testing.T) {
 		KeyIdentifier: "test-key-id",
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 	}, nil)
-	mockDB.On("UserLoadGroups", mock.Anything, user).Return(nil)
+	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(nil)
 	mockDB.On("GroupsLoadAttributes", mock.Anything, user.Groups).Return(nil)
-	mockDB.On("UserLoadAttributes", mock.Anything, user).Return(nil)
+	mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything, user).Return(nil)
 
 	input := &ImplicitGrantInput{
 		Client:            client,
@@ -2828,10 +2828,10 @@ func TestGenerateTokenResponseForImplicit_IdTokenOnly(t *testing.T) {
 		KeyIdentifier: "test-key-id",
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 	}, nil)
-	mockDB.On("UserLoadGroups", mock.Anything, user).Return(nil)
+	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(nil)
 	mockDB.On("GroupsLoadAttributes", mock.Anything, user.Groups).Return(nil)
-	mockDB.On("UserLoadAttributes", mock.Anything, user).Return(nil)
-	mockDB.On("UserHasProfilePicture", mock.Anything, user.Id).Return(false, nil)
+	mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything, user).Return(nil)
+	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, user.Id).Return(false, nil)
 
 	input := &ImplicitGrantInput{
 		Client:            client,
@@ -2917,10 +2917,10 @@ func TestGenerateTokenResponseForImplicit_BothTokens(t *testing.T) {
 		KeyIdentifier: "test-key-id",
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 	}, nil)
-	mockDB.On("UserLoadGroups", mock.Anything, user).Return(nil)
+	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(nil)
 	mockDB.On("GroupsLoadAttributes", mock.Anything, user.Groups).Return(nil)
-	mockDB.On("UserLoadAttributes", mock.Anything, user).Return(nil)
-	mockDB.On("UserHasProfilePicture", mock.Anything, user.Id).Return(false, nil)
+	mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything, user).Return(nil)
+	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, user.Id).Return(false, nil)
 
 	input := &ImplicitGrantInput{
 		Client:            client,
@@ -2996,9 +2996,9 @@ func TestGenerateTokenResponseForImplicit_NoRefreshToken(t *testing.T) {
 		KeyIdentifier: "test-key-id",
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 	}, nil)
-	mockDB.On("UserLoadGroups", mock.Anything, user).Return(nil)
+	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(nil)
 	mockDB.On("GroupsLoadAttributes", mock.Anything, user.Groups).Return(nil)
-	mockDB.On("UserLoadAttributes", mock.Anything, user).Return(nil)
+	mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything, user).Return(nil)
 
 	// Request with offline_access scope - should NOT result in refresh token for implicit flow
 	input := &ImplicitGrantInput{
@@ -3054,9 +3054,9 @@ func TestGenerateTokenResponseForImplicit_ClientOverrideExpiration(t *testing.T)
 		KeyIdentifier: "test-key-id",
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 	}, nil)
-	mockDB.On("UserLoadGroups", mock.Anything, user).Return(nil)
+	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(nil)
 	mockDB.On("GroupsLoadAttributes", mock.Anything, user.Groups).Return(nil)
-	mockDB.On("UserLoadAttributes", mock.Anything, user).Return(nil)
+	mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything, user).Return(nil)
 
 	input := &ImplicitGrantInput{
 		Client:            client,
@@ -3124,9 +3124,9 @@ func TestGenerateTokenResponseForImplicit_WithGroupsAndAttributes(t *testing.T) 
 		KeyIdentifier: "test-key-id",
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 	}, nil)
-	mockDB.On("UserLoadGroups", mock.Anything, user).Return(nil)
+	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(nil)
 	mockDB.On("GroupsLoadAttributes", mock.Anything, user.Groups).Return(nil)
-	mockDB.On("UserLoadAttributes", mock.Anything, user).Return(nil)
+	mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything, user).Return(nil)
 	// Note: UserHasProfilePicture not called because we don't have "profile" scope
 
 	input := &ImplicitGrantInput{
@@ -3285,13 +3285,13 @@ func TestGenerateTokenResponseForROPC_BasicOpenIDScope(t *testing.T) {
 
 	// Set up mock expectations - ROPC doesn't use CreateCode or GetUserSessionBySessionIdentifier
 	mockDB.On("GetCurrentSigningKey", mock.Anything).Return(keyPair, nil)
-	mockDB.On("UserLoadGroups", mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
-		u := args.Get(1).(*models.User)
+	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
+		u := args.Get(2).(*models.User)
 		u.Groups = []models.Group{}
 	})
 	mockDB.On("GroupsLoadAttributes", mock.Anything, mock.Anything).Return(nil)
-	mockDB.On("UserLoadAttributes", mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
-		u := args.Get(1).(*models.User)
+	mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
+		u := args.Get(2).(*models.User)
 		u.Attributes = []models.UserAttribute{}
 	})
 	mockDB.On("CreateRefreshToken", mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil)
@@ -3383,13 +3383,13 @@ func TestGenerateTokenResponseForROPC_WithOfflineAccess(t *testing.T) {
 
 	// Set up mock expectations - ROPC doesn't use CreateCode
 	mockDB.On("GetCurrentSigningKey", mock.Anything).Return(keyPair, nil)
-	mockDB.On("UserLoadGroups", mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
-		u := args.Get(1).(*models.User)
+	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
+		u := args.Get(2).(*models.User)
 		u.Groups = []models.Group{}
 	})
 	mockDB.On("GroupsLoadAttributes", mock.Anything, mock.Anything).Return(nil)
-	mockDB.On("UserLoadAttributes", mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
-		u := args.Get(1).(*models.User)
+	mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
+		u := args.Get(2).(*models.User)
 		u.Attributes = []models.UserAttribute{}
 	})
 	mockDB.On("CreateRefreshToken", mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil)
@@ -3464,16 +3464,16 @@ func TestGenerateTokenResponseForROPC_WithProfileScope(t *testing.T) {
 
 	// Set up mock expectations - ROPC doesn't use CreateCode or GetUserSessionBySessionIdentifier
 	mockDB.On("GetCurrentSigningKey", mock.Anything).Return(keyPair, nil)
-	mockDB.On("UserLoadGroups", mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
-		u := args.Get(1).(*models.User)
+	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
+		u := args.Get(2).(*models.User)
 		u.Groups = []models.Group{}
 	})
 	mockDB.On("GroupsLoadAttributes", mock.Anything, mock.Anything).Return(nil)
-	mockDB.On("UserLoadAttributes", mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
-		u := args.Get(1).(*models.User)
+	mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
+		u := args.Get(2).(*models.User)
 		u.Attributes = []models.UserAttribute{}
 	})
-	mockDB.On("UserHasProfilePicture", mock.Anything, user.Id).Return(false, nil)
+	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, user.Id).Return(false, nil)
 	mockDB.On("CreateRefreshToken", mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil)
 
 	input := &ROPCGrantInput{
@@ -3542,13 +3542,13 @@ func TestGenerateTokenResponseForROPC_WithEmailScope(t *testing.T) {
 
 	// Set up mock expectations - ROPC doesn't use CreateCode or GetUserSessionBySessionIdentifier
 	mockDB.On("GetCurrentSigningKey", mock.Anything).Return(keyPair, nil)
-	mockDB.On("UserLoadGroups", mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
-		u := args.Get(1).(*models.User)
+	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
+		u := args.Get(2).(*models.User)
 		u.Groups = []models.Group{}
 	})
 	mockDB.On("GroupsLoadAttributes", mock.Anything, mock.Anything).Return(nil)
-	mockDB.On("UserLoadAttributes", mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
-		u := args.Get(1).(*models.User)
+	mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
+		u := args.Get(2).(*models.User)
 		u.Attributes = []models.UserAttribute{}
 	})
 	mockDB.On("CreateRefreshToken", mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil)
@@ -3616,13 +3616,13 @@ func TestGenerateTokenResponseForROPC_WithResourcePermissions(t *testing.T) {
 
 	// Set up mock expectations - ROPC doesn't use CreateCode or GetUserSessionBySessionIdentifier
 	mockDB.On("GetCurrentSigningKey", mock.Anything).Return(keyPair, nil)
-	mockDB.On("UserLoadGroups", mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
-		u := args.Get(1).(*models.User)
+	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
+		u := args.Get(2).(*models.User)
 		u.Groups = []models.Group{}
 	})
 	mockDB.On("GroupsLoadAttributes", mock.Anything, mock.Anything).Return(nil)
-	mockDB.On("UserLoadAttributes", mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
-		u := args.Get(1).(*models.User)
+	mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
+		u := args.Get(2).(*models.User)
 		u.Attributes = []models.UserAttribute{}
 	})
 	mockDB.On("CreateRefreshToken", mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil)
@@ -3699,16 +3699,16 @@ func TestGenerateTokenResponseForROPC_WithGroups(t *testing.T) {
 
 	// Set up mock expectations with groups - ROPC doesn't use CreateCode or GetUserSessionBySessionIdentifier
 	mockDB.On("GetCurrentSigningKey", mock.Anything).Return(keyPair, nil)
-	mockDB.On("UserLoadGroups", mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
-		u := args.Get(1).(*models.User)
+	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
+		u := args.Get(2).(*models.User)
 		u.Groups = []models.Group{
 			{Id: 1, GroupIdentifier: "admins", IncludeInAccessToken: true, IncludeInIdToken: true},
 			{Id: 2, GroupIdentifier: "users", IncludeInAccessToken: true, IncludeInIdToken: false},
 		}
 	})
 	mockDB.On("GroupsLoadAttributes", mock.Anything, mock.Anything).Return(nil)
-	mockDB.On("UserLoadAttributes", mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
-		u := args.Get(1).(*models.User)
+	mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
+		u := args.Get(2).(*models.User)
 		u.Attributes = []models.UserAttribute{}
 	})
 	mockDB.On("CreateRefreshToken", mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil)
@@ -3783,13 +3783,13 @@ func TestGenerateTokenResponseForROPC_WithoutOpenID(t *testing.T) {
 
 	// Set up mock expectations - ROPC doesn't use CreateCode or GetUserSessionBySessionIdentifier
 	mockDB.On("GetCurrentSigningKey", mock.Anything).Return(keyPair, nil)
-	mockDB.On("UserLoadGroups", mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
-		u := args.Get(1).(*models.User)
+	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
+		u := args.Get(2).(*models.User)
 		u.Groups = []models.Group{}
 	})
 	mockDB.On("GroupsLoadAttributes", mock.Anything, mock.Anything).Return(nil)
-	mockDB.On("UserLoadAttributes", mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
-		u := args.Get(1).(*models.User)
+	mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
+		u := args.Get(2).(*models.User)
 		u.Attributes = []models.UserAttribute{}
 	})
 	mockDB.On("CreateRefreshToken", mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil)
@@ -3897,13 +3897,13 @@ func TestGenerateTokenResponseForROPC_DatabaseError_CreateRefreshToken(t *testin
 
 	// Set up mock expectations with CreateRefreshToken error
 	mockDB.On("GetCurrentSigningKey", mock.Anything).Return(keyPair, nil)
-	mockDB.On("UserLoadGroups", mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
-		u := args.Get(1).(*models.User)
+	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
+		u := args.Get(2).(*models.User)
 		u.Groups = []models.Group{}
 	})
 	mockDB.On("GroupsLoadAttributes", mock.Anything, mock.Anything).Return(nil)
-	mockDB.On("UserLoadAttributes", mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
-		u := args.Get(1).(*models.User)
+	mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
+		u := args.Get(2).(*models.User)
 		u.Attributes = []models.UserAttribute{}
 	})
 	mockDB.On("CreateRefreshToken", mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(fmt.Errorf("refresh token creation failed"))
@@ -3967,13 +3967,13 @@ func TestGenerateTokenResponseForROPC_ClientTokenExpiration(t *testing.T) {
 
 	// Set up mock expectations - ROPC doesn't use CreateCode or GetUserSessionBySessionIdentifier
 	mockDB.On("GetCurrentSigningKey", mock.Anything).Return(keyPair, nil)
-	mockDB.On("UserLoadGroups", mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
-		u := args.Get(1).(*models.User)
+	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
+		u := args.Get(2).(*models.User)
 		u.Groups = []models.Group{}
 	})
 	mockDB.On("GroupsLoadAttributes", mock.Anything, mock.Anything).Return(nil)
-	mockDB.On("UserLoadAttributes", mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
-		u := args.Get(1).(*models.User)
+	mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
+		u := args.Get(2).(*models.User)
 		u.Attributes = []models.UserAttribute{}
 	})
 	mockDB.On("CreateRefreshToken", mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil)
@@ -4037,13 +4037,13 @@ func TestGenerateTokenResponseForROPC_GlobalTokenExpiration(t *testing.T) {
 
 	// Set up mock expectations - ROPC doesn't use CreateCode or GetUserSessionBySessionIdentifier
 	mockDB.On("GetCurrentSigningKey", mock.Anything).Return(keyPair, nil)
-	mockDB.On("UserLoadGroups", mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
-		u := args.Get(1).(*models.User)
+	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
+		u := args.Get(2).(*models.User)
 		u.Groups = []models.Group{}
 	})
 	mockDB.On("GroupsLoadAttributes", mock.Anything, mock.Anything).Return(nil)
-	mockDB.On("UserLoadAttributes", mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
-		u := args.Get(1).(*models.User)
+	mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything, user).Return(nil).Run(func(args mock.Arguments) {
+		u := args.Get(2).(*models.User)
 		u.Attributes = []models.UserAttribute{}
 	})
 	mockDB.On("CreateRefreshToken", mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil)
@@ -4208,9 +4208,9 @@ func TestAMR_IsArrayType_InGeneratedTokens(t *testing.T) {
 
 		mockDB.On("CodeLoadClient", mock.Anything, mock.Anything).Return(nil).Once()
 		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything).Return(nil).Once()
-		mockDB.On("UserLoadGroups", mock.Anything, mock.Anything).Return(nil).Once()
+		mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 		mockDB.On("GroupsLoadAttributes", mock.Anything, mock.Anything).Return(nil).Once()
-		mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything).Return(nil).Once()
+		mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 		mockDB.On("GetCurrentSigningKey", mock.Anything).Return(keyPair, nil).Once()
 		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, sessionIdentifier).Return(&models.UserSession{
 			Started: time.Now().UTC().Add(-10 * time.Minute),
@@ -4252,9 +4252,9 @@ func TestAMR_IsArrayType_InGeneratedTokens(t *testing.T) {
 
 		mockDB.On("CodeLoadClient", mock.Anything, mock.Anything).Return(nil).Once()
 		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything).Return(nil).Once()
-		mockDB.On("UserLoadGroups", mock.Anything, mock.Anything).Return(nil).Once()
+		mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 		mockDB.On("GroupsLoadAttributes", mock.Anything, mock.Anything).Return(nil).Once()
-		mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything).Return(nil).Once()
+		mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 		mockDB.On("GetCurrentSigningKey", mock.Anything).Return(keyPair, nil).Once()
 		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, sessionIdentifier).Return(&models.UserSession{
 			Started: time.Now().UTC().Add(-10 * time.Minute),
@@ -4281,9 +4281,9 @@ func TestAMR_IsArrayType_InGeneratedTokens(t *testing.T) {
 
 	t.Run("ROPC flow - always pwd array", func(t *testing.T) {
 		mockDB.On("GetCurrentSigningKey", mock.Anything).Return(keyPair, nil).Once()
-		mockDB.On("UserLoadGroups", mock.Anything, mock.Anything).Return(nil).Once()
+		mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 		mockDB.On("GroupsLoadAttributes", mock.Anything, mock.Anything).Return(nil).Once()
-		mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything).Return(nil).Once()
+		mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 		mockDB.On("CreateRefreshToken", mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil).Once()
 
 		input := &ROPCGrantInput{
@@ -4312,9 +4312,9 @@ func TestAMR_IsArrayType_InGeneratedTokens(t *testing.T) {
 
 	t.Run("Implicit flow - AMR array", func(t *testing.T) {
 		mockDB.On("GetCurrentSigningKey", mock.Anything).Return(keyPair, nil).Once()
-		mockDB.On("UserLoadGroups", mock.Anything, mock.Anything).Return(nil).Once()
+		mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 		mockDB.On("GroupsLoadAttributes", mock.Anything, mock.Anything).Return(nil).Once()
-		mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything).Return(nil).Once()
+		mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
 		input := &ImplicitGrantInput{
 			Client:            client,
@@ -4399,9 +4399,9 @@ func TestAMR_OmittedWhenNoAuthMethodRecorded(t *testing.T) {
 	expectAuthCodeCalls := func() {
 		mockDB.On("CodeLoadClient", mock.Anything, mock.Anything).Return(nil).Once()
 		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything).Return(nil).Once()
-		mockDB.On("UserLoadGroups", mock.Anything, mock.Anything).Return(nil).Once()
+		mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 		mockDB.On("GroupsLoadAttributes", mock.Anything, mock.Anything).Return(nil).Once()
-		mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything).Return(nil).Once()
+		mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 		mockDB.On("GetCurrentSigningKey", mock.Anything).Return(keyPair, nil).Once()
 		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, sessionIdentifier).Return(&models.UserSession{
 			Started: time.Now().UTC().Add(-10 * time.Minute),
@@ -4411,9 +4411,9 @@ func TestAMR_OmittedWhenNoAuthMethodRecorded(t *testing.T) {
 
 	expectImplicitCalls := func() {
 		mockDB.On("GetCurrentSigningKey", mock.Anything).Return(keyPair, nil).Once()
-		mockDB.On("UserLoadGroups", mock.Anything, mock.Anything).Return(nil).Once()
+		mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 		mockDB.On("GroupsLoadAttributes", mock.Anything, mock.Anything).Return(nil).Once()
-		mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything).Return(nil).Once()
+		mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 	}
 
 	// An empty auth_methods is what a user_sessions row with no recorded method produces: the
@@ -4707,14 +4707,14 @@ func TestGenerateAccessTokenCore_InvalidScope(t *testing.T) {
 			AuthenticatedAt: now,
 		}
 
-		_, _, err := tokenIssuer.generateAccessTokenCore(settings, input, now, privKey, "key-id")
+		_, _, err := tokenIssuer.generateAccessTokenCore(context.Background(), settings, input, now, privKey, "key-id")
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid scope")
 	})
 
 	t.Run("Empty audience - only openid scope", func(t *testing.T) {
 		// This should not error - openid adds authserver as audience
-		mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything).Return(false, nil).Maybe()
+		mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
 
 		input := &TokenGenerationInput{
 			User: &models.User{
@@ -4729,7 +4729,7 @@ func TestGenerateAccessTokenCore_InvalidScope(t *testing.T) {
 			AuthenticatedAt: now,
 		}
 
-		token, scope, err := tokenIssuer.generateAccessTokenCore(settings, input, now, privKey, "key-id")
+		token, scope, err := tokenIssuer.generateAccessTokenCore(context.Background(), settings, input, now, privKey, "key-id")
 		assert.NoError(t, err)
 		assert.NotEmpty(t, token)
 		assert.Contains(t, scope, "authserver:userinfo")
@@ -4767,7 +4767,7 @@ func TestGenerateAccessTokenCore_MultipleAudiences(t *testing.T) {
 		AuthenticatedAt: now,
 	}
 
-	token, _, err := tokenIssuer.generateAccessTokenCore(settings, input, now, privKey, "key-id")
+	token, _, err := tokenIssuer.generateAccessTokenCore(context.Background(), settings, input, now, privKey, "key-id")
 	assert.NoError(t, err)
 
 	claims := verifyAndDecodeToken(t, token, publicKeyBytes)
@@ -4812,7 +4812,7 @@ func TestGenerateAccessTokenCore_OptionalClaims(t *testing.T) {
 			SessionIdentifier: "test-session",
 		}
 
-		token, _, err := tokenIssuer.generateAccessTokenCore(settings, input, now, privKey, "key-id")
+		token, _, err := tokenIssuer.generateAccessTokenCore(context.Background(), settings, input, now, privKey, "key-id")
 		assert.NoError(t, err)
 
 		claims := verifyAndDecodeToken(t, token, publicKeyBytes)
@@ -4835,7 +4835,7 @@ func TestGenerateAccessTokenCore_OptionalClaims(t *testing.T) {
 			Nonce:           "",
 		}
 
-		token, _, err := tokenIssuer.generateAccessTokenCore(settings, input, now, privKey, "key-id")
+		token, _, err := tokenIssuer.generateAccessTokenCore(context.Background(), settings, input, now, privKey, "key-id")
 		assert.NoError(t, err)
 
 		claims := verifyAndDecodeToken(t, token, publicKeyBytes)
@@ -4856,7 +4856,7 @@ func TestGenerateIdTokenCore_WithAtHash(t *testing.T) {
 	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(privateKeyBytes)
 	assert.NoError(t, err)
 
-	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything).Return(false, nil).Maybe()
+	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
 
 	settings := &models.Settings{
 		Issuer:                   "https://test-issuer.com",
@@ -4882,7 +4882,7 @@ func TestGenerateIdTokenCore_WithAtHash(t *testing.T) {
 			AccessToken:     "fake-access-token-for-hash",
 		}
 
-		token, err := tokenIssuer.generateIdTokenCore(settings, input, now, privKey, "key-id")
+		token, err := tokenIssuer.generateIdTokenCore(context.Background(), settings, input, now, privKey, "key-id")
 		assert.NoError(t, err)
 
 		claims := verifyAndDecodeToken(t, token, publicKeyBytes)
@@ -4907,7 +4907,7 @@ func TestGenerateIdTokenCore_WithAtHash(t *testing.T) {
 			AccessToken:     "",
 		}
 
-		token, err := tokenIssuer.generateIdTokenCore(settings, input, now, privKey, "key-id")
+		token, err := tokenIssuer.generateIdTokenCore(context.Background(), settings, input, now, privKey, "key-id")
 		assert.NoError(t, err)
 
 		claims := verifyAndDecodeToken(t, token, publicKeyBytes)
@@ -4926,7 +4926,7 @@ func TestGenerateIdTokenCore_GroupsAndAttributes(t *testing.T) {
 	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(privateKeyBytes)
 	assert.NoError(t, err)
 
-	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything).Return(false, nil).Maybe()
+	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
 
 	settings := &models.Settings{
 		Issuer:                   "https://test-issuer.com",
@@ -4961,7 +4961,7 @@ func TestGenerateIdTokenCore_GroupsAndAttributes(t *testing.T) {
 		AuthenticatedAt: now,
 	}
 
-	token, err := tokenIssuer.generateIdTokenCore(settings, input, now, privKey, "key-id")
+	token, err := tokenIssuer.generateIdTokenCore(context.Background(), settings, input, now, privKey, "key-id")
 	assert.NoError(t, err)
 
 	claims := verifyAndDecodeToken(t, token, publicKeyBytes)
@@ -5034,9 +5034,9 @@ func TestGenerateTokenResponseForRefreshROPC(t *testing.T) {
 	// Set up mocks
 	mockDB.On("RefreshTokenLoadUser", mock.Anything, refreshToken).Return(nil)
 	mockDB.On("RefreshTokenLoadClient", mock.Anything, refreshToken).Return(nil)
-	mockDB.On("UserLoadGroups", mock.Anything, &refreshToken.User).Return(nil)
+	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, &refreshToken.User).Return(nil)
 	mockDB.On("GroupsLoadAttributes", mock.Anything, refreshToken.User.Groups).Return(nil)
-	mockDB.On("UserLoadAttributes", mock.Anything, &refreshToken.User).Return(nil)
+	mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything, &refreshToken.User).Return(nil)
 	mockDB.On("GetCurrentSigningKey", mock.Anything).Return(&models.KeyPair{
 		KeyIdentifier: "test-key-id",
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
@@ -5047,7 +5047,7 @@ func TestGenerateTokenResponseForRefreshROPC(t *testing.T) {
 			capturedChild = args.Get(1).(*models.RefreshToken)
 		}).
 		Return(nil)
-	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything).Return(false, nil).Maybe()
+	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
 
 	input := &GenerateTokenForRefreshROPCInput{
 		RefreshToken:   refreshToken,
@@ -5138,15 +5138,15 @@ func TestGenerateTokenResponseForRefreshROPC_ScopeDowngrade(t *testing.T) {
 
 	mockDB.On("RefreshTokenLoadUser", mock.Anything, refreshToken).Return(nil)
 	mockDB.On("RefreshTokenLoadClient", mock.Anything, refreshToken).Return(nil)
-	mockDB.On("UserLoadGroups", mock.Anything, &refreshToken.User).Return(nil)
+	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, &refreshToken.User).Return(nil)
 	mockDB.On("GroupsLoadAttributes", mock.Anything, refreshToken.User.Groups).Return(nil)
-	mockDB.On("UserLoadAttributes", mock.Anything, &refreshToken.User).Return(nil)
+	mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything, &refreshToken.User).Return(nil)
 	mockDB.On("GetCurrentSigningKey", mock.Anything).Return(&models.KeyPair{
 		KeyIdentifier: "test-key-id",
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 	}, nil)
 	mockDB.On("CreateRefreshToken", mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil)
-	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything).Return(false, nil).Maybe()
+	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
 
 	// Request only a subset of the original scopes
 	input := &GenerateTokenForRefreshROPCInput{
@@ -5243,7 +5243,7 @@ func TestGenerateAccessTokenCore_ClientOverrideExpiration(t *testing.T) {
 			AuthenticatedAt: now,
 		}
 
-		token, _, err := tokenIssuer.generateAccessTokenCore(settings, input, now, privKey, "key-id")
+		token, _, err := tokenIssuer.generateAccessTokenCore(context.Background(), settings, input, now, privKey, "key-id")
 		assert.NoError(t, err)
 
 		claims := verifyAndDecodeToken(t, token, publicKeyBytes)
@@ -5267,7 +5267,7 @@ func TestGenerateAccessTokenCore_ClientOverrideExpiration(t *testing.T) {
 			AuthenticatedAt: now,
 		}
 
-		token, _, err := tokenIssuer.generateAccessTokenCore(settings, input, now, privKey, "key-id")
+		token, _, err := tokenIssuer.generateAccessTokenCore(context.Background(), settings, input, now, privKey, "key-id")
 		assert.NoError(t, err)
 
 		claims := verifyAndDecodeToken(t, token, publicKeyBytes)
@@ -5290,7 +5290,7 @@ func TestGenerateAccessTokenCore_OIDCClaimsInAccessToken(t *testing.T) {
 	now := time.Now().UTC()
 	userSubject := fake.UUID()
 
-	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything).Return(false, nil).Maybe()
+	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
 
 	t.Run("Global setting ON - includes OIDC claims", func(t *testing.T) {
 		settings := &models.Settings{
@@ -5314,7 +5314,7 @@ func TestGenerateAccessTokenCore_OIDCClaimsInAccessToken(t *testing.T) {
 			AuthenticatedAt: now,
 		}
 
-		token, _, err := tokenIssuer.generateAccessTokenCore(settings, input, now, privKey, "key-id")
+		token, _, err := tokenIssuer.generateAccessTokenCore(context.Background(), settings, input, now, privKey, "key-id")
 		assert.NoError(t, err)
 
 		claims := verifyAndDecodeToken(t, token, publicKeyBytes)
@@ -5343,7 +5343,7 @@ func TestGenerateAccessTokenCore_OIDCClaimsInAccessToken(t *testing.T) {
 			AuthenticatedAt: now,
 		}
 
-		token, _, err := tokenIssuer.generateAccessTokenCore(settings, input, now, privKey, "key-id")
+		token, _, err := tokenIssuer.generateAccessTokenCore(context.Background(), settings, input, now, privKey, "key-id")
 		assert.NoError(t, err)
 
 		claims := verifyAndDecodeToken(t, token, publicKeyBytes)
@@ -5374,7 +5374,7 @@ func TestGenerateAccessTokenCore_OIDCClaimsInAccessToken(t *testing.T) {
 			AuthenticatedAt: now,
 		}
 
-		token, _, err := tokenIssuer.generateAccessTokenCore(settings, input, now, privKey, "key-id")
+		token, _, err := tokenIssuer.generateAccessTokenCore(context.Background(), settings, input, now, privKey, "key-id")
 		assert.NoError(t, err)
 
 		claims := verifyAndDecodeToken(t, token, publicKeyBytes)
@@ -5404,11 +5404,51 @@ func TestGenerateAccessTokenCore_OIDCClaimsInAccessToken(t *testing.T) {
 			AuthenticatedAt: now,
 		}
 
-		token, _, err := tokenIssuer.generateAccessTokenCore(settings, input, now, privKey, "key-id")
+		token, _, err := tokenIssuer.generateAccessTokenCore(context.Background(), settings, input, now, privKey, "key-id")
 		assert.NoError(t, err)
 
 		claims := verifyAndDecodeToken(t, token, publicKeyBytes)
 		_, hasEmail := claims["email"]
 		assert.False(t, hasEmail, "email should not be in access token when client override is off")
+	})
+}
+
+// TestAddOpenIdConnectClaimsFromUser_CarriesTheCallersContext is the claim path's arm of #386's
+// seam 4. It is the one place a token's claims are assembled from a database read, and the read
+// is three hops below the entry point that holds the request's context, so a hop that dropped it
+// would be invisible at every other seam.
+//
+// The reject arm is the same call without the profile scope: no picture claim is owed, so the
+// port is not reached and there is no context to carry.
+func TestAddOpenIdConnectClaimsFromUser_CarriesTheCallersContext(t *testing.T) {
+	type marker struct{}
+	ctx := context.WithValue(context.Background(), marker{}, "the caller's own")
+	callersContext := mock.MatchedBy(func(got context.Context) bool {
+		return got.Value(marker{}) == "the caller's own"
+	})
+
+	user := &models.User{Id: 42, Subject: "sub-42", GivenName: "Ada", FamilyName: "Lovelace"}
+
+	t.Run("the profile scope reads the picture flag under the caller's context", func(t *testing.T) {
+		mockDB := mocks_data.NewDatabase(t)
+		mockDB.On("UserHasProfilePicture", callersContext, mock.Anything, int64(42)).Return(true, nil).Once()
+
+		issuer := NewTokenIssuer(mockDB, "https://auth.example.com")
+		claims := jwt.MapClaims{}
+		issuer.addOpenIdConnectClaimsFromUser(ctx, claims, user, []string{"openid", "profile"})
+
+		assert.Equal(t, "https://auth.example.com/userinfo/picture/sub-42", claims["picture"])
+		mockDB.AssertExpectations(t)
+	})
+
+	t.Run("without the profile scope the port is not reached", func(t *testing.T) {
+		mockDB := mocks_data.NewDatabase(t)
+
+		issuer := NewTokenIssuer(mockDB, "https://auth.example.com")
+		claims := jwt.MapClaims{}
+		issuer.addOpenIdConnectClaimsFromUser(ctx, claims, user, []string{"openid", "email"})
+
+		assert.NotContains(t, claims, "picture")
+		mockDB.AssertNotCalled(t, "UserHasProfilePicture", mock.Anything, mock.Anything, mock.Anything)
 	})
 }

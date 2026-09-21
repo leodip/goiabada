@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -309,10 +310,10 @@ func TestAPIGroupsGet_MemberCountAccuracy(t *testing.T) {
 		FamilyName:    "User1",
 		EmailVerified: true,
 	}
-	err := database.CreateUser(nil, testUser1)
+	err := database.CreateUser(context.Background(), nil, testUser1)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser1.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser1.Id)
 	}()
 
 	testUser2 := &models.User{
@@ -323,10 +324,10 @@ func TestAPIGroupsGet_MemberCountAccuracy(t *testing.T) {
 		FamilyName:    "User2",
 		EmailVerified: true,
 	}
-	err = database.CreateUser(nil, testUser2)
+	err = database.CreateUser(context.Background(), nil, testUser2)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser2.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser2.Id)
 	}()
 
 	// Setup: Add users to group
@@ -334,20 +335,20 @@ func TestAPIGroupsGet_MemberCountAccuracy(t *testing.T) {
 		UserId:  testUser1.Id,
 		GroupId: testGroup.Id,
 	}
-	err = database.CreateUserGroup(nil, userGroup1)
+	err = database.CreateUserGroup(context.Background(), nil, userGroup1)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUserGroup(nil, userGroup1.Id)
+		_ = database.DeleteUserGroup(context.Background(), nil, userGroup1.Id)
 	}()
 
 	userGroup2 := &models.UserGroup{
 		UserId:  testUser2.Id,
 		GroupId: testGroup.Id,
 	}
-	err = database.CreateUserGroup(nil, userGroup2)
+	err = database.CreateUserGroup(context.Background(), nil, userGroup2)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUserGroup(nil, userGroup2.Id)
+		_ = database.DeleteUserGroup(context.Background(), nil, userGroup2.Id)
 	}()
 
 	// Test: Get all groups
@@ -377,7 +378,7 @@ func TestAPIGroupsGet_MemberCountAccuracy(t *testing.T) {
 	assert.Equal(t, 2, foundGroup.MemberCount, "Group should have 2 members")
 
 	// Test: Remove one member and verify count decreases
-	err = database.DeleteUserGroup(nil, userGroup2.Id)
+	err = database.DeleteUserGroup(context.Background(), nil, userGroup2.Id)
 	assert.NoError(t, err)
 
 	// Test: Get groups again to verify member count updated

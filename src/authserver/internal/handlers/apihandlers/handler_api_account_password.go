@@ -55,7 +55,7 @@ func HandleAPIAccountPasswordPut(
 		}
 
 		// Load user
-		user, err := database.GetUserBySubject(nil, subject)
+		user, err := database.GetUserBySubject(r.Context(), nil, subject)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -106,7 +106,7 @@ func HandleAPIAccountPasswordPut(
 		// disable (decision 14).
 		result, err := handlers.RevokeUserAuthStateTx(r.Context(), database, user.Id, exceptSid,
 			func(tx *sql.Tx) error {
-				return database.SetUserPasswordHash(tx, user.Id, passwordHash)
+				return database.SetUserPasswordHash(r.Context(), tx, user.Id, passwordHash)
 			})
 		if err != nil {
 			writeInternalServerError(w, r, err)

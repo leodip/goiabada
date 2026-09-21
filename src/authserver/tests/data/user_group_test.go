@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -16,7 +17,7 @@ func TestCreateUserGroup(t *testing.T) {
 		GroupId: group.Id,
 	}
 
-	err := database.CreateUserGroup(nil, userGroup)
+	err := database.CreateUserGroup(context.Background(), nil, userGroup)
 	if err != nil {
 		t.Fatalf("Failed to create user group: %v", err)
 	}
@@ -31,7 +32,7 @@ func TestCreateUserGroup(t *testing.T) {
 		t.Error("Expected UpdatedAt to be set")
 	}
 
-	retrievedUserGroup, err := database.GetUserGroupById(nil, userGroup.Id)
+	retrievedUserGroup, err := database.GetUserGroupById(context.Background(), nil, userGroup.Id)
 	if err != nil {
 		t.Fatalf("Failed to retrieve created user group: %v", err)
 	}
@@ -55,12 +56,12 @@ func TestUpdateUserGroup(t *testing.T) {
 
 	time.Sleep(timestampTick)
 
-	err := database.UpdateUserGroup(nil, userGroup)
+	err := database.UpdateUserGroup(context.Background(), nil, userGroup)
 	if err != nil {
 		t.Fatalf("Failed to update user group: %v", err)
 	}
 
-	updatedUserGroup, err := database.GetUserGroupById(nil, userGroup.Id)
+	updatedUserGroup, err := database.GetUserGroupById(context.Background(), nil, userGroup.Id)
 	if err != nil {
 		t.Fatalf("Failed to retrieve updated user group: %v", err)
 	}
@@ -79,7 +80,7 @@ func TestUpdateUserGroup(t *testing.T) {
 func TestGetUserGroupById(t *testing.T) {
 	userGroup := createTestUserGroup(t)
 
-	retrievedUserGroup, err := database.GetUserGroupById(nil, userGroup.Id)
+	retrievedUserGroup, err := database.GetUserGroupById(context.Background(), nil, userGroup.Id)
 	if err != nil {
 		t.Fatalf("Failed to get user group by ID: %v", err)
 	}
@@ -94,7 +95,7 @@ func TestGetUserGroupById(t *testing.T) {
 		t.Errorf("Expected GroupId %d, got %d", userGroup.GroupId, retrievedUserGroup.GroupId)
 	}
 
-	nonExistentUserGroup, err := database.GetUserGroupById(nil, 99999)
+	nonExistentUserGroup, err := database.GetUserGroupById(context.Background(), nil, 99999)
 	if err != nil {
 		t.Errorf("Expected no error for non-existent user group, got: %v", err)
 	}
@@ -113,7 +114,7 @@ func TestGetUserGroupsByUserIds(t *testing.T) {
 	userGroup2 := createTestUserGroupWithUserAndGroup(t, user2.Id, group2.Id)
 
 	userIds := []int64{user1.Id, user2.Id}
-	userGroups, err := database.GetUserGroupsByUserIds(nil, userIds)
+	userGroups, err := database.GetUserGroupsByUserIds(context.Background(), nil, userIds)
 	if err != nil {
 		t.Fatalf("Failed to get user groups by user IDs: %v", err)
 	}
@@ -146,7 +147,7 @@ func TestGetUserGroupsByUserId(t *testing.T) {
 	userGroup1 := createTestUserGroupWithUserAndGroup(t, user.Id, group1.Id)
 	userGroup2 := createTestUserGroupWithUserAndGroup(t, user.Id, group2.Id)
 
-	userGroups, err := database.GetUserGroupsByUserId(nil, user.Id)
+	userGroups, err := database.GetUserGroupsByUserId(context.Background(), nil, user.Id)
 	if err != nil {
 		t.Fatalf("Failed to get user groups by user ID: %v", err)
 	}
@@ -176,7 +177,7 @@ func TestGetUserGroupByUserIdAndGroupId(t *testing.T) {
 	group := createTestGroup(t)
 	userGroup := createTestUserGroupWithUserAndGroup(t, user.Id, group.Id)
 
-	retrievedUserGroup, err := database.GetUserGroupByUserIdAndGroupId(nil, user.Id, group.Id)
+	retrievedUserGroup, err := database.GetUserGroupByUserIdAndGroupId(context.Background(), nil, user.Id, group.Id)
 	if err != nil {
 		t.Fatalf("Failed to get user group by user ID and group ID: %v", err)
 	}
@@ -191,7 +192,7 @@ func TestGetUserGroupByUserIdAndGroupId(t *testing.T) {
 		t.Errorf("Expected GroupId %d, got %d", group.Id, retrievedUserGroup.GroupId)
 	}
 
-	nonExistentUserGroup, err := database.GetUserGroupByUserIdAndGroupId(nil, 99999, 99999)
+	nonExistentUserGroup, err := database.GetUserGroupByUserIdAndGroupId(context.Background(), nil, 99999, 99999)
 	if err != nil {
 		t.Errorf("Expected no error for non-existent user group, got: %v", err)
 	}
@@ -203,12 +204,12 @@ func TestGetUserGroupByUserIdAndGroupId(t *testing.T) {
 func TestDeleteUserGroup(t *testing.T) {
 	userGroup := createTestUserGroup(t)
 
-	err := database.DeleteUserGroup(nil, userGroup.Id)
+	err := database.DeleteUserGroup(context.Background(), nil, userGroup.Id)
 	if err != nil {
 		t.Fatalf("Failed to delete user group: %v", err)
 	}
 
-	deletedUserGroup, err := database.GetUserGroupById(nil, userGroup.Id)
+	deletedUserGroup, err := database.GetUserGroupById(context.Background(), nil, userGroup.Id)
 	if err != nil {
 		t.Fatalf("Error while checking for deleted user group: %v", err)
 	}
@@ -216,7 +217,7 @@ func TestDeleteUserGroup(t *testing.T) {
 		t.Errorf("User group still exists after deletion")
 	}
 
-	err = database.DeleteUserGroup(nil, 99999)
+	err = database.DeleteUserGroup(context.Background(), nil, 99999)
 	if err != nil {
 		t.Errorf("Expected no error when deleting non-existent user group, got: %v", err)
 	}
@@ -233,7 +234,7 @@ func createTestUserGroupWithUserAndGroup(t *testing.T, userId, groupId int64) *m
 		UserId:  userId,
 		GroupId: groupId,
 	}
-	err := database.CreateUserGroup(nil, userGroup)
+	err := database.CreateUserGroup(context.Background(), nil, userGroup)
 	if err != nil {
 		t.Fatalf("Failed to create test user group: %v", err)
 	}

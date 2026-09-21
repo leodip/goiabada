@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"context"
 	"database/sql"
 	"testing"
 	"time"
@@ -19,7 +20,7 @@ func TestCreateUserConsent(t *testing.T) {
 		GrantedAt: sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true},
 	}
 
-	err := database.CreateUserConsent(nil, userConsent)
+	err := database.CreateUserConsent(context.Background(), nil, userConsent)
 	if err != nil {
 		t.Fatalf("Failed to create user consent: %v", err)
 	}
@@ -34,7 +35,7 @@ func TestCreateUserConsent(t *testing.T) {
 		t.Error("Expected UpdatedAt to be set")
 	}
 
-	retrievedConsent, err := database.GetUserConsentById(nil, userConsent.Id)
+	retrievedConsent, err := database.GetUserConsentById(context.Background(), nil, userConsent.Id)
 	if err != nil {
 		t.Fatalf("Failed to retrieve created user consent: %v", err)
 	}
@@ -61,12 +62,12 @@ func TestUpdateUserConsent(t *testing.T) {
 
 	time.Sleep(timestampTick)
 
-	err := database.UpdateUserConsent(nil, userConsent)
+	err := database.UpdateUserConsent(context.Background(), nil, userConsent)
 	if err != nil {
 		t.Fatalf("Failed to update user consent: %v", err)
 	}
 
-	updatedConsent, err := database.GetUserConsentById(nil, userConsent.Id)
+	updatedConsent, err := database.GetUserConsentById(context.Background(), nil, userConsent.Id)
 	if err != nil {
 		t.Fatalf("Failed to retrieve updated user consent: %v", err)
 	}
@@ -85,7 +86,7 @@ func TestUpdateUserConsent(t *testing.T) {
 func TestGetUserConsentById(t *testing.T) {
 	userConsent := createTestUserConsent(t)
 
-	retrievedConsent, err := database.GetUserConsentById(nil, userConsent.Id)
+	retrievedConsent, err := database.GetUserConsentById(context.Background(), nil, userConsent.Id)
 	if err != nil {
 		t.Fatalf("Failed to get user consent by ID: %v", err)
 	}
@@ -100,7 +101,7 @@ func TestGetUserConsentById(t *testing.T) {
 		t.Errorf("Expected ClientId %d, got %d", userConsent.ClientId, retrievedConsent.ClientId)
 	}
 
-	nonExistentConsent, err := database.GetUserConsentById(nil, 99999)
+	nonExistentConsent, err := database.GetUserConsentById(context.Background(), nil, 99999)
 	if err != nil {
 		t.Errorf("Expected no error for non-existent user consent, got: %v", err)
 	}
@@ -112,7 +113,7 @@ func TestGetUserConsentById(t *testing.T) {
 func TestGetConsentByUserIdAndClientId(t *testing.T) {
 	userConsent := createTestUserConsent(t)
 
-	retrievedConsent, err := database.GetConsentByUserIdAndClientId(nil, userConsent.UserId, userConsent.ClientId)
+	retrievedConsent, err := database.GetConsentByUserIdAndClientId(context.Background(), nil, userConsent.UserId, userConsent.ClientId)
 	if err != nil {
 		t.Fatalf("Failed to get consent by user ID and client ID: %v", err)
 	}
@@ -127,7 +128,7 @@ func TestGetConsentByUserIdAndClientId(t *testing.T) {
 		t.Errorf("Expected ClientId %d, got %d", userConsent.ClientId, retrievedConsent.ClientId)
 	}
 
-	nonExistentConsent, err := database.GetConsentByUserIdAndClientId(nil, 99999, 99999)
+	nonExistentConsent, err := database.GetConsentByUserIdAndClientId(context.Background(), nil, 99999, 99999)
 	if err != nil {
 		t.Errorf("Expected no error for non-existent user consent, got: %v", err)
 	}
@@ -142,7 +143,7 @@ func TestUserConsentsLoadClients(t *testing.T) {
 
 	userConsents := []models.UserConsent{*userConsent1, *userConsent2}
 
-	err := database.UserConsentsLoadClients(nil, userConsents)
+	err := database.UserConsentsLoadClients(context.Background(), nil, userConsents)
 	if err != nil {
 		t.Fatalf("Failed to load clients for user consents: %v", err)
 	}
@@ -159,7 +160,7 @@ func TestGetConsentsByUserId(t *testing.T) {
 	userConsent1 := createTestUserConsentForUser(t, user.Id)
 	userConsent2 := createTestUserConsentForUser(t, user.Id)
 
-	consents, err := database.GetConsentsByUserId(nil, user.Id)
+	consents, err := database.GetConsentsByUserId(context.Background(), nil, user.Id)
 	if err != nil {
 		t.Fatalf("Failed to get consents by user ID: %v", err)
 	}
@@ -184,12 +185,12 @@ func TestGetConsentsByUserId(t *testing.T) {
 func TestDeleteUserConsent(t *testing.T) {
 	userConsent := createTestUserConsent(t)
 
-	err := database.DeleteUserConsent(nil, userConsent.Id)
+	err := database.DeleteUserConsent(context.Background(), nil, userConsent.Id)
 	if err != nil {
 		t.Fatalf("Failed to delete user consent: %v", err)
 	}
 
-	deletedConsent, err := database.GetUserConsentById(nil, userConsent.Id)
+	deletedConsent, err := database.GetUserConsentById(context.Background(), nil, userConsent.Id)
 	if err != nil {
 		t.Fatalf("Error while checking for deleted user consent: %v", err)
 	}
@@ -197,7 +198,7 @@ func TestDeleteUserConsent(t *testing.T) {
 		t.Errorf("User consent still exists after deletion")
 	}
 
-	err = database.DeleteUserConsent(nil, 99999)
+	err = database.DeleteUserConsent(context.Background(), nil, 99999)
 	if err != nil {
 		t.Errorf("Expected no error when deleting non-existent user consent, got: %v", err)
 	}
@@ -214,7 +215,7 @@ func createTestUserConsent(t *testing.T) *models.UserConsent {
 		GrantedAt: sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true},
 	}
 
-	err := database.CreateUserConsent(nil, userConsent)
+	err := database.CreateUserConsent(context.Background(), nil, userConsent)
 	if err != nil {
 		t.Fatalf("Failed to create test user consent: %v", err)
 	}
@@ -231,7 +232,7 @@ func createTestUserConsentForUser(t *testing.T, userId int64) *models.UserConsen
 		Scope:    "openid profile",
 	}
 
-	err := database.CreateUserConsent(nil, userConsent)
+	err := database.CreateUserConsent(context.Background(), nil, userConsent)
 	if err != nil {
 		t.Fatalf("Failed to create test user consent: %v", err)
 	}

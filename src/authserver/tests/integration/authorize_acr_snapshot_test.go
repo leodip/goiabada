@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"net/url"
 	"testing"
 
@@ -67,7 +68,7 @@ func TestAcrSnapshot_ClientRaisedMidCeremonyDoesNotElevateTheAcr(t *testing.T) {
 		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
-	require.NoError(t, database.CreateUser(nil, user))
+	require.NoError(t, database.CreateUser(context.Background(), nil, user))
 
 	httpClient := createHttpClient(t)
 

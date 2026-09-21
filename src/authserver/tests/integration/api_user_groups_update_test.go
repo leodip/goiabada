@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -27,10 +28,10 @@ func TestAPIUserGroupsPut_Success(t *testing.T) {
 		FamilyName:    "User",
 		EmailVerified: true,
 	}
-	err := database.CreateUser(nil, testUser)
+	err := database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
 	// Setup: Create test groups
@@ -54,7 +55,7 @@ func TestAPIUserGroupsPut_Success(t *testing.T) {
 			UserId:  testUser.Id,
 			GroupId: groups[i].Id,
 		}
-		err = database.CreateUserGroup(nil, userGroup)
+		err = database.CreateUserGroup(context.Background(), nil, userGroup)
 		assert.NoError(t, err)
 		// Don't defer cleanup - the API call will modify these
 	}
@@ -92,9 +93,9 @@ func TestAPIUserGroupsPut_Success(t *testing.T) {
 	assert.False(t, responseGroupIds[groups[0].Id], "Should not include group 0")
 
 	// Verify changes were persisted to database
-	updatedUser, err := database.GetUserById(nil, testUser.Id)
+	updatedUser, err := database.GetUserById(context.Background(), nil, testUser.Id)
 	assert.NoError(t, err)
-	err = database.UserLoadGroups(nil, updatedUser)
+	err = database.UserLoadGroups(context.Background(), nil, updatedUser)
 	assert.NoError(t, err)
 
 	assert.Len(t, updatedUser.Groups, 2)
@@ -120,10 +121,10 @@ func TestAPIUserGroupsPut_EmptyGroups(t *testing.T) {
 		GivenName:  "Test",
 		FamilyName: "User",
 	}
-	err := database.CreateUser(nil, testUser)
+	err := database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
 	// Setup: Create test group and assign user to it
@@ -141,7 +142,7 @@ func TestAPIUserGroupsPut_EmptyGroups(t *testing.T) {
 		UserId:  testUser.Id,
 		GroupId: testGroup.Id,
 	}
-	err = database.CreateUserGroup(nil, userGroup)
+	err = database.CreateUserGroup(context.Background(), nil, userGroup)
 	assert.NoError(t, err)
 
 	// Test: Remove all groups (empty array)
@@ -166,9 +167,9 @@ func TestAPIUserGroupsPut_EmptyGroups(t *testing.T) {
 	assert.Len(t, updateResponse.Groups, 0)
 
 	// Verify in database
-	updatedUser, err := database.GetUserById(nil, testUser.Id)
+	updatedUser, err := database.GetUserById(context.Background(), nil, testUser.Id)
 	assert.NoError(t, err)
-	err = database.UserLoadGroups(nil, updatedUser)
+	err = database.UserLoadGroups(context.Background(), nil, updatedUser)
 	assert.NoError(t, err)
 	assert.Len(t, updatedUser.Groups, 0)
 }
@@ -185,10 +186,10 @@ func TestAPIUserGroupsPut_NonExistentGroup(t *testing.T) {
 		GivenName:  "Test",
 		FamilyName: "User",
 	}
-	err := database.CreateUser(nil, testUser)
+	err := database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
 	// Test: Try to assign user to non-existent group
@@ -262,10 +263,10 @@ func TestAPIUserGroupsPut_InvalidRequestBody(t *testing.T) {
 		GivenName:  "Test",
 		FamilyName: "User",
 	}
-	err := database.CreateUser(nil, testUser)
+	err := database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
 	// Test: Invalid JSON
@@ -293,10 +294,10 @@ func TestAPIUserGroupsPut_Unauthorized(t *testing.T) {
 		GivenName:  "Test",
 		FamilyName: "User",
 	}
-	err := database.CreateUser(nil, testUser)
+	err := database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
 	// Test: Request without access token
@@ -359,10 +360,10 @@ func TestAPIUserGroupsPut_TheGroupIdArrayIsBounded(t *testing.T) {
 				GivenName:  "Test",
 				FamilyName: "User",
 			}
-			err := database.CreateUser(nil, testUser)
+			err := database.CreateUser(context.Background(), nil, testUser)
 			assert.NoError(t, err)
 			defer func() {
-				_ = database.DeleteUser(nil, testUser.Id)
+				_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 			}()
 
 			groupIds := make([]int64, testCase.total)
@@ -384,7 +385,7 @@ func TestAPIUserGroupsPut_TheGroupIdArrayIsBounded(t *testing.T) {
 			assert.Equal(t, testCase.wantCode, errResp.ErrorCode)
 
 			// Nothing was written either way: the user belongs to no group afterwards.
-			err = database.UserLoadGroups(nil, testUser)
+			err = database.UserLoadGroups(context.Background(), nil, testUser)
 			assert.NoError(t, err)
 			assert.Empty(t, testUser.Groups)
 		})

@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"database/sql"
 	"net/http"
 	"net/url"
@@ -57,7 +58,7 @@ func TestPromptConsent_ForcesConsentEvenWhenAlreadyConsented(t *testing.T) {
 		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
-	err = database.CreateUser(nil, user)
+	err = database.CreateUser(context.Background(), nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -69,7 +70,7 @@ func TestPromptConsent_ForcesConsentEvenWhenAlreadyConsented(t *testing.T) {
 		Scope:     "openid profile",
 		GrantedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true},
 	}
-	err = database.CreateUserConsent(nil, consent)
+	err = database.CreateUserConsent(context.Background(), nil, consent)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -192,7 +193,7 @@ func TestPromptLoginConsent_Combined(t *testing.T) {
 		Scope:     "openid profile email",
 		GrantedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true},
 	}
-	err := database.CreateUserConsent(nil, consent)
+	err := database.CreateUserConsent(context.Background(), nil, consent)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -311,7 +312,7 @@ func TestPromptLogin_PreservesAcrLevel(t *testing.T) {
 	}
 	user.OTPEnabled = true
 	user.OTPSecretEncrypted = encryptOTPSecretForTest(t, key.Secret())
-	err = database.UpdateUser(nil, user)
+	err = database.UpdateUser(context.Background(), nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -450,7 +451,7 @@ func TestPromptConsent_UserDeclines(t *testing.T) {
 		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
-	err = database.CreateUser(nil, user)
+	err = database.CreateUser(context.Background(), nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -569,7 +570,7 @@ func TestPromptLogin_UserDisabled(t *testing.T) {
 
 	// Disable the user
 	user.Enabled = false
-	err := database.UpdateUser(nil, user)
+	err := database.UpdateUser(context.Background(), nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -659,7 +660,7 @@ func TestPromptLogin_NewAuthTime(t *testing.T) {
 		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
-	err = database.CreateUser(nil, user)
+	err = database.CreateUser(context.Background(), nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}

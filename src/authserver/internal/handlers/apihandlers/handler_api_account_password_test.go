@@ -36,7 +36,7 @@ var apiRevokeTx = &sql.Tx{}
 // and restating it here would mean two places to update.
 func stubSweep(database *mocks_data.Database, userId int64, newGeneration int64) {
 	expectRunInTransaction(database, apiRevokeTx)
-	database.On("IncrementUserAuthStateGeneration", apiRevokeTx, userId).
+	database.On("IncrementUserAuthStateGeneration", mock.Anything, apiRevokeTx, userId).
 		Return(newGeneration, nil).Once()
 	database.On("GetRefreshTokensByUserId", apiRevokeTx, userId).
 		Return([]*models.RefreshToken{}, nil).Once()
@@ -80,19 +80,19 @@ func TestHandleAPIAccountPasswordPut_PreservesTheCallersSession(t *testing.T) {
 	require.NoError(t, err)
 	user := &models.User{Id: 42, Enabled: true, PasswordHash: currentHash}
 
-	database.On("GetUserBySubject", (*sql.Tx)(nil), subject).Return(user, nil).Once()
+	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), subject).Return(user, nil).Once()
 
 	var savedHash string
-	database.On("SetUserPasswordHash", apiRevokeTx, int64(42), mock.Anything).
+	database.On("SetUserPasswordHash", mock.Anything, apiRevokeTx, int64(42), mock.Anything).
 		Run(func(args mock.Arguments) {
-			savedHash = args.Get(2).(string)
+			savedHash = args.Get(3).(string)
 		}).Return(nil).Once()
 
 	// The sweep, with the caller's session preserved. Registering the sid-scoped query is what
 	// proves exceptSid was threaded through: with an empty exceptSid the helper never calls it,
 	// and the strict mock would report the expectation unmet.
 	expectRunInTransaction(database, apiRevokeTx)
-	database.On("IncrementUserAuthStateGeneration", apiRevokeTx, int64(42)).
+	database.On("IncrementUserAuthStateGeneration", mock.Anything, apiRevokeTx, int64(42)).
 		Return(int64(8), nil).Once()
 	database.On("GetRefreshTokensByUserId", apiRevokeTx, int64(42)).
 		Return([]*models.RefreshToken{
@@ -131,7 +131,7 @@ func TestHandleAPIAccountPasswordPut_PreservesTheCallersSession(t *testing.T) {
 	auditLogger.AssertExpectations(t)
 
 	assert.True(t, passwordhash.Verify(savedHash, newPassword))
-	database.AssertNotCalled(t, "UpdateUser", mock.Anything, mock.Anything)
+	database.AssertNotCalled(t, "UpdateUser", mock.Anything, mock.Anything, mock.Anything)
 
 	// The audit payload, field by field. Asserted here rather than trusted because the event is
 	// the only durable record of what a revocation did, and a missing or renamed field is
@@ -169,9 +169,9 @@ func TestHandleAPIAccountPasswordPut_SidlessBearerRevokesEverything(t *testing.T
 	currentHash, err := passwordhash.Hash(currentPassword)
 	require.NoError(t, err)
 
-	database.On("GetUserBySubject", (*sql.Tx)(nil), subject).
+	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), subject).
 		Return(&models.User{Id: 42, Enabled: true, PasswordHash: currentHash}, nil).Once()
-	database.On("SetUserPasswordHash", apiRevokeTx, int64(42), mock.Anything).Return(nil).Once()
+	database.On("SetUserPasswordHash", mock.Anything, apiRevokeTx, int64(42), mock.Anything).Return(nil).Once()
 	stubSweep(database, 42, 8)
 
 	auditLogger.On("Log", mock.Anything, audit.AuditChangedPassword, mock.Anything).Return().Once()
@@ -216,11 +216,11 @@ func TestHandleAPIAccountPasswordPut_RevocationFailureIsA500(t *testing.T) {
 	currentHash, err := passwordhash.Hash(currentPassword)
 	require.NoError(t, err)
 
-	database.On("GetUserBySubject", (*sql.Tx)(nil), "the-subject").
+	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), "the-subject").
 		Return(&models.User{Id: 42, Enabled: true, PasswordHash: currentHash}, nil).Once()
 	stub := expectRunInTransaction(database, apiRevokeTx)
-	database.On("SetUserPasswordHash", apiRevokeTx, int64(42), mock.Anything).Return(nil).Once()
-	database.On("IncrementUserAuthStateGeneration", apiRevokeTx, int64(42)).
+	database.On("SetUserPasswordHash", mock.Anything, apiRevokeTx, int64(42), mock.Anything).Return(nil).Once()
+	database.On("IncrementUserAuthStateGeneration", mock.Anything, apiRevokeTx, int64(42)).
 		Return(int64(0), errors.New("increment failed")).Once()
 
 	rr := httptest.NewRecorder()

@@ -2,6 +2,7 @@ package integrationtests
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"net/http"
 	"net/url"
@@ -93,7 +94,7 @@ func createLevel2MandatoryUser(t *testing.T, otpEnabled bool) (*models.Client, *
 		user.OTPEnabled = true
 	}
 
-	err = database.CreateUser(nil, user)
+	err = database.CreateUser(context.Background(), nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -315,7 +316,7 @@ func TestAuthOtp_EnrolmentCodeIsRefusedAtVerification(t *testing.T) {
 	assertRedirect(t, resp, "/auth/completed")
 	_ = resp.Body.Close()
 
-	enrolled, err := database.GetUserById(nil, user.Id)
+	enrolled, err := database.GetUserById(context.Background(), nil, user.Id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -380,7 +381,7 @@ func TestAuthOtp_APIEnrolmentCodeIsRefusedAtVerification(t *testing.T) {
 	}
 	_ = resp.Body.Close()
 
-	enrolled, err := database.GetUserById(nil, user.Id)
+	enrolled, err := database.GetUserById(context.Background(), nil, user.Id)
 	if err != nil {
 		t.Fatal(err)
 	}

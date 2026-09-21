@@ -587,7 +587,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		ctx = context.WithValue(ctx, chimiddleware.RequestIDKey, "goiabada/req-pwd-1")
 		req = req.WithContext(ctx)
 
-		database.On("GetUserByEmail", mock.Anything, "test@example.com").Return(nil, nil)
+		database.On("GetUserByEmail", mock.Anything, mock.Anything, "test@example.com").Return(nil, nil)
 
 		// A handler closure is one of the four call shapes #328 has to reach, and this is that
 		// shape pinned: the context has to be the request's, not one the handler reached for.
@@ -656,7 +656,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		ctx := context.WithValue(req.Context(), constants.ContextKeySettings, settings)
 		req = req.WithContext(ctx)
 
-		database.On("GetUserByEmail", mock.Anything, "bob@example.com").Return(nil, nil)
+		database.On("GetUserByEmail", mock.Anything, mock.Anything, "bob@example.com").Return(nil, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.AuditAuthFailedPwd, mock.MatchedBy(func(details map[string]interface{}) bool {
 			return details["email"] == "bob@example.com"
@@ -768,7 +768,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 			// the two cannot be crossed (#242).
 			OtpConfigGeneration: 4,
 		}
-		database.On("GetUserByEmail", mock.Anything, "test@example.com").Return(user, nil)
+		database.On("GetUserByEmail", mock.Anything, mock.Anything, "test@example.com").Return(user, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.AuditAuthSuccessPwd, mock.MatchedBy(func(details map[string]interface{}) bool {
 			return details["userId"] == int64(1)
@@ -870,7 +870,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 			PasswordHash: passwordHash,
 			Enabled:      false,
 		}
-		database.On("GetUserByEmail", mock.Anything, "disabled@example.com").Return(disabledUser, nil)
+		database.On("GetUserByEmail", mock.Anything, mock.Anything, "disabled@example.com").Return(disabledUser, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.AuditUserDisabled, mock.MatchedBy(func(details map[string]interface{}) bool {
 			return details["userId"] == int64(2)
@@ -938,7 +938,7 @@ func TestHandleAuthPwdPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 		authHelper.On("RegenerateSession", mock.Anything, mock.Anything).Return(nil).Maybe()
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").
 			Return(&models.Client{ClientIdentifier: "test-client"}, nil)
-		database.On("GetUserByEmail", mock.Anything, email).Return(account, nil)
+		database.On("GetUserByEmail", mock.Anything, mock.Anything, email).Return(account, nil)
 		auditLogger.On("Log", mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
 		httpHelper.On("RenderTemplate", mock.Anything, mock.Anything, "/layouts/auth_layout.html",
 			"/auth_pwd.html", mock.Anything).Return(nil).Maybe()

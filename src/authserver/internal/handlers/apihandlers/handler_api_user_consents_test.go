@@ -47,9 +47,9 @@ func TestHandleAPIUserConsentsGet_Success(t *testing.T) {
 	req = setChiURLParam(req, "id", "7")
 	rr := httptest.NewRecorder()
 
-	database.On("GetUserById", (*sql.Tx)(nil), int64(7)).Return(user, nil)
-	database.On("GetConsentsByUserId", (*sql.Tx)(nil), int64(7)).Return(consents, nil)
-	database.On("UserConsentsLoadClients", (*sql.Tx)(nil), consents).Return(nil)
+	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(user, nil)
+	database.On("GetConsentsByUserId", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(consents, nil)
+	database.On("UserConsentsLoadClients", mock.Anything, (*sql.Tx)(nil), consents).Return(nil)
 
 	handler.ServeHTTP(rr, req)
 
@@ -68,7 +68,7 @@ func TestHandleAPIUserConsentsGet_GetUserFails_JSON500(t *testing.T) {
 	req = setChiURLParam(req, "id", "7")
 	rr := httptest.NewRecorder()
 
-	database.On("GetUserById", (*sql.Tx)(nil), int64(7)).Return(nil, assert.AnError)
+	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(nil, assert.AnError)
 
 	handler.ServeHTTP(rr, req)
 
@@ -84,8 +84,8 @@ func TestHandleAPIUserConsentsGet_GetConsentsFails_JSON500(t *testing.T) {
 	req = setChiURLParam(req, "id", "7")
 	rr := httptest.NewRecorder()
 
-	database.On("GetUserById", (*sql.Tx)(nil), int64(7)).Return(&models.User{Id: 7}, nil)
-	database.On("GetConsentsByUserId", (*sql.Tx)(nil), int64(7)).Return(nil, assert.AnError)
+	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(&models.User{Id: 7}, nil)
+	database.On("GetConsentsByUserId", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(nil, assert.AnError)
 
 	handler.ServeHTTP(rr, req)
 
@@ -103,9 +103,9 @@ func TestHandleAPIUserConsentsGet_LoadClientsFails_JSON500(t *testing.T) {
 	req = setChiURLParam(req, "id", "7")
 	rr := httptest.NewRecorder()
 
-	database.On("GetUserById", (*sql.Tx)(nil), int64(7)).Return(&models.User{Id: 7}, nil)
-	database.On("GetConsentsByUserId", (*sql.Tx)(nil), int64(7)).Return(consents, nil)
-	database.On("UserConsentsLoadClients", (*sql.Tx)(nil), consents).Return(assert.AnError)
+	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(&models.User{Id: 7}, nil)
+	database.On("GetConsentsByUserId", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(consents, nil)
+	database.On("UserConsentsLoadClients", mock.Anything, (*sql.Tx)(nil), consents).Return(assert.AnError)
 
 	handler.ServeHTTP(rr, req)
 
@@ -122,8 +122,8 @@ func TestHandleAPIUserConsentDelete_Success(t *testing.T) {
 	req = setChiURLParam(req, "id", "5")
 	rr := httptest.NewRecorder()
 
-	database.On("GetUserConsentById", (*sql.Tx)(nil), int64(5)).Return(&models.UserConsent{Id: 5, UserId: 7}, nil)
-	database.On("DeleteUserConsent", (*sql.Tx)(nil), int64(5)).Return(nil)
+	database.On("GetUserConsentById", mock.Anything, (*sql.Tx)(nil), int64(5)).Return(&models.UserConsent{Id: 5, UserId: 7}, nil)
+	database.On("DeleteUserConsent", mock.Anything, (*sql.Tx)(nil), int64(5)).Return(nil)
 	auditLogger.On("Log", mock.Anything, audit.AuditDeletedUserConsent, mock.MatchedBy(func(details map[string]interface{}) bool {
 		return details["userId"] == int64(7) && details["consentId"] == int64(5)
 	})).Return()
@@ -144,7 +144,7 @@ func TestHandleAPIUserConsentDelete_GetConsentFails_JSON500(t *testing.T) {
 	req = setChiURLParam(req, "id", "5")
 	rr := httptest.NewRecorder()
 
-	database.On("GetUserConsentById", (*sql.Tx)(nil), int64(5)).Return(nil, assert.AnError)
+	database.On("GetUserConsentById", mock.Anything, (*sql.Tx)(nil), int64(5)).Return(nil, assert.AnError)
 
 	handler.ServeHTTP(rr, req)
 
@@ -161,8 +161,8 @@ func TestHandleAPIUserConsentDelete_DeleteFails_JSON500(t *testing.T) {
 	req = setChiURLParam(req, "id", "5")
 	rr := httptest.NewRecorder()
 
-	database.On("GetUserConsentById", (*sql.Tx)(nil), int64(5)).Return(&models.UserConsent{Id: 5, UserId: 7}, nil)
-	database.On("DeleteUserConsent", (*sql.Tx)(nil), int64(5)).Return(assert.AnError)
+	database.On("GetUserConsentById", mock.Anything, (*sql.Tx)(nil), int64(5)).Return(&models.UserConsent{Id: 5, UserId: 7}, nil)
+	database.On("DeleteUserConsent", mock.Anything, (*sql.Tx)(nil), int64(5)).Return(assert.AnError)
 
 	handler.ServeHTTP(rr, req)
 

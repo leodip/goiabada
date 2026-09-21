@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -28,9 +29,9 @@ func TestAPIUserEmailVerificationCodePost_Success(t *testing.T) {
 		FamilyName:    "Code",
 		EmailVerified: false,
 	}
-	assert.NoError(t, database.CreateUser(nil, user))
+	assert.NoError(t, database.CreateUser(context.Background(), nil, user))
 	defer func() {
-		_ = database.DeleteUser(nil, user.Id)
+		_ = database.DeleteUser(context.Background(), nil, user.Id)
 	}()
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(user.Id, 10) + "/email/verification-code"
@@ -49,7 +50,7 @@ func TestAPIUserEmailVerificationCodePost_Success(t *testing.T) {
 	assert.Equal(t, user.Email, body.Email)
 	assert.WithinDuration(t, time.Now().UTC().Add(5*time.Minute), *body.VerificationCodeExpiresAt, 5*time.Second)
 
-	updatedUser, err := database.GetUserById(nil, user.Id)
+	updatedUser, err := database.GetUserById(context.Background(), nil, user.Id)
 	assert.NoError(t, err)
 	assert.NotNil(t, updatedUser.EmailVerificationCodeEncrypted)
 	assert.True(t, updatedUser.EmailVerificationCodeIssuedAt.Valid)
@@ -72,9 +73,9 @@ func TestAPIUserEmailVerificationCodePost_VerifiedUser(t *testing.T) {
 		FamilyName:    "User",
 		EmailVerified: true,
 	}
-	assert.NoError(t, database.CreateUser(nil, user))
+	assert.NoError(t, database.CreateUser(context.Background(), nil, user))
 	defer func() {
-		_ = database.DeleteUser(nil, user.Id)
+		_ = database.DeleteUser(context.Background(), nil, user.Id)
 	}()
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(user.Id, 10) + "/email/verification-code"
@@ -91,7 +92,7 @@ func TestAPIUserEmailVerificationCodePost_VerifiedUser(t *testing.T) {
 	assert.Equal(t, user.Id, body.UserId)
 	assert.Equal(t, user.Email, body.Email)
 
-	updatedUser, err := database.GetUserById(nil, user.Id)
+	updatedUser, err := database.GetUserById(context.Background(), nil, user.Id)
 	assert.NoError(t, err)
 	assert.NotNil(t, updatedUser.EmailVerificationCodeEncrypted)
 	assert.True(t, updatedUser.EmailVerificationCodeIssuedAt.Valid)
@@ -180,9 +181,9 @@ func TestAPIUserEmailVerificationCodePost_RegeneratesCode(t *testing.T) {
 		FamilyName:    "Code",
 		EmailVerified: false,
 	}
-	assert.NoError(t, database.CreateUser(nil, user))
+	assert.NoError(t, database.CreateUser(context.Background(), nil, user))
 	defer func() {
-		_ = database.DeleteUser(nil, user.Id)
+		_ = database.DeleteUser(context.Background(), nil, user.Id)
 	}()
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(user.Id, 10) + "/email/verification-code"
@@ -191,7 +192,7 @@ func TestAPIUserEmailVerificationCodePost_RegeneratesCode(t *testing.T) {
 	defer func() { _ = resp1.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp1.StatusCode)
 
-	updated1, err := database.GetUserById(nil, user.Id)
+	updated1, err := database.GetUserById(context.Background(), nil, user.Id)
 	assert.NoError(t, err)
 	assert.True(t, updated1.EmailVerificationCodeIssuedAt.Valid)
 	issuedAt1 := updated1.EmailVerificationCodeIssuedAt.Time
@@ -202,7 +203,7 @@ func TestAPIUserEmailVerificationCodePost_RegeneratesCode(t *testing.T) {
 	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp2.StatusCode)
 
-	updated2, err := database.GetUserById(nil, user.Id)
+	updated2, err := database.GetUserById(context.Background(), nil, user.Id)
 	assert.NoError(t, err)
 	assert.True(t, updated2.EmailVerificationCodeIssuedAt.Valid)
 	assert.True(t, updated2.EmailVerificationCodeIssuedAt.Time.After(issuedAt1))

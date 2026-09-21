@@ -721,7 +721,7 @@ func handlePromptNone(w http.ResponseWriter, r *http.Request, httpHelper HttpHel
 
 	// 7. Compute effective scopes (filter by user permissions)
 	user := &userSession.User
-	effectiveScope, err := permissionChecker.FilterOutScopesWhereUserIsNotAuthorized(authContext.Scope, user)
+	effectiveScope, err := permissionChecker.FilterOutScopesWhereUserIsNotAuthorized(r.Context(), authContext.Scope, user)
 	if err != nil {
 		httpHelper.InternalServerError(w, r, err)
 		return
@@ -734,7 +734,7 @@ func handlePromptNone(w http.ResponseWriter, r *http.Request, httpHelper HttpHel
 
 	// 8. Check consent requirements
 	if client.ConsentRequired || strings.Contains(effectiveScope, oidc.OfflineAccessScope) {
-		consent, err := database.GetConsentByUserIdAndClientId(nil, user.Id, client.Id)
+		consent, err := database.GetConsentByUserIdAndClientId(r.Context(), nil, user.Id, client.Id)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return

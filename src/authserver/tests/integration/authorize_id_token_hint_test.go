@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"io"
 	"net/url"
 	"testing"
@@ -37,7 +38,7 @@ func TestIdTokenHint_PromptLogin_MismatchedUser_BlocksAtIssuance(t *testing.T) {
 		Email:        fake.Email(),
 		PasswordHash: passwordHashedA,
 	}
-	err = database.CreateUser(nil, userA)
+	err = database.CreateUser(context.Background(), nil, userA)
 	assert.NoError(t, err)
 
 	passwordB := fake.Password(10)
@@ -50,7 +51,7 @@ func TestIdTokenHint_PromptLogin_MismatchedUser_BlocksAtIssuance(t *testing.T) {
 		Email:        fake.Email(),
 		PasswordHash: passwordHashedB,
 	}
-	err = database.CreateUser(nil, userB)
+	err = database.CreateUser(context.Background(), nil, userB)
 	assert.NoError(t, err)
 
 	// =========================================================================
@@ -259,7 +260,7 @@ func TestIdTokenHint_PromptLogin_MatchingUser_Success(t *testing.T) {
 		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
-	err = database.CreateUser(nil, user)
+	err = database.CreateUser(context.Background(), nil, user)
 	assert.NoError(t, err)
 
 	// =========================================================================
@@ -449,7 +450,7 @@ func TestIdTokenHint_NoPrompt_MismatchedUser_BlocksAtIssuance(t *testing.T) {
 		Email:        fake.Email(),
 		PasswordHash: passwordHashedA,
 	}
-	err = database.CreateUser(nil, userA)
+	err = database.CreateUser(context.Background(), nil, userA)
 	assert.NoError(t, err)
 
 	passwordB := fake.Password(10)
@@ -462,7 +463,7 @@ func TestIdTokenHint_NoPrompt_MismatchedUser_BlocksAtIssuance(t *testing.T) {
 		Email:        fake.Email(),
 		PasswordHash: passwordHashedB,
 	}
-	err = database.CreateUser(nil, userB)
+	err = database.CreateUser(context.Background(), nil, userB)
 	assert.NoError(t, err)
 
 	// Create client

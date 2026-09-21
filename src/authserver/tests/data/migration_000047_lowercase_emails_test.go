@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"path/filepath"
@@ -248,7 +249,7 @@ func seedUserEmail000047(t *testing.T, h *isolatedDB, n int, raw string) int64 {
 		Email:        raw,
 		PasswordHash: "not-a-real-hash",
 	}
-	require.NoErrorf(t, h.DB.CreateUser(nil, user), "seed user with email %q", raw)
+	require.NoErrorf(t, h.DB.CreateUser(context.Background(), nil, user), "seed user with email %q", raw)
 	return user.Id
 }
 
@@ -256,7 +257,7 @@ func seedUserEmail000047(t *testing.T, h *isolatedDB, n int, raw string) int64 {
 // read, so a difference here is a difference a sign-in would meet.
 func storedEmail000047(t *testing.T, h *isolatedDB, id int64) string {
 	t.Helper()
-	user, err := h.DB.GetUserById(nil, id)
+	user, err := h.DB.GetUserById(context.Background(), nil, id)
 	require.NoErrorf(t, err, "read back users.id=%d", id)
 	require.NotNilf(t, user, "users.id=%d is gone; this migration deletes nothing", id)
 	return user.Email
@@ -280,7 +281,7 @@ func assertEmailIndex000047(t *testing.T, h *isolatedDB, phase string) {
 		Email:        strings.ToLower(lowercaseCases000047()[0].raw),
 		PasswordHash: "not-a-real-hash",
 	}
-	assert.Errorf(t, h.DB.CreateUser(nil, taken),
+	assert.Errorf(t, h.DB.CreateUser(context.Background(), nil, taken),
 		"[%s] a second row holding an address already stored must be refused", phase)
 }
 
@@ -309,11 +310,11 @@ func TestNewDatabase_RefusesAnEmailCaseCollisionAtStartup(t *testing.T) {
 	m, err := seed.NewMigrator()
 	require.NoError(t, err)
 	require.NoError(t, m.Migrate(beforeLowercaseEmails000047), "step the throwaway database to 000046")
-	require.NoError(t, seed.CreateUser(nil, &models.User{
+	require.NoError(t, seed.CreateUser(context.Background(), nil, &models.User{
 		Enabled: true, Subject: "00000000-0000-0000-0000-000000047101",
 		Username: "mig47start0", Email: "Startup@example.com", PasswordHash: "not-a-real-hash",
 	}))
-	require.NoError(t, seed.CreateUser(nil, &models.User{
+	require.NoError(t, seed.CreateUser(context.Background(), nil, &models.User{
 		Enabled: true, Subject: "00000000-0000-0000-0000-000000047102",
 		Username: "mig47start1", Email: "startup@example.com", PasswordHash: "not-a-real-hash",
 	}))

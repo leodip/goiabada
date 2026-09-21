@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"context"
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/models"
@@ -24,7 +25,7 @@ func createUserWithGivenName(t *testing.T, givenName string) *models.User {
 		GivenName: givenName,
 		Email:     fake.LetterN(12) + "@example.com",
 	}
-	if err := database.CreateUser(nil, user); err != nil {
+	if err := database.CreateUser(context.Background(), nil, user); err != nil {
 		t.Fatalf("Failed to create user: %v", err)
 	}
 	return user
@@ -40,7 +41,7 @@ func TestUserLoadPermissions(t *testing.T) {
 	permission := createTestPermission(t, resource)
 	createTestUserPermissionWithUserAndPermission(t, user.Id, permission.Id)
 
-	if err := database.UserLoadPermissions(nil, user); err != nil {
+	if err := database.UserLoadPermissions(context.Background(), nil, user); err != nil {
 		t.Fatalf("UserLoadPermissions failed: %v", err)
 	}
 
@@ -59,7 +60,7 @@ func TestUserLoadPermissions(t *testing.T) {
 func TestUserLoadPermissions_NoPermissions(t *testing.T) {
 	user := createTestUser(t)
 
-	if err := database.UserLoadPermissions(nil, user); err != nil {
+	if err := database.UserLoadPermissions(context.Background(), nil, user); err != nil {
 		t.Fatalf("UserLoadPermissions failed: %v", err)
 	}
 
@@ -84,7 +85,7 @@ func TestUsersLoadPermissions(t *testing.T) {
 
 	users := []models.User{*userA, *userB, *userC}
 
-	if err := database.UsersLoadPermissions(nil, users); err != nil {
+	if err := database.UsersLoadPermissions(context.Background(), nil, users); err != nil {
 		t.Fatalf("UsersLoadPermissions failed: %v", err)
 	}
 
@@ -100,10 +101,10 @@ func TestUsersLoadPermissions(t *testing.T) {
 }
 
 func TestUsersLoadPermissions_NilAndEmptySlices(t *testing.T) {
-	if err := database.UsersLoadPermissions(nil, nil); err != nil {
+	if err := database.UsersLoadPermissions(context.Background(), nil, nil); err != nil {
 		t.Errorf("UsersLoadPermissions(nil) should be a no-op, got: %v", err)
 	}
-	if err := database.UsersLoadPermissions(nil, []models.User{}); err != nil {
+	if err := database.UsersLoadPermissions(context.Background(), nil, []models.User{}); err != nil {
 		t.Errorf("UsersLoadPermissions(empty) should be a no-op, got: %v", err)
 	}
 }
@@ -115,7 +116,7 @@ func TestUserLoadGroups(t *testing.T) {
 	createTestUserGroupWithUserAndGroup(t, user.Id, groupA.Id)
 	createTestUserGroupWithUserAndGroup(t, user.Id, groupB.Id)
 
-	if err := database.UserLoadGroups(nil, user); err != nil {
+	if err := database.UserLoadGroups(context.Background(), nil, user); err != nil {
 		t.Fatalf("UserLoadGroups failed: %v", err)
 	}
 
@@ -138,7 +139,7 @@ func TestUserLoadGroups(t *testing.T) {
 func TestUserLoadGroups_NoGroups(t *testing.T) {
 	user := createTestUser(t)
 
-	if err := database.UserLoadGroups(nil, user); err != nil {
+	if err := database.UserLoadGroups(context.Background(), nil, user); err != nil {
 		t.Fatalf("UserLoadGroups failed: %v", err)
 	}
 
@@ -158,7 +159,7 @@ func TestUsersLoadGroups(t *testing.T) {
 
 	users := []models.User{*userA, *userB}
 
-	if err := database.UsersLoadGroups(nil, users); err != nil {
+	if err := database.UsersLoadGroups(context.Background(), nil, users); err != nil {
 		t.Fatalf("UsersLoadGroups failed: %v", err)
 	}
 
@@ -171,10 +172,10 @@ func TestUsersLoadGroups(t *testing.T) {
 }
 
 func TestUsersLoadGroups_NilAndEmptySlices(t *testing.T) {
-	if err := database.UsersLoadGroups(nil, nil); err != nil {
+	if err := database.UsersLoadGroups(context.Background(), nil, nil); err != nil {
 		t.Errorf("UsersLoadGroups(nil) should be a no-op, got: %v", err)
 	}
-	if err := database.UsersLoadGroups(nil, []models.User{}); err != nil {
+	if err := database.UsersLoadGroups(context.Background(), nil, []models.User{}); err != nil {
 		t.Errorf("UsersLoadGroups(empty) should be a no-op, got: %v", err)
 	}
 }
@@ -184,7 +185,7 @@ func TestUserLoadAttributes(t *testing.T) {
 	attributeA := createTestUserAttribute(t, user.Id)
 	attributeB := createTestUserAttribute(t, user.Id)
 
-	if err := database.UserLoadAttributes(nil, user); err != nil {
+	if err := database.UserLoadAttributes(context.Background(), nil, user); err != nil {
 		t.Fatalf("UserLoadAttributes failed: %v", err)
 	}
 
@@ -207,7 +208,7 @@ func TestUserLoadAttributes(t *testing.T) {
 func TestUserLoadAttributes_NoAttributes(t *testing.T) {
 	user := createTestUser(t)
 
-	if err := database.UserLoadAttributes(nil, user); err != nil {
+	if err := database.UserLoadAttributes(context.Background(), nil, user); err != nil {
 		t.Fatalf("UserLoadAttributes failed: %v", err)
 	}
 
@@ -231,7 +232,7 @@ func TestGetUsersByIds(t *testing.T) {
 	userC := createTestUser(t)
 
 	// Deliberately ask for only two of the three.
-	users, err := database.GetUsersByIds(nil, []int64{userA.Id, userC.Id})
+	users, err := database.GetUsersByIds(context.Background(), nil, []int64{userA.Id, userC.Id})
 	if err != nil {
 		t.Fatalf("GetUsersByIds failed: %v", err)
 	}
@@ -258,7 +259,7 @@ func TestGetUsersByIds(t *testing.T) {
 func TestGetUsersByIds_UnknownIdIsSkipped(t *testing.T) {
 	user := createTestUser(t)
 
-	users, err := database.GetUsersByIds(nil, []int64{user.Id, 999999999})
+	users, err := database.GetUsersByIds(context.Background(), nil, []int64{user.Id, 999999999})
 	if err != nil {
 		t.Fatalf("GetUsersByIds failed: %v", err)
 	}
@@ -277,7 +278,7 @@ func TestGetUsersByIds_UnknownIdIsSkipped(t *testing.T) {
 func TestGetUsersByIds_DuplicateIdsCollapse(t *testing.T) {
 	user := createTestUser(t)
 
-	users, err := database.GetUsersByIds(nil, []int64{user.Id, user.Id})
+	users, err := database.GetUsersByIds(context.Background(), nil, []int64{user.Id, user.Id})
 	if err != nil {
 		t.Fatalf("GetUsersByIds failed: %v", err)
 	}
@@ -305,7 +306,7 @@ func TestGetUsersByIds_DuplicateIdsCollapse(t *testing.T) {
 // Asserted as len()==0 rather than == nil so the test states the contract
 // callers rely on (no users came back) and not the representation.
 func TestGetUsersByIds_EmptyInput(t *testing.T) {
-	users, err := database.GetUsersByIds(nil, []int64{})
+	users, err := database.GetUsersByIds(context.Background(), nil, []int64{})
 	if err != nil {
 		t.Fatalf("GetUsersByIds(empty) failed: %v", err)
 	}
@@ -313,7 +314,7 @@ func TestGetUsersByIds_EmptyInput(t *testing.T) {
 		t.Errorf("Expected no users for an empty id list, got %+v", users)
 	}
 
-	users, err = database.GetUsersByIds(nil, nil)
+	users, err = database.GetUsersByIds(context.Background(), nil, nil)
 	if err != nil {
 		t.Fatalf("GetUsersByIds(nil) failed: %v", err)
 	}
@@ -830,7 +831,7 @@ func TestDeleteAllUserConsent(t *testing.T) {
 
 	// Both exist to begin with.
 	for _, id := range []int64{consentA.Id, consentB.Id} {
-		consent, err := database.GetUserConsentById(nil, id)
+		consent, err := database.GetUserConsentById(context.Background(), nil, id)
 		if err != nil {
 			t.Fatalf("Failed to read consent %d: %v", id, err)
 		}
@@ -839,12 +840,12 @@ func TestDeleteAllUserConsent(t *testing.T) {
 		}
 	}
 
-	if err := database.DeleteAllUserConsent(nil); err != nil {
+	if err := database.DeleteAllUserConsent(context.Background(), nil); err != nil {
 		t.Fatalf("DeleteAllUserConsent failed: %v", err)
 	}
 
 	for _, id := range []int64{consentA.Id, consentB.Id} {
-		consent, err := database.GetUserConsentById(nil, id)
+		consent, err := database.GetUserConsentById(context.Background(), nil, id)
 		if err != nil {
 			t.Fatalf("Failed to read consent %d: %v", id, err)
 		}
@@ -856,10 +857,10 @@ func TestDeleteAllUserConsent(t *testing.T) {
 
 // Deleting from an already empty table must succeed rather than error.
 func TestDeleteAllUserConsent_Idempotent(t *testing.T) {
-	if err := database.DeleteAllUserConsent(nil); err != nil {
+	if err := database.DeleteAllUserConsent(context.Background(), nil); err != nil {
 		t.Fatalf("First DeleteAllUserConsent failed: %v", err)
 	}
-	if err := database.DeleteAllUserConsent(nil); err != nil {
+	if err := database.DeleteAllUserConsent(context.Background(), nil); err != nil {
 		t.Fatalf("Second DeleteAllUserConsent failed: %v", err)
 	}
 }

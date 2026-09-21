@@ -74,8 +74,8 @@ func newVerificationEnv(t *testing.T) *verificationEnv {
 		EmailVerificationCodeIssuedAt:  sql.NullTime{Time: time.Now().UTC(), Valid: true},
 	}
 
-	database.On("GetUserBySubject", (*sql.Tx)(nil), verificationSubject).Return(user, nil).Maybe()
-	database.On("UpdateUser", (*sql.Tx)(nil), user).Return(nil).Maybe()
+	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), verificationSubject).Return(user, nil).Maybe()
+	database.On("UpdateUser", mock.Anything, (*sql.Tx)(nil), user).Return(nil).Maybe()
 	auditLogger.On("Log", mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
 
 	rateLimiter := middleware.NewRateLimiterMiddleware(nil, unusedRenderer{t}, nil, true)

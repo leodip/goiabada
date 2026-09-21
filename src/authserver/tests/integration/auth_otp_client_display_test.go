@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/models"
@@ -50,7 +51,7 @@ func TestAuthOtp_ClientDisplay_ShowDisplayName_Enabled(t *testing.T) {
 		OTPSecretEncrypted: encryptOTPSecretForTest(t, key.Secret()),
 		OTPEnabled:         true,
 	}
-	err = database.CreateUser(nil, user)
+	err = database.CreateUser(context.Background(), nil, user)
 	assert.NoError(t, err)
 
 	// Navigate to OTP screen
@@ -111,7 +112,7 @@ func TestAuthOtp_ClientDisplay_AllEnabled_Enabled(t *testing.T) {
 		OTPSecretEncrypted: encryptOTPSecretForTest(t, key.Secret()),
 		OTPEnabled:         true,
 	}
-	err = database.CreateUser(nil, user)
+	err = database.CreateUser(context.Background(), nil, user)
 	assert.NoError(t, err)
 
 	// Navigate to OTP screen
@@ -173,7 +174,7 @@ func TestAuthOtp_ClientDisplay_AllDisabled_Enabled(t *testing.T) {
 		OTPSecretEncrypted: encryptOTPSecretForTest(t, key.Secret()),
 		OTPEnabled:         true,
 	}
-	err = database.CreateUser(nil, user)
+	err = database.CreateUser(context.Background(), nil, user)
 	assert.NoError(t, err)
 
 	// Navigate to OTP screen
@@ -223,7 +224,7 @@ func TestAuthOtp_ClientDisplay_ShowDisplayName_Enrollment(t *testing.T) {
 		PasswordHash: passwordHashed,
 		OTPEnabled:   false, // No OTP yet
 	}
-	err = database.CreateUser(nil, user)
+	err = database.CreateUser(context.Background(), nil, user)
 	assert.NoError(t, err)
 
 	// Navigate to OTP screen (will show enrollment page)
@@ -276,7 +277,7 @@ func TestAuthOtp_ClientDisplay_AllEnabled_Enrollment(t *testing.T) {
 		PasswordHash: passwordHashed,
 		OTPEnabled:   false,
 	}
-	err = database.CreateUser(nil, user)
+	err = database.CreateUser(context.Background(), nil, user)
 	assert.NoError(t, err)
 
 	// Navigate to OTP screen (enrollment)
@@ -330,7 +331,7 @@ func TestAuthOtp_ClientDisplay_AllDisabled_Enrollment(t *testing.T) {
 		PasswordHash: passwordHashed,
 		OTPEnabled:   false,
 	}
-	err = database.CreateUser(nil, user)
+	err = database.CreateUser(context.Background(), nil, user)
 	assert.NoError(t, err)
 
 	// Navigate to OTP screen (enrollment)

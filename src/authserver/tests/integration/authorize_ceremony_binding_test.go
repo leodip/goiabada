@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"net/http"
 	"net/url"
 	"testing"
@@ -58,7 +59,7 @@ func createCeremonyUser(t *testing.T) (*models.User, string) {
 		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
-	if err := database.CreateUser(nil, user); err != nil {
+	if err := database.CreateUser(context.Background(), nil, user); err != nil {
 		t.Fatal(err)
 	}
 	return user, password
@@ -195,7 +196,7 @@ func TestAuthorize_ConsentFormFromAReplacedCeremonyIsRefused(t *testing.T) {
 
 	// Nothing was issued and nothing was persisted, for either client.
 	for _, c := range []*models.Client{clientA, clientB} {
-		consent, err := database.GetConsentByUserIdAndClientId(nil, user.Id, c.Id)
+		consent, err := database.GetConsentByUserIdAndClientId(context.Background(), nil, user.Id, c.Id)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -219,13 +220,13 @@ func TestAuthorize_ConsentFormFromAReplacedCeremonyIsRefused(t *testing.T) {
 	assert.Equal(t, "openid profile", code.Scope)
 	assert.Equal(t, redirectUriB.URI, code.RedirectURI)
 
-	consentA, err := database.GetConsentByUserIdAndClientId(nil, user.Id, clientA.Id)
+	consentA, err := database.GetConsentByUserIdAndClientId(context.Background(), nil, user.Id, clientA.Id)
 	if err != nil {
 		t.Fatal(err)
 	}
 	assert.Nil(t, consentA, "client A was never consented to, so it must hold no consent row")
 
-	consentB, err := database.GetConsentByUserIdAndClientId(nil, user.Id, clientB.Id)
+	consentB, err := database.GetConsentByUserIdAndClientId(context.Background(), nil, user.Id, clientB.Id)
 	if err != nil {
 		t.Fatal(err)
 	}

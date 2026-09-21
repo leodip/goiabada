@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 	"testing"
@@ -93,7 +94,7 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2OptionalRequest_OtpDisabled
 	httpClient, client, redirectUri, user := createSessionWithAcrLevel1(t)
 
 	user.OTPEnabled = false
-	err := database.UpdateUser(nil, user)
+	err := database.UpdateUser(context.Background(), nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -187,7 +188,7 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2OptionalRequest_OtpEnabled(
 
 	user.OTPEnabled = true
 	user.OTPSecretEncrypted = encryptOTPSecretForTest(t, key.Secret())
-	err = database.UpdateUser(nil, user)
+	err = database.UpdateUser(context.Background(), nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -283,7 +284,7 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2MandatoryRequest_OtpDisable
 	httpClient, client, redirectUri, user := createSessionWithAcrLevel1(t)
 
 	user.OTPEnabled = false
-	err := database.UpdateUser(nil, user)
+	err := database.UpdateUser(context.Background(), nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -390,7 +391,7 @@ func TestAuthorize_ExistingAcrLevel1Session_AcrLevel2MandatoryRequest_OtpEnabled
 
 	user.OTPEnabled = true
 	user.OTPSecretEncrypted = encryptOTPSecretForTest(t, key.Secret())
-	err = database.UpdateUser(nil, user)
+	err = database.UpdateUser(context.Background(), nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -562,7 +563,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2OptionalRequest_Otp
 
 	// Ensure OTP is disabled for the user
 	user.OTPEnabled = false
-	err := database.UpdateUser(nil, user)
+	err := database.UpdateUser(context.Background(), nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -656,7 +657,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2OptionalRequest_Otp
 
 	user.OTPEnabled = true
 	user.OTPSecretEncrypted = encryptOTPSecretForTest(t, key.Secret())
-	err = database.UpdateUser(nil, user)
+	err = database.UpdateUser(context.Background(), nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -757,7 +758,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2OptionalRequest_Otp
 	// compared, /auth/level2 only captured onto the auth context, and /auth/completed is what
 	// wrote. A ceremony abandoned before that point would have left the snapshot behind and this
 	// same request would prompt for OTP again (#242 decision 3).
-	userAfter, err := database.GetUserById(nil, user.Id)
+	userAfter, err := database.GetUserById(context.Background(), nil, user.Id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -770,7 +771,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2MandatoryRequest_Ot
 
 	// Ensure OTP is disabled for the user
 	user.OTPEnabled = false
-	err := database.UpdateUser(nil, user)
+	err := database.UpdateUser(context.Background(), nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -863,7 +864,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2MandatoryRequest_Ot
 	assert.Greater(t, userSession2.LastAccessed, userSession1.LastAccessed)
 
 	// Verify that OTP is now enabled for the user
-	updatedUser, err := database.GetUserById(nil, user.Id)
+	updatedUser, err := database.GetUserById(context.Background(), nil, user.Id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -885,7 +886,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2MandatoryRequest_Ot
 
 	user.OTPEnabled = true
 	user.OTPSecretEncrypted = encryptOTPSecretForTest(t, key.Secret())
-	err = database.UpdateUser(nil, user)
+	err = database.UpdateUser(context.Background(), nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -977,7 +978,7 @@ func TestAuthorize_ExistingAcrLevel2OptionalSession_AcrLevel2MandatoryRequest_Ot
 	assert.Greater(t, userSession2.LastAccessed, userSession1.LastAccessed)
 
 	// Verify that OTP is still enabled for the user
-	updatedUser, err := database.GetUserById(nil, user.Id)
+	updatedUser, err := database.GetUserById(context.Background(), nil, user.Id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1067,7 +1068,7 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2OptionalRequest_Ot
 
 	// Disable OTP for the user
 	user.OTPEnabled = false
-	err := database.UpdateUser(nil, user)
+	err := database.UpdateUser(context.Background(), nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1144,7 +1145,7 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2OptionalRequest_Ot
 	assert.Greater(t, userSession2.LastAccessed, userSession1.LastAccessed)
 
 	// Verify that the user's OTP settings haven't changed
-	updatedUser, err := database.GetUserById(nil, user.Id)
+	updatedUser, err := database.GetUserById(context.Background(), nil, user.Id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1231,7 +1232,7 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2OptionalRequest_Ot
 	assert.Greater(t, userSession2.LastAccessed, userSession1.LastAccessed)
 
 	// Verify that the user's OTP settings haven't changed
-	updatedUser, err := database.GetUserById(nil, user.Id)
+	updatedUser, err := database.GetUserById(context.Background(), nil, user.Id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1244,7 +1245,7 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2MandatoryRequest_O
 
 	// Disable OTP for the user
 	user.OTPEnabled = false
-	err := database.UpdateUser(nil, user)
+	err := database.UpdateUser(context.Background(), nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1254,7 +1255,7 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2MandatoryRequest_O
 	// tagged dont-update precisely so an ordinary whole-user write can never move it. Without
 	// this the enrollment below submits a code from the same time step the session helper
 	// already consumed, and the claim refuses it (#111 decision 8).
-	err = database.ResetUserOTPStep(nil, user.Id)
+	err = database.ResetUserOTPStep(context.Background(), nil, user.Id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1353,7 +1354,7 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2MandatoryRequest_O
 	assert.Greater(t, userSession2.LastAccessed, userSession1.LastAccessed)
 
 	// Verify that the user's OTP settings have been updated
-	updatedUser, err := database.GetUserById(nil, user.Id)
+	updatedUser, err := database.GetUserById(context.Background(), nil, user.Id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1441,7 +1442,7 @@ func TestAuthorize_ExistingAcrLevel2MandatorySession_AcrLevel2MandatoryRequest_O
 	assert.Greater(t, userSession2.LastAccessed, userSession1.LastAccessed)
 
 	// Check that the user's OTP settings remain unchanged
-	updatedUser, err := database.GetUserById(nil, user.Id)
+	updatedUser, err := database.GetUserById(context.Background(), nil, user.Id)
 	if err != nil {
 		t.Fatal(err)
 	}

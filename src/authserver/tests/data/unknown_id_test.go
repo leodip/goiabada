@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"testing"
@@ -37,7 +38,10 @@ func byIdReaders() []byIdReader {
 			v, err := database.GetClientById(tx, id)
 			return v != nil, err
 		}},
-		{"GetUserById", func(tx *sql.Tx, id int64) (bool, error) { v, err := database.GetUserById(tx, id); return v != nil, err }},
+		{"GetUserById", func(tx *sql.Tx, id int64) (bool, error) {
+			v, err := database.GetUserById(context.Background(), tx, id)
+			return v != nil, err
+		}},
 		{"GetCodeById", func(tx *sql.Tx, id int64) (bool, error) { v, err := database.GetCodeById(tx, id); return v != nil, err }},
 		{"GetResourceById", func(tx *sql.Tx, id int64) (bool, error) {
 			v, err := database.GetResourceById(tx, id)
@@ -64,7 +68,7 @@ func byIdReaders() []byIdReader {
 			return v != nil, err
 		}},
 		{"GetUserPermissionById", func(tx *sql.Tx, id int64) (bool, error) {
-			v, err := database.GetUserPermissionById(tx, id)
+			v, err := database.GetUserPermissionById(context.Background(), tx, id)
 			return v != nil, err
 		}},
 		{"GetGroupById", func(tx *sql.Tx, id int64) (bool, error) {
@@ -72,11 +76,11 @@ func byIdReaders() []byIdReader {
 			return v != nil, err
 		}},
 		{"GetUserAttributeById", func(tx *sql.Tx, id int64) (bool, error) {
-			v, err := database.GetUserAttributeById(tx, id)
+			v, err := database.GetUserAttributeById(context.Background(), tx, id)
 			return v != nil, err
 		}},
 		{"GetUserProfilePictureByUserId", func(tx *sql.Tx, id int64) (bool, error) {
-			v, err := database.GetUserProfilePictureByUserId(tx, id)
+			v, err := database.GetUserProfilePictureByUserId(context.Background(), tx, id)
 			return v != nil, err
 		}},
 		{"GetClientLogoByClientId", func(tx *sql.Tx, id int64) (bool, error) {
@@ -92,7 +96,7 @@ func byIdReaders() []byIdReader {
 			return v != nil, err
 		}},
 		{"GetUserConsentById", func(tx *sql.Tx, id int64) (bool, error) {
-			v, err := database.GetUserConsentById(tx, id)
+			v, err := database.GetUserConsentById(context.Background(), tx, id)
 			return v != nil, err
 		}},
 		{"GetPreRegistrationById", func(tx *sql.Tx, id int64) (bool, error) {
@@ -100,7 +104,7 @@ func byIdReaders() []byIdReader {
 			return v != nil, err
 		}},
 		{"GetUserGroupById", func(tx *sql.Tx, id int64) (bool, error) {
-			v, err := database.GetUserGroupById(tx, id)
+			v, err := database.GetUserGroupById(context.Background(), tx, id)
 			return v != nil, err
 		}},
 		{"GetGroupAttributeById", func(tx *sql.Tx, id int64) (bool, error) {
@@ -158,16 +162,16 @@ func byValueReaders() []byValueReader {
 			return c != nil, err
 		}},
 		{"GetUserByUsername", randomWord, func(tx *sql.Tx, v string) (bool, error) {
-			u, err := database.GetUserByUsername(tx, v)
+			u, err := database.GetUserByUsername(context.Background(), tx, v)
 			return u != nil, err
 		}},
 		{"GetUserBySubject", randomUUID, func(tx *sql.Tx, v string) (bool, error) {
-			u, err := database.GetUserBySubject(tx, v)
+			u, err := database.GetUserBySubject(context.Background(), tx, v)
 			return u != nil, err
 		}},
 		{"GetUserByEmail", func() string { return "missing_" + fake.LetterN(12) + "@example.com" },
 			func(tx *sql.Tx, v string) (bool, error) {
-				u, err := database.GetUserByEmail(tx, v)
+				u, err := database.GetUserByEmail(context.Background(), tx, v)
 				return u != nil, err
 			}},
 		{"GetResourceByResourceIdentifier", randomWord, func(tx *sql.Tx, v string) (bool, error) {

@@ -152,7 +152,7 @@ func TestIdListLookups_MoreIdsThanOneStatementCanCarry(t *testing.T) {
 				return idsOfThree(func() int64 { return createTestUser(t).Id })
 			},
 			answered: func(t *testing.T, ids []int64) []int64 {
-				users, err := database.GetUsersByIds(nil, ids)
+				users, err := database.GetUsersByIds(context.Background(), nil, ids)
 				requireNoLookupError(t, err)
 				found := make([]int64, 0, len(users))
 				for id := range users {
@@ -172,7 +172,7 @@ func TestIdListLookups_MoreIdsThanOneStatementCanCarry(t *testing.T) {
 				})
 			},
 			answered: func(t *testing.T, ids []int64) []int64 {
-				userGroups, err := database.GetUserGroupsByUserIds(nil, ids)
+				userGroups, err := database.GetUserGroupsByUserIds(context.Background(), nil, ids)
 				requireNoLookupError(t, err)
 				found := make([]int64, 0, len(userGroups))
 				for _, userGroup := range userGroups {
@@ -193,7 +193,7 @@ func TestIdListLookups_MoreIdsThanOneStatementCanCarry(t *testing.T) {
 				})
 			},
 			answered: func(t *testing.T, ids []int64) []int64 {
-				userPermissions, err := database.GetUserPermissionsByUserIds(nil, ids)
+				userPermissions, err := database.GetUserPermissionsByUserIds(context.Background(), nil, ids)
 				requireNoLookupError(t, err)
 				found := make([]int64, 0, len(userPermissions))
 				for _, userPermission := range userPermissions {

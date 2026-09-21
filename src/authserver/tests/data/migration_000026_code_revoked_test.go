@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"strings"
@@ -96,7 +97,7 @@ func seedCode000026(t *testing.T, h *isolatedDB) int64 {
 		Subject:  fake.UUID(),
 		Username: "mig26_" + random,
 	}
-	require.NoError(t, h.DB.CreateUser(nil, user), "seed user")
+	require.NoError(t, h.DB.CreateUser(context.Background(), nil, user), "seed user")
 
 	// Two fields are here for engine-specific reasons, both found by running this on
 	// all four rather than by reading the schema. The challenge fields, because SQLite

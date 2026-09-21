@@ -32,13 +32,13 @@ func createEnrollableUser(t *testing.T) *models.User {
 	t.Helper()
 	user := createTestUser(t)
 	user.OTPEnabled = false
-	require.NoError(t, database.UpdateUser(nil, user), "UpdateUser to clear otp_enabled")
+	require.NoError(t, database.UpdateUser(context.Background(), nil, user), "UpdateUser to clear otp_enabled")
 	return user
 }
 
 func reloadUser(t *testing.T, userId int64) *models.User {
 	t.Helper()
-	u, err := database.GetUserById(nil, userId)
+	u, err := database.GetUserById(context.Background(), nil, userId)
 	require.NoError(t, err, "reload user %d", userId)
 	require.NotNil(t, u, "user %d vanished", userId)
 	return u
@@ -68,7 +68,7 @@ func TestTryInstallPendingOTPEnrollment_RoundTrip(t *testing.T) {
 	issuedAt := time.Now().UTC().Truncate(time.Microsecond)
 	ciphertext := encryptedKeyURL(t, "ZP2Z5KXRBAPPHWXEHH65PY5H7EKLVHRZ")
 
-	installed, err := database.TryInstallPendingOTPEnrollment(nil, user.Id, ciphertext, issuedAt,
+	installed, err := database.TryInstallPendingOTPEnrollment(context.Background(), nil, user.Id, ciphertext, issuedAt,
 		issuedAt.Add(-15*time.Minute))
 	require.NoError(t, err, "TryInstallPendingOTPEnrollment")
 	assert.True(t, installed, "a user with nothing pending and no authenticator must accept one")
@@ -89,7 +89,7 @@ func TestTryInstallPendingOTPEnrollment_RoundTrip(t *testing.T) {
 	assert.Nil(t, other.OtpEnrollmentSecretEncrypted,
 		"the install is keyed on one user id and must not reach any other row")
 
-	require.NoError(t, database.ClearPendingOTPEnrollment(nil, user.Id), "ClearPendingOTPEnrollment")
+	require.NoError(t, database.ClearPendingOTPEnrollment(context.Background(), nil, user.Id), "ClearPendingOTPEnrollment")
 
 	cleared := reloadUser(t, user.Id)
 	assert.Nil(t, cleared.OtpEnrollmentSecretEncrypted, "the clear must return the ciphertext to NULL")
@@ -97,7 +97,7 @@ func TestTryInstallPendingOTPEnrollment_RoundTrip(t *testing.T) {
 
 	// Clearing a user with nothing pending is not a failure: nothing gates on the transition, and
 	// both enable paths call it unconditionally.
-	assert.NoError(t, database.ClearPendingOTPEnrollment(nil, bystander.Id),
+	assert.NoError(t, database.ClearPendingOTPEnrollment(context.Background(), nil, bystander.Id),
 		"clearing a user with nothing pending must succeed")
 }
 
@@ -114,11 +114,11 @@ func TestTryInstallPendingOTPEnrollment_Idempotence(t *testing.T) {
 	winner := encryptedKeyURL(t, "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
 	loser := encryptedKeyURL(t, "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB")
 
-	installed, err := database.TryInstallPendingOTPEnrollment(nil, user.Id, winner, now, staleBefore)
+	installed, err := database.TryInstallPendingOTPEnrollment(context.Background(), nil, user.Id, winner, now, staleBefore)
 	require.NoError(t, err)
 	require.True(t, installed, "the first install must win")
 
-	installed, err = database.TryInstallPendingOTPEnrollment(nil, user.Id, loser, now.Add(time.Second), staleBefore)
+	installed, err = database.TryInstallPendingOTPEnrollment(context.Background(), nil, user.Id, loser, now.Add(time.Second), staleBefore)
 	require.NoError(t, err, "a losing install is not an error")
 	assert.False(t, installed, "a live unexpired pending enrolment must refuse to be replaced")
 
@@ -130,7 +130,7 @@ func TestTryInstallPendingOTPEnrollment_Idempotence(t *testing.T) {
 	// An expired one, by contrast, is replaceable. staleBefore moves past the stored issued_at,
 	// which is exactly what the handler's lifetime does as time passes.
 	replacement := encryptedKeyURL(t, "CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC")
-	installed, err = database.TryInstallPendingOTPEnrollment(nil, user.Id, replacement,
+	installed, err = database.TryInstallPendingOTPEnrollment(context.Background(), nil, user.Id, replacement,
 		now.Add(time.Hour), now.Add(time.Minute))
 	require.NoError(t, err)
 	assert.True(t, installed, "an expired pending enrolment must be replaceable")
@@ -145,10 +145,10 @@ func TestTryInstallPendingOTPEnrollment_Idempotence(t *testing.T) {
 func TestTryInstallPendingOTPEnrollment_RefusesAnEnabledAuthenticator(t *testing.T) {
 	user := createEnrollableUser(t)
 	user.OTPEnabled = true
-	require.NoError(t, database.UpdateUser(nil, user), "UpdateUser to set otp_enabled")
+	require.NoError(t, database.UpdateUser(context.Background(), nil, user), "UpdateUser to set otp_enabled")
 
 	now := time.Now().UTC().Truncate(time.Microsecond)
-	installed, err := database.TryInstallPendingOTPEnrollment(nil, user.Id,
+	installed, err := database.TryInstallPendingOTPEnrollment(context.Background(), nil, user.Id,
 		encryptedKeyURL(t, "DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD"), now, now.Add(-15*time.Minute))
 	require.NoError(t, err, "a refusal is not an error")
 	assert.False(t, installed, "a user with an authenticator already must not accept a pending enrolment")
@@ -164,20 +164,20 @@ func TestPendingOTPEnrollment_RefusedArguments(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	ciphertext := encryptedKeyURL(t, "EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE")
 
-	_, err := database.TryInstallPendingOTPEnrollment(nil, 0, ciphertext, now, now)
+	_, err := database.TryInstallPendingOTPEnrollment(context.Background(), nil, 0, ciphertext, now, now)
 	assert.Error(t, err, "user id 0 must be refused")
 
 	// An empty ciphertext is the dormant value of every user with nothing pending, so installing
 	// one would leave the row looking untouched while reporting success.
-	_, err = database.TryInstallPendingOTPEnrollment(nil, user.Id, nil, now, now)
+	_, err = database.TryInstallPendingOTPEnrollment(context.Background(), nil, user.Id, nil, now, now)
 	assert.Error(t, err, "an empty pending enrolment must be refused")
 
 	// A zero issued_at is worse than useless: every real staleBefore is after it, so the enrolment
 	// would install and then be treated as expired by the very next call.
-	_, err = database.TryInstallPendingOTPEnrollment(nil, user.Id, ciphertext, time.Time{}, now)
+	_, err = database.TryInstallPendingOTPEnrollment(context.Background(), nil, user.Id, ciphertext, time.Time{}, now)
 	assert.Error(t, err, "a zero issued at must be refused")
 
-	assert.Error(t, database.ClearPendingOTPEnrollment(nil, 0), "user id 0 must be refused")
+	assert.Error(t, database.ClearPendingOTPEnrollment(context.Background(), nil, 0), "user id 0 must be refused")
 
 	after := reloadUser(t, user.Id)
 	assert.Nil(t, after.OtpEnrollmentSecretEncrypted, "none of the refused calls may have written")
@@ -195,7 +195,7 @@ func TestUpdateUser_DoesNotClobberPendingOTPEnrollment(t *testing.T) {
 
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	ciphertext := encryptedKeyURL(t, "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF")
-	installed, err := database.TryInstallPendingOTPEnrollment(nil, user.Id, ciphertext, now,
+	installed, err := database.TryInstallPendingOTPEnrollment(context.Background(), nil, user.Id, ciphertext, now,
 		now.Add(-15*time.Minute))
 	require.NoError(t, err)
 	require.True(t, installed)
@@ -205,7 +205,7 @@ func TestUpdateUser_DoesNotClobberPendingOTPEnrollment(t *testing.T) {
 	stale.OtpEnrollmentSecretEncrypted = nil
 	stale.OtpEnrollmentIssuedAt = sql.NullTime{}
 	stale.GivenName = "Updated"
-	require.NoError(t, database.UpdateUser(nil, stale), "UpdateUser")
+	require.NoError(t, database.UpdateUser(context.Background(), nil, stale), "UpdateUser")
 
 	after := reloadUser(t, user.Id)
 	assert.Equal(t, ciphertext, after.OtpEnrollmentSecretEncrypted,
@@ -227,7 +227,7 @@ func TestPendingOTPEnrollment_EnlistsInTheCallersTransaction(t *testing.T) {
 	// The install, rolled back.
 	tx, err := database.BeginTransaction(context.Background())
 	require.NoError(t, err, "BeginTransaction")
-	installed, err := database.TryInstallPendingOTPEnrollment(tx, user.Id, ciphertext, now,
+	installed, err := database.TryInstallPendingOTPEnrollment(context.Background(), tx, user.Id, ciphertext, now,
 		now.Add(-15*time.Minute))
 	require.NoError(t, err)
 	require.True(t, installed, "inside the transaction the install reports that it won")
@@ -238,14 +238,14 @@ func TestPendingOTPEnrollment_EnlistsInTheCallersTransaction(t *testing.T) {
 			"outside the caller's transaction and a failed request would strand a live seed")
 
 	// The clear, rolled back over a committed install.
-	installed, err = database.TryInstallPendingOTPEnrollment(nil, user.Id, ciphertext, now,
+	installed, err = database.TryInstallPendingOTPEnrollment(context.Background(), nil, user.Id, ciphertext, now,
 		now.Add(-15*time.Minute))
 	require.NoError(t, err)
 	require.True(t, installed)
 
 	tx, err = database.BeginTransaction(context.Background())
 	require.NoError(t, err, "BeginTransaction")
-	require.NoError(t, database.ClearPendingOTPEnrollment(tx, user.Id), "ClearPendingOTPEnrollment")
+	require.NoError(t, database.ClearPendingOTPEnrollment(context.Background(), tx, user.Id), "ClearPendingOTPEnrollment")
 	require.NoError(t, database.RollbackTransaction(tx), "RollbackTransaction")
 
 	assert.Equal(t, ciphertext, reloadUser(t, user.Id).OtpEnrollmentSecretEncrypted,
@@ -262,7 +262,7 @@ func TestEnableUserOTPTx_ClearsThePendingEnrollment(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	ciphertext := encryptedKeyURL(t, "HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH")
 
-	installed, err := database.TryInstallPendingOTPEnrollment(nil, user.Id, ciphertext, now,
+	installed, err := database.TryInstallPendingOTPEnrollment(context.Background(), nil, user.Id, ciphertext, now,
 		now.Add(-15*time.Minute))
 	require.NoError(t, err)
 	require.True(t, installed)

@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -27,10 +28,10 @@ func TestAPIUserGroupsGet_Success(t *testing.T) {
 		FamilyName:    "User",
 		EmailVerified: true,
 	}
-	err := database.CreateUser(nil, testUser)
+	err := database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
 	// Setup: Create test groups
@@ -61,10 +62,10 @@ func TestAPIUserGroupsGet_Success(t *testing.T) {
 		UserId:  testUser.Id,
 		GroupId: testGroup1.Id,
 	}
-	err = database.CreateUserGroup(nil, userGroup)
+	err = database.CreateUserGroup(context.Background(), nil, userGroup)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUserGroup(nil, userGroup.Id)
+		_ = database.DeleteUserGroup(context.Background(), nil, userGroup.Id)
 	}()
 
 	// Test: Get user groups
@@ -106,10 +107,10 @@ func TestAPIUserGroupsGet_NoGroups(t *testing.T) {
 		GivenName:  "Test",
 		FamilyName: "User",
 	}
-	err := database.CreateUser(nil, testUser)
+	err := database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
 	// Test: Get user groups for user with no groups
@@ -177,10 +178,10 @@ func TestAPIUserGroupsGet_Unauthorized(t *testing.T) {
 		GivenName:  "Test",
 		FamilyName: "User",
 	}
-	err := database.CreateUser(nil, testUser)
+	err := database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
 	// Test: Request without access token

@@ -67,7 +67,7 @@ func newCredentialEnv(t *testing.T) *credentialEnv {
 		OtpEnrollmentIssuedAt:        issuedAt,
 	}
 
-	database.On("GetUserBySubject", (*sql.Tx)(nil), credentialSubject).Return(user, nil).Maybe()
+	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), credentialSubject).Return(user, nil).Maybe()
 	auditLogger.On("Log", mock.Anything, mock.Anything, mock.Anything).Return().Maybe()
 
 	rateLimiter := middleware.NewRateLimiterMiddleware(nil, unusedRenderer{t}, nil, true)

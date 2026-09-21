@@ -236,7 +236,7 @@ func (d *CommonDatabase) RefreshTokenLoadUser(tx *sql.Tx, refreshToken *models.R
 		return nil
 	}
 
-	user, err := d.GetUserById(tx, refreshToken.UserId.Int64)
+	user, err := d.GetUserById(context.Background(), tx, refreshToken.UserId.Int64)
 	if err != nil {
 		return errs.Wrap(err, "unable to load user")
 	}

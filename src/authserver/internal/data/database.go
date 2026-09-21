@@ -65,7 +65,7 @@ type Database interface {
 	// released before the read even runs.
 	AcquireClientRow(tx *sql.Tx, clientId int64) error
 	GetClientById(tx *sql.Tx, clientId int64) (*models.Client, error)
-	GetClientsByIds(tx *sql.Tx, clientIds []int64) ([]models.Client, error)
+	GetClientsByIds(ctx context.Context, tx *sql.Tx, clientIds []int64) ([]models.Client, error)
 	GetClientByClientIdentifier(tx *sql.Tx, clientIdentifier string) (*models.Client, error)
 	GetAllClients(tx *sql.Tx) ([]models.Client, error)
 	DeleteClient(tx *sql.Tx, clientId int64) error
@@ -73,21 +73,21 @@ type Database interface {
 	ClientLoadWebOrigins(tx *sql.Tx, client *models.Client) error
 	ClientLoadPermissions(tx *sql.Tx, client *models.Client) error
 
-	CreateUser(tx *sql.Tx, user *models.User) error
-	UpdateUser(tx *sql.Tx, user *models.User) error
-	GetUserById(tx *sql.Tx, userId int64) (*models.User, error)
-	GetUsersByIds(tx *sql.Tx, userIds []int64) (map[int64]models.User, error)
-	GetUserByUsername(tx *sql.Tx, username string) (*models.User, error)
-	GetUserBySubject(tx *sql.Tx, subject string) (*models.User, error)
-	GetUserByEmail(tx *sql.Tx, email string) (*models.User, error)
+	CreateUser(ctx context.Context, tx *sql.Tx, user *models.User) error
+	UpdateUser(ctx context.Context, tx *sql.Tx, user *models.User) error
+	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*models.User, error)
+	GetUsersByIds(ctx context.Context, tx *sql.Tx, userIds []int64) (map[int64]models.User, error)
+	GetUserByUsername(ctx context.Context, tx *sql.Tx, username string) (*models.User, error)
+	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*models.User, error)
+	GetUserByEmail(ctx context.Context, tx *sql.Tx, email string) (*models.User, error)
 	// GetUserByForgotPasswordCodeHash finds the user holding an outstanding reset code,
 	// by an unsalted SHA-256 of that code. This is what lets the reset link carry the
 	// code and nothing else, so no email address travels in it (#112). An empty codeHash
 	// returns (nil, nil) without querying: '' is the dormant value on every row with no
 	// code outstanding, so a query would match one of them.
-	GetUserByForgotPasswordCodeHash(tx *sql.Tx, codeHash string) (*models.User, error)
-	SearchUsersPaginated(tx *sql.Tx, query string, page int, pageSize int) ([]models.User, int, error)
-	DeleteUser(tx *sql.Tx, userId int64) error
+	GetUserByForgotPasswordCodeHash(ctx context.Context, tx *sql.Tx, codeHash string) (*models.User, error)
+	SearchUsersPaginated(ctx context.Context, tx *sql.Tx, query string, page int, pageSize int) ([]models.User, int, error)
+	DeleteUser(ctx context.Context, tx *sql.Tx, userId int64) error
 	// IncrementUserAuthStateGeneration advances the user's authentication generation
 	// and returns the new value. Separate from UpdateUser because the column is tagged
 	// dont-update: every credential handler writes the whole user back, so an ordinary
@@ -97,7 +97,7 @@ type Database interface {
 	// cannot be one statement portably across the four engines, so outside a
 	// transaction a concurrent increment can land between them and this caller would
 	// return the other caller's generation.
-	IncrementUserAuthStateGeneration(tx *sql.Tx, userId int64) (int64, error)
+	IncrementUserAuthStateGeneration(ctx context.Context, tx *sql.Tx, userId int64) (int64, error)
 	// IncrementUserOtpConfigGeneration advances the user's OTP configuration generation
 	// and returns the new value. Called at every site that establishes or removes an
 	// authenticator, inside the same transaction as the write that changed it, so there
@@ -111,11 +111,11 @@ type Database interface {
 	// value at /auth/completed, leaving a session that just enrolled and verified owing
 	// another prompt at once. Computing the successor in Go instead is what the
 	// read-back exists to refuse.
-	IncrementUserOtpConfigGeneration(tx *sql.Tx, userId int64) (int64, error)
+	IncrementUserOtpConfigGeneration(ctx context.Context, tx *sql.Tx, userId int64) (int64, error)
 	// SetUserPasswordHash writes a password hash and clears any outstanding
 	// forgot-password code in the same statement. Narrow rather than a full-row
 	// update, so a concurrent admin disable cannot be undone by it (#106).
-	SetUserPasswordHash(tx *sql.Tx, userId int64, passwordHash string) error
+	SetUserPasswordHash(ctx context.Context, tx *sql.Tx, userId int64, passwordHash string) error
 	// TryConsumeForgotPasswordCode writes a password hash and claims the outstanding
 	// reset code in one conditional UPDATE, reporting whether this call is the one that
 	// made the transition. Compare-and-set for the same reason MarkCodeAsUsed is: a
@@ -127,11 +127,11 @@ type Database interface {
 	// outstanding code and would have to pass a meaningless predicate. An empty codeHash
 	// or a zero userId is an error rather than a false: '' is the dormant value on every
 	// row with no code outstanding, so an empty predicate would claim one of them (#112).
-	TryConsumeForgotPasswordCode(tx *sql.Tx, userId int64, codeHash string, passwordHash string) (bool, error)
+	TryConsumeForgotPasswordCode(ctx context.Context, tx *sql.Tx, userId int64, codeHash string, passwordHash string) (bool, error)
 	// TrySetUserEnabled flips enabled from expected to desired, reporting whether this
 	// call made the transition. Compare-and-set for the same reason MarkCodeAsUsed is.
 	// The disable direction's return gates the revocation sweep (#106).
-	TrySetUserEnabled(tx *sql.Tx, userId int64, expected bool, desired bool) (bool, error)
+	TrySetUserEnabled(ctx context.Context, tx *sql.Tx, userId int64, expected bool, desired bool) (bool, error)
 	// TryConsumeUserOTPStep records step as the user's most recently consumed TOTP
 	// time step, only if it is strictly newer than what is stored, and reports whether
 	// this call made the transition. Compare-and-set for the same reason MarkCodeAsUsed
@@ -140,11 +140,11 @@ type Database interface {
 	// otp_enabled to the predicate, which verification sites set and enrollment sites
 	// do not. False means no row transitioned, which is a replay in all but a rare
 	// interleaving, never specifically proof of one.
-	TryConsumeUserOTPStep(tx *sql.Tx, userId int64, step int64, requireOTPEnabled bool) (bool, error)
+	TryConsumeUserOTPStep(ctx context.Context, tx *sql.Tx, userId int64, step int64, requireOTPEnabled bool) (bool, error)
 	// ResetUserOTPStep returns the consumed-step marker to 0. Called when OTP is
 	// disabled: the marker belongs to the enrolled authenticator, and it is the only
 	// remedy if a clock jump strands the marker in the future (#111).
-	ResetUserOTPStep(tx *sql.Tx, userId int64) error
+	ResetUserOTPStep(ctx context.Context, tx *sql.Tx, userId int64) error
 	// TryInstallPendingOTPEnrollment records a TOTP enrollment the server has just
 	// issued, only if the user has no live one and no authenticator already, and
 	// reports whether this call installed it. Compare-and-set is what makes the
@@ -153,17 +153,17 @@ type Database interface {
 	// handing out a second QR code that invalidates the one already scanned. An
 	// existing value counts as replaceable when it is absent or was issued before
 	// staleBefore, which keeps the lifetime itself in the handler (#247).
-	TryInstallPendingOTPEnrollment(tx *sql.Tx, userId int64, secretEncrypted []byte,
+	TryInstallPendingOTPEnrollment(ctx context.Context, tx *sql.Tx, userId int64, secretEncrypted []byte,
 		issuedAt time.Time, staleBefore time.Time) (bool, error)
 	// ClearPendingOTPEnrollment returns the pending enrollment pair to NULL. Called
 	// inside the transaction that establishes the authenticator, so no committed
 	// state has OTP enabled with a live pending seed still installed (#247).
-	ClearPendingOTPEnrollment(tx *sql.Tx, userId int64) error
-	UserLoadGroups(tx *sql.Tx, user *models.User) error
-	UsersLoadGroups(tx *sql.Tx, users []models.User) error
-	UserLoadPermissions(tx *sql.Tx, user *models.User) error
-	UsersLoadPermissions(tx *sql.Tx, users []models.User) error
-	UserLoadAttributes(tx *sql.Tx, user *models.User) error
+	ClearPendingOTPEnrollment(ctx context.Context, tx *sql.Tx, userId int64) error
+	UserLoadGroups(ctx context.Context, tx *sql.Tx, user *models.User) error
+	UsersLoadGroups(ctx context.Context, tx *sql.Tx, users []models.User) error
+	UserLoadPermissions(ctx context.Context, tx *sql.Tx, user *models.User) error
+	UsersLoadPermissions(ctx context.Context, tx *sql.Tx, users []models.User) error
+	UserLoadAttributes(ctx context.Context, tx *sql.Tx, user *models.User) error
 
 	CreateCode(tx *sql.Tx, code *models.Code) error
 	UpdateCode(tx *sql.Tx, code *models.Code) error
@@ -273,14 +273,14 @@ type Database interface {
 	// schedule on the wall clock instead of one process's uptime.
 	TryClaimCleanupRun(tx *sql.Tx, now time.Time, claimableBefore time.Time) (bool, error)
 
-	CreateUserPermission(tx *sql.Tx, userPermission *models.UserPermission) error
-	UpdateUserPermission(tx *sql.Tx, userPermission *models.UserPermission) error
-	GetUserPermissionById(tx *sql.Tx, userPermissionId int64) (*models.UserPermission, error)
-	GetUsersByPermissionIdPaginated(tx *sql.Tx, permissionId int64, page int, pageSize int) ([]models.User, int, error)
-	GetUserPermissionByUserIdAndPermissionId(tx *sql.Tx, userId, permissionId int64) (*models.UserPermission, error)
-	GetUserPermissionsByUserId(tx *sql.Tx, userId int64) ([]models.UserPermission, error)
-	GetUserPermissionsByUserIds(tx *sql.Tx, userIds []int64) ([]models.UserPermission, error)
-	DeleteUserPermission(tx *sql.Tx, userPermissionId int64) error
+	CreateUserPermission(ctx context.Context, tx *sql.Tx, userPermission *models.UserPermission) error
+	UpdateUserPermission(ctx context.Context, tx *sql.Tx, userPermission *models.UserPermission) error
+	GetUserPermissionById(ctx context.Context, tx *sql.Tx, userPermissionId int64) (*models.UserPermission, error)
+	GetUsersByPermissionIdPaginated(ctx context.Context, tx *sql.Tx, permissionId int64, page int, pageSize int) ([]models.User, int, error)
+	GetUserPermissionByUserIdAndPermissionId(ctx context.Context, tx *sql.Tx, userId, permissionId int64) (*models.UserPermission, error)
+	GetUserPermissionsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]models.UserPermission, error)
+	GetUserPermissionsByUserIds(ctx context.Context, tx *sql.Tx, userIds []int64) ([]models.UserPermission, error)
+	DeleteUserPermission(ctx context.Context, tx *sql.Tx, userPermissionId int64) error
 
 	CreateGroup(tx *sql.Tx, group *models.Group) error
 	UpdateGroup(tx *sql.Tx, group *models.Group) error
@@ -296,17 +296,17 @@ type Database interface {
 	GroupsLoadPermissions(tx *sql.Tx, groups []models.Group) error
 	GroupLoadPermissions(tx *sql.Tx, group *models.Group) error
 
-	CreateUserAttribute(tx *sql.Tx, userAttribute *models.UserAttribute) error
-	UpdateUserAttribute(tx *sql.Tx, userAttribute *models.UserAttribute) error
-	GetUserAttributeById(tx *sql.Tx, userAttributeId int64) (*models.UserAttribute, error)
-	GetUserAttributesByUserId(tx *sql.Tx, userId int64) ([]models.UserAttribute, error)
-	DeleteUserAttribute(tx *sql.Tx, userAttributeId int64) error
+	CreateUserAttribute(ctx context.Context, tx *sql.Tx, userAttribute *models.UserAttribute) error
+	UpdateUserAttribute(ctx context.Context, tx *sql.Tx, userAttribute *models.UserAttribute) error
+	GetUserAttributeById(ctx context.Context, tx *sql.Tx, userAttributeId int64) (*models.UserAttribute, error)
+	GetUserAttributesByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]models.UserAttribute, error)
+	DeleteUserAttribute(ctx context.Context, tx *sql.Tx, userAttributeId int64) error
 
-	CreateUserProfilePicture(tx *sql.Tx, profilePicture *models.UserProfilePicture) error
-	UpdateUserProfilePicture(tx *sql.Tx, profilePicture *models.UserProfilePicture) error
-	GetUserProfilePictureByUserId(tx *sql.Tx, userId int64) (*models.UserProfilePicture, error)
-	DeleteUserProfilePicture(tx *sql.Tx, userId int64) error
-	UserHasProfilePicture(tx *sql.Tx, userId int64) (bool, error)
+	CreateUserProfilePicture(ctx context.Context, tx *sql.Tx, profilePicture *models.UserProfilePicture) error
+	UpdateUserProfilePicture(ctx context.Context, tx *sql.Tx, profilePicture *models.UserProfilePicture) error
+	GetUserProfilePictureByUserId(ctx context.Context, tx *sql.Tx, userId int64) (*models.UserProfilePicture, error)
+	DeleteUserProfilePicture(ctx context.Context, tx *sql.Tx, userId int64) error
+	UserHasProfilePicture(ctx context.Context, tx *sql.Tx, userId int64) (bool, error)
 
 	CreateClientLogo(tx *sql.Tx, clientLogo *models.ClientLogo) error
 	UpdateClientLogo(tx *sql.Tx, clientLogo *models.ClientLogo) error
@@ -418,14 +418,14 @@ type Database interface {
 	// stops the table growing.
 	DeleteExpiredBrowserSessions(tx *sql.Tx, now time.Time) error
 
-	CreateUserConsent(tx *sql.Tx, userConsent *models.UserConsent) error
-	UpdateUserConsent(tx *sql.Tx, userConsent *models.UserConsent) error
-	GetUserConsentById(tx *sql.Tx, userConsentId int64) (*models.UserConsent, error)
-	GetConsentByUserIdAndClientId(tx *sql.Tx, userId int64, clientId int64) (*models.UserConsent, error)
-	GetConsentsByUserId(tx *sql.Tx, userId int64) ([]models.UserConsent, error)
-	DeleteUserConsent(tx *sql.Tx, userConsentId int64) error
-	DeleteAllUserConsent(tx *sql.Tx) error
-	UserConsentsLoadClients(tx *sql.Tx, userConsents []models.UserConsent) error
+	CreateUserConsent(ctx context.Context, tx *sql.Tx, userConsent *models.UserConsent) error
+	UpdateUserConsent(ctx context.Context, tx *sql.Tx, userConsent *models.UserConsent) error
+	GetUserConsentById(ctx context.Context, tx *sql.Tx, userConsentId int64) (*models.UserConsent, error)
+	GetConsentByUserIdAndClientId(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) (*models.UserConsent, error)
+	GetConsentsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]models.UserConsent, error)
+	DeleteUserConsent(ctx context.Context, tx *sql.Tx, userConsentId int64) error
+	DeleteAllUserConsent(ctx context.Context, tx *sql.Tx) error
+	UserConsentsLoadClients(ctx context.Context, tx *sql.Tx, userConsents []models.UserConsent) error
 
 	CreatePreRegistration(tx *sql.Tx, preRegistration *models.PreRegistration) error
 	UpdatePreRegistration(tx *sql.Tx, preRegistration *models.PreRegistration) error
@@ -439,13 +439,13 @@ type Database interface {
 	GetPreRegistrationByVerificationCodeHash(tx *sql.Tx, codeHash string) (*models.PreRegistration, error)
 	DeletePreRegistration(tx *sql.Tx, preRegistrationId int64) error
 
-	CreateUserGroup(tx *sql.Tx, userGroup *models.UserGroup) error
-	UpdateUserGroup(tx *sql.Tx, userGroup *models.UserGroup) error
-	GetUserGroupById(tx *sql.Tx, userGroupId int64) (*models.UserGroup, error)
-	GetUserGroupByUserIdAndGroupId(tx *sql.Tx, userId, groupId int64) (*models.UserGroup, error)
-	GetUserGroupsByUserId(tx *sql.Tx, userId int64) ([]models.UserGroup, error)
-	GetUserGroupsByUserIds(tx *sql.Tx, userIds []int64) ([]models.UserGroup, error)
-	DeleteUserGroup(tx *sql.Tx, userGroupId int64) error
+	CreateUserGroup(ctx context.Context, tx *sql.Tx, userGroup *models.UserGroup) error
+	UpdateUserGroup(ctx context.Context, tx *sql.Tx, userGroup *models.UserGroup) error
+	GetUserGroupById(ctx context.Context, tx *sql.Tx, userGroupId int64) (*models.UserGroup, error)
+	GetUserGroupByUserIdAndGroupId(ctx context.Context, tx *sql.Tx, userId, groupId int64) (*models.UserGroup, error)
+	GetUserGroupsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]models.UserGroup, error)
+	GetUserGroupsByUserIds(ctx context.Context, tx *sql.Tx, userIds []int64) ([]models.UserGroup, error)
+	DeleteUserGroup(ctx context.Context, tx *sql.Tx, userGroupId int64) error
 
 	CreateGroupAttribute(tx *sql.Tx, groupAttribute *models.GroupAttribute) error
 	UpdateGroupAttribute(tx *sql.Tx, groupAttribute *models.GroupAttribute) error

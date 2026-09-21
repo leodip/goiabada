@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"io"
@@ -55,7 +56,7 @@ func TestAPIAccountEmailVerificationSend_Success(t *testing.T) {
 	assert.Equal(t, u.Email, body.EmailDestination)
 
 	// DB should have code and issuedAt
-	updated, err := database.GetUserById(nil, u.Id)
+	updated, err := database.GetUserById(context.Background(), nil, u.Id)
 	assert.NoError(t, err)
 	assert.NotNil(t, updated.EmailVerificationCodeEncrypted)
 	assert.True(t, updated.EmailVerificationCodeIssuedAt.Valid)
@@ -108,12 +109,12 @@ func TestAPIAccountEmailVerificationSend_AlreadyVerified(t *testing.T) {
 	defer func() { settings.SMTPEnabled = prevSMTP; _ = database.UpdateSettings(nil, settings) }()
 
 	// Mark user as verified
-	user, err := database.GetUserById(nil, u.Id)
+	user, err := database.GetUserById(context.Background(), nil, u.Id)
 	assert.NoError(t, err)
 	user.EmailVerified = true
 	user.EmailVerificationCodeEncrypted = nil
 	user.EmailVerificationCodeIssuedAt = sqlNullTimeFalse()
-	err = database.UpdateUser(nil, user)
+	err = database.UpdateUser(context.Background(), nil, user)
 	assert.NoError(t, err)
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/account/email/verification/send"
@@ -180,7 +181,7 @@ func TestAPIAccountEmailVerification_VerifySuccess(t *testing.T) {
 	_ = makeAPIRequest(t, "POST", sendURL, accessToken, map[string]string{})
 
 	// Load user and decrypt code
-	user, err := database.GetUserById(nil, u.Id)
+	user, err := database.GetUserById(context.Background(), nil, u.Id)
 	assert.NoError(t, err)
 	code, err := encryption.DecryptData(user.EmailVerificationCodeEncrypted)
 	assert.NoError(t, err)
@@ -195,7 +196,7 @@ func TestAPIAccountEmailVerification_VerifySuccess(t *testing.T) {
 	assert.NoError(t, err)
 	assert.True(t, body.User.EmailVerified)
 
-	updated, err := database.GetUserById(nil, u.Id)
+	updated, err := database.GetUserById(context.Background(), nil, u.Id)
 	assert.NoError(t, err)
 	assert.True(t, updated.EmailVerified)
 	assert.Nil(t, updated.EmailVerificationCodeEncrypted)
@@ -237,14 +238,14 @@ func TestAPIAccountEmailVerification_VerifyExpiredCode(t *testing.T) {
 	defer func() { settings.SMTPEnabled = prevSMTP; _ = database.UpdateSettings(nil, settings) }()
 
 	// Manually set a code that is already expired
-	user, err := database.GetUserById(nil, u.Id)
+	user, err := database.GetUserById(context.Background(), nil, u.Id)
 	assert.NoError(t, err)
 	codePlain := "ABC123"
 	encrypted, err := encryption.EncryptData(codePlain)
 	assert.NoError(t, err)
 	user.EmailVerificationCodeEncrypted = encrypted
 	user.EmailVerificationCodeIssuedAt = sql.NullTime{Time: time.Now().UTC().Add(-6 * time.Minute), Valid: true}
-	err = database.UpdateUser(nil, user)
+	err = database.UpdateUser(context.Background(), nil, user)
 	assert.NoError(t, err)
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/account/email/verification"
@@ -268,12 +269,12 @@ func TestAPIAccountEmailVerification_VerifyAlreadyVerified(t *testing.T) {
 	assert.NoError(t, err)
 	defer func() { settings.SMTPEnabled = prevSMTP; _ = database.UpdateSettings(nil, settings) }()
 
-	user, err := database.GetUserById(nil, u.Id)
+	user, err := database.GetUserById(context.Background(), nil, u.Id)
 	assert.NoError(t, err)
 	user.EmailVerified = true
 	user.EmailVerificationCodeEncrypted = nil
 	user.EmailVerificationCodeIssuedAt = sqlNullTimeFalse()
-	err = database.UpdateUser(nil, user)
+	err = database.UpdateUser(context.Background(), nil, user)
 	assert.NoError(t, err)
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/account/email/verification"

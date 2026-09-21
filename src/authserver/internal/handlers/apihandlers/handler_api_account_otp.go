@@ -86,7 +86,7 @@ func HandleAPIAccountOTPEnrollmentGet(
 		}
 
 		// Load user
-		user, err := database.GetUserBySubject(nil, subject)
+		user, err := database.GetUserBySubject(r.Context(), nil, subject)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -140,7 +140,7 @@ func HandleAPIAccountOTPEnrollmentGet(
 				return
 			}
 
-			installed, err := database.TryInstallPendingOTPEnrollment(nil, user.Id, secretEncrypted, now, staleBefore)
+			installed, err := database.TryInstallPendingOTPEnrollment(r.Context(), nil, user.Id, secretEncrypted, now, staleBefore)
 			if err != nil {
 				writeInternalServerError(w, r, err)
 				return
@@ -153,7 +153,7 @@ func HandleAPIAccountOTPEnrollmentGet(
 				// the row is read back and the winner's value answered instead. Two
 				// concurrent calls then agree on one enrollment, which is the reason the
 				// install is conditional at all.
-				user, err = database.GetUserById(nil, user.Id)
+				user, err = database.GetUserById(r.Context(), nil, user.Id)
 				if err != nil {
 					writeInternalServerError(w, r, err)
 					return
@@ -265,7 +265,7 @@ func HandleAPIAccountOTPPut(
 		}
 
 		// Load user
-		user, err := database.GetUserBySubject(nil, subject)
+		user, err := database.GetUserBySubject(r.Context(), nil, subject)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -369,7 +369,7 @@ func HandleAPIAccountOTPPut(
 			// comes first deliberately, as at the browser enrollment site: if the write
 			// then fails, a code is burned and the user retries with the next one, whereas
 			// the reverse order would leave OTP enabled on a request that was refused.
-			consumed, err := database.TryConsumeUserOTPStep(nil, user.Id, step, false)
+			consumed, err := database.TryConsumeUserOTPStep(r.Context(), nil, user.Id, step, false)
 			if err != nil {
 				writeInternalServerError(w, r, err)
 				return
@@ -435,7 +435,7 @@ func HandleAPIAccountOTPPut(
 		// had (#242, parts 1.2 and 1.3).
 
 		// Get updated user and respond
-		updated, err := database.GetUserById(nil, user.Id)
+		updated, err := database.GetUserById(r.Context(), nil, user.Id)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -482,10 +482,10 @@ func disableUserOTP(ctx context.Context, database data.Database, user *models.Us
 	// Safe to rerun: the model was cleared above, before the helper opened, and is written
 	// unchanged on every attempt; the reset and the increment carry no state between attempts.
 	return database.RunInTransaction(ctx, func(tx *sql.Tx) error {
-		if err := database.UpdateUser(tx, user); err != nil {
+		if err := database.UpdateUser(ctx, tx, user); err != nil {
 			return err
 		}
-		if err := database.ResetUserOTPStep(tx, user.Id); err != nil {
+		if err := database.ResetUserOTPStep(ctx, tx, user.Id); err != nil {
 			return err
 		}
 		// The counter that tells every one of this user's sessions they owe a second factor
@@ -498,7 +498,7 @@ func disableUserOTP(ctx context.Context, database data.Database, user *models.Us
 		// Its error is returned rather than discarded, and that is the other half of decision 2:
 		// a removal that commits without the counter moving is precisely the state the re-prompt
 		// exists to prevent.
-		if _, err := database.IncrementUserOtpConfigGeneration(tx, user.Id); err != nil {
+		if _, err := database.IncrementUserOtpConfigGeneration(ctx, tx, user.Id); err != nil {
 			return err
 		}
 		return nil

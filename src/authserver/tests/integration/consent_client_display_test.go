@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/models"
@@ -40,7 +41,7 @@ func TestConsent_ClientDisplay_ShowDisplayName(t *testing.T) {
 		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
-	err = database.CreateUser(nil, user)
+	err = database.CreateUser(context.Background(), nil, user)
 	assert.NoError(t, err)
 
 	// Navigate to consent screen
@@ -89,7 +90,7 @@ func TestConsent_ClientDisplay_ShowLogo_WithLogo(t *testing.T) {
 		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
-	err = database.CreateUser(nil, user)
+	err = database.CreateUser(context.Background(), nil, user)
 	assert.NoError(t, err)
 
 	// Navigate to consent screen
@@ -138,7 +139,7 @@ func TestConsent_ClientDisplay_ShowDescription(t *testing.T) {
 		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
-	err = database.CreateUser(nil, user)
+	err = database.CreateUser(context.Background(), nil, user)
 	assert.NoError(t, err)
 
 	// Navigate to consent screen
@@ -190,7 +191,7 @@ func TestConsent_ClientDisplay_AllEnabled(t *testing.T) {
 		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
-	err = database.CreateUser(nil, user)
+	err = database.CreateUser(context.Background(), nil, user)
 	assert.NoError(t, err)
 
 	// Navigate to consent screen
@@ -243,7 +244,7 @@ func TestConsent_ClientDisplay_AllDisabled(t *testing.T) {
 		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
-	err = database.CreateUser(nil, user)
+	err = database.CreateUser(context.Background(), nil, user)
 	assert.NoError(t, err)
 
 	// Navigate to consent screen

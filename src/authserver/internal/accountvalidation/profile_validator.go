@@ -1,6 +1,7 @@
 package accountvalidation
 
 import (
+	"context"
 	"regexp"
 	"strconv"
 	"time"
@@ -69,11 +70,11 @@ func (val *ProfileValidator) ValidateName(name string, invalidNameCode string) e
 	return nil
 }
 
-func (val *ProfileValidator) ValidateProfile(input *ValidateProfileInput) error {
+func (val *ProfileValidator) ValidateProfile(ctx context.Context, input *ValidateProfileInput) error {
 
 	// i18n surface: C — admin/account API.
 	if len(input.Username) > 0 {
-		user, err := val.database.GetUserBySubject(nil, input.Subject)
+		user, err := val.database.GetUserBySubject(ctx, nil, input.Subject)
 		if err != nil {
 			return err
 		}
@@ -100,7 +101,7 @@ func (val *ProfileValidator) ValidateProfile(input *ValidateProfileInput) error 
 		// GetUserByUsername, and the one place the value escapes is the OIDC
 		// preferred_username claim, which the spec tells relying parties not to
 		// assume is unique.
-		userByUsername, err := val.database.GetUserByUsername(nil, input.Username)
+		userByUsername, err := val.database.GetUserByUsername(ctx, nil, input.Username)
 		if err != nil {
 			return err
 		}

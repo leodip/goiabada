@@ -274,7 +274,7 @@ func (d *CommonDatabase) CodeLoadUser(tx *sql.Tx, code *models.Code) error {
 		return nil
 	}
 
-	user, err := d.GetUserById(tx, code.UserId)
+	user, err := d.GetUserById(context.Background(), tx, code.UserId)
 	if err != nil {
 		return errs.Wrap(err, "unable to load user")
 	}

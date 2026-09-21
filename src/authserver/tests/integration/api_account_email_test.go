@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -45,7 +46,7 @@ func TestAPIAccountEmailPut_Success(t *testing.T) {
 	assert.False(t, updateResp.User.EmailVerified)
 
 	// Verify persisted changes
-	updatedUser, err := database.GetUserById(nil, u.Id)
+	updatedUser, err := database.GetUserById(context.Background(), nil, u.Id)
 	assert.NoError(t, err)
 	assert.NotNil(t, updatedUser)
 	assert.Equal(t, newEmail, updatedUser.Email)
@@ -91,9 +92,9 @@ func TestAPIAccountEmailPut_EmailAlreadyExists(t *testing.T) {
 	// Create another user with a known email
 	otherEmail := "existing_" + strings.ToLower(fake.LetterN(6)) + "@example.com"
 	otherUser := &models.User{Email: otherEmail, Enabled: true, Subject: fake.UUID()}
-	err := database.CreateUser(nil, otherUser)
+	err := database.CreateUser(context.Background(), nil, otherUser)
 	assert.NoError(t, err)
-	defer func() { _ = database.DeleteUser(nil, otherUser.Id) }()
+	defer func() { _ = database.DeleteUser(context.Background(), nil, otherUser.Id) }()
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/account/email"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateAccountEmailRequest{Email: otherEmail})

@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"net/http"
 	"net/url"
 	"testing"
@@ -164,7 +165,7 @@ func TestOtpCeremony_BrowserEnrolmentDoesNotOweAnImmediatePrompt(t *testing.T) {
 	resp = loadPage(t, httpClient, redirectLocation)
 	_ = resp.Body.Close()
 
-	enrolled, err := database.GetUserById(nil, user.Id)
+	enrolled, err := database.GetUserById(context.Background(), nil, user.Id)
 	if err != nil {
 		t.Fatal(err)
 	}

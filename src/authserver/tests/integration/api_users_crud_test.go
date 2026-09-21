@@ -2,6 +2,7 @@ package integrationtests
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -30,10 +31,10 @@ func TestAPIUserGet_Success(t *testing.T) {
 		FamilyName:    "User",
 		EmailVerified: true,
 	}
-	err := database.CreateUser(nil, testUser)
+	err := database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
 	// Test: Get user by ID
@@ -107,10 +108,10 @@ func TestAPIUserGet_Unauthorized(t *testing.T) {
 		FamilyName:    "User",
 		EmailVerified: true,
 	}
-	err := database.CreateUser(nil, testUser)
+	err := database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
 	// Test: Request without access token
@@ -174,12 +175,12 @@ func TestAPIUserCreatePost_Success(t *testing.T) {
 	// Cleanup: Delete created user
 	defer func() {
 		if createResponse.User.Id > 0 {
-			_ = database.DeleteUser(nil, createResponse.User.Id)
+			_ = database.DeleteUser(context.Background(), nil, createResponse.User.Id)
 		}
 	}()
 
 	// Verify user was actually created in database
-	createdUser, err := database.GetUserById(nil, createResponse.User.Id)
+	createdUser, err := database.GetUserById(context.Background(), nil, createResponse.User.Id)
 	assert.NoError(t, err)
 	assert.NotNil(t, createdUser)
 	assert.Equal(t, createReq.Email, createdUser.Email)
@@ -200,10 +201,10 @@ func TestAPIUserCreatePost_DuplicateEmail(t *testing.T) {
 		FamilyName:    "User",
 		EmailVerified: true,
 	}
-	err := database.CreateUser(nil, existingUser)
+	err := database.CreateUser(context.Background(), nil, existingUser)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, existingUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, existingUser.Id)
 	}()
 
 	// Test: Try to create user with same email
@@ -349,10 +350,10 @@ func TestAPIUserEnabledPut_Success(t *testing.T) {
 		FamilyName:    "User",
 		EmailVerified: true,
 	}
-	err := database.CreateUser(nil, testUser)
+	err := database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
 	// Test: Disable user
@@ -378,7 +379,7 @@ func TestAPIUserEnabledPut_Success(t *testing.T) {
 	assert.Equal(t, testUser.Email, updateResponse.User.Email)
 
 	// Verify in database
-	updatedUser, err := database.GetUserById(nil, testUser.Id)
+	updatedUser, err := database.GetUserById(context.Background(), nil, testUser.Id)
 	assert.NoError(t, err)
 	assert.False(t, updatedUser.Enabled)
 }
@@ -396,10 +397,10 @@ func TestAPIUserEnabledPut_EnableUser(t *testing.T) {
 		FamilyName:    "User",
 		EmailVerified: true,
 	}
-	err := database.CreateUser(nil, testUser)
+	err := database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
 	// Test: Enable user
@@ -471,10 +472,10 @@ func TestAPIUserEnabledPut_InvalidRequestBody(t *testing.T) {
 		FamilyName:    "User",
 		EmailVerified: true,
 	}
-	err := database.CreateUser(nil, testUser)
+	err := database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
 	// Test: Invalid JSON
@@ -507,7 +508,7 @@ func TestAPIUserDelete_Success(t *testing.T) {
 		FamilyName:    "User",
 		EmailVerified: true,
 	}
-	err := database.CreateUser(nil, testUser)
+	err := database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
 
 	// Test: Delete user
@@ -528,7 +529,7 @@ func TestAPIUserDelete_Success(t *testing.T) {
 	assert.True(t, deleteResponse.Success)
 
 	// Verify user was actually deleted from database
-	deletedUser, err := database.GetUserById(nil, testUser.Id)
+	deletedUser, err := database.GetUserById(context.Background(), nil, testUser.Id)
 	assert.NoError(t, err)
 	assert.Nil(t, deletedUser)
 }
@@ -581,10 +582,10 @@ func TestAPIUserDelete_Unauthorized(t *testing.T) {
 		FamilyName:    "User",
 		EmailVerified: true,
 	}
-	err := database.CreateUser(nil, testUser)
+	err := database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
 	// Test: Request without access token
@@ -601,7 +602,7 @@ func TestAPIUserDelete_Unauthorized(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 
 	// Verify user was not deleted
-	stillExists, err := database.GetUserById(nil, testUser.Id)
+	stillExists, err := database.GetUserById(context.Background(), nil, testUser.Id)
 	assert.NoError(t, err)
 	assert.NotNil(t, stillExists)
 }
@@ -657,7 +658,7 @@ func TestAPIUserCreatePost_SetPasswordTypeIsEnforced(t *testing.T) {
 				// A refusal must leave nothing behind. The defect's whole harm was a row created
 				// where the caller was told nothing, so a 400 that still wrote one would be the
 				// same failure wearing a different status.
-				user, err := database.GetUserByEmail(nil, email)
+				user, err := database.GetUserByEmail(context.Background(), nil, email)
 				require.NoError(t, err)
 				assert.Nil(t, user, "a refused create must not have written a user row")
 			}

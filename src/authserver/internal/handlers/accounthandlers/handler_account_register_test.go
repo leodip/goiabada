@@ -169,7 +169,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 		req = req.WithContext(ctx)
 
 		emailValidator.On("ValidateEmailAddress", "existing@example.com").Return(nil)
-		database.On("GetUserByEmail", mock.Anything, "existing@example.com").Return(&models.User{}, nil)
+		database.On("GetUserByEmail", mock.Anything, mock.Anything, "existing@example.com").Return(&models.User{}, nil)
 		httpHelper.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register.html", mock.Anything).Return(nil)
 
 		handler.ServeHTTP(rr, req)
@@ -205,7 +205,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 		req = req.WithContext(ctx)
 
 		emailValidator.On("ValidateEmailAddress", "preregistered@example.com").Return(nil)
-		database.On("GetUserByEmail", mock.Anything, "preregistered@example.com").Return(nil, nil)
+		database.On("GetUserByEmail", mock.Anything, mock.Anything, "preregistered@example.com").Return(nil, nil)
 		database.On("GetPreRegistrationByEmail", mock.Anything, "preregistered@example.com").Return(&models.PreRegistration{}, nil)
 		httpHelper.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register.html", mock.Anything).Return(nil)
 
@@ -242,7 +242,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 		req = req.WithContext(ctx)
 
 		emailValidator.On("ValidateEmailAddress", "valid@example.com").Return(nil)
-		database.On("GetUserByEmail", mock.Anything, "valid@example.com").Return(nil, nil)
+		database.On("GetUserByEmail", mock.Anything, mock.Anything, "valid@example.com").Return(nil, nil)
 		database.On("GetPreRegistrationByEmail", mock.Anything, "valid@example.com").Return(nil, nil)
 		httpHelper.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register.html", mock.Anything).Return(nil)
 
@@ -292,7 +292,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 		req = req.WithContext(ctx)
 
 		emailValidator.On("ValidateEmailAddress", "valid@example.com").Return(nil)
-		database.On("GetUserByEmail", mock.Anything, "valid@example.com").Return(nil, nil)
+		database.On("GetUserByEmail", mock.Anything, mock.Anything, "valid@example.com").Return(nil, nil)
 		database.On("GetPreRegistrationByEmail", mock.Anything, "valid@example.com").Return(nil, nil)
 		httpHelper.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register.html", mock.Anything).Return(nil)
 
@@ -343,7 +343,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 		req = req.WithContext(ctx)
 
 		emailValidator.On("ValidateEmailAddress", "valid@example.com").Return(nil)
-		database.On("GetUserByEmail", mock.Anything, "valid@example.com").Return(nil, nil)
+		database.On("GetUserByEmail", mock.Anything, mock.Anything, "valid@example.com").Return(nil, nil)
 		database.On("GetPreRegistrationByEmail", mock.Anything, "valid@example.com").Return(nil, nil)
 		httpHelper.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register.html", mock.Anything).Return(nil)
 
@@ -385,7 +385,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 		req = req.WithContext(ctx)
 
 		emailValidator.On("ValidateEmailAddress", "valid@example.com").Return(nil)
-		database.On("GetUserByEmail", mock.Anything, "valid@example.com").Return(nil, nil)
+		database.On("GetUserByEmail", mock.Anything, mock.Anything, "valid@example.com").Return(nil, nil)
 		database.On("GetPreRegistrationByEmail", mock.Anything, "valid@example.com").Return(nil, nil)
 		httpHelper.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register.html", mock.Anything).Return(nil)
 
@@ -424,7 +424,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 		req = req.WithContext(ctx)
 
 		emailValidator.On("ValidateEmailAddress", "valid@example.com").Return(nil)
-		database.On("GetUserByEmail", mock.Anything, "valid@example.com").Return(nil, nil)
+		database.On("GetUserByEmail", mock.Anything, mock.Anything, "valid@example.com").Return(nil, nil)
 		database.On("GetPreRegistrationByEmail", mock.Anything, "valid@example.com").Return(nil, nil)
 		httpHelper.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register.html", mock.Anything).Return(nil)
 
@@ -463,7 +463,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 		req = req.WithContext(ctx)
 
 		emailValidator.On("ValidateEmailAddress", "valid@example.com").Return(nil)
-		database.On("GetUserByEmail", mock.Anything, "valid@example.com").Return(nil, nil)
+		database.On("GetUserByEmail", mock.Anything, mock.Anything, "valid@example.com").Return(nil, nil)
 		database.On("GetPreRegistrationByEmail", mock.Anything, "valid@example.com").Return(nil, nil)
 		passwordValidator.On("ValidatePassword", mock.Anything, "short").Return(customerrors.NewErrorDetail("", "The minimum length for the password is 8 characters"))
 		httpHelper.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/account_register.html", mock.Anything).Return(nil)
@@ -516,7 +516,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 
 		// Ensure that no other mock methods were called
 		emailValidator.AssertNotCalled(t, "ValidateEmailAddress")
-		database.AssertNotCalled(t, "GetUserByEmail")
+		database.AssertNotCalled(t, "GetUserByEmail", mock.Anything, mock.Anything, mock.Anything)
 		database.AssertNotCalled(t, "GetPreRegistrationByEmail")
 		passwordValidator.AssertNotCalled(t, "ValidatePassword")
 	})
@@ -550,7 +550,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 		req = req.WithContext(ctx)
 
 		emailValidator.On("ValidateEmailAddress", "test@example.com").Return(nil)
-		database.On("GetUserByEmail", mock.Anything, "test@example.com").Return(nil, nil)
+		database.On("GetUserByEmail", mock.Anything, mock.Anything, "test@example.com").Return(nil, nil)
 		database.On("GetPreRegistrationByEmail", mock.Anything, "test@example.com").Return(nil, nil)
 		passwordValidator.On("ValidatePassword", mock.Anything, "password123").Return(nil)
 
@@ -641,7 +641,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 		req = req.WithContext(ctx)
 
 		emailValidator.On("ValidateEmailAddress", "test@example.com").Return(nil)
-		database.On("GetUserByEmail", mock.Anything, "test@example.com").Return(nil, nil)
+		database.On("GetUserByEmail", mock.Anything, mock.Anything, "test@example.com").Return(nil, nil)
 		database.On("GetPreRegistrationByEmail", mock.Anything, "test@example.com").Return(nil, nil)
 		passwordValidator.On("ValidatePassword", mock.Anything, "password123").Return(nil)
 
@@ -704,7 +704,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 		req = req.WithContext(ctx)
 
 		emailValidator.On("ValidateEmailAddress", "test@example.com").Return(nil)
-		database.On("GetUserByEmail", mock.Anything, "test@example.com").Return(nil, nil)
+		database.On("GetUserByEmail", mock.Anything, mock.Anything, "test@example.com").Return(nil, nil)
 		database.On("GetPreRegistrationByEmail", mock.Anything, "test@example.com").Return(nil, nil)
 		passwordValidator.On("ValidatePassword", mock.Anything, "password123").Return(nil)
 

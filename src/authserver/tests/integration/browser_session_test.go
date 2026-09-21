@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"encoding/hex"
 	"net/http"
 	"net/url"
@@ -171,7 +172,7 @@ func TestBrowserSession_IdentifierRotatesAtStepUp(t *testing.T) {
 	require.NoError(t, err)
 	user.OTPSecretEncrypted = encryptOTPSecretForTest(t, otpKey.Secret())
 	user.OTPEnabled = true
-	require.NoError(t, database.UpdateUser(nil, user))
+	require.NoError(t, database.UpdateUser(context.Background(), nil, user))
 
 	httpClient := createHttpClient(t)
 
@@ -383,7 +384,7 @@ func newLevel1Actors(t *testing.T) (*models.Client, *models.RedirectURI, *models
 		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
-	require.NoError(t, database.CreateUser(nil, user))
+	require.NoError(t, database.CreateUser(context.Background(), nil, user))
 
 	return client, redirectUri, user, password
 }

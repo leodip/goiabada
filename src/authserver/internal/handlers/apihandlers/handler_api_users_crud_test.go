@@ -94,7 +94,7 @@ func TestHandleAPIUserEnabledPut_RevocationConditionality(t *testing.T) {
 			database := mocks_data.NewDatabase(t)
 			auditLogger := mocks_audit.NewAuditLogger(t)
 
-			database.On("GetUserById", (*sql.Tx)(nil), userId).
+			database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), userId).
 				Return(&models.User{Id: userId}, nil).Once()
 
 			// Set on the disabling rows, which are the ones that open a transaction.
@@ -103,14 +103,14 @@ func TestHandleAPIUserEnabledPut_RevocationConditionality(t *testing.T) {
 				// Enabling: the compare-and-set runs outside a transaction, since there is no
 				// sweep to be atomic with. Both directions go through it, so neither stays on
 				// the full-row UpdateUser that decision 14 rules out.
-				database.On("TrySetUserEnabled", (*sql.Tx)(nil), userId, false, true).
+				database.On("TrySetUserEnabled", mock.Anything, (*sql.Tx)(nil), userId, false, true).
 					Return(tc.transitioned, nil).Once()
 			} else {
 				stub = expectRunInTransaction(database, apiRevokeTx)
-				database.On("TrySetUserEnabled", apiRevokeTx, userId, true, false).
+				database.On("TrySetUserEnabled", mock.Anything, apiRevokeTx, userId, true, false).
 					Return(tc.transitioned, nil).Once()
 				if tc.transitioned {
-					database.On("IncrementUserAuthStateGeneration", apiRevokeTx, userId).
+					database.On("IncrementUserAuthStateGeneration", mock.Anything, apiRevokeTx, userId).
 						Return(int64(4), nil).Once()
 					database.On("GetRefreshTokensByUserId", apiRevokeTx, userId).
 						Return([]*models.RefreshToken{}, nil).Once()
@@ -132,7 +132,7 @@ func TestHandleAPIUserEnabledPut_RevocationConditionality(t *testing.T) {
 			}
 
 			// The response re-reads the user.
-			database.On("GetUserById", (*sql.Tx)(nil), userId).
+			database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), userId).
 				Return(&models.User{Id: userId, Enabled: tc.requestedEnabled}, nil).Once()
 
 			rr := httptest.NewRecorder()
@@ -163,13 +163,13 @@ func TestHandleAPIUserEnabledPut_RevocationConditionality(t *testing.T) {
 				// No generation advance and no revocation event. Both matter: the first is the
 				// state change, the second is the claim about it.
 				database.AssertNotCalled(t, "IncrementUserAuthStateGeneration",
-					mock.Anything, mock.Anything)
+					mock.Anything, mock.Anything, mock.Anything)
 				auditLogger.AssertNotCalled(t, "Log", mock.Anything, audit.AuditRevokedUserAuthState,
 					mock.Anything)
 			}
 
 			// Never the full-row write, in either direction (decision 14).
-			database.AssertNotCalled(t, "UpdateUser", mock.Anything, mock.Anything)
+			database.AssertNotCalled(t, "UpdateUser", mock.Anything, mock.Anything, mock.Anything)
 		})
 	}
 }
@@ -182,10 +182,10 @@ func TestHandleAPIUserEnabledPut_SweepFailureRollsBack(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_audit.NewAuditLogger(t)
 
-	database.On("GetUserById", (*sql.Tx)(nil), userId).Return(&models.User{Id: userId}, nil).Once()
+	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), userId).Return(&models.User{Id: userId}, nil).Once()
 	stub := expectRunInTransaction(database, apiRevokeTx)
-	database.On("TrySetUserEnabled", apiRevokeTx, userId, true, false).Return(true, nil).Once()
-	database.On("IncrementUserAuthStateGeneration", apiRevokeTx, userId).
+	database.On("TrySetUserEnabled", mock.Anything, apiRevokeTx, userId, true, false).Return(true, nil).Once()
+	database.On("IncrementUserAuthStateGeneration", mock.Anything, apiRevokeTx, userId).
 		Return(int64(0), assert.AnError).Once()
 
 	rr := httptest.NewRecorder()
@@ -212,12 +212,12 @@ func TestHandleAPIUserPasswordPut_RevokesEverything(t *testing.T) {
 	auditLogger := mocks_audit.NewAuditLogger(t)
 	passwordValidator := accountvalidation.NewPasswordValidator()
 
-	database.On("GetUserById", (*sql.Tx)(nil), userId).Return(&models.User{Id: userId}, nil).Once()
+	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), userId).Return(&models.User{Id: userId}, nil).Once()
 
 	var savedHash string
-	database.On("SetUserPasswordHash", apiRevokeTx, userId, mock.Anything).
+	database.On("SetUserPasswordHash", mock.Anything, apiRevokeTx, userId, mock.Anything).
 		Run(func(args mock.Arguments) {
-			savedHash = args.Get(2).(string)
+			savedHash = args.Get(3).(string)
 		}).Return(nil).Once()
 	stubSweep(database, userId, 4)
 
@@ -228,7 +228,7 @@ func TestHandleAPIUserPasswordPut_RevokesEverything(t *testing.T) {
 			payload = args.Get(2).(map[string]interface{})
 		}).Return().Once()
 
-	database.On("GetUserById", (*sql.Tx)(nil), userId).
+	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), userId).
 		Return(&models.User{Id: userId, Enabled: true}, nil).Once()
 
 	body, err := json.Marshal(map[string]string{"newPassword": newPassword})
@@ -250,7 +250,7 @@ func TestHandleAPIUserPasswordPut_RevokesEverything(t *testing.T) {
 	auditLogger.AssertExpectations(t)
 
 	assert.True(t, passwordhash.Verify(savedHash, newPassword))
-	database.AssertNotCalled(t, "UpdateUser", mock.Anything, mock.Anything)
+	database.AssertNotCalled(t, "UpdateUser", mock.Anything, mock.Anything, mock.Anything)
 	// No exceptSid, so no sid-scoped query and nothing promoted.
 	database.AssertNotCalled(t, "GetRefreshTokensBySessionIdentifier", mock.Anything, mock.Anything)
 
@@ -275,23 +275,23 @@ func TestHandleAPIUserOTPPut_DisableCommitsBothWritesAtomically(t *testing.T) {
 	auditLogger := mocks_audit.NewAuditLogger(t)
 
 	user := &models.User{Id: userId, Enabled: true, OTPEnabled: true}
-	database.On("GetUserById", (*sql.Tx)(nil), userId).Return(user, nil).Once()
+	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), userId).Return(user, nil).Once()
 
 	var calls []string
 	expectRunInTransaction(database, otpDisableTx, func(edge string) { calls = append(calls, edge) })
-	database.On("UpdateUser", otpDisableTx, user).Return(nil).
+	database.On("UpdateUser", mock.Anything, otpDisableTx, user).Return(nil).
 		Run(func(mock.Arguments) { calls = append(calls, "update") }).Once()
-	database.On("ResetUserOTPStep", otpDisableTx, userId).Return(nil).
+	database.On("ResetUserOTPStep", mock.Anything, otpDisableTx, userId).Return(nil).
 		Run(func(mock.Arguments) { calls = append(calls, "reset") }).Once()
 	// The counter joins the same transaction here for free, because both disable sites share
 	// disableUserOTP. That is what closes the hole #242 found at this endpoint specifically: it
 	// flagged no session at all, so a target user whose authenticator an administrator removed
 	// kept every live session asserting amr ["pwd","otp"] for it.
-	database.On("IncrementUserOtpConfigGeneration", otpDisableTx, userId).Return(int64(1), nil).
+	database.On("IncrementUserOtpConfigGeneration", mock.Anything, otpDisableTx, userId).Return(int64(1), nil).
 		Run(func(mock.Arguments) { calls = append(calls, "increment") }).Once()
 
 	auditLogger.On("Log", mock.Anything, audit.AuditDisabledOTP, mock.Anything).Return().Once()
-	database.On("GetUserById", (*sql.Tx)(nil), userId).
+	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), userId).
 		Return(&models.User{Id: userId, Enabled: true}, nil).Once()
 
 	body, err := json.Marshal(map[string]bool{"enabled": false})
@@ -350,9 +350,9 @@ func TestHandleAPIUserCreatePost_StoresResetCodeHash(t *testing.T) {
 	// assertions below read.
 	createdUser := &models.User{Id: 7, Email: "newuser@example.com"}
 
-	database.On("GetUserByEmail", mock.Anything, "newuser@example.com").Return(nil, nil)
+	database.On("GetUserByEmail", mock.Anything, mock.Anything, "newuser@example.com").Return(nil, nil)
 	userCreator.On("CreateUser", mock.Anything, mock.Anything).Return(createdUser, nil)
-	database.On("UpdateUser", mock.Anything, createdUser).Return(nil)
+	database.On("UpdateUser", mock.Anything, mock.Anything, createdUser).Return(nil)
 	auditLogger.On("Log", mock.Anything, audit.AuditCreatedUser, mock.Anything).Return()
 	var emailedLink string
 	httpHelper.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html",
@@ -429,7 +429,7 @@ func TestHandleAPIUserCreatePost_LostRaceOnTheEmailAnswers409(t *testing.T) {
 		&models.Settings{AppName: "TestApp"}))
 
 	// The pre-check passes: at this instant nobody holds the address.
-	database.On("GetUserByEmail", mock.Anything, "taken@example.com").Return(nil, nil)
+	database.On("GetUserByEmail", mock.Anything, mock.Anything, "taken@example.com").Return(nil, nil)
 	// By the time the insert runs, somebody does.
 	lostRace := errs.Wrap(errs.Wrap(
 		errs.Wrap(errs.Errorf("%w: %w", data.ErrUniqueViolation,
@@ -483,7 +483,7 @@ func TestHandleAPIUserCreatePost_AnyOtherCreateFailureAnswers500(t *testing.T) {
 	req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings,
 		&models.Settings{AppName: "TestApp"}))
 
-	database.On("GetUserByEmail", mock.Anything, "fresh@example.com").Return(nil, nil)
+	database.On("GetUserByEmail", mock.Anything, mock.Anything, "fresh@example.com").Return(nil, nil)
 	userCreator.On("CreateUser", mock.Anything, mock.Anything).Return(nil,
 		errs.Wrap(errs.New("connection refused"), "unable to execute SQL"))
 
@@ -611,7 +611,7 @@ func TestHandleAPIUserCreatePost_SetPasswordTypeMatrix(t *testing.T) {
 				&models.Settings{AppName: "TestApp", SMTPEnabled: tc.smtpEnabled,
 					PasswordPolicy: models.PasswordPolicyLow}))
 
-			database.On("GetUserByEmail", mock.Anything, "newuser@example.com").Return(nil, nil)
+			database.On("GetUserByEmail", mock.Anything, mock.Anything, "newuser@example.com").Return(nil, nil)
 
 			// createdUser is what the handler mutates on the email arm, so the assertions below
 			// read the hash off the input the handler actually passed rather than off a value
@@ -626,7 +626,7 @@ func TestHandleAPIUserCreatePost_SetPasswordTypeMatrix(t *testing.T) {
 				auditLogger.On("Log", mock.Anything, audit.AuditCreatedUser, mock.Anything).Return()
 			}
 			if tc.wantEmail {
-				database.On("UpdateUser", mock.Anything, createdUser).Return(nil)
+				database.On("UpdateUser", mock.Anything, mock.Anything, createdUser).Return(nil)
 				httpHelper.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html",
 					"/emails/email_newuser_set_password.html", mock.Anything).
 					Return(&bytes.Buffer{}, nil)

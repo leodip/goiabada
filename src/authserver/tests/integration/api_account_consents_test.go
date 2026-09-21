@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -37,9 +38,9 @@ func TestAPIAccountConsentsGet_Success(t *testing.T) {
 		Scope:     "openid profile email",
 		GrantedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true},
 	}
-	err = database.CreateUserConsent(nil, consent)
+	err = database.CreateUserConsent(context.Background(), nil, consent)
 	assert.NoError(t, err)
-	defer func() { _ = database.DeleteUserConsent(nil, consent.Id) }()
+	defer func() { _ = database.DeleteUserConsent(context.Background(), nil, consent.Id) }()
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/account/consents"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
@@ -123,7 +124,7 @@ func TestAPIAccountConsentDelete_Success(t *testing.T) {
 		Scope:     "openid profile",
 		GrantedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true},
 	}
-	err = database.CreateUserConsent(nil, consent)
+	err = database.CreateUserConsent(context.Background(), nil, consent)
 	assert.NoError(t, err)
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/account/consents/" + fmt.Sprintf("%d", consent.Id)
@@ -139,7 +140,7 @@ func TestAPIAccountConsentDelete_Success(t *testing.T) {
 	assert.True(t, delResp.Success)
 
 	// Confirm deletion
-	got, err := database.GetUserConsentById(nil, consent.Id)
+	got, err := database.GetUserConsentById(context.Background(), nil, consent.Id)
 	assert.NoError(t, err)
 	assert.Nil(t, got)
 }
@@ -156,9 +157,9 @@ func TestAPIAccountConsentDelete_ForbiddenOnOtherUser(t *testing.T) {
 		GivenName:  "Other",
 		FamilyName: "User",
 	}
-	err := database.CreateUser(nil, user2)
+	err := database.CreateUser(context.Background(), nil, user2)
 	assert.NoError(t, err)
-	defer func() { _ = database.DeleteUser(nil, user2.Id) }()
+	defer func() { _ = database.DeleteUser(context.Background(), nil, user2.Id) }()
 
 	// Create client and consent for user2
 	client := &models.Client{
@@ -177,9 +178,9 @@ func TestAPIAccountConsentDelete_ForbiddenOnOtherUser(t *testing.T) {
 		Scope:     "openid",
 		GrantedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true},
 	}
-	err = database.CreateUserConsent(nil, consent)
+	err = database.CreateUserConsent(context.Background(), nil, consent)
 	assert.NoError(t, err)
-	defer func() { _ = database.DeleteUserConsent(nil, consent.Id) }()
+	defer func() { _ = database.DeleteUserConsent(context.Background(), nil, consent.Id) }()
 
 	// Attempt to delete using user1 token
 	url := config.GetAuthServer().BaseURL + "/api/v1/account/consents/" + fmt.Sprintf("%d", consent.Id)
@@ -195,7 +196,7 @@ func TestAPIAccountConsentDelete_ForbiddenOnOtherUser(t *testing.T) {
 	assert.Equal(t, "FORBIDDEN", errResp.ErrorCode)
 
 	// Ensure consent still exists
-	got, err := database.GetUserConsentById(nil, consent.Id)
+	got, err := database.GetUserConsentById(context.Background(), nil, consent.Id)
 	assert.NoError(t, err)
 	assert.NotNil(t, got)
 

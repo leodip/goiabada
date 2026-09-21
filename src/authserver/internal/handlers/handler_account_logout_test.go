@@ -805,7 +805,7 @@ func stubConfirmedHint(
 	tokenParser.On("DecodeAndValidateTokenString", mock.Anything, hintedToken, (*rsa.PublicKey)(nil), false).
 		Return(&oauth.JwtToken{TokenBase64: hintedToken, Claims: claims}, nil)
 	database.On("GetClientByClientIdentifier", mock.Anything, hintedClientId).Return(client, nil)
-	database.On("GetUserBySubject", mock.Anything, hintedSubject).
+	database.On("GetUserBySubject", mock.Anything, mock.Anything, hintedSubject).
 		Return(&models.User{Id: hintedUserId}, nil).Maybe()
 
 	return client
@@ -2024,7 +2024,7 @@ func TestClassifyIdTokenHint(t *testing.T) {
 	resolvesOwnedSessionRows := func(database *mocks_data.Database) {
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, theSessionId).
 			Return(&models.UserSession{Id: 7, UserId: theUserDbId}, nil).Maybe()
-		database.On("GetUserBySubject", mock.Anything, theSubject).
+		database.On("GetUserBySubject", mock.Anything, mock.Anything, theSubject).
 			Return(&models.User{Id: theUserDbId}, nil).Maybe()
 	}
 	resolvesOwnedSession := func(database *mocks_data.Database) {
@@ -2039,7 +2039,7 @@ func TestClassifyIdTokenHint(t *testing.T) {
 		return func(database *mocks_data.Database) {
 			resolvesClient(database)
 			database.On("GetUserSessionBySessionIdentifier", mock.Anything, theSessionId).Return(userSession, err)
-			database.On("GetUserBySubject", mock.Anything, theSubject).
+			database.On("GetUserBySubject", mock.Anything, mock.Anything, theSubject).
 				Return(&models.User{Id: theUserDbId}, nil).Maybe()
 		}
 	}
@@ -2052,7 +2052,7 @@ func TestClassifyIdTokenHint(t *testing.T) {
 			resolvesClient(database)
 			database.On("GetUserSessionBySessionIdentifier", mock.Anything, theSessionId).
 				Return(&models.UserSession{Id: 7, UserId: sessionUserId}, nil)
-			database.On("GetUserBySubject", mock.Anything, theSubject).Return(user, userErr)
+			database.On("GetUserBySubject", mock.Anything, mock.Anything, theSubject).Return(user, userErr)
 		}
 	}
 

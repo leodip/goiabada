@@ -1,6 +1,7 @@
 package issuance
 
 import (
+	"context"
 	"database/sql"
 	"testing"
 	"time"
@@ -88,7 +89,7 @@ func TestAccessToken_SidEmission(t *testing.T) {
 	// profile scope is present, so a mock is needed even though nothing here is about
 	// pictures. Maybe(), because the rows using bare "openid" never reach it.
 	mockDB := mocks_data.NewDatabase(t)
-	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything).Return(false, nil).Maybe()
+	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
 	issuer := NewTokenIssuer(mockDB, "http://localhost:8081")
 	now := time.Now().UTC()
 	const sid = "test-session-123"
@@ -149,7 +150,7 @@ func TestAccessToken_SidEmission(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			tokenStr, _, err := issuer.generateAccessToken(settings, tc.code, tc.scope, now, privKey, "test-kid", tc.parent)
+			tokenStr, _, err := issuer.generateAccessToken(context.Background(), settings, tc.code, tc.scope, now, privKey, "test-kid", tc.parent)
 			require.NoError(t, err, "generateAccessToken")
 
 			claims := parseAccessTokenClaims(t, tokenStr)
@@ -179,7 +180,7 @@ func TestAccessToken_GenerationProvenance(t *testing.T) {
 	// profile scope is present, so a mock is needed even though nothing here is about
 	// pictures. Maybe(), because the rows using bare "openid" never reach it.
 	mockDB := mocks_data.NewDatabase(t)
-	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything).Return(false, nil).Maybe()
+	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
 	issuer := NewTokenIssuer(mockDB, "http://localhost:8081")
 	now := time.Now().UTC()
 	const sid = "test-session-123"
@@ -187,7 +188,7 @@ func TestAccessToken_GenerationProvenance(t *testing.T) {
 	t.Run("initial code exchange takes the code's generation", func(t *testing.T) {
 		// code 7 against a user already at 9: reading the user would emit 9.
 		code := generationTestCode("openid", sid, 7, 9)
-		tokenStr, _, err := issuer.generateAccessToken(settings, code, code.Scope, now, privKey, "test-kid", nil)
+		tokenStr, _, err := issuer.generateAccessToken(context.Background(), settings, code, code.Scope, now, privKey, "test-kid", nil)
 		require.NoError(t, err)
 		assert.EqualValues(t, 7, parseAccessTokenClaims(t, tokenStr)["auth_state_generation"])
 	})
@@ -198,7 +199,7 @@ func TestAccessToken_GenerationProvenance(t *testing.T) {
 		// promoted to 7 while its code stayed at 3, and the user has since reached 9.
 		code := generationTestCode("openid", sid, 3, 9)
 		parent := &models.RefreshToken{RefreshTokenType: sessionRefreshTokenType, AuthStateGeneration: 7}
-		tokenStr, _, err := issuer.generateAccessToken(settings, code, code.Scope, now, privKey, "test-kid", parent)
+		tokenStr, _, err := issuer.generateAccessToken(context.Background(), settings, code, code.Scope, now, privKey, "test-kid", parent)
 		require.NoError(t, err)
 		assert.EqualValues(t, 7, parseAccessTokenClaims(t, tokenStr)["auth_state_generation"])
 	})
@@ -219,7 +220,7 @@ func TestAccessToken_GenerationProvenance(t *testing.T) {
 			User:   &models.User{Id: 1, Subject: fake.UUID(), Username: "testuser", AuthStateGeneration: 7},
 			Scope:  "openid",
 		}
-		tokenStr, _, err := issuer.generateROPCAccessToken(settings, input, input.Scope, now, privKey, "test-kid", nil)
+		tokenStr, _, err := issuer.generateROPCAccessToken(context.Background(), settings, input, input.Scope, now, privKey, "test-kid", nil)
 		require.NoError(t, err)
 
 		claims := parseAccessTokenClaims(t, tokenStr)
@@ -238,7 +239,7 @@ func TestAccessToken_GenerationProvenance(t *testing.T) {
 			Scope:  "openid",
 		}
 		parent := &models.RefreshToken{RefreshTokenType: offlineRefreshTokenType, AuthStateGeneration: 7}
-		tokenStr, _, err := issuer.generateROPCAccessToken(settings, input, input.Scope, now, privKey, "test-kid", parent)
+		tokenStr, _, err := issuer.generateROPCAccessToken(context.Background(), settings, input, input.Scope, now, privKey, "test-kid", parent)
 		require.NoError(t, err)
 		assert.EqualValues(t, 7, parseAccessTokenClaims(t, tokenStr)["auth_state_generation"])
 	})
@@ -255,7 +256,7 @@ func TestAccessToken_GenerationProvenance(t *testing.T) {
 			AuthStateGeneration: 7,
 		}
 		tokenInput := issuer.createTokenInputFromImplicit(input)
-		tokenStr, _, err := issuer.generateAccessTokenCore(settings, tokenInput, now, privKey, "test-kid")
+		tokenStr, _, err := issuer.generateAccessTokenCore(context.Background(), settings, tokenInput, now, privKey, "test-kid")
 		require.NoError(t, err)
 
 		claims := parseAccessTokenClaims(t, tokenStr)

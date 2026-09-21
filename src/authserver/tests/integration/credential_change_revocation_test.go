@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"database/sql"
 	"io"
 	"net/http"
@@ -349,7 +350,7 @@ func createOfflineGrant(t *testing.T) *offlineGrant {
 		Email:        strings.ToLower(fake.LetterN(12)) + "@example.com",
 		PasswordHash: passwordHashed,
 	}
-	require.NoError(t, database.CreateUser(nil, user))
+	require.NoError(t, database.CreateUser(context.Background(), nil, user))
 
 	// Only manage-account is granted. authserver:userinfo is deliberately NOT granted and NOT
 	// requested: the authorize validator rejects it explicitly, because an OpenID Connect scope
@@ -486,12 +487,12 @@ func resetPasswordFor(t *testing.T, user *models.User, newPassword string) {
 	codeHash, err := hashutil.HashString(code)
 	require.NoError(t, err)
 
-	fresh, err := database.GetUserById(nil, user.Id)
+	fresh, err := database.GetUserById(context.Background(), nil, user.Id)
 	require.NoError(t, err)
 	fresh.ForgotPasswordCodeEncrypted = encrypted
 	fresh.ForgotPasswordCodeHash = codeHash
 	fresh.ForgotPasswordCodeIssuedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
-	require.NoError(t, database.UpdateUser(nil, fresh))
+	require.NoError(t, database.UpdateUser(context.Background(), nil, fresh))
 
 	httpClient := createHttpClient(t)
 	cleanURL := followResetLink(t, httpClient, handlers.ResetPasswordLink(code))
@@ -506,7 +507,7 @@ func resetPasswordFor(t *testing.T, user *models.User, newPassword string) {
 
 	// Confirm the reset landed, so a later assertion cannot pass because the reset silently
 	// failed and left everything untouched.
-	after, err := database.GetUserById(nil, user.Id)
+	after, err := database.GetUserById(context.Background(), nil, user.Id)
 	require.NoError(t, err)
 	require.True(t, passwordhash.Verify(after.PasswordHash, newPassword),
 		"the reset must have replaced the password hash")
@@ -526,7 +527,7 @@ func claimString(t *testing.T, token string, claim string) string {
 
 func generationOf(t *testing.T, userId int64) int64 {
 	t.Helper()
-	user, err := database.GetUserById(nil, userId)
+	user, err := database.GetUserById(context.Background(), nil, userId)
 	require.NoError(t, err)
 	require.NotNil(t, user)
 	return user.AuthStateGeneration
@@ -635,7 +636,7 @@ func TestCredentialChange_SelfServicePreservesTheCallersSession(t *testing.T) {
 
 	// Set the known current password first, so the second login below can use it.
 	current := "Curr3ntP4ss!"
-	fresh, err := database.GetUserById(nil, grant.user.Id)
+	fresh, err := database.GetUserById(context.Background(), nil, grant.user.Id)
 	require.NoError(t, err)
 	setUserPassword(t, fresh, current)
 
@@ -758,7 +759,7 @@ func TestCredentialChange_DisabledUserSidlessTokenIsRejectedImmediately(t *testi
 	_ = resp.Body.Close()
 	require.Equal(t, http.StatusOK, resp.StatusCode, "the token should work while the user is enabled")
 
-	transitioned, err := database.TrySetUserEnabled(nil, user.Id, true, false)
+	transitioned, err := database.TrySetUserEnabled(context.Background(), nil, user.Id, true, false)
 	require.NoError(t, err)
 	require.True(t, transitioned)
 
@@ -854,7 +855,7 @@ func TestCredentialChange_PreservedFamilyKeepsRotating(t *testing.T) {
 		"the second grant must be session-bound to the ceremony's session")
 
 	current := "Curr3ntP4ss!"
-	fresh, err := database.GetUserById(nil, grant.user.Id)
+	fresh, err := database.GetUserById(context.Background(), nil, grant.user.Id)
 	require.NoError(t, err)
 	setUserPassword(t, fresh, current)
 

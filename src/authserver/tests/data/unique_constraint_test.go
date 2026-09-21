@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"context"
 	"database/sql"
 	"testing"
 	"time"
@@ -73,7 +74,7 @@ func TestUnique_UserSubject(t *testing.T) {
 		Username: fake.Username(),
 		Email:    "dup_subject_" + fake.LetterN(10) + "@example.com",
 	}
-	err := database.CreateUser(nil, duplicate)
+	err := database.CreateUser(context.Background(), nil, duplicate)
 	assert.Error(t, err, "two users must not share a subject")
 }
 
@@ -86,7 +87,7 @@ func TestUnique_UserEmail(t *testing.T) {
 		Username: fake.Username(),
 		Email:    existing.Email,
 	}
-	err := database.CreateUser(nil, duplicate)
+	err := database.CreateUser(context.Background(), nil, duplicate)
 	assert.Error(t, err, "two users must not share an email")
 }
 
@@ -168,7 +169,7 @@ func TestUnique_UserProfilePicturePerUser(t *testing.T) {
 		Picture:     createTestPNG(10, 10),
 		ContentType: "image/png",
 	}
-	err := database.CreateUserProfilePicture(nil, duplicate)
+	err := database.CreateUserProfilePicture(context.Background(), nil, duplicate)
 	assert.Error(t, err, "a user must not have two profile pictures")
 }
 

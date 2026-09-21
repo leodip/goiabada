@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -38,9 +39,9 @@ func TestSeederLowercasesAdminEmail(t *testing.T) {
 
 	seeder := data.NewDatabaseSeeder(h.DB, givenEmail, "SeedTest_p4ssword!", "Goiabada",
 		"https://localhost:8080", "https://localhost:8081")
-	require.NoError(t, seeder.Seed(), "seed a fresh deployment with a mixed-case admin address")
+	require.NoError(t, seeder.Seed(context.Background()), "seed a fresh deployment with a mixed-case admin address")
 
-	user, err := h.DB.GetUserByEmail(nil, wantEmail)
+	user, err := h.DB.GetUserByEmail(context.Background(), nil, wantEmail)
 	require.NoError(t, err, "look the admin up the way both credential paths do")
 	require.NotNilf(t, user,
 		"the seeded admin must be reachable by the lowercased address: that is the only spelling the password form and the ROPC grant ever ask for")

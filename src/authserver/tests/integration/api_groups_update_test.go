@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -393,20 +394,20 @@ func TestAPIGroupUpdatePut_MemberCountInResponse(t *testing.T) {
 		FamilyName:    "User",
 		EmailVerified: true,
 	}
-	err := database.CreateUser(nil, testUser)
+	err := database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
 	userGroup := &models.UserGroup{
 		UserId:  testUser.Id,
 		GroupId: testGroup.Id,
 	}
-	err = database.CreateUserGroup(nil, userGroup)
+	err = database.CreateUserGroup(context.Background(), nil, userGroup)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUserGroup(nil, userGroup.Id)
+		_ = database.DeleteUserGroup(context.Background(), nil, userGroup.Id)
 	}()
 
 	// Test: Update group (member count should be preserved in response)

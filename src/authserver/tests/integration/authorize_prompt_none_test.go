@@ -64,7 +64,7 @@ func TestPromptNone_AcrStepUpNeeded_ReturnsInteractionRequired(t *testing.T) {
 	}
 	user.OTPEnabled = true
 	user.OTPSecretEncrypted = encryptOTPSecretForTest(t, key.Secret())
-	err = database.UpdateUser(nil, user)
+	err = database.UpdateUser(context.Background(), nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -102,7 +102,7 @@ func TestPromptNone_OtpEnrollmentNeeded_ReturnsInteractionRequired(t *testing.T)
 
 	// Ensure user does NOT have OTP enabled
 	user.OTPEnabled = false
-	err := database.UpdateUser(nil, user)
+	err := database.UpdateUser(context.Background(), nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -139,7 +139,7 @@ func TestPromptNone_UserDisabled_ReturnsAccessDenied(t *testing.T) {
 
 	// Disable the user after session was created
 	user.Enabled = false
-	err := database.UpdateUser(nil, user)
+	err := database.UpdateUser(context.Background(), nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -205,7 +205,7 @@ func TestPromptNone_ConsentRequired_ReturnsConsentRequired(t *testing.T) {
 		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
-	err = database.CreateUser(nil, user)
+	err = database.CreateUser(context.Background(), nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -326,7 +326,7 @@ func walkDCRClientToConsentScreen(t *testing.T, clientName string) (*http.Client
 		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
-	err = database.CreateUser(nil, user)
+	err = database.CreateUser(context.Background(), nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -431,7 +431,7 @@ func TestPromptNone_DCRClient_ConsentExists_Success(t *testing.T) {
 		Scope:     "openid profile",
 		GrantedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true},
 	}
-	err := database.CreateUserConsent(nil, consent)
+	err := database.CreateUserConsent(context.Background(), nil, consent)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -533,7 +533,7 @@ func TestPromptNone_OtpOptionalNoOtp_ReturnsInteractionRequired(t *testing.T) {
 
 	// Ensure user does NOT have OTP enabled
 	user.OTPEnabled = false
-	err := database.UpdateUser(nil, user)
+	err := database.UpdateUser(context.Background(), nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -594,7 +594,7 @@ func TestPromptNone_OtpConfigChanged_ReturnsInteractionRequired(t *testing.T) {
 	}
 	user.OTPEnabled = true
 	user.OTPSecretEncrypted = encryptOTPSecretForTest(t, key.Secret())
-	err = database.UpdateUser(nil, user)
+	err = database.UpdateUser(context.Background(), nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -660,7 +660,7 @@ func TestPromptNone_OtpConfigChanged_RefusalWritesNothing(t *testing.T) {
 	}
 	user.OTPEnabled = true
 	user.OTPSecretEncrypted = encryptOTPSecretForTest(t, key.Secret())
-	if err := database.UpdateUser(nil, user); err != nil {
+	if err := database.UpdateUser(context.Background(), nil, user); err != nil {
 		t.Fatal(err)
 	}
 
@@ -920,7 +920,7 @@ func TestPromptNone_FullConsentCoverage(t *testing.T) {
 		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
-	err = database.CreateUser(nil, user)
+	err = database.CreateUser(context.Background(), nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -932,7 +932,7 @@ func TestPromptNone_FullConsentCoverage(t *testing.T) {
 		Scope:     "openid profile email", // Covers openid profile
 		GrantedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true},
 	}
-	err = database.CreateUserConsent(nil, consent)
+	err = database.CreateUserConsent(context.Background(), nil, consent)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1064,7 +1064,7 @@ func TestPromptNone_PartialConsentCoverage(t *testing.T) {
 		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
-	err = database.CreateUser(nil, user)
+	err = database.CreateUser(context.Background(), nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1076,7 +1076,7 @@ func TestPromptNone_PartialConsentCoverage(t *testing.T) {
 		Scope:     "openid", // Only openid, not profile
 		GrantedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true},
 	}
-	err = database.CreateUserConsent(nil, consent)
+	err = database.CreateUserConsent(context.Background(), nil, consent)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1187,7 +1187,7 @@ func TestPromptNone_OfflineAccessNotInConsent(t *testing.T) {
 		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
-	err = database.CreateUser(nil, user)
+	err = database.CreateUser(context.Background(), nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1199,7 +1199,7 @@ func TestPromptNone_OfflineAccessNotInConsent(t *testing.T) {
 		Scope:     "openid profile",
 		GrantedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true},
 	}
-	err = database.CreateUserConsent(nil, consent)
+	err = database.CreateUserConsent(context.Background(), nil, consent)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1319,7 +1319,7 @@ func TestPromptNone_OfflineAccessInConsent(t *testing.T) {
 		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
-	err = database.CreateUser(nil, user)
+	err = database.CreateUser(context.Background(), nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1331,7 +1331,7 @@ func TestPromptNone_OfflineAccessInConsent(t *testing.T) {
 		Scope:     "openid profile offline_access",
 		GrantedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true},
 	}
-	err = database.CreateUserConsent(nil, consent)
+	err = database.CreateUserConsent(context.Background(), nil, consent)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1463,7 +1463,7 @@ func TestPromptNone_RequestSubsetOfConsent(t *testing.T) {
 		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
-	err = database.CreateUser(nil, user)
+	err = database.CreateUser(context.Background(), nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1475,7 +1475,7 @@ func TestPromptNone_RequestSubsetOfConsent(t *testing.T) {
 		Scope:     "openid profile email address phone",
 		GrantedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true},
 	}
-	err = database.CreateUserConsent(nil, consent)
+	err = database.CreateUserConsent(context.Background(), nil, consent)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1598,7 +1598,7 @@ func TestPromptNone_EffectiveScopesEmpty_ReturnsAccessDenied(t *testing.T) {
 		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
-	err = database.CreateUser(nil, user)
+	err = database.CreateUser(context.Background(), nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1720,7 +1720,7 @@ func advanceOtpConfigGeneration(t *testing.T, userId int64) {
 	}
 	defer func() { _ = database.RollbackTransaction(tx) }()
 
-	if _, err := database.IncrementUserOtpConfigGeneration(tx, userId); err != nil {
+	if _, err := database.IncrementUserOtpConfigGeneration(context.Background(), tx, userId); err != nil {
 		t.Fatal(err)
 	}
 	if err := database.CommitTransaction(tx); err != nil {

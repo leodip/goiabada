@@ -66,7 +66,7 @@ func HandleAPIPermissionUsersGet(
 			}
 		}
 
-		users, total, err := database.GetUsersByPermissionIdPaginated(nil, permissionId, page, size)
+		users, total, err := database.GetUsersByPermissionIdPaginated(r.Context(), nil, permissionId, page, size)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: error getting users by permission paginated"), "permission_id", permissionId, "page", page, "size", size)
 			return

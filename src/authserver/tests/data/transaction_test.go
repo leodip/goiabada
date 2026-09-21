@@ -133,16 +133,16 @@ func TestTransaction_RollbackUndoesMultiStatementDelete(t *testing.T) {
 	refreshToken := createROPCRefreshToken(t, user.Id, client.Id)
 
 	tx := beginTx(t)
-	require.NoError(t, database.DeleteUser(tx, user.Id), "DeleteUser in a transaction")
+	require.NoError(t, database.DeleteUser(context.Background(), tx, user.Id), "DeleteUser in a transaction")
 
 	// Gone as far as this transaction is concerned.
-	deletedInTx, err := database.GetUserById(tx, user.Id)
+	deletedInTx, err := database.GetUserById(context.Background(), tx, user.Id)
 	require.NoError(t, err, "GetUserById through the transaction")
 	require.Nil(t, deletedInTx, "the transaction must see its own delete")
 
 	require.NoError(t, database.RollbackTransaction(tx), "RollbackTransaction")
 
-	restoredUser, err := database.GetUserById(nil, user.Id)
+	restoredUser, err := database.GetUserById(context.Background(), nil, user.Id)
 	require.NoError(t, err, "GetUserById after rollback")
 	assert.NotNil(t, restoredUser, "the user must survive a rolled-back delete")
 
@@ -160,10 +160,10 @@ func TestTransaction_CommitAppliesMultiStatementDelete(t *testing.T) {
 	refreshToken := createROPCRefreshToken(t, user.Id, client.Id)
 
 	tx := beginTx(t)
-	require.NoError(t, database.DeleteUser(tx, user.Id), "DeleteUser in a transaction")
+	require.NoError(t, database.DeleteUser(context.Background(), tx, user.Id), "DeleteUser in a transaction")
 	require.NoError(t, database.CommitTransaction(tx), "CommitTransaction")
 
-	deletedUser, err := database.GetUserById(nil, user.Id)
+	deletedUser, err := database.GetUserById(context.Background(), nil, user.Id)
 	require.NoError(t, err, "GetUserById after commit")
 	assert.Nil(t, deletedUser, "the user must be gone after the commit")
 

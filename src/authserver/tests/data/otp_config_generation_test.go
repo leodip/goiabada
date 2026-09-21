@@ -28,7 +28,7 @@ func TestIncrementUserOtpConfigGeneration(t *testing.T) {
 	bystander := createTestUser(t)
 
 	reload := func(id int64) int64 {
-		u, err := database.GetUserById(nil, id)
+		u, err := database.GetUserById(context.Background(), nil, id)
 		require.NoError(t, err, "reload user %d", id)
 		require.NotNil(t, u, "user %d vanished", id)
 		return u.OtpConfigGeneration
@@ -41,7 +41,7 @@ func TestIncrementUserOtpConfigGeneration(t *testing.T) {
 	// the browser enrollment promotes exactly this number onto the session it creates.
 	tx, err := database.BeginTransaction(context.Background())
 	require.NoError(t, err, "BeginTransaction")
-	got, err := database.IncrementUserOtpConfigGeneration(tx, moved.Id)
+	got, err := database.IncrementUserOtpConfigGeneration(context.Background(), tx, moved.Id)
 	require.NoError(t, err, "IncrementUserOtpConfigGeneration")
 	require.NoError(t, database.CommitTransaction(tx), "CommitTransaction")
 
@@ -54,7 +54,7 @@ func TestIncrementUserOtpConfigGeneration(t *testing.T) {
 	for want := int64(2); want <= 3; want++ {
 		tx, err := database.BeginTransaction(context.Background())
 		require.NoError(t, err, "BeginTransaction")
-		got, err := database.IncrementUserOtpConfigGeneration(tx, moved.Id)
+		got, err := database.IncrementUserOtpConfigGeneration(context.Background(), tx, moved.Id)
 		require.NoError(t, err, "IncrementUserOtpConfigGeneration")
 		require.NoError(t, database.CommitTransaction(tx), "CommitTransaction")
 		assert.EqualValues(t, want, got)
@@ -65,7 +65,7 @@ func TestIncrementUserOtpConfigGeneration(t *testing.T) {
 	// and its read-back are separable, so a concurrent increment landing between them would
 	// have this caller return the other caller's generation and promote it onto a session that
 	// never answered for it. IncrementUserAuthStateGeneration refuses nil for the same reason.
-	_, err = database.IncrementUserOtpConfigGeneration(nil, moved.Id)
+	_, err = database.IncrementUserOtpConfigGeneration(context.Background(), nil, moved.Id)
 	assert.Error(t, err, "a nil transaction must be refused")
 	assert.EqualValues(t, 3, reload(moved.Id), "the refused call must not have moved anything")
 
@@ -74,7 +74,7 @@ func TestIncrementUserOtpConfigGeneration(t *testing.T) {
 	// names the mistake rather than the symptom.
 	tx, err = database.BeginTransaction(context.Background())
 	require.NoError(t, err, "BeginTransaction")
-	_, err = database.IncrementUserOtpConfigGeneration(tx, 0)
+	_, err = database.IncrementUserOtpConfigGeneration(context.Background(), tx, 0)
 	assert.Error(t, err, "user id 0 must be refused")
 	require.NoError(t, database.RollbackTransaction(tx), "RollbackTransaction")
 
@@ -83,7 +83,7 @@ func TestIncrementUserOtpConfigGeneration(t *testing.T) {
 	// success would commit the authenticator change with nobody informed.
 	tx, err = database.BeginTransaction(context.Background())
 	require.NoError(t, err, "BeginTransaction")
-	_, err = database.IncrementUserOtpConfigGeneration(tx, bystander.Id+1_000_000)
+	_, err = database.IncrementUserOtpConfigGeneration(context.Background(), tx, bystander.Id+1_000_000)
 	assert.Error(t, err, "an unknown user id must be refused")
 	require.NoError(t, database.RollbackTransaction(tx), "RollbackTransaction")
 }
@@ -99,13 +99,13 @@ func TestIncrementUserOtpConfigGeneration_EnlistsInTheCallersTransaction(t *test
 	tx, err := database.BeginTransaction(context.Background())
 	require.NoError(t, err, "BeginTransaction")
 
-	got, err := database.IncrementUserOtpConfigGeneration(tx, user.Id)
+	got, err := database.IncrementUserOtpConfigGeneration(context.Background(), tx, user.Id)
 	require.NoError(t, err, "IncrementUserOtpConfigGeneration")
 	assert.EqualValues(t, 1, got, "inside the transaction the increment is visible to its own read-back")
 
 	require.NoError(t, database.RollbackTransaction(tx), "RollbackTransaction")
 
-	after, err := database.GetUserById(nil, user.Id)
+	after, err := database.GetUserById(context.Background(), nil, user.Id)
 	require.NoError(t, err, "reload user")
 	require.NotNil(t, after)
 	assert.EqualValues(t, 0, after.OtpConfigGeneration,
@@ -182,20 +182,20 @@ func TestUpdateUser_DoesNotClobberOtpConfigGeneration(t *testing.T) {
 
 	tx, err := database.BeginTransaction(context.Background())
 	require.NoError(t, err, "BeginTransaction")
-	_, err = database.IncrementUserOtpConfigGeneration(tx, user.Id)
+	_, err = database.IncrementUserOtpConfigGeneration(context.Background(), tx, user.Id)
 	require.NoError(t, err, "IncrementUserOtpConfigGeneration")
 	require.NoError(t, database.CommitTransaction(tx), "CommitTransaction")
 
-	stale, err := database.GetUserById(nil, user.Id)
+	stale, err := database.GetUserById(context.Background(), nil, user.Id)
 	require.NoError(t, err, "reload user")
 	require.NotNil(t, stale)
 	require.EqualValues(t, 1, stale.OtpConfigGeneration)
 
 	stale.OtpConfigGeneration = 0
 	stale.OTPEnabled = true
-	require.NoError(t, database.UpdateUser(nil, stale), "UpdateUser")
+	require.NoError(t, database.UpdateUser(context.Background(), nil, stale), "UpdateUser")
 
-	after, err := database.GetUserById(nil, user.Id)
+	after, err := database.GetUserById(context.Background(), nil, user.Id)
 	require.NoError(t, err, "reload user")
 	require.NotNil(t, after)
 	assert.EqualValues(t, 1, after.OtpConfigGeneration,

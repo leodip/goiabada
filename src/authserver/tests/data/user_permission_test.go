@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -18,7 +19,7 @@ func TestCreateUserPermission(t *testing.T) {
 		PermissionId: permission.Id,
 	}
 
-	err := database.CreateUserPermission(nil, userPermission)
+	err := database.CreateUserPermission(context.Background(), nil, userPermission)
 	if err != nil {
 		t.Fatalf("Failed to create user permission: %v", err)
 	}
@@ -33,7 +34,7 @@ func TestCreateUserPermission(t *testing.T) {
 		t.Error("Expected UpdatedAt to be set")
 	}
 
-	retrievedUserPermission, err := database.GetUserPermissionById(nil, userPermission.Id)
+	retrievedUserPermission, err := database.GetUserPermissionById(context.Background(), nil, userPermission.Id)
 	if err != nil {
 		t.Fatalf("Failed to retrieve created user permission: %v", err)
 	}
@@ -59,12 +60,12 @@ func TestUpdateUserPermission(t *testing.T) {
 
 	time.Sleep(timestampTick)
 
-	err := database.UpdateUserPermission(nil, userPermission)
+	err := database.UpdateUserPermission(context.Background(), nil, userPermission)
 	if err != nil {
 		t.Fatalf("Failed to update user permission: %v", err)
 	}
 
-	updatedUserPermission, err := database.GetUserPermissionById(nil, userPermission.Id)
+	updatedUserPermission, err := database.GetUserPermissionById(context.Background(), nil, userPermission.Id)
 	if err != nil {
 		t.Fatalf("Failed to retrieve updated user permission: %v", err)
 	}
@@ -85,7 +86,7 @@ func TestUpdateUserPermission(t *testing.T) {
 func TestGetUserPermissionById(t *testing.T) {
 	userPermission := createTestUserPermission(t)
 
-	retrievedUserPermission, err := database.GetUserPermissionById(nil, userPermission.Id)
+	retrievedUserPermission, err := database.GetUserPermissionById(context.Background(), nil, userPermission.Id)
 	if err != nil {
 		t.Fatalf("Failed to get user permission by ID: %v", err)
 	}
@@ -100,7 +101,7 @@ func TestGetUserPermissionById(t *testing.T) {
 		t.Errorf("Expected PermissionId %d, got %d", userPermission.PermissionId, retrievedUserPermission.PermissionId)
 	}
 
-	nonExistentUserPermission, err := database.GetUserPermissionById(nil, 99999)
+	nonExistentUserPermission, err := database.GetUserPermissionById(context.Background(), nil, 99999)
 	if err != nil {
 		t.Errorf("Expected no error for non-existent user permission, got: %v", err)
 	}
@@ -115,7 +116,7 @@ func TestGetUserPermissionsByUserIds(t *testing.T) {
 
 	userIds := []int64{userPermission1.UserId, userPermission2.UserId}
 
-	userPermissions, err := database.GetUserPermissionsByUserIds(nil, userIds)
+	userPermissions, err := database.GetUserPermissionsByUserIds(context.Background(), nil, userIds)
 	if err != nil {
 		t.Fatalf("Failed to get user permissions by user IDs: %v", err)
 	}
@@ -150,7 +151,7 @@ func TestGetUserPermissionsByUserId(t *testing.T) {
 	userPermission1 := createTestUserPermissionWithUserAndPermission(t, user.Id, permission1.Id)
 	userPermission2 := createTestUserPermissionWithUserAndPermission(t, user.Id, permission2.Id)
 
-	userPermissions, err := database.GetUserPermissionsByUserId(nil, user.Id)
+	userPermissions, err := database.GetUserPermissionsByUserId(context.Background(), nil, user.Id)
 	if err != nil {
 		t.Fatalf("Failed to get user permissions by user ID: %v", err)
 	}
@@ -178,7 +179,7 @@ func TestGetUserPermissionsByUserId(t *testing.T) {
 func TestGetUserPermissionByUserIdAndPermissionId(t *testing.T) {
 	userPermission := createTestUserPermission(t)
 
-	retrievedUserPermission, err := database.GetUserPermissionByUserIdAndPermissionId(nil, userPermission.UserId, userPermission.PermissionId)
+	retrievedUserPermission, err := database.GetUserPermissionByUserIdAndPermissionId(context.Background(), nil, userPermission.UserId, userPermission.PermissionId)
 	if err != nil {
 		t.Fatalf("Failed to get user permission by user ID and permission ID: %v", err)
 	}
@@ -193,7 +194,7 @@ func TestGetUserPermissionByUserIdAndPermissionId(t *testing.T) {
 		t.Errorf("Expected PermissionId %d, got %d", userPermission.PermissionId, retrievedUserPermission.PermissionId)
 	}
 
-	nonExistentUserPermission, err := database.GetUserPermissionByUserIdAndPermissionId(nil, 99999, 99999)
+	nonExistentUserPermission, err := database.GetUserPermissionByUserIdAndPermissionId(context.Background(), nil, 99999, 99999)
 	if err != nil {
 		t.Errorf("Expected no error for non-existent user permission, got: %v", err)
 	}
@@ -215,7 +216,7 @@ func TestGetUsersByPermissionIdPaginated(t *testing.T) {
 	}
 
 	// Test first page
-	users, total, err := database.GetUsersByPermissionIdPaginated(nil, permission.Id, 1, 10)
+	users, total, err := database.GetUsersByPermissionIdPaginated(context.Background(), nil, permission.Id, 1, 10)
 	if err != nil {
 		t.Fatalf("Failed to get paginated users: %v", err)
 	}
@@ -229,7 +230,7 @@ func TestGetUsersByPermissionIdPaginated(t *testing.T) {
 	}
 
 	// Test second page
-	users, total, err = database.GetUsersByPermissionIdPaginated(nil, permission.Id, 2, 10)
+	users, total, err = database.GetUsersByPermissionIdPaginated(context.Background(), nil, permission.Id, 2, 10)
 	if err != nil {
 		t.Fatalf("Failed to get second page of paginated users: %v", err)
 	}
@@ -243,7 +244,7 @@ func TestGetUsersByPermissionIdPaginated(t *testing.T) {
 	}
 
 	// Test last page
-	users, total, err = database.GetUsersByPermissionIdPaginated(nil, permission.Id, 3, 10)
+	users, total, err = database.GetUsersByPermissionIdPaginated(context.Background(), nil, permission.Id, 3, 10)
 	if err != nil {
 		t.Fatalf("Failed to get last page of paginated users: %v", err)
 	}
@@ -257,7 +258,7 @@ func TestGetUsersByPermissionIdPaginated(t *testing.T) {
 	}
 
 	// Test page beyond total
-	users, total, err = database.GetUsersByPermissionIdPaginated(nil, permission.Id, 4, 10)
+	users, total, err = database.GetUsersByPermissionIdPaginated(context.Background(), nil, permission.Id, 4, 10)
 	if err != nil {
 		t.Fatalf("Failed to get page beyond total: %v", err)
 	}
@@ -271,7 +272,7 @@ func TestGetUsersByPermissionIdPaginated(t *testing.T) {
 	}
 
 	// Verify all created users are included in the total
-	allUsers, allTotal, err := database.GetUsersByPermissionIdPaginated(nil, permission.Id, 1, numUsers)
+	allUsers, allTotal, err := database.GetUsersByPermissionIdPaginated(context.Background(), nil, permission.Id, 1, numUsers)
 	if err != nil {
 		t.Fatalf("Failed to get all users: %v", err)
 	}
@@ -299,12 +300,12 @@ func TestGetUsersByPermissionIdPaginated(t *testing.T) {
 func TestDeleteUserPermission(t *testing.T) {
 	userPermission := createTestUserPermission(t)
 
-	err := database.DeleteUserPermission(nil, userPermission.Id)
+	err := database.DeleteUserPermission(context.Background(), nil, userPermission.Id)
 	if err != nil {
 		t.Fatalf("Failed to delete user permission: %v", err)
 	}
 
-	deletedUserPermission, err := database.GetUserPermissionById(nil, userPermission.Id)
+	deletedUserPermission, err := database.GetUserPermissionById(context.Background(), nil, userPermission.Id)
 	if err != nil {
 		t.Fatalf("Error while checking for deleted user permission: %v", err)
 	}
@@ -312,7 +313,7 @@ func TestDeleteUserPermission(t *testing.T) {
 		t.Errorf("User permission still exists after deletion")
 	}
 
-	err = database.DeleteUserPermission(nil, 99999)
+	err = database.DeleteUserPermission(context.Background(), nil, 99999)
 	if err != nil {
 		t.Errorf("Expected no error when deleting non-existent user permission, got: %v", err)
 	}
@@ -330,7 +331,7 @@ func createTestUserPermissionWithUserAndPermission(t *testing.T, userId, permiss
 		UserId:       userId,
 		PermissionId: permissionId,
 	}
-	err := database.CreateUserPermission(nil, userPermission)
+	err := database.CreateUserPermission(context.Background(), nil, userPermission)
 	if err != nil {
 		t.Fatalf("Failed to create test user permission: %v", err)
 	}
@@ -369,16 +370,16 @@ func TestGetUsersByPermissionIdPaginated_EnlistsInTheCallersTransaction(t *testi
 		GivenName: "TxHolder" + fake.LetterN(6),
 		Email:     fake.LetterN(12) + "@example.com",
 	}
-	if err := database.CreateUser(tx, user); err != nil {
+	if err := database.CreateUser(context.Background(), tx, user); err != nil {
 		t.Fatalf("Failed to create user inside the transaction: %v", err)
 	}
 
 	userPermission := &models.UserPermission{UserId: user.Id, PermissionId: permission.Id}
-	if err := database.CreateUserPermission(tx, userPermission); err != nil {
+	if err := database.CreateUserPermission(context.Background(), tx, userPermission); err != nil {
 		t.Fatalf("Failed to create users_permissions row inside the transaction: %v", err)
 	}
 
-	users, total, err := database.GetUsersByPermissionIdPaginated(tx, permission.Id, 1, 10)
+	users, total, err := database.GetUsersByPermissionIdPaginated(context.Background(), tx, permission.Id, 1, 10)
 	if err != nil {
 		t.Fatalf("GetUsersByPermissionIdPaginated through the transaction: %v", err)
 	}

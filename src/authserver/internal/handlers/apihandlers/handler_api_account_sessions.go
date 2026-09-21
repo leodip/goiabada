@@ -35,7 +35,7 @@ func HandleAPIAccountSessionsGet(
 		}
 
 		// Resolve user by subject
-		user, err := database.GetUserBySubject(nil, subject)
+		user, err := database.GetUserBySubject(r.Context(), nil, subject)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -64,7 +64,7 @@ func HandleAPIAccountSessionsGet(
 		// same claim through the same mapper (#373 decision 1).
 		currentSid := jwtToken.GetStringClaim("sid")
 
-		sessions, err := buildSessionDetails(database, userSessions, settings, currentSid)
+		sessions, err := buildSessionDetails(r.Context(), database, userSessions, settings, currentSid)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -115,7 +115,7 @@ func HandleAPIAccountSessionDelete(
 		}
 
 		// Resolve user and verify ownership
-		user, err := database.GetUserBySubject(nil, subject)
+		user, err := database.GetUserBySubject(r.Context(), nil, subject)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return

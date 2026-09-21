@@ -111,7 +111,7 @@ func TestHandleAPIUsersSearchGet_ErrorRecordBoundsTheQuery(t *testing.T) {
 	rawQuery, wantQuery := oversized(t, forgedLine)
 
 	database := mocks_data.NewDatabase(t)
-	database.On("SearchUsersPaginated", mock.Anything, rawQuery, 1, 10).
+	database.On("SearchUsersPaginated", mock.Anything, mock.Anything, rawQuery, 1, 10).
 		Return([]models.User(nil), 0, errs.New("engine is down"))
 
 	capture := testutil.CaptureSlog(t)
@@ -161,7 +161,7 @@ func TestErrorRecordFiltersOfOrdinaryLengthAreUnchanged(t *testing.T) {
 // searchThatSucceeds lets the search itself pass with one user, which is what carries a case past
 // the first error record and into the annotation branch.
 func searchThatSucceeds(database *mocks_data.Database, rawQuery string) {
-	database.On("SearchUsersPaginated", mock.Anything, rawQuery, 1, 10).
+	database.On("SearchUsersPaginated", mock.Anything, mock.Anything, rawQuery, 1, 10).
 		Return([]models.User{{Id: 42}}, 1, nil)
 }
 
@@ -196,7 +196,7 @@ func TestHandleAPIUsersSearchGet_ErrorRecordBoundsTheQueryWhenLoadingGroupsFails
 	database := mocks_data.NewDatabase(t)
 	searchThatSucceeds(database, rawQuery)
 	database.On("GetGroupById", mock.Anything, int64(7)).Return(&models.Group{Id: 7}, nil)
-	database.On("UsersLoadGroups", mock.Anything, mock.Anything).
+	database.On("UsersLoadGroups", mock.Anything, mock.Anything, mock.Anything).
 		Return(errs.New("engine is down"))
 
 	capture := testutil.CaptureSlog(t)

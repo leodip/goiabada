@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"context"
 	"math"
 	"testing"
 
@@ -85,12 +86,12 @@ func TestPaginatedReads_AnOverflowingPageIsAnEmptyPage(t *testing.T) {
 		givenName := "offsettest" + fake.LetterN(10)
 		for i := 0; i < 3; i++ {
 			user := createUserWithGivenName(t, givenName)
-			t.Cleanup(func() { _ = database.DeleteUser(nil, user.Id) })
+			t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.Id) })
 		}
 
 		assertEmptyPagePastTheEnd(t, "SearchUsersPaginated", 10,
 			func(page, pageSize int) (int, int, error) {
-				users, total, err := database.SearchUsersPaginated(nil, givenName, page, pageSize)
+				users, total, err := database.SearchUsersPaginated(context.Background(), nil, givenName, page, pageSize)
 				return len(users), total, err
 			})
 	})
@@ -115,7 +116,7 @@ func TestPaginatedReads_AnOverflowingPageIsAnEmptyPage(t *testing.T) {
 		for i := 0; i < 3; i++ {
 			user := createTestUser(t)
 			createTestUserGroupWithUserAndGroup(t, user.Id, group.Id)
-			t.Cleanup(func() { _ = database.DeleteUser(nil, user.Id) })
+			t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.Id) })
 		}
 
 		assertEmptyPagePastTheEnd(t, "GetGroupMembersPaginated", 10,
@@ -133,19 +134,19 @@ func TestPaginatedReads_AnOverflowingPageIsAnEmptyPage(t *testing.T) {
 		for i := 0; i < 3; i++ {
 			user := createTestUser(t)
 			createTestUserPermissionWithUserAndPermission(t, user.Id, permission.Id)
-			t.Cleanup(func() { _ = database.DeleteUser(nil, user.Id) })
+			t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.Id) })
 		}
 
 		assertEmptyPagePastTheEnd(t, "GetUsersByPermissionIdPaginated", 10,
 			func(page, pageSize int) (int, int, error) {
-				users, total, err := database.GetUsersByPermissionIdPaginated(nil, permission.Id, page, pageSize)
+				users, total, err := database.GetUsersByPermissionIdPaginated(context.Background(), nil, permission.Id, page, pageSize)
 				return len(users), total, err
 			})
 	})
 
 	t.Run("GetUserSessionsByClientIdPaginated", func(t *testing.T) {
 		user := createTestUser(t)
-		t.Cleanup(func() { _ = database.DeleteUser(nil, user.Id) })
+		t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.Id) })
 		client := createTestClient(t)
 		t.Cleanup(func() { _ = database.DeleteClient(nil, client.Id) })
 		createTestUserSessionsWithClient(t, user.Id, client.Id, 3)

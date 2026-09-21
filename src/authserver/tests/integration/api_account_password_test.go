@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -20,7 +21,7 @@ func setUserPassword(t *testing.T, user *models.User, newPassword string) {
 	hash, err := passwordhash.Hash(newPassword)
 	assert.NoError(t, err)
 	user.PasswordHash = hash
-	err = database.UpdateUser(nil, user)
+	err = database.UpdateUser(context.Background(), nil, user)
 	assert.NoError(t, err)
 }
 
@@ -56,7 +57,7 @@ func TestAPIAccountPasswordPut_Success(t *testing.T) {
 	assert.Equal(t, u.Id, updateResp.User.Id)
 
 	// Verify password updated in DB and matches
-	updatedUser, err := database.GetUserById(nil, u.Id)
+	updatedUser, err := database.GetUserById(context.Background(), nil, u.Id)
 	assert.NoError(t, err)
 	assert.True(t, passwordhash.Verify(updatedUser.PasswordHash, reqBody.NewPassword))
 }

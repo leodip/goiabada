@@ -235,7 +235,7 @@ func resolveResetPasswordMarker(httpHelper HttpHelper, httpSession sessionstore.
 		return nil, nil
 	}
 
-	user, err := database.GetUserByForgotPasswordCodeHash(nil, marker.CodeHash)
+	user, err := database.GetUserByForgotPasswordCodeHash(r.Context(), nil, marker.CodeHash)
 	if err != nil {
 		httpHelper.InternalServerError(w, r, err)
 		return nil, nil
@@ -309,7 +309,7 @@ func handleResetPasswordLinkFollowed(httpHelper HttpHelper, httpSession sessions
 		return
 	}
 
-	user, err := database.GetUserByForgotPasswordCodeHash(nil, codeHash)
+	user, err := database.GetUserByForgotPasswordCodeHash(r.Context(), nil, codeHash)
 	if err != nil {
 		httpHelper.InternalServerError(w, r, err)
 		return
@@ -473,7 +473,7 @@ func HandleResetPasswordPost(
 		// password is not necessarily the person holding the live sessions, which is the
 		// stolen-laptop case this issue exists for.
 		result, err := RevokeUserAuthStateTx(r.Context(), database, user.Id, "", func(tx *sql.Tx) error {
-			claimed, err := database.TryConsumeForgotPasswordCode(tx, user.Id, marker.CodeHash, passwordHash)
+			claimed, err := database.TryConsumeForgotPasswordCode(r.Context(), tx, user.Id, marker.CodeHash, passwordHash)
 			if err != nil {
 				return err
 			}

@@ -55,12 +55,12 @@ func armIssueGate(database *mocks_data.Database, userSessionManager *mocks_handl
 			client := args.Get(1).(*models.Client)
 			client.RedirectURIs = []models.RedirectURI{{URI: redirectURI}}
 		}).Return(nil).Maybe()
-	database.On("GetUserById", mock.Anything, mock.Anything).
+	database.On("GetUserById", mock.Anything, mock.Anything, mock.Anything).
 		Return(&models.User{Id: 1, Subject: fake.UUID()}, nil).Maybe()
 	userSessionManager.On("HasValidUserSession", mock.Anything, mock.Anything, mock.Anything).
 		Return(true).Maybe()
-	permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, mock.Anything).
-		Return(func(scope string, _ *models.User) string { return scope }, nil).Maybe()
+	permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, mock.Anything, mock.Anything).
+		Return(func(_ context.Context, scope string, _ *models.User) string { return scope }, nil).Maybe()
 }
 
 func TestHandleIssueGet(t *testing.T) {
@@ -1329,7 +1329,7 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").
 			Return(&models.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true}, nil)
-		database.On("GetUserById", mock.Anything, int64(123)).
+		database.On("GetUserById", mock.Anything, mock.Anything, int64(123)).
 			Return(&models.User{Id: 123, Subject: "11111111-1111-1111-1111-111111111111", Enabled: true}, nil)
 
 		tokenIssuer.On("GenerateTokenResponseForImplicit", mock.Anything, mock.MatchedBy(func(input *issuance.ImplicitGrantInput) bool {
@@ -1725,7 +1725,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 			Email:   "test@example.com",
 			Enabled: true,
 		}
-		database.On("GetUserById", mock.Anything, int64(123)).Return(mockUser, nil)
+		database.On("GetUserById", mock.Anything, mock.Anything, int64(123)).Return(mockUser, nil)
 
 		// Mock token generation
 		tokenResponse := &issuance.ImplicitGrantResponse{
@@ -1816,7 +1816,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 			Email:   "test@example.com",
 			Enabled: true,
 		}
-		database.On("GetUserById", mock.Anything, int64(123)).Return(mockUser, nil)
+		database.On("GetUserById", mock.Anything, mock.Anything, int64(123)).Return(mockUser, nil)
 
 		tokenResponse := &issuance.ImplicitGrantResponse{
 			IdToken: "id-token-123",
@@ -1900,7 +1900,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 			Email:   "test@example.com",
 			Enabled: true,
 		}
-		database.On("GetUserById", mock.Anything, int64(123)).Return(mockUser, nil)
+		database.On("GetUserById", mock.Anything, mock.Anything, int64(123)).Return(mockUser, nil)
 
 		tokenResponse := &issuance.ImplicitGrantResponse{
 			AccessToken: "access-token-123",
@@ -1973,7 +1973,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(mockClient, nil)
 
 		mockUser := &models.User{Id: 123, Subject: "11111111-1111-1111-1111-111111111111"}
-		database.On("GetUserById", mock.Anything, int64(123)).Return(mockUser, nil)
+		database.On("GetUserById", mock.Anything, mock.Anything, int64(123)).Return(mockUser, nil)
 
 		tokenResponse := &issuance.ImplicitGrantResponse{
 			AccessToken: "access-token-123",
@@ -2090,7 +2090,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		mockClient := &models.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true}
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(mockClient, nil)
 
-		database.On("GetUserById", mock.Anything, int64(999)).Return(nil, nil)
+		database.On("GetUserById", mock.Anything, mock.Anything, int64(999)).Return(nil, nil)
 
 		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err != nil && strings.Contains(err.Error(), "user 999 not found")
@@ -2136,7 +2136,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(mockClient, nil)
 
 		mockUser := &models.User{Id: 123, Subject: "11111111-1111-1111-1111-111111111111"}
-		database.On("GetUserById", mock.Anything, int64(123)).Return(mockUser, nil)
+		database.On("GetUserById", mock.Anything, mock.Anything, int64(123)).Return(mockUser, nil)
 
 		tokenError := errs.New("token generation failed")
 		tokenIssuer.On("GenerateTokenResponseForImplicit", mock.Anything, mock.Anything, true, false).Return(nil, tokenError)
@@ -2463,7 +2463,7 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(mockClient, nil)
 
 		dbError := errs.New("user database error")
-		database.On("GetUserById", mock.Anything, int64(123)).Return(nil, dbError)
+		database.On("GetUserById", mock.Anything, mock.Anything, int64(123)).Return(nil, dbError)
 
 		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err == dbError
@@ -2509,7 +2509,7 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(mockClient, nil)
 
 		mockUser := &models.User{Id: 123, Subject: "11111111-1111-1111-1111-111111111111"}
-		database.On("GetUserById", mock.Anything, int64(123)).Return(mockUser, nil)
+		database.On("GetUserById", mock.Anything, mock.Anything, int64(123)).Return(mockUser, nil)
 
 		tokenResponse := &issuance.ImplicitGrantResponse{
 			AccessToken: "access-token-123",
@@ -3327,7 +3327,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 			Email:   "test@example.com",
 			Enabled: true,
 		}
-		database.On("GetUserById", mock.Anything, int64(1)).Return(mockUser, nil)
+		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(mockUser, nil)
 
 		stubLiveSession(database, 1)
 
@@ -3413,7 +3413,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 			Email:   "userb@example.com",
 			Enabled: true,
 		}
-		database.On("GetUserById", mock.Anything, int64(1)).Return(mockUser, nil)
+		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(mockUser, nil)
 
 		// The clear has to reach the browser, so it must run before the response is committed.
 		// This refusal is the one that leaves the context in ready_to_issue_code, so a browser
@@ -3487,7 +3487,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		authHelper.On("GetAuthContext", req).Return(authContext, nil)
 		stubClientProvenanceLookup(database)
 
-		database.On("GetUserById", mock.Anything, int64(1)).Return(&models.User{
+		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(&models.User{
 			Id:      1,
 			Subject: userBSubject,
 			Email:   "userb@example.com",
@@ -3564,7 +3564,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		authHelper.On("GetAuthContext", req).Return(authContext, nil)
 		stubClientProvenanceLookup(database)
 
-		database.On("GetUserById", mock.Anything, int64(1)).Return(&models.User{
+		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(&models.User{
 			Id:      1,
 			Subject: userBSubject,
 			Email:   "userb@example.com",
@@ -3633,7 +3633,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		authHelper.On("GetAuthContext", req).Return(authContext, nil)
 		stubClientProvenanceLookup(database)
 
-		database.On("GetUserById", mock.Anything, int64(1)).Return(&models.User{
+		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(&models.User{
 			Id:      1,
 			Subject: userBSubject,
 			Email:   "userb@example.com",
@@ -3693,7 +3693,9 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		}
 		authHelper.On("GetAuthContext", req).Return(authContext, nil)
 
-		// Do NOT mock database.GetUserById - it should not be called when IdTokenHintSub is empty
+		// GetUserById IS reached with no hint: armIssueGate stubs it because #241's live
+		// permission check loads the user whichever way the hint branch went. What an empty
+		// hint decides is only that no subject is compared, which is what the 302 below shows.
 
 		stubLiveSession(database, 1)
 
@@ -3727,9 +3729,6 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		// Assertions - code should be issued successfully
 		assert.Equal(t, http.StatusFound, rr.Code)
 		assert.Equal(t, "https://example.com/callback?code=test-code&state=test-state", rr.Header().Get("Location"))
-
-		// Verify GetUserById was NOT called (no need to check when no hint provided)
-		database.AssertNotCalled(t, "GetUserById")
 
 		// Verify all other expectations
 		httpHelper.AssertExpectations(t)
@@ -3786,7 +3785,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 			Email:   "userb@example.com",
 			Enabled: true,
 		}
-		database.On("GetUserById", mock.Anything, int64(99)).Return(mockUserB, nil)
+		database.On("GetUserById", mock.Anything, mock.Anything, int64(99)).Return(mockUserB, nil)
 
 		// The registration gate above the hint check loads the client, which
 		// stubClientProvenanceLookup already supplies, and then its registrations. Armed by hand
@@ -3931,10 +3930,10 @@ func TestHandleIssueGet_RedirectURIRecheck(t *testing.T) {
 			database.On("GetUserSessionBySessionIdentifier", (*sql.Tx)(nil), liveSessionIdentifier).
 				Return(&models.UserSession{Id: 55, SessionIdentifier: liveSessionIdentifier, UserId: 123}, nil).Maybe()
 			userSessionManager.On("HasValidUserSession", mock.Anything, mock.Anything, mock.Anything).Return(true).Maybe()
-			database.On("GetUserById", mock.Anything, int64(123)).
+			database.On("GetUserById", mock.Anything, mock.Anything, int64(123)).
 				Return(&models.User{Id: 123, Subject: fake.UUID(), Enabled: true}, nil).Maybe()
-			permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, mock.Anything).
-				Return(func(scope string, _ *models.User) string { return scope }, nil).Maybe()
+			permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, mock.Anything, mock.Anything).
+				Return(func(_ context.Context, scope string, _ *models.User) string { return scope }, nil).Maybe()
 			authHelper.On("ClearAuthContext", rr, req).Return(nil)
 
 			if tc.wantIssued {
@@ -4033,7 +4032,7 @@ func TestHandleIssueGet_RedirectURIRecheckOutranksTheIdTokenHintRefusal(t *testi
 
 	// The user is never even read: the gate refuses above the hint check, so the comparison that
 	// would have produced the redirect is never made.
-	database.AssertNotCalled(t, "GetUserById", mock.Anything, mock.Anything)
+	database.AssertNotCalled(t, "GetUserById", mock.Anything, mock.Anything, mock.Anything)
 
 	httpHelper.AssertExpectations(t)
 	database.AssertExpectations(t)
@@ -4256,7 +4255,7 @@ func TestHandleIssueGet_ScopeRefilter(t *testing.T) {
 			userSessionManager.On("HasValidUserSession", mock.Anything, mock.Anything, mock.Anything).Return(true)
 
 			user := &models.User{Id: 123, Subject: fake.UUID(), Enabled: true}
-			database.On("GetUserById", (*sql.Tx)(nil), int64(123)).Return(user, nil)
+			database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(user, nil)
 
 			// The field the filter is asked about is the one the issuer will read, and asserting
 			// it here is half of decision 2: reading the wrong field is as wrong as writing it.
@@ -4264,7 +4263,7 @@ func TestHandleIssueGet_ScopeRefilter(t *testing.T) {
 			if tc.consentedScope != "" {
 				wantFiltered = tc.consentedScope
 			}
-			permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", wantFiltered, user).
+			permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, wantFiltered, user).
 				Return(tc.filtered, nil)
 
 			authHelper.On("ClearAuthContext", rr, req).Return(nil)
@@ -4355,9 +4354,9 @@ func TestHandleIssueGet_TheLiveChecksFailClosedOnAStorageError(t *testing.T) {
 					}).Return(nil)
 				database.On("GetUserSessionBySessionIdentifier", (*sql.Tx)(nil), liveSessionIdentifier).
 					Return(&models.UserSession{Id: 55, SessionIdentifier: liveSessionIdentifier, UserId: 123}, nil)
-				database.On("GetUserById", mock.Anything, int64(123)).
+				database.On("GetUserById", mock.Anything, mock.Anything, int64(123)).
 					Return(&models.User{Id: 123, Subject: fake.UUID(), Enabled: true}, nil)
-				permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", "openid profile", mock.Anything).
+				permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, "openid profile", mock.Anything).
 					Return("", errs.New("permission filter sentinel"))
 			},
 			wantErr: "permission filter sentinel",
@@ -4621,8 +4620,8 @@ func TestHandleIssueGet_ScopeRefusalSurvivesItsOwnFailures(t *testing.T) {
 		userSessionManager.On("HasValidUserSession", mock.Anything, mock.Anything, mock.Anything).Return(true)
 
 		user := &models.User{Id: 123, Subject: fake.UUID(), Enabled: true}
-		database.On("GetUserById", (*sql.Tx)(nil), int64(123)).Return(user, nil)
-		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", "backend:read", user).
+		database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(user, nil)
+		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, "backend:read", user).
 			Return("", nil)
 
 		auditLogger.On("Log", mock.Anything, audit.AuditIssuanceRefusedScopeDenied, mock.Anything).Return()

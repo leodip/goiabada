@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -32,10 +33,10 @@ func TestAPIUserPasswordPut_Success(t *testing.T) {
 		EmailVerified: true,
 		PasswordHash:  "old-password-hash",
 	}
-	err := database.CreateUser(nil, testUser)
+	err := database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
 	// Test: Update password
@@ -59,7 +60,7 @@ func TestAPIUserPasswordPut_Success(t *testing.T) {
 	assert.Equal(t, testUser.Id, updateResponse.User.Id)
 
 	// Verify password was actually updated in database
-	updatedUser, err := database.GetUserById(nil, testUser.Id)
+	updatedUser, err := database.GetUserById(context.Background(), nil, testUser.Id)
 	assert.NoError(t, err)
 	assert.NotEqual(t, "old-password-hash", updatedUser.PasswordHash)
 
@@ -80,10 +81,10 @@ func TestAPIUserPasswordPut_ValidationError(t *testing.T) {
 		FamilyName:    "User",
 		EmailVerified: true,
 	}
-	err := database.CreateUser(nil, testUser)
+	err := database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
 	testCases := []struct {
@@ -166,10 +167,10 @@ func TestAPIUserOTPPut_DisableSuccess(t *testing.T) {
 		OTPEnabled:         true,
 		OTPSecretEncrypted: encryptOTPSecretForTest(t, secret.Secret()),
 	}
-	err = database.CreateUser(nil, testUser)
+	err = database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
 	// Test: Disable OTP
@@ -194,7 +195,7 @@ func TestAPIUserOTPPut_DisableSuccess(t *testing.T) {
 	assert.False(t, updateResponse.User.OTPEnabled)
 
 	// Verify OTP was actually disabled in database
-	updatedUser, err := database.GetUserById(nil, testUser.Id)
+	updatedUser, err := database.GetUserById(context.Background(), nil, testUser.Id)
 	assert.NoError(t, err)
 	assert.False(t, updatedUser.OTPEnabled)
 	// The seed itself is gone, not merely unreachable (#98).
@@ -272,10 +273,10 @@ func TestAPIUserOTPPut_EnableNotSupported(t *testing.T) {
 		EmailVerified: true,
 		OTPEnabled:    false,
 	}
-	err := database.CreateUser(nil, testUser)
+	err := database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
 	// Test: Try to enable OTP (should fail)
@@ -320,10 +321,10 @@ func TestAPIUserOTPPut_OTPNotEnabled(t *testing.T) {
 		EmailVerified: true,
 		OTPEnabled:    false,
 	}
-	err := database.CreateUser(nil, testUser)
+	err := database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
 	// Test: Try to disable OTP when it's already disabled
@@ -352,10 +353,10 @@ func TestAPIUserSessionGet_Success(t *testing.T) {
 		FamilyName:    "User",
 		EmailVerified: true,
 	}
-	err := database.CreateUser(nil, testUser)
+	err := database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
 	// Setup: Create test session

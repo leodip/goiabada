@@ -1,10 +1,12 @@
 package accountvalidation
 
 import (
+	"context"
 	"strings"
 	"testing"
 
 	"errors"
+
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
@@ -111,8 +113,8 @@ func TestValidateEmailUpdate(t *testing.T) {
 				Subject:           subject1,
 			},
 			mockSetup: func() {
-				mockDB.On("GetUserBySubject", mock.Anything, subject1).Return(&models.User{Subject: subject1}, nil)
-				mockDB.On("GetUserByEmail", mock.Anything, "new@example.com").Return(nil, nil)
+				mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, subject1).Return(&models.User{Subject: subject1}, nil)
+				mockDB.On("GetUserByEmail", mock.Anything, mock.Anything, "new@example.com").Return(nil, nil)
 			},
 		},
 		{
@@ -154,8 +156,8 @@ func TestValidateEmailUpdate(t *testing.T) {
 				Subject:           subject1,
 			},
 			mockSetup: func() {
-				mockDB.On("GetUserBySubject", mock.Anything, subject1).Return(&models.User{Subject: subject1}, nil)
-				mockDB.On("GetUserByEmail", mock.Anything, "existing@example.com").Return(&models.User{Subject: subject2}, nil)
+				mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, subject1).Return(&models.User{Subject: subject1}, nil)
+				mockDB.On("GetUserByEmail", mock.Anything, mock.Anything, "existing@example.com").Return(&models.User{Subject: subject2}, nil)
 			},
 			expectedCode: i18n.ErrCodeEmailAlreadyRegistered,
 		},
@@ -164,7 +166,7 @@ func TestValidateEmailUpdate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.mockSetup()
-			err := validator.ValidateEmailUpdate(&tt.input)
+			err := validator.ValidateEmailUpdate(context.Background(), &tt.input)
 			if tt.expectedCode == "" {
 				assert.NoError(t, err)
 			} else {
@@ -198,11 +200,11 @@ func TestValidateEmailChange_Accepted(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 		validator := NewEmailValidator(mockDB)
 
-		mockDB.On("GetUserBySubject", mock.Anything, subject).Return(
+		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, subject).Return(
 			&models.User{Id: 1, Subject: subject}, nil).Once()
-		mockDB.On("GetUserByEmail", mock.Anything, "new@example.com").Return(nil, nil).Once()
+		mockDB.On("GetUserByEmail", mock.Anything, mock.Anything, "new@example.com").Return(nil, nil).Once()
 
-		err := validator.ValidateEmailChange("new@example.com", subject)
+		err := validator.ValidateEmailChange(context.Background(), "new@example.com", subject)
 
 		assert.NoError(t, err)
 	})
@@ -212,10 +214,10 @@ func TestValidateEmailChange_Accepted(t *testing.T) {
 		validator := NewEmailValidator(mockDB)
 
 		user := &models.User{Id: 1, Subject: subject}
-		mockDB.On("GetUserBySubject", mock.Anything, subject).Return(user, nil).Once()
-		mockDB.On("GetUserByEmail", mock.Anything, "same@example.com").Return(user, nil).Once()
+		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, subject).Return(user, nil).Once()
+		mockDB.On("GetUserByEmail", mock.Anything, mock.Anything, "same@example.com").Return(user, nil).Once()
 
-		err := validator.ValidateEmailChange("same@example.com", subject)
+		err := validator.ValidateEmailChange(context.Background(), "same@example.com", subject)
 
 		assert.NoError(t, err, "keeping your own address must not be reported as taken")
 	})
@@ -227,11 +229,11 @@ func TestValidateEmailChange_Accepted(t *testing.T) {
 		email := strings.Repeat("a", 60-len("@example.com")) + "@example.com"
 		assert.Len(t, email, 60)
 
-		mockDB.On("GetUserBySubject", mock.Anything, subject).Return(
+		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, subject).Return(
 			&models.User{Id: 1, Subject: subject}, nil).Once()
-		mockDB.On("GetUserByEmail", mock.Anything, email).Return(nil, nil).Once()
+		mockDB.On("GetUserByEmail", mock.Anything, mock.Anything, email).Return(nil, nil).Once()
 
-		err := validator.ValidateEmailChange(email, subject)
+		err := validator.ValidateEmailChange(context.Background(), email, subject)
 
 		assert.NoError(t, err)
 	})
@@ -244,12 +246,12 @@ func TestValidateEmailChange_AddressTakenByAnotherUser(t *testing.T) {
 	subject := fake.UUID()
 	otherSubject := fake.UUID()
 
-	mockDB.On("GetUserBySubject", mock.Anything, subject).Return(
+	mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, subject).Return(
 		&models.User{Id: 1, Subject: subject}, nil).Once()
-	mockDB.On("GetUserByEmail", mock.Anything, "taken@example.com").Return(
+	mockDB.On("GetUserByEmail", mock.Anything, mock.Anything, "taken@example.com").Return(
 		&models.User{Id: 2, Subject: otherSubject}, nil).Once()
 
-	err := validator.ValidateEmailChange("taken@example.com", subject)
+	err := validator.ValidateEmailChange(context.Background(), "taken@example.com", subject)
 
 	assertLocalizedError(t, err, i18n.ErrCodeEmailAlreadyRegistered,
 		emailErrorMessages[i18n.ErrCodeEmailAlreadyRegistered])
@@ -279,7 +281,7 @@ func TestValidateEmailChange_RejectedBeforeAnyLookup(t *testing.T) {
 			// proves the short circuit.
 			validator := NewEmailValidator(mocks_data.NewDatabase(t))
 
-			err := validator.ValidateEmailChange(tc.email, fake.UUID())
+			err := validator.ValidateEmailChange(context.Background(), tc.email, fake.UUID())
 
 			assertLocalizedError(t, err, tc.expectedCode, emailErrorMessages[tc.expectedCode])
 		})
@@ -292,7 +294,7 @@ func TestValidateEmailChange_TooLong(t *testing.T) {
 	email := strings.Repeat("a", 50) + "@example.com"
 	assert.Greater(t, len(email), 60)
 
-	err := validator.ValidateEmailChange(email, fake.UUID())
+	err := validator.ValidateEmailChange(context.Background(), email, fake.UUID())
 
 	assertLocalizedError(t, err, i18n.ErrCodeEmailTooLong,
 		emailErrorMessages[i18n.ErrCodeEmailTooLong])
@@ -312,9 +314,9 @@ func TestValidateEmailChange_DatabaseErrorsPropagate(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 		validator := NewEmailValidator(mockDB)
 
-		mockDB.On("GetUserBySubject", mock.Anything, subject).Return(nil, dbErr).Once()
+		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, subject).Return(nil, dbErr).Once()
 
-		err := validator.ValidateEmailChange("new@example.com", subject)
+		err := validator.ValidateEmailChange(context.Background(), "new@example.com", subject)
 
 		assert.Error(t, err)
 		_, isLocalized := err.(*i18n.LocalizedError)
@@ -325,11 +327,11 @@ func TestValidateEmailChange_DatabaseErrorsPropagate(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 		validator := NewEmailValidator(mockDB)
 
-		mockDB.On("GetUserBySubject", mock.Anything, subject).Return(
+		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, subject).Return(
 			&models.User{Id: 1, Subject: subject}, nil).Once()
-		mockDB.On("GetUserByEmail", mock.Anything, "new@example.com").Return(nil, dbErr).Once()
+		mockDB.On("GetUserByEmail", mock.Anything, mock.Anything, "new@example.com").Return(nil, dbErr).Once()
 
-		err := validator.ValidateEmailChange("new@example.com", subject)
+		err := validator.ValidateEmailChange(context.Background(), "new@example.com", subject)
 
 		assert.Error(t, err)
 		_, isLocalized := err.(*i18n.LocalizedError)
@@ -347,9 +349,9 @@ func TestValidateEmailChange_UnresolvableSubjectReturnsError(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	validator := NewEmailValidator(mockDB)
 
-	mockDB.On("GetUserBySubject", mock.Anything, "unknown-subject").Return(nil, nil).Once()
+	mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "unknown-subject").Return(nil, nil).Once()
 
-	err := validator.ValidateEmailChange("new@example.com", "unknown-subject")
+	err := validator.ValidateEmailChange(context.Background(), "new@example.com", "unknown-subject")
 
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "subject not found: unknown-subject")
@@ -363,18 +365,18 @@ func TestValidateEmailChange_UnresolvableSubjectReturnsError(t *testing.T) {
 func TestSubjectResolutionIsConsistentAcrossValidators(t *testing.T) {
 	t.Run("ValidateEmailChange", func(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
-		mockDB.On("GetUserBySubject", mock.Anything, "unknown-subject").Return(nil, nil).Once()
+		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "unknown-subject").Return(nil, nil).Once()
 
-		err := NewEmailValidator(mockDB).ValidateEmailChange("new@example.com", "unknown-subject")
+		err := NewEmailValidator(mockDB).ValidateEmailChange(context.Background(), "new@example.com", "unknown-subject")
 
 		assert.ErrorContains(t, err, "subject not found")
 	})
 
 	t.Run("ValidateEmailUpdate", func(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
-		mockDB.On("GetUserBySubject", mock.Anything, "unknown-subject").Return(nil, nil).Once()
+		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "unknown-subject").Return(nil, nil).Once()
 
-		err := NewEmailValidator(mockDB).ValidateEmailUpdate(&ValidateEmailInput{
+		err := NewEmailValidator(mockDB).ValidateEmailUpdate(context.Background(), &ValidateEmailInput{
 			Email:             "new@example.com",
 			EmailConfirmation: "new@example.com",
 			Subject:           "unknown-subject",
@@ -385,9 +387,9 @@ func TestSubjectResolutionIsConsistentAcrossValidators(t *testing.T) {
 
 	t.Run("ValidateProfile", func(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
-		mockDB.On("GetUserBySubject", mock.Anything, "unknown-subject").Return(nil, nil).Once()
+		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "unknown-subject").Return(nil, nil).Once()
 
-		err := NewProfileValidator(mockDB).ValidateProfile(&ValidateProfileInput{
+		err := NewProfileValidator(mockDB).ValidateProfile(context.Background(), &ValidateProfileInput{
 			Username: "jdoe",
 			Subject:  "unknown-subject",
 		})
@@ -403,11 +405,11 @@ func TestValidateEmailChange_DoesNotCheckConfirmation(t *testing.T) {
 	validator := NewEmailValidator(mockDB)
 
 	subject := fake.UUID()
-	mockDB.On("GetUserBySubject", mock.Anything, subject).Return(
+	mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, subject).Return(
 		&models.User{Id: 1, Subject: subject}, nil).Once()
-	mockDB.On("GetUserByEmail", mock.Anything, "new@example.com").Return(nil, nil).Once()
+	mockDB.On("GetUserByEmail", mock.Anything, mock.Anything, "new@example.com").Return(nil, nil).Once()
 
-	err := validator.ValidateEmailChange("new@example.com", subject)
+	err := validator.ValidateEmailChange(context.Background(), "new@example.com", subject)
 
 	assert.NoError(t, err)
 }
@@ -419,9 +421,9 @@ func TestValidateEmailUpdate_UnresolvableSubjectReturnsError(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	validator := NewEmailValidator(mockDB)
 
-	mockDB.On("GetUserBySubject", mock.Anything, "unknown-subject").Return(nil, nil).Once()
+	mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "unknown-subject").Return(nil, nil).Once()
 
-	err := validator.ValidateEmailUpdate(&ValidateEmailInput{
+	err := validator.ValidateEmailUpdate(context.Background(), &ValidateEmailInput{
 		Email:             "new@example.com",
 		EmailConfirmation: "new@example.com",
 		Subject:           "unknown-subject",
@@ -431,4 +433,42 @@ func TestValidateEmailUpdate_UnresolvableSubjectReturnsError(t *testing.T) {
 	assert.Contains(t, err.Error(), "subject not found: unknown-subject")
 	_, isLocalized := err.(*i18n.LocalizedError)
 	assert.False(t, isLocalized, "an unresolvable subject is not a user-facing validation error")
+}
+
+// TestValidateEmailChange_CarriesTheCallersContextToBothReads is the validator arm of #386's
+// seam 4. Neither validator holds a request, so each takes a context and its only obligation is
+// to hand THAT one to the two reads it makes: the subject lookup and the uniqueness check.
+//
+// A read that received context.Background() matches nothing and the strict mock reports an
+// unexpected call, which is how this fails for its stated reason rather than on a count.
+func TestValidateEmailChange_CarriesTheCallersContextToBothReads(t *testing.T) {
+	type marker struct{}
+	ctx := context.WithValue(context.Background(), marker{}, "the caller's own")
+	callersContext := mock.MatchedBy(func(got context.Context) bool {
+		return got.Value(marker{}) == "the caller's own"
+	})
+
+	mockDB := mocks_data.NewDatabase(t)
+	mockDB.On("GetUserBySubject", callersContext, mock.Anything, "sub-1").
+		Return(&models.User{Id: 1, Subject: "sub-1", Email: "old@example.com"}, nil).Once()
+	mockDB.On("GetUserByEmail", callersContext, mock.Anything, "new@example.com").
+		Return(nil, nil).Once()
+
+	err := NewEmailValidator(mockDB).ValidateEmailChange(ctx, "new@example.com", "sub-1")
+
+	assert.NoError(t, err)
+	mockDB.AssertExpectations(t)
+}
+
+// The reject arm: an address the syntax rules refuse is answered before either read, so there is
+// no context to carry. Without it the accept arm would also pass on a validator that queried
+// unconditionally.
+func TestValidateEmailChange_AMalformedAddressReachesNoRead(t *testing.T) {
+	mockDB := mocks_data.NewDatabase(t)
+
+	err := NewEmailValidator(mockDB).ValidateEmailChange(context.Background(), "not-an-address", "sub-1")
+
+	assert.Error(t, err)
+	mockDB.AssertNotCalled(t, "GetUserBySubject", mock.Anything, mock.Anything, mock.Anything)
+	mockDB.AssertNotCalled(t, "GetUserByEmail", mock.Anything, mock.Anything, mock.Anything)
 }

@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	neturl "net/url"
@@ -243,10 +244,10 @@ func TestAPIClientDelete_CascadesLinkedData(t *testing.T) {
 
 	// Create user and consent to the client
 	user := &models.User{Subject: fake.UUID(), Enabled: true, Email: fake.Email()}
-	err = database.CreateUser(nil, user)
+	err = database.CreateUser(context.Background(), nil, user)
 	assert.NoError(t, err)
 	consent := &models.UserConsent{ClientId: client.Id, UserId: user.Id, Scope: "openid"}
-	err = database.CreateUserConsent(nil, consent)
+	err = database.CreateUserConsent(context.Background(), nil, consent)
 	assert.NoError(t, err)
 
 	// Delete client via API
@@ -261,7 +262,7 @@ func TestAPIClientDelete_CascadesLinkedData(t *testing.T) {
 	assert.True(t, len(cps) == 0)
 
 	// Assert user consent removed
-	uc, err := database.GetConsentByUserIdAndClientId(nil, user.Id, client.Id)
+	uc, err := database.GetConsentByUserIdAndClientId(context.Background(), nil, user.Id, client.Id)
 	assert.NoError(t, err)
 	assert.Nil(t, uc)
 }

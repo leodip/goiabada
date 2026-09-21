@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"net/http"
 	"net/url"
 	"testing"
@@ -59,7 +60,7 @@ func TestSessionDeletedDuringAuthFlow_LoginSucceeds(t *testing.T) {
 		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
-	err = database.CreateUser(nil, user)
+	err = database.CreateUser(context.Background(), nil, user)
 	assert.NoError(t, err)
 
 	// Step 2: Complete a full login to create a session in the database
@@ -237,7 +238,7 @@ func TestSessionEndedOnConsentScreen_NoCodeIsIssued(t *testing.T) {
 		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
-	err = database.CreateUser(nil, user)
+	err = database.CreateUser(context.Background(), nil, user)
 	assert.NoError(t, err)
 
 	// One HTTP client throughout, so the cookie is shared and this is one browser's ceremony
@@ -360,7 +361,7 @@ func TestSessionEndedDuringStepUp_OtpAloneDoesNotRecreateTheSession(t *testing.T
 	}
 	user.OTPEnabled = true
 	user.OTPSecretEncrypted = encryptOTPSecretForTest(t, key.Secret())
-	err = database.UpdateUser(nil, user)
+	err = database.UpdateUser(context.Background(), nil, user)
 	if err != nil {
 		t.Fatal(err)
 	}

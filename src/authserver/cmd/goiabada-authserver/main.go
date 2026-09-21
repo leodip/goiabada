@@ -123,6 +123,11 @@ func main() {
 	if isEmpty {
 		slog.Info("database is empty, performing initial bootstrap")
 
+		// The seed runs before the server listens and before the signal context exists, so
+		// this is where a startup context is born rather than inherited. Nothing can cancel
+		// it: a half-seeded database is worse than a slow one (#386).
+		seedCtx := context.Background()
+
 		// Check if OAuth client secret is provided (new single-step setup via goiabada-setup)
 		providedOAuthSecret := config.GetAdminConsole().OAuthClientSecret
 		bootstrapFile := config.GetAuthServer().BootstrapEnvOutFile
@@ -142,7 +147,7 @@ func main() {
 				config.GetAdminConsole().BaseURL,
 			).WithOAuthClientSecret(providedOAuthSecret)
 
-			err = databaseSeeder.Seed()
+			err = databaseSeeder.Seed(seedCtx)
 			if err != nil {
 				slog.Error("unable to seed the database", "error", err)
 				os.Exit(1)
@@ -164,7 +169,7 @@ func main() {
 				config.GetAdminConsole().BaseURL,
 			).WithBootstrapEnvOutFile(bootstrapFile)
 
-			err = databaseSeeder.Seed()
+			err = databaseSeeder.Seed(seedCtx)
 			if err != nil {
 				slog.Error("unable to seed the database", "error", err)
 				os.Exit(1)

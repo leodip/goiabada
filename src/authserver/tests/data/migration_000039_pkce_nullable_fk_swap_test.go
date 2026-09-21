@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"testing"
@@ -352,7 +353,7 @@ func TestMigration000039_RopcTokenBlocksUserDelete(t *testing.T) {
 	// And the invariant that makes all of this unobservable: DeleteUser clears the
 	// user's refresh tokens inside the same transaction, so the supported path still
 	// works. cascade_delete_test.go asserts the same thing across every dependent table.
-	require.NoErrorf(t, h.DB.DeleteUser(nil, user.Id),
+	require.NoErrorf(t, h.DB.DeleteUser(context.Background(), nil, user.Id),
 		"DeleteUser clears refresh tokens first, so it must still succeed on %s", dbType())
 	assert.Zerof(t, countRefreshTokens000039(t, h, token.Id),
 		"DeleteUser must have removed the token on %s", dbType())
@@ -387,7 +388,7 @@ func seedUser000039(t *testing.T, h *isolatedDB) *models.User {
 		Username:     "u-" + fake.UUID()[:8],
 		PasswordHash: "x",
 	}
-	require.NoError(t, h.DB.CreateUser(nil, user), "seed user")
+	require.NoError(t, h.DB.CreateUser(context.Background(), nil, user), "seed user")
 	return user
 }
 

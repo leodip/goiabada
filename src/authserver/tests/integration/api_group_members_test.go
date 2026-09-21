@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -42,10 +43,10 @@ func TestAPIGroupMembersGet_Success(t *testing.T) {
 		FamilyName:    "One",
 		EmailVerified: true,
 	}
-	err = database.CreateUser(nil, testUser1)
+	err = database.CreateUser(context.Background(), nil, testUser1)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser1.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser1.Id)
 	}()
 
 	testUser2 := &models.User{
@@ -56,25 +57,25 @@ func TestAPIGroupMembersGet_Success(t *testing.T) {
 		FamilyName:    "Two",
 		EmailVerified: true,
 	}
-	err = database.CreateUser(nil, testUser2)
+	err = database.CreateUser(context.Background(), nil, testUser2)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser2.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser2.Id)
 	}()
 
 	// Add users to group
 	userGroup1 := &models.UserGroup{UserId: testUser1.Id, GroupId: testGroup.Id}
-	err = database.CreateUserGroup(nil, userGroup1)
+	err = database.CreateUserGroup(context.Background(), nil, userGroup1)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUserGroup(nil, userGroup1.Id)
+		_ = database.DeleteUserGroup(context.Background(), nil, userGroup1.Id)
 	}()
 
 	userGroup2 := &models.UserGroup{UserId: testUser2.Id, GroupId: testGroup.Id}
-	err = database.CreateUserGroup(nil, userGroup2)
+	err = database.CreateUserGroup(context.Background(), nil, userGroup2)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUserGroup(nil, userGroup2.Id)
+		_ = database.DeleteUserGroup(context.Background(), nil, userGroup2.Id)
 	}()
 
 	// Test: Get group members
@@ -168,22 +169,22 @@ func TestAPIGroupMembersGet_Pagination(t *testing.T) {
 			GivenName:  "Page",
 			FamilyName: "User" + strconv.Itoa(i),
 		}
-		err = database.CreateUser(nil, user)
+		err = database.CreateUser(context.Background(), nil, user)
 		assert.NoError(t, err)
 		testUsers = append(testUsers, user)
 
 		userGroup := &models.UserGroup{UserId: user.Id, GroupId: testGroup.Id}
-		err = database.CreateUserGroup(nil, userGroup)
+		err = database.CreateUserGroup(context.Background(), nil, userGroup)
 		assert.NoError(t, err)
 		userGroups = append(userGroups, userGroup)
 	}
 
 	defer func() {
 		for _, userGroup := range userGroups {
-			_ = database.DeleteUserGroup(nil, userGroup.Id)
+			_ = database.DeleteUserGroup(context.Background(), nil, userGroup.Id)
 		}
 		for _, user := range testUsers {
-			_ = database.DeleteUser(nil, user.Id)
+			_ = database.DeleteUser(context.Background(), nil, user.Id)
 		}
 	}()
 
@@ -267,10 +268,10 @@ func TestAPIGroupMemberAdd_Success(t *testing.T) {
 		GivenName:  "New",
 		FamilyName: "Member",
 	}
-	err = database.CreateUser(nil, testUser)
+	err = database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
 	// Test: Add user to group
@@ -292,14 +293,14 @@ func TestAPIGroupMemberAdd_Success(t *testing.T) {
 	assert.True(t, successResponse.Success)
 
 	// Verify user was added to group in database
-	userGroup, err := database.GetUserGroupByUserIdAndGroupId(nil, testUser.Id, testGroup.Id)
+	userGroup, err := database.GetUserGroupByUserIdAndGroupId(context.Background(), nil, testUser.Id, testGroup.Id)
 	assert.NoError(t, err)
 	assert.NotNil(t, userGroup)
 	assert.Equal(t, testUser.Id, userGroup.UserId)
 	assert.Equal(t, testGroup.Id, userGroup.GroupId)
 
 	// Cleanup
-	_ = database.DeleteUserGroup(nil, userGroup.Id)
+	_ = database.DeleteUserGroup(context.Background(), nil, userGroup.Id)
 }
 
 func TestAPIGroupMemberAdd_UserAlreadyInGroup(t *testing.T) {
@@ -325,17 +326,17 @@ func TestAPIGroupMemberAdd_UserAlreadyInGroup(t *testing.T) {
 		GivenName:  "Duplicate",
 		FamilyName: "User",
 	}
-	err = database.CreateUser(nil, testUser)
+	err = database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
 	userGroup := &models.UserGroup{UserId: testUser.Id, GroupId: testGroup.Id}
-	err = database.CreateUserGroup(nil, userGroup)
+	err = database.CreateUserGroup(context.Background(), nil, userGroup)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUserGroup(nil, userGroup.Id)
+		_ = database.DeleteUserGroup(context.Background(), nil, userGroup.Id)
 	}()
 
 	// Test: Try to add user to group again
@@ -448,14 +449,14 @@ func TestAPIGroupMemberRemove_Success(t *testing.T) {
 		GivenName:  "Remove",
 		FamilyName: "Me",
 	}
-	err = database.CreateUser(nil, testUser)
+	err = database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
 	userGroup := &models.UserGroup{UserId: testUser.Id, GroupId: testGroup.Id}
-	err = database.CreateUserGroup(nil, userGroup)
+	err = database.CreateUserGroup(context.Background(), nil, userGroup)
 	assert.NoError(t, err)
 
 	// Test: Remove user from group
@@ -474,7 +475,7 @@ func TestAPIGroupMemberRemove_Success(t *testing.T) {
 	assert.True(t, successResponse.Success)
 
 	// Verify user was removed from group in database
-	removedUserGroup, err := database.GetUserGroupByUserIdAndGroupId(nil, testUser.Id, testGroup.Id)
+	removedUserGroup, err := database.GetUserGroupByUserIdAndGroupId(context.Background(), nil, testUser.Id, testGroup.Id)
 	assert.NoError(t, err)
 	assert.Nil(t, removedUserGroup)
 }
@@ -502,10 +503,10 @@ func TestAPIGroupMemberRemove_UserNotInGroup(t *testing.T) {
 		GivenName:  "Not",
 		FamilyName: "InGroup",
 	}
-	err = database.CreateUser(nil, testUser)
+	err = database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
 	// Test: Try to remove user from group they're not in

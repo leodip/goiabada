@@ -469,7 +469,7 @@ func classifyIdTokenHint(
 	// always agree once the ceremony is bound to a session it owns, and session ownership never
 	// changes afterwards, so only an artifact issued before that rule existed can disagree.
 	if userSession != nil {
-		user, err := database.GetUserBySubject(nil, subject)
+		user, err := database.GetUserBySubject(r.Context(), nil, subject)
 		if err != nil {
 			// Propagated, like the session lookup above and unlike the client lookup further up. Both
 			// of these decide whether the hint's session may be trusted at all, and answering that on

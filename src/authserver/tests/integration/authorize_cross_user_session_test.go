@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/url"
@@ -89,7 +90,7 @@ func createCrossUserUser(t *testing.T, withOtp bool) (*models.User, string, stri
 		user.OTPEnabled = true
 	}
 
-	require.NoError(t, database.CreateUser(nil, user))
+	require.NoError(t, database.CreateUser(context.Background(), nil, user))
 	return user, password, otpSecret
 }
 

@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"encoding/base64"
@@ -465,7 +466,7 @@ func TestToken_Refresh_ConsentRemoved(t *testing.T) {
 		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
-	err = database.CreateUser(nil, user)
+	err = database.CreateUser(context.Background(), nil, user)
 	assert.NoError(t, err)
 
 	// Create a resource and permission, and assign it to the user
@@ -543,11 +544,11 @@ func TestToken_Refresh_ConsentRemoved(t *testing.T) {
 	refreshToken := tokenResp["refresh_token"].(string)
 
 	// Remove the consent
-	consent, err := database.GetConsentByUserIdAndClientId(nil, user.Id, client.Id)
+	consent, err := database.GetConsentByUserIdAndClientId(context.Background(), nil, user.Id, client.Id)
 	assert.NoError(t, err)
 	assert.NotNil(t, consent)
 
-	err = database.DeleteUserConsent(nil, consent.Id)
+	err = database.DeleteUserConsent(context.Background(), nil, consent.Id)
 	assert.NoError(t, err)
 
 	// Attempt to use the refresh token
@@ -597,7 +598,7 @@ func TestToken_Refresh_ConsentDoesNotIncludeScope(t *testing.T) {
 		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
-	err = database.CreateUser(nil, user)
+	err = database.CreateUser(context.Background(), nil, user)
 	assert.NoError(t, err)
 
 	resource := createResource(t)

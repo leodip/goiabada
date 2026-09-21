@@ -39,7 +39,7 @@ func HandleAPIUserAttributesGet(
 		}
 
 		// Check if user exists
-		user, err := database.GetUserById(nil, userId)
+		user, err := database.GetUserById(r.Context(), nil, userId)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -50,7 +50,7 @@ func HandleAPIUserAttributesGet(
 		}
 
 		// Get user attributes
-		attributes, err := database.GetUserAttributesByUserId(nil, userId)
+		attributes, err := database.GetUserAttributesByUserId(r.Context(), nil, userId)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -87,7 +87,7 @@ func HandleAPIUserAttributeGet(
 		}
 
 		// Get user attribute from database
-		attribute, err := database.GetUserAttributeById(nil, attributeId)
+		attribute, err := database.GetUserAttributeById(r.Context(), nil, attributeId)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -130,7 +130,7 @@ func HandleAPIUserAttributeCreatePost(
 		}
 
 		// Validate user exists
-		user, err := database.GetUserById(nil, req.UserId)
+		user, err := database.GetUserById(r.Context(), nil, req.UserId)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -168,7 +168,7 @@ func HandleAPIUserAttributeCreatePost(
 			UserId:               req.UserId,
 		}
 
-		err = database.CreateUserAttribute(nil, userAttribute)
+		err = database.CreateUserAttribute(r.Context(), nil, userAttribute)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -228,7 +228,7 @@ func HandleAPIUserAttributeUpdatePut(
 		}
 
 		// Get existing attribute
-		attribute, err := database.GetUserAttributeById(nil, attributeId)
+		attribute, err := database.GetUserAttributeById(r.Context(), nil, attributeId)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -270,7 +270,7 @@ func HandleAPIUserAttributeUpdatePut(
 		attribute.IncludeInIdToken = req.IncludeInIdToken
 
 		// Update attribute in database
-		err = database.UpdateUserAttribute(nil, attribute)
+		err = database.UpdateUserAttribute(r.Context(), nil, attribute)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -322,7 +322,7 @@ func HandleAPIUserAttributeDelete(
 		}
 
 		// Check if attribute exists before deleting
-		attribute, err := database.GetUserAttributeById(nil, attributeId)
+		attribute, err := database.GetUserAttributeById(r.Context(), nil, attributeId)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -333,7 +333,7 @@ func HandleAPIUserAttributeDelete(
 		}
 
 		// Delete attribute from database
-		err = database.DeleteUserAttribute(nil, attributeId)
+		err = database.DeleteUserAttribute(r.Context(), nil, attributeId)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return

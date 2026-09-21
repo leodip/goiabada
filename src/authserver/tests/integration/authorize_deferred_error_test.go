@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"net/http"
 	"net/url"
 	"strings"
@@ -380,7 +381,7 @@ func newDeferralClient(t *testing.T) (*models.Client, *models.User, string) {
 		Email:        fake.Email(),
 		PasswordHash: passwordHashed,
 	}
-	err = database.CreateUser(nil, user)
+	err = database.CreateUser(context.Background(), nil, user)
 	require.NoError(t, err)
 
 	return client, user, password

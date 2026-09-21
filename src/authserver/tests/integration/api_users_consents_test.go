@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"net/http"
@@ -29,10 +30,10 @@ func TestAPIUserConsentsGet_Success(t *testing.T) {
 		FamilyName:    "User",
 		EmailVerified: true,
 	}
-	err := database.CreateUser(nil, testUser)
+	err := database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
 	// Setup: Create test clients
@@ -47,8 +48,8 @@ func TestAPIUserConsentsGet_Success(t *testing.T) {
 	consent1 := createTestUserConsent(t, testUser.Id, client1.Id)
 	consent2 := createTestUserConsent(t, testUser.Id, client2.Id)
 	defer func() {
-		_ = database.DeleteUserConsent(nil, consent1.Id)
-		_ = database.DeleteUserConsent(nil, consent2.Id)
+		_ = database.DeleteUserConsent(context.Background(), nil, consent1.Id)
+		_ = database.DeleteUserConsent(context.Background(), nil, consent2.Id)
 	}()
 
 	// Test: Get user consents
@@ -104,10 +105,10 @@ func TestAPIUserConsentsGet_EmptyConsents(t *testing.T) {
 		GivenName:  "Test",
 		FamilyName: "User",
 	}
-	err := database.CreateUser(nil, testUser)
+	err := database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
 	// Test: Get user consents for user with no consents
@@ -174,10 +175,10 @@ func TestAPIUserConsentsGet_Unauthorized(t *testing.T) {
 		GivenName:  "Test",
 		FamilyName: "User",
 	}
-	err := database.CreateUser(nil, testUser)
+	err := database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
 	// Test: Request without access token
@@ -208,10 +209,10 @@ func TestAPIUserConsentDelete_Success(t *testing.T) {
 		FamilyName:    "User",
 		EmailVerified: true,
 	}
-	err := database.CreateUser(nil, testUser)
+	err := database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
 	// Setup: Create test client
@@ -241,7 +242,7 @@ func TestAPIUserConsentDelete_Success(t *testing.T) {
 	assert.True(t, deleteResponse.Success)
 
 	// Verify consent was actually deleted from database
-	deletedConsent, err := database.GetUserConsentById(nil, consent.Id)
+	deletedConsent, err := database.GetUserConsentById(context.Background(), nil, consent.Id)
 	assert.NoError(t, err)
 	assert.Nil(t, deletedConsent)
 }
@@ -293,10 +294,10 @@ func TestAPIUserConsentDelete_Unauthorized(t *testing.T) {
 		GivenName:  "Test",
 		FamilyName: "User",
 	}
-	err := database.CreateUser(nil, testUser)
+	err := database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
 	// Setup: Create test client
@@ -308,7 +309,7 @@ func TestAPIUserConsentDelete_Unauthorized(t *testing.T) {
 	// Setup: Create test consent
 	consent := createTestUserConsent(t, testUser.Id, client.Id)
 	defer func() {
-		_ = database.DeleteUserConsent(nil, consent.Id)
+		_ = database.DeleteUserConsent(context.Background(), nil, consent.Id)
 	}()
 
 	// Test: Request without access token
@@ -325,7 +326,7 @@ func TestAPIUserConsentDelete_Unauthorized(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 
 	// Verify consent was not deleted
-	stillExists, err := database.GetUserConsentById(nil, consent.Id)
+	stillExists, err := database.GetUserConsentById(context.Background(), nil, consent.Id)
 	assert.NoError(t, err)
 	assert.NotNil(t, stillExists)
 }
@@ -343,10 +344,10 @@ func TestAPIUserConsentDelete_WithClientDetails(t *testing.T) {
 		FamilyName:    "User",
 		EmailVerified: true,
 	}
-	err := database.CreateUser(nil, testUser)
+	err := database.CreateUser(context.Background(), nil, testUser)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteUser(nil, testUser.Id)
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
 	// Setup: Create test client with specific details
@@ -373,7 +374,7 @@ func TestAPIUserConsentDelete_WithClientDetails(t *testing.T) {
 		Scope:     "openid profile email address phone",
 		GrantedAt: sql.NullTime{Time: time.Now().UTC().Add(-24 * time.Hour), Valid: true}, // Granted 24 hours ago
 	}
-	err = database.CreateUserConsent(nil, consent)
+	err = database.CreateUserConsent(context.Background(), nil, consent)
 	assert.NoError(t, err)
 
 	// First verify the consent exists and has client details when retrieved
@@ -402,7 +403,7 @@ func TestAPIUserConsentDelete_WithClientDetails(t *testing.T) {
 	assert.Equal(t, http.StatusOK, deleteResp.StatusCode)
 
 	// Verify consent is actually deleted
-	deletedConsent, err := database.GetUserConsentById(nil, consent.Id)
+	deletedConsent, err := database.GetUserConsentById(context.Background(), nil, consent.Id)
 	assert.NoError(t, err)
 	assert.Nil(t, deletedConsent)
 
@@ -447,7 +448,7 @@ func createTestUserConsent(t *testing.T, userId int64, clientId int64) *models.U
 		Scope:     "openid profile email",
 		GrantedAt: sql.NullTime{Time: time.Now().UTC(), Valid: true},
 	}
-	err := database.CreateUserConsent(nil, consent)
+	err := database.CreateUserConsent(context.Background(), nil, consent)
 	assert.NoError(t, err)
 	return consent
 }

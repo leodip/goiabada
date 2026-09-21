@@ -1,6 +1,8 @@
 package apihandlers
 
 import (
+	"context"
+
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/models"
@@ -21,6 +23,7 @@ import (
 // each UserSessionClient's Client. currentSid is the caller's own session identifier, empty when
 // the access token carries no sid claim.
 func buildSessionDetails(
+	ctx context.Context,
 	database data.Database,
 	sessions []models.UserSession,
 	settings *models.Settings,
@@ -40,7 +43,7 @@ func buildSessionDetails(
 	// One GetClientsByIds over the union of client ids across the whole page, in place of the
 	// per-session UserSessionClientsLoadClients the three loops used to call: at 50 sessions that
 	// was 50 queries to name the handful of clients a deployment has (#373 decision 9).
-	if err := loadSessionClients(database, valid); err != nil {
+	if err := loadSessionClients(ctx, database, valid); err != nil {
 		return nil, err
 	}
 
@@ -65,7 +68,7 @@ func buildSessionDetails(
 // The union it hands over is bounded by the deployment's client count and by nothing else, so
 // GetClientsByIds is the one that decides how many ids a single statement may bind; an id list
 // longer than that is read in several statements there rather than refused by the engine (#373).
-func loadSessionClients(database data.Database, sessions []models.UserSession) error {
+func loadSessionClients(ctx context.Context, database data.Database, sessions []models.UserSession) error {
 	clientIds := make([]int64, 0)
 	seen := make(map[int64]bool)
 	for _, session := range sessions {
@@ -80,7 +83,7 @@ func loadSessionClients(database data.Database, sessions []models.UserSession) e
 		return nil
 	}
 
-	clients, err := database.GetClientsByIds(nil, clientIds)
+	clients, err := database.GetClientsByIds(ctx, nil, clientIds)
 	if err != nil {
 		return errs.Wrap(err, "unable to get clients by ids")
 	}

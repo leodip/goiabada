@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -454,7 +455,7 @@ func TestDeleteIdleSessions(t *testing.T) {
 		FamilyName:    fake.LastName(),
 		OTPEnabled:    false,
 	}
-	err := database.CreateUser(nil, user)
+	err := database.CreateUser(context.Background(), nil, user)
 	if err != nil {
 		t.Fatalf("Failed to create test user: %v", err)
 	}
@@ -652,7 +653,7 @@ func TestDeleteExpiredSessions(t *testing.T) {
 		FamilyName:    fake.LastName(),
 		OTPEnabled:    false,
 	}
-	err := database.CreateUser(nil, user)
+	err := database.CreateUser(context.Background(), nil, user)
 	if err != nil {
 		t.Fatalf("Failed to create test user: %v", err)
 	}
@@ -1137,7 +1138,7 @@ func TestGetUserSessionsByClientIdPaginated_EnlistsInTheCallersTransaction(t *te
 		GivenName: "TxSession" + fake.LetterN(6),
 		Email:     fake.LetterN(12) + "@example.com",
 	}
-	if err := database.CreateUser(tx, user); err != nil {
+	if err := database.CreateUser(context.Background(), tx, user); err != nil {
 		t.Fatalf("Failed to create user inside the transaction: %v", err)
 	}
 

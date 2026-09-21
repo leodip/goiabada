@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/url"
@@ -141,7 +142,7 @@ func TestSelfRegister_Post_SMTPDisabled_RendersSuccessPage(t *testing.T) {
 	assert.NotEqual(t, http.StatusFound, resp.StatusCode)
 	assert.NotContains(t, body, "/auth/pwd")
 
-	user, err := database.GetUserByEmail(nil, email)
+	user, err := database.GetUserByEmail(context.Background(), nil, email)
 	assert.NoError(t, err)
 	if assert.NotNil(t, user) {
 		assert.False(t, user.EmailVerified)
@@ -172,7 +173,7 @@ func TestSelfRegister_Post_SMTPEnabled_NoVerification_RendersSuccess(t *testing.
 	assert.Contains(t, body, "Your account has been created.")
 	assert.Contains(t, body, config.GetAdminConsole().BaseURL+"/account/profile")
 
-	user, err := database.GetUserByEmail(nil, email)
+	user, err := database.GetUserByEmail(context.Background(), nil, email)
 	assert.NoError(t, err)
 	if assert.NotNil(t, user) {
 		assert.False(t, user.EmailVerified)
@@ -257,7 +258,7 @@ func TestSelfRegister_Post_SMTPEnabled_RequiresVerification_FullFlow(t *testing.
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
-	user, err := database.GetUserByEmail(nil, email)
+	user, err := database.GetUserByEmail(context.Background(), nil, email)
 	assert.NoError(t, err)
 	assert.Nil(t, user, "user should not exist before activation")
 
@@ -287,7 +288,7 @@ func TestSelfRegister_Post_SMTPEnabled_RequiresVerification_FullFlow(t *testing.
 	assert.Contains(t, activationBody, activationSucceededText)
 	assert.Contains(t, activationBody, config.GetAdminConsole().BaseURL+"/account/profile")
 
-	user, err = database.GetUserByEmail(nil, email)
+	user, err = database.GetUserByEmail(context.Background(), nil, email)
 	assert.NoError(t, err)
 	if assert.NotNil(t, user, "the '+' address must complete registration end to end") {
 		assert.True(t, user.EmailVerified)
@@ -325,7 +326,7 @@ func TestSelfRegister_ReplayedMarkerAfterActivationIsRefused(t *testing.T) {
 	_ = activateResp.Body.Close()
 	require.Contains(t, activationBody, activationSucceededText)
 
-	activated, err := database.GetUserByEmail(nil, email)
+	activated, err := database.GetUserByEmail(context.Background(), nil, email)
 	require.NoError(t, err)
 	require.NotNil(t, activated)
 
@@ -338,7 +339,7 @@ func TestSelfRegister_ReplayedMarkerAfterActivationIsRefused(t *testing.T) {
 		"a replayed marker must land on the register-again page")
 	assert.NotContains(t, replayBody, activationSucceededText)
 
-	after, err := database.GetUserByEmail(nil, email)
+	after, err := database.GetUserByEmail(context.Background(), nil, email)
 	require.NoError(t, err)
 	require.NotNil(t, after)
 	assert.Equal(t, activated.Id, after.Id,
@@ -389,11 +390,11 @@ func TestSelfRegister_ASecondLinkDoesNotRetargetTheRedirectInFlight(t *testing.T
 	_ = activateResp.Body.Close()
 	require.Contains(t, activationBody, activationSucceededText)
 
-	first, err := database.GetUserByEmail(nil, firstEmail)
+	first, err := database.GetUserByEmail(context.Background(), nil, firstEmail)
 	require.NoError(t, err)
 	assert.NotNil(t, first, "the registration whose link produced the redirect is the one activated")
 
-	second, err := database.GetUserByEmail(nil, secondEmail)
+	second, err := database.GetUserByEmail(context.Background(), nil, secondEmail)
 	require.NoError(t, err)
 	assert.Nil(t, second, "the second registration must not have been activated")
 
@@ -430,7 +431,7 @@ func TestSelfRegister_Post_DuplicateEmail(t *testing.T) {
 		Email:        fake.Email(),
 		PasswordHash: "irrelevant",
 	}
-	err := database.CreateUser(nil, existing)
+	err := database.CreateUser(context.Background(), nil, existing)
 	assert.NoError(t, err)
 
 	httpClient := createHttpClient(t)
@@ -487,7 +488,7 @@ func TestSelfRegister_Post_PasswordMismatch(t *testing.T) {
 	body := bodyString(t, resp)
 	assert.Contains(t, body, "password confirmation does not match")
 
-	user, err := database.GetUserByEmail(nil, email)
+	user, err := database.GetUserByEmail(context.Background(), nil, email)
 	assert.NoError(t, err)
 	assert.Nil(t, user, "no user should be created on validation failure")
 }

@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -46,7 +47,7 @@ func TestAPIAccountPhonePut_Success(t *testing.T) {
 	assert.Equal(t, "+1", updateResp.User.PhoneNumberCountryCallingCode)
 
 	// Verify persisted changes
-	updatedUser, err := database.GetUserById(nil, u.Id)
+	updatedUser, err := database.GetUserById(context.Background(), nil, u.Id)
 	assert.NoError(t, err)
 	assert.NotNil(t, updatedUser)
 	assert.Equal(t, reqBody.PhoneCountryUniqueId, updatedUser.PhoneNumberCountryUniqueId)

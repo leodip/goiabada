@@ -363,7 +363,7 @@ func TestHandleResetPasswordGet_LinkFollowed(t *testing.T) {
 		store := newMarkerTestStore()
 
 		user, codeHash := userWithCode(t, 1, code, time.Now().UTC().Add(-time.Minute))
-		database.On("GetUserByForgotPasswordCodeHash", (*sql.Tx)(nil), codeHash).Return(user, nil).Once()
+		database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).Return(user, nil).Once()
 
 		handler := HandleResetPasswordGet(httpHelper, store, database, auditLogger)
 		rr := httptest.NewRecorder()
@@ -401,7 +401,7 @@ func TestHandleResetPasswordGet_LinkFollowed(t *testing.T) {
 			arrange: func(t *testing.T, database *mocks_data.Database) {
 				codeHash, err := hashutil.HashString(code)
 				require.NoError(t, err)
-				database.On("GetUserByForgotPasswordCodeHash", (*sql.Tx)(nil), codeHash).
+				database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).
 					Return(nil, nil).Once()
 			},
 			wantReason: auditReasonUnknownCode,
@@ -415,7 +415,7 @@ func TestHandleResetPasswordGet_LinkFollowed(t *testing.T) {
 				other, _ := userWithCode(t, 1, "a-completely-different-code", time.Now().UTC())
 				codeHash, err := hashutil.HashString(code)
 				require.NoError(t, err)
-				database.On("GetUserByForgotPasswordCodeHash", (*sql.Tx)(nil), codeHash).
+				database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).
 					Return(other, nil).Once()
 			},
 			wantReason: auditReasonUnknownCode,
@@ -425,7 +425,7 @@ func TestHandleResetPasswordGet_LinkFollowed(t *testing.T) {
 			arrange: func(t *testing.T, database *mocks_data.Database) {
 				codeHash, err := hashutil.HashString(code)
 				require.NoError(t, err)
-				database.On("GetUserByForgotPasswordCodeHash", (*sql.Tx)(nil), codeHash).
+				database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).
 					Return(&models.User{Id: 1, ForgotPasswordCodeHash: codeHash}, nil).Once()
 			},
 			wantReason: auditReasonUnknownCode,
@@ -436,7 +436,7 @@ func TestHandleResetPasswordGet_LinkFollowed(t *testing.T) {
 			name: "an expired code",
 			arrange: func(t *testing.T, database *mocks_data.Database) {
 				user, codeHash := userWithCode(t, 42, code, time.Now().UTC().Add(-6*time.Minute))
-				database.On("GetUserByForgotPasswordCodeHash", (*sql.Tx)(nil), codeHash).
+				database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).
 					Return(user, nil).Once()
 			},
 			wantReason: auditReasonCodeExpired,
@@ -487,7 +487,7 @@ func TestHandleResetPasswordGet_SecondLinkWhileOneIsInFlight(t *testing.T) {
 	// The second link is entirely valid on its own: it is refused for the marker it would
 	// have replaced, not for anything wrong with it.
 	secondUser, secondHash := userWithCode(t, 99, secondCode, time.Now().UTC().Add(-time.Minute))
-	database.On("GetUserByForgotPasswordCodeHash", (*sql.Tx)(nil), secondHash).Return(secondUser, nil).Once()
+	database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), secondHash).Return(secondUser, nil).Once()
 
 	// The entry names the link that was refused, which did resolve. The account holding the
 	// live marker is not in the payload.
@@ -530,7 +530,7 @@ func TestHandleResetPasswordGet_SecondLinkWhileAnActivationIsInFlight(t *testing
 	store := newMarkerTestStore()
 
 	secondUser, secondHash := userWithCode(t, 99, secondCode, time.Now().UTC().Add(-time.Minute))
-	database.On("GetUserByForgotPasswordCodeHash", (*sql.Tx)(nil), secondHash).Return(secondUser, nil).Once()
+	database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), secondHash).Return(secondUser, nil).Once()
 
 	expectAuditFailedCode(auditLogger, string(LinkMarkerContinuationInFlight), 99)
 	expectRenderedCodeInvalid(httpHelper, 0)
@@ -569,7 +569,7 @@ func TestHandleResetPasswordGet_LifetimeBoundary(t *testing.T) {
 
 		user, codeHash := userWithCode(t, 1, code,
 			time.Now().UTC().Add(-forgotPasswordCodeLifetime+30*time.Second))
-		database.On("GetUserByForgotPasswordCodeHash", (*sql.Tx)(nil), codeHash).Return(user, nil).Once()
+		database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).Return(user, nil).Once()
 
 		handler := HandleResetPasswordGet(httpHelper, store, database, auditLogger)
 		rr := httptest.NewRecorder()
@@ -586,7 +586,7 @@ func TestHandleResetPasswordGet_LifetimeBoundary(t *testing.T) {
 
 		user, codeHash := userWithCode(t, 1, code,
 			time.Now().UTC().Add(-forgotPasswordCodeLifetime-30*time.Second))
-		database.On("GetUserByForgotPasswordCodeHash", (*sql.Tx)(nil), codeHash).Return(user, nil).Once()
+		database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).Return(user, nil).Once()
 		expectAuditFailedCode(auditLogger, auditReasonCodeExpired, 1)
 		expectRenderedCodeInvalid(httpHelper, 0)
 
@@ -613,7 +613,7 @@ func TestHandleResetPasswordGet_Clean(t *testing.T) {
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		store := newMarkerTestStore()
 
-		database.On("GetUserByForgotPasswordCodeHash", (*sql.Tx)(nil), codeHash).
+		database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).
 			Return(&models.User{Id: 1}, nil).Once()
 		handler := HandleResetPasswordGet(httpHelper, store, database, auditLogger)
 		req := withMarker(t, store, cleanGetRequest(), LinkMarkerFlowResetPassword, 1, codeHash)
@@ -675,7 +675,7 @@ func TestHandleResetPasswordGet_Clean(t *testing.T) {
 	t.Run("a live marker whose hash no longer resolves", func(t *testing.T) {
 		assertCleanGetRefused(t, auditReasonCodeNoLongerOutstanding, func(t *testing.T, store sessionstore.Store,
 			database *mocks_data.Database) *http.Request {
-			database.On("GetUserByForgotPasswordCodeHash", (*sql.Tx)(nil), codeHash).
+			database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).
 				Return(nil, nil).Once()
 			return withMarker(t, store, cleanGetRequest(), LinkMarkerFlowResetPassword, 1, codeHash)
 		})
@@ -878,7 +878,7 @@ func TestHandleResetPasswordPost_MarkerRejectionsDoNotChangeThePassword(t *testi
 			name:       "a live marker whose hash no longer resolves",
 			wantReason: auditReasonCodeNoLongerOutstanding,
 			arrange: func(t *testing.T, store sessionstore.Store, database *mocks_data.Database) *http.Request {
-				database.On("GetUserByForgotPasswordCodeHash", (*sql.Tx)(nil), codeHash).
+				database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).
 					Return(nil, nil).Once()
 				return postWithMarker(t, store, newPassword, newPassword,
 					LinkMarkerFlowResetPassword, 1, codeHash)
@@ -894,7 +894,7 @@ func TestHandleResetPasswordPost_MarkerRejectionsDoNotChangeThePassword(t *testi
 			wantReason: auditReasonContinuationMismatch,
 			wantUserId: 1,
 			arrange: func(t *testing.T, store sessionstore.Store, database *mocks_data.Database) *http.Request {
-				database.On("GetUserByForgotPasswordCodeHash", (*sql.Tx)(nil), codeHash).
+				database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).
 					Return(&models.User{Id: 1}, nil).Once()
 				return withMarker(t, store,
 					postResetRequest(newPassword, newPassword, "a-continuation-that-is-gone"),
@@ -906,7 +906,7 @@ func TestHandleResetPasswordPost_MarkerRejectionsDoNotChangeThePassword(t *testi
 			wantReason: auditReasonContinuationMismatch,
 			wantUserId: 1,
 			arrange: func(t *testing.T, store sessionstore.Store, database *mocks_data.Database) *http.Request {
-				database.On("GetUserByForgotPasswordCodeHash", (*sql.Tx)(nil), codeHash).
+				database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).
 					Return(&models.User{Id: 1}, nil).Once()
 				return withMarker(t, store, postResetRequest(newPassword, newPassword, ""),
 					LinkMarkerFlowResetPassword, 1, codeHash)
@@ -921,7 +921,7 @@ func TestHandleResetPasswordPost_MarkerRejectionsDoNotChangeThePassword(t *testi
 			wantReason: auditReasonContinuationMismatch,
 			wantUserId: 1,
 			arrange: func(t *testing.T, store sessionstore.Store, database *mocks_data.Database) *http.Request {
-				database.On("GetUserByForgotPasswordCodeHash", (*sql.Tx)(nil), codeHash).
+				database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).
 					Return(&models.User{Id: 1}, nil).Once()
 				return postWithMarkerContinuationInQuery(t, store, newPassword, newPassword,
 					LinkMarkerFlowResetPassword, 1, codeHash)
@@ -935,7 +935,7 @@ func TestHandleResetPasswordPost_MarkerRejectionsDoNotChangeThePassword(t *testi
 			wantReason: auditReasonContinuationMismatch,
 			wantUserId: 1,
 			arrange: func(t *testing.T, store sessionstore.Store, database *mocks_data.Database) *http.Request {
-				database.On("GetUserByForgotPasswordCodeHash", (*sql.Tx)(nil), codeHash).
+				database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).
 					Return(&models.User{Id: 1}, nil).Once()
 				return withRawMarker(t, store, postResetRequest(newPassword, newPassword, ""),
 					marshalMarker(t, &LinkMarker{
@@ -985,14 +985,14 @@ func TestHandleResetPasswordPost_HappyPath(t *testing.T) {
 	user := &models.User{Id: 1, Email: "test@example.com", PasswordHash: "the-previous-hash"}
 
 	passwordValidator.On("ValidatePassword", mock.Anything, newPassword).Return(nil).Once()
-	database.On("GetUserByForgotPasswordCodeHash", (*sql.Tx)(nil), codeHash).Return(user, nil).Once()
+	database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).Return(user, nil).Once()
 
 	var savedHash string
 	// The claim's predicate is the marker's own hash, which is what refuses a replay: a
 	// second call with the same hash matches no row once the first cleared it.
-	database.On("TryConsumeForgotPasswordCode", revokeTx, int64(1), codeHash, mock.Anything).
+	database.On("TryConsumeForgotPasswordCode", mock.Anything, revokeTx, int64(1), codeHash, mock.Anything).
 		Run(func(args mock.Arguments) {
-			savedHash = args.Get(3).(string)
+			savedHash = args.Get(4).(string)
 		}).Return(true, nil).Once()
 	stubRevocationSweepTx(database, 1, 4)
 
@@ -1033,8 +1033,8 @@ func TestHandleResetPasswordPost_HappyPath(t *testing.T) {
 
 	// The narrow conditional write is the only one: a full-row update would undo a
 	// concurrent admin disable (#106 decision 14).
-	database.AssertNotCalled(t, "UpdateUser", mock.Anything, mock.Anything)
-	database.AssertNotCalled(t, "SetUserPasswordHash", mock.Anything, mock.Anything, mock.Anything)
+	database.AssertNotCalled(t, "UpdateUser", mock.Anything, mock.Anything, mock.Anything)
+	database.AssertNotCalled(t, "SetUserPasswordHash", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 }
 
 // The claim matching no row is the replay and double-submit case, and it is NOT a server
@@ -1051,10 +1051,10 @@ func TestHandleResetPasswordPost_ClaimLost(t *testing.T) {
 	const newPassword = "Str0ngP4ss!"
 
 	passwordValidator.On("ValidatePassword", mock.Anything, newPassword).Return(nil).Once()
-	database.On("GetUserByForgotPasswordCodeHash", (*sql.Tx)(nil), codeHash).
+	database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).
 		Return(&models.User{Id: 1}, nil).Once()
 	stub := expectRunInTransaction(database, revokeTx)
-	database.On("TryConsumeForgotPasswordCode", revokeTx, int64(1), codeHash, mock.Anything).
+	database.On("TryConsumeForgotPasswordCode", mock.Anything, revokeTx, int64(1), codeHash, mock.Anything).
 		Return(false, nil).Once()
 
 	// The lookup succeeded, so the entry names the user.
@@ -1074,7 +1074,7 @@ func TestHandleResetPasswordPost_ClaimLost(t *testing.T) {
 	// terminate the user's sessions either. The body leaves the helper on the lost-claim
 	// sentinel, which is how it asks for a rollback rather than a commit.
 	assert.ErrorIs(t, stub.bodyErr, errResetPasswordClaimLost)
-	database.AssertNotCalled(t, "IncrementUserAuthStateGeneration", mock.Anything, mock.Anything)
+	database.AssertNotCalled(t, "IncrementUserAuthStateGeneration", mock.Anything, mock.Anything, mock.Anything)
 	// And it is not a 500: a lost claim is an ordinary outcome, not a fault.
 	httpHelper.AssertNotCalled(t, "InternalServerError", mock.Anything, mock.Anything, mock.Anything)
 }
@@ -1092,10 +1092,10 @@ func TestHandleResetPasswordPost_ClaimFails(t *testing.T) {
 	const codeHash = "the-code-hash"
 
 	passwordValidator.On("ValidatePassword", mock.Anything, "Str0ngP4ss!").Return(nil).Once()
-	database.On("GetUserByForgotPasswordCodeHash", (*sql.Tx)(nil), codeHash).
+	database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).
 		Return(&models.User{Id: 1}, nil).Once()
 	stub := expectRunInTransaction(database, revokeTx)
-	database.On("TryConsumeForgotPasswordCode", revokeTx, int64(1), codeHash, mock.Anything).
+	database.On("TryConsumeForgotPasswordCode", mock.Anything, revokeTx, int64(1), codeHash, mock.Anything).
 		Return(false, errors.New("update failed")).Once()
 	httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).Return().Once()
 
@@ -1112,7 +1112,7 @@ func TestHandleResetPasswordPost_ClaimFails(t *testing.T) {
 	// committed transaction would be the worst outcome: a changed password with the old
 	// sessions intact.
 	assert.EqualError(t, stub.bodyErr, "update failed", "the body hands its error to the helper, which rolls back")
-	database.AssertNotCalled(t, "IncrementUserAuthStateGeneration", mock.Anything, mock.Anything)
+	database.AssertNotCalled(t, "IncrementUserAuthStateGeneration", mock.Anything, mock.Anything, mock.Anything)
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 }
 
@@ -1154,7 +1154,7 @@ func TestHandleResetPasswordPost_TransactionFailureHandling(t *testing.T) {
 			// session block precedes the token sweep (#139).
 			label: "sweep fails during discovery",
 			arrange: func(database *mocks_data.Database) {
-				database.On("IncrementUserAuthStateGeneration", revokeTx, int64(1)).
+				database.On("IncrementUserAuthStateGeneration", mock.Anything, revokeTx, int64(1)).
 					Return(int64(4), nil).Once()
 				database.On("GetUserSessionsByUserId", revokeTx, int64(1)).
 					Return([]models.UserSession{}, nil).Once()
@@ -1169,7 +1169,7 @@ func TestHandleResetPasswordPost_TransactionFailureHandling(t *testing.T) {
 			arrange: func(database *mocks_data.Database) {
 				first := &models.RefreshToken{Id: 1, RefreshTokenJti: "rt-1"}
 				second := &models.RefreshToken{Id: 2, RefreshTokenJti: "rt-2"}
-				database.On("IncrementUserAuthStateGeneration", revokeTx, int64(1)).
+				database.On("IncrementUserAuthStateGeneration", mock.Anything, revokeTx, int64(1)).
 					Return(int64(4), nil).Once()
 				database.On("GetUserSessionsByUserId", revokeTx, int64(1)).
 					Return([]models.UserSession{}, nil).Once()
@@ -1187,7 +1187,7 @@ func TestHandleResetPasswordPost_TransactionFailureHandling(t *testing.T) {
 			// absence of an audit event, not that the write was undone.
 			label: "commit fails after a complete sweep",
 			arrange: func(database *mocks_data.Database) {
-				database.On("IncrementUserAuthStateGeneration", revokeTx, int64(1)).
+				database.On("IncrementUserAuthStateGeneration", mock.Anything, revokeTx, int64(1)).
 					Return(int64(4), nil).Once()
 				database.On("GetUserSessionsByUserId", revokeTx, int64(1)).
 					Return([]models.UserSession{}, nil).Once()
@@ -1207,14 +1207,14 @@ func TestHandleResetPasswordPost_TransactionFailureHandling(t *testing.T) {
 			store := newMarkerTestStore()
 
 			passwordValidator.On("ValidatePassword", mock.Anything, newPassword).Return(nil).Once()
-			database.On("GetUserByForgotPasswordCodeHash", (*sql.Tx)(nil), codeHash).
+			database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).
 				Return(&models.User{Id: 1}, nil).Once()
 			if tc.commitFails {
 				expectRunInTransactionThenFail(database, revokeTx, errors.New("commit failed"))
 			} else {
 				expectRunInTransaction(database, revokeTx)
 			}
-			database.On("TryConsumeForgotPasswordCode", revokeTx, int64(1), codeHash, mock.Anything).
+			database.On("TryConsumeForgotPasswordCode", mock.Anything, revokeTx, int64(1), codeHash, mock.Anything).
 				Return(true, nil).Once()
 			tc.arrange(database)
 			httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).
@@ -1320,7 +1320,7 @@ func TestResetPassword_LinkFailuresAreIndistinguishable(t *testing.T) {
 				database := mocks_data.NewDatabase(t)
 				auditLogger := mocks_audit.NewAuditLogger(t)
 				store := newMarkerTestStore()
-				database.On("GetUserByForgotPasswordCodeHash", (*sql.Tx)(nil), hashOfRequestCode).
+				database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), hashOfRequestCode).
 					Return(nil, nil).Once()
 				expectAuditFailedCode(auditLogger, auditReasonUnknownCode, 0)
 				bind := captureResetRender(t, httpHelper)
@@ -1338,7 +1338,7 @@ func TestResetPassword_LinkFailuresAreIndistinguishable(t *testing.T) {
 				auditLogger := mocks_audit.NewAuditLogger(t)
 				store := newMarkerTestStore()
 				user, hash := userWithCode(t, 1, requestCode, time.Now().UTC().Add(-time.Hour))
-				database.On("GetUserByForgotPasswordCodeHash", (*sql.Tx)(nil), hash).
+				database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), hash).
 					Return(user, nil).Once()
 				expectAuditFailedCode(auditLogger, auditReasonCodeExpired, 1)
 				bind := captureResetRender(t, httpHelper)
@@ -1370,7 +1370,7 @@ func TestResetPassword_LinkFailuresAreIndistinguishable(t *testing.T) {
 				database := mocks_data.NewDatabase(t)
 				auditLogger := mocks_audit.NewAuditLogger(t)
 				store := newMarkerTestStore()
-				database.On("GetUserByForgotPasswordCodeHash", (*sql.Tx)(nil), codeHash).
+				database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).
 					Return(nil, nil).Once()
 				expectAuditFailedCode(auditLogger, auditReasonCodeNoLongerOutstanding, 0)
 				bind := captureResetRender(t, httpHelper)
@@ -1408,7 +1408,7 @@ func TestResetPassword_LinkFailuresAreIndistinguishable(t *testing.T) {
 				auditLogger := mocks_audit.NewAuditLogger(t)
 				store := newMarkerTestStore()
 				passwordValidator.On("ValidatePassword", mock.Anything, newPassword).Return(nil).Once()
-				database.On("GetUserByForgotPasswordCodeHash", (*sql.Tx)(nil), codeHash).
+				database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).
 					Return(nil, nil).Once()
 				expectAuditFailedCode(auditLogger, auditReasonCodeNoLongerOutstanding, 0)
 				bind := captureResetRender(t, httpHelper)
@@ -1429,7 +1429,7 @@ func TestResetPassword_LinkFailuresAreIndistinguishable(t *testing.T) {
 				auditLogger := mocks_audit.NewAuditLogger(t)
 				store := newMarkerTestStore()
 				passwordValidator.On("ValidatePassword", mock.Anything, newPassword).Return(nil).Once()
-				database.On("GetUserByForgotPasswordCodeHash", (*sql.Tx)(nil), codeHash).
+				database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).
 					Return(&models.User{Id: 1}, nil).Once()
 				expectAuditFailedCode(auditLogger, auditReasonContinuationMismatch, 1)
 				bind := captureResetRender(t, httpHelper)
@@ -1451,10 +1451,10 @@ func TestResetPassword_LinkFailuresAreIndistinguishable(t *testing.T) {
 				auditLogger := mocks_audit.NewAuditLogger(t)
 				store := newMarkerTestStore()
 				passwordValidator.On("ValidatePassword", mock.Anything, newPassword).Return(nil).Once()
-				database.On("GetUserByForgotPasswordCodeHash", (*sql.Tx)(nil), codeHash).
+				database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).
 					Return(&models.User{Id: 1}, nil).Once()
 				expectRunInTransaction(database, revokeTx)
-				database.On("TryConsumeForgotPasswordCode", revokeTx, int64(1), codeHash, mock.Anything).
+				database.On("TryConsumeForgotPasswordCode", mock.Anything, revokeTx, int64(1), codeHash, mock.Anything).
 					Return(false, nil).Once()
 				expectAuditFailedCode(auditLogger, auditReasonClaimLost, 1)
 				bind := captureResetRender(t, httpHelper)
@@ -1510,7 +1510,7 @@ func TestResetPassword_GenuineFaultsStayInternalServerErrors(t *testing.T) {
 			ForgotPasswordCodeHash:      codeHash,
 			ForgotPasswordCodeIssuedAt:  sql.NullTime{Time: time.Now().UTC(), Valid: true},
 		}
-		database.On("GetUserByForgotPasswordCodeHash", (*sql.Tx)(nil), codeHash).Return(user, nil).Once()
+		database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).Return(user, nil).Once()
 		httpHelper.On("InternalServerError", mock.Anything, mock.Anything,
 			mock.MatchedBy(func(err error) bool {
 				return strings.Contains(err.Error(), "unable to decrypt forgot password code")
@@ -1529,7 +1529,7 @@ func TestResetPassword_GenuineFaultsStayInternalServerErrors(t *testing.T) {
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		store := newMarkerTestStore()
 
-		database.On("GetUserByForgotPasswordCodeHash", (*sql.Tx)(nil), mock.Anything).
+		database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), mock.Anything).
 			Return(nil, errors.New("database is down")).Once()
 		httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).Return().Once()
 
@@ -1545,7 +1545,7 @@ func TestResetPassword_GenuineFaultsStayInternalServerErrors(t *testing.T) {
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		store := newMarkerTestStore()
 
-		database.On("GetUserByForgotPasswordCodeHash", (*sql.Tx)(nil), "the-code-hash").
+		database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), "the-code-hash").
 			Return(nil, errors.New("database is down")).Once()
 		httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).Return().Once()
 
@@ -1583,7 +1583,7 @@ func TestResetPassword_GenuineFaultsStayInternalServerErrors(t *testing.T) {
 		store := mocks_sessionstore.NewStore(t)
 
 		user, codeHash := userWithCode(t, 1, code, time.Now().UTC())
-		database.On("GetUserByForgotPasswordCodeHash", (*sql.Tx)(nil), codeHash).Return(user, nil).Once()
+		database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).Return(user, nil).Once()
 		store.On("Get", mock.Anything, constants.AuthServerSessionName).
 			Return(nil, errors.New("session store is unavailable"))
 		httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).Return().Once()

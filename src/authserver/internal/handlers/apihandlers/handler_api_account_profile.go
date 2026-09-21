@@ -36,7 +36,7 @@ func HandleAPIAccountProfileGet(
 			return
 		}
 
-		user, err := database.GetUserBySubject(nil, subject)
+		user, err := database.GetUserBySubject(r.Context(), nil, subject)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -79,7 +79,7 @@ func HandleAPIAccountProfilePut(
 		}
 
 		// Load user
-		user, err := database.GetUserBySubject(nil, subject)
+		user, err := database.GetUserBySubject(r.Context(), nil, subject)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -105,7 +105,7 @@ func HandleAPIAccountProfilePut(
 			Subject:             user.Subject,
 		}
 
-		if err := profileValidator.ValidateProfile(input); err != nil {
+		if err := profileValidator.ValidateProfile(r.Context(), input); err != nil {
 			writeValidationError(w, r, err)
 			return
 		}
@@ -139,7 +139,7 @@ func HandleAPIAccountProfilePut(
 		user.ZoneInfo = input.ZoneInfo
 		user.Locale = input.Locale
 
-		if err := database.UpdateUser(nil, user); err != nil {
+		if err := database.UpdateUser(r.Context(), nil, user); err != nil {
 			writeInternalServerError(w, r, err)
 			return
 		}

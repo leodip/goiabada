@@ -43,7 +43,7 @@ func HandleAPIAccountPhonePut(
 		}
 
 		// Load current user
-		user, err := database.GetUserBySubject(nil, subject)
+		user, err := database.GetUserBySubject(r.Context(), nil, subject)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -95,7 +95,7 @@ func HandleAPIAccountPhonePut(
 		}
 
 		// Persist
-		if err := database.UpdateUser(nil, user); err != nil {
+		if err := database.UpdateUser(r.Context(), nil, user); err != nil {
 			writeInternalServerError(w, r, err)
 			return
 		}

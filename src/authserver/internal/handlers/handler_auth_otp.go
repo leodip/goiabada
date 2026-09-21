@@ -45,7 +45,7 @@ func HandleAuthOtpGet(
 			return
 		}
 
-		user, err := database.GetUserById(nil, authContext.UserId)
+		user, err := database.GetUserById(r.Context(), nil, authContext.UserId)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
@@ -230,7 +230,7 @@ func HandleAuthOtpPost(
 			}
 		}
 
-		user, err := database.GetUserById(nil, authContext.UserId)
+		user, err := database.GetUserById(r.Context(), nil, authContext.UserId)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
@@ -332,7 +332,7 @@ func HandleAuthOtpPost(
 			// request that loaded the user before a concurrent disable could still claim
 			// a step and be issued a token naming amr "otp" for an authenticator that had
 			// just been removed (#111 decision 10).
-			consumed, err := database.TryConsumeUserOTPStep(nil, user.Id, step, true)
+			consumed, err := database.TryConsumeUserOTPStep(r.Context(), nil, user.Id, step, true)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
 				return
@@ -369,7 +369,7 @@ func HandleAuthOtpPost(
 			// the enable write then fails, a code is burned and the user retries with the
 			// next one, whereas the reverse order would leave OTP enabled on a request
 			// that was refused.
-			consumed, err := database.TryConsumeUserOTPStep(nil, user.Id, step, false)
+			consumed, err := database.TryConsumeUserOTPStep(r.Context(), nil, user.Id, step, false)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
 				return

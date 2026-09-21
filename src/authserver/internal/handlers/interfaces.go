@@ -103,7 +103,7 @@ type TokenParser interface {
 
 type EmailValidator interface {
 	ValidateEmailAddress(emailAddress string) error
-	ValidateEmailUpdate(input *accountvalidation.ValidateEmailInput) error
+	ValidateEmailUpdate(ctx context.Context, input *accountvalidation.ValidateEmailInput) error
 }
 
 type PasswordValidator interface {
@@ -137,6 +137,6 @@ type CredentialFailureRecorder interface {
 }
 
 type PermissionChecker interface {
-	UserHasScopePermission(userId int64, scope string) (bool, error)
-	FilterOutScopesWhereUserIsNotAuthorized(scope string, user *models.User) (string, error)
+	UserHasScopePermission(ctx context.Context, userId int64, scope string) (bool, error)
+	FilterOutScopesWhereUserIsNotAuthorized(ctx context.Context, scope string, user *models.User) (string, error)
 }
