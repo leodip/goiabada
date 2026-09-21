@@ -80,7 +80,8 @@ them. Revisit if a row ever rests on a reference that turns out to be a false on
 from inside the declaring package are not read that way — they carry no selector, and matching them
 by spelling would let a local, a parameter or a struct field justify its namesake — so those are
 resolved with `go/types` over each package's own syntax, against a stub importer. The residual
-ceiling there is a dot import, of which this tree has none.
+ceiling there is a dot import, of which this tree has none; revisit if one is ever written under
+`src/`, which would need a real importer rather than a stub.
 
 ## Regenerating
 

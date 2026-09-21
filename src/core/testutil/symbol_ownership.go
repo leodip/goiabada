@@ -559,8 +559,9 @@ func (c *symbolCensus) spread(dir string, pkg *packageSymbols, names map[string]
 // ceiling: the go/types pass runs with a stub importer, so nothing an import contributes is
 // resolved and every selector on an imported package is an error the checker is told to continue
 // past. In-package name resolution does not depend on imports, so Uses and Defs are sound for
-// exactly the identifiers this arm reads. A dot import would break that, and this tree has none
-// (#385).
+// exactly the identifiers this arm reads. A dot import would break that, and this tree has none.
+// Revisit if a dot import is ever written under src/, which would need a real importer here rather
+// than a stub (#385).
 func buildSymbolCensus(root string, graph *importGraph) (*symbolCensus, error) {
 	census := &symbolCensus{
 		corePkgs:   map[symbolKey]map[string]bool{},
