@@ -48,6 +48,18 @@ type CommonDatabase struct {
 	// ErrUniqueViolation, so no caller above it ever sees a driver number or a driver sentence
 	// (#279).
 	IsUniqueViolation func(error) bool
+
+	// InsertReturningIdSQL rewrites a built INSERT so that the engine reports the new row's id
+	// in a result set. Each dialect sets it in its constructor, because only the engine's own
+	// grammar says how: PostgreSQL appends RETURNING id, SQL Server splices OUTPUT INSERTED.id
+	// in front of VALUES. Left nil, the insert goes through ExecSql and the id is read from
+	// LastInsertId, which is what SQLite and MySQL do, and which is what a handle built
+	// directly on this type gets by default rather than by remembering to opt out.
+	//
+	// insertReturningId is the only consumer, and it is the only place the 25 Create* methods
+	// obtain an id. Until #416 the two engines whose drivers refuse LastInsertId wrote all 25
+	// out by hand: fifty bodies of forty lines, differing in this one expression.
+	InsertReturningIdSQL func(insertSQL string) (string, error)
 }
 
 func NewCommonDatabase(db *sql.DB, flavor sqlbuilder.Flavor, logSQL bool) *CommonDatabase {
@@ -306,6 +318,67 @@ func (d *CommonDatabase) QuerySql(tx *sql.Tx, sql string, args ...any) (*sql.Row
 		return nil, d.WrapSQLError(err, "unable to execute SQL")
 	}
 	return rows, nil
+}
+
+// insertReturningId runs a built INSERT and returns the id the engine gave the new row. It is
+// the one place the four engines differ on how that id comes back, and the only place the 25
+// Create* methods obtain one.
+//
+// noun names the thing being inserted and reaches the two messages this can fail with,
+// "unable to insert <noun>" and "unable to scan <noun> id". Both are what each engine's
+// hand-written copy printed before they collapsed onto this, so no error text moved (#416).
+//
+// It takes the builder rather than a built statement so that the Build call, and with it the
+// local named sql that shadows the database/sql import, leaves all 25 callers.
+//
+// THE DEFERRED VIOLATION is why the returning arm ends the way it does. pgx and go-mssqldb can
+// both report a constraint violation through the result set rather than from the query call, and
+// then Next() simply reports no row. Without the rows.Err() check the insert would read as a
+// success with id 0, and data.ErrUniqueViolation -- which the handler above needs to answer 409
+// rather than 500 -- would be unreachable on exactly the two engines that take this arm. It goes
+// through WrapSQLError rather than errs.Wrap for that reason; the failure QuerySql itself returns
+// has already been through WrapSQLError (#279).
+func (d *CommonDatabase) insertReturningId(tx *sql.Tx, insertBuilder *sqlbuilder.InsertBuilder,
+	noun string) (int64, error) {
+
+	statement, args := insertBuilder.Build()
+
+	if d.InsertReturningIdSQL == nil {
+		result, err := d.ExecSql(tx, statement, args...)
+		if err != nil {
+			return 0, errs.Wrap(err, "unable to insert "+noun)
+		}
+
+		id, err := result.LastInsertId()
+		if err != nil {
+			return 0, errs.Wrap(err, "unable to get last insert id")
+		}
+		return id, nil
+	}
+
+	statement, err := d.InsertReturningIdSQL(statement)
+	if err != nil {
+		return 0, err
+	}
+
+	rows, err := d.QuerySql(tx, statement, args...)
+	if err != nil {
+		return 0, errs.Wrap(err, "unable to insert "+noun)
+	}
+	defer func() { _ = rows.Close() }()
+
+	var id int64
+	if rows.Next() {
+		if err := rows.Scan(&id); err != nil {
+			return 0, errs.Wrap(err, "unable to scan "+noun+" id")
+		}
+	}
+
+	if err := rows.Err(); err != nil {
+		return 0, d.WrapSQLError(err, "unable to insert "+noun)
+	}
+
+	return id, nil
 }
 
 func (d *CommonDatabase) IsEmpty() (bool, error) {

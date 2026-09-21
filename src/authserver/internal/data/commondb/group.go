@@ -23,19 +23,11 @@ func (d *CommonDatabase) CreateGroup(tx *sql.Tx, group *models.Group) error {
 
 	insertBuilder := groupStruct.WithoutTag("pk").InsertInto(d.Flavor.Quote("groups"), group)
 
-	sql, args := insertBuilder.Build()
-	result, err := d.ExecSql(tx, sql, args...)
+	id, err := d.insertReturningId(tx, insertBuilder, "group")
 	if err != nil {
 		group.CreatedAt = originalCreatedAt
 		group.UpdatedAt = originalUpdatedAt
-		return errs.Wrap(err, "unable to insert group")
-	}
-
-	id, err := result.LastInsertId()
-	if err != nil {
-		group.CreatedAt = originalCreatedAt
-		group.UpdatedAt = originalUpdatedAt
-		return errs.Wrap(err, "unable to get last insert id")
+		return err
 	}
 
 	group.Id = id

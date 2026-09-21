@@ -27,19 +27,11 @@ func (d *CommonDatabase) CreateClientLogo(tx *sql.Tx, clientLogo *models.ClientL
 
 	insertBuilder := clientLogoStruct.WithoutTag("pk").InsertInto("client_logos", clientLogo)
 
-	sql, args := insertBuilder.Build()
-	result, err := d.ExecSql(tx, sql, args...)
+	id, err := d.insertReturningId(tx, insertBuilder, "client logo")
 	if err != nil {
 		clientLogo.CreatedAt = originalCreatedAt
 		clientLogo.UpdatedAt = originalUpdatedAt
-		return errs.Wrap(err, "unable to insert client logo")
-	}
-
-	id, err := result.LastInsertId()
-	if err != nil {
-		clientLogo.CreatedAt = originalCreatedAt
-		clientLogo.UpdatedAt = originalUpdatedAt
-		return errs.Wrap(err, "unable to get last insert id")
+		return err
 	}
 
 	clientLogo.Id = id

@@ -27,19 +27,11 @@ func (d *CommonDatabase) CreatePermission(tx *sql.Tx, permission *models.Permiss
 
 	insertBuilder := permissionStruct.WithoutTag("pk").InsertInto("permissions", permission)
 
-	sql, args := insertBuilder.Build()
-	result, err := d.ExecSql(tx, sql, args...)
+	id, err := d.insertReturningId(tx, insertBuilder, "permission")
 	if err != nil {
 		permission.CreatedAt = originalCreatedAt
 		permission.UpdatedAt = originalUpdatedAt
-		return errs.Wrap(err, "unable to insert permission")
-	}
-
-	id, err := result.LastInsertId()
-	if err != nil {
-		permission.CreatedAt = originalCreatedAt
-		permission.UpdatedAt = originalUpdatedAt
-		return errs.Wrap(err, "unable to get last insert id")
+		return err
 	}
 
 	permission.Id = id

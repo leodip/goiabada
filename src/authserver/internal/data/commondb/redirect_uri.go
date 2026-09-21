@@ -25,17 +25,10 @@ func (d *CommonDatabase) CreateRedirectURI(tx *sql.Tx, redirectURI *models.Redir
 
 	insertBuilder := redirectURIStruct.WithoutTag("pk").InsertInto("redirect_uris", redirectURI)
 
-	sql, args := insertBuilder.Build()
-	result, err := d.ExecSql(tx, sql, args...)
+	id, err := d.insertReturningId(tx, insertBuilder, "redirectURI")
 	if err != nil {
 		redirectURI.CreatedAt = originalCreatedAt
-		return errs.Wrap(err, "unable to insert redirectURI")
-	}
-
-	id, err := result.LastInsertId()
-	if err != nil {
-		redirectURI.CreatedAt = originalCreatedAt
-		return errs.Wrap(err, "unable to get last insert id")
+		return err
 	}
 
 	redirectURI.Id = id

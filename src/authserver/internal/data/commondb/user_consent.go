@@ -31,19 +31,11 @@ func (d *CommonDatabase) CreateUserConsent(tx *sql.Tx, userConsent *models.UserC
 
 	insertBuilder := userConsentStruct.WithoutTag("pk").InsertInto("user_consents", userConsent)
 
-	sql, args := insertBuilder.Build()
-	result, err := d.ExecSql(tx, sql, args...)
+	id, err := d.insertReturningId(tx, insertBuilder, "userConsent")
 	if err != nil {
 		userConsent.CreatedAt = originalCreatedAt
 		userConsent.UpdatedAt = originalUpdatedAt
-		return errs.Wrap(err, "unable to insert userConsent")
-	}
-
-	id, err := result.LastInsertId()
-	if err != nil {
-		userConsent.CreatedAt = originalCreatedAt
-		userConsent.UpdatedAt = originalUpdatedAt
-		return errs.Wrap(err, "unable to get last insert id")
+		return err
 	}
 
 	userConsent.Id = id

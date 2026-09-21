@@ -31,19 +31,11 @@ func (d *CommonDatabase) CreateUserGroup(tx *sql.Tx, userGroup *models.UserGroup
 
 	insertBuilder := userGroupStruct.WithoutTag("pk").InsertInto("users_groups", userGroup)
 
-	sql, args := insertBuilder.Build()
-	result, err := d.ExecSql(tx, sql, args...)
+	id, err := d.insertReturningId(tx, insertBuilder, "userGroup")
 	if err != nil {
 		userGroup.CreatedAt = originalCreatedAt
 		userGroup.UpdatedAt = originalUpdatedAt
-		return errs.Wrap(err, "unable to insert userGroup")
-	}
-
-	id, err := result.LastInsertId()
-	if err != nil {
-		userGroup.CreatedAt = originalCreatedAt
-		userGroup.UpdatedAt = originalUpdatedAt
-		return errs.Wrap(err, "unable to get last insert id")
+		return err
 	}
 
 	userGroup.Id = id

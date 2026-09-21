@@ -87,11 +87,29 @@ type scriptedDriver struct {
 	escaped int
 }
 
-// scriptedExec is one statement's answer: how many rows it changed, or the failure it met.
+// scriptedExec is one statement's answer: how many rows it changed, or the failure it met, and
+// optionally the id the engine says it generated.
+//
+// lastInsertId is opt-in, and the default is the one that matters: with it unset the statement
+// answers with driver.RowsAffected, whose LastInsertId returns an error. That is pgx's and
+// go-mssqldb's behaviour, so a test gets the REFUSING driver unless it asks for the other one,
+// which is the right way round for the arm of insertReturningId that reads an id that way (#283,
+// #416).
 type scriptedExec struct {
 	rowsAffected int64
+	lastInsertId int64
 	err          error
 }
+
+// scriptedResult is what a statement answers once it has an id to report. driver.RowsAffected
+// cannot carry one: its LastInsertId is defined to fail.
+type scriptedResult struct {
+	rowsAffected int64
+	lastInsertId int64
+}
+
+func (r scriptedResult) LastInsertId() (int64, error) { return r.lastInsertId, nil }
+func (r scriptedResult) RowsAffected() (int64, error) { return r.rowsAffected, nil }
 
 func (d *scriptedDriver) Connect(context.Context) (driver.Conn, error) {
 	return &scriptedConn{d: d}, nil
@@ -186,6 +204,9 @@ func (s *scriptedStmt) Exec(args []driver.Value) (driver.Result, error) {
 	}
 	if scripted.err != nil {
 		return nil, scripted.err
+	}
+	if scripted.lastInsertId != 0 {
+		return scriptedResult{rowsAffected: scripted.rowsAffected, lastInsertId: scripted.lastInsertId}, nil
 	}
 	return driver.RowsAffected(scripted.rowsAffected), nil
 }

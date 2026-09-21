@@ -23,19 +23,11 @@ func (d *CommonDatabase) CreateResource(tx *sql.Tx, resource *models.Resource) e
 
 	insertBuilder := resourceStruct.WithoutTag("pk").InsertInto("resources", resource)
 
-	sql, args := insertBuilder.Build()
-	result, err := d.ExecSql(tx, sql, args...)
+	id, err := d.insertReturningId(tx, insertBuilder, "resource")
 	if err != nil {
 		resource.CreatedAt = originalCreatedAt
 		resource.UpdatedAt = originalUpdatedAt
-		return errs.Wrap(err, "unable to insert resource")
-	}
-
-	id, err := result.LastInsertId()
-	if err != nil {
-		resource.CreatedAt = originalCreatedAt
-		resource.UpdatedAt = originalUpdatedAt
-		return errs.Wrap(err, "unable to get last insert id")
+		return err
 	}
 
 	resource.Id = id

@@ -31,19 +31,11 @@ func (d *CommonDatabase) CreateGroupPermission(tx *sql.Tx, groupPermission *mode
 
 	insertBuilder := groupPermissionStruct.WithoutTag("pk").InsertInto("groups_permissions", groupPermission)
 
-	sql, args := insertBuilder.Build()
-	result, err := d.ExecSql(tx, sql, args...)
+	id, err := d.insertReturningId(tx, insertBuilder, "groupPermission")
 	if err != nil {
 		groupPermission.CreatedAt = originalCreatedAt
 		groupPermission.UpdatedAt = originalUpdatedAt
-		return errs.Wrap(err, "unable to insert groupPermission")
-	}
-
-	id, err := result.LastInsertId()
-	if err != nil {
-		groupPermission.CreatedAt = originalCreatedAt
-		groupPermission.UpdatedAt = originalUpdatedAt
-		return errs.Wrap(err, "unable to get last insert id")
+		return err
 	}
 
 	groupPermission.Id = id

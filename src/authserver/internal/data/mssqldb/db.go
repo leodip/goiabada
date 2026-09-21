@@ -115,6 +115,7 @@ func NewMsSQLDatabase(dbConfig *DatabaseConfig, logSQL bool) (*MsSQLDatabase, er
 	commonDb := commondb.NewCommonDatabase(db, sqlbuilder.SQLServer, logSQL)
 	commonDb.IsDeadlock = isDeadlock
 	commonDb.IsUniqueViolation = isUniqueViolation
+	commonDb.InsertReturningIdSQL = insertReturningIdSQL
 
 	mssqlDb := MsSQLDatabase{
 		CommonDatabase: commonDb,

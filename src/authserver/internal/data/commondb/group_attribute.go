@@ -27,19 +27,11 @@ func (d *CommonDatabase) CreateGroupAttribute(tx *sql.Tx, groupAttribute *models
 
 	insertBuilder := groupAttributeStruct.WithoutTag("pk").InsertInto("group_attributes", groupAttribute)
 
-	sql, args := insertBuilder.Build()
-	result, err := d.ExecSql(tx, sql, args...)
+	id, err := d.insertReturningId(tx, insertBuilder, "groupAttribute")
 	if err != nil {
 		groupAttribute.CreatedAt = originalCreatedAt
 		groupAttribute.UpdatedAt = originalUpdatedAt
-		return errs.Wrap(err, "unable to insert groupAttribute")
-	}
-
-	id, err := result.LastInsertId()
-	if err != nil {
-		groupAttribute.CreatedAt = originalCreatedAt
-		groupAttribute.UpdatedAt = originalUpdatedAt
-		return errs.Wrap(err, "unable to get last insert id")
+		return err
 	}
 
 	groupAttribute.Id = id
