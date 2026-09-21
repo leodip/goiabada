@@ -746,10 +746,17 @@ func checkPackage(fset *token.FileSet, dir string, files []*ast.File) (*types.Sc
 func readDecl(pkg *packageSymbols, decl ast.Decl, scope *types.Scope, info *types.Info) {
 	switch d := decl.(type) {
 	case *ast.FuncDecl:
+		// A declaration with no body -- assembly, or a //go:linkname -- carries a typed nil that
+		// ast.Inspect dereferences, so the nil check inside collect cannot see it and the whole
+		// guard dies on a nil pointer rather than reporting. There are none in core today.
+		body := ast.Node(d.Body)
+		if d.Body == nil {
+			body = nil
+		}
 		if d.Recv == nil {
 			owner := pkg.node(d.Name.Name)
 			collect(pkg, owner.decl, d.Type, d.Name.Name, scope, info)
-			collect(pkg, owner.body, d.Body, d.Name.Name, scope, info)
+			collect(pkg, owner.body, body, d.Name.Name, scope, info)
 			return
 		}
 		// A method rides with its receiver, so it adds no row of its own and cannot vouch for the
@@ -762,42 +769,68 @@ func readDecl(pkg *packageSymbols, decl ast.Decl, scope *types.Scope, info *type
 		}
 		owner := pkg.node(name)
 		collect(pkg, owner.decl, d.Type, name, scope, info)
-		collect(pkg, owner.body, d.Body, name, scope, info)
+		collect(pkg, owner.body, body, name, scope, info)
 	case *ast.GenDecl:
 		if d.Tok == token.IMPORT {
 			return
 		}
+		// inherited is the const repetition rule: inside a parenthesized const declaration an
+		// omitted expression list is, in Go's words, the textual substitution of the nearest
+		// preceding non-empty one, so an omitted spec's names reach everything that expression
+		// reaches. Reading only the spec's own Values left that edge out, and a symbol the tree
+		// justifies would then have been offered an asserted escape hatch -- the one thing this
+		// table exists to refuse. It is read for a const alone, because a var omitting its values
+		// is taking the zero value rather than repeating anything. Final review round 2, finding 1.
+		var inherited []ast.Expr
 		for _, spec := range d.Specs {
 			switch s := spec.(type) {
 			case *ast.TypeSpec:
 				owner := pkg.node(s.Name.Name)
+				// A constraint is named in the type parameter list rather than in the type, and
+				// it is as much a part of the declaration as a struct field's type is.
+				if s.TypeParams != nil {
+					collect(pkg, owner.decl, s.TypeParams, s.Name.Name, scope, info)
+				}
 				collect(pkg, owner.decl, s.Type, s.Name.Name, scope, info)
 			case *ast.ValueSpec:
+				values := s.Values
+				switch {
+				case len(values) > 0:
+					inherited = values
+				case d.Tok == token.CONST:
+					values = inherited
+				}
 				for i, name := range s.Names {
 					owner := pkg.node(name.Name)
 					// One expression per name is positional, which is what Go means by
 					// `var a, b = f(), g()`: a is initialised by f and b by g, and nothing a
-					// names is evidence for anything b names. Any other count is the
-					// tuple-valued form, `var a, b = pair()`, where the single expression
-					// really does initialise both names -- or a const spec repeating the one
-					// above it, which has no expression of its own at all.
-					if len(s.Values) == len(s.Names) {
-						collect(pkg, owner.body, s.Values[i], name.Name, scope, info)
+					// names is evidence for anything b names. An inherited list is paired the
+					// same way, since Go requires it to have one expression per name. Any other
+					// count is the tuple-valued form, `var a, b = pair()`, where the single
+					// expression really does initialise both names.
+					if len(values) == len(s.Names) {
+						collect(pkg, owner.body, values[i], name.Name, scope, info)
 					} else {
-						for _, value := range s.Values {
+						for _, value := range values {
 							collect(pkg, owner.body, value, name.Name, scope, info)
 						}
 					}
-					// The declared type of a const or var never counts as evidence for the type:
-					// it is the second shape that lets an enum justify the type it enumerates.
-					// It is recorded instead, because the arrow runs the other way -- a const of a
-					// justified type is reachable. Deleting it from the body afterwards is what
+					// The type slot is part of the declaration, so what it names is reachable
+					// from a justified value: `var Registry map[string]Cog` is the only thing in
+					// the package that names Cog, and reading the values alone left it looking
+					// unjustified.
+					collect(pkg, owner.decl, s.Type, name.Name, scope, info)
+					// Its own named type is the exception, and never counts as evidence for that
+					// type: it is the second shape that lets an enum justify the type it
+					// enumerates. It is recorded instead, because the arrow runs the other way --
+					// a const of a justified type is reachable. Deleting it afterwards is what
 					// extends that to `LevelLow = Level("low")`, where the declared type is
 					// spelled in the initializer rather than in the type slot and would otherwise
 					// read as an ordinary reference to it.
 					if named := namedValueType(name.Name, scope); named != "" {
 						pkg.valueType[name.Name] = named
 						delete(owner.body, named)
+						delete(owner.decl, named)
 					}
 				}
 			}
@@ -950,11 +983,12 @@ func (c *symbolCensus) readReferences(root string, graph *importGraph, byImportP
 // test-support row that the tree can supply rather than contradict.
 //
 // It is a per-package pass rather than a branch of the reference walk because the two kinds of
-// test file in a directory resolve a name two different ways. An internal test (`package p`) names
-// a symbol unqualified, so it is type-checked together with the production files and read by
-// object identity, exactly as collect reads a production declaration. An external test
-// (`package p_test`) is a different package that reaches the symbol through the import, so it is
-// read as a selector like any other importing file.
+// test file in a directory resolve a name two different ways. An internal test, whose clause is
+// the production package's own name, names a symbol unqualified, so it is type-checked together
+// with the production files and read by object identity, exactly as collect reads a production
+// declaration. An external test, whose clause is that name with `_test` on the end, is a different
+// package that reaches the symbol through the import, so it is read as a selector like any other
+// importing file.
 //
 // Reading the internal arm by spelling instead is what the final review caught: a local variable,
 // a parameter or a field spelled like an exported orphan made the orphan look named, so
@@ -968,7 +1002,7 @@ func (c *symbolCensus) readOwnPackageTests(root, dir, importPath string) error {
 	}
 
 	fset := token.NewFileSet()
-	var production, internal, external []*ast.File
+	var production, tests []*ast.File
 	for _, entry := range entries {
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".go") {
 			continue
@@ -979,16 +1013,37 @@ func (c *symbolCensus) readOwnPackageTests(root, dir, importPath string) error {
 			// corePackageDirs.
 			continue
 		}
-		switch {
-		case !strings.HasSuffix(entry.Name(), "_test.go"):
-			if !exemptByBuildConstraint(file, fset) {
-				production = append(production, file)
-			}
-		case strings.HasSuffix(file.Name.Name, "_test"):
-			external = append(external, file)
-		default:
-			internal = append(internal, file)
+		if strings.HasSuffix(entry.Name(), "_test.go") {
+			tests = append(tests, file)
+			continue
 		}
+		if !exemptByBuildConstraint(file, fset) {
+			production = append(production, file)
+		}
+	}
+
+	// Which of the two shapes a test file is, is decided by the declaring package's own name
+	// rather than by whether the test's package clause ends in `_test`. A production package may
+	// legally be named that way, and then its internal tests carry the same clause: the spelling
+	// sent them down the external arm, which looks for a self-import no internal test has, and the
+	// guard refused genuine evidence for test-support. The suffix is the fallback for a directory
+	// whose production files did not parse, where there is no name to compare against. Final
+	// review round 2, finding 2.
+	declared := ""
+	if len(production) > 0 {
+		declared = production[0].Name.Name
+	}
+	var internal, external []*ast.File
+	for _, file := range tests {
+		isExternal := strings.HasSuffix(file.Name.Name, "_test")
+		if declared != "" {
+			isExternal = file.Name.Name != declared
+		}
+		if isExternal {
+			external = append(external, file)
+			continue
+		}
+		internal = append(internal, file)
 	}
 
 	pkg := c.pkgs[dir]
