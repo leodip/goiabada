@@ -1,6 +1,7 @@
 package commondb
 
 import (
+	"context"
 	"database/sql"
 	"time"
 
@@ -25,7 +26,7 @@ func (d *CommonDatabase) CreateWebOrigin(tx *sql.Tx, webOrigin *models.WebOrigin
 
 	insertBuilder := webOriginStruct.WithoutTag("pk").InsertInto("web_origins", webOrigin)
 
-	id, err := d.insertReturningId(tx, insertBuilder, "webOrigin")
+	id, err := d.insertReturningId(context.Background(), tx, insertBuilder, "webOrigin")
 	if err != nil {
 		webOrigin.CreatedAt = originalCreatedAt
 		return err
@@ -39,7 +40,7 @@ func (d *CommonDatabase) getWebOriginCommon(tx *sql.Tx, selectBuilder *sqlbuilde
 	webOriginStruct *sqlbuilder.Struct) (*models.WebOrigin, error) {
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(tx, sql, args...)
+	rows, err := d.QuerySql(context.Background(), tx, sql, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -86,7 +87,7 @@ func (d *CommonDatabase) GetWebOriginsByClientId(tx *sql.Tx, clientId int64) ([]
 	selectBuilder.Where(selectBuilder.Equal("client_id", clientId))
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(tx, sql, args...)
+	rows, err := d.QuerySql(context.Background(), tx, sql, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -118,7 +119,7 @@ func (d *CommonDatabase) GetAllWebOrigins(tx *sql.Tx) ([]models.WebOrigin, error
 	selectBuilder := webOriginStruct.SelectFrom("web_origins")
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(tx, sql, args...)
+	rows, err := d.QuerySql(context.Background(), tx, sql, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -160,7 +161,7 @@ func (d *CommonDatabase) WebOriginExists(tx *sql.Tx, origin string) (bool, error
 	selectBuilder.Where(selectBuilder.Equal("origin", origin))
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(tx, sql, args...)
+	rows, err := d.QuerySql(context.Background(), tx, sql, args...)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to query database")
 	}
@@ -189,7 +190,7 @@ func (d *CommonDatabase) DeleteWebOrigin(tx *sql.Tx, webOriginId int64) error {
 	deleteBuilder.Where(deleteBuilder.Equal("id", webOriginId))
 
 	sql, args := deleteBuilder.Build()
-	_, err := d.ExecSql(tx, sql, args...)
+	_, err := d.ExecSql(context.Background(), tx, sql, args...)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete webOrigin")
 	}

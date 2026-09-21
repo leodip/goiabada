@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"database/sql"
 
 	"github.com/leodip/goiabada/authserver/internal/data"
@@ -33,12 +34,12 @@ import (
 // The browser caller needs the returned value: it captured the pre-enrollment generation at
 // /auth/level2, and promoting that at /auth/completed would leave a session that just
 // enrolled and verified owing another second-factor prompt at once.
-func EnableUserOTPTx(database data.Database, user *models.User) (int64, error) {
+func EnableUserOTPTx(ctx context.Context, database data.Database, user *models.User) (int64, error) {
 	// Opened through RunInTransaction, so a deadlock reruns the three writes together (#301).
 	// Safe to rerun: the user model was set by the caller before this opened and is written
 	// unchanged on every attempt, and generation is the committing attempt's.
 	var generation int64
-	err := database.RunInTransaction(func(tx *sql.Tx) error {
+	err := database.RunInTransaction(ctx, func(tx *sql.Tx) error {
 		if err := database.UpdateUser(tx, user); err != nil {
 			return err
 		}

@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/leodip/goiabada/core/testutil"
@@ -65,6 +66,10 @@ type scriptedDriver struct {
 	statements []string
 
 	openTx int
+	// txOptions is every transaction's options as they reached the driver, which is how a test
+	// says the isolation level is still the default one: commondb opens with BeginTx(ctx, nil)
+	// and nothing in the repository asks for an isolation level.
+	txOptions []driver.TxOptions
 	// commits counts every Commit the driver was asked for, including the ones commitErrs
 	// scripted to fail; rollbacks likewise. A commit that fails is still a commit that was
 	// attempted, and RunInTransaction's contract is about how many times it asked.
@@ -99,6 +104,12 @@ type scriptedExec struct {
 	rowsAffected int64
 	lastInsertId int64
 	err          error
+	// delay is how long the engine spends inside this statement before answering, and it is
+	// interruptible: the wait is a select on the call's context, so a deadline landing inside
+	// the statement is reported as the context's error and not slept through. It is the only
+	// way this seam can observe a cancellation that arrives mid-call, and it works only because
+	// the driver implements StmtExecContext -- see the context interfaces below (#386).
+	delay time.Duration
 }
 
 // scriptedResult is what a statement answers once it has an id to report. driver.RowsAffected
@@ -130,6 +141,32 @@ func (c *scriptedConn) Close() error { return nil }
 func (c *scriptedConn) Begin() (driver.Tx, error) {
 	c.d.mu.Lock()
 	defer c.d.mu.Unlock()
+	c.inTx = true
+	c.d.openTx++
+	return &scriptedTx{c: c}, nil
+}
+
+// THE THREE CONTEXT INTERFACES, and why a legacy driver is not enough.
+//
+// database/sql refuses an ALREADY cancelled context before it touches the driver, whatever the
+// driver implements. What it cannot do for a driver implementing only Conn.Begin, Stmt.Exec and
+// Stmt.Query is interrupt a call already in progress: probe/driverfallback measured a 100ms
+// deadline against a 700ms legacy Exec returning after 700ms with a NIL error. Every case in
+// run_in_transaction_test.go about a cancellation arriving mid-call would therefore pass on a
+// helper that ignored the context entirely.
+//
+// So the driver implements driver.ConnBeginTx, driver.StmtExecContext and driver.StmtQueryContext,
+// each honouring the context around the answer it was scripted. The legacy methods stay and share
+// the same core, because they are still what a Conn without a transaction reaches in some
+// database/sql paths and nothing about their behaviour moves (#386).
+
+func (c *scriptedConn) BeginTx(ctx context.Context, opts driver.TxOptions) (driver.Tx, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	c.d.mu.Lock()
+	defer c.d.mu.Unlock()
+	c.d.txOptions = append(c.d.txOptions, opts)
 	c.inTx = true
 	c.d.openTx++
 	return &scriptedTx{c: c}, nil
@@ -185,6 +222,14 @@ func (s *scriptedStmt) noteStatement() {
 }
 
 func (s *scriptedStmt) Exec(args []driver.Value) (driver.Result, error) {
+	return s.exec(context.Background(), args)
+}
+
+func (s *scriptedStmt) ExecContext(ctx context.Context, args []driver.NamedValue) (driver.Result, error) {
+	return s.exec(ctx, namedToValues(args))
+}
+
+func (s *scriptedStmt) exec(ctx context.Context, args []driver.Value) (driver.Result, error) {
 	s.noteStatement()
 
 	d := s.c.d
@@ -202,6 +247,9 @@ func (s *scriptedStmt) Exec(args []driver.Value) (driver.Result, error) {
 	if scripted == nil {
 		return driver.RowsAffected(1), nil
 	}
+	if err := spendInsideTheCall(ctx, scripted.delay); err != nil {
+		return nil, err
+	}
 	if scripted.err != nil {
 		return nil, scripted.err
 	}
@@ -211,7 +259,15 @@ func (s *scriptedStmt) Exec(args []driver.Value) (driver.Result, error) {
 	return driver.RowsAffected(scripted.rowsAffected), nil
 }
 
-func (s *scriptedStmt) Query([]driver.Value) (driver.Rows, error) {
+func (s *scriptedStmt) Query(args []driver.Value) (driver.Rows, error) {
+	return s.runQuery(context.Background(), args)
+}
+
+func (s *scriptedStmt) QueryContext(ctx context.Context, args []driver.NamedValue) (driver.Rows, error) {
+	return s.runQuery(ctx, namedToValues(args))
+}
+
+func (s *scriptedStmt) runQuery(ctx context.Context, _ []driver.Value) (driver.Rows, error) {
 	s.noteStatement()
 
 	d := s.c.d
@@ -229,10 +285,39 @@ func (s *scriptedStmt) Query([]driver.Value) (driver.Rows, error) {
 		return &scriptedRows{}, nil
 	}
 	r := *scripted
+	if err := spendInsideTheCall(ctx, r.delay); err != nil {
+		return nil, err
+	}
 	if r.openErr != nil {
 		return nil, r.openErr
 	}
 	return &r, nil
+}
+
+// spendInsideTheCall is the engine taking d to answer, interruptibly. A zero delay answers at
+// once, which is every case that is not about cancellation.
+func spendInsideTheCall(ctx context.Context, d time.Duration) error {
+	if d <= 0 {
+		return ctx.Err()
+	}
+	timer := time.NewTimer(d)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
+}
+
+// namedToValues drops the names database/sql attaches, because nothing here binds by name and
+// execArgs has always been a positional list.
+func namedToValues(args []driver.NamedValue) []driver.Value {
+	values := make([]driver.Value, len(args))
+	for i, a := range args {
+		values[i] = a.Value
+	}
+	return values
 }
 
 // scriptedRows yields values and then either ends or fails. failAt counts rows emitted
@@ -249,7 +334,10 @@ type scriptedRows struct {
 	err    error
 	// openErr fails the query itself rather than its iteration, which is the difference
 	// between a statement the engine refused and a result set that died being read.
-	openErr  error
+	openErr error
+	// delay is how long the engine spends before the result set exists, interruptible on the
+	// query's context. See scriptedExec.delay.
+	delay    time.Duration
 	returned int
 }
 

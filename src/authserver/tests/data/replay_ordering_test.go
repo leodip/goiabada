@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"context"
 	"database/sql"
 	"testing"
 
@@ -78,7 +79,7 @@ func TestLockOrder_ReplayResponseAgainstTermination(t *testing.T) {
 		code := createTestCodeInSession(t, client.Id, user.Id, session.SessionIdentifier)
 		token := createTokenOfCode(t, client.Id, user.Id, code.Id, session.SessionIdentifier)
 
-		tx, err := database.BeginTransaction()
+		tx, err := database.BeginTransaction(context.Background())
 		require.NoError(t, err, "opening the replay's transaction")
 		defer func() { _ = database.RollbackTransaction(tx) }()
 
@@ -90,7 +91,7 @@ func TestLockOrder_ReplayResponseAgainstTermination(t *testing.T) {
 		// Its first statement is the delete, which is what makes it wait.
 		termination := goBlocked(t, "the termination", tx, func(reached func()) error {
 			reached()
-			_, err := handlers.TerminateUserSessionTx(other, session)
+			_, err := handlers.TerminateUserSessionTx(context.Background(), other, session)
 			return err
 		})
 
@@ -115,7 +116,7 @@ func TestLockOrder_ReplayResponseAgainstTermination(t *testing.T) {
 		code := createTestCodeInSession(t, client.Id, user.Id, session.SessionIdentifier)
 		token := createTokenOfCode(t, client.Id, user.Id, code.Id, session.SessionIdentifier)
 
-		tx, err := database.BeginTransaction()
+		tx, err := database.BeginTransaction(context.Background())
 		require.NoError(t, err, "opening the termination's transaction")
 		defer func() { _ = database.RollbackTransaction(tx) }()
 
@@ -127,7 +128,7 @@ func TestLockOrder_ReplayResponseAgainstTermination(t *testing.T) {
 			err  error
 		}
 		replay := goBlocked(t, "the replay response", tx, func(reached func()) replayOutcome {
-			otherTx, err := other.BeginTransaction()
+			otherTx, err := other.BeginTransaction(context.Background())
 			if err != nil {
 				reached()
 				return replayOutcome{err: err}

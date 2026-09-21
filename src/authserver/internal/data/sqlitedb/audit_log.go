@@ -1,6 +1,7 @@
 package sqlitedb
 
 import (
+	"context"
 	"database/sql"
 	"time"
 )
@@ -11,7 +12,7 @@ func (d *SQLiteDatabase) DeleteOldAuditLogs(tx *sql.Tx, cutoff time.Time, maxDel
 		SELECT id FROM audit_logs WHERE created_at < ? ORDER BY id LIMIT ?
 	)`
 
-	result, err := d.ExecSql(tx, deleteSQL, cutoff, maxDeletions)
+	result, err := d.ExecSql(context.Background(), tx, deleteSQL, cutoff, maxDeletions)
 	if err != nil {
 		return 0, err
 	}

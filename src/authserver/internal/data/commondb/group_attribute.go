@@ -1,6 +1,7 @@
 package commondb
 
 import (
+	"context"
 	"database/sql"
 	"time"
 
@@ -27,7 +28,7 @@ func (d *CommonDatabase) CreateGroupAttribute(tx *sql.Tx, groupAttribute *models
 
 	insertBuilder := groupAttributeStruct.WithoutTag("pk").InsertInto("group_attributes", groupAttribute)
 
-	id, err := d.insertReturningId(tx, insertBuilder, "groupAttribute")
+	id, err := d.insertReturningId(context.Background(), tx, insertBuilder, "groupAttribute")
 	if err != nil {
 		groupAttribute.CreatedAt = originalCreatedAt
 		groupAttribute.UpdatedAt = originalUpdatedAt
@@ -54,7 +55,7 @@ func (d *CommonDatabase) UpdateGroupAttribute(tx *sql.Tx, groupAttribute *models
 	updateBuilder.Where(updateBuilder.Equal("id", groupAttribute.Id))
 
 	sql, args := updateBuilder.Build()
-	_, err := d.ExecSql(tx, sql, args...)
+	_, err := d.ExecSql(context.Background(), tx, sql, args...)
 	if err != nil {
 		groupAttribute.UpdatedAt = originalUpdatedAt
 		return errs.Wrap(err, "unable to update groupAttribute")
@@ -67,7 +68,7 @@ func (d *CommonDatabase) getGroupAttributeCommon(tx *sql.Tx, selectBuilder *sqlb
 	groupAttributeStruct *sqlbuilder.Struct) (*models.GroupAttribute, error) {
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(tx, sql, args...)
+	rows, err := d.QuerySql(context.Background(), tx, sql, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -121,7 +122,7 @@ func (d *CommonDatabase) GetGroupAttributesByGroupIds(tx *sql.Tx, groupIds []int
 		selectBuilder.Where(selectBuilder.In("group_id", sqlbuilder.Flatten(batch)...))
 
 		sql, args := selectBuilder.Build()
-		rows, err := d.QuerySql(tx, sql, args...)
+		rows, err := d.QuerySql(context.Background(), tx, sql, args...)
 		if err != nil {
 			return errs.Wrap(err, "unable to query database")
 		}
@@ -159,7 +160,7 @@ func (d *CommonDatabase) GetGroupAttributesByGroupId(tx *sql.Tx, groupId int64) 
 	selectBuilder.Where(selectBuilder.Equal("group_id", groupId))
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(tx, sql, args...)
+	rows, err := d.QuerySql(context.Background(), tx, sql, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -192,7 +193,7 @@ func (d *CommonDatabase) DeleteGroupAttribute(tx *sql.Tx, groupAttributeId int64
 	deleteBuilder.Where(deleteBuilder.Equal("id", groupAttributeId))
 
 	sql, args := deleteBuilder.Build()
-	_, err := d.ExecSql(tx, sql, args...)
+	_, err := d.ExecSql(context.Background(), tx, sql, args...)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete groupAttribute")
 	}

@@ -122,7 +122,7 @@ func HandleAPIUserSessionDelete(
 		// session revoked and sweeps the refresh tokens those grants produced, all in one
 		// transaction (#129 decision 5). The 404 above answers first, so a missing session never
 		// opens one.
-		result, err := handlers.TerminateUserSessionTx(database, userSession)
+		result, err := handlers.TerminateUserSessionTx(r.Context(), database, userSession)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return

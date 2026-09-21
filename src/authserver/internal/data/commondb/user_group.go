@@ -1,6 +1,7 @@
 package commondb
 
 import (
+	"context"
 	"database/sql"
 	"time"
 
@@ -31,7 +32,7 @@ func (d *CommonDatabase) CreateUserGroup(tx *sql.Tx, userGroup *models.UserGroup
 
 	insertBuilder := userGroupStruct.WithoutTag("pk").InsertInto("users_groups", userGroup)
 
-	id, err := d.insertReturningId(tx, insertBuilder, "userGroup")
+	id, err := d.insertReturningId(context.Background(), tx, insertBuilder, "userGroup")
 	if err != nil {
 		userGroup.CreatedAt = originalCreatedAt
 		userGroup.UpdatedAt = originalUpdatedAt
@@ -58,7 +59,7 @@ func (d *CommonDatabase) UpdateUserGroup(tx *sql.Tx, userGroup *models.UserGroup
 	updateBuilder.Where(updateBuilder.Equal("id", userGroup.Id))
 
 	sql, args := updateBuilder.Build()
-	_, err := d.ExecSql(tx, sql, args...)
+	_, err := d.ExecSql(context.Background(), tx, sql, args...)
 	if err != nil {
 		userGroup.UpdatedAt = originalUpdatedAt
 		return errs.Wrap(err, "unable to update userGroup")
@@ -71,7 +72,7 @@ func (d *CommonDatabase) getUserGroupCommon(tx *sql.Tx, selectBuilder *sqlbuilde
 	userGroupStruct *sqlbuilder.Struct) (*models.UserGroup, error) {
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(tx, sql, args...)
+	rows, err := d.QuerySql(context.Background(), tx, sql, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -125,7 +126,7 @@ func (d *CommonDatabase) GetUserGroupsByUserIds(tx *sql.Tx, userIds []int64) ([]
 		selectBuilder.Where(selectBuilder.In("user_id", sqlbuilder.Flatten(batch)...))
 
 		sql, args := selectBuilder.Build()
-		rows, err := d.QuerySql(tx, sql, args...)
+		rows, err := d.QuerySql(context.Background(), tx, sql, args...)
 		if err != nil {
 			return errs.Wrap(err, "unable to query database")
 		}
@@ -163,7 +164,7 @@ func (d *CommonDatabase) GetUserGroupsByUserId(tx *sql.Tx, userId int64) ([]mode
 	selectBuilder.Where(selectBuilder.Equal("user_id", userId))
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(tx, sql, args...)
+	rows, err := d.QuerySql(context.Background(), tx, sql, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -213,7 +214,7 @@ func (d *CommonDatabase) DeleteUserGroup(tx *sql.Tx, userGroupId int64) error {
 	deleteBuilder.Where(deleteBuilder.Equal("id", userGroupId))
 
 	sql, args := deleteBuilder.Build()
-	_, err := d.ExecSql(tx, sql, args...)
+	_, err := d.ExecSql(context.Background(), tx, sql, args...)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete userGroup")
 	}

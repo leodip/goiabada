@@ -1,6 +1,7 @@
 package datafactory
 
 import (
+	"context"
 	"log/slog"
 	"path/filepath"
 	"reflect"
@@ -381,7 +382,7 @@ func TestOpenDatabase_PassesLogSQLToTheEngine(t *testing.T) {
 
 			capture := testutil.CaptureSlog(t)
 
-			tx, err := database.BeginTransaction()
+			tx, err := database.BeginTransaction(context.Background())
 			require.NoError(t, err)
 			require.NoError(t, database.RollbackTransaction(tx))
 

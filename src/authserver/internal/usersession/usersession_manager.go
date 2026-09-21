@@ -145,7 +145,7 @@ func (u *UserSessionManager) StartNewUserSession(w http.ResponseWriter, r *http.
 	// committed session row that no cookie named, sometimes having already deleted the session the
 	// browser did have (#198). Only the browser-store write below is left after the commit, and it
 	// is compensated rather than prevented: see abandonUserSession.
-	err = u.database.RunInTransaction(func(tx *sql.Tx) error {
+	err = u.database.RunInTransaction(r.Context(), func(tx *sql.Tx) error {
 		if err := u.database.CreateUserSession(tx, userSession); err != nil {
 			return err
 		}
@@ -349,7 +349,7 @@ func (u *UserSessionManager) BumpUserSession(r *http.Request, sessionIdentifier 
 		// transaction opened and the body only reads it: the insert-versus-update decision comes
 		// from client.Id on a copy, so an attempt that inserted leaves the slice as it found it
 		// and the rerun decides the same way.
-		err = u.database.RunInTransaction(func(tx *sql.Tx) error {
+		err = u.database.RunInTransaction(r.Context(), func(tx *sql.Tx) error {
 			if err := u.database.UpdateUserSession(tx, userSession); err != nil {
 				return err
 			}

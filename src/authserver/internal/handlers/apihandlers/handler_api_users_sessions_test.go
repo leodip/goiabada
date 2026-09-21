@@ -210,6 +210,6 @@ func TestHandleAPIUserSessionDelete_NotFoundDoesNotTerminate(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, rr.Code)
 	database.AssertExpectations(t)
 	// No transaction is opened for a session that does not exist.
-	database.AssertNotCalled(t, "RunInTransaction", mock.Anything)
+	database.AssertNotCalled(t, "RunInTransaction", mock.Anything, mock.Anything)
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 }

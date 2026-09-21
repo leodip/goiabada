@@ -931,7 +931,7 @@ func TestStartNewUserSession_RefusesAMissingCredentialInstant(t *testing.T) {
 			// Nothing may have been written on either side of the refusal: the argument
 			// counts below match each method's arity, because AssertNotCalled compares the
 			// whole argument list and a wrong count would match nothing and assert nothing.
-			m.db.AssertNotCalled(t, "RunInTransaction", mock.Anything)
+			m.db.AssertNotCalled(t, "RunInTransaction", mock.Anything, mock.Anything)
 			m.db.AssertNotCalled(t, "CreateUserSession", mock.Anything, mock.Anything)
 			m.db.AssertNotCalled(t, "CreateUserSessionClient", mock.Anything, mock.Anything)
 			m.db.AssertNotCalled(t, "GetUserSessionsByUserId", mock.Anything, mock.Anything)

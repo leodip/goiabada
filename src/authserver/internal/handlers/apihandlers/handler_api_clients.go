@@ -1,6 +1,7 @@
 package apihandlers
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -67,11 +68,11 @@ import (
 // It does not close the lost update on the columns each endpoint DOES own: two concurrent saves
 // of the same section still last-write-wins, which is how every entity in this codebase behaves
 // and is a separate, wider question.
-func updateClientNotOwningAuthenticationMode(database data.Database, client *models.Client) error {
+func updateClientNotOwningAuthenticationMode(ctx context.Context, database data.Database, client *models.Client) error {
 	// Opened through RunInTransaction, so a deadlock reruns the acquisition, the re-read and the
 	// write together (#301). Safe to rerun: the two columns are copied from the row re-read under
 	// this attempt's own lock, and applyPublicClientInvariants is idempotent on the result.
-	return database.RunInTransaction(func(tx *sql.Tx) error {
+	return database.RunInTransaction(ctx, func(tx *sql.Tx) error {
 		if err := database.AcquireClientRow(tx, client.Id); err != nil {
 			return err
 		}
@@ -563,7 +564,7 @@ func HandleAPIClientUpdatePut(
 			client.DefaultAcrLevel = acrLevel
 		}
 
-		if err := updateClientNotOwningAuthenticationMode(database, client); err != nil {
+		if err := updateClientNotOwningAuthenticationMode(r.Context(), database, client); err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error updating client"), "client_id", client.Id, "client_identifier", client.ClientIdentifier)
 			return
 		}
@@ -672,7 +673,7 @@ func HandleAPIClientAuthenticationPut(
 		// review finding 1, decision 17).
 		if req.IsPublic {
 			var becamePublic bool
-			result, err := handlers.RevokeClientGrantsTx(database, client.Id, func(tx *sql.Tx) (bool, error) {
+			result, err := handlers.RevokeClientGrantsTx(r.Context(), database, client.Id, func(tx *sql.Tx) (bool, error) {
 				var err error
 				becamePublic, err = database.SetClientPublic(tx, client.Id)
 				if err != nil {
@@ -784,7 +785,7 @@ func HandleAPIClientOAuth2FlowsPut(
 		// became public in between would have its two rules skipped and be saved with client
 		// credentials on and PKCE off, which is the state this whole change exists to make
 		// unreachable (#245, final review finding 1).
-		if err := updateClientNotOwningAuthenticationMode(database, client); err != nil {
+		if err := updateClientNotOwningAuthenticationMode(r.Context(), database, client); err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error updating client OAuth2 flows"), "client_id", client.Id)
 			return
 		}
@@ -1065,7 +1066,7 @@ func HandleAPIClientWebOriginsPut(
 		// webOriginsWriteFailure that keeps the database's own error in the chain, so the helper's
 		// classifier still sees a deadlock, and nothing is logged or written to the response until
 		// the helper has returned: an attempt that is about to be rerun must not answer.
-		err = database.RunInTransaction(func(tx *sql.Tx) error {
+		err = database.RunInTransaction(r.Context(), func(tx *sql.Tx) error {
 			if err := database.AcquireClientRow(tx, client.Id); err != nil {
 				return &webOriginsWriteFailure{
 					logMessage: "AuthServer API: Database error acquiring client row for web origins update",
@@ -1247,7 +1248,7 @@ func HandleAPIClientTokensPut(
 		client.IncludeOpenIDConnectClaimsInAccessToken = includeClaimsInAccessToken.String()
 		client.IncludeOpenIDConnectClaimsInIdToken = includeClaimsInIdToken.String()
 
-		if err := updateClientNotOwningAuthenticationMode(database, client); err != nil {
+		if err := updateClientNotOwningAuthenticationMode(r.Context(), database, client); err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error updating client tokens"), "client_id", client.Id)
 			return
 		}

@@ -2,6 +2,7 @@ package apihandlers
 
 import (
 	"bytes"
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -76,7 +77,7 @@ func TestUpdateClientNotOwningAuthenticationMode_TakesTheModeFromTheRowNotTheCal
 		Run(func(args mock.Arguments) { written = args.Get(1).(*models.Client) }).Return(nil).Once()
 
 	stale := &models.Client{Id: 7, IsPublic: true, ClientSecretEncrypted: nil, Description: "edited"}
-	require.NoError(t, updateClientNotOwningAuthenticationMode(database, stale))
+	require.NoError(t, updateClientNotOwningAuthenticationMode(context.Background(), database, stale))
 
 	require.NotNil(t, written)
 	assert.False(t, written.IsPublic, "the write must carry the row's authentication mode")
@@ -129,7 +130,7 @@ func TestUpdateClientNotOwningAuthenticationMode_ReappliesThePublicInvariantsAga
 		PKCERequired:             &pkceOff,
 		ClientCredentialsEnabled: true,
 	}
-	require.NoError(t, updateClientNotOwningAuthenticationMode(database, stale))
+	require.NoError(t, updateClientNotOwningAuthenticationMode(context.Background(), database, stale))
 
 	require.NotNil(t, written)
 	assert.True(t, written.IsPublic, "the write must carry the row's authentication mode")
@@ -164,7 +165,7 @@ func TestUpdateClientNotOwningAuthenticationMode_LeavesAConfidentialClientsFlows
 		PKCERequired:             &pkceOff,
 		ClientCredentialsEnabled: true,
 	}
-	require.NoError(t, updateClientNotOwningAuthenticationMode(database, client))
+	require.NoError(t, updateClientNotOwningAuthenticationMode(context.Background(), database, client))
 
 	require.NotNil(t, written)
 	assert.True(t, written.ClientCredentialsEnabled,
@@ -183,7 +184,7 @@ func TestUpdateClientNotOwningAuthenticationMode_ADisappearedClientIsAnErrorNotA
 	database.On("AcquireClientRow", clientUpdateTx, int64(7)).Return(nil).Once()
 	database.On("GetClientById", clientUpdateTx, int64(7)).Return(nil, nil).Once()
 
-	err := updateClientNotOwningAuthenticationMode(database, &models.Client{Id: 7})
+	err := updateClientNotOwningAuthenticationMode(context.Background(), database, &models.Client{Id: 7})
 	require.Error(t, err)
 	assert.Equal(t, err, stub.bodyErr, "the body hands its error to the helper, which rolls back")
 	assertNotAttemptedOnClientDatabase(t, database, "UpdateClient")
@@ -201,7 +202,7 @@ func TestUpdateClientNotOwningAuthenticationMode_AFailedAcquisitionDoesNotWrite(
 	database.On("AcquireClientRow", clientUpdateTx, int64(7)).
 		Return(errors.New("deadlock found when trying to get lock")).Once()
 
-	err := updateClientNotOwningAuthenticationMode(database, &models.Client{Id: 7, IsPublic: true})
+	err := updateClientNotOwningAuthenticationMode(context.Background(), database, &models.Client{Id: 7, IsPublic: true})
 	require.Error(t, err)
 	assert.Equal(t, err, stub.bodyErr, "the body hands its error to the helper unchanged, which is what lets a real deadlock be rerun")
 	assertNotAttemptedOnClientDatabase(t, database, "GetClientById", "UpdateClient")
@@ -492,7 +493,7 @@ func TestHandleAPIClientWebOriginsPut_ARerunAttemptAnswersOnce(t *testing.T) {
 
 	deadlock := errors.New("Error 1213: Deadlock found when trying to get lock")
 	attempts := 0
-	database.EXPECT().RunInTransaction(mock.Anything).RunAndReturn(func(fn func(tx *sql.Tx) error) error {
+	database.EXPECT().RunInTransaction(mock.Anything, mock.Anything).RunAndReturn(func(_ context.Context, fn func(tx *sql.Tx) error) error {
 		for {
 			attempts++
 			err := fn(clientUpdateTx)
@@ -577,5 +578,5 @@ func TestHandleAPIClientWebOriginsPut_AnOverlongOriginIsRefusedNotStored(t *test
 	assert.Equal(t, http.StatusBadRequest, rr.Code)
 	assert.Contains(t, rr.Body.String(), "too long")
 	database.AssertExpectations(t)
-	database.AssertNotCalled(t, "RunInTransaction", mock.Anything)
+	database.AssertNotCalled(t, "RunInTransaction", mock.Anything, mock.Anything)
 }

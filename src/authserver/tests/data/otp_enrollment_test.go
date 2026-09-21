@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"context"
 	"database/sql"
 	"testing"
 	"time"
@@ -224,7 +225,7 @@ func TestPendingOTPEnrollment_EnlistsInTheCallersTransaction(t *testing.T) {
 	ciphertext := encryptedKeyURL(t, "GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG")
 
 	// The install, rolled back.
-	tx, err := database.BeginTransaction()
+	tx, err := database.BeginTransaction(context.Background())
 	require.NoError(t, err, "BeginTransaction")
 	installed, err := database.TryInstallPendingOTPEnrollment(tx, user.Id, ciphertext, now,
 		now.Add(-15*time.Minute))
@@ -242,7 +243,7 @@ func TestPendingOTPEnrollment_EnlistsInTheCallersTransaction(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, installed)
 
-	tx, err = database.BeginTransaction()
+	tx, err = database.BeginTransaction(context.Background())
 	require.NoError(t, err, "BeginTransaction")
 	require.NoError(t, database.ClearPendingOTPEnrollment(tx, user.Id), "ClearPendingOTPEnrollment")
 	require.NoError(t, database.RollbackTransaction(tx), "RollbackTransaction")
@@ -271,7 +272,7 @@ func TestEnableUserOTPTx_ClearsThePendingEnrollment(t *testing.T) {
 	// including the clear must roll back with it.
 	broken := reloadUser(t, user.Id)
 	broken.Id = 0
-	_, err = handlers.EnableUserOTPTx(database, broken)
+	_, err = handlers.EnableUserOTPTx(context.Background(), database, broken)
 	require.Error(t, err, "EnableUserOTPTx must fail on a user with id 0")
 
 	assert.Equal(t, ciphertext, reloadUser(t, user.Id).OtpEnrollmentSecretEncrypted,
@@ -281,7 +282,7 @@ func TestEnableUserOTPTx_ClearsThePendingEnrollment(t *testing.T) {
 	enrolling := reloadUser(t, user.Id)
 	enrolling.OTPEnabled = true
 	require.NoError(t, enrolling.SetOTPSecret("ZP2Z5KXRBAPPHWXEHH65PY5H7EKLVHRZ"), "SetOTPSecret")
-	generation, err := handlers.EnableUserOTPTx(database, enrolling)
+	generation, err := handlers.EnableUserOTPTx(context.Background(), database, enrolling)
 	require.NoError(t, err, "EnableUserOTPTx")
 	assert.EqualValues(t, 1, generation, "the counter advance still happens")
 

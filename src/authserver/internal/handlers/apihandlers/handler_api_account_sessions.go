@@ -130,7 +130,7 @@ func HandleAPIAccountSessionDelete(
 		// through the session revoked and sweeps the refresh tokens those grants produced, in one
 		// transaction (#129 decision 5). The ownership check above answers 403 first, so this is
 		// never reached for somebody else's session.
-		result, err := handlers.TerminateUserSessionTx(database, us)
+		result, err := handlers.TerminateUserSessionTx(r.Context(), database, us)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return

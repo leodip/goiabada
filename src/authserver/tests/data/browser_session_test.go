@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"context"
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
@@ -442,7 +443,7 @@ func TestBrowserSession_StorageFailuresAreErrors(t *testing.T) {
 
 	deadTx := func(t *testing.T) *sql.Tx {
 		t.Helper()
-		tx, err := database.BeginTransaction()
+		tx, err := database.BeginTransaction(context.Background())
 		require.NoError(t, err, "BeginTransaction")
 		require.NoError(t, database.RollbackTransaction(tx), "RollbackTransaction")
 		return tx
@@ -549,7 +550,7 @@ func TestBrowserSession_EnlistsInTheCallersTransaction(t *testing.T) {
 	t.Run("CreateBrowserSession", func(t *testing.T) {
 		bs := newBrowserSession(ownerAuthServer, now, time.Hour)
 
-		tx, err := database.BeginTransaction()
+		tx, err := database.BeginTransaction(context.Background())
 		require.NoError(t, err, "BeginTransaction")
 
 		require.NoError(t, database.CreateBrowserSession(tx, bs), "CreateBrowserSession")
@@ -569,7 +570,7 @@ func TestBrowserSession_EnlistsInTheCallersTransaction(t *testing.T) {
 	t.Run("UpdateBrowserSessionData", func(t *testing.T) {
 		bs := createTestBrowserSession(t, ownerAuthServer, now, time.Hour)
 
-		tx, err := database.BeginTransaction()
+		tx, err := database.BeginTransaction(context.Background())
 		require.NoError(t, err, "BeginTransaction")
 
 		moved, err := database.UpdateBrowserSessionData(tx, bs.Owner, bs.SessionIdHash, "rewritten",
@@ -588,7 +589,7 @@ func TestBrowserSession_EnlistsInTheCallersTransaction(t *testing.T) {
 	t.Run("DeleteBrowserSession", func(t *testing.T) {
 		bs := createTestBrowserSession(t, ownerAuthServer, now, time.Hour)
 
-		tx, err := database.BeginTransaction()
+		tx, err := database.BeginTransaction(context.Background())
 		require.NoError(t, err, "BeginTransaction")
 
 		require.NoError(t, database.DeleteBrowserSession(tx, bs.Owner, bs.SessionIdHash))

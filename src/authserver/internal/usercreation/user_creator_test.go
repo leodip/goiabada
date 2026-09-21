@@ -1,6 +1,7 @@
 package usercreation
 
 import (
+	"context"
 	"database/sql"
 	"testing"
 
@@ -52,7 +53,7 @@ func TestUserCreator_CreateUser_WritesTheUserAndItsAccountPermissionInOneTransac
 		return up.UserId == 77 && up.PermissionId == accountPermissionId
 	})).Run(func(mock.Arguments) { calls = append(calls, "permission row") }).Return(nil).Once()
 
-	user, err := NewUserCreator(db).CreateUser(&CreateUserInput{
+	user, err := NewUserCreator(db).CreateUser(context.Background(), &CreateUserInput{
 		Email:         "ada@example.com",
 		EmailVerified: true,
 		PasswordHash:  "hash",
@@ -85,7 +86,7 @@ func TestUserCreator_CreateUser_AFailedUserInsertReachesTheHelperAndWritesNoPerm
 	stub := expectRunInTransaction(db)
 	db.On("CreateUser", mock.Anything, mock.Anything).Return(boom).Once()
 
-	user, err := NewUserCreator(db).CreateUser(&CreateUserInput{Email: "ada@example.com"})
+	user, err := NewUserCreator(db).CreateUser(context.Background(), &CreateUserInput{Email: "ada@example.com"})
 
 	require.ErrorIs(t, err, boom)
 	assert.Nil(t, user, "no user is returned alongside an error")
@@ -100,7 +101,7 @@ func TestUserCreator_CreateUser_ATransactionThatCannotOpenIsReported(t *testing.
 	boom := errors.New("cannot begin")
 	expectRunInTransactionRefused(db, boom)
 
-	user, err := NewUserCreator(db).CreateUser(&CreateUserInput{Email: "ada@example.com"})
+	user, err := NewUserCreator(db).CreateUser(context.Background(), &CreateUserInput{Email: "ada@example.com"})
 
 	require.ErrorIs(t, err, boom)
 	assert.Nil(t, user)
@@ -113,12 +114,12 @@ func TestUserCreator_CreateUser_RefusesWithoutTheAccountPermissionBeforeAnyTrans
 		{Id: 30, PermissionIdentifier: "something-else"},
 	})
 
-	user, err := NewUserCreator(db).CreateUser(&CreateUserInput{Email: "ada@example.com"})
+	user, err := NewUserCreator(db).CreateUser(context.Background(), &CreateUserInput{Email: "ada@example.com"})
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unable to find the account permission")
 	assert.Nil(t, user)
-	db.AssertNotCalled(t, "RunInTransaction", mock.Anything)
+	db.AssertNotCalled(t, "RunInTransaction", mock.Anything, mock.Anything)
 }
 
 // TestUserCreator_CreateUser_TheBodyIsSafeToRerun is the property RunInTransaction relies on: a
@@ -129,7 +130,7 @@ func TestUserCreator_CreateUser_TheBodyIsSafeToRerun(t *testing.T) {
 	expectAccountPermissionLookup(db, accountPermissions())
 
 	// A stub that runs the body twice, as the helper does after a deadlock on the first attempt.
-	db.EXPECT().RunInTransaction(mock.Anything).RunAndReturn(func(fn func(tx *sql.Tx) error) error {
+	db.EXPECT().RunInTransaction(mock.Anything, mock.Anything).RunAndReturn(func(_ context.Context, fn func(tx *sql.Tx) error) error {
 		if err := fn(nil); err != nil {
 			return err
 		}
@@ -146,7 +147,7 @@ func TestUserCreator_CreateUser_TheBodyIsSafeToRerun(t *testing.T) {
 		permissionUserIds = append(permissionUserIds, args.Get(1).(*models.UserPermission).UserId)
 	}).Return(nil).Twice()
 
-	user, err := NewUserCreator(db).CreateUser(&CreateUserInput{Email: "ada@example.com"})
+	user, err := NewUserCreator(db).CreateUser(context.Background(), &CreateUserInput{Email: "ada@example.com"})
 	require.NoError(t, err)
 
 	assert.Equal(t, []int64{77, 78}, permissionUserIds,

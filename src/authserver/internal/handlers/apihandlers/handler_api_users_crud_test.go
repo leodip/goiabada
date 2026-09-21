@@ -351,7 +351,7 @@ func TestHandleAPIUserCreatePost_StoresResetCodeHash(t *testing.T) {
 	createdUser := &models.User{Id: 7, Email: "newuser@example.com"}
 
 	database.On("GetUserByEmail", mock.Anything, "newuser@example.com").Return(nil, nil)
-	userCreator.On("CreateUser", mock.Anything).Return(createdUser, nil)
+	userCreator.On("CreateUser", mock.Anything, mock.Anything).Return(createdUser, nil)
 	database.On("UpdateUser", mock.Anything, createdUser).Return(nil)
 	auditLogger.On("Log", mock.Anything, audit.AuditCreatedUser, mock.Anything).Return()
 	var emailedLink string
@@ -436,7 +436,7 @@ func TestHandleAPIUserCreatePost_LostRaceOnTheEmailAnswers409(t *testing.T) {
 			errors.New("Duplicate entry 'taken@example.com' for key 'users.idx_email'")),
 			"unable to execute SQL"),
 		"unable to insert user"), "unable to create user")
-	userCreator.On("CreateUser", mock.Anything).Return(nil, lostRace)
+	userCreator.On("CreateUser", mock.Anything, mock.Anything).Return(nil, lostRace)
 
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)
@@ -484,7 +484,7 @@ func TestHandleAPIUserCreatePost_AnyOtherCreateFailureAnswers500(t *testing.T) {
 		&models.Settings{AppName: "TestApp"}))
 
 	database.On("GetUserByEmail", mock.Anything, "fresh@example.com").Return(nil, nil)
-	userCreator.On("CreateUser", mock.Anything).Return(nil,
+	userCreator.On("CreateUser", mock.Anything, mock.Anything).Return(nil,
 		errs.Wrap(errs.New("connection refused"), "unable to execute SQL"))
 
 	rr := httptest.NewRecorder()
@@ -619,9 +619,9 @@ func TestHandleAPIUserCreatePost_SetPasswordTypeMatrix(t *testing.T) {
 			createdUser := &models.User{Id: 7, Email: "newuser@example.com"}
 			var gotPasswordHash string
 			if tc.wantCreated {
-				userCreator.On("CreateUser", mock.Anything).
+				userCreator.On("CreateUser", mock.Anything, mock.Anything).
 					Run(func(args mock.Arguments) {
-						gotPasswordHash = args.Get(0).(*usercreation.CreateUserInput).PasswordHash
+						gotPasswordHash = args.Get(1).(*usercreation.CreateUserInput).PasswordHash
 					}).Return(createdUser, nil)
 				auditLogger.On("Log", mock.Anything, audit.AuditCreatedUser, mock.Anything).Return()
 			}

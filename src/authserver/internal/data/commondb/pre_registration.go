@@ -1,6 +1,7 @@
 package commondb
 
 import (
+	"context"
 	"database/sql"
 	"time"
 
@@ -23,7 +24,7 @@ func (d *CommonDatabase) CreatePreRegistration(tx *sql.Tx, preRegistration *mode
 
 	insertBuilder := preRegistrationStruct.WithoutTag("pk").InsertInto("pre_registrations", preRegistration)
 
-	id, err := d.insertReturningId(tx, insertBuilder, "preRegistration")
+	id, err := d.insertReturningId(context.Background(), tx, insertBuilder, "preRegistration")
 	if err != nil {
 		preRegistration.CreatedAt = originalCreatedAt
 		preRegistration.UpdatedAt = originalUpdatedAt
@@ -50,7 +51,7 @@ func (d *CommonDatabase) UpdatePreRegistration(tx *sql.Tx, preRegistration *mode
 	updateBuilder.Where(updateBuilder.Equal("id", preRegistration.Id))
 
 	sql, args := updateBuilder.Build()
-	_, err := d.ExecSql(tx, sql, args...)
+	_, err := d.ExecSql(context.Background(), tx, sql, args...)
 	if err != nil {
 		preRegistration.UpdatedAt = originalUpdatedAt
 		return errs.Wrap(err, "unable to update preRegistration")
@@ -63,7 +64,7 @@ func (d *CommonDatabase) getPreRegistrationCommon(tx *sql.Tx, selectBuilder *sql
 	preRegistrationStruct *sqlbuilder.Struct) (*models.PreRegistration, error) {
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(tx, sql, args...)
+	rows, err := d.QuerySql(context.Background(), tx, sql, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -110,7 +111,7 @@ func (d *CommonDatabase) DeletePreRegistration(tx *sql.Tx, preRegistrationId int
 	deleteBuilder.Where(deleteBuilder.Equal("id", preRegistrationId))
 
 	sql, args := deleteBuilder.Build()
-	_, err := d.ExecSql(tx, sql, args...)
+	_, err := d.ExecSql(context.Background(), tx, sql, args...)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete preRegistration")
 	}

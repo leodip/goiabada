@@ -1,6 +1,7 @@
 package commondb
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"log/slog"
@@ -47,10 +48,22 @@ func retryingDB(t *testing.T, d *scriptedDriver) *CommonDatabase {
 func recordBackoff(t *testing.T) *[]time.Duration {
 	t.Helper()
 	requested := []time.Duration{}
-	previous := sleep
-	sleep = func(d time.Duration) { requested = append(requested, d) }
-	t.Cleanup(func() { sleep = previous })
+	swapSleep(t, func(_ context.Context, d time.Duration) error {
+		requested = append(requested, d)
+		return nil
+	})
 	return &requested
+}
+
+// swapSleep installs a backoff for the duration of one test and puts the real one back. It is
+// separate from recordBackoff because the cancellation case needs the REAL wait, with a cancel
+// fired at it, so that the select on ctx.Done() is the thing under test rather than a stub
+// imitating its answer.
+func swapSleep(t *testing.T, replacement func(context.Context, time.Duration) error) {
+	t.Helper()
+	previous := sleep
+	sleep = replacement
+	t.Cleanup(func() { sleep = previous })
 }
 
 // retryWarnings counts the reruns the helper announced.
@@ -68,9 +81,17 @@ func retryWarnings(logs *testutil.SlogCapture) int {
 // whatever the driver answered, which is how a scripted failure reaches the helper by the path a
 // real one takes: through ExecSql's wrapping, not as a bare sentinel.
 func oneStatement(db *CommonDatabase, ran *int) func(tx *sql.Tx) error {
+	return oneStatementOn(context.Background(), db, ran)
+}
+
+// oneStatementOn is oneStatement with the statement issued on a context of the caller's choosing,
+// which is what the cancelled-inside-the-body case needs: the migration's end state is a body
+// whose statements run on the same context RunInTransaction was given, and the exit being pinned
+// is the one where the cancellation lands between the BEGIN and the statement.
+func oneStatementOn(ctx context.Context, db *CommonDatabase, ran *int) func(tx *sql.Tx) error {
 	return func(tx *sql.Tx) error {
 		*ran++
-		_, err := db.ExecSql(tx, "UPDATE settings SET updated_at = updated_at")
+		_, err := db.ExecSql(ctx, tx, "UPDATE settings SET updated_at = updated_at")
 		return err
 	}
 }
@@ -82,7 +103,7 @@ func TestRunInTransaction_ASuccessfulBodyCommitsOnce(t *testing.T) {
 	db := retryingDB(t, d)
 	ran := 0
 
-	err := db.RunInTransaction(oneStatement(db, &ran))
+	err := db.RunInTransaction(context.Background(), oneStatement(db, &ran))
 
 	require.NoError(t, err)
 	assert.Equal(t, 1, ran, "the body runs exactly once when it succeeds")
@@ -101,7 +122,7 @@ func TestRunInTransaction_APlainErrorRollsBackAndIsReturnedAsItWas(t *testing.T)
 	db := retryingDB(t, d)
 	ran := 0
 
-	err := db.RunInTransaction(func(tx *sql.Tx) error {
+	err := db.RunInTransaction(context.Background(), func(tx *sql.Tx) error {
 		ran++
 		return boom
 	})
@@ -125,7 +146,7 @@ func TestRunInTransaction_ADeadlockInTheBodyIsRerunAndTheRerunCommits(t *testing
 	db := retryingDB(t, d)
 	ran := 0
 
-	err := db.RunInTransaction(oneStatement(db, &ran))
+	err := db.RunInTransaction(context.Background(), oneStatement(db, &ran))
 
 	require.NoError(t, err, "the second attempt succeeded, so the call does")
 	assert.Equal(t, 2, ran, "two attempts")
@@ -143,7 +164,7 @@ func TestRunInTransaction_ThreeDeadlocksExhaustTheAttemptsAndTheLastOneSurfaces(
 	db := retryingDB(t, d)
 	ran := 0
 
-	err := db.RunInTransaction(oneStatement(db, &ran))
+	err := db.RunInTransaction(context.Background(), oneStatement(db, &ran))
 
 	require.Error(t, err)
 	assert.ErrorIs(t, err, errDeadlock, "the error unwraps to the last deadlock, so the caller can still see what it was")
@@ -172,7 +193,7 @@ func TestRunInTransaction_AVictimTheEngineAlreadyRolledBackIsStillRerun(t *testi
 	recordBackoff(t)
 	ran := 0
 
-	err := db.RunInTransaction(oneStatement(db, &ran))
+	err := db.RunInTransaction(context.Background(), oneStatement(db, &ran))
 
 	require.Error(t, err)
 	assert.Equal(t, 3, ran, "the rollback's complaint does not stop the rerun")
@@ -188,7 +209,7 @@ func TestRunInTransaction_ADeadlockAtCommitIsRerunAndTheRerunCommits(t *testing.
 	db := retryingDB(t, d)
 	ran := 0
 
-	err := db.RunInTransaction(oneStatement(db, &ran))
+	err := db.RunInTransaction(context.Background(), oneStatement(db, &ran))
 
 	require.NoError(t, err, "the second commit went through, so the call succeeds")
 	assert.Equal(t, 2, ran, "two attempts")
@@ -205,7 +226,7 @@ func TestRunInTransaction_ThreeDeadlocksAtCommitExhaustTheAttempts(t *testing.T)
 	db := retryingDB(t, d)
 	ran := 0
 
-	err := db.RunInTransaction(oneStatement(db, &ran))
+	err := db.RunInTransaction(context.Background(), oneStatement(db, &ran))
 
 	require.Error(t, err)
 	assert.ErrorIs(t, err, errDeadlock)
@@ -225,7 +246,7 @@ func TestRunInTransaction_ACommitThatFailsForAnyOtherReasonIsNotReplayed(t *test
 	db := retryingDB(t, d)
 	ran := 0
 
-	err := db.RunInTransaction(oneStatement(db, &ran))
+	err := db.RunInTransaction(context.Background(), oneStatement(db, &ran))
 
 	require.Error(t, err)
 	assert.ErrorIs(t, err, boom, "the commit's own failure comes back")
@@ -241,7 +262,7 @@ func TestRunInTransaction_APanicInTheBodyPropagatesAndLeavesNoOpenTransaction(t 
 	db := retryingDB(t, d)
 
 	require.PanicsWithValue(t, "the body blew up", func() {
-		_ = db.RunInTransaction(func(tx *sql.Tx) error {
+		_ = db.RunInTransaction(context.Background(), func(tx *sql.Tx) error {
 			panic("the body blew up")
 		})
 	}, "the panic is the caller's to see, not something the helper swallows")
@@ -261,7 +282,7 @@ func TestRunInTransaction_WithNoClassifierNothingIsADeadlock(t *testing.T) {
 	require.Nil(t, db.IsDeadlock, "the fixture only says anything if no classifier is installed")
 	ran := 0
 
-	err := db.RunInTransaction(func(tx *sql.Tx) error {
+	err := db.RunInTransaction(context.Background(), func(tx *sql.Tx) error {
 		ran++
 		return errDeadlock
 	})
@@ -286,7 +307,7 @@ func TestInTransaction_OnlyTheOwnerRetries(t *testing.T) {
 		db := retryingDB(t, d)
 		ran := 0
 
-		err := db.inTransaction(nil, oneStatement(db, &ran))
+		err := db.inTransaction(context.Background(), nil, oneStatement(db, &ran))
 
 		require.NoError(t, err)
 		assert.Equal(t, 2, ran, "the deadlock was retried")
@@ -296,11 +317,11 @@ func TestInTransaction_OnlyTheOwnerRetries(t *testing.T) {
 	t.Run("handed a transaction, it runs once and returns the deadlock to the owner", func(t *testing.T) {
 		d := &scriptedDriver{execs: []*scriptedExec{{err: errDeadlock}}}
 		db := retryingDB(t, d)
-		tx, err := db.BeginTransaction()
+		tx, err := db.BeginTransaction(context.Background())
 		require.NoError(t, err)
 		ran := 0
 
-		err = db.inTransaction(tx, oneStatement(db, &ran))
+		err = db.inTransaction(context.Background(), tx, oneStatement(db, &ran))
 
 		require.Error(t, err)
 		assert.ErrorIs(t, err, errDeadlock, "the owner gets the deadlock and decides")
@@ -309,4 +330,159 @@ func TestInTransaction_OnlyTheOwnerRetries(t *testing.T) {
 		assert.Zero(t, d.rollbacks)
 		require.NoError(t, db.RollbackTransaction(tx))
 	})
+}
+
+// THE FOUR CANCELLATION EXITS, decision 13 of #386.
+//
+// A transaction helper that reruns a body has four places a cancellation can arrive: before the
+// first attempt, inside the body, inside the pause between attempts, and between a deadlock and
+// the rerun it triggered. Each is below, and each asserts the error IDENTITY it produces rather
+// than merely that something failed, because the whole of the decision is which error wins and
+// what stays reachable beside it.
+//
+// The scripted driver is the only seam where these are observable: a real engine reports the
+// outcome of a transaction and nothing about how many attempts asked for one. It answers them
+// truthfully only because it implements ConnBeginTx, StmtExecContext and StmtQueryContext --
+// probe/driverfallback measured a legacy driver ignoring a 100ms deadline for 700ms and
+// reporting no error at all, against which every case here would pass on a helper that dropped
+// the context on the floor.
+
+func TestRunInTransaction_ACancelledContextIsRefusedBeforeTheFirstAttempt(t *testing.T) {
+	requested := recordBackoff(t)
+	d := &scriptedDriver{}
+	db := retryingDB(t, d)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	ran := 0
+
+	err := db.RunInTransaction(ctx, oneStatement(db, &ran))
+
+	require.Error(t, err)
+	assert.ErrorIs(t, err, context.Canceled, "the context error is what the caller matches on")
+	assert.Zero(t, ran, "the body never ran")
+	assert.Zero(t, d.openTx, "and no transaction was ever opened")
+	assert.Zero(t, d.commits)
+	assert.Zero(t, d.rollbacks)
+	assert.Empty(t, *requested, "nothing precedes the first attempt, cancelled or not")
+}
+
+// TestRunInTransaction_ADeadlineInsideTheBodyComesBackUnretried is the exit that does NOT go
+// through abandoned: the statement's own context error is not a deadlock, so the ordinary
+// not-a-deadlock arm returns it after one attempt. Asserted because the alternative -- a helper
+// that classified a context error as retryable -- would spend three attempts and two backoffs on
+// a caller that has already gone.
+func TestRunInTransaction_ADeadlineInsideTheBodyComesBackUnretried(t *testing.T) {
+	requested := recordBackoff(t)
+	// The statement takes longer than the deadline allows, interruptibly.
+	d := &scriptedDriver{execs: []*scriptedExec{{delay: 2 * time.Second}}}
+	db := retryingDB(t, d)
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	ran := 0
+
+	err := db.RunInTransaction(ctx, oneStatementOn(ctx, db, &ran))
+
+	require.Error(t, err)
+	assert.ErrorIs(t, err, context.DeadlineExceeded, "the deadline the statement met is what surfaces")
+	assert.Equal(t, 1, ran, "one attempt: a context error is not a deadlock and is not rerun")
+	assert.Equal(t, 1, d.rollbacks, "the open transaction was rolled back on the way out")
+	assert.Zero(t, d.commits)
+	assert.Zero(t, d.openTx)
+	assert.Empty(t, *requested, "and no backoff was spent on it")
+}
+
+// TestRunInTransaction_ACancellationDuringTheBackoffStopsTheRerun exercises the real select: the
+// stub cancels and then delegates to the sleep the helper actually ships with, so what is under
+// test is that wait's ctx.Done() arm and not a stub's imitation of it.
+func TestRunInTransaction_ACancellationDuringTheBackoffStopsTheRerun(t *testing.T) {
+	logs := testutil.CaptureSlog(t)
+	d := &scriptedDriver{execs: []*scriptedExec{{err: errDeadlock}, {err: errDeadlock}}}
+	db := retryingDB(t, d)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	realSleep := sleep
+	requested := []time.Duration{}
+	swapSleep(t, func(ctx context.Context, delay time.Duration) error {
+		requested = append(requested, delay)
+		cancel()
+		return realSleep(ctx, delay)
+	})
+	ran := 0
+
+	err := db.RunInTransaction(ctx, oneStatement(db, &ran))
+
+	require.Error(t, err)
+	assert.ErrorIs(t, err, context.Canceled, "the context error wins")
+	assert.ErrorIs(t, err, errDeadlock, "and the deadlock that caused the retry is joined to it, not dropped")
+	assert.Equal(t, 1, ran, "the rerun never happened")
+	assert.Equal(t, 1, d.rollbacks)
+	assert.Zero(t, d.commits)
+	assert.Equal(t, []time.Duration{25 * time.Millisecond}, requested,
+		"the pause was entered, which is what makes this a cancellation DURING the backoff")
+	assert.Zero(t, retryWarnings(logs), "a rerun that never happened is not announced")
+}
+
+// TestRunInTransaction_ACancellationBetweenADeadlockAndItsRerunStopsTheLoop is the other joined
+// case, and the one the loop's own ctx.Err() check owns: the cancellation is already in force
+// when the next iteration begins, so the helper stops before it even reaches the pause.
+func TestRunInTransaction_ACancellationBetweenADeadlockAndItsRerunStopsTheLoop(t *testing.T) {
+	logs := testutil.CaptureSlog(t)
+	requested := recordBackoff(t)
+	d := &scriptedDriver{execs: []*scriptedExec{{err: errDeadlock}, {err: errDeadlock}}}
+	db := retryingDB(t, d)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	ran := 0
+
+	err := db.RunInTransaction(ctx, func(tx *sql.Tx) error {
+		ran++
+		_, execErr := db.ExecSql(context.Background(), tx, "UPDATE settings SET updated_at = updated_at")
+		// The caller goes away while the first attempt is being rolled back.
+		cancel()
+		return execErr
+	})
+
+	require.Error(t, err)
+	assert.ErrorIs(t, err, context.Canceled)
+	assert.ErrorIs(t, err, errDeadlock, "errors.Is still reaches the engine's abort")
+	assert.Equal(t, 1, ran, "one attempt, and no second one")
+	assert.Empty(t, *requested, "the loop stopped before the pause, so no backoff was requested")
+	assert.Zero(t, retryWarnings(logs))
+}
+
+// TestRunInTransaction_AnExhaustedRunIsStillTheDeadlockAndNotAContextError is the negative that
+// makes the four above attributable. Decision 13 changes what a CANCELLED run returns and
+// nothing else: three real deadlocks on a live context still answer exactly as they did, with
+// the deadlock and the attempts-spent text and no context error anywhere in the tree.
+func TestRunInTransaction_AnExhaustedRunIsStillTheDeadlockAndNotAContextError(t *testing.T) {
+	recordBackoff(t)
+	d := &scriptedDriver{execs: []*scriptedExec{{err: errDeadlock}, {err: errDeadlock}, {err: errDeadlock}}}
+	db := retryingDB(t, d)
+	ran := 0
+
+	err := db.RunInTransaction(context.Background(), oneStatement(db, &ran))
+
+	require.Error(t, err)
+	assert.ErrorIs(t, err, errDeadlock)
+	assert.Contains(t, err.Error(), "all 3 attempts")
+	assert.NotErrorIs(t, err, context.Canceled, "a live context contributes nothing to the error")
+	assert.NotErrorIs(t, err, context.DeadlineExceeded)
+	assert.Equal(t, 3, ran)
+}
+
+// TestRunInTransaction_OpensWithTheDefaultIsolationLevel pins the one thing BeginTx could have
+// changed and did not. Nothing in this repository asks for an isolation level, and
+// tests/data/rcsi_test.go's argument that SQL Server's error 3960 is unreachable rests on it.
+func TestRunInTransaction_OpensWithTheDefaultIsolationLevel(t *testing.T) {
+	d := &scriptedDriver{}
+	db := retryingDB(t, d)
+	ran := 0
+
+	require.NoError(t, db.RunInTransaction(context.Background(), oneStatement(db, &ran)))
+
+	require.Len(t, d.txOptions, 1)
+	assert.Equal(t, sql.LevelDefault, sql.IsolationLevel(d.txOptions[0].Isolation),
+		"BeginTx is called with nil options, which is LevelDefault")
+	assert.False(t, d.txOptions[0].ReadOnly)
 }

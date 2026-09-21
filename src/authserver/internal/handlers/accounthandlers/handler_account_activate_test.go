@@ -228,7 +228,7 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 
 		// The account is NOT created on this hop, and the row is NOT consumed: a link
 		// previewer prefetching the URL must leave the code usable (#112 decision 7).
-		userCreator.AssertNotCalled(t, "CreateUser", mock.Anything)
+		userCreator.AssertNotCalled(t, "CreateUser", mock.Anything, mock.Anything)
 		database.AssertNotCalled(t, "DeletePreRegistration", mock.Anything, mock.Anything)
 
 		marker, rejection, err := handlers.GetLinkMarker(store, nextBrowserRequest(t, sent, rr),
@@ -258,7 +258,7 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 		handler := HandleAccountActivateGet(httpHelper, store, database, userCreator, auditLogger)
 		handler.ServeHTTP(httptest.NewRecorder(), linkFollowedRequest(code))
 
-		userCreator.AssertNotCalled(t, "CreateUser", mock.Anything)
+		userCreator.AssertNotCalled(t, "CreateUser", mock.Anything, mock.Anything)
 		database.AssertExpectations(t)
 		httpHelper.AssertExpectations(t)
 	})
@@ -283,7 +283,7 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 		sent := linkFollowedRequest(code)
 		handler.ServeHTTP(rr, sent)
 
-		userCreator.AssertNotCalled(t, "CreateUser", mock.Anything)
+		userCreator.AssertNotCalled(t, "CreateUser", mock.Anything, mock.Anything)
 
 		_, rejection, err := handlers.GetLinkMarker(store, nextBrowserRequest(t, sent, rr),
 			handlers.LinkMarkerFlowAccountActivate)
@@ -319,7 +319,7 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 		handler.ServeHTTP(rr, sent)
 
 		assert.NotEqual(t, http.StatusSeeOther, rr.Code, "a refused second link must not redirect")
-		userCreator.AssertNotCalled(t, "CreateUser", mock.Anything)
+		userCreator.AssertNotCalled(t, "CreateUser", mock.Anything, mock.Anything)
 		database.AssertNotCalled(t, "DeletePreRegistration", mock.Anything, mock.Anything)
 
 		// The first continuation survives, so the redirect already in flight still activates
@@ -360,7 +360,7 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 		handler.ServeHTTP(rr, sent)
 
 		assert.NotEqual(t, http.StatusSeeOther, rr.Code, "a refused link must not redirect")
-		userCreator.AssertNotCalled(t, "CreateUser", mock.Anything)
+		userCreator.AssertNotCalled(t, "CreateUser", mock.Anything, mock.Anything)
 		database.AssertNotCalled(t, "DeletePreRegistration", mock.Anything, mock.Anything)
 
 		marker, rejection, err := handlers.GetLinkMarker(store, nextBrowserRequest(t, sent, rr),
@@ -390,7 +390,7 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 		handler := HandleAccountActivateGet(httpHelper, store, database, userCreator, auditLogger)
 		handler.ServeHTTP(httptest.NewRecorder(), linkFollowedRequest(code))
 
-		userCreator.AssertNotCalled(t, "CreateUser", mock.Anything)
+		userCreator.AssertNotCalled(t, "CreateUser", mock.Anything, mock.Anything)
 		database.AssertExpectations(t)
 		httpHelper.AssertExpectations(t)
 	})
@@ -455,7 +455,7 @@ func TestHandleAccountActivateGet_Clean(t *testing.T) {
 		database.On("GetPreRegistrationByVerificationCodeHash", (*sql.Tx)(nil), codeHash).Return(preReg, nil).Once()
 
 		createdUser := &models.User{Id: 3, Email: activateTestEmail}
-		userCreator.On("CreateUser", &usercreation.CreateUserInput{
+		userCreator.On("CreateUser", mock.Anything, &usercreation.CreateUserInput{
 			Email:         activateTestEmail,
 			EmailVerified: true,
 			PasswordHash:  "password_hash",
@@ -546,7 +546,7 @@ func TestHandleAccountActivateGet_Clean(t *testing.T) {
 				handler := HandleAccountActivateGet(httpHelper, store, database, userCreator, auditLogger)
 				handler.ServeHTTP(httptest.NewRecorder(), tc.request(t, store))
 
-				userCreator.AssertNotCalled(t, "CreateUser", mock.Anything)
+				userCreator.AssertNotCalled(t, "CreateUser", mock.Anything, mock.Anything)
 				database.AssertNotCalled(t, "DeletePreRegistration", mock.Anything, mock.Anything)
 				database.AssertExpectations(t)
 				httpHelper.AssertExpectations(t)

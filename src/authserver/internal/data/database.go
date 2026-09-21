@@ -1,6 +1,7 @@
 package data
 
 import (
+	"context"
 	"database/sql"
 	"time"
 
@@ -9,7 +10,7 @@ import (
 )
 
 type Database interface {
-	BeginTransaction() (*sql.Tx, error)
+	BeginTransaction(ctx context.Context) (*sql.Tx, error)
 	CommitTransaction(tx *sql.Tx) error
 	RollbackTransaction(tx *sql.Tx) error
 	// RunInTransaction opens a transaction, runs fn on it, commits when fn returns nil and rolls
@@ -20,7 +21,12 @@ type Database interface {
 	// so a deadlock between two transactions on the same account is answered here, by rerunning
 	// the victim, rather than prevented by a rule every site has to remember (#301). fn must keep its effects inside the
 	// transaction and write any audit event after this returns, so a rerun is a first run.
-	RunInTransaction(fn func(tx *sql.Tx) error) error
+	//
+	// A cancelled ctx stops the helper before it starts another attempt and interrupts the
+	// pause between them: the error then satisfies errors.Is for context.Canceled or
+	// context.DeadlineExceeded, with the deadlock that caused the retry joined to it where
+	// there was one (#386 decision 13).
+	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 	Migrate() error
 	// ScanEmailCase reads every users row as its id, its stored address and that address as
 	// THIS engine's own LOWER() reduces it, which is the read behind the startup pre-flight

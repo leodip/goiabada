@@ -289,7 +289,7 @@ func RevokeUserAuthStateTx(ctx context.Context, db data.Database, userId int64, 
 	// compare-and-set or an idempotent column write, the sweep reads the sessions and tokens
 	// afresh on each attempt, and result is whatever the attempt that committed produced.
 	var result RevocationResult
-	err := db.RunInTransaction(func(tx *sql.Tx) error {
+	err := db.RunInTransaction(ctx, func(tx *sql.Tx) error {
 		if err := write(tx); err != nil {
 			return err
 		}
@@ -378,7 +378,7 @@ type TerminationResult struct {
 // caller here must not be read as "nothing happened"; the durable outcome of a reported commit
 // failure is indeterminate, and the bounded consequence is a termination with no audit record of
 // it, which is fail-closed on the security side and a gap on the forensic side.
-func TerminateUserSessionTx(db data.Database, userSession *models.UserSession) (TerminationResult, error) {
+func TerminateUserSessionTx(ctx context.Context, db data.Database, userSession *models.UserSession) (TerminationResult, error) {
 	// Both sweeps key on the session identifier and the delete keys on the id, so this takes the
 	// loaded row rather than two loose values: from one row they cannot describe two different
 	// sessions, and both call sites already load it for their own not-found and ownership checks.
@@ -397,7 +397,7 @@ func TerminateUserSessionTx(db data.Database, userSession *models.UserSession) (
 	// The body is safe to rerun: it reads nothing from outside the closure but the session it
 	// was handed, and the counts it reports are the committing attempt's.
 	var result TerminationResult
-	err := db.RunInTransaction(func(tx *sql.Tx) error {
+	err := db.RunInTransaction(ctx, func(tx *sql.Tx) error {
 		// First, and write 1 of the doc comment above is why: it is the statement that takes the
 		// session row, which is what orders this transaction against a ceremony minting a code
 		// for the session it is ending (#139).
@@ -558,7 +558,7 @@ const RevocationReasonClientBecamePublic = "client_became_public"
 // caller here must not be read as "nothing happened"; the durable outcome of a reported commit
 // failure is indeterminate, and the bounded consequence is a client left flipped and revoked with
 // no audit record of it, which is fail-closed on the security side and a gap on the forensic side.
-func RevokeClientGrantsTx(db data.Database, clientId int64,
+func RevokeClientGrantsTx(ctx context.Context, db data.Database, clientId int64,
 	write func(tx *sql.Tx) (bool, error)) (ClientGrantRevocationResult, error) {
 
 	// The write and the conditional sweep in one transaction opened through RunInTransaction, so
@@ -566,7 +566,7 @@ func RevokeClientGrantsTx(db data.Database, clientId int64,
 	// SetClientPublic followed by an idempotent UpdateClient, its answer is asked again on every
 	// attempt, and result is the committing attempt's.
 	var result ClientGrantRevocationResult
-	err := db.RunInTransaction(func(tx *sql.Tx) error {
+	err := db.RunInTransaction(ctx, func(tx *sql.Tx) error {
 		revoke, err := write(tx)
 		if err != nil {
 			return err

@@ -2,6 +2,7 @@ package commondb
 
 import (
 	"bytes"
+	"context"
 	"database/sql"
 
 	"github.com/huandu/go-sqlbuilder"
@@ -39,7 +40,7 @@ func (d *CommonDatabase) reencryptToKey(oldKey, newKey []byte) error {
 
 	// Opened through RunInTransaction, so a deadlock reruns the body (#301); every read and
 	// write is inside it, so a rerun starts from the data as it was under oldKey.
-	return d.RunInTransaction(func(tx *sql.Tx) error {
+	return d.RunInTransaction(context.Background(), func(tx *sql.Tx) error {
 		return d.reencryptAll(tx, oldKey, newKey)
 	})
 }
@@ -116,7 +117,7 @@ func (d *CommonDatabase) reencryptStringColumn(tx *sql.Tx, table, column string,
 	sb.Select("id", column).From(table)
 	query, args := sb.BuildWithFlavor(d.Flavor)
 
-	rows, err := d.QuerySql(tx, query, args...)
+	rows, err := d.QuerySql(context.Background(), tx, query, args...)
 	if err != nil {
 		return err
 	}
@@ -157,7 +158,7 @@ func (d *CommonDatabase) reencryptStringColumn(tx *sql.Tx, table, column string,
 		ub.Set(ub.Assign(column, newCt))
 		ub.Where(ub.Equal("id", it.id))
 		uq, uargs := ub.BuildWithFlavor(d.Flavor)
-		if _, err := d.ExecSql(tx, uq, uargs...); err != nil {
+		if _, err := d.ExecSql(context.Background(), tx, uq, uargs...); err != nil {
 			return err
 		}
 	}
@@ -178,7 +179,7 @@ func (d *CommonDatabase) reencryptPrivateKeys(tx *sql.Tx, oldKey, newKey []byte)
 	sb.Select("id", "private_key_pem").From("key_pairs")
 	query, args := sb.BuildWithFlavor(d.Flavor)
 
-	rows, err := d.QuerySql(tx, query, args...)
+	rows, err := d.QuerySql(context.Background(), tx, query, args...)
 	if err != nil {
 		return err
 	}
@@ -225,7 +226,7 @@ func (d *CommonDatabase) reencryptPrivateKeys(tx *sql.Tx, oldKey, newKey []byte)
 		ub.Set(ub.Assign("private_key_pem", enc))
 		ub.Where(ub.Equal("id", it.id))
 		uq, uargs := ub.BuildWithFlavor(d.Flavor)
-		if _, err := d.ExecSql(tx, uq, uargs...); err != nil {
+		if _, err := d.ExecSql(context.Background(), tx, uq, uargs...); err != nil {
 			return err
 		}
 	}

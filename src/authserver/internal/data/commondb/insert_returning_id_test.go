@@ -1,6 +1,7 @@
 package commondb
 
 import (
+	"context"
 	"database/sql/driver"
 	"errors"
 	"strings"
@@ -44,7 +45,7 @@ func TestInsertReturningId_LastInsertIdArm(t *testing.T) {
 	script := &scriptedDriver{execs: []*scriptedExec{{rowsAffected: 1, lastInsertId: 77}}}
 	d := scriptedDB(t, script)
 
-	id, err := d.insertReturningId(nil, probeInsert(), "widget")
+	id, err := d.insertReturningId(context.Background(), nil, probeInsert(), "widget")
 	if err != nil {
 		t.Fatalf("insertReturningId returned %v, want nil", err)
 	}
@@ -74,7 +75,7 @@ func TestInsertReturningId_LastInsertIdArmReportsARefusingDriver(t *testing.T) {
 	// LastInsertId returns an error.
 	d := scriptedDB(t, &scriptedDriver{execs: []*scriptedExec{{rowsAffected: 1}}})
 
-	_, err := d.insertReturningId(nil, probeInsert(), "widget")
+	_, err := d.insertReturningId(context.Background(), nil, probeInsert(), "widget")
 	if err == nil {
 		t.Fatal("a driver that refuses LastInsertId was reported as a successful insert")
 	}
@@ -94,7 +95,7 @@ func TestInsertReturningId_LastInsertIdArmWrapsTheInsertFailure(t *testing.T) {
 		return errors.As(err, &target)
 	}
 
-	_, err := d.insertReturningId(nil, probeInsert(), "widget")
+	_, err := d.insertReturningId(context.Background(), nil, probeInsert(), "widget")
 	if err == nil {
 		t.Fatal("a refused statement was reported as a successful insert")
 	}
@@ -118,7 +119,7 @@ func TestInsertReturningId_ReturningArm(t *testing.T) {
 	d := scriptedDB(t, script)
 	d.InsertReturningIdSQL = appendReturningId
 
-	id, err := d.insertReturningId(nil, probeInsert(), "widget")
+	id, err := d.insertReturningId(context.Background(), nil, probeInsert(), "widget")
 	if err != nil {
 		t.Fatalf("insertReturningId returned %v, want nil", err)
 	}
@@ -161,7 +162,7 @@ func TestInsertReturningId_ReturningArmSurfacesADeferredViolation(t *testing.T) 
 		return errors.As(err, &target)
 	}
 
-	id, err := d.insertReturningId(nil, probeInsert(), "widget")
+	id, err := d.insertReturningId(context.Background(), nil, probeInsert(), "widget")
 	if err == nil {
 		t.Fatalf("a violation the driver deferred to the result set was reported as a "+
 			"successful insert with id %d", id)
@@ -184,7 +185,7 @@ func TestInsertReturningId_ReturningArmReportsAScanFailure(t *testing.T) {
 	}}})
 	d.InsertReturningIdSQL = appendReturningId
 
-	_, err := d.insertReturningId(nil, probeInsert(), "widget")
+	_, err := d.insertReturningId(context.Background(), nil, probeInsert(), "widget")
 	if err == nil {
 		t.Fatal("an unreadable id was reported as a successful insert")
 	}
@@ -201,7 +202,7 @@ func TestInsertReturningId_ReturningArmOnAnEmptyResultSet(t *testing.T) {
 	d := scriptedDB(t, &scriptedDriver{rows: []*scriptedRows{{cols: []string{"id"}}}})
 	d.InsertReturningIdSQL = appendReturningId
 
-	id, err := d.insertReturningId(nil, probeInsert(), "widget")
+	id, err := d.insertReturningId(context.Background(), nil, probeInsert(), "widget")
 	if err != nil {
 		t.Fatalf("insertReturningId returned %v, want nil", err)
 	}
@@ -220,7 +221,7 @@ func TestInsertReturningId_AHookFailureStopsBeforeTheEngine(t *testing.T) {
 	d := scriptedDB(t, script)
 	d.InsertReturningIdSQL = func(string) (string, error) { return "", refused }
 
-	_, err := d.insertReturningId(nil, probeInsert(), "widget")
+	_, err := d.insertReturningId(context.Background(), nil, probeInsert(), "widget")
 	if !errors.Is(err, refused) {
 		t.Errorf("err = %v, want the hook's own error unchanged", err)
 	}
@@ -238,7 +239,7 @@ func TestInsertReturningId_ReturningArmWrapsARefusedQuery(t *testing.T) {
 	}}})
 	d.InsertReturningIdSQL = appendReturningId
 
-	_, err := d.insertReturningId(nil, probeInsert(), "widget")
+	_, err := d.insertReturningId(context.Background(), nil, probeInsert(), "widget")
 	if err == nil {
 		t.Fatal("a refused query was reported as a successful insert")
 	}

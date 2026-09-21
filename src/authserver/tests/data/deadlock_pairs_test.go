@@ -188,7 +188,7 @@ func TestDeadlockRetry_CredentialSweepAgainstIssuance(t *testing.T) {
 	}
 	issuance := goBlocked(t, "issuance", sweepTx, func(reached func()) issuanceOut {
 		var out issuanceOut
-		out.err = other.RunInTransaction(func(tx *sql.Tx) error {
+		out.err = other.RunInTransaction(context.Background(), func(tx *sql.Tx) error {
 			// Each attempt starts clean. out lives outside the closure, so a rerun would
 			// otherwise inherit the aborted attempt's code and could report a gone session
 			// holding a code that was never committed, which is the impossible shape the
@@ -361,7 +361,7 @@ func TestDeadlockRetry_DeleteClientAgainstTermination(t *testing.T) {
 
 	terminationDone := make(chan error, 1)
 	go func() {
-		_, err := handlers.TerminateUserSessionTx(pDB, session)
+		_, err := handlers.TerminateUserSessionTx(context.Background(), pDB, session)
 		terminationDone <- err
 	}()
 

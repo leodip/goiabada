@@ -1,6 +1,7 @@
 package apihandlers
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"io"
@@ -397,7 +398,7 @@ func HandleAPIAccountOTPPut(
 			// (#242 decision 2). The returned generation is discarded here: only the browser
 			// ceremony, which captured the pre-enrollment value earlier in the same ceremony,
 			// has a use for it.
-			if _, err := handlers.EnableUserOTPTx(database, user); err != nil {
+			if _, err := handlers.EnableUserOTPTx(r.Context(), database, user); err != nil {
 				writeInternalServerError(w, r, err)
 				return
 			}
@@ -412,7 +413,7 @@ func HandleAPIAccountOTPPut(
 				return
 			}
 
-			if err := disableUserOTP(database, user); err != nil {
+			if err := disableUserOTP(r.Context(), database, user); err != nil {
 				writeInternalServerError(w, r, err)
 				return
 			}
@@ -473,14 +474,14 @@ func HandleAPIAccountOTPPut(
 //
 // Shared by the two sites decision 4 names, HandleAPIAccountOTPPut's disable branch and
 // HandleAPIUserOTPPut. There is no third: the browser flow enrolls but never disables.
-func disableUserOTP(database data.Database, user *models.User) error {
+func disableUserOTP(ctx context.Context, database data.Database, user *models.User) error {
 	user.ClearOTPSecret()
 	user.OTPEnabled = false
 
 	// Opened through RunInTransaction, so a deadlock reruns the three writes together (#301).
 	// Safe to rerun: the model was cleared above, before the helper opened, and is written
 	// unchanged on every attempt; the reset and the increment carry no state between attempts.
-	return database.RunInTransaction(func(tx *sql.Tx) error {
+	return database.RunInTransaction(ctx, func(tx *sql.Tx) error {
 		if err := database.UpdateUser(tx, user); err != nil {
 			return err
 		}

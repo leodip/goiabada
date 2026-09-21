@@ -1024,7 +1024,7 @@ func TestHandleTokenPost_AuthCode_ConcurrentDoubleSpendLoses(t *testing.T) {
 	// The loser must not mint tokens, and must not run the reuse cascade: no
 	// transaction, no session teardown, no reuse audit.
 	tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForAuthCode", mock.Anything, mock.Anything)
-	database.AssertNotCalled(t, "RunInTransaction", mock.Anything)
+	database.AssertNotCalled(t, "RunInTransaction", mock.Anything, mock.Anything)
 	database.AssertNotCalled(t, "DeleteUserSession", mock.Anything, mock.Anything)
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 }

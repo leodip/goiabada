@@ -1,6 +1,7 @@
 package commondb
 
 import (
+	"context"
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/errs"
@@ -26,7 +27,7 @@ func (d *CommonDatabase) ScanEmailCase() ([]models.EmailCaseRow, error) {
 	sb.Select("id", "email", "LOWER(email)").From("users")
 	query, args := sb.BuildWithFlavor(d.Flavor)
 
-	rows, err := d.QuerySql(nil, query, args...)
+	rows, err := d.QuerySql(context.Background(), nil, query, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query users for the email case pre-flight")
 	}

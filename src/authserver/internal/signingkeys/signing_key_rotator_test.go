@@ -1,6 +1,7 @@
 package signingkeys
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"testing"
@@ -41,7 +42,7 @@ type rotatorTransaction struct {
 // what the helper reports after a body that returned nil, the commit-failure shape.
 func expectRotatorTransaction(database *mocks_data.Database, commitErr error) *rotatorTransaction {
 	stub := &rotatorTransaction{}
-	database.EXPECT().RunInTransaction(mock.Anything).RunAndReturn(func(fn func(tx *sql.Tx) error) error {
+	database.EXPECT().RunInTransaction(mock.Anything, mock.Anything).RunAndReturn(func(_ context.Context, fn func(tx *sql.Tx) error) error {
 		stub.bodyErr = fn(rotatorTx)
 		if stub.bodyErr != nil {
 			return stub.bodyErr
@@ -106,7 +107,7 @@ func TestSigningKeyRotator_Rotate_Success(t *testing.T) {
 			created = args.Get(1).(*models.KeyPair)
 		})
 
-	err := newTestRotator(database).Rotate()
+	err := newTestRotator(database).Rotate(context.Background())
 	require.NoError(t, err)
 
 	// The delete precedes the demotion, which the unique index on key_pairs (state)
@@ -156,7 +157,7 @@ func TestSigningKeyRotator_Rotate_SucceedsWithNoPreviousKey(t *testing.T) {
 		models.KeyStateNext.String(), models.KeyStateCurrent.String()).Return(true, nil).Once()
 	database.On("CreateKeyPair", rotatorTx, mock.Anything).Return(nil).Once()
 
-	require.NoError(t, newTestRotator(database).Rotate())
+	require.NoError(t, newTestRotator(database).Rotate(context.Background()))
 	database.AssertNotCalled(t, "DeleteKeyPair", mock.Anything, mock.Anything)
 }
 
@@ -194,7 +195,7 @@ func TestSigningKeyRotator_Rotate_GuardRefusesBeforeAnyWrite(t *testing.T) {
 			stub := expectRotatorTransaction(database, nil)
 			database.On("GetAllSigningKeys", rotatorTx).Return(tc.keys, nil).Once()
 
-			err := newTestRotator(database).Rotate()
+			err := newTestRotator(database).Rotate(context.Background())
 
 			assert.ErrorIs(t, err, ErrKeySetIncomplete)
 			assert.ErrorIs(t, stub.bodyErr, ErrKeySetIncomplete, "the refusal reaches the helper, which rolls back")
@@ -222,7 +223,7 @@ func TestSigningKeyRotator_Rotate_LosesTheDemotion(t *testing.T) {
 		models.KeyStateCurrent.String(), models.KeyStatePrevious.String()).
 		Return(false, nil).Once()
 
-	err := newTestRotator(database).Rotate()
+	err := newTestRotator(database).Rotate(context.Background())
 
 	assert.ErrorIs(t, err, ErrRotationInProgress)
 	// A false compare-and-set is not an error, so the promotion must not have been
@@ -249,7 +250,7 @@ func TestSigningKeyRotator_Rotate_LosesThePromotion(t *testing.T) {
 		models.KeyStateNext.String(), models.KeyStateCurrent.String()).
 		Return(false, nil).Once()
 
-	err := newTestRotator(database).Rotate()
+	err := newTestRotator(database).Rotate(context.Background())
 
 	assert.ErrorIs(t, err, ErrRotationInProgress)
 	database.AssertNotCalled(t, "CreateKeyPair", mock.Anything, mock.Anything)
@@ -334,7 +335,7 @@ func TestSigningKeyRotator_Rotate_RollsBackOnFailureAtEveryStep(t *testing.T) {
 			stub := expectRotatorTransaction(database, nil)
 			tc.setUp(database)
 
-			err := newTestRotator(database).Rotate()
+			err := newTestRotator(database).Rotate(context.Background())
 
 			require.Error(t, err)
 			// A genuine failure is neither refusal: the handler maps anything that is
@@ -365,7 +366,7 @@ func TestSigningKeyRotator_Rotate_CommitFailureIsReported(t *testing.T) {
 		models.KeyStateNext.String(), models.KeyStateCurrent.String()).Return(true, nil).Once()
 	database.On("CreateKeyPair", rotatorTx, mock.Anything).Return(nil).Once()
 
-	assert.ErrorIs(t, newTestRotator(database).Rotate(), failure)
+	assert.ErrorIs(t, newTestRotator(database).Rotate(context.Background()), failure)
 }
 
 // TestSigningKeyRotator_Rotate_ATransactionThatCannotOpenIsReported is the helper failing
@@ -375,9 +376,9 @@ func TestSigningKeyRotator_Rotate_ATransactionThatCannotOpenIsReported(t *testin
 	database := mocks_data.NewDatabase(t)
 	failure := errors.New("cannot begin")
 
-	database.EXPECT().RunInTransaction(mock.Anything).Return(failure).Once()
+	database.EXPECT().RunInTransaction(mock.Anything, mock.Anything).Return(failure).Once()
 
-	assert.ErrorIs(t, newTestRotator(database).Rotate(), failure)
+	assert.ErrorIs(t, newTestRotator(database).Rotate(context.Background()), failure)
 	database.AssertNotCalled(t, "GetAllSigningKeys", mock.Anything)
 }
 
@@ -394,11 +395,11 @@ func TestSigningKeyRotator_Rotate_GeneratesTheKeyBeforeOpeningTheTransaction(t *
 	rotator := NewSigningKeyRotator(database)
 	rotator.keySizeBits = 512 // crypto/rsa refuses anything under 1024
 
-	err := rotator.Rotate()
+	err := rotator.Rotate(context.Background())
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unable to generate a private key")
-	database.AssertNotCalled(t, "RunInTransaction", mock.Anything)
+	database.AssertNotCalled(t, "RunInTransaction", mock.Anything, mock.Anything)
 }
 
 // TestNewSigningKeyRotator_UsesFourThousandNinetySixBits pins the production key size,

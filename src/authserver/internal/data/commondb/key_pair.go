@@ -1,6 +1,7 @@
 package commondb
 
 import (
+	"context"
 	"database/sql"
 	"time"
 
@@ -23,7 +24,7 @@ func (d *CommonDatabase) CreateKeyPair(tx *sql.Tx, keyPair *models.KeyPair) erro
 
 	insertBuilder := keyPairStruct.WithoutTag("pk").InsertInto("key_pairs", keyPair)
 
-	id, err := d.insertReturningId(tx, insertBuilder, "keyPair")
+	id, err := d.insertReturningId(context.Background(), tx, insertBuilder, "keyPair")
 	if err != nil {
 		keyPair.CreatedAt = originalCreatedAt
 		keyPair.UpdatedAt = originalUpdatedAt
@@ -50,7 +51,7 @@ func (d *CommonDatabase) UpdateKeyPair(tx *sql.Tx, keyPair *models.KeyPair) erro
 	updateBuilder.Where(updateBuilder.Equal("id", keyPair.Id))
 
 	sql, args := updateBuilder.Build()
-	_, err := d.ExecSql(tx, sql, args...)
+	_, err := d.ExecSql(context.Background(), tx, sql, args...)
 	if err != nil {
 		keyPair.UpdatedAt = originalUpdatedAt
 		return errs.Wrap(err, "unable to update keyPair")
@@ -82,7 +83,7 @@ func (d *CommonDatabase) UpdateKeyPairState(tx *sql.Tx, keyPairId int64, fromSta
 	)
 
 	query, args := ub.BuildWithFlavor(d.Flavor)
-	result, err := d.ExecSql(tx, query, args...)
+	result, err := d.ExecSql(context.Background(), tx, query, args...)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to update keyPair state")
 	}
@@ -99,7 +100,7 @@ func (d *CommonDatabase) getKeyPairCommon(tx *sql.Tx, selectBuilder *sqlbuilder.
 	keyPairStruct *sqlbuilder.Struct) (*models.KeyPair, error) {
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(tx, sql, args...)
+	rows, err := d.QuerySql(context.Background(), tx, sql, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -144,7 +145,7 @@ func (d *CommonDatabase) GetAllSigningKeys(tx *sql.Tx) ([]models.KeyPair, error)
 	selectBuilder := keyPairStruct.SelectFrom("key_pairs")
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(tx, sql, args...)
+	rows, err := d.QuerySql(context.Background(), tx, sql, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -202,7 +203,7 @@ func (d *CommonDatabase) DeleteKeyPair(tx *sql.Tx, keyPairId int64) error {
 	deleteBuilder.Where(deleteBuilder.Equal("id", keyPairId))
 
 	sql, args := deleteBuilder.Build()
-	_, err := d.ExecSql(tx, sql, args...)
+	_, err := d.ExecSql(context.Background(), tx, sql, args...)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete keyPair")
 	}

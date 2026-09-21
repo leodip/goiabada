@@ -650,7 +650,7 @@ func revokeOnAuthCodeReuse(ctx context.Context, database data.Database, code *mo
 	// is safe to rerun: every read is inside the closure, revokedJtis is whatever the committing
 	// attempt revoked, and the reuse audit event is the caller's, written after this returns.
 	var revokedJtis []string
-	err := database.RunInTransaction(func(tx *sql.Tx) error {
+	err := database.RunInTransaction(ctx, func(tx *sql.Tx) error {
 		// THE SESSION ROW FIRST, before any grant that hangs off it (#139). A termination of this
 		// session deletes that row as its first statement, so with this leading the two
 		// transactions serialize on the row and one simply waits. Without it this one takes

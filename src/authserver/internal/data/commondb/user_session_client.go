@@ -1,6 +1,7 @@
 package commondb
 
 import (
+	"context"
 	"database/sql"
 	"time"
 
@@ -23,7 +24,7 @@ func (d *CommonDatabase) CreateUserSessionClient(tx *sql.Tx, userSessionClient *
 
 	insertBuilder := userSessionClientStruct.WithoutTag("pk").InsertInto("user_session_clients", userSessionClient)
 
-	id, err := d.insertReturningId(tx, insertBuilder, "userSessionClient")
+	id, err := d.insertReturningId(context.Background(), tx, insertBuilder, "userSessionClient")
 	if err != nil {
 		userSessionClient.CreatedAt = originalCreatedAt
 		userSessionClient.UpdatedAt = originalUpdatedAt
@@ -50,7 +51,7 @@ func (d *CommonDatabase) UpdateUserSessionClient(tx *sql.Tx, userSessionClient *
 	updateBuilder.Where(updateBuilder.Equal("id", userSessionClient.Id))
 
 	sql, args := updateBuilder.Build()
-	_, err := d.ExecSql(tx, sql, args...)
+	_, err := d.ExecSql(context.Background(), tx, sql, args...)
 	if err != nil {
 		userSessionClient.UpdatedAt = originalUpdatedAt
 		return errs.Wrap(err, "unable to update userSessionClient")
@@ -63,7 +64,7 @@ func (d *CommonDatabase) getUserSessionClientCommon(tx *sql.Tx, selectBuilder *s
 	userSessionClientStruct *sqlbuilder.Struct) (*models.UserSessionClient, error) {
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(tx, sql, args...)
+	rows, err := d.QuerySql(context.Background(), tx, sql, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -133,7 +134,7 @@ func (d *CommonDatabase) GetUserSessionClientsByUserSessionIds(tx *sql.Tx, userS
 		selectBuilder.Where(selectBuilder.In("user_session_id", sqlbuilder.Flatten(batch)...))
 
 		sql, args := selectBuilder.Build()
-		rows, err := d.QuerySql(tx, sql, args...)
+		rows, err := d.QuerySql(context.Background(), tx, sql, args...)
 		if err != nil {
 			return errs.Wrap(err, "unable to query database")
 		}
@@ -171,7 +172,7 @@ func (d *CommonDatabase) GetUserSessionClientsByUserSessionId(tx *sql.Tx, userSe
 	selectBuilder.Where(selectBuilder.Equal("user_session_id", userSessionId))
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(tx, sql, args...)
+	rows, err := d.QuerySql(context.Background(), tx, sql, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -211,7 +212,7 @@ func (d *CommonDatabase) GetUserSessionsClientByIds(tx *sql.Tx, userSessionClien
 		selectBuilder.Where(selectBuilder.In("id", sqlbuilder.Flatten(batch)...))
 
 		sql, args := selectBuilder.Build()
-		rows, err := d.QuerySql(tx, sql, args...)
+		rows, err := d.QuerySql(context.Background(), tx, sql, args...)
 		if err != nil {
 			return errs.Wrap(err, "unable to query database")
 		}
@@ -265,7 +266,7 @@ func (d *CommonDatabase) DeleteUserSessionClient(tx *sql.Tx, userSessionClientId
 	deleteBuilder.Where(deleteBuilder.Equal("id", userSessionClientId))
 
 	sql, args := deleteBuilder.Build()
-	_, err := d.ExecSql(tx, sql, args...)
+	_, err := d.ExecSql(context.Background(), tx, sql, args...)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete userSessionClient")
 	}

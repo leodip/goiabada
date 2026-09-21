@@ -1,6 +1,7 @@
 package usersession
 
 import (
+	"context"
 	"database/sql"
 
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
@@ -37,7 +38,7 @@ func expectRunInTransaction(db *mocks_data.Database) *runInTransactionStub {
 // nil commitErr it is expectRunInTransaction.
 func expectRunInTransactionThenFail(db *mocks_data.Database, commitErr error) *runInTransactionStub {
 	stub := &runInTransactionStub{}
-	db.EXPECT().RunInTransaction(mock.Anything).RunAndReturn(func(fn func(tx *sql.Tx) error) error {
+	db.EXPECT().RunInTransaction(mock.Anything, mock.Anything).RunAndReturn(func(_ context.Context, fn func(tx *sql.Tx) error) error {
 		stub.bodyErr = fn(txSentinel)
 		if stub.bodyErr != nil {
 			return stub.bodyErr
@@ -50,5 +51,5 @@ func expectRunInTransactionThenFail(db *mocks_data.Database, commitErr error) *r
 // expectRunInTransactionRefused is the shape where the helper cannot open a transaction at all:
 // the body never runs and the helper's error is what the caller sees.
 func expectRunInTransactionRefused(db *mocks_data.Database, err error) {
-	db.EXPECT().RunInTransaction(mock.Anything).Return(err).Once()
+	db.EXPECT().RunInTransaction(mock.Anything, mock.Anything).Return(err).Once()
 }

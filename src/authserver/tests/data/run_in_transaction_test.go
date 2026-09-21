@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"sync"
@@ -38,7 +39,7 @@ func newClientModel() *models.Client {
 func TestRunInTransaction_ABodyThatReturnsNilIsCommittedAndItsRowsAreVisible(t *testing.T) {
 	client := newClientModel()
 
-	err := database.RunInTransaction(func(tx *sql.Tx) error {
+	err := database.RunInTransaction(context.Background(), func(tx *sql.Tx) error {
 		return database.CreateClient(tx, client)
 	})
 
@@ -56,7 +57,7 @@ func TestRunInTransaction_ABodyThatReturnsAnErrorIsRolledBackAndTheErrorComesBac
 	client := newClientModel()
 	refused := errors.New("the body decided against it")
 
-	err := database.RunInTransaction(func(tx *sql.Tx) error {
+	err := database.RunInTransaction(context.Background(), func(tx *sql.Tx) error {
 		if err := database.CreateClient(tx, client); err != nil {
 			return err
 		}
@@ -117,7 +118,7 @@ func TestRunInTransaction_ARealDeadlockIsRerunAndBothPartiesFinish(t *testing.T)
 	var attempts atomic.Int32
 
 	party := func(db data.Database, first, second *models.Client, held *sync.Once, mine, theirs chan struct{}) error {
-		return db.RunInTransaction(func(tx *sql.Tx) error {
+		return db.RunInTransaction(context.Background(), func(tx *sql.Tx) error {
 			attempts.Add(1)
 			if err := db.AcquireClientRow(tx, first.Id); err != nil {
 				return err

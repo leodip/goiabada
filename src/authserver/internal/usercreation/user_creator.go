@@ -1,6 +1,7 @@
 package usercreation
 
 import (
+	"context"
 	"database/sql"
 
 	"github.com/leodip/goiabada/authserver/internal/data"
@@ -29,7 +30,7 @@ type CreateUserInput struct {
 	FamilyName    string
 }
 
-func (uc *UserCreator) CreateUser(input *CreateUserInput) (*models.User, error) {
+func (uc *UserCreator) CreateUser(ctx context.Context, input *CreateUserInput) (*models.User, error) {
 
 	user := &models.User{
 		Subject:       uuidutil.New(),
@@ -70,7 +71,7 @@ func (uc *UserCreator) CreateUser(input *CreateUserInput) (*models.User, error) 
 	// RunInTransaction so a deadlock reruns the body (#301). The body is safe to rerun: the id
 	// CreateUser assigns onto user is reassigned by the next attempt before the permission
 	// insert reads it.
-	err = uc.database.RunInTransaction(func(tx *sql.Tx) error {
+	err = uc.database.RunInTransaction(ctx, func(tx *sql.Tx) error {
 		if err := uc.database.CreateUser(tx, user); err != nil {
 			return err
 		}

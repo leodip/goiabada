@@ -1,6 +1,7 @@
 package signingkeys
 
 import (
+	"context"
 	"crypto/x509"
 	"database/sql"
 	"encoding/pem"
@@ -73,7 +74,7 @@ func NewSigningKeyRotator(database data.Database) *SigningKeyRotator {
 // The replacement key is generated before the transaction opens. That is deliberate: the
 // generation is the slow step by three orders of magnitude, and holding a transaction open
 // across it is what made the window wide enough to hit.
-func (r *SigningKeyRotator) Rotate() error {
+func (r *SigningKeyRotator) Rotate(ctx context.Context) error {
 
 	newNextKey, err := r.generateNextKey()
 	if err != nil {
@@ -86,7 +87,7 @@ func (r *SigningKeyRotator) Rotate() error {
 	// not deadlocks, so they roll back once and surface unchanged. The replacement key is the
 	// one value the body captures, and the id CreateKeyPair assigns onto it is reassigned by
 	// the next attempt.
-	return r.database.RunInTransaction(func(tx *sql.Tx) error {
+	return r.database.RunInTransaction(ctx, func(tx *sql.Tx) error {
 		allSigningKeys, err := r.database.GetAllSigningKeys(tx)
 		if err != nil {
 			return err

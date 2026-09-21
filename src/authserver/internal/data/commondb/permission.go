@@ -1,6 +1,7 @@
 package commondb
 
 import (
+	"context"
 	"database/sql"
 	"time"
 
@@ -27,7 +28,7 @@ func (d *CommonDatabase) CreatePermission(tx *sql.Tx, permission *models.Permiss
 
 	insertBuilder := permissionStruct.WithoutTag("pk").InsertInto("permissions", permission)
 
-	id, err := d.insertReturningId(tx, insertBuilder, "permission")
+	id, err := d.insertReturningId(context.Background(), tx, insertBuilder, "permission")
 	if err != nil {
 		permission.CreatedAt = originalCreatedAt
 		permission.UpdatedAt = originalUpdatedAt
@@ -54,7 +55,7 @@ func (d *CommonDatabase) UpdatePermission(tx *sql.Tx, permission *models.Permiss
 	updateBuilder.Where(updateBuilder.Equal("id", permission.Id))
 
 	sql, args := updateBuilder.Build()
-	_, err := d.ExecSql(tx, sql, args...)
+	_, err := d.ExecSql(context.Background(), tx, sql, args...)
 	if err != nil {
 		permission.UpdatedAt = originalUpdatedAt
 		return errs.Wrap(err, "unable to update permission")
@@ -67,7 +68,7 @@ func (d *CommonDatabase) getPermissionCommon(tx *sql.Tx, selectBuilder *sqlbuild
 	permissionStruct *sqlbuilder.Struct) (*models.Permission, error) {
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(tx, sql, args...)
+	rows, err := d.QuerySql(context.Background(), tx, sql, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -114,7 +115,7 @@ func (d *CommonDatabase) GetPermissionsByResourceId(tx *sql.Tx, resourceId int64
 	selectBuilder.Where(selectBuilder.Equal("resource_id", resourceId))
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(tx, sql, args...)
+	rows, err := d.QuerySql(context.Background(), tx, sql, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -182,7 +183,7 @@ func (d *CommonDatabase) GetPermissionsByIds(tx *sql.Tx, permissionIds []int64) 
 		selectBuilder.Where(selectBuilder.In("id", sqlbuilder.Flatten(batch)...))
 
 		sql, args := selectBuilder.Build()
-		rows, err := d.QuerySql(tx, sql, args...)
+		rows, err := d.QuerySql(context.Background(), tx, sql, args...)
 		if err != nil {
 			return errs.Wrap(err, "unable to query database")
 		}
@@ -220,7 +221,7 @@ func (d *CommonDatabase) DeletePermission(tx *sql.Tx, permissionId int64) error 
 	deleteBuilder.Where(deleteBuilder.Equal("id", permissionId))
 
 	sql, args := deleteBuilder.Build()
-	_, err := d.ExecSql(tx, sql, args...)
+	_, err := d.ExecSql(context.Background(), tx, sql, args...)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete permission")
 	}

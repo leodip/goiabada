@@ -1,6 +1,7 @@
 package commondb
 
 import (
+	"context"
 	"database/sql"
 	"time"
 
@@ -25,7 +26,7 @@ func (d *CommonDatabase) CreateRedirectURI(tx *sql.Tx, redirectURI *models.Redir
 
 	insertBuilder := redirectURIStruct.WithoutTag("pk").InsertInto("redirect_uris", redirectURI)
 
-	id, err := d.insertReturningId(tx, insertBuilder, "redirectURI")
+	id, err := d.insertReturningId(context.Background(), tx, insertBuilder, "redirectURI")
 	if err != nil {
 		redirectURI.CreatedAt = originalCreatedAt
 		return err
@@ -39,7 +40,7 @@ func (d *CommonDatabase) getRedirectURICommon(tx *sql.Tx, selectBuilder *sqlbuil
 	redirectURIStruct *sqlbuilder.Struct) (*models.RedirectURI, error) {
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(tx, sql, args...)
+	rows, err := d.QuerySql(context.Background(), tx, sql, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -86,7 +87,7 @@ func (d *CommonDatabase) GetRedirectURIsByClientId(tx *sql.Tx, clientId int64) (
 	selectBuilder.Where(selectBuilder.Equal("client_id", clientId))
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(tx, sql, args...)
+	rows, err := d.QuerySql(context.Background(), tx, sql, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -119,7 +120,7 @@ func (d *CommonDatabase) DeleteRedirectURI(tx *sql.Tx, redirectURIId int64) erro
 	deleteBuilder.Where(deleteBuilder.Equal("id", redirectURIId))
 
 	sql, args := deleteBuilder.Build()
-	_, err := d.ExecSql(tx, sql, args...)
+	_, err := d.ExecSql(context.Background(), tx, sql, args...)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete redirectURI")
 	}

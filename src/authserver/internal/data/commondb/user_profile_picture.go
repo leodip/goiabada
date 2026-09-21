@@ -1,6 +1,7 @@
 package commondb
 
 import (
+	"context"
 	"database/sql"
 	"time"
 
@@ -27,7 +28,7 @@ func (d *CommonDatabase) CreateUserProfilePicture(tx *sql.Tx, profilePicture *mo
 
 	insertBuilder := profilePictureStruct.WithoutTag("pk").InsertInto("user_profile_pictures", profilePicture)
 
-	id, err := d.insertReturningId(tx, insertBuilder, "profile picture")
+	id, err := d.insertReturningId(context.Background(), tx, insertBuilder, "profile picture")
 	if err != nil {
 		profilePicture.CreatedAt = originalCreatedAt
 		profilePicture.UpdatedAt = originalUpdatedAt
@@ -54,7 +55,7 @@ func (d *CommonDatabase) UpdateUserProfilePicture(tx *sql.Tx, profilePicture *mo
 	updateBuilder.Where(updateBuilder.Equal("id", profilePicture.Id))
 
 	sql, args := updateBuilder.Build()
-	_, err := d.ExecSql(tx, sql, args...)
+	_, err := d.ExecSql(context.Background(), tx, sql, args...)
 	if err != nil {
 		profilePicture.UpdatedAt = originalUpdatedAt
 		return errs.Wrap(err, "unable to update profile picture")
@@ -72,7 +73,7 @@ func (d *CommonDatabase) GetUserProfilePictureByUserId(tx *sql.Tx, userId int64)
 	selectBuilder.Where(selectBuilder.Equal("user_id", userId))
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(tx, sql, args...)
+	rows, err := d.QuerySql(context.Background(), tx, sql, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -103,7 +104,7 @@ func (d *CommonDatabase) DeleteUserProfilePicture(tx *sql.Tx, userId int64) erro
 	deleteBuilder.Where(deleteBuilder.Equal("user_id", userId))
 
 	sql, args := deleteBuilder.Build()
-	_, err := d.ExecSql(tx, sql, args...)
+	_, err := d.ExecSql(context.Background(), tx, sql, args...)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete profile picture")
 	}
@@ -119,7 +120,7 @@ func (d *CommonDatabase) UserHasProfilePicture(tx *sql.Tx, userId int64) (bool, 
 	selectBuilder.Limit(1)
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(tx, sql, args...)
+	rows, err := d.QuerySql(context.Background(), tx, sql, args...)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to query database")
 	}

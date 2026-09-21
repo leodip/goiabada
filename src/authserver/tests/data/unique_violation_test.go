@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"testing"
@@ -97,7 +98,7 @@ func TestCreateUser_DuplicateEmailInsideATransactionIsErrUniqueViolation(t *test
 		Email:   first.Email,
 	}
 
-	err := database.RunInTransaction(func(tx *sql.Tx) error {
+	err := database.RunInTransaction(context.Background(), func(tx *sql.Tx) error {
 		return database.CreateUser(tx, second)
 	})
 	if err == nil {

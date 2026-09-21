@@ -1,6 +1,7 @@
 package commondb
 
 import (
+	"context"
 	"database/sql"
 	"time"
 
@@ -23,7 +24,7 @@ func (d *CommonDatabase) CreateClient(tx *sql.Tx, client *models.Client) error {
 
 	insertBuilder := clientStruct.WithoutTag("pk").InsertInto("clients", client)
 
-	id, err := d.insertReturningId(tx, insertBuilder, "client")
+	id, err := d.insertReturningId(context.Background(), tx, insertBuilder, "client")
 	if err != nil {
 		client.CreatedAt = originalCreatedAt
 		client.UpdatedAt = originalUpdatedAt
@@ -50,7 +51,7 @@ func (d *CommonDatabase) UpdateClient(tx *sql.Tx, client *models.Client) error {
 	updateBuilder.Where(updateBuilder.Equal("id", client.Id))
 
 	sql, args := updateBuilder.Build()
-	_, err := d.ExecSql(tx, sql, args...)
+	_, err := d.ExecSql(context.Background(), tx, sql, args...)
 	if err != nil {
 		client.UpdatedAt = originalUpdatedAt
 		return errs.Wrap(err, "unable to update client")
@@ -100,7 +101,7 @@ func (d *CommonDatabase) AcquireClientRow(tx *sql.Tx, clientId int64) error {
 	acquire.Where(acquire.Equal("id", clientId))
 
 	query, args := acquire.BuildWithFlavor(d.Flavor)
-	if _, err := d.ExecSql(tx, query, args...); err != nil {
+	if _, err := d.ExecSql(context.Background(), tx, query, args...); err != nil {
 		return errs.Wrap(err, "unable to acquire client row")
 	}
 
@@ -172,7 +173,7 @@ func (d *CommonDatabase) SetClientPublic(tx *sql.Tx, clientId int64) (bool, erro
 	)
 
 	query, args := classify.BuildWithFlavor(d.Flavor)
-	result, err := d.ExecSql(tx, query, args...)
+	result, err := d.ExecSql(context.Background(), tx, query, args...)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to make client public")
 	}
@@ -203,7 +204,7 @@ func (d *CommonDatabase) getClientCommon(tx *sql.Tx, selectBuilder *sqlbuilder.S
 	clientStruct *sqlbuilder.Struct) (*models.Client, error) {
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(tx, sql, args...)
+	rows, err := d.QuerySql(context.Background(), tx, sql, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -308,7 +309,7 @@ func (d *CommonDatabase) GetClientsByIds(tx *sql.Tx, clientIds []int64) ([]model
 		selectBuilder.Where(selectBuilder.In("id", sqlbuilder.Flatten(batch)...))
 
 		sql, args := selectBuilder.Build()
-		rows, err := d.QuerySql(tx, sql, args...)
+		rows, err := d.QuerySql(context.Background(), tx, sql, args...)
 		if err != nil {
 			return errs.Wrap(err, "unable to query database")
 		}
@@ -371,7 +372,7 @@ func (d *CommonDatabase) GetAllClients(tx *sql.Tx) ([]models.Client, error) {
 	selectBuilder := clientStruct.SelectFrom("clients")
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(tx, sql, args...)
+	rows, err := d.QuerySql(context.Background(), tx, sql, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -407,7 +408,7 @@ func (d *CommonDatabase) GetAllClients(tx *sql.Tx) ([]models.Client, error) {
 // RunInTransaction rerunning whichever of the two the engine aborts (#301).
 func (d *CommonDatabase) DeleteClient(tx *sql.Tx, clientId int64) error {
 
-	return d.inTransaction(tx, func(tx *sql.Tx) error {
+	return d.inTransaction(context.Background(), tx, func(tx *sql.Tx) error {
 		if err := d.deleteRefreshTokensByColumn(tx, "client_id", clientId); err != nil {
 			return err
 		}
@@ -419,7 +420,7 @@ func (d *CommonDatabase) DeleteClient(tx *sql.Tx, clientId int64) error {
 		deleteBuilder.Where(deleteBuilder.Equal("id", clientId))
 
 		sql, args := deleteBuilder.Build()
-		_, err := d.ExecSql(tx, sql, args...)
+		_, err := d.ExecSql(context.Background(), tx, sql, args...)
 		if err != nil {
 			return errs.Wrap(err, "unable to delete client")
 		}

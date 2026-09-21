@@ -1,6 +1,7 @@
 package apihandlers
 
 import (
+	"context"
 	"database/sql"
 
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
@@ -30,7 +31,7 @@ func expectRunInTransaction(database *mocks_data.Database, tx *sql.Tx, note ...f
 // nil commitErr it is expectRunInTransaction.
 func expectRunInTransactionThenFail(database *mocks_data.Database, tx *sql.Tx, commitErr error, note ...func(string)) *runInTransactionStub {
 	stub := &runInTransactionStub{}
-	database.EXPECT().RunInTransaction(mock.Anything).RunAndReturn(func(fn func(tx *sql.Tx) error) error {
+	database.EXPECT().RunInTransaction(mock.Anything, mock.Anything).RunAndReturn(func(_ context.Context, fn func(tx *sql.Tx) error) error {
 		for _, n := range note {
 			n("begin")
 		}
@@ -52,5 +53,5 @@ func expectRunInTransactionThenFail(database *mocks_data.Database, tx *sql.Tx, c
 // expectRunInTransactionRefused is the shape where the helper cannot open a transaction at all:
 // the body never runs and the helper's error is what the caller sees.
 func expectRunInTransactionRefused(database *mocks_data.Database, err error) {
-	database.EXPECT().RunInTransaction(mock.Anything).Return(err).Once()
+	database.EXPECT().RunInTransaction(mock.Anything, mock.Anything).Return(err).Once()
 }
