@@ -68,9 +68,23 @@ func swapSleep(t *testing.T, replacement func(context.Context, time.Duration) er
 
 // retryWarnings counts the reruns the helper announced.
 func retryWarnings(logs *testutil.SlogCapture) int {
+	return warningsContaining(logs, retryWarning)
+}
+
+// rollbackWarning is the opener of the record the deferred rollback writes when the rollback it
+// asked for answered with something other than success.
+const rollbackWarning = "rolling back a failed transaction reported an error"
+
+// rollbackWarnings counts those records, which is the only observable the deferred rollback's
+// error arm has: it returns nothing and changes nothing the caller can see.
+func rollbackWarnings(logs *testutil.SlogCapture) int {
+	return warningsContaining(logs, rollbackWarning)
+}
+
+func warningsContaining(logs *testutil.SlogCapture, text string) int {
 	n := 0
 	for _, m := range messagesAt(logs, slog.LevelWarn) {
-		if strings.Contains(m, retryWarning) {
+		if strings.Contains(m, text) {
 			n++
 		}
 	}
@@ -107,9 +121,10 @@ func TestRunInTransaction_ASuccessfulBodyCommitsOnce(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, 1, ran, "the body runs exactly once when it succeeds")
-	assert.Equal(t, 1, d.commits, "and its transaction is committed")
-	assert.Zero(t, d.rollbacks)
-	assert.Zero(t, d.openTx, "nothing is left open")
+	c := d.settled(t)
+	assert.Equal(t, 1, c.commits, "and its transaction is committed")
+	assert.Zero(t, c.rollbacks)
+	assert.Zero(t, c.openTx, "nothing is left open")
 	assert.Empty(t, *requested, "nothing precedes the first attempt")
 	assert.Zero(t, retryWarnings(logs), "a success is not worth a warning")
 }
@@ -130,9 +145,10 @@ func TestRunInTransaction_APlainErrorRollsBackAndIsReturnedAsItWas(t *testing.T)
 	require.Error(t, err)
 	assert.Equal(t, boom, err, "the body's error comes back IDENTICAL, not wrapped: callers match it with errors.Is and read it as they wrote it")
 	assert.Equal(t, 1, ran, "an error that is not a deadlock is not retried")
-	assert.Equal(t, 1, d.rollbacks, "the transaction is rolled back")
-	assert.Zero(t, d.commits)
-	assert.Zero(t, d.openTx)
+	c := d.settled(t)
+	assert.Equal(t, 1, c.rollbacks, "the transaction is rolled back")
+	assert.Zero(t, c.commits)
+	assert.Zero(t, c.openTx)
 	assert.Empty(t, *requested)
 	assert.Zero(t, retryWarnings(logs))
 }
@@ -150,9 +166,10 @@ func TestRunInTransaction_ADeadlockInTheBodyIsRerunAndTheRerunCommits(t *testing
 
 	require.NoError(t, err, "the second attempt succeeded, so the call does")
 	assert.Equal(t, 2, ran, "two attempts")
-	assert.Equal(t, 1, d.rollbacks, "the aborted attempt was rolled back")
-	assert.Equal(t, 1, d.commits, "and the rerun committed")
-	assert.Zero(t, d.openTx)
+	c := d.settled(t)
+	assert.Equal(t, 1, c.rollbacks, "the aborted attempt was rolled back")
+	assert.Equal(t, 1, c.commits, "and the rerun committed")
+	assert.Zero(t, c.openTx)
 	assert.Equal(t, []time.Duration{25 * time.Millisecond}, *requested, "one pause, before the second attempt")
 	assert.Equal(t, 1, retryWarnings(logs), "exactly one warning, for the one rerun")
 }
@@ -170,9 +187,10 @@ func TestRunInTransaction_ThreeDeadlocksExhaustTheAttemptsAndTheLastOneSurfaces(
 	assert.ErrorIs(t, err, errDeadlock, "the error unwraps to the last deadlock, so the caller can still see what it was")
 	assert.Contains(t, err.Error(), "all 3 attempts", "and says the attempts were spent")
 	assert.Equal(t, 3, ran, "three attempts, no more")
-	assert.Equal(t, 3, d.rollbacks)
-	assert.Zero(t, d.commits, "nothing was ever committed")
-	assert.Zero(t, d.openTx)
+	c := d.settled(t)
+	assert.Equal(t, 3, c.rollbacks)
+	assert.Zero(t, c.commits, "nothing was ever committed")
+	assert.Zero(t, c.openTx)
 	assert.Equal(t, []time.Duration{25 * time.Millisecond, 100 * time.Millisecond}, *requested,
 		"the backoff before attempts two and three, in that order, and nothing before the first")
 	assert.Equal(t, 2, retryWarnings(logs), "one warning per rerun")
@@ -184,6 +202,7 @@ func TestRunInTransaction_ThreeDeadlocksExhaustTheAttemptsAndTheLastOneSurfaces(
 // deadlock, which is the error that decides whether to retry, with a bookkeeping one, and the
 // retry would never happen. This is the case that fails if rollback errors are returned.
 func TestRunInTransaction_AVictimTheEngineAlreadyRolledBackIsStillRerun(t *testing.T) {
+	logs := testutil.CaptureSlog(t)
 	rolledBackAlready := errors.New("Error 1213: this transaction was already rolled back")
 	d := &scriptedDriver{
 		execs:        []*scriptedExec{{err: errDeadlock}, {err: errDeadlock}, {err: errDeadlock}},
@@ -199,6 +218,8 @@ func TestRunInTransaction_AVictimTheEngineAlreadyRolledBackIsStillRerun(t *testi
 	assert.Equal(t, 3, ran, "the rollback's complaint does not stop the rerun")
 	assert.ErrorIs(t, err, errDeadlock, "and what surfaces at exhaustion is the deadlock")
 	assert.NotErrorIs(t, err, rolledBackAlready, "never the rollback failure")
+	assert.Equal(t, 3, rollbackWarnings(logs),
+		"a rollback that failed on a LIVE context is still recorded, once per attempt; this is the negative that keeps the cancelled-transaction suppression narrow")
 }
 
 func TestRunInTransaction_ADeadlockAtCommitIsRerunAndTheRerunCommits(t *testing.T) {
@@ -213,9 +234,10 @@ func TestRunInTransaction_ADeadlockAtCommitIsRerunAndTheRerunCommits(t *testing.
 
 	require.NoError(t, err, "the second commit went through, so the call succeeds")
 	assert.Equal(t, 2, ran, "two attempts")
-	assert.Equal(t, 2, d.commits, "two commits asked for, the first refused")
-	assert.Zero(t, d.rollbacks, "a transaction whose commit failed is finished; database/sql refuses a rollback after it and none is attempted")
-	assert.Zero(t, d.openTx)
+	c := d.settled(t)
+	assert.Equal(t, 2, c.commits, "two commits asked for, the first refused")
+	assert.Zero(t, c.rollbacks, "a transaction whose commit failed is finished; database/sql refuses a rollback after it and none is attempted")
+	assert.Zero(t, c.openTx)
 	assert.Equal(t, []time.Duration{25 * time.Millisecond}, *requested)
 	assert.Equal(t, 1, retryWarnings(logs))
 }
@@ -231,7 +253,7 @@ func TestRunInTransaction_ThreeDeadlocksAtCommitExhaustTheAttempts(t *testing.T)
 	require.Error(t, err)
 	assert.ErrorIs(t, err, errDeadlock)
 	assert.Equal(t, 3, ran)
-	assert.Equal(t, 3, d.commits)
+	assert.Equal(t, 3, d.settled(t).commits)
 }
 
 // TestRunInTransaction_ACommitThatFailsForAnyOtherReasonIsNotReplayed holds the decided line
@@ -252,7 +274,7 @@ func TestRunInTransaction_ACommitThatFailsForAnyOtherReasonIsNotReplayed(t *test
 	assert.ErrorIs(t, err, boom, "the commit's own failure comes back")
 	assert.NotContains(t, err.Error(), "attempts", "with no retry wrapping, because there was no retry")
 	assert.Equal(t, 1, ran, "ONE attempt")
-	assert.Equal(t, 1, d.commits)
+	assert.Equal(t, 1, d.settled(t).commits)
 	assert.Empty(t, *requested)
 	assert.Zero(t, retryWarnings(logs))
 }
@@ -267,9 +289,10 @@ func TestRunInTransaction_APanicInTheBodyPropagatesAndLeavesNoOpenTransaction(t 
 		})
 	}, "the panic is the caller's to see, not something the helper swallows")
 
-	assert.Equal(t, 1, d.rollbacks, "the transaction was rolled back on the way out")
-	assert.Zero(t, d.commits)
-	assert.Zero(t, d.openTx, "so nothing holds its locks until the pool closes the connection")
+	c := d.settled(t)
+	assert.Equal(t, 1, c.rollbacks, "the transaction was rolled back on the way out")
+	assert.Zero(t, c.commits)
+	assert.Zero(t, c.openTx, "so nothing holds its locks until the pool closes the connection")
 }
 
 // TestRunInTransaction_WithNoClassifierNothingIsADeadlock is the default a handle gets when no
@@ -290,7 +313,7 @@ func TestRunInTransaction_WithNoClassifierNothingIsADeadlock(t *testing.T) {
 	require.Error(t, err)
 	assert.Equal(t, errDeadlock, err, "returned as it was")
 	assert.Equal(t, 1, ran, "after one attempt")
-	assert.Equal(t, 1, d.rollbacks)
+	assert.Equal(t, 1, d.settled(t).rollbacks)
 	assert.Empty(t, *requested)
 }
 
@@ -311,7 +334,7 @@ func TestInTransaction_OnlyTheOwnerRetries(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Equal(t, 2, ran, "the deadlock was retried")
-		assert.Equal(t, 1, d.commits)
+		assert.Equal(t, 1, d.settled(t).commits)
 	})
 
 	t.Run("handed a transaction, it runs once and returns the deadlock to the owner", func(t *testing.T) {
@@ -326,8 +349,9 @@ func TestInTransaction_OnlyTheOwnerRetries(t *testing.T) {
 		require.Error(t, err)
 		assert.ErrorIs(t, err, errDeadlock, "the owner gets the deadlock and decides")
 		assert.Equal(t, 1, ran, "no retry from inside a transaction it does not own")
-		assert.Zero(t, d.commits, "and it neither commits nor rolls back what is not its own")
-		assert.Zero(t, d.rollbacks)
+		held := d.counts()
+		assert.Zero(t, held.commits, "and it neither commits nor rolls back what is not its own")
+		assert.Zero(t, held.rollbacks)
 		require.NoError(t, db.RollbackTransaction(tx))
 	})
 }
@@ -360,9 +384,10 @@ func TestRunInTransaction_ACancelledContextIsRefusedBeforeTheFirstAttempt(t *tes
 	require.Error(t, err)
 	assert.ErrorIs(t, err, context.Canceled, "the context error is what the caller matches on")
 	assert.Zero(t, ran, "the body never ran")
-	assert.Zero(t, d.openTx, "and no transaction was ever opened")
-	assert.Zero(t, d.commits)
-	assert.Zero(t, d.rollbacks)
+	c := d.settled(t)
+	assert.Zero(t, c.openTx, "and no transaction was ever opened")
+	assert.Zero(t, c.commits)
+	assert.Zero(t, c.rollbacks)
 	assert.Empty(t, *requested, "nothing precedes the first attempt, cancelled or not")
 }
 
@@ -385,10 +410,60 @@ func TestRunInTransaction_ADeadlineInsideTheBodyComesBackUnretried(t *testing.T)
 	require.Error(t, err)
 	assert.ErrorIs(t, err, context.DeadlineExceeded, "the deadline the statement met is what surfaces")
 	assert.Equal(t, 1, ran, "one attempt: a context error is not a deadlock and is not rerun")
-	assert.Equal(t, 1, d.rollbacks, "the open transaction was rolled back on the way out")
-	assert.Zero(t, d.commits)
-	assert.Zero(t, d.openTx)
+	c := d.settled(t)
+	assert.Equal(t, 1, c.rollbacks, "the open transaction was rolled back on the way out")
+	assert.Zero(t, c.commits)
+	assert.Zero(t, c.openTx)
 	assert.Empty(t, *requested, "and no backoff was spent on it")
+}
+
+// TestRunInTransaction_ACancelledTransactionsRollbackIsNotRecordedAsAFailure is the log half of
+// the case above, and it is a consequence of BeginTx that BeginTransaction's own tests cannot
+// see. database/sql starts a goroutine at BeginTx that rolls the transaction back as soon as the
+// context is done, so the deferred rollback in runTransactionOnce arrives second and is answered
+// with sql.ErrTxDone. Nothing failed -- the rollback the caller needed already happened -- and
+// recording it would put a warning in the log for every cancelled request that was inside a
+// transaction, which is an operator sent after a non-event (#386).
+func TestRunInTransaction_ACancelledTransactionsRollbackIsNotRecordedAsAFailure(t *testing.T) {
+	logs := testutil.CaptureSlog(t)
+	recordBackoff(t)
+	d := &scriptedDriver{execs: []*scriptedExec{{delay: 2 * time.Second}}}
+	db := retryingDB(t, d)
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	ran := 0
+
+	err := db.RunInTransaction(ctx, oneStatementOn(ctx, db, &ran))
+
+	require.Error(t, err)
+	assert.ErrorIs(t, err, context.DeadlineExceeded, "the deadline is still what the caller gets")
+	assert.Zero(t, rollbackWarnings(logs),
+		"the transaction database/sql had already rolled back is not a rollback failure")
+	assert.Equal(t, 1, d.settled(t).rollbacks, "and it was rolled back exactly once")
+}
+
+// TestRunInTransaction_AnAlreadyDoneRollbackOnALiveContextIsStillRecorded is the other side of
+// that suppression, and the reason it is written as two conditions rather than one. ErrTxDone
+// with no cancellation to explain it means the transaction was finished by something other than
+// this helper, which is a defect and not a non-event, so it keeps its record. Suppressing on the
+// error alone would have swallowed it (#386).
+func TestRunInTransaction_AnAlreadyDoneRollbackOnALiveContextIsStillRecorded(t *testing.T) {
+	logs := testutil.CaptureSlog(t)
+	recordBackoff(t)
+	boom := errors.New("connection reset by peer")
+	d := &scriptedDriver{
+		execs:        []*scriptedExec{{err: boom}},
+		rollbackErrs: []error{sql.ErrTxDone},
+	}
+	db := retryingDB(t, d)
+	ran := 0
+
+	err := db.RunInTransaction(context.Background(), oneStatement(db, &ran))
+
+	require.Error(t, err)
+	assert.ErrorIs(t, err, boom, "the body's error is still what the caller gets")
+	assert.Equal(t, 1, rollbackWarnings(logs),
+		"a transaction that was already finished with nothing cancelled is worth the record")
 }
 
 // TestRunInTransaction_ACancellationDuringTheBackoffStopsTheRerun exercises the real select: the
@@ -416,8 +491,9 @@ func TestRunInTransaction_ACancellationDuringTheBackoffStopsTheRerun(t *testing.
 	assert.ErrorIs(t, err, context.Canceled, "the context error wins")
 	assert.ErrorIs(t, err, errDeadlock, "and the deadlock that caused the retry is joined to it, not dropped")
 	assert.Equal(t, 1, ran, "the rerun never happened")
-	assert.Equal(t, 1, d.rollbacks)
-	assert.Zero(t, d.commits)
+	c := d.settled(t)
+	assert.Equal(t, 1, c.rollbacks)
+	assert.Zero(t, c.commits)
 	assert.Equal(t, []time.Duration{25 * time.Millisecond}, requested,
 		"the pause was entered, which is what makes this a cancellation DURING the backoff")
 	assert.Zero(t, retryWarnings(logs), "a rerun that never happened is not announced")

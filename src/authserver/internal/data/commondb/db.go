@@ -3,6 +3,7 @@ package commondb
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"log/slog"
 	"time"
 
@@ -228,15 +229,25 @@ func (d *CommonDatabase) runTransactionOnce(ctx context.Context, fn func(tx *sql
 	// Once Commit has been attempted the transaction is finished whatever it answered, and
 	// database/sql refuses a Rollback after it. The deferred rollback therefore covers exactly
 	// the two exits before the commit: fn returning an error and fn panicking.
+	//
+	// A THIRD FINISHED STATE arrives with the context. When ctx is done, database/sql rolls the
+	// transaction back on the goroutine it started at BeginTx, so by the time this runs the
+	// rollback the caller needed has already happened and tx.Rollback answers sql.ErrTxDone.
+	// Nothing failed there, so it earns no record: warning on it would put a line in the log for
+	// every cancelled request that was inside a transaction, which is an operator sent after a
+	// non-event. Only a rollback that failed for some OTHER reason is still worth the warning,
+	// and a live context still reports ErrTxDone as the anomaly it would be (#386).
 	committing := false
 	defer func() {
 		if committing {
 			return
 		}
-		if rollbackErr := d.RollbackTransaction(tx); rollbackErr != nil {
-			slog.WarnContext(ctx, "rolling back a failed transaction reported an error, which is ignored because the transaction's own error is the one the caller needs",
-				"error", rollbackErr)
+		rollbackErr := d.RollbackTransaction(tx)
+		if rollbackErr == nil || (ctx.Err() != nil && errors.Is(rollbackErr, sql.ErrTxDone)) {
+			return
 		}
+		slog.WarnContext(ctx, "rolling back a failed transaction reported an error, which is ignored because the transaction's own error is the one the caller needs",
+			"error", rollbackErr)
 	}()
 
 	if err := fn(tx); err != nil {
