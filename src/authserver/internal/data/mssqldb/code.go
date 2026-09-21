@@ -38,7 +38,7 @@ func (d *MsSQLDatabase) CreateCode(tx *sql.Tx, code *models.Code) error {
 	}
 	sql = parts[0] + "OUTPUT INSERTED.id VALUES" + parts[1]
 
-	rows, err := d.CommonDB.QuerySql(tx, sql, args...)
+	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
 		code.CreatedAt = originalCreatedAt
 		code.UpdatedAt = originalUpdatedAt
@@ -61,48 +61,8 @@ func (d *MsSQLDatabase) CreateCode(tx *sql.Tx, code *models.Code) error {
 	if err := rows.Err(); err != nil {
 		code.CreatedAt = originalCreatedAt
 		code.UpdatedAt = originalUpdatedAt
-		return d.CommonDB.WrapSQLError(err, "unable to insert code")
+		return d.WrapSQLError(err, "unable to insert code")
 	}
 
 	return nil
-}
-
-func (d *MsSQLDatabase) UpdateCode(tx *sql.Tx, code *models.Code) error {
-	return d.CommonDB.UpdateCode(tx, code)
-}
-
-func (d *MsSQLDatabase) MarkCodeAsUsed(tx *sql.Tx, codeId int64) (bool, error) {
-	return d.CommonDB.MarkCodeAsUsed(tx, codeId)
-}
-
-func (d *MsSQLDatabase) RevokeCodesBySessionIdentifier(tx *sql.Tx, sessionIdentifier string) (int64, error) {
-	return d.CommonDB.RevokeCodesBySessionIdentifier(tx, sessionIdentifier)
-}
-
-func (d *MsSQLDatabase) RevokeCodesByClientId(tx *sql.Tx, clientId int64) (int64, error) {
-	return d.CommonDB.RevokeCodesByClientId(tx, clientId)
-}
-
-func (d *MsSQLDatabase) GetCodeById(tx *sql.Tx, codeId int64) (*models.Code, error) {
-	return d.CommonDB.GetCodeById(tx, codeId)
-}
-
-func (d *MsSQLDatabase) CodeLoadClient(tx *sql.Tx, code *models.Code) error {
-	return d.CommonDB.CodeLoadClient(tx, code)
-}
-
-func (d *MsSQLDatabase) CodeLoadUser(tx *sql.Tx, code *models.Code) error {
-	return d.CommonDB.CodeLoadUser(tx, code)
-}
-
-func (d *MsSQLDatabase) GetCodeByCodeHash(tx *sql.Tx, codeHash string, used bool) (*models.Code, error) {
-	return d.CommonDB.GetCodeByCodeHash(tx, codeHash, used)
-}
-
-func (d *MsSQLDatabase) DeleteCode(tx *sql.Tx, codeId int64) error {
-	return d.CommonDB.DeleteCode(tx, codeId)
-}
-
-func (d *MsSQLDatabase) DeleteUsedCodesWithoutRefreshTokens(tx *sql.Tx, createdBefore time.Time) error {
-	return d.CommonDB.DeleteUsedCodesWithoutRefreshTokens(tx, createdBefore)
 }

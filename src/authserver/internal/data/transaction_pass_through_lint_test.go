@@ -141,8 +141,8 @@ func findEscapedTransactions(root string) ([]escapedTransactionCall, int, error)
 				if !ok {
 					return true
 				}
-				// d.QuerySql(...) and d.CommonDB.QuerySql(...), the shape the engine adapters
-				// hold, are both rooted at the receiver.
+				// Rooted at the receiver, so d.QuerySql(...) counts and so would any
+				// selector chain starting there.
 				if leftmostIdent(sel.X) != receiver {
 					return true
 				}
@@ -216,7 +216,7 @@ func receiverIdent(fn *ast.FuncDecl) string {
 	return name
 }
 
-// leftmostIdent walks a selector chain down to the identifier it is rooted at, so d.CommonDB.X
+// leftmostIdent walks a selector chain down to the identifier it is rooted at, so d.Inner.X
 // answers "d".
 func leftmostIdent(expr ast.Expr) string {
 	for {

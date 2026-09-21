@@ -33,7 +33,7 @@ func (d *PostgresDatabase) CreateUserGroup(tx *sql.Tx, userGroup *models.UserGro
 	sql, args := insertBuilder.Build()
 	sql = sql + " RETURNING id"
 
-	rows, err := d.CommonDB.QuerySql(tx, sql, args...)
+	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
 		userGroup.CreatedAt = originalCreatedAt
 		userGroup.UpdatedAt = originalUpdatedAt
@@ -56,32 +56,8 @@ func (d *PostgresDatabase) CreateUserGroup(tx *sql.Tx, userGroup *models.UserGro
 	if err := rows.Err(); err != nil {
 		userGroup.CreatedAt = originalCreatedAt
 		userGroup.UpdatedAt = originalUpdatedAt
-		return d.CommonDB.WrapSQLError(err, "unable to insert userGroup")
+		return d.WrapSQLError(err, "unable to insert userGroup")
 	}
 
 	return nil
-}
-
-func (d *PostgresDatabase) UpdateUserGroup(tx *sql.Tx, userGroup *models.UserGroup) error {
-	return d.CommonDB.UpdateUserGroup(tx, userGroup)
-}
-
-func (d *PostgresDatabase) GetUserGroupById(tx *sql.Tx, userGroupId int64) (*models.UserGroup, error) {
-	return d.CommonDB.GetUserGroupById(tx, userGroupId)
-}
-
-func (d *PostgresDatabase) GetUserGroupsByUserIds(tx *sql.Tx, userIds []int64) ([]models.UserGroup, error) {
-	return d.CommonDB.GetUserGroupsByUserIds(tx, userIds)
-}
-
-func (d *PostgresDatabase) GetUserGroupsByUserId(tx *sql.Tx, userId int64) ([]models.UserGroup, error) {
-	return d.CommonDB.GetUserGroupsByUserId(tx, userId)
-}
-
-func (d *PostgresDatabase) GetUserGroupByUserIdAndGroupId(tx *sql.Tx, userId, groupId int64) (*models.UserGroup, error) {
-	return d.CommonDB.GetUserGroupByUserIdAndGroupId(tx, userId, groupId)
-}
-
-func (d *PostgresDatabase) DeleteUserGroup(tx *sql.Tx, userGroupId int64) error {
-	return d.CommonDB.DeleteUserGroup(tx, userGroupId)
 }

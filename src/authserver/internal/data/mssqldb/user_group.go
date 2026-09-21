@@ -38,7 +38,7 @@ func (d *MsSQLDatabase) CreateUserGroup(tx *sql.Tx, userGroup *models.UserGroup)
 	}
 	sql = parts[0] + "OUTPUT INSERTED.id VALUES" + parts[1]
 
-	rows, err := d.CommonDB.QuerySql(tx, sql, args...)
+	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
 		userGroup.CreatedAt = originalCreatedAt
 		userGroup.UpdatedAt = originalUpdatedAt
@@ -61,32 +61,8 @@ func (d *MsSQLDatabase) CreateUserGroup(tx *sql.Tx, userGroup *models.UserGroup)
 	if err := rows.Err(); err != nil {
 		userGroup.CreatedAt = originalCreatedAt
 		userGroup.UpdatedAt = originalUpdatedAt
-		return d.CommonDB.WrapSQLError(err, "unable to insert userGroup")
+		return d.WrapSQLError(err, "unable to insert userGroup")
 	}
 
 	return nil
-}
-
-func (d *MsSQLDatabase) UpdateUserGroup(tx *sql.Tx, userGroup *models.UserGroup) error {
-	return d.CommonDB.UpdateUserGroup(tx, userGroup)
-}
-
-func (d *MsSQLDatabase) GetUserGroupById(tx *sql.Tx, userGroupId int64) (*models.UserGroup, error) {
-	return d.CommonDB.GetUserGroupById(tx, userGroupId)
-}
-
-func (d *MsSQLDatabase) GetUserGroupsByUserIds(tx *sql.Tx, userIds []int64) ([]models.UserGroup, error) {
-	return d.CommonDB.GetUserGroupsByUserIds(tx, userIds)
-}
-
-func (d *MsSQLDatabase) GetUserGroupsByUserId(tx *sql.Tx, userId int64) ([]models.UserGroup, error) {
-	return d.CommonDB.GetUserGroupsByUserId(tx, userId)
-}
-
-func (d *MsSQLDatabase) GetUserGroupByUserIdAndGroupId(tx *sql.Tx, userId, groupId int64) (*models.UserGroup, error) {
-	return d.CommonDB.GetUserGroupByUserIdAndGroupId(tx, userId, groupId)
-}
-
-func (d *MsSQLDatabase) DeleteUserGroup(tx *sql.Tx, userGroupId int64) error {
-	return d.CommonDB.DeleteUserGroup(tx, userGroupId)
 }

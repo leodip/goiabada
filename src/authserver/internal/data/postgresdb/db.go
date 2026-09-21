@@ -22,9 +22,11 @@ import (
 //go:embed migrations/*.sql
 var postgresMigrationsFs embed.FS
 
+// PostgresDatabase declares only the methods PostgreSQL needs its own SQL for; the rest are promoted
+// from the embedded common implementation. See commondb.CommonDatabase for what embedding does
+// and does not buy (#416).
 type PostgresDatabase struct {
-	DB       *sql.DB
-	CommonDB *commondb.CommonDatabase
+	*commondb.CommonDatabase
 	dbConfig *DatabaseConfig
 }
 
@@ -109,9 +111,8 @@ func NewPostgresDatabase(dbConfig *DatabaseConfig, logSQL bool) (*PostgresDataba
 	commonDb.IsUniqueViolation = isUniqueViolation
 
 	postgresDb := PostgresDatabase{
-		DB:       db,
-		CommonDB: commonDb,
-		dbConfig: dbConfig,
+		CommonDatabase: commonDb,
+		dbConfig:       dbConfig,
 	}
 	return &postgresDb, nil
 }
@@ -268,14 +269,6 @@ func QuoteIdentifier(name string) string {
 	return `"` + strings.ReplaceAll(name, `"`, `""`) + `"`
 }
 
-func (d *PostgresDatabase) BeginTransaction() (*sql.Tx, error) {
-	return d.CommonDB.BeginTransaction()
-}
-
-func (d *PostgresDatabase) RunInTransaction(fn func(tx *sql.Tx) error) error {
-	return d.CommonDB.RunInTransaction(fn)
-}
-
 // isDeadlock is PostgreSQL's half of RunInTransaction's classifier: SQLSTATE 40P01,
 // deadlock_detected, which the server raises on the transaction it chose as the victim after
 // rolling it back. 55P03, lock_not_available, is a lock wait that ran out and is deliberately
@@ -321,14 +314,6 @@ func isUniqueViolation(err error) bool {
 func isDuplicateDatabase(err error) bool {
 	var pgErr *pgconn.PgError
 	return errors.As(err, &pgErr) && pgErr.Code == pgDuplicateDatabase
-}
-
-func (d *PostgresDatabase) CommitTransaction(tx *sql.Tx) error {
-	return d.CommonDB.CommitTransaction(tx)
-}
-
-func (d *PostgresDatabase) RollbackTransaction(tx *sql.Tx) error {
-	return d.CommonDB.RollbackTransaction(tx)
 }
 
 // schemaMigrationsTableDDL pins the shape of the version table the runner keeps, which
@@ -394,8 +379,4 @@ func (d *PostgresDatabase) Migrate() error {
 	}
 
 	return nil
-}
-
-func (d *PostgresDatabase) IsEmpty() (bool, error) {
-	return d.CommonDB.IsEmpty()
 }

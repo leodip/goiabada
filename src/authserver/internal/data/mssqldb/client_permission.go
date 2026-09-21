@@ -38,7 +38,7 @@ func (d *MsSQLDatabase) CreateClientPermission(tx *sql.Tx, clientPermission *mod
 	}
 	sql = parts[0] + "OUTPUT INSERTED.id VALUES" + parts[1]
 
-	rows, err := d.CommonDB.QuerySql(tx, sql, args...)
+	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
 		clientPermission.CreatedAt = originalCreatedAt
 		clientPermission.UpdatedAt = originalUpdatedAt
@@ -61,28 +61,8 @@ func (d *MsSQLDatabase) CreateClientPermission(tx *sql.Tx, clientPermission *mod
 	if err := rows.Err(); err != nil {
 		clientPermission.CreatedAt = originalCreatedAt
 		clientPermission.UpdatedAt = originalUpdatedAt
-		return d.CommonDB.WrapSQLError(err, "unable to insert clientPermission")
+		return d.WrapSQLError(err, "unable to insert clientPermission")
 	}
 
 	return nil
-}
-
-func (d *MsSQLDatabase) UpdateClientPermission(tx *sql.Tx, clientPermission *models.ClientPermission) error {
-	return d.CommonDB.UpdateClientPermission(tx, clientPermission)
-}
-
-func (d *MsSQLDatabase) GetClientPermissionById(tx *sql.Tx, clientPermissionId int64) (*models.ClientPermission, error) {
-	return d.CommonDB.GetClientPermissionById(tx, clientPermissionId)
-}
-
-func (d *MsSQLDatabase) GetClientPermissionByClientIdAndPermissionId(tx *sql.Tx, clientId, permissionId int64) (*models.ClientPermission, error) {
-	return d.CommonDB.GetClientPermissionByClientIdAndPermissionId(tx, clientId, permissionId)
-}
-
-func (d *MsSQLDatabase) GetClientPermissionsByClientId(tx *sql.Tx, clientId int64) ([]models.ClientPermission, error) {
-	return d.CommonDB.GetClientPermissionsByClientId(tx, clientId)
-}
-
-func (d *MsSQLDatabase) DeleteClientPermission(tx *sql.Tx, clientPermissionId int64) error {
-	return d.CommonDB.DeleteClientPermission(tx, clientPermissionId)
 }

@@ -25,7 +25,7 @@ func (d *PostgresDatabase) CreateUserSessionClient(tx *sql.Tx, userSessionClient
 	sql, args := insertBuilder.Build()
 	sql = sql + " RETURNING id"
 
-	rows, err := d.CommonDB.QuerySql(tx, sql, args...)
+	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
 		userSessionClient.CreatedAt = originalCreatedAt
 		userSessionClient.UpdatedAt = originalUpdatedAt
@@ -48,36 +48,8 @@ func (d *PostgresDatabase) CreateUserSessionClient(tx *sql.Tx, userSessionClient
 	if err := rows.Err(); err != nil {
 		userSessionClient.CreatedAt = originalCreatedAt
 		userSessionClient.UpdatedAt = originalUpdatedAt
-		return d.CommonDB.WrapSQLError(err, "unable to insert userSessionClient")
+		return d.WrapSQLError(err, "unable to insert userSessionClient")
 	}
 
 	return nil
-}
-
-func (d *PostgresDatabase) UpdateUserSessionClient(tx *sql.Tx, userSessionClient *models.UserSessionClient) error {
-	return d.CommonDB.UpdateUserSessionClient(tx, userSessionClient)
-}
-
-func (d *PostgresDatabase) UserSessionClientsLoadClients(tx *sql.Tx, userSessionClients []models.UserSessionClient) error {
-	return d.CommonDB.UserSessionClientsLoadClients(tx, userSessionClients)
-}
-
-func (d *PostgresDatabase) GetUserSessionClientsByUserSessionIds(tx *sql.Tx, userSessionIds []int64) ([]models.UserSessionClient, error) {
-	return d.CommonDB.GetUserSessionClientsByUserSessionIds(tx, userSessionIds)
-}
-
-func (d *PostgresDatabase) GetUserSessionClientsByUserSessionId(tx *sql.Tx, userSessionId int64) ([]models.UserSessionClient, error) {
-	return d.CommonDB.GetUserSessionClientsByUserSessionId(tx, userSessionId)
-}
-
-func (d *PostgresDatabase) GetUserSessionsClientByIds(tx *sql.Tx, userSessionClientIds []int64) ([]models.UserSessionClient, error) {
-	return d.CommonDB.GetUserSessionsClientByIds(tx, userSessionClientIds)
-}
-
-func (d *PostgresDatabase) GetUserSessionClientById(tx *sql.Tx, userSessionClientId int64) (*models.UserSessionClient, error) {
-	return d.CommonDB.GetUserSessionClientById(tx, userSessionClientId)
-}
-
-func (d *PostgresDatabase) DeleteUserSessionClient(tx *sql.Tx, userSessionClientId int64) error {
-	return d.CommonDB.DeleteUserSessionClient(tx, userSessionClientId)
 }

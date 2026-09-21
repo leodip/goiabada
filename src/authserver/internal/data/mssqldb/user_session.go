@@ -34,7 +34,7 @@ func (d *MsSQLDatabase) CreateUserSession(tx *sql.Tx, userSession *models.UserSe
 	}
 	sql = parts[0] + "OUTPUT INSERTED.id VALUES" + parts[1]
 
-	rows, err := d.CommonDB.QuerySql(tx, sql, args...)
+	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
 		userSession.CreatedAt = originalCreatedAt
 		userSession.UpdatedAt = originalUpdatedAt
@@ -57,68 +57,8 @@ func (d *MsSQLDatabase) CreateUserSession(tx *sql.Tx, userSession *models.UserSe
 	if err := rows.Err(); err != nil {
 		userSession.CreatedAt = originalCreatedAt
 		userSession.UpdatedAt = originalUpdatedAt
-		return d.CommonDB.WrapSQLError(err, "unable to insert userSession")
+		return d.WrapSQLError(err, "unable to insert userSession")
 	}
 
 	return nil
-}
-
-func (d *MsSQLDatabase) UpdateUserSession(tx *sql.Tx, userSession *models.UserSession) error {
-	return d.CommonDB.UpdateUserSession(tx, userSession)
-}
-
-func (d *MsSQLDatabase) GetUserSessionById(tx *sql.Tx, userSessionId int64) (*models.UserSession, error) {
-	return d.CommonDB.GetUserSessionById(tx, userSessionId)
-}
-
-func (d *MsSQLDatabase) GetUserSessionBySessionIdentifier(tx *sql.Tx, sessionIdentifier string) (*models.UserSession, error) {
-	return d.CommonDB.GetUserSessionBySessionIdentifier(tx, sessionIdentifier)
-}
-
-func (d *MsSQLDatabase) GetUserSessionsByClientIdPaginated(tx *sql.Tx, clientId int64, page int, pageSize int) ([]models.UserSession, int, error) {
-	return d.CommonDB.GetUserSessionsByClientIdPaginated(tx, clientId, page, pageSize)
-}
-
-func (d *MsSQLDatabase) UserSessionsLoadUsers(tx *sql.Tx, userSessions []models.UserSession) error {
-	return d.CommonDB.UserSessionsLoadUsers(tx, userSessions)
-}
-
-func (d *MsSQLDatabase) UserSessionsLoadClients(tx *sql.Tx, userSessions []models.UserSession) error {
-	return d.CommonDB.UserSessionsLoadClients(tx, userSessions)
-}
-
-func (d *MsSQLDatabase) UserSessionLoadClients(tx *sql.Tx, userSession *models.UserSession) error {
-	return d.CommonDB.UserSessionLoadClients(tx, userSession)
-}
-
-func (d *MsSQLDatabase) UserSessionLoadUser(tx *sql.Tx, userSession *models.UserSession) error {
-	return d.CommonDB.UserSessionLoadUser(tx, userSession)
-}
-
-func (d *MsSQLDatabase) GetUserSessionsByUserId(tx *sql.Tx, userId int64) ([]models.UserSession, error) {
-	return d.CommonDB.GetUserSessionsByUserId(tx, userId)
-}
-
-func (d *MsSQLDatabase) DeleteUserSession(tx *sql.Tx, userSessionId int64) error {
-	return d.CommonDB.DeleteUserSession(tx, userSessionId)
-}
-
-func (d *MsSQLDatabase) AcquireUserSessionRow(tx *sql.Tx, sessionIdentifier string) (bool, error) {
-	return d.CommonDB.AcquireUserSessionRow(tx, sessionIdentifier)
-}
-
-func (d *MsSQLDatabase) DeleteIdleSessions(tx *sql.Tx, idleTimeout time.Duration) error {
-	return d.CommonDB.DeleteIdleSessions(tx, idleTimeout)
-}
-
-func (d *MsSQLDatabase) DeleteExpiredSessions(tx *sql.Tx, maxLifetime time.Duration) error {
-	return d.CommonDB.DeleteExpiredSessions(tx, maxLifetime)
-}
-
-func (d *MsSQLDatabase) PromoteUserSessionGeneration(tx *sql.Tx, userSessionId int64, generation int64) error {
-	return d.CommonDB.PromoteUserSessionGeneration(tx, userSessionId, generation)
-}
-
-func (d *MsSQLDatabase) PromoteUserSessionOtpConfigGeneration(tx *sql.Tx, userSessionId int64, generation int64) error {
-	return d.CommonDB.PromoteUserSessionOtpConfigGeneration(tx, userSessionId, generation)
 }

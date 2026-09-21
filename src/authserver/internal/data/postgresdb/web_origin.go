@@ -27,7 +27,7 @@ func (d *PostgresDatabase) CreateWebOrigin(tx *sql.Tx, webOrigin *models.WebOrig
 	sql, args := insertBuilder.Build()
 	sql = sql + " RETURNING id"
 
-	rows, err := d.CommonDB.QuerySql(tx, sql, args...)
+	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
 		webOrigin.CreatedAt = originalCreatedAt
 		return errs.Wrap(err, "unable to insert webOrigin")
@@ -47,28 +47,8 @@ func (d *PostgresDatabase) CreateWebOrigin(tx *sql.Tx, webOrigin *models.WebOrig
 	// Without this the insert would look like a success with id 0.
 	if err := rows.Err(); err != nil {
 		webOrigin.CreatedAt = originalCreatedAt
-		return d.CommonDB.WrapSQLError(err, "unable to insert webOrigin")
+		return d.WrapSQLError(err, "unable to insert webOrigin")
 	}
 
 	return nil
-}
-
-func (d *PostgresDatabase) GetWebOriginById(tx *sql.Tx, webOriginId int64) (*models.WebOrigin, error) {
-	return d.CommonDB.GetWebOriginById(tx, webOriginId)
-}
-
-func (d *PostgresDatabase) GetWebOriginsByClientId(tx *sql.Tx, clientId int64) ([]models.WebOrigin, error) {
-	return d.CommonDB.GetWebOriginsByClientId(tx, clientId)
-}
-
-func (d *PostgresDatabase) GetAllWebOrigins(tx *sql.Tx) ([]models.WebOrigin, error) {
-	return d.CommonDB.GetAllWebOrigins(tx)
-}
-
-func (d *PostgresDatabase) WebOriginExists(tx *sql.Tx, origin string) (bool, error) {
-	return d.CommonDB.WebOriginExists(tx, origin)
-}
-
-func (d *PostgresDatabase) DeleteWebOrigin(tx *sql.Tx, webOriginId int64) error {
-	return d.CommonDB.DeleteWebOrigin(tx, webOriginId)
 }

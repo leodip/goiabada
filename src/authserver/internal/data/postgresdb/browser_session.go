@@ -36,7 +36,7 @@ func (d *PostgresDatabase) CreateBrowserSession(tx *sql.Tx, browserSession *mode
 	sql, args := insertBuilder.Build()
 	sql = sql + " RETURNING id"
 
-	rows, err := d.CommonDB.QuerySql(tx, sql, args...)
+	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
 		browserSession.CreatedAt = originalCreatedAt
 		browserSession.UpdatedAt = originalUpdatedAt
@@ -59,31 +59,8 @@ func (d *PostgresDatabase) CreateBrowserSession(tx *sql.Tx, browserSession *mode
 	if err := rows.Err(); err != nil {
 		browserSession.CreatedAt = originalCreatedAt
 		browserSession.UpdatedAt = originalUpdatedAt
-		return d.CommonDB.WrapSQLError(err, "unable to insert browser session")
+		return d.WrapSQLError(err, "unable to insert browser session")
 	}
 
 	return nil
-}
-
-func (d *PostgresDatabase) GetBrowserSessionByOwnerAndSessionIdHash(tx *sql.Tx, owner, sessionIdHash string,
-	now time.Time) (*models.BrowserSession, error) {
-	return d.CommonDB.GetBrowserSessionByOwnerAndSessionIdHash(tx, owner, sessionIdHash, now)
-}
-
-func (d *PostgresDatabase) UpdateBrowserSessionData(tx *sql.Tx, owner, sessionIdHash, data string,
-	now, expiresAt time.Time) (bool, error) {
-	return d.CommonDB.UpdateBrowserSessionData(tx, owner, sessionIdHash, data, now, expiresAt)
-}
-
-func (d *PostgresDatabase) TouchBrowserSession(tx *sql.Tx, owner, sessionIdHash string,
-	now, expiresAt time.Time) (bool, error) {
-	return d.CommonDB.TouchBrowserSession(tx, owner, sessionIdHash, now, expiresAt)
-}
-
-func (d *PostgresDatabase) DeleteBrowserSession(tx *sql.Tx, owner, sessionIdHash string) error {
-	return d.CommonDB.DeleteBrowserSession(tx, owner, sessionIdHash)
-}
-
-func (d *PostgresDatabase) DeleteExpiredBrowserSessions(tx *sql.Tx, now time.Time) error {
-	return d.CommonDB.DeleteExpiredBrowserSessions(tx, now)
 }

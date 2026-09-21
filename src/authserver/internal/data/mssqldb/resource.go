@@ -30,7 +30,7 @@ func (d *MsSQLDatabase) CreateResource(tx *sql.Tx, resource *models.Resource) er
 	}
 	sql = parts[0] + "OUTPUT INSERTED.id VALUES" + parts[1]
 
-	rows, err := d.CommonDB.QuerySql(tx, sql, args...)
+	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
 		resource.CreatedAt = originalCreatedAt
 		resource.UpdatedAt = originalUpdatedAt
@@ -53,32 +53,8 @@ func (d *MsSQLDatabase) CreateResource(tx *sql.Tx, resource *models.Resource) er
 	if err := rows.Err(); err != nil {
 		resource.CreatedAt = originalCreatedAt
 		resource.UpdatedAt = originalUpdatedAt
-		return d.CommonDB.WrapSQLError(err, "unable to insert resource")
+		return d.WrapSQLError(err, "unable to insert resource")
 	}
 
 	return nil
-}
-
-func (d *MsSQLDatabase) UpdateResource(tx *sql.Tx, resource *models.Resource) error {
-	return d.CommonDB.UpdateResource(tx, resource)
-}
-
-func (d *MsSQLDatabase) GetResourceById(tx *sql.Tx, resourceId int64) (*models.Resource, error) {
-	return d.CommonDB.GetResourceById(tx, resourceId)
-}
-
-func (d *MsSQLDatabase) GetResourceByResourceIdentifier(tx *sql.Tx, resourceIdentifier string) (*models.Resource, error) {
-	return d.CommonDB.GetResourceByResourceIdentifier(tx, resourceIdentifier)
-}
-
-func (d *MsSQLDatabase) GetResourcesByIds(tx *sql.Tx, resourceIds []int64) ([]models.Resource, error) {
-	return d.CommonDB.GetResourcesByIds(tx, resourceIds)
-}
-
-func (d *MsSQLDatabase) GetAllResources(tx *sql.Tx) ([]models.Resource, error) {
-	return d.CommonDB.GetAllResources(tx)
-}
-
-func (d *MsSQLDatabase) DeleteResource(tx *sql.Tx, resourceId int64) error {
-	return d.CommonDB.DeleteResource(tx, resourceId)
 }

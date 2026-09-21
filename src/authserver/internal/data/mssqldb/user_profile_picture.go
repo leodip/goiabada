@@ -35,7 +35,7 @@ func (d *MsSQLDatabase) CreateUserProfilePicture(tx *sql.Tx, profilePicture *mod
 	}
 	sqlStr = parts[0] + "OUTPUT INSERTED.id VALUES" + parts[1]
 
-	rows, err := d.CommonDB.QuerySql(tx, sqlStr, args...)
+	rows, err := d.QuerySql(tx, sqlStr, args...)
 	if err != nil {
 		profilePicture.CreatedAt = originalCreatedAt
 		profilePicture.UpdatedAt = originalUpdatedAt
@@ -58,24 +58,8 @@ func (d *MsSQLDatabase) CreateUserProfilePicture(tx *sql.Tx, profilePicture *mod
 	if err := rows.Err(); err != nil {
 		profilePicture.CreatedAt = originalCreatedAt
 		profilePicture.UpdatedAt = originalUpdatedAt
-		return d.CommonDB.WrapSQLError(err, "unable to insert profile picture")
+		return d.WrapSQLError(err, "unable to insert profile picture")
 	}
 
 	return nil
-}
-
-func (d *MsSQLDatabase) UpdateUserProfilePicture(tx *sql.Tx, profilePicture *models.UserProfilePicture) error {
-	return d.CommonDB.UpdateUserProfilePicture(tx, profilePicture)
-}
-
-func (d *MsSQLDatabase) GetUserProfilePictureByUserId(tx *sql.Tx, userId int64) (*models.UserProfilePicture, error) {
-	return d.CommonDB.GetUserProfilePictureByUserId(tx, userId)
-}
-
-func (d *MsSQLDatabase) DeleteUserProfilePicture(tx *sql.Tx, userId int64) error {
-	return d.CommonDB.DeleteUserProfilePicture(tx, userId)
-}
-
-func (d *MsSQLDatabase) UserHasProfilePicture(tx *sql.Tx, userId int64) (bool, error) {
-	return d.CommonDB.UserHasProfilePicture(tx, userId)
 }

@@ -22,9 +22,11 @@ import (
 //go:embed migrations/*.sql
 var mssqlMigrationsFs embed.FS
 
+// MsSQLDatabase declares only the methods SQL Server needs its own SQL for; the rest are promoted
+// from the embedded common implementation. See commondb.CommonDatabase for what embedding does
+// and does not buy (#416).
 type MsSQLDatabase struct {
-	DB       *sql.DB
-	CommonDB *commondb.CommonDatabase
+	*commondb.CommonDatabase
 	dbConfig *DatabaseConfig
 }
 
@@ -115,9 +117,8 @@ func NewMsSQLDatabase(dbConfig *DatabaseConfig, logSQL bool) (*MsSQLDatabase, er
 	commonDb.IsUniqueViolation = isUniqueViolation
 
 	mssqlDb := MsSQLDatabase{
-		DB:       db,
-		CommonDB: commonDb,
-		dbConfig: dbConfig,
+		CommonDatabase: commonDb,
+		dbConfig:       dbConfig,
 	}
 	return &mssqlDb, nil
 }
@@ -267,14 +268,6 @@ func databaseExists(ctx context.Context, masterDB *sql.DB, name string) (bool, e
 	return found > 0, nil
 }
 
-func (d *MsSQLDatabase) BeginTransaction() (*sql.Tx, error) {
-	return d.CommonDB.BeginTransaction()
-}
-
-func (d *MsSQLDatabase) RunInTransaction(fn func(tx *sql.Tx) error) error {
-	return d.CommonDB.RunInTransaction(fn)
-}
-
 // isDeadlock is SQL Server's half of RunInTransaction's classifier: error 1205, raised on the
 // session the server chose as the deadlock victim after rolling its transaction back. Both
 // shapes of the driver's error are checked because mssql.Error has value receivers and the
@@ -313,14 +306,6 @@ func isUniqueViolation(err error) bool {
 	var byPointer *mssql.Error
 	return errors.As(err, &byPointer) &&
 		(byPointer.Number == mssqlUniqueConstraint || byPointer.Number == mssqlUniqueIndex)
-}
-
-func (d *MsSQLDatabase) CommitTransaction(tx *sql.Tx) error {
-	return d.CommonDB.CommitTransaction(tx)
-}
-
-func (d *MsSQLDatabase) RollbackTransaction(tx *sql.Tx) error {
-	return d.CommonDB.RollbackTransaction(tx)
 }
 
 // schemaMigrationsTableDDL pins the shape of the version table the runner keeps, which
@@ -439,10 +424,6 @@ func (d *MsSQLDatabase) Migrate() error {
 	}
 
 	return nil
-}
-
-func (d *MsSQLDatabase) IsEmpty() (bool, error) {
-	return d.CommonDB.IsEmpty()
 }
 
 // quoteIdentifier wraps name in the brackets SQL Server spells an identifier with, doubling any

@@ -18,13 +18,13 @@ import (
 // reach a dialect's override of that method, and on two of the four engines the override is the
 // only implementation that works.
 //
-// WHY THE CALL CANNOT REACH THE OVERRIDE. PostgresDatabase and MsSQLDatabase hold
-// *CommonDatabase as a named field, CommonDB, rather than embedding it, and they satisfy the
-// Database interface by declaring all 212 methods themselves. Most are one-line delegations to
-// d.CommonDB.X(...); a few are not, because the engine needs different SQL. Go resolves
-// d.X(...) inside this package against *CommonDatabase at compile time, so a self-call always
-// takes the common implementation whatever the caller's real dialect is. There is no dynamic
-// dispatch to fall back on.
+// WHY THE CALL CANNOT REACH THE OVERRIDE. The four engine adapters embed *CommonDatabase and
+// declare only the methods their engine needs different SQL for; everything else is promoted
+// from this package (#416). Promotion is resolved at compile time and is not dispatch: Go
+// resolves d.X(...) inside this package against *CommonDatabase, so a self-call takes the
+// common implementation whatever the caller's real dialect is. Embedding reads as though it
+// were inheritance and is not, which is why the trap survived the shape change that removed
+// the 801 hand-written delegations.
 //
 // WHAT THAT COSTS, measured rather than imagined. commondb.BackfillLowercaseEmails called
 // d.CreateAuditLog to record a forced logout. CreateAuditLog ends at result.LastInsertId(),
@@ -46,22 +46,23 @@ import (
 // rather than a false alarm.
 //
 // THE BOUNDARY, stated because it decides what this file is worth. It compares method NAMES: a
-// name declared by either dialect with a body that is not a single delegation to
-// d.CommonDB.<same name>(...) is treated as divergent, and this package may not take it on a
-// *CommonDatabase anywhere. That over-approximates, deliberately. A dialect method that diverges
-// for a reason unrelated to the caller is still a method whose behaviour depends on which engine
-// is running, and a self-call to one is still engine-dependent behaviour written as though it
-// were not, so it is worth a look either way.
+// name any dialect declares at all is treated as divergent, and this package may not take it on
+// a *CommonDatabase anywhere. Declaring one is the whole signal since #416, because embedding
+// left a dialect no reason to write a method out except that the engine needs a different one.
+// That over-approximates, deliberately. A dialect method that diverges for a reason unrelated
+// to the caller is still a method whose behaviour depends on which engine is running, and a
+// self-call to one is still engine-dependent behaviour written as though it were not, so it is
+// worth a look either way.
 //
 // WHAT COUNTS AS THE CALL is wider than d.M(...) on the receiver, and deliberately so. A guard
 // keyed to one spelling guards the spelling rather than the defect: x := d; x.M(...), a
 // package-level helper taking *CommonDatabase, a closure capturing either, and the method value
-// f := d.M all resolve statically to the same common implementation and cost the same two engines
-// the same wrong SQL, while reading no more suspiciously than the shape that actually shipped. So
-// selfCalls tracks the names known to hold a *CommonDatabase rather than the receiver's name, and
-// states there what remains outside it.
+// f := d.M all resolve statically to the same common implementation and cost the overriding
+// engines the same wrong SQL, while reading no more suspiciously than the shape that actually
+// shipped. So selfCalls tracks the names known to hold a *CommonDatabase rather than the
+// receiver's name, and states there what remains outside it.
 func TestCommonDatabase_NoSelfCallToAnOverriddenMethod(t *testing.T) {
-	// The two dialects are located from the source root rather than by counting "../" from
+	// The dialects are located from the source root rather than by counting "../" from
 	// here. #354 moved the four engine adapters to authserver/internal/data while commondb
 	// stayed in core, so they stopped being siblings, and they are siblings again once #359
 	// moves this package to sit beside them. The ascent is what every other tree-wide guard
@@ -71,7 +72,14 @@ func TestCommonDatabase_NoSelfCallToAnOverriddenMethod(t *testing.T) {
 	// running the tier.
 	root := testutil.SourceRoot(t)
 	divergent := map[string][]string{}
+	// All four, not just the two #283 cost. Before #416 sqlitedb and mysqldb declared every
+	// method, so "declares it" said nothing about them and the guard could only read the two
+	// that held a named field. Now every dialect declares only its overrides, so all four
+	// answer the same question and an override reaching one engine is as much a divergence as
+	// one reaching two.
 	for _, dialect := range []struct{ dir, recvType string }{
+		{filepath.Join(root, "authserver", "internal", "data", "sqlitedb"), "SQLiteDatabase"},
+		{filepath.Join(root, "authserver", "internal", "data", "mysqldb"), "MySQLDatabase"},
 		{filepath.Join(root, "authserver", "internal", "data", "postgresdb"), "PostgresDatabase"},
 		{filepath.Join(root, "authserver", "internal", "data", "mssqldb"), "MsSQLDatabase"},
 	} {
@@ -80,7 +88,7 @@ func TestCommonDatabase_NoSelfCallToAnOverriddenMethod(t *testing.T) {
 		}
 	}
 	if len(divergent) == 0 {
-		t.Fatal("no divergent dialect method was found at all, so this test could not fail and is not measuring anything; the parse or the delegation shape has changed")
+		t.Fatal("no divergent dialect method was found at all, so this test could not fail and is not measuring anything; the parse or the adapters' shape has changed")
 	}
 
 	offenders := []string{}
@@ -88,14 +96,14 @@ func TestCommonDatabase_NoSelfCallToAnOverriddenMethod(t *testing.T) {
 		if owners, ok := divergent[call.method]; ok {
 			sort.Strings(owners)
 			offenders = append(offenders, call.pos+": ."+call.method+" on a *CommonDatabase takes "+
-				"the MySQL/SQLite implementation always, but "+strings.Join(owners, " and ")+
+				"the common implementation always, but "+strings.Join(owners, " and ")+
 				" override it")
 		}
 	}
 
 	sort.Strings(offenders)
 	if len(offenders) > 0 {
-		t.Errorf("%d self-call(s) in commondb resolve to an implementation two engines replace:\n  %s\n\n"+
+		t.Errorf("%d self-call(s) in commondb resolve to an implementation an engine replaces:\n  %s\n\n"+
 			"Each one runs the wrong SQL on the engine that overrode it, silently. Give this package "+
 			"its own unexported helper that does what the caller actually needs and no more -- the "+
 			"divergence is usually a value the caller never wanted -- or take the value through the "+
@@ -104,8 +112,9 @@ func TestCommonDatabase_NoSelfCallToAnOverriddenMethod(t *testing.T) {
 	}
 }
 
-// divergentMethods returns the methods one dialect declares on recvType whose body is anything
-// other than a single delegation to d.CommonDB.<same name>(...).
+// divergentMethods returns every method one dialect declares on recvType. Since #416 the
+// adapters embed *CommonDatabase, so a method written out by hand is an override by
+// construction: there is nothing else it could be.
 func divergentMethods(t *testing.T, dir string, recvType string) map[string]bool {
 	t.Helper()
 
@@ -124,46 +133,10 @@ func divergentMethods(t *testing.T, dir string, recvType string) map[string]bool
 			if !ok || ident.Name != recvType {
 				continue
 			}
-			if !delegatesToCommonDB(fn) {
-				out[fn.Name.Name] = true
-			}
+			out[fn.Name.Name] = true
 		}
 	}
 	return out
-}
-
-// delegatesToCommonDB reports whether fn's whole body is one statement handing the same method
-// name to the embedded common implementation, which is the shape that makes an override no
-// override at all.
-func delegatesToCommonDB(fn *ast.FuncDecl) bool {
-	if len(fn.Body.List) != 1 {
-		return false
-	}
-
-	var call *ast.CallExpr
-	switch stmt := fn.Body.List[0].(type) {
-	case *ast.ReturnStmt:
-		if len(stmt.Results) != 1 {
-			return false
-		}
-		call, _ = stmt.Results[0].(*ast.CallExpr)
-	case *ast.ExprStmt:
-		call, _ = stmt.X.(*ast.CallExpr)
-	}
-	if call == nil {
-		return false
-	}
-
-	// d.CommonDB.<name>(...)
-	outer, ok := call.Fun.(*ast.SelectorExpr)
-	if !ok || outer.Sel.Name != fn.Name.Name {
-		return false
-	}
-	inner, ok := outer.X.(*ast.SelectorExpr)
-	if !ok || inner.Sel.Name != "CommonDB" {
-		return false
-	}
-	return true
 }
 
 type selfCall struct {
@@ -192,7 +165,8 @@ type selfCall struct {
 //
 // The over-approximation also runs the other way, since a selector is matched by name alone: a
 // FIELD on CommonDatabase sharing a name with a divergent dialect method would be reported. There
-// are three fields (DB, Flavor, logSQL), none of them a method name on either dialect, so the case
+// are five fields (DB, Flavor, logSQL, IsDeadlock, IsUniqueViolation), none of them a method name
+// on any dialect, so the case
 // is theoretical today and a false report would name a line and be dismissed in a second.
 func selfCalls(t *testing.T, dir string) []selfCall {
 	t.Helper()

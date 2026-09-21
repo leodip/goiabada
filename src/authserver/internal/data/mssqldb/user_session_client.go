@@ -30,7 +30,7 @@ func (d *MsSQLDatabase) CreateUserSessionClient(tx *sql.Tx, userSessionClient *m
 	}
 	sql = parts[0] + "OUTPUT INSERTED.id VALUES" + parts[1]
 
-	rows, err := d.CommonDB.QuerySql(tx, sql, args...)
+	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
 		userSessionClient.CreatedAt = originalCreatedAt
 		userSessionClient.UpdatedAt = originalUpdatedAt
@@ -53,35 +53,8 @@ func (d *MsSQLDatabase) CreateUserSessionClient(tx *sql.Tx, userSessionClient *m
 	if err := rows.Err(); err != nil {
 		userSessionClient.CreatedAt = originalCreatedAt
 		userSessionClient.UpdatedAt = originalUpdatedAt
-		return d.CommonDB.WrapSQLError(err, "unable to insert userSessionClient")
+		return d.WrapSQLError(err, "unable to insert userSessionClient")
 	}
 
 	return nil
-}
-func (d *MsSQLDatabase) UpdateUserSessionClient(tx *sql.Tx, userSessionClient *models.UserSessionClient) error {
-	return d.CommonDB.UpdateUserSessionClient(tx, userSessionClient)
-}
-
-func (d *MsSQLDatabase) UserSessionClientsLoadClients(tx *sql.Tx, userSessionClients []models.UserSessionClient) error {
-	return d.CommonDB.UserSessionClientsLoadClients(tx, userSessionClients)
-}
-
-func (d *MsSQLDatabase) GetUserSessionClientsByUserSessionIds(tx *sql.Tx, userSessionIds []int64) ([]models.UserSessionClient, error) {
-	return d.CommonDB.GetUserSessionClientsByUserSessionIds(tx, userSessionIds)
-}
-
-func (d *MsSQLDatabase) GetUserSessionClientsByUserSessionId(tx *sql.Tx, userSessionId int64) ([]models.UserSessionClient, error) {
-	return d.CommonDB.GetUserSessionClientsByUserSessionId(tx, userSessionId)
-}
-
-func (d *MsSQLDatabase) GetUserSessionsClientByIds(tx *sql.Tx, userSessionClientIds []int64) ([]models.UserSessionClient, error) {
-	return d.CommonDB.GetUserSessionsClientByIds(tx, userSessionClientIds)
-}
-
-func (d *MsSQLDatabase) GetUserSessionClientById(tx *sql.Tx, userSessionClientId int64) (*models.UserSessionClient, error) {
-	return d.CommonDB.GetUserSessionClientById(tx, userSessionClientId)
-}
-
-func (d *MsSQLDatabase) DeleteUserSessionClient(tx *sql.Tx, userSessionClientId int64) error {
-	return d.CommonDB.DeleteUserSessionClient(tx, userSessionClientId)
 }

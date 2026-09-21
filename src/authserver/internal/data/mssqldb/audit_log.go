@@ -33,7 +33,7 @@ func (d *MsSQLDatabase) CreateAuditLog(tx *sql.Tx, auditLog *models.AuditLog) er
 	}
 	sqlStr = parts[0] + "OUTPUT INSERTED.id VALUES" + parts[1]
 
-	rows, err := d.CommonDB.QuerySql(tx, sqlStr, args...)
+	rows, err := d.QuerySql(tx, sqlStr, args...)
 	if err != nil {
 		return errs.Wrap(err, "unable to insert audit log")
 	}
@@ -50,7 +50,7 @@ func (d *MsSQLDatabase) CreateAuditLog(tx *sql.Tx, auditLog *models.AuditLog) er
 	// returning it from the query, in which case Next() simply reports no row.
 	// Without this the insert would look like a success with id 0.
 	if err := rows.Err(); err != nil {
-		return d.CommonDB.WrapSQLError(err, "unable to insert audit log")
+		return d.WrapSQLError(err, "unable to insert audit log")
 	}
 
 	return nil
@@ -60,7 +60,7 @@ func (d *MsSQLDatabase) DeleteOldAuditLogs(tx *sql.Tx, cutoff time.Time, maxDele
 	// MSSQL uses DELETE TOP(n) syntax
 	sqlStr := fmt.Sprintf("DELETE TOP (%d) FROM audit_logs WHERE created_at < @p1", maxDeletions)
 
-	result, err := d.CommonDB.ExecSql(tx, sqlStr, cutoff)
+	result, err := d.ExecSql(tx, sqlStr, cutoff)
 	if err != nil {
 		return 0, errs.Wrap(err, "unable to delete old audit logs")
 	}
@@ -125,7 +125,7 @@ func (d *MsSQLDatabase) GetAuditLogsPaginated(tx *sql.Tx, page int, pageSize int
 	// MSSQL requires OFFSET...FETCH syntax for pagination
 	sqlStr = fmt.Sprintf("%s OFFSET %d ROWS FETCH NEXT %d ROWS ONLY", sqlStr, offset, pageSize)
 
-	rows, err := d.CommonDB.QuerySql(tx, sqlStr, args...)
+	rows, err := d.QuerySql(tx, sqlStr, args...)
 	if err != nil {
 		return nil, 0, errs.Wrap(err, "unable to query database")
 	}
@@ -154,7 +154,7 @@ func (d *MsSQLDatabase) GetAuditLogsPaginated(tx *sql.Tx, page int, pageSize int
 	}
 
 	countSql, countArgs := countBuilder.Build()
-	countRows, err := d.CommonDB.QuerySql(tx, countSql, countArgs...)
+	countRows, err := d.QuerySql(tx, countSql, countArgs...)
 	if err != nil {
 		return nil, 0, errs.Wrap(err, "unable to query count")
 	}

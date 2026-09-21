@@ -42,7 +42,7 @@ func (d *MsSQLDatabase) CreateBrowserSession(tx *sql.Tx, browserSession *models.
 	}
 	sql = parts[0] + "OUTPUT INSERTED.id VALUES" + parts[1]
 
-	rows, err := d.CommonDB.QuerySql(tx, sql, args...)
+	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
 		browserSession.CreatedAt = originalCreatedAt
 		browserSession.UpdatedAt = originalUpdatedAt
@@ -65,31 +65,8 @@ func (d *MsSQLDatabase) CreateBrowserSession(tx *sql.Tx, browserSession *models.
 	if err := rows.Err(); err != nil {
 		browserSession.CreatedAt = originalCreatedAt
 		browserSession.UpdatedAt = originalUpdatedAt
-		return d.CommonDB.WrapSQLError(err, "unable to insert browser session")
+		return d.WrapSQLError(err, "unable to insert browser session")
 	}
 
 	return nil
-}
-
-func (d *MsSQLDatabase) GetBrowserSessionByOwnerAndSessionIdHash(tx *sql.Tx, owner, sessionIdHash string,
-	now time.Time) (*models.BrowserSession, error) {
-	return d.CommonDB.GetBrowserSessionByOwnerAndSessionIdHash(tx, owner, sessionIdHash, now)
-}
-
-func (d *MsSQLDatabase) UpdateBrowserSessionData(tx *sql.Tx, owner, sessionIdHash, data string,
-	now, expiresAt time.Time) (bool, error) {
-	return d.CommonDB.UpdateBrowserSessionData(tx, owner, sessionIdHash, data, now, expiresAt)
-}
-
-func (d *MsSQLDatabase) TouchBrowserSession(tx *sql.Tx, owner, sessionIdHash string,
-	now, expiresAt time.Time) (bool, error) {
-	return d.CommonDB.TouchBrowserSession(tx, owner, sessionIdHash, now, expiresAt)
-}
-
-func (d *MsSQLDatabase) DeleteBrowserSession(tx *sql.Tx, owner, sessionIdHash string) error {
-	return d.CommonDB.DeleteBrowserSession(tx, owner, sessionIdHash)
-}
-
-func (d *MsSQLDatabase) DeleteExpiredBrowserSessions(tx *sql.Tx, now time.Time) error {
-	return d.CommonDB.DeleteExpiredBrowserSessions(tx, now)
 }

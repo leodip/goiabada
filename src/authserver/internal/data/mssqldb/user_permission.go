@@ -38,7 +38,7 @@ func (d *MsSQLDatabase) CreateUserPermission(tx *sql.Tx, userPermission *models.
 	}
 	sql = parts[0] + "OUTPUT INSERTED.id VALUES" + parts[1]
 
-	rows, err := d.CommonDB.QuerySql(tx, sql, args...)
+	rows, err := d.QuerySql(tx, sql, args...)
 	if err != nil {
 		userPermission.CreatedAt = originalCreatedAt
 		userPermission.UpdatedAt = originalUpdatedAt
@@ -61,36 +61,8 @@ func (d *MsSQLDatabase) CreateUserPermission(tx *sql.Tx, userPermission *models.
 	if err := rows.Err(); err != nil {
 		userPermission.CreatedAt = originalCreatedAt
 		userPermission.UpdatedAt = originalUpdatedAt
-		return d.CommonDB.WrapSQLError(err, "unable to insert userPermission")
+		return d.WrapSQLError(err, "unable to insert userPermission")
 	}
 
 	return nil
-}
-
-func (d *MsSQLDatabase) UpdateUserPermission(tx *sql.Tx, userPermission *models.UserPermission) error {
-	return d.CommonDB.UpdateUserPermission(tx, userPermission)
-}
-
-func (d *MsSQLDatabase) GetUserPermissionById(tx *sql.Tx, userPermissionId int64) (*models.UserPermission, error) {
-	return d.CommonDB.GetUserPermissionById(tx, userPermissionId)
-}
-
-func (d *MsSQLDatabase) GetUserPermissionsByUserIds(tx *sql.Tx, userIds []int64) ([]models.UserPermission, error) {
-	return d.CommonDB.GetUserPermissionsByUserIds(tx, userIds)
-}
-
-func (d *MsSQLDatabase) GetUserPermissionsByUserId(tx *sql.Tx, userId int64) ([]models.UserPermission, error) {
-	return d.CommonDB.GetUserPermissionsByUserId(tx, userId)
-}
-
-func (d *MsSQLDatabase) GetUserPermissionByUserIdAndPermissionId(tx *sql.Tx, userId, permissionId int64) (*models.UserPermission, error) {
-	return d.CommonDB.GetUserPermissionByUserIdAndPermissionId(tx, userId, permissionId)
-}
-
-func (d *MsSQLDatabase) GetUsersByPermissionIdPaginated(tx *sql.Tx, permissionId int64, page int, pageSize int) ([]models.User, int, error) {
-	return d.CommonDB.GetUsersByPermissionIdPaginated(tx, permissionId, page, pageSize)
-}
-
-func (d *MsSQLDatabase) DeleteUserPermission(tx *sql.Tx, userPermissionId int64) error {
-	return d.CommonDB.DeleteUserPermission(tx, userPermissionId)
 }

@@ -28,16 +28,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// runInTransactionOwners are the files allowed to call BeginTransaction: the helper's own body,
-// and the four dialect wrappers that forward to it. Relative to the source root, forward slashes.
-// Nothing else is exempt, and the list is not the place to put a new owner: an owner that cannot
-// be written as a closure is a design question, not an exemption.
+// runInTransactionOwners are the files allowed to call BeginTransaction. One, now: the helper's
+// own body. The four dialect wrappers that used to forward to it are gone, because #416 made the
+// adapters embed *CommonDatabase and promotion needs no wrapper. Relative to the source root,
+// forward slashes. Nothing else is exempt, and the list is not the place to put a new owner: an
+// owner that cannot be written as a closure is a design question, not an exemption.
 var runInTransactionOwners = map[string]bool{
-	"authserver/internal/data/commondb/db.go":   true,
-	"authserver/internal/data/sqlitedb/db.go":   true,
-	"authserver/internal/data/mysqldb/db.go":    true,
-	"authserver/internal/data/postgresdb/db.go": true,
-	"authserver/internal/data/mssqldb/db.go":    true,
+	"authserver/internal/data/commondb/db.go": true,
 }
 
 // bareBeginTransactionCall is one call expression selecting BeginTransaction in a file that is
