@@ -178,6 +178,18 @@ const (
 	handlersImportPath    = "github.com/leodip/goiabada/authserver/internal/handlers"
 )
 
+// slogWatchedImports is every path these rules resolve a call site against, with the identifier an
+// unaliased import of it binds: log/slog for rules 1, 2 and 5, and the three packages
+// slogSpreadSites registers a forwarder in, whose qualified calls rule 3 follows. See
+// watchedImport in import_binding.go for why the declared name is the rule and the last element of
+// the path is not.
+var slogWatchedImports = watchedImports{
+	slogImportPath:        {name: "slog"},
+	apiresponseImportPath: {name: "apiresponse", dir: "authserver/internal/apiresponse"},
+	apihandlersImportPath: {name: "apihandlers", dir: "authserver/internal/handlers/apihandlers"},
+	handlersImportPath:    {name: "handlers", dir: "authserver/internal/handlers"},
+}
+
 // slogSpreadSites is rule 3's table. Every production function that spreads a run into a record
 // is here with its reason, and rule 3 refuses any other.
 //
@@ -489,27 +501,19 @@ func slogViolationsInFile(file *ast.File, fset *token.FileSet, rel string) []slo
 
 	// importPaths maps the name a file actually writes at a call site to the path it imports, so
 	// an aliased log/slog resolves like any other, exactly as errors_lint.go reads its imports.
-	importPaths := map[string]string{}
+	importPaths := bindImports(file, slogWatchedImports)
+
+	// A dot import of log/slog is a finding of its own, and does not depend on what anything is
+	// bound to: it binds no name at all.
 	for _, spec := range file.Imports {
 		path, err := strconv.Unquote(spec.Path.Value)
 		if err != nil {
 			continue
 		}
-		name := defaultImportName(path)
-		if spec.Name != nil {
-			name = spec.Name.Name
+		if path == slogImportPath && spec.Name != nil && spec.Name.Name == "." {
+			report(spec.Pos(), `dot import of "log/slog"`,
+				"import it under its own name; a dot import leaves no selector for the handler-ownership rule to resolve")
 		}
-		if name == "." {
-			if path == slogImportPath {
-				report(spec.Pos(), `dot import of "log/slog"`,
-					"import it under its own name; a dot import leaves no selector for the handler-ownership rule to resolve")
-			}
-			continue
-		}
-		if name == "_" {
-			continue
-		}
-		importPaths[name] = path
 	}
 
 	// Rule 2 reads every selector rather than every call, so slog.New handed round as a value is

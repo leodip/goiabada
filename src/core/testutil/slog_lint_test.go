@@ -155,6 +155,30 @@ import . "log/slog"
 
 func dot() { Info("nothing here resolves") }
 `)
+	// The resolver rather than a rule of its own, and the shape that made every rule here quiet on
+	// a whole file: a package named for something other than its directory, imported unaliased
+	// beside log/slog. Go binds the package clause, so this one binds "vendored" and slog below is
+	// still log/slog. Reading the last element of the path instead recorded this path under
+	// "slog" -- second in the file, so it overwrote log/slog -- and the opener on line 11 resolved
+	// to a package no rule names. bindImports records watched paths only, which is what makes that
+	// unreachable (#385).
+	tree.write("core/vendored/slog/pkg.go", `package vendored
+
+func Helper() string { return "x" }
+`)
+	tree.write("core/caught/path_base_collision.go", `package caught
+
+import (
+	"log/slog"
+
+	"github.com/leodip/goiabada/core/vendored/slog"
+)
+
+func collide() {
+	_ = vendored.Helper()
+	slog.Info("failed to resolve the package")
+}
+`)
 	// The owners: the handler's package, a main, schemadump, and the one file in core/testutil.
 	tree.write("core/logging/handler.go", `package logging
 
@@ -418,7 +442,7 @@ func tagged() { slog.SetDefault(slog.Default()); slog.Info("failed to x") }
 
 	violations, files, err := findSlogViolations(tree.root, tree.golangci, nil)
 	require.NoError(t, err)
-	assert.Equal(t, 26, files, "every non-exempt fixture is walked")
+	assert.Equal(t, 28, files, "every non-exempt fixture is walked")
 
 	got := make([]string, 0, len(violations))
 	for _, v := range violations {
@@ -443,6 +467,8 @@ func tagged() { slog.SetDefault(slog.Default()); slog.Info("failed to x") }
 		"core/caught/installs.go:13 slog.New outside the files that own the handler",
 		"core/caught/aliased.go:8 slog.New outside the files that own the handler",
 		`core/caught/dot.go:3 dot import of "log/slog"`,
+		// the resolver row
+		`core/caught/path_base_collision.go:11 message opens with "failed to"`,
 		"core/testutil/other.go:5 slog.Default outside the files that own the handler",
 		"core/testutil/other.go:5 slog.New outside the files that own the handler",
 		// rule 3
