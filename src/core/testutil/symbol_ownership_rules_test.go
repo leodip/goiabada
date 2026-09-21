@@ -832,6 +832,157 @@ var (
 		"Repeated inherits the 1; only alsoDiscarded inherits the expression naming Tick")
 }
 
+// TestSymbolOwnership_AVarOmittingItsValuesInheritsNothing is the other half of the const
+// repetition rule, and the half that says where it stops. A var with no expression list takes its
+// declared type's zero value rather than repeating the list above it, so nothing the preceding
+// initializer names is evidence for it. Without this case the rule reads the same with the const
+// test removed from it: a mutation widening `case d.Tok == token.CONST` to every kind of value
+// declaration left the whole core tier green. Final review round 3, finding 1.
+func TestSymbolOwnership_AVarOmittingItsValuesInheritsNothing(t *testing.T) {
+	files := withSymbolBaseline(map[string]string{
+		"core/shared/zero.go": `package shared
+
+type Tick int
+
+var (
+	discarded = int(Tick(1))
+	Reset     int
+)
+`,
+		"authserver/main.go": `package main
+
+import "example.test/core/shared"
+
+var (
+	_ = shared.Widget{}
+	_ = shared.Colour("")
+	_ = shared.New()
+	_ = shared.Stable{}
+	_ = shared.Reset
+)
+`,
+		"adminconsole/main.go": `package main
+
+import "example.test/core/shared"
+
+var (
+	_ = shared.Widget{}
+	_ = shared.Colour("")
+	_ = shared.New()
+	_ = shared.Departing{}
+	_ = shared.Reset
+)
+`,
+	})
+
+	computed := computedOver(t, files)
+
+	assert.Equal(t, justificationBothApps, computed["core/shared.Reset"])
+	assert.Equal(t, "", computed["core/shared.Tick"],
+		"Reset is its type's zero value; it repeats nothing and names nothing")
+}
+
+// TestSymbolOwnership_AnOmittedConstSpecInheritsItsTypeSlotToo: what Go substitutes into an
+// omitted ConstSpec is the preceding expression list *and its type if any*, so `const ( discarded
+// Tick = 1; Rearmed )` declares Rearmed exactly as `Rearmed Tick = 1` does. Carrying only the
+// expressions left the type out of the inheriting spec's declaration, and a type slot is the one
+// reference a package makes to an alias standing in front of a predeclared type. Final review
+// round 3, finding 2.
+func TestSymbolOwnership_AnOmittedConstSpecInheritsItsTypeSlotToo(t *testing.T) {
+	files := withSymbolBaseline(map[string]string{
+		"core/shared/alias.go": `package shared
+
+type Tick = int
+
+const (
+	discarded Tick = 1
+	Rearmed
+)
+`,
+		"authserver/main.go": `package main
+
+import "example.test/core/shared"
+
+var (
+	_ = shared.Widget{}
+	_ = shared.Colour("")
+	_ = shared.New()
+	_ = shared.Stable{}
+	_ = shared.Rearmed
+)
+`,
+		"adminconsole/main.go": `package main
+
+import "example.test/core/shared"
+
+var (
+	_ = shared.Widget{}
+	_ = shared.Colour("")
+	_ = shared.New()
+	_ = shared.Departing{}
+	_ = shared.Rearmed
+)
+`,
+	})
+
+	computed := computedOver(t, files)
+
+	assert.Equal(t, justificationBothApps, computed["core/shared.Rearmed"])
+	assert.Equal(t, justificationReachable, computed["core/shared.Tick"],
+		"Rearmed inherits the type slot as well as the expression, and a type slot is a declaration")
+}
+
+// TestSymbolOwnership_AnInheritedTypeSlotIsResetByTheNextList is the leniency that one must not
+// take with it. The substitution is of the *nearest preceding* non-empty list, so a later untyped
+// list resets the type to nothing at all, and a const inheriting `2` inherits no type with it.
+// Carrying the last type seen would hand every const below an untyped list a declaration edge to a
+// type it does not have.
+func TestSymbolOwnership_AnInheritedTypeSlotIsResetByTheNextList(t *testing.T) {
+	files := withSymbolBaseline(map[string]string{
+		"core/shared/alias.go": `package shared
+
+type Tick = int
+
+const (
+	discarded Tick = 1
+	alsoDiscarded
+	second = 2
+	Reset
+)
+`,
+		"authserver/main.go": `package main
+
+import "example.test/core/shared"
+
+var (
+	_ = shared.Widget{}
+	_ = shared.Colour("")
+	_ = shared.New()
+	_ = shared.Stable{}
+	_ = shared.Reset
+)
+`,
+		"adminconsole/main.go": `package main
+
+import "example.test/core/shared"
+
+var (
+	_ = shared.Widget{}
+	_ = shared.Colour("")
+	_ = shared.New()
+	_ = shared.Departing{}
+	_ = shared.Reset
+)
+`,
+	})
+
+	computed := computedOver(t, files)
+
+	assert.Equal(t, justificationBothApps, computed["core/shared.Reset"])
+	assert.Equal(t, "", computed["core/shared.Tick"],
+		"Reset inherits the untyped 2 above it, which carries no type slot with it")
+}
+
 // TestSymbolOwnership_AValueSpecTypeSlotIsPartOfItsDeclaration: `var Registry map[string]Slotted`
 // names Slotted in the type slot and nowhere else, so reading only the initializer left the one
 // reference the package makes out of the graph. The same family as the two the final review
@@ -922,6 +1073,57 @@ var (
 	assert.Equal(t, justificationBothApps, computed["core/shared.ToneWarm"])
 	assert.Equal(t, "", computed["core/shared.Tone"],
 		"a value never justifies the type it is declared with, whichever slot that type is spelled in")
+}
+
+// TestSymbolOwnership_AnIndependentUseOfTheDeclaredTypeIsStillAReference is how far that
+// exclusion reaches, and it is a narrow rule rather than a wide one: what a value may not vouch
+// for is the one occurrence that spells its own type, the type slot or the conversion standing in
+// for it. Every other occurrence in the initializer is an ordinary reference, and erasing the type
+// from the whole declaration by name threw those away -- an initializer that builds a slice of the
+// type, or names it in a signature, really is the package using it. Final review round 3,
+// finding 3.
+func TestSymbolOwnership_AnIndependentUseOfTheDeclaredTypeIsStillAReference(t *testing.T) {
+	files := withSymbolBaseline(map[string]string{
+		"core/shared/tone.go": `package shared
+
+type Tone string
+
+var ToneWarm Tone = func() Tone {
+	tones := []Tone{"warm"}
+	return tones[0]
+}()
+`,
+		"authserver/main.go": `package main
+
+import "example.test/core/shared"
+
+var (
+	_ = shared.Widget{}
+	_ = shared.Colour("")
+	_ = shared.New()
+	_ = shared.Stable{}
+	_ = shared.ToneWarm
+)
+`,
+		"adminconsole/main.go": `package main
+
+import "example.test/core/shared"
+
+var (
+	_ = shared.Widget{}
+	_ = shared.Colour("")
+	_ = shared.New()
+	_ = shared.Departing{}
+	_ = shared.ToneWarm
+)
+`,
+	})
+
+	computed := computedOver(t, files)
+
+	assert.Equal(t, justificationBothApps, computed["core/shared.ToneWarm"])
+	assert.Equal(t, justificationOwnPackage, computed["core/shared.Tone"],
+		"the type slot is the excluded occurrence; the slice the initializer builds is a use of Tone")
 }
 
 // TestSymbolOwnership_ATypeParameterConstraintIsPartOfTheDeclaration: a constraint is named in the
@@ -1168,6 +1370,124 @@ func TestNothingNamesUnused(t *testing.T) {
 	findings := checkSymbols(t, files, rows)
 
 	assertFindings(t, findings, "records core/odd.Unused as test-support, but nothing names it")
+}
+
+// TestSymbolOwnership_AnExternalTestOfAPackageNamedLikeATestIsEvidence is the external half of the
+// same shape, and it turns on what Go binds an unaliased import to: the imported package's
+// declared name, not the last segment of its path. An external test of a package named `odd_test`
+// living in `core/odd` therefore writes `odd_test.Unused`, and looking for `odd.Unused` refused
+// the evidence and with it the one asserted word the tree can argue with. Final review round 3,
+// finding 4.
+func TestSymbolOwnership_AnExternalTestOfAPackageNamedLikeATestIsEvidence(t *testing.T) {
+	files := withSymbolBaseline(map[string]string{
+		"core/odd/odd.go": "package odd_test\n\ntype Unused struct{}\n",
+		"core/odd/orphan_test.go": `package odd_test_test
+
+import (
+	"testing"
+
+	"example.test/core/odd"
+)
+
+func TestUnusedIsNamed(t *testing.T) {
+	_ = odd_test.Unused{}
+}
+`,
+	})
+	rows := append(symbolBaselineRows(), "core/odd Unused test-support Only a test names it.")
+
+	assert.Empty(t, checkSymbols(t, files, rows))
+}
+
+// TestSymbolOwnership_APackageNamedForSomethingOtherThanItsDirectory is that same binding rule on
+// the production side, where it decides every row rather than one asserted word. Both applications
+// import `core/odd` without an alias and name its symbol through the identifier the package
+// declares, and reading the path's last segment instead saw no reference at all: a symbol the
+// whole tree shares would have been offered an asserted escape hatch, which is the one thing this
+// table exists to refuse. Final review round 3, finding 5.
+func TestSymbolOwnership_APackageNamedForSomethingOtherThanItsDirectory(t *testing.T) {
+	files := withSymbolBaseline(map[string]string{
+		"core/odd/odd.go": "package renamed\n\ntype Shared struct{}\n",
+		"authserver/main.go": `package main
+
+import (
+	"example.test/core/odd"
+	"example.test/core/shared"
+)
+
+var (
+	_ = shared.Widget{}
+	_ = shared.Colour("")
+	_ = shared.New()
+	_ = shared.Stable{}
+	_ = renamed.Shared{}
+)
+`,
+		"adminconsole/main.go": `package main
+
+import (
+	"example.test/core/odd"
+	"example.test/core/shared"
+)
+
+var (
+	_ = shared.Widget{}
+	_ = shared.Colour("")
+	_ = shared.New()
+	_ = shared.Departing{}
+	_ = renamed.Shared{}
+)
+`,
+	})
+
+	computed := computedOver(t, files)
+
+	assert.Equal(t, justificationBothApps, computed["core/odd.Shared"],
+		"an unaliased import binds the name the package declares, which is what both applications wrote")
+}
+
+// TestSymbolOwnership_AnAliasedImportStillOverridesTheDeclaredName is the negative that binding
+// rule must not swallow: an explicit alias is the file's own word on the identifier, and it beats
+// both the declared name and the path.
+func TestSymbolOwnership_AnAliasedImportStillOverridesTheDeclaredName(t *testing.T) {
+	files := withSymbolBaseline(map[string]string{
+		"core/odd/odd.go": "package renamed\n\ntype Shared struct{}\n",
+		"authserver/main.go": `package main
+
+import (
+	odd "example.test/core/odd"
+	"example.test/core/shared"
+)
+
+var (
+	_ = shared.Widget{}
+	_ = shared.Colour("")
+	_ = shared.New()
+	_ = shared.Stable{}
+	_ = odd.Shared{}
+)
+`,
+		"adminconsole/main.go": `package main
+
+import (
+	odd "example.test/core/odd"
+	"example.test/core/shared"
+)
+
+var (
+	_ = shared.Widget{}
+	_ = shared.Colour("")
+	_ = shared.New()
+	_ = shared.Departing{}
+	_ = odd.Shared{}
+)
+`,
+	})
+
+	computed := computedOver(t, files)
+
+	assert.Equal(t, justificationBothApps, computed["core/odd.Shared"],
+		"the alias is what the selector names, whatever the package calls itself")
 }
 
 // TestSymbolOwnership_ATestSupportRowAnUnlinkedProductionFileNames is the deliberate leniency that

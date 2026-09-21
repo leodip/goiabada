@@ -89,10 +89,12 @@ func buildConstantsCensus(root string, graph *importGraph) (*constantsCensus, er
 	}
 	importPath := coreModule + "/constants"
 
-	declared, err := exportedDeclarations(filepath.Join(root, filepath.FromSlash(coreConstantsPkg)))
+	pkgDir := filepath.Join(root, filepath.FromSlash(coreConstantsPkg))
+	declared, err := exportedDeclarations(pkgDir)
 	if err != nil {
 		return nil, err
 	}
+	pkgName := declaredPackageName(pkgDir)
 
 	refs := map[string]map[string]bool{}
 	err = filepath.WalkDir(root, func(path string, d fs.DirEntry, walkErr error) error {
@@ -135,7 +137,7 @@ func buildConstantsCensus(root string, graph *importGraph) (*constantsCensus, er
 			return nil
 		}
 
-		local, imports := localImportName(file, importPath)
+		local, imports := localImportName(file, importPath, pkgName)
 		if !imports {
 			return nil
 		}
@@ -212,14 +214,45 @@ func exportedNames(decl ast.Decl) []string {
 	return names
 }
 
+// declaredPackageName returns the package clause a directory's production files carry, or "" when
+// none of them parses. It is what an unaliased import of that directory binds, and the two guards
+// that read references by selector need it to know what to look for.
+func declaredPackageName(dir string) string {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return ""
+	}
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".go") || strings.HasSuffix(entry.Name(), "_test.go") {
+			continue
+		}
+		fset := token.NewFileSet()
+		file, pErr := parser.ParseFile(fset, filepath.Join(dir, entry.Name()), nil, parser.PackageClauseOnly)
+		if pErr != nil {
+			continue
+		}
+		return file.Name.Name
+	}
+	return ""
+}
+
 // localImportName returns the identifier a file binds an import path to. A blank or dot import
 // binds no identifier a selector can name, so neither counts as a reference.
-func localImportName(file *ast.File, importPath string) (string, bool) {
+//
+// declared is the package clause of the imported package, which is what Go binds when the import
+// carries no alias -- the last segment of the path is only the usual spelling of it, not the rule.
+// A caller that does not know the name passes "" and gets that usual spelling; the two differ
+// exactly when a package is named for something other than its directory, and there every
+// reference to it would otherwise be read as no reference at all. Final review round 3, finding 5.
+func localImportName(file *ast.File, importPath, declared string) (string, bool) {
 	for _, spec := range file.Imports {
 		if spec.Path == nil || strings.Trim(spec.Path.Value, `"`) != importPath {
 			continue
 		}
 		if spec.Name == nil {
+			if declared != "" {
+				return declared, true
+			}
 			return importPath[strings.LastIndex(importPath, "/")+1:], true
 		}
 		if spec.Name.Name == "_" || spec.Name.Name == "." {

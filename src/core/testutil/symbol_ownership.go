@@ -133,6 +133,11 @@ type symbolCensus struct {
 
 // packageSymbols is one core package as the resolver reads it.
 type packageSymbols struct {
+	// name is the package clause its production files carry, which is the identifier an unaliased
+	// import of it binds. Go binds the declared name and not the last segment of the import path,
+	// and a package named for something other than its directory is read through that name
+	// everywhere: by the applications importing it, and by its own external tests.
+	name     string
 	exported map[string]bool
 	// nodes is one entry per top-level declaration owner: a function by its name, a method by its
 	// receiver type, a type by its name, a const or var by each name it introduces. Unexported
@@ -692,6 +697,7 @@ func readPackageSymbols(root, dir string) (*packageSymbols, error) {
 	if len(files) == 0 {
 		return pkg, nil
 	}
+	pkg.name = files[0].Name.Name
 
 	scope, info := checkPackage(fset, dir, files)
 	for _, file := range files {
@@ -776,12 +782,18 @@ func readDecl(pkg *packageSymbols, decl ast.Decl, scope *types.Scope, info *type
 		}
 		// inherited is the const repetition rule: inside a parenthesized const declaration an
 		// omitted expression list is, in Go's words, the textual substitution of the nearest
-		// preceding non-empty one, so an omitted spec's names reach everything that expression
-		// reaches. Reading only the spec's own Values left that edge out, and a symbol the tree
-		// justifies would then have been offered an asserted escape hatch -- the one thing this
-		// table exists to refuse. It is read for a const alone, because a var omitting its values
-		// is taking the zero value rather than repeating anything. Final review round 2, finding 1.
+		// preceding non-empty one *and its type if any*, so an omitted spec's names reach
+		// everything that expression and that type slot reach. Reading only the spec's own Values
+		// left those edges out, and a symbol the tree justifies would then have been offered an
+		// asserted escape hatch -- the one thing this table exists to refuse. It is read for a
+		// const alone, because a var omitting its values is taking the zero value rather than
+		// repeating anything. Final review round 2, finding 1; the type slot, round 3, finding 2.
+		//
+		// inheritedType is reset by every non-empty list, to nil as readily as to a type, because
+		// what Go substitutes is the *nearest* preceding list: a const below an untyped list
+		// inherits no type at all.
 		var inherited []ast.Expr
+		var inheritedType ast.Expr
 		for _, spec := range d.Specs {
 			switch s := spec.(type) {
 			case *ast.TypeSpec:
@@ -793,45 +805,53 @@ func readDecl(pkg *packageSymbols, decl ast.Decl, scope *types.Scope, info *type
 				}
 				collect(pkg, owner.decl, s.Type, s.Name.Name, scope, info)
 			case *ast.ValueSpec:
-				values := s.Values
+				values, declaredType := s.Values, s.Type
 				switch {
 				case len(values) > 0:
-					inherited = values
+					inherited, inheritedType = values, s.Type
 				case d.Tok == token.CONST:
-					values = inherited
+					values, declaredType = inherited, inheritedType
 				}
 				for i, name := range s.Names {
 					owner := pkg.node(name.Name)
+					// Its own named type is the one reference that never counts as evidence for
+					// that type: it is the second of the two shapes that let an enum justify the
+					// type it enumerates. It is recorded instead, because the arrow runs the
+					// other way -- a const of a justified type is reachable.
+					//
+					// Only the occurrence that spells the type is excluded, the type slot or a
+					// conversion standing in for it, which is what `LevelLow = Level("low")` and
+					// `LevelLow Level = "low"` have in common. Every other occurrence in the
+					// initializer is an ordinary reference, and deleting the name from the whole
+					// declaration afterwards threw those away: an initializer building a slice of
+					// the type really is the package using it. Final review round 3, finding 3.
+					named := namedValueType(name.Name, scope)
+					var value ast.Expr
+					if len(values) == len(s.Names) {
+						value = values[i]
+					}
+					if named != "" {
+						pkg.valueType[name.Name] = named
+					}
+					skip := declaredTypeOccurrences(declaredType, value, named)
 					// One expression per name is positional, which is what Go means by
 					// `var a, b = f(), g()`: a is initialised by f and b by g, and nothing a
 					// names is evidence for anything b names. An inherited list is paired the
 					// same way, since Go requires it to have one expression per name. Any other
 					// count is the tuple-valued form, `var a, b = pair()`, where the single
 					// expression really does initialise both names.
-					if len(values) == len(s.Names) {
-						collect(pkg, owner.body, values[i], name.Name, scope, info)
+					if value != nil {
+						collectExcept(pkg, owner.body, value, name.Name, scope, info, skip)
 					} else {
-						for _, value := range values {
-							collect(pkg, owner.body, value, name.Name, scope, info)
+						for _, expr := range values {
+							collectExcept(pkg, owner.body, expr, name.Name, scope, info, skip)
 						}
 					}
 					// The type slot is part of the declaration, so what it names is reachable
 					// from a justified value: `var Registry map[string]Cog` is the only thing in
 					// the package that names Cog, and reading the values alone left it looking
 					// unjustified.
-					collect(pkg, owner.decl, s.Type, name.Name, scope, info)
-					// Its own named type is the exception, and never counts as evidence for that
-					// type: it is the second shape that lets an enum justify the type it
-					// enumerates. It is recorded instead, because the arrow runs the other way --
-					// a const of a justified type is reachable. Deleting it afterwards is what
-					// extends that to `LevelLow = Level("low")`, where the declared type is
-					// spelled in the initializer rather than in the type slot and would otherwise
-					// read as an ordinary reference to it.
-					if named := namedValueType(name.Name, scope); named != "" {
-						pkg.valueType[name.Name] = named
-						delete(owner.body, named)
-						delete(owner.decl, named)
-					}
+					collectExcept(pkg, owner.decl, declaredType, name.Name, scope, info, skip)
 				}
 			}
 		}
@@ -905,11 +925,43 @@ func namedValueType(name string, scope *types.Scope) string {
 	return named.Obj().Name()
 }
 
+// declaredTypeOccurrences returns the identifiers in one value's declaration that spell the value's
+// own named type rather than use it: the type slot, and the conversion or composite literal at the
+// head of its initializer, which is where a value that omits the slot spells the same thing.
+// Nothing deeper counts, so `var ToneWarm Tone = firstOf([]Tone{"warm"})` still names Tone once.
+//
+// An empty named means the value has no same-package named type, and then nothing is excluded.
+func declaredTypeOccurrences(declaredType, value ast.Expr, named string) map[*ast.Ident]bool {
+	if named == "" {
+		return nil
+	}
+	skip := map[*ast.Ident]bool{}
+	mark := func(expr ast.Expr) {
+		if ident, ok := unparen(expr).(*ast.Ident); ok && ident.Name == named {
+			skip[ident] = true
+		}
+	}
+	mark(declaredType)
+	switch head := unparen(value).(type) {
+	case *ast.CallExpr:
+		mark(head.Fun)
+	case *ast.CompositeLit:
+		mark(head.Type)
+	}
+	return skip
+}
+
 // collect records every package-level name of this package that a syntax subtree reaches, skipping
 // the owner's own name. Resolution is by object identity rather than by spelling, so a local, a
 // parameter, a struct field, a struct-literal key, a label or a selector member sharing an
 // exported symbol's name is not a reference to it.
 func collect(pkg *packageSymbols, into map[string]bool, node ast.Node, owner string, scope *types.Scope, info *types.Info) {
+	collectExcept(pkg, into, node, owner, scope, info, nil)
+}
+
+// collectExcept is collect with a set of identifier occurrences left out, which is how a value's
+// declaration of its own type is told apart from a use of it.
+func collectExcept(pkg *packageSymbols, into map[string]bool, node ast.Node, owner string, scope *types.Scope, info *types.Info, skip map[*ast.Ident]bool) {
 	if node == nil {
 		return
 	}
@@ -919,7 +971,7 @@ func collect(pkg *packageSymbols, into map[string]bool, node ast.Node, owner str
 			return true
 		}
 		obj := info.Uses[ident]
-		if obj == nil || obj.Parent() != scope || ident.Name == owner {
+		if obj == nil || obj.Parent() != scope || ident.Name == owner || skip[ident] {
 			return true
 		}
 		into[ident.Name] = true
@@ -1048,7 +1100,10 @@ func (c *symbolCensus) readOwnPackageTests(root, dir, importPath string) error {
 
 	pkg := c.pkgs[dir]
 	for _, file := range external {
-		local, imports := localImportName(file, importPath)
+		// The self-import binds the declaring package's own name when it carries no alias, so an
+		// external test of a package named `odd_test` in core/odd writes `odd_test.Unused` and
+		// looking for `odd.Unused` finds nothing. Final review round 3, finding 4.
+		local, imports := localImportName(file, importPath, declared)
 		if !imports {
 			continue
 		}
@@ -1085,7 +1140,7 @@ func (c *symbolCensus) recordSelectors(dir string, isTest bool, byImportPath map
 		if declaring == dir {
 			continue
 		}
-		local, imports := localImportName(file, importPath)
+		local, imports := localImportName(file, importPath, c.pkgs[declaring].name)
 		if !imports {
 			continue
 		}
