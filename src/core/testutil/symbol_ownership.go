@@ -880,8 +880,14 @@ func (p *packageSymbols) node(name string) *declNode {
 	return node
 }
 
-// receiverTypeName returns the base type name a method hangs off, with any pointer and any type
-// parameters stripped.
+// receiverTypeName returns the base type name a method hangs off, with any pointer, any
+// parentheses and any type parameters stripped.
+//
+// Parentheses are part of that list because Go accepts `func (l *(Level)) Build()` and gofmt
+// preserves them between the pointer and its base, so nothing this repository runs would flag the
+// spelling. Left unstripped it is not a name, and readDecl discards the method instead of
+// attributing it -- which loses every edge that method carries and asks a human to assert a symbol
+// the tree justifies. Final review round 5, finding 4 (#385).
 func receiverTypeName(recv *ast.FieldList) string {
 	if recv == nil || len(recv.List) == 0 {
 		return ""
@@ -890,6 +896,8 @@ func receiverTypeName(recv *ast.FieldList) string {
 	for {
 		switch t := expr.(type) {
 		case *ast.StarExpr:
+			expr = t.X
+		case *ast.ParenExpr:
 			expr = t.X
 		case *ast.IndexExpr:
 			expr = t.X

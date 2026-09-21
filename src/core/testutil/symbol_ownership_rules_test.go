@@ -555,6 +555,179 @@ var (
 	assertFindings(t, findings, "records core/ring.Level as moving, but the tree backs both-apps")
 }
 
+// ---- a method rides with its receiver, however the receiver is spelled -----------------------
+
+// TestSymbolOwnership_AGenericMethodRidesWithItsReceiver is the attribution half of the same rule,
+// at the two shapes the parser keeps for a generic receiver: `Box[T]` is an IndexExpr and
+// `Pair[K, V]` an IndexListExpr, so each is a separate arm of the walk that finds the base name.
+// Fail to unwrap one and the method is discarded rather than attributed, which is the quiet
+// direction: everything only that method reaches loses its evidence, and the table then asks a
+// human to assert a symbol the tree does in fact justify. Before these two receivers existed,
+// replacing either arm on its own left the whole core tier green. Final review round 5, finding 3
+// (#385).
+func TestSymbolOwnership_AGenericMethodRidesWithItsReceiver(t *testing.T) {
+	files := withSymbolBaseline(map[string]string{
+		"core/ring/ring.go": `package ring
+
+type Crank struct{}
+
+type Flange struct{}
+
+type Sprocket struct{}
+
+type Bearing struct{}
+
+type Box[T any] struct {
+	V T
+}
+
+func (b Box[T]) Build() *Crank {
+	_ = Flange{}
+	return nil
+}
+
+type Pair[K, V any] struct {
+	Key   K
+	Value V
+}
+
+func (p Pair[K, V]) Build() *Sprocket {
+	_ = Bearing{}
+	return nil
+}
+`,
+		"authserver/main.go": `package main
+
+import (
+	"example.test/core/ring"
+	"example.test/core/shared"
+)
+
+var (
+	_ = shared.Widget{}
+	_ = shared.Colour("")
+	_ = shared.New()
+	_ = shared.Stable{}
+	_ = ring.Box[int]{}
+	_ = ring.Pair[int, string]{}
+)
+`,
+		"adminconsole/main.go": `package main
+
+import (
+	"example.test/core/ring"
+	"example.test/core/shared"
+)
+
+var (
+	_ = shared.Widget{}
+	_ = shared.Colour("")
+	_ = shared.New()
+	_ = shared.Departing{}
+	_ = ring.Box[int]{}
+	_ = ring.Pair[int, string]{}
+)
+`,
+	})
+
+	computed := computedOver(t, files)
+
+	assert.Equal(t, justificationBothApps, computed["core/ring.Box"])
+	assert.Equal(t, justificationBothApps, computed["core/ring.Pair"])
+	assert.Equal(t, justificationReachable, computed["core/ring.Crank"],
+		"a one-parameter generic method's signature is its receiver's declaration")
+	assert.Equal(t, justificationOwnPackage, computed["core/ring.Flange"],
+		"and its body is its receiver's body")
+	assert.Equal(t, justificationReachable, computed["core/ring.Sprocket"],
+		"which holds for a receiver carrying more than one type parameter too")
+	assert.Equal(t, justificationOwnPackage, computed["core/ring.Bearing"],
+		"in the body as in the signature")
+}
+
+// TestSymbolOwnership_AParenthesizedReceiverStillNamesItsType is the receiver form the walk did not
+// know. Go accepts `func (l *(Level)) Build()` and gofmt preserves parentheses between the pointer
+// and its base, so the form survives every formatting check this repository runs and a reader has
+// no hint it is unusual. The walk stripped pointers and type arguments but not parentheses, so it
+// returned "" and the method was dropped rather than attributed to Level -- a symbol only that
+// method reaches would then be asked to justify itself in writing. The second receiver is the
+// composition, `*(Box[T])`, which is a pointer, parentheses and an instantiation at once. Final
+// review round 5, finding 4 (#385).
+func TestSymbolOwnership_AParenthesizedReceiverStillNamesItsType(t *testing.T) {
+	files := withSymbolBaseline(map[string]string{
+		"core/ring/ring.go": `package ring
+
+type Level struct{}
+
+type Orphan struct{}
+
+type Cotter struct{}
+
+type Gasket struct{}
+
+type Spindle struct{}
+
+type Box[T any] struct {
+	V T
+}
+
+func (l *(Level)) Build() *Orphan {
+	_ = Cotter{}
+	return nil
+}
+
+func (b *(Box[T])) Peek() *Gasket {
+	_ = Spindle{}
+	return nil
+}
+`,
+		"authserver/main.go": `package main
+
+import (
+	"example.test/core/ring"
+	"example.test/core/shared"
+)
+
+var (
+	_ = shared.Widget{}
+	_ = shared.Colour("")
+	_ = shared.New()
+	_ = shared.Stable{}
+	_ = ring.Level{}
+	_ = ring.Box[int]{}
+)
+`,
+		"adminconsole/main.go": `package main
+
+import (
+	"example.test/core/ring"
+	"example.test/core/shared"
+)
+
+var (
+	_ = shared.Widget{}
+	_ = shared.Colour("")
+	_ = shared.New()
+	_ = shared.Departing{}
+	_ = ring.Level{}
+	_ = ring.Box[int]{}
+)
+`,
+	})
+
+	computed := computedOver(t, files)
+
+	assert.Equal(t, justificationBothApps, computed["core/ring.Level"])
+	assert.Equal(t, justificationBothApps, computed["core/ring.Box"])
+	assert.Equal(t, justificationReachable, computed["core/ring.Orphan"],
+		"a parenthesized pointer receiver names its type as surely as a bare one")
+	assert.Equal(t, justificationOwnPackage, computed["core/ring.Cotter"],
+		"so the method's body is its receiver's body")
+	assert.Equal(t, justificationReachable, computed["core/ring.Gasket"],
+		"and parentheses compose with the pointer and the type arguments")
+	assert.Equal(t, justificationOwnPackage, computed["core/ring.Spindle"],
+		"in the body as in the signature")
+}
+
 // ---- a name is not a reference ---------------------------------------------------------------
 
 // TestSymbolOwnership_ASameSpelledNameIsNotAReference is why the own-package arm resolves objects
@@ -1125,6 +1298,127 @@ var (
 		"an instantiated generic type slot spells the value's own type as surely as a bare one")
 	assert.Equal(t, justificationReachable, computed["core/shared.Knob"],
 		"the type argument is not the value's own type, so it stays an ordinary reference")
+}
+
+// TestSymbolOwnership_AMultiArgumentGenericTypeSlotIsStillTheValuesOwnType is the same exclusion at
+// the other parser shape. Go writes a one-argument instantiation `Box[Knob]` as an IndexExpr and
+// every wider one `Pair[Knob, Toggle]` as an IndexListExpr, so a fixture covering the first pins
+// nothing about the second: with only the Box case here, replacing the IndexListExpr arm left the
+// whole core tier green. Generated is the same instantiation spelled at the head of an initializer
+// instead of in the slot, which is where this exclusion and the composite-literal one compose.
+// Final review round 5, finding 1 (#385).
+func TestSymbolOwnership_AMultiArgumentGenericTypeSlotIsStillTheValuesOwnType(t *testing.T) {
+	files := withSymbolBaseline(map[string]string{
+		"core/shared/pair.go": `package shared
+
+type Knob int
+
+type Toggle bool
+
+type Ferrule int
+
+type Shim bool
+
+type Pair[K, V any] struct {
+	Key   K
+	Value V
+}
+
+var Default Pair[Knob, Toggle]
+
+var Generated = Pair[Ferrule, Shim]{}
+`,
+		"authserver/main.go": `package main
+
+import "example.test/core/shared"
+
+var (
+	_ = shared.Widget{}
+	_ = shared.Colour("")
+	_ = shared.New()
+	_ = shared.Stable{}
+	_ = shared.Default
+	_ = shared.Generated
+)
+`,
+		"adminconsole/main.go": `package main
+
+import "example.test/core/shared"
+
+var (
+	_ = shared.Widget{}
+	_ = shared.Colour("")
+	_ = shared.New()
+	_ = shared.Departing{}
+	_ = shared.Default
+	_ = shared.Generated
+)
+`,
+	})
+
+	computed := computedOver(t, files)
+
+	assert.Equal(t, justificationBothApps, computed["core/shared.Default"])
+	assert.Equal(t, justificationBothApps, computed["core/shared.Generated"])
+	assert.Equal(t, "", computed["core/shared.Pair"],
+		"a two-argument instantiation spells the value's own type, in the slot and at the head of an initializer alike")
+	assert.Equal(t, justificationReachable, computed["core/shared.Knob"],
+		"the first type argument is not the value's own type, so the slot names it as an ordinary reference")
+	assert.Equal(t, justificationReachable, computed["core/shared.Toggle"],
+		"and neither is the second")
+	assert.Equal(t, justificationOwnPackage, computed["core/shared.Ferrule"],
+		"the arguments of the instantiation that stands in an initializer are ordinary references too, from the stronger position")
+	assert.Equal(t, justificationOwnPackage, computed["core/shared.Shim"],
+		"and so is the second of those")
+}
+
+// TestSymbolOwnership_ACompositeLiteralHeadIsTheDeclaredType is the second of the three initializer
+// heads, and the one no fixture reached: `var Default = Tone{}` spells Tone exactly as the
+// conversion `Tone("warm")` and the assertion `source.(Tone)` do, and for the same reason it is not
+// a use of Tone. Read as an ordinary reference it let a package's own value promote the type it is
+// an instance of, which is the circularity this exclusion exists to refuse. Replacing the arm left
+// the whole core tier green before this fixture existed. Final review round 5, finding 2 (#385).
+func TestSymbolOwnership_ACompositeLiteralHeadIsTheDeclaredType(t *testing.T) {
+	files := withSymbolBaseline(map[string]string{
+		"core/shared/tone.go": `package shared
+
+type Tone struct {
+	Name string
+}
+
+var Default = Tone{Name: "warm"}
+`,
+		"authserver/main.go": `package main
+
+import "example.test/core/shared"
+
+var (
+	_ = shared.Widget{}
+	_ = shared.Colour("")
+	_ = shared.New()
+	_ = shared.Stable{}
+	_ = shared.Default
+)
+`,
+		"adminconsole/main.go": `package main
+
+import "example.test/core/shared"
+
+var (
+	_ = shared.Widget{}
+	_ = shared.Colour("")
+	_ = shared.New()
+	_ = shared.Departing{}
+	_ = shared.Default
+)
+`,
+	})
+
+	computed := computedOver(t, files)
+
+	assert.Equal(t, justificationBothApps, computed["core/shared.Default"])
+	assert.Equal(t, "", computed["core/shared.Tone"],
+		"a composite literal at the head of an initializer is the value's own type, not a use of it")
 }
 
 // TestSymbolOwnership_ATypeAssertionHeadIsTheDeclaredType is the third way an initializer spells
