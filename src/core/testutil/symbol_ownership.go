@@ -833,7 +833,17 @@ func readDecl(pkg *packageSymbols, decl ast.Decl, scope *types.Scope, info *type
 					if named != "" {
 						pkg.valueType[name.Name] = named
 					}
-					skip := declaredTypeOccurrences(declaredType, value, named)
+					// head is the expression whose head spells this name's own type. For the
+					// positional form that is the name's own value; for the tuple form it is the
+					// single expression, which is how `var ToneCool, ok = source.(Tone)` reaches
+					// the assertion at all. Which of the two names it excludes for is decided by
+					// named rather than by position: ok was declared with bool, so named is empty
+					// for it and nothing is excluded. Final review round 4, finding 2.
+					head := value
+					if head == nil && len(values) == 1 {
+						head = values[0]
+					}
+					skip := declaredTypeOccurrences(declaredType, head, named)
 					// One expression per name is positional, which is what Go means by
 					// `var a, b = f(), g()`: a is initialised by f and b by g, and nothing a
 					// names is evidence for anything b names. An inherited list is paired the
@@ -926,19 +936,42 @@ func namedValueType(name string, scope *types.Scope) string {
 }
 
 // declaredTypeOccurrences returns the identifiers in one value's declaration that spell the value's
-// own named type rather than use it: the type slot, and the conversion or composite literal at the
-// head of its initializer, which is where a value that omits the slot spells the same thing.
-// Nothing deeper counts, so `var ToneWarm Tone = firstOf([]Tone{"warm"})` still names Tone once.
+// own named type rather than use it: the type slot, and the conversion, composite literal or type
+// assertion at the head of its initializer, which is where a value that omits the slot spells the
+// same thing. Those three are the whole of it, because they are the only expression forms whose
+// head names the type of the value the expression produces. Nothing deeper counts, so
+// `var ToneWarm Tone = firstOf([]Tone{"warm"})` still names Tone once.
 //
-// An empty named means the value has no same-package named type, and then nothing is excluded.
+// An empty named means the value has no same-package named type, and then nothing is excluded --
+// which is what leaves the bool of `var ToneCool, ok = source.(Tone)` naming Tone ordinarily. The
+// exclusion is per value rather than per declaration, and only the first result of a comma-ok
+// assertion takes the asserted type.
 func declaredTypeOccurrences(declaredType, value ast.Expr, named string) map[*ast.Ident]bool {
 	if named == "" {
 		return nil
 	}
 	skip := map[*ast.Ident]bool{}
+	// A generic named type is spelled instantiated, `Box[int]` or `Pair[K, V]`, which go/ast wraps
+	// in an IndexExpr or an IndexListExpr around the base identifier. Only that base is the value's
+	// own type: the type arguments are ordinary references, and so is anything deeper. Without the
+	// unwrapping the slot read as a plain reference and a justified `var Default Box[int]` made Box
+	// reachable from itself, which is the circularity this whole exclusion exists to refuse.
+	// Final review round 4, finding 1.
 	mark := func(expr ast.Expr) {
-		if ident, ok := unparen(expr).(*ast.Ident); ok && ident.Name == named {
-			skip[ident] = true
+		for {
+			switch e := unparen(expr).(type) {
+			case *ast.IndexExpr:
+				expr = e.X
+			case *ast.IndexListExpr:
+				expr = e.X
+			case *ast.Ident:
+				if e.Name == named {
+					skip[e] = true
+				}
+				return
+			default:
+				return
+			}
 		}
 	}
 	mark(declaredType)
@@ -946,6 +979,11 @@ func declaredTypeOccurrences(declaredType, value ast.Expr, named string) map[*as
 	case *ast.CallExpr:
 		mark(head.Fun)
 	case *ast.CompositeLit:
+		mark(head.Type)
+	case *ast.TypeAssertExpr:
+		// `var ToneWarm = source.(Tone)` spells Tone exactly as `Tone("warm")` does. Reading it as
+		// a use instead let a member promote its own type to own-package. Final review round 4,
+		// finding 2.
 		mark(head.Type)
 	}
 	return skip

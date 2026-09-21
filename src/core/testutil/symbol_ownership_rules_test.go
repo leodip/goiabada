@@ -1075,6 +1075,165 @@ var (
 		"a value never justifies the type it is declared with, whichever slot that type is spelled in")
 }
 
+// TestSymbolOwnership_AGenericTypeSlotIsStillTheValuesOwnType is the same rule spelled with type
+// arguments. Go writes an instantiated named type as an IndexExpr, so the type slot of
+// `var Default Box[int]` is not the bare identifier the exclusion was looking for, and Box was
+// read as an ordinary reference from a justified value -- the circular evidence the rule above
+// exists to refuse, reached by writing the type generically. The type argument is a different
+// question and stays an ordinary reference, which is what Knob asserts. Final review round 4,
+// finding 1.
+func TestSymbolOwnership_AGenericTypeSlotIsStillTheValuesOwnType(t *testing.T) {
+	files := withSymbolBaseline(map[string]string{
+		"core/shared/box.go": `package shared
+
+type Knob int
+
+type Box[T any] struct{ V T }
+
+var Default Box[Knob]
+`,
+		"authserver/main.go": `package main
+
+import "example.test/core/shared"
+
+var (
+	_ = shared.Widget{}
+	_ = shared.Colour("")
+	_ = shared.New()
+	_ = shared.Stable{}
+	_ = shared.Default
+)
+`,
+		"adminconsole/main.go": `package main
+
+import "example.test/core/shared"
+
+var (
+	_ = shared.Widget{}
+	_ = shared.Colour("")
+	_ = shared.New()
+	_ = shared.Departing{}
+	_ = shared.Default
+)
+`,
+	})
+
+	computed := computedOver(t, files)
+
+	assert.Equal(t, justificationBothApps, computed["core/shared.Default"])
+	assert.Equal(t, "", computed["core/shared.Box"],
+		"an instantiated generic type slot spells the value's own type as surely as a bare one")
+	assert.Equal(t, justificationReachable, computed["core/shared.Knob"],
+		"the type argument is not the value's own type, so it stays an ordinary reference")
+}
+
+// TestSymbolOwnership_ATypeAssertionHeadIsTheDeclaredType is the third way an initializer spells
+// the type of the value it initializes, after the conversion and the composite literal: a value
+// that omits its type slot and asserts one instead. Reading it as an ordinary reference let a
+// package's own member promote the type it belongs to all the way to own-package. The comma-ok
+// form is the same assertion, and only the first result takes the asserted type -- the bool does
+// not, so for it the assertion is an ordinary reference like any other. Final review round 4,
+// finding 2.
+func TestSymbolOwnership_ATypeAssertionHeadIsTheDeclaredType(t *testing.T) {
+	files := withSymbolBaseline(map[string]string{
+		"core/shared/tone.go": `package shared
+
+var source any = "warm"
+
+type Tone string
+
+var ToneWarm = source.(Tone)
+
+var ToneCool, ToneCoolOk = source.(Tone)
+`,
+		"authserver/main.go": `package main
+
+import "example.test/core/shared"
+
+var (
+	_ = shared.Widget{}
+	_ = shared.Colour("")
+	_ = shared.New()
+	_ = shared.Stable{}
+	_ = shared.ToneWarm
+	_ = shared.ToneCool
+)
+`,
+		"adminconsole/main.go": `package main
+
+import "example.test/core/shared"
+
+var (
+	_ = shared.Widget{}
+	_ = shared.Colour("")
+	_ = shared.New()
+	_ = shared.Departing{}
+	_ = shared.ToneWarm
+	_ = shared.ToneCool
+)
+`,
+	})
+
+	computed := computedOver(t, files)
+
+	assert.Equal(t, justificationBothApps, computed["core/shared.ToneWarm"])
+	assert.Equal(t, justificationBothApps, computed["core/shared.ToneCool"])
+	assert.Equal(t, "", computed["core/shared.Tone"],
+		"an asserted type is the value's own type, not a use of it, in either form of the assertion")
+}
+
+// TestSymbolOwnership_TheBoolOfACommaOkAssertionStillNamesTheType is how far that exclusion
+// reaches, and it is the leniency the per-value rule buys. The exclusion asks what type *this*
+// value was declared with, and the bool of a comma-ok assertion was declared with bool, so the
+// asserted type is an ordinary reference from where it stands. Excluding it for every name in the
+// spec instead would be a per-declaration rule, which is the wide reading
+// AnIndependentUseOfTheDeclaredTypeIsStillAReference already refuses. Final review round 4,
+// finding 2.
+func TestSymbolOwnership_TheBoolOfACommaOkAssertionStillNamesTheType(t *testing.T) {
+	files := withSymbolBaseline(map[string]string{
+		"core/shared/tone.go": `package shared
+
+var source any = "warm"
+
+type Tone string
+
+var toneCool, ToneCoolOk = source.(Tone)
+
+var _ = toneCool
+`,
+		"authserver/main.go": `package main
+
+import "example.test/core/shared"
+
+var (
+	_ = shared.Widget{}
+	_ = shared.Colour("")
+	_ = shared.New()
+	_ = shared.Stable{}
+	_ = shared.ToneCoolOk
+)
+`,
+		"adminconsole/main.go": `package main
+
+import "example.test/core/shared"
+
+var (
+	_ = shared.Widget{}
+	_ = shared.Colour("")
+	_ = shared.New()
+	_ = shared.Departing{}
+	_ = shared.ToneCoolOk
+)
+`,
+	})
+
+	computed := computedOver(t, files)
+
+	assert.Equal(t, justificationBothApps, computed["core/shared.ToneCoolOk"])
+	assert.Equal(t, justificationOwnPackage, computed["core/shared.Tone"],
+		"the bool was not declared with Tone, so its declaration names Tone like any other")
+}
+
 // TestSymbolOwnership_AnIndependentUseOfTheDeclaredTypeIsStillAReference is how far that
 // exclusion reaches, and it is a narrow rule rather than a wide one: what a value may not vouch
 // for is the one occurrence that spells its own type, the type slot or the conversion standing in
