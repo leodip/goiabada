@@ -54,6 +54,8 @@ import (
 // matched the literal text "errors." would walk straight past it while also catching every
 // unrelated package that happens to be called errors. Parentheses around a callee are stripped
 // for the same reason, since (errors.New)("x") constructs exactly what errors.New("x") constructs.
+// Which name each watched path is bound to is bindImports' answer, and errorsWatchedImports is
+// the set it is asked about.
 //
 // The boundary is one file's own imports, which is what makes this a parsing test and not a type
 // check: an unrelated package re-exporting a stdlib constructor under its own name would need
@@ -109,7 +111,25 @@ type legacyErrorUse struct {
 	fix  string
 }
 
-const errsImportPath = "github.com/leodip/goiabada/core/errs"
+const (
+	errsImportPath      = "github.com/leodip/goiabada/core/errs"
+	pkgErrorsImportPath = "github.com/pkg/errors"
+)
+
+// errorsWatchedImports is every path this rule resolves a call site against, with the identifier
+// an unaliased import of it binds. See watchedImport in import_binding.go for why the declared
+// name is the rule and the last element of the path is not.
+//
+// github.com/pkg/errors is here although no case below compares against it: importing it is
+// already the finding, and binding it is what keeps the map honest about which package errors.New
+// names in a file that imports it. Its clause is errors, the same name stdlib errors binds, which
+// is legal in one file only if one of the two is aliased -- and the alias is then what binds.
+var errorsWatchedImports = watchedImports{
+	"errors":            {name: "errors"},
+	"fmt":               {name: "fmt"},
+	pkgErrorsImportPath: {name: "errors"},
+	errsImportPath:      {name: "errs", dir: "core/errs"},
+}
 
 // errsConstructors is every exported function in core/errs that can attach frames. All of them
 // are wrong in a package-level var for the one reason: the frames would be init's.
@@ -296,45 +316,37 @@ func legacyErrorUsesInFile(file *ast.File, fset *token.FileSet, rel string) []le
 
 	// importPaths maps the name a file actually writes at a call site to the path it imports, so
 	// the goerrors alias in authserver/internal/data/mssqldb/db.go resolves like any other.
-	importPaths := map[string]string{}
+	importPaths := bindImports(file, errorsWatchedImports)
+
+	// The import declaration carries two findings of its own, neither of which depends on the name
+	// anything is bound to.
 	for _, spec := range file.Imports {
 		path, err := strconv.Unquote(spec.Path.Value)
 		if err != nil {
 			continue
 		}
-		if path == "github.com/pkg/errors" {
+		if path == pkgErrorsImportPath {
 			uses = append(uses, legacyErrorUse{
 				file: rel,
 				line: fset.Position(spec.Pos()).Line,
-				what: `import "github.com/pkg/errors"`,
+				what: `import "` + pkgErrorsImportPath + `"`,
 				fix:  "import " + errsImportPath + " instead",
 			})
 		}
-		name := defaultImportName(path)
-		if spec.Name != nil {
-			name = spec.Name.Name
+		// A dot import binds the package's exported names unqualified, so errors.New is written
+		// New and there is no selector left for qualifiedCall to resolve: the whole rule below
+		// walks straight past the file. Refusing the import is the answer rather than resolving
+		// unqualified calls, which would also have to model every local declaration that shadows
+		// one. Nothing in this tree dot-imports any of the three, and doing so could only hide a
+		// construction this rule exists to refuse (#279).
+		if spec.Name != nil && spec.Name.Name == "." && dotImportHidesTheRule[path] {
+			uses = append(uses, legacyErrorUse{
+				file: rel,
+				line: fset.Position(spec.Pos()).Line,
+				what: `dot import of "` + path + `"`,
+				fix:  "import it under its own name; a dot import hides its constructors from this rule",
+			})
 		}
-		if name == "." {
-			// A dot import binds the package's exported names unqualified, so errors.New is
-			// written New and there is no selector left for qualifiedCall to resolve: the whole
-			// rule below walks straight past the file. Refusing the import is the answer rather
-			// than resolving unqualified calls, which would also have to model every local
-			// declaration that shadows one. Nothing in this tree dot-imports any of the three,
-			// and doing so could only hide a construction this rule exists to refuse (#279).
-			if dotImportHidesTheRule[path] {
-				uses = append(uses, legacyErrorUse{
-					file: rel,
-					line: fset.Position(spec.Pos()).Line,
-					what: `dot import of "` + path + `"`,
-					fix:  "import it under its own name; a dot import hides its constructors from this rule",
-				})
-			}
-			continue
-		}
-		if name == "_" {
-			continue
-		}
-		importPaths[name] = path
 	}
 
 	sentinels, initSelectors := packageLevelVarCalls(file)
@@ -480,15 +492,6 @@ func unparen(expr ast.Expr) ast.Expr {
 		}
 		expr = paren.X
 	}
-}
-
-// defaultImportName is the name an unaliased import binds, which for every path in this tree is
-// its last element.
-func defaultImportName(path string) string {
-	if i := strings.LastIndex(path, "/"); i >= 0 {
-		return path[i+1:]
-	}
-	return path
 }
 
 // packageLevelVarCalls collects the calls that are evaluated during package initialization, which

@@ -152,21 +152,7 @@ func auditLogContextViolationsInFile(file *ast.File, fset *token.FileSet, rel st
 	// an aliased context resolves like any other. Without it `import stdctx "context"` followed
 	// by stdctx.Background() is invisible to the rule, which is the one rename that would carry
 	// the refused shape past it.
-	importPaths := map[string]string{}
-	for _, spec := range file.Imports {
-		path, err := strconv.Unquote(spec.Path.Value)
-		if err != nil {
-			continue
-		}
-		name := defaultImportName(path)
-		if spec.Name != nil {
-			name = spec.Name.Name
-		}
-		if name == "." || name == "_" {
-			continue
-		}
-		importPaths[name] = path
-	}
+	importPaths := bindImports(file, auditWatchedImports)
 
 	ast.Inspect(file, func(n ast.Node) bool {
 		call, ok := n.(*ast.CallExpr)
@@ -207,6 +193,12 @@ const (
 	// context a record is written under, not about which type declared the method.
 	auditLogMethodName = "Log"
 )
+
+// auditWatchedImports is the one path this rule resolves a call site against. See watchedImport in
+// import_binding.go for why the declared name is the rule and the last element of the path is not.
+var auditWatchedImports = watchedImports{
+	contextImportPath: {name: "context"},
+}
 
 // auditLogRefusedContexts is the two constructors of a context carrying nothing. They are one
 // rule rather than two because they differ only in what a reader is meant to infer about intent,

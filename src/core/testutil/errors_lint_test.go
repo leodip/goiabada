@@ -235,6 +235,31 @@ import "errors"
 func onLinuxOrDev() error { return errors.New("x") }
 `)
 
+	// The resolver rather than a rule of its own, and the one shape that made this guard quiet
+	// rather than wrong: a package named for something other than its directory, imported
+	// unaliased beside stdlib errors. Go binds the package clause, so this one binds "vendored"
+	// and errors below is still stdlib. Reading the last element of the path instead recorded this
+	// path under "errors" -- second in the file, so it overwrote the stdlib binding -- and the
+	// construction on line 11 resolved to a package no case names and was walked past. bindImports
+	// records watched paths only, which is what makes that unreachable (#385).
+	write("core/caught/vendored/errors/pkg.go", `package vendored
+
+func Helper() string { return "x" }
+`)
+	write("core/caught/path_base_collision.go", `package caught
+
+import (
+	"errors"
+
+	"github.com/leodip/goiabada/core/caught/vendored/errors"
+)
+
+func collide() error {
+	_ = vendored.Helper()
+	return errors.New("x")
+}
+`)
+
 	// ---- passed ------------------------------------------------------------------------------
 
 	// A package-level sentinel keeps stdlib errors.New: a stack captured at init would record the
@@ -333,7 +358,7 @@ func broken( {
 
 	uses, files, err := findLegacyErrorUses(root, nil)
 	require.NoError(t, err)
-	assert.Equal(t, 27, files,
+	assert.Equal(t, 29, files,
 		"every non-test, parseable, production-reachable fixture outside core/errs and mocks is parsed")
 	assert.Equal(t, []string{
 		"core/caught/aliased_import.go:3 " + `import "github.com/pkg/errors"`,
@@ -353,6 +378,7 @@ func broken( {
 		"core/caught/package_var_helper.go:5 errs.New in a package-level var",
 		"core/caught/package_var_iife.go:5 errs.New in a package-level var",
 		"core/caught/paren_callee.go:5 stdlib errors.New",
+		"core/caught/path_base_collision.go:11 stdlib errors.New",
 		"core/caught/plain_import.go:3 " + `import "github.com/pkg/errors"`,
 		"core/caught/redundant_withstack.go:5 errs.WithStack(errs.New(...))",
 		"core/caught/redundant_withstack.go:7 errs.WithStack(errs.Errorf(...))",

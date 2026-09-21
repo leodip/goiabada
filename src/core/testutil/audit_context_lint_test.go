@@ -105,6 +105,36 @@ func notLog(ctx context.Context, other interface{ Warn(context.Context) }) {
 }
 `)
 
+	// The resolver rather than a rule of its own: a package named for something other than its
+	// directory, imported unaliased beside stdlib context. Go binds the package clause, so this one
+	// binds "vendored" and the context below is still stdlib. Reading the last element of the path
+	// instead recorded this path under "context" -- second in the file, so it overwrote the stdlib
+	// binding -- and the refused call on line 15 resolved to a package the rule does not name and
+	// was walked past. bindImports records watched paths only, which is what makes that
+	// unreachable. The vendored package sits outside slogRequestPathDirs so that it is filtered out
+	// rather than walked, and the count below moves by the one refused file (#385).
+	tree.write("core/vendored/context/pkg.go", `package vendored
+
+func Helper() string { return "x" }
+`)
+	tree.write("authserver/internal/handlers/path_base_collision.go", `package handlers
+
+import (
+	"context"
+
+	"github.com/leodip/goiabada/core/vendored/context"
+)
+
+type collisionLogger interface {
+	Log(ctx context.Context, event string, details map[string]interface{})
+}
+
+func collide(auditLogger collisionLogger) {
+	_ = vendored.Helper()
+	auditLogger.Log(context.Background(), "user_login", nil)
+}
+`)
+
 	// Outside slogRequestPathDirs: a startup pass has no request, so a Background context is the
 	// honest answer there and the rule says nothing about it. The scope filter drops it before it
 	// is parsed, which is why it is not among the walked files counted below.
@@ -152,7 +182,7 @@ func inMock(auditLogger logger) {
 
 	violations, files, err := findAuditLogContextViolations(tree.root, nil)
 	require.NoError(t, err)
-	assert.Equal(t, 3, files, "every non-exempt fixture in a request-path package is walked")
+	assert.Equal(t, 4, files, "every non-exempt fixture in a request-path package is walked")
 
 	got := make([]string, 0, len(violations))
 	for _, v := range violations {
@@ -162,6 +192,7 @@ func inMock(auditLogger logger) {
 		"authserver/internal/handlers/caught.go:13 context.Background() passed to .Log in a request-path package",
 		"authserver/internal/handlers/caught.go:17 context.TODO() passed to .Log in a request-path package",
 		"authserver/internal/handlers/caught.go:21 context.Background() passed to .Log in a request-path package",
+		"authserver/internal/handlers/path_base_collision.go:15 context.Background() passed to .Log in a request-path package",
 		"core/sessionstore/aliased.go:12 context.Background() passed to .Log in a request-path package",
 		"core/sessionstore/aliased.go:16 context.TODO() passed to .Log in a request-path package",
 	}
