@@ -281,6 +281,13 @@ var slogSpreadSites = []slogSpreadSite{
 // handler packages' do. Listed by the commit that creates the package rather than by the one that
 // first writes a record in it, since a directory absent from this list costs all three rules
 // silently (#387).
+//
+// authserver/internal/userclaims is the fourth of #387's capability packages and is listed on the
+// same terms: the claim block it owns ran inside handler_userinfo.go and token_issuer.go, both
+// already here, and every call to it is made while answering /userinfo or minting a token. It
+// writes no record today -- a failed picture lookup omits the claim silently, as it did at both
+// sites before the move -- and the rule is what refuses one written there later without the
+// request's context (#387).
 var slogRequestPathDirs = []string{
 	"authserver/internal/audit",
 	"authserver/internal/data/commondb",
@@ -303,6 +310,7 @@ var slogRequestPathDirs = []string{
 	"authserver/internal/emaillinks",
 	"authserver/internal/otp",
 	"authserver/internal/otpcredential",
+	"authserver/internal/userclaims",
 	"authserver/internal/imaging",
 	"authserver/internal/uithemes",
 	"adminconsole/internal/handlers",

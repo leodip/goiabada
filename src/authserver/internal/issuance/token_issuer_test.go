@@ -18,6 +18,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
+	"github.com/leodip/goiabada/authserver/internal/userclaims"
 	"github.com/leodip/goiabada/authserver/internal/uuidutil"
 	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/oauth"
@@ -2431,259 +2432,6 @@ func TestGenerateTokenResponseForRefresh_Offline_NoIdToken(t *testing.T) {
 	assert.WithinDuration(t, now.Add(172800*time.Second), capturedRefreshToken.MaxLifetime.Time, 1*time.Second)
 
 	mockDB.AssertExpectations(t)
-}
-
-func TestAddOpenIdConnectClaimsFromUser(t *testing.T) {
-	mockDB := mocks_data.NewDatabase(t)
-	tokenIssuer := &TokenIssuer{
-		database: mockDB,
-		baseURL:  "http://localhost:8081",
-	}
-	now := time.Now().UTC()
-
-	// Set up mock for profile picture check - it will be called for tests with profile scope
-	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
-
-	testCases := []struct {
-		name     string
-		user     *models.User
-		scopes   []string
-		expected jwt.MapClaims
-	}{
-		{
-			name: "Full scope",
-			user: &models.User{
-				Email:               "test@example.com",
-				EmailVerified:       true,
-				Username:            "testuser",
-				GivenName:           "Test",
-				MiddleName:          "Middle",
-				FamilyName:          "User",
-				Nickname:            "Testy",
-				Website:             "https://test.com",
-				Gender:              "male",
-				BirthDate:           sql.NullTime{Time: time.Date(1990, 1, 1, 0, 0, 0, 0, time.UTC), Valid: true},
-				ZoneInfo:            "Europe/London",
-				Locale:              "en-GB",
-				PhoneNumber:         "+1234567890",
-				PhoneNumberVerified: true,
-				AddressLine1:        "123 Test St",
-				AddressLine2:        "Apt 4",
-				AddressLocality:     "Testville",
-				AddressRegion:       "Testshire",
-				AddressPostalCode:   "TE1 2ST",
-				AddressCountry:      "Testland",
-				UpdatedAt:           sql.NullTime{Time: now.Add(-1 * time.Hour), Valid: true},
-			},
-			scopes: []string{"openid", "profile", "email", "address", "phone"},
-			expected: jwt.MapClaims{
-				"name":                  "Test Middle User",
-				"given_name":            "Test",
-				"middle_name":           "Middle",
-				"family_name":           "User",
-				"nickname":              "Testy",
-				"preferred_username":    "testuser",
-				"profile":               "http://localhost:8081/account/profile",
-				"website":               "https://test.com",
-				"gender":                "male",
-				"birthdate":             "1990-01-01",
-				"zoneinfo":              "Europe/London",
-				"locale":                "en-GB",
-				"email":                 "test@example.com",
-				"email_verified":        true,
-				"phone_number":          "+1234567890",
-				"phone_number_verified": true,
-				"updated_at":            now.Add(-1 * time.Hour).Unix(),
-			},
-		},
-		{
-			name: "Minimal scope",
-			user: &models.User{
-				Email:     "minimal@example.com",
-				UpdatedAt: sql.NullTime{Time: now.Add(-1 * time.Hour), Valid: true},
-			},
-			scopes:   []string{"openid"},
-			expected: jwt.MapClaims{},
-		},
-		{
-			name: "Profile scope only",
-			user: &models.User{
-				Username:   "profileuser",
-				GivenName:  "Profile",
-				FamilyName: "User",
-				UpdatedAt:  sql.NullTime{Time: now.Add(-1 * time.Hour), Valid: true},
-			},
-			scopes: []string{"openid", "profile"},
-			expected: jwt.MapClaims{
-				"name":               "Profile User",
-				"given_name":         "Profile",
-				"family_name":        "User",
-				"preferred_username": "profileuser",
-				"profile":            "http://localhost:8081/account/profile",
-				"updated_at":         now.Add(-1 * time.Hour).Unix(),
-			},
-		},
-		{
-			name: "Email scope only",
-			user: &models.User{
-				Email:         "email@example.com",
-				EmailVerified: true,
-				UpdatedAt:     sql.NullTime{Time: now.Add(-1 * time.Hour), Valid: true},
-			},
-			scopes: []string{"openid", "email"},
-			expected: jwt.MapClaims{
-				"email":          "email@example.com",
-				"email_verified": true,
-				"updated_at":     now.Add(-1 * time.Hour).Unix(),
-			},
-		},
-		{
-			name: "Address scope only",
-			user: &models.User{
-				AddressLine1:      "456 Address St",
-				AddressLocality:   "Addressville",
-				AddressRegion:     "Addressshire",
-				AddressPostalCode: "AD1 3SS",
-				AddressCountry:    "Addressland",
-				UpdatedAt:         sql.NullTime{Time: now.Add(-1 * time.Hour), Valid: true},
-			},
-			scopes: []string{"openid", "address"},
-			expected: jwt.MapClaims{
-				"updated_at": now.Add(-1 * time.Hour).Unix(),
-			},
-		},
-		{
-			name: "Phone scope only",
-			user: &models.User{
-				PhoneNumber:         "+9876543210",
-				PhoneNumberVerified: false,
-				UpdatedAt:           sql.NullTime{Time: now.Add(-1 * time.Hour), Valid: true},
-			},
-			scopes: []string{"openid", "phone"},
-			expected: jwt.MapClaims{
-				"phone_number":          "+9876543210",
-				"phone_number_verified": false,
-				"updated_at":            now.Add(-1 * time.Hour).Unix(),
-			},
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			claims := make(jwt.MapClaims)
-
-			tokenIssuer.addOpenIdConnectClaimsFromUser(context.Background(), claims, tc.user, tc.scopes)
-
-			for key, expectedValue := range tc.expected {
-				assert.Equal(t, expectedValue, claims[key], "Mismatch for claim: %s", key)
-			}
-
-			if len(tc.scopes) > 1 || (len(tc.scopes) == 1 && tc.scopes[0] != "openid") {
-				assert.NotZero(t, claims["updated_at"], "updated_at should be set")
-			}
-
-			// Check for address claim separately
-			if slices.Contains(tc.scopes, "address") {
-				addressClaim, ok := claims["address"].(map[string]string)
-				assert.True(t, ok, "Address claim should be of type map[string]string")
-				if ok {
-					assert.Equal(t, tc.user.AddressLine1+"\r\n"+tc.user.AddressLine2, addressClaim["street_address"])
-					assert.Equal(t, tc.user.AddressLocality, addressClaim["locality"])
-					assert.Equal(t, tc.user.AddressRegion, addressClaim["region"])
-					assert.Equal(t, tc.user.AddressPostalCode, addressClaim["postal_code"])
-					assert.Equal(t, tc.user.AddressCountry, addressClaim["country"])
-					expectedFormatted := strings.TrimSpace(tc.user.AddressLine1 + "\r\n" + tc.user.AddressLine2 + "\r\n" +
-						tc.user.AddressLocality + "\r\n" + tc.user.AddressRegion + "\r\n" +
-						tc.user.AddressPostalCode + "\r\n" + tc.user.AddressCountry)
-					assert.Equal(t, expectedFormatted, addressClaim["formatted"])
-				}
-			}
-
-			for key := range claims {
-				if key != "updated_at" && key != "address" {
-					_, expected := tc.expected[key]
-					assert.True(t, expected, "Unexpected claim: %s", key)
-				}
-			}
-		})
-	}
-}
-
-func TestAddClaimIfNotEmpty(t *testing.T) {
-	tokenIssuer := &TokenIssuer{}
-
-	testCases := []struct {
-		name           string
-		claims         jwt.MapClaims
-		claimName      string
-		claimValue     string
-		expectedClaims jwt.MapClaims
-	}{
-		{
-			name:           "Non-empty claim",
-			claims:         jwt.MapClaims{},
-			claimName:      "test_claim",
-			claimValue:     "test_value",
-			expectedClaims: jwt.MapClaims{"test_claim": "test_value"},
-		},
-		{
-			name:           "Empty claim",
-			claims:         jwt.MapClaims{},
-			claimName:      "empty_claim",
-			claimValue:     "",
-			expectedClaims: jwt.MapClaims{},
-		},
-		{
-			name:           "Whitespace-only claim",
-			claims:         jwt.MapClaims{},
-			claimName:      "whitespace_claim",
-			claimValue:     "   ",
-			expectedClaims: jwt.MapClaims{},
-		},
-		{
-			name:           "Claim with leading/trailing whitespace",
-			claims:         jwt.MapClaims{},
-			claimName:      "trimmed_claim",
-			claimValue:     "  trimmed_value  ",
-			expectedClaims: jwt.MapClaims{"trimmed_claim": "  trimmed_value  "},
-		},
-		{
-			name:           "Adding to existing claims",
-			claims:         jwt.MapClaims{"existing_claim": "existing_value"},
-			claimName:      "new_claim",
-			claimValue:     "new_value",
-			expectedClaims: jwt.MapClaims{"existing_claim": "existing_value", "new_claim": "new_value"},
-		},
-		{
-			name:           "Overwriting existing claim",
-			claims:         jwt.MapClaims{"overwrite_claim": "old_value"},
-			claimName:      "overwrite_claim",
-			claimValue:     "new_value",
-			expectedClaims: jwt.MapClaims{"overwrite_claim": "new_value"},
-		},
-		{
-			name:           "Unicode claim value",
-			claims:         jwt.MapClaims{},
-			claimName:      "unicode_claim",
-			claimValue:     "こんにちは",
-			expectedClaims: jwt.MapClaims{"unicode_claim": "こんにちは"},
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			tokenIssuer.addClaimIfNotEmpty(tc.claims, tc.claimName, tc.claimValue)
-
-			assert.Equal(t, tc.expectedClaims, tc.claims, "Claims do not match expected values")
-
-			if len(strings.TrimSpace(tc.claimValue)) > 0 {
-				assert.Contains(t, tc.claims, tc.claimName, "Claim should be added")
-				assert.Equal(t, tc.claimValue, tc.claims[tc.claimName], "Claim value should match")
-			} else {
-				assert.NotContains(t, tc.claims, tc.claimName, "Claim should not be added")
-			}
-		})
-	}
 }
 
 func assertTimeClaimWithinRange(t *testing.T, claims jwt.MapClaims, claimName string, expectedDuration time.Duration, message string) {
@@ -5414,14 +5162,19 @@ func TestGenerateAccessTokenCore_OIDCClaimsInAccessToken(t *testing.T) {
 	})
 }
 
-// TestAddOpenIdConnectClaimsFromUser_CarriesTheCallersContext is the claim path's arm of #386's
-// seam 4. It is the one place a token's claims are assembled from a database read, and the read
-// is three hops below the entry point that holds the request's context, so a hop that dropped it
-// would be invisible at every other seam.
+// TestClaimMapper_CarriesTheCallersContext is the claim path's arm of #386's seam 4. It is the
+// one place a token's claims are assembled from a database read, and the read is three hops
+// below the entry point that holds the request's context, so a hop that dropped it would be
+// invisible at every other seam.
+//
+// It drives the mapper this package hands its context to rather than a method of its own, since
+// #387 moved the claim block to authserver/internal/userclaims. What it holds here is the wiring
+// claimMapper performs -- this issuer's port, this issuer's base URL, and the caller's context
+// reaching the port through both -- which is exactly what the private method used to do.
 //
 // The reject arm is the same call without the profile scope: no picture claim is owed, so the
 // port is not reached and there is no context to carry.
-func TestAddOpenIdConnectClaimsFromUser_CarriesTheCallersContext(t *testing.T) {
+func TestClaimMapper_CarriesTheCallersContext(t *testing.T) {
 	type marker struct{}
 	ctx := context.WithValue(context.Background(), marker{}, "the caller's own")
 	callersContext := mock.MatchedBy(func(got context.Context) bool {
@@ -5436,9 +5189,10 @@ func TestAddOpenIdConnectClaimsFromUser_CarriesTheCallersContext(t *testing.T) {
 
 		issuer := NewTokenIssuer(mockDB, "https://auth.example.com")
 		claims := jwt.MapClaims{}
-		issuer.addOpenIdConnectClaimsFromUser(ctx, claims, user, []string{"openid", "profile"})
+		issuer.claimMapper(userclaims.InclusionIdToken).AddOpenIdConnectClaims(ctx, claims, user, []string{"openid", "profile"})
 
 		assert.Equal(t, "https://auth.example.com/userinfo/picture/sub-42", claims["picture"])
+		assert.Equal(t, "https://auth.example.com/account/profile", claims["profile"])
 		mockDB.AssertExpectations(t)
 	})
 
@@ -5447,7 +5201,7 @@ func TestAddOpenIdConnectClaimsFromUser_CarriesTheCallersContext(t *testing.T) {
 
 		issuer := NewTokenIssuer(mockDB, "https://auth.example.com")
 		claims := jwt.MapClaims{}
-		issuer.addOpenIdConnectClaimsFromUser(ctx, claims, user, []string{"openid", "email"})
+		issuer.claimMapper(userclaims.InclusionIdToken).AddOpenIdConnectClaims(ctx, claims, user, []string{"openid", "email"})
 
 		assert.NotContains(t, claims, "picture")
 		mockDB.AssertNotCalled(t, "UserHasProfilePicture", mock.Anything, mock.Anything, mock.Anything)
@@ -5461,8 +5215,8 @@ func TestAddOpenIdConnectClaimsFromUser_CarriesTheCallersContext(t *testing.T) {
 // requires before the claims mapper that will serve this package and /userinfo from one
 // implementation. Each names a place where the two deliberately disagree today, and the
 // counterpart case lives in handlers/handler_userinfo_test.go. They are written against the
-// public generation path rather than against addOpenIdConnectClaimsFromUser, because part of
-// what diverges is the scope slice each token type hands it.
+// public generation path rather than against the claim block itself, because part of what
+// diverges is the scope slice each token type hands it.
 // ============================================================================
 
 // issueCharacterizationTokens drives GenerateTokenResponseForAuthCode once for one scope string
@@ -5548,8 +5302,8 @@ func issueCharacterizationTokens(t *testing.T, scope string, baseURL string, use
 //
 // The access token's row for "openid" alone is the part that surprises, and it is recorded here
 // rather than repaired: the scope slice it gates on is not the granted scope.
-// generateAccessTokenCore appends authserver:userinfo to scopes before calling
-// addOpenIdConnectClaimsFromUser, so len(scopes) > 1 already holds and the access token carries
+// generateAccessTokenCore appends authserver:userinfo to scopes before calling the mapper,
+// so len(scopes) > 1 already holds and the access token carries
 // updated_at where the ID token, gating on the granted scope verbatim, does not.
 func TestClaimCharacterization_UpdatedAtGate(t *testing.T) {
 	tests := []struct {

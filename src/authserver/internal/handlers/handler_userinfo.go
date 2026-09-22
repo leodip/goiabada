@@ -3,7 +3,6 @@ package handlers
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"net/http"
 	"strings"
 
@@ -13,6 +12,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/userclaims"
 	"github.com/leodip/goiabada/core/errs"
 )
 
@@ -101,81 +101,26 @@ func HandleUserInfoGetPost(
 		claims := make(jwt.MapClaims)
 		claims["sub"] = user.Subject
 
-		addClaimIfNotEmpty := func(claims jwt.MapClaims, claimName string, claimValue string) {
-			if len(strings.TrimSpace(claimValue)) > 0 {
-				claims[claimName] = claimValue
-			}
+		// The same split JwtToken.HasScope performs internally, done once: a missing or
+		// non-string scope claim yields one empty element, which matches nothing, exactly as
+		// HasScope answers false for everything in that case.
+		scopes := strings.Split(jwtToken.GetStringClaim("scope"), " ")
+
+		// The three fields after the port are this endpoint's side of the three divergences
+		// userclaims keeps as inputs: the base URL is read from the global configuration here
+		// and injected in issuance, updated_at rides with the profile scope here and with any
+		// scope but a lone openid there, and all three filter sites read the ID token's
+		// include flag (#387 decision 5).
+		mapper := userclaims.Mapper{
+			Database:  database,
+			BaseURL:   config.GetAuthServer().BaseURL,
+			UpdatedAt: userclaims.UpdatedAtWithProfileScope,
+			Inclusion: userclaims.InclusionIdToken,
 		}
+		mapper.AddOpenIdConnectClaims(r.Context(), claims, user, scopes)
+		mapper.AddGroupClaims(claims, user, scopes)
+		mapper.AddAttributeClaims(claims, user, scopes)
 
-		if jwtToken.HasScope("profile") {
-			addClaimIfNotEmpty(claims, "name", user.GetFullName())
-			addClaimIfNotEmpty(claims, "given_name", user.GivenName)
-			addClaimIfNotEmpty(claims, "middle_name", user.MiddleName)
-			addClaimIfNotEmpty(claims, "family_name", user.FamilyName)
-			addClaimIfNotEmpty(claims, "nickname", user.Nickname)
-			addClaimIfNotEmpty(claims, "preferred_username", user.Username)
-			claims["profile"] = fmt.Sprintf("%v/account/profile", config.GetAuthServer().BaseURL)
-			addClaimIfNotEmpty(claims, "website", user.Website)
-			addClaimIfNotEmpty(claims, "gender", user.Gender)
-			if user.BirthDate.Valid {
-				claims["birthdate"] = user.BirthDate.Time.Format("2006-01-02")
-			}
-			addClaimIfNotEmpty(claims, "zoneinfo", user.ZoneInfo)
-			addClaimIfNotEmpty(claims, "locale", user.Locale)
-			claims["updated_at"] = user.UpdatedAt.Time.UTC().Unix()
-
-			// Add picture claim if user has a profile picture
-			hasPicture, pictureErr := database.UserHasProfilePicture(r.Context(), nil, user.Id)
-			if pictureErr == nil && hasPicture {
-				claims["picture"] = fmt.Sprintf("%v/userinfo/picture/%v", config.GetAuthServer().BaseURL, user.Subject)
-			}
-		}
-
-		if jwtToken.HasScope("email") {
-			addClaimIfNotEmpty(claims, "email", user.Email)
-			claims["email_verified"] = user.EmailVerified
-		}
-
-		if jwtToken.HasScope("address") && user.HasAddress() {
-			claims["address"] = user.GetAddressClaim()
-		}
-
-		if jwtToken.HasScope("phone") {
-			addClaimIfNotEmpty(claims, "phone_number", user.PhoneNumber)
-			claims["phone_number_verified"] = user.PhoneNumberVerified
-		}
-
-		if jwtToken.HasScope("groups") {
-			groups := []string{}
-			for _, group := range user.Groups {
-				if group.IncludeInIdToken {
-					groups = append(groups, group.GroupIdentifier)
-				}
-			}
-			if len(groups) > 0 {
-				claims["groups"] = groups
-			}
-		}
-
-		if jwtToken.HasScope("attributes") {
-			attributes := map[string]string{}
-			for _, attribute := range user.Attributes {
-				if attribute.IncludeInIdToken {
-					attributes[attribute.Key] = attribute.Value
-				}
-			}
-
-			for _, group := range user.Groups {
-				for _, attribute := range group.Attributes {
-					if attribute.IncludeInIdToken {
-						attributes[attribute.Key] = attribute.Value
-					}
-				}
-			}
-			if len(attributes) > 0 {
-				claims["attributes"] = attributes
-			}
-		}
 		httpHelper.EncodeJson(w, r, claims)
 	}
 }
