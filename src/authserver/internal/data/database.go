@@ -17,7 +17,7 @@ import (
 //   - datafactory, which builds one and returns it, and the `migrate` subcommand that feeds
 //     datafactory's pre-flight the handle it built;
 //   - server.Server, which holds it and hands it to every constructor, each of which narrows it;
-//   - tests/data, which exercises 214 of these 215 methods on every engine, and is the tier that
+//   - tests/data, which exercises 215 of these 216 methods on every engine, and is the tier that
 //     proves each one works there;
 //   - this declaration itself, which is the compiler's check that the four engine adapters still
 //     implement a complete set -- worth more since #416 replaced their explicit delegations with
@@ -280,6 +280,10 @@ type Database interface {
 	DeleteWebOrigin(ctx context.Context, tx *sql.Tx, webOriginId int64) error
 
 	CreateSettings(ctx context.Context, tx *sql.Tx, settings *models.Settings) error
+	// CreateInitialSettings writes a deployment's one settings row at the id IsEmpty and every
+	// reader ask for, whatever the engine's counter would hand out, inside the transaction it is
+	// given and never outside one: the first seed's settings row (#424 decision 14).
+	CreateInitialSettings(ctx context.Context, tx *sql.Tx, settings *models.Settings) error
 	UpdateSettings(ctx context.Context, tx *sql.Tx, settings *models.Settings) error
 	GetSettingsById(ctx context.Context, tx *sql.Tx, settingsId int64) (*models.Settings, error)
 	// TryClaimCleanupRun atomically claims the next background cleanup run via a

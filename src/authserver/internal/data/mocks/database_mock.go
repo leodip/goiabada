@@ -1397,6 +1397,69 @@ func (_c *Database_CreateGroupPermission_Call) RunAndReturn(run func(ctx context
 	return _c
 }
 
+// CreateInitialSettings provides a mock function for the type Database
+func (_mock *Database) CreateInitialSettings(ctx context.Context, tx *sql.Tx, settings *models.Settings) error {
+	ret := _mock.Called(ctx, tx, settings)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateInitialSettings")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, *models.Settings) error); ok {
+		r0 = returnFunc(ctx, tx, settings)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// Database_CreateInitialSettings_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateInitialSettings'
+type Database_CreateInitialSettings_Call struct {
+	*mock.Call
+}
+
+// CreateInitialSettings is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - settings *models.Settings
+func (_e *Database_Expecter) CreateInitialSettings(ctx any, tx any, settings any) *Database_CreateInitialSettings_Call {
+	return &Database_CreateInitialSettings_Call{Call: _e.mock.On("CreateInitialSettings", ctx, tx, settings)}
+}
+
+func (_c *Database_CreateInitialSettings_Call) Run(run func(ctx context.Context, tx *sql.Tx, settings *models.Settings)) *Database_CreateInitialSettings_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 *models.Settings
+		if args[2] != nil {
+			arg2 = args[2].(*models.Settings)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_CreateInitialSettings_Call) Return(err error) *Database_CreateInitialSettings_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *Database_CreateInitialSettings_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, settings *models.Settings) error) *Database_CreateInitialSettings_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // CreateKeyPair provides a mock function for the type Database
 func (_mock *Database) CreateKeyPair(ctx context.Context, tx *sql.Tx, keyPair *models.KeyPair) error {
 	ret := _mock.Called(ctx, tx, keyPair)

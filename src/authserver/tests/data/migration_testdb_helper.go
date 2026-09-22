@@ -46,8 +46,8 @@ const (
 // database (data_test.go) is always fully migrated, so it can't be used to
 // exercise a single migration against seeded pre-migration data.
 type isolatedDB struct {
-	// The whole interface, and one of the four places that still holds it: this tier exercises 214
-	// of the 215 methods on every engine, which is the broad capability #386 decision 8 names.
+	// The whole interface, and one of the four places that still holds it: this tier exercises 215
+	// of the 216 methods on every engine, which is the broad capability #386 decision 8 names.
 	DB       data.Database      // concrete dialect DB (implements the interface)
 	SQL      *sql.DB            // raw handle for seeding / asserting
 	Migrator *migrator.Migrator // bound to DB, starts at version 0

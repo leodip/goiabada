@@ -35,6 +35,70 @@ func (d *CommonDatabase) CreateSettings(ctx context.Context, tx *sql.Tx, setting
 	return nil
 }
 
+// initialSettingsId is the settings row's id: IsEmpty and every reader of the settings ask for this
+// id and no other, so the one row a deployment carries has to be written at it.
+const initialSettingsId = 1
+
+// CreateInitialSettings writes a deployment's settings row at initialSettingsId rather than at the
+// id the engine's counter hands out. PostgreSQL, MySQL and SQL Server do not give back an id drawn
+// inside a transaction that rolled back, so a first seed that failed after its settings insert left
+// the next seed's row at 2, which no reader finds: the database stayed unusable and every later
+// start failed on the rows it re-inserted (#424 decision 14). Naming the id makes a rolled-back
+// seed leave nothing behind, whatever the engine's counter did.
+//
+// It refuses a nil transaction because SQL Server's IDENTITY_INSERT, which ExplicitIdInsertSQL
+// brackets the insert with there, is a setting of the connection, and only a transaction pins the
+// three statements to one.
+func (d *CommonDatabase) CreateInitialSettings(ctx context.Context, tx *sql.Tx, settings *models.Settings) error {
+	if tx == nil {
+		return errs.New("the initial settings are written inside a transaction, and none was given")
+	}
+
+	now := time.Now().UTC()
+
+	originalId := settings.Id
+	originalCreatedAt := settings.CreatedAt
+	originalUpdatedAt := settings.UpdatedAt
+	restore := func() {
+		settings.Id = originalId
+		settings.CreatedAt = originalCreatedAt
+		settings.UpdatedAt = originalUpdatedAt
+	}
+	settings.Id = initialSettingsId
+	settings.CreatedAt = sql.NullTime{Time: now, Valid: true}
+	settings.UpdatedAt = sql.NullTime{Time: now, Valid: true}
+
+	var before, after []string
+	if d.ExplicitIdInsertSQL != nil {
+		before, after = d.ExplicitIdInsertSQL("settings")
+	}
+
+	for _, statement := range before {
+		if _, err := d.ExecSql(ctx, tx, statement); err != nil {
+			restore()
+			return errs.Wrap(err, "unable to prepare the initial settings insert")
+		}
+	}
+
+	insertBuilder := sqlbuilder.NewStruct(new(models.Settings)).
+		For(d.Flavor).
+		InsertInto("settings", settings)
+	statement, args := insertBuilder.Build()
+	if _, err := d.ExecSql(ctx, tx, statement, args...); err != nil {
+		restore()
+		return d.WrapSQLError(err, "unable to insert the initial settings")
+	}
+
+	for _, statement := range after {
+		if _, err := d.ExecSql(ctx, tx, statement); err != nil {
+			restore()
+			return errs.Wrap(err, "unable to finish the initial settings insert")
+		}
+	}
+
+	return nil
+}
+
 func (d *CommonDatabase) UpdateSettings(ctx context.Context, tx *sql.Tx, settings *models.Settings) error {
 
 	if settings.Id == 0 {

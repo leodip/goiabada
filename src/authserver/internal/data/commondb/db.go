@@ -62,6 +62,15 @@ type CommonDatabase struct {
 	// obtain an id. Until #416 the two engines whose drivers refuse LastInsertId wrote all 25
 	// out by hand: fifty bodies of forty lines, differing in this one expression.
 	InsertReturningIdSQL func(insertSQL string) (string, error)
+
+	// ExplicitIdInsertSQL answers the statements an INSERT naming its own id needs around it on
+	// table, run on the same transaction. Each dialect that needs any sets it in its constructor:
+	// SQL Server refuses an explicit identity value unless IDENTITY_INSERT is on for the table,
+	// and PostgreSQL's serial sequence does not move past an id it did not hand out, so the next
+	// insert through it would collide. Left nil, the insert runs alone, which is what SQLite and
+	// MySQL do, since both advance their counters past an explicit id. CreateInitialSettings is
+	// the only consumer (#424 decision 14).
+	ExplicitIdInsertSQL func(table string) (before []string, after []string)
 }
 
 func NewCommonDatabase(db *sql.DB, flavor sqlbuilder.Flavor, logSQL bool) *CommonDatabase {
@@ -479,7 +488,7 @@ func (d *CommonDatabase) insertReturningId(ctx context.Context, tx *sql.Tx,
 }
 
 func (d *CommonDatabase) IsEmpty(ctx context.Context) (bool, error) {
-	settings, err := d.GetSettingsById(ctx, nil, 1)
+	settings, err := d.GetSettingsById(ctx, nil, initialSettingsId)
 	if err != nil {
 		return false, errs.Wrap(err, "failed to check if database is empty")
 	}
