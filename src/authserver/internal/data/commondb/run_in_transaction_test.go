@@ -392,8 +392,10 @@ func TestRunInTransaction_ACancelledContextIsRefusedBeforeTheFirstAttempt(t *tes
 }
 
 // TestRunInTransaction_ADeadlineInsideTheBodyComesBackUnretried is the exit that does NOT go
-// through abandoned: the statement's own context error is not a deadlock, so the ordinary
-// not-a-deadlock arm returns it after one attempt. Asserted because the alternative -- a helper
+// through abandoned, because on a first attempt there is no deadlock waiting to be joined: the
+// statement's own context error is not a deadlock, so the ordinary not-a-deadlock arm returns it
+// after one attempt. The same cancellation reached on a RERUN is the sixth exit below, where the
+// abort that caused the rerun has to be kept. Asserted because the alternative -- a helper
 // that classified a context error as retryable -- would spend three attempts and two backoffs on
 // a caller that has already gone.
 func TestRunInTransaction_ADeadlineInsideTheBodyComesBackUnretried(t *testing.T) {
@@ -527,8 +529,38 @@ func TestRunInTransaction_ACancellationBetweenADeadlockAndItsRerunStopsTheLoop(t
 	assert.Zero(t, retryWarnings(logs))
 }
 
+// TestRunInTransaction_ACancellationInsideARerunJoinsTheDeadlockItWasRerunFor is the third
+// joined case, and the one no other exit reaches. The two above see a cancellation that had
+// ALREADY landed when the helper looked -- at the top of the loop, or in the pause -- and the
+// commit race in run_in_transaction_cancel_commit_test.go sees one that lands after a successful
+// body, where the error to classify is sql.ErrTxDone. This is the cancellation that arrives while
+// the rerun is still inside its statement, so the attempt's own error IS the context error: not a
+// deadlock, not the sentinel, and so returned by the ordinary not-a-deadlock arm with the abort
+// that caused the rerun dropped (#386 decision 13, final review round 2 finding 1).
+func TestRunInTransaction_ACancellationInsideARerunJoinsTheDeadlockItWasRerunFor(t *testing.T) {
+	requested := recordBackoff(t)
+	// The first attempt is aborted as a victim; the second blocks inside its statement for far
+	// longer than the deadline allows, which is what puts the cancellation INSIDE the rerun
+	// rather than between the two attempts. The recorded backoff is instant, so the whole
+	// deadline is still unspent when the second attempt begins.
+	d := &scriptedDriver{execs: []*scriptedExec{{err: errDeadlock}, {delay: 10 * time.Second}}}
+	db := retryingDB(t, d)
+	ctx, cancel := context.WithTimeout(context.Background(), 250*time.Millisecond)
+	defer cancel()
+	ran := 0
+
+	err := db.RunInTransaction(ctx, oneStatementOn(ctx, db, &ran))
+
+	require.Error(t, err)
+	assert.ErrorIs(t, err, context.DeadlineExceeded, "the deadline is what decided the outcome")
+	assert.ErrorIs(t, err, errDeadlock, "and the abort the helper was rerunning for stays reachable")
+	assert.Contains(t, err.Error(), "transaction abandoned after the engine aborted it")
+	assert.Equal(t, 2, ran, "two attempts: the deadlock was rerun, and the rerun was the cancelled one")
+	assert.Len(t, *requested, 1, "one backoff, for the one rerun")
+}
+
 // TestRunInTransaction_AnExhaustedRunIsStillTheDeadlockAndNotAContextError is the negative that
-// makes the four above attributable. Decision 13 changes what a CANCELLED run returns and
+// makes the five above attributable. Decision 13 changes what a CANCELLED run returns and
 // nothing else: three real deadlocks on a live context still answer exactly as they did, with
 // the deadlock and the attempts-spent text and no context error anywhere in the tree.
 func TestRunInTransaction_AnExhaustedRunIsStillTheDeadlockAndNotAContextError(t *testing.T) {

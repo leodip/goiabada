@@ -12,10 +12,10 @@ import (
 
 // The fifth cancellation exit, and the one the other four could not see.
 //
-// run_in_transaction_test.go pins four: cancelled before the first attempt, cancelled inside a
-// statement, cancelled during the backoff, and cancelled between a deadlock and its rerun. Each of
-// those leaves fn with an error to return, so the context error is already in the tree by the time
-// RunInTransaction looks at it. The fifth is the one where fn SUCCEEDS and the cancellation lands
+// run_in_transaction_test.go pins the other five: cancelled before the first attempt, cancelled
+// inside a statement, cancelled during the backoff, cancelled between a deadlock and its rerun,
+// and cancelled inside a rerun. Each of those leaves fn with an error to return, so the context
+// error is already in the tree by the time RunInTransaction looks at it. The fifth is the one where fn SUCCEEDS and the cancellation lands
 // between its last statement and the commit, and there decision 13 was not being kept: database/sql
 // starts a goroutine at BeginTx that rolls the transaction back as soon as the context is done, and
 // Tx.Commit answers a finished transaction with sql.ErrTxDone, which matches neither
