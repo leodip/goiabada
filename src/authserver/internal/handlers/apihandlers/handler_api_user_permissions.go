@@ -1,6 +1,8 @@
 package apihandlers
 
 import (
+	"context"
+	"database/sql"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -8,15 +10,26 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
 )
 
+// userPermissionsDatabase is what the user permission endpoints need: the user's grants and the
+// catalogue they are granted from.
+type userPermissionsDatabase interface {
+	CreateUserPermission(ctx context.Context, tx *sql.Tx, userPermission *models.UserPermission) error
+	DeleteUserPermission(ctx context.Context, tx *sql.Tx, userPermissionId int64) error
+	GetPermissionById(ctx context.Context, tx *sql.Tx, permissionId int64) (*models.Permission, error)
+	GetResourceById(ctx context.Context, tx *sql.Tx, resourceId int64) (*models.Resource, error)
+	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*models.User, error)
+	GetUserPermissionByUserIdAndPermissionId(ctx context.Context, tx *sql.Tx, userId, permissionId int64) (*models.UserPermission, error)
+	UserLoadPermissions(ctx context.Context, tx *sql.Tx, user *models.User) error
+}
+
 func HandleAPIUserPermissionsGet(
-	database data.Database,
+	database userPermissionsDatabase,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		idStr := chi.URLParam(r, "id")
@@ -69,7 +82,7 @@ func HandleAPIUserPermissionsGet(
 }
 
 func HandleAPIUserPermissionsPut(
-	database data.Database,
+	database userPermissionsDatabase,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

@@ -1,13 +1,14 @@
 package apihandlers
 
 import (
+	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/http"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/constants"
-	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/api"
@@ -37,9 +38,14 @@ func HandleAPISettingsTokensGet(
 	}
 }
 
+// settingsTokensDatabase is what the token settings endpoint needs: the settings write.
+type settingsTokensDatabase interface {
+	UpdateSettings(ctx context.Context, tx *sql.Tx, settings *models.Settings) error
+}
+
 // HandleAPISettingsTokensPut - PUT /api/v1/admin/settings/tokens
 func HandleAPISettingsTokensPut(
-	database data.Database,
+	database settingsTokensDatabase,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

@@ -6,6 +6,11 @@
 // all four of them, which made every importer of the Database interface compile every driver back
 // when that interface was core/data's. internal/data declares the interface and nothing that
 // chooses between implementations of it (#353, #359).
+//
+// It is one of the four places that still names the whole data.Database, and the one that produces
+// it. Everything here opens, migrates or pre-flights a database rather than reading rows through
+// one, so there is no narrower capability to declare; the ports are at the consumers this hands
+// the result to (#386 decision 8).
 package datafactory
 
 import (

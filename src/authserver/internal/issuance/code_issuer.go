@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
-	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/useragent"
 	"github.com/leodip/goiabada/authserver/internal/uuidutil"
@@ -31,8 +30,15 @@ import (
 // diagnosis by having no frames of its own (#279 decision 5).
 var ErrIssuingClientGone = errors.New("the client this ceremony is issuing for no longer exists")
 
+// codeIssuerDatabase is what the code issuer needs: the client it issues for and the code row it
+// writes.
+type codeIssuerDatabase interface {
+	CreateCode(ctx context.Context, tx *sql.Tx, code *models.Code) error
+	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*models.Client, error)
+}
+
 type CodeIssuer struct {
-	database data.Database
+	database codeIssuerDatabase
 }
 
 type CreateCodeInput struct {
@@ -40,7 +46,7 @@ type CreateCodeInput struct {
 	SessionIdentifier string
 }
 
-func NewCodeIssuer(database data.Database) *CodeIssuer {
+func NewCodeIssuer(database codeIssuerDatabase) *CodeIssuer {
 	return &CodeIssuer{
 		database: database,
 	}

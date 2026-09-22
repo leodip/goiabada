@@ -2,19 +2,30 @@ package permissions
 
 import (
 	"context"
+	"database/sql"
 	"strings"
 
-	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/core/errs"
 )
 
-type PermissionChecker struct {
-	database data.Database
+// permissionCheckerDatabase is what the permission check needs: the user's own grants and the
+// ones their groups carry.
+type permissionCheckerDatabase interface {
+	GetPermissionsByResourceId(ctx context.Context, tx *sql.Tx, resourceId int64) ([]models.Permission, error)
+	GetResourceByResourceIdentifier(ctx context.Context, tx *sql.Tx, resourceIdentifier string) (*models.Resource, error)
+	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*models.User, error)
+	GroupsLoadPermissions(ctx context.Context, tx *sql.Tx, groups []models.Group) error
+	UserLoadGroups(ctx context.Context, tx *sql.Tx, user *models.User) error
+	UserLoadPermissions(ctx context.Context, tx *sql.Tx, user *models.User) error
 }
 
-func NewPermissionChecker(database data.Database) *PermissionChecker {
+type PermissionChecker struct {
+	database permissionCheckerDatabase
+}
+
+func NewPermissionChecker(database permissionCheckerDatabase) *PermissionChecker {
 	return &PermissionChecker{
 		database: database,
 	}

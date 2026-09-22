@@ -2,17 +2,24 @@ package middleware
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"log/slog"
 	"net/http"
 
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/authserver/internal/constants"
-	"github.com/leodip/goiabada/authserver/internal/data"
+	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
-func MiddlewareSessionIdentifier(sessionStore sessionstore.Store, database data.Database) func(next http.Handler) http.Handler {
+// sessionIdentifierDatabase is what the session identifier middleware needs: the session a cookie
+// names.
+type sessionIdentifierDatabase interface {
+	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*models.UserSession, error)
+}
+
+func MiddlewareSessionIdentifier(sessionStore sessionstore.Store, database sessionIdentifierDatabase) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()

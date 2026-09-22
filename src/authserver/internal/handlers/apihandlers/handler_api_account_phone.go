@@ -1,6 +1,8 @@
 package apihandlers
 
 import (
+	"context"
+	"database/sql"
 	"encoding/json"
 	"net/http"
 	"strings"
@@ -8,16 +10,22 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
+	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/phonecountries"
 	"github.com/leodip/goiabada/core/api"
 )
 
+// accountPhoneDatabase is what the account phone endpoints need: the caller's own user row.
+type accountPhoneDatabase interface {
+	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*models.User, error)
+	UpdateUser(ctx context.Context, tx *sql.Tx, user *models.User) error
+}
+
 // HandleAPIAccountPhonePut - PUT /api/v1/account/phone
 func HandleAPIAccountPhonePut(
-	database data.Database,
+	database accountPhoneDatabase,
 	phoneValidator *accountvalidation.PhoneValidator,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {

@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/constants"
-	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/useragent"
 	"github.com/leodip/goiabada/authserver/internal/uuidutil"
@@ -18,13 +17,27 @@ import (
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
+// userSessionManagerDatabase is what the session manager needs: the session row and the clients
+// it authorized, and the transaction that changes them together.
+type userSessionManagerDatabase interface {
+	CreateUserSession(ctx context.Context, tx *sql.Tx, userSession *models.UserSession) error
+	CreateUserSessionClient(ctx context.Context, tx *sql.Tx, userSessionClient *models.UserSessionClient) error
+	DeleteUserSession(ctx context.Context, tx *sql.Tx, userSessionId int64) error
+	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*models.UserSession, error)
+	GetUserSessionsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]models.UserSession, error)
+	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
+	UpdateUserSession(ctx context.Context, tx *sql.Tx, userSession *models.UserSession) error
+	UpdateUserSessionClient(ctx context.Context, tx *sql.Tx, userSessionClient *models.UserSessionClient) error
+	UserSessionLoadClients(ctx context.Context, tx *sql.Tx, userSession *models.UserSession) error
+}
+
 type UserSessionManager struct {
 	sessionStore sessionstore.Store
 	sessionName  string
-	database     data.Database
+	database     userSessionManagerDatabase
 }
 
-func NewUserSessionManager(sessionStore sessionstore.Store, sessionName string, database data.Database) *UserSessionManager {
+func NewUserSessionManager(sessionStore sessionstore.Store, sessionName string, database userSessionManagerDatabase) *UserSessionManager {
 	return &UserSessionManager{
 		sessionStore: sessionStore,
 		sessionName:  sessionName,

@@ -1,19 +1,32 @@
 package apihandlers
 
 import (
+	"context"
+	"database/sql"
 	"net/http"
 	"strconv"
 
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
-	"github.com/leodip/goiabada/authserver/internal/data"
+	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/logging"
 )
 
+// usersSearchDatabase is what the user search endpoint needs: one page of users and the groups
+// and permissions each carries.
+type usersSearchDatabase interface {
+	GetGroupById(ctx context.Context, tx *sql.Tx, groupId int64) (*models.Group, error)
+	GetPermissionById(ctx context.Context, tx *sql.Tx, permissionId int64) (*models.Permission, error)
+	GetResourceById(ctx context.Context, tx *sql.Tx, resourceId int64) (*models.Resource, error)
+	SearchUsersPaginated(ctx context.Context, tx *sql.Tx, query string, page int, pageSize int) ([]models.User, int, error)
+	UsersLoadGroups(ctx context.Context, tx *sql.Tx, users []models.User) error
+	UsersLoadPermissions(ctx context.Context, tx *sql.Tx, users []models.User) error
+}
+
 func HandleAPIUsersSearchGet(
-	database data.Database,
+	database usersSearchDatabase,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Authentication and authorization handled by middleware

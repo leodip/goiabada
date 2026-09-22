@@ -1,16 +1,25 @@
 package handlers
 
 import (
+	"context"
+	"database/sql"
 	"net/http"
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/leodip/goiabada/authserver/internal/data"
+	"github.com/leodip/goiabada/authserver/internal/models"
 )
+
+// profilePictureDatabase is what the profile picture page needs: the caller's user row and the
+// picture attached to it.
+type profilePictureDatabase interface {
+	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*models.User, error)
+	GetUserProfilePictureByUserId(ctx context.Context, tx *sql.Tx, userId int64) (*models.UserProfilePicture, error)
+}
 
 func HandleProfilePictureGet(
 	httpHelper HttpHelper,
-	database data.Database,
+	database profilePictureDatabase,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {

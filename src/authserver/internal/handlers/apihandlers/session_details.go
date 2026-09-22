@@ -2,13 +2,18 @@ package apihandlers
 
 import (
 	"context"
+	"database/sql"
 
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
-	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
 )
+
+// sessionDetailsDatabase is what buildSessionDetails needs: the clients a session authorized.
+type sessionDetailsDatabase interface {
+	GetClientsByIds(ctx context.Context, tx *sql.Tx, clientIds []int64) ([]models.Client, error)
+}
 
 // buildSessionDetails is the one loop behind all three session list endpoints: filter to the
 // sessions still active under the current settings, hydrate the clients they authorized, and map
@@ -24,7 +29,7 @@ import (
 // the access token carries no sid claim.
 func buildSessionDetails(
 	ctx context.Context,
-	database data.Database,
+	database sessionDetailsDatabase,
 	sessions []models.UserSession,
 	settings *models.Settings,
 	currentSid string,
@@ -68,7 +73,7 @@ func buildSessionDetails(
 // The union it hands over is bounded by the deployment's client count and by nothing else, so
 // GetClientsByIds is the one that decides how many ids a single statement may bind; an id list
 // longer than that is read in several statements there rather than refused by the engine (#373).
-func loadSessionClients(ctx context.Context, database data.Database, sessions []models.UserSession) error {
+func loadSessionClients(ctx context.Context, database sessionDetailsDatabase, sessions []models.UserSession) error {
 	clientIds := make([]int64, 0)
 	seen := make(map[int64]bool)
 	for _, session := range sessions {

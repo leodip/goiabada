@@ -1,6 +1,8 @@
 package apihandlers
 
 import (
+	"context"
+	"database/sql"
 	"io"
 	"net/http"
 	"strconv"
@@ -8,16 +10,26 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/config"
-	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/imaging"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/models"
 )
 
+// usersProfilePictureDatabase is what the administrator's user picture endpoints need: the user
+// row and the picture attached to it.
+type usersProfilePictureDatabase interface {
+	CreateUserProfilePicture(ctx context.Context, tx *sql.Tx, profilePicture *models.UserProfilePicture) error
+	DeleteUserProfilePicture(ctx context.Context, tx *sql.Tx, userId int64) error
+	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*models.User, error)
+	GetUserProfilePictureByUserId(ctx context.Context, tx *sql.Tx, userId int64) (*models.UserProfilePicture, error)
+	UpdateUserProfilePicture(ctx context.Context, tx *sql.Tx, profilePicture *models.UserProfilePicture) error
+	UserHasProfilePicture(ctx context.Context, tx *sql.Tx, userId int64) (bool, error)
+}
+
 // HandleAPIUserProfilePicturePost - POST /api/v1/admin/users/{id}/profile-picture
 func HandleAPIUserProfilePicturePost(
-	database data.Database,
+	database usersProfilePictureDatabase,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -136,7 +148,7 @@ func HandleAPIUserProfilePicturePost(
 
 // HandleAPIUserProfilePictureDelete - DELETE /api/v1/admin/users/{id}/profile-picture
 func HandleAPIUserProfilePictureDelete(
-	database data.Database,
+	database usersProfilePictureDatabase,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -196,7 +208,7 @@ func HandleAPIUserProfilePictureDelete(
 
 // HandleAPIUserProfilePictureGet - GET /api/v1/admin/users/{id}/profile-picture (check if exists)
 func HandleAPIUserProfilePictureGet(
-	database data.Database,
+	database usersProfilePictureDatabase,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Parse user ID from URL

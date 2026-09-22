@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -11,7 +13,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/constants"
-	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/errs"
@@ -54,11 +55,24 @@ func HandleAuthLevel1Get(
 	}
 }
 
+// authLevel1Database is what the level 1 hops need: the client and the session behind the step-up
+// decision.
+//
+// It embeds the authorize port because a deferred error is delivered through
+// answerClientWithError.
+type authLevel1Database interface {
+	authorizeDatabase
+
+	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*models.Client, error)
+	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*models.UserSession, error)
+	UserSessionLoadUser(ctx context.Context, tx *sql.Tx, userSession *models.UserSession) error
+}
+
 func HandleAuthLevel1CompletedGet(
 	httpHelper HttpHelper,
 	authHelper AuthHelper,
 	userSessionManager UserSessionManager,
-	database data.Database,
+	database authLevel1Database,
 	templateFS fs.FS,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

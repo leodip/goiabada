@@ -4,9 +4,20 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/models"
 )
+
+// OTPEnrolmentDatabase is what installing an authenticator needs: the user row, the generation
+// counter, and the pending enrolment it clears, in one transaction.
+//
+// Exported, unlike most ports here, because EnableUserOTPTx is called from apihandlers, whose own
+// port has to name this capability to hand it on (#386 decision 8).
+type OTPEnrolmentDatabase interface {
+	ClearPendingOTPEnrollment(ctx context.Context, tx *sql.Tx, userId int64) error
+	IncrementUserOtpConfigGeneration(ctx context.Context, tx *sql.Tx, userId int64) (int64, error)
+	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
+	UpdateUser(ctx context.Context, tx *sql.Tx, user *models.User) error
+}
 
 // EnableUserOTPTx establishes a user's authenticator: it writes the user, whose OTPEnabled
 // and encrypted secret the caller has already set, and advances the OTP configuration
@@ -34,7 +45,7 @@ import (
 // The browser caller needs the returned value: it captured the pre-enrollment generation at
 // /auth/level2, and promoting that at /auth/completed would leave a session that just
 // enrolled and verified owing another second-factor prompt at once.
-func EnableUserOTPTx(ctx context.Context, database data.Database, user *models.User) (int64, error) {
+func EnableUserOTPTx(ctx context.Context, database OTPEnrolmentDatabase, user *models.User) (int64, error) {
 	// Opened through RunInTransaction, so a deadlock reruns the three writes together (#301).
 	// Safe to rerun: the user model was set by the caller before this opened and is written
 	// unchanged on every attempt, and generation is the committing attempt's.

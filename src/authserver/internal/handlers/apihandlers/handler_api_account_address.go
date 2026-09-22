@@ -1,6 +1,8 @@
 package apihandlers
 
 import (
+	"context"
+	"database/sql"
 	"encoding/json"
 	"net/http"
 	"strings"
@@ -8,15 +10,21 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
+	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/api"
 )
 
+// accountAddressDatabase is what the account address endpoints need: the caller's own user row.
+type accountAddressDatabase interface {
+	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*models.User, error)
+	UpdateUser(ctx context.Context, tx *sql.Tx, user *models.User) error
+}
+
 // HandleAPIAccountAddressPut - PUT /api/v1/account/address
 func HandleAPIAccountAddressPut(
-	database data.Database,
+	database accountAddressDatabase,
 	addressValidator *accountvalidation.AddressValidator,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {

@@ -2,18 +2,26 @@ package accountvalidation
 
 import (
 	"context"
+	"database/sql"
 	"regexp"
 
-	"github.com/leodip/goiabada/authserver/internal/data"
+	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
 )
 
-type EmailValidator struct {
-	database data.Database
+// emailValidatorDatabase is what the account email validator reads: the rows that decide whether
+// an address is already somebody else's.
+type emailValidatorDatabase interface {
+	GetUserByEmail(ctx context.Context, tx *sql.Tx, email string) (*models.User, error)
+	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*models.User, error)
 }
 
-func NewEmailValidator(database data.Database) *EmailValidator {
+type EmailValidator struct {
+	database emailValidatorDatabase
+}
+
+func NewEmailValidator(database emailValidatorDatabase) *EmailValidator {
 	return &EmailValidator{
 		database: database,
 	}

@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"context"
+	"database/sql"
 	"errors"
 	"io/fs"
 	"log/slog"
@@ -10,7 +12,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/constants"
-	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
@@ -18,11 +19,29 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 )
 
+// authCompletedDatabase is what the end of the authentication ceremony needs: the session it
+// bumps or replaces, and the generation it promotes.
+//
+// It embeds the authorize port because a refusal here is answered through redirToClientWithError,
+// and the revocation port because an unusable session is terminated through
+// TerminateUserSessionTx.
+type authCompletedDatabase interface {
+	authorizeDatabase
+	RevocationDatabase
+
+	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*models.Client, error)
+	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*models.User, error)
+	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*models.UserSession, error)
+	PromoteUserSessionOtpConfigGeneration(ctx context.Context, tx *sql.Tx, userSessionId int64, generation int64) error
+	UpdateUserSession(ctx context.Context, tx *sql.Tx, userSession *models.UserSession) error
+	UserSessionLoadUser(ctx context.Context, tx *sql.Tx, userSession *models.UserSession) error
+}
+
 func HandleAuthCompletedGet(
 	httpHelper HttpHelper,
 	authHelper AuthHelper,
 	userSessionManager UserSessionManager,
-	database data.Database,
+	database authCompletedDatabase,
 	templateFS fs.FS,
 	auditLogger AuditLogger,
 	permissionChecker PermissionChecker,

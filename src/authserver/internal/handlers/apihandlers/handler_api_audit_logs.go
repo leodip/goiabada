@@ -1,17 +1,24 @@
 package apihandlers
 
 import (
+	"context"
+	"database/sql"
 	"net/http"
 	"strconv"
 
-	"github.com/leodip/goiabada/authserver/internal/data"
+	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/logging"
 )
 
+// auditLogsDatabase is what the audit log endpoint needs: one page of records.
+type auditLogsDatabase interface {
+	GetAuditLogsPaginated(ctx context.Context, tx *sql.Tx, page int, pageSize int, auditEvent string, requestId string) ([]models.AuditLog, int, error)
+}
+
 func HandleAPIAuditLogsGet(
-	database data.Database,
+	database auditLogsDatabase,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Authentication and authorization handled by middleware

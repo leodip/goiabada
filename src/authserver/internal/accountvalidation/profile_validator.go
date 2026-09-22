@@ -2,11 +2,12 @@ package accountvalidation
 
 import (
 	"context"
+	"database/sql"
 	"regexp"
 	"strconv"
 	"time"
 
-	"github.com/leodip/goiabada/authserver/internal/data"
+	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/gender"
 	"github.com/leodip/goiabada/core/i18n"
@@ -14,11 +15,18 @@ import (
 	"github.com/leodip/goiabada/core/timezones"
 )
 
-type ProfileValidator struct {
-	database data.Database
+// profileValidatorDatabase is what the account profile validator reads: the rows that decide
+// whether a username is already somebody else's.
+type profileValidatorDatabase interface {
+	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*models.User, error)
+	GetUserByUsername(ctx context.Context, tx *sql.Tx, username string) (*models.User, error)
 }
 
-func NewProfileValidator(database data.Database) *ProfileValidator {
+type ProfileValidator struct {
+	database profileValidatorDatabase
+}
+
+func NewProfileValidator(database profileValidatorDatabase) *ProfileValidator {
 	return &ProfileValidator{
 		database: database,
 	}

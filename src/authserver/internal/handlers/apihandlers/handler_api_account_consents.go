@@ -1,6 +1,8 @@
 package apihandlers
 
 import (
+	"context"
+	"database/sql"
 	"net/http"
 	"strconv"
 	"strings"
@@ -8,15 +10,25 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
+	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/api"
 )
 
+// accountConsentsDatabase is what the account consent endpoints need: the caller's consents and
+// the clients they name.
+type accountConsentsDatabase interface {
+	DeleteUserConsent(ctx context.Context, tx *sql.Tx, userConsentId int64) error
+	GetConsentsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]models.UserConsent, error)
+	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*models.User, error)
+	GetUserConsentById(ctx context.Context, tx *sql.Tx, userConsentId int64) (*models.UserConsent, error)
+	UserConsentsLoadClients(ctx context.Context, tx *sql.Tx, userConsents []models.UserConsent) error
+}
+
 // GET /api/v1/account/consents
 func HandleAPIAccountConsentsGet(
-	database data.Database,
+	database accountConsentsDatabase,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		jwtToken, ok := middleware.GetValidatedToken(r)
@@ -59,7 +71,7 @@ func HandleAPIAccountConsentsGet(
 
 // DELETE /api/v1/account/consents/{id}
 func HandleAPIAccountConsentDelete(
-	database data.Database,
+	database accountConsentsDatabase,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

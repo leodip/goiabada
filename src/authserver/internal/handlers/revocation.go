@@ -7,10 +7,29 @@ import (
 	"sort"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/errs"
 )
+
+// RevocationDatabase is what the revocation service needs: the generation counters it advances,
+// and the sessions, codes and refresh tokens the advance invalidates.
+//
+// Exported, unlike most ports here, because four of its functions are called from apihandlers,
+// whose own ports have to name this capability to hand it on (#386 decision 8).
+type RevocationDatabase interface {
+	DeleteUserSession(ctx context.Context, tx *sql.Tx, userSessionId int64) error
+	GetRefreshTokensByClientId(ctx context.Context, tx *sql.Tx, clientId int64) ([]*models.RefreshToken, error)
+	GetRefreshTokensBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) ([]*models.RefreshToken, error)
+	GetRefreshTokensByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]*models.RefreshToken, error)
+	GetUserSessionsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]models.UserSession, error)
+	IncrementUserAuthStateGeneration(ctx context.Context, tx *sql.Tx, userId int64) (int64, error)
+	PromoteRefreshTokenGenerations(ctx context.Context, tx *sql.Tx, refreshTokenIds []int64, generation int64) error
+	PromoteUserSessionGeneration(ctx context.Context, tx *sql.Tx, userSessionId int64, generation int64) error
+	RevokeCodesByClientId(ctx context.Context, tx *sql.Tx, clientId int64) (int64, error)
+	RevokeCodesBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (int64, error)
+	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
+	UpdateRefreshToken(ctx context.Context, tx *sql.Tx, refreshToken *models.RefreshToken) error
+}
 
 // revokeRefreshTokens marks the given refresh tokens revoked and returns the JTIs this call
 // transitioned from live to revoked. Already-revoked tokens are skipped and NOT reported:
@@ -21,7 +40,7 @@ import (
 //
 // The caller owns the transaction. Passing a nil tx is permitted and means no transaction,
 // following the data layer's convention, but every caller here supplies one.
-func revokeRefreshTokens(ctx context.Context, db data.Database, tx *sql.Tx, tokens []*models.RefreshToken) ([]string, error) {
+func revokeRefreshTokens(ctx context.Context, db RevocationDatabase, tx *sql.Tx, tokens []*models.RefreshToken) ([]string, error) {
 	revokedJtis := make([]string, 0, len(tokens))
 	for _, rt := range tokens {
 		if rt.Revoked {
@@ -76,7 +95,7 @@ type RevocationResult struct {
 // (decision 4). The caller owns the transaction, which is REQUIRED here rather than
 // optional, because IncrementUserAuthStateGeneration cannot read back its own increment
 // safely without one.
-func RevokeUserAuthState(ctx context.Context, db data.Database, tx *sql.Tx, userId int64, exceptSid string) (RevocationResult, error) {
+func RevokeUserAuthState(ctx context.Context, db RevocationDatabase, tx *sql.Tx, userId int64, exceptSid string) (RevocationResult, error) {
 	result := RevocationResult{
 		TerminatedSessionIdentifiers: []string{},
 		RevokedRefreshTokenJtis:      []string{},
@@ -281,7 +300,7 @@ const (
 // side and a gap on the forensic side. Closing that gap needs a transactional outbox or a
 // distinct "commit outcome unknown" event, not a rollback, and neither is in scope for #106
 // (decision 5, finding 36).
-func RevokeUserAuthStateTx(ctx context.Context, db data.Database, userId int64, exceptSid string,
+func RevokeUserAuthStateTx(ctx context.Context, db RevocationDatabase, userId int64, exceptSid string,
 	write func(tx *sql.Tx) error) (RevocationResult, error) {
 
 	// The write and the sweep in one transaction opened through RunInTransaction, so a deadlock
@@ -378,7 +397,7 @@ type TerminationResult struct {
 // caller here must not be read as "nothing happened"; the durable outcome of a reported commit
 // failure is indeterminate, and the bounded consequence is a termination with no audit record of
 // it, which is fail-closed on the security side and a gap on the forensic side.
-func TerminateUserSessionTx(ctx context.Context, db data.Database, userSession *models.UserSession) (TerminationResult, error) {
+func TerminateUserSessionTx(ctx context.Context, db RevocationDatabase, userSession *models.UserSession) (TerminationResult, error) {
 	// Both sweeps key on the session identifier and the delete keys on the id, so this takes the
 	// loaded row rather than two loose values: from one row they cannot describe two different
 	// sessions, and both call sites already load it for their own not-found and ownership checks.
@@ -490,7 +509,7 @@ type ClientGrantRevocationResult struct {
 // RevokeUserAuthState states about its own: the contract is atomicity across a marker and a
 // multi-row sweep, so the transaction is a precondition of the whole operation rather than an
 // argument one nested call happens to care about.
-func RevokeClientGrants(ctx context.Context, db data.Database, tx *sql.Tx, clientId int64) (ClientGrantRevocationResult, error) {
+func RevokeClientGrants(ctx context.Context, db RevocationDatabase, tx *sql.Tx, clientId int64) (ClientGrantRevocationResult, error) {
 	result := ClientGrantRevocationResult{RevokedRefreshTokenJtis: []string{}}
 
 	if tx == nil {
@@ -558,7 +577,7 @@ const RevocationReasonClientBecamePublic = "client_became_public"
 // caller here must not be read as "nothing happened"; the durable outcome of a reported commit
 // failure is indeterminate, and the bounded consequence is a client left flipped and revoked with
 // no audit record of it, which is fail-closed on the security side and a gap on the forensic side.
-func RevokeClientGrantsTx(ctx context.Context, db data.Database, clientId int64,
+func RevokeClientGrantsTx(ctx context.Context, db RevocationDatabase, clientId int64,
 	write func(tx *sql.Tx) (bool, error)) (ClientGrantRevocationResult, error) {
 
 	// The write and the conditional sweep in one transaction opened through RunInTransaction, so

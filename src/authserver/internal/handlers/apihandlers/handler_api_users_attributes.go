@@ -1,6 +1,8 @@
 package apihandlers
 
 import (
+	"context"
+	"database/sql"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -9,7 +11,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/models"
@@ -18,9 +19,20 @@ import (
 	"github.com/leodip/goiabada/core/validators"
 )
 
+// usersAttributesDatabase is what the user attribute endpoints need: the user and the attributes
+// hanging off it.
+type usersAttributesDatabase interface {
+	CreateUserAttribute(ctx context.Context, tx *sql.Tx, userAttribute *models.UserAttribute) error
+	DeleteUserAttribute(ctx context.Context, tx *sql.Tx, userAttributeId int64) error
+	GetUserAttributeById(ctx context.Context, tx *sql.Tx, userAttributeId int64) (*models.UserAttribute, error)
+	GetUserAttributesByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]models.UserAttribute, error)
+	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*models.User, error)
+	UpdateUserAttribute(ctx context.Context, tx *sql.Tx, userAttribute *models.UserAttribute) error
+}
+
 // HandleAPIUserAttributesGet - GET /api/v1/admin/users/{id}/attributes
 func HandleAPIUserAttributesGet(
-	database data.Database,
+	database usersAttributesDatabase,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Authentication and authorization handled by middleware
@@ -68,7 +80,7 @@ func HandleAPIUserAttributesGet(
 
 // HandleAPIUserAttributeGet - GET /api/v1/admin/user-attributes/{id}
 func HandleAPIUserAttributeGet(
-	database data.Database,
+	database usersAttributesDatabase,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Authentication and authorization handled by middleware
@@ -109,7 +121,7 @@ func HandleAPIUserAttributeGet(
 
 // HandleAPIUserAttributeCreatePost - POST /api/v1/admin/user-attributes
 func HandleAPIUserAttributeCreatePost(
-	database data.Database,
+	database usersAttributesDatabase,
 	identifierValidator *validators.IdentifierValidator,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
@@ -200,7 +212,7 @@ func HandleAPIUserAttributeCreatePost(
 
 // HandleAPIUserAttributeUpdatePut - PUT /api/v1/admin/user-attributes/{id}
 func HandleAPIUserAttributeUpdatePut(
-	database data.Database,
+	database usersAttributesDatabase,
 	identifierValidator *validators.IdentifierValidator,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
@@ -302,7 +314,7 @@ func HandleAPIUserAttributeUpdatePut(
 
 // HandleAPIUserAttributeDelete - DELETE /api/v1/admin/user-attributes/{id}
 func HandleAPIUserAttributeDelete(
-	database data.Database,
+	database usersAttributesDatabase,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

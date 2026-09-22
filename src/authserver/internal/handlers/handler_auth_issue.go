@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"bytes"
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -16,7 +17,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/constants"
-	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
 	"github.com/leodip/goiabada/authserver/internal/issuance"
 	"github.com/leodip/goiabada/authserver/internal/models"
@@ -25,13 +25,28 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 )
 
+// authIssueDatabase is what code issuance needs: the session row it takes before inserting the
+// code, inside one transaction.
+//
+// It embeds the authorize port because a refusal here is answered through redirToClientWithError.
+type authIssueDatabase interface {
+	authorizeDatabase
+
+	AcquireUserSessionRow(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (bool, error)
+	ClientLoadRedirectURIs(ctx context.Context, tx *sql.Tx, client *models.Client) error
+	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*models.Client, error)
+	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*models.User, error)
+	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*models.UserSession, error)
+	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
+}
+
 func HandleIssueGet(
 	httpHelper HttpHelper,
 	authHelper AuthHelper,
 	templateFS fs.FS,
 	codeIssuer CodeIssuer,
 	tokenIssuer TokenIssuer,
-	database data.Database,
+	database authIssueDatabase,
 	auditLogger AuditLogger,
 	userSessionManager UserSessionManager,
 	permissionChecker PermissionChecker,
@@ -587,7 +602,7 @@ func refuseIssuanceUnusableSession(
 	httpHelper HttpHelper,
 	authHelper AuthHelper,
 	templateFS fs.FS,
-	database data.Database,
+	database authIssueDatabase,
 	auditLogger AuditLogger,
 ) {
 	// Only the expired shape audits. The foreign and gone shapes are #133's and #129's refusals,

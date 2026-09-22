@@ -1,26 +1,40 @@
 package apihandlers
 
 import (
+	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
 
+	"net/url"
+
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/constants"
-	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/api"
-	"net/url"
 )
+
+// accountLogoutDatabase is what the account logout endpoint needs: the session being ended, the
+// clients it authorized, and the key that signs the logout token.
+type accountLogoutDatabase interface {
+	ClientLoadRedirectURIs(ctx context.Context, tx *sql.Tx, client *models.Client) error
+	GetAllClients(ctx context.Context, tx *sql.Tx) ([]models.Client, error)
+	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*models.Client, error)
+	GetCurrentSigningKey(ctx context.Context, tx *sql.Tx) (*models.KeyPair, error)
+	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*models.UserSession, error)
+	UserSessionClientsLoadClients(ctx context.Context, tx *sql.Tx, userSessionClients []models.UserSessionClient) error
+	UserSessionLoadClients(ctx context.Context, tx *sql.Tx, userSession *models.UserSession) error
+}
 
 // HandleAPIAccountLogoutRequestPost - POST /api/v1/account/logout-request
 // Returns a prepared logout instruction: a self-submitting form's parameters when the request asks
 // for api.AccountLogoutResponseModeFormPost, and a ready-to-follow redirect URL otherwise.
 func HandleAPIAccountLogoutRequestPost(
-	database data.Database,
+	database accountLogoutDatabase,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Access token + required scope enforced by middleware

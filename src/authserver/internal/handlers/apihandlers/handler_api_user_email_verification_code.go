@@ -1,6 +1,7 @@
 package apihandlers
 
 import (
+	"context"
 	"database/sql"
 	"net/http"
 	"strconv"
@@ -8,16 +9,23 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
+	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/api"
 )
 
+// userEmailVerificationCodeDatabase is what the user email verification code endpoint needs: the
+// user row it stamps.
+type userEmailVerificationCodeDatabase interface {
+	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*models.User, error)
+	UpdateUser(ctx context.Context, tx *sql.Tx, user *models.User) error
+}
+
 // HandleAPIUserEmailVerificationCodePost - POST /api/v1/admin/users/{id}/email/verification-code
 func HandleAPIUserEmailVerificationCodePost(
-	database data.Database,
+	database userEmailVerificationCodeDatabase,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

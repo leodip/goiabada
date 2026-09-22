@@ -1,12 +1,13 @@
 package apihandlers
 
 import (
+	"context"
+	"database/sql"
 	"io"
 	"net/http"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/config"
-	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/imaging"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
@@ -14,9 +15,20 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 )
 
+// accountProfilePictureDatabase is what the account profile picture endpoints need: the caller's
+// user row and the picture attached to it.
+type accountProfilePictureDatabase interface {
+	CreateUserProfilePicture(ctx context.Context, tx *sql.Tx, profilePicture *models.UserProfilePicture) error
+	DeleteUserProfilePicture(ctx context.Context, tx *sql.Tx, userId int64) error
+	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*models.User, error)
+	GetUserProfilePictureByUserId(ctx context.Context, tx *sql.Tx, userId int64) (*models.UserProfilePicture, error)
+	UpdateUserProfilePicture(ctx context.Context, tx *sql.Tx, profilePicture *models.UserProfilePicture) error
+	UserHasProfilePicture(ctx context.Context, tx *sql.Tx, userId int64) (bool, error)
+}
+
 // HandleAPIAccountProfilePicturePost - POST /api/v1/account/profile-picture
 func HandleAPIAccountProfilePicturePost(
-	database data.Database,
+	database accountProfilePictureDatabase,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -127,7 +139,7 @@ func HandleAPIAccountProfilePicturePost(
 
 // HandleAPIAccountProfilePictureDelete - DELETE /api/v1/account/profile-picture
 func HandleAPIAccountProfilePictureDelete(
-	database data.Database,
+	database accountProfilePictureDatabase,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -179,7 +191,7 @@ func HandleAPIAccountProfilePictureDelete(
 
 // HandleAPIAccountProfilePictureGet - GET /api/v1/account/profile-picture
 func HandleAPIAccountProfilePictureGet(
-	database data.Database,
+	database accountProfilePictureDatabase,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Get logged in user from access token

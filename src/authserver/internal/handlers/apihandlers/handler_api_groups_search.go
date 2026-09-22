@@ -1,20 +1,30 @@
 package apihandlers
 
 import (
+	"context"
+	"database/sql"
 	"net/http"
 	"strconv"
 
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
-	"github.com/leodip/goiabada/authserver/internal/data"
+	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
 )
+
+// groupsSearchDatabase is what the group search endpoint needs: one page of groups and the
+// permissions they carry.
+type groupsSearchDatabase interface {
+	GetAllGroupsPaginated(ctx context.Context, tx *sql.Tx, page int, pageSize int) ([]models.Group, int, error)
+	GetGroupPermissionsByGroupIds(ctx context.Context, tx *sql.Tx, groupIds []int64) ([]models.GroupPermission, error)
+	GetPermissionById(ctx context.Context, tx *sql.Tx, permissionId int64) (*models.Permission, error)
+}
 
 // HandleAPIGroupsSearchGet
 // GET /api/v1/admin/groups/search?annotatePermissionId={permissionId}&page={page}&size={size}
 // Returns paginated groups annotated with whether they have the specified permission.
 func HandleAPIGroupsSearchGet(
-	database data.Database,
+	database groupsSearchDatabase,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Parse and validate annotatePermissionId

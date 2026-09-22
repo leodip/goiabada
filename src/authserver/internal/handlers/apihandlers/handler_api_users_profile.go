@@ -1,6 +1,7 @@
 package apihandlers
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"net/http"
@@ -12,16 +13,22 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
+	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/gender"
 )
 
+// usersProfileDatabase is what the administrator's user profile endpoint needs: the user row.
+type usersProfileDatabase interface {
+	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*models.User, error)
+	UpdateUser(ctx context.Context, tx *sql.Tx, user *models.User) error
+}
+
 // HandleAPIUserProfilePut - PUT /api/v1/admin/users/{id}/profile
 func HandleAPIUserProfilePut(
-	database data.Database,
+	database usersProfileDatabase,
 	profileValidator *accountvalidation.ProfileValidator,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
@@ -151,7 +158,7 @@ func HandleAPIUserProfilePut(
 
 // HandleAPIUserAddressPut - PUT /api/v1/admin/users/{id}/address
 func HandleAPIUserAddressPut(
-	database data.Database,
+	database usersProfileDatabase,
 	addressValidator *accountvalidation.AddressValidator,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {

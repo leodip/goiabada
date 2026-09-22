@@ -29,7 +29,9 @@ import (
 )
 
 type Server struct {
-	router       *chi.Mux
+	router *chi.Mux
+	// The whole interface, and one of the four places that still holds it: routes.go hands this
+	// to every constructor and each one narrows it to a port of its own (#386 decision 8).
 	database     data.Database
 	sessionStore sessionstore.Store
 	worker       *workers.Worker

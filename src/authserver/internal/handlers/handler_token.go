@@ -15,7 +15,6 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/constants"
-	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/issuance"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
@@ -75,10 +74,29 @@ const genericServerErrorDescription = "An unexpected server error has occurred. 
 // endpoint's observable behaviour did not change (#250).
 const authCodeNotAuthorizedErrorMsg = "The client associated with the provided client_id does not support authorization code flow."
 
+// tokenDatabase is what the token endpoint needs: the code it marks used, the refresh tokens it
+// rotates and revokes, and the session those grants hang from.
+//
+// It embeds the revocation port because reuse detection revokes a family through
+// revokeRefreshTokens.
+type tokenDatabase interface {
+	RevocationDatabase
+
+	AcquireUserSessionRow(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (bool, error)
+	DeleteUserSession(ctx context.Context, tx *sql.Tx, userSessionId int64) error
+	GetRefreshTokensByCodeId(ctx context.Context, tx *sql.Tx, codeId int64) ([]*models.RefreshToken, error)
+	GetRefreshTokensBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) ([]*models.RefreshToken, error)
+	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*models.UserSession, error)
+	MarkCodeAsUsed(ctx context.Context, tx *sql.Tx, codeId int64) (bool, error)
+	MarkRefreshTokenAsRevoked(ctx context.Context, tx *sql.Tx, refreshTokenId int64) (bool, error)
+	RevokeRefreshTokenFamily(ctx context.Context, tx *sql.Tx, firstRefreshTokenJti string) (int64, error)
+	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
+}
+
 func HandleTokenPost(
 	httpHelper HttpHelper,
 	userSessionManager UserSessionManager,
-	database data.Database,
+	database tokenDatabase,
 	tokenIssuer TokenIssuer,
 	tokenValidator TokenValidator,
 	auditLogger AuditLogger,
@@ -615,7 +633,7 @@ func HandleTokenPost(
 // path and the concurrent double-spend guard in the authorization_code grant
 // (#77). On a nil return the caller is responsible for writing the client-facing
 // invalid_grant response; on a non-nil error the caller must surface a 500.
-func revokeAndAuditAuthCodeReuse(ctx context.Context, database data.Database, auditLogger AuditLogger, code *models.Code) error {
+func revokeAndAuditAuthCodeReuse(ctx context.Context, database tokenDatabase, auditLogger AuditLogger, code *models.Code) error {
 	revokedJtis, err := revokeOnAuthCodeReuse(ctx, database, code)
 	if err != nil {
 		return err
@@ -641,7 +659,7 @@ func revokeAndAuditAuthCodeReuse(ctx context.Context, database data.Database, au
 // Its first statement takes the session row, ahead of every grant that hangs off
 // it, so that this response and a termination of the same session serialize on
 // that row (#139). See the comment on that statement for what it prevents.
-func revokeOnAuthCodeReuse(ctx context.Context, database data.Database, code *models.Code) ([]string, error) {
+func revokeOnAuthCodeReuse(ctx context.Context, database tokenDatabase, code *models.Code) ([]string, error) {
 	if code == nil {
 		return nil, nil
 	}

@@ -1,6 +1,8 @@
 package apihandlers
 
 import (
+	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -12,7 +14,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/data"
 	srvhandlers "github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/api"
@@ -22,8 +23,19 @@ import (
 	"github.com/leodip/goiabada/core/validators"
 )
 
+// permissionsDatabase is what the permission endpoints need: the resource that owns a permission
+// and the permission rows under it.
+type permissionsDatabase interface {
+	CreatePermission(ctx context.Context, tx *sql.Tx, permission *models.Permission) error
+	DeletePermission(ctx context.Context, tx *sql.Tx, permissionId int64) error
+	GetPermissionsByResourceId(ctx context.Context, tx *sql.Tx, resourceId int64) ([]models.Permission, error)
+	GetResourceById(ctx context.Context, tx *sql.Tx, resourceId int64) (*models.Resource, error)
+	PermissionsLoadResources(ctx context.Context, tx *sql.Tx, permissions []models.Permission) error
+	UpdatePermission(ctx context.Context, tx *sql.Tx, permission *models.Permission) error
+}
+
 func HandleAPIPermissionsByResourceGet(
-	database data.Database,
+	database permissionsDatabase,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		resourceIdStr := chi.URLParam(r, "resourceId")
@@ -76,7 +88,7 @@ func HandleAPIPermissionsByResourceGet(
 // HandleAPIResourcePermissionsPut - PUT /api/v1/admin/resources/{resourceId}/permissions
 // Replaces the full set of permission definitions for a resource.
 func HandleAPIResourcePermissionsPut(
-	database data.Database,
+	database permissionsDatabase,
 	identifierValidator *validators.IdentifierValidator,
 	auditLogger srvhandlers.AuditLogger,
 ) http.HandlerFunc {

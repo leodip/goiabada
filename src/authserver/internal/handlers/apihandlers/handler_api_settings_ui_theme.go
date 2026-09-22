@@ -1,13 +1,14 @@
 package apihandlers
 
 import (
+	"context"
+	"database/sql"
 	"encoding/json"
 	"net/http"
 	"strings"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/constants"
-	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/uithemes"
@@ -35,9 +36,14 @@ func HandleAPISettingsUIThemeGet(
 	}
 }
 
+// settingsUIThemeDatabase is what the UI theme settings endpoint needs: the settings write.
+type settingsUIThemeDatabase interface {
+	UpdateSettings(ctx context.Context, tx *sql.Tx, settings *models.Settings) error
+}
+
 // HandleAPISettingsUIThemePut - PUT /api/v1/admin/settings/ui-theme
 func HandleAPISettingsUIThemePut(
-	database data.Database,
+	database settingsUIThemeDatabase,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

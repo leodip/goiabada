@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"context"
+	"database/sql"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -10,7 +12,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/constants"
-	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/otp"
@@ -18,10 +19,24 @@ import (
 	"github.com/leodip/goiabada/core/i18n"
 )
 
+// authOTPDatabase is what the OTP hop needs: the client, the user, and the step the replay window
+// consumes.
+//
+// It embeds the client display port because the screen renders through getClientDisplayInfo, and
+// the enrolment port because installing an authenticator is EnableUserOTPTx.
+type authOTPDatabase interface {
+	clientDisplayDatabase
+	OTPEnrolmentDatabase
+
+	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*models.Client, error)
+	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*models.User, error)
+	TryConsumeUserOTPStep(ctx context.Context, tx *sql.Tx, userId int64, step int64, requireOTPEnabled bool) (bool, error)
+}
+
 func HandleAuthOtpGet(
 	httpHelper HttpHelper,
 	authHelper AuthHelper,
-	database data.Database,
+	database authOTPDatabase,
 	otpSecretGenerator OtpSecretGenerator,
 ) http.HandlerFunc {
 
@@ -174,7 +189,7 @@ func HandleAuthOtpGet(
 func HandleAuthOtpPost(
 	httpHelper HttpHelper,
 	authHelper AuthHelper,
-	database data.Database,
+	database authOTPDatabase,
 	auditLogger AuditLogger,
 	credentialFailures CredentialFailureRecorder,
 ) http.HandlerFunc {

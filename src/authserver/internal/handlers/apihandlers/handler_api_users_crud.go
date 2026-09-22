@@ -1,6 +1,7 @@
 package apihandlers
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -29,9 +30,28 @@ import (
 	"github.com/leodip/goiabada/core/stringutil"
 )
 
+// usersCrudDatabase is what the user endpoints need: the user row, the writes that change it, and
+// the transaction they share.
+//
+// It embeds the account OTP port because disabling a user's OTP runs through disableUserOTP, and
+// the revocation port because every credential write here revokes what the old credential
+// authorized.
+type usersCrudDatabase interface {
+	accountOTPDatabase
+	handlers.RevocationDatabase
+
+	DeleteUser(ctx context.Context, tx *sql.Tx, userId int64) error
+	GetUserByEmail(ctx context.Context, tx *sql.Tx, email string) (*models.User, error)
+	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*models.User, error)
+	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
+	SetUserPasswordHash(ctx context.Context, tx *sql.Tx, userId int64, passwordHash string) error
+	TrySetUserEnabled(ctx context.Context, tx *sql.Tx, userId int64, expected bool, desired bool) (bool, error)
+	UpdateUser(ctx context.Context, tx *sql.Tx, user *models.User) error
+}
+
 // HandleAPIUserGet - GET /api/v1/admin/users/{id}
 func HandleAPIUserGet(
-	database data.Database,
+	database usersCrudDatabase,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Authentication and authorization handled by middleware
@@ -73,7 +93,7 @@ func HandleAPIUserGet(
 
 // HandleAPIUserPasswordPut - PUT /api/v1/admin/users/{id}/password
 func HandleAPIUserPasswordPut(
-	database data.Database,
+	database usersCrudDatabase,
 	passwordValidator *accountvalidation.PasswordValidator,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
@@ -180,7 +200,7 @@ func HandleAPIUserPasswordPut(
 
 // HandleAPIUserOTPPut - PUT /api/v1/admin/users/{id}/otp
 func HandleAPIUserOTPPut(
-	database data.Database,
+	database usersCrudDatabase,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -263,7 +283,7 @@ func HandleAPIUserOTPPut(
 // HandleAPIUserCreatePost - POST /api/v1/admin/users/create
 func HandleAPIUserCreatePost(
 	httpHelper handlers.HttpHelper,
-	database data.Database,
+	database usersCrudDatabase,
 	userCreator handlers.UserCreator,
 	emailValidator *accountvalidation.EmailValidator,
 	profileValidator *accountvalidation.ProfileValidator,
@@ -513,7 +533,7 @@ var errUserAlreadyDisabled = errors.New("the user is already disabled")
 
 // HandleAPIUserEnabledPut - PUT /api/v1/admin/users/{id}/enabled
 func HandleAPIUserEnabledPut(
-	database data.Database,
+	database usersCrudDatabase,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -652,7 +672,7 @@ func HandleAPIUserEnabledPut(
 
 // HandleAPIUserDelete - DELETE /api/v1/admin/users/{id}
 func HandleAPIUserDelete(
-	database data.Database,
+	database usersCrudDatabase,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

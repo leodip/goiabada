@@ -2,18 +2,31 @@ package apihandlers
 
 import (
 	"context"
+	"database/sql"
 	"net/http"
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/constants"
-	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
 )
+
+// clientSessionsDatabase is what the client session endpoint needs: the sessions a client holds
+// and the users behind them.
+//
+// It embeds the row builder's port because the listing is built by buildSessionDetails.
+type clientSessionsDatabase interface {
+	sessionDetailsDatabase
+
+	GetClientById(ctx context.Context, tx *sql.Tx, clientId int64) (*models.Client, error)
+	GetUserSessionsByClientIdPaginated(ctx context.Context, tx *sql.Tx, clientId int64, page int, pageSize int) ([]models.UserSession, int, error)
+	GetUsersByIds(ctx context.Context, tx *sql.Tx, userIds []int64) (map[int64]models.User, error)
+	UserSessionsLoadClients(ctx context.Context, tx *sql.Tx, userSessions []models.UserSession) error
+}
 
 // HandleAPIClientSessionsGet - GET /api/v1/admin/clients/{id}/sessions
 // Returns a paginated list of user sessions associated with a client, and the people they
@@ -24,7 +37,7 @@ import (
 // without reading each one back: it fetched a user per row, up to 50 HTTP round trips to render
 // one page. The owners ride along in a normalized users array instead (#373 decision 9).
 func HandleAPIClientSessionsGet(
-	database data.Database,
+	database clientSessionsDatabase,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Authentication and authorization handled by middleware
@@ -126,7 +139,7 @@ func HandleAPIClientSessionsGet(
 // missing, for the reason loadSessionClients refuses a client id with no row: user_sessions.user_id
 // is a non-null foreign key, so an unresolvable one is a broken row and a page rendering a blank
 // email in its place would hide it.
-func sessionOwners(ctx context.Context, database data.Database, sessions []api.UserSessionDetailResponse) ([]api.SessionOwnerResponse, error) {
+func sessionOwners(ctx context.Context, database clientSessionsDatabase, sessions []api.UserSessionDetailResponse) ([]api.SessionOwnerResponse, error) {
 	userIds := make([]int64, 0, len(sessions))
 	seen := make(map[int64]bool, len(sessions))
 	for _, session := range sessions {

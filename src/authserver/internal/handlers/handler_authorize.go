@@ -3,6 +3,7 @@ package handlers
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"errors"
 	"html/template"
 	"io/fs"
@@ -16,7 +17,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/constants"
-	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
@@ -75,11 +75,21 @@ func validateIdTokenHint(ctx context.Context, idTokenHint string, tokenParser To
 	return sub, nil
 }
 
+// authorizeDatabase is what the authorization endpoint needs: the client and its redirect URIs,
+// the consent already given, and the session a browser may arrive with.
+type authorizeDatabase interface {
+	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*models.Client, error)
+	GetConsentByUserIdAndClientId(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) (*models.UserConsent, error)
+	GetRedirectURIsByClientId(ctx context.Context, tx *sql.Tx, clientId int64) ([]models.RedirectURI, error)
+	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*models.UserSession, error)
+	UserSessionLoadUser(ctx context.Context, tx *sql.Tx, userSession *models.UserSession) error
+}
+
 func HandleAuthorizeGet(
 	httpHelper HttpHelper,
 	authHelper AuthHelper,
 	userSessionManager UserSessionManager,
-	database data.Database,
+	database authorizeDatabase,
 	templateFS fs.FS,
 	authorizeValidator AuthorizeValidator,
 	auditLogger AuditLogger,
@@ -611,7 +621,7 @@ func HandleAuthorizeGet(
 // It performs all necessary checks without displaying any UI and either:
 // - Returns an error to the client if silent auth is not possible
 // - Issues a code silently if all conditions are met
-func handlePromptNone(w http.ResponseWriter, r *http.Request, httpHelper HttpHelper, authHelper AuthHelper, userSessionManager UserSessionManager, database data.Database, templateFS fs.FS, auditLogger AuditLogger, permissionChecker PermissionChecker, authContext *ceremony.AuthContext, client *models.Client, sessionIdentifier string) {
+func handlePromptNone(w http.ResponseWriter, r *http.Request, httpHelper HttpHelper, authHelper AuthHelper, userSessionManager UserSessionManager, database authorizeDatabase, templateFS fs.FS, auditLogger AuditLogger, permissionChecker PermissionChecker, authContext *ceremony.AuthContext, client *models.Client, sessionIdentifier string) {
 	// Helper to clear the auth context and then redirect with error. The clear-then-answer
 	// sequence and its server_error fallback live in answerClientWithError, which derives that
 	// fallback from the input handed to it, so this path keeps answering from the stored ceremony
@@ -895,7 +905,7 @@ func redirectErrorFromRequest(r *http.Request, client *models.Client,
 // server_error for exactly this condition (#141). The fallback is the caller's own input with its
 // code and description swapped, so each call site keeps the parameter source it built the input
 // from and neither has to restate it.
-func answerClientWithError(w http.ResponseWriter, r *http.Request, database data.Database,
+func answerClientWithError(w http.ResponseWriter, r *http.Request, database authorizeDatabase,
 	httpHelper HttpHelper, authHelper AuthHelper, templateFS fs.FS, input redirectErrorInput) {
 
 	err := authHelper.ClearAuthContext(w, r)
@@ -930,7 +940,7 @@ func answerClientWithError(w http.ResponseWriter, r *http.Request, database data
 // error response to the client, so a lookup that fails must not turn a refusal that works today
 // into a 500; and unresolved provenance is the untrusted case, which errs towards withholding a
 // redirect rather than towards performing one (#108).
-func clientProvenance(ctx context.Context, database data.Database, clientIdentifier string) *models.Client {
+func clientProvenance(ctx context.Context, database authorizeDatabase, clientIdentifier string) *models.Client {
 	client, err := database.GetClientByClientIdentifier(ctx, nil, clientIdentifier)
 	if err != nil {
 		slog.ErrorContext(ctx, "unable to load the client while answering it with an error, treating its provenance as unresolved",
@@ -1026,7 +1036,7 @@ func clientProvenance(ctx context.Context, database data.Database, clientIdentif
 // This predicate is asked twice within one authorization request, and the second answer may not be
 // more permissive than the first: see redirectErrorInput.redirectAlreadyWithheld, which carries the
 // first refusal into the emitter.
-func redirectWillBeEmitted(ctx context.Context, database data.Database, client *models.Client, redirectURI string,
+func redirectWillBeEmitted(ctx context.Context, database authorizeDatabase, client *models.Client, redirectURI string,
 	responseType string, site string) bool {
 
 	if client == nil || client.CreatedViaDCR {
@@ -1068,7 +1078,7 @@ func redirectWillBeEmitted(ctx context.Context, database data.Database, client *
 	return true
 }
 
-func redirToClientWithError(w http.ResponseWriter, r *http.Request, database data.Database,
+func redirToClientWithError(w http.ResponseWriter, r *http.Request, database authorizeDatabase,
 	httpHelper HttpHelper, templateFS fs.FS, input redirectErrorInput) error {
 
 	// All three gates, asked through the one predicate so this emitter and the callers that ask the

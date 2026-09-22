@@ -1,6 +1,8 @@
 package apihandlers
 
 import (
+	"context"
+	"database/sql"
 	"io"
 	"net/http"
 	"strconv"
@@ -8,16 +10,26 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/config"
-	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/imaging"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/models"
 )
 
+// clientLogoDatabase is what the client logo endpoints need: the client and the logo row they
+// read, write and delete.
+type clientLogoDatabase interface {
+	ClientHasLogo(ctx context.Context, tx *sql.Tx, clientId int64) (bool, error)
+	CreateClientLogo(ctx context.Context, tx *sql.Tx, clientLogo *models.ClientLogo) error
+	DeleteClientLogo(ctx context.Context, tx *sql.Tx, clientId int64) error
+	GetClientById(ctx context.Context, tx *sql.Tx, clientId int64) (*models.Client, error)
+	GetClientLogoByClientId(ctx context.Context, tx *sql.Tx, clientId int64) (*models.ClientLogo, error)
+	UpdateClientLogo(ctx context.Context, tx *sql.Tx, clientLogo *models.ClientLogo) error
+}
+
 // HandleAPIClientLogoPost - POST /api/v1/admin/clients/{id}/logo
 func HandleAPIClientLogoPost(
-	database data.Database,
+	database clientLogoDatabase,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -136,7 +148,7 @@ func HandleAPIClientLogoPost(
 
 // HandleAPIClientLogoDelete - DELETE /api/v1/admin/clients/{id}/logo
 func HandleAPIClientLogoDelete(
-	database data.Database,
+	database clientLogoDatabase,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -196,7 +208,7 @@ func HandleAPIClientLogoDelete(
 
 // HandleAPIClientLogoGet - GET /api/v1/admin/clients/{id}/logo
 func HandleAPIClientLogoGet(
-	database data.Database,
+	database clientLogoDatabase,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Parse client ID from URL

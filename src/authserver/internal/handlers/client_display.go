@@ -2,9 +2,9 @@ package handlers
 
 import (
 	"context"
+	"database/sql"
 	"log/slog"
 
-	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/models"
 )
 
@@ -18,8 +18,14 @@ type ClientDisplayInfo struct {
 	WebsiteURL  string // empty if not to be shown
 }
 
+// clientDisplayDatabase is what the client display block needs: whether the client has a logo to
+// show.
+type clientDisplayDatabase interface {
+	ClientHasLogo(ctx context.Context, tx *sql.Tx, clientId int64) (bool, error)
+}
+
 // getClientDisplayInfo computes what client information should be displayed based on the client's display settings
-func getClientDisplayInfo(ctx context.Context, database data.Database, client *models.Client) *ClientDisplayInfo {
+func getClientDisplayInfo(ctx context.Context, database clientDisplayDatabase, client *models.Client) *ClientDisplayInfo {
 	info := &ClientDisplayInfo{}
 
 	if client.ShowDisplayName && client.DisplayName != "" {

@@ -2,16 +2,23 @@ package middleware
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"log/slog"
 	"net/http"
 
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/authserver/internal/constants"
-	"github.com/leodip/goiabada/authserver/internal/data"
+	"github.com/leodip/goiabada/authserver/internal/models"
 )
 
-func MiddlewareSettings(database data.Database) func(next http.Handler) http.Handler {
+// settingsDatabase is what the settings middleware needs: the settings row it puts on every
+// request's context.
+type settingsDatabase interface {
+	GetSettingsById(ctx context.Context, tx *sql.Tx, settingsId int64) (*models.Settings, error)
+}
+
+func MiddlewareSettings(database settingsDatabase) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
