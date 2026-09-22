@@ -25,7 +25,7 @@ func HandleAdminSettingsKeysGet(
 			return
 		}
 
-		apiKeys, err := apiClient.GetSettingsKeys(jwtInfo.TokenResponse.AccessToken)
+		apiKeys, err := apiClient.GetSettingsKeys(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -80,7 +80,7 @@ func HandleAdminSettingsKeysRotatePost(
 			return
 		}
 
-		if err := apiClient.RotateSettingsKeys(jwtInfo.TokenResponse.AccessToken); err != nil {
+		if err := apiClient.RotateSettingsKeys(r.Context(), jwtInfo.TokenResponse.AccessToken); err != nil {
 			// Not JsonError directly: the API answers 409 when another rotation won the race,
 			// and JsonError's generic branch would show the administrator "An unexpected
 			// server error has occurred" with a request id, for something neither unexpected
@@ -127,7 +127,7 @@ func HandleAdminSettingsKeysRevokePost(
 		}
 
 		// Let the API enforce state=previous and handle auditing
-		if err := apiClient.DeleteSettingsKey(jwtInfo.TokenResponse.AccessToken, int64(id)); err != nil {
+		if err := apiClient.DeleteSettingsKey(r.Context(), jwtInfo.TokenResponse.AccessToken, int64(id)); err != nil {
 			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}

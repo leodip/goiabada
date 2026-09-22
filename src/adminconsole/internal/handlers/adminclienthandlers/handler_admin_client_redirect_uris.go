@@ -60,7 +60,7 @@ func HandleAdminClientRedirectURIsGet(
 		// resolving it here rather than in the template keeps the template to one condition and
 		// keeps the inheritance rule in one place. The auth server's own gate on
 		// PUT /api/v1/admin/clients/{id}/redirect-uris asks the same question.
-		settingsResp, err := apiClient.GetSettingsGeneral(jwtInfo.TokenResponse.AccessToken)
+		settingsResp, err := apiClient.GetSettingsGeneral(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return

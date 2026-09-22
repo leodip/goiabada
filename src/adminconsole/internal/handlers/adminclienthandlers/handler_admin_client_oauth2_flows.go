@@ -53,7 +53,7 @@ func HandleAdminClientOAuth2Get(
 		}
 
 		// Fetch global settings to get the global PKCE setting
-		settingsResp, err := apiClient.GetSettingsGeneral(jwtInfo.TokenResponse.AccessToken)
+		settingsResp, err := apiClient.GetSettingsGeneral(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return

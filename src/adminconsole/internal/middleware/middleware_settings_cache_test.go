@@ -1,12 +1,14 @@
 package middleware
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/adminconsole/internal/cache"
@@ -289,4 +291,37 @@ func TestMiddlewareSettingsCache_TheIssuerRefusalLogsAStackedErrorOfItsOwn(t *te
 	assert.Contains(t, logged.Error(), "issuer")
 	assert.Positive(t, stackFrameCount(logged),
 		"this arm refuses a successful response, so it has to raise its own error to be locatable")
+}
+
+// The request's own cancellation reaches the auth server call this middleware makes, two hops
+// down: SettingsCache.Get hands it to fetchAndCache, which hands it to GetPublicSettings (#386).
+//
+// Asserted by how long the refusal takes rather than by a marker, because the context cannot cross
+// the wire. An auth server that accepts the connection and never answers is exactly the failure
+// the deadline exists for: with the request's context the middleware refuses at once, and with a
+// context.Background() in its place it would sit on SettingsClient's own ten second timeout while
+// holding this handler goroutine open. Nothing else in the tree can see that substitution.
+func TestMiddlewareSettingsCache_ACancelledRequestAbandonsTheFetch(t *testing.T) {
+	released := make(chan struct{})
+	authServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		<-released
+	}))
+	t.Cleanup(func() {
+		close(released)
+		authServer.Close()
+	})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	req := httptest.NewRequest(http.MethodGet, "/admin/clients", nil).WithContext(ctx)
+
+	started := time.Now()
+	recorder, seen := runSettingsChainForRequest(t, authServer.URL, req)
+	elapsed := time.Since(started)
+
+	assert.Equal(t, http.StatusInternalServerError, recorder.Code)
+	assert.Nil(t, seen, "the next handler is never reached without settings")
+	assert.Less(t, elapsed, 5*time.Second,
+		"the fetch must end with the request rather than on the client's own timeout")
 }

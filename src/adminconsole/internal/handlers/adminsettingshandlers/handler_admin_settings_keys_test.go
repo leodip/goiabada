@@ -1,6 +1,7 @@
 package adminsettingshandlers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -29,11 +30,11 @@ type stubApiClient struct {
 	keys      []api.SettingsSigningKeyResponse
 }
 
-func (s *stubApiClient) RotateSettingsKeys(accessToken string) error {
+func (s *stubApiClient) RotateSettingsKeys(_ context.Context, accessToken string) error {
 	return s.rotateErr
 }
 
-func (s *stubApiClient) GetSettingsKeys(accessToken string) ([]api.SettingsSigningKeyResponse, error) {
+func (s *stubApiClient) GetSettingsKeys(_ context.Context, accessToken string) ([]api.SettingsSigningKeyResponse, error) {
 	return s.keys, nil
 }
 

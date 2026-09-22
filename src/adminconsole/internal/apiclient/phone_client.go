@@ -1,85 +1,36 @@
 package apiclient
 
 import (
-	"bytes"
-	"encoding/json"
-	"io"
+	"context"
 	"net/http"
 	"strconv"
 
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/errs"
 )
 
-func (c *AuthServerClient) UpdateUserPhone(accessToken string, userId int64, request *api.UpdateUserPhoneRequest) (*api.UserResponse, error) {
-	fullURL := c.baseURL + "/api/v1/admin/users/" + strconv.FormatInt(userId, 10) + "/phone"
-
-	jsonData, err := json.Marshal(request)
+func (c *AuthServerClient) UpdateUserPhone(ctx context.Context, accessToken string, userId int64, request *api.UpdateUserPhoneRequest) (*api.UserResponse, error) {
+	response, err := execute[api.UpdateUserResponse](ctx, c, accessToken, apiRequest{
+		method:        "PUT",
+		url:           c.baseURL + "/api/v1/admin/users/" + strconv.FormatInt(userId, 10) + "/phone",
+		jsonBody:      request,
+		contentType:   contentTypeJSON,
+		successStatus: http.StatusOK,
+	})
 	if err != nil {
-		return nil, errs.Errorf("failed to marshal request: %w", err)
+		return nil, err
 	}
-
-	req, err := http.NewRequest("PUT", fullURL, bytes.NewBuffer(jsonData))
-	if err != nil {
-		return nil, errs.Errorf("failed to create request: %w", err)
-	}
-
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, errs.Errorf("failed to make request: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, errs.Errorf("failed to read response body: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, parseAPIError(resp, respBody)
-	}
-
-	var response api.UpdateUserResponse
-	if err := json.Unmarshal(respBody, &response); err != nil {
-		return nil, errs.Errorf("failed to decode response: %w", err)
-	}
-
 	return &response.User, nil
 }
 
-func (c *AuthServerClient) GetPhoneCountries(accessToken string) ([]api.PhoneCountryResponse, error) {
-	fullURL := c.baseURL + "/api/v1/admin/phone-countries"
-
-	req, err := http.NewRequest("GET", fullURL, nil)
+func (c *AuthServerClient) GetPhoneCountries(ctx context.Context, accessToken string) ([]api.PhoneCountryResponse, error) {
+	response, err := execute[api.GetPhoneCountriesResponse](ctx, c, accessToken, apiRequest{
+		method:        "GET",
+		url:           c.baseURL + "/api/v1/admin/phone-countries",
+		contentType:   contentTypeJSON,
+		successStatus: http.StatusOK,
+	})
 	if err != nil {
-		return nil, errs.Errorf("failed to create request: %w", err)
+		return nil, err
 	}
-
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, errs.Errorf("failed to make request: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, errs.Errorf("failed to read response body: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, parseAPIError(resp, respBody)
-	}
-
-	var response api.GetPhoneCountriesResponse
-	if err := json.Unmarshal(respBody, &response); err != nil {
-		return nil, errs.Errorf("failed to decode response: %w", err)
-	}
-
 	return response.PhoneCountries, nil
 }

@@ -1,6 +1,7 @@
 package apiclient
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 
@@ -14,7 +15,7 @@ type ApiClient interface {
 	UpdateUserProfile(accessToken string, userId int64, request *api.UpdateUserProfileRequest) (*api.UserResponse, error)
 	UpdateUserAddress(accessToken string, userId int64, request *api.UpdateUserAddressRequest) (*api.UserResponse, error)
 	UpdateUserEmail(accessToken string, userId int64, request *api.UpdateUserEmailRequest) (*api.UserResponse, error)
-	UpdateUserPhone(accessToken string, userId int64, request *api.UpdateUserPhoneRequest) (*api.UserResponse, error)
+	UpdateUserPhone(ctx context.Context, accessToken string, userId int64, request *api.UpdateUserPhoneRequest) (*api.UserResponse, error)
 	UpdateUserPassword(accessToken string, userId int64, request *api.UpdateUserPasswordRequest) (*api.UserResponse, error)
 	UpdateUserOTP(accessToken string, userId int64, request *api.UpdateUserOTPRequest) (*api.UserResponse, error)
 	CreateUserAdmin(accessToken string, request *api.CreateUserAdminRequest) (*api.UserResponse, error)
@@ -54,7 +55,7 @@ type ApiClient interface {
 	GetPermissionsByResource(accessToken string, resourceId int64) ([]api.PermissionResponse, error)
 	UpdateResourcePermissions(accessToken string, resourceId int64, request *api.UpdateResourcePermissionsRequest) error
 	CreateResource(accessToken string, request *api.CreateResourceRequest) (*api.ResourceResponse, error)
-	GetPhoneCountries(accessToken string) ([]api.PhoneCountryResponse, error)
+	GetPhoneCountries(ctx context.Context, accessToken string) ([]api.PhoneCountryResponse, error)
 	GetGroupAttributesByGroupId(accessToken string, groupId int64) ([]api.GroupAttributeResponse, error)
 	GetGroupAttributeById(accessToken string, attributeId int64) (*api.GroupAttributeResponse, error)
 	CreateGroupAttribute(accessToken string, request *api.CreateGroupAttributeRequest) (*api.GroupAttributeResponse, error)
@@ -78,50 +79,50 @@ type ApiClient interface {
 	// Users search annotated with permission flag
 	SearchUsersWithPermissionAnnotation(accessToken string, permissionId int64, query string, page, size int) ([]api.UserWithPermissionResponse, int, error)
 	// Settings - General
-	GetSettingsGeneral(accessToken string) (*api.SettingsGeneralResponse, error)
-	UpdateSettingsGeneral(accessToken string, request *api.UpdateSettingsGeneralRequest) (*api.SettingsGeneralResponse, error)
+	GetSettingsGeneral(ctx context.Context, accessToken string) (*api.SettingsGeneralResponse, error)
+	UpdateSettingsGeneral(ctx context.Context, accessToken string, request *api.UpdateSettingsGeneralRequest) (*api.SettingsGeneralResponse, error)
 	// Settings - Email
-	GetSettingsEmail(accessToken string) (*api.SettingsEmailResponse, error)
-	UpdateSettingsEmail(accessToken string, request *api.UpdateSettingsEmailRequest) (*api.SettingsEmailResponse, error)
-	SendTestEmail(accessToken string, request *api.SendTestEmailRequest) error
+	GetSettingsEmail(ctx context.Context, accessToken string) (*api.SettingsEmailResponse, error)
+	UpdateSettingsEmail(ctx context.Context, accessToken string, request *api.UpdateSettingsEmailRequest) (*api.SettingsEmailResponse, error)
+	SendTestEmail(ctx context.Context, accessToken string, request *api.SendTestEmailRequest) error
 	// Settings - Sessions
-	GetSettingsSessions(accessToken string) (*api.SettingsSessionsResponse, error)
-	UpdateSettingsSessions(accessToken string, request *api.UpdateSettingsSessionsRequest) (*api.SettingsSessionsResponse, error)
+	GetSettingsSessions(ctx context.Context, accessToken string) (*api.SettingsSessionsResponse, error)
+	UpdateSettingsSessions(ctx context.Context, accessToken string, request *api.UpdateSettingsSessionsRequest) (*api.SettingsSessionsResponse, error)
 	// Settings - Tokens
-	GetSettingsTokens(accessToken string) (*api.SettingsTokensResponse, error)
-	UpdateSettingsTokens(accessToken string, request *api.UpdateSettingsTokensRequest) (*api.SettingsTokensResponse, error)
+	GetSettingsTokens(ctx context.Context, accessToken string) (*api.SettingsTokensResponse, error)
+	UpdateSettingsTokens(ctx context.Context, accessToken string, request *api.UpdateSettingsTokensRequest) (*api.SettingsTokensResponse, error)
 	// Settings - UI Theme
-	GetSettingsUITheme(accessToken string) (*api.SettingsUIThemeResponse, error)
-	UpdateSettingsUITheme(accessToken string, request *api.UpdateSettingsUIThemeRequest) (*api.SettingsUIThemeResponse, error)
+	GetSettingsUITheme(ctx context.Context, accessToken string) (*api.SettingsUIThemeResponse, error)
+	UpdateSettingsUITheme(ctx context.Context, accessToken string, request *api.UpdateSettingsUIThemeRequest) (*api.SettingsUIThemeResponse, error)
 	// Settings - Keys
-	GetSettingsKeys(accessToken string) ([]api.SettingsSigningKeyResponse, error)
-	RotateSettingsKeys(accessToken string) error
-	DeleteSettingsKey(accessToken string, id int64) error
+	GetSettingsKeys(ctx context.Context, accessToken string) ([]api.SettingsSigningKeyResponse, error)
+	RotateSettingsKeys(ctx context.Context, accessToken string) error
+	DeleteSettingsKey(ctx context.Context, accessToken string, id int64) error
 	// Settings - Audit Logs
 	GetSettingsAuditLogs(accessToken string) (*api.SettingsAuditLogsResponse, error)
 	UpdateSettingsAuditLogs(accessToken string, request *api.UpdateSettingsAuditLogsRequest) (*api.SettingsAuditLogsResponse, error)
 	GetAuditLogsPaginated(accessToken string, page, pageSize int, auditEvent string, requestId string) (*api.GetAuditLogsResponse, error)
 	GetAuditEventTypes(accessToken string) (*api.GetAuditEventTypesResponse, error)
 	// Account (self-service)
-	GetAccountProfile(accessToken string) (*api.UserResponse, error)
-	UpdateAccountProfile(accessToken string, request *api.UpdateUserProfileRequest) (*api.UserResponse, error)
-	UpdateAccountEmail(accessToken string, request *api.UpdateAccountEmailRequest) (*api.UserResponse, error)
-	UpdateAccountPhone(accessToken string, request *api.UpdateAccountPhoneRequest) (*api.UserResponse, error)
-	UpdateAccountAddress(accessToken string, request *api.UpdateUserAddressRequest) (*api.UserResponse, error)
-	UpdateAccountPassword(accessToken string, request *api.UpdateAccountPasswordRequest) (*api.UserResponse, error)
-	SendAccountEmailVerification(accessToken string) (*api.AccountEmailVerificationSendResponse, error)
-	VerifyAccountEmail(accessToken string, request *api.VerifyAccountEmailRequest) (*api.UserResponse, error)
+	GetAccountProfile(ctx context.Context, accessToken string) (*api.UserResponse, error)
+	UpdateAccountProfile(ctx context.Context, accessToken string, request *api.UpdateUserProfileRequest) (*api.UserResponse, error)
+	UpdateAccountEmail(ctx context.Context, accessToken string, request *api.UpdateAccountEmailRequest) (*api.UserResponse, error)
+	UpdateAccountPhone(ctx context.Context, accessToken string, request *api.UpdateAccountPhoneRequest) (*api.UserResponse, error)
+	UpdateAccountAddress(ctx context.Context, accessToken string, request *api.UpdateUserAddressRequest) (*api.UserResponse, error)
+	UpdateAccountPassword(ctx context.Context, accessToken string, request *api.UpdateAccountPasswordRequest) (*api.UserResponse, error)
+	SendAccountEmailVerification(ctx context.Context, accessToken string) (*api.AccountEmailVerificationSendResponse, error)
+	VerifyAccountEmail(ctx context.Context, accessToken string, request *api.VerifyAccountEmailRequest) (*api.UserResponse, error)
 	// Account - OTP
-	GetAccountOTPEnrollment(accessToken string) (*api.AccountOTPEnrollmentResponse, error)
-	UpdateAccountOTP(accessToken string, request *api.UpdateAccountOTPRequest) (*api.UserResponse, error)
+	GetAccountOTPEnrollment(ctx context.Context, accessToken string) (*api.AccountOTPEnrollmentResponse, error)
+	UpdateAccountOTP(ctx context.Context, accessToken string, request *api.UpdateAccountOTPRequest) (*api.UserResponse, error)
 	// Account - Consents
-	GetAccountConsents(accessToken string) ([]api.UserConsentResponse, error)
-	RevokeAccountConsent(accessToken string, consentId int64) error
-	CreateAccountLogoutRequest(accessToken string, request *api.AccountLogoutRequest) (*api.AccountLogoutFormPostResponse, *api.AccountLogoutRedirectResponse, error)
+	GetAccountConsents(ctx context.Context, accessToken string) ([]api.UserConsentResponse, error)
+	RevokeAccountConsent(ctx context.Context, accessToken string, consentId int64) error
+	CreateAccountLogoutRequest(ctx context.Context, accessToken string, request *api.AccountLogoutRequest) (*api.AccountLogoutFormPostResponse, *api.AccountLogoutRedirectResponse, error)
 	// Account - Profile Picture
-	GetAccountProfilePicture(accessToken string) (*ProfilePictureInfo, error)
-	UploadAccountProfilePicture(accessToken string, pictureData []byte, filename string) (*ProfilePictureUploadResponse, error)
-	DeleteAccountProfilePicture(accessToken string) error
+	GetAccountProfilePicture(ctx context.Context, accessToken string) (*ProfilePictureInfo, error)
+	UploadAccountProfilePicture(ctx context.Context, accessToken string, pictureData []byte, filename string) (*ProfilePictureUploadResponse, error)
+	DeleteAccountProfilePicture(ctx context.Context, accessToken string) error
 	// Admin - User Profile Picture
 	UploadUserProfilePicture(accessToken string, userId int64, pictureData []byte, filename string) (*ProfilePictureUploadResponse, error)
 	DeleteUserProfilePicture(accessToken string, userId int64) error
@@ -173,7 +174,9 @@ func parseAPIError(resp *http.Response, body []byte) *APIError {
 
 func NewAuthServerClient(authServerBaseURL string) *AuthServerClient {
 	return &AuthServerClient{
-		baseURL:    authServerBaseURL,
-		httpClient: &http.Client{},
+		baseURL: authServerBaseURL,
+		httpClient: &http.Client{
+			Timeout: generalAPITimeout,
+		},
 	}
 }

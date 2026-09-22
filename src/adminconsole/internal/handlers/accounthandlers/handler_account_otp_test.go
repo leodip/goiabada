@@ -1,6 +1,7 @@
 package accounthandlers
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -54,11 +55,11 @@ type stubApiClient struct {
 	updateReq *api.UpdateAccountOTPRequest
 }
 
-func (s *stubApiClient) GetAccountProfile(accessToken string) (*api.UserResponse, error) {
+func (s *stubApiClient) GetAccountProfile(_ context.Context, accessToken string) (*api.UserResponse, error) {
 	return s.profile, nil
 }
 
-func (s *stubApiClient) GetAccountOTPEnrollment(accessToken string) (*api.AccountOTPEnrollmentResponse, error) {
+func (s *stubApiClient) GetAccountOTPEnrollment(_ context.Context, accessToken string) (*api.AccountOTPEnrollmentResponse, error) {
 	s.enrollmentGET++
 	if s.enrollmentErr != nil {
 		return nil, s.enrollmentErr
@@ -66,7 +67,7 @@ func (s *stubApiClient) GetAccountOTPEnrollment(accessToken string) (*api.Accoun
 	return s.enrollment, nil
 }
 
-func (s *stubApiClient) UpdateAccountOTP(accessToken string,
+func (s *stubApiClient) UpdateAccountOTP(_ context.Context, accessToken string,
 	request *api.UpdateAccountOTPRequest) (*api.UserResponse, error) {
 
 	s.updateReq = request

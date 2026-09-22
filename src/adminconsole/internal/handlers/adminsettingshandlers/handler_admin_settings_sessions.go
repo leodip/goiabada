@@ -33,7 +33,7 @@ func HandleAdminSettingsSessionsGet(
 		}
 
 		// Fetch settings from API
-		apiResp, err := apiClient.GetSettingsSessions(jwtInfo.TokenResponse.AccessToken)
+		apiResp, err := apiClient.GetSettingsSessions(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -123,7 +123,7 @@ func HandleAdminSettingsSessionsPost(
 			UserSessionMaxLifetimeInSeconds: maxInt,
 		}
 
-		_, err := apiClient.UpdateSettingsSessions(jwtInfo.TokenResponse.AccessToken, updateReq)
+		_, err := apiClient.UpdateSettingsSessions(r.Context(), jwtInfo.TokenResponse.AccessToken, updateReq)
 		if err != nil {
 			handlers.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
 			return

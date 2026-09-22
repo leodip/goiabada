@@ -1,6 +1,7 @@
 package accounthandlers
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -34,7 +35,7 @@ type settingsCarrierApiClient struct {
 	apiclient.ApiClient
 }
 
-func (settingsCarrierApiClient) GetAccountProfile(string) (*api.UserResponse, error) {
+func (settingsCarrierApiClient) GetAccountProfile(context.Context, string) (*api.UserResponse, error) {
 	return &api.UserResponse{Id: 11, Email: "someone@example.com", EmailVerified: true}, nil
 }
 

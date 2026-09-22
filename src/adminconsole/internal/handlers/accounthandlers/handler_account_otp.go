@@ -28,7 +28,7 @@ func HandleAccountOtpGet(
 		}
 
 		// Load current user profile via API
-		user, err := apiClient.GetAccountProfile(jwtInfo.TokenResponse.AccessToken)
+		user, err := apiClient.GetAccountProfile(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -40,7 +40,7 @@ func HandleAccountOtpGet(
 
 		if !user.OTPEnabled {
 			// request enrollment secret and QR from API
-			enrollment, err := apiClient.GetAccountOTPEnrollment(jwtInfo.TokenResponse.AccessToken)
+			enrollment, err := apiClient.GetAccountOTPEnrollment(r.Context(), jwtInfo.TokenResponse.AccessToken)
 			if err != nil {
 				handlers.HandleAPIError(httpHelper, w, r, err)
 				return
@@ -72,7 +72,7 @@ func HandleAccountOtpPost(
 			return
 		}
 		// Load user to determine current OTP state
-		user, err := apiClient.GetAccountProfile(jwtInfo.TokenResponse.AccessToken)
+		user, err := apiClient.GetAccountProfile(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -114,7 +114,7 @@ func HandleAccountOtpPost(
 		// code or a wrong password would have rerendered an empty QR code and an empty seed, and
 		// the user could not have finished enrolling.
 		renderEnrollmentError := func(message string) {
-			enrollment, err := apiClient.GetAccountOTPEnrollment(jwtInfo.TokenResponse.AccessToken)
+			enrollment, err := apiClient.GetAccountOTPEnrollment(r.Context(), jwtInfo.TokenResponse.AccessToken)
 			if err != nil {
 				handlers.HandleAPIError(httpHelper, w, r, err)
 				return
@@ -139,7 +139,7 @@ func HandleAccountOtpPost(
 				Enabled:  false,
 				Password: password,
 			}
-			if _, err := apiClient.UpdateAccountOTP(jwtInfo.TokenResponse.AccessToken, req); err != nil {
+			if _, err := apiClient.UpdateAccountOTP(r.Context(), jwtInfo.TokenResponse.AccessToken, req); err != nil {
 				var apiErr *apiclient.APIError
 				if errors.As(err, &apiErr) && isHandledAccountOTPError(apiErr.Code) {
 					renderDisableError(apiErr.Message)
@@ -166,7 +166,7 @@ func HandleAccountOtpPost(
 				Password: password,
 				OtpCode:  otpCode,
 			}
-			if _, err := apiClient.UpdateAccountOTP(jwtInfo.TokenResponse.AccessToken, req); err != nil {
+			if _, err := apiClient.UpdateAccountOTP(r.Context(), jwtInfo.TokenResponse.AccessToken, req); err != nil {
 				var apiErr *apiclient.APIError
 				if errors.As(err, &apiErr) {
 					// An enrolment that has already succeeded, from another tab or another

@@ -1,6 +1,7 @@
 package cache
 
 import (
+	"context"
 	"sync"
 	"time"
 
@@ -25,8 +26,9 @@ func NewSettingsCache(authServerBaseURL string) *SettingsCache {
 	}
 }
 
-// Get returns the cached settings or fetches them if the cache is expired or empty
-func (c *SettingsCache) Get() (*api.PublicSettingsResponse, error) {
+// Get returns the cached settings or fetches them if the cache is expired or empty.
+// The context is the originating request's and reaches the auth server call a cache miss makes.
+func (c *SettingsCache) Get(ctx context.Context) (*api.PublicSettingsResponse, error) {
 	c.mu.RLock()
 	// Check if cache is valid
 	if c.cachedData != nil && time.Since(c.cachedAt) < cacheTTL {
@@ -37,7 +39,7 @@ func (c *SettingsCache) Get() (*api.PublicSettingsResponse, error) {
 	c.mu.RUnlock()
 
 	// Cache is expired or empty, fetch new data
-	return c.fetchAndCache()
+	return c.fetchAndCache(ctx)
 }
 
 // Invalidate clears the cache, forcing a fresh fetch on the next Get()
@@ -50,7 +52,7 @@ func (c *SettingsCache) Invalidate() {
 }
 
 // fetchAndCache fetches settings from the authserver and caches them
-func (c *SettingsCache) fetchAndCache() (*api.PublicSettingsResponse, error) {
+func (c *SettingsCache) fetchAndCache(ctx context.Context) (*api.PublicSettingsResponse, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -60,7 +62,7 @@ func (c *SettingsCache) fetchAndCache() (*api.PublicSettingsResponse, error) {
 	}
 
 	// Fetch from authserver
-	settings, err := c.client.GetPublicSettings()
+	settings, err := c.client.GetPublicSettings(ctx)
 	if err != nil {
 		return nil, err
 	}

@@ -16,7 +16,7 @@ func MiddlewareSettingsCache(settingsCache *cache.SettingsCache) func(http.Handl
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Fetch settings from cache (auto-refreshes if expired)
-			publicSettings, err := settingsCache.Get()
+			publicSettings, err := settingsCache.Get(r.Context())
 			if err != nil {
 				// The detail goes to the log rather than to the browser. It names the auth
 				// server's address and whatever the transport failed with, which the operator

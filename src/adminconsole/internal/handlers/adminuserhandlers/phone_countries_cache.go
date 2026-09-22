@@ -1,6 +1,7 @@
 package adminuserhandlers
 
 import (
+	"context"
 	"sync"
 	"time"
 
@@ -18,7 +19,7 @@ var phoneCountriesCache struct {
 const phoneCountriesCacheTTL = 24 * time.Hour
 
 // getPhoneCountriesWithCache retrieves phone countries from cache or API
-func getPhoneCountriesWithCache(apiClient apiclient.ApiClient, accessToken string) ([]api.PhoneCountryResponse, error) {
+func getPhoneCountriesWithCache(ctx context.Context, apiClient apiclient.ApiClient, accessToken string) ([]api.PhoneCountryResponse, error) {
 	// Try to read from cache first
 	phoneCountriesCache.mutex.RLock()
 	if time.Since(phoneCountriesCache.timestamp) < phoneCountriesCacheTTL && phoneCountriesCache.data != nil {
@@ -28,7 +29,7 @@ func getPhoneCountriesWithCache(apiClient apiclient.ApiClient, accessToken strin
 	phoneCountriesCache.mutex.RUnlock()
 
 	// Cache miss or expired - fetch from API
-	data, err := apiClient.GetPhoneCountries(accessToken)
+	data, err := apiClient.GetPhoneCountries(ctx, accessToken)
 	if err != nil {
 		return nil, err
 	}

@@ -1,6 +1,7 @@
 package apiclient
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -32,7 +33,7 @@ func TestAuthServerClient_CreateAccountLogoutRequestReadsTheFormInstruction(t *t
 		}
 	}`)
 
-	formResp, redirectResp, err := client.CreateAccountLogoutRequest("an-access-token",
+	formResp, redirectResp, err := client.CreateAccountLogoutRequest(context.Background(), "an-access-token",
 		&api.AccountLogoutRequest{
 			PostLogoutRedirectUri: "https://console.example.com/",
 			ResponseMode:          api.AccountLogoutResponseModeFormPost,
@@ -62,7 +63,7 @@ func TestAuthServerClient_CreateAccountLogoutRequestReadsTheRedirect(t *testing.
 	client, _ := serves(t,
 		`{"logoutUrl":"https://auth.example.com/auth/logout?id_token_hint=the.id.token"}`)
 
-	formResp, redirectResp, err := client.CreateAccountLogoutRequest("an-access-token",
+	formResp, redirectResp, err := client.CreateAccountLogoutRequest(context.Background(), "an-access-token",
 		&api.AccountLogoutRequest{
 			PostLogoutRedirectUri: "https://console.example.com/",
 			ResponseMode:          api.AccountLogoutResponseModeFormPost,
@@ -80,7 +81,7 @@ func TestAuthServerClient_CreateAccountLogoutRequestReadsTheRedirect(t *testing.
 func TestAuthServerClient_CreateAccountLogoutRequestRefusesABodyOfNeitherShape(t *testing.T) {
 	client, _ := serves(t, `{"somethingElse":true}`)
 
-	formResp, redirectResp, err := client.CreateAccountLogoutRequest("an-access-token",
+	formResp, redirectResp, err := client.CreateAccountLogoutRequest(context.Background(), "an-access-token",
 		&api.AccountLogoutRequest{PostLogoutRedirectUri: "https://console.example.com/"})
 
 	require.Error(t, err)

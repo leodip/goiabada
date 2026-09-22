@@ -35,7 +35,7 @@ func HandleAdminSettingsEmailGet(
 		}
 
 		// Fetch settings via API
-		apiResp, err := apiClient.GetSettingsEmail(jwtInfo.TokenResponse.AccessToken)
+		apiResp, err := apiClient.GetSettingsEmail(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -147,7 +147,7 @@ func HandleAdminSettingsEmailPost(
 			SMTPFromEmail:  strings.TrimSpace(settingsInfo.SMTPFromEmail),
 		}
 
-		_, err := apiClient.UpdateSettingsEmail(jwtInfo.TokenResponse.AccessToken, updateReq)
+		_, err := apiClient.UpdateSettingsEmail(r.Context(), jwtInfo.TokenResponse.AccessToken, updateReq)
 		if err != nil {
 			handlers.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
 			return
@@ -203,7 +203,7 @@ func HandleAdminSettingsEmailSendTestGet(
 		}
 
 		// Fetch settings to know whether SMTP is enabled
-		apiResp, err := apiClient.GetSettingsEmail(jwtInfo.TokenResponse.AccessToken)
+		apiResp, err := apiClient.GetSettingsEmail(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -258,7 +258,7 @@ func HandleAdminSettingsEmailSendTestPost(
 		}
 
 		// Call API to send test email (server validates SMTP enabled and email)
-		err := apiClient.SendTestEmail(jwtInfo.TokenResponse.AccessToken, &api.SendTestEmailRequest{To: destinationEmail})
+		err := apiClient.SendTestEmail(r.Context(), jwtInfo.TokenResponse.AccessToken, &api.SendTestEmailRequest{To: destinationEmail})
 		if err != nil {
 			// Prefer to render form error for known API error codes
 			var apiErr *apiclient.APIError

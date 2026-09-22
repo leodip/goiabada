@@ -33,7 +33,7 @@ func HandleAdminSettingsTokensGet(
 		}
 
 		// Fetch settings from API
-		apiResp, err := apiClient.GetSettingsTokens(jwtInfo.TokenResponse.AccessToken)
+		apiResp, err := apiClient.GetSettingsTokens(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -138,7 +138,7 @@ func HandleAdminSettingsTokensPost(
 			IncludeOpenIDConnectClaimsInIdToken:     settingsInfo.IncludeOpenIDConnectClaimsInIdToken,
 		}
 
-		_, err := apiClient.UpdateSettingsTokens(jwtInfo.TokenResponse.AccessToken, updateReq)
+		_, err := apiClient.UpdateSettingsTokens(r.Context(), jwtInfo.TokenResponse.AccessToken, updateReq)
 		if err != nil {
 			handlers.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
 			return

@@ -1,11 +1,9 @@
 package apiclient
 
 import (
-	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
-	"io"
-	"mime/multipart"
 	"net/http"
 
 	"github.com/leodip/goiabada/core/api"
@@ -19,384 +17,144 @@ type ProfilePictureUploadResponse struct {
 }
 
 // GetAccountProfile retrieves the current user's profile
-func (c *AuthServerClient) GetAccountProfile(accessToken string) (*api.UserResponse, error) {
-	fullURL := c.baseURL + "/api/v1/account/profile"
-
-	req, err := http.NewRequest("GET", fullURL, nil)
+func (c *AuthServerClient) GetAccountProfile(ctx context.Context, accessToken string) (*api.UserResponse, error) {
+	response, err := execute[api.GetUserResponse](ctx, c, accessToken, apiRequest{
+		method:        "GET",
+		url:           c.baseURL + "/api/v1/account/profile",
+		contentType:   contentTypeJSON,
+		successStatus: http.StatusOK,
+	})
 	if err != nil {
-		return nil, errs.Errorf("failed to create request: %w", err)
+		return nil, err
 	}
-
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, errs.Errorf("failed to make request: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, errs.Errorf("failed to read response body: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, parseAPIError(resp, body)
-	}
-
-	var response api.GetUserResponse
-	if err := json.Unmarshal(body, &response); err != nil {
-		return nil, errs.Errorf("failed to decode response: %w", err)
-	}
-
 	return &response.User, nil
 }
 
 // UpdateAccountProfile updates the current user's profile
-func (c *AuthServerClient) UpdateAccountProfile(accessToken string, request *api.UpdateUserProfileRequest) (*api.UserResponse, error) {
-	fullURL := c.baseURL + "/api/v1/account/profile"
-
-	jsonData, err := json.Marshal(request)
+func (c *AuthServerClient) UpdateAccountProfile(ctx context.Context, accessToken string, request *api.UpdateUserProfileRequest) (*api.UserResponse, error) {
+	response, err := execute[api.UpdateUserResponse](ctx, c, accessToken, apiRequest{
+		method:        "PUT",
+		url:           c.baseURL + "/api/v1/account/profile",
+		jsonBody:      request,
+		contentType:   contentTypeJSON,
+		successStatus: http.StatusOK,
+	})
 	if err != nil {
-		return nil, errs.Errorf("failed to marshal request: %w", err)
+		return nil, err
 	}
-
-	req, err := http.NewRequest("PUT", fullURL, bytes.NewBuffer(jsonData))
-	if err != nil {
-		return nil, errs.Errorf("failed to create request: %w", err)
-	}
-
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, errs.Errorf("failed to make request: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, errs.Errorf("failed to read response body: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, parseAPIError(resp, body)
-	}
-
-	var response api.UpdateUserResponse
-	if err := json.Unmarshal(body, &response); err != nil {
-		return nil, errs.Errorf("failed to decode response: %w", err)
-	}
-
 	return &response.User, nil
 }
 
 // UpdateAccountEmail updates the current user's email
-func (c *AuthServerClient) UpdateAccountEmail(accessToken string, request *api.UpdateAccountEmailRequest) (*api.UserResponse, error) {
-	fullURL := c.baseURL + "/api/v1/account/email"
-
-	jsonData, err := json.Marshal(request)
+func (c *AuthServerClient) UpdateAccountEmail(ctx context.Context, accessToken string, request *api.UpdateAccountEmailRequest) (*api.UserResponse, error) {
+	response, err := execute[api.UpdateUserResponse](ctx, c, accessToken, apiRequest{
+		method:        "PUT",
+		url:           c.baseURL + "/api/v1/account/email",
+		jsonBody:      request,
+		contentType:   contentTypeJSON,
+		successStatus: http.StatusOK,
+	})
 	if err != nil {
-		return nil, errs.Errorf("failed to marshal request: %w", err)
+		return nil, err
 	}
-
-	req, err := http.NewRequest("PUT", fullURL, bytes.NewBuffer(jsonData))
-	if err != nil {
-		return nil, errs.Errorf("failed to create request: %w", err)
-	}
-
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, errs.Errorf("failed to make request: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, errs.Errorf("failed to read response body: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, parseAPIError(resp, body)
-	}
-
-	var response api.UpdateUserResponse
-	if err := json.Unmarshal(body, &response); err != nil {
-		return nil, errs.Errorf("failed to decode response: %w", err)
-	}
-
 	return &response.User, nil
 }
 
 // UpdateAccountPhone updates the current user's phone
-func (c *AuthServerClient) UpdateAccountPhone(accessToken string, request *api.UpdateAccountPhoneRequest) (*api.UserResponse, error) {
-	fullURL := c.baseURL + "/api/v1/account/phone"
-
-	jsonData, err := json.Marshal(request)
+func (c *AuthServerClient) UpdateAccountPhone(ctx context.Context, accessToken string, request *api.UpdateAccountPhoneRequest) (*api.UserResponse, error) {
+	response, err := execute[api.UpdateUserResponse](ctx, c, accessToken, apiRequest{
+		method:        "PUT",
+		url:           c.baseURL + "/api/v1/account/phone",
+		jsonBody:      request,
+		contentType:   contentTypeJSON,
+		successStatus: http.StatusOK,
+	})
 	if err != nil {
-		return nil, errs.Errorf("failed to marshal request: %w", err)
+		return nil, err
 	}
-
-	req, err := http.NewRequest("PUT", fullURL, bytes.NewBuffer(jsonData))
-	if err != nil {
-		return nil, errs.Errorf("failed to create request: %w", err)
-	}
-
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, errs.Errorf("failed to make request: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, errs.Errorf("failed to read response body: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, parseAPIError(resp, body)
-	}
-
-	var response api.UpdateUserResponse
-	if err := json.Unmarshal(body, &response); err != nil {
-		return nil, errs.Errorf("failed to decode response: %w", err)
-	}
-
 	return &response.User, nil
 }
 
 // UpdateAccountAddress updates the current user's address
-func (c *AuthServerClient) UpdateAccountAddress(accessToken string, request *api.UpdateUserAddressRequest) (*api.UserResponse, error) {
-	fullURL := c.baseURL + "/api/v1/account/address"
-
-	jsonData, err := json.Marshal(request)
+func (c *AuthServerClient) UpdateAccountAddress(ctx context.Context, accessToken string, request *api.UpdateUserAddressRequest) (*api.UserResponse, error) {
+	response, err := execute[api.UpdateUserResponse](ctx, c, accessToken, apiRequest{
+		method:        "PUT",
+		url:           c.baseURL + "/api/v1/account/address",
+		jsonBody:      request,
+		contentType:   contentTypeJSON,
+		successStatus: http.StatusOK,
+	})
 	if err != nil {
-		return nil, errs.Errorf("failed to marshal request: %w", err)
+		return nil, err
 	}
-
-	req, err := http.NewRequest("PUT", fullURL, bytes.NewBuffer(jsonData))
-	if err != nil {
-		return nil, errs.Errorf("failed to create request: %w", err)
-	}
-
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, errs.Errorf("failed to make request: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, errs.Errorf("failed to read response body: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, parseAPIError(resp, body)
-	}
-
-	var response api.UpdateUserResponse
-	if err := json.Unmarshal(body, &response); err != nil {
-		return nil, errs.Errorf("failed to decode response: %w", err)
-	}
-
 	return &response.User, nil
 }
 
 // UpdateAccountPassword changes the current user's password
-func (c *AuthServerClient) UpdateAccountPassword(accessToken string, request *api.UpdateAccountPasswordRequest) (*api.UserResponse, error) {
-	fullURL := c.baseURL + "/api/v1/account/password"
-
-	jsonData, err := json.Marshal(request)
+func (c *AuthServerClient) UpdateAccountPassword(ctx context.Context, accessToken string, request *api.UpdateAccountPasswordRequest) (*api.UserResponse, error) {
+	response, err := execute[api.UpdateUserResponse](ctx, c, accessToken, apiRequest{
+		method:        "PUT",
+		url:           c.baseURL + "/api/v1/account/password",
+		jsonBody:      request,
+		contentType:   contentTypeJSON,
+		successStatus: http.StatusOK,
+	})
 	if err != nil {
-		return nil, errs.Errorf("failed to marshal request: %w", err)
+		return nil, err
 	}
-
-	req, err := http.NewRequest("PUT", fullURL, bytes.NewBuffer(jsonData))
-	if err != nil {
-		return nil, errs.Errorf("failed to create request: %w", err)
-	}
-
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, errs.Errorf("failed to make request: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, errs.Errorf("failed to read response body: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, parseAPIError(resp, body)
-	}
-
-	var response api.UpdateUserResponse
-	if err := json.Unmarshal(body, &response); err != nil {
-		return nil, errs.Errorf("failed to decode response: %w", err)
-	}
-
 	return &response.User, nil
 }
 
 // SendAccountEmailVerification triggers sending a verification code to the user's email
-func (c *AuthServerClient) SendAccountEmailVerification(accessToken string) (*api.AccountEmailVerificationSendResponse, error) {
-	fullURL := c.baseURL + "/api/v1/account/email/verification/send"
-
-	// empty JSON object
-	req, err := http.NewRequest("POST", fullURL, bytes.NewBuffer([]byte("{}")))
-	if err != nil {
-		return nil, errs.Errorf("failed to create request: %w", err)
-	}
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, errs.Errorf("failed to make request: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, errs.Errorf("failed to read response body: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, parseAPIError(resp, body)
-	}
-
-	var response api.AccountEmailVerificationSendResponse
-	if err := json.Unmarshal(body, &response); err != nil {
-		return nil, errs.Errorf("failed to decode response: %w", err)
-	}
-	return &response, nil
+func (c *AuthServerClient) SendAccountEmailVerification(ctx context.Context, accessToken string) (*api.AccountEmailVerificationSendResponse, error) {
+	return execute[api.AccountEmailVerificationSendResponse](ctx, c, accessToken, apiRequest{
+		method: "POST",
+		url:    c.baseURL + "/api/v1/account/email/verification/send",
+		// An empty JSON object, not a marshalled value: this endpoint takes no parameters and the
+		// literal is what it has always been sent.
+		rawBody:       []byte("{}"),
+		contentType:   contentTypeJSON,
+		successStatus: http.StatusOK,
+	})
 }
 
 // VerifyAccountEmail sends the verification code to confirm the user's email
-func (c *AuthServerClient) VerifyAccountEmail(accessToken string, request *api.VerifyAccountEmailRequest) (*api.UserResponse, error) {
-	fullURL := c.baseURL + "/api/v1/account/email/verification"
-
-	jsonData, err := json.Marshal(request)
+func (c *AuthServerClient) VerifyAccountEmail(ctx context.Context, accessToken string, request *api.VerifyAccountEmailRequest) (*api.UserResponse, error) {
+	response, err := execute[api.UpdateUserResponse](ctx, c, accessToken, apiRequest{
+		method:        "POST",
+		url:           c.baseURL + "/api/v1/account/email/verification",
+		jsonBody:      request,
+		contentType:   contentTypeJSON,
+		successStatus: http.StatusOK,
+	})
 	if err != nil {
-		return nil, errs.Errorf("failed to marshal request: %w", err)
+		return nil, err
 	}
-
-	req, err := http.NewRequest("POST", fullURL, bytes.NewBuffer(jsonData))
-	if err != nil {
-		return nil, errs.Errorf("failed to create request: %w", err)
-	}
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, errs.Errorf("failed to make request: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, errs.Errorf("failed to read response body: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, parseAPIError(resp, body)
-	}
-
-	var response api.UpdateUserResponse
-	if err := json.Unmarshal(body, &response); err != nil {
-		return nil, errs.Errorf("failed to decode response: %w", err)
-	}
-
 	return &response.User, nil
 }
 
 // GetAccountOTPEnrollment generates an OTP enrollment secret and QR for current user
-func (c *AuthServerClient) GetAccountOTPEnrollment(accessToken string) (*api.AccountOTPEnrollmentResponse, error) {
-	fullURL := c.baseURL + "/api/v1/account/otp/enrollment"
-
-	req, err := http.NewRequest("GET", fullURL, nil)
-	if err != nil {
-		return nil, errs.Errorf("failed to create request: %w", err)
-	}
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, errs.Errorf("failed to make request: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, errs.Errorf("failed to read response body: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, parseAPIError(resp, body)
-	}
-
-	var response api.AccountOTPEnrollmentResponse
-	if err := json.Unmarshal(body, &response); err != nil {
-		return nil, errs.Errorf("failed to decode response: %w", err)
-	}
-
-	return &response, nil
+func (c *AuthServerClient) GetAccountOTPEnrollment(ctx context.Context, accessToken string) (*api.AccountOTPEnrollmentResponse, error) {
+	return execute[api.AccountOTPEnrollmentResponse](ctx, c, accessToken, apiRequest{
+		method:        "GET",
+		url:           c.baseURL + "/api/v1/account/otp/enrollment",
+		contentType:   contentTypeJSON,
+		successStatus: http.StatusOK,
+	})
 }
 
 // UpdateAccountOTP enables or disables OTP for the current user
-func (c *AuthServerClient) UpdateAccountOTP(accessToken string, request *api.UpdateAccountOTPRequest) (*api.UserResponse, error) {
-	fullURL := c.baseURL + "/api/v1/account/otp"
-
-	jsonData, err := json.Marshal(request)
+func (c *AuthServerClient) UpdateAccountOTP(ctx context.Context, accessToken string, request *api.UpdateAccountOTPRequest) (*api.UserResponse, error) {
+	response, err := execute[api.UpdateUserResponse](ctx, c, accessToken, apiRequest{
+		method:        "PUT",
+		url:           c.baseURL + "/api/v1/account/otp",
+		jsonBody:      request,
+		contentType:   contentTypeJSON,
+		successStatus: http.StatusOK,
+	})
 	if err != nil {
-		return nil, errs.Errorf("failed to marshal request: %w", err)
+		return nil, err
 	}
-
-	req, err := http.NewRequest("PUT", fullURL, bytes.NewBuffer(jsonData))
-	if err != nil {
-		return nil, errs.Errorf("failed to create request: %w", err)
-	}
-
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, errs.Errorf("failed to make request: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, errs.Errorf("failed to read response body: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, parseAPIError(resp, body)
-	}
-
-	var response api.UpdateUserResponse
-	if err := json.Unmarshal(body, &response); err != nil {
-		return nil, errs.Errorf("failed to decode response: %w", err)
-	}
-
 	return &response.User, nil
 }
 
@@ -406,35 +164,18 @@ func (c *AuthServerClient) UpdateAccountOTP(accessToken string, request *api.Upd
 // The two shapes share no field, so they are told apart by what survived the unmarshal rather than
 // by a discriminator: encoding/json fills neither struct from the other's body, and a body that
 // fills neither is an error rather than a nil pair, because the caller would otherwise dereference
-// whichever it expected.
-func (c *AuthServerClient) CreateAccountLogoutRequest(accessToken string, request *api.AccountLogoutRequest) (*api.AccountLogoutFormPostResponse, *api.AccountLogoutRedirectResponse, error) {
-	fullURL := c.baseURL + "/api/v1/account/logout-request"
-
-	jsonData, err := json.Marshal(request)
+// whichever it expected. That is why this one takes the body from the executor and decodes it
+// itself rather than naming a single response type.
+func (c *AuthServerClient) CreateAccountLogoutRequest(ctx context.Context, accessToken string, request *api.AccountLogoutRequest) (*api.AccountLogoutFormPostResponse, *api.AccountLogoutRedirectResponse, error) {
+	body, err := c.do(ctx, accessToken, apiRequest{
+		method:        "POST",
+		url:           c.baseURL + "/api/v1/account/logout-request",
+		jsonBody:      request,
+		contentType:   contentTypeJSON,
+		anySuccess2xx: true,
+	})
 	if err != nil {
-		return nil, nil, errs.Errorf("failed to marshal request: %w", err)
-	}
-
-	req, err := http.NewRequest("POST", fullURL, bytes.NewBuffer(jsonData))
-	if err != nil {
-		return nil, nil, errs.Errorf("failed to create request: %w", err)
-	}
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, nil, errs.Errorf("failed to make request: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, nil, errs.Errorf("failed to read response body: %w", err)
-	}
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, nil, parseAPIError(resp, body)
+		return nil, nil, err
 	}
 
 	// Try to decode as form_post response first
@@ -453,179 +194,64 @@ func (c *AuthServerClient) CreateAccountLogoutRequest(accessToken string, reques
 }
 
 // GetAccountConsents retrieves the current user's consents
-func (c *AuthServerClient) GetAccountConsents(accessToken string) ([]api.UserConsentResponse, error) {
-	fullURL := c.baseURL + "/api/v1/account/consents"
-
-	req, err := http.NewRequest("GET", fullURL, nil)
+func (c *AuthServerClient) GetAccountConsents(ctx context.Context, accessToken string) ([]api.UserConsentResponse, error) {
+	response, err := execute[api.GetUserConsentsResponse](ctx, c, accessToken, apiRequest{
+		method:        "GET",
+		url:           c.baseURL + "/api/v1/account/consents",
+		contentType:   contentTypeJSON,
+		successStatus: http.StatusOK,
+	})
 	if err != nil {
-		return nil, errs.Errorf("failed to create request: %w", err)
+		return nil, err
 	}
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, errs.Errorf("failed to make request: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, errs.Errorf("failed to read response body: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, parseAPIError(resp, body)
-	}
-
-	var response api.GetUserConsentsResponse
-	if err := json.Unmarshal(body, &response); err != nil {
-		return nil, errs.Errorf("failed to decode response: %w", err)
-	}
-
 	return response.Consents, nil
 }
 
 // RevokeAccountConsent deletes a consent for the current user
-func (c *AuthServerClient) RevokeAccountConsent(accessToken string, consentId int64) error {
-	fullURL := fmt.Sprintf("%s/api/v1/account/consents/%d", c.baseURL, consentId)
-
-	req, err := http.NewRequest("DELETE", fullURL, nil)
-	if err != nil {
-		return errs.Errorf("failed to create request: %w", err)
-	}
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return errs.Errorf("failed to make request: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return errs.Errorf("failed to read response body: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return parseAPIError(resp, body)
-	}
-	return nil
+func (c *AuthServerClient) RevokeAccountConsent(ctx context.Context, accessToken string, consentId int64) error {
+	_, err := c.do(ctx, accessToken, apiRequest{
+		method:        "DELETE",
+		url:           fmt.Sprintf("%s/api/v1/account/consents/%d", c.baseURL, consentId),
+		contentType:   contentTypeJSON,
+		successStatus: http.StatusOK,
+	})
+	return err
 }
 
 // GetAccountProfilePicture retrieves the current user's profile picture info
-func (c *AuthServerClient) GetAccountProfilePicture(accessToken string) (*ProfilePictureInfo, error) {
-	fullURL := c.baseURL + "/api/v1/account/profile-picture"
-
-	req, err := http.NewRequest("GET", fullURL, nil)
-	if err != nil {
-		return nil, errs.Errorf("failed to create request: %w", err)
-	}
-
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, errs.Errorf("failed to make request: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, errs.Errorf("failed to read response body: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, parseAPIError(resp, body)
-	}
-
-	var response ProfilePictureInfo
-	if err := json.Unmarshal(body, &response); err != nil {
-		return nil, errs.Errorf("failed to decode response: %w", err)
-	}
-
-	return &response, nil
+func (c *AuthServerClient) GetAccountProfilePicture(ctx context.Context, accessToken string) (*ProfilePictureInfo, error) {
+	return execute[ProfilePictureInfo](ctx, c, accessToken, apiRequest{
+		method:        "GET",
+		url:           c.baseURL + "/api/v1/account/profile-picture",
+		contentType:   contentTypeJSON,
+		successStatus: http.StatusOK,
+	})
 }
 
 // UploadAccountProfilePicture uploads a profile picture for the current user
-func (c *AuthServerClient) UploadAccountProfilePicture(accessToken string, pictureData []byte, filename string) (*ProfilePictureUploadResponse, error) {
-	fullURL := c.baseURL + "/api/v1/account/profile-picture"
-
-	// Create multipart form
-	var buf bytes.Buffer
-	writer := multipart.NewWriter(&buf)
-
-	part, err := writer.CreateFormFile("picture", filename)
+func (c *AuthServerClient) UploadAccountProfilePicture(ctx context.Context, accessToken string, pictureData []byte, filename string) (*ProfilePictureUploadResponse, error) {
+	body, contentType, err := multipartPicture(filename, pictureData)
 	if err != nil {
-		return nil, errs.Errorf("failed to create form file: %w", err)
+		return nil, err
 	}
 
-	if _, err := part.Write(pictureData); err != nil {
-		return nil, errs.Errorf("failed to write picture data: %w", err)
-	}
-
-	if err := writer.Close(); err != nil {
-		return nil, errs.Errorf("failed to close multipart writer: %w", err)
-	}
-
-	req, err := http.NewRequest("POST", fullURL, &buf)
-	if err != nil {
-		return nil, errs.Errorf("failed to create request: %w", err)
-	}
-
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-	req.Header.Set("Content-Type", writer.FormDataContentType())
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, errs.Errorf("failed to make request: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, errs.Errorf("failed to read response body: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, parseAPIError(resp, body)
-	}
-
-	var response ProfilePictureUploadResponse
-	if err := json.Unmarshal(body, &response); err != nil {
-		return nil, errs.Errorf("failed to decode response: %w", err)
-	}
-
-	return &response, nil
+	return execute[ProfilePictureUploadResponse](ctx, c, accessToken, apiRequest{
+		method:        "POST",
+		url:           c.baseURL + "/api/v1/account/profile-picture",
+		rawBody:       body,
+		contentType:   contentType,
+		successStatus: http.StatusOK,
+	})
 }
 
 // DeleteAccountProfilePicture deletes the current user's profile picture
-func (c *AuthServerClient) DeleteAccountProfilePicture(accessToken string) error {
-	fullURL := c.baseURL + "/api/v1/account/profile-picture"
-
-	req, err := http.NewRequest("DELETE", fullURL, nil)
-	if err != nil {
-		return errs.Errorf("failed to create request: %w", err)
-	}
-
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return errs.Errorf("failed to make request: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return errs.Errorf("failed to read response body: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return parseAPIError(resp, body)
-	}
-
-	return nil
+func (c *AuthServerClient) DeleteAccountProfilePicture(ctx context.Context, accessToken string) error {
+	// No Content-Type: this request carries no body, and the header it never set is left unset
+	// rather than tidied up, because nothing observable moves in this change.
+	_, err := c.do(ctx, accessToken, apiRequest{
+		method:        "DELETE",
+		url:           c.baseURL + "/api/v1/account/profile-picture",
+		successStatus: http.StatusOK,
+	})
+	return err
 }

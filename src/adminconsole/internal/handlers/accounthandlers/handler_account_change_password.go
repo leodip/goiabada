@@ -90,7 +90,7 @@ func HandleAccountChangePasswordPost(
 			NewPassword:     strings.TrimSpace(newPassword),
 		}
 
-		_, err := apiClient.UpdateAccountPassword(jwtInfo.TokenResponse.AccessToken, req)
+		_, err := apiClient.UpdateAccountPassword(r.Context(), jwtInfo.TokenResponse.AccessToken, req)
 		if err != nil {
 			handlers.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(errorMessage string) {
 				renderError(errorMessage)
