@@ -57,7 +57,7 @@ func HandleAccountLogoutGet(
 			ResponseMode:          api.AccountLogoutResponseModeFormPost,
 		}
 
-		formResp, redirectResp, err := apiClient.CreateAccountLogoutRequest(accessToken, req)
+		formResp, redirectResp, err := apiClient.CreateAccountLogoutRequest(r.Context(), accessToken, req)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return

@@ -30,7 +30,7 @@ func HandleAccountEmailVerificationGet(
 			httpHelper.InternalServerError(w, r, errs.New("no JWT info found in context"))
 			return
 		}
-		user, err := apiClient.GetAccountProfile(jwtInfo.TokenResponse.AccessToken)
+		user, err := apiClient.GetAccountProfile(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -88,7 +88,7 @@ func HandleAccountEmailSendVerificationPost(
 			return
 		}
 
-		resp, err := apiClient.SendAccountEmailVerification(jwtInfo.TokenResponse.AccessToken)
+		resp, err := apiClient.SendAccountEmailVerification(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
 			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
@@ -118,7 +118,7 @@ func HandleAccountEmailVerificationPost(
 			return
 		}
 
-		user, err := apiClient.GetAccountProfile(jwtInfo.TokenResponse.AccessToken)
+		user, err := apiClient.GetAccountProfile(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -133,7 +133,7 @@ func HandleAccountEmailVerificationPost(
 		verificationCode := strings.TrimSpace(r.PostFormValue("verificationCode"))
 		req := &api.VerifyAccountEmailRequest{VerificationCode: verificationCode}
 
-		if _, err := apiClient.VerifyAccountEmail(jwtInfo.TokenResponse.AccessToken, req); err != nil {
+		if _, err := apiClient.VerifyAccountEmail(r.Context(), jwtInfo.TokenResponse.AccessToken, req); err != nil {
 			// Handle invalid/expired code gracefully as validation error
 			var apiErr *apiclient.APIError
 			if errors.As(err, &apiErr) && apiErr.Code == "INVALID_OR_EXPIRED_VERIFICATION_CODE" {

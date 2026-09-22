@@ -1,6 +1,7 @@
 package accounthandlers
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -38,7 +39,7 @@ type flashStubApiClient struct {
 	apiclient.ApiClient
 }
 
-func (flashStubApiClient) UpdateAccountPassword(accessToken string,
+func (flashStubApiClient) UpdateAccountPassword(_ context.Context, accessToken string,
 	request *api.UpdateAccountPasswordRequest) (*api.UserResponse, error) {
 	return &api.UserResponse{Id: 7}, nil
 }

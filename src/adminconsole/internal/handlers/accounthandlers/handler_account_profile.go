@@ -38,7 +38,7 @@ func HandleAccountProfileGet(
 			return
 		}
 
-		user, err := apiClient.GetAccountProfile(jwtInfo.TokenResponse.AccessToken)
+		user, err := apiClient.GetAccountProfile(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -93,7 +93,7 @@ func HandleAccountProfilePost(
 		}
 
 		// Load current profile (for successful render or error rebound)
-		user, err := apiClient.GetAccountProfile(jwtInfo.TokenResponse.AccessToken)
+		user, err := apiClient.GetAccountProfile(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -129,7 +129,7 @@ func HandleAccountProfilePost(
 		}
 
 		// Call API to update
-		updatedUser, err := apiClient.UpdateAccountProfile(jwtInfo.TokenResponse.AccessToken, request)
+		updatedUser, err := apiClient.UpdateAccountProfile(r.Context(), jwtInfo.TokenResponse.AccessToken, request)
 		if err != nil {
 			// Render validation error retaining input
 			handlers.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(errorMessage string) {

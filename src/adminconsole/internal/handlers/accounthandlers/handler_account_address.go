@@ -37,7 +37,7 @@ func HandleAccountAddressGet(
 			return
 		}
 
-		user, err := apiClient.GetAccountProfile(jwtInfo.TokenResponse.AccessToken)
+		user, err := apiClient.GetAccountProfile(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -108,7 +108,7 @@ func HandleAccountAddressPost(
 			return
 		}
 
-		user, err := apiClient.GetAccountProfile(jwtInfo.TokenResponse.AccessToken)
+		user, err := apiClient.GetAccountProfile(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -123,7 +123,7 @@ func HandleAccountAddressPost(
 			AddressCountry:    strings.TrimSpace(r.FormValue("addressCountry")),
 		}
 
-		_, err = apiClient.UpdateAccountAddress(jwtInfo.TokenResponse.AccessToken, req)
+		_, err = apiClient.UpdateAccountAddress(r.Context(), jwtInfo.TokenResponse.AccessToken, req)
 		if err != nil {
 			handlers.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(errorMessage string) {
 				// Re-render with submitted values

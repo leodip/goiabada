@@ -2,6 +2,7 @@ package adminclienthandlers
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -39,7 +40,7 @@ func (s *stubApiClient) GetClientById(accessToken string, clientId int64) (*api.
 	return s.client, nil
 }
 
-func (s *stubApiClient) GetSettingsGeneral(accessToken string) (*api.SettingsGeneralResponse, error) {
+func (s *stubApiClient) GetSettingsGeneral(_ context.Context, accessToken string) (*api.SettingsGeneralResponse, error) {
 	return s.settings, nil
 }
 

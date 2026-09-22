@@ -30,7 +30,7 @@ func HandleAccountEmailGet(
 			return
 		}
 
-		user, err := apiClient.GetAccountProfile(jwtInfo.TokenResponse.AccessToken)
+		user, err := apiClient.GetAccountProfile(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -83,7 +83,7 @@ func HandleAccountEmailPost(
 			return
 		}
 
-		user, err := apiClient.GetAccountProfile(jwtInfo.TokenResponse.AccessToken)
+		user, err := apiClient.GetAccountProfile(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -108,7 +108,7 @@ func HandleAccountEmailPost(
 		}
 
 		req := &api.UpdateAccountEmailRequest{Email: email}
-		_, err = apiClient.UpdateAccountEmail(jwtInfo.TokenResponse.AccessToken, req)
+		_, err = apiClient.UpdateAccountEmail(r.Context(), jwtInfo.TokenResponse.AccessToken, req)
 		if err != nil {
 			handlers.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(errorMessage string) {
 				bind := map[string]interface{}{

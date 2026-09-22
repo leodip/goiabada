@@ -1,6 +1,7 @@
 package accounthandlers
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -33,7 +34,7 @@ type logoutApiClient struct {
 	got *api.AccountLogoutRequest
 }
 
-func (c *logoutApiClient) CreateAccountLogoutRequest(accessToken string, request *api.AccountLogoutRequest) (
+func (c *logoutApiClient) CreateAccountLogoutRequest(_ context.Context, accessToken string, request *api.AccountLogoutRequest) (
 	*api.AccountLogoutFormPostResponse, *api.AccountLogoutRedirectResponse, error) {
 	c.got = request
 	return c.form, c.redirect, nil

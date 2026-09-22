@@ -28,14 +28,14 @@ func HandleAccountPhoneGet(
 			return
 		}
 
-		user, err := apiClient.GetAccountProfile(jwtInfo.TokenResponse.AccessToken)
+		user, err := apiClient.GetAccountProfile(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
 		}
 
 		// Fetch phone countries via existing admin API
-		phoneCountries, err := apiClient.GetPhoneCountries(jwtInfo.TokenResponse.AccessToken)
+		phoneCountries, err := apiClient.GetPhoneCountries(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -83,7 +83,7 @@ func HandleAccountPhonePost(
 		}
 
 		// Load phone countries for error rendering
-		phoneCountries, err := apiClient.GetPhoneCountries(jwtInfo.TokenResponse.AccessToken)
+		phoneCountries, err := apiClient.GetPhoneCountries(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -109,7 +109,7 @@ func HandleAccountPhonePost(
 		}
 
 		// Call API
-		_, err = apiClient.UpdateAccountPhone(jwtInfo.TokenResponse.AccessToken, req)
+		_, err = apiClient.UpdateAccountPhone(r.Context(), jwtInfo.TokenResponse.AccessToken, req)
 		if err != nil {
 			handlers.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
 			return

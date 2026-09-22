@@ -25,7 +25,7 @@ func HandleAccountManageConsentsGet(
 			return
 		}
 
-		userConsents, err := apiClient.GetAccountConsents(jwtInfo.TokenResponse.AccessToken)
+		userConsents, err := apiClient.GetAccountConsents(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -88,7 +88,7 @@ func HandleAccountManageConsentsRevokePost(
 		}
 
 		// Call API to revoke
-		if err := apiClient.RevokeAccountConsent(jwtInfo.TokenResponse.AccessToken, int64(consentId)); err != nil {
+		if err := apiClient.RevokeAccountConsent(r.Context(), jwtInfo.TokenResponse.AccessToken, int64(consentId)); err != nil {
 			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}

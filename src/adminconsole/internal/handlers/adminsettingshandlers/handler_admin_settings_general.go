@@ -33,7 +33,7 @@ func HandleAdminSettingsGeneralGet(
 		}
 
 		// Fetch settings from API
-		apiResp, err := apiClient.GetSettingsGeneral(jwtInfo.TokenResponse.AccessToken)
+		apiResp, err := apiClient.GetSettingsGeneral(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -95,7 +95,7 @@ func HandleAdminSettingsGeneralPost(
 		}
 
 		// Fetch current settings to compare issuer later
-		currentSettingsResp, err := apiClient.GetSettingsGeneral(jwtInfo.TokenResponse.AccessToken)
+		currentSettingsResp, err := apiClient.GetSettingsGeneral(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -139,7 +139,7 @@ func HandleAdminSettingsGeneralPost(
 			ResourceOwnerPasswordCredentialsEnabled:   settingsInfo.ResourceOwnerPasswordCredentialsEnabled,
 		}
 
-		updatedResp, err := apiClient.UpdateSettingsGeneral(jwtInfo.TokenResponse.AccessToken, updateReq)
+		updatedResp, err := apiClient.UpdateSettingsGeneral(r.Context(), jwtInfo.TokenResponse.AccessToken, updateReq)
 		if err != nil {
 			handlers.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
 			return

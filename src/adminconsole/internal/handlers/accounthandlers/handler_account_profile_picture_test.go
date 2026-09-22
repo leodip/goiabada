@@ -2,6 +2,7 @@ package accounthandlers
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"io"
 	"mime/multipart"
@@ -39,11 +40,11 @@ type pictureApiClient struct {
 	err      error
 }
 
-func (c *pictureApiClient) UploadAccountProfilePicture(accessToken string, pictureData []byte, filename string) (*apiclient.ProfilePictureUploadResponse, error) {
+func (c *pictureApiClient) UploadAccountProfilePicture(_ context.Context, accessToken string, pictureData []byte, filename string) (*apiclient.ProfilePictureUploadResponse, error) {
 	return c.response, c.err
 }
 
-func (c *pictureApiClient) DeleteAccountProfilePicture(accessToken string) error {
+func (c *pictureApiClient) DeleteAccountProfilePicture(_ context.Context, accessToken string) error {
 	return c.err
 }
 

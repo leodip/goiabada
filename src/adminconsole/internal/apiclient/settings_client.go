@@ -1,9 +1,9 @@
 package apiclient
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"time"
 
@@ -40,22 +40,38 @@ func NewSettingsClient(authServerBaseURL string) *SettingsClient {
 // Returns only safe-to-share settings: appName, uiTheme, smtpEnabled, issuer. The issuer is
 // already served anonymously at /.well-known/openid-configuration, which OIDC Discovery
 // section 3 requires, so carrying it here discloses nothing new (#285).
-func (c *SettingsClient) GetPublicSettings() (*api.PublicSettingsResponse, error) {
+//
+// This is the admin console's second caller of the auth server, so it is bounded and carries a
+// context on the same terms as the general client (#386). Both arms read through readBounded
+// before anything looks at them: the success arm used to decode straight off the wire through a
+// json.Decoder, which stops at the first complete value and would therefore accept a truncated
+// prefix with keys missing and say nothing, and the failure arm discarded its read error. The 10
+// second timeout stays as it was.
+func (c *SettingsClient) GetPublicSettings(ctx context.Context) (*api.PublicSettingsResponse, error) {
 	url := fmt.Sprintf("%s/api/public/settings", c.authServerBaseURL)
 
-	resp, err := c.httpClient.Get(url)
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, errs.Wrap(err, "failed to build the public settings request")
+	}
+
+	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, errs.Wrap(err, "failed to fetch public settings from authserver")
 	}
 	defer func() { _ = resp.Body.Close() }()
 
+	body, err := readBounded(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
 		return nil, errs.Errorf("authserver returned status %d: %s", resp.StatusCode, string(body))
 	}
 
 	var settings api.PublicSettingsResponse
-	if err := json.NewDecoder(resp.Body).Decode(&settings); err != nil {
+	if err := json.Unmarshal(body, &settings); err != nil {
 		return nil, errs.Wrap(err, "failed to decode public settings response")
 	}
 

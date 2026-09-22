@@ -34,7 +34,7 @@ func HandleAdminSettingsUIThemeGet(
 		}
 
 		// Fetch from API
-		apiResp, err := apiClient.GetSettingsUITheme(jwtInfo.TokenResponse.AccessToken)
+		apiResp, err := apiClient.GetSettingsUITheme(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -90,7 +90,7 @@ func HandleAdminSettingsUIThemePost(
 			// Try to get themes from API to populate the dropdown on error
 			uiThemes := []string{}
 			if jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo); ok {
-				if apiResp, err := apiClient.GetSettingsUITheme(jwtInfo.TokenResponse.AccessToken); err == nil {
+				if apiResp, err := apiClient.GetSettingsUITheme(r.Context(), jwtInfo.TokenResponse.AccessToken); err == nil {
 					uiThemes = apiResp.AvailableThemes
 				}
 			}
@@ -116,7 +116,7 @@ func HandleAdminSettingsUIThemePost(
 		}
 
 		// Call API to update
-		_, err := apiClient.UpdateSettingsUITheme(jwtInfo.TokenResponse.AccessToken, &api.UpdateSettingsUIThemeRequest{
+		_, err := apiClient.UpdateSettingsUITheme(r.Context(), jwtInfo.TokenResponse.AccessToken, &api.UpdateSettingsUIThemeRequest{
 			UITheme: settingsInfo.UITheme,
 		})
 		if err != nil {

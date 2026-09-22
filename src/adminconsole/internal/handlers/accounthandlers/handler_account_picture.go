@@ -28,7 +28,7 @@ func HandleAccountPictureGet(
 
 		// Get profile picture info
 		var profilePictureUrl string
-		pictureInfo, err := apiClient.GetAccountProfilePicture(jwtInfo.TokenResponse.AccessToken)
+		pictureInfo, err := apiClient.GetAccountProfilePicture(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err == nil && pictureInfo != nil && pictureInfo.HasPicture {
 			// Add cache-busting parameter to prevent browser caching
 			profilePictureUrl = fmt.Sprintf("%s?t=%d", pictureInfo.PictureUrl, time.Now().UnixNano())
