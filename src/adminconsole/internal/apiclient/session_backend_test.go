@@ -548,25 +548,11 @@ func TestHTTPBackend_RefusesAResponseOverTheCap(t *testing.T) {
 // And the boundary itself: an answer of exactly the cap is accepted. Without this the case
 // above reads as "large answers are refused" rather than "answers over the cap are".
 func TestHTTPBackend_AcceptsAResponseOfExactlyTheCap(t *testing.T) {
+	atTheCap := sessionEnvelopeOfExactly(t, sessionstore.MaxSessionWireBytes)
+
 	stub := newStubEndpoint(t, func(w http.ResponseWriter, _ int) {
-		encoded, err := json.Marshal(api.SessionLoadResponse{
-			Data:         "",
-			LastAccessed: time.Now().UTC(),
-			ExpiresAt:    time.Now().UTC().Add(time.Hour),
-		})
-		require.NoError(t, err)
-
-		// Pad the one field of unbounded length until the envelope is the cap to the byte.
-		padded, err := json.Marshal(api.SessionLoadResponse{
-			Data:         strings.Repeat("x", sessionstore.MaxSessionWireBytes-len(encoded)),
-			LastAccessed: time.Now().UTC(),
-			ExpiresAt:    time.Now().UTC().Add(time.Hour),
-		})
-		require.NoError(t, err)
-		require.Len(t, padded, sessionstore.MaxSessionWireBytes)
-
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write(padded)
+		_, _ = w.Write(atTheCap)
 	})
 	backend := NewSessionBackend(stub.server.URL, newStubTokens())
 
@@ -574,4 +560,80 @@ func TestHTTPBackend_AcceptsAResponseOfExactlyTheCap(t *testing.T) {
 
 	require.NoError(t, err, "the cap is the largest accepted answer, not the first refused one")
 	assert.NotEmpty(t, record.Data)
+}
+
+// sessionEnvelopeOfExactly encodes a load response of exactly size bytes, by padding the one
+// field of unbounded length until it is.
+//
+// Both encodings are taken against one fixed pair of instants rather than against time.Now(),
+// because a time.Time marshals through RFC 3339 with the trailing zeros trimmed off its
+// fractional seconds: an instant at .1 encodes sixteen bytes shorter than one at .123456789.
+// Measuring the envelope against one instant and answering with another therefore missed the
+// size by the difference on about one run in seven, which is how the case above came to fail
+// on CI and pass everywhere else.
+//
+// It also runs on the test goroutine rather than inside the stub's handler, so a size it
+// could not reach is reported as two numbers instead of as a megabyte of decimal bytes.
+func sessionEnvelopeOfExactly(t *testing.T, size int) []byte {
+	t.Helper()
+
+	lastAccessed := time.Date(2026, 9, 22, 5, 12, 40, 123456789, time.UTC)
+	expiresAt := lastAccessed.Add(time.Hour)
+
+	encode := func(data string) []byte {
+		encoded, err := json.Marshal(api.SessionLoadResponse{
+			Data:         data,
+			LastAccessed: lastAccessed,
+			ExpiresAt:    expiresAt,
+		})
+		require.NoError(t, err)
+		return encoded
+	}
+
+	empty := encode("")
+	require.LessOrEqual(t, len(empty), size, "the envelope alone is already longer than the size asked for")
+
+	// "x" is not a character JSON escapes, so one byte of padding is one byte encoded.
+	padded := encode(strings.Repeat("x", size-len(empty)))
+	require.Len(t, padded, size)
+
+	return padded
+}
+
+// TestSessionEnvelopeOfExactly_IsTheSizeItWasAskedFor holds that arithmetic at the cap and on
+// either side of it, so the case above fails for the reason it names rather than because the
+// body it served was not the size it meant to serve.
+func TestSessionEnvelopeOfExactly_IsTheSizeItWasAskedFor(t *testing.T) {
+	for _, size := range []int{
+		256,
+		sessionstore.MaxSessionWireBytes - 1,
+		sessionstore.MaxSessionWireBytes,
+		sessionstore.MaxSessionWireBytes + 1,
+	} {
+		assert.Len(t, sessionEnvelopeOfExactly(t, size), size)
+	}
+}
+
+// TestSessionEnvelope_TwoInstantsDoNotEncodeToTheSameLength is the hazard the fixed instants
+// exist for, pinned deterministically rather than left to a one-in-seven run: RFC 3339 trims
+// the trailing zeros off the fractional seconds, so two instants inside the same second encode
+// to different lengths. Padding computed against one instant and served with another is off by
+// that difference, which is exactly what a case asserting an exact size cannot absorb.
+func TestSessionEnvelope_TwoInstantsDoNotEncodeToTheSameLength(t *testing.T) {
+	second := time.Date(2026, 9, 22, 5, 12, 40, 0, time.UTC)
+	tenth := second.Add(100 * time.Millisecond)
+	nanos := second.Add(123456789 * time.Nanosecond)
+
+	lengthAt := func(at time.Time) int {
+		encoded, err := json.Marshal(api.SessionLoadResponse{
+			Data: "", LastAccessed: at, ExpiresAt: at,
+		})
+		require.NoError(t, err)
+		return len(encoded)
+	}
+
+	assert.NotEqual(t, lengthAt(tenth), lengthAt(nanos),
+		"an instant whose fractional seconds trim encodes shorter, so one may not stand in for another")
+	assert.NotEqual(t, lengthAt(second), lengthAt(tenth),
+		"and an instant on the second carries no fractional part at all")
 }
