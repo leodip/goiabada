@@ -587,7 +587,7 @@ func TestHandleExistingSessionOnLogout(t *testing.T) {
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "lookup exploded")
 		database.AssertExpectations(t)
-		auditLogger.AssertNotCalled(t, "Log")
+		auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 	})
 
 	t.Run("Session not found", func(t *testing.T) {
@@ -601,7 +601,7 @@ func TestHandleExistingSessionOnLogout(t *testing.T) {
 
 		assert.NoError(t, err, "a session that is not there is nothing to tear down, not a failure")
 		database.AssertExpectations(t)
-		auditLogger.AssertNotCalled(t, "Log")
+		auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 	})
 
 	// Decision 3's first half: another client on the session means the row survives, so that client's
@@ -718,7 +718,7 @@ func TestHandleExistingSessionOnLogout(t *testing.T) {
 
 		assert.NoError(t, err) // The function should not return an error if the client is not found in the session
 		database.AssertExpectations(t)
-		auditLogger.AssertNotCalled(t, "Log")
+		auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 	})
 }
 

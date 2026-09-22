@@ -324,10 +324,21 @@ func TestHandleAPIClientAuthenticationPut_ASaveOfAnAlreadyPublicClientRevokesNot
 
 // assertNotAttemptedOnClientDatabase fails naming the method, where the strict mock alone would
 // fail naming an unexpected call.
+//
+// It reads the recorded calls rather than calling AssertNotCalled, because the method is named
+// through a parameter here and AssertNotCalled matches on the name and the whole argument list at
+// once: it was passing two matchers to methods that all take three, so it compared lists that
+// could never be equal and passed at every call site whatever the handler did. Matching on the
+// name alone is what this helper meant in the first place, and it is the one thing an argument
+// list cannot express (#421).
 func assertNotAttemptedOnClientDatabase(t *testing.T, database *mocks_data.Database, methods ...string) {
 	t.Helper()
 	for _, method := range methods {
-		database.AssertNotCalled(t, method, mock.Anything, mock.Anything)
+		for _, call := range database.Calls {
+			if call.Method == method {
+				t.Errorf("%s was called, and this path must not reach it", method)
+			}
+		}
 	}
 }
 

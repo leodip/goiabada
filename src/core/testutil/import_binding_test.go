@@ -1,9 +1,10 @@
 package testutil
 
-// Seam: bindImports, the resolver the three call-site guards share -- AssertNoLegacyErrors,
-// AssertSlogConvention and AssertAuditLogContext. Each of them asks one question of a selector,
-// "is its left side the package at this path", and each answer is only as good as the name the
-// import is read as binding.
+// Seam: bindImports, the resolver the call-site guards share -- AssertNoLegacyErrors,
+// AssertSlogConvention, AssertAuditLogContext and AssertRequestPathContext over a call, and
+// AssertNotCalledArity over a struct's embedded field. Each of them asks one question of a
+// selector, "is its left side the package at this path", and each answer is only as good as the
+// name the import is read as binding.
 //
 // The rows below are the resolver itself, over source text rather than a tree, because it is a
 // pure function of one file's import declarations. The two tree-reading tests at the bottom are
@@ -146,12 +147,13 @@ import (
 }
 
 // watchedTables is every table bindImports is called with in production, so the two tests below
-// hold all three rather than whichever one was remembered.
+// hold all four rather than whichever one was remembered.
 func watchedTables() map[string]watchedImports {
 	return map[string]watchedImports{
-		"errorsWatchedImports": errorsWatchedImports,
-		"slogWatchedImports":   slogWatchedImports,
-		"auditWatchedImports":  auditWatchedImports,
+		"errorsWatchedImports":    errorsWatchedImports,
+		"slogWatchedImports":      slogWatchedImports,
+		"auditWatchedImports":     auditWatchedImports,
+		"notCalledWatchedImports": notCalledWatchedImports,
 	}
 }
 

@@ -560,7 +560,8 @@ func TestHandleTokenPost(t *testing.T) {
 		auditLogger.AssertExpectations(t)
 
 		// Ensure that BumpUserSession was not called
-		userSessionManager.AssertNotCalled(t, "BumpUserSession")
+		userSessionManager.AssertNotCalled(t, "BumpUserSession",
+			mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	})
 
 	t.Run("Unsupported_grant_type", func(t *testing.T) {
@@ -599,11 +600,13 @@ func TestHandleTokenPost(t *testing.T) {
 
 		// Ensure that other methods were not called
 		database.AssertNotCalled(t, "UpdateRefreshToken", mock.Anything, mock.Anything, mock.Anything)
-		tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForAuthCode")
-		tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForClientCred")
-		tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForRefresh")
-		userSessionManager.AssertNotCalled(t, "BumpUserSession")
-		auditLogger.AssertNotCalled(t, "Log")
+		tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForAuthCode", mock.Anything, mock.Anything)
+		tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForClientCred",
+			mock.Anything, mock.Anything, mock.Anything)
+		tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForRefresh", mock.Anything, mock.Anything)
+		userSessionManager.AssertNotCalled(t, "BumpUserSession",
+			mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+		auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 	})
 }
 
