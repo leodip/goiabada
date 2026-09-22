@@ -900,15 +900,17 @@ func TestHandleTokenPost_AuthCodeReuse_RevokeFailureReturns500(t *testing.T) {
 	tokenValidator.On("ValidateTokenRequest", req.Context(), mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
 		Return(nil, reuseErr)
 
-	stub := expectRunInTransaction(database, nil)
+	stub := mocks_data.ExpectRunInTransaction(database, revokeTx)
 
 	// The session row is taken first, ahead of the grants that hang off it (#139). Stubbed as
-	// succeeding so this case still fails where it means to, at the token read below.
-	database.On("AcquireUserSessionRow", mock.Anything, (*sql.Tx)(nil), "sid-reused").
+	// succeeding so this case still fails where it means to, at the token read below. Both reads
+	// name revokeTx rather than nil, which is what says they happened inside the transaction:
+	// until #422 this case expected (*sql.Tx)(nil), which a call made outside one also matches.
+	database.On("AcquireUserSessionRow", mock.Anything, revokeTx, "sid-reused").
 		Return(true, nil).Once()
 
 	dbErr := errors.New("connection refused")
-	database.On("GetRefreshTokensBySessionIdentifier", mock.Anything, (*sql.Tx)(nil), "sid-reused").
+	database.On("GetRefreshTokensBySessionIdentifier", mock.Anything, revokeTx, "sid-reused").
 		Return(nil, dbErr).Once()
 
 	httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
@@ -917,7 +919,7 @@ func TestHandleTokenPost_AuthCodeReuse_RevokeFailureReturns500(t *testing.T) {
 
 	handler.ServeHTTP(rr, req)
 
-	assert.ErrorIs(t, stub.bodyErr, dbErr, "the body hands its error to the helper, which rolls back")
+	assert.ErrorIs(t, stub.BodyErr, dbErr, "the body hands its error to the helper, which rolls back")
 
 	httpHelper.AssertExpectations(t)
 	tokenValidator.AssertExpectations(t)
@@ -960,7 +962,7 @@ func TestHandleTokenPost_AuthCodeReuse_BeginTransactionFailureReturns500(t *test
 		Return(nil, reuseErr)
 
 	beginErr := errors.New("tx begin failed")
-	expectRunInTransactionRefused(database, beginErr)
+	mocks_data.ExpectRunInTransactionRefused(database, beginErr)
 
 	httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 		return err != nil && strings.Contains(err.Error(), "tx begin failed")
@@ -2408,7 +2410,7 @@ func TestRevokeOnAuthCodeReuse_TakesTheSessionRowFirst(t *testing.T) {
 		tx := &sql.Tx{}
 		token := &models.RefreshToken{Id: 1, RefreshTokenJti: "rt-1"}
 
-		expectRunInTransaction(db, tx)
+		mocks_data.ExpectRunInTransaction(db, tx)
 		db.On("AcquireUserSessionRow", mock.Anything, tx, sid).Return(true, nil).Once()
 		db.On("GetRefreshTokensBySessionIdentifier", mock.Anything, tx, sid).
 			Return([]*models.RefreshToken{token}, nil).Once()
@@ -2439,7 +2441,7 @@ func TestRevokeOnAuthCodeReuse_TakesTheSessionRowFirst(t *testing.T) {
 		tx := &sql.Tx{}
 		token := &models.RefreshToken{Id: 1, RefreshTokenJti: "rt-1"}
 
-		expectRunInTransaction(db, tx)
+		mocks_data.ExpectRunInTransaction(db, tx)
 		// The row is already gone, which is ordinary: an offline grant's tokens are designed
 		// to outlive their session, and the background reapers remove idle sessions routinely.
 		db.On("AcquireUserSessionRow", mock.Anything, tx, sid).Return(false, nil).Once()
@@ -2461,7 +2463,7 @@ func TestRevokeOnAuthCodeReuse_TakesTheSessionRowFirst(t *testing.T) {
 		tx := &sql.Tx{}
 		boom := errors.New("connection refused")
 
-		stub := expectRunInTransaction(db, tx)
+		stub := mocks_data.ExpectRunInTransaction(db, tx)
 		db.On("AcquireUserSessionRow", mock.Anything, tx, sid).Return(false, boom).Once()
 
 		jtis, err := revokeOnAuthCodeReuse(context.Background(), db, &models.Code{Id: 42, SessionIdentifier: sid})
@@ -2470,7 +2472,7 @@ func TestRevokeOnAuthCodeReuse_TakesTheSessionRowFirst(t *testing.T) {
 			"a statement that did not run has not established anything, so the caller gets a 500")
 		assert.Nil(t, jtis)
 		db.AssertNotCalled(t, "GetRefreshTokensBySessionIdentifier", mock.Anything, mock.Anything, mock.Anything)
-		assert.ErrorIs(t, stub.bodyErr, boom, "the body hands its error to the helper, which rolls back")
+		assert.ErrorIs(t, stub.BodyErr, boom, "the body hands its error to the helper, which rolls back")
 	})
 
 	t.Run("a code with no session identifier acquires nothing", func(t *testing.T) {
@@ -2478,7 +2480,7 @@ func TestRevokeOnAuthCodeReuse_TakesTheSessionRowFirst(t *testing.T) {
 		tx := &sql.Tx{}
 		token := &models.RefreshToken{Id: 1, RefreshTokenJti: "rt-1"}
 
-		expectRunInTransaction(db, tx)
+		mocks_data.ExpectRunInTransaction(db, tx)
 		db.On("GetRefreshTokensByCodeId", mock.Anything, tx, int64(42)).
 			Return([]*models.RefreshToken{token}, nil).Once()
 		db.On("UpdateRefreshToken", mock.Anything, tx, token).Return(nil).Once()
@@ -2496,7 +2498,7 @@ func TestRevokeOnAuthCodeReuse_TakesTheSessionRowFirst(t *testing.T) {
 		db := mocks_data.NewDatabase(t)
 		tx := &sql.Tx{}
 
-		expectRunInTransaction(db, tx)
+		mocks_data.ExpectRunInTransaction(db, tx)
 		db.On("AcquireUserSessionRow", mock.Anything, tx, sid).Return(true, nil).Once()
 		db.On("GetRefreshTokensBySessionIdentifier", mock.Anything, tx, sid).
 			Return([]*models.RefreshToken{{Id: 1, RefreshTokenJti: "rt-1", Revoked: true}}, nil).Once()

@@ -62,7 +62,7 @@ func methodOrder(db *mocks_data.Database) []string {
 // nested call is asserted to receive that exact pointer. A nil one would be rejected by
 // revocation.RevokeUserAuthState's precondition.
 func stubRevocationSweepTx(database *mocks_data.Database, userId int64, newGeneration int64) {
-	expectRunInTransaction(database, revokeTx)
+	mocks_data.ExpectRunInTransaction(database, revokeTx)
 	database.On("IncrementUserAuthStateGeneration", mock.Anything, revokeTx, userId).
 		Return(newGeneration, nil).Once()
 	database.On("GetRefreshTokensByUserId", mock.Anything, revokeTx, userId).

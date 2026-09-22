@@ -532,7 +532,7 @@ func TestTerminateUserSessionTx_RevokesTheGrantsOfTheSession(t *testing.T) {
 	db := mocks_data.NewDatabase(t)
 	tokens := terminationFixture()
 
-	expectRunInTransaction(db, revokeTx)
+	mocks_data.ExpectRunInTransaction(db, revokeTx)
 	db.On("DeleteUserSession", mock.Anything, revokeTx, terminateSessionId).Return(nil).Once()
 	db.On("RevokeCodesBySessionIdentifier", mock.Anything, revokeTx, terminateSid).Return(int64(2), nil).Once()
 	db.On("GetRefreshTokensBySessionIdentifier", mock.Anything, revokeTx, terminateSid).Return(tokens, nil).Once()
@@ -590,7 +590,7 @@ func TestTerminateUserSessionTx_RevokesTheGrantsOfTheSession(t *testing.T) {
 func TestTerminateUserSessionTx_NothingToRevoke(t *testing.T) {
 	db := mocks_data.NewDatabase(t)
 
-	expectRunInTransaction(db, revokeTx)
+	mocks_data.ExpectRunInTransaction(db, revokeTx)
 	db.On("DeleteUserSession", mock.Anything, revokeTx, terminateSessionId).Return(nil).Once()
 	db.On("RevokeCodesBySessionIdentifier", mock.Anything, revokeTx, terminateSid).Return(int64(0), nil).Once()
 	db.On("GetRefreshTokensBySessionIdentifier", mock.Anything, revokeTx, terminateSid).
@@ -660,7 +660,7 @@ func TestTerminateUserSessionTx_AnyFailureYieldsTheZeroResult(t *testing.T) {
 			// The helper could not open a transaction, so the body never runs.
 			name: "the transaction cannot be opened",
 			setup: func(db *mocks_data.Database) {
-				expectRunInTransactionRefused(db, boom)
+				mocks_data.ExpectRunInTransactionRefused(db, boom)
 			},
 			notAttempted: []string{"DeleteUserSession"},
 		},
@@ -671,7 +671,7 @@ func TestTerminateUserSessionTx_AnyFailureYieldsTheZeroResult(t *testing.T) {
 			// transaction can be reached past.
 			name: "the deletion fails",
 			setup: func(db *mocks_data.Database) {
-				expectRunInTransaction(db, revokeTx)
+				mocks_data.ExpectRunInTransaction(db, revokeTx)
 				db.On("DeleteUserSession", mock.Anything, revokeTx, terminateSessionId).Return(boom).Once()
 			},
 			notAttempted: []string{"RevokeCodesBySessionIdentifier",
@@ -680,7 +680,7 @@ func TestTerminateUserSessionTx_AnyFailureYieldsTheZeroResult(t *testing.T) {
 		{
 			name: "the code sweep fails",
 			setup: func(db *mocks_data.Database) {
-				expectRunInTransaction(db, revokeTx)
+				mocks_data.ExpectRunInTransaction(db, revokeTx)
 				db.On("DeleteUserSession", mock.Anything, revokeTx, terminateSessionId).Return(nil).Once()
 				db.On("RevokeCodesBySessionIdentifier", mock.Anything, revokeTx, terminateSid).
 					Return(int64(0), boom).Once()
@@ -697,7 +697,7 @@ func TestTerminateUserSessionTx_AnyFailureYieldsTheZeroResult(t *testing.T) {
 			// itself, so the failure reads as a contract violation rather than a struct mismatch.
 			name: "the token query fails after the code sweep revoked two codes",
 			setup: func(db *mocks_data.Database) {
-				expectRunInTransaction(db, revokeTx)
+				mocks_data.ExpectRunInTransaction(db, revokeTx)
 				db.On("DeleteUserSession", mock.Anything, revokeTx, terminateSessionId).Return(nil).Once()
 				db.On("RevokeCodesBySessionIdentifier", mock.Anything, revokeTx, terminateSid).
 					Return(int64(2), nil).Once()
@@ -714,7 +714,7 @@ func TestTerminateUserSessionTx_AnyFailureYieldsTheZeroResult(t *testing.T) {
 			name: "a token write fails",
 			setup: func(db *mocks_data.Database) {
 				tokens := terminationFixture()
-				expectRunInTransaction(db, revokeTx)
+				mocks_data.ExpectRunInTransaction(db, revokeTx)
 				db.On("DeleteUserSession", mock.Anything, revokeTx, terminateSessionId).Return(nil).Once()
 				db.On("RevokeCodesBySessionIdentifier", mock.Anything, revokeTx, terminateSid).
 					Return(int64(2), nil).Once()
@@ -729,7 +729,7 @@ func TestTerminateUserSessionTx_AnyFailureYieldsTheZeroResult(t *testing.T) {
 			// error may in fact have applied.
 			name: "the commit fails",
 			setup: func(db *mocks_data.Database) {
-				expectRunInTransactionThenFail(db, revokeTx, boom)
+				mocks_data.ExpectRunInTransactionThenFail(db, revokeTx, boom)
 				db.On("DeleteUserSession", mock.Anything, revokeTx, terminateSessionId).Return(nil).Once()
 				db.On("RevokeCodesBySessionIdentifier", mock.Anything, revokeTx, terminateSid).
 					Return(int64(1), nil).Once()
@@ -912,7 +912,7 @@ func TestRevokeClientGrants_RequiresATransaction(t *testing.T) {
 func TestRevokeClientGrantsTx_WritesAndRevokesInOneTransaction(t *testing.T) {
 	db := mocks_data.NewDatabase(t)
 
-	expectRunInTransaction(db, revokeTx)
+	mocks_data.ExpectRunInTransaction(db, revokeTx)
 	db.On("RevokeCodesByClientId", mock.Anything, revokeTx, revokeClientId).Return(int64(1), nil).Once()
 	db.On("GetRefreshTokensByClientId", mock.Anything, revokeTx, revokeClientId).
 		Return([]*models.RefreshToken{}, nil).Once()
@@ -950,7 +950,7 @@ func TestRevokeClientGrantsTx_WritesAndRevokesInOneTransaction(t *testing.T) {
 func TestRevokeClientGrantsTx_AWriteThatIsNotATransitionCommitsAndRevokesNothing(t *testing.T) {
 	db := mocks_data.NewDatabase(t)
 
-	expectRunInTransaction(db, revokeTx)
+	mocks_data.ExpectRunInTransaction(db, revokeTx)
 
 	wrote := false
 	result, err := RevokeClientGrantsTx(context.Background(), db, revokeClientId, func(tx *sql.Tx) (bool, error) {
@@ -990,7 +990,7 @@ func TestRevokeClientGrantsTx_AnyFailureYieldsTheZeroResult(t *testing.T) {
 			// The helper could not open a transaction, so the body never runs.
 			name: "the transaction cannot be opened",
 			setup: func(db *mocks_data.Database) {
-				expectRunInTransactionRefused(db, boom)
+				mocks_data.ExpectRunInTransactionRefused(db, boom)
 			},
 			notAttempted: []string{"RevokeCodesByClientId"},
 		},
@@ -1000,7 +1000,7 @@ func TestRevokeClientGrantsTx_AnyFailureYieldsTheZeroResult(t *testing.T) {
 			// still confidential.
 			name: "the client write fails",
 			setup: func(db *mocks_data.Database) {
-				expectRunInTransaction(db, revokeTx)
+				mocks_data.ExpectRunInTransaction(db, revokeTx)
 			},
 			write:        func(tx *sql.Tx) (bool, error) { return false, boom },
 			notAttempted: []string{"RevokeCodesByClientId", "GetRefreshTokensByClientId"},
@@ -1008,7 +1008,7 @@ func TestRevokeClientGrantsTx_AnyFailureYieldsTheZeroResult(t *testing.T) {
 		{
 			name: "the code marker fails",
 			setup: func(db *mocks_data.Database) {
-				expectRunInTransaction(db, revokeTx)
+				mocks_data.ExpectRunInTransaction(db, revokeTx)
 				db.On("RevokeCodesByClientId", mock.Anything, revokeTx, revokeClientId).Return(int64(0), boom).Once()
 			},
 			notAttempted: []string{"GetRefreshTokensByClientId"},
@@ -1020,7 +1020,7 @@ func TestRevokeClientGrantsTx_AnyFailureYieldsTheZeroResult(t *testing.T) {
 			// reads as a contract violation rather than a struct mismatch.
 			name: "the token query fails after the marker revoked two codes",
 			setup: func(db *mocks_data.Database) {
-				expectRunInTransaction(db, revokeTx)
+				mocks_data.ExpectRunInTransaction(db, revokeTx)
 				db.On("RevokeCodesByClientId", mock.Anything, revokeTx, revokeClientId).Return(int64(2), nil).Once()
 				db.On("GetRefreshTokensByClientId", mock.Anything, revokeTx, revokeClientId).Return(nil, boom).Once()
 			},
@@ -1034,7 +1034,7 @@ func TestRevokeClientGrantsTx_AnyFailureYieldsTheZeroResult(t *testing.T) {
 			name: "a token write fails",
 			setup: func(db *mocks_data.Database) {
 				tokens := clientGrantFixture()
-				expectRunInTransaction(db, revokeTx)
+				mocks_data.ExpectRunInTransaction(db, revokeTx)
 				db.On("RevokeCodesByClientId", mock.Anything, revokeTx, revokeClientId).Return(int64(1), nil).Once()
 				db.On("GetRefreshTokensByClientId", mock.Anything, revokeTx, revokeClientId).Return(tokens, nil).Once()
 				db.On("UpdateRefreshToken", mock.Anything, revokeTx, tokens[0]).Return(boom).Once()
@@ -1043,7 +1043,7 @@ func TestRevokeClientGrantsTx_AnyFailureYieldsTheZeroResult(t *testing.T) {
 		{
 			name: "the commit fails",
 			setup: func(db *mocks_data.Database) {
-				expectRunInTransactionThenFail(db, revokeTx, boom)
+				mocks_data.ExpectRunInTransactionThenFail(db, revokeTx, boom)
 				db.On("RevokeCodesByClientId", mock.Anything, revokeTx, revokeClientId).Return(int64(1), nil).Once()
 				db.On("GetRefreshTokensByClientId", mock.Anything, revokeTx, revokeClientId).
 					Return([]*models.RefreshToken{}, nil).Once()

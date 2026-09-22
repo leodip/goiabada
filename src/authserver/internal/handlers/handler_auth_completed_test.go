@@ -150,7 +150,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 	stubCrossUserTermination := func(database *mocks_data.Database, userSession *models.UserSession,
 		revokedCodeCount int64, tokens []*models.RefreshToken, record func(string)) {
 
-		expectRunInTransaction(database, crossUserTerminateTx, func(edge string) {
+		mocks_data.ExpectRunInTransaction(database, crossUserTerminateTx, func(edge string) {
 			if record != nil && edge == "commit" {
 				record("commit")
 			}
@@ -627,7 +627,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		// statement that takes the session row, and the two sweeps follow it. So the deferred
 		// rollback runs and nothing was committed. Same failure point the two API callers use.
 		deleteError := errors.New("the session delete failed")
-		stub := expectRunInTransaction(database, crossUserTerminateTx)
+		stub := mocks_data.ExpectRunInTransaction(database, crossUserTerminateTx)
 		database.On("DeleteUserSession", mock.Anything, crossUserTerminateTx, foreignSession.Id).
 			Return(deleteError).Once()
 
@@ -643,7 +643,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		// Nothing committed, nothing deleted, and no replacement session. The browser is left
 		// cookied to the session that is still there, which is the fail-closed direction.
-		assert.ErrorIs(t, stub.bodyErr, deleteError, "the body hands its error to the helper, which rolls back")
+		assert.ErrorIs(t, stub.BodyErr, deleteError, "the body hands its error to the helper, which rolls back")
 		assertNotAttempted(t, database, "RevokeCodesBySessionIdentifier",
 			"GetRefreshTokensBySessionIdentifier", "UpdateRefreshToken", "UpdateUserSession")
 		// Nine mock.Anything, one per parameter. AssertNotCalled compares the whole argument

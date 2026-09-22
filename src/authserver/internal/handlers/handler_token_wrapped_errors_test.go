@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"context"
-	"database/sql"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -136,9 +135,9 @@ func TestHandleTokenPost_WrappedAuthCodeReuseStillRevokes(t *testing.T) {
 	httpHelper, auditLogger, database, rr, req, handler := wrappedTokenRequest(t,
 		errs.Wrap(reuse, "unable to validate the token request"))
 
-	expectRunInTransaction(database, (*sql.Tx)(nil))
-	database.EXPECT().AcquireUserSessionRow(mock.Anything, mock.Anything, "sid-reused").Return(true, nil).Once()
-	database.EXPECT().GetRefreshTokensBySessionIdentifier(mock.Anything, mock.Anything, "sid-reused").
+	mocks_data.ExpectRunInTransaction(database, revokeTx)
+	database.EXPECT().AcquireUserSessionRow(mock.Anything, revokeTx, "sid-reused").Return(true, nil).Once()
+	database.EXPECT().GetRefreshTokensBySessionIdentifier(mock.Anything, revokeTx, "sid-reused").
 		Return(nil, nil).Once()
 
 	var auditedCodeId int64

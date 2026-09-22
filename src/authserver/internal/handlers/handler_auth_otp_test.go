@@ -1089,7 +1089,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		// against this exact handle, so a write that slipped back to the pool would arrive
 		// carrying a nil tx and fail as an unexpected call.
 		var calls []string
-		expectRunInTransaction(database, otpEnrolTx, func(edge string) { calls = append(calls, edge) })
+		mocks_data.ExpectRunInTransaction(database, otpEnrolTx, func(edge string) { calls = append(calls, edge) })
 		database.On("UpdateUser", mock.Anything, otpEnrolTx, mock.MatchedBy(func(u *models.User) bool {
 			// The secret must be stored encrypted. There is no plaintext column any more: migration
 			// 000048 dropped users.otp_secret (#98).
@@ -1212,7 +1212,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 			Return(true, nil)
 
 		updateError := errors.New("failed to update user")
-		stub := expectRunInTransaction(database, otpEnrolTx)
+		stub := mocks_data.ExpectRunInTransaction(database, otpEnrolTx)
 		database.On("UpdateUser", mock.Anything, otpEnrolTx, mock.Anything).Return(updateError).Once()
 
 		httpHelper.On("InternalServerError", rr, req, updateError).Return()
@@ -1223,7 +1223,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		// the point: a failed enable rolls back whole, and the counter must not move for an
 		// authenticator that was never established.
 		database.AssertNotCalled(t, "IncrementUserOtpConfigGeneration", mock.Anything, mock.Anything, mock.Anything)
-		assert.ErrorIs(t, stub.bodyErr, updateError, "the body hands its error to the helper, which rolls back")
+		assert.ErrorIs(t, stub.BodyErr, updateError, "the body hands its error to the helper, which rolls back")
 
 		httpHelper.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
@@ -1280,7 +1280,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 			Return(true, nil)
 
 		incrementError := errors.New("the database is unwell")
-		stub := expectRunInTransaction(database, otpEnrolTx)
+		stub := mocks_data.ExpectRunInTransaction(database, otpEnrolTx)
 		database.On("UpdateUser", mock.Anything, otpEnrolTx, mock.Anything).Return(nil).Once()
 		database.On("IncrementUserOtpConfigGeneration", mock.Anything, otpEnrolTx, int64(1)).
 			Return(int64(0), incrementError).Once()
@@ -1292,7 +1292,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 
 		handler.ServeHTTP(rr, req)
 
-		assert.ErrorIs(t, stub.bodyErr, incrementError, "the body hands its error to the helper, which rolls back")
+		assert.ErrorIs(t, stub.BodyErr, incrementError, "the body hands its error to the helper, which rolls back")
 		database.AssertNotCalled(t, "ClearPendingOTPEnrollment", mock.Anything, mock.Anything, mock.Anything)
 		// Nothing is audited as an enrollment that did not happen, and the ceremony does not
 		// advance: no auth method is added and no context is saved.

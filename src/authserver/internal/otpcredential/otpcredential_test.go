@@ -63,7 +63,7 @@ func TestEstablish_WritesTheUserTheGenerationAndTheClearInOneTransaction(t *test
 	user := enrollableUser()
 
 	var calls []string
-	expectRunInTransaction(database, otpTx, func(edge string) { calls = append(calls, edge) })
+	mocks_data.ExpectRunInTransaction(database, otpTx, func(edge string) { calls = append(calls, edge) })
 
 	database.EXPECT().UpdateUser(mock.Anything, otpTx, mock.MatchedBy(func(u *models.User) bool {
 		// otp_enabled is on and the seed is stored encrypted, both of which were the caller's
@@ -112,14 +112,14 @@ func TestEstablish_AFailedWriteRollsTheWholeTransactionBack(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	writeErr := errors.New("update refused")
 
-	stub := expectRunInTransaction(database, otpTx)
+	stub := mocks_data.ExpectRunInTransaction(database, otpTx)
 	database.EXPECT().UpdateUser(mock.Anything, otpTx, mock.Anything).Return(writeErr).Once()
 
 	generation, err := Establish(context.Background(), database, enrollableUser(), otpSeed)
 
 	require.ErrorIs(t, err, writeErr)
 	assert.Zero(t, generation)
-	assert.ErrorIs(t, stub.bodyErr, writeErr,
+	assert.ErrorIs(t, stub.BodyErr, writeErr,
 		"the body must hand the error to the helper rather than swallow it, because that is what "+
 			"makes the pending enrolment survive a failed enable (#247)")
 	database.AssertNotCalled(t, "IncrementUserOtpConfigGeneration", mock.Anything, mock.Anything, mock.Anything)
@@ -132,7 +132,7 @@ func TestEstablish_ACommitFailureYieldsNoGeneration(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	commitErr := errors.New("commit refused")
 
-	expectRunInTransactionThenFail(database, otpTx, commitErr)
+	mocks_data.ExpectRunInTransactionThenFail(database, otpTx, commitErr)
 	database.EXPECT().UpdateUser(mock.Anything, otpTx, mock.Anything).Return(nil).Once()
 	database.EXPECT().IncrementUserOtpConfigGeneration(mock.Anything, otpTx, otpUserId).Return(11, nil).Once()
 	database.EXPECT().ClearPendingOTPEnrollment(mock.Anything, otpTx, otpUserId).Return(nil).Once()
@@ -149,7 +149,7 @@ func TestEstablish_ARefusedTransactionWritesNothing(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	beginErr := errors.New("cannot begin")
 
-	expectRunInTransactionRefused(database, beginErr)
+	mocks_data.ExpectRunInTransactionRefused(database, beginErr)
 
 	generation, err := Establish(context.Background(), database, enrollableUser(), otpSeed)
 
@@ -166,7 +166,7 @@ func TestRemove_ClearsDisablesResetsAndAdvancesInOneTransaction(t *testing.T) {
 	user := enrolledUser(t)
 
 	var calls []string
-	expectRunInTransaction(database, otpTx, func(edge string) { calls = append(calls, edge) })
+	mocks_data.ExpectRunInTransaction(database, otpTx, func(edge string) { calls = append(calls, edge) })
 
 	database.EXPECT().UpdateUser(mock.Anything, otpTx, mock.MatchedBy(func(u *models.User) bool {
 		return !u.OTPEnabled && len(u.OTPSecretEncrypted) == 0
@@ -202,7 +202,7 @@ func TestRemove_AFailedGenerationAdvanceFailsTheRemoval(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	incrementErr := errors.New("increment refused")
 
-	stub := expectRunInTransaction(database, otpTx)
+	stub := mocks_data.ExpectRunInTransaction(database, otpTx)
 	database.EXPECT().UpdateUser(mock.Anything, otpTx, mock.Anything).Return(nil).Once()
 	database.EXPECT().ResetUserOTPStep(mock.Anything, otpTx, otpUserId).Return(nil).Once()
 	database.EXPECT().IncrementUserOtpConfigGeneration(mock.Anything, otpTx, otpUserId).
@@ -211,7 +211,7 @@ func TestRemove_AFailedGenerationAdvanceFailsTheRemoval(t *testing.T) {
 	err := Remove(context.Background(), database, enrolledUser(t))
 
 	require.ErrorIs(t, err, incrementErr)
-	assert.ErrorIs(t, stub.bodyErr, incrementErr)
+	assert.ErrorIs(t, stub.BodyErr, incrementErr)
 }
 
 // Seam 3, the three-arm table, against the authenticator the user has enrolled. requireOTPEnabled
