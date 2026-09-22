@@ -1,11 +1,7 @@
 package models
 
 import (
-	"crypto/rsa"
 	"database/sql"
-
-	jwt "github.com/golang-jwt/jwt/v5"
-	"github.com/leodip/goiabada/authserver/internal/encryption"
 )
 
 type KeyPair struct {
@@ -17,20 +13,11 @@ type KeyPair struct {
 	Type          string       `db:"type" fieldopt:"withquote"`
 	Algorithm     string       `db:"algorithm" fieldopt:"withquote"`
 	// PrivateKeyPEM is the RSA private key PEM, encrypted at rest with the data
-	// cipher (issue #83). Use ParsePrivateKey to obtain the usable key.
+	// cipher (issue #83). Use signingkeys.ParsePrivateKey to obtain the usable
+	// key: decrypting and parsing it is a capability of the package that owns
+	// the signing keys, not of the row (#387).
 	PrivateKeyPEM     []byte `db:"private_key_pem"`
 	PublicKeyPEM      []byte `db:"public_key_pem"`
 	PublicKeyASN1_DER []byte `db:"public_key_asn1_der"`
 	PublicKeyJWK      []byte `db:"public_key_jwk"`
-}
-
-// ParsePrivateKey decrypts the stored private-key PEM with the process data
-// cipher (encryption.InitDataCipher must have run at startup) and parses it into
-// an *rsa.PrivateKey for signing.
-func (kp *KeyPair) ParsePrivateKey() (*rsa.PrivateKey, error) {
-	pem, err := encryption.DecryptData(kp.PrivateKeyPEM)
-	if err != nil {
-		return nil, err
-	}
-	return jwt.ParseRSAPrivateKeyFromPEM([]byte(pem))
 }

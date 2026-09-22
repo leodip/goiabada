@@ -17,6 +17,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
+	"github.com/leodip/goiabada/authserver/internal/signingkeys"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
@@ -298,7 +299,7 @@ func TestToken_Refresh_TokenExpired(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	privKey, err := keyPair.ParsePrivateKey()
+	privKey, err := signingkeys.ParsePrivateKey(keyPair)
 	if err != nil {
 		t.Fatal("unable to parse private key from PEM")
 	}
