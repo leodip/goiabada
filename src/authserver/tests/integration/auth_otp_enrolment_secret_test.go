@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 )
@@ -62,7 +63,7 @@ func TestAuthOtp_EnrolmentReloadRendersTheSameSecret(t *testing.T) {
 
 	// And it enrolled the seed the user actually scanned, rather than accepting the code against
 	// one seed and storing another.
-	stored, err := enrolled.GetOTPSecret()
+	stored, err := encryption.DecryptData(enrolled.OTPSecretEncrypted)
 	if err != nil {
 		t.Fatal(err)
 	}

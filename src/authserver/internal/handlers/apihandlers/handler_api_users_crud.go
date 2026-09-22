@@ -22,6 +22,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/otpcredential"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/revocation"
 	"github.com/leodip/goiabada/authserver/internal/usercreation"
@@ -35,9 +36,9 @@ import (
 // usersCrudDatabase is what the user endpoints need: the user row, the writes that change it, and
 // the transaction they share.
 //
-// It embeds the account OTP port because disabling a user's OTP runs through disableUserOTP, and
-// the revocation port because every credential write here revokes what the old credential
-// authorized.
+// It embeds the account OTP port because disabling a user's OTP runs through
+// otpcredential.Remove, and the revocation port because every credential write here revokes what
+// the old credential authorized.
 type usersCrudDatabase interface {
 	accountOTPDatabase
 	revocation.Database
@@ -253,8 +254,8 @@ func HandleAPIUserOTPPut(
 
 		// Disable OTP. Clearing the secret, turning otp_enabled off and resetting the
 		// consumed-step marker are one atomic operation, shared with the account API's disable
-		// branch (#111 decisions 4 and 13); disableUserOTP carries the reasoning.
-		err = disableUserOTP(r.Context(), database, user)
+		// branch (#111 decisions 4 and 13); otpcredential.Remove carries the reasoning.
+		err = otpcredential.Remove(r.Context(), database, user)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return

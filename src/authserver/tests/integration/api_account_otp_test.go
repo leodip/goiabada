@@ -156,7 +156,7 @@ func resetOTPStateForTest(t *testing.T, userId int64) {
 	user, err := database.GetUserById(context.Background(), nil, userId)
 	assert.NoError(t, err)
 	user.OTPEnabled = false
-	user.ClearOTPSecret()
+	user.OTPSecretEncrypted = nil
 	assert.NoError(t, database.UpdateUser(context.Background(), nil, user))
 	assert.NoError(t, database.ClearPendingOTPEnrollment(context.Background(), nil, userId))
 }
@@ -299,7 +299,7 @@ func TestAPIAccountOTPPut_Enable_Success(t *testing.T) {
 	updated, err := database.GetUserById(context.Background(), nil, userId)
 	assert.NoError(t, err)
 	assert.True(t, updated.OTPEnabled)
-	decrypted, err := updated.GetOTPSecret()
+	decrypted, err := encryption.DecryptData(updated.OTPSecretEncrypted)
 	assert.NoError(t, err)
 	assert.Equal(t, strings.ToUpper(secret), decrypted)
 }
@@ -780,7 +780,7 @@ func TestAPIAccountOTPPut_Enable_RefusedWithAnExpiredEnrollment(t *testing.T) {
 // behaviour anyone actually depends on, and it would keep passing if the browser ceremony could not
 // verify against what was stored. The direct column reads belong to seam F, which owns them on all
 // four engines in tests/data/otp_enrollment_test.go: TestTryInstallPendingOTPEnrollment_RoundTrip
-// for the write and read back, TestEnableUserOTPTx_ClearsThePendingEnrollment for the clear.
+// for the write and read back, TestOtpCredentialEstablish_ClearsThePendingEnrollment for the clear.
 //
 // Loading the user is fixture setup rather than an assertion: the ceremony driver takes a
 // *models.User for its email, and no caller of this API has one.

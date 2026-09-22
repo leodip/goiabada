@@ -264,7 +264,7 @@ func TestHandleAPIUserPasswordPut_RevokesEverything(t *testing.T) {
 }
 
 // TestHandleAPIUserOTPPut_DisableCommitsBothWritesAtomically is the admin half of #111 decision 13.
-// Decision 4 names two disable sites and this is the second: they share disableUserOTP, and this case
+// Decision 4 names two disable sites and this is the second: they share otpcredential.Remove, and this case
 // is what pins that this handler goes through it rather than keeping two unbound writes of its own.
 // Its account sibling, TestHandleAPIAccountOTPPut_Disable_CommitsBothWritesAtomically, carries the
 // reasoning about why the two writes have to commit together.
@@ -284,7 +284,7 @@ func TestHandleAPIUserOTPPut_DisableCommitsBothWritesAtomically(t *testing.T) {
 	database.On("ResetUserOTPStep", mock.Anything, otpDisableTx, userId).Return(nil).
 		Run(func(mock.Arguments) { calls = append(calls, "reset") }).Once()
 	// The counter joins the same transaction here for free, because both disable sites share
-	// disableUserOTP. That is what closes the hole #242 found at this endpoint specifically: it
+	// otpcredential.Remove. That is what closes the hole #242 found at this endpoint specifically: it
 	// flagged no session at all, so a target user whose authenticator an administrator removed
 	// kept every live session asserting amr ["pwd","otp"] for it.
 	database.On("IncrementUserOtpConfigGeneration", mock.Anything, otpDisableTx, userId).Return(int64(1), nil).

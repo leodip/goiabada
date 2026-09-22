@@ -65,7 +65,7 @@ func (g *OTPSecretGenerator) GenerateOTPSecret(email string, appName string) (st
 }
 
 // SecretFromKeyURL returns the base32 TOTP secret carried by an otpauth:// URL, the value
-// MatchStep verifies a passcode against and User.SetOTPSecret stores.
+// MatchStep verifies a passcode against and otpcredential.Establish stores.
 func SecretFromKeyURL(keyURL string) (string, error) {
 	key, err := parseKeyURL(keyURL)
 	if err != nil {

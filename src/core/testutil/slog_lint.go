@@ -274,6 +274,13 @@ var slogSpreadSites = []slogSpreadSite{
 // forgot-password, reset-password and activation handlers run through on a request, so it is a
 // request-path package by this list's own definition, and the rule is what refuses a plain
 // slog.Warn written beside the marker later (#387).
+//
+// authserver/internal/otpcredential likewise, and it also writes none today: establishing,
+// removing and verifying an authenticator all run under a request, at /auth/otp and at the two
+// account and admin OTP endpoints, and a record written there carries the same obligation the
+// handler packages' do. Listed by the commit that creates the package rather than by the one that
+// first writes a record in it, since a directory absent from this list costs all three rules
+// silently (#387).
 var slogRequestPathDirs = []string{
 	"authserver/internal/audit",
 	"authserver/internal/data/commondb",
@@ -295,6 +302,7 @@ var slogRequestPathDirs = []string{
 	"authserver/internal/emaildelivery",
 	"authserver/internal/emaillinks",
 	"authserver/internal/otp",
+	"authserver/internal/otpcredential",
 	"authserver/internal/imaging",
 	"authserver/internal/uithemes",
 	"adminconsole/internal/handlers",

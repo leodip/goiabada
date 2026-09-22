@@ -1096,7 +1096,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 			if u.Id != 1 || !u.OTPEnabled || len(u.OTPSecretEncrypted) == 0 {
 				return false
 			}
-			decrypted, err := u.GetOTPSecret()
+			decrypted, err := encryption.DecryptData(u.OTPSecretEncrypted)
 			return err == nil && decrypted == otpSecret
 		})).Return(nil).
 			Run(func(mock.Arguments) { calls = append(calls, "update") }).Once()

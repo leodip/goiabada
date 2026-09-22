@@ -4,8 +4,6 @@ import (
 	"database/sql"
 	"fmt"
 	"strings"
-
-	"github.com/leodip/goiabada/authserver/internal/encryption"
 )
 
 type User struct {
@@ -100,7 +98,7 @@ type User struct {
 	// Both are tagged dont-update for the reason AuthStateGeneration, LastOTPStep and
 	// OtpConfigGeneration are, and the hazard is the pair's whole purpose. UpdateUser writes
 	// every field not tagged pk or dont-update, and fourteen production sites load a user and
-	// later write it back, EnableUserOTPTx among them. In the ordinary update set, two
+	// later write it back, otpcredential.Establish among them. In the ordinary update set, two
 	// concurrent enrolment requests would each see no pending value, issue different seeds and
 	// leave only the last one usable, which is exactly the reload bug these columns exist to
 	// close; and any later full-row write from a model loaded before issuance would erase or
@@ -112,35 +110,6 @@ type User struct {
 	Groups      []Group         `db:"-"`
 	Permissions []Permission    `db:"-"`
 	Attributes  []UserAttribute `db:"-"`
-}
-
-// SetOTPSecret encrypts the TOTP seed at rest (AES-256-GCM, via the process
-// data cipher) into OTPSecretEncrypted. See issue #82: TOTP secrets must not be
-// stored in plaintext. The data cipher must be initialized at startup
-// (encryption.InitDataCipher, issue #83).
-func (u *User) SetOTPSecret(secret string) error {
-	encrypted, err := encryption.EncryptData(secret)
-	if err != nil {
-		return err
-	}
-	u.OTPSecretEncrypted = encrypted
-	return nil
-}
-
-// GetOTPSecret returns the decrypted TOTP seed, or an empty string if the user
-// has no encrypted secret. It is the only way a seed is read: the legacy
-// plaintext users.otp_secret column was dropped by migration 000048 along with
-// the startup pass that converted it (#98, #262).
-func (u *User) GetOTPSecret() (string, error) {
-	if len(u.OTPSecretEncrypted) == 0 {
-		return "", nil
-	}
-	return encryption.DecryptData(u.OTPSecretEncrypted)
-}
-
-// ClearOTPSecret removes any stored TOTP seed.
-func (u *User) ClearOTPSecret() {
-	u.OTPSecretEncrypted = nil
 }
 
 func (u *User) HasAddress() bool {

@@ -845,7 +845,7 @@ func TestHandleAPIAccountOTPPut_Enable_StoresTheIssuedSeed(t *testing.T) {
 	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
 	assert.True(t, user.OTPEnabled)
 
-	stored, err := user.GetOTPSecret()
+	stored, err := encryption.DecryptData(user.OTPSecretEncrypted)
 	require.NoError(t, err)
 	assert.Equal(t, otpTestSecret, stored,
 		"the enrolled authenticator must be the one the server issued and recorded")

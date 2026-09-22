@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/encryption"
-	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/otpcredential"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -254,10 +254,14 @@ func TestPendingOTPEnrollment_EnlistsInTheCallersTransaction(t *testing.T) {
 			"thrown away a seed the user still needs")
 }
 
-// TestEnableUserOTPTx_ClearsThePendingEnrollment is the property #247 §4.5 states, at the only tier
-// that can observe it: an authenticator never commits with a live pending seed still installed, and
-// a failed enable never discards one.
-func TestEnableUserOTPTx_ClearsThePendingEnrollment(t *testing.T) {
+// TestOtpCredentialEstablish_ClearsThePendingEnrollment is the property #247 §4.5 states, at the
+// only tier that can observe it: an authenticator never commits with a live pending seed still
+// installed, and a failed enable never discards one.
+func TestOtpCredentialEstablish_ClearsThePendingEnrollment(t *testing.T) {
+	// The seed the authenticator is established with. Establish encrypts it at rest, so the
+	// failing arm below encrypts one too and still writes nothing: the refusal is UpdateUser's.
+	const enrolledSeed = "ZP2Z5KXRBAPPHWXEHH65PY5H7EKLVHRZ"
+
 	user := createEnrollableUser(t)
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	ciphertext := encryptedKeyURL(t, "HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH")
@@ -272,18 +276,16 @@ func TestEnableUserOTPTx_ClearsThePendingEnrollment(t *testing.T) {
 	// including the clear must roll back with it.
 	broken := reloadUser(t, user.Id)
 	broken.Id = 0
-	_, err = handlers.EnableUserOTPTx(context.Background(), database, broken)
-	require.Error(t, err, "EnableUserOTPTx must fail on a user with id 0")
+	_, err = otpcredential.Establish(context.Background(), database, broken, enrolledSeed)
+	require.Error(t, err, "Establish must fail on a user with id 0")
 
 	assert.Equal(t, ciphertext, reloadUser(t, user.Id).OtpEnrollmentSecretEncrypted,
 		"a failed enable must leave the pending enrolment alone: the user has scanned that QR "+
 			"code and is about to retry with the next passcode")
 
 	enrolling := reloadUser(t, user.Id)
-	enrolling.OTPEnabled = true
-	require.NoError(t, enrolling.SetOTPSecret("ZP2Z5KXRBAPPHWXEHH65PY5H7EKLVHRZ"), "SetOTPSecret")
-	generation, err := handlers.EnableUserOTPTx(context.Background(), database, enrolling)
-	require.NoError(t, err, "EnableUserOTPTx")
+	generation, err := otpcredential.Establish(context.Background(), database, enrolling, enrolledSeed)
+	require.NoError(t, err, "Establish")
 	assert.EqualValues(t, 1, generation, "the counter advance still happens")
 
 	after := reloadUser(t, user.Id)
