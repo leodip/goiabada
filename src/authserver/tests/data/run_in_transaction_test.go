@@ -40,12 +40,12 @@ func TestRunInTransaction_ABodyThatReturnsNilIsCommittedAndItsRowsAreVisible(t *
 	client := newClientModel()
 
 	err := database.RunInTransaction(context.Background(), func(tx *sql.Tx) error {
-		return database.CreateClient(tx, client)
+		return database.CreateClient(context.Background(), tx, client)
 	})
 
 	require.NoError(t, err)
 	require.NotZero(t, client.Id)
-	t.Cleanup(func() { _ = database.DeleteClient(nil, client.Id) })
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
 
 	got, err := database.GetClientById(context.Background(), nil, client.Id)
 	require.NoError(t, err)
@@ -58,7 +58,7 @@ func TestRunInTransaction_ABodyThatReturnsAnErrorIsRolledBackAndTheErrorComesBac
 	refused := errors.New("the body decided against it")
 
 	err := database.RunInTransaction(context.Background(), func(tx *sql.Tx) error {
-		if err := database.CreateClient(tx, client); err != nil {
+		if err := database.CreateClient(context.Background(), tx, client); err != nil {
 			return err
 		}
 		// Enlisted: the insert is visible on the transaction that made it, which is what a
@@ -108,8 +108,8 @@ func TestRunInTransaction_ARealDeadlockIsRerunAndBothPartiesFinish(t *testing.T)
 	rowA := createTestClient(t)
 	rowB := createTestClient(t)
 	t.Cleanup(func() {
-		_ = database.DeleteClient(nil, rowA.Id)
-		_ = database.DeleteClient(nil, rowB.Id)
+		_ = database.DeleteClient(context.Background(), nil, rowA.Id)
+		_ = database.DeleteClient(context.Background(), nil, rowB.Id)
 	})
 
 	aHeld := make(chan struct{})
@@ -120,7 +120,7 @@ func TestRunInTransaction_ARealDeadlockIsRerunAndBothPartiesFinish(t *testing.T)
 	party := func(db data.Database, first, second *models.Client, held *sync.Once, mine, theirs chan struct{}) error {
 		return db.RunInTransaction(context.Background(), func(tx *sql.Tx) error {
 			attempts.Add(1)
-			if err := db.AcquireClientRow(tx, first.Id); err != nil {
+			if err := db.AcquireClientRow(context.Background(), tx, first.Id); err != nil {
 				return err
 			}
 			held.Do(func() { close(mine) })
@@ -129,7 +129,7 @@ func TestRunInTransaction_ARealDeadlockIsRerunAndBothPartiesFinish(t *testing.T)
 			case <-time.After(deadlockCeiling):
 				return errors.New("the other party never took its first row")
 			}
-			return db.AcquireClientRow(tx, second.Id)
+			return db.AcquireClientRow(context.Background(), tx, second.Id)
 		})
 	}
 

@@ -27,7 +27,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsNotRequired(t *testi
 		DefaultAcrLevel:          models.AcrLevel1,
 	}
 
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -37,7 +37,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsNotRequired(t *testi
 		URI:      fake.URL(),
 	}
 
-	err = database.CreateRedirectURI(nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -134,7 +134,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIs
 		DefaultAcrLevel:          models.AcrLevel2Optional,
 	}
 
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -144,7 +144,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpDisabled_ConsentIs
 		URI:      fake.URL(),
 	}
 
-	err = database.CreateRedirectURI(nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -246,7 +246,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsN
 		DefaultAcrLevel:          models.AcrLevel2Optional,
 	}
 
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -256,7 +256,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Optional_Pwd_OtpEnabled_ConsentIsN
 		URI:      fake.URL(),
 	}
 
-	err = database.CreateRedirectURI(nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -379,7 +379,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 		DefaultAcrLevel:          models.AcrLevel2Mandatory,
 	}
 
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -389,7 +389,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 		URI:      fake.URL(),
 	}
 
-	err = database.CreateRedirectURI(nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -504,7 +504,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 		DefaultAcrLevel:          models.AcrLevel2Mandatory,
 	}
 
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -514,7 +514,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 		URI:      fake.URL(),
 	}
 
-	err = database.CreateRedirectURI(nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -637,7 +637,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsNotRequired_Password
 		DefaultAcrLevel:          models.AcrLevel1,
 	}
 
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -647,7 +647,7 @@ func TestAuthorize_NoExistingSession_AcrLevel1_Pwd_ConsentIsNotRequired_Password
 		URI:      fake.URL(),
 	}
 
-	err = database.CreateRedirectURI(nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -728,7 +728,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 		DefaultAcrLevel:          models.AcrLevel2Mandatory,
 	}
 
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -738,7 +738,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpDisabled_ConsentI
 		URI:      fake.URL(),
 	}
 
-	err = database.CreateRedirectURI(nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -844,7 +844,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 		DefaultAcrLevel:          models.AcrLevel2Mandatory,
 	}
 
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -854,7 +854,7 @@ func TestAuthorize_NoExistingSession_AcrLevel2Mandatory_Pwd_OtpEnabled_ConsentIs
 		URI:      fake.URL(),
 	}
 
-	err = database.CreateRedirectURI(nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	if err != nil {
 		t.Fatal(err)
 	}

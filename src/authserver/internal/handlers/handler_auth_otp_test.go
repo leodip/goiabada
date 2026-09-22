@@ -156,7 +156,7 @@ func TestHandleAuthOtpGet(t *testing.T) {
 		client := &models.Client{
 			ClientIdentifier: "test-client",
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		httpHelper.On("RenderTemplate",
 			mock.Anything,
@@ -249,7 +249,7 @@ func TestHandleAuthOtpGet(t *testing.T) {
 		client := &models.Client{
 			ClientIdentifier: "test-client",
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		otpSecretGenerator.On("GenerateOTPSecret", "test@example.com", "TestApp").Return(generatedKeyURL, nil)
 
@@ -355,7 +355,7 @@ func TestHandleAuthOtpGet(t *testing.T) {
 		client := &models.Client{
 			ClientIdentifier: "test-client",
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		httpHelper.On("RenderTemplate",
 			mock.Anything,
@@ -645,7 +645,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		client := &models.Client{
 			ClientIdentifier: "test-client",
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.AuditUserDisabled, mock.Anything).Return()
 
@@ -692,7 +692,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		client := &models.Client{
 			ClientIdentifier: "test-client",
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		httpHelper.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/auth_otp.html", mock.Anything).Return(nil)
 
@@ -754,7 +754,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		client := &models.Client{
 			ClientIdentifier: "test-client",
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		// The code-required re-render, carrying the ceremony id so the user can retry: the
 		// same answer an empty submission gets. No audit entry either, because no credential
@@ -810,7 +810,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		client := &models.Client{
 			ClientIdentifier: "test-client",
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.AuditAuthFailedOtp, mock.Anything).Return()
 
@@ -860,7 +860,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).
 			Return(&models.User{Id: 1, Enabled: true, OTPEnabled: false}, nil)
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
 			Return(&models.Client{ClientIdentifier: "test-client"}, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.AuditAuthFailedOtp, mock.Anything).Return()
@@ -922,7 +922,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		client := &models.Client{
 			ClientIdentifier: "test-client",
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.AuditAuthFailedOtp, mock.Anything).Return()
 
@@ -986,7 +986,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		client := &models.Client{
 			ClientIdentifier: "test-client",
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		// requireOTPEnabled is matched exactly rather than with mock.Anything: true is what
 		// makes a verification claim assert an enrolled authenticator (#111 decision 10),
@@ -1076,7 +1076,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		client := &models.Client{
 			ClientIdentifier: "test-client",
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		// false, because enrollment claims before the enable write and otp_enabled is
 		// still off at that point (#111 decision 10). Matched exactly for the reason the
@@ -1204,7 +1204,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		client := &models.Client{
 			ClientIdentifier: "test-client",
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		// The claim succeeds and the enable write then fails, which is the ordering §4
 		// asks for: a burned code and a retry beats OTP left enabled on a refused request.
@@ -1274,7 +1274,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
 		client := &models.Client{ClientIdentifier: "test-client"}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		database.On("TryConsumeUserOTPStep", mock.Anything, mock.Anything, int64(1), mock.Anything, false).
 			Return(true, nil)
@@ -1350,7 +1350,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		client := &models.Client{
 			ClientIdentifier: "test-client",
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		// The code validates against the secret, so the matcher accepts it; the claim is
 		// what refuses it. That is the whole point of the case: without the claim this is
@@ -1437,7 +1437,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		client := &models.Client{
 			ClientIdentifier: "test-client",
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		// A database fault must surface as a 500 rather than being collapsed into either
 		// answer: "not consumed" would refuse valid codes for the duration of the fault,
@@ -1498,7 +1498,7 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		client := &models.Client{
 			ClientIdentifier: "test-client",
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.AuditUserDisabled, mock.Anything).Return()
 
@@ -1562,7 +1562,7 @@ func TestHandleAuthOtpPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 		}
 
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
 			Return(&models.Client{ClientIdentifier: "test-client"}, nil)
 		// requireOTPEnabled mirrors enrolled: the enrolled half asserts an authenticator and
 		// the enrollment half establishes one (#111 decision 10).

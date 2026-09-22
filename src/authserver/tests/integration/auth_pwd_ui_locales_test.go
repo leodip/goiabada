@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -32,7 +33,7 @@ func TestAuthPwd_UILocales_PreservedAcrossFlow(t *testing.T) {
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
-	err := database.CreateRedirectURI(nil, redirectUri)
+	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	assert.NoError(t, err)
 
 	httpClient := createHttpClient(t)

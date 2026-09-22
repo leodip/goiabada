@@ -23,7 +23,7 @@ func HandleClientLogoGet(
 			return
 		}
 
-		client, err := database.GetClientByClientIdentifier(nil, clientIdentifier)
+		client, err := database.GetClientByClientIdentifier(r.Context(), nil, clientIdentifier)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
@@ -34,7 +34,7 @@ func HandleClientLogoGet(
 			return
 		}
 
-		clientLogo, err := database.GetClientLogoByClientId(nil, client.Id)
+		clientLogo, err := database.GetClientLogoByClientId(r.Context(), nil, client.Id)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return

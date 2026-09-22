@@ -39,14 +39,14 @@ func createROPCClient(t *testing.T, clientSecret string, isPublic bool) *models.
 		client.ClientSecretEncrypted = clientSecretEncrypted
 	}
 
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	assert.Nil(t, err)
 
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
-	err = database.CreateRedirectURI(nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	assert.Nil(t, err)
 
 	return client
@@ -177,7 +177,7 @@ func TestROPC_GlobalDisabled(t *testing.T) {
 		ResourceOwnerPasswordCredentialsEnabled: nil, // Follow global setting
 		DefaultAcrLevel:                         models.AcrLevel1,
 	}
-	err = database.CreateClient(nil, client)
+	err = database.CreateClient(context.Background(), nil, client)
 	assert.Nil(t, err)
 	user := createROPCUser(t, password)
 
@@ -223,7 +223,7 @@ func TestROPC_ClientOverrideDisabled(t *testing.T) {
 		ResourceOwnerPasswordCredentialsEnabled: &ropcDisabled,
 		DefaultAcrLevel:                         models.AcrLevel1,
 	}
-	err = database.CreateClient(nil, client)
+	err = database.CreateClient(context.Background(), nil, client)
 	assert.Nil(t, err)
 
 	password := fake.Password(12)
@@ -762,7 +762,7 @@ func TestROPC_RefreshToken_StopsWhenROPCDisabled(t *testing.T) {
 			disable: func(t *testing.T, client *models.Client) func() {
 				ropcDisabled := false
 				client.ResourceOwnerPasswordCredentialsEnabled = &ropcDisabled
-				assert.Nil(t, database.UpdateClient(nil, client))
+				assert.Nil(t, database.UpdateClient(context.Background(), nil, client))
 				return func() {}
 			},
 		},
@@ -770,7 +770,7 @@ func TestROPC_RefreshToken_StopsWhenROPCDisabled(t *testing.T) {
 			name: "the client inherits and the global switch is turned off",
 			disable: func(t *testing.T, client *models.Client) func() {
 				client.ResourceOwnerPasswordCredentialsEnabled = nil
-				assert.Nil(t, database.UpdateClient(nil, client))
+				assert.Nil(t, database.UpdateClient(context.Background(), nil, client))
 
 				settings, err := database.GetSettingsById(nil, 1)
 				assert.Nil(t, err)

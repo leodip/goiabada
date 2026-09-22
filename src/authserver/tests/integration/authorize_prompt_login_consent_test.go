@@ -31,7 +31,7 @@ func TestPromptConsent_ForcesConsentEvenWhenAlreadyConsented(t *testing.T) {
 		ConsentRequired:          false, // Consent NOT normally required
 		DefaultAcrLevel:          models.AcrLevel1,
 	}
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -40,7 +40,7 @@ func TestPromptConsent_ForcesConsentEvenWhenAlreadyConsented(t *testing.T) {
 		ClientId: client.Id,
 		URI:      "https://example.com/callback",
 	}
-	err = database.CreateRedirectURI(nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -425,7 +425,7 @@ func TestPromptConsent_UserDeclines(t *testing.T) {
 		ConsentRequired:          true,
 		DefaultAcrLevel:          models.AcrLevel1,
 	}
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -434,7 +434,7 @@ func TestPromptConsent_UserDeclines(t *testing.T) {
 		ClientId: client.Id,
 		URI:      "https://example.com/callback",
 	}
-	err = database.CreateRedirectURI(nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -634,7 +634,7 @@ func TestPromptLogin_NewAuthTime(t *testing.T) {
 		RefreshTokenOfflineIdleTimeoutInSeconds: 3600,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 86400,
 	}
-	err = database.CreateClient(nil, client)
+	err = database.CreateClient(context.Background(), nil, client)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -643,7 +643,7 @@ func TestPromptLogin_NewAuthTime(t *testing.T) {
 		ClientId: client.Id,
 		URI:      "https://example.com/callback",
 	}
-	err = database.CreateRedirectURI(nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	if err != nil {
 		t.Fatal(err)
 	}

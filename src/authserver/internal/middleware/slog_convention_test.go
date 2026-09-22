@@ -57,7 +57,7 @@ func TestSlogConvention_CorsConfigurationFailureIsError(t *testing.T) {
 	logged := testutil.CaptureSlog(t)
 
 	mockDB := mocks_data.NewDatabase(t)
-	mockDB.On("WebOriginExists", mock.Anything, "https://app.example.com").
+	mockDB.On("WebOriginExists", mock.Anything, mock.Anything, "https://app.example.com").
 		Return(false, errors.New("the database is unreachable"))
 
 	req := httptest.NewRequest(http.MethodGet, "/userinfo", nil)

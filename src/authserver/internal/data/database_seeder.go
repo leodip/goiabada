@@ -159,7 +159,7 @@ func (ds *DatabaseSeeder) Seed(ctx context.Context) error {
 		ShowDisplayName:                         true,
 	}
 
-	err = ds.DB.CreateClient(nil, client1)
+	err = ds.DB.CreateClient(ctx, nil, client1)
 	if err != nil {
 		return err
 	}
@@ -195,7 +195,7 @@ func (ds *DatabaseSeeder) Seed(ctx context.Context) error {
 		URI:      ds.adminConsoleBaseURL + "/auth/callback",
 		ClientId: client1.Id,
 	}
-	err = ds.DB.CreateRedirectURI(nil, redirectURI)
+	err = ds.DB.CreateRedirectURI(ctx, nil, redirectURI)
 	if err != nil {
 		return err
 	}
@@ -205,7 +205,7 @@ func (ds *DatabaseSeeder) Seed(ctx context.Context) error {
 		URI:      ds.adminConsoleBaseURL,
 		ClientId: client1.Id,
 	}
-	err = ds.DB.CreateRedirectURI(nil, redirectURI)
+	err = ds.DB.CreateRedirectURI(ctx, nil, redirectURI)
 	if err != nil {
 		return err
 	}
@@ -252,7 +252,7 @@ func (ds *DatabaseSeeder) Seed(ctx context.Context) error {
 		ResourceIdentifier: constants.AuthServerResourceIdentifier,
 		Description:        "Authorization server (system-level)",
 	}
-	err = ds.DB.CreateResource(nil, resource1)
+	err = ds.DB.CreateResource(ctx, nil, resource1)
 	if err != nil {
 		return err
 	}
@@ -263,7 +263,7 @@ func (ds *DatabaseSeeder) Seed(ctx context.Context) error {
 		Description:          "Access to the OpenID Connect user info endpoint",
 		ResourceId:           resource1.Id,
 	}
-	err = ds.DB.CreatePermission(nil, permission1)
+	err = ds.DB.CreatePermission(ctx, nil, permission1)
 	if err != nil {
 		return err
 	}
@@ -274,7 +274,7 @@ func (ds *DatabaseSeeder) Seed(ctx context.Context) error {
 		Description:          "View and update user account data for the current user",
 		ResourceId:           resource1.Id,
 	}
-	err = ds.DB.CreatePermission(nil, permission2)
+	err = ds.DB.CreatePermission(ctx, nil, permission2)
 	if err != nil {
 		return err
 	}
@@ -285,7 +285,7 @@ func (ds *DatabaseSeeder) Seed(ctx context.Context) error {
 		Description:          "Manage the authorization server via the admin console",
 		ResourceId:           resource1.Id,
 	}
-	err = ds.DB.CreatePermission(nil, permission3)
+	err = ds.DB.CreatePermission(ctx, nil, permission3)
 	if err != nil {
 		return err
 	}
@@ -297,7 +297,7 @@ func (ds *DatabaseSeeder) Seed(ctx context.Context) error {
 		Description:          "Read-only access to all admin API endpoints",
 		ResourceId:           resource1.Id,
 	}
-	err = ds.DB.CreatePermission(nil, permissionAdminRead)
+	err = ds.DB.CreatePermission(ctx, nil, permissionAdminRead)
 	if err != nil {
 		return err
 	}
@@ -308,7 +308,7 @@ func (ds *DatabaseSeeder) Seed(ctx context.Context) error {
 		Description:          "Manage users, groups, and permissions",
 		ResourceId:           resource1.Id,
 	}
-	err = ds.DB.CreatePermission(nil, permissionManageUsers)
+	err = ds.DB.CreatePermission(ctx, nil, permissionManageUsers)
 	if err != nil {
 		return err
 	}
@@ -319,7 +319,7 @@ func (ds *DatabaseSeeder) Seed(ctx context.Context) error {
 		Description:          "Manage OAuth2 clients",
 		ResourceId:           resource1.Id,
 	}
-	err = ds.DB.CreatePermission(nil, permissionManageClients)
+	err = ds.DB.CreatePermission(ctx, nil, permissionManageClients)
 	if err != nil {
 		return err
 	}
@@ -330,7 +330,7 @@ func (ds *DatabaseSeeder) Seed(ctx context.Context) error {
 		Description:          "Manage system settings and signing keys",
 		ResourceId:           resource1.Id,
 	}
-	err = ds.DB.CreatePermission(nil, permissionManageSettings)
+	err = ds.DB.CreatePermission(ctx, nil, permissionManageSettings)
 	if err != nil {
 		return err
 	}
@@ -341,7 +341,7 @@ func (ds *DatabaseSeeder) Seed(ctx context.Context) error {
 		Description:          "Read and write admin console browser sessions",
 		ResourceId:           resource1.Id,
 	}
-	err = ds.DB.CreatePermission(nil, permissionBrowserSessions)
+	err = ds.DB.CreatePermission(ctx, nil, permissionBrowserSessions)
 	if err != nil {
 		return err
 	}
@@ -350,7 +350,7 @@ func (ds *DatabaseSeeder) Seed(ctx context.Context) error {
 	// Migration 000035 produces this same end state for an installation that already
 	// existed, and the two must not drift: the permission on the authserver resource,
 	// the grant to the admin console client, and client_credentials_enabled on it.
-	err = ds.DB.CreateClientPermission(nil, &models.ClientPermission{
+	err = ds.DB.CreateClientPermission(ctx, nil, &models.ClientPermission{
 		ClientId:     client1.Id,
 		PermissionId: permissionBrowserSessions.Id,
 	})

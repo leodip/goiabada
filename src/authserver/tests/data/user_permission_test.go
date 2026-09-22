@@ -350,7 +350,7 @@ func TestGetUsersByPermissionIdPaginated_EnlistsInTheCallersTransaction(t *testi
 		ResourceIdentifier: "tx_resource_" + fake.LetterN(8),
 		Description:        "Transaction pass-through resource",
 	}
-	if err := database.CreateResource(tx, resource); err != nil {
+	if err := database.CreateResource(context.Background(), tx, resource); err != nil {
 		t.Fatalf("Failed to create resource inside the transaction: %v", err)
 	}
 
@@ -359,7 +359,7 @@ func TestGetUsersByPermissionIdPaginated_EnlistsInTheCallersTransaction(t *testi
 		Description:          "Transaction pass-through permission",
 		ResourceId:           resource.Id,
 	}
-	if err := database.CreatePermission(tx, permission); err != nil {
+	if err := database.CreatePermission(context.Background(), tx, permission); err != nil {
 		t.Fatalf("Failed to create permission inside the transaction: %v", err)
 	}
 

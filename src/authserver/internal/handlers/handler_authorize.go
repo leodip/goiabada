@@ -220,7 +220,7 @@ func HandleAuthorizeGet(
 		// Nothing is lost by the move: ValidateClientAndRedirectURI ran directly above and returns
 		// an error unless the client exists and is enabled, so the only way this finds nothing is a
 		// client deleted between the two lookups, which answered 500 before the move as well.
-		client, err := database.GetClientByClientIdentifier(nil, authContext.ClientId)
+		client, err := database.GetClientByClientIdentifier(r.Context(), nil, authContext.ClientId)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
@@ -444,7 +444,7 @@ func HandleAuthorizeGet(
 			}
 		}
 
-		err = authorizeValidator.ValidateScopes(authContext.Scope)
+		err = authorizeValidator.ValidateScopes(r.Context(), authContext.Scope)
 
 		if err != nil {
 			var valError *customerrors.ErrorDetail
@@ -931,7 +931,7 @@ func answerClientWithError(w http.ResponseWriter, r *http.Request, database data
 // into a 500; and unresolved provenance is the untrusted case, which errs towards withholding a
 // redirect rather than towards performing one (#108).
 func clientProvenance(ctx context.Context, database data.Database, clientIdentifier string) *models.Client {
-	client, err := database.GetClientByClientIdentifier(nil, clientIdentifier)
+	client, err := database.GetClientByClientIdentifier(ctx, nil, clientIdentifier)
 	if err != nil {
 		slog.ErrorContext(ctx, "unable to load the client while answering it with an error, treating its provenance as unresolved",
 			"client_identifier", clientIdentifier, "error", err)
@@ -1037,7 +1037,7 @@ func redirectWillBeEmitted(ctx context.Context, database data.Database, client *
 		return false
 	}
 
-	redirectURIs, err := database.GetRedirectURIsByClientId(nil, client.Id)
+	redirectURIs, err := database.GetRedirectURIsByClientId(ctx, nil, client.Id)
 	if err != nil {
 		// The client identifier is a bounded stored value and is safe to log; the URI is not,
 		// matching checkRedirectURIEmittable, which records where a refusal happened and

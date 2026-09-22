@@ -29,7 +29,7 @@ func TestAPIClientDelete_Success(t *testing.T) {
 		Enabled:          true,
 		IsPublic:         true,
 	}
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
 
 	// Delete via API
@@ -122,13 +122,13 @@ func TestAPIClientGetPermissions_IncludesPermissions(t *testing.T) {
 		Enabled:          true,
 		IsPublic:         true,
 	}
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
-	defer func() { _ = database.DeleteClient(nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
 	resource := createResource(t)
 	perm := createPermission(t, resource.Id)
-	err = database.CreateClientPermission(nil, &models.ClientPermission{ClientId: client.Id, PermissionId: perm.Id})
+	err = database.CreateClientPermission(context.Background(), nil, &models.ClientPermission{ClientId: client.Id, PermissionId: perm.Id})
 	assert.NoError(t, err)
 
 	// Call GET client permissions by id
@@ -171,15 +171,15 @@ func TestAPIClientDelete_InsufficientScope(t *testing.T) {
 		IsPublic:                 false,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
-	err = database.CreateClient(nil, client)
+	err = database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
 	clientWithScope = client
-	defer func() { _ = database.DeleteClient(nil, clientWithScope.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, clientWithScope.Id) }()
 
 	// Grant auth-server:userinfo permission
-	authRes, err := database.GetResourceByResourceIdentifier(nil, constants.AuthServerResourceIdentifier)
+	authRes, err := database.GetResourceByResourceIdentifier(context.Background(), nil, constants.AuthServerResourceIdentifier)
 	assert.NoError(t, err)
-	perms, err := database.GetPermissionsByResourceId(nil, authRes.Id)
+	perms, err := database.GetPermissionsByResourceId(context.Background(), nil, authRes.Id)
 	assert.NoError(t, err)
 	var userinfoPerm *models.Permission
 	for i := range perms {
@@ -189,7 +189,7 @@ func TestAPIClientDelete_InsufficientScope(t *testing.T) {
 		}
 	}
 	assert.NotNil(t, userinfoPerm)
-	err = database.CreateClientPermission(nil, &models.ClientPermission{ClientId: client.Id, PermissionId: userinfoPerm.Id})
+	err = database.CreateClientPermission(context.Background(), nil, &models.ClientPermission{ClientId: client.Id, PermissionId: userinfoPerm.Id})
 	assert.NoError(t, err)
 
 	// Get token with only auth-server:userinfo scope
@@ -213,9 +213,9 @@ func TestAPIClientDelete_InsufficientScope(t *testing.T) {
 		Enabled:          true,
 		IsPublic:         true,
 	}
-	err = database.CreateClient(nil, target)
+	err = database.CreateClient(context.Background(), nil, target)
 	assert.NoError(t, err)
-	defer func() { _ = database.DeleteClient(nil, target.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, target.Id) }()
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(target.Id, 10)
 	resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
@@ -233,13 +233,13 @@ func TestAPIClientDelete_CascadesLinkedData(t *testing.T) {
 		Enabled:          true,
 		IsPublic:         true,
 	}
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
 
 	// Create permission and assign to client
 	resource := createResource(t)
 	perm := createPermission(t, resource.Id)
-	err = database.CreateClientPermission(nil, &models.ClientPermission{ClientId: client.Id, PermissionId: perm.Id})
+	err = database.CreateClientPermission(context.Background(), nil, &models.ClientPermission{ClientId: client.Id, PermissionId: perm.Id})
 	assert.NoError(t, err)
 
 	// Create user and consent to the client
@@ -257,7 +257,7 @@ func TestAPIClientDelete_CascadesLinkedData(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 	// Assert client permissions removed
-	cps, err := database.GetClientPermissionsByClientId(nil, client.Id)
+	cps, err := database.GetClientPermissionsByClientId(context.Background(), nil, client.Id)
 	assert.NoError(t, err)
 	assert.True(t, len(cps) == 0)
 

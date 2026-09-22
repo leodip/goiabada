@@ -188,10 +188,10 @@ func TestAPIGroupDelete_WithGroupPermissions(t *testing.T) {
 		Description:          "Test permission for group deletion",
 		ResourceId:           1, // Assuming resource with ID 1 exists
 	}
-	err := database.CreatePermission(nil, testPermission)
+	err := database.CreatePermission(context.Background(), nil, testPermission)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeletePermission(nil, testPermission.Id)
+		_ = database.DeletePermission(context.Background(), nil, testPermission.Id)
 	}()
 
 	groupPermission := &models.GroupPermission{

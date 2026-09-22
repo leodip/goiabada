@@ -56,7 +56,7 @@ func HandleAuthOtpGet(
 		}
 
 		// Fetch client to get display settings
-		client, err := database.GetClientByClientIdentifier(nil, authContext.ClientId)
+		client, err := database.GetClientByClientIdentifier(r.Context(), nil, authContext.ClientId)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
@@ -241,7 +241,7 @@ func HandleAuthOtpPost(
 		}
 
 		// Fetch client to get display settings
-		client, err := database.GetClientByClientIdentifier(nil, authContext.ClientId)
+		client, err := database.GetClientByClientIdentifier(r.Context(), nil, authContext.ClientId)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return

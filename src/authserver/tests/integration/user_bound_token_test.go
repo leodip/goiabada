@@ -94,14 +94,14 @@ func createImpersonatingClientCredentialsToken(t *testing.T, subject string, per
 		DefaultAcrLevel:          models.AcrLevel2Optional,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
-	err = database.CreateClient(nil, client)
+	err = database.CreateClient(context.Background(), nil, client)
 	require.NoError(t, err)
 
-	authserverResource, err := database.GetResourceByResourceIdentifier(nil, constants.AuthServerResourceIdentifier)
+	authserverResource, err := database.GetResourceByResourceIdentifier(context.Background(), nil, constants.AuthServerResourceIdentifier)
 	require.NoError(t, err)
 	require.NotNil(t, authserverResource)
 
-	permissions, err := database.GetPermissionsByResourceId(nil, authserverResource.Id)
+	permissions, err := database.GetPermissionsByResourceId(context.Background(), nil, authserverResource.Id)
 	require.NoError(t, err)
 
 	var granted *models.Permission
@@ -113,7 +113,7 @@ func createImpersonatingClientCredentialsToken(t *testing.T, subject string, per
 	}
 	require.NotNil(t, granted, "built-in permission %q must exist on the authserver resource", permissionIdentifier)
 
-	err = database.CreateClientPermission(nil, &models.ClientPermission{
+	err = database.CreateClientPermission(context.Background(), nil, &models.ClientPermission{
 		ClientId:     client.Id,
 		PermissionId: granted.Id,
 	})
@@ -358,9 +358,9 @@ func userAccessTokenViaROPC(t *testing.T) (string, *models.User, string) {
 	// and its absence is what makes the "sessionless ROPC refresh token" case exercise the fix.
 	// Do not add it back to make a failure go away: a failure here means the injected-scope
 	// exception has regressed.
-	authserverResource, err := database.GetResourceByResourceIdentifier(nil, constants.AuthServerResourceIdentifier)
+	authserverResource, err := database.GetResourceByResourceIdentifier(context.Background(), nil, constants.AuthServerResourceIdentifier)
 	require.NoError(t, err)
-	permissions, err := database.GetPermissionsByResourceId(nil, authserverResource.Id)
+	permissions, err := database.GetPermissionsByResourceId(context.Background(), nil, authserverResource.Id)
 	require.NoError(t, err)
 	for i := range permissions {
 		if permissions[i].PermissionIdentifier == constants.ManageAccountPermissionIdentifier {

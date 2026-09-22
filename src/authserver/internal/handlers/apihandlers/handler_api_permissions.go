@@ -38,7 +38,7 @@ func HandleAPIPermissionsByResourceGet(
 			return
 		}
 
-		permissions, err := database.GetPermissionsByResourceId(nil, resourceId)
+		permissions, err := database.GetPermissionsByResourceId(r.Context(), nil, resourceId)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting permissions"), "resource_id", resourceId)
 			return
@@ -51,7 +51,7 @@ func HandleAPIPermissionsByResourceGet(
 
 		// Load resource information for each permission if we have any
 		if len(permissions) > 0 {
-			err = database.PermissionsLoadResources(nil, permissions)
+			err = database.PermissionsLoadResources(r.Context(), nil, permissions)
 			if err != nil {
 				writeInternalServerError(w, r, err)
 				return
@@ -93,7 +93,7 @@ func HandleAPIResourcePermissionsPut(
 			return
 		}
 
-		resource, err := database.GetResourceById(nil, resourceId)
+		resource, err := database.GetResourceById(r.Context(), nil, resourceId)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting resource by ID for permissions update"), "resource_id", resourceId)
 			return
@@ -165,7 +165,7 @@ func HandleAPIResourcePermissionsPut(
 		}
 
 		// Load existing permissions once
-		existing, err := database.GetPermissionsByResourceId(nil, resource.Id)
+		existing, err := database.GetPermissionsByResourceId(r.Context(), nil, resource.Id)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting existing permissions"), "resource_id", resource.Id)
 			return
@@ -231,7 +231,7 @@ func HandleAPIResourcePermissionsPut(
 
 				cur.PermissionIdentifier = p.PermissionIdentifier
 				cur.Description = p.Description
-				if err := database.UpdatePermission(nil, &cur); err != nil {
+				if err := database.UpdatePermission(r.Context(), nil, &cur); err != nil {
 					writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error updating permission"), "permission_id", cur.Id)
 					return
 				}
@@ -253,7 +253,7 @@ func HandleAPIResourcePermissionsPut(
 					PermissionIdentifier: p.PermissionIdentifier,
 					Description:          p.Description,
 				}
-				if err := database.CreatePermission(nil, perm); err != nil {
+				if err := database.CreatePermission(r.Context(), nil, perm); err != nil {
 					writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error creating permission"), "resource_id", resource.Id)
 					return
 				}
@@ -264,7 +264,7 @@ func HandleAPIResourcePermissionsPut(
 
 		// Delete any permissions that are no longer present (by identifier set)
 		// Reload current permissions to be safe
-		current, err := database.GetPermissionsByResourceId(nil, resource.Id)
+		current, err := database.GetPermissionsByResourceId(r.Context(), nil, resource.Id)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting current permissions for deletion"), "resource_id", resource.Id)
 			return
@@ -275,7 +275,7 @@ func HandleAPIResourcePermissionsPut(
 		}
 		for _, existingPerm := range current {
 			if !desiredIdentifiers[existingPerm.PermissionIdentifier] {
-				if err := database.DeletePermission(nil, existingPerm.Id); err != nil {
+				if err := database.DeletePermission(r.Context(), nil, existingPerm.Id); err != nil {
 					writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error deleting permission"), "permission_id", existingPerm.Id)
 					return
 				}

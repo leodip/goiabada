@@ -49,7 +49,7 @@ func HandleAPIGroupPermissionsGet(
 
 		// Load resource information for each permission
 		for i := range group.Permissions {
-			resource, err := database.GetResourceById(nil, group.Permissions[i].ResourceId)
+			resource, err := database.GetResourceById(r.Context(), nil, group.Permissions[i].ResourceId)
 			if err != nil {
 				writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting resource by ID for permission"), "resource_id", group.Permissions[i].ResourceId, "group_id", group.Id)
 				return
@@ -127,7 +127,7 @@ func HandleAPIGroupPermissionsPut(
 
 		// Validate that all requested permissions exist
 		for _, permissionId := range request.PermissionIds {
-			permission, err := database.GetPermissionById(nil, permissionId)
+			permission, err := database.GetPermissionById(r.Context(), nil, permissionId)
 			if err != nil {
 				writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting permission by ID for validation"), "permission_id", permissionId, "group_id", group.Id)
 				return
@@ -149,7 +149,7 @@ func HandleAPIGroupPermissionsPut(
 			}
 
 			if !found {
-				permission, err := database.GetPermissionById(nil, permissionId)
+				permission, err := database.GetPermissionById(r.Context(), nil, permissionId)
 				if err != nil {
 					writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error retrieving permission for group assignment"), "permission_id", permissionId, "group_id", group.Id)
 					return

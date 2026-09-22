@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"context"
 	"database/sql"
 	"testing"
 	"time"
@@ -16,7 +17,7 @@ func TestCreateWebOrigin(t *testing.T) {
 		ClientId: client.Id,
 	}
 
-	err := database.CreateWebOrigin(nil, webOrigin)
+	err := database.CreateWebOrigin(context.Background(), nil, webOrigin)
 	if err != nil {
 		t.Fatalf("Failed to create web origin: %v", err)
 	}
@@ -28,7 +29,7 @@ func TestCreateWebOrigin(t *testing.T) {
 		t.Error("Expected CreatedAt to be set")
 	}
 
-	retrievedWebOrigin, err := database.GetWebOriginById(nil, webOrigin.Id)
+	retrievedWebOrigin, err := database.GetWebOriginById(context.Background(), nil, webOrigin.Id)
 	if err != nil {
 		t.Fatalf("Failed to retrieve created web origin: %v", err)
 	}
@@ -45,7 +46,7 @@ func TestGetWebOriginById(t *testing.T) {
 	client := createTestClient(t)
 	webOrigin := createTestWebOrigin(t, client.Id)
 
-	retrievedWebOrigin, err := database.GetWebOriginById(nil, webOrigin.Id)
+	retrievedWebOrigin, err := database.GetWebOriginById(context.Background(), nil, webOrigin.Id)
 	if err != nil {
 		t.Fatalf("Failed to get web origin by ID: %v", err)
 	}
@@ -57,7 +58,7 @@ func TestGetWebOriginById(t *testing.T) {
 		t.Errorf("Expected Origin %s, got %s", webOrigin.Origin, retrievedWebOrigin.Origin)
 	}
 
-	nonExistentWebOrigin, err := database.GetWebOriginById(nil, 99999)
+	nonExistentWebOrigin, err := database.GetWebOriginById(context.Background(), nil, 99999)
 	if err != nil {
 		t.Errorf("Expected no error for non-existent web origin, got: %v", err)
 	}
@@ -71,7 +72,7 @@ func TestGetWebOriginsByClientId(t *testing.T) {
 	webOrigin1 := createTestWebOrigin(t, client.Id)
 	webOrigin2 := createTestWebOrigin(t, client.Id)
 
-	webOrigins, err := database.GetWebOriginsByClientId(nil, client.Id)
+	webOrigins, err := database.GetWebOriginsByClientId(context.Background(), nil, client.Id)
 	if err != nil {
 		t.Fatalf("Failed to get web origins by client ID: %v", err)
 	}
@@ -98,12 +99,12 @@ func TestGetWebOriginsByClientId(t *testing.T) {
 
 func TestGetAllWebOrigins(t *testing.T) {
 	// First, delete all existing web origins
-	existingWebOrigins, err := database.GetAllWebOrigins(nil)
+	existingWebOrigins, err := database.GetAllWebOrigins(context.Background(), nil)
 	if err != nil {
 		t.Fatalf("Failed to get existing web origins: %v", err)
 	}
 	for _, webOrigin := range existingWebOrigins {
-		err := database.DeleteWebOrigin(nil, webOrigin.Id)
+		err := database.DeleteWebOrigin(context.Background(), nil, webOrigin.Id)
 		if err != nil {
 			t.Fatalf("Failed to delete existing web origin: %v", err)
 		}
@@ -114,7 +115,7 @@ func TestGetAllWebOrigins(t *testing.T) {
 	webOrigin1 := createTestWebOrigin(t, client.Id)
 	webOrigin2 := createTestWebOrigin(t, client.Id)
 
-	webOrigins, err := database.GetAllWebOrigins(nil)
+	webOrigins, err := database.GetAllWebOrigins(context.Background(), nil)
 	if err != nil {
 		t.Fatalf("Failed to get all web origins: %v", err)
 	}
@@ -143,12 +144,12 @@ func TestDeleteWebOrigin(t *testing.T) {
 	client := createTestClient(t)
 	webOrigin := createTestWebOrigin(t, client.Id)
 
-	err := database.DeleteWebOrigin(nil, webOrigin.Id)
+	err := database.DeleteWebOrigin(context.Background(), nil, webOrigin.Id)
 	if err != nil {
 		t.Fatalf("Failed to delete web origin: %v", err)
 	}
 
-	deletedWebOrigin, err := database.GetWebOriginById(nil, webOrigin.Id)
+	deletedWebOrigin, err := database.GetWebOriginById(context.Background(), nil, webOrigin.Id)
 	if err != nil {
 		t.Fatalf("Error while checking for deleted web origin: %v", err)
 	}
@@ -156,7 +157,7 @@ func TestDeleteWebOrigin(t *testing.T) {
 		t.Errorf("Web origin still exists after deletion")
 	}
 
-	err = database.DeleteWebOrigin(nil, 99999)
+	err = database.DeleteWebOrigin(context.Background(), nil, 99999)
 	if err != nil {
 		t.Errorf("Expected no error when deleting non-existent web origin, got: %v", err)
 	}
@@ -179,7 +180,7 @@ func TestWebOriginExists(t *testing.T) {
 	client := createTestClient(t)
 	webOrigin := createTestWebOrigin(t, client.Id)
 
-	exists, err := database.WebOriginExists(nil, webOrigin.Origin)
+	exists, err := database.WebOriginExists(context.Background(), nil, webOrigin.Origin)
 	if err != nil {
 		t.Fatalf("WebOriginExists for a registered origin: %v", err)
 	}
@@ -190,7 +191,7 @@ func TestWebOriginExists(t *testing.T) {
 	// A near miss rather than an unrelated string: the same origin with one
 	// character added still has to answer false, or the lookup is matching on a
 	// prefix rather than on equality, which is what CORS compares.
-	exists, err = database.WebOriginExists(nil, webOrigin.Origin+"x")
+	exists, err = database.WebOriginExists(context.Background(), nil, webOrigin.Origin+"x")
 	if err != nil {
 		t.Errorf("expected no error for an unregistered origin, got: %v", err)
 	}
@@ -198,7 +199,7 @@ func TestWebOriginExists(t *testing.T) {
 		t.Errorf("expected %sx not to exist", webOrigin.Origin)
 	}
 
-	exists, err = database.WebOriginExists(nil, "")
+	exists, err = database.WebOriginExists(context.Background(), nil, "")
 	if err != nil {
 		t.Errorf("expected no error for an empty origin, got: %v", err)
 	}
@@ -218,7 +219,7 @@ func TestWebOriginExists_Transaction(t *testing.T) {
 
 	tx := beginTx(t)
 	webOrigin := &models.WebOrigin{Origin: origin, ClientId: client.Id}
-	if err := database.CreateWebOrigin(tx, webOrigin); err != nil {
+	if err := database.CreateWebOrigin(context.Background(), tx, webOrigin); err != nil {
 		t.Fatalf("CreateWebOrigin in a transaction: %v", err)
 	}
 
@@ -234,7 +235,7 @@ func TestWebOriginExists_Transaction(t *testing.T) {
 		t.Fatalf("RollbackTransaction: %v", err)
 	}
 
-	exists, err = database.WebOriginExists(nil, origin)
+	exists, err = database.WebOriginExists(context.Background(), nil, origin)
 	if err != nil {
 		t.Fatalf("WebOriginExists after the rollback: %v", err)
 	}
@@ -246,7 +247,7 @@ func TestWebOriginExists_Transaction(t *testing.T) {
 	// error and not a false: false is indistinguishable from "no client has
 	// registered that origin", which is the answer that quietly denies every
 	// cross-origin request for as long as the database is unhappy.
-	if _, err := database.WebOriginExists(tx, origin); err == nil {
+	if _, err := database.WebOriginExists(context.Background(), tx, origin); err == nil {
 		t.Error("expected an error from a finished transaction, not a benign false")
 	}
 }
@@ -270,7 +271,7 @@ func webOriginExistsWithin(t *testing.T, tx *sql.Tx, origin string, within time.
 	// deferred rollback releases it, rather than leaking on a send nobody reads.
 	done := make(chan answer, 1)
 	go func() {
-		exists, err := database.WebOriginExists(tx, origin)
+		exists, err := database.WebOriginExists(context.Background(), tx, origin)
 		done <- answer{exists, err}
 	}()
 
@@ -290,7 +291,7 @@ func createTestWebOrigin(t *testing.T, clientId int64) *models.WebOrigin {
 		Origin:   "https://" + random + ".example.com",
 		ClientId: clientId,
 	}
-	err := database.CreateWebOrigin(nil, webOrigin)
+	err := database.CreateWebOrigin(context.Background(), nil, webOrigin)
 	if err != nil {
 		t.Fatalf("Failed to create test web origin: %v", err)
 	}

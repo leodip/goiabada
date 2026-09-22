@@ -2,6 +2,7 @@ package integrationtests
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/url"
@@ -179,13 +180,13 @@ func TestAPIClientCreate_InsufficientScope(t *testing.T) {
 		IsPublic:                 false,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
-	err = database.CreateClient(nil, client)
+	err = database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
 
 	// Grant auth-server:userinfo permission
-	authRes, err := database.GetResourceByResourceIdentifier(nil, constants.AuthServerResourceIdentifier)
+	authRes, err := database.GetResourceByResourceIdentifier(context.Background(), nil, constants.AuthServerResourceIdentifier)
 	assert.NoError(t, err)
-	perms, err := database.GetPermissionsByResourceId(nil, authRes.Id)
+	perms, err := database.GetPermissionsByResourceId(context.Background(), nil, authRes.Id)
 	assert.NoError(t, err)
 	var userinfoPerm *models.Permission
 	for i := range perms {
@@ -195,7 +196,7 @@ func TestAPIClientCreate_InsufficientScope(t *testing.T) {
 		}
 	}
 	assert.NotNil(t, userinfoPerm)
-	err = database.CreateClientPermission(nil, &models.ClientPermission{ClientId: client.Id, PermissionId: userinfoPerm.Id})
+	err = database.CreateClientPermission(context.Background(), nil, &models.ClientPermission{ClientId: client.Id, PermissionId: userinfoPerm.Id})
 	assert.NoError(t, err)
 
 	// Get token with only auth-server:userinfo scope
@@ -350,7 +351,7 @@ func TestAPIClientCreate_AngleBracketsRejected(t *testing.T) {
 			assert.Equal(t, tc.wantCode, errResp.ErrorCode)
 
 			// Nothing was created.
-			stored, err := database.GetClientByClientIdentifier(nil, tc.body.ClientIdentifier)
+			stored, err := database.GetClientByClientIdentifier(context.Background(), nil, tc.body.ClientIdentifier)
 			assert.NoError(t, err)
 			assert.Nil(t, stored)
 		})
@@ -384,12 +385,12 @@ func TestAPIClientCreate_AmpersandsAndQuotesStoredVerbatim(t *testing.T) {
 	assert.Equal(t, `AT&T "Wireless"`, client["displayName"])
 	assert.Equal(t, true, client["showDisplayName"])
 
-	stored, err := database.GetClientByClientIdentifier(nil, ident)
+	stored, err := database.GetClientByClientIdentifier(context.Background(), nil, ident)
 	assert.NoError(t, err)
 	assert.NotNil(t, stored)
 	assert.Equal(t, `Tom & Jerry said "hi"`, stored.Description)
 	assert.Equal(t, `AT&T "Wireless"`, stored.DisplayName)
-	_ = database.DeleteClient(nil, stored.Id)
+	_ = database.DeleteClient(context.Background(), nil, stored.Id)
 }
 
 func TestAPIClientCreate_DescriptionOnlyBackwardCompat(t *testing.T) {

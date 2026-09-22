@@ -84,8 +84,8 @@ func TestAPISessionLists_PublishNoPresentationFields(t *testing.T) {
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 	}
-	require.NoError(t, database.CreateClient(nil, testClient))
-	defer func() { _ = database.DeleteClient(nil, testClient.Id) }()
+	require.NoError(t, database.CreateClient(context.Background(), nil, testClient))
+	defer func() { _ = database.DeleteClient(context.Background(), nil, testClient.Id) }()
 
 	now := time.Now().UTC()
 	require.NoError(t, database.CreateUserSessionClient(context.Background(), nil, &models.UserSessionClient{
@@ -138,8 +138,8 @@ func TestAPISessionLists_IsCurrentIsTrueOnAllThreeEndpoints(t *testing.T) {
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 	}
-	require.NoError(t, database.CreateClient(nil, testClient))
-	defer func() { _ = database.DeleteClient(nil, testClient.Id) }()
+	require.NoError(t, database.CreateClient(context.Background(), nil, testClient))
+	defer func() { _ = database.DeleteClient(context.Background(), nil, testClient.Id) }()
 
 	now := time.Now().UTC()
 	require.NoError(t, database.CreateUserSessionClient(context.Background(), nil, &models.UserSessionClient{

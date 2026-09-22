@@ -37,16 +37,16 @@ func TestAPIClientRedirectURIsPut_Success_AddRemoveAndTrim(t *testing.T) {
 		AuthorizationCodeEnabled: true,
 		ClientCredentialsEnabled: false,
 	}
-	err = database.CreateClient(nil, client)
+	err = database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
-	defer func() { _ = database.DeleteClient(nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
 	// Seed existing redirect URIs
 	uriA := "https://a.example.com/callback"
 	uriB := "https://b.example.com/callback"
-	err = database.CreateRedirectURI(nil, &models.RedirectURI{ClientId: client.Id, URI: uriA})
+	err = database.CreateRedirectURI(context.Background(), nil, &models.RedirectURI{ClientId: client.Id, URI: uriA})
 	assert.NoError(t, err)
-	err = database.CreateRedirectURI(nil, &models.RedirectURI{ClientId: client.Id, URI: uriB})
+	err = database.CreateRedirectURI(context.Background(), nil, &models.RedirectURI{ClientId: client.Id, URI: uriB})
 	assert.NoError(t, err)
 
 	// Desired: keep A (with spaces to test trimming), remove B, add C
@@ -76,7 +76,7 @@ func TestAPIClientRedirectURIsPut_Success_AddRemoveAndTrim(t *testing.T) {
 	// Verify DB reflects the change
 	refreshed, err := database.GetClientById(context.Background(), nil, client.Id)
 	assert.NoError(t, err)
-	err = database.ClientLoadRedirectURIs(nil, refreshed)
+	err = database.ClientLoadRedirectURIs(context.Background(), nil, refreshed)
 	assert.NoError(t, err)
 	gotDB := map[string]bool{}
 	for _, ru := range refreshed.RedirectURIs {
@@ -107,9 +107,9 @@ func TestAPIClientRedirectURIsPut_NoRedirectFlowRejected(t *testing.T) {
 		ImplicitGrantEnabled:     &implicitDisabled,
 		ClientCredentialsEnabled: false,
 	}
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
-	defer func() { _ = database.DeleteClient(nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
 	reqBody := api.UpdateClientRedirectURIsRequest{RedirectURIs: []string{"https://example.com/cb"}}
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/redirect-uris"
@@ -142,9 +142,9 @@ func TestAPIClientRedirectURIsPut_ImplicitOnlyClientAllowed(t *testing.T) {
 		ImplicitGrantEnabled:     &implicitEnabled,
 		ClientCredentialsEnabled: false,
 	}
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
-	defer func() { _ = database.DeleteClient(nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
 	uri := "https://implicit-app.example.com/cb"
 	reqBody := api.UpdateClientRedirectURIsRequest{RedirectURIs: []string{uri}}
@@ -207,9 +207,9 @@ func TestAPIClientRedirectURIsPut_DuplicateAndInvalidURLs(t *testing.T) {
 		AuthorizationCodeEnabled: true,
 		ClientCredentialsEnabled: false,
 	}
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
-	defer func() { _ = database.DeleteClient(nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
 	baseURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/redirect-uris"
 
@@ -331,9 +331,9 @@ func TestAPIClientRedirectURIsPut_NotFound_InvalidId_InvalidBody_Unauthorized(t 
 		AuthorizationCodeEnabled: true,
 		ClientCredentialsEnabled: false,
 	}
-	err := database.CreateClient(nil, client2)
+	err := database.CreateClient(context.Background(), nil, client2)
 	assert.NoError(t, err)
-	defer func() { _ = database.DeleteClient(nil, client2.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client2.Id) }()
 
 	urlIB := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client2.Id, 10) + "/redirect-uris"
 	req, err := http.NewRequest("PUT", urlIB, nil)
@@ -374,14 +374,14 @@ func TestAPIClientRedirectURIsPut_InsufficientScope(t *testing.T) {
 		IsPublic:                 false,
 		ClientSecretEncrypted:    enc,
 	}
-	err = database.CreateClient(nil, client)
+	err = database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
-	defer func() { _ = database.DeleteClient(nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
 	// Grant auth-server:userinfo permission
-	authRes, err := database.GetResourceByResourceIdentifier(nil, constants.AuthServerResourceIdentifier)
+	authRes, err := database.GetResourceByResourceIdentifier(context.Background(), nil, constants.AuthServerResourceIdentifier)
 	assert.NoError(t, err)
-	perms, err := database.GetPermissionsByResourceId(nil, authRes.Id)
+	perms, err := database.GetPermissionsByResourceId(context.Background(), nil, authRes.Id)
 	assert.NoError(t, err)
 	var userinfoPerm *models.Permission
 	for i := range perms {
@@ -391,7 +391,7 @@ func TestAPIClientRedirectURIsPut_InsufficientScope(t *testing.T) {
 		}
 	}
 	assert.NotNil(t, userinfoPerm)
-	err = database.CreateClientPermission(nil, &models.ClientPermission{ClientId: client.Id, PermissionId: userinfoPerm.Id})
+	err = database.CreateClientPermission(context.Background(), nil, &models.ClientPermission{ClientId: client.Id, PermissionId: userinfoPerm.Id})
 	assert.NoError(t, err)
 
 	// Get token with only authserver:userinfo scope
@@ -416,9 +416,9 @@ func TestAPIClientRedirectURIsPut_InsufficientScope(t *testing.T) {
 		AuthorizationCodeEnabled: true,
 		ClientCredentialsEnabled: false,
 	}
-	err = database.CreateClient(nil, target)
+	err = database.CreateClient(context.Background(), nil, target)
 	assert.NoError(t, err)
-	defer func() { _ = database.DeleteClient(nil, target.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, target.Id) }()
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(target.Id, 10) + "/redirect-uris"
 	reqBody := api.UpdateClientRedirectURIsRequest{RedirectURIs: []string{"https://example.com/cb"}}

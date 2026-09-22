@@ -61,7 +61,7 @@ func stubRegisteredRedirectURI(database *mocks_data.Database, registered ...stri
 	for _, uri := range registered {
 		uris = append(uris, models.RedirectURI{URI: uri})
 	}
-	database.On("GetRedirectURIsByClientId", mock.Anything, mock.Anything).Return(uris, nil)
+	database.On("GetRedirectURIsByClientId", mock.Anything, mock.Anything, mock.Anything).Return(uris, nil)
 }
 
 func stubAuthenticatedBrowser(database *mocks_data.Database, userSessionManager *mocks_handlers.UserSessionManager) {
@@ -113,10 +113,10 @@ func TestHandleAuthorizeGet(t *testing.T) {
 			ClientIdentifier: "test-client",
 			DefaultAcrLevel:  models.AcrLevel1,
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*protocolvalidation.ValidateRequestInput")).Return(nil)
-		authorizeValidator.On("ValidateScopes", "openid").Return(nil)
+		authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
 		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
 
 		userSession := &models.UserSession{
@@ -202,10 +202,10 @@ func TestHandleAuthorizeGet(t *testing.T) {
 			ClientIdentifier: "test-client",
 			DefaultAcrLevel:  models.AcrLevel1,
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*protocolvalidation.ValidateRequestInput")).Return(nil)
-		authorizeValidator.On("ValidateScopes", "openid").Return(nil)
+		authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
 		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
 
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.AnythingOfType("string")).Return(nil, nil)
@@ -379,7 +379,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 			ClientIdentifier: "test-client",
 			DefaultAcrLevel:  models.AcrLevel1,
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*protocolvalidation.ValidateRequestInput")).Return(
 			customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
@@ -494,7 +494,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 			ClientIdentifier: "test-client",
 			DefaultAcrLevel:  models.AcrLevel1,
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		validationError := customerrors.NewErrorDetail("", "Invalid response type")
 		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*protocolvalidation.ValidateRequestInput")).Return(validationError)
@@ -560,11 +560,11 @@ func TestHandleAuthorizeGet(t *testing.T) {
 			ClientIdentifier: "test-client",
 			DefaultAcrLevel:  models.AcrLevel1,
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*protocolvalidation.ValidateRequestInput")).Return(nil)
 		validationError := customerrors.NewErrorDetail("", "Invalid scope")
-		authorizeValidator.On("ValidateScopes", "invalid").Return(validationError)
+		authorizeValidator.On("ValidateScopes", mock.Anything, "invalid").Return(validationError)
 
 		handler.ServeHTTP(rr, req)
 
@@ -617,10 +617,10 @@ func TestHandleAuthorizeGet(t *testing.T) {
 			ClientIdentifier: "test-client",
 			DefaultAcrLevel:  models.AcrLevel1,
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*protocolvalidation.ValidateRequestInput")).Return(nil)
-		authorizeValidator.On("ValidateScopes", "invalid").Return(customerrors.NewErrorDetail("", "Invalid scope"))
+		authorizeValidator.On("ValidateScopes", mock.Anything, "invalid").Return(customerrors.NewErrorDetail("", "Invalid scope"))
 
 		handler.ServeHTTP(rr, req)
 
@@ -688,10 +688,10 @@ func TestHandleAuthorizeGet(t *testing.T) {
 			ClientIdentifier: "test-client",
 			DefaultAcrLevel:  models.AcrLevel1,
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*protocolvalidation.ValidateRequestInput")).Return(nil)
-		authorizeValidator.On("ValidateScopes", "invalid").Return(customerrors.NewErrorDetail("", "Invalid scope"))
+		authorizeValidator.On("ValidateScopes", mock.Anything, "invalid").Return(customerrors.NewErrorDetail("", "Invalid scope"))
 
 		handler.ServeHTTP(rr, req)
 
@@ -753,10 +753,10 @@ func TestHandleAuthorizeGet(t *testing.T) {
 			ClientIdentifier: "test-client",
 			DefaultAcrLevel:  models.AcrLevel1,
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*protocolvalidation.ValidateRequestInput")).Return(nil)
-		authorizeValidator.On("ValidateScopes", "invalid").Return(customerrors.NewErrorDetail("", "Invalid scope"))
+		authorizeValidator.On("ValidateScopes", mock.Anything, "invalid").Return(customerrors.NewErrorDetail("", "Invalid scope"))
 
 		handler.ServeHTTP(rr, req)
 
@@ -808,10 +808,10 @@ func TestHandleAuthorizeGet(t *testing.T) {
 			ClientIdentifier: "test-client",
 			DefaultAcrLevel:  models.AcrLevel1,
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*protocolvalidation.ValidateRequestInput")).Return(nil)
-		authorizeValidator.On("ValidateScopes", "openid").Return(nil)
+		authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
 		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
 
 		userSession := &models.UserSession{
@@ -916,10 +916,10 @@ func TestHandleAuthorizeGet(t *testing.T) {
 			ClientIdentifier: "test-client",
 			DefaultAcrLevel:  models.AcrLevel2Optional,
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*protocolvalidation.ValidateRequestInput")).Return(nil)
-		authorizeValidator.On("ValidateScopes", "openid").Return(nil)
+		authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
 		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
 
 		userSession := &models.UserSession{
@@ -1005,10 +1005,10 @@ func TestHandleAuthorizeGet(t *testing.T) {
 			ClientIdentifier: "test-client",
 			DefaultAcrLevel:  models.AcrLevel1,
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*protocolvalidation.ValidateRequestInput")).Return(nil)
-		authorizeValidator.On("ValidateScopes", "openid").Return(nil)
+		authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
 		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
 
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.AnythingOfType("string")).Return(nil, nil)
@@ -1083,7 +1083,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 			ClientIdentifier: "test-client",
 			DefaultAcrLevel:  models.AcrLevel1,
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		validationError := customerrors.NewErrorDetail("invalid_request", "Invalid response type")
 		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*protocolvalidation.ValidateRequestInput")).Return(validationError)
@@ -1147,10 +1147,10 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.Anything).Return(nil)
 
 		client := &models.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: models.AcrLevel1}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		authorizeValidator.On("ValidateRequest", mock.Anything).Return(nil)
-		authorizeValidator.On("ValidateScopes", "openid").Return(nil)
+		authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
 		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
 
 		// Second save: AuthState advances after id_token_hint validation —
@@ -1220,10 +1220,10 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.Anything).Return(nil)
 
 		client := &models.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: models.AcrLevel1}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		authorizeValidator.On("ValidateRequest", mock.Anything).Return(nil)
-		authorizeValidator.On("ValidateScopes", "openid").Return(nil)
+		authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
 		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
 
 		authHelper.On("SaveAuthContext", rr, mock.Anything, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
@@ -1247,7 +1247,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 // an administrator-created client, the case in which weighing provenance changes nothing, so a
 // refusal case still asserts the redirect it was written to assert (#108).
 func stubClientProvenanceLookup(database *mocks_data.Database) {
-	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything).
+	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, mock.Anything).
 		Return(&models.Client{Id: 1, ClientIdentifier: "test-client"}, nil)
 }
 
@@ -1267,7 +1267,7 @@ func testRegisteredDatabase(t *testing.T, registered ...string) *mocks_data.Data
 	for _, uri := range registered {
 		uris = append(uris, models.RedirectURI{URI: uri})
 	}
-	database.On("GetRedirectURIsByClientId", mock.Anything, mock.Anything).Return(uris, nil)
+	database.On("GetRedirectURIsByClientId", mock.Anything, mock.Anything, mock.Anything).Return(uris, nil)
 
 	return database
 }
@@ -1870,7 +1870,7 @@ func TestRedirectWillBeEmitted(t *testing.T) {
 		for _, uri := range registered {
 			uris = append(uris, models.RedirectURI{URI: uri})
 		}
-		database.On("GetRedirectURIsByClientId", mock.Anything, mock.Anything).Return(uris, nil)
+		database.On("GetRedirectURIsByClientId", mock.Anything, mock.Anything, mock.Anything).Return(uris, nil)
 
 		return database
 	}
@@ -1883,7 +1883,7 @@ func TestRedirectWillBeEmitted(t *testing.T) {
 
 	failingDatabase := func(t *testing.T) *mocks_data.Database {
 		database := mocks_data.NewDatabase(t)
-		database.On("GetRedirectURIsByClientId", mock.Anything, mock.Anything).
+		database.On("GetRedirectURIsByClientId", mock.Anything, mock.Anything, mock.Anything).
 			Return(nil, errors.New("the database is unavailable"))
 		return database
 	}
@@ -2274,12 +2274,12 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 			DefaultAcrLevel:      models.AcrLevel1,
 			ImplicitGrantEnabled: nil, // Uses global setting
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		authorizeValidator.On("ValidateRequest", mock.MatchedBy(func(input *protocolvalidation.ValidateRequestInput) bool {
 			return input.ResponseType == "token" && input.ImplicitGrantEnabled == true
 		})).Return(nil)
-		authorizeValidator.On("ValidateScopes", "openid").Return(nil)
+		authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
 		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
 
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.AnythingOfType("string")).Return(nil, nil)
@@ -2344,12 +2344,12 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 			DefaultAcrLevel:      models.AcrLevel1,
 			ImplicitGrantEnabled: nil,
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		authorizeValidator.On("ValidateRequest", mock.MatchedBy(func(input *protocolvalidation.ValidateRequestInput) bool {
 			return input.ResponseType == "id_token token" && input.ImplicitGrantEnabled == true && input.Nonce == "test-nonce"
 		})).Return(nil)
-		authorizeValidator.On("ValidateScopes", "openid").Return(nil)
+		authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
 		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
 
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.AnythingOfType("string")).Return(nil, nil)
@@ -2413,7 +2413,7 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 			DefaultAcrLevel:      models.AcrLevel1,
 			ImplicitGrantEnabled: nil, // Uses global setting (disabled)
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		// Validator returns error because implicit flow is disabled
 		validationError := customerrors.NewErrorDetail("unauthorized_client", "This client is not authorized for the implicit grant flow.")
@@ -2476,13 +2476,13 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 			DefaultAcrLevel:      models.AcrLevel1,
 			ImplicitGrantEnabled: &implicitEnabled, // Client override
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		authorizeValidator.On("ValidateRequest", mock.MatchedBy(func(input *protocolvalidation.ValidateRequestInput) bool {
 			// Client override should take effect
 			return input.ResponseType == "token" && input.ImplicitGrantEnabled == true
 		})).Return(nil)
-		authorizeValidator.On("ValidateScopes", "openid").Return(nil)
+		authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
 		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
 
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.AnythingOfType("string")).Return(nil, nil)
@@ -2546,10 +2546,10 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 			ClientIdentifier: "test-client",
 			DefaultAcrLevel:  models.AcrLevel1,
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*protocolvalidation.ValidateRequestInput")).Return(nil)
-		authorizeValidator.On("ValidateScopes", "openid").Return(nil)
+		authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
 		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
 
 		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "bad-jwt-token", mock.Anything, false).Return(nil, errors.New("signature verification failed"))
@@ -2609,10 +2609,10 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 			ClientIdentifier: "test-client",
 			DefaultAcrLevel:  models.AcrLevel1,
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*protocolvalidation.ValidateRequestInput")).Return(nil)
-		authorizeValidator.On("ValidateScopes", "openid").Return(nil)
+		authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
 		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
 
 		wrongIssuerToken := &oauth.JwtToken{
@@ -2679,10 +2679,10 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 			ClientIdentifier: "test-client",
 			DefaultAcrLevel:  models.AcrLevel1,
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*protocolvalidation.ValidateRequestInput")).Return(nil)
-		authorizeValidator.On("ValidateScopes", "openid").Return(nil)
+		authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
 		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
 
 		noSubToken := &oauth.JwtToken{
@@ -2749,10 +2749,10 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 			ClientIdentifier: "test-client",
 			DefaultAcrLevel:  models.AcrLevel1,
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*protocolvalidation.ValidateRequestInput")).Return(nil)
-		authorizeValidator.On("ValidateScopes", "openid").Return(nil)
+		authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
 		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
 
 		expiredToken := &oauth.JwtToken{
@@ -2841,10 +2841,10 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 			ClientIdentifier: "test-client",
 			DefaultAcrLevel:  models.AcrLevel1,
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*protocolvalidation.ValidateRequestInput")).Return(nil)
-		authorizeValidator.On("ValidateScopes", "openid").Return(nil)
+		authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
 		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
 
 		validToken := &oauth.JwtToken{
@@ -2935,10 +2935,10 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 			ClientIdentifier: "test-client",
 			DefaultAcrLevel:  models.AcrLevel1,
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*protocolvalidation.ValidateRequestInput")).Return(nil)
-		authorizeValidator.On("ValidateScopes", "openid").Return(nil)
+		authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
 		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
 
 		differentUserToken := &oauth.JwtToken{
@@ -3026,10 +3026,10 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 			ClientIdentifier: "test-client",
 			DefaultAcrLevel:  models.AcrLevel1,
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*protocolvalidation.ValidateRequestInput")).Return(nil)
-		authorizeValidator.On("ValidateScopes", "openid").Return(nil)
+		authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
 		authorizeValidator.On("ValidatePrompt", "none").Return("none", nil)
 
 		validToken := &oauth.JwtToken{
@@ -3142,10 +3142,10 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 			ClientIdentifier: "test-client",
 			DefaultAcrLevel:  models.AcrLevel1,
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*protocolvalidation.ValidateRequestInput")).Return(nil)
-		authorizeValidator.On("ValidateScopes", "openid").Return(nil)
+		authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
 		authorizeValidator.On("ValidatePrompt", "none").Return("none", nil)
 
 		differentUserToken := &oauth.JwtToken{
@@ -3242,10 +3242,10 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 			ClientIdentifier: "test-client",
 			DefaultAcrLevel:  models.AcrLevel1,
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*protocolvalidation.ValidateRequestInput")).Return(nil)
-		authorizeValidator.On("ValidateScopes", "openid").Return(nil)
+		authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
 		authorizeValidator.On("ValidatePrompt", "none").Return("none", nil)
 
 		differentUserToken := &oauth.JwtToken{
@@ -3344,10 +3344,10 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 			ClientIdentifier: "test-client",
 			DefaultAcrLevel:  models.AcrLevel1,
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*protocolvalidation.ValidateRequestInput")).Return(nil)
-		authorizeValidator.On("ValidateScopes", "openid").Return(nil)
+		authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
 		authorizeValidator.On("ValidatePrompt", "none").Return("none", nil)
 
 		differentUserToken := &oauth.JwtToken{
@@ -3438,10 +3438,10 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 			ClientIdentifier: "test-client",
 			DefaultAcrLevel:  models.AcrLevel1,
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*protocolvalidation.ValidateRequestInput")).Return(nil)
-		authorizeValidator.On("ValidateScopes", "openid").Return(nil)
+		authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
 		authorizeValidator.On("ValidatePrompt", "none").Return("none", nil)
 
 		differentUserToken := &oauth.JwtToken{
@@ -3805,13 +3805,13 @@ func TestHandleAuthorizeGet_AuthenticateBeforeRedirect_RoutingTable(t *testing.T
 
 			authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything,
 				mock.AnythingOfType("*protocolvalidation.ValidateClientAndRedirectURIInput")).Return(nil)
-			database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(
+			database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
 				&models.Client{Id: 1, ClientIdentifier: "test-client", CreatedViaDCR: tc.createdVia}, nil)
 			authorizeValidator.On("ValidateUnsupportedRequestParameters",
 				mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
 			authorizeValidator.On("ValidateRequest",
 				mock.AnythingOfType("*protocolvalidation.ValidateRequestInput")).Return(nil)
-			authorizeValidator.On("ValidateScopes", "openid bogus").Return(
+			authorizeValidator.On("ValidateScopes", mock.Anything, "openid bogus").Return(
 				customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope",
 					"Invalid scope format: 'bogus'.", http.StatusBadRequest))
 
@@ -3820,7 +3820,7 @@ func TestHandleAuthorizeGet_AuthenticateBeforeRedirect_RoutingTable(t *testing.T
 			// row are refused above it and never query. The rows that do reach it hold their own
 			// destination registered, which is what keeps them about the routing they are named
 			// for rather than about a deleted callback (#241 decision 11).
-			database.On("GetRedirectURIsByClientId", mock.Anything, mock.Anything).
+			database.On("GetRedirectURIsByClientId", mock.Anything, mock.Anything, mock.Anything).
 				Return([]models.RedirectURI{{URI: tc.redirectURI}}, nil).Maybe()
 
 			// Maybe, because whether the session is looked up at all is the point of half these
@@ -3923,7 +3923,7 @@ func TestHandleAuthorizeGet_SessionLookupIsLazyAndFailsClosed(t *testing.T) {
 			authHelper.On("SaveAuthContext", rr, req, mock.AnythingOfType("*ceremony.AuthContext")).Return(nil)
 			authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything,
 				mock.AnythingOfType("*protocolvalidation.ValidateClientAndRedirectURIInput")).Return(nil)
-			database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(
+			database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
 				&models.Client{Id: 1, ClientIdentifier: "test-client"}, nil)
 			// Maybe on all three, because the predicate is computed above the validations: the
 			// row that answers 500 does so before any of them runs, which is the correct order
@@ -3933,7 +3933,7 @@ func TestHandleAuthorizeGet_SessionLookupIsLazyAndFailsClosed(t *testing.T) {
 				mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil).Maybe()
 			authorizeValidator.On("ValidateRequest",
 				mock.AnythingOfType("*protocolvalidation.ValidateRequestInput")).Return(nil).Maybe()
-			authorizeValidator.On("ValidateScopes", "openid bogus").Return(
+			authorizeValidator.On("ValidateScopes", mock.Anything, "openid bogus").Return(
 				customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope",
 					"Invalid scope format: 'bogus'.", http.StatusBadRequest)).Maybe()
 
@@ -4015,13 +4015,13 @@ func TestHandleAuthorizeGet_ParkedDescriptionIsConformed(t *testing.T) {
 
 	authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything,
 		mock.AnythingOfType("*protocolvalidation.ValidateClientAndRedirectURIInput")).Return(nil)
-	database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(
+	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
 		&models.Client{Id: 1, ClientIdentifier: "test-client"}, nil)
 	authorizeValidator.On("ValidateUnsupportedRequestParameters",
 		mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
 	authorizeValidator.On("ValidateRequest",
 		mock.AnythingOfType("*protocolvalidation.ValidateRequestInput")).Return(nil)
-	authorizeValidator.On("ValidateScopes", "openid 💣").Return(
+	authorizeValidator.On("ValidateScopes", mock.Anything, "openid 💣").Return(
 		customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope",
 			"Invalid scope format: '💣'.", http.StatusBadRequest))
 	database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
@@ -4066,11 +4066,11 @@ func TestHandleAuthorizeGet_RegistrationReadDisagreesWithItself(t *testing.T) {
 			name:       "a refusal is never widened into a redirect",
 			hasSession: false,
 			firstRead: func(database *mocks_data.Database) {
-				database.On("GetRedirectURIsByClientId", mock.Anything, mock.Anything).
+				database.On("GetRedirectURIsByClientId", mock.Anything, mock.Anything, mock.Anything).
 					Return(nil, errors.New("the database is unavailable")).Once()
 			},
 			secondRead: func(database *mocks_data.Database) {
-				database.On("GetRedirectURIsByClientId", mock.Anything, mock.Anything).
+				database.On("GetRedirectURIsByClientId", mock.Anything, mock.Anything, mock.Anything).
 					Return([]models.RedirectURI{{URI: redirectURI}}, nil).Maybe()
 			},
 			wantReads: 1,
@@ -4082,11 +4082,11 @@ func TestHandleAuthorizeGet_RegistrationReadDisagreesWithItself(t *testing.T) {
 			name:       "a permission is still narrowed into a refusal",
 			hasSession: true,
 			firstRead: func(database *mocks_data.Database) {
-				database.On("GetRedirectURIsByClientId", mock.Anything, mock.Anything).
+				database.On("GetRedirectURIsByClientId", mock.Anything, mock.Anything, mock.Anything).
 					Return([]models.RedirectURI{{URI: redirectURI}}, nil).Once()
 			},
 			secondRead: func(database *mocks_data.Database) {
-				database.On("GetRedirectURIsByClientId", mock.Anything, mock.Anything).
+				database.On("GetRedirectURIsByClientId", mock.Anything, mock.Anything, mock.Anything).
 					Return([]models.RedirectURI{}, nil).Maybe()
 			},
 			wantReads: 2,
@@ -4120,13 +4120,13 @@ func TestHandleAuthorizeGet_RegistrationReadDisagreesWithItself(t *testing.T) {
 
 			authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything,
 				mock.AnythingOfType("*protocolvalidation.ValidateClientAndRedirectURIInput")).Return(nil)
-			database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(
+			database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
 				&models.Client{Id: 1, ClientIdentifier: "test-client", CreatedViaDCR: false}, nil)
 			authorizeValidator.On("ValidateUnsupportedRequestParameters",
 				mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
 			authorizeValidator.On("ValidateRequest",
 				mock.AnythingOfType("*protocolvalidation.ValidateRequestInput")).Return(nil)
-			authorizeValidator.On("ValidateScopes", "openid bogus").Return(
+			authorizeValidator.On("ValidateScopes", mock.Anything, "openid bogus").Return(
 				customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope",
 					"Invalid scope format: 'bogus'.", http.StatusBadRequest))
 

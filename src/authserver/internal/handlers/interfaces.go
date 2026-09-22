@@ -61,7 +61,7 @@ type TokenIssuer interface {
 }
 
 type AuthorizeValidator interface {
-	ValidateScopes(scope string) error
+	ValidateScopes(ctx context.Context, scope string) error
 	ValidateClientAndRedirectURI(ctx context.Context, input *protocolvalidation.ValidateClientAndRedirectURIInput) error
 	ValidateRequest(input *protocolvalidation.ValidateRequestInput) error
 	ValidatePrompt(prompt string) (string, error)

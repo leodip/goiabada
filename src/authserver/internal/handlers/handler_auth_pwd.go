@@ -66,7 +66,7 @@ func HandleAuthPwdGet(
 		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
 
 		// Fetch client to get display settings
-		client, err := database.GetClientByClientIdentifier(nil, authContext.ClientId)
+		client, err := database.GetClientByClientIdentifier(r.Context(), nil, authContext.ClientId)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
@@ -165,7 +165,7 @@ func HandleAuthPwdPost(
 		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
 
 		// Fetch client to get display settings
-		client, err := database.GetClientByClientIdentifier(nil, authContext.ClientId)
+		client, err := database.GetClientByClientIdentifier(r.Context(), nil, authContext.ClientId)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return

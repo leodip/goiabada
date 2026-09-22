@@ -29,7 +29,7 @@ func getClientDisplayInfo(ctx context.Context, database data.Database, client *m
 	}
 
 	if client.ShowLogo {
-		hasLogo, err := database.ClientHasLogo(nil, client.Id)
+		hasLogo, err := database.ClientHasLogo(ctx, nil, client.Id)
 		if err != nil {
 			// The error as a value, not through %v: %v prints err.Error() and drops the
 			// stack core/errs captured at the origin (#320, #279).

@@ -111,10 +111,10 @@ func codeOnSameSessionForNewClient(t *testing.T, httpClient *http.Client, client
 		DefaultAcrLevel:          models.AcrLevel2Optional,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
-	require.NoError(t, database.CreateClient(nil, client))
+	require.NoError(t, database.CreateClient(context.Background(), nil, client))
 
 	redirectURI := &models.RedirectURI{ClientId: client.Id, URI: fake.URL()}
-	require.NoError(t, database.CreateRedirectURI(nil, redirectURI))
+	require.NoError(t, database.CreateRedirectURI(context.Background(), nil, redirectURI))
 
 	const codeVerifier = "code-verifier-second-client"
 	destURL := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +

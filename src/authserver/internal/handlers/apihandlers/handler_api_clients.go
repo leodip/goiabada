@@ -73,7 +73,7 @@ func updateClientNotOwningAuthenticationMode(ctx context.Context, database data.
 	// write together (#301). Safe to rerun: the two columns are copied from the row re-read under
 	// this attempt's own lock, and applyPublicClientInvariants is idempotent on the result.
 	return database.RunInTransaction(ctx, func(tx *sql.Tx) error {
-		if err := database.AcquireClientRow(tx, client.Id); err != nil {
+		if err := database.AcquireClientRow(ctx, tx, client.Id); err != nil {
 			return err
 		}
 
@@ -89,7 +89,7 @@ func updateClientNotOwningAuthenticationMode(ctx context.Context, database data.
 
 		applyPublicClientInvariants(client)
 
-		return database.UpdateClient(tx, client)
+		return database.UpdateClient(ctx, tx, client)
 	})
 }
 
@@ -125,7 +125,7 @@ func HandleAPIClientsGet(
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		clients, err := database.GetAllClients(nil)
+		clients, err := database.GetAllClients(r.Context(), nil)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting all clients"))
 			return
@@ -133,13 +133,13 @@ func HandleAPIClientsGet(
 
 		// Load RedirectURIs and WebOrigins for each client
 		for i := range clients {
-			err = database.ClientLoadRedirectURIs(nil, &clients[i])
+			err = database.ClientLoadRedirectURIs(r.Context(), nil, &clients[i])
 			if err != nil {
 				writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error loading client redirect URIs"), "client_id", clients[i].Id)
 				return
 			}
 
-			err = database.ClientLoadWebOrigins(nil, &clients[i])
+			err = database.ClientLoadWebOrigins(r.Context(), nil, &clients[i])
 			if err != nil {
 				writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error loading client web origins"), "client_id", clients[i].Id)
 				return
@@ -187,13 +187,13 @@ func HandleAPIClientGet(
 		}
 
 		// Load RedirectURIs and WebOrigins
-		err = database.ClientLoadRedirectURIs(nil, client)
+		err = database.ClientLoadRedirectURIs(r.Context(), nil, client)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error loading client redirect URIs"), "client_id", client.Id)
 			return
 		}
 
-		err = database.ClientLoadWebOrigins(nil, client)
+		err = database.ClientLoadWebOrigins(r.Context(), nil, client)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error loading client web origins"), "client_id", client.Id)
 			return
@@ -256,7 +256,7 @@ func HandleAPIClientDelete(
 			return
 		}
 
-		if err := database.DeleteClient(nil, client.Id); err != nil {
+		if err := database.DeleteClient(r.Context(), nil, client.Id); err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error deleting client"), "client_id", client.Id, "client_identifier", client.ClientIdentifier)
 			return
 		}
@@ -325,7 +325,7 @@ func HandleAPIClientCreatePost(
 		}
 
 		// Check uniqueness
-		existingClient, err := database.GetClientByClientIdentifier(nil, req.ClientIdentifier)
+		existingClient, err := database.GetClientByClientIdentifier(r.Context(), nil, req.ClientIdentifier)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error checking client existence by identifier"), "client_identifier", req.ClientIdentifier)
 			return
@@ -359,7 +359,7 @@ func HandleAPIClientCreatePost(
 			IncludeOpenIDConnectClaimsInAccessToken: models.ThreeStateSettingDefault.String(),
 		}
 
-		if err := database.CreateClient(nil, client); err != nil {
+		if err := database.CreateClient(r.Context(), nil, client); err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error creating client"))
 			return
 		}
@@ -372,11 +372,11 @@ func HandleAPIClientCreatePost(
 		})
 
 		// Load related fields for response consistency (fail if these operations fail)
-		if err := database.ClientLoadRedirectURIs(nil, client); err != nil {
+		if err := database.ClientLoadRedirectURIs(r.Context(), nil, client); err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error loading client redirect URIs after create"), "client_id", client.Id)
 			return
 		}
-		if err := database.ClientLoadWebOrigins(nil, client); err != nil {
+		if err := database.ClientLoadWebOrigins(r.Context(), nil, client); err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error loading client web origins after create"), "client_id", client.Id)
 			return
 		}
@@ -471,7 +471,7 @@ func HandleAPIClientUpdatePut(
 			}
 
 			// Check uniqueness excluding current client
-			existingClient, err := database.GetClientByClientIdentifier(nil, updateReq.ClientIdentifier)
+			existingClient, err := database.GetClientByClientIdentifier(r.Context(), nil, updateReq.ClientIdentifier)
 			if err != nil {
 				writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error checking client existence by identifier for update"), "client_identifier", updateReq.ClientIdentifier, "client_id", client.Id)
 				return
@@ -570,11 +570,11 @@ func HandleAPIClientUpdatePut(
 		}
 
 		// Load related fields for response consistency
-		if err := database.ClientLoadRedirectURIs(nil, client); err != nil {
+		if err := database.ClientLoadRedirectURIs(r.Context(), nil, client); err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error loading client redirect URIs after update"), "client_id", client.Id)
 			return
 		}
-		if err := database.ClientLoadWebOrigins(nil, client); err != nil {
+		if err := database.ClientLoadWebOrigins(r.Context(), nil, client); err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error loading client web origins after update"), "client_id", client.Id)
 			return
 		}
@@ -675,11 +675,11 @@ func HandleAPIClientAuthenticationPut(
 			var becamePublic bool
 			result, err := handlers.RevokeClientGrantsTx(r.Context(), database, client.Id, func(tx *sql.Tx) (bool, error) {
 				var err error
-				becamePublic, err = database.SetClientPublic(tx, client.Id)
+				becamePublic, err = database.SetClientPublic(r.Context(), tx, client.Id)
 				if err != nil {
 					return false, err
 				}
-				if err := database.UpdateClient(tx, client); err != nil {
+				if err := database.UpdateClient(r.Context(), tx, client); err != nil {
 					return false, err
 				}
 				return becamePublic, nil
@@ -694,17 +694,17 @@ func HandleAPIClientAuthenticationPut(
 				handlers.LogRevokedClientGrants(r.Context(), auditLogger, client.Id,
 					handlers.RevocationReasonClientBecamePublic, callerSubject(r), result)
 			}
-		} else if err := database.UpdateClient(nil, client); err != nil {
+		} else if err := database.UpdateClient(r.Context(), nil, client); err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error updating client authentication"), "client_id", client.Id)
 			return
 		}
 
 		// Load related fields for response consistency
-		if err := database.ClientLoadRedirectURIs(nil, client); err != nil {
+		if err := database.ClientLoadRedirectURIs(r.Context(), nil, client); err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error loading client redirect URIs after auth update"), "client_id", client.Id)
 			return
 		}
-		if err := database.ClientLoadWebOrigins(nil, client); err != nil {
+		if err := database.ClientLoadWebOrigins(r.Context(), nil, client); err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error loading client web origins after auth update"), "client_id", client.Id)
 			return
 		}
@@ -791,11 +791,11 @@ func HandleAPIClientOAuth2FlowsPut(
 		}
 
 		// Load related fields for response consistency
-		if err := database.ClientLoadRedirectURIs(nil, client); err != nil {
+		if err := database.ClientLoadRedirectURIs(r.Context(), nil, client); err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error loading client redirect URIs after oauth2 flows update"), "client_id", client.Id)
 			return
 		}
-		if err := database.ClientLoadWebOrigins(nil, client); err != nil {
+		if err := database.ClientLoadWebOrigins(r.Context(), nil, client); err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error loading client web origins after oauth2 flows update"), "client_id", client.Id)
 			return
 		}
@@ -908,7 +908,7 @@ func HandleAPIClientRedirectURIsPut(
 		}
 
 		// Load existing redirect URIs
-		if err := database.ClientLoadRedirectURIs(nil, client); err != nil {
+		if err := database.ClientLoadRedirectURIs(r.Context(), nil, client); err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error loading client redirect URIs before update"), "client_id", client.Id)
 			return
 		}
@@ -923,7 +923,7 @@ func HandleAPIClientRedirectURIsPut(
 		// Add new URIs
 		for _, uri := range normalized {
 			if _, ok := existingSet[uri]; !ok {
-				if err := database.CreateRedirectURI(nil, &models.RedirectURI{ClientId: client.Id, URI: uri}); err != nil {
+				if err := database.CreateRedirectURI(r.Context(), nil, &models.RedirectURI{ClientId: client.Id, URI: uri}); err != nil {
 					writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error creating redirect URI"), "client_id", client.Id, "uri", uri)
 					return
 				}
@@ -933,7 +933,7 @@ func HandleAPIClientRedirectURIsPut(
 		// Delete removed URIs
 		for uri, rid := range existingSet {
 			if _, ok := desiredSet[uri]; !ok {
-				if err := database.DeleteRedirectURI(nil, rid); err != nil {
+				if err := database.DeleteRedirectURI(r.Context(), nil, rid); err != nil {
 					writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error deleting redirect URI"), "client_id", client.Id, "uri", uri)
 					return
 				}
@@ -941,11 +941,11 @@ func HandleAPIClientRedirectURIsPut(
 		}
 
 		// Reload related fields for response consistency
-		if err := database.ClientLoadRedirectURIs(nil, client); err != nil {
+		if err := database.ClientLoadRedirectURIs(r.Context(), nil, client); err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error loading client redirect URIs after update"), "client_id", client.Id)
 			return
 		}
-		if err := database.ClientLoadWebOrigins(nil, client); err != nil {
+		if err := database.ClientLoadWebOrigins(r.Context(), nil, client); err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error loading client web origins after redirect URIs update"), "client_id", client.Id)
 			return
 		}
@@ -1067,14 +1067,14 @@ func HandleAPIClientWebOriginsPut(
 		// classifier still sees a deadlock, and nothing is logged or written to the response until
 		// the helper has returned: an attempt that is about to be rerun must not answer.
 		err = database.RunInTransaction(r.Context(), func(tx *sql.Tx) error {
-			if err := database.AcquireClientRow(tx, client.Id); err != nil {
+			if err := database.AcquireClientRow(r.Context(), tx, client.Id); err != nil {
 				return &webOriginsWriteFailure{
 					logMessage: "AuthServer API: Database error acquiring client row for web origins update",
 					err:        err}
 			}
 
 			// Load existing web origins
-			if err := database.ClientLoadWebOrigins(tx, client); err != nil {
+			if err := database.ClientLoadWebOrigins(r.Context(), tx, client); err != nil {
 				return &webOriginsWriteFailure{
 					logMessage: "AuthServer API: Database error loading client web origins before update",
 					err:        err}
@@ -1093,7 +1093,7 @@ func HandleAPIClientWebOriginsPut(
 			// Add new origins
 			for _, origin := range normalized {
 				if _, ok := existingSet[origin]; !ok {
-					if err := database.CreateWebOrigin(tx, &models.WebOrigin{ClientId: client.Id, Origin: origin}); err != nil {
+					if err := database.CreateWebOrigin(r.Context(), tx, &models.WebOrigin{ClientId: client.Id, Origin: origin}); err != nil {
 						return &webOriginsWriteFailure{
 							logMessage: "AuthServer API: Database error creating web origin",
 							origin:     origin, err: err}
@@ -1104,7 +1104,7 @@ func HandleAPIClientWebOriginsPut(
 			// Delete removed origins
 			for origin, wid := range existingSet {
 				if _, ok := desiredSet[origin]; !ok {
-					if err := database.DeleteWebOrigin(tx, wid); err != nil {
+					if err := database.DeleteWebOrigin(r.Context(), tx, wid); err != nil {
 						return &webOriginsWriteFailure{
 							logMessage: "AuthServer API: Database error deleting web origin",
 							origin:     origin, err: err}
@@ -1134,11 +1134,11 @@ func HandleAPIClientWebOriginsPut(
 		}
 
 		// Reload related fields for response consistency
-		if err := database.ClientLoadRedirectURIs(nil, client); err != nil {
+		if err := database.ClientLoadRedirectURIs(r.Context(), nil, client); err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error loading client redirect URIs after web origins update"), "client_id", client.Id)
 			return
 		}
-		if err := database.ClientLoadWebOrigins(nil, client); err != nil {
+		if err := database.ClientLoadWebOrigins(r.Context(), nil, client); err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error loading client web origins after update"), "client_id", client.Id)
 			return
 		}
@@ -1254,11 +1254,11 @@ func HandleAPIClientTokensPut(
 		}
 
 		// Reload related fields for response consistency
-		if err := database.ClientLoadRedirectURIs(nil, client); err != nil {
+		if err := database.ClientLoadRedirectURIs(r.Context(), nil, client); err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error loading client redirect URIs after tokens update"), "client_id", client.Id)
 			return
 		}
-		if err := database.ClientLoadWebOrigins(nil, client); err != nil {
+		if err := database.ClientLoadWebOrigins(r.Context(), nil, client); err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error loading client web origins after tokens update"), "client_id", client.Id)
 			return
 		}

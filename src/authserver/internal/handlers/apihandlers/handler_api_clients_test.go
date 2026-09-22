@@ -47,8 +47,8 @@ func authenticationPutRequest(t *testing.T, id string, req api.UpdateClientAuthe
 // stubClientResponseLoads registers the two related-field loads every client handler performs
 // before it encodes its response. They carry nothing this file asserts on.
 func stubClientResponseLoads(database *mocks_data.Database) {
-	database.On("ClientLoadRedirectURIs", (*sql.Tx)(nil), mock.Anything).Return(nil).Once()
-	database.On("ClientLoadWebOrigins", (*sql.Tx)(nil), mock.Anything).Return(nil).Once()
+	database.On("ClientLoadRedirectURIs", mock.Anything, (*sql.Tx)(nil), mock.Anything).Return(nil).Once()
+	database.On("ClientLoadWebOrigins", mock.Anything, (*sql.Tx)(nil), mock.Anything).Return(nil).Once()
 }
 
 // =============================================================================
@@ -69,12 +69,12 @@ func TestUpdateClientNotOwningAuthenticationMode_TakesTheModeFromTheRowNotTheCal
 
 	secret := []byte("the-secret-another-request-just-set")
 	expectRunInTransaction(database, clientUpdateTx)
-	database.On("AcquireClientRow", clientUpdateTx, int64(7)).Return(nil).Once()
+	database.On("AcquireClientRow", mock.Anything, clientUpdateTx, int64(7)).Return(nil).Once()
 	database.On("GetClientById", mock.Anything, clientUpdateTx, int64(7)).
 		Return(&models.Client{Id: 7, IsPublic: false, ClientSecretEncrypted: secret}, nil).Once()
 	var written *models.Client
-	database.On("UpdateClient", clientUpdateTx, mock.Anything).
-		Run(func(args mock.Arguments) { written = args.Get(1).(*models.Client) }).Return(nil).Once()
+	database.On("UpdateClient", mock.Anything, clientUpdateTx, mock.Anything).
+		Run(func(args mock.Arguments) { written = args.Get(2).(*models.Client) }).Return(nil).Once()
 
 	stale := &models.Client{Id: 7, IsPublic: true, ClientSecretEncrypted: nil, Description: "edited"}
 	require.NoError(t, updateClientNotOwningAuthenticationMode(context.Background(), database, stale))
@@ -113,13 +113,13 @@ func TestUpdateClientNotOwningAuthenticationMode_ReappliesThePublicInvariantsAga
 	database := mocks_data.NewDatabase(t)
 
 	expectRunInTransaction(database, clientUpdateTx)
-	database.On("AcquireClientRow", clientUpdateTx, int64(7)).Return(nil).Once()
+	database.On("AcquireClientRow", mock.Anything, clientUpdateTx, int64(7)).Return(nil).Once()
 	// The row is public; the caller below thinks it is confidential.
 	database.On("GetClientById", mock.Anything, clientUpdateTx, int64(7)).
 		Return(&models.Client{Id: 7, IsPublic: true}, nil).Once()
 	var written *models.Client
-	database.On("UpdateClient", clientUpdateTx, mock.Anything).
-		Run(func(args mock.Arguments) { written = args.Get(1).(*models.Client) }).Return(nil).Once()
+	database.On("UpdateClient", mock.Anything, clientUpdateTx, mock.Anything).
+		Run(func(args mock.Arguments) { written = args.Get(2).(*models.Client) }).Return(nil).Once()
 
 	// A confidential client's legitimate settings, carried by a request that loaded it before it
 	// became public.
@@ -151,12 +151,12 @@ func TestUpdateClientNotOwningAuthenticationMode_LeavesAConfidentialClientsFlows
 	database := mocks_data.NewDatabase(t)
 
 	expectRunInTransaction(database, clientUpdateTx)
-	database.On("AcquireClientRow", clientUpdateTx, int64(7)).Return(nil).Once()
+	database.On("AcquireClientRow", mock.Anything, clientUpdateTx, int64(7)).Return(nil).Once()
 	database.On("GetClientById", mock.Anything, clientUpdateTx, int64(7)).
 		Return(&models.Client{Id: 7, IsPublic: false}, nil).Once()
 	var written *models.Client
-	database.On("UpdateClient", clientUpdateTx, mock.Anything).
-		Run(func(args mock.Arguments) { written = args.Get(1).(*models.Client) }).Return(nil).Once()
+	database.On("UpdateClient", mock.Anything, clientUpdateTx, mock.Anything).
+		Run(func(args mock.Arguments) { written = args.Get(2).(*models.Client) }).Return(nil).Once()
 
 	pkceOff := false
 	client := &models.Client{
@@ -181,7 +181,7 @@ func TestUpdateClientNotOwningAuthenticationMode_ADisappearedClientIsAnErrorNotA
 	database := mocks_data.NewDatabase(t)
 
 	stub := expectRunInTransaction(database, clientUpdateTx)
-	database.On("AcquireClientRow", clientUpdateTx, int64(7)).Return(nil).Once()
+	database.On("AcquireClientRow", mock.Anything, clientUpdateTx, int64(7)).Return(nil).Once()
 	database.On("GetClientById", mock.Anything, clientUpdateTx, int64(7)).Return(nil, nil).Once()
 
 	err := updateClientNotOwningAuthenticationMode(context.Background(), database, &models.Client{Id: 7})
@@ -199,7 +199,7 @@ func TestUpdateClientNotOwningAuthenticationMode_AFailedAcquisitionDoesNotWrite(
 	database := mocks_data.NewDatabase(t)
 
 	stub := expectRunInTransaction(database, clientUpdateTx)
-	database.On("AcquireClientRow", clientUpdateTx, int64(7)).
+	database.On("AcquireClientRow", mock.Anything, clientUpdateTx, int64(7)).
 		Return(errors.New("deadlock found when trying to get lock")).Once()
 
 	err := updateClientNotOwningAuthenticationMode(context.Background(), database, &models.Client{Id: 7, IsPublic: true})
@@ -232,8 +232,8 @@ func TestHandleAPIClientAuthenticationPut_ClassifiesTheFlipAgainstTheRow(t *test
 	// request got there first with confidential mode and the grants it issued are the ones at
 	// stake. The handler must believe this over its own snapshot.
 	expectRunInTransaction(database, clientUpdateTx)
-	database.On("SetClientPublic", clientUpdateTx, int64(7)).Return(true, nil).Once()
-	database.On("UpdateClient", clientUpdateTx, mock.Anything).Return(nil).Once()
+	database.On("SetClientPublic", mock.Anything, clientUpdateTx, int64(7)).Return(true, nil).Once()
+	database.On("UpdateClient", mock.Anything, clientUpdateTx, mock.Anything).Return(nil).Once()
 	database.On("RevokeCodesByClientId", mock.Anything, clientUpdateTx, int64(7)).Return(int64(2), nil).Once()
 	database.On("GetRefreshTokensByClientId", mock.Anything, clientUpdateTx, int64(7)).
 		Return([]*models.RefreshToken{}, nil).Once()
@@ -276,7 +276,7 @@ func TestHandleAPIClientAuthenticationPut_AFailedClassificationRevokesNothingAnd
 	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).
 		Return(&models.Client{Id: 7, IsPublic: false, ClientSecretEncrypted: []byte("secret")}, nil).Once()
 	stub := expectRunInTransaction(database, clientUpdateTx)
-	database.On("SetClientPublic", clientUpdateTx, int64(7)).
+	database.On("SetClientPublic", mock.Anything, clientUpdateTx, int64(7)).
 		Return(false, errors.New("no client with that id")).Once()
 
 	rr := httptest.NewRecorder()
@@ -305,8 +305,8 @@ func TestHandleAPIClientAuthenticationPut_ASaveOfAnAlreadyPublicClientRevokesNot
 	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).
 		Return(&models.Client{Id: 7, IsPublic: true}, nil).Once()
 	expectRunInTransaction(database, clientUpdateTx)
-	database.On("SetClientPublic", clientUpdateTx, int64(7)).Return(false, nil).Once()
-	database.On("UpdateClient", clientUpdateTx, mock.Anything).Return(nil).Once()
+	database.On("SetClientPublic", mock.Anything, clientUpdateTx, int64(7)).Return(false, nil).Once()
+	database.On("UpdateClient", mock.Anything, clientUpdateTx, mock.Anything).Return(nil).Once()
 	stubClientResponseLoads(database)
 
 	auditLogger.On("Log", mock.Anything, audit.AuditUpdatedClientAuthentication, mock.Anything).Return().Once()
@@ -375,18 +375,18 @@ func TestHandleAPIClientWebOriginsPut_SavesInOneTransactionUnderTheRowAcquisitio
 	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(client, nil).Once()
 
 	expectRunInTransaction(database, clientUpdateTx)
-	database.On("AcquireClientRow", clientUpdateTx, int64(7)).Return(nil).Once()
-	database.On("ClientLoadWebOrigins", clientUpdateTx, mock.Anything).
+	database.On("AcquireClientRow", mock.Anything, clientUpdateTx, int64(7)).Return(nil).Once()
+	database.On("ClientLoadWebOrigins", mock.Anything, clientUpdateTx, mock.Anything).
 		Run(func(args mock.Arguments) {
-			args.Get(1).(*models.Client).WebOrigins = []models.WebOrigin{
+			args.Get(2).(*models.Client).WebOrigins = []models.WebOrigin{
 				{Id: 11, ClientId: 7, Origin: "https://old.example.com"},
 			}
 		}).Return(nil).Once()
 
 	var created string
-	database.On("CreateWebOrigin", clientUpdateTx, mock.Anything).
-		Run(func(args mock.Arguments) { created = args.Get(1).(*models.WebOrigin).Origin }).Return(nil).Once()
-	database.On("DeleteWebOrigin", clientUpdateTx, int64(11)).Return(nil).Once()
+	database.On("CreateWebOrigin", mock.Anything, clientUpdateTx, mock.Anything).
+		Run(func(args mock.Arguments) { created = args.Get(2).(*models.WebOrigin).Origin }).Return(nil).Once()
+	database.On("DeleteWebOrigin", mock.Anything, clientUpdateTx, int64(11)).Return(nil).Once()
 	stubClientResponseLoads(database)
 
 	auditLogger.On("Log", mock.Anything, audit.AuditUpdatedWebOrigins, mock.Anything).Return().Once()
@@ -422,9 +422,9 @@ func TestHandleAPIClientWebOriginsPut_AFailedWriteCommitsNothing(t *testing.T) {
 		Return(&models.Client{Id: 7, AuthorizationCodeEnabled: true}, nil).Once()
 	diskFull := errors.New("the disk is full")
 	stub := expectRunInTransaction(database, clientUpdateTx)
-	database.On("AcquireClientRow", clientUpdateTx, int64(7)).Return(nil).Once()
-	database.On("ClientLoadWebOrigins", clientUpdateTx, mock.Anything).Return(nil).Once()
-	database.On("CreateWebOrigin", clientUpdateTx, mock.Anything).Return(diskFull).Once()
+	database.On("AcquireClientRow", mock.Anything, clientUpdateTx, int64(7)).Return(nil).Once()
+	database.On("ClientLoadWebOrigins", mock.Anything, clientUpdateTx, mock.Anything).Return(nil).Once()
+	database.On("CreateWebOrigin", mock.Anything, clientUpdateTx, mock.Anything).Return(diskFull).Once()
 
 	rr := httptest.NewRecorder()
 	handler := HandleAPIClientWebOriginsPut(database, auditLogger)
@@ -458,8 +458,8 @@ func TestHandleAPIClientWebOriginsPut_AFailedLoadIsAnsweredAsALoadFailure(t *tes
 		Return(&models.Client{Id: 7, AuthorizationCodeEnabled: true}, nil).Once()
 	loadErr := errors.New("the read failed")
 	stub := expectRunInTransaction(database, clientUpdateTx)
-	database.On("AcquireClientRow", clientUpdateTx, int64(7)).Return(nil).Once()
-	database.On("ClientLoadWebOrigins", clientUpdateTx, mock.Anything).Return(loadErr).Once()
+	database.On("AcquireClientRow", mock.Anything, clientUpdateTx, int64(7)).Return(nil).Once()
+	database.On("ClientLoadWebOrigins", mock.Anything, clientUpdateTx, mock.Anything).Return(loadErr).Once()
 
 	rr := httptest.NewRecorder()
 	handler := HandleAPIClientWebOriginsPut(database, auditLogger)
@@ -507,11 +507,11 @@ func TestHandleAPIClientWebOriginsPut_ARerunAttemptAnswersOnce(t *testing.T) {
 	}).Once()
 
 	// Both attempts take the row and read the list afresh.
-	database.On("AcquireClientRow", clientUpdateTx, int64(7)).Return(nil).Twice()
-	database.On("ClientLoadWebOrigins", clientUpdateTx, mock.Anything).Return(nil).Twice()
+	database.On("AcquireClientRow", mock.Anything, clientUpdateTx, int64(7)).Return(nil).Twice()
+	database.On("ClientLoadWebOrigins", mock.Anything, clientUpdateTx, mock.Anything).Return(nil).Twice()
 	// The first insert is the deadlock victim; the second lands.
-	database.On("CreateWebOrigin", clientUpdateTx, mock.Anything).Return(deadlock).Once()
-	database.On("CreateWebOrigin", clientUpdateTx, mock.Anything).Return(nil).Once()
+	database.On("CreateWebOrigin", mock.Anything, clientUpdateTx, mock.Anything).Return(deadlock).Once()
+	database.On("CreateWebOrigin", mock.Anything, clientUpdateTx, mock.Anything).Return(nil).Once()
 	stubClientResponseLoads(database)
 
 	auditLogger.On("Log", mock.Anything, audit.AuditUpdatedWebOrigins, mock.Anything).Return().Once()

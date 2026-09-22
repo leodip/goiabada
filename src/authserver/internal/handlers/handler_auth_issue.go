@@ -71,7 +71,7 @@ func HandleIssueGet(
 		//
 		// The client loaded here is passed down to handleImplicitFlow, which used to load it
 		// again.
-		issuingClient, err := database.GetClientByClientIdentifier(nil, authContext.ClientId)
+		issuingClient, err := database.GetClientByClientIdentifier(r.Context(), nil, authContext.ClientId)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
@@ -88,7 +88,7 @@ func HandleIssueGet(
 
 		registered := []string{}
 		if issuingClient != nil {
-			err = database.ClientLoadRedirectURIs(nil, issuingClient)
+			err = database.ClientLoadRedirectURIs(r.Context(), nil, issuingClient)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
 				return

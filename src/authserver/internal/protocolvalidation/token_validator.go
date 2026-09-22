@@ -104,7 +104,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 			"Missing required client_id parameter.", http.StatusBadRequest)
 	}
 
-	client, err := val.database.GetClientByClientIdentifier(nil, input.ClientId)
+	client, err := val.database.GetClientByClientIdentifier(ctx, nil, input.ClientId)
 	if err != nil {
 		return nil, err
 	}
@@ -395,7 +395,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 		//
 		// A failed load is PROPAGATED, not read as a refusal, matching the ownership lookup
 		// above: an unreachable database says nothing about whether the URI is registered.
-		err = val.database.ClientLoadRedirectURIs(nil, client)
+		err = val.database.ClientLoadRedirectURIs(ctx, nil, client)
 		if err != nil {
 			return nil, err
 		}
@@ -447,12 +447,12 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 				"Client authentication failed.", http.StatusUnauthorized)
 		}
 
-		err = val.database.ClientLoadPermissions(nil, client)
+		err = val.database.ClientLoadPermissions(ctx, nil, client)
 		if err != nil {
 			return nil, err
 		}
 
-		err = val.database.PermissionsLoadResources(nil, client.Permissions)
+		err = val.database.PermissionsLoadResources(ctx, nil, client.Permissions)
 		if err != nil {
 			return nil, err
 		}
@@ -495,7 +495,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 			input.Scope = strings.TrimSpace(input.Scope)
 		}
 
-		err = val.validateClientCredentialsScopes(input.Scope, client)
+		err = val.validateClientCredentialsScopes(ctx, input.Scope, client)
 		if err != nil {
 			return nil, err
 		}
@@ -1125,7 +1125,7 @@ type scopeResolution struct {
 //
 // Package-level rather than a method because the two callers are different types, AuthorizeValidator
 // and TokenValidator, that merely hold the same data.Database.
-func resolveScope(db data.Database, scopeStr string) (scopeResolution, error) {
+func resolveScope(ctx context.Context, db data.Database, scopeStr string) (scopeResolution, error) {
 	parts := strings.Split(scopeStr, ":")
 	if len(parts) != 2 {
 		return scopeResolution{Outcome: scopeMalformed}, nil
@@ -1136,7 +1136,7 @@ func resolveScope(db data.Database, scopeStr string) (scopeResolution, error) {
 		PermissionIdentifier: parts[1],
 	}
 
-	res, err := db.GetResourceByResourceIdentifier(nil, resolution.ResourceIdentifier)
+	res, err := db.GetResourceByResourceIdentifier(ctx, nil, resolution.ResourceIdentifier)
 	if err != nil {
 		return scopeResolution{}, err
 	}
@@ -1145,7 +1145,7 @@ func resolveScope(db data.Database, scopeStr string) (scopeResolution, error) {
 		return resolution, nil
 	}
 
-	permissions, err := db.GetPermissionsByResourceId(nil, res.Id)
+	permissions, err := db.GetPermissionsByResourceId(ctx, nil, res.Id)
 	if err != nil {
 		return scopeResolution{}, err
 	}
@@ -1166,7 +1166,7 @@ func resolveScope(db data.Database, scopeStr string) (scopeResolution, error) {
 	return resolution, nil
 }
 
-func (val *TokenValidator) validateClientCredentialsScopes(scope string, client *models.Client) error {
+func (val *TokenValidator) validateClientCredentialsScopes(ctx context.Context, scope string, client *models.Client) error {
 
 	if len(scope) == 0 {
 		return nil
@@ -1185,7 +1185,7 @@ func (val *TokenValidator) validateClientCredentialsScopes(scope string, client 
 				http.StatusBadRequest)
 		}
 
-		resolution, err := resolveScope(val.database, scopeStr)
+		resolution, err := resolveScope(ctx, val.database, scopeStr)
 		if err != nil {
 			return err
 		}
@@ -1264,7 +1264,7 @@ func (val *TokenValidator) validateROPCScopes(ctx context.Context, scope string,
 		// Resolve resource:permission against the database. The malformed-pair wording here is
 		// this grant's own - it names the OIDC scopes, which the other two sites do not - so the
 		// resolver answers with an outcome and each site writes its own message (#124).
-		resolution, err := resolveScope(val.database, scopeStr)
+		resolution, err := resolveScope(ctx, val.database, scopeStr)
 		if err != nil {
 			return "", err
 		}

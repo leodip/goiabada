@@ -130,15 +130,15 @@ func TestAPIUsersSearch_AnnotatePermission_UserinfoForbidden(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Get existing AuthServer resource
-	authRes, err := database.GetResourceByResourceIdentifier(nil, constants.AuthServerResourceIdentifier)
+	authRes, err := database.GetResourceByResourceIdentifier(context.Background(), nil, constants.AuthServerResourceIdentifier)
 	assert.NoError(t, err)
 	if authRes == nil {
 		t.Skip("AuthServer resource not found in database - skipping userinfo annotation test")
 	}
 	// Locate userinfo permission
-	perms, err := database.GetPermissionsByResourceId(nil, authRes.Id)
+	perms, err := database.GetPermissionsByResourceId(context.Background(), nil, authRes.Id)
 	assert.NoError(t, err)
-	err = database.PermissionsLoadResources(nil, perms)
+	err = database.PermissionsLoadResources(context.Background(), nil, perms)
 	assert.NoError(t, err)
 	var userinfoPermId int64
 	for i := range perms {

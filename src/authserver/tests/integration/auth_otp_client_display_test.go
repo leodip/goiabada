@@ -28,7 +28,7 @@ func TestAuthOtp_ClientDisplay_ShowDisplayName_Enabled(t *testing.T) {
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
-	err := database.CreateRedirectURI(nil, redirectUri)
+	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	assert.NoError(t, err)
 
 	// Create user with OTP enabled
@@ -89,7 +89,7 @@ func TestAuthOtp_ClientDisplay_AllEnabled_Enabled(t *testing.T) {
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
-	err := database.CreateRedirectURI(nil, redirectUri)
+	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	assert.NoError(t, err)
 
 	// Create user with OTP enabled
@@ -151,7 +151,7 @@ func TestAuthOtp_ClientDisplay_AllDisabled_Enabled(t *testing.T) {
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
-	err := database.CreateRedirectURI(nil, redirectUri)
+	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	assert.NoError(t, err)
 
 	// Create user with OTP enabled
@@ -209,7 +209,7 @@ func TestAuthOtp_ClientDisplay_ShowDisplayName_Enrollment(t *testing.T) {
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
-	err := database.CreateRedirectURI(nil, redirectUri)
+	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	assert.NoError(t, err)
 
 	// Create user WITHOUT OTP (enrollment scenario)
@@ -262,7 +262,7 @@ func TestAuthOtp_ClientDisplay_AllEnabled_Enrollment(t *testing.T) {
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
-	err := database.CreateRedirectURI(nil, redirectUri)
+	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	assert.NoError(t, err)
 
 	// Create user WITHOUT OTP (enrollment scenario)
@@ -316,7 +316,7 @@ func TestAuthOtp_ClientDisplay_AllDisabled_Enrollment(t *testing.T) {
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
-	err := database.CreateRedirectURI(nil, redirectUri)
+	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	assert.NoError(t, err)
 
 	// Create user WITHOUT OTP (enrollment scenario)

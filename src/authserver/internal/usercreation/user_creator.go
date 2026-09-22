@@ -43,12 +43,12 @@ func (uc *UserCreator) CreateUser(ctx context.Context, input *CreateUserInput) (
 		PasswordHash:  input.PasswordHash,
 	}
 
-	authServerResource, err := uc.database.GetResourceByResourceIdentifier(nil, constants.AuthServerResourceIdentifier)
+	authServerResource, err := uc.database.GetResourceByResourceIdentifier(ctx, nil, constants.AuthServerResourceIdentifier)
 	if err != nil {
 		return nil, err
 	}
 
-	permissions, err := uc.database.GetPermissionsByResourceId(nil, authServerResource.Id)
+	permissions, err := uc.database.GetPermissionsByResourceId(ctx, nil, authServerResource.Id)
 	if err != nil {
 		return nil, err
 	}

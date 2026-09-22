@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -105,7 +106,7 @@ func TestMigration000029_CreatedViaDCR(t *testing.T) {
 			ConsentRequired:  false,
 			CreatedViaDCR:    false,
 		}
-		require.NoErrorf(t, h.DB.CreateClient(nil, client), "seed client %s", c.identifier)
+		require.NoErrorf(t, h.DB.CreateClient(context.Background(), nil, client), "seed client %s", c.identifier)
 		ids[i] = client.Id
 	}
 

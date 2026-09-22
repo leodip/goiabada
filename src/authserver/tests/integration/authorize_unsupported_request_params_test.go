@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"net/http"
 	"net/url"
 	"strings"
@@ -21,7 +22,7 @@ func createTestClientWithRedirect(t *testing.T) (*models.Client, *models.Redirec
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 	}
-	if err := database.CreateClient(nil, client); err != nil {
+	if err := database.CreateClient(context.Background(), nil, client); err != nil {
 		t.Fatal(err)
 	}
 
@@ -29,7 +30,7 @@ func createTestClientWithRedirect(t *testing.T) (*models.Client, *models.Redirec
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
-	if err := database.CreateRedirectURI(nil, redirectUri); err != nil {
+	if err := database.CreateRedirectURI(context.Background(), nil, redirectUri); err != nil {
 		t.Fatal(err)
 	}
 

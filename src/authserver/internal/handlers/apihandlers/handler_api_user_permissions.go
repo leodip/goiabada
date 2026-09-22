@@ -49,7 +49,7 @@ func HandleAPIUserPermissionsGet(
 
 		// Load resource information for each permission
 		for i := range user.Permissions {
-			resource, err := database.GetResourceById(nil, user.Permissions[i].ResourceId)
+			resource, err := database.GetResourceById(r.Context(), nil, user.Permissions[i].ResourceId)
 			if err != nil {
 				writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: failed to load resource information"), "user_id", user.Id, "resource_id", user.Permissions[i].ResourceId)
 				return
@@ -110,7 +110,7 @@ func HandleAPIUserPermissionsPut(
 
 		// Validate that all requested permissions exist
 		for _, permissionId := range request.PermissionIds {
-			permission, err := database.GetPermissionById(nil, permissionId)
+			permission, err := database.GetPermissionById(r.Context(), nil, permissionId)
 			if err != nil {
 				writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: failed to get permission by ID during validation"), "user_id", user.Id, "permission_id", permissionId)
 				return
@@ -132,7 +132,7 @@ func HandleAPIUserPermissionsPut(
 			}
 
 			if !found {
-				permission, err := database.GetPermissionById(nil, permissionId)
+				permission, err := database.GetPermissionById(r.Context(), nil, permissionId)
 				if err != nil {
 					writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: failed to retrieve permission for user permission creation"), "user_id", user.Id, "permission_id", permissionId)
 					return

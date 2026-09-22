@@ -375,7 +375,7 @@ func seedClient000039(t *testing.T, h *isolatedDB) *models.Client {
 		AuthorizationCodeEnabled: true,
 		DefaultAcrLevel:          "urn:goiabada:level1",
 	}
-	require.NoError(t, h.DB.CreateClient(nil, client), "seed client")
+	require.NoError(t, h.DB.CreateClient(context.Background(), nil, client), "seed client")
 	return client
 }
 

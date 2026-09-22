@@ -41,7 +41,7 @@ func HandleAuthLevel2Get(
 		// here we'll select what type of level2 auth we'll use (otp, email_code, sms_code, magic_link)
 		// today we only support otp, other types will be added in the future
 
-		client, err := database.GetClientByClientIdentifier(nil, authContext.ClientId)
+		client, err := database.GetClientByClientIdentifier(r.Context(), nil, authContext.ClientId)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return

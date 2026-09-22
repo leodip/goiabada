@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"net/http"
 	"strings"
 	"testing"
@@ -26,9 +27,9 @@ func TestCors_TrailingSlashUsesTheSamePolicy(t *testing.T) {
 			ClientIdentifier: "cors-slash-" + strings.ToLower(fake.LetterN(8)),
 			Enabled:          true,
 		}
-		require.NoError(t, database.CreateClient(nil, client))
-		defer func() { _ = database.DeleteClient(nil, client.Id) }()
-		require.NoError(t, database.CreateWebOrigin(nil, &models.WebOrigin{
+		require.NoError(t, database.CreateClient(context.Background(), nil, client))
+		defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
+		require.NoError(t, database.CreateWebOrigin(context.Background(), nil, &models.WebOrigin{
 			ClientId: client.Id,
 			Origin:   origin,
 		}))

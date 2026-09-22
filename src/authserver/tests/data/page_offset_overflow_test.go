@@ -128,9 +128,9 @@ func TestPaginatedReads_AnOverflowingPageIsAnEmptyPage(t *testing.T) {
 
 	t.Run("GetUsersByPermissionIdPaginated", func(t *testing.T) {
 		resource := createTestResource(t)
-		t.Cleanup(func() { _ = database.DeleteResource(nil, resource.Id) })
+		t.Cleanup(func() { _ = database.DeleteResource(context.Background(), nil, resource.Id) })
 		permission := createTestPermission(t, resource)
-		t.Cleanup(func() { _ = database.DeletePermission(nil, permission.Id) })
+		t.Cleanup(func() { _ = database.DeletePermission(context.Background(), nil, permission.Id) })
 		for i := 0; i < 3; i++ {
 			user := createTestUser(t)
 			createTestUserPermissionWithUserAndPermission(t, user.Id, permission.Id)
@@ -148,7 +148,7 @@ func TestPaginatedReads_AnOverflowingPageIsAnEmptyPage(t *testing.T) {
 		user := createTestUser(t)
 		t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.Id) })
 		client := createTestClient(t)
-		t.Cleanup(func() { _ = database.DeleteClient(nil, client.Id) })
+		t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
 		createTestUserSessionsWithClient(t, user.Id, client.Id, 3)
 
 		assertEmptyPagePastTheEnd(t, "GetUserSessionsByClientIdPaginated", 50,

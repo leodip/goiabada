@@ -53,10 +53,10 @@ func newPublicPKCEClient(t *testing.T, pkceRequired *bool) (*models.Client, stri
 		DefaultAcrLevel:          models.AcrLevel1,
 		PKCERequired:             pkceRequired,
 	}
-	require.NoError(t, database.CreateClient(nil, client))
+	require.NoError(t, database.CreateClient(context.Background(), nil, client))
 
 	redirectURI := "https://public-pkce.example.com/callback"
-	require.NoError(t, database.CreateRedirectURI(nil, &models.RedirectURI{
+	require.NoError(t, database.CreateRedirectURI(context.Background(), nil, &models.RedirectURI{
 		ClientId: client.Id,
 		URI:      redirectURI,
 	}))

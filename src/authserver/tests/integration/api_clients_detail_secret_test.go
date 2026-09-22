@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -44,9 +45,9 @@ func TestAPIClientGet_ConfidentialIncludesSecretInDetailButNotList(t *testing.T)
 		IsPublic:                 false,
 		ClientSecretEncrypted:    enc,
 	}
-	err = database.CreateClient(nil, client)
+	err = database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
-	defer func() { _ = database.DeleteClient(nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
 	// Detail should include clientSecret
 	detailURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10)

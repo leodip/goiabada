@@ -125,7 +125,7 @@ func HandleDynamicClientRegistrationPost(
 		}
 
 		// 10. Save client to database
-		if err := database.CreateClient(nil, client); err != nil {
+		if err := database.CreateClient(r.Context(), nil, client); err != nil {
 			apiresponse.LogInternalServerError(r, errs.Wrap(err, "DCR: database error creating client"))
 			writeDCRError(w, "server_error", "Failed to register client", http.StatusInternalServerError)
 			return
@@ -137,10 +137,10 @@ func HandleDynamicClientRegistrationPost(
 				ClientId: client.Id,
 				URI:      uri,
 			}
-			if err := database.CreateRedirectURI(nil, redirectURI); err != nil {
+			if err := database.CreateRedirectURI(r.Context(), nil, redirectURI); err != nil {
 				apiresponse.LogInternalServerError(r, errs.Wrap(err, "DCR: failed to create redirect URI"), "uri", uri)
 				// Rollback client creation
-				_ = database.DeleteClient(nil, client.Id)
+				_ = database.DeleteClient(r.Context(), nil, client.Id)
 				writeDCRError(w, "server_error", "Failed to register redirect URIs", http.StatusInternalServerError)
 				return
 			}

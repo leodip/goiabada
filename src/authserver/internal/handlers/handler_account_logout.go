@@ -131,7 +131,7 @@ func isEncryptedIDTokenHint(hint string) bool {
 // hint cannot be confirmed, and the spec's answer to a hint the OP cannot confirm is to ask the
 // End-User rather than to show them a diagnostic about a request their relying party built (#109).
 func decryptIDTokenHint(ctx context.Context, idTokenHint, clientID string, database data.Database) (string, error) {
-	client, err := database.GetClientByClientIdentifier(nil, clientID)
+	client, err := database.GetClientByClientIdentifier(ctx, nil, clientID)
 	if err != nil {
 		slog.ErrorContext(ctx, "unable to look up the client an id_token_hint names, so the hint cannot be decrypted",
 			"client_identifier", clientID, "error", err)
@@ -371,7 +371,7 @@ func classifyIdTokenHint(
 			"client_identifier", clientId, "aud", clientIdentifier)
 	}
 
-	client, err := database.GetClientByClientIdentifier(nil, clientIdentifier)
+	client, err := database.GetClientByClientIdentifier(r.Context(), nil, clientIdentifier)
 	if err != nil {
 		// Rejected rather than propagated, unlike the expiry lookup below. This runs before any
 		// teardown, so a 500 here would put the End-User on a terminal page while still signed in,
@@ -830,7 +830,7 @@ func clientForPostLogoutRedirect(ctx context.Context, clientId string, database 
 		return nil
 	}
 
-	client, err := database.GetClientByClientIdentifier(nil, clientId)
+	client, err := database.GetClientByClientIdentifier(ctx, nil, clientId)
 	if err != nil {
 		slog.ErrorContext(ctx, "unable to look up the client named by client_id, not redirecting",
 			"client_identifier", clientId, "error", err)
@@ -888,7 +888,7 @@ func postLogoutRedirectLocation(
 		return ""
 	}
 
-	if err := database.ClientLoadRedirectURIs(nil, client); err != nil {
+	if err := database.ClientLoadRedirectURIs(r.Context(), nil, client); err != nil {
 		slog.ErrorContext(r.Context(), "unable to load the client's redirect URIs, not redirecting",
 			"client_identifier", client.ClientIdentifier, "error", err)
 		return ""

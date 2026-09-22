@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"context"
 	"strings"
 	"testing"
 	"time"
@@ -15,7 +16,7 @@ func TestCreateResource(t *testing.T) {
 		Description:        "Test Resource",
 	}
 
-	err := database.CreateResource(nil, resource)
+	err := database.CreateResource(context.Background(), nil, resource)
 	if err != nil {
 		t.Fatalf("Failed to create resource: %v", err)
 	}
@@ -30,7 +31,7 @@ func TestCreateResource(t *testing.T) {
 		t.Error("Expected UpdatedAt to be set")
 	}
 
-	retrievedResource, err := database.GetResourceById(nil, resource.Id)
+	retrievedResource, err := database.GetResourceById(context.Background(), nil, resource.Id)
 	if err != nil {
 		t.Fatalf("Failed to retrieve created resource: %v", err)
 	}
@@ -51,12 +52,12 @@ func TestUpdateResource(t *testing.T) {
 
 	time.Sleep(timestampTick)
 
-	err := database.UpdateResource(nil, resource)
+	err := database.UpdateResource(context.Background(), nil, resource)
 	if err != nil {
 		t.Fatalf("Failed to update resource: %v", err)
 	}
 
-	updatedResource, err := database.GetResourceById(nil, resource.Id)
+	updatedResource, err := database.GetResourceById(context.Background(), nil, resource.Id)
 	if err != nil {
 		t.Fatalf("Failed to retrieve updated resource: %v", err)
 	}
@@ -75,7 +76,7 @@ func TestUpdateResource(t *testing.T) {
 func TestGetResourceById(t *testing.T) {
 	resource := createTestResource(t)
 
-	retrievedResource, err := database.GetResourceById(nil, resource.Id)
+	retrievedResource, err := database.GetResourceById(context.Background(), nil, resource.Id)
 	if err != nil {
 		t.Fatalf("Failed to get resource by ID: %v", err)
 	}
@@ -87,7 +88,7 @@ func TestGetResourceById(t *testing.T) {
 		t.Errorf("Expected ResourceIdentifier %s, got %s", resource.ResourceIdentifier, retrievedResource.ResourceIdentifier)
 	}
 
-	nonExistentResource, err := database.GetResourceById(nil, 99999)
+	nonExistentResource, err := database.GetResourceById(context.Background(), nil, 99999)
 	if err != nil {
 		t.Errorf("Expected no error for non-existent resource, got: %v", err)
 	}
@@ -99,7 +100,7 @@ func TestGetResourceById(t *testing.T) {
 func TestGetResourceByResourceIdentifier(t *testing.T) {
 	resource := createTestResource(t)
 
-	retrievedResource, err := database.GetResourceByResourceIdentifier(nil, resource.ResourceIdentifier)
+	retrievedResource, err := database.GetResourceByResourceIdentifier(context.Background(), nil, resource.ResourceIdentifier)
 	if err != nil {
 		t.Fatalf("Failed to get resource by identifier: %v", err)
 	}
@@ -111,7 +112,7 @@ func TestGetResourceByResourceIdentifier(t *testing.T) {
 		t.Errorf("Expected ResourceIdentifier %s, got %s", resource.ResourceIdentifier, retrievedResource.ResourceIdentifier)
 	}
 
-	nonExistentResource, err := database.GetResourceByResourceIdentifier(nil, "non_existent_identifier")
+	nonExistentResource, err := database.GetResourceByResourceIdentifier(context.Background(), nil, "non_existent_identifier")
 	if err != nil {
 		t.Errorf("Expected no error for non-existent resource, got: %v", err)
 	}
@@ -125,7 +126,7 @@ func TestGetResourcesByIds(t *testing.T) {
 	resource2 := createTestResource(t)
 
 	ids := []int64{resource1.Id, resource2.Id}
-	resources, err := database.GetResourcesByIds(nil, ids)
+	resources, err := database.GetResourcesByIds(context.Background(), nil, ids)
 	if err != nil {
 		t.Fatalf("Failed to get resources by IDs: %v", err)
 	}
@@ -152,12 +153,12 @@ func TestGetResourcesByIds(t *testing.T) {
 
 func TestGetAllResources(t *testing.T) {
 	// Clean the database first
-	existingResources, err := database.GetAllResources(nil)
+	existingResources, err := database.GetAllResources(context.Background(), nil)
 	if err != nil {
 		t.Fatalf("Failed to get existing resources: %v", err)
 	}
 	for _, resource := range existingResources {
-		err := database.DeleteResource(nil, resource.Id)
+		err := database.DeleteResource(context.Background(), nil, resource.Id)
 		if err != nil {
 			t.Fatalf("Failed to delete existing resource: %v", err)
 		}
@@ -169,7 +170,7 @@ func TestGetAllResources(t *testing.T) {
 	resource3 := createTestResource(t)
 
 	// Get all resources
-	resources, err := database.GetAllResources(nil)
+	resources, err := database.GetAllResources(context.Background(), nil)
 	if err != nil {
 		t.Fatalf("Failed to get all resources: %v", err)
 	}
@@ -208,12 +209,12 @@ func TestGetAllResources(t *testing.T) {
 func TestDeleteResource(t *testing.T) {
 	resource := createTestResource(t)
 
-	err := database.DeleteResource(nil, resource.Id)
+	err := database.DeleteResource(context.Background(), nil, resource.Id)
 	if err != nil {
 		t.Fatalf("Failed to delete resource: %v", err)
 	}
 
-	deletedResource, err := database.GetResourceById(nil, resource.Id)
+	deletedResource, err := database.GetResourceById(context.Background(), nil, resource.Id)
 	if err != nil {
 		t.Fatalf("Error while checking for deleted resource: %v", err)
 	}
@@ -221,7 +222,7 @@ func TestDeleteResource(t *testing.T) {
 		t.Errorf("Resource still exists after deletion")
 	}
 
-	err = database.DeleteResource(nil, 99999)
+	err = database.DeleteResource(context.Background(), nil, 99999)
 	if err != nil {
 		t.Errorf("Expected no error when deleting non-existent resource, got: %v", err)
 	}
@@ -232,7 +233,7 @@ func createTestResource(t *testing.T) *models.Resource {
 		ResourceIdentifier: "test_resource" + fake.LetterN(4),
 		Description:        "Test Resource",
 	}
-	err := database.CreateResource(nil, resource)
+	err := database.CreateResource(context.Background(), nil, resource)
 	if err != nil {
 		t.Fatalf("Failed to create test resource: %v", err)
 	}
@@ -254,14 +255,14 @@ func TestGetResourceByResourceIdentifierIsCaseSensitive(t *testing.T) {
 	upper := strings.ToUpper(lower)
 
 	lowerResource := &models.Resource{ResourceIdentifier: lower, Description: "lowercase"}
-	if err := database.CreateResource(nil, lowerResource); err != nil {
+	if err := database.CreateResource(context.Background(), nil, lowerResource); err != nil {
 		t.Fatalf("Failed to create the lowercase resource: %v", err)
 	}
 
 	// A second resource differing from the first only by case, which MySQL and SQL Server
 	// refused before 000040.
 	upperResource := &models.Resource{ResourceIdentifier: upper, Description: "uppercase"}
-	if err := database.CreateResource(nil, upperResource); err != nil {
+	if err := database.CreateResource(context.Background(), nil, upperResource); err != nil {
 		t.Fatalf("Failed to create a resource differing only by case, which every engine must now accept: %v", err)
 	}
 
@@ -275,7 +276,7 @@ func TestGetResourceByResourceIdentifierIsCaseSensitive(t *testing.T) {
 		{"a mis-cased name resolves nothing", "Case_Resource_" + strings.ToUpper(lower[14:]), 0},
 		{"a trailing space resolves nothing, which SQL Server's padding would otherwise defeat", lower + " ", 0},
 	} {
-		got, err := database.GetResourceByResourceIdentifier(nil, tc.lookup)
+		got, err := database.GetResourceByResourceIdentifier(context.Background(), nil, tc.lookup)
 		if err != nil {
 			t.Fatalf("%s: unexpected error: %v", tc.name, err)
 		}

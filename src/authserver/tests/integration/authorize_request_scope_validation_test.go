@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -21,7 +22,7 @@ func TestAuthorize_ValidateRequest_ResponseTypeIsMissing(t *testing.T) {
 		AuthorizationCodeEnabled: true,
 	}
 
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -31,7 +32,7 @@ func TestAuthorize_ValidateRequest_ResponseTypeIsMissing(t *testing.T) {
 		URI:      fake.URL(),
 	}
 
-	err = database.CreateRedirectURI(nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -67,7 +68,7 @@ func TestAuthorize_ValidateRequest_ResponseTypeIsInvalid(t *testing.T) {
 		AuthorizationCodeEnabled: true,
 	}
 
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -77,7 +78,7 @@ func TestAuthorize_ValidateRequest_ResponseTypeIsInvalid(t *testing.T) {
 		URI:      fake.URL(),
 	}
 
-	err = database.CreateRedirectURI(nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -115,7 +116,7 @@ func TestAuthorize_ValidateRequest_CodeChallengeMethodIsMissing(t *testing.T) {
 		PKCERequired:             &pkceRequired,
 	}
 
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -125,7 +126,7 @@ func TestAuthorize_ValidateRequest_CodeChallengeMethodIsMissing(t *testing.T) {
 		URI:      fake.URL(),
 	}
 
-	err = database.CreateRedirectURI(nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -163,7 +164,7 @@ func TestAuthorize_ValidateRequest_CodeChallengeMethodIsInvalid(t *testing.T) {
 		PKCERequired:             &pkceRequired,
 	}
 
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -173,7 +174,7 @@ func TestAuthorize_ValidateRequest_CodeChallengeMethodIsInvalid(t *testing.T) {
 		URI:      fake.URL(),
 	}
 
-	err = database.CreateRedirectURI(nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -211,7 +212,7 @@ func TestAuthorize_ValidateRequest_CodeChallengeIsMissing(t *testing.T) {
 		PKCERequired:             &pkceRequired,
 	}
 
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -221,7 +222,7 @@ func TestAuthorize_ValidateRequest_CodeChallengeIsMissing(t *testing.T) {
 		URI:      fake.URL(),
 	}
 
-	err = database.CreateRedirectURI(nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -270,7 +271,7 @@ func TestAuthorize_ValidateRequest_CodeChallengeInvalid(t *testing.T) {
 			PKCERequired:             &pkceRequired,
 		}
 
-		err := database.CreateClient(nil, client)
+		err := database.CreateClient(context.Background(), nil, client)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -280,7 +281,7 @@ func TestAuthorize_ValidateRequest_CodeChallengeInvalid(t *testing.T) {
 			URI:      fake.URL(),
 		}
 
-		err = database.CreateRedirectURI(nil, redirectUri)
+		err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -329,7 +330,7 @@ func TestAuthorize_ValidateRequest_InvalidResponseMode(t *testing.T) {
 		AuthorizationCodeEnabled: true,
 	}
 
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -339,7 +340,7 @@ func TestAuthorize_ValidateRequest_InvalidResponseMode(t *testing.T) {
 		URI:      fake.URL(),
 	}
 
-	err = database.CreateRedirectURI(nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -388,7 +389,7 @@ func TestAuthorize_ValidateRequest_InvalidResponseMode_NoSessionIsNotAskedToLogI
 		AuthorizationCodeEnabled: true,
 	}
 
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -398,7 +399,7 @@ func TestAuthorize_ValidateRequest_InvalidResponseMode_NoSessionIsNotAskedToLogI
 		URI:      fake.URL(),
 	}
 
-	err = database.CreateRedirectURI(nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -447,7 +448,7 @@ func TestAuthorize_ValidateRequest_InvalidResponseMode_RendersInTheRequestedLoca
 		AuthorizationCodeEnabled: true,
 	}
 
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -457,7 +458,7 @@ func TestAuthorize_ValidateRequest_InvalidResponseMode_RendersInTheRequestedLoca
 		URI:      fake.URL(),
 	}
 
-	err = database.CreateRedirectURI(nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -497,7 +498,7 @@ func TestAuthorize_ValidateRequest_QueryResponseMode(t *testing.T) {
 		AuthorizationCodeEnabled: true,
 	}
 
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -507,7 +508,7 @@ func TestAuthorize_ValidateRequest_QueryResponseMode(t *testing.T) {
 		URI:      fake.URL(),
 	}
 
-	err = database.CreateRedirectURI(nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -549,7 +550,7 @@ func TestAuthorize_ValidateRequest_FragmentResponseMode(t *testing.T) {
 		AuthorizationCodeEnabled: true,
 	}
 
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -559,7 +560,7 @@ func TestAuthorize_ValidateRequest_FragmentResponseMode(t *testing.T) {
 		URI:      fake.URL(),
 	}
 
-	err = database.CreateRedirectURI(nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -602,7 +603,7 @@ func TestAuthorize_ValidateRequest_FormPostResponseMode(t *testing.T) {
 		AuthorizationCodeEnabled: true,
 	}
 
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -612,7 +613,7 @@ func TestAuthorize_ValidateRequest_FormPostResponseMode(t *testing.T) {
 		URI:      fake.URL(),
 	}
 
-	err = database.CreateRedirectURI(nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -658,7 +659,7 @@ func TestAuthorize_ValidateScopes_ScopeIsMissing(t *testing.T) {
 		AuthorizationCodeEnabled: true,
 	}
 
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -668,7 +669,7 @@ func TestAuthorize_ValidateScopes_ScopeIsMissing(t *testing.T) {
 		URI:      fake.URL(),
 	}
 
-	err = database.CreateRedirectURI(nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -707,7 +708,7 @@ func TestAuthorize_ValidateScopes_UserInfoShouldNotBeIncluded(t *testing.T) {
 		AuthorizationCodeEnabled: true,
 	}
 
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -717,7 +718,7 @@ func TestAuthorize_ValidateScopes_UserInfoShouldNotBeIncluded(t *testing.T) {
 		URI:      fake.URL(),
 	}
 
-	err = database.CreateRedirectURI(nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -764,7 +765,7 @@ func TestAuthorize_ValidateScopes_InvalidScope(t *testing.T) {
 		AuthorizationCodeEnabled: true,
 	}
 
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -774,7 +775,7 @@ func TestAuthorize_ValidateScopes_InvalidScope(t *testing.T) {
 		URI:      fake.URL(),
 	}
 
-	err = database.CreateRedirectURI(nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -833,7 +834,7 @@ func TestAuthorize_ValidateScopes_ResourceDoesNotExist(t *testing.T) {
 		AuthorizationCodeEnabled: true,
 	}
 
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -843,7 +844,7 @@ func TestAuthorize_ValidateScopes_ResourceDoesNotExist(t *testing.T) {
 		URI:      fake.URL(),
 	}
 
-	err = database.CreateRedirectURI(nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -887,7 +888,7 @@ func TestAuthorize_ValidateScopes_ResourceDoesNotHavePermissionAssociated(t *tes
 		AuthorizationCodeEnabled: true,
 	}
 
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -897,7 +898,7 @@ func TestAuthorize_ValidateScopes_ResourceDoesNotHavePermissionAssociated(t *tes
 		URI:      fake.URL(),
 	}
 
-	err = database.CreateRedirectURI(nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -907,7 +908,7 @@ func TestAuthorize_ValidateScopes_ResourceDoesNotHavePermissionAssociated(t *tes
 		Description:        "Test Resource",
 	}
 
-	err = database.CreateResource(nil, resource)
+	err = database.CreateResource(context.Background(), nil, resource)
 	if err != nil {
 		t.Fatal(err)
 	}

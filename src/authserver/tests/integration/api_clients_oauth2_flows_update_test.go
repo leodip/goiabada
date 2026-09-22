@@ -33,9 +33,9 @@ func TestAPIClientOAuth2FlowsPut_Success_PublicClient_ForcesNoClientCredentials(
 		AuthorizationCodeEnabled: false,
 		ClientCredentialsEnabled: false,
 	}
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
-	defer func() { _ = database.DeleteClient(nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
 	// Try to enable both flows; client is public so client credentials must be forced to false
 	reqBody := api.UpdateClientOAuth2FlowsRequest{AuthorizationCodeEnabled: true, ClientCredentialsEnabled: true}
@@ -77,9 +77,9 @@ func TestAPIClientOAuth2FlowsPut_Success_ConfidentialClient_ToggleBoth(t *testin
 		AuthorizationCodeEnabled: true,
 		ClientCredentialsEnabled: false,
 	}
-	err = database.CreateClient(nil, client)
+	err = database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
-	defer func() { _ = database.DeleteClient(nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
 	// Disable auth code, enable client credentials
 	reqBody := api.UpdateClientOAuth2FlowsRequest{AuthorizationCodeEnabled: false, ClientCredentialsEnabled: true}
@@ -175,9 +175,9 @@ func TestAPIClientOAuth2FlowsPut_InvalidRequestBodyAndUnauthorized(t *testing.T)
 		AuthorizationCodeEnabled: false,
 		ClientCredentialsEnabled: false,
 	}
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
-	defer func() { _ = database.DeleteClient(nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/oauth2-flows"
 
@@ -220,14 +220,14 @@ func TestAPIClientOAuth2FlowsPut_InsufficientScope(t *testing.T) {
 		IsPublic:                 false,
 		ClientSecretEncrypted:    enc,
 	}
-	err = database.CreateClient(nil, client)
+	err = database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
-	defer func() { _ = database.DeleteClient(nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
 	// Grant auth-server:userinfo permission
-	authRes, err := database.GetResourceByResourceIdentifier(nil, constants.AuthServerResourceIdentifier)
+	authRes, err := database.GetResourceByResourceIdentifier(context.Background(), nil, constants.AuthServerResourceIdentifier)
 	assert.NoError(t, err)
-	perms, err := database.GetPermissionsByResourceId(nil, authRes.Id)
+	perms, err := database.GetPermissionsByResourceId(context.Background(), nil, authRes.Id)
 	assert.NoError(t, err)
 	var userinfoPerm *models.Permission
 	for i := range perms {
@@ -237,7 +237,7 @@ func TestAPIClientOAuth2FlowsPut_InsufficientScope(t *testing.T) {
 		}
 	}
 	assert.NotNil(t, userinfoPerm)
-	err = database.CreateClientPermission(nil, &models.ClientPermission{ClientId: client.Id, PermissionId: userinfoPerm.Id})
+	err = database.CreateClientPermission(context.Background(), nil, &models.ClientPermission{ClientId: client.Id, PermissionId: userinfoPerm.Id})
 	assert.NoError(t, err)
 
 	// Get token with only authserver:userinfo scope
@@ -262,9 +262,9 @@ func TestAPIClientOAuth2FlowsPut_InsufficientScope(t *testing.T) {
 		AuthorizationCodeEnabled: false,
 		ClientCredentialsEnabled: false,
 	}
-	err = database.CreateClient(nil, target)
+	err = database.CreateClient(context.Background(), nil, target)
 	assert.NoError(t, err)
-	defer func() { _ = database.DeleteClient(nil, target.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, target.Id) }()
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(target.Id, 10) + "/oauth2-flows"
 	reqBody := api.UpdateClientOAuth2FlowsRequest{AuthorizationCodeEnabled: true}
@@ -289,9 +289,9 @@ func TestAPIClientOAuth2FlowsPut_BothDisabledAllowed(t *testing.T) {
 		AuthorizationCodeEnabled: true,
 		ClientCredentialsEnabled: true,
 	}
-	err = database.CreateClient(nil, client)
+	err = database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
-	defer func() { _ = database.DeleteClient(nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
 	// Disable both flows
 	reqBody := api.UpdateClientOAuth2FlowsRequest{AuthorizationCodeEnabled: false, ClientCredentialsEnabled: false}
@@ -326,9 +326,9 @@ func TestAPIClientOAuth2FlowsPut_ImplicitGrantEnabled_UseGlobalSetting(t *testin
 		AuthorizationCodeEnabled: true,
 		ImplicitGrantEnabled:     nil, // Initially use global
 	}
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
-	defer func() { _ = database.DeleteClient(nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
 	// Update with nil (use global setting)
 	reqBody := api.UpdateClientOAuth2FlowsRequest{
@@ -361,9 +361,9 @@ func TestAPIClientOAuth2FlowsPut_ImplicitGrantEnabled_ExplicitEnable(t *testing.
 		AuthorizationCodeEnabled: true,
 		ImplicitGrantEnabled:     nil,
 	}
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
-	defer func() { _ = database.DeleteClient(nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
 	// Explicitly enable implicit flow
 	implicitEnabled := true
@@ -400,9 +400,9 @@ func TestAPIClientOAuth2FlowsPut_ImplicitGrantEnabled_ExplicitDisable(t *testing
 		AuthorizationCodeEnabled: true,
 		ImplicitGrantEnabled:     &implicitEnabled,
 	}
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
-	defer func() { _ = database.DeleteClient(nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
 	// Explicitly disable implicit flow
 	implicitDisabled := false
@@ -442,9 +442,9 @@ func TestAPIClientOAuth2FlowsPut_PKCERequired_TriState(t *testing.T) {
 		AuthorizationCodeEnabled: true,
 		PKCERequired:             nil, // Initially use global
 	}
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
-	defer func() { _ = database.DeleteClient(nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
 	apiURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/oauth2-flows"
 
@@ -516,9 +516,9 @@ func TestAPIClientOAuth2FlowsPut_PKCERequired_PublicClientIsAlwaysRequired(t *te
 		// this by leaving the column alone.
 		PKCERequired: &pkceOptional,
 	}
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
-	defer func() { _ = database.DeleteClient(nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
 	apiURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/oauth2-flows"
 
@@ -565,9 +565,9 @@ func TestAPIClientOAuth2FlowsPut_ImplicitOnly_NoAuthCode(t *testing.T) {
 		AuthorizationCodeEnabled: false,
 		ImplicitGrantEnabled:     &implicitEnabled,
 	}
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
-	defer func() { _ = database.DeleteClient(nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
 	// Update to keep implicit enabled, auth code disabled
 	reqBody := api.UpdateClientOAuth2FlowsRequest{
@@ -605,9 +605,9 @@ func TestAPIClientOAuth2FlowsPut_ROPCEnabled_UseGlobalSetting(t *testing.T) {
 		AuthorizationCodeEnabled:                true,
 		ResourceOwnerPasswordCredentialsEnabled: nil, // Initially use global
 	}
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
-	defer func() { _ = database.DeleteClient(nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
 	// Update with nil (use global setting)
 	reqBody := api.UpdateClientOAuth2FlowsRequest{
@@ -640,9 +640,9 @@ func TestAPIClientOAuth2FlowsPut_ROPCEnabled_ExplicitEnable(t *testing.T) {
 		AuthorizationCodeEnabled:                true,
 		ResourceOwnerPasswordCredentialsEnabled: nil,
 	}
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
-	defer func() { _ = database.DeleteClient(nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
 	// Explicitly enable ROPC flow
 	ropcEnabled := true
@@ -679,9 +679,9 @@ func TestAPIClientOAuth2FlowsPut_ROPCEnabled_ExplicitDisable(t *testing.T) {
 		AuthorizationCodeEnabled:                true,
 		ResourceOwnerPasswordCredentialsEnabled: &ropcEnabled,
 	}
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
-	defer func() { _ = database.DeleteClient(nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
 	// Explicitly disable ROPC flow
 	ropcDisabled := false
@@ -716,9 +716,9 @@ func TestAPIClientOAuth2FlowsPut_ROPCEnabled_TriState(t *testing.T) {
 		AuthorizationCodeEnabled:                true,
 		ResourceOwnerPasswordCredentialsEnabled: nil, // Initially use global
 	}
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
-	defer func() { _ = database.DeleteClient(nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
 	apiURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/oauth2-flows"
 
@@ -779,9 +779,9 @@ func TestAPIClientOAuth2FlowsPut_ROPCOnly_NoOtherFlows(t *testing.T) {
 		ClientCredentialsEnabled:                false,
 		ResourceOwnerPasswordCredentialsEnabled: &ropcEnabled,
 	}
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
-	defer func() { _ = database.DeleteClient(nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
 	// Update to keep ROPC enabled, other flows disabled
 	reqBody := api.UpdateClientOAuth2FlowsRequest{

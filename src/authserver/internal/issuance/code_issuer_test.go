@@ -49,7 +49,7 @@ func TestCreateAuthCode(t *testing.T) {
 		ClientIdentifier: "test-client",
 	}
 
-	mockDB.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(testClient, nil)
+	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(testClient, nil)
 	mockDB.On("CreateCode", mock.Anything, mock.Anything, mock.AnythingOfType("*models.Code")).Return(nil)
 
 	input := &CreateCodeInput{
@@ -136,7 +136,7 @@ func TestCreateAuthCode_BoundsTheUserAgent(t *testing.T) {
 			mockDB := mocks_data.NewDatabase(t)
 			codeIssuer := NewCodeIssuer(mockDB)
 
-			mockDB.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(
+			mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
 				&models.Client{Id: 1, ClientIdentifier: "test-client"}, nil)
 
 			var persisted string
@@ -179,7 +179,7 @@ func TestCreateAuthCode_DefaultResponseMode(t *testing.T) {
 		ClientIdentifier: "test-client",
 	}
 
-	mockDB.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(testClient, nil)
+	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(testClient, nil)
 	mockDB.On("CreateCode", mock.Anything, mock.Anything, mock.AnythingOfType("*models.Code")).Return(nil)
 
 	input := &CreateCodeInput{
@@ -209,7 +209,7 @@ func TestCreateAuthCode_ScopeHandling(t *testing.T) {
 		ClientIdentifier: "test-client",
 	}
 
-	mockDB.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(testClient, nil)
+	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(testClient, nil)
 	mockDB.On("CreateCode", mock.Anything, mock.Anything, mock.AnythingOfType("*models.Code")).Return(nil)
 
 	testCases := []struct {
@@ -270,7 +270,7 @@ func TestCreateAuthCode_DatabaseError(t *testing.T) {
 		ClientIdentifier: "test-client",
 	}
 
-	mockDB.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(testClient, nil)
+	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(testClient, nil)
 	mockDB.On("CreateCode", mock.Anything, mock.Anything, mock.AnythingOfType("*models.Code")).Return(errors.New("database error"))
 
 	input := &CreateCodeInput{
@@ -308,7 +308,7 @@ func TestCreateAuthCode_RefusesAMissingClient(t *testing.T) {
 
 	// nil, nil is the shape GetClientByClientIdentifier reports for a client that is not there:
 	// an absence rather than a failure.
-	mockDB.On("GetClientByClientIdentifier", mock.Anything, "deleted-client").
+	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "deleted-client").
 		Return((*models.Client)(nil), nil)
 
 	code, err := codeIssuer.CreateAuthCode(context.Background(), nil, &CreateCodeInput{

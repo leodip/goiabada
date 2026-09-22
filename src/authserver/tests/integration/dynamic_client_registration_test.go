@@ -2,6 +2,7 @@ package integrationtests
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -87,7 +88,7 @@ func TestDCR_PublicClient_MCP_UseCase_Success(t *testing.T) {
 	assert.Equal(t, "MCP Remote Client", response.ClientName)
 
 	// Verify database state
-	client, err := database.GetClientByClientIdentifier(nil, response.ClientID)
+	client, err := database.GetClientByClientIdentifier(context.Background(), nil, response.ClientID)
 	assert.NoError(t, err)
 	assert.NotNil(t, client)
 	assert.Equal(t, "MCP Remote Client", client.Description)
@@ -100,7 +101,7 @@ func TestDCR_PublicClient_MCP_UseCase_Success(t *testing.T) {
 	assert.Nil(t, client.ClientSecretEncrypted)
 
 	// Verify redirect URIs saved
-	redirectURIs, err := database.GetRedirectURIsByClientId(nil, client.Id)
+	redirectURIs, err := database.GetRedirectURIsByClientId(context.Background(), nil, client.Id)
 	assert.NoError(t, err)
 	assert.Len(t, redirectURIs, 1)
 	assert.Equal(t, "http://localhost:8080/callback", redirectURIs[0].URI)
@@ -133,7 +134,7 @@ func TestDCR_ConfidentialClient_Success(t *testing.T) {
 	assert.Equal(t, "client_secret_post", response.TokenEndpointAuthMethod)
 
 	// Verify database state
-	client, err := database.GetClientByClientIdentifier(nil, response.ClientID)
+	client, err := database.GetClientByClientIdentifier(context.Background(), nil, response.ClientID)
 	assert.NoError(t, err)
 	assert.False(t, client.IsPublic)
 	assert.True(t, client.AuthorizationCodeEnabled)
@@ -172,7 +173,7 @@ func TestDCR_DefaultValues_Applied(t *testing.T) {
 	assert.NotEmpty(t, response.ClientSecret, "Confidential client receives secret")
 
 	// Verify database
-	client, err := database.GetClientByClientIdentifier(nil, response.ClientID)
+	client, err := database.GetClientByClientIdentifier(context.Background(), nil, response.ClientID)
 	assert.NoError(t, err)
 	assert.False(t, client.IsPublic)
 	assert.True(t, client.AuthorizationCodeEnabled)
@@ -612,10 +613,10 @@ func TestDCR_MultipleRedirectURIs(t *testing.T) {
 	assert.Len(t, response.RedirectURIs, 3)
 
 	// Verify all URIs saved in database
-	client, err := database.GetClientByClientIdentifier(nil, response.ClientID)
+	client, err := database.GetClientByClientIdentifier(context.Background(), nil, response.ClientID)
 	assert.NoError(t, err)
 
-	redirectURIs, err := database.GetRedirectURIsByClientId(nil, client.Id)
+	redirectURIs, err := database.GetRedirectURIsByClientId(context.Background(), nil, client.Id)
 	assert.NoError(t, err)
 	assert.Len(t, redirectURIs, 3)
 
@@ -648,7 +649,7 @@ func TestDCR_ConfidentialClient_DefaultAcrLevel(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Verify database defaults
-	client, err := database.GetClientByClientIdentifier(nil, response.ClientID)
+	client, err := database.GetClientByClientIdentifier(context.Background(), nil, response.ClientID)
 	assert.NoError(t, err)
 
 	assert.Equal(t, models.AcrLevel2Optional, client.DefaultAcrLevel, "Should default to level 2 optional")
@@ -701,7 +702,7 @@ func registerDCRClient(t *testing.T, clientName string, redirectURI string) *mod
 	var response oidc.DynamicClientRegistrationResponse
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&response))
 
-	client, err := database.GetClientByClientIdentifier(nil, response.ClientID)
+	client, err := database.GetClientByClientIdentifier(context.Background(), nil, response.ClientID)
 	require.NoError(t, err)
 	require.NotNil(t, client)
 
@@ -760,10 +761,10 @@ func TestDCR_PublicClient_PKCERequiredIsWrittenExplicitly(t *testing.T) {
 		var registered oidc.DynamicClientRegistrationResponse
 		require.NoError(t, json.NewDecoder(resp.Body).Decode(&registered))
 
-		client, err := database.GetClientByClientIdentifier(nil, registered.ClientID)
+		client, err := database.GetClientByClientIdentifier(context.Background(), nil, registered.ClientID)
 		require.NoError(t, err)
 		require.NotNil(t, client)
-		t.Cleanup(func() { _ = database.DeleteClient(nil, client.Id) })
+		t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
 
 		detailURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" +
 			strconv.FormatInt(client.Id, 10)

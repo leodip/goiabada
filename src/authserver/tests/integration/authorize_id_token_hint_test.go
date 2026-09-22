@@ -70,14 +70,14 @@ func TestIdTokenHint_PromptLogin_MismatchedUser_BlocksAtIssuance(t *testing.T) {
 		DefaultAcrLevel:          models.AcrLevel1,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
-	err = database.CreateClient(nil, client)
+	err = database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
 
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
 		URI:      "https://example.com/callback",
 	}
-	err = database.CreateRedirectURI(nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	assert.NoError(t, err)
 
 	// =========================================================================
@@ -279,14 +279,14 @@ func TestIdTokenHint_PromptLogin_MatchingUser_Success(t *testing.T) {
 		DefaultAcrLevel:          models.AcrLevel1,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
-	err = database.CreateClient(nil, client)
+	err = database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
 
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
 		URI:      "https://example.com/callback",
 	}
-	err = database.CreateRedirectURI(nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	assert.NoError(t, err)
 
 	// =========================================================================
@@ -480,14 +480,14 @@ func TestIdTokenHint_NoPrompt_MismatchedUser_BlocksAtIssuance(t *testing.T) {
 		DefaultAcrLevel:          models.AcrLevel1,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
-	err = database.CreateClient(nil, client)
+	err = database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
 
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
 		URI:      "https://example.com/callback",
 	}
-	err = database.CreateRedirectURI(nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	assert.NoError(t, err)
 
 	// Get ID token for User A (complete flow and token exchange)

@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -40,14 +41,14 @@ func TestAPIResourcesCreate_Success(t *testing.T) {
 	assert.Equal(t, "Created via API", createResp.Resource.Description, "Description should be trimmed/sanitized")
 
 	// Verify persistence
-	stored, err := database.GetResourceByResourceIdentifier(nil, identifier)
+	stored, err := database.GetResourceByResourceIdentifier(context.Background(), nil, identifier)
 	assert.NoError(t, err)
 	assert.NotNil(t, stored)
 	assert.Equal(t, identifier, stored.ResourceIdentifier)
 	assert.Equal(t, "Created via API", stored.Description)
 
 	// Cleanup
-	_ = database.DeleteResource(nil, stored.Id)
+	_ = database.DeleteResource(context.Background(), nil, stored.Id)
 }
 
 func TestAPIResourcesCreate_ValidationErrors(t *testing.T) {
@@ -103,7 +104,7 @@ func TestAPIResourcesCreate_DuplicateIdentifier(t *testing.T) {
 	// Pre-create a resource
 	identifier := "api-test-dup-resource-" + fake.LetterN(8)
 	existing := createTestResource(t, identifier, "Existing")
-	defer func() { _ = database.DeleteResource(nil, existing.Id) }()
+	defer func() { _ = database.DeleteResource(context.Background(), nil, existing.Id) }()
 
 	// Attempt to create with the same identifier
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources"
@@ -183,7 +184,7 @@ func TestAPIResourcesCreate_AngleBracketsRejected(t *testing.T) {
 	_ = json.NewDecoder(resp.Body).Decode(&errResp)
 	assert.Equal(t, "validator.description.angle_brackets", errResp.ErrorCode)
 
-	stored, err := database.GetResourceByResourceIdentifier(nil, identifier)
+	stored, err := database.GetResourceByResourceIdentifier(context.Background(), nil, identifier)
 	assert.NoError(t, err)
 	assert.Nil(t, stored)
 }
@@ -209,9 +210,9 @@ func TestAPIResourcesCreate_AmpersandsAndQuotesStoredVerbatim(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, `AT&T "Wireless"`, createResp.Resource.Description)
 
-	stored, err := database.GetResourceByResourceIdentifier(nil, identifier)
+	stored, err := database.GetResourceByResourceIdentifier(context.Background(), nil, identifier)
 	assert.NoError(t, err)
 	assert.NotNil(t, stored)
 	assert.Equal(t, `AT&T "Wireless"`, stored.Description)
-	_ = database.DeleteResource(nil, stored.Id)
+	_ = database.DeleteResource(context.Background(), nil, stored.Id)
 }

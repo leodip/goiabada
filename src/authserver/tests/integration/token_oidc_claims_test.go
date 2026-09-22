@@ -191,11 +191,11 @@ func TestToken_IdToken_OIDCClaims_ClientOverride_On(t *testing.T) {
 	// Set client-level override to "on"
 	originalClientSetting := code.Client.IncludeOpenIDConnectClaimsInIdToken
 	code.Client.IncludeOpenIDConnectClaimsInIdToken = "on"
-	err = database.UpdateClient(nil, &code.Client)
+	err = database.UpdateClient(context.Background(), nil, &code.Client)
 	assert.NoError(t, err)
 	defer func() {
 		code.Client.IncludeOpenIDConnectClaimsInIdToken = originalClientSetting
-		_ = database.UpdateClient(nil, &code.Client)
+		_ = database.UpdateClient(context.Background(), nil, &code.Client)
 	}()
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
@@ -248,11 +248,11 @@ func TestToken_IdToken_OIDCClaims_ClientOverride_Off(t *testing.T) {
 	// Set client-level override to "off"
 	originalClientSetting := code.Client.IncludeOpenIDConnectClaimsInIdToken
 	code.Client.IncludeOpenIDConnectClaimsInIdToken = "off"
-	err = database.UpdateClient(nil, &code.Client)
+	err = database.UpdateClient(context.Background(), nil, &code.Client)
 	assert.NoError(t, err)
 	defer func() {
 		code.Client.IncludeOpenIDConnectClaimsInIdToken = originalClientSetting
-		_ = database.UpdateClient(nil, &code.Client)
+		_ = database.UpdateClient(context.Background(), nil, &code.Client)
 	}()
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
@@ -298,7 +298,7 @@ func createAuthCodeWithUserProfile(t *testing.T, clientSecret string, scope stri
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
 
-	err = database.CreateClient(nil, client)
+	err = database.CreateClient(context.Background(), nil, client)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -308,7 +308,7 @@ func createAuthCodeWithUserProfile(t *testing.T, clientSecret string, scope stri
 		URI:      fake.URL(),
 	}
 
-	err = database.CreateRedirectURI(nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	if err != nil {
 		t.Fatal(err)
 	}

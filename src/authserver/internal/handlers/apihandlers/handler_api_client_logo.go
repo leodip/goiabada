@@ -85,7 +85,7 @@ func HandleAPIClientLogoPost(
 		}
 
 		// Check if client already has a logo
-		existingLogo, err := database.GetClientLogoByClientId(nil, clientId)
+		existingLogo, err := database.GetClientLogoByClientId(r.Context(), nil, clientId)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -95,7 +95,7 @@ func HandleAPIClientLogoPost(
 			// Update existing logo
 			existingLogo.Logo = fileData
 			existingLogo.ContentType = result.ContentType
-			err = database.UpdateClientLogo(nil, existingLogo)
+			err = database.UpdateClientLogo(r.Context(), nil, existingLogo)
 		} else {
 			// Create new logo
 			clientLogo := &models.ClientLogo{
@@ -103,7 +103,7 @@ func HandleAPIClientLogoPost(
 				Logo:        fileData,
 				ContentType: result.ContentType,
 			}
-			err = database.CreateClientLogo(nil, clientLogo)
+			err = database.CreateClientLogo(r.Context(), nil, clientLogo)
 		}
 
 		if err != nil {
@@ -166,7 +166,7 @@ func HandleAPIClientLogoDelete(
 		}
 
 		// Delete the logo
-		err = database.DeleteClientLogo(nil, clientId)
+		err = database.DeleteClientLogo(r.Context(), nil, clientId)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -225,7 +225,7 @@ func HandleAPIClientLogoGet(
 		}
 
 		// Check if client has a logo
-		hasLogo, err := database.ClientHasLogo(nil, clientId)
+		hasLogo, err := database.ClientHasLogo(r.Context(), nil, clientId)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return

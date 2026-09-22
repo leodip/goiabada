@@ -74,7 +74,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			DefaultAcrLevel:          models.AcrLevel1,
 			AuthorizationCodeEnabled: true,
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
 		userSessionManager.On("BumpUserSession", req, sessionIdentifier, int64(1),
@@ -226,7 +226,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			DefaultAcrLevel:          models.AcrLevel1,
 			AuthorizationCodeEnabled: true,
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		// True, so ownership is the only thing keeping this ceremony off the reuse arm. No
 		// BumpUserSession expectation is registered anywhere in this subtest, and the mock is
@@ -407,7 +407,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			DefaultAcrLevel:          models.AcrLevel1,
 			AuthorizationCodeEnabled: true,
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		// Both false this time, which is the whole point of the row.
 		userSessionManager.On("HasValidUserSession", mock.Anything, foreignSession, mock.AnythingOfType("*int")).Return(false)
@@ -511,7 +511,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			DefaultAcrLevel:          models.AcrLevel1,
 			AuthorizationCodeEnabled: true,
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		userSessionManager.On("HasValidUserSession", mock.Anything, ownSession, mock.AnythingOfType("*int")).Return(false)
 
@@ -619,7 +619,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			DefaultAcrLevel:          models.AcrLevel1,
 			AuthorizationCodeEnabled: true,
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		userSessionManager.On("HasValidUserSession", mock.Anything, foreignSession, mock.AnythingOfType("*int")).Return(true)
 
@@ -728,7 +728,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			DefaultAcrLevel:          models.AcrLevel1,
 			AuthorizationCodeEnabled: true,
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		userSessionManager.On("HasValidUserSession", mock.Anything, foreignSession, mock.AnythingOfType("*int")).Return(true)
 
@@ -840,7 +840,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			DefaultAcrLevel:          models.AcrLevel1,
 			AuthorizationCodeEnabled: true,
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
 		userSessionManager.On("BumpUserSession", req, sessionIdentifier, int64(1),
@@ -940,7 +940,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			DefaultAcrLevel:          models.AcrLevel1,
 			AuthorizationCodeEnabled: true,
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
 		userSessionManager.On("BumpUserSession", req, sessionIdentifier, int64(1),
@@ -1033,7 +1033,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			DefaultAcrLevel:          models.AcrLevel1,
 			AuthorizationCodeEnabled: true,
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		// Expect HasValidUserSession to return false for a new session
 		userSessionManager.On("HasValidUserSession", mock.Anything, (*models.UserSession)(nil), mock.AnythingOfType("*int")).Return(false)
@@ -1137,7 +1137,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			DefaultAcrLevel:          models.AcrLevel2Optional,
 			AuthorizationCodeEnabled: true,
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		// This ceremony's methods are "pwd otp" against a session holding none, so the bump
 		// would raise the session's privilege and the browser session's identifier is
@@ -1233,7 +1233,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			DefaultAcrLevel:          models.AcrLevel1,
 			AuthorizationCodeEnabled: true,
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		// This ceremony's methods are "pwd otp" against a session holding none, so the bump
 		// would raise the session's privilege and the browser session's identifier is
@@ -1323,7 +1323,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			DefaultAcrLevel:          models.AcrLevel2Optional,
 			AuthorizationCodeEnabled: true,
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		// This ceremony's methods are "pwd otp" against a session holding none, so the bump
 		// would raise the session's privilege and the browser session's identifier is
@@ -1408,7 +1408,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			DefaultAcrLevel:          models.AcrLevel2Optional,
 			AuthorizationCodeEnabled: true,
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		userSessionManager.On("HasValidUserSession", mock.Anything, (*models.UserSession)(nil), mock.AnythingOfType("*int")).Return(false)
 
@@ -1531,7 +1531,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(nil, nil)
 		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, (*models.UserSession)(nil)).Return(nil)
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(nil, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(nil, nil)
 
 		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return strings.Contains(err.Error(), "client test-client not found")
@@ -1593,7 +1593,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			DefaultAcrLevel:          models.AcrLevel1,
 			AuthorizationCodeEnabled: true,
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
 		userSessionManager.On("BumpUserSession", req, sessionIdentifier, int64(1),
@@ -1691,7 +1691,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			DefaultAcrLevel:          models.AcrLevel1,
 			AuthorizationCodeEnabled: true,
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
 		userSessionManager.On("BumpUserSession", req, sessionIdentifier, int64(1),
@@ -1785,7 +1785,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			DefaultAcrLevel:          models.AcrLevel1,
 			AuthorizationCodeEnabled: true,
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
 		userSessionManager.On("BumpUserSession", req, sessionIdentifier, int64(1),
@@ -1875,7 +1875,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			DefaultAcrLevel:          models.AcrLevel1,
 			AuthorizationCodeEnabled: true,
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
 		userSessionManager.On("BumpUserSession", req, sessionIdentifier, int64(1),
@@ -1961,7 +1961,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			DefaultAcrLevel:          models.AcrLevel1,
 			AuthorizationCodeEnabled: true,
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
 		userSessionManager.On("BumpUserSession", req, sessionIdentifier, int64(1),
@@ -2057,7 +2057,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			DefaultAcrLevel:          models.AcrLevel1,
 			AuthorizationCodeEnabled: true,
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
 		userSessionManager.On("BumpUserSession", req, sessionIdentifier, int64(1),
@@ -2144,7 +2144,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			DefaultAcrLevel:          models.AcrLevel1,
 			AuthorizationCodeEnabled: true,
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
 		userSessionManager.On("BumpUserSession", req, sessionIdentifier, int64(1),
@@ -2229,7 +2229,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			DefaultAcrLevel:          models.AcrLevel1,
 			AuthorizationCodeEnabled: true,
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
 		userSessionManager.On("BumpUserSession", req, sessionIdentifier, int64(1),
@@ -2315,7 +2315,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			DefaultAcrLevel:          models.AcrLevel1,
 			AuthorizationCodeEnabled: true,
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		userSessionManager.On("HasValidUserSession", mock.Anything, (*models.UserSession)(nil), mock.AnythingOfType("*int")).Return(false)
 
@@ -2403,7 +2403,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			DefaultAcrLevel:          models.AcrLevel1,
 			AuthorizationCodeEnabled: true,
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		userSessionManager.On("HasValidUserSession", mock.Anything, (*models.UserSession)(nil), mock.AnythingOfType("*int")).Return(false)
 
@@ -2504,7 +2504,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			DefaultAcrLevel:          models.AcrLevel1,
 			AuthorizationCodeEnabled: true,
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		userSessionManager.On("HasValidUserSession", mock.Anything, (*models.UserSession)(nil), mock.AnythingOfType("*int")).Return(false)
 
@@ -2573,7 +2573,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 			DefaultAcrLevel:          models.AcrLevel1,
 			AuthorizationCodeEnabled: true,
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		userSessionManager.On("HasValidUserSession", mock.Anything, (*models.UserSession)(nil), mock.AnythingOfType("*int")).Return(false)
 

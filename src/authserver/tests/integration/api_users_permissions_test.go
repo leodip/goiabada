@@ -37,14 +37,14 @@ func TestAPIUserPermissionsGet_Success(t *testing.T) {
 	// Setup: Create test resource and permissions
 	resource := createTestResource(t, "test-resource", "Test Resource")
 	defer func() {
-		_ = database.DeleteResource(nil, resource.Id)
+		_ = database.DeleteResource(context.Background(), nil, resource.Id)
 	}()
 
 	perm1 := createTestPermission(t, resource.Id, "read", "Read permission")
 	perm2 := createTestPermission(t, resource.Id, "write", "Write permission")
 	defer func() {
-		_ = database.DeletePermission(nil, perm1.Id)
-		_ = database.DeletePermission(nil, perm2.Id)
+		_ = database.DeletePermission(context.Background(), nil, perm1.Id)
+		_ = database.DeletePermission(context.Background(), nil, perm2.Id)
 	}()
 
 	// Setup: Assign permissions to user
@@ -211,16 +211,16 @@ func TestAPIUserPermissionsPut_Success(t *testing.T) {
 	// Setup: Create test resource and permissions
 	resource := createTestResource(t, "put-test-resource", "PUT Test Resource")
 	defer func() {
-		_ = database.DeleteResource(nil, resource.Id)
+		_ = database.DeleteResource(context.Background(), nil, resource.Id)
 	}()
 
 	perm1 := createTestPermission(t, resource.Id, "read", "Read permission")
 	perm2 := createTestPermission(t, resource.Id, "write", "Write permission")
 	perm3 := createTestPermission(t, resource.Id, "delete", "Delete permission")
 	defer func() {
-		_ = database.DeletePermission(nil, perm1.Id)
-		_ = database.DeletePermission(nil, perm2.Id)
-		_ = database.DeletePermission(nil, perm3.Id)
+		_ = database.DeletePermission(context.Background(), nil, perm1.Id)
+		_ = database.DeletePermission(context.Background(), nil, perm2.Id)
+		_ = database.DeletePermission(context.Background(), nil, perm3.Id)
 	}()
 
 	// Setup: Initially assign one permission
@@ -286,12 +286,12 @@ func TestAPIUserPermissionsPut_RemoveAllPermissions(t *testing.T) {
 	// Setup: Create test resource and permission
 	resource := createTestResource(t, "remove-test-resource", "Remove Test Resource")
 	defer func() {
-		_ = database.DeleteResource(nil, resource.Id)
+		_ = database.DeleteResource(context.Background(), nil, resource.Id)
 	}()
 
 	perm := createTestPermission(t, resource.Id, "test-perm", "Test permission")
 	defer func() {
-		_ = database.DeletePermission(nil, perm.Id)
+		_ = database.DeletePermission(context.Background(), nil, perm.Id)
 	}()
 
 	// Setup: Assign permission to user

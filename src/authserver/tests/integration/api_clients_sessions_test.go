@@ -31,9 +31,9 @@ func TestAPIClientSessionsGet_Success(t *testing.T) {
 		AuthorizationCodeEnabled: true,
 		ClientCredentialsEnabled: false,
 	}
-	err := database.CreateClient(nil, testClient)
+	err := database.CreateClient(context.Background(), nil, testClient)
 	assert.NoError(t, err)
-	defer func() { _ = database.DeleteClient(nil, testClient.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, testClient.Id) }()
 
 	// Create a user
 	testUser := &models.User{
@@ -115,9 +115,9 @@ func TestAPIClientSessionsGet_EmptySessions(t *testing.T) {
 		AuthorizationCodeEnabled: true,
 		ClientCredentialsEnabled: false,
 	}
-	err := database.CreateClient(nil, testClient)
+	err := database.CreateClient(context.Background(), nil, testClient)
 	assert.NoError(t, err)
-	defer func() { _ = database.DeleteClient(nil, testClient.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, testClient.Id) }()
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(testClient.Id, 10) + "/sessions"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
@@ -192,9 +192,9 @@ func TestAPIClientSessionsGet_Unauthorized(t *testing.T) {
 		AuthorizationCodeEnabled: true,
 		ClientCredentialsEnabled: false,
 	}
-	err := database.CreateClient(nil, testClient)
+	err := database.CreateClient(context.Background(), nil, testClient)
 	assert.NoError(t, err)
-	defer func() { _ = database.DeleteClient(nil, testClient.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, testClient.Id) }()
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(testClient.Id, 10) + "/sessions"
 	req, err := http.NewRequest("GET", url, nil)
@@ -220,9 +220,9 @@ func TestAPIClientSessionsGet_OnlyValidSessions(t *testing.T) {
 		AuthorizationCodeEnabled: true,
 		ClientCredentialsEnabled: false,
 	}
-	err := database.CreateClient(nil, testClient)
+	err := database.CreateClient(context.Background(), nil, testClient)
 	assert.NoError(t, err)
-	defer func() { _ = database.DeleteClient(nil, testClient.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, testClient.Id) }()
 
 	// User
 	testUser := &models.User{
@@ -309,9 +309,9 @@ func TestAPIClientSessionsGet_PaginationDefaultAndCap(t *testing.T) {
 		AuthorizationCodeEnabled: true,
 		ClientCredentialsEnabled: false,
 	}
-	err := database.CreateClient(nil, testClient)
+	err := database.CreateClient(context.Background(), nil, testClient)
 	assert.NoError(t, err)
-	defer func() { _ = database.DeleteClient(nil, testClient.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, testClient.Id) }()
 
 	// User
 	testUser := &models.User{
@@ -399,9 +399,9 @@ func TestAPIClientSessionsGet_UsersAreNormalizedAndCarryOnlyTheOwnerFields(t *te
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 	}
-	err := database.CreateClient(nil, testClient)
+	err := database.CreateClient(context.Background(), nil, testClient)
 	require.NoError(t, err)
-	defer func() { _ = database.DeleteClient(nil, testClient.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, testClient.Id) }()
 
 	// Two sessions for the first person, one for the second.
 	first := &models.User{

@@ -27,7 +27,7 @@ func TestConsent_ClientDisplay_ShowDisplayName(t *testing.T) {
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
-	err := database.CreateRedirectURI(nil, redirectUri)
+	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	assert.NoError(t, err)
 
 	// Create user
@@ -76,7 +76,7 @@ func TestConsent_ClientDisplay_ShowLogo_WithLogo(t *testing.T) {
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
-	err := database.CreateRedirectURI(nil, redirectUri)
+	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	assert.NoError(t, err)
 
 	// Create user
@@ -125,7 +125,7 @@ func TestConsent_ClientDisplay_ShowDescription(t *testing.T) {
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
-	err := database.CreateRedirectURI(nil, redirectUri)
+	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	assert.NoError(t, err)
 
 	// Create user
@@ -177,7 +177,7 @@ func TestConsent_ClientDisplay_AllEnabled(t *testing.T) {
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
-	err := database.CreateRedirectURI(nil, redirectUri)
+	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	assert.NoError(t, err)
 
 	// Create user
@@ -230,7 +230,7 @@ func TestConsent_ClientDisplay_AllDisabled(t *testing.T) {
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
-	err := database.CreateRedirectURI(nil, redirectUri)
+	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	assert.NoError(t, err)
 
 	// Create user

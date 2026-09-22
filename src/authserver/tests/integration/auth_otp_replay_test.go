@@ -35,7 +35,7 @@ func createLevel2MandatoryClient(t *testing.T) (*models.Client, *models.Redirect
 		ConsentRequired:          false,
 		DefaultAcrLevel:          models.AcrLevel2Mandatory,
 	}
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -44,7 +44,7 @@ func createLevel2MandatoryClient(t *testing.T) (*models.Client, *models.Redirect
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
-	err = database.CreateRedirectURI(nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	if err != nil {
 		t.Fatal(err)
 	}

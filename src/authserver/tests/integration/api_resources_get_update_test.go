@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -19,7 +20,7 @@ func TestAPIResourceGet_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	res := createTestResource(t, "api-test-get-resource-"+fake.LetterN(6), "Get Resource")
-	defer func() { _ = database.DeleteResource(nil, res.Id) }()
+	defer func() { _ = database.DeleteResource(context.Background(), nil, res.Id) }()
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(res.Id, 10)
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
@@ -93,7 +94,7 @@ func TestAPIResourceUpdatePut_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	res := createTestResource(t, "api-test-update-resource-"+fake.LetterN(6), "Original")
-	defer func() { _ = database.DeleteResource(nil, res.Id) }()
+	defer func() { _ = database.DeleteResource(context.Background(), nil, res.Id) }()
 
 	updateReq := api.UpdateResourceRequest{
 		ResourceIdentifier: "updated-resource-" + fake.LetterN(6),
@@ -115,7 +116,7 @@ func TestAPIResourceUpdatePut_Success(t *testing.T) {
 	assert.Equal(t, "Updated desc", updResp.Resource.Description)
 
 	// Verify DB persisted
-	stored, err := database.GetResourceById(nil, res.Id)
+	stored, err := database.GetResourceById(context.Background(), nil, res.Id)
 	assert.NoError(t, err)
 	assert.NotNil(t, stored)
 	assert.Equal(t, updateReq.ResourceIdentifier, stored.ResourceIdentifier)
@@ -125,7 +126,7 @@ func TestAPIResourceUpdatePut_Success(t *testing.T) {
 func TestAPIResourceUpdatePut_ValidationErrors(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 	res := createTestResource(t, "api-test-update-val-"+fake.LetterN(6), "desc")
-	defer func() { _ = database.DeleteResource(nil, res.Id) }()
+	defer func() { _ = database.DeleteResource(context.Background(), nil, res.Id) }()
 
 	// Empty identifier
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(res.Id, 10)
@@ -158,7 +159,10 @@ func TestAPIResourceUpdatePut_DuplicateIdentifier(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 	res1 := createTestResource(t, "api-test-dup1-"+fake.LetterN(6), "desc")
 	res2 := createTestResource(t, "api-test-dup2-"+fake.LetterN(6), "desc")
-	defer func() { _ = database.DeleteResource(nil, res1.Id); _ = database.DeleteResource(nil, res2.Id) }()
+	defer func() {
+		_ = database.DeleteResource(context.Background(), nil, res1.Id)
+		_ = database.DeleteResource(context.Background(), nil, res2.Id)
+	}()
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(res2.Id, 10)
 	resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateResourceRequest{ResourceIdentifier: res1.ResourceIdentifier, Description: "x"})
@@ -173,7 +177,7 @@ func TestAPIResourceUpdatePut_SystemLevelResourceAllowed(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Find system-level resource (authserver)
-	sysRes, err := database.GetResourceByResourceIdentifier(nil, constants.AuthServerResourceIdentifier)
+	sysRes, err := database.GetResourceByResourceIdentifier(context.Background(), nil, constants.AuthServerResourceIdentifier)
 	assert.NoError(t, err)
 	assert.NotNil(t, sysRes)
 
@@ -198,7 +202,7 @@ func TestAPIResourceUpdatePut_SystemLevelResourceIdentifierChangeBlocked(t *test
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Find system-level resource (authserver)
-	sysRes, err := database.GetResourceByResourceIdentifier(nil, constants.AuthServerResourceIdentifier)
+	sysRes, err := database.GetResourceByResourceIdentifier(context.Background(), nil, constants.AuthServerResourceIdentifier)
 	assert.NoError(t, err)
 	assert.NotNil(t, sysRes)
 
@@ -252,7 +256,7 @@ func TestAPIResourceUpdatePut_InvalidIdAndBody(t *testing.T) {
 func TestAPIResourceUpdatePut_UnauthorizedAndScope(t *testing.T) {
 	// Prepare a test resource to reference
 	res := createTestResource(t, "api-test-update-unauth-"+fake.LetterN(6), "desc")
-	defer func() { _ = database.DeleteResource(nil, res.Id) }()
+	defer func() { _ = database.DeleteResource(context.Background(), nil, res.Id) }()
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(res.Id, 10)
 
@@ -283,7 +287,7 @@ func TestAPIResourceUpdatePut_AngleBracketsRejected(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	res := createTestResource(t, "api-test-update-angle-"+fake.LetterN(6), "Original")
-	defer func() { _ = database.DeleteResource(nil, res.Id) }()
+	defer func() { _ = database.DeleteResource(context.Background(), nil, res.Id) }()
 
 	updateReq := api.UpdateResourceRequest{
 		ResourceIdentifier: res.ResourceIdentifier,
@@ -300,7 +304,7 @@ func TestAPIResourceUpdatePut_AngleBracketsRejected(t *testing.T) {
 
 	// The old sanitizer rewrote a bare ">" to the literal "&gt;" and stored it; nothing is stored
 	// now.
-	stored, err := database.GetResourceById(nil, res.Id)
+	stored, err := database.GetResourceById(context.Background(), nil, res.Id)
 	assert.NoError(t, err)
 	assert.Equal(t, "Original", stored.Description)
 }
@@ -310,7 +314,7 @@ func TestAPIResourceUpdatePut_AmpersandsAndQuotesStoredVerbatim(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	res := createTestResource(t, "api-test-update-verbatim-"+fake.LetterN(6), "Original")
-	defer func() { _ = database.DeleteResource(nil, res.Id) }()
+	defer func() { _ = database.DeleteResource(context.Background(), nil, res.Id) }()
 
 	updateReq := api.UpdateResourceRequest{
 		ResourceIdentifier: res.ResourceIdentifier,
@@ -322,7 +326,7 @@ func TestAPIResourceUpdatePut_AmpersandsAndQuotesStoredVerbatim(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
-	stored, err := database.GetResourceById(nil, res.Id)
+	stored, err := database.GetResourceById(context.Background(), nil, res.Id)
 	assert.NoError(t, err)
 	assert.Equal(t, `Tom & Jerry said "hi"`, stored.Description)
 }

@@ -48,11 +48,11 @@ import (
 func armIssueGate(database *mocks_data.Database, userSessionManager *mocks_handlers.UserSessionManager,
 	permissionChecker *mocks_handlers.PermissionChecker, redirectURI string) {
 
-	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything).
+	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, mock.Anything).
 		Return(&models.Client{Id: 1, ClientIdentifier: "test-client"}, nil).Maybe()
-	database.On("ClientLoadRedirectURIs", mock.Anything, mock.Anything).
+	database.On("ClientLoadRedirectURIs", mock.Anything, mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
-			client := args.Get(1).(*models.Client)
+			client := args.Get(2).(*models.Client)
 			client.RedirectURIs = []models.RedirectURI{{URI: redirectURI}}
 		}).Return(nil).Maybe()
 	database.On("GetUserById", mock.Anything, mock.Anything, mock.Anything).
@@ -1327,7 +1327,7 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 
 		stubLiveSession(database, 123)
 
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
 			Return(&models.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true}, nil)
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(123)).
 			Return(&models.User{Id: 123, Subject: "11111111-1111-1111-1111-111111111111", Enabled: true}, nil)
@@ -1716,7 +1716,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 			ClientIdentifier: "test-client",
 			Enabled:          true,
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(mockClient, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(mockClient, nil)
 
 		// Mock user lookup
 		mockUser := &models.User{
@@ -1808,7 +1808,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 			ClientIdentifier: "test-client",
 			Enabled:          true,
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(mockClient, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(mockClient, nil)
 
 		mockUser := &models.User{
 			Id:      123,
@@ -1892,7 +1892,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 			ClientIdentifier: "test-client",
 			Enabled:          true,
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(mockClient, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(mockClient, nil)
 
 		mockUser := &models.User{
 			Id:      123,
@@ -1970,7 +1970,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		authHelper.On("GetAuthContext", req).Return(authContext, nil)
 
 		mockClient := &models.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(mockClient, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(mockClient, nil)
 
 		mockUser := &models.User{Id: 123, Subject: "11111111-1111-1111-1111-111111111111"}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(123)).Return(mockUser, nil)
@@ -2032,7 +2032,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		}
 		authHelper.On("GetAuthContext", req).Return(authContext, nil)
 
-		database.On("GetClientByClientIdentifier", mock.Anything, "unknown-client").Return(nil, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "unknown-client").Return(nil, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.AuditIssuanceRefusedRedirectURI, mock.MatchedBy(func(details map[string]interface{}) bool {
 			return details["clientId"] == "unknown-client" && details["userId"] == int64(123)
@@ -2088,7 +2088,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		authHelper.On("GetAuthContext", req).Return(authContext, nil)
 
 		mockClient := &models.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(mockClient, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(mockClient, nil)
 
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(999)).Return(nil, nil)
 
@@ -2133,7 +2133,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		authHelper.On("GetAuthContext", req).Return(authContext, nil)
 
 		mockClient := &models.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(mockClient, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(mockClient, nil)
 
 		mockUser := &models.User{Id: 123, Subject: "11111111-1111-1111-1111-111111111111"}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(123)).Return(mockUser, nil)
@@ -2417,7 +2417,7 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 		authHelper.On("GetAuthContext", req).Return(authContext, nil)
 
 		dbError := errs.New("database connection failed")
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(nil, dbError)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(nil, dbError)
 
 		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err == dbError
@@ -2460,7 +2460,7 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 		authHelper.On("GetAuthContext", req).Return(authContext, nil)
 
 		mockClient := &models.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(mockClient, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(mockClient, nil)
 
 		dbError := errs.New("user database error")
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(123)).Return(nil, dbError)
@@ -2506,7 +2506,7 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 		authHelper.On("GetAuthContext", req).Return(authContext, nil)
 
 		mockClient := &models.Client{Id: 1, ClientIdentifier: "test-client", Enabled: true}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(mockClient, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(mockClient, nil)
 
 		mockUser := &models.User{Id: 123, Subject: "11111111-1111-1111-1111-111111111111"}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(123)).Return(mockUser, nil)
@@ -3792,9 +3792,9 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		// rather than through armIssueGate so that the stub keeps supplying the client: testify
 		// answers with the first matching expectation, and a generic one registered here would
 		// shadow it and leave it unmet.
-		database.On("ClientLoadRedirectURIs", mock.Anything, mock.Anything).
+		database.On("ClientLoadRedirectURIs", mock.Anything, mock.Anything, mock.Anything).
 			Run(func(args mock.Arguments) {
-				client := args.Get(1).(*models.Client)
+				client := args.Get(2).(*models.Client)
 				client.RedirectURIs = []models.RedirectURI{{URI: "https://example.com/callback"}}
 			}).Return(nil)
 
@@ -3915,10 +3915,10 @@ func TestHandleIssueGet_RedirectURIRecheck(t *testing.T) {
 			authHelper.On("GetAuthContext", req).Return(authContext, nil)
 
 			issuingClient := &models.Client{Id: 1, ClientIdentifier: "test-client", DisplayName: "Test Client"}
-			database.On("GetClientByClientIdentifier", (*sql.Tx)(nil), "test-client").Return(issuingClient, nil)
-			database.On("ClientLoadRedirectURIs", (*sql.Tx)(nil), issuingClient).
+			database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "test-client").Return(issuingClient, nil)
+			database.On("ClientLoadRedirectURIs", mock.Anything, (*sql.Tx)(nil), issuingClient).
 				Run(func(args mock.Arguments) {
-					client := args.Get(1).(*models.Client)
+					client := args.Get(2).(*models.Client)
 					client.RedirectURIs = nil
 					for _, uri := range tc.registered {
 						client.RedirectURIs = append(client.RedirectURIs, models.RedirectURI{URI: uri})
@@ -4017,8 +4017,8 @@ func TestHandleIssueGet_RedirectURIRecheckOutranksTheIdTokenHintRefusal(t *testi
 	authHelper.On("GetAuthContext", req).Return(authContext, nil)
 
 	issuingClient := &models.Client{Id: 1, ClientIdentifier: "test-client"}
-	database.On("GetClientByClientIdentifier", (*sql.Tx)(nil), "test-client").Return(issuingClient, nil)
-	database.On("ClientLoadRedirectURIs", (*sql.Tx)(nil), issuingClient).Return(nil)
+	database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "test-client").Return(issuingClient, nil)
+	database.On("ClientLoadRedirectURIs", mock.Anything, (*sql.Tx)(nil), issuingClient).Return(nil)
 
 	auditLogger.On("Log", mock.Anything, audit.AuditIssuanceRefusedRedirectURI, mock.Anything).Return()
 	authHelper.On("ClearAuthContext", rr, req).Return(nil)
@@ -4095,10 +4095,10 @@ func TestHandleIssueGet_ExpiredAmbientSession(t *testing.T) {
 			authHelper.On("GetAuthContext", req).Return(authContext, nil)
 
 			issuingClient := &models.Client{Id: 1, ClientIdentifier: "test-client"}
-			database.On("GetClientByClientIdentifier", (*sql.Tx)(nil), "test-client").Return(issuingClient, nil)
-			database.On("ClientLoadRedirectURIs", (*sql.Tx)(nil), issuingClient).
+			database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "test-client").Return(issuingClient, nil)
+			database.On("ClientLoadRedirectURIs", mock.Anything, (*sql.Tx)(nil), issuingClient).
 				Run(func(args mock.Arguments) {
-					args.Get(1).(*models.Client).RedirectURIs = []models.RedirectURI{{URI: "https://example.com/callback"}}
+					args.Get(2).(*models.Client).RedirectURIs = []models.RedirectURI{{URI: "https://example.com/callback"}}
 				}).Return(nil)
 
 			// Present and OWNED, so #129's liveness test and #133's ownership test both pass it.
@@ -4245,10 +4245,10 @@ func TestHandleIssueGet_ScopeRefilter(t *testing.T) {
 			authHelper.On("GetAuthContext", req).Return(authContext, nil)
 
 			issuingClient := &models.Client{Id: 1, ClientIdentifier: "test-client"}
-			database.On("GetClientByClientIdentifier", (*sql.Tx)(nil), "test-client").Return(issuingClient, nil)
-			database.On("ClientLoadRedirectURIs", (*sql.Tx)(nil), issuingClient).
+			database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "test-client").Return(issuingClient, nil)
+			database.On("ClientLoadRedirectURIs", mock.Anything, (*sql.Tx)(nil), issuingClient).
 				Run(func(args mock.Arguments) {
-					args.Get(1).(*models.Client).RedirectURIs = []models.RedirectURI{{URI: "https://example.com/callback"}}
+					args.Get(2).(*models.Client).RedirectURIs = []models.RedirectURI{{URI: "https://example.com/callback"}}
 				}).Return(nil)
 
 			stubLiveSession(database, 123)
@@ -4336,7 +4336,7 @@ func TestHandleIssueGet_TheLiveChecksFailClosedOnAStorageError(t *testing.T) {
 		{
 			name: "the registration load fails",
 			arm: func(database *mocks_data.Database, _ *mocks_handlers.PermissionChecker, client *models.Client) {
-				database.On("ClientLoadRedirectURIs", (*sql.Tx)(nil), client).
+				database.On("ClientLoadRedirectURIs", mock.Anything, (*sql.Tx)(nil), client).
 					Return(errs.New("registration read sentinel"))
 			},
 			wantErr: "registration read sentinel",
@@ -4347,9 +4347,9 @@ func TestHandleIssueGet_TheLiveChecksFailClosedOnAStorageError(t *testing.T) {
 		{
 			name: "the permission filter fails",
 			arm: func(database *mocks_data.Database, permissionChecker *mocks_handlers.PermissionChecker, client *models.Client) {
-				database.On("ClientLoadRedirectURIs", (*sql.Tx)(nil), client).
+				database.On("ClientLoadRedirectURIs", mock.Anything, (*sql.Tx)(nil), client).
 					Run(func(args mock.Arguments) {
-						args.Get(1).(*models.Client).RedirectURIs =
+						args.Get(2).(*models.Client).RedirectURIs =
 							[]models.RedirectURI{{URI: "https://example.com/callback"}}
 					}).Return(nil)
 				database.On("GetUserSessionBySessionIdentifier", mock.Anything, (*sql.Tx)(nil), liveSessionIdentifier).
@@ -4395,7 +4395,7 @@ func TestHandleIssueGet_TheLiveChecksFailClosedOnAStorageError(t *testing.T) {
 			authHelper.On("GetAuthContext", req).Return(authContext, nil)
 
 			issuingClient := &models.Client{Id: 1, ClientIdentifier: "test-client", DisplayName: "Test Client"}
-			database.On("GetClientByClientIdentifier", (*sql.Tx)(nil), "test-client").Return(issuingClient, nil)
+			database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "test-client").Return(issuingClient, nil)
 
 			// Only reached on the second row, and only because its own arming got that far.
 			userSessionManager.On("HasValidUserSession", mock.Anything, mock.Anything, mock.Anything).
@@ -4470,10 +4470,10 @@ func TestHandleIssueGet_RedirectURIRefusalSurvivesItsOwnFailures(t *testing.T) {
 		authHelper.On("GetAuthContext", req).Return(authContext, nil)
 
 		issuingClient := &models.Client{Id: 1, ClientIdentifier: "test-client", DisplayName: "Test Client"}
-		database.On("GetClientByClientIdentifier", (*sql.Tx)(nil), "test-client").Return(issuingClient, nil)
-		database.On("ClientLoadRedirectURIs", (*sql.Tx)(nil), issuingClient).
+		database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "test-client").Return(issuingClient, nil)
+		database.On("ClientLoadRedirectURIs", mock.Anything, (*sql.Tx)(nil), issuingClient).
 			Run(func(args mock.Arguments) {
-				args.Get(1).(*models.Client).RedirectURIs =
+				args.Get(2).(*models.Client).RedirectURIs =
 					[]models.RedirectURI{{URI: "https://other.example/cb"}}
 			}).Return(nil)
 
@@ -4540,10 +4540,10 @@ func TestHandleIssueGet_RedirectURIRefusalSurvivesItsOwnFailures(t *testing.T) {
 		authHelper.On("GetAuthContext", req).Return(authContext, nil)
 
 		issuingClient := &models.Client{Id: 1, ClientIdentifier: "test-client", DisplayName: "Test Client"}
-		database.On("GetClientByClientIdentifier", (*sql.Tx)(nil), "test-client").Return(issuingClient, nil)
-		database.On("ClientLoadRedirectURIs", (*sql.Tx)(nil), issuingClient).
+		database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "test-client").Return(issuingClient, nil)
+		database.On("ClientLoadRedirectURIs", mock.Anything, (*sql.Tx)(nil), issuingClient).
 			Run(func(args mock.Arguments) {
-				args.Get(1).(*models.Client).RedirectURIs =
+				args.Get(2).(*models.Client).RedirectURIs =
 					[]models.RedirectURI{{URI: "https://other.example/cb"}}
 			}).Return(nil)
 
@@ -4608,10 +4608,10 @@ func TestHandleIssueGet_ScopeRefusalSurvivesItsOwnFailures(t *testing.T) {
 		// The gate's own registration read, and separately the emitter's: the refusal below is an
 		// answer to the client, so it passes through redirectWillBeEmitted too (#241 decision 11).
 		issuingClient := &models.Client{Id: 1, ClientIdentifier: "test-client"}
-		database.On("GetClientByClientIdentifier", (*sql.Tx)(nil), "test-client").Return(issuingClient, nil)
-		database.On("ClientLoadRedirectURIs", (*sql.Tx)(nil), issuingClient).
+		database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "test-client").Return(issuingClient, nil)
+		database.On("ClientLoadRedirectURIs", mock.Anything, (*sql.Tx)(nil), issuingClient).
 			Run(func(args mock.Arguments) {
-				args.Get(1).(*models.Client).RedirectURIs =
+				args.Get(2).(*models.Client).RedirectURIs =
 					[]models.RedirectURI{{URI: "https://example.com/callback"}}
 			}).Return(nil)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")

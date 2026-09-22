@@ -47,11 +47,11 @@ func byIdReaders() []byIdReader {
 			return v != nil, err
 		}},
 		{"GetResourceById", func(tx *sql.Tx, id int64) (bool, error) {
-			v, err := database.GetResourceById(tx, id)
+			v, err := database.GetResourceById(context.Background(), tx, id)
 			return v != nil, err
 		}},
 		{"GetPermissionById", func(tx *sql.Tx, id int64) (bool, error) {
-			v, err := database.GetPermissionById(tx, id)
+			v, err := database.GetPermissionById(context.Background(), tx, id)
 			return v != nil, err
 		}},
 		{"GetKeyPairById", func(tx *sql.Tx, id int64) (bool, error) {
@@ -59,11 +59,11 @@ func byIdReaders() []byIdReader {
 			return v != nil, err
 		}},
 		{"GetRedirectURIById", func(tx *sql.Tx, id int64) (bool, error) {
-			v, err := database.GetRedirectURIById(tx, id)
+			v, err := database.GetRedirectURIById(context.Background(), tx, id)
 			return v != nil, err
 		}},
 		{"GetWebOriginById", func(tx *sql.Tx, id int64) (bool, error) {
-			v, err := database.GetWebOriginById(tx, id)
+			v, err := database.GetWebOriginById(context.Background(), tx, id)
 			return v != nil, err
 		}},
 		{"GetSettingsById", func(tx *sql.Tx, id int64) (bool, error) {
@@ -87,11 +87,11 @@ func byIdReaders() []byIdReader {
 			return v != nil, err
 		}},
 		{"GetClientLogoByClientId", func(tx *sql.Tx, id int64) (bool, error) {
-			v, err := database.GetClientLogoByClientId(tx, id)
+			v, err := database.GetClientLogoByClientId(context.Background(), tx, id)
 			return v != nil, err
 		}},
 		{"GetClientPermissionById", func(tx *sql.Tx, id int64) (bool, error) {
-			v, err := database.GetClientPermissionById(tx, id)
+			v, err := database.GetClientPermissionById(context.Background(), tx, id)
 			return v != nil, err
 		}},
 		{"GetUserSessionById", func(tx *sql.Tx, id int64) (bool, error) {
@@ -161,7 +161,7 @@ func byValueReaders() []byValueReader {
 
 	return []byValueReader{
 		{"GetClientByClientIdentifier", randomWord, func(tx *sql.Tx, v string) (bool, error) {
-			c, err := database.GetClientByClientIdentifier(tx, v)
+			c, err := database.GetClientByClientIdentifier(context.Background(), tx, v)
 			return c != nil, err
 		}},
 		{"GetUserByUsername", randomWord, func(tx *sql.Tx, v string) (bool, error) {
@@ -178,7 +178,7 @@ func byValueReaders() []byValueReader {
 				return u != nil, err
 			}},
 		{"GetResourceByResourceIdentifier", randomWord, func(tx *sql.Tx, v string) (bool, error) {
-			r, err := database.GetResourceByResourceIdentifier(tx, v)
+			r, err := database.GetResourceByResourceIdentifier(context.Background(), tx, v)
 			return r != nil, err
 		}},
 		{"GetGroupByGroupIdentifier", randomWord, func(tx *sql.Tx, v string) (bool, error) {

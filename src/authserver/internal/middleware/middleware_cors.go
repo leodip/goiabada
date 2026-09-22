@@ -31,7 +31,7 @@ func MiddlewareCors(database data.Database) func(next http.Handler) http.Handler
 				// no client identity is available at preflight time and per-client enforcement
 				// is not implementable here. The admin console and the docs say so rather than
 				// implying a scoping the server cannot honour.
-				exists, err := database.WebOriginExists(nil, origin)
+				exists, err := database.WebOriginExists(r.Context(), nil, origin)
 				if err != nil {
 					// Fail closed: an unreadable list is not an empty one, and answering true
 					// here would let script on any origin read a token response.

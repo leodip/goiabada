@@ -24,7 +24,7 @@ func HandleAPIResourcesGet(
 	database data.Database,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		resources, err := database.GetAllResources(nil)
+		resources, err := database.GetAllResources(r.Context(), nil)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting all resources"))
 			return
@@ -81,7 +81,7 @@ func HandleAPIResourceCreatePost(
 		}
 
 		// Check uniqueness
-		existing, err := database.GetResourceByResourceIdentifier(nil, createReq.ResourceIdentifier)
+		existing, err := database.GetResourceByResourceIdentifier(r.Context(), nil, createReq.ResourceIdentifier)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error checking resource by identifier"), "resource_identifier", createReq.ResourceIdentifier)
 			return
@@ -96,7 +96,7 @@ func HandleAPIResourceCreatePost(
 			ResourceIdentifier: strings.TrimSpace(createReq.ResourceIdentifier),
 			Description:        strings.TrimSpace(createReq.Description),
 		}
-		if err := database.CreateResource(nil, resource); err != nil {
+		if err := database.CreateResource(r.Context(), nil, resource); err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error creating resource"), "resource_identifier", resource.ResourceIdentifier)
 			return
 		}
@@ -133,7 +133,7 @@ func HandleAPIResourceGet(
 			return
 		}
 
-		resource, err := database.GetResourceById(nil, id)
+		resource, err := database.GetResourceById(r.Context(), nil, id)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting resource by ID"), "resource_id", id)
 			return
@@ -169,7 +169,7 @@ func HandleAPIResourceUpdatePut(
 			return
 		}
 
-		resource, err := database.GetResourceById(nil, id)
+		resource, err := database.GetResourceById(r.Context(), nil, id)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting resource by ID for update"), "resource_id", id)
 			return
@@ -210,7 +210,7 @@ func HandleAPIResourceUpdatePut(
 		}
 
 		// Uniqueness check (excluding this resource)
-		existing, err := database.GetResourceByResourceIdentifier(nil, updateReq.ResourceIdentifier)
+		existing, err := database.GetResourceByResourceIdentifier(r.Context(), nil, updateReq.ResourceIdentifier)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error checking resource by identifier for update"), "resource_identifier", updateReq.ResourceIdentifier, "resource_id", resource.Id)
 			return
@@ -232,7 +232,7 @@ func HandleAPIResourceUpdatePut(
 		resource.ResourceIdentifier = trimmedResourceIdentifier
 		resource.Description = strings.TrimSpace(updateReq.Description)
 
-		if err := database.UpdateResource(nil, resource); err != nil {
+		if err := database.UpdateResource(r.Context(), nil, resource); err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error updating resource"), "resource_id", resource.Id, "resource_identifier", resource.ResourceIdentifier)
 			return
 		}
@@ -270,7 +270,7 @@ func HandleAPIResourceDelete(
 			return
 		}
 
-		resource, err := database.GetResourceById(nil, id)
+		resource, err := database.GetResourceById(r.Context(), nil, id)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting resource by ID for deletion"), "resource_id", id)
 			return
@@ -285,7 +285,7 @@ func HandleAPIResourceDelete(
 			return
 		}
 
-		if err := database.DeleteResource(nil, resource.Id); err != nil {
+		if err := database.DeleteResource(r.Context(), nil, resource.Id); err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error deleting resource"), "resource_id", resource.Id, "resource_identifier", resource.ResourceIdentifier)
 			return
 		}

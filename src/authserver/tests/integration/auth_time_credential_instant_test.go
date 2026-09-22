@@ -75,7 +75,7 @@ func TestAuthTime_IsTheInstantTheCredentialWasAccepted(t *testing.T) {
 		RefreshTokenOfflineIdleTimeoutInSeconds: 3600,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 86400,
 	}
-	if err := database.CreateClient(nil, client); err != nil {
+	if err := database.CreateClient(context.Background(), nil, client); err != nil {
 		t.Fatal(err)
 	}
 
@@ -83,7 +83,7 @@ func TestAuthTime_IsTheInstantTheCredentialWasAccepted(t *testing.T) {
 		ClientId: client.Id,
 		URI:      "https://example.com/callback",
 	}
-	if err := database.CreateRedirectURI(nil, redirectUri); err != nil {
+	if err := database.CreateRedirectURI(context.Background(), nil, redirectUri); err != nil {
 		t.Fatal(err)
 	}
 

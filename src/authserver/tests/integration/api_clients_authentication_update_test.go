@@ -35,9 +35,9 @@ func TestAPIClientAuthenticationPut_ConfidentialToPublic_Success(t *testing.T) {
 		// Make client credentials enabled to verify it gets disabled when switching to public
 		ClientCredentialsEnabled: true,
 	}
-	err = database.CreateClient(nil, client)
+	err = database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
-	defer func() { _ = database.DeleteClient(nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
 	reqBody := api.UpdateClientAuthenticationRequest{IsPublic: true}
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/authentication"
@@ -59,7 +59,7 @@ func TestAPIClientAuthenticationPut_PublicToConfidential_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	client := createPublicClient(t)
-	defer func() { _ = database.DeleteClient(nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
 	newSecret := stringutil.GenerateSecurityRandomString(60)
 	reqBody := api.UpdateClientAuthenticationRequest{IsPublic: false, ClientSecret: newSecret}
@@ -91,7 +91,7 @@ func TestAPIClientAuthenticationPut_InvalidSecret_TooShort(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	client := createPublicClient(t)
-	defer func() { _ = database.DeleteClient(nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
 	// Too short secret
 	reqBody := api.UpdateClientAuthenticationRequest{IsPublic: false, ClientSecret: "abc123"}
@@ -111,7 +111,7 @@ func TestAPIClientAuthenticationPut_InvalidSecret_BadChars(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	client := createPublicClient(t)
-	defer func() { _ = database.DeleteClient(nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
 	// 60 chars but includes an invalid '!'
 	bad := strings.Repeat("A", 59) + "!"
@@ -160,7 +160,7 @@ func TestAPIClientAuthenticationPut_SystemLevelClientAllowed(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Get system-level client from DB so we can save/restore state
-	sysClient, err := database.GetClientByClientIdentifier(nil, constants.AdminConsoleClientIdentifier)
+	sysClient, err := database.GetClientByClientIdentifier(context.Background(), nil, constants.AdminConsoleClientIdentifier)
 	assert.NoError(t, err)
 	if sysClient == nil {
 		t.Skip("system-level client not found")
@@ -172,12 +172,12 @@ func TestAPIClientAuthenticationPut_SystemLevelClientAllowed(t *testing.T) {
 	origCCEnabled := sysClient.ClientCredentialsEnabled
 	defer func() {
 		// Re-fetch to get current DB state, then restore original fields
-		c, _ := database.GetClientByClientIdentifier(nil, constants.AdminConsoleClientIdentifier)
+		c, _ := database.GetClientByClientIdentifier(context.Background(), nil, constants.AdminConsoleClientIdentifier)
 		if c != nil {
 			c.IsPublic = origIsPublic
 			c.ClientSecretEncrypted = origSecretEncrypted
 			c.ClientCredentialsEnabled = origCCEnabled
-			_ = database.UpdateClient(nil, c)
+			_ = database.UpdateClient(context.Background(), nil, c)
 		}
 	}()
 
@@ -202,14 +202,14 @@ func TestAPIClientAuthenticationPut_InsufficientScope(t *testing.T) {
 		IsPublic:                 false,
 		ClientSecretEncrypted:    enc,
 	}
-	err = database.CreateClient(nil, client)
+	err = database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
-	defer func() { _ = database.DeleteClient(nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
 	// Grant auth-server:userinfo permission
-	authRes, err := database.GetResourceByResourceIdentifier(nil, constants.AuthServerResourceIdentifier)
+	authRes, err := database.GetResourceByResourceIdentifier(context.Background(), nil, constants.AuthServerResourceIdentifier)
 	assert.NoError(t, err)
-	perms, err := database.GetPermissionsByResourceId(nil, authRes.Id)
+	perms, err := database.GetPermissionsByResourceId(context.Background(), nil, authRes.Id)
 	assert.NoError(t, err)
 	var userinfoPerm *models.Permission
 	for i := range perms {
@@ -219,7 +219,7 @@ func TestAPIClientAuthenticationPut_InsufficientScope(t *testing.T) {
 		}
 	}
 	assert.NotNil(t, userinfoPerm)
-	err = database.CreateClientPermission(nil, &models.ClientPermission{ClientId: client.Id, PermissionId: userinfoPerm.Id})
+	err = database.CreateClientPermission(context.Background(), nil, &models.ClientPermission{ClientId: client.Id, PermissionId: userinfoPerm.Id})
 	assert.NoError(t, err)
 
 	// Get token with only auth-server:userinfo scope
@@ -238,7 +238,7 @@ func TestAPIClientAuthenticationPut_InsufficientScope(t *testing.T) {
 
 	// Create a target client to attempt updating
 	target := createPublicClient(t)
-	defer func() { _ = database.DeleteClient(nil, target.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, target.Id) }()
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(target.Id, 10) + "/authentication"
 	reqBody := api.UpdateClientAuthenticationRequest{IsPublic: false, ClientSecret: stringutil.GenerateSecurityRandomString(60)}
@@ -257,7 +257,7 @@ func createPublicClient(t *testing.T) *models.Client {
 		IsPublic:                 true,
 		AuthorizationCodeEnabled: true,
 	}
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
 	return client
 }

@@ -39,7 +39,7 @@ func TestAuthCompleted_DisabledUserRefusal_CannotBeReplayed(t *testing.T) {
 		DefaultAcrLevel:          models.AcrLevel1,
 	}
 
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,7 +49,7 @@ func TestAuthCompleted_DisabledUserRefusal_CannotBeReplayed(t *testing.T) {
 		URI:      fake.URL(),
 	}
 
-	err = database.CreateRedirectURI(nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -152,7 +152,7 @@ func TestAuthCompleted_NoAuthorizedScopesRefusal_CannotBeReplayed(t *testing.T) 
 		DefaultAcrLevel:          models.AcrLevel1,
 	}
 
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -162,7 +162,7 @@ func TestAuthCompleted_NoAuthorizedScopesRefusal_CannotBeReplayed(t *testing.T) 
 		URI:      fake.URL(),
 	}
 
-	err = database.CreateRedirectURI(nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	if err != nil {
 		t.Fatal(err)
 	}

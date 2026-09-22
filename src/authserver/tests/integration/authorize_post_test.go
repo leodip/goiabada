@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"net/http"
 	"net/url"
 	"strings"
@@ -34,7 +35,7 @@ func TestAuthorize_PostRequest(t *testing.T) {
 				ConsentRequired:          false,
 				DefaultAcrLevel:          models.AcrLevel1,
 			}
-			if err := database.CreateClient(nil, client); err != nil {
+			if err := database.CreateClient(context.Background(), nil, client); err != nil {
 				t.Fatal(err)
 			}
 
@@ -42,7 +43,7 @@ func TestAuthorize_PostRequest(t *testing.T) {
 				ClientId: client.Id,
 				URI:      fake.URL(),
 			}
-			if err := database.CreateRedirectURI(nil, redirectUri); err != nil {
+			if err := database.CreateRedirectURI(context.Background(), nil, redirectUri); err != nil {
 				t.Fatal(err)
 			}
 

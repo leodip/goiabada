@@ -93,7 +93,7 @@ func TestAPISessions_NoTokenIsUnauthorized(t *testing.T) {
 func TestAPISessions_WrongScopeIsForbidden(t *testing.T) {
 	accessToken, client := createClientWithGranularScope(t, coreconstants.AdminReadPermissionIdentifier)
 	defer func() {
-		_ = database.DeleteClient(nil, client.Id)
+		_ = database.DeleteClient(context.Background(), nil, client.Id)
 	}()
 
 	for _, operation := range []string{"load", "create", "update", "touch", "delete"} {
@@ -111,7 +111,7 @@ func TestAPISessions_WrongScopeIsForbidden(t *testing.T) {
 func TestAPISessions_RoundTrip(t *testing.T) {
 	accessToken, client := createClientWithGranularScope(t, coreconstants.BrowserSessionsPermissionIdentifier)
 	defer func() {
-		_ = database.DeleteClient(nil, client.Id)
+		_ = database.DeleteClient(context.Background(), nil, client.Id)
 	}()
 
 	id := newTestSessionId(t)
@@ -188,7 +188,7 @@ func TestAPISessions_RoundTrip(t *testing.T) {
 func TestAPISessions_ExpiredSessionIsNotFound(t *testing.T) {
 	accessToken, client := createClientWithGranularScope(t, coreconstants.BrowserSessionsPermissionIdentifier)
 	defer func() {
-		_ = database.DeleteClient(nil, client.Id)
+		_ = database.DeleteClient(context.Background(), nil, client.Id)
 	}()
 
 	id := newTestSessionId(t)
@@ -212,7 +212,7 @@ func TestAPISessions_ExpiredSessionIsNotFound(t *testing.T) {
 func TestAPISessions_AuthServerSessionIsNotFound(t *testing.T) {
 	accessToken, client := createClientWithGranularScope(t, coreconstants.BrowserSessionsPermissionIdentifier)
 	defer func() {
-		_ = database.DeleteClient(nil, client.Id)
+		_ = database.DeleteClient(context.Background(), nil, client.Id)
 	}()
 
 	id := newTestSessionId(t)
@@ -252,7 +252,7 @@ func TestAPISessions_RealAuthServerSessionIsNotFound(t *testing.T) {
 
 	accessToken, client := createClientWithGranularScope(t, coreconstants.BrowserSessionsPermissionIdentifier)
 	defer func() {
-		_ = database.DeleteClient(nil, client.Id)
+		_ = database.DeleteClient(context.Background(), nil, client.Id)
 	}()
 
 	resp := postSession(t, accessToken, "load", api.SessionLoadRequest{Id: id})
@@ -271,7 +271,7 @@ func TestAPISessions_RealAuthServerSessionIsNotFound(t *testing.T) {
 func TestAPISessions_BadRequests(t *testing.T) {
 	accessToken, client := createClientWithGranularScope(t, coreconstants.BrowserSessionsPermissionIdentifier)
 	defer func() {
-		_ = database.DeleteClient(nil, client.Id)
+		_ = database.DeleteClient(context.Background(), nil, client.Id)
 	}()
 
 	req, err := http.NewRequest("POST", sessionEndpointURL("load"), bytes.NewReader([]byte("not json")))

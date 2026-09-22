@@ -60,7 +60,7 @@ func TestCreateAuthCode_InsertsUnderTheCallersContext(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	issuanceTx := &sql.Tx{}
 
-	mockDB.On("GetClientByClientIdentifier", issuanceTx, "test-client").
+	mockDB.On("GetClientByClientIdentifier", mock.Anything, issuanceTx, "test-client").
 		Return(&models.Client{Id: 1, ClientIdentifier: "test-client"}, nil).Once()
 	mockDB.On("CreateCode", theIssuersCallersContext(), issuanceTx, mock.AnythingOfType("*models.Code")).
 		Return(nil).Once()
@@ -79,7 +79,7 @@ func TestCreateAuthCode_AGoneClientReachesNoInsert(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 	issuanceTx := &sql.Tx{}
 
-	mockDB.On("GetClientByClientIdentifier", issuanceTx, "test-client").Return(nil, nil).Once()
+	mockDB.On("GetClientByClientIdentifier", mock.Anything, issuanceTx, "test-client").Return(nil, nil).Once()
 
 	code, err := NewCodeIssuer(mockDB).CreateAuthCode(issuanceCallerContext(), issuanceTx, propagationCodeInput())
 

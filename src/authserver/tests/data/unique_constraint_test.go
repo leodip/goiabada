@@ -39,7 +39,7 @@ func TestUnique_ClientIdentifier(t *testing.T) {
 		ClientIdentifier: existing.ClientIdentifier,
 		Description:      "Duplicate client identifier",
 	}
-	err := database.CreateClient(nil, duplicate)
+	err := database.CreateClient(context.Background(), nil, duplicate)
 	assert.Error(t, err, "two clients must not share a client_identifier")
 }
 
@@ -50,7 +50,7 @@ func TestUnique_ResourceIdentifier(t *testing.T) {
 		ResourceIdentifier: existing.ResourceIdentifier,
 		Description:        "Duplicate resource identifier",
 	}
-	err := database.CreateResource(nil, duplicate)
+	err := database.CreateResource(context.Background(), nil, duplicate)
 	assert.Error(t, err, "two resources must not share a resource_identifier")
 }
 
@@ -183,7 +183,7 @@ func TestUnique_ClientLogoPerClient(t *testing.T) {
 		Logo:        createTestPNG(10, 10),
 		ContentType: "image/png",
 	}
-	err := database.CreateClientLogo(nil, duplicate)
+	err := database.CreateClientLogo(context.Background(), nil, duplicate)
 	assert.Error(t, err, "a client must not have two logos")
 }
 
@@ -201,7 +201,7 @@ func TestUnique_PermissionIdentifierPerResource(t *testing.T) {
 		Description:          "Duplicate permission on the same resource",
 		ResourceId:           resource.Id,
 	}
-	err := database.CreatePermission(nil, duplicate)
+	err := database.CreatePermission(context.Background(), nil, duplicate)
 	assert.Error(t, err, "a resource must not have two permissions with the same identifier")
 
 	// The same identifier on a different resource is legitimate, and is what
@@ -212,7 +212,7 @@ func TestUnique_PermissionIdentifierPerResource(t *testing.T) {
 		Description:          "Same identifier, different resource",
 		ResourceId:           otherResource.Id,
 	}
-	require.NoError(t, database.CreatePermission(nil, onOtherResource),
+	require.NoError(t, database.CreatePermission(context.Background(), nil, onOtherResource),
 		"the same permission identifier must be allowed on a different resource")
 	assert.NotZero(t, onOtherResource.Id, "expected the permission to be created")
 }

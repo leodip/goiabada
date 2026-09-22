@@ -191,7 +191,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 			ClientIdentifier: "test-client",
 			DefaultAcrLevel:  models.AcrLevel2Optional,
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
 
@@ -247,7 +247,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 			ClientIdentifier: "test-client",
 			DefaultAcrLevel:  models.AcrLevel1,
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
 
@@ -301,7 +301,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 			ClientIdentifier: "test-client",
 			DefaultAcrLevel:  models.AcrLevel1,
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(false)
 
@@ -363,7 +363,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 			ClientIdentifier: "test-client",
 			DefaultAcrLevel:  models.AcrLevel2Optional,
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
 
@@ -513,7 +513,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 					ClientIdentifier: "test-client",
 					DefaultAcrLevel:  tt.targetAcrLevel,
 				}
-				database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+				database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 				userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
 
@@ -639,7 +639,7 @@ func TestHandleAuthLevel1CompletedGet(t *testing.T) {
 					ClientIdentifier: "test-client",
 					DefaultAcrLevel:  tt.targetAcrLevel,
 				}
-				database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+				database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 				userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
 
@@ -718,7 +718,7 @@ func TestHandleAuthLevel1CompletedGet_DeliversADeferredError(t *testing.T) {
 				args.Get(0).(http.ResponseWriter).Header().Set("Set-Cookie", clearedContextCookie)
 			}).Return(nil)
 
-			database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(
+			database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
 				&models.Client{Id: 1, ClientIdentifier: "test-client"}, nil)
 			stubRegisteredRedirectURI(database, "https://legit.example/cb")
 
@@ -752,7 +752,7 @@ func TestHandleAuthLevel1CompletedGet_DeliversADeferredError(t *testing.T) {
 		authHelper.On("GetAuthContext", mock.Anything).Return(
 			newParkedContext(ceremony.AuthStateLevel1PasswordCompleted), nil)
 		authHelper.On("ClearAuthContext", rr, req).Return(assert.AnError)
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
 			&models.Client{Id: 1, ClientIdentifier: "test-client"}, nil)
 		stubRegisteredRedirectURI(database, "https://legit.example/cb")
 
@@ -796,7 +796,7 @@ func TestHandleAuthLevel1CompletedGet_DeliversADeferredError(t *testing.T) {
 		authContext.ResponseMode = "form_post"
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 		authHelper.On("ClearAuthContext", rr, req).Return(nil)
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
 			&models.Client{Id: 1, ClientIdentifier: "test-client"}, nil)
 		stubRegisteredRedirectURI(database, "https://legit.example/cb")
 		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
@@ -823,7 +823,7 @@ func TestHandleAuthLevel1CompletedGet_DeliversADeferredError(t *testing.T) {
 		authHelper.On("GetAuthContext", mock.Anything).Return(
 			newParkedContext(ceremony.AuthStateLevel1PasswordCompleted), nil)
 		authHelper.On("ClearAuthContext", rr, req).Return(nil)
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
 			&models.Client{Id: 1, ClientIdentifier: "test-client", CreatedViaDCR: true}, nil)
 		httpHelper.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html",
 			"/auth_redirect_blocked.html", mock.Anything).Return(nil)
@@ -859,7 +859,7 @@ func TestHandleAuthLevel1CompletedGet_DeliversADeferredError(t *testing.T) {
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "sess-1").Return(nil, nil)
 		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(
 			&models.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: models.AcrLevel1}, nil)
 		userSessionManager.On("HasValidUserSession", mock.Anything, mock.Anything, mock.Anything).Return(false)
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {

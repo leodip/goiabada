@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -25,8 +26,8 @@ func TestAPIResourcesGet_Success(t *testing.T) {
 	resource1 := createTestResource(t, "api-test-resource-1", "API Test Resource 1")
 	resource2 := createTestResource(t, "api-test-resource-2", "API Test Resource 2")
 	defer func() {
-		_ = database.DeleteResource(nil, resource1.Id)
-		_ = database.DeleteResource(nil, resource2.Id)
+		_ = database.DeleteResource(context.Background(), nil, resource1.Id)
+		_ = database.DeleteResource(context.Background(), nil, resource2.Id)
 	}()
 
 	// Test: Get all resources
@@ -166,15 +167,15 @@ func createClientCredentialsTokenWithScope(t *testing.T, resourceIdentifier, per
 		IsPublic:                 false,
 		ClientSecretEncrypted:    encSecret,
 	}
-	err = database.CreateClient(nil, client)
+	err = database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
 
 	// Find the requested permission
-	resource, err := database.GetResourceByResourceIdentifier(nil, resourceIdentifier)
+	resource, err := database.GetResourceByResourceIdentifier(context.Background(), nil, resourceIdentifier)
 	assert.NoError(t, err)
 	assert.NotNil(t, resource)
 
-	perms, err := database.GetPermissionsByResourceId(nil, resource.Id)
+	perms, err := database.GetPermissionsByResourceId(context.Background(), nil, resource.Id)
 	assert.NoError(t, err)
 
 	var selected *models.Permission
@@ -187,7 +188,7 @@ func createClientCredentialsTokenWithScope(t *testing.T, resourceIdentifier, per
 	assert.NotNil(t, selected, "permission should exist")
 
 	// Assign permission to client
-	err = database.CreateClientPermission(nil, &models.ClientPermission{ClientId: client.Id, PermissionId: selected.Id})
+	err = database.CreateClientPermission(context.Background(), nil, &models.ClientPermission{ClientId: client.Id, PermissionId: selected.Id})
 	assert.NoError(t, err)
 
 	// Request an access token with that scope
@@ -223,7 +224,7 @@ func TestAPIResourcesGet_ManyResources(t *testing.T) {
 	defer func() {
 		// Cleanup test resources
 		for _, resource := range testResources {
-			_ = database.DeleteResource(nil, resource.Id)
+			_ = database.DeleteResource(context.Background(), nil, resource.Id)
 		}
 	}()
 

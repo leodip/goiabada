@@ -362,10 +362,10 @@ func newDeferralClient(t *testing.T) (*models.Client, *models.User, string) {
 		ConsentRequired:          false,
 		DefaultAcrLevel:          models.AcrLevel1,
 	}
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	require.NoError(t, err)
 
-	err = database.CreateRedirectURI(nil, &models.RedirectURI{
+	err = database.CreateRedirectURI(context.Background(), nil, &models.RedirectURI{
 		ClientId: client.Id,
 		URI:      deferralRedirectURI,
 	})

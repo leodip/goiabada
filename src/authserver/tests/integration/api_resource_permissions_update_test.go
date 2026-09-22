@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -20,14 +21,14 @@ func TestAPIResourcePermissionsPut_Success_CreateUpdateDelete(t *testing.T) {
 
 	// Create resource
 	resource := createTestResource(t, "perm-put-res-"+fake.LetterN(6), "Perms Test")
-	defer func() { _ = database.DeleteResource(nil, resource.Id) }()
+	defer func() { _ = database.DeleteResource(context.Background(), nil, resource.Id) }()
 
 	// Seed existing permissions
 	p1 := createTestPermission(t, resource.Id, "read", "Read")
 	p2 := createTestPermission(t, resource.Id, "write", "Write")
 	defer func() {
-		_ = database.DeletePermission(nil, p1.Id)
-		_ = database.DeletePermission(nil, p2.Id)
+		_ = database.DeletePermission(context.Background(), nil, p1.Id)
+		_ = database.DeletePermission(context.Background(), nil, p2.Id)
 	}()
 
 	// Build request: update p1 description, remove p2 (not included), add new p3
@@ -75,7 +76,7 @@ func TestAPIResourcePermissionsPut_ValidationErrors(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	resource := createTestResource(t, "perm-put-val-"+fake.LetterN(6), "Val Test")
-	defer func() { _ = database.DeleteResource(nil, resource.Id) }()
+	defer func() { _ = database.DeleteResource(context.Background(), nil, resource.Id) }()
 
 	baseURL := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(resource.Id, 10) + "/permissions"
 
@@ -115,7 +116,7 @@ func TestAPIResourcePermissionsPut_ValidationErrors(t *testing.T) {
 	}
 
 	// Nothing in the table above was created, "valid<b" included.
-	perms, err := database.GetPermissionsByResourceId(nil, resource.Id)
+	perms, err := database.GetPermissionsByResourceId(context.Background(), nil, resource.Id)
 	assert.NoError(t, err)
 	assert.Empty(t, perms)
 }
@@ -125,13 +126,13 @@ func TestAPIResourcePermissionsPut_UpdateConflict(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	resource := createTestResource(t, "perm-put-conf-"+fake.LetterN(6), "Conf Test")
-	defer func() { _ = database.DeleteResource(nil, resource.Id) }()
+	defer func() { _ = database.DeleteResource(context.Background(), nil, resource.Id) }()
 
 	p1 := createTestPermission(t, resource.Id, "aaa", "A")
 	p2 := createTestPermission(t, resource.Id, "bbb", "B")
 	defer func() {
-		_ = database.DeletePermission(nil, p1.Id)
-		_ = database.DeletePermission(nil, p2.Id)
+		_ = database.DeletePermission(context.Background(), nil, p1.Id)
+		_ = database.DeletePermission(context.Background(), nil, p2.Id)
 	}()
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(resource.Id, 10) + "/permissions"
@@ -152,13 +153,13 @@ func TestAPIResourcePermissionsPut_UpdateConflict(t *testing.T) {
 func TestAPIResourcePermissionsPut_SystemResourceAddPermissionAllowed(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
-	sysRes, err := database.GetResourceByResourceIdentifier(nil, constants.AuthServerResourceIdentifier)
+	sysRes, err := database.GetResourceByResourceIdentifier(context.Background(), nil, constants.AuthServerResourceIdentifier)
 	assert.NoError(t, err)
 	if sysRes == nil {
 		t.Skip("system authserver resource not found")
 	}
 
-	existingPerms, err := database.GetPermissionsByResourceId(nil, sysRes.Id)
+	existingPerms, err := database.GetPermissionsByResourceId(context.Background(), nil, sysRes.Id)
 	assert.NoError(t, err)
 
 	// Build request with all existing built-in permissions PLUS a new one
@@ -180,10 +181,10 @@ func TestAPIResourcePermissionsPut_SystemResourceAddPermissionAllowed(t *testing
 
 	// Cleanup: delete only the specific permission created by this test
 	defer func() {
-		afterPerms, _ := database.GetPermissionsByResourceId(nil, sysRes.Id)
+		afterPerms, _ := database.GetPermissionsByResourceId(context.Background(), nil, sysRes.Id)
 		for _, p := range afterPerms {
 			if p.PermissionIdentifier == newPermIdentifier {
-				_ = database.DeletePermission(nil, p.Id)
+				_ = database.DeletePermission(context.Background(), nil, p.Id)
 				break
 			}
 		}
@@ -200,14 +201,14 @@ func TestAPIResourcePermissionsPut_SystemResourceAddPermissionAllowed(t *testing
 func TestAPIResourcePermissionsPut_SystemResourceRenameBuiltInBlocked(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
-	sysRes, err := database.GetResourceByResourceIdentifier(nil, constants.AuthServerResourceIdentifier)
+	sysRes, err := database.GetResourceByResourceIdentifier(context.Background(), nil, constants.AuthServerResourceIdentifier)
 	assert.NoError(t, err)
 	if sysRes == nil {
 		t.Skip("system authserver resource not found")
 	}
 
 	// Get existing permissions
-	existingPerms, err := database.GetPermissionsByResourceId(nil, sysRes.Id)
+	existingPerms, err := database.GetPermissionsByResourceId(context.Background(), nil, sysRes.Id)
 	assert.NoError(t, err)
 
 	// Find the "manage" built-in permission
@@ -253,14 +254,14 @@ func TestAPIResourcePermissionsPut_SystemResourceRenameBuiltInBlocked(t *testing
 func TestAPIResourcePermissionsPut_SystemResourceDeleteBuiltInBlocked(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
-	sysRes, err := database.GetResourceByResourceIdentifier(nil, constants.AuthServerResourceIdentifier)
+	sysRes, err := database.GetResourceByResourceIdentifier(context.Background(), nil, constants.AuthServerResourceIdentifier)
 	assert.NoError(t, err)
 	if sysRes == nil {
 		t.Skip("system authserver resource not found")
 	}
 
 	// Get existing permissions
-	existingPerms, err := database.GetPermissionsByResourceId(nil, sysRes.Id)
+	existingPerms, err := database.GetPermissionsByResourceId(context.Background(), nil, sysRes.Id)
 	assert.NoError(t, err)
 
 	// Build request that omits the "manage-account" built-in permission (attempt to delete)
@@ -293,13 +294,13 @@ func TestAPIResourcePermissionsPut_SystemResourceDeleteBuiltInBlocked(t *testing
 func TestAPIResourcePermissionsPut_SystemResourceDeleteRecreateBuiltInBlocked(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
-	sysRes, err := database.GetResourceByResourceIdentifier(nil, constants.AuthServerResourceIdentifier)
+	sysRes, err := database.GetResourceByResourceIdentifier(context.Background(), nil, constants.AuthServerResourceIdentifier)
 	assert.NoError(t, err)
 	if sysRes == nil {
 		t.Skip("system authserver resource not found")
 	}
 
-	existingPerms, err := database.GetPermissionsByResourceId(nil, sysRes.Id)
+	existingPerms, err := database.GetPermissionsByResourceId(context.Background(), nil, sysRes.Id)
 	assert.NoError(t, err)
 
 	// Find the "manage" built-in permission
@@ -351,14 +352,14 @@ func TestAPIResourcePermissionsPut_SystemResourceDeleteRecreateBuiltInBlocked(t 
 func TestAPIResourcePermissionsPut_SystemResourceChangeDescriptionAllowed(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
-	sysRes, err := database.GetResourceByResourceIdentifier(nil, constants.AuthServerResourceIdentifier)
+	sysRes, err := database.GetResourceByResourceIdentifier(context.Background(), nil, constants.AuthServerResourceIdentifier)
 	assert.NoError(t, err)
 	if sysRes == nil {
 		t.Skip("system authserver resource not found")
 	}
 
 	// Get existing permissions
-	existingPerms, err := database.GetPermissionsByResourceId(nil, sysRes.Id)
+	existingPerms, err := database.GetPermissionsByResourceId(context.Background(), nil, sysRes.Id)
 	assert.NoError(t, err)
 
 	// Find the "manage" built-in permission and save original description
@@ -377,10 +378,10 @@ func TestAPIResourcePermissionsPut_SystemResourceChangeDescriptionAllowed(t *tes
 
 	// Restore original description after test
 	defer func() {
-		perm, _ := database.GetPermissionById(nil, managePermId)
+		perm, _ := database.GetPermissionById(context.Background(), nil, managePermId)
 		if perm != nil {
 			perm.Description = origDescription
-			_ = database.UpdatePermission(nil, perm)
+			_ = database.UpdatePermission(context.Background(), nil, perm)
 		}
 	}()
 
@@ -405,7 +406,7 @@ func TestAPIResourcePermissionsPut_SystemResourceChangeDescriptionAllowed(t *tes
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 	// Verify description was updated
-	updatedPerms, err := database.GetPermissionsByResourceId(nil, sysRes.Id)
+	updatedPerms, err := database.GetPermissionsByResourceId(context.Background(), nil, sysRes.Id)
 	assert.NoError(t, err)
 	for _, p := range updatedPerms {
 		if p.Id == managePermId {
@@ -420,13 +421,13 @@ func TestAPIResourcePermissionsPut_SystemResourceChangeDescriptionAllowed(t *tes
 func TestAPIResourcePermissionsPut_DuplicateIdRejected(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
-	sysRes, err := database.GetResourceByResourceIdentifier(nil, constants.AuthServerResourceIdentifier)
+	sysRes, err := database.GetResourceByResourceIdentifier(context.Background(), nil, constants.AuthServerResourceIdentifier)
 	assert.NoError(t, err)
 	if sysRes == nil {
 		t.Skip("system authserver resource not found")
 	}
 
-	existingPerms, err := database.GetPermissionsByResourceId(nil, sysRes.Id)
+	existingPerms, err := database.GetPermissionsByResourceId(context.Background(), nil, sysRes.Id)
 	assert.NoError(t, err)
 
 	// Find the "manage" built-in permission
@@ -475,10 +476,10 @@ func TestAPIResourcePermissionsPut_DuplicateIdNonSystemRejected(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	resource := createTestResource(t, "perm-put-dupid-"+fake.LetterN(6), "DupId Test")
-	defer func() { _ = database.DeleteResource(nil, resource.Id) }()
+	defer func() { _ = database.DeleteResource(context.Background(), nil, resource.Id) }()
 
 	p1 := createTestPermission(t, resource.Id, "read", "Read")
-	defer func() { _ = database.DeletePermission(nil, p1.Id) }()
+	defer func() { _ = database.DeletePermission(context.Background(), nil, p1.Id) }()
 
 	// Two entries with the same existing ID
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(resource.Id, 10) + "/permissions"
@@ -499,7 +500,7 @@ func TestAPIResourcePermissionsPut_DuplicateIdNonSystemRejected(t *testing.T) {
 func TestAPIResourcePermissionsPut_Unauthorized(t *testing.T) {
 	// Create a resource
 	res := createTestResource(t, "perm-put-unauth-"+fake.LetterN(6), "Unauth Test")
-	defer func() { _ = database.DeleteResource(nil, res.Id) }()
+	defer func() { _ = database.DeleteResource(context.Background(), nil, res.Id) }()
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(res.Id, 10) + "/permissions"
 

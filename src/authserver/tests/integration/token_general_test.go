@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -50,7 +51,7 @@ func TestToken_InvalidGrantType(t *testing.T) {
 		ClientCredentialsEnabled: true,
 		DefaultAcrLevel:          models.AcrLevel2Optional,
 	}
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	assert.Nil(t, err)
 
 	httpClient := createHttpClient(t)

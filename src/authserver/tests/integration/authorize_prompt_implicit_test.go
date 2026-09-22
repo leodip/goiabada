@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"net/http"
 	"net/url"
 	"strings"
@@ -48,7 +49,7 @@ func createImplicitClientForPromptTests(t *testing.T) (*models.Client, *models.R
 		DefaultAcrLevel:          models.AcrLevel1,
 	}
 
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -58,7 +59,7 @@ func createImplicitClientForPromptTests(t *testing.T) (*models.Client, *models.R
 		URI:      "https://example.com/callback",
 	}
 
-	err = database.CreateRedirectURI(nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	if err != nil {
 		t.Fatal(err)
 	}

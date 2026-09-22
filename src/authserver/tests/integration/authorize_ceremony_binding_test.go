@@ -31,7 +31,7 @@ func createLevel1Client(t *testing.T, consentRequired bool) (*models.Client, *mo
 		ConsentRequired:          consentRequired,
 		DefaultAcrLevel:          models.AcrLevel1,
 	}
-	if err := database.CreateClient(nil, client); err != nil {
+	if err := database.CreateClient(context.Background(), nil, client); err != nil {
 		t.Fatal(err)
 	}
 
@@ -39,7 +39,7 @@ func createLevel1Client(t *testing.T, consentRequired bool) (*models.Client, *mo
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
-	if err := database.CreateRedirectURI(nil, redirectUri); err != nil {
+	if err := database.CreateRedirectURI(context.Background(), nil, redirectUri); err != nil {
 		t.Fatal(err)
 	}
 	return client, redirectUri

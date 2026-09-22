@@ -155,7 +155,7 @@ func newCsrfTestServer(t *testing.T) *Server {
 	// /userinfo when an Origin header is present, which every cross-site row here sends. Answering
 	// false is the production answer for an unregistered origin and keeps CORS out of the result:
 	// the origin check is what these rows are about.
-	database.On("WebOriginExists", mock.Anything, mock.Anything).Return(false, nil).Maybe()
+	database.On("WebOriginExists", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
 
 	s := &Server{
 		router:       chi.NewRouter(),

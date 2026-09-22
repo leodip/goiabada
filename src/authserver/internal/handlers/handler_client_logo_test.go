@@ -63,7 +63,7 @@ func TestHandleClientLogoGet_ClientNotFound(t *testing.T) {
 	req = setChiURLParamForHandlers(req, "clientIdentifier", "unknown-app")
 	rr := httptest.NewRecorder()
 
-	database.On("GetClientByClientIdentifier", (*sql.Tx)(nil), "unknown-app").Return(nil, nil)
+	database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "unknown-app").Return(nil, nil)
 
 	handler.ServeHTTP(rr, req)
 
@@ -83,8 +83,8 @@ func TestHandleClientLogoGet_NoLogo(t *testing.T) {
 	req = setChiURLParamForHandlers(req, "clientIdentifier", "my-app")
 	rr := httptest.NewRecorder()
 
-	database.On("GetClientByClientIdentifier", (*sql.Tx)(nil), "my-app").Return(client, nil)
-	database.On("GetClientLogoByClientId", (*sql.Tx)(nil), int64(123)).Return(nil, nil)
+	database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "my-app").Return(client, nil)
+	database.On("GetClientLogoByClientId", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(nil, nil)
 
 	handler.ServeHTTP(rr, req)
 
@@ -111,8 +111,8 @@ func TestHandleClientLogoGet_Success(t *testing.T) {
 	req = setChiURLParamForHandlers(req, "clientIdentifier", "my-app")
 	rr := httptest.NewRecorder()
 
-	database.On("GetClientByClientIdentifier", (*sql.Tx)(nil), "my-app").Return(client, nil)
-	database.On("GetClientLogoByClientId", (*sql.Tx)(nil), int64(123)).Return(clientLogo, nil)
+	database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "my-app").Return(client, nil)
+	database.On("GetClientLogoByClientId", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(clientLogo, nil)
 
 	handler.ServeHTTP(rr, req)
 
@@ -150,8 +150,8 @@ func TestHandleClientLogoGet_ETagMatch_304(t *testing.T) {
 	req.Header.Set("If-None-Match", expectedETag)
 	rr := httptest.NewRecorder()
 
-	database.On("GetClientByClientIdentifier", (*sql.Tx)(nil), "my-app").Return(client, nil)
-	database.On("GetClientLogoByClientId", (*sql.Tx)(nil), int64(123)).Return(clientLogo, nil)
+	database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "my-app").Return(client, nil)
+	database.On("GetClientLogoByClientId", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(clientLogo, nil)
 
 	handler.ServeHTTP(rr, req)
 
@@ -182,8 +182,8 @@ func TestHandleClientLogoGet_ETagMismatch_200(t *testing.T) {
 	req.Header.Set("If-None-Match", "\"stale-etag\"")
 	rr := httptest.NewRecorder()
 
-	database.On("GetClientByClientIdentifier", (*sql.Tx)(nil), "my-app").Return(client, nil)
-	database.On("GetClientLogoByClientId", (*sql.Tx)(nil), int64(123)).Return(clientLogo, nil)
+	database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "my-app").Return(client, nil)
+	database.On("GetClientLogoByClientId", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(clientLogo, nil)
 
 	handler.ServeHTTP(rr, req)
 
@@ -218,8 +218,8 @@ func TestHandleClientLogoGet_WeakETagMatch_304(t *testing.T) {
 	req.Header.Set("If-None-Match", weakETag)
 	rr := httptest.NewRecorder()
 
-	database.On("GetClientByClientIdentifier", (*sql.Tx)(nil), "my-app").Return(client, nil)
-	database.On("GetClientLogoByClientId", (*sql.Tx)(nil), int64(123)).Return(clientLogo, nil)
+	database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "my-app").Return(client, nil)
+	database.On("GetClientLogoByClientId", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(clientLogo, nil)
 
 	handler.ServeHTTP(rr, req)
 
@@ -253,8 +253,8 @@ func TestHandleClientLogoGet_MultipleETags_304(t *testing.T) {
 	req.Header.Set("If-None-Match", multipleETags)
 	rr := httptest.NewRecorder()
 
-	database.On("GetClientByClientIdentifier", (*sql.Tx)(nil), "my-app").Return(client, nil)
-	database.On("GetClientLogoByClientId", (*sql.Tx)(nil), int64(123)).Return(clientLogo, nil)
+	database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "my-app").Return(client, nil)
+	database.On("GetClientLogoByClientId", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(clientLogo, nil)
 
 	handler.ServeHTTP(rr, req)
 
@@ -283,8 +283,8 @@ func TestHandleClientLogoGet_StarETag_304(t *testing.T) {
 	req.Header.Set("If-None-Match", "*")
 	rr := httptest.NewRecorder()
 
-	database.On("GetClientByClientIdentifier", (*sql.Tx)(nil), "my-app").Return(client, nil)
-	database.On("GetClientLogoByClientId", (*sql.Tx)(nil), int64(123)).Return(clientLogo, nil)
+	database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "my-app").Return(client, nil)
+	database.On("GetClientLogoByClientId", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(clientLogo, nil)
 
 	handler.ServeHTTP(rr, req)
 
@@ -303,7 +303,7 @@ func TestHandleClientLogoGet_DatabaseError(t *testing.T) {
 	req = setChiURLParamForHandlers(req, "clientIdentifier", "my-app")
 	rr := httptest.NewRecorder()
 
-	database.On("GetClientByClientIdentifier", (*sql.Tx)(nil), "my-app").Return(nil, assert.AnError)
+	database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "my-app").Return(nil, assert.AnError)
 
 	httpHelper.On("InternalServerError",
 		mock.AnythingOfType("*httptest.ResponseRecorder"),

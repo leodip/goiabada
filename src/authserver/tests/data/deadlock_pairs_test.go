@@ -369,7 +369,7 @@ func TestDeadlockRetry_DeleteClientAgainstTermination(t *testing.T) {
 
 	deleteClient := goBlocked(t, "DeleteClient", terminationTx, func(reached func()) error {
 		reached()
-		return other.DeleteClient(nil, client.Id)
+		return other.DeleteClient(context.Background(), nil, client.Id)
 	})
 
 	deleteClient.requireBlocked(t) // DeleteClient holds the tokens and waits for the codes cascade

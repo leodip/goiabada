@@ -133,7 +133,7 @@ func TestAPIClientAuthenticationPut_FlipToPublic_RevokesTheClientsGrants(t *test
 
 	clientSecret := fake.LetterN(32)
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
-	defer func() { _ = database.DeleteClient(nil, code.ClientId) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, code.ClientId) }()
 
 	tokens := redeemCode(t, httpClient, code, clientSecret)
 	refreshToken, ok := tokens["refresh_token"].(string)
@@ -202,7 +202,7 @@ func TestAPIClientAuthenticationPut_FlipToPublic_LeavesTheUsersOtherClientAlone(
 	flippedSecret := fake.LetterN(32)
 	flippedClient, flippedCode := createAuthCode(t, flippedSecret, "openid profile email",
 		authCodeOptions{user: user, userPassword: password})
-	defer func() { _ = database.DeleteClient(nil, flippedCode.ClientId) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, flippedCode.ClientId) }()
 
 	// A DIFFERENT DEVICE for the second grant, which is a fixture requirement rather than
 	// decoration: two ceremonies for one user from the same device replace each other's session,
@@ -211,7 +211,7 @@ func TestAPIClientAuthenticationPut_FlipToPublic_LeavesTheUsersOtherClientAlone(
 	otherSecret := fake.LetterN(32)
 	otherClient, otherCode := createAuthCode(t, otherSecret, "openid profile email",
 		authCodeOptions{user: user, userPassword: password, userAgent: "goiabada-d2-second-device"})
-	defer func() { _ = database.DeleteClient(nil, otherCode.ClientId) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, otherCode.ClientId) }()
 
 	// Both grants belong to the same person, which is the whole point of the fixture.
 	require.Equal(t, flippedCode.UserId, otherCode.UserId,
@@ -260,7 +260,7 @@ func TestAPIClientAuthenticationPut_FlipToPublic_RevokesROPCGrantsToo(t *testing
 	clientSecret := fake.Password(32)
 	password := fake.Password(12)
 	client := createROPCClient(t, clientSecret, false)
-	defer func() { _ = database.DeleteClient(nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 	user := createROPCUser(t, password)
 
 	destURL := config.GetAuthServer().BaseURL + "/auth/token/"
@@ -294,7 +294,7 @@ func TestAPIClientAuthenticationPut_FlipToConfidential_DoesNotRevoke(t *testing.
 
 	httpClient, code := createAuthCode(t, fake.LetterN(32), "openid profile email",
 		authCodeOptions{isPublic: true})
-	defer func() { _ = database.DeleteClient(nil, code.ClientId) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, code.ClientId) }()
 
 	tokens := redeemCode(t, httpClient, code, "")
 	refreshToken, ok := tokens["refresh_token"].(string)
@@ -316,7 +316,7 @@ func TestAPIClientAuthenticationPut_RotatingAConfidentialSecret_DoesNotRevoke(t 
 
 	clientSecret := fake.LetterN(32)
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
-	defer func() { _ = database.DeleteClient(nil, code.ClientId) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, code.ClientId) }()
 
 	tokens := redeemCode(t, httpClient, code, clientSecret)
 	refreshToken, ok := tokens["refresh_token"].(string)
@@ -339,7 +339,7 @@ func TestAPIClientAuthenticationPut_SavingAnAlreadyPublicClient_DoesNotRevoke(t 
 
 	httpClient, code := createAuthCode(t, fake.LetterN(32), "openid profile email",
 		authCodeOptions{isPublic: true})
-	defer func() { _ = database.DeleteClient(nil, code.ClientId) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, code.ClientId) }()
 
 	tokens := redeemCode(t, httpClient, code, "")
 	refreshToken, ok := tokens["refresh_token"].(string)
@@ -369,8 +369,8 @@ func TestAPIClientAuthenticationPut_FlipToPublic_SetsPKCERequired(t *testing.T) 
 		AuthorizationCodeEnabled: true,
 		PKCERequired:             &pkceOptional,
 	}
-	require.NoError(t, database.CreateClient(nil, client))
-	defer func() { _ = database.DeleteClient(nil, client.Id) }()
+	require.NoError(t, database.CreateClient(context.Background(), nil, client))
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
 	body := flipToPublic(t, adminToken, client.Id)
 

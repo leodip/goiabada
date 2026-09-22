@@ -36,7 +36,7 @@ func TestDCR_AStorageFailureLogsOnceAndKeepsTheRFC7591Envelope(t *testing.T) {
 	auditLogger := mocks_audit.NewAuditLogger(t)
 	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 
-	database.On("CreateClient", (*sql.Tx)(nil), mock.Anything).
+	database.On("CreateClient", mock.Anything, (*sql.Tx)(nil), mock.Anything).
 		Return(errors.New("the disk is full")).Once()
 
 	body, err := json.Marshal(oidc.DynamicClientRegistrationRequest{

@@ -28,9 +28,9 @@ func TestAPIAccountConsentsGet_Success(t *testing.T) {
 		Enabled:          true,
 		IsPublic:         true,
 	}
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
-	defer func() { _ = database.DeleteClient(nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
 	consent := &models.UserConsent{
 		UserId:    u.Id,
@@ -114,9 +114,9 @@ func TestAPIAccountConsentDelete_Success(t *testing.T) {
 		Enabled:          true,
 		IsPublic:         true,
 	}
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
-	defer func() { _ = database.DeleteClient(nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
 	consent := &models.UserConsent{
 		UserId:    u.Id,
@@ -168,9 +168,9 @@ func TestAPIAccountConsentDelete_ForbiddenOnOtherUser(t *testing.T) {
 		Enabled:          true,
 		IsPublic:         true,
 	}
-	err = database.CreateClient(nil, client)
+	err = database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
-	defer func() { _ = database.DeleteClient(nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
 	consent := &models.UserConsent{
 		UserId:    user2.Id,
