@@ -399,10 +399,10 @@ func newClientAndRedirectUri(t *testing.T, acrLevel models.AcrLevel) (*models.Cl
 		ConsentRequired:          false,
 		DefaultAcrLevel:          acrLevel,
 	}
-	require.NoError(t, database.CreateClient(nil, client))
+	require.NoError(t, database.CreateClient(context.Background(), nil, client))
 
 	redirectUri := &models.RedirectURI{ClientId: client.Id, URI: fake.URL()}
-	require.NoError(t, database.CreateRedirectURI(nil, redirectUri))
+	require.NoError(t, database.CreateRedirectURI(context.Background(), nil, redirectUri))
 
 	return client, redirectUri
 }

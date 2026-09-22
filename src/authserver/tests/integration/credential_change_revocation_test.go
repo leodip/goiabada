@@ -335,10 +335,10 @@ func createOfflineGrant(t *testing.T) *offlineGrant {
 		RefreshTokenOfflineIdleTimeoutInSeconds: 3600,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 86400,
 	}
-	require.NoError(t, database.CreateClient(nil, client))
+	require.NoError(t, database.CreateClient(context.Background(), nil, client))
 
 	redirectURI := &models.RedirectURI{ClientId: client.Id, URI: "https://example.com/callback"}
-	require.NoError(t, database.CreateRedirectURI(nil, redirectURI))
+	require.NoError(t, database.CreateRedirectURI(context.Background(), nil, redirectURI))
 
 	password := fake.Password(12)
 	passwordHashed, err := passwordhash.Hash(password)
@@ -356,9 +356,9 @@ func createOfflineGrant(t *testing.T) *offlineGrant {
 	// requested: the authorize validator rejects it explicitly, because an OpenID Connect scope
 	// causes the server to inject it into the access token itself. That injection is what lets
 	// the resulting token call /userinfo below.
-	authserverResource, err := database.GetResourceByResourceIdentifier(nil, constants.AuthServerResourceIdentifier)
+	authserverResource, err := database.GetResourceByResourceIdentifier(context.Background(), nil, constants.AuthServerResourceIdentifier)
 	require.NoError(t, err)
-	permissions, err := database.GetPermissionsByResourceId(nil, authserverResource.Id)
+	permissions, err := database.GetPermissionsByResourceId(context.Background(), nil, authserverResource.Id)
 	require.NoError(t, err)
 	for i := range permissions {
 		if permissions[i].PermissionIdentifier == constants.ManageAccountPermissionIdentifier {

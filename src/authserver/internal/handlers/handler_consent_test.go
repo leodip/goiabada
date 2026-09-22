@@ -227,7 +227,7 @@ func TestHandleConsentGet(t *testing.T) {
 		user := &models.User{Id: 1}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
 
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(nil, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(nil, nil)
 
 		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err.Error() == "client not found"
@@ -270,11 +270,11 @@ func TestHandleConsentGet(t *testing.T) {
 			ShowDescription:  true,
 			ShowWebsiteURL:   true,
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		database.On("GetConsentByUserIdAndClientId", mock.Anything, mock.Anything, int64(1), int64(1)).Return(nil, nil)
 
-		database.On("ClientHasLogo", mock.Anything, int64(1)).Return(true, nil)
+		database.On("ClientHasLogo", mock.Anything, mock.Anything, int64(1)).Return(true, nil)
 
 		httpHelper.On("RenderTemplate", rr, req, "/layouts/auth_layout.html", "/consent.html", mock.MatchedBy(func(data map[string]interface{}) bool {
 			scopes, ok := data["scopes"].([]ScopeInfo)
@@ -323,7 +323,7 @@ func TestHandleConsentGet(t *testing.T) {
 			ClientIdentifier: "test-client",
 			Description:      "Test Client",
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		consent := &models.UserConsent{
 			UserId:   1,
@@ -373,7 +373,7 @@ func TestHandleConsentGet(t *testing.T) {
 			Description:      "Test Client",
 			ShowDescription:  true,
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		consent := &models.UserConsent{
 			UserId:   1,
@@ -425,7 +425,7 @@ func TestHandleConsentGet(t *testing.T) {
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(&models.User{Id: 1}, nil)
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
 			Return(&models.Client{Id: 1, ClientIdentifier: "test-client"}, nil)
 		database.On("GetConsentByUserIdAndClientId", mock.Anything, mock.Anything, int64(1), int64(1)).Return(nil, nil)
 
@@ -864,7 +864,7 @@ func TestHandleConsentPost(t *testing.T) {
 			Id:               1,
 			ClientIdentifier: "test-client",
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		user := &models.User{Id: 1}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
@@ -926,7 +926,7 @@ func TestHandleConsentPost(t *testing.T) {
 			Id:               1,
 			ClientIdentifier: "test-client",
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		user := &models.User{Id: 1}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
@@ -994,7 +994,7 @@ func TestHandleConsentPost(t *testing.T) {
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 		client := &models.Client{Id: 1, ClientIdentifier: "test-client"}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		user := &models.User{Id: 1}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
@@ -1080,7 +1080,7 @@ func TestHandleConsentPost(t *testing.T) {
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 		client := &models.Client{Id: 1, ClientIdentifier: "test-client"}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		user := &models.User{Id: 1}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
@@ -1139,7 +1139,7 @@ func TestHandleConsentPost(t *testing.T) {
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 		client := &models.Client{Id: 1, ClientIdentifier: "test-client"}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		user := &models.User{Id: 1}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
@@ -1214,7 +1214,7 @@ func TestHandleConsentPost(t *testing.T) {
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 		client := &models.Client{Id: 1, ClientIdentifier: "test-client"}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		user := &models.User{Id: 1}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
@@ -1289,7 +1289,7 @@ func TestHandleConsentPost(t *testing.T) {
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 		client := &models.Client{Id: 1, ClientIdentifier: "test-client"}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		user := &models.User{Id: 1}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
@@ -1355,7 +1355,7 @@ func TestHandleConsentPost(t *testing.T) {
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
 		client := &models.Client{Id: 1, ClientIdentifier: "test-client"}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		user := &models.User{Id: 1}
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil)
@@ -1869,7 +1869,7 @@ func TestHandleConsentPost(t *testing.T) {
 					expectedScope := strings.Join(grantedScopes, " ")
 
 					client := &models.Client{Id: 1, ClientIdentifier: "test-client"}
-					database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+					database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 					database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(&models.User{Id: 1}, nil)
 					database.On("GetConsentByUserIdAndClientId", mock.Anything, mock.Anything, int64(1), int64(1)).Return(nil, nil)
 
@@ -1942,7 +1942,7 @@ func TestHandleConsentPost(t *testing.T) {
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
 			Return(&models.Client{Id: 1, ClientIdentifier: "test-client"}, nil)
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(&models.User{Id: 1}, nil)
 		database.On("GetConsentByUserIdAndClientId", mock.Anything, mock.Anything, int64(1), int64(1)).

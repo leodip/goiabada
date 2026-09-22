@@ -51,7 +51,7 @@ func (pc *PermissionChecker) UserHasScopePermission(ctx context.Context, userId 
 	resourceIdentifier := parts[0]
 	permissionIdentifier := parts[1]
 
-	resource, err := pc.database.GetResourceByResourceIdentifier(nil, resourceIdentifier)
+	resource, err := pc.database.GetResourceByResourceIdentifier(ctx, nil, resourceIdentifier)
 	if err != nil {
 		return false, err
 	}
@@ -59,7 +59,7 @@ func (pc *PermissionChecker) UserHasScopePermission(ctx context.Context, userId 
 		return false, err
 	}
 
-	permissions, err := pc.database.GetPermissionsByResourceId(nil, resource.Id)
+	permissions, err := pc.database.GetPermissionsByResourceId(ctx, nil, resource.Id)
 	if err != nil {
 		return false, err
 	}

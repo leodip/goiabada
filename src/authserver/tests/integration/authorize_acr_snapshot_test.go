@@ -48,13 +48,13 @@ func TestAcrSnapshot_ClientRaisedMidCeremonyDoesNotElevateTheAcr(t *testing.T) {
 		ConsentRequired:          false,
 		DefaultAcrLevel:          models.AcrLevel1,
 	}
-	require.NoError(t, database.CreateClient(nil, client))
+	require.NoError(t, database.CreateClient(context.Background(), nil, client))
 
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
 		URI:      "https://example.com/callback",
 	}
-	require.NoError(t, database.CreateRedirectURI(nil, redirectUri))
+	require.NoError(t, database.CreateRedirectURI(context.Background(), nil, redirectUri))
 
 	password := fake.Password(10)
 	passwordHashed, err := passwordhash.Hash(password)
@@ -108,7 +108,7 @@ func TestAcrSnapshot_ClientRaisedMidCeremonyDoesNotElevateTheAcr(t *testing.T) {
 
 	// The administrator tightens the client's policy, mid-ceremony.
 	client.DefaultAcrLevel = models.AcrLevel2Mandatory
-	require.NoError(t, database.UpdateClient(nil, client))
+	require.NoError(t, database.UpdateClient(context.Background(), nil, client))
 
 	resp = loadPage(t, httpClient, loc)
 	loc = assertRedirect(t, resp, "/auth/issue")

@@ -124,7 +124,7 @@ func HandleAPIUsersSearchGet(
 			}
 
 			// Verify permission exists and enforce userinfo special case
-			perm, err := database.GetPermissionById(nil, permId)
+			perm, err := database.GetPermissionById(r.Context(), nil, permId)
 			if err != nil {
 				writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: failed to get permission by ID"), "permission_id", permId)
 				return
@@ -133,7 +133,7 @@ func HandleAPIUsersSearchGet(
 				writeJSONError(w, "Permission not found", "NOT_FOUND", http.StatusNotFound)
 				return
 			}
-			resource, err := database.GetResourceById(nil, perm.ResourceId)
+			resource, err := database.GetResourceById(r.Context(), nil, perm.ResourceId)
 			if err != nil {
 				writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: failed to get resource for permission annotation"), "permission_id", permId)
 				return

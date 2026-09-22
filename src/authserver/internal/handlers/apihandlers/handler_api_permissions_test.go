@@ -15,6 +15,7 @@ import (
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/validators"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
 // TestHandleAPIResourcePermissionsPut_BuiltInPermissionMissingFromDB verifies that when
@@ -46,8 +47,8 @@ func TestHandleAPIResourcePermissionsPut_BuiltInPermissionMissingFromDB(t *testi
 		{Id: 16, PermissionIdentifier: constants.ManageSettingsPermissionIdentifier, ResourceId: 1, Description: "Manage settings"},
 	}
 
-	database.On("GetResourceById", (*sql.Tx)(nil), int64(1)).Return(resource, nil)
-	database.On("GetPermissionsByResourceId", (*sql.Tx)(nil), int64(1)).Return(existingPerms, nil)
+	database.On("GetResourceById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(resource, nil)
+	database.On("GetPermissionsByResourceId", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(existingPerms, nil)
 
 	// Build a valid request body that includes all the permissions we have
 	var permUpserts []api.ResourcePermissionUpsert

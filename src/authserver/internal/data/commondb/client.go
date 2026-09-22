@@ -10,7 +10,7 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 )
 
-func (d *CommonDatabase) CreateClient(tx *sql.Tx, client *models.Client) error {
+func (d *CommonDatabase) CreateClient(ctx context.Context, tx *sql.Tx, client *models.Client) error {
 
 	now := time.Now().UTC()
 
@@ -24,7 +24,7 @@ func (d *CommonDatabase) CreateClient(tx *sql.Tx, client *models.Client) error {
 
 	insertBuilder := clientStruct.WithoutTag("pk").InsertInto("clients", client)
 
-	id, err := d.insertReturningId(context.Background(), tx, insertBuilder, "client")
+	id, err := d.insertReturningId(ctx, tx, insertBuilder, "client")
 	if err != nil {
 		client.CreatedAt = originalCreatedAt
 		client.UpdatedAt = originalUpdatedAt
@@ -35,7 +35,7 @@ func (d *CommonDatabase) CreateClient(tx *sql.Tx, client *models.Client) error {
 	return nil
 }
 
-func (d *CommonDatabase) UpdateClient(tx *sql.Tx, client *models.Client) error {
+func (d *CommonDatabase) UpdateClient(ctx context.Context, tx *sql.Tx, client *models.Client) error {
 
 	if client.Id == 0 {
 		return errs.New("can't update client with id 0")
@@ -51,7 +51,7 @@ func (d *CommonDatabase) UpdateClient(tx *sql.Tx, client *models.Client) error {
 	updateBuilder.Where(updateBuilder.Equal("id", client.Id))
 
 	sql, args := updateBuilder.Build()
-	_, err := d.ExecSql(context.Background(), tx, sql, args...)
+	_, err := d.ExecSql(ctx, tx, sql, args...)
 	if err != nil {
 		client.UpdatedAt = originalUpdatedAt
 		return errs.Wrap(err, "unable to update client")
@@ -85,7 +85,7 @@ func (d *CommonDatabase) UpdateClient(tx *sql.Tx, client *models.Client) error {
 //
 // The transaction is required rather than optional. Without one the statement autocommits and
 // drops the row before the caller's read runs, which is the whole of what this buys.
-func (d *CommonDatabase) AcquireClientRow(tx *sql.Tx, clientId int64) error {
+func (d *CommonDatabase) AcquireClientRow(ctx context.Context, tx *sql.Tx, clientId int64) error {
 
 	if tx == nil {
 		return errs.New("acquiring a client row requires a transaction: an autocommitted statement releases the row before the caller can read it")
@@ -101,7 +101,7 @@ func (d *CommonDatabase) AcquireClientRow(tx *sql.Tx, clientId int64) error {
 	acquire.Where(acquire.Equal("id", clientId))
 
 	query, args := acquire.BuildWithFlavor(d.Flavor)
-	if _, err := d.ExecSql(context.Background(), tx, query, args...); err != nil {
+	if _, err := d.ExecSql(ctx, tx, query, args...); err != nil {
 		return errs.Wrap(err, "unable to acquire client row")
 	}
 
@@ -145,7 +145,7 @@ func (d *CommonDatabase) AcquireClientRow(tx *sql.Tx, clientId int64) error {
 // The transaction is required rather than optional, for the reason RevokeClientGrants states
 // about its own: without one, each statement autocommits and the acquisition drops its lock
 // before the classification runs, which is the whole mechanism.
-func (d *CommonDatabase) SetClientPublic(tx *sql.Tx, clientId int64) (bool, error) {
+func (d *CommonDatabase) SetClientPublic(ctx context.Context, tx *sql.Tx, clientId int64) (bool, error) {
 
 	if tx == nil {
 		return false, errs.New("making a client public requires a transaction: the row must be held between acquiring it and classifying the write")
@@ -155,7 +155,7 @@ func (d *CommonDatabase) SetClientPublic(tx *sql.Tx, clientId int64) (bool, erro
 		return false, errs.New("can't make a client public with an id of 0")
 	}
 
-	if err := d.AcquireClientRow(tx, clientId); err != nil {
+	if err := d.AcquireClientRow(ctx, tx, clientId); err != nil {
 		return false, err
 	}
 
@@ -173,7 +173,7 @@ func (d *CommonDatabase) SetClientPublic(tx *sql.Tx, clientId int64) (bool, erro
 	)
 
 	query, args := classify.BuildWithFlavor(d.Flavor)
-	result, err := d.ExecSql(context.Background(), tx, query, args...)
+	result, err := d.ExecSql(ctx, tx, query, args...)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to make client public")
 	}
@@ -190,7 +190,7 @@ func (d *CommonDatabase) SetClientPublic(tx *sql.Tx, clientId int64) (bool, erro
 	// rather than reported as the same thing. This read DECIDES NOTHING about the transition:
 	// that answer is already in hand above, and the row is held by the acquisition, so all this
 	// can observe is whether there is a client to have saved at all.
-	client, err := d.GetClientById(context.Background(), tx, clientId)
+	client, err := d.GetClientById(ctx, tx, clientId)
 	if err != nil {
 		return false, err
 	}
@@ -242,7 +242,7 @@ func (d *CommonDatabase) GetClientById(ctx context.Context, tx *sql.Tx, clientId
 	return client, nil
 }
 
-func (d *CommonDatabase) GetClientByClientIdentifier(tx *sql.Tx, clientIdentifier string) (*models.Client, error) {
+func (d *CommonDatabase) GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*models.Client, error) {
 
 	clientStruct := sqlbuilder.NewStruct(new(models.Client)).
 		For(d.Flavor)
@@ -250,7 +250,7 @@ func (d *CommonDatabase) GetClientByClientIdentifier(tx *sql.Tx, clientIdentifie
 	selectBuilder := clientStruct.SelectFrom("clients")
 	selectBuilder.Where(selectBuilder.Equal("client_identifier", clientIdentifier))
 
-	client, err := d.getClientCommon(context.Background(), tx, selectBuilder, clientStruct)
+	client, err := d.getClientCommon(ctx, tx, selectBuilder, clientStruct)
 	if err != nil {
 		return nil, err
 	}
@@ -263,14 +263,14 @@ func (d *CommonDatabase) GetClientByClientIdentifier(tx *sql.Tx, clientIdentifie
 	return client, nil
 }
 
-func (d *CommonDatabase) ClientLoadRedirectURIs(tx *sql.Tx, client *models.Client) error {
+func (d *CommonDatabase) ClientLoadRedirectURIs(ctx context.Context, tx *sql.Tx, client *models.Client) error {
 
 	if client == nil {
 		return nil
 	}
 
 	var err error
-	client.RedirectURIs, err = d.GetRedirectURIsByClientId(tx, client.Id)
+	client.RedirectURIs, err = d.GetRedirectURIsByClientId(ctx, tx, client.Id)
 	if err != nil {
 		return errs.Wrap(err, "unable to get redirect URIs")
 	}
@@ -278,14 +278,14 @@ func (d *CommonDatabase) ClientLoadRedirectURIs(tx *sql.Tx, client *models.Clien
 	return nil
 }
 
-func (d *CommonDatabase) ClientLoadWebOrigins(tx *sql.Tx, client *models.Client) error {
+func (d *CommonDatabase) ClientLoadWebOrigins(ctx context.Context, tx *sql.Tx, client *models.Client) error {
 
 	if client == nil {
 		return nil
 	}
 
 	var err error
-	client.WebOrigins, err = d.GetWebOriginsByClientId(tx, client.Id)
+	client.WebOrigins, err = d.GetWebOriginsByClientId(ctx, tx, client.Id)
 	if err != nil {
 		return errs.Wrap(err, "unable to get web origins")
 	}
@@ -340,13 +340,13 @@ func (d *CommonDatabase) GetClientsByIds(ctx context.Context, tx *sql.Tx, client
 	return clients, nil
 }
 
-func (d *CommonDatabase) ClientLoadPermissions(tx *sql.Tx, client *models.Client) error {
+func (d *CommonDatabase) ClientLoadPermissions(ctx context.Context, tx *sql.Tx, client *models.Client) error {
 
 	if client == nil {
 		return nil
 	}
 
-	clientPermissions, err := d.GetClientPermissionsByClientId(tx, client.Id)
+	clientPermissions, err := d.GetClientPermissionsByClientId(ctx, tx, client.Id)
 	if err != nil {
 		return err
 	}
@@ -356,7 +356,7 @@ func (d *CommonDatabase) ClientLoadPermissions(tx *sql.Tx, client *models.Client
 		permissionIds = append(permissionIds, clientPermission.PermissionId)
 	}
 
-	client.Permissions, err = d.GetPermissionsByIds(tx, permissionIds)
+	client.Permissions, err = d.GetPermissionsByIds(ctx, tx, permissionIds)
 	if err != nil {
 		return err
 	}
@@ -364,7 +364,7 @@ func (d *CommonDatabase) ClientLoadPermissions(tx *sql.Tx, client *models.Client
 	return nil
 }
 
-func (d *CommonDatabase) GetAllClients(tx *sql.Tx) ([]models.Client, error) {
+func (d *CommonDatabase) GetAllClients(ctx context.Context, tx *sql.Tx) ([]models.Client, error) {
 
 	clientStruct := sqlbuilder.NewStruct(new(models.Client)).
 		For(d.Flavor)
@@ -372,7 +372,7 @@ func (d *CommonDatabase) GetAllClients(tx *sql.Tx) ([]models.Client, error) {
 	selectBuilder := clientStruct.SelectFrom("clients")
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(context.Background(), tx, sql, args...)
+	rows, err := d.QuerySql(ctx, tx, sql, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -406,10 +406,10 @@ func (d *CommonDatabase) GetAllClients(tx *sql.Tx) ([]models.Client, error) {
 // itself, and a transaction of this shape racing an authorization ceremony for the same
 // client, or a termination of a session that holds this client's tokens, is answered by
 // RunInTransaction rerunning whichever of the two the engine aborts (#301).
-func (d *CommonDatabase) DeleteClient(tx *sql.Tx, clientId int64) error {
+func (d *CommonDatabase) DeleteClient(ctx context.Context, tx *sql.Tx, clientId int64) error {
 
-	return d.inTransaction(context.Background(), tx, func(tx *sql.Tx) error {
-		if err := d.deleteRefreshTokensByColumn(context.Background(), tx, "client_id", clientId); err != nil {
+	return d.inTransaction(ctx, tx, func(tx *sql.Tx) error {
+		if err := d.deleteRefreshTokensByColumn(ctx, tx, "client_id", clientId); err != nil {
 			return err
 		}
 
@@ -420,7 +420,7 @@ func (d *CommonDatabase) DeleteClient(tx *sql.Tx, clientId int64) error {
 		deleteBuilder.Where(deleteBuilder.Equal("id", clientId))
 
 		sql, args := deleteBuilder.Build()
-		_, err := d.ExecSql(context.Background(), tx, sql, args...)
+		_, err := d.ExecSql(ctx, tx, sql, args...)
 		if err != nil {
 			return errs.Wrap(err, "unable to delete client")
 		}

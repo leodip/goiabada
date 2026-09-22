@@ -52,7 +52,7 @@ func TestToken_AuthCode_ChallengelessCode_RefusedAfterClientBecomesPublic(t *tes
 	require.NoError(t, err)
 	client.IsPublic = true
 	client.ClientSecretEncrypted = nil
-	require.NoError(t, database.UpdateClient(nil, client))
+	require.NoError(t, database.UpdateClient(context.Background(), nil, client))
 
 	// No secret and no verifier, which is everything a public client has to present.
 	data := postToTokenEndpoint(t, createHttpClient(t), destUrl, url.Values{
@@ -97,7 +97,7 @@ func TestToken_AuthCode_ChallengelessCode_SurvivesTurningPKCEOnForAConfidentialC
 	require.NoError(t, err)
 	pkceRequired := true
 	client.PKCERequired = &pkceRequired
-	require.NoError(t, database.UpdateClient(nil, client))
+	require.NoError(t, database.UpdateClient(context.Background(), nil, client))
 
 	data := postToTokenEndpoint(t, createHttpClient(t), destUrl, url.Values{
 		"grant_type":    {"authorization_code"},

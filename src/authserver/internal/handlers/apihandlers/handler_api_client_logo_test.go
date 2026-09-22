@@ -91,7 +91,7 @@ func TestHandleAPIClientLogoGet_HasLogo(t *testing.T) {
 	rr := httptest.NewRecorder()
 
 	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(client, nil)
-	database.On("ClientHasLogo", (*sql.Tx)(nil), int64(123)).Return(true, nil)
+	database.On("ClientHasLogo", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(true, nil)
 
 	handler.ServeHTTP(rr, req)
 
@@ -118,7 +118,7 @@ func TestHandleAPIClientLogoGet_NoLogo(t *testing.T) {
 	rr := httptest.NewRecorder()
 
 	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(client, nil)
-	database.On("ClientHasLogo", (*sql.Tx)(nil), int64(123)).Return(false, nil)
+	database.On("ClientHasLogo", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(false, nil)
 
 	handler.ServeHTTP(rr, req)
 
@@ -245,8 +245,8 @@ func TestHandleAPIClientLogoPost_CreateNew(t *testing.T) {
 	rr := httptest.NewRecorder()
 
 	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(client, nil)
-	database.On("GetClientLogoByClientId", (*sql.Tx)(nil), int64(123)).Return(nil, nil)
-	database.On("CreateClientLogo", (*sql.Tx)(nil), mock.MatchedBy(func(cl *models.ClientLogo) bool {
+	database.On("GetClientLogoByClientId", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(nil, nil)
+	database.On("CreateClientLogo", mock.Anything, (*sql.Tx)(nil), mock.MatchedBy(func(cl *models.ClientLogo) bool {
 		return cl.ClientId == int64(123) && cl.ContentType == "image/png"
 	})).Return(nil)
 
@@ -291,8 +291,8 @@ func TestHandleAPIClientLogoPost_UpdateExisting(t *testing.T) {
 	rr := httptest.NewRecorder()
 
 	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(client, nil)
-	database.On("GetClientLogoByClientId", (*sql.Tx)(nil), int64(123)).Return(existingLogo, nil)
-	database.On("UpdateClientLogo", (*sql.Tx)(nil), mock.MatchedBy(func(cl *models.ClientLogo) bool {
+	database.On("GetClientLogoByClientId", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(existingLogo, nil)
+	database.On("UpdateClientLogo", mock.Anything, (*sql.Tx)(nil), mock.MatchedBy(func(cl *models.ClientLogo) bool {
 		return cl.Id == existingLogo.Id && cl.ContentType == "image/png"
 	})).Return(nil)
 
@@ -395,7 +395,7 @@ func TestHandleAPIClientLogoDelete_Success(t *testing.T) {
 	rr := httptest.NewRecorder()
 
 	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(client, nil)
-	database.On("DeleteClientLogo", (*sql.Tx)(nil), int64(123)).Return(nil)
+	database.On("DeleteClientLogo", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(nil)
 
 	auditLogger.On("Log", mock.Anything, audit.AuditDeletedClientLogo, mock.MatchedBy(func(details map[string]interface{}) bool {
 		return details["clientId"] == client.Id && details["loggedInUser"] == adminSub
@@ -427,7 +427,7 @@ func TestHandleAPIClientLogoDelete_DatabaseError(t *testing.T) {
 	rr := httptest.NewRecorder()
 
 	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(client, nil)
-	database.On("DeleteClientLogo", (*sql.Tx)(nil), int64(123)).Return(assert.AnError)
+	database.On("DeleteClientLogo", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(assert.AnError)
 
 	handler.ServeHTTP(rr, req)
 

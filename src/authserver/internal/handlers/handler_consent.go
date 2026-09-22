@@ -91,7 +91,7 @@ func HandleConsentGet(
 			return
 		}
 
-		client, err := database.GetClientByClientIdentifier(nil, authContext.ClientId)
+		client, err := database.GetClientByClientIdentifier(r.Context(), nil, authContext.ClientId)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
@@ -282,7 +282,7 @@ func HandleConsentPost(
 				return
 			} else {
 
-				client, err := database.GetClientByClientIdentifier(nil, authContext.ClientId)
+				client, err := database.GetClientByClientIdentifier(r.Context(), nil, authContext.ClientId)
 				if err != nil {
 					httpHelper.InternalServerError(w, r, err)
 					return

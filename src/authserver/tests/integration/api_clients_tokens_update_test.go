@@ -23,7 +23,7 @@ func TestAPIClientTokensPut_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	client := createTestClientUnique(t, true)
-	defer func() { _ = database.DeleteClient(nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
 	req := api.UpdateClientTokensRequest{
 		TokenExpirationInSeconds:                3600,
@@ -64,7 +64,7 @@ func TestAPIClientTokensPut_ValidationErrors(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	client := createTestClientUnique(t, true)
-	defer func() { _ = database.DeleteClient(nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
 	baseURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/tokens"
 
@@ -163,7 +163,7 @@ func TestAPIClientTokensPut_InvalidRequestBodyAndUnauthorized(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	client := createTestClientUnique(t, true)
-	defer func() { _ = database.DeleteClient(nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/tokens"
 
@@ -206,14 +206,14 @@ func TestAPIClientTokensPut_InsufficientScope(t *testing.T) {
 		IsPublic:                 false,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
-	err = database.CreateClient(nil, client)
+	err = database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
-	defer func() { _ = database.DeleteClient(nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
 	// Grant auth-server:userinfo permission
-	authRes, err := database.GetResourceByResourceIdentifier(nil, constants.AuthServerResourceIdentifier)
+	authRes, err := database.GetResourceByResourceIdentifier(context.Background(), nil, constants.AuthServerResourceIdentifier)
 	assert.NoError(t, err)
-	perms, err := database.GetPermissionsByResourceId(nil, authRes.Id)
+	perms, err := database.GetPermissionsByResourceId(context.Background(), nil, authRes.Id)
 	assert.NoError(t, err)
 	var userinfoPerm *models.Permission
 	for i := range perms {
@@ -223,7 +223,7 @@ func TestAPIClientTokensPut_InsufficientScope(t *testing.T) {
 		}
 	}
 	assert.NotNil(t, userinfoPerm)
-	err = database.CreateClientPermission(nil, &models.ClientPermission{ClientId: client.Id, PermissionId: userinfoPerm.Id})
+	err = database.CreateClientPermission(context.Background(), nil, &models.ClientPermission{ClientId: client.Id, PermissionId: userinfoPerm.Id})
 	assert.NoError(t, err)
 
 	// Get token with only auth-server:userinfo scope
@@ -242,7 +242,7 @@ func TestAPIClientTokensPut_InsufficientScope(t *testing.T) {
 
 	// Create a target client to attempt updating
 	target := createTestClientUnique(t, true)
-	defer func() { _ = database.DeleteClient(nil, target.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, target.Id) }()
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(target.Id, 10) + "/tokens"
 	reqBody := api.UpdateClientTokensRequest{TokenExpirationInSeconds: 1, RefreshTokenOfflineIdleTimeoutInSeconds: 1, RefreshTokenOfflineMaxLifetimeInSeconds: 2, IncludeOpenIDConnectClaimsInAccessToken: "default"}

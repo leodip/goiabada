@@ -30,7 +30,7 @@ func HandleAPIGroupsSearchGet(
 		}
 
 		// Ensure permission exists
-		perm, err := database.GetPermissionById(nil, permId)
+		perm, err := database.GetPermissionById(r.Context(), nil, permId)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting permission by ID for annotation"), "permission_id", permId)
 			return

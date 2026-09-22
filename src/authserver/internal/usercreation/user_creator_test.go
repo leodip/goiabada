@@ -27,9 +27,9 @@ const accountPermissionId = int64(31)
 // expectAccountPermissionLookup registers the two reads that precede the transaction: the
 // authserver resource and its permissions.
 func expectAccountPermissionLookup(db *mocks_data.Database, permissions []models.Permission) {
-	db.On("GetResourceByResourceIdentifier", mock.Anything, constants.AuthServerResourceIdentifier).
+	db.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, constants.AuthServerResourceIdentifier).
 		Return(&models.Resource{Id: 3}, nil).Once()
-	db.On("GetPermissionsByResourceId", mock.Anything, int64(3)).Return(permissions, nil).Once()
+	db.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(3)).Return(permissions, nil).Once()
 }
 
 func accountPermissions() []models.Permission {

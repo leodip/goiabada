@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"net/http"
 	"net/url"
 	"strings"
@@ -63,7 +64,7 @@ func TestAuthorize_ValidateClientAndRedirectURI_ClientIsDisabled(t *testing.T) {
 		Enabled:          false,
 	}
 
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -96,7 +97,7 @@ func TestAuthorize_ValidateClientAndRedirectURI_ClientDoesNotSupportTheAuthoriza
 		AuthorizationCodeEnabled: false,
 	}
 
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -129,7 +130,7 @@ func TestAuthorize_ValidateClientAndRedirectURI_RedirectURIIsMissing(t *testing.
 		AuthorizationCodeEnabled: true,
 	}
 
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -162,7 +163,7 @@ func TestAuthorize_ValidateClientAndRedirectURI_ClientDoesNotHaveRedirectURI(t *
 		AuthorizationCodeEnabled: true,
 	}
 
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -212,12 +213,12 @@ func TestAuthorize_ValidateClientAndRedirectURI_RedirectURIIsNotAbsolute(t *test
 		AuthorizationCodeEnabled: true,
 	}
 
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = database.CreateRedirectURI(nil, &models.RedirectURI{ClientId: client.Id, URI: nonAbsoluteURI})
+	err = database.CreateRedirectURI(context.Background(), nil, &models.RedirectURI{ClientId: client.Id, URI: nonAbsoluteURI})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -37,16 +37,16 @@ func TestAPIClientWebOriginsPut_Success_AddRemoveAndNormalize(t *testing.T) {
 		AuthorizationCodeEnabled: true,
 		ClientCredentialsEnabled: false,
 	}
-	err = database.CreateClient(nil, client)
+	err = database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
-	defer func() { _ = database.DeleteClient(nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
 	// Seed existing web origins
 	originA := "https://a.example.com"
 	originB := "https://b.example.com"
-	err = database.CreateWebOrigin(nil, &models.WebOrigin{ClientId: client.Id, Origin: originA})
+	err = database.CreateWebOrigin(context.Background(), nil, &models.WebOrigin{ClientId: client.Id, Origin: originA})
 	assert.NoError(t, err)
-	err = database.CreateWebOrigin(nil, &models.WebOrigin{ClientId: client.Id, Origin: originB})
+	err = database.CreateWebOrigin(context.Background(), nil, &models.WebOrigin{ClientId: client.Id, Origin: originB})
 	assert.NoError(t, err)
 
 	// Desired: keep A (with spaces and uppercase to test trimming+lowercasing), remove B, add C
@@ -77,7 +77,7 @@ func TestAPIClientWebOriginsPut_Success_AddRemoveAndNormalize(t *testing.T) {
 	// Verify DB reflects the change
 	refreshed, err := database.GetClientById(context.Background(), nil, client.Id)
 	assert.NoError(t, err)
-	err = database.ClientLoadWebOrigins(nil, refreshed)
+	err = database.ClientLoadWebOrigins(context.Background(), nil, refreshed)
 	assert.NoError(t, err)
 	gotDB := map[string]bool{}
 	for _, wo := range refreshed.WebOrigins {
@@ -108,9 +108,9 @@ func TestAPIClientWebOriginsPut_AuthCodeDisabledAccepted(t *testing.T) {
 		AuthorizationCodeEnabled: false,
 		ClientCredentialsEnabled: false,
 	}
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
-	defer func() { _ = database.DeleteClient(nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
 	origin := "https://spa-" + strings.ToLower(fake.LetterN(8)) + ".example.com"
 	reqBody := api.UpdateClientWebOriginsRequest{WebOrigins: []string{origin}}
@@ -128,7 +128,7 @@ func TestAPIClientWebOriginsPut_AuthCodeDisabledAccepted(t *testing.T) {
 	// And it really landed, rather than being echoed back from the request.
 	refreshed, err := database.GetClientById(context.Background(), nil, client.Id)
 	assert.NoError(t, err)
-	err = database.ClientLoadWebOrigins(nil, refreshed)
+	err = database.ClientLoadWebOrigins(context.Background(), nil, refreshed)
 	assert.NoError(t, err)
 	assert.Len(t, refreshed.WebOrigins, 1)
 	assert.Equal(t, origin, refreshed.WebOrigins[0].Origin)
@@ -150,9 +150,9 @@ func TestAPIClientWebOriginsPut_StoresTheCanonicalOrigin(t *testing.T) {
 		AuthorizationCodeEnabled: true,
 		ClientCredentialsEnabled: false,
 	}
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
-	defer func() { _ = database.DeleteClient(nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
 	host := "canon-" + strings.ToLower(fake.LetterN(8)) + ".example.com"
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/web-origins"
@@ -183,7 +183,7 @@ func TestAPIClientWebOriginsPut_StoresTheCanonicalOrigin(t *testing.T) {
 
 			refreshed, err := database.GetClientById(context.Background(), nil, client.Id)
 			assert.NoError(t, err)
-			err = database.ClientLoadWebOrigins(nil, refreshed)
+			err = database.ClientLoadWebOrigins(context.Background(), nil, refreshed)
 			assert.NoError(t, err)
 			assert.Len(t, refreshed.WebOrigins, 1)
 			assert.Equal(t, tc.want, refreshed.WebOrigins[0].Origin)
@@ -232,9 +232,9 @@ func TestAPIClientWebOriginsPut_ValidationErrors(t *testing.T) {
 		AuthorizationCodeEnabled: true,
 		ClientCredentialsEnabled: false,
 	}
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
-	defer func() { _ = database.DeleteClient(nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
 	baseURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/web-origins"
 
@@ -322,9 +322,9 @@ func TestAPIClientWebOriginsPut_NotFound_InvalidId_InvalidBody_Unauthorized(t *t
 		AuthorizationCodeEnabled: true,
 		ClientCredentialsEnabled: false,
 	}
-	err := database.CreateClient(nil, client2)
+	err := database.CreateClient(context.Background(), nil, client2)
 	assert.NoError(t, err)
-	defer func() { _ = database.DeleteClient(nil, client2.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client2.Id) }()
 
 	urlIB := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client2.Id, 10) + "/web-origins"
 	req, err := http.NewRequest("PUT", urlIB, nil)
@@ -365,14 +365,14 @@ func TestAPIClientWebOriginsPut_InsufficientScope(t *testing.T) {
 		IsPublic:                 false,
 		ClientSecretEncrypted:    enc,
 	}
-	err = database.CreateClient(nil, client)
+	err = database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
-	defer func() { _ = database.DeleteClient(nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
 	// Grant auth-server:userinfo permission only
-	authRes, err := database.GetResourceByResourceIdentifier(nil, constants.AuthServerResourceIdentifier)
+	authRes, err := database.GetResourceByResourceIdentifier(context.Background(), nil, constants.AuthServerResourceIdentifier)
 	assert.NoError(t, err)
-	perms, err := database.GetPermissionsByResourceId(nil, authRes.Id)
+	perms, err := database.GetPermissionsByResourceId(context.Background(), nil, authRes.Id)
 	assert.NoError(t, err)
 	var userinfoPerm *models.Permission
 	for i := range perms {
@@ -382,7 +382,7 @@ func TestAPIClientWebOriginsPut_InsufficientScope(t *testing.T) {
 		}
 	}
 	assert.NotNil(t, userinfoPerm)
-	err = database.CreateClientPermission(nil, &models.ClientPermission{ClientId: client.Id, PermissionId: userinfoPerm.Id})
+	err = database.CreateClientPermission(context.Background(), nil, &models.ClientPermission{ClientId: client.Id, PermissionId: userinfoPerm.Id})
 	assert.NoError(t, err)
 
 	// Get token with only authserver:userinfo scope
@@ -407,9 +407,9 @@ func TestAPIClientWebOriginsPut_InsufficientScope(t *testing.T) {
 		AuthorizationCodeEnabled: true,
 		ClientCredentialsEnabled: false,
 	}
-	err = database.CreateClient(nil, target)
+	err = database.CreateClient(context.Background(), nil, target)
 	assert.NoError(t, err)
-	defer func() { _ = database.DeleteClient(nil, target.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, target.Id) }()
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(target.Id, 10) + "/web-origins"
 	reqBody := api.UpdateClientWebOriginsRequest{WebOrigins: []string{"https://example.com"}}

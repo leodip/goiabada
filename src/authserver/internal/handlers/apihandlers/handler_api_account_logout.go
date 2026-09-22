@@ -49,14 +49,14 @@ func HandleAPIAccountLogoutRequestPost(
 		var client *models.Client
 		var err error
 		if req.ClientIdentifier != "" {
-			client, err = database.GetClientByClientIdentifier(nil, req.ClientIdentifier)
+			client, err = database.GetClientByClientIdentifier(r.Context(), nil, req.ClientIdentifier)
 			if err != nil || client == nil {
 				writeJSONError(w, "Invalid client identifier", "VALIDATION_ERROR", http.StatusBadRequest)
 				return
 			}
 		} else {
 			// Automatic resolution by post_logout_redirect_uri
-			clients, err := database.GetAllClients(nil)
+			clients, err := database.GetAllClients(r.Context(), nil)
 			if err != nil {
 				writeInternalServerError(w, r, err)
 				return
@@ -64,7 +64,7 @@ func HandleAPIAccountLogoutRequestPost(
 			var matches []*models.Client
 			for i := range clients {
 				c := &clients[i]
-				if derr := database.ClientLoadRedirectURIs(nil, c); derr != nil {
+				if derr := database.ClientLoadRedirectURIs(r.Context(), nil, c); derr != nil {
 					writeInternalServerError(w, r, err)
 					return
 				}
@@ -83,7 +83,7 @@ func HandleAPIAccountLogoutRequestPost(
 		}
 
 		// Validate redirect URI belongs to client
-		if err = database.ClientLoadRedirectURIs(nil, client); err != nil {
+		if err = database.ClientLoadRedirectURIs(r.Context(), nil, client); err != nil {
 			writeInternalServerError(w, r, err)
 			return
 		}

@@ -475,7 +475,7 @@ func TestDeleteIdleSessions(t *testing.T) {
 		IncludeOpenIDConnectClaimsInAccessToken: "no",
 		DefaultAcrLevel:                         models.AcrLevel1,
 	}
-	err = database.CreateClient(nil, client)
+	err = database.CreateClient(context.Background(), nil, client)
 	if err != nil {
 		t.Fatalf("Failed to create test client: %v", err)
 	}
@@ -673,7 +673,7 @@ func TestDeleteExpiredSessions(t *testing.T) {
 		IncludeOpenIDConnectClaimsInAccessToken: "no",
 		DefaultAcrLevel:                         models.AcrLevel1,
 	}
-	err = database.CreateClient(nil, client)
+	err = database.CreateClient(context.Background(), nil, client)
 	if err != nil {
 		t.Fatalf("Failed to create test client: %v", err)
 	}
@@ -1127,7 +1127,7 @@ func TestGetUserSessionsByClientIdPaginated_EnlistsInTheCallersTransaction(t *te
 		ClientIdentifier: "tx_client_" + fake.LetterN(8),
 		Description:      "Transaction pass-through client",
 	}
-	if err := database.CreateClient(tx, client); err != nil {
+	if err := database.CreateClient(context.Background(), tx, client); err != nil {
 		t.Fatalf("Failed to create client inside the transaction: %v", err)
 	}
 

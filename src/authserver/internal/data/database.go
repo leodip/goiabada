@@ -38,8 +38,8 @@ type Database interface {
 	RotateEncryptionKeyIfNeeded(currentKey, previousKey []byte) (bool, error)
 	IsEmpty() (bool, error)
 
-	CreateClient(tx *sql.Tx, client *models.Client) error
-	UpdateClient(tx *sql.Tx, client *models.Client) error
+	CreateClient(ctx context.Context, tx *sql.Tx, client *models.Client) error
+	UpdateClient(ctx context.Context, tx *sql.Tx, client *models.Client) error
 	// SetClientPublic makes one client public and reports whether THIS call performed
 	// the confidential-to-public transition, which is the write that removes the
 	// client's obligation to authenticate and so the one that must revoke its
@@ -50,7 +50,7 @@ type Database interface {
 	// themselves rather than by a read the caller compares against, because a read and
 	// the write after it can straddle another writer's commit, and a classification
 	// taken from the stale side leaves the grants alive.
-	SetClientPublic(tx *sql.Tx, clientId int64) (bool, error)
+	SetClientPublic(ctx context.Context, tx *sql.Tx, clientId int64) (bool, error)
 	// AcquireClientRow takes the client's row inside the caller's transaction and holds it
 	// until that transaction ends, so a read taken afterwards cannot be invalidated by
 	// another writer before the caller writes it back (see #245).
@@ -63,15 +63,15 @@ type Database interface {
 	//
 	// A transaction is required: without one the statement autocommits and the row is
 	// released before the read even runs.
-	AcquireClientRow(tx *sql.Tx, clientId int64) error
+	AcquireClientRow(ctx context.Context, tx *sql.Tx, clientId int64) error
 	GetClientById(ctx context.Context, tx *sql.Tx, clientId int64) (*models.Client, error)
 	GetClientsByIds(ctx context.Context, tx *sql.Tx, clientIds []int64) ([]models.Client, error)
-	GetClientByClientIdentifier(tx *sql.Tx, clientIdentifier string) (*models.Client, error)
-	GetAllClients(tx *sql.Tx) ([]models.Client, error)
-	DeleteClient(tx *sql.Tx, clientId int64) error
-	ClientLoadRedirectURIs(tx *sql.Tx, client *models.Client) error
-	ClientLoadWebOrigins(tx *sql.Tx, client *models.Client) error
-	ClientLoadPermissions(tx *sql.Tx, client *models.Client) error
+	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*models.Client, error)
+	GetAllClients(ctx context.Context, tx *sql.Tx) ([]models.Client, error)
+	DeleteClient(ctx context.Context, tx *sql.Tx, clientId int64) error
+	ClientLoadRedirectURIs(ctx context.Context, tx *sql.Tx, client *models.Client) error
+	ClientLoadWebOrigins(ctx context.Context, tx *sql.Tx, client *models.Client) error
+	ClientLoadPermissions(ctx context.Context, tx *sql.Tx, client *models.Client) error
 
 	CreateUser(ctx context.Context, tx *sql.Tx, user *models.User) error
 	UpdateUser(ctx context.Context, tx *sql.Tx, user *models.User) error
@@ -212,21 +212,21 @@ type Database interface {
 	// token.
 	DeleteUsedCodesWithoutRefreshTokens(ctx context.Context, tx *sql.Tx, createdBefore time.Time) error
 
-	CreateResource(tx *sql.Tx, resource *models.Resource) error
-	UpdateResource(tx *sql.Tx, resource *models.Resource) error
-	GetResourceById(tx *sql.Tx, resourceId int64) (*models.Resource, error)
-	GetResourcesByIds(tx *sql.Tx, resourceIds []int64) ([]models.Resource, error)
-	GetResourceByResourceIdentifier(tx *sql.Tx, resourceIdentifier string) (*models.Resource, error)
-	GetAllResources(tx *sql.Tx) ([]models.Resource, error)
-	DeleteResource(tx *sql.Tx, resourceId int64) error
+	CreateResource(ctx context.Context, tx *sql.Tx, resource *models.Resource) error
+	UpdateResource(ctx context.Context, tx *sql.Tx, resource *models.Resource) error
+	GetResourceById(ctx context.Context, tx *sql.Tx, resourceId int64) (*models.Resource, error)
+	GetResourcesByIds(ctx context.Context, tx *sql.Tx, resourceIds []int64) ([]models.Resource, error)
+	GetResourceByResourceIdentifier(ctx context.Context, tx *sql.Tx, resourceIdentifier string) (*models.Resource, error)
+	GetAllResources(ctx context.Context, tx *sql.Tx) ([]models.Resource, error)
+	DeleteResource(ctx context.Context, tx *sql.Tx, resourceId int64) error
 
-	CreatePermission(tx *sql.Tx, permission *models.Permission) error
-	UpdatePermission(tx *sql.Tx, permission *models.Permission) error
-	GetPermissionById(tx *sql.Tx, permissionId int64) (*models.Permission, error)
-	GetPermissionsByIds(tx *sql.Tx, permissionIds []int64) ([]models.Permission, error)
-	GetPermissionsByResourceId(tx *sql.Tx, resourceId int64) ([]models.Permission, error)
-	DeletePermission(tx *sql.Tx, permissionId int64) error
-	PermissionsLoadResources(tx *sql.Tx, permissions []models.Permission) error
+	CreatePermission(ctx context.Context, tx *sql.Tx, permission *models.Permission) error
+	UpdatePermission(ctx context.Context, tx *sql.Tx, permission *models.Permission) error
+	GetPermissionById(ctx context.Context, tx *sql.Tx, permissionId int64) (*models.Permission, error)
+	GetPermissionsByIds(ctx context.Context, tx *sql.Tx, permissionIds []int64) ([]models.Permission, error)
+	GetPermissionsByResourceId(ctx context.Context, tx *sql.Tx, resourceId int64) ([]models.Permission, error)
+	DeletePermission(ctx context.Context, tx *sql.Tx, permissionId int64) error
+	PermissionsLoadResources(ctx context.Context, tx *sql.Tx, permissions []models.Permission) error
 
 	CreateKeyPair(tx *sql.Tx, keyPair *models.KeyPair) error
 	UpdateKeyPair(tx *sql.Tx, keyPair *models.KeyPair) error
@@ -251,17 +251,17 @@ type Database interface {
 	GetCurrentSigningKey(tx *sql.Tx) (*models.KeyPair, error)
 	DeleteKeyPair(tx *sql.Tx, keyPairId int64) error
 
-	CreateRedirectURI(tx *sql.Tx, redirectURI *models.RedirectURI) error
-	GetRedirectURIById(tx *sql.Tx, redirectURIId int64) (*models.RedirectURI, error)
-	GetRedirectURIsByClientId(tx *sql.Tx, clientId int64) ([]models.RedirectURI, error)
-	DeleteRedirectURI(tx *sql.Tx, redirectURIId int64) error
+	CreateRedirectURI(ctx context.Context, tx *sql.Tx, redirectURI *models.RedirectURI) error
+	GetRedirectURIById(ctx context.Context, tx *sql.Tx, redirectURIId int64) (*models.RedirectURI, error)
+	GetRedirectURIsByClientId(ctx context.Context, tx *sql.Tx, clientId int64) ([]models.RedirectURI, error)
+	DeleteRedirectURI(ctx context.Context, tx *sql.Tx, redirectURIId int64) error
 
-	CreateWebOrigin(tx *sql.Tx, webOrigin *models.WebOrigin) error
-	GetWebOriginById(tx *sql.Tx, webOriginId int64) (*models.WebOrigin, error)
-	GetAllWebOrigins(tx *sql.Tx) ([]models.WebOrigin, error)
-	GetWebOriginsByClientId(tx *sql.Tx, clientId int64) ([]models.WebOrigin, error)
-	WebOriginExists(tx *sql.Tx, origin string) (bool, error)
-	DeleteWebOrigin(tx *sql.Tx, webOriginId int64) error
+	CreateWebOrigin(ctx context.Context, tx *sql.Tx, webOrigin *models.WebOrigin) error
+	GetWebOriginById(ctx context.Context, tx *sql.Tx, webOriginId int64) (*models.WebOrigin, error)
+	GetAllWebOrigins(ctx context.Context, tx *sql.Tx) ([]models.WebOrigin, error)
+	GetWebOriginsByClientId(ctx context.Context, tx *sql.Tx, clientId int64) ([]models.WebOrigin, error)
+	WebOriginExists(ctx context.Context, tx *sql.Tx, origin string) (bool, error)
+	DeleteWebOrigin(ctx context.Context, tx *sql.Tx, webOriginId int64) error
 
 	CreateSettings(tx *sql.Tx, settings *models.Settings) error
 	UpdateSettings(tx *sql.Tx, settings *models.Settings) error
@@ -308,22 +308,22 @@ type Database interface {
 	DeleteUserProfilePicture(ctx context.Context, tx *sql.Tx, userId int64) error
 	UserHasProfilePicture(ctx context.Context, tx *sql.Tx, userId int64) (bool, error)
 
-	CreateClientLogo(tx *sql.Tx, clientLogo *models.ClientLogo) error
-	UpdateClientLogo(tx *sql.Tx, clientLogo *models.ClientLogo) error
-	GetClientLogoByClientId(tx *sql.Tx, clientId int64) (*models.ClientLogo, error)
-	DeleteClientLogo(tx *sql.Tx, clientId int64) error
-	ClientHasLogo(tx *sql.Tx, clientId int64) (bool, error)
+	CreateClientLogo(ctx context.Context, tx *sql.Tx, clientLogo *models.ClientLogo) error
+	UpdateClientLogo(ctx context.Context, tx *sql.Tx, clientLogo *models.ClientLogo) error
+	GetClientLogoByClientId(ctx context.Context, tx *sql.Tx, clientId int64) (*models.ClientLogo, error)
+	DeleteClientLogo(ctx context.Context, tx *sql.Tx, clientId int64) error
+	ClientHasLogo(ctx context.Context, tx *sql.Tx, clientId int64) (bool, error)
 
 	CreateAuditLog(tx *sql.Tx, auditLog *models.AuditLog) error
 	DeleteOldAuditLogs(tx *sql.Tx, cutoff time.Time, maxDeletions int) (int, error)
 	GetAuditLogsPaginated(tx *sql.Tx, page int, pageSize int, auditEvent string, requestId string) ([]models.AuditLog, int, error)
 
-	CreateClientPermission(tx *sql.Tx, clientPermission *models.ClientPermission) error
-	UpdateClientPermission(tx *sql.Tx, clientPermission *models.ClientPermission) error
-	GetClientPermissionById(tx *sql.Tx, clientPermissionId int64) (*models.ClientPermission, error)
-	GetClientPermissionByClientIdAndPermissionId(tx *sql.Tx, clientId, permissionId int64) (*models.ClientPermission, error)
-	GetClientPermissionsByClientId(tx *sql.Tx, clientId int64) ([]models.ClientPermission, error)
-	DeleteClientPermission(tx *sql.Tx, clientPermissionId int64) error
+	CreateClientPermission(ctx context.Context, tx *sql.Tx, clientPermission *models.ClientPermission) error
+	UpdateClientPermission(ctx context.Context, tx *sql.Tx, clientPermission *models.ClientPermission) error
+	GetClientPermissionById(ctx context.Context, tx *sql.Tx, clientPermissionId int64) (*models.ClientPermission, error)
+	GetClientPermissionByClientIdAndPermissionId(ctx context.Context, tx *sql.Tx, clientId, permissionId int64) (*models.ClientPermission, error)
+	GetClientPermissionsByClientId(ctx context.Context, tx *sql.Tx, clientId int64) ([]models.ClientPermission, error)
+	DeleteClientPermission(ctx context.Context, tx *sql.Tx, clientPermissionId int64) error
 
 	CreateUserSession(ctx context.Context, tx *sql.Tx, userSession *models.UserSession) error
 	UpdateUserSession(ctx context.Context, tx *sql.Tx, userSession *models.UserSession) error

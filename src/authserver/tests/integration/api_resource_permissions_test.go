@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -22,7 +23,7 @@ func TestAPIResourcePermissionsGet_Success(t *testing.T) {
 	// Setup: Create test resource
 	resource := createTestResource(t, "test-resource-perms-"+fake.UUID()[:8], "Test Resource for Permissions")
 	defer func() {
-		_ = database.DeleteResource(nil, resource.Id)
+		_ = database.DeleteResource(context.Background(), nil, resource.Id)
 	}()
 
 	// Setup: Create test permissions
@@ -30,9 +31,9 @@ func TestAPIResourcePermissionsGet_Success(t *testing.T) {
 	perm2 := createTestPermission(t, resource.Id, "write", "Write permission")
 	perm3 := createTestPermission(t, resource.Id, "admin", "Admin permission")
 	defer func() {
-		_ = database.DeletePermission(nil, perm1.Id)
-		_ = database.DeletePermission(nil, perm2.Id)
-		_ = database.DeletePermission(nil, perm3.Id)
+		_ = database.DeletePermission(context.Background(), nil, perm1.Id)
+		_ = database.DeletePermission(context.Background(), nil, perm2.Id)
+		_ = database.DeletePermission(context.Background(), nil, perm3.Id)
 	}()
 
 	// Test: Get permissions for resource
@@ -87,7 +88,7 @@ func TestAPIResourcePermissionsGet_NoPermissions(t *testing.T) {
 	// Setup: Create test resource without permissions
 	resource := createTestResource(t, "test-resource-no-perms-"+fake.UUID()[:8], "Test Resource without Permissions")
 	defer func() {
-		_ = database.DeleteResource(nil, resource.Id)
+		_ = database.DeleteResource(context.Background(), nil, resource.Id)
 	}()
 
 	// Test: Get permissions for resource with no permissions
@@ -168,7 +169,7 @@ func TestAPIResourcePermissionsGet_AuthServerResourceFiltersUserinfo(t *testing.
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Get the AuthServer resource (should exist as a default system resource)
-	authServerResource, err := database.GetResourceByResourceIdentifier(nil, constants.AuthServerResourceIdentifier)
+	authServerResource, err := database.GetResourceByResourceIdentifier(context.Background(), nil, constants.AuthServerResourceIdentifier)
 	assert.NoError(t, err)
 	if authServerResource == nil {
 		t.Skip("AuthServer resource not found in database - skipping userinfo filter test")
@@ -199,7 +200,7 @@ func TestAPIResourcePermissionsGet_AuthServerResourceIncludesOtherPermissions(t 
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Setup: Get the AuthServer resource
-	authServerResource, err := database.GetResourceByResourceIdentifier(nil, constants.AuthServerResourceIdentifier)
+	authServerResource, err := database.GetResourceByResourceIdentifier(context.Background(), nil, constants.AuthServerResourceIdentifier)
 	assert.NoError(t, err)
 	if authServerResource == nil {
 		t.Skip("AuthServer resource not found in database - skipping permission inclusion test")
@@ -208,7 +209,7 @@ func TestAPIResourcePermissionsGet_AuthServerResourceIncludesOtherPermissions(t 
 	// Setup: Create a test permission for AuthServer resource (non-userinfo)
 	testPerm := createTestPermission(t, authServerResource.Id, "test-auth-perm", "Test Auth Permission")
 	defer func() {
-		_ = database.DeletePermission(nil, testPerm.Id)
+		_ = database.DeletePermission(context.Background(), nil, testPerm.Id)
 	}()
 
 	// Test: Get permissions for AuthServer resource
@@ -244,15 +245,15 @@ func TestAPIResourcePermissionsGet_NonAuthServerResourceIncludesAllPermissions(t
 	// Setup: Create test resource (non-AuthServer)
 	resource := createTestResource(t, "test-non-authserver-"+fake.UUID()[:8], "Test Non-AuthServer Resource")
 	defer func() {
-		_ = database.DeleteResource(nil, resource.Id)
+		_ = database.DeleteResource(context.Background(), nil, resource.Id)
 	}()
 
 	// Setup: Create permission with userinfo identifier (should NOT be filtered for non-AuthServer resources)
 	userinfoLikePerm := createTestPermission(t, resource.Id, constants.UserinfoPermissionIdentifier, "Userinfo-like permission")
 	regularPerm := createTestPermission(t, resource.Id, "regular-perm", "Regular permission")
 	defer func() {
-		_ = database.DeletePermission(nil, userinfoLikePerm.Id)
-		_ = database.DeletePermission(nil, regularPerm.Id)
+		_ = database.DeletePermission(context.Background(), nil, userinfoLikePerm.Id)
+		_ = database.DeletePermission(context.Background(), nil, regularPerm.Id)
 	}()
 
 	// Test: Get permissions for non-AuthServer resource
@@ -290,7 +291,7 @@ func TestAPIResourcePermissionsGet_Unauthorized(t *testing.T) {
 	// Setup: Create test resource
 	resource := createTestResource(t, "test-resource-unauth-"+fake.UUID()[:8], "Test Resource for Unauthorized Test")
 	defer func() {
-		_ = database.DeleteResource(nil, resource.Id)
+		_ = database.DeleteResource(context.Background(), nil, resource.Id)
 	}()
 
 	// Test: Request without access token
@@ -311,7 +312,7 @@ func TestAPIResourcePermissionsGet_InvalidAccessToken(t *testing.T) {
 	// Setup: Create test resource
 	resource := createTestResource(t, "test-resource-invalid-token-"+fake.UUID()[:8], "Test Resource for Invalid Token Test")
 	defer func() {
-		_ = database.DeleteResource(nil, resource.Id)
+		_ = database.DeleteResource(context.Background(), nil, resource.Id)
 	}()
 
 	// Test: Request with invalid access token
@@ -330,7 +331,7 @@ func TestAPIResourcePermissionsGet_LargeNumberOfPermissions(t *testing.T) {
 	// Setup: Create test resource
 	resource := createTestResource(t, "test-resource-many-perms-"+fake.UUID()[:8], "Test Resource with Many Permissions")
 	defer func() {
-		_ = database.DeleteResource(nil, resource.Id)
+		_ = database.DeleteResource(context.Background(), nil, resource.Id)
 	}()
 
 	// Setup: Create many permissions
@@ -345,7 +346,7 @@ func TestAPIResourcePermissionsGet_LargeNumberOfPermissions(t *testing.T) {
 
 	defer func() {
 		for _, perm := range permissions {
-			_ = database.DeletePermission(nil, perm.Id)
+			_ = database.DeletePermission(context.Background(), nil, perm.Id)
 		}
 	}()
 

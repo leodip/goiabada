@@ -116,7 +116,7 @@ func TestHandleAuthPwdGet(t *testing.T) {
 			ShowDescription:  false,
 			ShowWebsiteURL:   false,
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "my-app").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "my-app").Return(client, nil)
 
 		settings := &models.Settings{
 			SMTPEnabled: true,
@@ -165,7 +165,7 @@ func TestHandleAuthPwdGet(t *testing.T) {
 			ShowDescription:  false,
 			ShowWebsiteURL:   false,
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "another-app").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "another-app").Return(client, nil)
 
 		settings := &models.Settings{
 			SMTPEnabled: false,
@@ -212,7 +212,7 @@ func TestHandleAuthPwdGet(t *testing.T) {
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-		database.On("GetClientByClientIdentifier", mock.Anything, "my-app").
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "my-app").
 			Return(&models.Client{ClientIdentifier: "my-app"}, nil)
 
 		ctx := context.WithValue(req.Context(), constants.ContextKeySettings, &models.Settings{})
@@ -427,7 +427,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 			ShowDescription:  false,
 			ShowWebsiteURL:   false,
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "my-app").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "my-app").Return(client, nil)
 
 		settings := &models.Settings{
 			SMTPEnabled: true,
@@ -472,7 +472,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		client := &models.Client{
 			ClientIdentifier: "test-client",
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		settings := &models.Settings{
 			SMTPEnabled: true,
@@ -529,7 +529,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		client := &models.Client{
 			ClientIdentifier: "test-client",
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		settings := &models.Settings{
 			SMTPEnabled: true,
@@ -576,7 +576,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		client := &models.Client{
 			ClientIdentifier: "test-client",
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		settings := &models.Settings{
 			SMTPEnabled: true,
@@ -648,7 +648,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		client := &models.Client{
 			ClientIdentifier: "test-client",
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		settings := &models.Settings{
 			SMTPEnabled: true,
@@ -702,7 +702,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		client := &models.Client{
 			ClientIdentifier: "test-client",
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		settings := &models.Settings{SMTPEnabled: true}
 		req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings, settings))
@@ -748,7 +748,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		client := &models.Client{
 			ClientIdentifier: "test-client",
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		settings := &models.Settings{
 			SMTPEnabled: true,
@@ -856,7 +856,7 @@ func TestHandleAuthPwdPost(t *testing.T) {
 		client := &models.Client{
 			ClientIdentifier: "test-client",
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		settings := &models.Settings{
 			SMTPEnabled: true,
@@ -936,7 +936,7 @@ func TestHandleAuthPwdPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 		authHelper.On("SaveAuthContext", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 		// Only the accepted-password case reaches it, and this table covers both outcomes.
 		authHelper.On("RegenerateSession", mock.Anything, mock.Anything).Return(nil).Maybe()
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
 			Return(&models.Client{ClientIdentifier: "test-client"}, nil)
 		database.On("GetUserByEmail", mock.Anything, mock.Anything, email).Return(account, nil)
 		auditLogger.On("Log", mock.Anything, mock.Anything, mock.Anything).Return().Maybe()

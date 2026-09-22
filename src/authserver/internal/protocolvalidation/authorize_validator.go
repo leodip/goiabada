@@ -50,7 +50,7 @@ func NewAuthorizeValidator(database data.Database) *AuthorizeValidator {
 	}
 }
 
-func (val *AuthorizeValidator) ValidateScopes(scope string) error {
+func (val *AuthorizeValidator) ValidateScopes(ctx context.Context, scope string) error {
 
 	// trim leading and trailing whitespace
 	scope = strings.TrimSpace(scope)
@@ -84,7 +84,7 @@ func (val *AuthorizeValidator) ValidateScopes(scope string) error {
 		// The rejection wording below is this endpoint's own and differs from the token
 		// endpoint's for the same outcome; both are asserted verbatim by the integration suite,
 		// so the shared resolver hands back an outcome and never a message (#124).
-		resolution, err := resolveScope(val.database, scopeStr)
+		resolution, err := resolveScope(ctx, val.database, scopeStr)
 		if err != nil {
 			return err
 		}
@@ -121,7 +121,7 @@ func (val *AuthorizeValidator) ValidateClientAndRedirectURI(ctx context.Context,
 		return i18n.NewLocalizedError(i18n.ErrCodeAuthorizeClientIdMissing, nil)
 	}
 
-	client, err := val.database.GetClientByClientIdentifier(nil, input.ClientId)
+	client, err := val.database.GetClientByClientIdentifier(ctx, nil, input.ClientId)
 	if err != nil {
 		return err
 	}
@@ -192,7 +192,7 @@ func (val *AuthorizeValidator) ValidateClientAndRedirectURI(ctx context.Context,
 		return i18n.NewLocalizedError(i18n.ErrCodeAuthorizeRedirectURINotAbsolute, nil)
 	}
 
-	err = val.database.ClientLoadRedirectURIs(nil, client)
+	err = val.database.ClientLoadRedirectURIs(ctx, nil, client)
 	if err != nil {
 		return err
 	}

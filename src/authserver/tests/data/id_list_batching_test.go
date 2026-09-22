@@ -122,7 +122,7 @@ func TestIdListLookups_MoreIdsThanOneStatementCanCarry(t *testing.T) {
 				return idsOfThree(func() int64 { return createTestPermission(t, resource).Id })
 			},
 			answered: func(t *testing.T, ids []int64) []int64 {
-				permissions, err := database.GetPermissionsByIds(nil, ids)
+				permissions, err := database.GetPermissionsByIds(context.Background(), nil, ids)
 				requireNoLookupError(t, err)
 				found := make([]int64, 0, len(permissions))
 				for _, permission := range permissions {
@@ -137,7 +137,7 @@ func TestIdListLookups_MoreIdsThanOneStatementCanCarry(t *testing.T) {
 				return idsOfThree(func() int64 { return createTestResource(t).Id })
 			},
 			answered: func(t *testing.T, ids []int64) []int64 {
-				resources, err := database.GetResourcesByIds(nil, ids)
+				resources, err := database.GetResourcesByIds(context.Background(), nil, ids)
 				requireNoLookupError(t, err)
 				found := make([]int64, 0, len(resources))
 				for _, resource := range resources {

@@ -354,8 +354,8 @@ func TestLogout_WithIdTokenHint_OtherClientOnSession_KeepsSessionBoundTokensWork
 		Enabled:                  true,
 		AuthorizationCodeEnabled: true,
 	}
-	require.NoError(t, database.CreateClient(nil, otherClient))
-	defer func() { _ = database.DeleteClient(nil, otherClient.Id) }()
+	require.NoError(t, database.CreateClient(context.Background(), nil, otherClient))
+	defer func() { _ = database.DeleteClient(context.Background(), nil, otherClient.Id) }()
 
 	now := time.Now().UTC()
 	require.NoError(t, database.CreateUserSessionClient(context.Background(), nil, &models.UserSessionClient{

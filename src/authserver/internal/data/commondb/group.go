@@ -163,7 +163,7 @@ func (d *CommonDatabase) GroupLoadPermissions(tx *sql.Tx, group *models.Group) e
 		permissionIds[i] = groupPermission.PermissionId
 	}
 
-	permissions, err := d.GetPermissionsByIds(tx, permissionIds)
+	permissions, err := d.GetPermissionsByIds(context.Background(), tx, permissionIds)
 	if err != nil {
 		return errs.Wrap(err, "unable to get permissions")
 	}
@@ -195,7 +195,7 @@ func (d *CommonDatabase) GroupsLoadPermissions(tx *sql.Tx, groups []models.Group
 		permissionIds[i] = groupPermission.PermissionId
 	}
 
-	permissions, err := d.GetPermissionsByIds(tx, permissionIds)
+	permissions, err := d.GetPermissionsByIds(context.Background(), tx, permissionIds)
 	if err != nil {
 		return errs.Wrap(err, "unable to get permissions")
 	}

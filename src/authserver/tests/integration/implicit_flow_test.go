@@ -67,7 +67,7 @@ func createImplicitFlowClient(t *testing.T, implicitEnabled *bool) (*models.Clie
 		DefaultAcrLevel:          models.AcrLevel1,
 	}
 
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -77,7 +77,7 @@ func createImplicitFlowClient(t *testing.T, implicitEnabled *bool) (*models.Clie
 		URI:      "https://example.com/callback",
 	}
 
-	err = database.CreateRedirectURI(nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -600,14 +600,14 @@ func TestImplicitFlow_UnsupportedResponseType_HybridFlow(t *testing.T) {
 		ConsentRequired:          false,
 		DefaultAcrLevel:          models.AcrLevel1,
 	}
-	err = database.CreateClient(nil, client)
+	err = database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
 
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
 		URI:      "https://example.com/callback",
 	}
-	err = database.CreateRedirectURI(nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	assert.NoError(t, err)
 
 	requestState := fake.LetterN(16)
@@ -798,14 +798,14 @@ func TestImplicitFlow_WithResourcePermissions(t *testing.T) {
 		ConsentRequired:          true, // Consent required
 		DefaultAcrLevel:          models.AcrLevel1,
 	}
-	err = database.CreateClient(nil, client)
+	err = database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
 
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
 		URI:      "https://example.com/callback",
 	}
-	err = database.CreateRedirectURI(nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	assert.NoError(t, err)
 
 	user, password := createTestUserForImplicit(t)
@@ -1342,14 +1342,14 @@ func TestImplicitFlow_AuthCodeFlowClient_CanAlsoUseImplicit(t *testing.T) {
 		ConsentRequired:          false,
 		DefaultAcrLevel:          models.AcrLevel1,
 	}
-	err = database.CreateClient(nil, client)
+	err = database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
 
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
 		URI:      "https://example.com/callback",
 	}
-	err = database.CreateRedirectURI(nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	assert.NoError(t, err)
 
 	user, password := createTestUserForImplicit(t)

@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 	"strings"
@@ -36,11 +37,11 @@ func TestToken_ClientCred_ClientSecretBasic_Success(t *testing.T) {
 		IsPublic:                 false,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
-	err = database.CreateClient(nil, client)
+	err = database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
 
 	// Assign permission to the client
-	err = database.CreateClientPermission(nil, &models.ClientPermission{
+	err = database.CreateClientPermission(context.Background(), nil, &models.ClientPermission{
 		ClientId:     client.Id,
 		PermissionId: permission.Id,
 	})
@@ -74,7 +75,7 @@ func TestToken_ClientCred_ClientSecretBasic_WrongSecret(t *testing.T) {
 		IsPublic:                 false,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
-	err = database.CreateClient(nil, client)
+	err = database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
 
 	httpClient := createHttpClient(t)
@@ -102,7 +103,7 @@ func TestToken_ClientCred_FlowIsNotEnabled(t *testing.T) {
 		ClientCredentialsEnabled: false, // Client credentials flow is not enabled
 		DefaultAcrLevel:          models.AcrLevel2Optional,
 	}
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
 
 	httpClient := createHttpClient(t)
@@ -129,7 +130,7 @@ func TestToken_ClientCred_ClientSecretIsMissing(t *testing.T) {
 		DefaultAcrLevel:          models.AcrLevel2Optional,
 		IsPublic:                 false, // Set to false to require a client secret
 	}
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
 
 	httpClient := createHttpClient(t)
@@ -162,7 +163,7 @@ func TestToken_ClientCred_ClientAuthFailed(t *testing.T) {
 		IsPublic:                 false,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
-	err = database.CreateClient(nil, client)
+	err = database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
 
 	httpClient := createHttpClient(t)
@@ -194,7 +195,7 @@ func TestToken_ClientCred_InvalidScope(t *testing.T) {
 		IsPublic:                 false,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
-	err = database.CreateClient(nil, client)
+	err = database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
 
 	// Create a resource and permission for the last test cases
@@ -274,7 +275,7 @@ func TestToken_ClientCred_NoScopesGiven(t *testing.T) {
 		IsPublic:                 false,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
-	err = database.CreateClient(nil, client)
+	err = database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
 
 	// Create resources and permissions with random identifiers
@@ -289,12 +290,12 @@ func TestToken_ClientCred_NoScopesGiven(t *testing.T) {
 	permissionB := createPermissionWithId(t, resourceB.Id, permissionBIdentifier)
 
 	// Assign permissions to the client
-	err = database.CreateClientPermission(nil, &models.ClientPermission{
+	err = database.CreateClientPermission(context.Background(), nil, &models.ClientPermission{
 		ClientId:     client.Id,
 		PermissionId: permissionA.Id,
 	})
 	assert.NoError(t, err)
-	err = database.CreateClientPermission(nil, &models.ClientPermission{
+	err = database.CreateClientPermission(context.Background(), nil, &models.ClientPermission{
 		ClientId:     client.Id,
 		PermissionId: permissionB.Id,
 	})
@@ -340,7 +341,7 @@ func TestToken_ClientCred_SpecificScope(t *testing.T) {
 		IsPublic:                 false,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
-	err = database.CreateClient(nil, client)
+	err = database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
 
 	// Create resources and permissions with random identifiers
@@ -355,12 +356,12 @@ func TestToken_ClientCred_SpecificScope(t *testing.T) {
 	permissionB := createPermissionWithId(t, resourceB.Id, permissionBIdentifier)
 
 	// Assign permissions to the client
-	err = database.CreateClientPermission(nil, &models.ClientPermission{
+	err = database.CreateClientPermission(context.Background(), nil, &models.ClientPermission{
 		ClientId:     client.Id,
 		PermissionId: permissionA.Id,
 	})
 	assert.NoError(t, err)
-	err = database.CreateClientPermission(nil, &models.ClientPermission{
+	err = database.CreateClientPermission(context.Background(), nil, &models.ClientPermission{
 		ClientId:     client.Id,
 		PermissionId: permissionB.Id,
 	})
@@ -415,7 +416,7 @@ func TestToken_ClientCred_CrossResourcePermissionCollision(t *testing.T) {
 		IsPublic:                 false,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
-	err = database.CreateClient(nil, client)
+	err = database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
 
 	// One permission identifier, defined on two different resources.
@@ -430,7 +431,7 @@ func TestToken_ClientCred_CrossResourcePermissionCollision(t *testing.T) {
 	createPermissionWithId(t, resourceB.Id, sharedPermissionIdentifier)
 
 	// The client holds resource A's permission and nothing else.
-	err = database.CreateClientPermission(nil, &models.ClientPermission{
+	err = database.CreateClientPermission(context.Background(), nil, &models.ClientPermission{
 		ClientId:     client.Id,
 		PermissionId: permissionA.Id,
 	})
@@ -497,7 +498,7 @@ func TestToken_ClientCred_AuthServerScopeNotReachableByCollision(t *testing.T) {
 		IsPublic:                 false,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
-	err = database.CreateClient(nil, client)
+	err = database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
 
 	// A custom resource whose permission identifier collides with the built-in one.
@@ -505,7 +506,7 @@ func TestToken_ClientCred_AuthServerScopeNotReachableByCollision(t *testing.T) {
 	customResource := createResourceWithId(t, customResourceIdentifier)
 	customManage := createPermissionWithId(t, customResource.Id, constants.ManagePermissionIdentifier)
 
-	err = database.CreateClientPermission(nil, &models.ClientPermission{
+	err = database.CreateClientPermission(context.Background(), nil, &models.ClientPermission{
 		ClientId:     client.Id,
 		PermissionId: customManage.Id,
 	})
@@ -513,10 +514,10 @@ func TestToken_ClientCred_AuthServerScopeNotReachableByCollision(t *testing.T) {
 
 	// Confirm the collision really exists against the seeded authserver resource,
 	// otherwise this test could pass because there was nothing to collide with.
-	authserverResource, err := database.GetResourceByResourceIdentifier(nil, constants.AuthServerResourceIdentifier)
+	authserverResource, err := database.GetResourceByResourceIdentifier(context.Background(), nil, constants.AuthServerResourceIdentifier)
 	assert.NoError(t, err)
 	assert.NotNil(t, authserverResource)
-	authserverPermissions, err := database.GetPermissionsByResourceId(nil, authserverResource.Id)
+	authserverPermissions, err := database.GetPermissionsByResourceId(context.Background(), nil, authserverResource.Id)
 	assert.NoError(t, err)
 	foundBuiltInManage := false
 	for _, perm := range authserverPermissions {
@@ -588,7 +589,7 @@ func TestToken_ClientCred_TabSeparatedScopeIsNormalized(t *testing.T) {
 		IsPublic:                 false,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
-	err = database.CreateClient(nil, client)
+	err = database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
 
 	resourceIdentifier := "billing-api-" + fake.LetterN(8)
@@ -597,7 +598,7 @@ func TestToken_ClientCred_TabSeparatedScopeIsNormalized(t *testing.T) {
 	writePermission := createPermissionWithId(t, resource.Id, "write-"+fake.LetterN(6))
 
 	for _, permission := range []*models.Permission{readPermission, writePermission} {
-		err = database.CreateClientPermission(nil, &models.ClientPermission{
+		err = database.CreateClientPermission(context.Background(), nil, &models.ClientPermission{
 			ClientId:     client.Id,
 			PermissionId: permission.Id,
 		})
@@ -662,7 +663,7 @@ func TestToken_ClientCred_InvalidScopeWithEmoji_DescriptionIsConformed(t *testin
 		IsPublic:                 false,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
-	err = database.CreateClient(nil, client)
+	err = database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
 
 	httpClient := createHttpClient(t)

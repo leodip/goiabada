@@ -40,8 +40,8 @@ func TestAPIUserConsentsGet_Success(t *testing.T) {
 	client1 := createTestClient(t, "test-client-1")
 	client2 := createTestClient(t, "test-client-2")
 	defer func() {
-		_ = database.DeleteClient(nil, client1.Id)
-		_ = database.DeleteClient(nil, client2.Id)
+		_ = database.DeleteClient(context.Background(), nil, client1.Id)
+		_ = database.DeleteClient(context.Background(), nil, client2.Id)
 	}()
 
 	// Setup: Create test consents
@@ -218,7 +218,7 @@ func TestAPIUserConsentDelete_Success(t *testing.T) {
 	// Setup: Create test client
 	client := createTestClient(t, "test-client-delete")
 	defer func() {
-		_ = database.DeleteClient(nil, client.Id)
+		_ = database.DeleteClient(context.Background(), nil, client.Id)
 	}()
 
 	// Setup: Create test consent
@@ -303,7 +303,7 @@ func TestAPIUserConsentDelete_Unauthorized(t *testing.T) {
 	// Setup: Create test client
 	client := createTestClient(t, "test-client-unauth")
 	defer func() {
-		_ = database.DeleteClient(nil, client.Id)
+		_ = database.DeleteClient(context.Background(), nil, client.Id)
 	}()
 
 	// Setup: Create test consent
@@ -361,10 +361,10 @@ func TestAPIUserConsentDelete_WithClientDetails(t *testing.T) {
 		AuthorizationCodeEnabled: true,
 		TokenExpirationInSeconds: 3600,
 	}
-	err = database.CreateClient(nil, client)
+	err = database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteClient(nil, client.Id)
+		_ = database.DeleteClient(context.Background(), nil, client.Id)
 	}()
 
 	// Setup: Create test consent with specific scope
@@ -435,7 +435,7 @@ func createTestClient(t *testing.T, identifier string) *models.Client {
 		IncludeOpenIDConnectClaimsInAccessToken: models.ThreeStateSettingDefault.String(),
 		DefaultAcrLevel:                         models.AcrLevel1,
 	}
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
 	return client
 }

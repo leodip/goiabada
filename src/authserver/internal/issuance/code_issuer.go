@@ -58,7 +58,7 @@ func (ci *CodeIssuer) CreateAuthCode(ctx context.Context, tx *sql.Tx, input *Cre
 		responseMode = "query"
 	}
 
-	client, err := ci.database.GetClientByClientIdentifier(tx, input.ClientId)
+	client, err := ci.database.GetClientByClientIdentifier(ctx, tx, input.ClientId)
 	if err != nil {
 		return nil, err
 	}

@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"context"
 	"errors"
 	"strings"
 	"testing"
@@ -134,7 +135,7 @@ func TestMigration000034_CanonicalizeWebOrigins(t *testing.T) {
 
 	// 3. Every seeded shape lands where the table says.
 	for i, c := range cases {
-		got, err := h.DB.GetWebOriginById(nil, ids[i])
+		got, err := h.DB.GetWebOriginById(context.Background(), nil, ids[i])
 		require.NoErrorf(t, err, "read back the row seeded from %q", c.raw)
 
 		if c.deleted {
@@ -149,7 +150,7 @@ func TestMigration000034_CanonicalizeWebOrigins(t *testing.T) {
 	// 4, continued.
 	survivors := 0
 	for _, id := range dupIds {
-		row, err := h.DB.GetWebOriginById(nil, id)
+		row, err := h.DB.GetWebOriginById(context.Background(), nil, id)
 		require.NoError(t, err, "read back a duplicate row")
 		if row != nil {
 			survivors++
@@ -161,7 +162,7 @@ func TestMigration000034_CanonicalizeWebOrigins(t *testing.T) {
 	}
 	assert.Equal(t, 1, survivors, "three rows canonicalizing to one value must leave one row for that client")
 
-	other, err := h.DB.GetWebOriginById(nil, otherClientDup)
+	other, err := h.DB.GetWebOriginById(context.Background(), nil, otherClientDup)
 	require.NoError(t, err, "read back the second client's row")
 	if assert.NotNil(t, other,
 		"an origin listed by a second client must survive: the index is (origin, client_id), and UNIQUE(origin) alone would have deleted this") {
@@ -309,14 +310,14 @@ func assertWebOriginsIndex000034(t *testing.T, h *isolatedDB, clientAId, clientB
 
 	// Enforced, not merely declared.
 	dup := &models.WebOrigin{Origin: "https://dup.example.com", ClientId: clientAId}
-	assert.Errorf(t, h.DB.CreateWebOrigin(nil, dup),
+	assert.Errorf(t, h.DB.CreateWebOrigin(context.Background(), nil, dup),
 		"[%s] a second row with the same origin for the same client must be refused", phase)
 
 	// And enforced no more widely than that.
 	spare := &models.WebOrigin{Origin: "https://spare.example.com", ClientId: clientBId}
-	require.NoErrorf(t, h.DB.CreateWebOrigin(nil, spare),
+	require.NoErrorf(t, h.DB.CreateWebOrigin(context.Background(), nil, spare),
 		"[%s] an origin no client lists yet must still be insertable", phase)
-	require.NoErrorf(t, h.DB.DeleteWebOrigin(nil, spare.Id), "[%s] clean up the spare row", phase)
+	require.NoErrorf(t, h.DB.DeleteWebOrigin(context.Background(), nil, spare.Id), "[%s] clean up the spare row", phase)
 }
 
 func seedClient000034(t *testing.T, h *isolatedDB, identifier string) *models.Client {
@@ -326,7 +327,7 @@ func seedClient000034(t *testing.T, h *isolatedDB, identifier string) *models.Cl
 		ClientIdentifier: identifier,
 		Description:      "Migration 000034 test client",
 	}
-	require.NoErrorf(t, h.DB.CreateClient(nil, client), "seed client %s", identifier)
+	require.NoErrorf(t, h.DB.CreateClient(context.Background(), nil, client), "seed client %s", identifier)
 	return client
 }
 
@@ -338,7 +339,7 @@ func seedWebOrigin000034(t *testing.T, h *isolatedDB, clientId int64, raw string
 	t.Helper()
 
 	webOrigin := &models.WebOrigin{Origin: raw, ClientId: clientId}
-	require.NoErrorf(t, h.DB.CreateWebOrigin(nil, webOrigin), "seed web origin %q", raw)
+	require.NoErrorf(t, h.DB.CreateWebOrigin(context.Background(), nil, webOrigin), "seed web origin %q", raw)
 	return webOrigin.Id
 }
 

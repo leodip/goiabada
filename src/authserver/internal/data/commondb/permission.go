@@ -10,7 +10,7 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 )
 
-func (d *CommonDatabase) CreatePermission(tx *sql.Tx, permission *models.Permission) error {
+func (d *CommonDatabase) CreatePermission(ctx context.Context, tx *sql.Tx, permission *models.Permission) error {
 
 	if permission.ResourceId == 0 {
 		return errs.New("can't create permission with resource_id 0")
@@ -28,7 +28,7 @@ func (d *CommonDatabase) CreatePermission(tx *sql.Tx, permission *models.Permiss
 
 	insertBuilder := permissionStruct.WithoutTag("pk").InsertInto("permissions", permission)
 
-	id, err := d.insertReturningId(context.Background(), tx, insertBuilder, "permission")
+	id, err := d.insertReturningId(ctx, tx, insertBuilder, "permission")
 	if err != nil {
 		permission.CreatedAt = originalCreatedAt
 		permission.UpdatedAt = originalUpdatedAt
@@ -39,7 +39,7 @@ func (d *CommonDatabase) CreatePermission(tx *sql.Tx, permission *models.Permiss
 	return nil
 }
 
-func (d *CommonDatabase) UpdatePermission(tx *sql.Tx, permission *models.Permission) error {
+func (d *CommonDatabase) UpdatePermission(ctx context.Context, tx *sql.Tx, permission *models.Permission) error {
 
 	if permission.Id == 0 {
 		return errs.New("can't update permission with id 0")
@@ -55,7 +55,7 @@ func (d *CommonDatabase) UpdatePermission(tx *sql.Tx, permission *models.Permiss
 	updateBuilder.Where(updateBuilder.Equal("id", permission.Id))
 
 	sql, args := updateBuilder.Build()
-	_, err := d.ExecSql(context.Background(), tx, sql, args...)
+	_, err := d.ExecSql(ctx, tx, sql, args...)
 	if err != nil {
 		permission.UpdatedAt = originalUpdatedAt
 		return errs.Wrap(err, "unable to update permission")
@@ -64,11 +64,11 @@ func (d *CommonDatabase) UpdatePermission(tx *sql.Tx, permission *models.Permiss
 	return nil
 }
 
-func (d *CommonDatabase) getPermissionCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
+func (d *CommonDatabase) getPermissionCommon(ctx context.Context, tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
 	permissionStruct *sqlbuilder.Struct) (*models.Permission, error) {
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(context.Background(), tx, sql, args...)
+	rows, err := d.QuerySql(ctx, tx, sql, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -90,7 +90,7 @@ func (d *CommonDatabase) getPermissionCommon(tx *sql.Tx, selectBuilder *sqlbuild
 	return nil, nil
 }
 
-func (d *CommonDatabase) GetPermissionById(tx *sql.Tx, permissionId int64) (*models.Permission, error) {
+func (d *CommonDatabase) GetPermissionById(ctx context.Context, tx *sql.Tx, permissionId int64) (*models.Permission, error) {
 
 	permissionStruct := sqlbuilder.NewStruct(new(models.Permission)).
 		For(d.Flavor)
@@ -98,7 +98,7 @@ func (d *CommonDatabase) GetPermissionById(tx *sql.Tx, permissionId int64) (*mod
 	selectBuilder := permissionStruct.SelectFrom("permissions")
 	selectBuilder.Where(selectBuilder.Equal("id", permissionId))
 
-	permission, err := d.getPermissionCommon(tx, selectBuilder, permissionStruct)
+	permission, err := d.getPermissionCommon(ctx, tx, selectBuilder, permissionStruct)
 	if err != nil {
 		return nil, err
 	}
@@ -106,7 +106,7 @@ func (d *CommonDatabase) GetPermissionById(tx *sql.Tx, permissionId int64) (*mod
 	return permission, nil
 }
 
-func (d *CommonDatabase) GetPermissionsByResourceId(tx *sql.Tx, resourceId int64) ([]models.Permission, error) {
+func (d *CommonDatabase) GetPermissionsByResourceId(ctx context.Context, tx *sql.Tx, resourceId int64) ([]models.Permission, error) {
 
 	permissionStruct := sqlbuilder.NewStruct(new(models.Permission)).
 		For(d.Flavor)
@@ -115,7 +115,7 @@ func (d *CommonDatabase) GetPermissionsByResourceId(tx *sql.Tx, resourceId int64
 	selectBuilder.Where(selectBuilder.Equal("resource_id", resourceId))
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(context.Background(), tx, sql, args...)
+	rows, err := d.QuerySql(ctx, tx, sql, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -139,7 +139,7 @@ func (d *CommonDatabase) GetPermissionsByResourceId(tx *sql.Tx, resourceId int64
 	return permissions, nil
 }
 
-func (d *CommonDatabase) PermissionsLoadResources(tx *sql.Tx, permissions []models.Permission) error {
+func (d *CommonDatabase) PermissionsLoadResources(ctx context.Context, tx *sql.Tx, permissions []models.Permission) error {
 
 	if permissions == nil {
 		return nil
@@ -150,7 +150,7 @@ func (d *CommonDatabase) PermissionsLoadResources(tx *sql.Tx, permissions []mode
 		resourceIds = append(resourceIds, permission.ResourceId)
 	}
 
-	resources, err := d.GetResourcesByIds(tx, resourceIds)
+	resources, err := d.GetResourcesByIds(ctx, tx, resourceIds)
 	if err != nil {
 		return errs.Wrap(err, "unable to get resources for permissions")
 	}
@@ -167,7 +167,7 @@ func (d *CommonDatabase) PermissionsLoadResources(tx *sql.Tx, permissions []mode
 	return nil
 }
 
-func (d *CommonDatabase) GetPermissionsByIds(tx *sql.Tx, permissionIds []int64) ([]models.Permission, error) {
+func (d *CommonDatabase) GetPermissionsByIds(ctx context.Context, tx *sql.Tx, permissionIds []int64) ([]models.Permission, error) {
 
 	if len(permissionIds) == 0 {
 		return nil, nil
@@ -183,7 +183,7 @@ func (d *CommonDatabase) GetPermissionsByIds(tx *sql.Tx, permissionIds []int64) 
 		selectBuilder.Where(selectBuilder.In("id", sqlbuilder.Flatten(batch)...))
 
 		sql, args := selectBuilder.Build()
-		rows, err := d.QuerySql(context.Background(), tx, sql, args...)
+		rows, err := d.QuerySql(ctx, tx, sql, args...)
 		if err != nil {
 			return errs.Wrap(err, "unable to query database")
 		}
@@ -212,7 +212,7 @@ func (d *CommonDatabase) GetPermissionsByIds(tx *sql.Tx, permissionIds []int64) 
 	return permissions, nil
 }
 
-func (d *CommonDatabase) DeletePermission(tx *sql.Tx, permissionId int64) error {
+func (d *CommonDatabase) DeletePermission(ctx context.Context, tx *sql.Tx, permissionId int64) error {
 
 	clientStruct := sqlbuilder.NewStruct(new(models.Permission)).
 		For(d.Flavor)
@@ -221,7 +221,7 @@ func (d *CommonDatabase) DeletePermission(tx *sql.Tx, permissionId int64) error 
 	deleteBuilder.Where(deleteBuilder.Equal("id", permissionId))
 
 	sql, args := deleteBuilder.Build()
-	_, err := d.ExecSql(context.Background(), tx, sql, args...)
+	_, err := d.ExecSql(ctx, tx, sql, args...)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete permission")
 	}

@@ -10,7 +10,7 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 )
 
-func (d *CommonDatabase) CreateWebOrigin(tx *sql.Tx, webOrigin *models.WebOrigin) error {
+func (d *CommonDatabase) CreateWebOrigin(ctx context.Context, tx *sql.Tx, webOrigin *models.WebOrigin) error {
 
 	if webOrigin.ClientId == 0 {
 		return errs.New("client id must be greater than 0")
@@ -26,7 +26,7 @@ func (d *CommonDatabase) CreateWebOrigin(tx *sql.Tx, webOrigin *models.WebOrigin
 
 	insertBuilder := webOriginStruct.WithoutTag("pk").InsertInto("web_origins", webOrigin)
 
-	id, err := d.insertReturningId(context.Background(), tx, insertBuilder, "webOrigin")
+	id, err := d.insertReturningId(ctx, tx, insertBuilder, "webOrigin")
 	if err != nil {
 		webOrigin.CreatedAt = originalCreatedAt
 		return err
@@ -36,11 +36,11 @@ func (d *CommonDatabase) CreateWebOrigin(tx *sql.Tx, webOrigin *models.WebOrigin
 	return nil
 }
 
-func (d *CommonDatabase) getWebOriginCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
+func (d *CommonDatabase) getWebOriginCommon(ctx context.Context, tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
 	webOriginStruct *sqlbuilder.Struct) (*models.WebOrigin, error) {
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(context.Background(), tx, sql, args...)
+	rows, err := d.QuerySql(ctx, tx, sql, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -62,7 +62,7 @@ func (d *CommonDatabase) getWebOriginCommon(tx *sql.Tx, selectBuilder *sqlbuilde
 	return nil, nil
 }
 
-func (d *CommonDatabase) GetWebOriginById(tx *sql.Tx, webOriginId int64) (*models.WebOrigin, error) {
+func (d *CommonDatabase) GetWebOriginById(ctx context.Context, tx *sql.Tx, webOriginId int64) (*models.WebOrigin, error) {
 
 	webOriginStruct := sqlbuilder.NewStruct(new(models.WebOrigin)).
 		For(d.Flavor)
@@ -70,7 +70,7 @@ func (d *CommonDatabase) GetWebOriginById(tx *sql.Tx, webOriginId int64) (*model
 	selectBuilder := webOriginStruct.SelectFrom("web_origins")
 	selectBuilder.Where(selectBuilder.Equal("id", webOriginId))
 
-	webOrigin, err := d.getWebOriginCommon(tx, selectBuilder, webOriginStruct)
+	webOrigin, err := d.getWebOriginCommon(ctx, tx, selectBuilder, webOriginStruct)
 	if err != nil {
 		return nil, err
 	}
@@ -78,7 +78,7 @@ func (d *CommonDatabase) GetWebOriginById(tx *sql.Tx, webOriginId int64) (*model
 	return webOrigin, nil
 }
 
-func (d *CommonDatabase) GetWebOriginsByClientId(tx *sql.Tx, clientId int64) ([]models.WebOrigin, error) {
+func (d *CommonDatabase) GetWebOriginsByClientId(ctx context.Context, tx *sql.Tx, clientId int64) ([]models.WebOrigin, error) {
 
 	webOriginStruct := sqlbuilder.NewStruct(new(models.WebOrigin)).
 		For(d.Flavor)
@@ -87,7 +87,7 @@ func (d *CommonDatabase) GetWebOriginsByClientId(tx *sql.Tx, clientId int64) ([]
 	selectBuilder.Where(selectBuilder.Equal("client_id", clientId))
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(context.Background(), tx, sql, args...)
+	rows, err := d.QuerySql(ctx, tx, sql, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -111,7 +111,7 @@ func (d *CommonDatabase) GetWebOriginsByClientId(tx *sql.Tx, clientId int64) ([]
 	return webOrigins, nil
 }
 
-func (d *CommonDatabase) GetAllWebOrigins(tx *sql.Tx) ([]models.WebOrigin, error) {
+func (d *CommonDatabase) GetAllWebOrigins(ctx context.Context, tx *sql.Tx) ([]models.WebOrigin, error) {
 
 	webOriginStruct := sqlbuilder.NewStruct(new(models.WebOrigin)).
 		For(d.Flavor)
@@ -119,7 +119,7 @@ func (d *CommonDatabase) GetAllWebOrigins(tx *sql.Tx) ([]models.WebOrigin, error
 	selectBuilder := webOriginStruct.SelectFrom("web_origins")
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(context.Background(), tx, sql, args...)
+	rows, err := d.QuerySql(ctx, tx, sql, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -154,14 +154,14 @@ func (d *CommonDatabase) GetAllWebOrigins(tx *sql.Tx) ([]models.WebOrigin, error
 // The rows.Err() check is not boilerplate. This method gates cross-origin access, so a query
 // that failed part way through and reported false would fail closed with no explanation, and
 // one that reported true would fail open; either way every mock-backed test above stays green.
-func (d *CommonDatabase) WebOriginExists(tx *sql.Tx, origin string) (bool, error) {
+func (d *CommonDatabase) WebOriginExists(ctx context.Context, tx *sql.Tx, origin string) (bool, error) {
 
 	selectBuilder := d.Flavor.NewSelectBuilder()
 	selectBuilder.Select("count(*)").From("web_origins")
 	selectBuilder.Where(selectBuilder.Equal("origin", origin))
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(context.Background(), tx, sql, args...)
+	rows, err := d.QuerySql(ctx, tx, sql, args...)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to query database")
 	}
@@ -181,7 +181,7 @@ func (d *CommonDatabase) WebOriginExists(tx *sql.Tx, origin string) (bool, error
 	return count > 0, nil
 }
 
-func (d *CommonDatabase) DeleteWebOrigin(tx *sql.Tx, webOriginId int64) error {
+func (d *CommonDatabase) DeleteWebOrigin(ctx context.Context, tx *sql.Tx, webOriginId int64) error {
 
 	clientStruct := sqlbuilder.NewStruct(new(models.WebOrigin)).
 		For(d.Flavor)
@@ -190,7 +190,7 @@ func (d *CommonDatabase) DeleteWebOrigin(tx *sql.Tx, webOriginId int64) error {
 	deleteBuilder.Where(deleteBuilder.Equal("id", webOriginId))
 
 	sql, args := deleteBuilder.Build()
-	_, err := d.ExecSql(context.Background(), tx, sql, args...)
+	_, err := d.ExecSql(ctx, tx, sql, args...)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete webOrigin")
 	}

@@ -178,7 +178,7 @@ func TestPromptNone_ConsentRequired_ReturnsConsentRequired(t *testing.T) {
 		ConsentRequired:          true, // Consent required
 		DefaultAcrLevel:          models.AcrLevel1,
 	}
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -187,7 +187,7 @@ func TestPromptNone_ConsentRequired_ReturnsConsentRequired(t *testing.T) {
 		ClientId: client.Id,
 		URI:      "https://example.com/callback",
 	}
-	err = database.CreateRedirectURI(nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -305,7 +305,7 @@ func walkDCRClientToConsentScreen(t *testing.T, clientName string) (*http.Client
 
 	client := registerDCRClient(t, clientName, "https://dcr-app.example.com/callback")
 
-	redirectURIs, err := database.GetRedirectURIsByClientId(nil, client.Id)
+	redirectURIs, err := database.GetRedirectURIsByClientId(context.Background(), nil, client.Id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -894,7 +894,7 @@ func TestPromptNone_FullConsentCoverage(t *testing.T) {
 		ConsentRequired:          true,
 		DefaultAcrLevel:          models.AcrLevel1,
 	}
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -903,7 +903,7 @@ func TestPromptNone_FullConsentCoverage(t *testing.T) {
 		ClientId: client.Id,
 		URI:      "https://example.com/callback",
 	}
-	err = database.CreateRedirectURI(nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1038,7 +1038,7 @@ func TestPromptNone_PartialConsentCoverage(t *testing.T) {
 		ConsentRequired:          true,
 		DefaultAcrLevel:          models.AcrLevel1,
 	}
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1047,7 +1047,7 @@ func TestPromptNone_PartialConsentCoverage(t *testing.T) {
 		ClientId: client.Id,
 		URI:      "https://example.com/callback",
 	}
-	err = database.CreateRedirectURI(nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1161,7 +1161,7 @@ func TestPromptNone_OfflineAccessNotInConsent(t *testing.T) {
 		ConsentRequired:          true,
 		DefaultAcrLevel:          models.AcrLevel1,
 	}
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1170,7 +1170,7 @@ func TestPromptNone_OfflineAccessNotInConsent(t *testing.T) {
 		ClientId: client.Id,
 		URI:      "https://example.com/callback",
 	}
-	err = database.CreateRedirectURI(nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1293,7 +1293,7 @@ func TestPromptNone_OfflineAccessInConsent(t *testing.T) {
 		ConsentRequired:          true,
 		DefaultAcrLevel:          models.AcrLevel1,
 	}
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1302,7 +1302,7 @@ func TestPromptNone_OfflineAccessInConsent(t *testing.T) {
 		ClientId: client.Id,
 		URI:      "https://example.com/callback",
 	}
-	err = database.CreateRedirectURI(nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1437,7 +1437,7 @@ func TestPromptNone_RequestSubsetOfConsent(t *testing.T) {
 		ConsentRequired:          true,
 		DefaultAcrLevel:          models.AcrLevel1,
 	}
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1446,7 +1446,7 @@ func TestPromptNone_RequestSubsetOfConsent(t *testing.T) {
 		ClientId: client.Id,
 		URI:      "https://example.com/callback",
 	}
-	err = database.CreateRedirectURI(nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	if err != nil {
 		t.Fatal(err)
 	}

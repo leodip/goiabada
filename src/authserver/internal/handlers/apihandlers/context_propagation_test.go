@@ -118,3 +118,90 @@ func TestHandleAPIUserSessionsGet_MalformedIdReachesNoSessionPort(t *testing.T) 
 	database.AssertNotCalled(t, "GetUserSessionsByUserId", mock.Anything, mock.Anything, mock.Anything)
 	database.AssertNotCalled(t, "UserSessionsLoadClients", mock.Anything, mock.Anything, mock.Anything)
 }
+
+// Stage 7 adds the client, resource and permission half. The admin API's client pages are the
+// widest reads in this package after the session ones: every client on the install, each hydrated
+// with its redirect URIs and its web origins through two loaders that reach the database again
+// inside commondb.
+
+// apiClientRequest is apiRequestCarryingId plus the chi id parameter the single-client handlers
+// read, which is everything HandleAPIClientGet needs before its first query.
+func apiClientRequest(clientId string) *http.Request {
+	req := apiRequestCarryingId("/api/v1/admin/clients/" + clientId)
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("id", clientId)
+	return req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+}
+
+// The accept arm: all three reads -- the client list and both loaders -- carry the request's own
+// context. The loaders matter more than the list here, because each reaches the database a second
+// time inside commondb and is the shape that would keep compiling with a context.Background()
+// under it.
+func TestHandleAPIClientsGet_ListsClientsUnderTheRequestsContext(t *testing.T) {
+	database := mocks_data.NewDatabase(t)
+
+	database.On("GetAllClients", theApiRequestsContext(), mock.Anything).
+		Return([]models.Client{{Id: 3, ClientIdentifier: "portal"}}, nil).Once()
+	database.On("ClientLoadRedirectURIs", theApiRequestsContext(), mock.Anything, mock.Anything).
+		Return(nil).Once()
+	database.On("ClientLoadWebOrigins", theApiRequestsContext(), mock.Anything, mock.Anything).
+		Return(nil).Once()
+
+	rr := httptest.NewRecorder()
+	HandleAPIClientsGet(database).ServeHTTP(rr, apiRequestCarryingId("/api/v1/admin/clients"))
+
+	require.Equal(t, http.StatusOK, rr.Code)
+	database.AssertExpectations(t)
+}
+
+// The reject arm: an id that is not a number is refused before the first query, so neither the
+// client read nor either loader is reached and there is no context to get wrong.
+func TestHandleAPIClientGet_MalformedIdReachesNoClientPort(t *testing.T) {
+	database := mocks_data.NewDatabase(t)
+
+	rr := httptest.NewRecorder()
+	HandleAPIClientGet(database).ServeHTTP(rr, apiClientRequest("not-a-number"))
+
+	require.Equal(t, http.StatusBadRequest, rr.Code)
+	database.AssertNotCalled(t, "GetClientById", mock.Anything, mock.Anything, mock.Anything)
+	database.AssertNotCalled(t, "ClientLoadRedirectURIs", mock.Anything, mock.Anything, mock.Anything)
+	database.AssertNotCalled(t, "ClientLoadWebOrigins", mock.Anything, mock.Anything, mock.Anything)
+}
+
+// apiResourcePermissionsRequest carries the resourceId parameter the permission listing reads.
+func apiResourcePermissionsRequest(resourceId string) *http.Request {
+	req := apiRequestCarryingId("/api/v1/admin/resources/" + resourceId + "/permissions")
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("resourceId", resourceId)
+	return req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+}
+
+// The accept arm for the permission half: the listing and the resource hydration that follows it
+// are both issued on behalf of the request that asked.
+func TestHandleAPIPermissionsByResourceGet_ReadsPermissionsUnderTheRequestsContext(t *testing.T) {
+	database := mocks_data.NewDatabase(t)
+
+	database.On("GetPermissionsByResourceId", theApiRequestsContext(), mock.Anything, int64(4)).
+		Return([]models.Permission{{Id: 11, PermissionIdentifier: "read", ResourceId: 4}}, nil).Once()
+	database.On("PermissionsLoadResources", theApiRequestsContext(), mock.Anything, mock.Anything).
+		Return(nil).Once()
+
+	rr := httptest.NewRecorder()
+	HandleAPIPermissionsByResourceGet(database).ServeHTTP(rr, apiResourcePermissionsRequest("4"))
+
+	require.Equal(t, http.StatusOK, rr.Code)
+	database.AssertExpectations(t)
+}
+
+// The reject arm: a resource id that is not a number is refused before the listing, so neither
+// permission port is reached.
+func TestHandleAPIPermissionsByResourceGet_MalformedResourceIdReachesNoPermissionPort(t *testing.T) {
+	database := mocks_data.NewDatabase(t)
+
+	rr := httptest.NewRecorder()
+	HandleAPIPermissionsByResourceGet(database).ServeHTTP(rr, apiResourcePermissionsRequest("not-a-number"))
+
+	require.Equal(t, http.StatusBadRequest, rr.Code)
+	database.AssertNotCalled(t, "GetPermissionsByResourceId", mock.Anything, mock.Anything, mock.Anything)
+	database.AssertNotCalled(t, "PermissionsLoadResources", mock.Anything, mock.Anything, mock.Anything)
+}

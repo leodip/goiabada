@@ -87,7 +87,7 @@ func TestRotateEncryptionKeyIfNeeded(t *testing.T) {
 		ClientIdentifier:      "c-" + fake.UUID(),
 		ClientSecretEncrypted: encA(clientSec),
 	}
-	if err := db.CreateClient(nil, client); err != nil {
+	if err := db.CreateClient(context.Background(), nil, client); err != nil {
 		t.Fatalf("CreateClient: %v", err)
 	}
 	user := &models.User{
@@ -244,7 +244,7 @@ func TestRotateEncryptionKeyIfNeeded_PlaintextPemFailsClosed(t *testing.T) {
 		ClientIdentifier:      "c-" + fake.UUID(),
 		ClientSecretEncrypted: secretUnderA,
 	}
-	if err := db.CreateClient(nil, client); err != nil {
+	if err := db.CreateClient(context.Background(), nil, client); err != nil {
 		t.Fatalf("CreateClient: %v", err)
 	}
 

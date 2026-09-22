@@ -80,7 +80,7 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 		}
 		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
 
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(nil, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(nil, nil)
 
 		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err.Error() == "client test-client not found"
@@ -115,7 +115,7 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 			ClientIdentifier: "test-client",
 			DefaultAcrLevel:  models.AcrLevel2Optional,
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		user := &models.User{
 			Id:                  1,
@@ -161,7 +161,7 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 			ClientIdentifier: "test-client",
 			DefaultAcrLevel:  models.AcrLevel2Optional,
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		user := &models.User{
 			Id:                  1,
@@ -212,7 +212,7 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 			ClientIdentifier: "test-client",
 			DefaultAcrLevel:  models.AcrLevel2Mandatory,
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		user := &models.User{
 			Id:                  1,
@@ -262,7 +262,7 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 			ClientIdentifier: "test-client",
 			DefaultAcrLevel:  models.AcrLevel2Mandatory,
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(nil, nil)
 
@@ -304,7 +304,7 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 			ClientIdentifier: "test-client",
 			DefaultAcrLevel:  models.AcrLevel1,
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test-client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		user := &models.User{
 			Id: 1,

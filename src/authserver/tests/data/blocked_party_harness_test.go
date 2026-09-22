@@ -40,7 +40,7 @@ func unrelatedContention(t *testing.T) (release func()) {
 	bystander := createTestClient(t)
 	holder, err := database.BeginTransaction(context.Background())
 	require.NoError(t, err, "opening the unrelated holder's transaction")
-	require.NoError(t, database.AcquireClientRow(holder, bystander.Id), "the unrelated holder takes its row")
+	require.NoError(t, database.AcquireClientRow(context.Background(), holder, bystander.Id), "the unrelated holder takes its row")
 
 	waiterDone := make(chan error, 1)
 	go func() {
@@ -50,7 +50,7 @@ func unrelatedContention(t *testing.T) (release func()) {
 			return
 		}
 		defer func() { _ = other.RollbackTransaction(tx) }()
-		waiterDone <- other.AcquireClientRow(tx, bystander.Id)
+		waiterDone <- other.AcquireClientRow(context.Background(), tx, bystander.Id)
 	}()
 
 	// Wait until the engine actually reports the unrelated waiter, so the contention is real
@@ -88,7 +88,7 @@ func TestBlockedParty_UnrelatedContentionIsNotThisParty(t *testing.T) {
 	tx, err := database.BeginTransaction(context.Background())
 	require.NoError(t, err, "opening the foreground transaction")
 	defer func() { _ = database.RollbackTransaction(tx) }()
-	require.NoError(t, database.AcquireClientRow(tx, client.Id), "the foreground takes its row")
+	require.NoError(t, database.AcquireClientRow(context.Background(), tx, client.Id), "the foreground takes its row")
 
 	release := unrelatedContention(t)
 	defer release()
@@ -119,7 +119,7 @@ func TestBlockedParty_AWaitBehindTheForegroundIsReported(t *testing.T) {
 	tx, err := database.BeginTransaction(context.Background())
 	require.NoError(t, err, "opening the foreground transaction")
 	defer func() { _ = database.RollbackTransaction(tx) }()
-	require.NoError(t, database.AcquireClientRow(tx, client.Id), "the foreground takes its row")
+	require.NoError(t, database.AcquireClientRow(context.Background(), tx, client.Id), "the foreground takes its row")
 
 	// The same unrelated contention, so this case differs from the one above only in whether
 	// the tested party genuinely queues behind the foreground.
@@ -134,7 +134,7 @@ func TestBlockedParty_AWaitBehindTheForegroundIsReported(t *testing.T) {
 		}
 		defer func() { _ = other.RollbackTransaction(otherTx) }()
 		reached()
-		return other.AcquireClientRow(otherTx, client.Id)
+		return other.AcquireClientRow(context.Background(), otherTx, client.Id)
 	})
 
 	require.NoError(t, party.awaitBlocked(), "a party queued behind the foreground must be reported as blocked")
@@ -155,11 +155,11 @@ func TestBlockedParty_IdentityIsTheTransactionsOwnConnection(t *testing.T) {
 	first, err := database.BeginTransaction(context.Background())
 	require.NoError(t, err)
 	defer func() { _ = database.RollbackTransaction(first) }()
-	require.NoError(t, database.AcquireClientRow(first, createTestClient(t).Id))
+	require.NoError(t, database.AcquireClientRow(context.Background(), first, createTestClient(t).Id))
 	second, err := database.BeginTransaction(context.Background())
 	require.NoError(t, err)
 	defer func() { _ = database.RollbackTransaction(second) }()
-	require.NoError(t, database.AcquireClientRow(second, createTestClient(t).Id))
+	require.NoError(t, database.AcquireClientRow(context.Background(), second, createTestClient(t).Id))
 
 	a := identify(t, first)
 	b := identify(t, second)

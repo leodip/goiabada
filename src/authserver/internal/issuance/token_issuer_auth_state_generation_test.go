@@ -296,7 +296,7 @@ func TestPersistedGeneration_Stamping(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 		issuer := NewCodeIssuer(mockDB)
 
-		mockDB.On("GetClientByClientIdentifier", mock.Anything, "test-client").
+		mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
 			Return(&models.Client{Id: 1, ClientIdentifier: "test-client"}, nil)
 
 		var captured *models.Code

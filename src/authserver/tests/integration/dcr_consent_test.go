@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/url"
@@ -182,7 +183,7 @@ func TestDCR_Consent_RetainedMarkupNameIsEscaped(t *testing.T) {
 	// Written straight to the row, because no write path accepts it any more. This is a client
 	// that predates the reject, which decision 7 of #275 leaves exactly as it is.
 	client.Description = retained
-	require.NoError(t, database.UpdateClient(nil, client))
+	require.NoError(t, database.UpdateClient(context.Background(), nil, client))
 
 	user, password := createCeremonyUser(t)
 	httpClient := createHttpClient(t)
@@ -216,7 +217,7 @@ func TestDCR_Consent_UnverifiedNameSuppressesTheDescriptionLine(t *testing.T) {
 
 	// The one thing an administrator can do that would surface the duplication.
 	client.ShowDescription = true
-	require.NoError(t, database.UpdateClient(nil, client))
+	require.NoError(t, database.UpdateClient(context.Background(), nil, client))
 
 	user, password := createCeremonyUser(t)
 	httpClient := createHttpClient(t)

@@ -42,13 +42,13 @@ func HandleAPIClientPermissionsGet(
 			return
 		}
 
-		if err := database.ClientLoadPermissions(nil, client); err != nil {
+		if err := database.ClientLoadPermissions(r.Context(), nil, client); err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error loading client permissions"), "client_id", client.Id)
 			return
 		}
 
 		if client.Permissions != nil {
-			if err := database.PermissionsLoadResources(nil, client.Permissions); err != nil {
+			if err := database.PermissionsLoadResources(r.Context(), nil, client.Permissions); err != nil {
 				writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error loading permission resources"), "client_id", client.Id)
 				return
 			}
@@ -117,14 +117,14 @@ func HandleAPIClientPermissionsPut(
 		}
 
 		// Load current permissions
-		if err := database.ClientLoadPermissions(nil, client); err != nil {
+		if err := database.ClientLoadPermissions(r.Context(), nil, client); err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error loading current client permissions"), "client_id", client.Id)
 			return
 		}
 
 		// Validate that all requested permissions exist
 		for _, permissionId := range request.PermissionIds {
-			permission, err := database.GetPermissionById(nil, permissionId)
+			permission, err := database.GetPermissionById(r.Context(), nil, permissionId)
 			if err != nil {
 				writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting permission by ID for validation"), "permission_id", permissionId, "client_id", client.Id)
 				return
@@ -145,13 +145,13 @@ func HandleAPIClientPermissionsPut(
 				}
 			}
 			if !found {
-				permission, err := database.GetPermissionById(nil, permissionId)
+				permission, err := database.GetPermissionById(r.Context(), nil, permissionId)
 				if err != nil {
 					writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error retrieving permission for client assignment"), "permission_id", permissionId, "client_id", client.Id)
 					return
 				}
 
-				if err := database.CreateClientPermission(nil, &models.ClientPermission{
+				if err := database.CreateClientPermission(r.Context(), nil, &models.ClientPermission{
 					ClientId:     client.Id,
 					PermissionId: permission.Id,
 				}); err != nil {
@@ -177,7 +177,7 @@ func HandleAPIClientPermissionsPut(
 		}
 
 		for _, permissionId := range toDelete {
-			clientPermission, err := database.GetClientPermissionByClientIdAndPermissionId(nil, client.Id, permissionId)
+			clientPermission, err := database.GetClientPermissionByClientIdAndPermissionId(r.Context(), nil, client.Id, permissionId)
 			if err != nil {
 				writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting client permission for deletion"), "client_id", client.Id, "permission_id", permissionId)
 				return
@@ -187,7 +187,7 @@ func HandleAPIClientPermissionsPut(
 				return
 			}
 
-			if err := database.DeleteClientPermission(nil, clientPermission.Id); err != nil {
+			if err := database.DeleteClientPermission(r.Context(), nil, clientPermission.Id); err != nil {
 				writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error deleting client permission"), "client_permission_id", clientPermission.Id, "client_id", client.Id, "permission_id", permissionId)
 				return
 			}

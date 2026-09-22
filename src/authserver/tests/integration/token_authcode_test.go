@@ -137,7 +137,7 @@ func TestToken_AuthCode_WrongClient(t *testing.T) {
 		ConsentRequired:          false,
 		DefaultAcrLevel:          models.AcrLevel2Optional,
 	}
-	err := database.CreateClient(nil, wrongClient)
+	err := database.CreateClient(context.Background(), nil, wrongClient)
 	assert.NoError(t, err)
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
@@ -161,7 +161,7 @@ func TestToken_AuthCode_ConfidentialClient_NoClientSecret(t *testing.T) {
 
 	// Ensure the client is not public (confidential)
 	code.Client.IsPublic = false
-	err := database.UpdateClient(nil, &code.Client)
+	err := database.UpdateClient(context.Background(), nil, &code.Client)
 	assert.NoError(t, err)
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
@@ -187,7 +187,7 @@ func TestToken_AuthCode_ConfidentialClient_ClientAuthFailed(t *testing.T) {
 
 	// Ensure the client is confidential (not public)
 	code.Client.IsPublic = false
-	err := database.UpdateClient(nil, &code.Client)
+	err := database.UpdateClient(context.Background(), nil, &code.Client)
 	assert.NoError(t, err)
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
@@ -213,7 +213,7 @@ func TestToken_AuthCode_InvalidCodeVerifier(t *testing.T) {
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
 
 	code.Client.IsPublic = false
-	err := database.UpdateClient(nil, &code.Client)
+	err := database.UpdateClient(context.Background(), nil, &code.Client)
 	assert.NoError(t, err)
 
 	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"

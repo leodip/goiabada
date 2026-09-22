@@ -87,7 +87,7 @@ func TestGetClientDisplayInfo(t *testing.T) {
 			ShowLogo:         true,
 		}
 
-		database.On("ClientHasLogo", mock.Anything, int64(1)).Return(true, nil)
+		database.On("ClientHasLogo", mock.Anything, mock.Anything, int64(1)).Return(true, nil)
 
 		info := getClientDisplayInfo(context.Background(), database, client)
 
@@ -110,7 +110,7 @@ func TestGetClientDisplayInfo(t *testing.T) {
 			ShowLogo:         true,
 		}
 
-		database.On("ClientHasLogo", mock.Anything, int64(1)).Return(false, nil)
+		database.On("ClientHasLogo", mock.Anything, mock.Anything, int64(1)).Return(false, nil)
 
 		info := getClientDisplayInfo(context.Background(), database, client)
 
@@ -292,7 +292,7 @@ func TestGetClientDisplayInfo(t *testing.T) {
 			ShowWebsiteURL:   true,
 		}
 
-		database.On("ClientHasLogo", mock.Anything, int64(1)).Return(true, nil)
+		database.On("ClientHasLogo", mock.Anything, mock.Anything, int64(1)).Return(true, nil)
 
 		info := getClientDisplayInfo(context.Background(), database, client)
 
@@ -362,7 +362,7 @@ func TestGetClientDisplayInfo(t *testing.T) {
 			ShowLogo:         true,
 		}
 
-		database.On("ClientHasLogo", mock.Anything, int64(1)).Return(false, assert.AnError)
+		database.On("ClientHasLogo", mock.Anything, mock.Anything, int64(1)).Return(false, assert.AnError)
 
 		info := getClientDisplayInfo(context.Background(), database, client)
 

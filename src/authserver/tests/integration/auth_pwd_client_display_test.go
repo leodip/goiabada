@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/models"
@@ -26,7 +27,7 @@ func TestAuthPwd_ClientDisplay_ShowDisplayName_WithValue(t *testing.T) {
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
-	err := database.CreateRedirectURI(nil, redirectUri)
+	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	assert.NoError(t, err)
 
 	// Navigate to password screen
@@ -64,7 +65,7 @@ func TestAuthPwd_ClientDisplay_ShowDisplayName_Empty(t *testing.T) {
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
-	err := database.CreateRedirectURI(nil, redirectUri)
+	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	assert.NoError(t, err)
 
 	httpClient := createHttpClient(t)
@@ -98,7 +99,7 @@ func TestAuthPwd_ClientDisplay_HideDisplayName(t *testing.T) {
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
-	err := database.CreateRedirectURI(nil, redirectUri)
+	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	assert.NoError(t, err)
 
 	httpClient := createHttpClient(t)
@@ -131,7 +132,7 @@ func TestAuthPwd_ClientDisplay_ShowLogo_WithLogo(t *testing.T) {
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
-	err := database.CreateRedirectURI(nil, redirectUri)
+	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	assert.NoError(t, err)
 
 	httpClient := createHttpClient(t)
@@ -164,7 +165,7 @@ func TestAuthPwd_ClientDisplay_ShowLogo_NoLogo(t *testing.T) {
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
-	err := database.CreateRedirectURI(nil, redirectUri)
+	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	assert.NoError(t, err)
 
 	httpClient := createHttpClient(t)
@@ -197,7 +198,7 @@ func TestAuthPwd_ClientDisplay_HideLogo_WithLogo(t *testing.T) {
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
-	err := database.CreateRedirectURI(nil, redirectUri)
+	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	assert.NoError(t, err)
 
 	httpClient := createHttpClient(t)
@@ -230,7 +231,7 @@ func TestAuthPwd_ClientDisplay_ShowDescription_WithValue(t *testing.T) {
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
-	err := database.CreateRedirectURI(nil, redirectUri)
+	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	assert.NoError(t, err)
 
 	httpClient := createHttpClient(t)
@@ -263,7 +264,7 @@ func TestAuthPwd_ClientDisplay_ShowDescription_Empty(t *testing.T) {
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
-	err := database.CreateRedirectURI(nil, redirectUri)
+	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	assert.NoError(t, err)
 
 	httpClient := createHttpClient(t)
@@ -296,7 +297,7 @@ func TestAuthPwd_ClientDisplay_HideDescription(t *testing.T) {
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
-	err := database.CreateRedirectURI(nil, redirectUri)
+	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	assert.NoError(t, err)
 
 	httpClient := createHttpClient(t)
@@ -329,7 +330,7 @@ func TestAuthPwd_ClientDisplay_ShowWebsiteUrl_WithValue(t *testing.T) {
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
-	err := database.CreateRedirectURI(nil, redirectUri)
+	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	assert.NoError(t, err)
 
 	httpClient := createHttpClient(t)
@@ -362,7 +363,7 @@ func TestAuthPwd_ClientDisplay_ShowWebsiteUrl_Empty(t *testing.T) {
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
-	err := database.CreateRedirectURI(nil, redirectUri)
+	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	assert.NoError(t, err)
 
 	httpClient := createHttpClient(t)
@@ -395,7 +396,7 @@ func TestAuthPwd_ClientDisplay_HideWebsiteUrl(t *testing.T) {
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
-	err := database.CreateRedirectURI(nil, redirectUri)
+	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	assert.NoError(t, err)
 
 	httpClient := createHttpClient(t)
@@ -431,7 +432,7 @@ func TestAuthPwd_ClientDisplay_AllEnabled(t *testing.T) {
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
-	err := database.CreateRedirectURI(nil, redirectUri)
+	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	assert.NoError(t, err)
 
 	httpClient := createHttpClient(t)
@@ -468,7 +469,7 @@ func TestAuthPwd_ClientDisplay_AllDisabled(t *testing.T) {
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
-	err := database.CreateRedirectURI(nil, redirectUri)
+	err := database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	assert.NoError(t, err)
 
 	httpClient := createHttpClient(t)

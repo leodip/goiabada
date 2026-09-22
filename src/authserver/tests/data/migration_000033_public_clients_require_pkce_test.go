@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -122,7 +123,7 @@ func TestMigration000033_PublicClientsRequirePKCE(t *testing.T) {
 			IsPublic:         c.isPublic,
 			PKCERequired:     c.seeded,
 		}
-		require.NoErrorf(t, h.DB.CreateClient(nil, client), "seed client %s", c.name)
+		require.NoErrorf(t, h.DB.CreateClient(context.Background(), nil, client), "seed client %s", c.name)
 		ids[i] = client.Id
 	}
 

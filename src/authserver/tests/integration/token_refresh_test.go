@@ -104,7 +104,7 @@ func TestToken_Refresh_ClientSecretIsMissing(t *testing.T) {
 		AuthorizationCodeEnabled: true,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
-	err = database.CreateClient(nil, client)
+	err = database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
 
 	httpClient := createHttpClient(t)
@@ -274,7 +274,7 @@ func TestToken_Refresh_TokenExpired(t *testing.T) {
 	assert.NoError(t, err)
 	client.ClientSecretEncrypted = clientSecretEncrypted
 
-	err = database.CreateClient(nil, client)
+	err = database.CreateClient(context.Background(), nil, client)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -353,7 +353,7 @@ func TestToken_Refresh_WrongClient(t *testing.T) {
 		DefaultAcrLevel:          models.AcrLevel2Optional,
 		ClientSecretEncrypted:    wrongClientSecretEncrypted,
 	}
-	err = database.CreateClient(nil, wrongClient)
+	err = database.CreateClient(context.Background(), nil, wrongClient)
 	assert.NoError(t, err)
 
 	// Now try to use the refresh token with the wrong client
@@ -445,7 +445,7 @@ func TestToken_Refresh_ConsentRemoved(t *testing.T) {
 		DefaultAcrLevel:          models.AcrLevel1,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
-	err = database.CreateClient(nil, client)
+	err = database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
 
 	// Create a redirect URI for the client
@@ -453,7 +453,7 @@ func TestToken_Refresh_ConsentRemoved(t *testing.T) {
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
-	err = database.CreateRedirectURI(nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	assert.NoError(t, err)
 
 	// Create a user
@@ -579,14 +579,14 @@ func TestToken_Refresh_ConsentDoesNotIncludeScope(t *testing.T) {
 		DefaultAcrLevel:          models.AcrLevel1,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
-	err = database.CreateClient(nil, client)
+	err = database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
 
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
-	err = database.CreateRedirectURI(nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	assert.NoError(t, err)
 
 	password := fake.Password(8)

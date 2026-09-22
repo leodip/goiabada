@@ -2,6 +2,7 @@ package integrationtests
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
@@ -27,7 +28,7 @@ func createTestClientForLogo(t *testing.T) *models.Client {
 		Description:      "Test client for logo tests",
 		Enabled:          true,
 	}
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
 	return client
 }

@@ -135,13 +135,13 @@ func createCrossUserBrowser(t *testing.T, defaultAcrLevel models.AcrLevel,
 		DefaultAcrLevel:          defaultAcrLevel,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
-	require.NoError(t, database.CreateClient(nil, client))
+	require.NoError(t, database.CreateClient(context.Background(), nil, client))
 
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
 		URI:      "https://example.com/callback",
 	}
-	require.NoError(t, database.CreateRedirectURI(nil, redirectUri))
+	require.NoError(t, database.CreateRedirectURI(context.Background(), nil, redirectUri))
 
 	// A presents a second factor whenever A's own level asks for one; B never does.
 	aPresentsOtp := aSessionAcrLevel.IsHigherThan(models.AcrLevel1)

@@ -47,10 +47,10 @@ func TestAPIUserSessionsGet_Success(t *testing.T) {
 		AuthorizationCodeEnabled: true,
 		ClientCredentialsEnabled: false,
 	}
-	err = database.CreateClient(nil, testClient)
+	err = database.CreateClient(context.Background(), nil, testClient)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteClient(nil, testClient.Id)
+		_ = database.DeleteClient(context.Background(), nil, testClient.Id)
 	}()
 
 	// Setup: Create test sessions

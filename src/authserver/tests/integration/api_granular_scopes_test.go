@@ -30,15 +30,15 @@ func createClientWithGranularScope(t *testing.T, permissionIdentifier string) (s
 		IsPublic:                 false,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
-	err = database.CreateClient(nil, client)
+	err = database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
 
 	// Get authserver resource
-	authServerResource, err := database.GetResourceByResourceIdentifier(nil, constants.AuthServerResourceIdentifier)
+	authServerResource, err := database.GetResourceByResourceIdentifier(context.Background(), nil, constants.AuthServerResourceIdentifier)
 	assert.NoError(t, err)
 
 	// Find the specified permission
-	permissions, err := database.GetPermissionsByResourceId(nil, authServerResource.Id)
+	permissions, err := database.GetPermissionsByResourceId(context.Background(), nil, authServerResource.Id)
 	assert.NoError(t, err)
 
 	var targetPermission *models.Permission
@@ -51,7 +51,7 @@ func createClientWithGranularScope(t *testing.T, permissionIdentifier string) (s
 	assert.NotNil(t, targetPermission, "Should find permission: %s", permissionIdentifier)
 
 	// Assign permission to client
-	err = database.CreateClientPermission(nil, &models.ClientPermission{
+	err = database.CreateClientPermission(context.Background(), nil, &models.ClientPermission{
 		ClientId:     client.Id,
 		PermissionId: targetPermission.Id,
 	})
@@ -82,7 +82,7 @@ func TestGranularScopes_AdminReadCanOnlyReadUserEndpoints(t *testing.T) {
 	// Create client with admin-read scope only
 	accessToken, client := createClientWithGranularScope(t, constants.AdminReadPermissionIdentifier)
 	defer func() {
-		_ = database.DeleteClient(nil, client.Id)
+		_ = database.DeleteClient(context.Background(), nil, client.Id)
 	}()
 
 	// Create a test user for the tests
@@ -136,7 +136,7 @@ func TestGranularScopes_AdminReadCanOnlyReadClientEndpoints(t *testing.T) {
 	// Create client with admin-read scope only
 	accessToken, client := createClientWithGranularScope(t, constants.AdminReadPermissionIdentifier)
 	defer func() {
-		_ = database.DeleteClient(nil, client.Id)
+		_ = database.DeleteClient(context.Background(), nil, client.Id)
 	}()
 
 	// Create a test client for the tests
@@ -144,10 +144,10 @@ func TestGranularScopes_AdminReadCanOnlyReadClientEndpoints(t *testing.T) {
 		ClientIdentifier: "test-client-" + fake.LetterN(8),
 		Enabled:          true,
 	}
-	err := database.CreateClient(nil, testClient)
+	err := database.CreateClient(context.Background(), nil, testClient)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteClient(nil, testClient.Id)
+		_ = database.DeleteClient(context.Background(), nil, testClient.Id)
 	}()
 
 	baseURL := config.GetAuthServer().BaseURL
@@ -188,7 +188,7 @@ func TestGranularScopes_AdminReadCanOnlyReadSettingsEndpoints(t *testing.T) {
 	// Create client with admin-read scope only
 	accessToken, client := createClientWithGranularScope(t, constants.AdminReadPermissionIdentifier)
 	defer func() {
-		_ = database.DeleteClient(nil, client.Id)
+		_ = database.DeleteClient(context.Background(), nil, client.Id)
 	}()
 
 	baseURL := config.GetAuthServer().BaseURL
@@ -229,7 +229,7 @@ func TestGranularScopes_ManageUsersCanAccessUserEndpointsOnly(t *testing.T) {
 	// Create client with manage-users scope only
 	accessToken, client := createClientWithGranularScope(t, constants.ManageUsersPermissionIdentifier)
 	defer func() {
-		_ = database.DeleteClient(nil, client.Id)
+		_ = database.DeleteClient(context.Background(), nil, client.Id)
 	}()
 
 	// Create a test user for the tests
@@ -250,10 +250,10 @@ func TestGranularScopes_ManageUsersCanAccessUserEndpointsOnly(t *testing.T) {
 		ClientIdentifier: "test-client-" + fake.LetterN(8),
 		Enabled:          true,
 	}
-	err = database.CreateClient(nil, testClient)
+	err = database.CreateClient(context.Background(), nil, testClient)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteClient(nil, testClient.Id)
+		_ = database.DeleteClient(context.Background(), nil, testClient.Id)
 	}()
 
 	baseURL := config.GetAuthServer().BaseURL
@@ -288,7 +288,7 @@ func TestGranularScopes_ManageClientsCanAccessClientEndpointsOnly(t *testing.T) 
 	// Create client with manage-clients scope only
 	accessToken, client := createClientWithGranularScope(t, constants.ManageClientsPermissionIdentifier)
 	defer func() {
-		_ = database.DeleteClient(nil, client.Id)
+		_ = database.DeleteClient(context.Background(), nil, client.Id)
 	}()
 
 	// Create a test user
@@ -309,10 +309,10 @@ func TestGranularScopes_ManageClientsCanAccessClientEndpointsOnly(t *testing.T) 
 		ClientIdentifier: "test-client-" + fake.LetterN(8),
 		Enabled:          true,
 	}
-	err = database.CreateClient(nil, testClient)
+	err = database.CreateClient(context.Background(), nil, testClient)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteClient(nil, testClient.Id)
+		_ = database.DeleteClient(context.Background(), nil, testClient.Id)
 	}()
 
 	baseURL := config.GetAuthServer().BaseURL
@@ -347,7 +347,7 @@ func TestGranularScopes_ManageSettingsCanAccessSettingsEndpointsOnly(t *testing.
 	// Create client with manage-settings scope only
 	accessToken, client := createClientWithGranularScope(t, constants.ManageSettingsPermissionIdentifier)
 	defer func() {
-		_ = database.DeleteClient(nil, client.Id)
+		_ = database.DeleteClient(context.Background(), nil, client.Id)
 	}()
 
 	// Create a test user
@@ -392,7 +392,7 @@ func TestGranularScopes_ManageCanAccessAllEndpoints(t *testing.T) {
 	// Create client with manage scope (full access)
 	accessToken, client := createAdminClientWithToken(t)
 	defer func() {
-		_ = database.DeleteClient(nil, client.Id)
+		_ = database.DeleteClient(context.Background(), nil, client.Id)
 	}()
 
 	// Create a test user
@@ -413,10 +413,10 @@ func TestGranularScopes_ManageCanAccessAllEndpoints(t *testing.T) {
 		ClientIdentifier: "test-client-" + fake.LetterN(8),
 		Enabled:          true,
 	}
-	err = database.CreateClient(nil, testClient)
+	err = database.CreateClient(context.Background(), nil, testClient)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteClient(nil, testClient.Id)
+		_ = database.DeleteClient(context.Background(), nil, testClient.Id)
 	}()
 
 	baseURL := config.GetAuthServer().BaseURL
@@ -507,7 +507,7 @@ func TestGranularScopes_PhoneCountriesAccessibleByAnyAdminScope(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			accessToken, client := createClientWithGranularScope(t, tc.permissionId)
 			defer func() {
-				_ = database.DeleteClient(nil, client.Id)
+				_ = database.DeleteClient(context.Background(), nil, client.Id)
 			}()
 
 			resp := makeAPIRequest(t, "GET", baseURL+"/api/v1/admin/phone-countries", accessToken, nil)
@@ -521,7 +521,7 @@ func TestGranularScopes_PhoneCountriesAccessibleByAnyAdminScope(t *testing.T) {
 	t.Run("manage", func(t *testing.T) {
 		accessToken, client := createAdminClientWithToken(t)
 		defer func() {
-			_ = database.DeleteClient(nil, client.Id)
+			_ = database.DeleteClient(context.Background(), nil, client.Id)
 		}()
 
 		resp := makeAPIRequest(t, "GET", baseURL+"/api/v1/admin/phone-countries", accessToken, nil)
@@ -557,7 +557,7 @@ func TestGranularScopes_GroupsRequireUsersScope(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			accessToken, client := createClientWithGranularScope(t, tc.permissionId)
 			defer func() {
-				_ = database.DeleteClient(nil, client.Id)
+				_ = database.DeleteClient(context.Background(), nil, client.Id)
 			}()
 
 			// Test reading groups
@@ -589,7 +589,7 @@ func TestGranularScopes_ResourcesRequireSettingsScope(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			accessToken, client := createClientWithGranularScope(t, tc.permissionId)
 			defer func() {
-				_ = database.DeleteClient(nil, client.Id)
+				_ = database.DeleteClient(context.Background(), nil, client.Id)
 			}()
 
 			// Test reading resources
@@ -634,7 +634,7 @@ func TestGranularScopes_UserPermissionsRequireUsersScope(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			accessToken, client := createClientWithGranularScope(t, tc.permissionId)
 			defer func() {
-				_ = database.DeleteClient(nil, client.Id)
+				_ = database.DeleteClient(context.Background(), nil, client.Id)
 			}()
 
 			// Test reading user permissions
@@ -654,10 +654,10 @@ func TestGranularScopes_ClientPermissionsRequireClientsScope(t *testing.T) {
 		ClientIdentifier: "test-client-" + fake.LetterN(8),
 		Enabled:          true,
 	}
-	err := database.CreateClient(nil, testClient)
+	err := database.CreateClient(context.Background(), nil, testClient)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteClient(nil, testClient.Id)
+		_ = database.DeleteClient(context.Background(), nil, testClient.Id)
 	}()
 
 	baseURL := config.GetAuthServer().BaseURL
@@ -677,7 +677,7 @@ func TestGranularScopes_ClientPermissionsRequireClientsScope(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			accessToken, client := createClientWithGranularScope(t, tc.permissionId)
 			defer func() {
-				_ = database.DeleteClient(nil, client.Id)
+				_ = database.DeleteClient(context.Background(), nil, client.Id)
 			}()
 
 			// Test reading client permissions
@@ -697,13 +697,13 @@ func TestGranularScopes_WriteOperationsRequireSpecificScopes(t *testing.T) {
 	// Create admin-read client (read-only)
 	readOnlyToken, readOnlyClient := createClientWithGranularScope(t, constants.AdminReadPermissionIdentifier)
 	defer func() {
-		_ = database.DeleteClient(nil, readOnlyClient.Id)
+		_ = database.DeleteClient(context.Background(), nil, readOnlyClient.Id)
 	}()
 
 	// Create manage-users client (full user access)
 	usersToken, usersClient := createClientWithGranularScope(t, constants.ManageUsersPermissionIdentifier)
 	defer func() {
-		_ = database.DeleteClient(nil, usersClient.Id)
+		_ = database.DeleteClient(context.Background(), nil, usersClient.Id)
 	}()
 
 	// Test user creation

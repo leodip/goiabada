@@ -90,7 +90,7 @@ func seedCode000026(t *testing.T, h *isolatedDB) int64 {
 		ClientIdentifier: "mig26_client_" + random,
 		Description:      "Migration 000026 test client",
 	}
-	require.NoError(t, h.DB.CreateClient(nil, client), "seed client")
+	require.NoError(t, h.DB.CreateClient(context.Background(), nil, client), "seed client")
 
 	user := &models.User{
 		Enabled:  true,

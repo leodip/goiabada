@@ -170,7 +170,7 @@ func (d *CommonDatabase) UsersLoadPermissions(ctx context.Context, tx *sql.Tx, u
 		permissionIds[i] = userPermission.PermissionId
 	}
 
-	permissions, err := d.GetPermissionsByIds(tx, permissionIds)
+	permissions, err := d.GetPermissionsByIds(ctx, tx, permissionIds)
 	if err != nil {
 		return err
 	}
@@ -227,7 +227,7 @@ func (d *CommonDatabase) UserLoadPermissions(ctx context.Context, tx *sql.Tx, us
 		permissionIds[i] = userPermission.PermissionId
 	}
 
-	permissions, err := d.GetPermissionsByIds(tx, permissionIds)
+	permissions, err := d.GetPermissionsByIds(ctx, tx, permissionIds)
 	if err != nil {
 		return err
 	}

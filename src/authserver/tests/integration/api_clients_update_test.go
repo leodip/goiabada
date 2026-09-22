@@ -24,7 +24,7 @@ func TestAPIClientUpdatePut_Success(t *testing.T) {
 
 	// Create a client with authorization code enabled so defaultAcrLevel applies
 	client := createTestClientUnique(t, true)
-	defer func() { _ = database.DeleteClient(nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
 	updateReq := api.UpdateClientSettingsRequest{
 		ClientIdentifier: client.ClientIdentifier + "-upd",
@@ -70,7 +70,7 @@ func TestAPIClientUpdatePut_ValidationErrors(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	client := createTestClientUnique(t, true)
-	defer func() { _ = database.DeleteClient(nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
 	cases := []struct {
 		name           string
@@ -102,9 +102,9 @@ func TestAPIClientUpdatePut_DuplicateIdentifier(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	a := createTestClientUnique(t, true)
-	defer func() { _ = database.DeleteClient(nil, a.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, a.Id) }()
 	b := createTestClientUnique(t, true)
-	defer func() { _ = database.DeleteClient(nil, b.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, b.Id) }()
 
 	// Try to update B to use A's identifier
 	updateReq := api.UpdateClientSettingsRequest{ClientIdentifier: a.ClientIdentifier, Description: "upd"}
@@ -123,7 +123,7 @@ func TestAPIClientUpdatePut_SameIdentifierAllowed(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	client := createTestClientUnique(t, true)
-	defer func() { _ = database.DeleteClient(nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
 	updateReq := api.UpdateClientSettingsRequest{
 		ClientIdentifier: client.ClientIdentifier, // same identifier
@@ -192,7 +192,7 @@ func TestAPIClientUpdatePut_InvalidRequestBodyAndUnauthorized(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	client := createTestClientUnique(t, true)
-	defer func() { _ = database.DeleteClient(nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
 	// Invalid body
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10)
@@ -226,7 +226,7 @@ func TestAPIClientUpdatePut_ACRRuleEnforcement(t *testing.T) {
 
 	// Client with auth code disabled
 	client := createTestClientUnique(t, false)
-	defer func() { _ = database.DeleteClient(nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
 	// Attempt to set DefaultAcrLevel when not applicable should be rejected
 	updateReq := api.UpdateClientSettingsRequest{
@@ -252,7 +252,7 @@ func TestAPIClientUpdatePut_WhitespaceHandling(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	client := createTestClientUnique(t, true)
-	defer func() { _ = database.DeleteClient(nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
 	// With whitespace around identifier should fail validation
 	badReq := api.UpdateClientSettingsRequest{
@@ -369,7 +369,7 @@ func TestAPIClientUpdatePut_SelfRegisteredClientIdentifierChangeBlocked(t *testi
 
 	accessToken, _ := createAdminClientWithToken(t)
 	client := registerDCRClient(t, "Renameable Portal", "https://dcr-rename.example.com/callback")
-	defer func() { _ = database.DeleteClient(nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10)
 	reqBody := api.UpdateClientSettingsRequest{ClientIdentifier: "looks-administrator-created", Description: "renamed"}
@@ -411,7 +411,7 @@ func TestAPIClientUpdatePut_SelfRegisteredClientRemainsEditable(t *testing.T) {
 
 	accessToken, _ := createAdminClientWithToken(t)
 	client := registerDCRClient(t, "Reviewed Portal", "https://dcr-reviewed.example.com/callback")
-	defer func() { _ = database.DeleteClient(nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 	assert.True(t, client.ConsentRequired, "registration turns consent on, which is what is being turned off here")
 	assert.Greater(t, len(client.ClientIdentifier), 38,
 		"a generated identifier is longer than ValidateIdentifier accepts, which is what makes this the regression guard")
@@ -440,7 +440,7 @@ func TestAPIClientUpdatePut_WebsiteURLValidation(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	client := createTestClientUnique(t, true)
-	defer func() { _ = database.DeleteClient(nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
 	apiURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10)
 
@@ -496,7 +496,7 @@ func TestAPIClientUpdatePut_InvalidDefaultAcrLevelValue(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	client := createTestClientUnique(t, true)
-	defer func() { _ = database.DeleteClient(nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10)
 	reqBody := api.UpdateClientSettingsRequest{ClientIdentifier: client.ClientIdentifier, Description: client.Description, DefaultAcrLevel: "invalid-acr"}
@@ -524,14 +524,14 @@ func TestAPIClientUpdatePut_InsufficientScope(t *testing.T) {
 		IsPublic:                 false,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
-	err = database.CreateClient(nil, client)
+	err = database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
-	defer func() { _ = database.DeleteClient(nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
 	// Grant auth-server:userinfo permission
-	authRes, err := database.GetResourceByResourceIdentifier(nil, constants.AuthServerResourceIdentifier)
+	authRes, err := database.GetResourceByResourceIdentifier(context.Background(), nil, constants.AuthServerResourceIdentifier)
 	assert.NoError(t, err)
-	perms, err := database.GetPermissionsByResourceId(nil, authRes.Id)
+	perms, err := database.GetPermissionsByResourceId(context.Background(), nil, authRes.Id)
 	assert.NoError(t, err)
 	var userinfoPerm *models.Permission
 	for i := range perms {
@@ -541,7 +541,7 @@ func TestAPIClientUpdatePut_InsufficientScope(t *testing.T) {
 		}
 	}
 	assert.NotNil(t, userinfoPerm)
-	err = database.CreateClientPermission(nil, &models.ClientPermission{ClientId: client.Id, PermissionId: userinfoPerm.Id})
+	err = database.CreateClientPermission(context.Background(), nil, &models.ClientPermission{ClientId: client.Id, PermissionId: userinfoPerm.Id})
 	assert.NoError(t, err)
 
 	// Get token with only auth-server:userinfo scope
@@ -560,7 +560,7 @@ func TestAPIClientUpdatePut_InsufficientScope(t *testing.T) {
 
 	// Create a target client to attempt updating
 	target := createTestClientUnique(t, true)
-	defer func() { _ = database.DeleteClient(nil, target.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, target.Id) }()
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(target.Id, 10)
 	reqBody := api.UpdateClientSettingsRequest{ClientIdentifier: target.ClientIdentifier, Description: "x"}
@@ -583,7 +583,7 @@ func createTestClientUnique(t *testing.T, authCodeEnabled bool) *models.Client {
 		ClientCredentialsEnabled: false,
 		DefaultAcrLevel:          models.AcrLevel2Optional,
 	}
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
 	return client
 }
@@ -595,7 +595,7 @@ func TestAPIClientUpdatePut_AngleBracketsRejected(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	client := createTestClientUnique(t, true)
-	defer func() { _ = database.DeleteClient(nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
 	endpoint := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10)
 
@@ -640,7 +640,7 @@ func TestAPIClientUpdatePut_AmpersandsAndQuotesStoredVerbatim(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	client := createTestClientUnique(t, true)
-	defer func() { _ = database.DeleteClient(nil, client.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
 	updateReq := api.UpdateClientSettingsRequest{
 		ClientIdentifier: client.ClientIdentifier,

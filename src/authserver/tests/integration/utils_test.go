@@ -240,7 +240,7 @@ func createResource(t *testing.T) *models.Resource {
 	resource := &models.Resource{
 		ResourceIdentifier: "res-" + fake.LetterN(8),
 	}
-	err := database.CreateResource(nil, resource)
+	err := database.CreateResource(context.Background(), nil, resource)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -251,7 +251,7 @@ func createResourceWithId(t *testing.T, resourceIdentifier string) *models.Resou
 	resource := &models.Resource{
 		ResourceIdentifier: resourceIdentifier,
 	}
-	err := database.CreateResource(nil, resource)
+	err := database.CreateResource(context.Background(), nil, resource)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -263,7 +263,7 @@ func createPermission(t *testing.T, resourceId int64) *models.Permission {
 		PermissionIdentifier: "perm-" + fake.LetterN(8),
 		ResourceId:           resourceId,
 	}
-	err := database.CreatePermission(nil, permission)
+	err := database.CreatePermission(context.Background(), nil, permission)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -275,7 +275,7 @@ func createPermissionWithId(t *testing.T, resourceId int64, permissionIdentifier
 		PermissionIdentifier: permissionIdentifier,
 		ResourceId:           resourceId,
 	}
-	err := database.CreatePermission(nil, permission)
+	err := database.CreatePermission(context.Background(), nil, permission)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -356,7 +356,7 @@ func createSessionWithAcrLevel1(t *testing.T) (*http.Client, *models.Client, *mo
 		DefaultAcrLevel:          models.AcrLevel1,
 	}
 
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -366,7 +366,7 @@ func createSessionWithAcrLevel1(t *testing.T) (*http.Client, *models.Client, *mo
 		URI:      fake.URL(),
 	}
 
-	err = database.CreateRedirectURI(nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -465,7 +465,7 @@ func createSessionWithAcrLevel2Optional(t *testing.T) (*http.Client, *models.Cli
 		DefaultAcrLevel:          models.AcrLevel2Optional,
 	}
 
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -475,7 +475,7 @@ func createSessionWithAcrLevel2Optional(t *testing.T) (*http.Client, *models.Cli
 		URI:      fake.URL(),
 	}
 
-	err = database.CreateRedirectURI(nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -578,7 +578,7 @@ func createSessionWithAcrLevel2Mandatory(t *testing.T) (*http.Client, *models.Cl
 		DefaultAcrLevel:          models.AcrLevel2Mandatory,
 	}
 
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -588,7 +588,7 @@ func createSessionWithAcrLevel2Mandatory(t *testing.T) (*http.Client, *models.Cl
 		URI:      fake.URL(),
 	}
 
-	err = database.CreateRedirectURI(nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -767,7 +767,7 @@ func createAuthCode(t *testing.T, clientSecret string, scope string, opts ...aut
 		client.ClientSecretEncrypted = nil
 	}
 
-	err = database.CreateClient(nil, client)
+	err = database.CreateClient(context.Background(), nil, client)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -777,7 +777,7 @@ func createAuthCode(t *testing.T, clientSecret string, scope string, opts ...aut
 		URI:      fake.URL(),
 	}
 
-	err = database.CreateRedirectURI(nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -885,13 +885,13 @@ func createAuthCodeEnsuringUserScope(t *testing.T, clientSecret string, scope st
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
 
-	err = database.CreateClient(nil, client)
+	err = database.CreateClient(context.Background(), nil, client)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	redirectUri := &models.RedirectURI{ClientId: client.Id, URI: fake.URL()}
-	err = database.CreateRedirectURI(nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -921,7 +921,7 @@ func createAuthCodeEnsuringUserScope(t *testing.T, clientSecret string, scope st
 		resourceIdentifier := parts[0]
 		permissionIdentifier := parts[1]
 
-		resource, err := database.GetResourceByResourceIdentifier(nil, resourceIdentifier)
+		resource, err := database.GetResourceByResourceIdentifier(context.Background(), nil, resourceIdentifier)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -929,7 +929,7 @@ func createAuthCodeEnsuringUserScope(t *testing.T, clientSecret string, scope st
 			t.Fatalf("resource not found: %s", resourceIdentifier)
 		}
 
-		perms, err := database.GetPermissionsByResourceId(nil, resource.Id)
+		perms, err := database.GetPermissionsByResourceId(context.Background(), nil, resource.Id)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1122,14 +1122,14 @@ func createAdminClientWithToken(t *testing.T) (string, *models.Client) {
 		IsPublic:                 false,
 		ClientSecretEncrypted:    clientSecretEncrypted,
 	}
-	err = database.CreateClient(nil, client)
+	err = database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
 
 	// Get authserver resource and permission
-	authServerResource, err := database.GetResourceByResourceIdentifier(nil, constants.AuthServerResourceIdentifier)
+	authServerResource, err := database.GetResourceByResourceIdentifier(context.Background(), nil, constants.AuthServerResourceIdentifier)
 	assert.NoError(t, err)
 
-	permissions, err := database.GetPermissionsByResourceId(nil, authServerResource.Id)
+	permissions, err := database.GetPermissionsByResourceId(context.Background(), nil, authServerResource.Id)
 	assert.NoError(t, err)
 
 	var adminPermission *models.Permission
@@ -1142,7 +1142,7 @@ func createAdminClientWithToken(t *testing.T) (string, *models.Client) {
 	assert.NotNil(t, adminPermission, "Should find manage permission")
 
 	// Assign admin permission to client
-	err = database.CreateClientPermission(nil, &models.ClientPermission{
+	err = database.CreateClientPermission(context.Background(), nil, &models.ClientPermission{
 		ClientId:     client.Id,
 		PermissionId: adminPermission.Id,
 	})
@@ -1203,7 +1203,7 @@ func createTestResource(t *testing.T, identifier, description string) *models.Re
 		ResourceIdentifier: identifier,
 		Description:        description,
 	}
-	err := database.CreateResource(nil, resource)
+	err := database.CreateResource(context.Background(), nil, resource)
 	assert.NoError(t, err)
 	return resource
 }
@@ -1266,7 +1266,7 @@ func createTestPermission(t *testing.T, resourceId int64, identifier, descriptio
 		PermissionIdentifier: identifier,
 		Description:          description,
 	}
-	err := database.CreatePermission(nil, permission)
+	err := database.CreatePermission(context.Background(), nil, permission)
 	assert.NoError(t, err)
 	return permission
 }
@@ -1492,7 +1492,7 @@ func createClientWithDisplaySettings(t *testing.T, settings ClientDisplaySetting
 		DefaultAcrLevel:          settings.DefaultAcrLevel,
 	}
 
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1517,7 +1517,7 @@ func createClientWithDisplaySettings(t *testing.T, settings ClientDisplaySetting
 			Logo:     logoData,
 		}
 
-		err = database.CreateClientLogo(nil, clientLogo)
+		err = database.CreateClientLogo(context.Background(), nil, clientLogo)
 		if err != nil {
 			t.Fatal(err)
 		}

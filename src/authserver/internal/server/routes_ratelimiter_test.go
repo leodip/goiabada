@@ -154,9 +154,9 @@ func newRoutesTestServer(t *testing.T) *Server {
 	// client whose branding the form carries.
 	database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).
 		Return(&models.User{Id: 1, Enabled: true, OTPEnabled: false}, nil).Maybe()
-	database.On("GetClientByClientIdentifier", mock.Anything, routesTestClientId).
+	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, routesTestClientId).
 		Return(&models.Client{Id: 1, ClientIdentifier: routesTestClientId}, nil).Maybe()
-	database.On("ClientHasLogo", mock.Anything, int64(1)).Return(false, nil).Maybe()
+	database.On("ClientHasLogo", mock.Anything, mock.Anything, int64(1)).Return(false, nil).Maybe()
 
 	s := &Server{
 		router:       chi.NewRouter(),

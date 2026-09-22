@@ -486,7 +486,7 @@ func TestDecryptIDTokenHint(t *testing.T) {
 		clientSecret := "test_secret"
 		clientSecretEncrypted, _ := encryption.EncryptData(clientSecret)
 		client := &models.Client{ClientSecretEncrypted: clientSecretEncrypted}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test_client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test_client").Return(client, nil)
 
 		innerToken := "test_token"
 		jwe, err := encryption.EncryptIDTokenHintJWE(innerToken, clientSecret)
@@ -502,7 +502,7 @@ func TestDecryptIDTokenHint(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		logs := testutil.CaptureSlog(t)
 
-		database.On("GetClientByClientIdentifier", mock.Anything, "invalid_client").Return(nil, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "invalid_client").Return(nil, nil)
 
 		_, err := decryptIDTokenHint(context.Background(), "a.b.c.d.e", "invalid_client", database)
 
@@ -525,7 +525,7 @@ func TestDecryptIDTokenHint(t *testing.T) {
 		clientSecret := "test_secret"
 		clientSecretEncrypted, _ := encryption.EncryptData(clientSecret)
 		client := &models.Client{ClientSecretEncrypted: clientSecretEncrypted}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test_client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test_client").Return(client, nil)
 
 		logs := testutil.CaptureSlog(t)
 
@@ -549,7 +549,7 @@ func TestDecryptIDTokenHint(t *testing.T) {
 		clientSecret := "test_secret"
 		clientSecretEncrypted, _ := encryption.EncryptData(clientSecret)
 		client := &models.Client{ClientSecretEncrypted: clientSecretEncrypted}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test_client").Return(client, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test_client").Return(client, nil)
 
 		// Encrypted with a different secret than the client's.
 		jwe, err := encryption.EncryptIDTokenHintJWE("test_token", "a-different-secret")
@@ -804,7 +804,7 @@ func stubConfirmedHint(
 	httpHelper.On("LookupFromUrlQueryOrFormPost", mock.Anything, "client_id").Return("", false)
 	tokenParser.On("DecodeAndValidateTokenString", mock.Anything, hintedToken, (*rsa.PublicKey)(nil), false).
 		Return(&oauth.JwtToken{TokenBase64: hintedToken, Claims: claims}, nil)
-	database.On("GetClientByClientIdentifier", mock.Anything, hintedClientId).Return(client, nil)
+	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, hintedClientId).Return(client, nil)
 	database.On("GetUserBySubject", mock.Anything, mock.Anything, hintedSubject).
 		Return(&models.User{Id: hintedUserId}, nil).Maybe()
 
@@ -814,8 +814,8 @@ func stubConfirmedHint(
 // stubRegisteredURI gives the client one registered redirect URI, which is the set a post-logout
 // target is matched against exactly.
 func stubRegisteredURI(database *mocks_data.Database, client *models.Client, uri string) {
-	database.On("ClientLoadRedirectURIs", mock.Anything, client).Run(func(args mock.Arguments) {
-		args.Get(1).(*models.Client).RedirectURIs = []models.RedirectURI{{URI: uri}}
+	database.On("ClientLoadRedirectURIs", mock.Anything, mock.Anything, client).Run(func(args mock.Arguments) {
+		args.Get(2).(*models.Client).RedirectURIs = []models.RedirectURI{{URI: uri}}
 	}).Return(nil)
 }
 
@@ -1008,8 +1008,8 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 			ClientIdentifier: "test_client",
 			RedirectURIs:     []models.RedirectURI{{URI: "https://example.com/out?state=registered&lang=en"}},
 		}
-		database.On("GetClientByClientIdentifier", mock.Anything, "test_client").Return(client, nil)
-		database.On("ClientLoadRedirectURIs", mock.Anything, client).Return(nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test_client").Return(client, nil)
+		database.On("ClientLoadRedirectURIs", mock.Anything, mock.Anything, client).Return(nil)
 
 		userSession := &models.UserSession{Id: 42, UserId: 123}
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test-session").Return(userSession, nil)
@@ -1071,8 +1071,8 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 					ClientIdentifier: "test_client",
 					RedirectURIs:     []models.RedirectURI{{URI: uri}},
 				}
-				database.On("GetClientByClientIdentifier", mock.Anything, "test_client").Return(client, nil)
-				database.On("ClientLoadRedirectURIs", mock.Anything, client).Return(nil)
+				database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test_client").Return(client, nil)
+				database.On("ClientLoadRedirectURIs", mock.Anything, mock.Anything, client).Return(nil)
 			}
 		}
 
@@ -1093,8 +1093,8 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 					ClientIdentifier: "test_client",
 					RedirectURIs:     []models.RedirectURI{{URI: uri}},
 				}
-				database.On("GetClientByClientIdentifier", mock.Anything, "test_client").Return(client, nil)
-				database.On("ClientLoadRedirectURIs", mock.Anything, client).Return(nil).Maybe()
+				database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test_client").Return(client, nil)
+				database.On("ClientLoadRedirectURIs", mock.Anything, mock.Anything, client).Return(nil).Maybe()
 			}
 		}
 
@@ -1114,7 +1114,7 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 				name:     "client_id names no client",
 				clientId: "ghost_client",
 				stubDB: func(database *mocks_data.Database) {
-					database.On("GetClientByClientIdentifier", mock.Anything, "ghost_client").Return(nil, nil)
+					database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "ghost_client").Return(nil, nil)
 				},
 			},
 			{
@@ -1250,7 +1250,7 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 				name:     "the client lookup fails",
 				clientId: "test_client",
 				stubDB: func(database *mocks_data.Database) {
-					database.On("GetClientByClientIdentifier", mock.Anything, "test_client").
+					database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test_client").
 						Return(nil, errors.New("client lookup exploded"))
 				},
 			},
@@ -1259,8 +1259,8 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 				clientId: "test_client",
 				stubDB: func(database *mocks_data.Database) {
 					client := &models.Client{ClientIdentifier: "test_client"}
-					database.On("GetClientByClientIdentifier", mock.Anything, "test_client").Return(client, nil)
-					database.On("ClientLoadRedirectURIs", mock.Anything, client).
+					database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test_client").Return(client, nil)
+					database.On("ClientLoadRedirectURIs", mock.Anything, mock.Anything, client).
 						Return(errors.New("load redirect URIs exploded"))
 				},
 			},
@@ -2012,7 +2012,7 @@ func TestClassifyIdTokenHint(t *testing.T) {
 	// Maybe(), because the rows refused at an earlier gate never get here, and the state assertion is
 	// what catches a gate that stopped refusing.
 	resolvesClient := func(database *mocks_data.Database) {
-		database.On("GetClientByClientIdentifier", mock.Anything, theClientId).Return(newClient(), nil).Maybe()
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, theClientId).Return(newClient(), nil).Maybe()
 	}
 
 	// The default database for a row that reaches the sid gate: the session sid names, owned by the
@@ -2124,7 +2124,7 @@ func TestClassifyIdTokenHint(t *testing.T) {
 			stubDB: func(database *mocks_data.Database) {
 				secret, err := encryption.EncryptData("some_client_secret")
 				assert.NoError(t, err)
-				database.On("GetClientByClientIdentifier", mock.Anything, theClientId).
+				database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, theClientId).
 					Return(&models.Client{ClientIdentifier: theClientId, ClientSecretEncrypted: secret}, nil)
 			},
 			want: hintRejected,
@@ -2139,7 +2139,7 @@ func TestClassifyIdTokenHint(t *testing.T) {
 			stubDB: func(database *mocks_data.Database) {
 				secret, err := encryption.EncryptData("some_client_secret")
 				assert.NoError(t, err)
-				database.On("GetClientByClientIdentifier", mock.Anything, theClientId).
+				database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, theClientId).
 					Return(&models.Client{Id: theClientDbId, ClientIdentifier: theClientId, ClientSecretEncrypted: secret}, nil)
 				resolvesOwnedSessionRows(database)
 			},
@@ -2234,7 +2234,7 @@ func TestClassifyIdTokenHint(t *testing.T) {
 			mutate:   func(claims map[string]interface{}) { claims["aud"] = "ghost_client" },
 			clientId: strPtr("ghost_client"),
 			stubDB: func(database *mocks_data.Database) {
-				database.On("GetClientByClientIdentifier", mock.Anything, "ghost_client").Return(nil, nil)
+				database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "ghost_client").Return(nil, nil)
 			},
 			want: hintRejected,
 		},
@@ -2244,7 +2244,7 @@ func TestClassifyIdTokenHint(t *testing.T) {
 			// on a terminal page while still signed in.
 			name: "the client lookup fails", gate: "aud",
 			stubDB: func(database *mocks_data.Database) {
-				database.On("GetClientByClientIdentifier", mock.Anything, theClientId).
+				database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, theClientId).
 					Return(nil, errors.New("the database is on fire"))
 			},
 			want: hintRejected,

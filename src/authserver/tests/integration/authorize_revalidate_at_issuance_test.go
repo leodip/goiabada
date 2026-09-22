@@ -70,11 +70,11 @@ func parkOnConsentScreen(t *testing.T, requestScope string, clientSecret string,
 		DefaultAcrLevel:       models.AcrLevel1,
 		ClientSecretEncrypted: clientSecretEncrypted,
 	}
-	err = database.CreateClient(nil, client)
+	err = database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
 
 	redirectURI := &models.RedirectURI{ClientId: client.Id, URI: fake.URL()}
-	err = database.CreateRedirectURI(nil, redirectURI)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectURI)
 	assert.NoError(t, err)
 
 	password := fake.Password(10)
@@ -93,10 +93,10 @@ func parkOnConsentScreen(t *testing.T, requestScope string, clientSecret string,
 	for _, scope := range grantScopes {
 		parts := strings.Split(scope, ":")
 		assert.Len(t, parts, 2, "a grantable scope is resource:permission")
-		resource, err := database.GetResourceByResourceIdentifier(nil, parts[0])
+		resource, err := database.GetResourceByResourceIdentifier(context.Background(), nil, parts[0])
 		assert.NoError(t, err)
 		assert.NotNil(t, resource)
-		permissions, err := database.GetPermissionsByResourceId(nil, resource.Id)
+		permissions, err := database.GetPermissionsByResourceId(context.Background(), nil, resource.Id)
 		assert.NoError(t, err)
 		granted := false
 		for i := range permissions {
@@ -304,7 +304,7 @@ func TestRedirectURIDeletedOnConsentScreen_NothingIsDelivered(t *testing.T) {
 	// code. Nothing else about the client changes, so it is still enabled, still administrator
 	// registered, and its stored redirect URI is still an absolute URI naming a host, which is
 	// what makes the registration check the only thing that can refuse this.
-	err := database.DeleteRedirectURI(nil, parked.redirectURI.Id)
+	err := database.DeleteRedirectURI(context.Background(), nil, parked.redirectURI.Id)
 	assert.NoError(t, err)
 
 	resp = loadPage(t, parked.httpClient, redirectLocation)
@@ -361,7 +361,7 @@ func TestRedirectURIDeletedOnConsentScreen_CancelIsNotDeliveredEither(t *testing
 
 	// The window opens before the submission here rather than after it, because this refusal is
 	// answered by the consent handler itself and never reaches another hop.
-	err := database.DeleteRedirectURI(nil, parked.redirectURI.Id)
+	err := database.DeleteRedirectURI(context.Background(), nil, parked.redirectURI.Id)
 	assert.NoError(t, err)
 
 	// No consent indices is a Cancel, per postConsent.

@@ -265,3 +265,140 @@ func TestAcquireUserSessionRow_RefusesAnAlreadyCancelledContext(t *testing.T) {
 	assert.ErrorIs(t, err, context.Canceled)
 	assert.False(t, live)
 }
+
+// Stage 7 adds the client, resource and permission half. The four shapes below repeat the ones
+// above on the methods this batch carries, for the reason stage 6's note gives: "the context
+// reaches the driver" is a claim about each method's own body, and a batch that took the ctx
+// into its signature and left a context.Background() at its QuerySql would pass every other tier.
+
+// The read every ceremony hop makes. /auth/authorize, /auth/pwd, /auth/level1completed,
+// /auth/level2, /auth/otp, /auth/completed, /auth/consent, /auth/issue and the token endpoint all
+// resolve the ceremony's client through this one method, so it is the client read most worth
+// being able to abandon.
+func TestGetClientByClientIdentifier_RefusesAnAlreadyCancelledContext(t *testing.T) {
+	client := createTestClient(t)
+
+	got, err := database.GetClientByClientIdentifier(cancelled(), nil, client.ClientIdentifier)
+
+	require.Error(t, err, "a read must not be issued on behalf of a caller that is already gone")
+	assert.ErrorIs(t, err, context.Canceled, "and the reason must be matchable, not a sentence")
+	assert.Nil(t, got, "no row is returned alongside the refusal")
+}
+
+// The write half, and the second assertion is the one that matters: a method that took the
+// context and then issued the insert without it would fail on the row count rather than on the
+// error. CreateClient rather than any other insert in this batch because it is the one dynamic
+// client registration reaches from an unauthenticated request, where an abandoned caller is
+// ordinary rather than exceptional.
+func TestCreateClient_RefusesAnAlreadyCancelledContextAndInsertsNothing(t *testing.T) {
+	client := &models.Client{
+		ClientIdentifier: "cancelled_client_" + fake.LetterN(8),
+		Description:      "Cancelled client",
+	}
+
+	err := database.CreateClient(cancelled(), nil, client)
+
+	require.Error(t, err)
+	assert.ErrorIs(t, err, context.Canceled)
+
+	found, err := database.GetClientByClientIdentifier(context.Background(), nil, client.ClientIdentifier)
+	require.NoError(t, err, "the read that checks the table must itself succeed")
+	assert.Nil(t, found, "the refused insert wrote no row")
+}
+
+// A loader rather than a plain select: ClientLoadPermissions reaches the database through
+// GetClientPermissionsByClientId and then through GetPermissionsByIds. What this case owns is
+// that the loader as a whole refuses a caller that is already gone, and no more than that: with
+// an already-cancelled context either hop alone is enough to refuse, so neutralising one hop's
+// context leaves the case green and only neutralising both turns it red. Both were measured.
+//
+// Each hop therefore owes a case of its own, and this batch adds both below:
+// TestGetClientPermissionsByClientId_RefusesAnAlreadyCancelledContext for the join rows and
+// TestGetPermissionsByIds_RefusesAnAlreadyCancelledContext for the permissions themselves.
+//
+// It is also the method stage 1 fixed, and the two claims are separate:
+// TestClientLoadPermissions_EnlistsInTheCallersTransaction says the second hop uses the caller's
+// transaction, this says the loader uses the caller's context.
+func TestClientLoadPermissions_RefusesAnAlreadyCancelledContext(t *testing.T) {
+	resource := createTestResource(t)
+	permission := createTestPermission(t, resource)
+	client := createTestClient(t)
+
+	clientPermission := &models.ClientPermission{ClientId: client.Id, PermissionId: permission.Id}
+	require.NoError(t, database.CreateClientPermission(context.Background(), nil, clientPermission))
+
+	err := database.ClientLoadPermissions(cancelled(), nil, client)
+
+	require.Error(t, err)
+	assert.ErrorIs(t, err, context.Canceled)
+	assert.Empty(t, client.Permissions, "nothing was loaded onto the model")
+}
+
+// The first hop on its own account: the join rows the admin API's client-permission page reads
+// through this same method, one query and no batching.
+func TestGetClientPermissionsByClientId_RefusesAnAlreadyCancelledContext(t *testing.T) {
+	resource := createTestResource(t)
+	permission := createTestPermission(t, resource)
+	client := createTestClient(t)
+
+	clientPermission := &models.ClientPermission{ClientId: client.Id, PermissionId: permission.Id}
+	require.NoError(t, database.CreateClientPermission(context.Background(), nil, clientPermission))
+
+	got, err := database.GetClientPermissionsByClientId(cancelled(), nil, client.Id)
+
+	require.Error(t, err, "a read must not be issued on behalf of a caller that is already gone")
+	assert.ErrorIs(t, err, context.Canceled, "and the reason must be matchable, not a sentence")
+	assert.Empty(t, got, "no rows are returned alongside the refusal")
+}
+
+// The second hop, reached directly because the loader above cannot reach it with a context that
+// is already over. GetPermissionsByIds is the method four loaders share -- the client one, both
+// group ones and both user ones -- and the one whose read #413 was escaping, so it is worth being
+// able to abandon on its own account.
+//
+// The empty-list short circuit is why the case creates a permission first: with no ids there is
+// no statement, and the method returns nil, nil however the context stands.
+func TestGetPermissionsByIds_RefusesAnAlreadyCancelledContext(t *testing.T) {
+	resource := createTestResource(t)
+	permission := createTestPermission(t, resource)
+
+	got, err := database.GetPermissionsByIds(cancelled(), nil, []int64{permission.Id})
+
+	require.Error(t, err, "a read must not be issued on behalf of a caller that is already gone")
+	assert.ErrorIs(t, err, context.Canceled, "and the reason must be matchable, not a sentence")
+	assert.Empty(t, got, "no rows are returned alongside the refusal")
+}
+
+// AcquireClientRow is this batch's row acquisition, the client-side twin of
+// AcquireUserSessionRow: HandleAPIClientAuthenticationPut and HandleAPIClientWebOriginsPut take
+// the client row before reading what they are about to replace. It is an ExecSql rather than a
+// QuerySql, which is the other of the two SQL chokepoints, so it is the case that would fail if
+// only the query half of this batch carried the context through.
+func TestAcquireClientRow_RefusesAnAlreadyCancelledContext(t *testing.T) {
+	client := createTestClient(t)
+
+	tx, err := database.BeginTransaction(context.Background())
+	require.NoError(t, err)
+	defer func() { _ = database.RollbackTransaction(tx) }()
+
+	err = database.AcquireClientRow(cancelled(), tx, client.Id)
+
+	require.Error(t, err, "a refusal, not a silent acquisition of nothing")
+	assert.ErrorIs(t, err, context.Canceled)
+}
+
+// WebOriginExists is the read MiddlewareCors makes on every CORS-checked request, and the one
+// place in this batch where the refusal has to be an error rather than a value: the middleware
+// fails closed on an error and would allow the origin on a false with no error, so a method that
+// swallowed a cancellation into its exists boolean would turn an abandoned request into a
+// permissive one.
+func TestWebOriginExists_RefusesAnAlreadyCancelledContext(t *testing.T) {
+	client := createTestClient(t)
+	origin := createTestWebOrigin(t, client.Id)
+
+	exists, err := database.WebOriginExists(cancelled(), nil, origin.Origin)
+
+	require.Error(t, err, "the refusal must reach the caller as an error, not as a false")
+	assert.ErrorIs(t, err, context.Canceled)
+	assert.False(t, exists)
+}

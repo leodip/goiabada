@@ -40,14 +40,14 @@ func TestSessionDeletedDuringAuthFlow_LoginSucceeds(t *testing.T) {
 		ConsentRequired:          false,
 		DefaultAcrLevel:          models.AcrLevel1,
 	}
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
 
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
-	err = database.CreateRedirectURI(nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	assert.NoError(t, err)
 
 	password := fake.Password(8)
@@ -218,14 +218,14 @@ func TestSessionEndedOnConsentScreen_NoCodeIsIssued(t *testing.T) {
 		ConsentRequired: true,
 		DefaultAcrLevel: models.AcrLevel1,
 	}
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
 
 	redirectUri := &models.RedirectURI{
 		ClientId: client.Id,
 		URI:      fake.URL(),
 	}
-	err = database.CreateRedirectURI(nil, redirectUri)
+	err = database.CreateRedirectURI(context.Background(), nil, redirectUri)
 	assert.NoError(t, err)
 
 	password := fake.Password(8)

@@ -221,16 +221,16 @@ func (_c *AuthorizeValidator_ValidateRequest_Call) RunAndReturn(run func(input *
 }
 
 // ValidateScopes provides a mock function for the type AuthorizeValidator
-func (_mock *AuthorizeValidator) ValidateScopes(scope string) error {
-	ret := _mock.Called(scope)
+func (_mock *AuthorizeValidator) ValidateScopes(ctx context.Context, scope string) error {
+	ret := _mock.Called(ctx, scope)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ValidateScopes")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(string) error); ok {
-		r0 = returnFunc(scope)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) error); ok {
+		r0 = returnFunc(ctx, scope)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -243,19 +243,25 @@ type AuthorizeValidator_ValidateScopes_Call struct {
 }
 
 // ValidateScopes is a helper method to define mock.On call
+//   - ctx context.Context
 //   - scope string
-func (_e *AuthorizeValidator_Expecter) ValidateScopes(scope any) *AuthorizeValidator_ValidateScopes_Call {
-	return &AuthorizeValidator_ValidateScopes_Call{Call: _e.mock.On("ValidateScopes", scope)}
+func (_e *AuthorizeValidator_Expecter) ValidateScopes(ctx any, scope any) *AuthorizeValidator_ValidateScopes_Call {
+	return &AuthorizeValidator_ValidateScopes_Call{Call: _e.mock.On("ValidateScopes", ctx, scope)}
 }
 
-func (_c *AuthorizeValidator_ValidateScopes_Call) Run(run func(scope string)) *AuthorizeValidator_ValidateScopes_Call {
+func (_c *AuthorizeValidator_ValidateScopes_Call) Run(run func(ctx context.Context, scope string)) *AuthorizeValidator_ValidateScopes_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 string
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(string)
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
 		}
 		run(
 			arg0,
+			arg1,
 		)
 	})
 	return _c
@@ -266,7 +272,7 @@ func (_c *AuthorizeValidator_ValidateScopes_Call) Return(err error) *AuthorizeVa
 	return _c
 }
 
-func (_c *AuthorizeValidator_ValidateScopes_Call) RunAndReturn(run func(scope string) error) *AuthorizeValidator_ValidateScopes_Call {
+func (_c *AuthorizeValidator_ValidateScopes_Call) RunAndReturn(run func(ctx context.Context, scope string) error) *AuthorizeValidator_ValidateScopes_Call {
 	_c.Call.Return(run)
 	return _c
 }

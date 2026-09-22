@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"net/url"
 	"strings"
 	"testing"
@@ -26,7 +27,7 @@ func createClientForClientIdComparison(t *testing.T) *models.Client {
 		ClientCredentialsEnabled: true,
 		DefaultAcrLevel:          models.AcrLevel2Optional,
 	}
-	err := database.CreateClient(nil, client)
+	err := database.CreateClient(context.Background(), nil, client)
 	assert.Nil(t, err)
 	return client
 }

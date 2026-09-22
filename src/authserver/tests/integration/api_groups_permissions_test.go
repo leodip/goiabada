@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -26,14 +27,14 @@ func TestAPIGroupPermissionsGet_Success(t *testing.T) {
 	// Setup: Create test resource and permissions
 	resource := createTestResource(t, "test-group-resource", "Test Group Resource")
 	defer func() {
-		_ = database.DeleteResource(nil, resource.Id)
+		_ = database.DeleteResource(context.Background(), nil, resource.Id)
 	}()
 
 	perm1 := createTestPermission(t, resource.Id, "read", "Read permission")
 	perm2 := createTestPermission(t, resource.Id, "write", "Write permission")
 	defer func() {
-		_ = database.DeletePermission(nil, perm1.Id)
-		_ = database.DeletePermission(nil, perm2.Id)
+		_ = database.DeletePermission(context.Background(), nil, perm1.Id)
+		_ = database.DeletePermission(context.Background(), nil, perm2.Id)
 	}()
 
 	// Setup: Assign permissions to group
@@ -175,16 +176,16 @@ func TestAPIGroupPermissionsPut_Success(t *testing.T) {
 	// Setup: Create test resource and permissions
 	resource := createTestResource(t, "put-test-group-resource", "PUT Test Group Resource")
 	defer func() {
-		_ = database.DeleteResource(nil, resource.Id)
+		_ = database.DeleteResource(context.Background(), nil, resource.Id)
 	}()
 
 	perm1 := createTestPermission(t, resource.Id, "read", "Read permission")
 	perm2 := createTestPermission(t, resource.Id, "write", "Write permission")
 	perm3 := createTestPermission(t, resource.Id, "delete", "Delete permission")
 	defer func() {
-		_ = database.DeletePermission(nil, perm1.Id)
-		_ = database.DeletePermission(nil, perm2.Id)
-		_ = database.DeletePermission(nil, perm3.Id)
+		_ = database.DeletePermission(context.Background(), nil, perm1.Id)
+		_ = database.DeletePermission(context.Background(), nil, perm2.Id)
+		_ = database.DeletePermission(context.Background(), nil, perm3.Id)
 	}()
 
 	// Setup: Initially assign one permission
@@ -239,12 +240,12 @@ func TestAPIGroupPermissionsPut_RemoveAllPermissions(t *testing.T) {
 	// Setup: Create test resource and permission
 	resource := createTestResource(t, "remove-test-group-resource", "Remove Test Group Resource")
 	defer func() {
-		_ = database.DeleteResource(nil, resource.Id)
+		_ = database.DeleteResource(context.Background(), nil, resource.Id)
 	}()
 
 	perm := createTestPermission(t, resource.Id, "test-perm", "Test permission")
 	defer func() {
-		_ = database.DeletePermission(nil, perm.Id)
+		_ = database.DeletePermission(context.Background(), nil, perm.Id)
 	}()
 
 	// Setup: Assign permission to group
@@ -292,14 +293,14 @@ func TestAPIGroupPermissionsPut_AddPermissionsToEmptyGroup(t *testing.T) {
 	// Setup: Create test resource and permissions
 	resource := createTestResource(t, "add-test-group-resource", "Add Test Group Resource")
 	defer func() {
-		_ = database.DeleteResource(nil, resource.Id)
+		_ = database.DeleteResource(context.Background(), nil, resource.Id)
 	}()
 
 	perm1 := createTestPermission(t, resource.Id, "admin", "Admin permission")
 	perm2 := createTestPermission(t, resource.Id, "user", "User permission")
 	defer func() {
-		_ = database.DeletePermission(nil, perm1.Id)
-		_ = database.DeletePermission(nil, perm2.Id)
+		_ = database.DeletePermission(context.Background(), nil, perm1.Id)
+		_ = database.DeletePermission(context.Background(), nil, perm2.Id)
 	}()
 
 	// Test: Add permissions to group that has none
@@ -447,12 +448,12 @@ func TestAPIGroupPermissionsPut_DuplicatePermissionIds(t *testing.T) {
 	// Setup: Create test resource and permission
 	resource := createTestResource(t, "duplicate-test-resource", "Duplicate Test Resource")
 	defer func() {
-		_ = database.DeleteResource(nil, resource.Id)
+		_ = database.DeleteResource(context.Background(), nil, resource.Id)
 	}()
 
 	perm := createTestPermission(t, resource.Id, "test-perm", "Test permission")
 	defer func() {
-		_ = database.DeletePermission(nil, perm.Id)
+		_ = database.DeletePermission(context.Background(), nil, perm.Id)
 	}()
 
 	// Test: Update with duplicate permission IDs
@@ -517,7 +518,7 @@ func TestAPIGroupPermissionsPut_ComplexScenario(t *testing.T) {
 	// Setup: Create test resource and permissions
 	resource := createTestResource(t, "complex-test-resource", "Complex Test Resource")
 	defer func() {
-		_ = database.DeleteResource(nil, resource.Id)
+		_ = database.DeleteResource(context.Background(), nil, resource.Id)
 	}()
 
 	permA := createTestPermission(t, resource.Id, "permission-a", "Permission A")
@@ -525,10 +526,10 @@ func TestAPIGroupPermissionsPut_ComplexScenario(t *testing.T) {
 	permC := createTestPermission(t, resource.Id, "permission-c", "Permission C")
 	permD := createTestPermission(t, resource.Id, "permission-d", "Permission D")
 	defer func() {
-		_ = database.DeletePermission(nil, permA.Id)
-		_ = database.DeletePermission(nil, permB.Id)
-		_ = database.DeletePermission(nil, permC.Id)
-		_ = database.DeletePermission(nil, permD.Id)
+		_ = database.DeletePermission(context.Background(), nil, permA.Id)
+		_ = database.DeletePermission(context.Background(), nil, permB.Id)
+		_ = database.DeletePermission(context.Background(), nil, permC.Id)
+		_ = database.DeletePermission(context.Background(), nil, permD.Id)
 	}()
 
 	// Setup: Initially assign permissions A, B, C

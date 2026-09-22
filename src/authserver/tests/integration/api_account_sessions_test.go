@@ -33,9 +33,9 @@ func TestAPIAccountSessionsGet_Success_IncludesIsCurrent(t *testing.T) {
 		AuthorizationCodeEnabled: true,
 		ClientCredentialsEnabled: false,
 	}
-	err := database.CreateClient(nil, testClient)
+	err := database.CreateClient(context.Background(), nil, testClient)
 	assert.NoError(t, err)
-	defer func() { _ = database.DeleteClient(nil, testClient.Id) }()
+	defer func() { _ = database.DeleteClient(context.Background(), nil, testClient.Id) }()
 
 	s1 := createTestUserSession(t, user.Id, fake.UUID())
 	s2 := createTestUserSession(t, user.Id, fake.UUID())

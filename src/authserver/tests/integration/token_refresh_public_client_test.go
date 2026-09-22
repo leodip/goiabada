@@ -59,7 +59,7 @@ func TestToken_Refresh_ChallengelessGrant_RefusedOnceTheClientIsPublic(t *testin
 	require.NoError(t, err)
 	client.IsPublic = true
 	client.ClientSecretEncrypted = nil
-	require.NoError(t, database.UpdateClient(nil, client))
+	require.NoError(t, database.UpdateClient(context.Background(), nil, client))
 
 	data := postToTokenEndpoint(t, createHttpClient(t), destUrl, url.Values{
 		"grant_type":    {"refresh_token"},

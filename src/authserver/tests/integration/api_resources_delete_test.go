@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -71,7 +72,7 @@ func TestAPIResourceDelete_SystemLevelResource(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Find system-level resource (authserver)
-	sysRes, err := database.GetResourceByResourceIdentifier(nil, constants.AuthServerResourceIdentifier)
+	sysRes, err := database.GetResourceByResourceIdentifier(context.Background(), nil, constants.AuthServerResourceIdentifier)
 	assert.NoError(t, err)
 	assert.NotNil(t, sysRes)
 
@@ -88,7 +89,7 @@ func TestAPIResourceDelete_SystemLevelResource(t *testing.T) {
 func TestAPIResourceDelete_UnauthorizedAndScope(t *testing.T) {
 	// Prepare a test resource to reference
 	res := createTestResource(t, "api-test-del-unauth-"+fake.LetterN(6), "desc")
-	defer func() { _ = database.DeleteResource(nil, res.Id) }()
+	defer func() { _ = database.DeleteResource(context.Background(), nil, res.Id) }()
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(res.Id, 10)
 
