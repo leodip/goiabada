@@ -9,7 +9,6 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/constants"
-	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/uithemes"
 	"github.com/leodip/goiabada/core/api"
@@ -18,7 +17,7 @@ import (
 
 // HandleAPISettingsUIThemeGet - GET /api/v1/admin/settings/ui-theme
 func HandleAPISettingsUIThemeGet(
-	httpHelper handlers.HttpHelper,
+	httpHelper HttpHelper,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
@@ -44,7 +43,7 @@ type settingsUIThemeDatabase interface {
 // HandleAPISettingsUIThemePut - PUT /api/v1/admin/settings/ui-theme
 func HandleAPISettingsUIThemePut(
 	database settingsUIThemeDatabase,
-	auditLogger handlers.AuditLogger,
+	auditLogger AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		currentSettings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)

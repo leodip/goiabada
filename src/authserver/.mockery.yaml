@@ -28,10 +28,6 @@ packages:
         config:
           dir: "./internal/protocolvalidation/mocks"
           pkgname: "mocks_protocolvalidation"
-      EmailValidator:
-        config:
-          dir: "./internal/accountvalidation/mocks"
-          pkgname: "mocks_accountvalidation"
       PasswordValidator:
         config:
           dir: "./internal/accountvalidation/mocks"
@@ -72,15 +68,28 @@ packages:
         config:
           dir: "./internal/handlers/mocks"
           pkgname: "mocks_handlers"
-      UserCreator:
-        config:
-          dir: "./internal/handlers/mocks"
-          pkgname: "mocks_handlers"
       UserSessionManager:
         config:
           dir: "./internal/handlers/mocks"
           pkgname: "mocks_handlers"
       OtpSecretGenerator:
+        config:
+          dir: "./internal/handlers/mocks"
+          pkgname: "mocks_handlers"
+  # UserCreator and EmailValidator were declared in internal/handlers until #387, which gave the two
+  # child handler packages their own ports and left these two with no reference in the parent at
+  # all. They are sourced from accounthandlers because that package is the dominant consumer of both
+  # generated mocks -- all fifteen EmailValidator sites and twenty-four of the twenty-eight
+  # UserCreator ones -- and because apihandlers declares the identical pair, which one mock satisfies
+  # structurally either way. dir and pkgname are unchanged on purpose, so no test's import moved when
+  # the source package did.
+  github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers:
+    interfaces:
+      EmailValidator:
+        config:
+          dir: "./internal/accountvalidation/mocks"
+          pkgname: "mocks_accountvalidation"
+      UserCreator:
         config:
           dir: "./internal/handlers/mocks"
           pkgname: "mocks_handlers"

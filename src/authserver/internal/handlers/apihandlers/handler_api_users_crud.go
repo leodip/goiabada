@@ -19,7 +19,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	"github.com/leodip/goiabada/authserver/internal/emaillinks"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
-	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/otpcredential"
@@ -98,7 +97,7 @@ func HandleAPIUserGet(
 func HandleAPIUserPasswordPut(
 	database usersCrudDatabase,
 	passwordValidator *accountvalidation.PasswordValidator,
-	auditLogger handlers.AuditLogger,
+	auditLogger AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Authentication and authorization handled by middleware
@@ -204,7 +203,7 @@ func HandleAPIUserPasswordPut(
 // HandleAPIUserOTPPut - PUT /api/v1/admin/users/{id}/otp
 func HandleAPIUserOTPPut(
 	database usersCrudDatabase,
-	auditLogger handlers.AuditLogger,
+	auditLogger AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Authentication and authorization handled by middleware
@@ -285,14 +284,14 @@ func HandleAPIUserOTPPut(
 
 // HandleAPIUserCreatePost - POST /api/v1/admin/users/create
 func HandleAPIUserCreatePost(
-	httpHelper handlers.HttpHelper,
+	httpHelper HttpHelper,
 	database usersCrudDatabase,
-	userCreator handlers.UserCreator,
+	userCreator UserCreator,
 	emailValidator *accountvalidation.EmailValidator,
 	profileValidator *accountvalidation.ProfileValidator,
 	passwordValidator *accountvalidation.PasswordValidator,
-	auditLogger handlers.AuditLogger,
-	emailSender handlers.EmailSender,
+	auditLogger AuditLogger,
+	emailSender EmailSender,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Authentication and authorization handled by middleware
@@ -537,7 +536,7 @@ var errUserAlreadyDisabled = errors.New("the user is already disabled")
 // HandleAPIUserEnabledPut - PUT /api/v1/admin/users/{id}/enabled
 func HandleAPIUserEnabledPut(
 	database usersCrudDatabase,
-	auditLogger handlers.AuditLogger,
+	auditLogger AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Authentication and authorization handled by middleware
@@ -676,7 +675,7 @@ func HandleAPIUserEnabledPut(
 // HandleAPIUserDelete - DELETE /api/v1/admin/users/{id}
 func HandleAPIUserDelete(
 	database usersCrudDatabase,
-	auditLogger handlers.AuditLogger,
+	auditLogger AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Authentication and authorization handled by middleware

@@ -17,7 +17,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
-	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/revocation"
 	"github.com/leodip/goiabada/authserver/internal/urlutil"
@@ -249,7 +248,7 @@ func HandleAPIClientGet(
 // HandleAPIClientDelete - DELETE /api/v1/admin/clients/{id}
 func HandleAPIClientDelete(
 	database clientsDatabase,
-	auditLogger handlers.AuditLogger,
+	auditLogger AuditLogger,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -301,7 +300,7 @@ func HandleAPIClientDelete(
 func HandleAPIClientCreatePost(
 	database clientsDatabase,
 	identifierValidator *validators.IdentifierValidator,
-	auditLogger handlers.AuditLogger,
+	auditLogger AuditLogger,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -418,7 +417,7 @@ func HandleAPIClientCreatePost(
 func HandleAPIClientUpdatePut(
 	database clientsDatabase,
 	identifierValidator *validators.IdentifierValidator,
-	auditLogger handlers.AuditLogger,
+	auditLogger AuditLogger,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -622,7 +621,7 @@ func HandleAPIClientUpdatePut(
 // Changes client's public/confidential mode and client secret.
 func HandleAPIClientAuthenticationPut(
 	database clientsDatabase,
-	auditLogger handlers.AuditLogger,
+	auditLogger AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		idStr := chi.URLParam(r, "id")
@@ -766,7 +765,7 @@ func validateClientSecret(secret string) error {
 // Updates which OAuth2 flows are enabled for the client.
 func HandleAPIClientOAuth2FlowsPut(
 	database clientsDatabase,
-	auditLogger handlers.AuditLogger,
+	auditLogger AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		idStr := chi.URLParam(r, "id")
@@ -841,7 +840,7 @@ func HandleAPIClientOAuth2FlowsPut(
 // inputs, enforces business rules, computes add/remove, and returns the updated client.
 func HandleAPIClientRedirectURIsPut(
 	database clientsDatabase,
-	auditLogger handlers.AuditLogger,
+	auditLogger AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		idStr := chi.URLParam(r, "id")
@@ -1000,7 +999,7 @@ const maxWebOriginLength = 256
 // origin is always one CORS can match.
 func HandleAPIClientWebOriginsPut(
 	database clientsDatabase,
-	auditLogger handlers.AuditLogger,
+	auditLogger AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		idStr := chi.URLParam(r, "id")
@@ -1200,7 +1199,7 @@ func (f *webOriginsWriteFailure) Unwrap() error { return f.err }
 // Updates token-related settings for a client.
 func HandleAPIClientTokensPut(
 	database clientsDatabase,
-	auditLogger handlers.AuditLogger,
+	auditLogger AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		idStr := chi.URLParam(r, "id")

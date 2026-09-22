@@ -8,7 +8,6 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/config"
-	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/imaging"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/models"
@@ -29,7 +28,7 @@ type accountProfilePictureDatabase interface {
 // HandleAPIAccountProfilePicturePost - POST /api/v1/account/profile-picture
 func HandleAPIAccountProfilePicturePost(
 	database accountProfilePictureDatabase,
-	auditLogger handlers.AuditLogger,
+	auditLogger AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Get logged in user from access token
@@ -140,7 +139,7 @@ func HandleAPIAccountProfilePicturePost(
 // HandleAPIAccountProfilePictureDelete - DELETE /api/v1/account/profile-picture
 func HandleAPIAccountProfilePictureDelete(
 	database accountProfilePictureDatabase,
-	auditLogger handlers.AuditLogger,
+	auditLogger AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Get logged in user from access token

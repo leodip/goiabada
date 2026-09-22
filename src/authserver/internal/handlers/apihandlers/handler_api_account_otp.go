@@ -13,7 +13,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
-	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/otp"
@@ -84,7 +83,7 @@ type accountOTPDatabase interface {
 // HandleAPIAccountOTPEnrollmentGet - GET /api/v1/account/otp/enrollment
 func HandleAPIAccountOTPEnrollmentGet(
 	database accountOTPDatabase,
-	otpSecretGenerator handlers.OtpSecretGenerator,
+	otpSecretGenerator OtpSecretGenerator,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Token and scope are enforced by middleware; extract validated token
@@ -219,8 +218,8 @@ func HandleAPIAccountOTPEnrollmentGet(
 // HandleAPIAccountOTPPut - PUT /api/v1/account/otp
 func HandleAPIAccountOTPPut(
 	database accountOTPDatabase,
-	auditLogger handlers.AuditLogger,
-	credentialFailures handlers.CredentialFailureRecorder,
+	auditLogger AuditLogger,
+	credentialFailures CredentialFailureRecorder,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Token and scope are enforced by middleware; extract validated token

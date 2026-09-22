@@ -10,7 +10,6 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/config"
-	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/imaging"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/models"
@@ -30,7 +29,7 @@ type usersProfilePictureDatabase interface {
 // HandleAPIUserProfilePicturePost - POST /api/v1/admin/users/{id}/profile-picture
 func HandleAPIUserProfilePicturePost(
 	database usersProfilePictureDatabase,
-	auditLogger handlers.AuditLogger,
+	auditLogger AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Parse user ID from URL
@@ -149,7 +148,7 @@ func HandleAPIUserProfilePicturePost(
 // HandleAPIUserProfilePictureDelete - DELETE /api/v1/admin/users/{id}/profile-picture
 func HandleAPIUserProfilePictureDelete(
 	database usersProfilePictureDatabase,
-	auditLogger handlers.AuditLogger,
+	auditLogger AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Parse user ID from URL

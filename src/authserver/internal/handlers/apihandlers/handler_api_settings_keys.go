@@ -11,7 +11,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/signingkeys"
 	"github.com/leodip/goiabada/core/api"
@@ -95,7 +94,7 @@ func HandleAPISettingsKeysGet(
 // had already destroyed the key still signing live tokens (#251).
 func HandleAPISettingsKeysRotatePost(
 	database settingsKeysDatabase,
-	auditLogger handlers.AuditLogger,
+	auditLogger AuditLogger,
 ) http.HandlerFunc {
 
 	rotator := signingkeys.NewSigningKeyRotator(database)
@@ -140,7 +139,7 @@ func HandleAPISettingsKeysRotatePost(
 // HandleAPISettingsKeyDelete - DELETE /api/v1/admin/settings/keys/{id}
 func HandleAPISettingsKeyDelete(
 	database settingsKeysDatabase,
-	auditLogger handlers.AuditLogger,
+	auditLogger AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		idStr := chi.URLParam(r, "id")

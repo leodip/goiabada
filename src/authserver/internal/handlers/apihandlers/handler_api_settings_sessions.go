@@ -9,7 +9,6 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/constants"
-	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
@@ -17,7 +16,7 @@ import (
 
 // HandleAPISettingsSessionsGet - GET /api/v1/admin/settings/sessions
 func HandleAPISettingsSessionsGet(
-	httpHelper handlers.HttpHelper,
+	httpHelper HttpHelper,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
@@ -43,7 +42,7 @@ type settingsSessionsDatabase interface {
 // HandleAPISettingsSessionsPut - PUT /api/v1/admin/settings/sessions
 func HandleAPISettingsSessionsPut(
 	database settingsSessionsDatabase,
-	auditLogger handlers.AuditLogger,
+	auditLogger AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		currentSettings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)

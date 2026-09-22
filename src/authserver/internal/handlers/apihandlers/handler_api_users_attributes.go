@@ -11,7 +11,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/api"
@@ -123,7 +122,7 @@ func HandleAPIUserAttributeGet(
 func HandleAPIUserAttributeCreatePost(
 	database usersAttributesDatabase,
 	identifierValidator *validators.IdentifierValidator,
-	auditLogger handlers.AuditLogger,
+	auditLogger AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Authentication and authorization handled by middleware
@@ -214,7 +213,7 @@ func HandleAPIUserAttributeCreatePost(
 func HandleAPIUserAttributeUpdatePut(
 	database usersAttributesDatabase,
 	identifierValidator *validators.IdentifierValidator,
-	auditLogger handlers.AuditLogger,
+	auditLogger AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Authentication and authorization handled by middleware
@@ -315,7 +314,7 @@ func HandleAPIUserAttributeUpdatePut(
 // HandleAPIUserAttributeDelete - DELETE /api/v1/admin/user-attributes/{id}
 func HandleAPIUserAttributeDelete(
 	database usersAttributesDatabase,
-	auditLogger handlers.AuditLogger,
+	auditLogger AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Authentication and authorization handled by middleware

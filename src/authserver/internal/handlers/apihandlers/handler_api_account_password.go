@@ -10,7 +10,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
@@ -34,8 +33,8 @@ type accountPasswordDatabase interface {
 func HandleAPIAccountPasswordPut(
 	database accountPasswordDatabase,
 	passwordValidator *accountvalidation.PasswordValidator,
-	auditLogger handlers.AuditLogger,
-	credentialFailures handlers.CredentialFailureRecorder,
+	auditLogger AuditLogger,
+	credentialFailures CredentialFailureRecorder,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Token and scope are enforced by middleware; extract validated token
