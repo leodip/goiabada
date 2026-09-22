@@ -515,10 +515,10 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 		httpHelper.AssertExpectations(t)
 
 		// Ensure that no other mock methods were called
-		emailValidator.AssertNotCalled(t, "ValidateEmailAddress")
+		emailValidator.AssertNotCalled(t, "ValidateEmailAddress", mock.Anything)
 		database.AssertNotCalled(t, "GetUserByEmail", mock.Anything, mock.Anything, mock.Anything)
-		database.AssertNotCalled(t, "GetPreRegistrationByEmail", mock.Anything)
-		passwordValidator.AssertNotCalled(t, "ValidatePassword")
+		database.AssertNotCalled(t, "GetPreRegistrationByEmail", mock.Anything, mock.Anything, mock.Anything)
+		passwordValidator.AssertNotCalled(t, "ValidatePassword", mock.Anything, mock.Anything)
 	})
 
 	t.Run("SMTP enabled and requires email verification", func(t *testing.T) {
@@ -670,9 +670,10 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 		httpHelper.AssertExpectations(t)
 
 		// Ensure that these methods were not called
-		emailSender.AssertNotCalled(t, "SendEmail")
-		database.AssertNotCalled(t, "CreatePreRegistration", mock.Anything)
-		httpHelper.AssertNotCalled(t, "RenderTemplateToBuffer")
+		emailSender.AssertNotCalled(t, "SendEmail", mock.Anything, mock.Anything)
+		database.AssertNotCalled(t, "CreatePreRegistration", mock.Anything, mock.Anything, mock.Anything)
+		httpHelper.AssertNotCalled(t, "RenderTemplateToBuffer",
+			mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	})
 
 	t.Run("SMTP enabled but does not require email verification", func(t *testing.T) {
@@ -743,7 +744,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 		httpHelper.AssertExpectations(t)
 
 		// Ensure no pre-registration is created on the no-verification path
-		database.AssertNotCalled(t, "CreatePreRegistration", mock.Anything)
+		database.AssertNotCalled(t, "CreatePreRegistration", mock.Anything, mock.Anything, mock.Anything)
 	})
 }
 

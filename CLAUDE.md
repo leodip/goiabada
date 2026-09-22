@@ -352,10 +352,13 @@ a walk that reached nothing into `Fatalf`. The reporting half takes a `testutil.
 exported `Assert*` keeps its `*testing.T` and delegates, so no caller moves. Both halves are then
 driven from a rule test: the finder directly, the reporting half through `testutil.RunGuard`, which
 runs it on its own goroutine so a recorded `Fatalf` ends it in `runtime.Goexit` the way the real one
-does. Nineteen guards follow this -- eleven in `core/testutil`, plus `authserver/internal/data`'s
+does. Twenty guards follow this -- twelve in `core/testutil`, plus `authserver/internal/data`'s
 begin-transaction, benign-sentinel, page-offset, id-list-bound, transaction-pass-through and
 SQL-context lints and the auth server's API error-code and audit-catalog lints. Each owes three cases: a tree that must fail, a tree that must
-pass, and the walk that reached nothing. Without the last two the first proves nothing, and without
+pass, and the walk that reached nothing. The twentieth, `AssertNotCalledArity`, owes a fourth: a
+test that measures testify's matching against testify, because a guard whose premise is a reading
+of a dependency stops meaning anything the moment that dependency changes and nothing says so
+(#421). Without the last two the first proves nothing, and without
 the reporting half under test a defect in the five lines that report disables the guard across
 every module with nothing going red -- which is what blinding `AssertNoDeadInterfaces` demonstrated on `8883642d`
 (#333).
@@ -390,6 +393,19 @@ handler packages are the only call sites. Liveness is `go/types` object identity
 spelling — a shadowed name and a same-named type in another package each count as nothing, which is
 how the census behind #333 first read `TCPConnectionTester` as live — and structural satisfaction
 does not count at all, since an interface no code names is what dead means here (#333).
+
+**Vacuous-assertion guard**: all three module unit tiers run `TestNotCalledArity` over the whole
+source root, holding every testify `AssertNotCalled` to carrying one matcher per parameter of the
+method it names, through `core/testutil.AssertNotCalledArity`. testify matches a recorded call on
+the method name *and* the whole argument list, so `AssertNotCalled(t, "Log")` against a three-parameter
+`Log` compares lists that can never be equal and passes whatever the subject did; the compiler sees
+a variadic call and says nothing. Forty-one such sites shipped, one of them false since #241. The
+receiver is resolved with `go/types` rather than by spelling, because one method name can sit on two
+doubles at two arities (`CreateUser` is 3 on `Database` and 2 on `UserCreator`), and four shapes are
+reported rather than skipped: a method named through anything but a string literal, an unresolvable
+receiver, a name the double does not declare, and a variadic method. It does not widen to
+`AssertCalled`, whose arity mismatch fails loudly, or to `.On(...)`, where a stub matching nothing
+panics (#421).
 
 **Schema golden files**: each engine's fully migrated catalog is recorded in
 `src/authserver/internal/data/<engine>db/schema.golden`, and the data tier compares a freshly

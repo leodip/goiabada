@@ -410,6 +410,7 @@ command itself and fails on a tree it changed.
 | `core/testutil` | `AssertNoCredentialQueryFallback` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
 | `core/testutil` | `AssertNoDeadInterfaces` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
 | `core/testutil` | `AssertNoLegacyErrors` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
+| `core/testutil` | `AssertNotCalledArity` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
 | `core/testutil` | `AssertRequestPathContext` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
 | `core/testutil` | `AssertSlogConvention` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
 | `core/testutil` | `AssertSymbolOwnership` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |

@@ -31,13 +31,13 @@ import (
 //
 // It is an interface rather than a testing.TB parameter because testing.TB cannot be implemented
 // outside the testing package -- it carries an unexported method precisely to prevent it -- so
-// there is no recording fake that satisfies it. It is exported rather than internal because six
-// of the sixteen guards live outside this package, in the _test.go files of three auth server
+// there is no recording fake that satisfies it. It is exported rather than internal because eight
+// of the twenty-four guards live outside this package, in the _test.go files of three auth server
 // directories -- internal/audit, internal/data and internal/handlers/apihandlers -- and they report
 // through the same harness. Recount with
 // `git grep -n 'func assert.*\(r Reporter\|r testutil\.Reporter\)' -- '*.go'` rather than trusting
-// the number: #333, #338 and #354 each moved or added a guard without touching this sentence, which
-// is how it came to be wrong on the path and on both counts at once (#359).
+// the number: #333, #338, #354 and #386 each moved or added a guard without touching this sentence,
+// which is how it came to be wrong on the path and on both counts at once (#359).
 //
 // *testing.T satisfies it, so no exported guard signature changes and no caller moves.
 type Reporter interface {

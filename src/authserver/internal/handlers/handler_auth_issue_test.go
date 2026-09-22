@@ -394,7 +394,7 @@ func TestHandleIssueGet(t *testing.T) {
 
 		// The ceremony ends here rather than being restarted, so the state the interactive
 		// rows assert is never saved.
-		authHelper.AssertNotCalled(t, "SaveAuthContext")
+		authHelper.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
 
 		httpHelper.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
@@ -454,7 +454,7 @@ func TestHandleIssueGet(t *testing.T) {
 		assert.NotContains(t, location, "login_required")
 		assert.NotContains(t, location, "/auth/level1")
 
-		authHelper.AssertNotCalled(t, "SaveAuthContext")
+		authHelper.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
 
 		httpHelper.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
@@ -622,7 +622,7 @@ func TestHandleIssueGet(t *testing.T) {
 		httpHelper.AssertExpectations(t)
 		database.AssertExpectations(t)
 		codeIssuer.AssertExpectations(t)
-		authHelper.AssertNotCalled(t, "SaveAuthContext")
+		authHelper.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
 	})
 
 	t.Run("The commit fails, so no code reaches the client", func(t *testing.T) {
@@ -685,8 +685,8 @@ func TestHandleIssueGet(t *testing.T) {
 
 		httpHelper.AssertExpectations(t)
 		database.AssertExpectations(t)
-		auditLogger.AssertNotCalled(t, "Log")
-		authHelper.AssertNotCalled(t, "ClearAuthContext")
+		auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
+		authHelper.AssertNotCalled(t, "ClearAuthContext", mock.Anything, mock.Anything)
 	})
 }
 
@@ -852,7 +852,7 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 		// refusal sentinel, which is how it asks for a rollback rather than a commit.
 		assert.ErrorIs(t, stub.bodyErr, errIssuanceRefused)
 		auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
-		authHelper.AssertNotCalled(t, "ClearAuthContext")
+		authHelper.AssertNotCalled(t, "ClearAuthContext", mock.Anything, mock.Anything)
 
 		httpHelper.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
@@ -966,7 +966,7 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 
 		assert.NotContains(t, rr.Header().Get("Location"), "/auth/level1")
 		assert.NotContains(t, rr.Header().Get("Location"), "code=")
-		authHelper.AssertNotCalled(t, "SaveAuthContext")
+		authHelper.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
 		assert.ErrorIs(t, stub.bodyErr, boom, "the body hands its error to the helper unchanged, which rolls back")
 
 		httpHelper.AssertExpectations(t)
@@ -1015,7 +1015,7 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 		assert.NotContains(t, location, "code=")
 		assert.NotContains(t, location, "/auth/level1")
 
-		authHelper.AssertNotCalled(t, "SaveAuthContext")
+		authHelper.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
 		assert.ErrorIs(t, stub.bodyErr, errIssuanceRefused)
 
 		httpHelper.AssertExpectations(t)
@@ -1088,8 +1088,8 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 				// sent to the client.
 				assert.NotContains(t, rr.Header().Get("Location"), "/auth/level1")
 				assert.NotContains(t, rr.Header().Get("Location"), "code=")
-				authHelper.AssertNotCalled(t, "SaveAuthContext")
-				authHelper.AssertNotCalled(t, "ClearAuthContext")
+				authHelper.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
+				authHelper.AssertNotCalled(t, "ClearAuthContext", mock.Anything, mock.Anything)
 				auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 				if stub != nil {
 					assert.ErrorIs(t, stub.bodyErr, boom, "the body hands its error to the helper unchanged, which rolls back")
@@ -1196,13 +1196,14 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 			assert.NotContains(t, location, "access_token=")
 			assert.NotContains(t, location, "id_token=")
 			codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything, mock.Anything, mock.Anything)
-			tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForImplicit")
+			tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForImplicit",
+				mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 
 			assertWarnedForeignSession(t, logs, authContext.UserId)
 
 			// The ceremony is restarted rather than ended, so the context survives to be
 			// rebuilt at /auth/level1.
-			authHelper.AssertNotCalled(t, "ClearAuthContext")
+			authHelper.AssertNotCalled(t, "ClearAuthContext", mock.Anything, mock.Anything)
 
 			httpHelper.AssertExpectations(t)
 			authHelper.AssertExpectations(t)
@@ -1277,12 +1278,13 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 			assert.NotContains(t, location, "access_token=")
 
 			codeIssuer.AssertNotCalled(t, "CreateAuthCode", mock.Anything, mock.Anything, mock.Anything)
-			tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForImplicit")
+			tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForImplicit",
+				mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 
 			assertWarnedForeignSession(t, logs, authContext.UserId)
 
 			// A silent ceremony ends here rather than restarting, so no state is saved.
-			authHelper.AssertNotCalled(t, "SaveAuthContext")
+			authHelper.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
 
 			httpHelper.AssertExpectations(t)
 			authHelper.AssertExpectations(t)
@@ -1428,7 +1430,8 @@ func TestHandleIssueGet_ImplicitAmbientSessionVanished(t *testing.T) {
 		assert.NotNil(t, savedAuthContext)
 		assert.Equal(t, ceremony.AuthStateRequiresLevel1, savedAuthContext.AuthState)
 
-		tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForImplicit")
+		tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForImplicit",
+			mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 		// No owner to name, so this takes #129's line rather than decision 7's.
 		assertWarnedSessionGone(t, logs)
 
@@ -1484,8 +1487,9 @@ func TestHandleIssueGet_ImplicitAmbientSessionVanished(t *testing.T) {
 		assert.NotContains(t, location, "access_token=")
 		assert.NotContains(t, location, "id_token=")
 
-		tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForImplicit")
-		authHelper.AssertNotCalled(t, "SaveAuthContext")
+		tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForImplicit",
+			mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+		authHelper.AssertNotCalled(t, "SaveAuthContext", mock.Anything, mock.Anything, mock.Anything)
 		assertWarnedSessionGone(t, logs)
 
 		httpHelper.AssertExpectations(t)

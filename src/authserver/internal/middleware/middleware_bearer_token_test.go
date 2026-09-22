@@ -214,7 +214,8 @@ func TestJwtAuthorizationHeaderToContext_PostBodyIgnoredForGetRequest(t *testing
 	handler.ServeHTTP(rr, req)
 
 	// Token parser should NOT be called for GET request with body token
-	mockTokenParser.AssertNotCalled(t, "DecodeAndValidateTokenString")
+	mockTokenParser.AssertNotCalled(t, "DecodeAndValidateTokenString",
+		mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 }
 
 // A POST that carries the token only in its query is the one request where the two accessors
@@ -245,7 +246,8 @@ func TestJwtAuthorizationHeaderToContext_PostQueryTokenIgnored(t *testing.T) {
 	handler.ServeHTTP(rr, req)
 
 	// Token parser should NOT be called for a token that arrived in the request target
-	mockTokenParser.AssertNotCalled(t, "DecodeAndValidateTokenString")
+	mockTokenParser.AssertNotCalled(t, "DecodeAndValidateTokenString",
+		mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 }
 
 func TestJwtAuthorizationHeaderToContext_PostBodyIgnoredForWrongContentType(t *testing.T) {
@@ -266,7 +268,8 @@ func TestJwtAuthorizationHeaderToContext_PostBodyIgnoredForWrongContentType(t *t
 	handler.ServeHTTP(rr, req)
 
 	// Token parser should NOT be called for wrong content type
-	mockTokenParser.AssertNotCalled(t, "DecodeAndValidateTokenString")
+	mockTokenParser.AssertNotCalled(t, "DecodeAndValidateTokenString",
+		mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 }
 
 func TestJwtAuthorizationHeaderToContext_PostBodyEmptyAccessToken(t *testing.T) {
@@ -287,7 +290,8 @@ func TestJwtAuthorizationHeaderToContext_PostBodyEmptyAccessToken(t *testing.T) 
 	handler.ServeHTTP(rr, req)
 
 	// Token parser should NOT be called for empty token
-	mockTokenParser.AssertNotCalled(t, "DecodeAndValidateTokenString")
+	mockTokenParser.AssertNotCalled(t, "DecodeAndValidateTokenString",
+		mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 }
 
 func TestJwtAuthorizationHeaderToContext_PostBodyNoAccessTokenParameter(t *testing.T) {
@@ -308,7 +312,8 @@ func TestJwtAuthorizationHeaderToContext_PostBodyNoAccessTokenParameter(t *testi
 	handler.ServeHTTP(rr, req)
 
 	// Token parser should NOT be called when access_token is missing
-	mockTokenParser.AssertNotCalled(t, "DecodeAndValidateTokenString")
+	mockTokenParser.AssertNotCalled(t, "DecodeAndValidateTokenString",
+		mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 }
 
 func TestJwtAuthorizationHeaderToContext_PostBodyContentTypeWithCharset(t *testing.T) {
@@ -422,5 +427,6 @@ func TestJwtAuthorizationHeaderToContext_PutRequestIgnoresPostBody(t *testing.T)
 	handler.ServeHTTP(rr, req)
 
 	// Token parser should NOT be called for PUT request
-	mockTokenParser.AssertNotCalled(t, "DecodeAndValidateTokenString")
+	mockTokenParser.AssertNotCalled(t, "DecodeAndValidateTokenString",
+		mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 }
