@@ -1,6 +1,7 @@
 package adminclienthandlers
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -8,7 +9,6 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/core/api"
@@ -26,10 +26,18 @@ type effectiveWebOrigin struct {
 	ClientIdentifier string
 }
 
+// clientWebOriginsAPI is what the web origins page needs: the client, every other client it
+// checks against, and the write.
+type clientWebOriginsAPI interface {
+	GetAllClients(ctx context.Context, accessToken string) ([]api.ClientResponse, error)
+	GetClientById(ctx context.Context, accessToken string, clientId int64) (*api.ClientResponse, error)
+	UpdateClientWebOrigins(ctx context.Context, accessToken string, clientId int64, request *api.UpdateClientWebOriginsRequest) (*api.ClientResponse, error)
+}
+
 func HandleAdminClientWebOriginsGet(
 	httpHelper handlers.HttpHelper,
 	httpSession sessionstore.Store,
-	apiClient apiclient.ApiClient,
+	apiClient clientWebOriginsAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -151,7 +159,7 @@ func HandleAdminClientWebOriginsGet(
 func HandleAdminClientWebOriginsPost(
 	httpHelper handlers.HttpHelper,
 	httpSession sessionstore.Store,
-	apiClient apiclient.ApiClient,
+	apiClient clientWebOriginsAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {

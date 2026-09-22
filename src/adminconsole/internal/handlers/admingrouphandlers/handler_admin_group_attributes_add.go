@@ -1,12 +1,12 @@
 package admingrouphandlers
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/core/api"
@@ -14,9 +14,16 @@ import (
 	"github.com/leodip/goiabada/core/oauth"
 )
 
+// groupAttributesAddAPI is what the add group attribute page needs: the group it belongs to, and
+// the create.
+type groupAttributesAddAPI interface {
+	CreateGroupAttribute(ctx context.Context, accessToken string, request *api.CreateGroupAttributeRequest) (*api.GroupAttributeResponse, error)
+	GetGroupById(ctx context.Context, accessToken string, groupId int64) (*api.GroupResponse, error)
+}
+
 func HandleAdminGroupAttributesAddGet(
 	httpHelper handlers.HttpHelper,
-	apiClient apiclient.ApiClient,
+	apiClient groupAttributesAddAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -69,7 +76,7 @@ func HandleAdminGroupAttributesAddGet(
 
 func HandleAdminGroupAttributesAddPost(
 	httpHelper handlers.HttpHelper,
-	apiClient apiclient.ApiClient,
+	apiClient groupAttributesAddAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {

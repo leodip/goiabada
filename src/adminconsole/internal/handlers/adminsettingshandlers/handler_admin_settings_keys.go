@@ -1,19 +1,27 @@
 package adminsettingshandlers
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 
-	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
+	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
 )
 
+// settingsKeysAPI is what the keys page needs: the key list, the rotation, and the delete of one.
+type settingsKeysAPI interface {
+	DeleteSettingsKey(ctx context.Context, accessToken string, id int64) error
+	GetSettingsKeys(ctx context.Context, accessToken string) ([]api.SettingsSigningKeyResponse, error)
+	RotateSettingsKeys(ctx context.Context, accessToken string) error
+}
+
 func HandleAdminSettingsKeysGet(
 	httpHelper handlers.HttpHelper,
-	apiClient apiclient.ApiClient,
+	apiClient settingsKeysAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -68,7 +76,7 @@ func HandleAdminSettingsKeysGet(
 
 func HandleAdminSettingsKeysRotatePost(
 	httpHelper handlers.HttpHelper,
-	apiClient apiclient.ApiClient,
+	apiClient settingsKeysAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -101,7 +109,7 @@ func HandleAdminSettingsKeysRotatePost(
 
 func HandleAdminSettingsKeysRevokePost(
 	httpHelper handlers.HttpHelper,
-	apiClient apiclient.ApiClient,
+	apiClient settingsKeysAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {

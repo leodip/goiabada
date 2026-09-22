@@ -1,18 +1,24 @@
 package admingrouphandlers
 
 import (
+	"context"
 	"net/http"
 
-	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
+	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
 )
 
+// groupsAPI is what the groups list needs: the one read it renders.
+type groupsAPI interface {
+	GetAllGroups(ctx context.Context, accessToken string) ([]api.GroupResponse, error)
+}
+
 func HandleAdminGroupsGet(
 	httpHelper handlers.HttpHelper,
-	apiClient apiclient.ApiClient,
+	apiClient groupsAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {

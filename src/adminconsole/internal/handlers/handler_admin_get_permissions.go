@@ -1,19 +1,24 @@
 package handlers
 
 import (
+	"context"
 	"net/http"
 	"strconv"
 
-	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
 )
 
+// permissionsAPI is what the permissions lookup needs: the one read it answers with.
+type permissionsAPI interface {
+	GetPermissionsByResource(ctx context.Context, accessToken string, resourceId int64) ([]api.PermissionResponse, error)
+}
+
 func HandleAdminGetPermissionsGet(
 	httpHelper HttpHelper,
-	apiClient apiclient.ApiClient,
+	apiClient permissionsAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {

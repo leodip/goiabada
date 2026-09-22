@@ -1,12 +1,12 @@
 package adminclienthandlers
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
@@ -15,9 +15,16 @@ import (
 	"github.com/leodip/goiabada/core/oauth"
 )
 
+// clientDeleteAPI is what the client delete page needs: the permissions it warns about, and the
+// delete.
+type clientDeleteAPI interface {
+	DeleteClient(ctx context.Context, accessToken string, clientId int64) error
+	GetClientPermissions(ctx context.Context, accessToken string, clientId int64) (*api.ClientResponse, []api.PermissionResponse, error)
+}
+
 func HandleAdminClientDeleteGet(
 	httpHelper handlers.HttpHelper,
-	apiClient apiclient.ApiClient,
+	apiClient clientDeleteAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -90,7 +97,7 @@ func HandleAdminClientDeleteGet(
 
 func HandleAdminClientDeletePost(
 	httpHelper handlers.HttpHelper,
-	apiClient apiclient.ApiClient,
+	apiClient clientDeleteAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {

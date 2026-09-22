@@ -1,11 +1,11 @@
 package accounthandlers
 
 import (
+	"context"
 	"net/http"
 	"sort"
 	"strings"
 
-	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
@@ -17,10 +17,17 @@ import (
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
+// accountAddressAPI is what the account address page needs: the profile it renders from, and the
+// address write.
+type accountAddressAPI interface {
+	GetAccountProfile(ctx context.Context, accessToken string) (*api.UserResponse, error)
+	UpdateAccountAddress(ctx context.Context, accessToken string, request *api.UpdateUserAddressRequest) (*api.UserResponse, error)
+}
+
 func HandleAccountAddressGet(
 	httpHelper handlers.HttpHelper,
 	httpSession sessionstore.Store,
-	apiClient apiclient.ApiClient,
+	apiClient accountAddressAPI,
 ) http.HandlerFunc {
 
 	countries := countries.AllInfo()
@@ -92,7 +99,7 @@ func HandleAccountAddressGet(
 func HandleAccountAddressPost(
 	httpHelper handlers.HttpHelper,
 	httpSession sessionstore.Store,
-	apiClient apiclient.ApiClient,
+	apiClient accountAddressAPI,
 ) http.HandlerFunc {
 
 	countries := countries.AllInfo()

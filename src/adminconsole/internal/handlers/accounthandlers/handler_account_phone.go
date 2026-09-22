@@ -1,10 +1,10 @@
 package accounthandlers
 
 import (
+	"context"
 	"net/http"
 	"strings"
 
-	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
@@ -15,10 +15,18 @@ import (
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
+// accountPhoneAPI is what the account phone page needs: the profile, the country list, and the
+// phone write.
+type accountPhoneAPI interface {
+	GetAccountProfile(ctx context.Context, accessToken string) (*api.UserResponse, error)
+	GetPhoneCountries(ctx context.Context, accessToken string) ([]api.PhoneCountryResponse, error)
+	UpdateAccountPhone(ctx context.Context, accessToken string, request *api.UpdateAccountPhoneRequest) (*api.UserResponse, error)
+}
+
 func HandleAccountPhoneGet(
 	httpHelper handlers.HttpHelper,
 	httpSession sessionstore.Store,
-	apiClient apiclient.ApiClient,
+	apiClient accountPhoneAPI,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Get JWT info to extract access token
@@ -72,7 +80,7 @@ func HandleAccountPhoneGet(
 func HandleAccountPhonePost(
 	httpHelper handlers.HttpHelper,
 	httpSession sessionstore.Store,
-	apiClient apiclient.ApiClient,
+	apiClient accountPhoneAPI,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Get access token and current data for re-rendering errors

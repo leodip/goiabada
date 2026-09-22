@@ -1,11 +1,11 @@
 package adminsettingshandlers
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strings"
 
-	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/cache"
 	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
@@ -17,10 +17,16 @@ import (
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
+// settingsGeneralAPI is what the general settings page needs: the settings, and the write.
+type settingsGeneralAPI interface {
+	GetSettingsGeneral(ctx context.Context, accessToken string) (*api.SettingsGeneralResponse, error)
+	UpdateSettingsGeneral(ctx context.Context, accessToken string, request *api.UpdateSettingsGeneralRequest) (*api.SettingsGeneralResponse, error)
+}
+
 func HandleAdminSettingsGeneralGet(
 	httpHelper handlers.HttpHelper,
 	httpSession sessionstore.Store,
-	apiClient apiclient.ApiClient,
+	apiClient settingsGeneralAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -82,7 +88,7 @@ func HandleAdminSettingsGeneralGet(
 func HandleAdminSettingsGeneralPost(
 	httpHelper handlers.HttpHelper,
 	httpSession sessionstore.Store,
-	apiClient apiclient.ApiClient,
+	apiClient settingsGeneralAPI,
 	settingsCache *cache.SettingsCache,
 ) http.HandlerFunc {
 

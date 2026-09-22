@@ -5,7 +5,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/core/api"
 )
 
@@ -18,8 +17,13 @@ var phoneCountriesCache struct {
 
 const phoneCountriesCacheTTL = 24 * time.Hour
 
+// phoneCountriesAPI is what the phone country cache needs: the one read it fills itself from.
+type phoneCountriesAPI interface {
+	GetPhoneCountries(ctx context.Context, accessToken string) ([]api.PhoneCountryResponse, error)
+}
+
 // getPhoneCountriesWithCache retrieves phone countries from cache or API
-func getPhoneCountriesWithCache(ctx context.Context, apiClient apiclient.ApiClient, accessToken string) ([]api.PhoneCountryResponse, error) {
+func getPhoneCountriesWithCache(ctx context.Context, apiClient phoneCountriesAPI, accessToken string) ([]api.PhoneCountryResponse, error) {
 	// Try to read from cache first
 	phoneCountriesCache.mutex.RLock()
 	if time.Since(phoneCountriesCache.timestamp) < phoneCountriesCacheTTL && phoneCountriesCache.data != nil {

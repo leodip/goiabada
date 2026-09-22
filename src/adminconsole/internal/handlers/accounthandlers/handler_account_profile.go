@@ -1,12 +1,12 @@
 package accounthandlers
 
 import (
+	"context"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
@@ -20,10 +20,17 @@ import (
 	"github.com/leodip/goiabada/core/timezones"
 )
 
+// accountProfileAPI is what the account profile page needs: the profile it renders from, and the
+// write.
+type accountProfileAPI interface {
+	GetAccountProfile(ctx context.Context, accessToken string) (*api.UserResponse, error)
+	UpdateAccountProfile(ctx context.Context, accessToken string, request *api.UpdateUserProfileRequest) (*api.UserResponse, error)
+}
+
 func HandleAccountProfileGet(
 	httpHelper handlers.HttpHelper,
 	httpSession sessionstore.Store,
-	apiClient apiclient.ApiClient,
+	apiClient accountProfileAPI,
 ) http.HandlerFunc {
 
 	timezones := timezones.Get()
@@ -77,7 +84,7 @@ func HandleAccountProfileGet(
 func HandleAccountProfilePost(
 	httpHelper handlers.HttpHelper,
 	httpSession sessionstore.Store,
-	apiClient apiclient.ApiClient,
+	apiClient accountProfileAPI,
 ) http.HandlerFunc {
 
 	timezones := timezones.Get()

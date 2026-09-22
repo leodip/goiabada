@@ -1,18 +1,24 @@
 package adminclienthandlers
 
 import (
+	"context"
 	"net/http"
 
-	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
+	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
 )
 
+// clientsAPI is what the clients list needs: the one read it renders.
+type clientsAPI interface {
+	GetAllClients(ctx context.Context, accessToken string) ([]api.ClientResponse, error)
+}
+
 func HandleAdminClientsGet(
 	httpHelper handlers.HttpHelper,
-	apiClient apiclient.ApiClient,
+	apiClient clientsAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {

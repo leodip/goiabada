@@ -1,6 +1,7 @@
 package adminsettingshandlers
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -8,7 +9,6 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/sessionstore"
 
-	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
@@ -17,10 +17,16 @@ import (
 	"github.com/leodip/goiabada/core/oauth"
 )
 
+// settingsSessionsAPI is what the session settings page needs: the settings, and the write.
+type settingsSessionsAPI interface {
+	GetSettingsSessions(ctx context.Context, accessToken string) (*api.SettingsSessionsResponse, error)
+	UpdateSettingsSessions(ctx context.Context, accessToken string, request *api.UpdateSettingsSessionsRequest) (*api.SettingsSessionsResponse, error)
+}
+
 func HandleAdminSettingsSessionsGet(
 	httpHelper handlers.HttpHelper,
 	httpSession sessionstore.Store,
-	apiClient apiclient.ApiClient,
+	apiClient settingsSessionsAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -75,7 +81,7 @@ func HandleAdminSettingsSessionsGet(
 func HandleAdminSettingsSessionsPost(
 	httpHelper handlers.HttpHelper,
 	httpSession sessionstore.Store,
-	apiClient apiclient.ApiClient,
+	apiClient settingsSessionsAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {

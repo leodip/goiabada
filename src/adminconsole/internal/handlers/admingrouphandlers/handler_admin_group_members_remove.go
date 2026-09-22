@@ -1,20 +1,25 @@
 package admingrouphandlers
 
 import (
+	"context"
 	"net/http"
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
 )
 
+// groupMembersRemoveAPI is what the remove member endpoint needs: the one write it makes.
+type groupMembersRemoveAPI interface {
+	RemoveUserFromGroup(ctx context.Context, accessToken string, groupId int64, userId int64) error
+}
+
 func HandleAdminGroupMembersRemoveUserPost(
 	httpHelper handlers.HttpHelper,
-	apiClient apiclient.ApiClient,
+	apiClient groupMembersRemoveAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {

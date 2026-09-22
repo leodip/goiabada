@@ -1,13 +1,13 @@
 package adminclienthandlers
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"sort"
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/core/api"
@@ -15,9 +15,17 @@ import (
 	"github.com/leodip/goiabada/core/oauth"
 )
 
+// clientSessionsAPI is what the client sessions page needs: the client, its sessions, and the
+// revoke of one.
+type clientSessionsAPI interface {
+	DeleteUserSessionById(ctx context.Context, accessToken string, sessionId int64) error
+	GetClientById(ctx context.Context, accessToken string, clientId int64) (*api.ClientResponse, error)
+	GetClientSessionsByClientId(ctx context.Context, accessToken string, clientId int64, page, size int) (*api.GetClientSessionsResponse, error)
+}
+
 func HandleAdminClientUserSessionsGet(
 	httpHelper handlers.HttpHelper,
-	apiClient apiclient.ApiClient,
+	apiClient clientSessionsAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -110,7 +118,7 @@ func HandleAdminClientUserSessionsGet(
 
 func HandleAdminClientUserSessionsPost(
 	httpHelper handlers.HttpHelper,
-	apiClient apiclient.ApiClient,
+	apiClient clientSessionsAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {

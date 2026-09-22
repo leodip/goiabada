@@ -1,6 +1,7 @@
 package adminuserhandlers
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"sort"
@@ -8,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
@@ -20,10 +20,16 @@ import (
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
+// userAddressAPI is what the user address page needs: the user, and the address write.
+type userAddressAPI interface {
+	GetUserById(ctx context.Context, accessToken string, userId int64) (*api.UserResponse, error)
+	UpdateUserAddress(ctx context.Context, accessToken string, userId int64, request *api.UpdateUserAddressRequest) (*api.UserResponse, error)
+}
+
 func HandleAdminUserAddressGet(
 	httpHelper handlers.HttpHelper,
 	httpSession sessionstore.Store,
-	apiClient apiclient.ApiClient,
+	apiClient userAddressAPI,
 ) http.HandlerFunc {
 
 	countries := countries.AllInfo()
@@ -105,7 +111,7 @@ func HandleAdminUserAddressGet(
 func HandleAdminUserAddressPost(
 	httpHelper handlers.HttpHelper,
 	httpSession sessionstore.Store,
-	apiClient apiclient.ApiClient,
+	apiClient userAddressAPI,
 ) http.HandlerFunc {
 
 	countries := countries.AllInfo()

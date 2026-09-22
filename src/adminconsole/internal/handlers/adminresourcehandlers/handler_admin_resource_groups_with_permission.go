@@ -1,12 +1,12 @@
 package adminresourcehandlers
 
 import (
+	"context"
 	"net/http"
 	"slices"
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/adminconsole/internal/pagination"
@@ -17,10 +17,21 @@ import (
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
+// resourceGroupsWithPermissionAPI is what the groups-with-permission page needs: the resource and
+// its permissions, the groups to choose from, and each group's own set.
+type resourceGroupsWithPermissionAPI interface {
+	GetAllGroups(ctx context.Context, accessToken string) ([]api.GroupResponse, error)
+	GetGroupPermissions(ctx context.Context, accessToken string, groupId int64) (*api.GroupResponse, []api.PermissionResponse, error)
+	GetPermissionsByResource(ctx context.Context, accessToken string, resourceId int64) ([]api.PermissionResponse, error)
+	GetResourceById(ctx context.Context, accessToken string, resourceId int64) (*api.ResourceResponse, error)
+	SearchGroupsWithPermissionAnnotation(ctx context.Context, accessToken string, permissionId int64, page, size int) ([]api.GroupWithPermissionResponse, int, error)
+	UpdateGroupPermissions(ctx context.Context, accessToken string, groupId int64, request *api.UpdateGroupPermissionsRequest) error
+}
+
 func HandleAdminResourceGroupsWithPermissionGet(
 	httpHelper handlers.HttpHelper,
 	httpSession sessionstore.Store,
-	apiClient apiclient.ApiClient,
+	apiClient resourceGroupsWithPermissionAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -216,7 +227,7 @@ func HandleAdminResourceGroupsWithPermissionGet(
 
 func HandleAdminResourceGroupsWithPermissionAddPermissionPost(
 	httpHelper handlers.HttpHelper,
-	apiClient apiclient.ApiClient,
+	apiClient resourceGroupsWithPermissionAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -346,7 +357,7 @@ func HandleAdminResourceGroupsWithPermissionAddPermissionPost(
 
 func HandleAdminResourceGroupsWithPermissionRemovePermissionPost(
 	httpHelper handlers.HttpHelper,
-	apiClient apiclient.ApiClient,
+	apiClient resourceGroupsWithPermissionAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {

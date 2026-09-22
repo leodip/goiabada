@@ -1,13 +1,13 @@
 package adminresourcehandlers
 
 import (
+	"context"
 	"net/http"
 	"slices"
 	"strconv"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/adminconsole/internal/pagination"
@@ -18,10 +18,21 @@ import (
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
+// resourceUsersWithPermissionAPI is what the users-with-permission page needs: the resource and
+// its permissions, the users holding one, and each user's own set.
+type resourceUsersWithPermissionAPI interface {
+	GetPermissionsByResource(ctx context.Context, accessToken string, resourceId int64) ([]api.PermissionResponse, error)
+	GetResourceById(ctx context.Context, accessToken string, resourceId int64) (*api.ResourceResponse, error)
+	GetUserPermissions(ctx context.Context, accessToken string, userId int64) (*api.UserResponse, []api.PermissionResponse, error)
+	GetUsersByPermission(ctx context.Context, accessToken string, permissionId int64, page, size int) ([]api.UserResponse, int, error)
+	SearchUsersWithPermissionAnnotation(ctx context.Context, accessToken string, permissionId int64, query string, page, size int) ([]api.UserWithPermissionResponse, int, error)
+	UpdateUserPermissions(ctx context.Context, accessToken string, userId int64, request *api.UpdateUserPermissionsRequest) error
+}
+
 func HandleAdminResourceUsersWithPermissionGet(
 	httpHelper handlers.HttpHelper,
 	httpSession sessionstore.Store,
-	apiClient apiclient.ApiClient,
+	apiClient resourceUsersWithPermissionAPI,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		idStr := chi.URLParam(r, "resourceId")
@@ -171,7 +182,7 @@ func HandleAdminResourceUsersWithPermissionGet(
 
 func HandleAdminResourceUsersWithPermissionRemovePermissionPost(
 	httpHelper handlers.HttpHelper,
-	apiClient apiclient.ApiClient,
+	apiClient resourceUsersWithPermissionAPI,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		idStr := chi.URLParam(r, "resourceId")
@@ -290,7 +301,7 @@ func HandleAdminResourceUsersWithPermissionRemovePermissionPost(
 
 func HandleAdminResourceUsersWithPermissionAddGet(
 	httpHelper handlers.HttpHelper,
-	apiClient apiclient.ApiClient,
+	apiClient resourceUsersWithPermissionAPI,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		idStr := chi.URLParam(r, "resourceId")
@@ -388,7 +399,7 @@ func HandleAdminResourceUsersWithPermissionAddGet(
 
 func HandleAdminResourceUsersWithPermissionSearchGet(
 	httpHelper handlers.HttpHelper,
-	apiClient apiclient.ApiClient,
+	apiClient resourceUsersWithPermissionAPI,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		result := SearchResult{}
@@ -490,7 +501,7 @@ func HandleAdminResourceUsersWithPermissionSearchGet(
 
 func HandleAdminResourceUsersWithPermissionAddPermissionPost(
 	httpHelper handlers.HttpHelper,
-	apiClient apiclient.ApiClient,
+	apiClient resourceUsersWithPermissionAPI,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		idStr := chi.URLParam(r, "resourceId")

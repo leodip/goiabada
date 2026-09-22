@@ -1,6 +1,7 @@
 package adminsettingshandlers
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -19,10 +20,18 @@ import (
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
+// settingsEmailAPI is what the email settings page needs: the settings, the write, and the test
+// send.
+type settingsEmailAPI interface {
+	GetSettingsEmail(ctx context.Context, accessToken string) (*api.SettingsEmailResponse, error)
+	SendTestEmail(ctx context.Context, accessToken string, request *api.SendTestEmailRequest) error
+	UpdateSettingsEmail(ctx context.Context, accessToken string, request *api.UpdateSettingsEmailRequest) (*api.SettingsEmailResponse, error)
+}
+
 func HandleAdminSettingsEmailGet(
 	httpHelper handlers.HttpHelper,
 	httpSession sessionstore.Store,
-	apiClient apiclient.ApiClient,
+	apiClient settingsEmailAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -86,7 +95,7 @@ func HandleAdminSettingsEmailGet(
 func HandleAdminSettingsEmailPost(
 	httpHelper handlers.HttpHelper,
 	httpSession sessionstore.Store,
-	apiClient apiclient.ApiClient,
+	apiClient settingsEmailAPI,
 	settingsCache *cache.SettingsCache,
 ) http.HandlerFunc {
 
@@ -176,7 +185,7 @@ func HandleAdminSettingsEmailPost(
 func HandleAdminSettingsEmailSendTestGet(
 	httpHelper handlers.HttpHelper,
 	httpSession sessionstore.Store,
-	apiClient apiclient.ApiClient,
+	apiClient settingsEmailAPI,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
@@ -225,7 +234,7 @@ func HandleAdminSettingsEmailSendTestGet(
 func HandleAdminSettingsEmailSendTestPost(
 	httpHelper handlers.HttpHelper,
 	httpSession sessionstore.Store,
-	apiClient apiclient.ApiClient,
+	apiClient settingsEmailAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {

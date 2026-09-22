@@ -48,6 +48,8 @@ repository root. It is enforced rather than descriptive: see **Architecture guar
 
 ### Admin Console (`src/adminconsole/`)
 - `internal/handlers/` - Admin UI handlers
+- `internal/apiclient/` - The composition-only `ApiClient` interface and the one deadlined, bounded executor behind all 106 methods. No handler takes the whole interface; each declares an unexported port beside the function taking it (#386)
+- `internal/boundedread/` - The one rule for a capped response body: read one byte past the cap and refuse the overrun rather than decode a prefix. Six callers (#386)
 - `web/template/` - Admin UI templates
 
 ## Database Pattern
@@ -350,9 +352,9 @@ a walk that reached nothing into `Fatalf`. The reporting half takes a `testutil.
 exported `Assert*` keeps its `*testing.T` and delegates, so no caller moves. Both halves are then
 driven from a rule test: the finder directly, the reporting half through `testutil.RunGuard`, which
 runs it on its own goroutine so a recorded `Fatalf` ends it in `runtime.Goexit` the way the real one
-does. Sixteen guards follow this -- ten in `core/testutil`, plus `authserver/internal/data`'s
-begin-transaction, benign-sentinel, page-offset and id-list-bound lints and the auth server's API
-error-code and audit-catalog lints. Each owes three cases: a tree that must fail, a tree that must
+does. Nineteen guards follow this -- eleven in `core/testutil`, plus `authserver/internal/data`'s
+begin-transaction, benign-sentinel, page-offset, id-list-bound, transaction-pass-through and
+SQL-context lints and the auth server's API error-code and audit-catalog lints. Each owes three cases: a tree that must fail, a tree that must
 pass, and the walk that reached nothing. Without the last two the first proves nothing, and without
 the reporting half under test a defect in the five lines that report disables the guard across
 every module with nothing going red -- which is what blinding `AssertNoDeadInterfaces` demonstrated on `8883642d`

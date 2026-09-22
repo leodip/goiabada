@@ -1,6 +1,7 @@
 package accounthandlers
 
 import (
+	"context"
 	"errors"
 	"net/http"
 
@@ -13,9 +14,17 @@ import (
 	"github.com/leodip/goiabada/core/oauth"
 )
 
+// accountOTPAPI is what the account OTP page needs: the enrolment offer, the profile, and the
+// write.
+type accountOTPAPI interface {
+	GetAccountOTPEnrollment(ctx context.Context, accessToken string) (*api.AccountOTPEnrollmentResponse, error)
+	GetAccountProfile(ctx context.Context, accessToken string) (*api.UserResponse, error)
+	UpdateAccountOTP(ctx context.Context, accessToken string, request *api.UpdateAccountOTPRequest) (*api.UserResponse, error)
+}
+
 func HandleAccountOtpGet(
 	httpHelper handlers.HttpHelper,
-	apiClient apiclient.ApiClient,
+	apiClient accountOTPAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -60,7 +69,7 @@ func HandleAccountOtpGet(
 
 func HandleAccountOtpPost(
 	httpHelper handlers.HttpHelper,
-	apiClient apiclient.ApiClient,
+	apiClient accountOTPAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {

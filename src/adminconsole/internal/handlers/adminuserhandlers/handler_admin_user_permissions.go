@@ -1,13 +1,13 @@
 package adminuserhandlers
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/core/api"
@@ -17,10 +17,18 @@ import (
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
+// userPermissionsAPI is what the user permissions page needs: the resources to choose from, and
+// the user's own set.
+type userPermissionsAPI interface {
+	GetAllResources(ctx context.Context, accessToken string) ([]api.ResourceResponse, error)
+	GetUserPermissions(ctx context.Context, accessToken string, userId int64) (*api.UserResponse, []api.PermissionResponse, error)
+	UpdateUserPermissions(ctx context.Context, accessToken string, userId int64, request *api.UpdateUserPermissionsRequest) error
+}
+
 func HandleAdminUserPermissionsGet(
 	httpHelper handlers.HttpHelper,
 	httpSession sessionstore.Store,
-	apiClient apiclient.ApiClient,
+	apiClient userPermissionsAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -105,7 +113,7 @@ func HandleAdminUserPermissionsGet(
 func HandleAdminUserPermissionsPost(
 	httpHelper handlers.HttpHelper,
 	httpSession sessionstore.Store,
-	apiClient apiclient.ApiClient,
+	apiClient userPermissionsAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {

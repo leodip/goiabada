@@ -1,6 +1,7 @@
 package adminuserhandlers
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -15,6 +16,12 @@ import (
 	"github.com/leodip/goiabada/core/oauth"
 )
 
+// userProfilePictureAPI is what the user profile picture page needs: the upload, and the delete.
+type userProfilePictureAPI interface {
+	DeleteUserProfilePicture(ctx context.Context, accessToken string, userId int64) error
+	UploadUserProfilePicture(ctx context.Context, accessToken string, userId int64, pictureData []byte, filename string) (*apiclient.ProfilePictureUploadResponse, error)
+}
+
 // The error surface here answers through the console's shared JSON writers rather than the
 // hand-rolled {"success": false, "error": <message>} these handlers wrote until #279, which put an
 // internal message on the wire at 500 with nothing in the log, answered 401 for the middleware
@@ -23,7 +30,7 @@ import (
 // HandleAdminUserProfilePicturePost handles uploading a profile picture for a user (admin)
 func HandleAdminUserProfilePicturePost(
 	httpHelper handlers.HttpHelper,
-	apiClient apiclient.ApiClient,
+	apiClient userProfilePictureAPI,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Get JWT info to extract access token
@@ -80,7 +87,7 @@ func HandleAdminUserProfilePicturePost(
 // HandleAdminUserProfilePictureDelete handles deleting a user's profile picture (admin)
 func HandleAdminUserProfilePictureDelete(
 	httpHelper handlers.HttpHelper,
-	apiClient apiclient.ApiClient,
+	apiClient userProfilePictureAPI,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Get JWT info to extract access token

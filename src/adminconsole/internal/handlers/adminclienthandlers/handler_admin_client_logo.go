@@ -1,6 +1,7 @@
 package adminclienthandlers
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/leodip/goiabada/core/api"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
@@ -18,6 +20,15 @@ import (
 	"github.com/leodip/goiabada/core/oauth"
 )
 
+// clientLogoAPI is what the client logo page needs: the client, and the logo it reads, uploads
+// and deletes.
+type clientLogoAPI interface {
+	DeleteClientLogo(ctx context.Context, accessToken string, clientId int64) error
+	GetClientById(ctx context.Context, accessToken string, clientId int64) (*api.ClientResponse, error)
+	GetClientLogo(ctx context.Context, accessToken string, clientId int64) (*apiclient.ClientLogoInfo, error)
+	UploadClientLogo(ctx context.Context, accessToken string, clientId int64, logoData []byte, filename string) (*apiclient.ClientLogoUploadResponse, error)
+}
+
 // The error surface here answers through the console's shared JSON writers rather than the
 // hand-rolled {"success": false, "error": <message>} these handlers wrote until #279, which put an
 // internal message on the wire at 500 with nothing in the log, answered 401 for the middleware
@@ -25,7 +36,7 @@ import (
 // was about to call response.json(). The success bodies are unchanged.
 func HandleAdminClientLogoGet(
 	httpHelper handlers.HttpHelper,
-	apiClient apiclient.ApiClient,
+	apiClient clientLogoAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -81,7 +92,7 @@ func HandleAdminClientLogoGet(
 
 func HandleAdminClientLogoPost(
 	httpHelper handlers.HttpHelper,
-	apiClient apiclient.ApiClient,
+	apiClient clientLogoAPI,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
@@ -131,7 +142,7 @@ func HandleAdminClientLogoPost(
 
 func HandleAdminClientLogoDelete(
 	httpHelper handlers.HttpHelper,
-	apiClient apiclient.ApiClient,
+	apiClient clientLogoAPI,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
