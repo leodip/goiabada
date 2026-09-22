@@ -633,11 +633,18 @@ type regeneratingStore struct {
 	// was written into it before the rotation rather than after.
 	gotSession *sessionstore.Session
 	calls      int
+	// beforeRegenerate runs at the top of Regenerate, which is the one point inside
+	// StartNewUserSession that is after the commit and before the compensation. The cancellation
+	// case needs to act exactly there and nowhere else.
+	beforeRegenerate func()
 }
 
 func (s *regeneratingStore) Regenerate(w http.ResponseWriter, r *http.Request, session *sessionstore.Session) error {
 	s.calls++
 	s.gotSession = session
+	if s.beforeRegenerate != nil {
+		s.beforeRegenerate()
+	}
 	return s.err
 }
 
@@ -705,6 +712,48 @@ func TestStartNewUserSession_DeletesTheRowWhenTheSaveFails(t *testing.T) {
 
 	assert.Nil(t, result)
 	assert.ErrorIs(t, err, saveErr, "the caller must be told why the ceremony failed, not what the cleanup did")
+}
+
+// The compensation runs on a context of its own, because the cancellation that would stop it is
+// the same event that causes the failure it is compensating for (#386, final review round 1
+// finding 9).
+//
+// net/http cancels a request's context the moment the client disconnects, and a disconnected
+// client is exactly why a browser-store write fails. So the two arrive together: Regenerate or
+// Save reports a failure, and the DeleteUserSession that undoes the committed row is handed a
+// context that is already done. Before this, that left #198's orphan behind in precisely the case
+// the compensation was written for -- and only in that case, which is why every other test in
+// this file passed over it.
+//
+// The store cancels the request here rather than the test doing it up front, because cancelling
+// before the call would stop RunInTransaction instead and never reach the window.
+func TestStartNewUserSession_DeletesTheRowEvenWhenTheRequestWasCancelled(t *testing.T) {
+	m := newStartSessionMocks(t)
+	rotationErr := errors.New("cannot rotate: the client went away")
+	store := m.withRegeneratingStore(rotationErr)
+
+	req := newSessionRequest("192.168.1.50:54321", chromeUserAgent)
+	ctx, cancel := context.WithCancel(req.Context())
+	req = req.WithContext(ctx)
+	store.beforeRegenerate = cancel
+
+	m.expectPersistThroughCommit(123, nil)
+	m.db.On("DeleteUserSession", aLiveSessionContext(), (*sql.Tx)(nil), int64(99)).Return(nil).Once()
+
+	result, err := m.manager.StartNewUserSession(
+		httptest.NewRecorder(), req,
+		123, 7, "pwd", models.AcrLevel1.String(), 0, nil, someCredentialInstant())
+
+	assert.Nil(t, result)
+	assert.ErrorIs(t, err, rotationErr, "the caller is still told why the ceremony failed")
+	assert.Error(t, ctx.Err(), "the request really was cancelled before the compensation ran")
+	m.db.AssertExpectations(t)
+}
+
+// aLiveSessionContext matches only a context that is not done, so a compensation issued on the
+// cancelled request's context matches nothing and the strict mock reports it.
+func aLiveSessionContext() interface{} {
+	return mock.MatchedBy(func(ctx context.Context) bool { return ctx.Err() == nil })
 }
 
 // The compensation is best effort and can itself fail, which is the one thing this fix cannot

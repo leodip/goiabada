@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"log/slog"
+	"time"
 
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/authserver/internal/constants"
@@ -18,6 +19,11 @@ type auditDatabase interface {
 	CreateAuditLog(ctx context.Context, tx *sql.Tx, auditLog *models.AuditLog) error
 	GetSettingsById(ctx context.Context, tx *sql.Tx, settingsId int64) (*models.Settings, error)
 }
+
+// auditWriteTimeout bounds the settings read and the audit insert once Log has detached them from
+// the caller's cancellation. Ten seconds, matching every other bounded wait on a dependency in
+// this repository's request path rather than introducing a value nobody chose against the others.
+const auditWriteTimeout = 10 * time.Second
 
 type AuditLogger struct {
 	database auditDatabase
@@ -44,6 +50,27 @@ func (al *AuditLogger) Log(ctx context.Context, auditEvent string, details map[s
 	if al.database == nil {
 		return
 	}
+
+	// The caller's VALUES, deliberately not the caller's cancellation. Every one of the 126 call
+	// sites logs its event after the outcome it records is already durable -- the token was
+	// issued, the password was changed, the user was deleted -- so the request going away is not
+	// a reason to stop recording that it happened. Before #386 the two calls below took no
+	// context at all and always ran; net/http cancels a request's context the moment the client
+	// disconnects, so passing it straight through would have made "hang up" a way to keep an
+	// event out of the audit trail, which is the opposite of what the trail is for.
+	//
+	// WithoutCancel and not context.Background(): the settings row and the request id are read
+	// off this context a few lines down, and a fresh root would lose both, costing every audit
+	// row written under a cancelled request its request_id and forcing a settings read the
+	// middleware had already done.
+	//
+	// The deadline is what the request's cancellation used to supply by accident, and it is not
+	// optional once the cancellation is gone: an unbounded detached context is how a database
+	// that has stopped answering holds a handler's goroutine for ever. 10 seconds, which is the
+	// one value the repository uses for a bounded wait on a dependency in the request path
+	// (#386 decision 6, and final review round 1 finding 9).
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), auditWriteTimeout)
+	defer cancel()
 
 	// Settings: taken off the request context when the settings middleware put them there, which
 	// is every route on the app branch, and read from the row when it did not (#212 item 2, folded

@@ -49,7 +49,7 @@ repository root. It is enforced rather than descriptive: see **Architecture guar
 ### Admin Console (`src/adminconsole/`)
 - `internal/handlers/` - Admin UI handlers
 - `internal/apiclient/` - The composition-only `ApiClient` interface and the one deadlined, bounded executor behind all 106 methods. No handler takes the whole interface; each declares an unexported port beside the function taking it (#386)
-- `internal/boundedread/` - The one rule for a capped response body: read one byte past the cap and refuse the overrun rather than decode a prefix. Six callers (#386)
+- `internal/boundedread/` - The one rule for a capped response body: read one byte past the cap and refuse the overrun rather than decode a prefix. Seven callers (#386)
 - `web/template/` - Admin UI templates
 
 ## Database Pattern

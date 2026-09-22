@@ -31,6 +31,12 @@ type userSessionManagerDatabase interface {
 	UserSessionLoadClients(ctx context.Context, tx *sql.Tx, userSession *models.UserSession) error
 }
 
+// sessionCleanupTimeout bounds the compensating delete once abandonUserSession has detached it
+// from the caller's cancellation. Ten seconds, matching every other bounded wait on a dependency
+// in this repository's request path rather than introducing a value nobody chose against the
+// others.
+const sessionCleanupTimeout = 10 * time.Second
+
 type UserSessionManager struct {
 	sessionStore sessionstore.Store
 	sessionName  string
@@ -269,6 +275,18 @@ func (u *UserSessionManager) StartNewUserSession(w http.ResponseWriter, r *http.
 // the Set-Cookie. Revisit if the store gains a two-phase write that can be prepared before the
 // commit and completed after it (#198).
 func (u *UserSessionManager) abandonUserSession(ctx context.Context, userSession *models.UserSession, cause error) error {
+	// The caller's VALUES, deliberately not the caller's cancellation, because the cancellation
+	// and the failure this compensates for are the same event: net/http cancels a request's
+	// context the instant the client disconnects, and a disconnected client is exactly why a
+	// browser-store write fails. Inheriting it would abandon the delete in the one case the
+	// compensation exists for, leaving #198's orphan behind and reporting nothing but the
+	// rotation error. WithoutCancel rather than a fresh root so the delete's own record still
+	// carries the request id, bounded because a detached context has no other stop signal and
+	// ten seconds is this repository's one value for a bounded wait on a dependency
+	// (#386 decision 6, and final review round 1 finding 9).
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), sessionCleanupTimeout)
+	defer cancel()
+
 	if err := u.database.DeleteUserSession(ctx, nil, userSession.Id); err != nil {
 		return errs.Join(cause, errs.Wrap(err,
 			"unable to delete the user session left behind by a failed browser session write"))
