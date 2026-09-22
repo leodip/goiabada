@@ -277,9 +277,9 @@ Token ACR = `max(targetACR, sessionACR)`. Never downgrades within a session.
 
 ### OTP config generation
 `users.otp_config_generation` is a per-user counter, advanced by one at every site that establishes
-or removes an authenticator (`EnableUserOTPTx` and `disableUserOTP`), inside the same transaction as
-the write that changed it. `user_sessions.otp_config_generation` records the value that session last
-satisfied, so a session owes a level 2 re-prompt whenever the two differ. Being per user means one
+or removes an authenticator (`otpcredential.Establish` and `otpcredential.Remove`), inside the same
+transaction as the write that changed it. `user_sessions.otp_config_generation` records the value
+that session last satisfied, so a session owes a level 2 re-prompt whenever the two differ. Being per user means one
 statement covers every session of that user.
 
 Both readers, `HandleAuthLevel1CompletedGet` and `handlePromptNone`, only compare and write nothing,

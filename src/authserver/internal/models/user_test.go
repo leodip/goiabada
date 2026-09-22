@@ -1,69 +1,12 @@
 package models
 
 import (
-	"bytes"
 	"database/sql"
 	"testing"
 	"time"
 
-	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/stretchr/testify/assert"
 )
-
-func TestUser_OTPSecret(t *testing.T) {
-	key := []byte("0123456789abcdef0123456789abcdef") // 32 bytes
-	if err := encryption.InitDataCipher(key); err != nil {
-		t.Fatalf("InitDataCipher: %v", err)
-	}
-	const secret = "JBSWY3DPEHPK3PXP"
-
-	u := &User{}
-	if err := u.SetOTPSecret(secret); err != nil {
-		t.Fatalf("SetOTPSecret: %v", err)
-	}
-
-	// The encrypted value must be populated without containing the seed verbatim. There is no
-	// plaintext column to check: migration 000048 dropped users.otp_secret (#98).
-	if len(u.OTPSecretEncrypted) == 0 {
-		t.Fatal("OTPSecretEncrypted is empty after SetOTPSecret")
-	}
-	if bytes.Contains(u.OTPSecretEncrypted, []byte(secret)) {
-		t.Error("encrypted OTP secret contains the plaintext seed")
-	}
-
-	got, err := u.GetOTPSecret()
-	if err != nil {
-		t.Fatalf("GetOTPSecret: %v", err)
-	}
-	if got != secret {
-		t.Errorf("GetOTPSecret = %q, want %q", got, secret)
-	}
-
-	// With a different cipher key the stored value must not decrypt.
-	if err := encryption.InitDataCipher([]byte("fedcba9876543210fedcba9876543210")); err != nil {
-		t.Fatalf("InitDataCipher: %v", err)
-	}
-	if _, err := u.GetOTPSecret(); err == nil {
-		t.Error("GetOTPSecret with a different cipher key: expected error, got nil")
-	}
-	if err := encryption.InitDataCipher(key); err != nil { // restore
-		t.Fatalf("InitDataCipher: %v", err)
-	}
-
-	// A user with no encrypted secret returns an empty string, no error.
-	if got, err := (&User{}).GetOTPSecret(); err != nil || got != "" {
-		t.Errorf("GetOTPSecret on empty user = (%q, %v), want (\"\", nil)", got, err)
-	}
-
-	// ClearOTPSecret removes the stored seed.
-	u.ClearOTPSecret()
-	if len(u.OTPSecretEncrypted) != 0 {
-		t.Errorf("ClearOTPSecret left data: enc len=%d", len(u.OTPSecretEncrypted))
-	}
-	if got, err := u.GetOTPSecret(); err != nil || got != "" {
-		t.Errorf("GetOTPSecret after ClearOTPSecret = (%q, %v), want (\"\", nil)", got, err)
-	}
-}
 
 func TestUser_HasAddress(t *testing.T) {
 	tests := []struct {

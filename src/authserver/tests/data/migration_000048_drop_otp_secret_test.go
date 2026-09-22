@@ -35,7 +35,7 @@ const (
 //     the test looks like.
 //
 //  2. A user row written BEFORE the drop, carrying an encrypted seed, reads back afterwards with
-//     otp_secret_encrypted intact and GetOTPSecret still returning the seed. That is the claim the
+//     otp_secret_encrypted intact and the stored seed still decrypting. That is the claim the
 //     release rests on: 1.6.x moved every seed to the encrypted column, so dropping the plaintext
 //     one costs a database that has booted 1.6.x nothing.
 //
@@ -108,7 +108,7 @@ func TestMigration000048_DropOtpSecret(t *testing.T) {
 	require.NotNilf(t, got, "users.id=%d is gone; this migration deletes no rows", user.Id)
 	assert.Truef(t, got.OTPEnabled, "the drop must not disturb otp_enabled on %s", dbType())
 
-	decrypted, err := got.GetOTPSecret()
+	decrypted, err := encryption.DecryptData(got.OTPSecretEncrypted)
 	require.NoErrorf(t, err, "the encrypted seed must still decrypt after the drop on %s", dbType())
 	assert.Equalf(t, seed, decrypted,
 		"the seed has to survive the drop: a user whose authenticator stops working is what dropping the wrong column looks like on %s",
@@ -137,7 +137,7 @@ func TestMigration000048_DropOtpSecret(t *testing.T) {
 	rolledBack, err := h.DB.GetUserById(context.Background(), nil, user.Id)
 	require.NoError(t, err)
 	require.NotNil(t, rolledBack)
-	stillDecrypts, err := rolledBack.GetOTPSecret()
+	stillDecrypts, err := encryption.DecryptData(rolledBack.OTPSecretEncrypted)
 	require.NoErrorf(t, err, "the encrypted seed is untouched by the roll back on %s", dbType())
 	assert.Equal(t, seed, stillDecrypts,
 		"a down migration that restores a shape must not disturb the column that actually carries the seed")

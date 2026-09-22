@@ -15,22 +15,23 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/otp"
+	"github.com/leodip/goiabada/authserver/internal/otpcredential"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
 )
 
-// authOTPDatabase is what the OTP hop needs: the client, the user, and the step the replay window
-// consumes.
+// authOTPDatabase is what the OTP hop needs: the client, the user, and the OTP credential
+// lifecycle this hop verifies against and may establish.
 //
 // It embeds the client display port because the screen renders through getClientDisplayInfo, and
-// the enrolment port because installing an authenticator is EnableUserOTPTx.
+// the OTP credential port because verifying a passcode and installing an authenticator both run
+// through otpcredential, which owns the step claim as well as the write (#387).
 type authOTPDatabase interface {
 	clientDisplayDatabase
-	OTPEnrolmentDatabase
+	otpcredential.Database
 
 	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*models.Client, error)
 	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*models.User, error)
-	TryConsumeUserOTPStep(ctx context.Context, tx *sql.Tx, userId int64, step int64, requireOTPEnabled bool) (bool, error)
 }
 
 func HandleAuthOtpGet(
@@ -323,95 +324,57 @@ func HandleAuthOtpPost(
 
 		incorrectOtpError := i18n.NewLocalizedError(i18n.ErrCodeOtpIncorrectCode, nil).Localize(r.Context())
 
+		// One verification call on both arms, and which one is the difference the two arms have
+		// always had: an enrolled user's passcode is checked against the authenticator stored on
+		// their row, an enrolling one's against the seed this ceremony rendered. The step claim
+		// that makes a passcode single-use rides inside either, with requireOTPEnabled set from
+		// the entry point rather than from here (#111 decision 10, #387).
+		var verified otpcredential.VerifyResult
 		if user.OTPEnabled {
-			// already has OTP enrolled; decrypt the stored secret to validate
-			otpSecret, err := user.GetOTPSecret()
-			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
-				return
-			}
-			step, matched := otp.MatchStep(otpCode, otpSecret, time.Now().UTC())
-			if !matched {
-				// Every wrong code is a guess at three of a million, so this is the
-				// counter the whole OTP budget exists to move (#219).
-				credentialFailures.RecordCredentialFailure(r)
-				auditLogger.Log(r.Context(), audit.AuditAuthFailedOtp, map[string]interface{}{
-					"userId": user.Id,
-				})
-				renderError(incorrectOtpError)
-				return
-			}
-
-			// requireOTPEnabled is true here: this claim asserts a factor, and that
-			// assertion is only true of an enrolled authenticator. Without the term a
-			// request that loaded the user before a concurrent disable could still claim
-			// a step and be issued a token naming amr "otp" for an authenticator that had
-			// just been removed (#111 decision 10).
-			consumed, err := database.TryConsumeUserOTPStep(r.Context(), nil, user.Id, step, true)
-			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
-				return
-			}
-			if !consumed {
-				// A replayed step is refused exactly as a wrong code is, so it counts as
-				// one: a code already spent proves nothing about who is submitting it.
-				credentialFailures.RecordCredentialFailure(r)
-				auditLogger.Log(r.Context(), audit.AuditOTPCodeReplayDetected, map[string]interface{}{
-					"userId": user.Id,
-					"step":   step,
-				})
-				auditLogger.Log(r.Context(), audit.AuditAuthFailedOtp, map[string]interface{}{
-					"userId": user.Id,
-				})
-				renderError(incorrectOtpError)
-				return
-			}
+			verified, err = otpcredential.VerifyStored(r.Context(), database, user, otpCode, time.Now().UTC())
 		} else {
-			// is enrolling to TOTP now
-			step, matched := otp.MatchStep(otpCode, secretKey, time.Now().UTC())
-			if !matched {
-				credentialFailures.RecordCredentialFailure(r)
-				auditLogger.Log(r.Context(), audit.AuditAuthFailedOtp, map[string]interface{}{
-					"userId": user.Id,
-				})
-				renderError(incorrectOtpError)
-				return
-			}
+			verified, err = otpcredential.VerifySupplied(r.Context(), database, user, secretKey, otpCode,
+				time.Now().UTC())
+		}
+		if err != nil {
+			httpHelper.InternalServerError(w, r, err)
+			return
+		}
 
-			// requireOTPEnabled is false here: enrollment is establishing the
-			// authenticator rather than asserting it, and otp_enabled is still off until
-			// the write below (#111 decision 10). The claim comes first deliberately: if
-			// the enable write then fails, a code is burned and the user retries with the
-			// next one, whereas the reverse order would leave OTP enabled on a request
-			// that was refused.
-			consumed, err := database.TryConsumeUserOTPStep(r.Context(), nil, user.Id, step, false)
-			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
-				return
-			}
-			if !consumed {
-				credentialFailures.RecordCredentialFailure(r)
-				auditLogger.Log(r.Context(), audit.AuditOTPCodeReplayDetected, map[string]interface{}{
-					"userId": user.Id,
-					"step":   step,
-				})
-				auditLogger.Log(r.Context(), audit.AuditAuthFailedOtp, map[string]interface{}{
-					"userId": user.Id,
-				})
-				renderError(incorrectOtpError)
-				return
-			}
+		// The audit set stays here rather than moving with the verification, because it is what
+		// genuinely differs between this ceremony and the account API: that endpoint raises
+		// nothing on a wrong code and no failure event at all, where a browser authentication
+		// refusal is an event an operator filters by (#387 decision 4).
+		switch verified.Outcome {
+		case otpcredential.OutcomeReplayed:
+			// A replayed step is refused exactly as a wrong code is, so it counts as
+			// one: a code already spent proves nothing about who is submitting it.
+			credentialFailures.RecordCredentialFailure(r)
+			auditLogger.Log(r.Context(), audit.AuditOTPCodeReplayDetected, map[string]interface{}{
+				"userId": user.Id,
+				"step":   verified.Step,
+			})
+			auditLogger.Log(r.Context(), audit.AuditAuthFailedOtp, map[string]interface{}{
+				"userId": user.Id,
+			})
+			renderError(incorrectOtpError)
+			return
+		case otpcredential.OutcomeWrong:
+			// Every wrong code is a guess at three of a million, so this is the
+			// counter the whole OTP budget exists to move (#219).
+			credentialFailures.RecordCredentialFailure(r)
+			auditLogger.Log(r.Context(), audit.AuditAuthFailedOtp, map[string]interface{}{
+				"userId": user.Id,
+			})
+			renderError(incorrectOtpError)
+			return
+		}
 
-			// save TOTP secret (encrypted at rest)
-			if err := user.SetOTPSecret(secretKey); err != nil {
-				httpHelper.InternalServerError(w, r, err)
-				return
-			}
-			user.OTPEnabled = true
-			// The user write and the OTP configuration generation's advance commit together,
-			// so there is no state in which the authenticator is on and no session knows
-			// (#242 decision 2).
-			enrolledGeneration, err := EnableUserOTPTx(r.Context(), database, user)
+		if !user.OTPEnabled {
+			// is enrolling to TOTP now. The seed is encrypted at rest, the user written and the
+			// OTP configuration generation's advance committed together, so there is no state in
+			// which the authenticator is on and no session knows (#242 decision 2).
+			enrolledGeneration, err := otpcredential.Establish(r.Context(), database, user, secretKey)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
 				return
@@ -452,8 +415,8 @@ func HandleAuthOtpPost(
 		// spent credential through /auth/completed, /auth/consent and /auth/issue, and leaves
 		// it in the cookie of a ceremony abandoned after enrolling until a later
 		// /auth/authorize replaces the context, whose ceiling is the cookie's own one-year
-		// maximum age. Same discipline as User.SetOTPSecret, which blanks the plaintext seed
-		// once it has encrypted it (#82, #247).
+		// maximum age. Same discipline as otpcredential.Establish, which stores the seed
+		// encrypted and keeps no plaintext copy of it (#82, #247).
 		authContext.OTPKeyURL = ""
 
 		// Rotate the browser session's identifier here too, for the same reason the
