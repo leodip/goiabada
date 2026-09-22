@@ -12,7 +12,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
@@ -73,7 +72,7 @@ func HandleAPIGroupsGet(
 func HandleAPIGroupCreatePost(
 	database groupsDatabase,
 	identifierValidator *validators.IdentifierValidator,
-	auditLogger handlers.AuditLogger,
+	auditLogger AuditLogger,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -197,7 +196,7 @@ func HandleAPIGroupGet(
 func HandleAPIGroupUpdatePut(
 	database groupsDatabase,
 	identifierValidator *validators.IdentifierValidator,
-	auditLogger handlers.AuditLogger,
+	auditLogger AuditLogger,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -304,7 +303,7 @@ func HandleAPIGroupUpdatePut(
 
 func HandleAPIGroupDelete(
 	database groupsDatabase,
-	auditLogger handlers.AuditLogger,
+	auditLogger AuditLogger,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {

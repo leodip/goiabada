@@ -10,7 +10,6 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/api"
@@ -72,7 +71,7 @@ func HandleAPIAccountConsentsGet(
 // DELETE /api/v1/account/consents/{id}
 func HandleAPIAccountConsentDelete(
 	database accountConsentsDatabase,
-	auditLogger handlers.AuditLogger,
+	auditLogger AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		jwtToken, ok := middleware.GetValidatedToken(r)

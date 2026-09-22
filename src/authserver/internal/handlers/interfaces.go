@@ -8,12 +8,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	"github.com/leodip/goiabada/authserver/internal/issuance"
 	"github.com/leodip/goiabada/authserver/internal/models"
-	"github.com/leodip/goiabada/authserver/internal/usercreation"
 	"github.com/leodip/goiabada/core/oauth"
 
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
@@ -92,18 +90,9 @@ type TokenValidator interface {
 	ValidateTokenRequest(ctx context.Context, input *protocolvalidation.ValidateTokenRequestInput) (*protocolvalidation.ValidateTokenRequestResult, error)
 }
 
-type UserCreator interface {
-	CreateUser(ctx context.Context, input *usercreation.CreateUserInput) (*models.User, error)
-}
-
 type TokenParser interface {
 	DecodeAndValidateTokenString(ctx context.Context, token string, pubKey *rsa.PublicKey, withExpirationCheck bool) (*oauth.JwtToken, error)
 	DecodeAndValidateTokenResponse(ctx context.Context, tokenResponse *oauth.TokenResponse) (*oauth.JwtInfo, error)
-}
-
-type EmailValidator interface {
-	ValidateEmailAddress(emailAddress string) error
-	ValidateEmailUpdate(ctx context.Context, input *accountvalidation.ValidateEmailInput) error
 }
 
 type PasswordValidator interface {

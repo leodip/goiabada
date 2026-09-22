@@ -16,7 +16,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
-	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
@@ -25,7 +24,7 @@ import (
 
 // HandleAPISettingsEmailGet - GET /api/v1/admin/settings/email
 func HandleAPISettingsEmailGet(
-	httpHelper handlers.HttpHelper,
+	httpHelper HttpHelper,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
@@ -57,8 +56,8 @@ type settingsEmailDatabase interface {
 // HandleAPISettingsEmailPut - PUT /api/v1/admin/settings/email
 func HandleAPISettingsEmailPut(
 	database settingsEmailDatabase,
-	emailValidator handlers.EmailValidator,
-	auditLogger handlers.AuditLogger,
+	emailValidator EmailValidator,
+	auditLogger AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		currentSettings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
@@ -225,9 +224,9 @@ func HandleAPISettingsEmailPut(
 
 // HandleAPISettingsEmailSendTestPost - POST /api/v1/admin/settings/email/send-test
 func HandleAPISettingsEmailSendTestPost(
-	emailValidator handlers.EmailValidator,
-	emailSender handlers.EmailSender,
-	auditLogger handlers.AuditLogger,
+	emailValidator EmailValidator,
+	emailSender EmailSender,
+	auditLogger AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)

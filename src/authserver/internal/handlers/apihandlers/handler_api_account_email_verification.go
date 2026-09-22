@@ -15,7 +15,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
-	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/api"
@@ -32,10 +31,10 @@ type accountEmailVerificationDatabase interface {
 
 // HandleAPIAccountEmailVerificationSendPost - POST /api/v1/account/email/verification/send
 func HandleAPIAccountEmailVerificationSendPost(
-	httpHelper handlers.HttpHelper,
+	httpHelper HttpHelper,
 	database accountEmailVerificationDatabase,
-	emailSender handlers.EmailSender,
-	auditLogger handlers.AuditLogger,
+	emailSender EmailSender,
+	auditLogger AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Auth and scope are enforced by middleware; extract validated token
@@ -141,8 +140,8 @@ func HandleAPIAccountEmailVerificationSendPost(
 // HandleAPIAccountEmailVerificationPost - POST /api/v1/account/email/verification
 func HandleAPIAccountEmailVerificationPost(
 	database accountEmailVerificationDatabase,
-	auditLogger handlers.AuditLogger,
-	credentialFailures handlers.CredentialFailureRecorder,
+	auditLogger AuditLogger,
+	credentialFailures CredentialFailureRecorder,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Auth and scope are enforced by middleware; extract validated token

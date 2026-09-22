@@ -10,9 +10,6 @@
 package mocks_accountvalidation
 
 import (
-	"context"
-
-	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -99,63 +96,6 @@ func (_c *EmailValidator_ValidateEmailAddress_Call) Return(err error) *EmailVali
 }
 
 func (_c *EmailValidator_ValidateEmailAddress_Call) RunAndReturn(run func(emailAddress string) error) *EmailValidator_ValidateEmailAddress_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// ValidateEmailUpdate provides a mock function for the type EmailValidator
-func (_mock *EmailValidator) ValidateEmailUpdate(ctx context.Context, input *accountvalidation.ValidateEmailInput) error {
-	ret := _mock.Called(ctx, input)
-
-	if len(ret) == 0 {
-		panic("no return value specified for ValidateEmailUpdate")
-	}
-
-	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *accountvalidation.ValidateEmailInput) error); ok {
-		r0 = returnFunc(ctx, input)
-	} else {
-		r0 = ret.Error(0)
-	}
-	return r0
-}
-
-// EmailValidator_ValidateEmailUpdate_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ValidateEmailUpdate'
-type EmailValidator_ValidateEmailUpdate_Call struct {
-	*mock.Call
-}
-
-// ValidateEmailUpdate is a helper method to define mock.On call
-//   - ctx context.Context
-//   - input *accountvalidation.ValidateEmailInput
-func (_e *EmailValidator_Expecter) ValidateEmailUpdate(ctx any, input any) *EmailValidator_ValidateEmailUpdate_Call {
-	return &EmailValidator_ValidateEmailUpdate_Call{Call: _e.mock.On("ValidateEmailUpdate", ctx, input)}
-}
-
-func (_c *EmailValidator_ValidateEmailUpdate_Call) Run(run func(ctx context.Context, input *accountvalidation.ValidateEmailInput)) *EmailValidator_ValidateEmailUpdate_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 context.Context
-		if args[0] != nil {
-			arg0 = args[0].(context.Context)
-		}
-		var arg1 *accountvalidation.ValidateEmailInput
-		if args[1] != nil {
-			arg1 = args[1].(*accountvalidation.ValidateEmailInput)
-		}
-		run(
-			arg0,
-			arg1,
-		)
-	})
-	return _c
-}
-
-func (_c *EmailValidator_ValidateEmailUpdate_Call) Return(err error) *EmailValidator_ValidateEmailUpdate_Call {
-	_c.Call.Return(err)
-	return _c
-}
-
-func (_c *EmailValidator_ValidateEmailUpdate_Call) RunAndReturn(run func(ctx context.Context, input *accountvalidation.ValidateEmailInput) error) *EmailValidator_ValidateEmailUpdate_Call {
 	_c.Call.Return(run)
 	return _c
 }

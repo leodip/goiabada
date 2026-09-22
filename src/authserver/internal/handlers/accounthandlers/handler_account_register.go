@@ -14,7 +14,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	"github.com/leodip/goiabada/authserver/internal/emaillinks"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
-	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/usercreation"
@@ -26,7 +25,7 @@ import (
 )
 
 func HandleAccountRegisterGet(
-	httpHelper handlers.HttpHelper,
+	httpHelper HttpHelper,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -56,13 +55,13 @@ type accountRegisterDatabase interface {
 }
 
 func HandleAccountRegisterPost(
-	httpHelper handlers.HttpHelper,
+	httpHelper HttpHelper,
 	database accountRegisterDatabase,
-	userCreator handlers.UserCreator,
-	emailValidator handlers.EmailValidator,
-	passwordValidator handlers.PasswordValidator,
-	emailSender handlers.EmailSender,
-	auditLogger handlers.AuditLogger,
+	userCreator UserCreator,
+	emailValidator EmailValidator,
+	passwordValidator PasswordValidator,
+	emailSender EmailSender,
+	auditLogger AuditLogger,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {

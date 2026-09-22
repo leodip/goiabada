@@ -10,7 +10,6 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
@@ -93,7 +92,7 @@ func HandleAPIGroupMembersGet(
 
 func HandleAPIGroupMemberAddPost(
 	database groupMembersDatabase,
-	auditLogger handlers.AuditLogger,
+	auditLogger AuditLogger,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -178,7 +177,7 @@ func HandleAPIGroupMemberAddPost(
 
 func HandleAPIGroupMemberDelete(
 	database groupMembersDatabase,
-	auditLogger handlers.AuditLogger,
+	auditLogger AuditLogger,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {

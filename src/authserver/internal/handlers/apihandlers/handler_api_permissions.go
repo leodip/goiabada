@@ -14,7 +14,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	srvhandlers "github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
@@ -90,7 +89,7 @@ func HandleAPIPermissionsByResourceGet(
 func HandleAPIResourcePermissionsPut(
 	database permissionsDatabase,
 	identifierValidator *validators.IdentifierValidator,
-	auditLogger srvhandlers.AuditLogger,
+	auditLogger AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		resourceIdStr := chi.URLParam(r, "resourceId")
