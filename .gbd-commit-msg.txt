@@ -1,0 +1,42 @@
+docs(agents): describe the package layout #387 leaves behind
+
+AGENTS.md and CLAUDE.md gain the four capability packages this issue created --
+revocation, otpcredential, userclaims and emaillinks -- one line each in the
+voice of the entry beside them, and the internal/models line now says what the
+package is allowed to import, because that is acceptance bullet 3 and a guard
+holds it: the standard library, core/constants and core/errs, no cryptography
+and no claim construction.
+
+Three more sections were falsified by this run and no stage had noticed, because
+each stage asked what its own moved files falsified and the answer was honestly
+"nothing" -- what falsified these was a guard the run added or widened. Pattern
+8's slogRequestPathDirs enumeration named 29 directories against slog_lint.go's
+33. The dead-interface paragraph said the guard runs "over their own
+internal/handlers package", which is no longer all the auth server's call names.
+And the guard-shape count said twenty, against twenty-two: models' import lint
+and handlers' child-package import lint both follow that shape.
+
+Pattern 5's credential-read sentence, the one the plan expected to find broken,
+is not: AssertNoCredentialQueryFallback still has exactly the three call sites it
+claims, and nothing this run moved reads a form value. Left as it stands.
+
+Three drifts are folded in from #417, which owns CLAUDE.md accuracy and stays
+open for its second half. AuthStateGeneration joins the AuthContext field rule's
+"overwritten before its next read" clause: it is written at /auth/authorize from
+a reused session and at /auth/pwd from the verified user, read at /auth/completed
+and /auth/issue, and both restart routes land the ceremony at requires_level_1,
+whose only reachable writer is /auth/pwd. The Core directory list goes from 5
+named directories to the 19 on disk, alphabetical, each line written against the
+package's own doc comment or ARCHITECTURE.md's ownership table. And
+handler_authorize.go's ui_locales comment stops bounding "the session cookie":
+#266 moved that store server-side and the cookie carries a key and nothing else.
+
+Tiers: build, and unit at 8683 passing, unchanged -- this stage adds no test.
+Integration, data and lint are not applicable: the one production line is a
+comment, and nothing here is a query, a port method, a schema or a mockery
+entry. One mutation, CAUGHT: differ the two files by two words and
+AssertAgentDocs names the line, which is the only rule that reads either of them.
+
+Refs #387, #417
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
