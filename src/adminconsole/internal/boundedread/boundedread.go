@@ -4,7 +4,7 @@
 //
 // It is a package rather than a helper in one of the callers because the rule is shared by three
 // of them -- apiclient, oauthclient and middleware -- and a rule with three sentinels is three
-// rules. A reader arriving at any of the six read sites finds the same function and the same
+// rules. A reader arriving at any of the seven read sites finds the same function and the same
 // error, and does not have to work out which convention that site is in (#386 decision 4).
 //
 // The ceiling itself is not here. The three in use mean different things -- the admin API's
@@ -26,7 +26,7 @@ import (
 // and a truncated prefix that happens to be balanced decodes with keys missing and nothing says
 // so -- which is what a JWKS document reaching json.NewDecoder through a LimitReader could do.
 //
-// No caller needs to match on it to behave correctly. Every one of the six sites already answers
+// No caller needs to match on it to behave correctly. Every one of the seven sites already answers
 // a failed read the same way it answers a failed parse: the admin console's error classifier
 // falls through to a 500, a refresh clears the session and continues, a JWKS fetch leaves the
 // cache as it was, and a session store call fails without retrying. The sentinel is what makes

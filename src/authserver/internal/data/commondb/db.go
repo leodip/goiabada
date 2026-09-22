@@ -187,6 +187,20 @@ func (d *CommonDatabase) RunInTransaction(ctx context.Context, fn func(tx *sql.T
 		if err == nil {
 			return nil
 		}
+		// The fifth cancellation exit, and the only one whose error arrives carrying nothing
+		// about why. When the body SUCCEEDS and the cancellation lands between its last
+		// statement and the commit, database/sql has already rolled the transaction back on the
+		// goroutine BeginTx started, so Tx.Commit finds it finished and answers sql.ErrTxDone --
+		// a bookkeeping sentinel saying only that the transaction was already over, which
+		// matches neither context.Canceled nor context.DeadlineExceeded. Tx.Commit races that
+		// goroutine, returning ctx.Err() when the rollback has not finished and the sentinel
+		// when it has, so without this the answer to a cancelled run was decided by scheduling.
+		// Both conditions are required: ErrTxDone on a LIVE context means the transaction was
+		// finished by something other than this helper, which is a defect and keeps its own
+		// error, exactly as the deferred rollback's suppression is written (#386 decision 13).
+		if ctxErr := ctx.Err(); ctxErr != nil && errors.Is(err, sql.ErrTxDone) {
+			return abandoned(ctxErr, lastDeadlock)
+		}
 		if !d.deadlock(err) {
 			return err
 		}
@@ -209,6 +223,10 @@ func (d *CommonDatabase) RunInTransaction(ctx context.Context, fn func(tx *sql.T
 // A cancellation arriving INSIDE fn does not come through here. The statement's own context error
 // is not a deadlock, so the loop returns it unchanged after one attempt, which is the same answer
 // by the ordinary path.
+//
+// A cancellation arriving between a SUCCESSFUL fn and the commit does come through here, and the
+// commit's sql.ErrTxDone is dropped rather than joined: unlike a deadlock it carries no fact worth
+// keeping, saying only that the transaction database/sql had already rolled back was over.
 func abandoned(ctxErr error, lastDeadlock error) error {
 	if lastDeadlock != nil {
 		return errs.Wrap(errs.Join(ctxErr, lastDeadlock),

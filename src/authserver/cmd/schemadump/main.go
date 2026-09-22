@@ -253,14 +253,21 @@ func open(t target, name string) (migratable, *sql.DB, func(), error) {
 // runs from a deferred cleanup, where the interesting error is the one that got us there. A
 // leftover scratch database is harmless to the next run, which picks a new name, but it is
 // worth saying so out loud.
+//
+// It owns a root context of its own rather than taking dumpOne's, because it runs from a cleanup
+// closure built before that context exists and outlives the call that made it. The rule is the
+// same one the rest of this command follows: a driver call takes a context, and a command with no
+// request above it declares the root (#386).
 func dropDatabase(driver, dsn, stmt, name string) {
+	ctx := context.Background()
+
 	sqlDB, err := sql.Open(driver, dsn)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "schemadump: could not connect to drop the scratch database %s: %v\n", name, err)
 		return
 	}
 	defer func() { _ = sqlDB.Close() }()
-	if _, err := sqlDB.Exec(stmt); err != nil {
+	if _, err := sqlDB.ExecContext(ctx, stmt); err != nil {
 		fmt.Fprintf(os.Stderr, "schemadump: could not drop the scratch database %s: %v\n", name, err)
 	}
 }

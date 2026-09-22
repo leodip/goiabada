@@ -24,6 +24,11 @@ import (
 
 // dynamicClientRegistrationDatabase is what RFC 7591 registration needs: the client and redirect
 // URIs it creates, and the delete that undoes a half-built one.
+// dcrRollbackTimeout bounds the compensating delete once it has been detached from the caller's
+// cancellation. Ten seconds, matching every other bounded wait on a dependency in this
+// repository's request path rather than introducing a value nobody chose against the others.
+const dcrRollbackTimeout = 10 * time.Second
+
 type dynamicClientRegistrationDatabase interface {
 	CreateClient(ctx context.Context, tx *sql.Tx, client *models.Client) error
 	CreateRedirectURI(ctx context.Context, tx *sql.Tx, redirectURI *models.RedirectURI) error
@@ -148,8 +153,18 @@ func HandleDynamicClientRegistrationPost(
 			}
 			if err := database.CreateRedirectURI(r.Context(), nil, redirectURI); err != nil {
 				apiresponse.LogInternalServerError(r, errs.Wrap(err, "DCR: failed to create redirect URI"), "uri", uri)
-				// Rollback client creation
-				_ = database.DeleteClient(r.Context(), nil, client.Id)
+				// Rollback client creation, on a context of its own rather than the request's.
+				// The client row above is already committed and there is no transaction across
+				// the two writes, so this is the only thing that withdraws it -- and a cancelled
+				// request is one of the reasons the write above fails, which would leave the
+				// compensation unable to run in precisely the case it exists for. WithoutCancel
+				// keeps the request id on the record, and the bound is what the cancellation used
+				// to supply (#386 decision 6, and final review round 1 finding 9; the same rule
+				// as audit.Log and usersession.abandonUserSession).
+				rollbackCtx, cancelRollback := context.WithTimeout(
+					context.WithoutCancel(r.Context()), dcrRollbackTimeout)
+				_ = database.DeleteClient(rollbackCtx, nil, client.Id)
+				cancelRollback()
 				writeDCRError(w, "server_error", "Failed to register redirect URIs", http.StatusInternalServerError)
 				return
 			}
