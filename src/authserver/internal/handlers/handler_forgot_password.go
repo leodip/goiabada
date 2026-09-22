@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
+	"github.com/leodip/goiabada/authserver/internal/emaillinks"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/hashutil"
@@ -102,7 +103,7 @@ func HandleForgotPasswordPost(
 
 			bind := map[string]interface{}{
 				"name": user.GetFullName(),
-				"link": ResetPasswordLink(verificationCode),
+				"link": emaillinks.ResetPasswordLink(verificationCode),
 			}
 			emailReq := r.WithContext(i18n.WithLocale(r.Context(), true, user.Locale, "en"))
 			buf, err := httpHelper.RenderTemplateToBuffer(emailReq, "/layouts/email_layout.html", "/emails/email_forgot_password.html", bind)

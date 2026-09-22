@@ -1,4 +1,17 @@
-package handlers
+// Package emaillinks owns the emailed-link round trip that password reset and account
+// activation share: build the link, record that it was followed once its code validated,
+// and redeem that record once.
+//
+// The two halves are one package because they already name the same two flows from
+// opposite ends -- ResetPasswordPath and AccountActivatePath here, LinkMarkerFlowResetPassword
+// and LinkMarkerFlowAccountActivate below -- so splitting them would leave two packages each
+// knowing about both. It sits beside emaildelivery, which sends the message these links travel
+// in: one sends, this one builds the link and redeems it when it is followed (#387).
+//
+// It is transport-shared rather than an application service: SaveLinkMarker and ClearLinkMarker
+// write a cookie through the session store, so unlike the capability packages this issue lifts
+// out of handlers, these take an http.ResponseWriter and a *http.Request.
+package emaillinks
 
 import (
 	"encoding/json"

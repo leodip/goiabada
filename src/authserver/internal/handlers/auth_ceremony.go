@@ -17,9 +17,9 @@ import (
 // cases catch: they read the field out of the rendered page rather than building the form.
 const ceremonyIdField = "ceremonyId"
 
-// ceremonyIdLength matches continuationIdLength, and for the same reason its comment gives:
-// over the 65-character alphabet GenerateSecurityRandomString draws from, this is far more
-// entropy than the value needs. Nobody outside the session ever sees it and it authorizes
+// ceremonyIdLength matches the length of the continuation id emaillinks issues, and for the
+// same reason that package's own comment gives: over the 65-character alphabet
+// GenerateSecurityRandomString draws from, this is far more entropy than the value needs. Nobody outside the session ever sees it and it authorizes
 // nothing on its own.
 const ceremonyIdLength = 32
 

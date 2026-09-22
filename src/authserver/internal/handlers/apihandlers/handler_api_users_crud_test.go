@@ -16,9 +16,9 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/data"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/emaillinks"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	mocks_handlerhelpers "github.com/leodip/goiabada/authserver/internal/handlerhelpers/mocks"
-	"github.com/leodip/goiabada/authserver/internal/handlers"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
@@ -379,7 +379,7 @@ func TestHandleAPIUserCreatePost_StoresResetCodeHash(t *testing.T) {
 	// This site's only job is to hand the issued code to the shared builder; the link's shape
 	// and the absence of an address in it belong to ResetPasswordLink's own tests (#112
 	// decision 5).
-	assert.Equal(t, handlers.ResetPasswordLink(issuedCode), emailedLink,
+	assert.Equal(t, emaillinks.ResetPasswordLink(issuedCode), emailedLink,
 		"the emailed link must be the shared builder's output for the code that was issued")
 
 	httpHelper.AssertExpectations(t)

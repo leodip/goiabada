@@ -1,4 +1,4 @@
-package handlers
+package emaillinks
 
 import (
 	"net/url"
@@ -46,9 +46,10 @@ func TestResetPasswordLink(t *testing.T) {
 			want:    "http://localhost:9090/reset-password?code=abc123",
 		},
 		{
-			// The base URL is concatenated as-is, the same way GetProfileURL does it,
-			// so a trailing slash doubles up. Pinned because it produces a subtly
-			// broken link rather than an obvious failure.
+			// The base URL is concatenated as-is, the same way the handlers'
+			// GetProfileURL does it, so a trailing slash doubles up. Pinned
+			// because it produces a subtly broken link rather than an obvious
+			// failure.
 			name:    "trailing slash is not normalized",
 			baseURL: "https://auth.example.com/",
 			code:    "abc123",

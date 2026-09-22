@@ -14,6 +14,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/config"
+	"github.com/leodip/goiabada/authserver/internal/emaillinks"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/models"
@@ -36,9 +37,10 @@ const forgotPasswordCodeLifetime = 5 * time.Minute
 // URL with no query at all, so four of those five are no longer determinable and naming them
 // would have the entry assert causes the handler cannot know.
 //
-// Four more live on LinkMarkerRejection (marker_missing, marker_wrong_flow, marker_expired,
-// and continuation_in_flight), which is what GetLinkMarker and SaveLinkMarker return, so the
-// handler records what the helper decided rather than re-deriving it from the same state.
+// Four more live on emaillinks.LinkMarkerRejection (marker_missing, marker_wrong_flow,
+// marker_expired, and continuation_in_flight), which is what emaillinks.GetLinkMarker and
+// emaillinks.SaveLinkMarker return, so the handler records what the helper decided rather
+// than re-deriving it from the same state.
 const (
 	// auditReasonUnknownCode is a code that resolves to no outstanding reset. Emitted on
 	// the first hop only, which after this change is the only request where an
@@ -114,8 +116,8 @@ func forgotPasswordCodeMatches(storedCode string, suppliedCode string) bool {
 // session currently holds.
 //
 // This is what binds a rendered page to the account whose link authorized it, and it is
-// needed on top of SaveLinkMarker's first-writer-wins rule because that rule governs
-// writes and this refusal is about a page that is already on screen. A marker may be
+// needed on top of emaillinks.SaveLinkMarker's first-writer-wins rule because that rule
+// governs writes and this refusal is about a page that is already on screen. A marker may be
 // replaced legitimately once it expires, so a form rendered at t=0 and submitted at
 // t=5min would otherwise act on whatever marker the session holds by then (#112).
 //
@@ -233,9 +235,9 @@ type resetPasswordDatabase interface {
 // Returns (nil, nil) when the request was refused, having already audited and responded.
 func resolveResetPasswordMarker(httpHelper HttpHelper, httpSession sessionstore.Store,
 	database resetPasswordDatabase, auditLogger AuditLogger, w http.ResponseWriter, r *http.Request,
-	httpStatus int) (*LinkMarker, *models.User) {
+	httpStatus int) (*emaillinks.LinkMarker, *models.User) {
 
-	marker, rejection, err := GetLinkMarker(httpSession, r, LinkMarkerFlowResetPassword)
+	marker, rejection, err := emaillinks.GetLinkMarker(httpSession, r, emaillinks.LinkMarkerFlowResetPassword)
 	if err != nil {
 		httpHelper.InternalServerError(w, r, err)
 		return nil, nil
@@ -355,7 +357,8 @@ func handleResetPasswordLinkFollowed(httpHelper HttpHelper, httpSession sessions
 
 	// The marker names the code hash, not only the user: see resolveResetPasswordMarker for
 	// why a marker naming a durable id alone would be weaker than the flow it replaces.
-	rejection, err := SaveLinkMarker(httpSession, w, r, LinkMarkerFlowResetPassword, user.Id, codeHash)
+	rejection, err := emaillinks.SaveLinkMarker(httpSession, w, r,
+		emaillinks.LinkMarkerFlowResetPassword, user.Id, codeHash)
 	if err != nil {
 		httpHelper.InternalServerError(w, r, err)
 		return
@@ -378,7 +381,7 @@ func handleResetPasswordLinkFollowed(httpHelper HttpHelper, httpSession sessions
 
 	// 303 rather than 302, so the browser is required to follow with a GET regardless of
 	// what this request was, and the code is gone from the request target from here on.
-	http.Redirect(w, r, ResetPasswordPath, http.StatusSeeOther)
+	http.Redirect(w, r, emaillinks.ResetPasswordPath, http.StatusSeeOther)
 }
 
 func HandleResetPasswordPost(
@@ -454,7 +457,8 @@ func HandleResetPasswordPost(
 		// changed between the rendering and the submit: the previous marker expired and a
 		// newer link took the slot, the reset that rendered this form already completed and
 		// cleared it, or two first hops left the browser at once and the later Set-Cookie
-		// won. SaveLinkMarker cannot cover any of those, because they act after the write.
+		// won. emaillinks.SaveLinkMarker cannot cover any of those, because they act after
+		// the write.
 		//
 		// The userId audited is the marker's, which resolved: it names the account this
 		// submission would have written into, which is the useful half of the entry.
@@ -514,7 +518,7 @@ func HandleResetPasswordPost(
 		// A failure here is logged rather than answered with a 500, because the password has
 		// already changed and telling the caller the reset failed would be false. The stale
 		// marker it leaves behind resolves to nothing on its next use.
-		if err := ClearLinkMarker(httpSession, w, r); err != nil {
+		if err := emaillinks.ClearLinkMarker(httpSession, w, r); err != nil {
 			slog.ErrorContext(r.Context(), "unable to clear the reset password link marker after a completed reset",
 				"user_id", user.Id, "error", err)
 		}

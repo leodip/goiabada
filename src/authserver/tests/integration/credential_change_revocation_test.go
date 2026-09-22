@@ -12,8 +12,8 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/leodip/goiabada/authserver/internal/config"
+	"github.com/leodip/goiabada/authserver/internal/emaillinks"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
-	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
@@ -495,7 +495,7 @@ func resetPasswordFor(t *testing.T, user *models.User, newPassword string) {
 	require.NoError(t, database.UpdateUser(context.Background(), nil, fresh))
 
 	httpClient := createHttpClient(t)
-	cleanURL := followResetLink(t, httpClient, handlers.ResetPasswordLink(code))
+	cleanURL := followResetLink(t, httpClient, emaillinks.ResetPasswordLink(code))
 
 	// The form is rendered first, because the submission has to carry the continuation id
 	// the form held, exactly as a browser does.

@@ -1,4 +1,4 @@
-package handlers
+package emaillinks
 
 import (
 	"net/url"

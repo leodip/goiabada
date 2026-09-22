@@ -12,6 +12,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
+	"github.com/leodip/goiabada/authserver/internal/emaillinks"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/models"
@@ -218,7 +219,7 @@ func HandleAccountRegisterPost(
 				// every '+' and '%xx' address under form-urlencoded query parsing (#112). The
 				// helper also owns the path the activation handler redirects back to, so the
 				// two cannot drift.
-				"link": handlers.AccountActivateLink(verificationCode),
+				"link": emaillinks.AccountActivateLink(verificationCode),
 			}
 			// Pre-registration recipient has no stored locale yet; render in
 			// the originating request's locale so the activation email matches

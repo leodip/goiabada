@@ -17,6 +17,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
+	"github.com/leodip/goiabada/authserver/internal/emaillinks"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
@@ -491,7 +492,7 @@ func HandleAPIUserCreatePost(
 
 			bind := map[string]interface{}{
 				"name": name,
-				"link": handlers.ResetPasswordLink(verificationCode),
+				"link": emaillinks.ResetPasswordLink(verificationCode),
 			}
 
 			// Newly-created user has no stored Locale yet; render the
