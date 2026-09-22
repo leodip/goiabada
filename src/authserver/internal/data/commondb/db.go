@@ -201,6 +201,26 @@ func (d *CommonDatabase) RunInTransaction(ctx context.Context, fn func(tx *sql.T
 		if ctxErr := ctx.Err(); ctxErr != nil && errors.Is(err, sql.ErrTxDone) {
 			return abandoned(ctxErr, lastDeadlock)
 		}
+		// The sixth exit: a cancellation that lands while a RERUN is running. The attempt
+		// answers with the context's own error -- from BeginTx, from a statement fn issued, or
+		// from Tx.Commit's ctx.Err() arm -- which is neither a deadlock nor the sentinel above,
+		// so the arm below returned it and dropped the abort the helper was rerunning FOR. The
+		// two checks at the top of the loop cannot cover this: ctx.Err() there and the backoff's
+		// own select see only a cancellation that has ALREADY landed, never one arriving inside
+		// an attempt. Decision 13 keeps that abort reachable whenever it was the reason for the
+		// rerun, so this is a conformance gap and not a preference.
+		//
+		// Three conditions, each load-bearing. lastDeadlock is one because with nothing to join
+		// the attempt's error is already the whole answer and goes back untouched, which is what
+		// the cancelled-inside-the-body case pins. errors.Is against the context's error is one
+		// because a failure that merely COINCIDES with a cancellation -- a constraint violation
+		// on the last statement, say -- did not end the run through the context and keeps its
+		// own error, the same way the sentinel arm above requires both of its conditions. And it
+		// is err rather than ctxErr that is joined, so the statement's own wrapping survives
+		// beside the abort (#386 decision 13, final review round 2 finding 1).
+		if ctxErr := ctx.Err(); ctxErr != nil && lastDeadlock != nil && errors.Is(err, ctxErr) {
+			return abandoned(err, lastDeadlock)
+		}
 		if !d.deadlock(err) {
 			return err
 		}
@@ -210,8 +230,10 @@ func (d *CommonDatabase) RunInTransaction(ctx context.Context, fn func(tx *sql.T
 	return errs.Wrapf(lastDeadlock, "transaction aborted as a deadlock victim on all %d attempts", attempts)
 }
 
-// abandoned is what a cancelled run returns: the context's error, joined to the deadlock that was
-// the reason the helper was about to try again when there was one.
+// abandoned is what a cancelled run returns: the error carrying the cancellation, joined to the
+// deadlock that was the reason the helper was about to try again when there was one. That first
+// error is the context's own where the helper noticed the cancellation itself, and the attempt's
+// error where the attempt noticed it first, which keeps the failing statement's wrapping.
 //
 // The context error wins because it is the one that decided the outcome -- the caller is gone, and
 // nothing below chose that. The deadlock is joined rather than dropped because losing it leaves a
@@ -220,19 +242,19 @@ func (d *CommonDatabase) RunInTransaction(ctx context.Context, fn func(tx *sql.T
 // context.DeadlineExceeded, and errors.Is and errors.As still reach the engine's own abort
 // (#386 decision 13).
 //
-// A cancellation arriving INSIDE fn does not come through here. The statement's own context error
-// is not a deadlock, so the loop returns it unchanged after one attempt, which is the same answer
-// by the ordinary path.
+// A cancellation arriving INSIDE an attempt comes through here only when a deadlock is waiting to
+// be joined. With none, the statement's own context error is not a deadlock, so the loop returns it
+// unchanged after one attempt, which is the same answer by the ordinary path.
 //
 // A cancellation arriving between a SUCCESSFUL fn and the commit does come through here, and the
 // commit's sql.ErrTxDone is dropped rather than joined: unlike a deadlock it carries no fact worth
 // keeping, saying only that the transaction database/sql had already rolled back was over.
-func abandoned(ctxErr error, lastDeadlock error) error {
+func abandoned(cancelled error, lastDeadlock error) error {
 	if lastDeadlock != nil {
-		return errs.Wrap(errs.Join(ctxErr, lastDeadlock),
+		return errs.Wrap(errs.Join(cancelled, lastDeadlock),
 			"transaction abandoned after the engine aborted it as a deadlock victim")
 	}
-	return errs.Wrap(ctxErr, "transaction abandoned")
+	return errs.Wrap(cancelled, "transaction abandoned")
 }
 
 // runTransactionOnce is one attempt. Its own function so the rollback is deferred, which is
