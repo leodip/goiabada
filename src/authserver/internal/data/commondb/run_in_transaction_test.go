@@ -103,9 +103,20 @@ func oneStatement(db *CommonDatabase, ran *int) func(tx *sql.Tx) error {
 // whose statements run on the same context RunInTransaction was given, and the exit being pinned
 // is the one where the cancellation lands between the BEGIN and the statement.
 func oneStatementOn(ctx context.Context, db *CommonDatabase, ran *int) func(tx *sql.Tx) error {
+	return oneStatementCapturing(ctx, db, ran, new(error))
+}
+
+// oneStatementCapturing is oneStatementOn with the statement's own error recorded, which is what
+// the two error-IDENTITY cases need: both of the sixth exit's returned values -- the attempt
+// error returned untouched when nothing preceded it, and the same error kept inside the join when
+// a deadlock did -- are distinguishable from a lookalike only by comparing against the value
+// RunInTransaction was actually handed. On a rerun it holds the last attempt's, which is the one
+// the helper classified (#386 decision 13, final review round 3 findings 1 and 2).
+func oneStatementCapturing(ctx context.Context, db *CommonDatabase, ran *int, captured *error) func(tx *sql.Tx) error {
 	return func(tx *sql.Tx) error {
 		*ran++
 		_, err := db.ExecSql(ctx, tx, "UPDATE settings SET updated_at = updated_at")
+		*captured = err
 		return err
 	}
 }
@@ -419,6 +430,40 @@ func TestRunInTransaction_ADeadlineInsideTheBodyComesBackUnretried(t *testing.T)
 	assert.Empty(t, *requested, "and no backoff was spent on it")
 }
 
+// TestRunInTransaction_ACancellationWithNothingToJoinComesBackUntouched pins the lastDeadlock
+// condition on the sixth exit, which is the difference between the case above and the rerun case
+// below. The case above asserts what the returned error CARRIES, and a cancellation routed
+// through abandoned with nothing to join carries exactly the same things -- the deadline is still
+// reachable, one attempt was still spent, no backoff was still requested -- so it cannot tell the
+// two apart. What separates them is the wrapper: with no deadlock waiting, the statement's own
+// error is already the whole answer, and a "transaction abandoned" sentence added to it would
+// describe a run that was abandoned in favour of nothing.
+//
+// Asserted on the value rather than on the text because that is the claim decision 13 makes: the
+// error the body was handed is the error the caller gets (#386 decision 13, final review round 3
+// finding 1).
+func TestRunInTransaction_ACancellationWithNothingToJoinComesBackUntouched(t *testing.T) {
+	requested := recordBackoff(t)
+	// The same shape as the case above: one attempt, blocked inside its statement for longer
+	// than the deadline allows, so no deadlock ever reaches lastDeadlock.
+	d := &scriptedDriver{execs: []*scriptedExec{{delay: 2 * time.Second}}}
+	db := retryingDB(t, d)
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	ran := 0
+	var captured error
+
+	err := db.RunInTransaction(ctx, oneStatementCapturing(ctx, db, &ran, &captured))
+
+	require.Error(t, err)
+	require.Error(t, captured, "the statement answered, and its answer is what the helper classified")
+	assert.Equal(t, captured, err, "the attempt's own error is returned as it was, not rewrapped")
+	assert.NotContains(t, err.Error(), "transaction abandoned",
+		"nothing was abandoned in favour of anything, so nothing says so")
+	assert.Equal(t, 1, ran, "one attempt, as the case above")
+	assert.Empty(t, *requested)
+}
+
 // TestRunInTransaction_ACancelledTransactionsRollbackIsNotRecordedAsAFailure is the log half of
 // the case above, and it is a consequence of BeginTx that BeginTransaction's own tests cannot
 // see. database/sql starts a goroutine at BeginTx that rolls the transaction back as soon as the
@@ -536,7 +581,9 @@ func TestRunInTransaction_ACancellationBetweenADeadlockAndItsRerunStopsTheLoop(t
 // body, where the error to classify is sql.ErrTxDone. This is the cancellation that arrives while
 // the rerun is still inside its statement, so the attempt's own error IS the context error: not a
 // deadlock, not the sentinel, and so returned by the ordinary not-a-deadlock arm with the abort
-// that caused the rerun dropped (#386 decision 13, final review round 2 finding 1).
+// that caused the rerun dropped. It pins all three of the arm's returned facts: the deadline, the
+// joined abort, and the attempt error the join is built from (#386 decision 13, final review
+// round 2 finding 1 and round 3 finding 2).
 func TestRunInTransaction_ACancellationInsideARerunJoinsTheDeadlockItWasRerunFor(t *testing.T) {
 	requested := recordBackoff(t)
 	// The first attempt is aborted as a victim; the second blocks inside its statement for far
@@ -548,12 +595,22 @@ func TestRunInTransaction_ACancellationInsideARerunJoinsTheDeadlockItWasRerunFor
 	ctx, cancel := context.WithTimeout(context.Background(), 250*time.Millisecond)
 	defer cancel()
 	ran := 0
+	var captured error
 
-	err := db.RunInTransaction(ctx, oneStatementOn(ctx, db, &ran))
+	err := db.RunInTransaction(ctx, oneStatementCapturing(ctx, db, &ran, &captured))
 
 	require.Error(t, err)
 	assert.ErrorIs(t, err, context.DeadlineExceeded, "the deadline is what decided the outcome")
 	assert.ErrorIs(t, err, errDeadlock, "and the abort the helper was rerunning for stays reachable")
+	// The third fact, and the one the two above cannot see: it is the RERUN'S OWN ERROR that is
+	// joined and not the context's. Joining ctx.Err() instead would satisfy both assertions above
+	// -- the deadline is reachable either way, and so is the deadlock -- while dropping the
+	// failing statement's wrapping, which is the only thing in the tree that says WHERE the
+	// cancellation was noticed.
+	require.Error(t, captured, "the rerun's statement answered before the helper classified it")
+	assert.ErrorIs(t, err, captured, "the attempt's own error is what was joined, wrapping and all")
+	assert.Contains(t, captured.Error(), "unable to execute SQL", "which is the statement's wrapping")
+	assert.Contains(t, err.Error(), "unable to execute SQL", "and it survives into the joined tree")
 	assert.Contains(t, err.Error(), "transaction abandoned after the engine aborted it")
 	assert.Equal(t, 2, ran, "two attempts: the deadlock was rerun, and the rerun was the cancelled one")
 	assert.Len(t, *requested, 1, "one backoff, for the one rerun")
