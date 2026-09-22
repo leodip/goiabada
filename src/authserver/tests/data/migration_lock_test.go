@@ -6,7 +6,6 @@ import (
 	"database/sql/driver"
 	"errors"
 	"fmt"
-	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -258,13 +257,7 @@ func precreateFaultPool(t *testing.T, name string) *sql.DB {
 	t.Helper()
 	cfg := config.GetDatabase()
 
-	dsn := url.URL{
-		Scheme:   "sqlserver",
-		User:     url.UserPassword(cfg.Username, cfg.Password),
-		Host:     fmt.Sprintf("%s:%d", cfg.Host, cfg.Port),
-		RawQuery: url.Values{"database": {name}, "encrypt": {"disable"}}.Encode(),
-	}
-	connector, err := mssql.NewConnector(dsn.String())
+	connector, err := mssql.NewConnector(msSQLDatabaseDSN(cfg.Username, cfg.Password, name, cfg))
 	require.NoErrorf(t, err, "build a real SQL Server connector to %s", name)
 
 	pool := sql.OpenDB(precreateFaultConnector{Connector: connector})

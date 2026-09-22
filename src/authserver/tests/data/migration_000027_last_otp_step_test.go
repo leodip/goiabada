@@ -15,7 +15,7 @@ import (
 // TestMigration000027_LastOTPStep exercises the migration that introduces the
 // consumed-step marker that makes TOTP codes one-time-use (#111, RFC 6238 5.2). It
 // runs against an ISOLATED database of the configured dialect (see
-// migration_testdb_helper.go).
+// migration_testdb_helper_test.go).
 //
 // The properties, in the order they appear below:
 //

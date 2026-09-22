@@ -18,7 +18,7 @@ import (
 // TestMigration000029_CreatedViaDCR exercises the migration that introduces the
 // self-registration marker and backfills it from the dcr_ identifier prefix (#108).
 // It runs against an ISOLATED database of the configured dialect (see
-// migration_testdb_helper.go).
+// migration_testdb_helper_test.go).
 //
 // The properties, in the order they appear below:
 //

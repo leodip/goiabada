@@ -16,7 +16,7 @@ import (
 
 // TestMigration000046_UserSessionsUserAgent is #281's column, and it is the only tier that proves
 // the four hand-written SQL files agree. It runs against an ISOLATED database of the configured
-// dialect (see migration_testdb_helper.go), so it can look at the schema below 000046 as well as
+// dialect (see migration_testdb_helper_test.go), so it can look at the schema below 000046 as well as
 // above it.
 //
 // What is asserted:

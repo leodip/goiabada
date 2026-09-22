@@ -1,3 +1,7 @@
+// Package postgresdb is the PostgreSQL adapter: the constructor that opens, and when asked
+// creates, the application database, the migration chain PostgreSQL runs, and the handful of
+// Database methods whose SQL differs from commondb's. Everything else is promoted from the
+// embedded common implementation.
 package postgresdb
 
 import (
@@ -51,15 +55,13 @@ func NewPostgresDatabase(dbConfig *DatabaseConfig, logSQL bool) (*PostgresDataba
 	slog.Info("using database", "type", "postgres", "username", dbConfig.Username,
 		"host", dbConfig.Host, "port", dbConfig.Port, "name", dbConfig.Name)
 
-	dbURL := fmt.Sprintf("postgres://%v:%v@%v:%v/%v",
-		dbConfig.Username,
-		dbConfig.Password,
-		dbConfig.Host,
-		dbConfig.Port,
-		dbConfig.Name)
+	// The constructor owns this root, because nothing is waiting on it: the process is starting
+	// and there is no request and no operator to cancel. It is here so the ping below goes through
+	// the *Context call like every other statement this package issues (#386, #424).
+	ctx := context.Background()
 
 	// Open with database/sql for commondb compatibility
-	db, err := sql.Open("pgx", dbURL)
+	db, err := sql.Open("pgx", DSN(dbConfig))
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to open database")
 	}
@@ -73,11 +75,7 @@ func NewPostgresDatabase(dbConfig *DatabaseConfig, logSQL bool) (*PostgresDataba
 		// the 42P04 isDuplicateDatabase tolerates below: the loser returns
 		// "unable to create database" and the process exits. Two replicas starting together
 		// against a fresh server is an ordinary topology, not a hypothetical one (#293).
-		defaultDB, err := sql.Open("pgx", fmt.Sprintf("postgres://%v:%v@%v:%v/postgres",
-			dbConfig.Username,
-			dbConfig.Password,
-			dbConfig.Host,
-			dbConfig.Port))
+		defaultDB, err := sql.Open("pgx", MaintenanceDSN(dbConfig))
 		if err != nil {
 			return nil, errs.Wrap(err, "unable to connect to default database")
 		}
@@ -100,7 +98,7 @@ func NewPostgresDatabase(dbConfig *DatabaseConfig, logSQL bool) (*PostgresDataba
 		// PostgreSQL's own `database "x" does not exist (SQLSTATE 3D000)` from the
 		// constructor. Not on the creating arm, where the CREATE DATABASE above already forces
 		// the question.
-		if err := db.Ping(); err != nil {
+		if err := db.PingContext(ctx); err != nil {
 			_ = db.Close()
 			return nil, errs.Wrap(err, "unable to connect to database")
 		}

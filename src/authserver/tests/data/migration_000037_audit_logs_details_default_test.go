@@ -11,7 +11,7 @@ import (
 
 // TestMigration000037_AuditLogsDetailsDefault is goal 2 of #282 stated as a test:
 // audit_logs.details defaults to '{}' on all four engines. It runs against an ISOLATED
-// database of the configured dialect (see migration_testdb_helper.go).
+// database of the configured dialect (see migration_testdb_helper_test.go).
 //
 // The migration file exists on MySQL alone, which was the engine without the default, so
 // this test takes two shapes: MySQL goes 000035 to 000037 and back, and the other three

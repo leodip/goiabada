@@ -15,7 +15,7 @@ import (
 // TestMigration000031_OTPConfigGeneration exercises the migration that replaces the per-session
 // boolean level2_auth_config_has_changed with the per-user counter otp_config_generation and its
 // per-session snapshot (#242). It runs against an ISOLATED database of the configured dialect
-// (see migration_testdb_helper.go).
+// (see migration_testdb_helper_test.go).
 //
 // §5 seam 4 of the agreement said this seed could not be covered by any tier, on the premise that
 // migrations run before any test row exists. That premise is false in this tree: migrations 000024

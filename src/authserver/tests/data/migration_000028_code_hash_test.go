@@ -15,7 +15,7 @@ import (
 // TestMigration000028_CodeHashColumns exercises the migration that lets a reset or
 // activation link be found by an unsalted SHA-256 of its code, so the link no longer
 // carries an email address (#112). It runs against an ISOLATED database of the configured
-// dialect (see migration_testdb_helper.go).
+// dialect (see migration_testdb_helper_test.go).
 //
 // The properties, in the order they appear below:
 //

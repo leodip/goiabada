@@ -16,7 +16,7 @@ import (
 
 // TestMigration000026_CodeRevoked exercises the migration that introduces the
 // termination marker (#129). It runs against an ISOLATED database of the configured
-// dialect (see migration_testdb_helper.go).
+// dialect (see migration_testdb_helper_test.go).
 //
 // The properties, in the order they appear below:
 //

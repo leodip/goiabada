@@ -14,7 +14,7 @@ import (
 
 // TestMigration000024_AuthStateGeneration exercises the migration that introduces
 // the per-user authentication generation boundary (#106). It runs against an
-// ISOLATED database of the configured dialect (see migration_testdb_helper.go):
+// ISOLATED database of the configured dialect (see migration_testdb_helper_test.go):
 // migrate to 000023, seed a row while the column does not yet exist, apply 000024,
 // and assert.
 //
@@ -232,7 +232,7 @@ func assertExpectedIndexes000024(t *testing.T, h *isolatedDB, phase string) {
 // index000024Exists asks only whether the index is present, which is all this
 // migration needs: 000024 adds indexes to cover columns the revocation sweep filters
 // on, and any index on the right column serves that. The per-dialect catalog queries
-// live in describeIndex (migration_testdb_helper.go), which also reports column
+// live in describeIndex (migration_testdb_helper_test.go), which also reports column
 // membership and uniqueness for callers that need them, such as the 000025 test.
 func index000024Exists(t *testing.T, h *isolatedDB, table, index string) bool {
 	t.Helper()

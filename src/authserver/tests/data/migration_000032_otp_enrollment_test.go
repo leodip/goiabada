@@ -12,7 +12,7 @@ import (
 
 // TestMigration000032_OTPEnrollment exercises the migration that adds the pending TOTP enrolment
 // pair to users (#247). It runs against an ISOLATED database of the configured dialect (see
-// migration_testdb_helper.go).
+// migration_testdb_helper_test.go).
 //
 // The properties, in the order they appear below:
 //

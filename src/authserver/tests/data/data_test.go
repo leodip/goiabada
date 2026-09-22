@@ -48,7 +48,6 @@ func TestMain(m *testing.M) {
 	switch dbType {
 	case "mysql", "postgres":
 		slog.Info("config.DBUsername=" + config.GetDatabase().Username)
-		slog.Info("config.DBPassword=" + config.GetDatabase().Password)
 		slog.Info("config.DBHost=" + config.GetDatabase().Host)
 		slog.Info("config.DBPort=" + fmt.Sprintf("%d", config.GetDatabase().Port))
 		slog.Info("config.DBName=" + config.GetDatabase().Name)

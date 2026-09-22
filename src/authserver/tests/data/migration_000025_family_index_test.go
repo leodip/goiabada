@@ -13,7 +13,7 @@ const familyIndexName000025 = "idx_refresh_tokens_first_refresh_token_jti"
 
 // TestMigration000025_RefreshTokenFamilyIndex exercises the migration that indexes
 // the rotation family identifier (#128). It runs against an ISOLATED database of the
-// configured dialect (see migration_testdb_helper.go): migrate to 000024, assert the
+// configured dialect (see migration_testdb_helper_test.go): migrate to 000024, assert the
 // index is absent, apply 000025, and assert.
 //
 // The assertions worth explaining:
