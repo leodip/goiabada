@@ -116,7 +116,7 @@ resource-permissions page.
 | Code | Args | English message |
 |---|---|---|
 | `validator.password.too_short` | `min` (int) | The minimum length for the password is {{.min}} characters |
-| `validator.password.too_long` | `max` (int) | The maximum length for the password is {{.max}} characters |
+| `validator.password.too_long` | `max` (int) | The password can be at most {{.max}} bytes long. Accented and other non-English characters count as two or more bytes each. |
 | `validator.password.lowercase_required` | (none) | As per our policy, a lowercase character is required in the password. |
 | `validator.password.uppercase_required` | (none) | As per our policy, an uppercase character is required in the password. |
 | `validator.password.number_required` | (none) | As per our policy, your password must contain a numerical digit. |

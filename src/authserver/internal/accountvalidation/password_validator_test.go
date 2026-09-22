@@ -7,8 +7,10 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestPasswordValidator_ValidatePassword(t *testing.T) {
@@ -32,8 +34,32 @@ func TestPasswordValidator_ValidatePassword(t *testing.T) {
 
 		t.Run("TooLong", func(t *testing.T) {
 			err := validator.ValidatePassword(ctx, strings.Repeat("a", 65))
-			assertLocalizedError(t, err, i18n.ErrCodePasswordTooLong,
-				"The maximum length for the password is 64 characters")
+			assertLocalizedError(t, err, i18n.ErrCodePasswordTooLong, tooLongSentence)
+		})
+
+		// Accented rows either side of both bounds. "é" is one character and two bytes, so the
+		// same string can be long enough in characters and too long in bytes (#409).
+		t.Run("AccentedBelowMinimum", func(t *testing.T) {
+			err := validator.ValidatePassword(ctx, strings.Repeat("é", 5))
+			assertLocalizedError(t, err, i18n.ErrCodePasswordTooShort,
+				"The minimum length for the password is 6 characters")
+		})
+
+		t.Run("AccentedAtMinimum", func(t *testing.T) {
+			assert.NoError(t, validator.ValidatePassword(ctx, strings.Repeat("é", 6)))
+		})
+
+		t.Run("AccentedAtMaximum", func(t *testing.T) {
+			assert.NoError(t, validator.ValidatePassword(ctx, strings.Repeat("é", 32)))
+		})
+
+		t.Run("AccentedOverMaximum", func(t *testing.T) {
+			err := validator.ValidatePassword(ctx, strings.Repeat("é", 33))
+			assertLocalizedError(t, err, i18n.ErrCodePasswordTooLong, tooLongSentence)
+		})
+
+		t.Run("ASCIIAtMaximum", func(t *testing.T) {
+			assert.NoError(t, validator.ValidatePassword(ctx, strings.Repeat("a", 64)))
 		})
 	})
 
@@ -89,6 +115,35 @@ func TestPasswordValidator_ValidatePassword(t *testing.T) {
 		})
 	})
 }
+
+// TestPasswordValidator_MaximumIsWithinBcrypt holds #409 item 3: no password a form or the API
+// accepts is one bcrypt refuses to hash. Held twice, by the constant and by behaviour under every
+// policy, so a maximum raised past bcrypt's bound fails here whichever way it is raised.
+func TestPasswordValidator_MaximumIsWithinBcrypt(t *testing.T) {
+	assert.LessOrEqual(t, maxPasswordBytes, passwordhash.MaxPasswordBytes)
+
+	validator := NewPasswordValidator()
+	// Satisfies every policy's character classes, so only the length can refuse it.
+	overBcrypt := "Aa1!" + strings.Repeat("a", passwordhash.MaxPasswordBytes+1-4)
+	require.Len(t, overBcrypt, passwordhash.MaxPasswordBytes+1)
+
+	for _, policy := range []models.PasswordPolicy{
+		models.PasswordPolicyNone, models.PasswordPolicyLow, models.PasswordPolicyMedium, models.PasswordPolicyHigh,
+	} {
+		t.Run(policy.String(), func(t *testing.T) {
+			ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &models.Settings{
+				PasswordPolicy: policy,
+			})
+			err := validator.ValidatePassword(ctx, overBcrypt)
+			assertLocalizedError(t, err, i18n.ErrCodePasswordTooLong, tooLongSentence)
+		})
+	}
+}
+
+// tooLongSentence is the English catalog's too-long message at the validator's maximum. It says
+// bytes, because the maximum counts them.
+const tooLongSentence = "The password can be at most 64 bytes long. " +
+	"Accented and other non-English characters count as two or more bytes each."
 
 func TestPasswordValidator_ContainsLowerCase(t *testing.T) {
 	validator := NewPasswordValidator()

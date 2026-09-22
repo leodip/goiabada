@@ -35,7 +35,7 @@ Used only on first startup:
     <tr>
       <td style="white-space: nowrap;"><code>GOIABADA_ADMIN_PASSWORD</code><br/><code>--admin-password</code></td>
       <td><code>changeme</code></td>
-      <td>Password for initial admin user</td>
+      <td>Password for initial admin user. At most 72 bytes, bcrypt's limit: a non-ASCII character counts as two to four, and startup refuses a longer password</td>
     </tr>
     <tr>
       <td style="white-space: nowrap;"><code>GOIABADA_APPNAME</code><br/><code>--appname</code></td>

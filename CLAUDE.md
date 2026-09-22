@@ -381,9 +381,11 @@ a walk that reached nothing into `Fatalf`. The reporting half takes a `testutil.
 exported `Assert*` keeps its `*testing.T` and delegates, so no caller moves. Both halves are then
 driven from a rule test: the finder directly, the reporting half through `testutil.RunGuard`, which
 runs it on its own goroutine so a recorded `Fatalf` ends it in `runtime.Goexit` the way the real one
-does. Twenty-two guards follow this -- twelve in `core/testutil`, plus `authserver/internal/data`'s
+does. Twenty-three guards follow this -- twelve in `core/testutil`, plus `authserver/internal/data`'s
 begin-transaction, benign-sentinel, page-offset, id-list-bound, transaction-pass-through and
-SQL-context lints, the auth server's API error-code and audit-catalog lints, and the two import
+SQL-context lints, the auth server's API error-code and audit-catalog lints, its discarded-error lint
+in `internal/server`, which refuses `_` in the error position of a hash, encryption or
+key-generation call (#409), and the two import
 rules #387 added: `models/import_lint_test.go`, which holds that package to the standard library,
 `core/constants` and `core/errs`, and `handlers/child_package_import_lint_test.go`, which holds
 `apihandlers` and `accounthandlers` to naming no import of the parent -- both parse imports with

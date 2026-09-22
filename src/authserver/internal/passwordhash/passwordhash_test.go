@@ -1,9 +1,12 @@
 package passwordhash
 
 import (
+	"errors"
+	"strings"
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
+	"golang.org/x/crypto/bcrypt"
 )
 
 func TestHash(t *testing.T) {
@@ -14,8 +17,12 @@ func TestHash(t *testing.T) {
 	}{
 		{"Normal password", "password123", false},
 		{"Empty password", "", false},
-		{"Max length password", fake.LetterN(72), false},
-		{"Exceeds max length", fake.LetterN(73), true},
+		{"Max length password", fake.LetterN(MaxPasswordBytes), false},
+		{"Exceeds max length", fake.LetterN(MaxPasswordBytes + 1), true},
+		// 36 two-byte characters are 72 bytes and pass; 37 are 74 and do not, although both
+		// are far fewer than 72 characters. The bound is bcrypt's, and bcrypt counts bytes.
+		{"Max length in two-byte characters", strings.Repeat("é", MaxPasswordBytes/2), false},
+		{"Exceeds max length in two-byte characters", strings.Repeat("é", MaxPasswordBytes/2+1), true},
 	}
 
 	for _, tt := range tests {
@@ -24,6 +31,9 @@ func TestHash(t *testing.T) {
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Hash() error = %v, wantErr %v", err, tt.wantErr)
 				return
+			}
+			if tt.wantErr && !errors.Is(err, bcrypt.ErrPasswordTooLong) {
+				t.Errorf("Hash() error = %v, want it to wrap bcrypt.ErrPasswordTooLong", err)
 			}
 			if !tt.wantErr && got == "" {
 				t.Errorf("Hash() returned empty string")
@@ -53,6 +63,25 @@ func TestVerify(t *testing.T) {
 				t.Errorf("Verify() = %v, want %v", got, tt.wantVerified)
 			}
 		})
+	}
+}
+
+// TestVerify_ReadsTheFirstMaxPasswordBytes pins what Verify's doc comment says bcrypt does past
+// the bound: the comparison reads the first MaxPasswordBytes bytes and no more, so a longer input
+// matches the hash of its own prefix. Nothing stores a hash of a longer password, which is why
+// every path that hashes one checks the bound first rather than relying on this (#409).
+func TestVerify_ReadsTheFirstMaxPasswordBytes(t *testing.T) {
+	prefix := fake.LetterN(MaxPasswordBytes)
+	hashed, err := Hash(prefix)
+	if err != nil {
+		t.Fatalf("Hash() error = %v", err)
+	}
+
+	if !Verify(hashed, prefix+"x") {
+		t.Error("Verify() = false for the stored password plus one byte; bcrypt compares only the first 72")
+	}
+	if Verify(hashed, prefix[:MaxPasswordBytes-1]) {
+		t.Error("Verify() = true for the stored password less its last byte")
 	}
 }
 
