@@ -21,7 +21,7 @@ const (
 
 // TestMigration000048_DropOtpSecret exercises the migration that removes users.otp_secret, the
 // plaintext TOTP seed column (#98, #262), against a REAL engine of the configured dialect (see
-// migration_testdb_helper.go).
+// migration_testdb_helper_test.go).
 //
 // Four engines matter here rather than one. The column's declared type differs on every one of
 // them -- TEXT, varchar(64), character varying(64), nvarchar(64) -- so the up statement is written

@@ -14,7 +14,7 @@ const refreshTokensClientIdIndex000036 = "idx_refresh_tokens_client_id"
 
 // TestMigration000036_RefreshTokensClientIdIndex is goal 1 of #282 stated as a test:
 // refresh_tokens(client_id) is indexed on all four engines. It runs against an ISOLATED
-// database of the configured dialect (see migration_testdb_helper.go).
+// database of the configured dialect (see migration_testdb_helper_test.go).
 //
 // The migration file exists on SQLite alone, because the other three already have the
 // index, so this test takes two shapes. On SQLite it is the usual migration shape: absent

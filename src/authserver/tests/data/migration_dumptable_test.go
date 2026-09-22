@@ -12,7 +12,7 @@ import (
 )
 
 // TestDumpTable_ReadsTheCatalog is the control for dumpTable (see
-// migration_testdb_helper.go). The dumper's own failure mode is the one that matters to
+// migration_testdb_helper_test.go). The dumper's own failure mode is the one that matters to
 // the migration tests that lean on it: a per-engine branch that silently reports nothing
 // makes a before-and-after comparison read as "nothing changed" and pass. Every
 // assertion below is chosen so that a projection which under-reports, or reports a

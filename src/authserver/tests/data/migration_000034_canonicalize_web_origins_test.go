@@ -40,7 +40,7 @@ type repair000034 struct {
 // stored web origins into the exact string a browser sends in an Origin header,
 // deletes the rows no conversion can reach, and adds UNIQUE (origin, client_id)
 // (#250). It runs against an ISOLATED database of the configured dialect (see
-// migration_testdb_helper.go).
+// migration_testdb_helper_test.go).
 //
 // This is the tier that matters for this file. The repair is string surgery
 // written four different ways in four different dialects, and decision 10 records

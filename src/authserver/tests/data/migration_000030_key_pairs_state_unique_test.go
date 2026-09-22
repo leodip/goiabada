@@ -15,7 +15,7 @@ const keyPairsStateIndex000030 = "idx_key_pairs_state"
 
 // TestMigration000030_KeyPairsStateUnique exercises the migration that makes
 // key_pairs hold at most one row per state (#251). It runs against an ISOLATED
-// database of the configured dialect (see migration_testdb_helper.go): seed
+// database of the configured dialect (see migration_testdb_helper_test.go): seed
 // duplicates at 000029, apply 000030, and assert what survived and what the index
 // now refuses.
 //

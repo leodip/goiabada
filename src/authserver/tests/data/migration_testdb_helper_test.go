@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -20,25 +19,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/data/schemadump"
 	"github.com/leodip/goiabada/authserver/internal/data/sqlitedb"
 	"github.com/stretchr/testify/require"
-)
-
-// The collations migration 000040 moves between. MySQL and SQL Server only: SQLite compares
-// BINARY and PostgreSQL's en_US.utf8 is deterministic, so both already answer `=` the way
-// #283 asks for and neither has a 000040 file.
-//
-// Declared HERE rather than beside the 000040 test because this file is the package's only
-// non-test file, so it cannot see a constant a _test.go file declares, and
-// assertCreatedDatabaseCollation below needs the same two target names the migration test
-// asserts columns against. One definition is the point: the constructor and the migration have
-// to land on the same collation or a fresh install and a migrated one disagree, which is
-// exactly what #283 decision 4 is about.
-const (
-	mysqlCollationBefore000040        = "utf8mb4_0900_ai_ci"
-	mysqlUnicodeCollationBefore000040 = "utf8mb4_unicode_ci"
-	mysqlCollationAfter000040         = "utf8mb4_0900_as_cs"
-
-	mssqlCollationBefore000040 = "Latin1_General_100_CI_AI_SC_UTF8"
-	mssqlCollationAfter000040  = "Latin1_General_100_CS_AS_KS_WS_SC_UTF8"
 )
 
 // isolatedDB is a throwaway database of the CONFIGURED dialect, used by
@@ -302,9 +282,7 @@ func (s tableShape) foreignKey(t *testing.T, column string) foreignKeyShape {
 }
 
 func dropMySQL(t *testing.T, cfg *config.DatabaseConfig, name string) {
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/?charset=utf8mb4&parseTime=True&loc=UTC",
-		cfg.Username, cfg.Password, cfg.Host, cfg.Port)
-	sqlDB, err := sql.Open("mysql", dsn)
+	sqlDB, err := sql.Open("mysql", mySQLServerDSN(cfg.Username, cfg.Password, cfg))
 	if err != nil {
 		t.Logf("dropMySQL open: %v", err)
 		return
@@ -319,9 +297,7 @@ func dropMySQL(t *testing.T, cfg *config.DatabaseConfig, name string) {
 }
 
 func dropPostgres(t *testing.T, cfg *config.DatabaseConfig, name string) {
-	dsn := fmt.Sprintf("postgres://%s:%s@%s:%d/postgres",
-		cfg.Username, cfg.Password, cfg.Host, cfg.Port)
-	sqlDB, err := sql.Open("pgx", dsn)
+	sqlDB, err := sql.Open("pgx", postgresMaintenanceDSN(cfg.Username, cfg.Password, cfg))
 	if err != nil {
 		t.Logf("dropPostgres open: %v", err)
 		return
@@ -395,18 +371,11 @@ func newPreCreatedMsSQLDB(t *testing.T, collation string) *isolatedDB {
 }
 
 // msSQLMasterDSN is the connection string for the master database, which is where a
-// database is created and dropped from.
+// database is created and dropped from, as the tier's own login.
 func msSQLMasterDSN(cfg *config.DatabaseConfig) string {
-	q := url.Values{}
-	q.Add("database", "master")
-	q.Add("encrypt", "disable")
-	u := url.URL{
-		Scheme:   "sqlserver",
-		User:     url.UserPassword(cfg.Username, cfg.Password),
-		Host:     fmt.Sprintf("%s:%d", cfg.Host, cfg.Port),
-		RawQuery: q.Encode(),
-	}
-	return u.String()
+	return mssqldb.MaintenanceDSN(&mssqldb.DatabaseConfig{
+		Username: cfg.Username, Password: cfg.Password, Host: cfg.Host, Port: cfg.Port,
+	})
 }
 
 func dropMsSQL(t *testing.T, cfg *config.DatabaseConfig, name string) {
@@ -465,16 +434,21 @@ func restrictedLoginName() string {
 }
 
 // mySQLServerDSN is a connection to the server with no database selected, which is both what
-// the fixture administers through and what NewMySQLDatabase's maintenance connection uses.
+// the fixture administers through and what NewMySQLDatabase's maintenance connection uses:
+// mysqldb.MaintenanceDSN, as the credential given rather than the configured one.
 func mySQLServerDSN(username, password string, cfg *config.DatabaseConfig) string {
-	return fmt.Sprintf("%s:%s@tcp(%s:%d)/?charset=utf8mb4&parseTime=True&loc=UTC",
-		username, password, cfg.Host, cfg.Port)
+	return mysqldb.MaintenanceDSN(&mysqldb.DatabaseConfig{
+		Username: username, Password: password, Host: cfg.Host, Port: cfg.Port,
+	})
 }
 
 // postgresMaintenanceDSN is a connection to the postgres database, which is both what the
-// fixture administers through and what NewPostgresDatabase's maintenance connection uses.
+// fixture administers through and what NewPostgresDatabase's maintenance connection uses:
+// postgresdb.MaintenanceDSN, as the credential given rather than the configured one.
 func postgresMaintenanceDSN(username, password string, cfg *config.DatabaseConfig) string {
-	return fmt.Sprintf("postgres://%s:%s@%s:%d/postgres", username, password, cfg.Host, cfg.Port)
+	return postgresdb.MaintenanceDSN(&postgresdb.DatabaseConfig{
+		Username: username, Password: password, Host: cfg.Host, Port: cfg.Port,
+	})
 }
 
 // newRestrictedLoginDB pre-creates an isolated database and a credential that cannot create
@@ -646,16 +620,9 @@ func (r *restrictedLoginDB) connectionCount(t *testing.T) int {
 
 // msSQLDatabaseDSN is the connection string for a named database rather than master.
 func msSQLDatabaseDSN(username, password, name string, cfg *config.DatabaseConfig) string {
-	q := url.Values{}
-	q.Add("database", name)
-	q.Add("encrypt", "disable")
-	u := url.URL{
-		Scheme:   "sqlserver",
-		User:     url.UserPassword(username, password),
-		Host:     fmt.Sprintf("%s:%d", cfg.Host, cfg.Port),
-		RawQuery: q.Encode(),
-	}
-	return u.String()
+	return mssqldb.DSN(&mssqldb.DatabaseConfig{
+		Username: username, Password: password, Host: cfg.Host, Port: cfg.Port, Name: name,
+	})
 }
 
 // mustExec runs a fixture statement and fails the test with the statement in the message when

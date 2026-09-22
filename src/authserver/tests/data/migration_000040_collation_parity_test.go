@@ -11,6 +11,23 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// The collations migration 000040 moves between. MySQL and SQL Server only: SQLite compares
+// BINARY and PostgreSQL's en_US.utf8 is deterministic, so both already answer `=` the way
+// #283 asks for and neither has a 000040 file.
+//
+// assertCreatedDatabaseCollation in migration_testdb_helper_test.go reads the two targets too.
+// One definition is the point: the constructor and the migration have to land on the same
+// collation or a fresh install and a migrated one disagree, which is exactly what #283
+// decision 4 is about.
+const (
+	mysqlCollationBefore000040        = "utf8mb4_0900_ai_ci"
+	mysqlUnicodeCollationBefore000040 = "utf8mb4_unicode_ci"
+	mysqlCollationAfter000040         = "utf8mb4_0900_as_cs"
+
+	mssqlCollationBefore000040 = "Latin1_General_100_CI_AI_SC_UTF8"
+	mssqlCollationAfter000040  = "Latin1_General_100_CS_AS_KS_WS_SC_UTF8"
+)
+
 // mysqlUnicodeTables000040 are the three tables 000008, 000014 and 000018 built at
 // utf8mb4_unicode_ci while the other 22 were built at utf8mb4_0900_ai_ci. They matter twice:
 // the before-dump has to expect their collation rather than the majority one, and the down

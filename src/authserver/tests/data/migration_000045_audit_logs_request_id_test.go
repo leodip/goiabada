@@ -11,7 +11,7 @@ import (
 
 // TestMigration000045_AuditLogsRequestId is the storage half of #328 as a test: audit_logs gains
 // request_id, NOT NULL with an empty-string default and indexed, on all four engines. It runs
-// against an ISOLATED database of the configured dialect (see migration_testdb_helper.go).
+// against an ISOLATED database of the configured dialect (see migration_testdb_helper_test.go).
 //
 // What is asserted, and what deliberately is not:
 //

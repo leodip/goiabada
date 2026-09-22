@@ -43,7 +43,7 @@ func migratedIsolatedDB(t *testing.T) *isolatedDB {
 // Both compare "=" exactly, and the password form and the ROPC grant each look the account up
 // by the lowercased address, so the two spellings never met.
 //
-// It runs against an ISOLATED database (see migration_testdb_helper.go) because it seeds a
+// It runs against an ISOLATED database (see migration_testdb_helper_test.go) because it seeds a
 // whole deployment, which the shared test database already has.
 //
 // The stored value is asserted, not merely the lookup. On MySQL and SQL Server the lookup

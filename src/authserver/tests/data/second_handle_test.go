@@ -30,11 +30,14 @@ var (
 // chain and the startup data tasks, both idempotent and both no-ops against an already migrated
 // catalog, but neither is free and mssql in particular does not enjoy being asked repeatedly.
 //
-// CALL IT BEFORE OPENING ANY TRANSACTION. The startup tasks write users (the OTP secret backfill
-// is an UPDATE on that table), so a handle first built while the calling test holds a users row
-// queues behind that test's own lock, times out after InnoDB's 50 seconds, and the error is then
-// cached by the Once for every later test in the package. Every test here therefore takes the
-// handle on its first line, before it holds anything.
+// CALL IT BEFORE OPENING ANY TRANSACTION. Construction reads the database it is about to share
+// with the calling test: it takes the migration lock, reads schema_migrations, and, when
+// GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS is set, reads key_pairs for the rotation canary, which SQL
+// Server under READ COMMITTED without RCSI answers only after any uncommitted key_pairs write
+// commits. A handle first built while the calling test holds such a write waits on that test's
+// own lock, and the Once then caches the error for every later test in the package. Every test
+// here therefore takes the handle on its first line, before it holds anything. (The rule once
+// rested on the OTP secret backfill, an UPDATE on users, which #359 deleted.)
 //
 // What it does NOT give is more concurrency than production has. The authserver builds one
 // data.Database, so a SQLite deployment runs the whole process on a single connection and the

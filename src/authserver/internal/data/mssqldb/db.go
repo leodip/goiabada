@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"net/url"
 	"strings"
 
 	"github.com/huandu/go-sqlbuilder"
@@ -51,28 +50,21 @@ func NewMsSQLDatabase(dbConfig *DatabaseConfig, logSQL bool) (*MsSQLDatabase, er
 	slog.Info("using database", "type", "mssql", "username", dbConfig.Username,
 		"host", dbConfig.Host, "port", dbConfig.Port, "name", dbConfig.Name)
 
-	// SQL Server connection string format
-	queryParams := url.Values{}
-	queryParams.Add("database", "master") // Connect to master first to create DB
-	queryParams.Add("encrypt", "disable") // Disable encryption requirement
+	// The constructor owns this root, because nothing is waiting on it: the process is starting
+	// and there is no request and no operator to cancel. It is here so the two pings below go
+	// through the *Context call like every other statement this package issues (#386, #424).
+	ctx := context.Background()
 
 	if dbConfig.Create {
-		connStringMaster := url.URL{
-			Scheme:   "sqlserver",
-			User:     url.UserPassword(dbConfig.Username, dbConfig.Password),
-			Host:     fmt.Sprintf("%s:%d", dbConfig.Host, dbConfig.Port),
-			RawQuery: queryParams.Encode(),
-		}
-
 		// Connect to master database first
-		masterDB, err := sql.Open("sqlserver", connStringMaster.String())
+		masterDB, err := sql.Open("sqlserver", MaintenanceDSN(dbConfig))
 		if err != nil {
 			return nil, errs.Wrap(err, "unable to open master database")
 		}
 		defer func() { _ = masterDB.Close() }() // Ensure we close the master connection
 
 		// Test the connection
-		err = masterDB.Ping()
+		err = masterDB.PingContext(ctx)
 		if err != nil {
 			return nil, errs.Wrap(err, "unable to connect to master database")
 		}
@@ -88,17 +80,8 @@ func NewMsSQLDatabase(dbConfig *DatabaseConfig, logSQL bool) (*MsSQLDatabase, er
 		slog.Info("database creation is disabled, so the database must already exist", "setting", "GOIABADA_DB_CREATE")
 	}
 
-	// Now connect to the actual database
-	queryParams.Set("database", dbConfig.Name)
-	connString := url.URL{
-		Scheme:   "sqlserver",
-		User:     url.UserPassword(dbConfig.Username, dbConfig.Password),
-		Host:     fmt.Sprintf("%s:%d", dbConfig.Host, dbConfig.Port),
-		RawQuery: queryParams.Encode(),
-	}
-
 	// Connect to the actual database
-	db, err := sql.Open("sqlserver", connString.String())
+	db, err := sql.Open("sqlserver", DSN(dbConfig))
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to open database")
 	}
@@ -106,7 +89,7 @@ func NewMsSQLDatabase(dbConfig *DatabaseConfig, logSQL bool) (*MsSQLDatabase, er
 	// Test the connection to the application database. This is also what makes an absent
 	// database the constructor's error rather than the migrator's on the skipping arm: SQL
 	// Server answers "Cannot open database ... requested by the login" here (#293).
-	err = db.Ping()
+	err = db.PingContext(ctx)
 	if err != nil {
 		_ = db.Close()
 		return nil, errs.Wrap(err, "unable to connect to database")

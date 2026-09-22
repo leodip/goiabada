@@ -17,7 +17,7 @@ import (
 // TestMigration000021_CountryData exercises the data migration that moves stored
 // user phone-country and address-country values from the biter777 dataset to the
 // datahub dataset. It runs against an ISOLATED database of the configured dialect
-// (see migration_testdb_helper.go): bring the schema to head, force the version
+// (see migration_testdb_helper_test.go): bring the schema to head, force the version
 // marker back to 000020, seed pre-migration rows covering every branch of the state
 // hierarchy, run 000021 against them, and assert. Then it re-runs 000021 (forcing the
 // marker back again) to prove idempotency / restart-safety.

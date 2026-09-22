@@ -38,7 +38,7 @@ var nvarcharColumns000038 = []struct {
 // Server columns declared VARCHAR become NVARCHAR, and the auto-named default constraint
 // on clients.include_open_id_connect_claims_in_id_token is replaced by a named one. It
 // runs against an ISOLATED database of the configured dialect (see
-// migration_testdb_helper.go).
+// migration_testdb_helper_test.go).
 //
 // SQL Server only. The other three engines have no non-Unicode string type to migrate away
 // from: SQLite has one TEXT type, MySQL's tables are utf8mb4 throughout, and PostgreSQL's

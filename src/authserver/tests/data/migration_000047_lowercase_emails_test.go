@@ -81,7 +81,7 @@ func engineName000047() string {
 
 // TestMigration000047_LowercaseEmails exercises the migration that replaced
 // commondb.BackfillLowercaseEmails, and the pre-flight that guards it, against a REAL engine of
-// the configured dialect (see migration_testdb_helper.go).
+// the configured dialect (see migration_testdb_helper_test.go).
 //
 // This is the tier that matters for this change. The whole design rests on a claim about SQL that
 // only a live engine can settle: that `LOWER()` means four different things, and that the Go-side

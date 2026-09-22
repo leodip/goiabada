@@ -23,10 +23,10 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	_ "github.com/go-sql-driver/mysql"
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -66,7 +66,7 @@ func targets() []target {
 // withOverrides applies GOIABADA_SCHEMADUMP_<ENGINE>_{HOST,PORT,USERNAME,PASSWORD}, so the
 // command runs somewhere the compose service names do not resolve without editing it.
 func (t target) withOverrides() (target, error) {
-	prefix := "GOIABADA_SCHEMADUMP_" + up(string(t.dialect)) + "_"
+	prefix := "GOIABADA_SCHEMADUMP_" + strings.ToUpper(string(t.dialect)) + "_"
 	if v, ok := os.LookupEnv(prefix + "HOST"); ok {
 		t.host = v
 	}
@@ -86,14 +86,28 @@ func (t target) withOverrides() (target, error) {
 	return t, nil
 }
 
-func up(s string) string {
-	out := []byte(s)
-	for i := range out {
-		if out[i] >= 'a' && out[i] <= 'z' {
-			out[i] -= 'a' - 'A'
-		}
+// mysqlConfig, postgresConfig and mssqlConfig are the engine configs this target's scratch
+// database is created through, which is also what the engine's own DSN builders take for the
+// drop: one mapping, so the constructor and the cleanup connect with the same credentials (#424).
+func (t target) mysqlConfig(name string) *mysqldb.DatabaseConfig {
+	return &mysqldb.DatabaseConfig{
+		Type: "mysql", Username: t.username, Password: t.password,
+		Host: t.host, Port: t.port, Name: name, Create: true,
 	}
-	return string(out)
+}
+
+func (t target) postgresConfig(name string) *postgresdb.DatabaseConfig {
+	return &postgresdb.DatabaseConfig{
+		Type: "postgres", Username: t.username, Password: t.password,
+		Host: t.host, Port: t.port, Name: name, Create: true,
+	}
+}
+
+func (t target) mssqlConfig(name string) *mssqldb.DatabaseConfig {
+	return &mssqldb.DatabaseConfig{
+		Type: "mssql", Username: t.username, Password: t.password,
+		Host: t.host, Port: t.port, Name: name, Create: true,
+	}
 }
 
 func main() {
@@ -173,8 +187,8 @@ func dumpOne(t target) ([]byte, error) {
 }
 
 // migratable is what the four concrete database types have in common here. Declared over the
-// two methods this command calls rather than over data.Database, whose seventy-odd methods
-// none of this needs.
+// one method this command calls on them rather than over data.Database, whose two hundred-odd
+// methods none of this needs.
 type migratable interface {
 	Migrate(ctx context.Context) error
 }
@@ -201,47 +215,38 @@ func open(t target, name string) (migratable, *sql.DB, func(), error) {
 		return db, db.DB, func() { _ = db.DB.Close(); _ = os.RemoveAll(dir) }, nil
 
 	case schemadump.MySQL:
-		db, err := mysqldb.NewMySQLDatabase(&mysqldb.DatabaseConfig{
-			Type: "mysql", Username: t.username, Password: t.password,
-			Host: t.host, Port: t.port, Name: name, Create: true,
-		}, false)
+		cfg := t.mysqlConfig(name)
+		db, err := mysqldb.NewMySQLDatabase(cfg, false)
 		if err != nil {
 			return nil, nil, nil, err
 		}
 		return db, db.DB, func() {
 			_ = db.DB.Close()
-			dropDatabase("mysql",
-				fmt.Sprintf("%s:%s@tcp(%s:%d)/?charset=utf8mb4&parseTime=True&loc=UTC", t.username, t.password, t.host, t.port),
-				"DROP DATABASE IF EXISTS "+name, name)
+			dropDatabase("mysql", mysqldb.MaintenanceDSN(cfg), "DROP DATABASE IF EXISTS "+name, name)
 		}, nil
 
 	case schemadump.Postgres:
-		db, err := postgresdb.NewPostgresDatabase(&postgresdb.DatabaseConfig{
-			Type: "postgres", Username: t.username, Password: t.password,
-			Host: t.host, Port: t.port, Name: name, Create: true,
-		}, false)
+		cfg := t.postgresConfig(name)
+		db, err := postgresdb.NewPostgresDatabase(cfg, false)
 		if err != nil {
 			return nil, nil, nil, err
 		}
 		return db, db.DB, func() {
 			_ = db.DB.Close()
 			// FORCE terminates lingering connections (PostgreSQL 13+).
-			dropDatabase("pgx",
-				fmt.Sprintf("postgres://%s:%s@%s:%d/postgres", t.username, t.password, t.host, t.port),
+			dropDatabase("pgx", postgresdb.MaintenanceDSN(cfg),
 				fmt.Sprintf("DROP DATABASE IF EXISTS %s WITH (FORCE)", name), name)
 		}, nil
 
 	case schemadump.MSSQL:
-		db, err := mssqldb.NewMsSQLDatabase(&mssqldb.DatabaseConfig{
-			Type: "mssql", Username: t.username, Password: t.password,
-			Host: t.host, Port: t.port, Name: name, Create: true,
-		}, false)
+		cfg := t.mssqlConfig(name)
+		db, err := mssqldb.NewMsSQLDatabase(cfg, false)
 		if err != nil {
 			return nil, nil, nil, err
 		}
 		return db, db.DB, func() {
 			_ = db.DB.Close()
-			dropDatabase("sqlserver", msSQLMasterDSN(t),
+			dropDatabase("sqlserver", mssqldb.MaintenanceDSN(cfg),
 				fmt.Sprintf("IF DB_ID(N'%s') IS NOT NULL BEGIN ALTER DATABASE [%s] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE [%s]; END",
 					name, name, name), name)
 		}, nil
@@ -270,21 +275,6 @@ func dropDatabase(driver, dsn, stmt, name string) {
 	if _, err := sqlDB.ExecContext(ctx, stmt); err != nil {
 		fmt.Fprintf(os.Stderr, "schemadump: could not drop the scratch database %s: %v\n", name, err)
 	}
-}
-
-// msSQLMasterDSN is the connection string for the master database, which is where a database
-// is created and dropped from.
-func msSQLMasterDSN(t target) string {
-	q := url.Values{}
-	q.Add("database", "master")
-	q.Add("encrypt", "disable")
-	u := url.URL{
-		Scheme:   "sqlserver",
-		User:     url.UserPassword(t.username, t.password),
-		Host:     fmt.Sprintf("%s:%d", t.host, t.port),
-		RawQuery: q.Encode(),
-	}
-	return u.String()
 }
 
 // scratchName is unique to this process, so two runs against one server cannot collide and

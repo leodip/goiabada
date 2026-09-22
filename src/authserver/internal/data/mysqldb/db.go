@@ -51,26 +51,13 @@ func NewMySQLDatabase(dbConfig *DatabaseConfig, logSQL bool) (*MySQLDatabase, er
 
 	// The constructor owns this root, because nothing is waiting on it: the process is starting
 	// and there is no request and no operator to cancel. What the context buys here is that the
-	// CREATE DATABASE below goes through the *Context calls like every other statement this
+	// CREATE DATABASE and the ping below go through the *Context calls like every other statement this
 	// package issues, so the shape has no exception to remember and no exemption to maintain
 	// (#386).
 	ctx := context.Background()
 
-	dsnWithoutDBname := fmt.Sprintf("%v:%v@tcp(%v:%v)/?charset=utf8mb4&parseTime=True&loc=UTC",
-		dbConfig.Username,
-		dbConfig.Password,
-		dbConfig.Host,
-		dbConfig.Port)
-
-	dsnWithDBname := fmt.Sprintf("%v:%v@tcp(%v:%v)/%v?charset=utf8mb4&parseTime=True&loc=UTC&multiStatements=true",
-		dbConfig.Username,
-		dbConfig.Password,
-		dbConfig.Host,
-		dbConfig.Port,
-		dbConfig.Name)
-
 	if dbConfig.Create {
-		tempDB, err := sql.Open("mysql", dsnWithoutDBname)
+		tempDB, err := sql.Open("mysql", MaintenanceDSN(dbConfig))
 		if err != nil {
 			return nil, errs.Wrap(err, "unable to open database")
 		}
@@ -106,7 +93,7 @@ func NewMySQLDatabase(dbConfig *DatabaseConfig, logSQL bool) (*MySQLDatabase, er
 		slog.Info("database creation is disabled, so the database must already exist", "setting", "GOIABADA_DB_CREATE")
 	}
 
-	db, err := sql.Open("mysql", dsnWithDBname)
+	db, err := sql.Open("mysql", DSN(dbConfig))
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to open database")
 	}
@@ -117,7 +104,7 @@ func NewMySQLDatabase(dbConfig *DatabaseConfig, logSQL bool) (*MySQLDatabase, er
 		// as somebody else's problem. Ping forces first use here, so the caller gets MySQL's
 		// own "Error 1049 (42000): Unknown database" from the constructor. Not on the creating
 		// arm, where the CREATE DATABASE above already forces it (#293).
-		if err := db.Ping(); err != nil {
+		if err := db.PingContext(ctx); err != nil {
 			_ = db.Close()
 			return nil, errs.Wrap(err, "unable to connect to database")
 		}

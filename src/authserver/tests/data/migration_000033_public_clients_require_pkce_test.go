@@ -17,7 +17,7 @@ import (
 // TestMigration000033_PublicClientsRequirePKCE exercises the migration that brings
 // clients.pkce_required into line with the rule that a public client always requires PKCE
 // (#245). It runs against an ISOLATED database of the configured dialect (see
-// migration_testdb_helper.go).
+// migration_testdb_helper_test.go).
 //
 // The migration is data-only: one UPDATE, no column and no schema change. What it has to get
 // right is its predicate, and a wrong predicate here fails SILENTLY rather than erroring, in

@@ -10,7 +10,7 @@ import (
 )
 
 // Seam 3 of #266: migration 000035, against an ISOLATED database of the configured
-// dialect (see migration_testdb_helper.go).
+// dialect (see migration_testdb_helper_test.go).
 //
 // The migration does five things and each is asserted below: it creates
 // browser_sessions with its unique lookup index and its expiry index, it adds the
