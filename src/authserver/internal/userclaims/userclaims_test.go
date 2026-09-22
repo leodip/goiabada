@@ -18,16 +18,18 @@ import (
 // idTokenMapper is the shape /userinfo and the ID token share: the ID token's include flag and a
 // base URL the assertions can name. The updated_at gate is per test, since that is one of the
 // three things the two callers disagree about.
-func idTokenMapper(db Database, gate UpdatedAtGate) Mapper {
-	return Mapper{Database: db, BaseURL: "http://localhost:8081", UpdatedAt: gate, Inclusion: InclusionIdToken}
+func idTokenMapper(db Database) Mapper {
+	return Mapper{Database: db, BaseURL: "http://localhost:8081", Inclusion: InclusionIdToken}
 }
 
 // TestAddOpenIdConnectClaims is the table that came with the code from
-// issuance/token_issuer_test.go, where it drove the private addOpenIdConnectClaimsFromUser. It
-// keeps issuance's gate, so every row still reads exactly as it did before the move (#387).
+// issuance/token_issuer_test.go, where it drove the private addOpenIdConnectClaimsFromUser. Its
+// three non-profile rows carried updated_at until the gate became the profile scope: that was
+// issuance's "anything beyond a lone openid" rule, and it put a profile claim in a response that
+// had not been granted the profile scope.
 func TestAddOpenIdConnectClaims(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
-	mapper := idTokenMapper(mockDB, UpdatedAtBeyondOpenidScope)
+	mapper := idTokenMapper(mockDB)
 	now := time.Now().UTC()
 
 	// Set up mock for profile picture check - it will be called for tests with profile scope
@@ -123,7 +125,6 @@ func TestAddOpenIdConnectClaims(t *testing.T) {
 			expected: jwt.MapClaims{
 				"email":          "email@example.com",
 				"email_verified": true,
-				"updated_at":     now.Add(-1 * time.Hour).Unix(),
 			},
 		},
 		{
@@ -136,10 +137,8 @@ func TestAddOpenIdConnectClaims(t *testing.T) {
 				AddressCountry:    "Addressland",
 				UpdatedAt:         sql.NullTime{Time: now.Add(-1 * time.Hour), Valid: true},
 			},
-			scopes: []string{"openid", "address"},
-			expected: jwt.MapClaims{
-				"updated_at": now.Add(-1 * time.Hour).Unix(),
-			},
+			scopes:   []string{"openid", "address"},
+			expected: jwt.MapClaims{},
 		},
 		{
 			name: "Phone scope only",
@@ -152,7 +151,6 @@ func TestAddOpenIdConnectClaims(t *testing.T) {
 			expected: jwt.MapClaims{
 				"phone_number":          "+9876543210",
 				"phone_number_verified": false,
-				"updated_at":            now.Add(-1 * time.Hour).Unix(),
 			},
 		},
 	}
@@ -167,8 +165,8 @@ func TestAddOpenIdConnectClaims(t *testing.T) {
 				assert.Equal(t, expectedValue, claims[key], "Mismatch for claim: %s", key)
 			}
 
-			if len(tc.scopes) > 1 || (len(tc.scopes) == 1 && tc.scopes[0] != "openid") {
-				assert.NotZero(t, claims["updated_at"], "updated_at should be set")
+			if slices.Contains(tc.scopes, "profile") {
+				assert.NotZero(t, claims["updated_at"], "updated_at rides with the profile scope")
 			}
 
 			// Check for address claim separately
@@ -189,7 +187,7 @@ func TestAddOpenIdConnectClaims(t *testing.T) {
 			}
 
 			for key := range claims {
-				if key != "updated_at" && key != "address" {
+				if key != "address" {
 					_, expected := tc.expected[key]
 					assert.True(t, expected, "Unexpected claim: %s", key)
 				}
@@ -198,48 +196,73 @@ func TestAddOpenIdConnectClaims(t *testing.T) {
 	}
 }
 
-// TestUpdatedAtGates holds the first of the three divergences: the same scope set yields a
-// different answer from the two gates, which is why the mapper takes one rather than choosing.
-// scope=openid email is the case the tiers did not reach before #387 stage 1 pinned it.
-func TestUpdatedAtGates(t *testing.T) {
+// TestAddOpenIdConnectClaims_UpdatedAtRidesWithTheProfileScope is the one rule, where there were
+// two gates. updated_at is a profile-scope claim: OIDC Core 5.4 lists it with name, family_name,
+// birthdate and the rest, and this repository's own documentation has always assigned it there
+// (site/src/content/docs/concepts/openid-connect.mdx, integration/endpoints.mdx). /userinfo
+// already gated on profile; issuance emitted it for any scope but a lone openid, so "openid email"
+// carried it with no profile scope granted.
+//
+// The empty-element row is the scope claim a token can be missing entirely, which strings.Split
+// turns into []string{""}. It used to open issuance's gate, since one element that is not "openid"
+// satisfied it.
+func TestAddOpenIdConnectClaims_UpdatedAtRidesWithTheProfileScope(t *testing.T) {
+	updatedAt := time.Date(2026, 9, 22, 10, 0, 0, 0, time.UTC)
+
 	tests := []struct {
-		name         string
-		scopes       []string
-		withProfile  bool
-		beyondOpenid bool
+		name    string
+		scopes  []string
+		carries bool
 	}{
-		{"openid alone", []string{"openid"}, false, false},
-		{"openid email", []string{"openid", "email"}, false, true},
-		{"openid profile", []string{"openid", "profile"}, true, true},
-		{"profile alone", []string{"profile"}, true, true},
-		{"no scope at all", []string{}, false, false},
-		{"the empty element a missing scope claim splits into", []string{""}, false, true},
+		{"openid alone", []string{"openid"}, false},
+		{"openid email", []string{"openid", "email"}, false},
+		{"openid address", []string{"openid", "address"}, false},
+		{"openid phone", []string{"openid", "phone"}, false},
+		{"openid profile", []string{"openid", "profile"}, true},
+		{"profile alone", []string{"profile"}, true},
+		{"no scope at all", []string{}, false},
+		{"the empty element a missing scope claim splits into", []string{""}, false},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			assert.Equal(t, test.withProfile, UpdatedAtWithProfileScope(test.scopes))
-			assert.Equal(t, test.beyondOpenid, UpdatedAtBeyondOpenidScope(test.scopes))
+			user := &models.User{Id: 7, Email: "a@example.com",
+				UpdatedAt: sql.NullTime{Time: updatedAt, Valid: true}}
+			mockDB := mocks_data.NewDatabase(t)
+			if slices.Contains(test.scopes, "profile") {
+				mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, int64(7)).
+					Return(false, nil).Once()
+			}
+
+			claims := jwt.MapClaims{}
+			idTokenMapper(mockDB).AddOpenIdConnectClaims(context.Background(), claims, user, test.scopes)
+
+			if test.carries {
+				assert.Equal(t, updatedAt.Unix(), claims["updated_at"])
+			} else {
+				assert.NotContains(t, claims, "updated_at")
+			}
 		})
 	}
 }
 
-// TestAddOpenIdConnectClaims_UpdatedAtFollowsTheGate is the same divergence at the mapper: one
-// user, one scope set, two mappers, two answers.
-func TestAddOpenIdConnectClaims_UpdatedAtFollowsTheGate(t *testing.T) {
+// TestAddOpenIdConnectClaims_UpdatedAtDoesNotDependOnTheTokenType is the divergence's other half,
+// refused at the mapper: the access token's mapper and the ID token's differ in which include flag
+// filters groups and attributes, and in nothing else. A gate that reads the token type, or a scope
+// slice one caller has extended and the other has not, would show up here.
+func TestAddOpenIdConnectClaims_UpdatedAtDoesNotDependOnTheTokenType(t *testing.T) {
 	updatedAt := time.Date(2026, 9, 22, 10, 0, 0, 0, time.UTC)
 	user := &models.User{Id: 7, Email: "a@example.com", UpdatedAt: sql.NullTime{Time: updatedAt, Valid: true}}
-	scopes := []string{"openid", "email"}
 
-	userinfoClaims := jwt.MapClaims{}
-	idTokenMapper(mocks_data.NewDatabase(t), UpdatedAtWithProfileScope).
-		AddOpenIdConnectClaims(context.Background(), userinfoClaims, user, scopes)
-	assert.NotContains(t, userinfoClaims, "updated_at")
+	for _, inclusion := range []Inclusion{InclusionIdToken, InclusionAccessToken} {
+		mapper := Mapper{Database: mocks_data.NewDatabase(t), BaseURL: "http://localhost:8081",
+			Inclusion: inclusion}
 
-	issuanceClaims := jwt.MapClaims{}
-	idTokenMapper(mocks_data.NewDatabase(t), UpdatedAtBeyondOpenidScope).
-		AddOpenIdConnectClaims(context.Background(), issuanceClaims, user, scopes)
-	assert.Equal(t, updatedAt.Unix(), issuanceClaims["updated_at"])
+		claims := jwt.MapClaims{}
+		mapper.AddOpenIdConnectClaims(context.Background(), claims, user, []string{"openid", "email"})
+		assert.NotContains(t, claims, "updated_at",
+			"no profile scope, so neither token type carries the claim")
+	}
 }
 
 // TestAddOpenIdConnectClaims_CarriesTheCallersContext is #386 seam 4 at the package the read
@@ -259,7 +282,7 @@ func TestAddOpenIdConnectClaims_CarriesTheCallersContext(t *testing.T) {
 		mockDB.On("UserHasProfilePicture", callersContext, mock.Anything, int64(42)).Return(true, nil).Once()
 
 		claims := jwt.MapClaims{}
-		idTokenMapper(mockDB, UpdatedAtBeyondOpenidScope).
+		idTokenMapper(mockDB).
 			AddOpenIdConnectClaims(ctx, claims, user, []string{"openid", "profile"})
 
 		assert.Equal(t, "http://localhost:8081/userinfo/picture/sub-42", claims["picture"])
@@ -270,7 +293,7 @@ func TestAddOpenIdConnectClaims_CarriesTheCallersContext(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
 
 		claims := jwt.MapClaims{}
-		idTokenMapper(mockDB, UpdatedAtBeyondOpenidScope).
+		idTokenMapper(mockDB).
 			AddOpenIdConnectClaims(ctx, claims, user, []string{"openid", "email"})
 
 		assert.NotContains(t, claims, "picture")
@@ -287,7 +310,7 @@ func TestAddOpenIdConnectClaims_PictureFailureLeavesTheRestStanding(t *testing.T
 
 	user := &models.User{Id: 9, Subject: "sub-9", GivenName: "Ada"}
 	claims := jwt.MapClaims{}
-	idTokenMapper(mockDB, UpdatedAtBeyondOpenidScope).
+	idTokenMapper(mockDB).
 		AddOpenIdConnectClaims(context.Background(), claims, user, []string{"openid", "profile"})
 
 	assert.NotContains(t, claims, "picture")
@@ -582,7 +605,7 @@ func TestAddressClaim(t *testing.T) {
 // rather than an empty object.
 func TestAddOpenIdConnectClaims_AddressScopeWithoutAnAddress(t *testing.T) {
 	claims := jwt.MapClaims{}
-	idTokenMapper(mocks_data.NewDatabase(t), UpdatedAtBeyondOpenidScope).
+	idTokenMapper(mocks_data.NewDatabase(t)).
 		AddOpenIdConnectClaims(context.Background(), claims, &models.User{Id: 4}, []string{"openid", "address"})
 
 	assert.NotContains(t, claims, "address")

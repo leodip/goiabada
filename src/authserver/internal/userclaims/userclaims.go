@@ -7,19 +7,26 @@
 // that no test and no document named. Building the address claim sat on models.User besides,
 // which is a persistence record with no business constructing an OIDC claim (#387 decision 5).
 //
-// The three divergences are inputs here, not merges. Each is observable on the wire, so
-// collapsing them would change what a client receives, which #387 is not permitted to do; #387
+// Two of the three divergences are inputs here, not merges. Each is observable on the wire, so
+// collapsing one changes what a client receives, which #387 was not permitted to do; #387
 // decision 6 pinned all three with tests before this package existed:
 //
 //   - the base URL the profile and picture claims are built from. /userinfo reads the global
 //     configuration, issuance the one injected into TokenIssuer. That is Mapper.BaseURL.
-//   - the gate on updated_at. /userinfo writes it inside the profile arm; issuance writes it for
-//     any scope but a lone openid, which in an access token is always, because
-//     generateAccessTokenCore appends authserver:userinfo to the slice before it asks. That is
-//     Mapper.UpdatedAt, with the two gates this package names.
 //   - which of a group's or an attribute's two include flags decides. /userinfo reads
 //     IncludeInIdToken at all three of its filter sites; issuance reads IncludeInAccessToken in
 //     the access token and IncludeInIdToken in the ID token. That is Mapper.Inclusion.
+//
+// The third was the gate on updated_at, and it is no longer an input: both sites now write the
+// claim inside the profile arm. It was a defect rather than a difference two callers wanted.
+// /userinfo already gated on profile, which is the scope OIDC Core 5.4 lists updated_at under and
+// the scope this repository's own documentation has always assigned it to; issuance wrote it for
+// any scope but a lone openid, so a grant of "openid email" carried a profile claim nobody asked
+// for. In an access token issuance wrote it always, including for a lone openid, because
+// generateAccessTokenCore appends authserver:userinfo to the scope slice for the audience before
+// the claim block reads it -- so the same grant produced an access token carrying updated_at and
+// an ID token without it, which nothing chose. Emitting it under the profile scope alone is one
+// rule for all three sites, and it is the rule the wire documentation already stated.
 //
 // Staying with the caller: every gate above these ones -- the openid requirement and the
 // per-client IncludeOpenIDConnectClaimsInAccessToken / InIdToken settings issuance applies, and
@@ -51,25 +58,6 @@ import (
 // changes which database it reads.
 type Database interface {
 	UserHasProfilePicture(ctx context.Context, tx *sql.Tx, userId int64) (bool, error)
-}
-
-// UpdatedAtGate decides whether the updated_at claim is written, from the scopes claims are being
-// built for. The caller supplies one of the two below rather than this package choosing, because
-// the two sites disagree and the disagreement is observable (#387 decision 5).
-type UpdatedAtGate func(scopes []string) bool
-
-// UpdatedAtWithProfileScope is /userinfo's gate: updated_at rides with the rest of the profile
-// claims, and a response without that scope carries none.
-func UpdatedAtWithProfileScope(scopes []string) bool {
-	return slices.Contains(scopes, "profile")
-}
-
-// UpdatedAtBeyondOpenidScope is issuance's gate: anything beyond a lone openid carries updated_at,
-// whatever the extra scope is. An ID token gates on the granted scope verbatim, so scope=openid
-// alone omits the claim there; an access token never reaches this gate with one element, since
-// generateAccessTokenCore appends the userinfo scope first.
-func UpdatedAtBeyondOpenidScope(scopes []string) bool {
-	return len(scopes) > 1 || (len(scopes) == 1 && scopes[0] != "openid")
 }
 
 // Inclusion names which of the two include flags a group or an attribute is filtered by. The zero
@@ -112,25 +100,22 @@ type Mapper struct {
 	Database Database
 	// BaseURL is the public URL the profile and picture claims are built from.
 	BaseURL string
-	// UpdatedAt decides the updated_at claim. A nil gate writes it for no scope set.
-	UpdatedAt UpdatedAtGate
 	// Inclusion filters groups and attributes. The zero value is the ID token's flag.
 	Inclusion Inclusion
 }
 
 // AddOpenIdConnectClaims writes the profile, email, address and phone claims the given scopes ask
-// for, plus updated_at when this mapper's gate accepts them.
+// for. updated_at rides inside the profile arm with the rest of the claims OIDC Core 5.4 lists
+// under that scope, which is also what this repository's own documentation has always said
+// (site/src/content/docs/concepts/openid-connect.mdx and integration/endpoints.mdx).
 //
 // A failed picture lookup is not an error here and never has been: the claim is omitted and the
 // rest of the response stands, because a user who cannot be told whether they have a picture still
 // has a name and an email.
 func (m Mapper) AddOpenIdConnectClaims(ctx context.Context, claims jwt.MapClaims, user *models.User, scopes []string) {
 
-	if m.UpdatedAt != nil && m.UpdatedAt(scopes) {
-		claims["updated_at"] = user.UpdatedAt.Time.UTC().Unix()
-	}
-
 	if slices.Contains(scopes, "profile") {
+		claims["updated_at"] = user.UpdatedAt.Time.UTC().Unix()
 		addClaimIfNotEmpty(claims, "name", user.GetFullName())
 		addClaimIfNotEmpty(claims, "given_name", user.GivenName)
 		addClaimIfNotEmpty(claims, "middle_name", user.MiddleName)

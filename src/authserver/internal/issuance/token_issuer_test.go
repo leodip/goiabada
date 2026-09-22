@@ -5294,18 +5294,18 @@ func issueCharacterizationTokens(t *testing.T, scope string, baseURL string, use
 	return idClaims, accessClaims
 }
 
-// Divergence 1, issuance's side. The gate here is "any scope beyond openid alone", where
-// /userinfo emits updated_at only inside its profile arm, so at scope=openid email an ID token
-// carries updated_at and the userinfo response for the same grant does not. That is observable
-// and undocumented, and the mapper #387 introduces has to keep it rather than merge the two
-// gates into one.
+// updated_at is a profile-scope claim at both token types, which is what OIDC Core 5.4 lists it
+// as and what this repository's own documentation has always said it is. This test was written by
+// #387 stage 1 as a characterization: it recorded issuance's gate, "any scope beyond openid
+// alone", and the access token's extra row on top of it, where a lone openid still carried the
+// claim because generateAccessTokenCore appends authserver:userinfo to the scope slice for the
+// audience before the claim block reads it. Both were defects rather than choices, and the rows
+// below are what each grant carries now that the gate is the profile scope at all three sites.
 //
-// The access token's row for "openid" alone is the part that surprises, and it is recorded here
-// rather than repaired: the scope slice it gates on is not the granted scope.
-// generateAccessTokenCore appends authserver:userinfo to scopes before calling the mapper,
-// so len(scopes) > 1 already holds and the access token carries
-// updated_at where the ID token, gating on the granted scope verbatim, does not.
-func TestClaimCharacterization_UpdatedAtGate(t *testing.T) {
+// The two rows that changed are the tripwire the characterization was for: "openid alone" stopped
+// disagreeing between the two token types, and "openid email" stopped emitting a profile claim for
+// a grant that was never given the profile scope.
+func TestClaims_UpdatedAtRidesWithTheProfileScope(t *testing.T) {
 	tests := []struct {
 		name                    string
 		scope                   string
@@ -5313,16 +5313,20 @@ func TestClaimCharacterization_UpdatedAtGate(t *testing.T) {
 		accessTokenHasUpdatedAt bool
 	}{
 		{
+			// Was id=false, access=true: the same grant, two answers, because only one of the
+			// two slices had authserver:userinfo appended to it.
 			name:                    "openid alone",
 			scope:                   "openid",
 			idTokenHasUpdatedAt:     false,
-			accessTokenHasUpdatedAt: true,
+			accessTokenHasUpdatedAt: false,
 		},
 		{
+			// Was true/true: a profile claim with no profile scope granted, on the default path,
+			// since IncludeOpenIDConnectClaimsInIdToken is seeded on.
 			name:                    "openid email",
 			scope:                   "openid email",
-			idTokenHasUpdatedAt:     true,
-			accessTokenHasUpdatedAt: true,
+			idTokenHasUpdatedAt:     false,
+			accessTokenHasUpdatedAt: false,
 		},
 		{
 			name:                    "openid profile",
