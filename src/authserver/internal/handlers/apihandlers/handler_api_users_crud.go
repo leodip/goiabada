@@ -22,6 +22,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
+	"github.com/leodip/goiabada/authserver/internal/revocation"
 	"github.com/leodip/goiabada/authserver/internal/usercreation"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
@@ -38,7 +39,7 @@ import (
 // authorized.
 type usersCrudDatabase interface {
 	accountOTPDatabase
-	handlers.RevocationDatabase
+	revocation.Database
 
 	DeleteUser(ctx context.Context, tx *sql.Tx, userId int64) error
 	GetUserByEmail(ctx context.Context, tx *sql.Tx, email string) (*models.User, error)
@@ -158,7 +159,7 @@ func HandleAPIUserPasswordPut(
 		//
 		// Narrow write, not a full-row UpdateUser: the model was loaded before validation, so
 		// writing every column back would undo a concurrent disable (decision 14).
-		result, err := handlers.RevokeUserAuthStateTx(r.Context(), database, user.Id, "", func(tx *sql.Tx) error {
+		result, err := revocation.RevokeUserAuthStateTx(r.Context(), database, user.Id, "", func(tx *sql.Tx) error {
 			return database.SetUserPasswordHash(r.Context(), tx, user.Id, passwordHash)
 		})
 		if err != nil {
@@ -178,8 +179,8 @@ func HandleAPIUserPasswordPut(
 			"userId":       user.Id,
 			"loggedInUser": loggedInUser,
 		})
-		handlers.LogRevokedUserAuthState(r.Context(), auditLogger, user.Id,
-			handlers.RevocationReasonAdminPasswordSet, loggedInUser, result)
+		revocation.LogRevokedUserAuthState(r.Context(), auditLogger, user.Id,
+			revocation.RevocationReasonAdminPasswordSet, loggedInUser, result)
 
 		// Get the updated user to return
 		updatedUser, err := database.GetUserById(r.Context(), nil, userId)
@@ -596,8 +597,8 @@ func HandleAPIUserEnabledPut(
 		// Opened through RunInTransaction, so a deadlock reruns the compare-and-set and the
 		// sweep together (#301). Safe to rerun: the compare-and-set asks the row again on every
 		// attempt, and the sweep reads the sessions and tokens afresh.
-		disableWithRevocation := func() (handlers.RevocationResult, bool, error) {
-			var result handlers.RevocationResult
+		disableWithRevocation := func() (revocation.RevocationResult, bool, error) {
+			var result revocation.RevocationResult
 			err := database.RunInTransaction(r.Context(), func(tx *sql.Tx) error {
 				transitioned, err := database.TrySetUserEnabled(r.Context(), tx, userId, true, false)
 				if err != nil {
@@ -610,19 +611,19 @@ func HandleAPIUserEnabledPut(
 					return errUserAlreadyDisabled
 				}
 
-				result, err = handlers.RevokeUserAuthState(r.Context(), database, tx, userId, "")
+				result, err = revocation.RevokeUserAuthState(r.Context(), database, tx, userId, "")
 				return err
 			})
 			if errors.Is(err, errUserAlreadyDisabled) {
-				return handlers.RevocationResult{}, false, nil
+				return revocation.RevocationResult{}, false, nil
 			}
 			if err != nil {
-				return handlers.RevocationResult{}, false, err
+				return revocation.RevocationResult{}, false, err
 			}
 			return result, true, nil
 		}
 
-		var result handlers.RevocationResult
+		var result revocation.RevocationResult
 		transitioned := false
 
 		if req.Enabled {
@@ -649,8 +650,8 @@ func HandleAPIUserEnabledPut(
 
 		// Only on a real disable transition, and only after its commit.
 		if transitioned {
-			handlers.LogRevokedUserAuthState(r.Context(), auditLogger, userId,
-				handlers.RevocationReasonAccountDisabled, loggedInUser, result)
+			revocation.LogRevokedUserAuthState(r.Context(), auditLogger, userId,
+				revocation.RevocationReasonAccountDisabled, loggedInUser, result)
 		}
 
 		// Get the updated user to return

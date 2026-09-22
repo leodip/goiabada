@@ -136,8 +136,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 	// would exercise a shape production never runs.
 	crossUserTerminateTx := &sql.Tx{}
 
-	// stubCrossUserTermination registers the six calls TerminateUserSessionTx and
-	// revokeRefreshTokens make for one session. Thin on purpose: revocation_test.go owns the
+	// stubCrossUserTermination registers the six calls revocation.TerminateUserSessionTx and
+	// revocation.RevokeRefreshTokens make for one session. Thin on purpose: revocation_test.go owns the
 	// exhaustive termination table, and restating it here would mean two places to update.
 	// RollbackTransaction is included because the deferred rollback runs on the success path too,
 	// where it is a no-op against a committed transaction; a test omitting it fails on the strict
@@ -257,7 +257,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 				deletedPayload = args.Get(2).(map[string]interface{})
 			}).Return().Once()
 		var terminatedPayload map[string]interface{}
-		// LogTerminatedUserSession is one of the three revocation helpers that took neither an
+		// revocation.LogTerminatedUserSession is one of the three revocation helpers that took neither an
 		// *http.Request nor a context before #328, so this is the call shape the compiler could
 		// not have forced on its own: the helper has to be handed the request's context by each
 		// of its eight callers, and the id below is how this case says it was.
@@ -319,7 +319,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		assert.Equal(t, []string{"rt-of-user-1"}, terminatedPayload["revokedRefreshTokenJtis"])
 
 		// deleted_user_session beside it, the lifecycle record every other caller of
-		// TerminateUserSessionTx writes. Without it a handover is the one termination a consumer
+		// revocation.TerminateUserSessionTx writes. Without it a handover is the one termination a consumer
 		// watching that stream never sees. Its loggedInUser is empty for the same reason.
 		assert.Equal(t, int64(7), deletedPayload["userSessionId"])
 		assert.Equal(t, "", deletedPayload["loggedInUser"])
@@ -516,7 +516,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		userSessionManager.On("HasValidUserSession", mock.Anything, ownSession, mock.AnythingOfType("*int")).Return(false)
 
 		// No termination expectations at all. The mock is strict, so any of the six calls
-		// TerminateUserSessionTx makes fails this case, and no cross_user_session_replaced or
+		// revocation.TerminateUserSessionTx makes fails this case, and no cross_user_session_replaced or
 		// terminated_user_session event is permitted either.
 		auditLogger.On("Log", mock.Anything, audit.AuditStartedNewUserSesson, mock.Anything).Return().Once()
 
@@ -562,7 +562,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 	// The failure side of the same condition. A termination that did not commit must stop the
 	// ceremony dead: the previous user's grants are still live, so minting a replacement session
 	// and an authorization code on top of them would hand the browser to the new user while
-	// leaving the old user's refresh tokens working. Both other callers of TerminateUserSessionTx
+	// leaving the old user's refresh tokens working. Both other callers of revocation.TerminateUserSessionTx
 	// pin exactly this, in TestHandleAPIUserSessionDelete_TerminationFailureIsA500 and
 	// TestHandleAPIAccountSessionDelete_TerminationFailureIsA500, and it is the audit suppression
 	// that matters as much as the 500: an event written on a rolled-back termination is a false

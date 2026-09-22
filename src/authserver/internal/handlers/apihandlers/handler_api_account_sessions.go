@@ -12,16 +12,17 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/revocation"
 	"github.com/leodip/goiabada/core/api"
 )
 
 // accountSessionsDatabase is what the account session endpoints need: the caller's own sessions.
 //
 // It embeds the row builder's port because the listing is built by buildSessionDetails, and the
-// revocation port because terminating a session goes through handlers.TerminateUserSessionTx.
+// revocation port because terminating a session goes through revocation.TerminateUserSessionTx.
 type accountSessionsDatabase interface {
 	sessionDetailsDatabase
-	handlers.RevocationDatabase
+	revocation.Database
 
 	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*models.User, error)
 	GetUserSessionById(ctx context.Context, tx *sql.Tx, userSessionId int64) (*models.UserSession, error)
@@ -145,7 +146,7 @@ func HandleAPIAccountSessionDelete(
 		// through the session revoked and sweeps the refresh tokens those grants produced, in one
 		// transaction (#129 decision 5). The ownership check above answers 403 first, so this is
 		// never reached for somebody else's session.
-		result, err := handlers.TerminateUserSessionTx(r.Context(), database, us)
+		result, err := revocation.TerminateUserSessionTx(r.Context(), database, us)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -159,7 +160,7 @@ func HandleAPIAccountSessionDelete(
 			"userSessionId": sessionId,
 			"loggedInUser":  loggedInUser,
 		})
-		handlers.LogTerminatedUserSession(r.Context(), auditLogger, us, loggedInUser, result)
+		revocation.LogTerminatedUserSession(r.Context(), auditLogger, us, loggedInUser, result)
 
 		// Success response
 		resp := api.SuccessResponse{Success: true}

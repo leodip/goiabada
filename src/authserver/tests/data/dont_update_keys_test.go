@@ -19,7 +19,7 @@ import (
 // UpdateRefreshToken and UpdateUserSessionClient are both full-row updates through sqlbuilder, so
 // every column not tagged is in that list.
 //
-// What that cost. revokeRefreshTokens calls UpdateRefreshToken, and it is what EVERY session-side
+// What that cost. revocation.RevokeRefreshTokens calls UpdateRefreshToken, and it is what EVERY session-side
 // transaction on this branch ends with: the credential sweep, the two other revocation paths and
 // the auth-code replay response. So each of them took a shared clients lock at its grant sweep,
 // after it already held the session row and, through the session's cascade, that session's

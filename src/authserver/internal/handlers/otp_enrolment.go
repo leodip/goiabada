@@ -40,7 +40,9 @@ type OTPEnrolmentDatabase interface {
 // Shared by the two enable sites decision 2 names, HandleAuthOtpPost's enrollment branch
 // and HandleAPIAccountOTPPut's enable branch. There is no third. It lives here rather than
 // beside disableUserOTP because the browser handler cannot reach an unexported function in
-// apihandlers, which is why TerminateUserSessionTx sits in this package too.
+// apihandlers. TerminateUserSessionTx used to sit in this package for the same reason and no
+// longer does: #387 moved it to internal/revocation, which both callers reach, and this
+// function follows it to internal/otpcredential.
 //
 // The browser caller needs the returned value: it captured the pre-enrollment generation at
 // /auth/level2, and promoting that at /auth/completed would leave a session that just

@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/data"
-	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/revocation"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 )
 
@@ -49,9 +49,9 @@ func TestTerminateUserSessionTx_SweepsAfterTheSessionRowIsDeleted(t *testing.T) 
 	otherCode := createTestCodeInSession(t, client.Id, user.Id, otherSession.SessionIdentifier)
 	otherToken := createTokenOfCode(t, client.Id, user.Id, otherCode.Id, otherSession.SessionIdentifier)
 
-	result, err := handlers.TerminateUserSessionTx(context.Background(), database, session)
+	result, err := revocation.TerminateUserSessionTx(context.Background(), database, session)
 	if err != nil {
-		t.Fatalf("TerminateUserSessionTx returned error: %v", err)
+		t.Fatalf("revocation.TerminateUserSessionTx returned error: %v", err)
 	}
 
 	if result.RevokedCodeCount != 2 {

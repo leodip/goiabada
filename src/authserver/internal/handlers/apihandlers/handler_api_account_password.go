@@ -14,6 +14,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
+	"github.com/leodip/goiabada/authserver/internal/revocation"
 	"github.com/leodip/goiabada/core/api"
 )
 
@@ -23,7 +24,7 @@ import (
 // It embeds the revocation port because a password change revokes the credentials issued under
 // the old one.
 type accountPasswordDatabase interface {
-	handlers.RevocationDatabase
+	revocation.Database
 
 	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*models.User, error)
 	SetUserPasswordHash(ctx context.Context, tx *sql.Tx, userId int64, passwordHash string) error
@@ -117,7 +118,7 @@ func HandleAPIAccountPasswordPut(
 		// Narrow write, not a full-row UpdateUser: the user model was loaded before the
 		// password was validated, so writing every column back would undo a concurrent admin
 		// disable (decision 14).
-		result, err := handlers.RevokeUserAuthStateTx(r.Context(), database, user.Id, exceptSid,
+		result, err := revocation.RevokeUserAuthStateTx(r.Context(), database, user.Id, exceptSid,
 			func(tx *sql.Tx) error {
 				return database.SetUserPasswordHash(r.Context(), tx, user.Id, passwordHash)
 			})
@@ -133,8 +134,8 @@ func HandleAPIAccountPasswordPut(
 			"userId":       user.Id,
 			"loggedInUser": subject,
 		})
-		handlers.LogRevokedUserAuthState(r.Context(), auditLogger, user.Id,
-			handlers.RevocationReasonPasswordChange, subject, result)
+		revocation.LogRevokedUserAuthState(r.Context(), auditLogger, user.Id,
+			revocation.RevocationReasonPasswordChange, subject, result)
 
 		// Response
 		resp := api.UpdateUserResponse{User: *apimapping.ToUserResponse(user)}

@@ -261,6 +261,13 @@ var slogSpreadSites = []slogSpreadSite{
 // than the whole of authserver/internal/data, because the match below is a path prefix and the
 // wider name would also reach the seeder's startup records and the four adapters' connection
 // records, which have no request above them and are the shape this list's own rule excludes.
+//
+// authserver/internal/revocation is listed by the commit that creates it, for the reason the
+// oauthclient note above gives: the five operations and their one warning record ran under
+// authserver/internal/handlers until #387, and a move alone would have dropped all three rules
+// this list gates -- the slog convention, AssertAuditLogContext and AssertRequestPathContext --
+// with nothing going red, since the walk fails only when it reaches no files at all. The three
+// Log* helpers are exactly what #328 gave a context so an audit record joins its request.
 var slogRequestPathDirs = []string{
 	"authserver/internal/audit",
 	"authserver/internal/data/commondb",
@@ -275,6 +282,7 @@ var slogRequestPathDirs = []string{
 	"authserver/internal/accountvalidation",
 	"authserver/internal/protocolvalidation",
 	"authserver/internal/permissions",
+	"authserver/internal/revocation",
 	"authserver/internal/usercreation",
 	"authserver/internal/usersession",
 	"authserver/internal/useragent",

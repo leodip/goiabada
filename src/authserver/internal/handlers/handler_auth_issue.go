@@ -518,7 +518,7 @@ func HandleIssueGet(
 		}
 
 		// Everything below this line attests to a write, so it waits for the helper to return,
-		// which is after the commit: the rule TerminateUserSessionTx documents, never attest to a
+		// which is after the commit: the rule revocation.TerminateUserSessionTx documents, never attest to a
 		// write that could still roll back. A commit that returns an error leaves the code row's
 		// fate indeterminate, which is the same contract that helper already carries, and the
 		// client is answered with a 500 rather than a code.

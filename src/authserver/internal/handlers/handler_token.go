@@ -18,6 +18,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/issuance"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
+	"github.com/leodip/goiabada/authserver/internal/revocation"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
@@ -78,9 +79,9 @@ const authCodeNotAuthorizedErrorMsg = "The client associated with the provided c
 // rotates and revokes, and the session those grants hang from.
 //
 // It embeds the revocation port because reuse detection revokes a family through
-// revokeRefreshTokens.
+// revocation.RevokeRefreshTokens.
 type tokenDatabase interface {
-	RevocationDatabase
+	revocation.Database
 
 	AcquireUserSessionRow(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (bool, error)
 	DeleteUserSession(ctx context.Context, tx *sql.Tx, userSessionId int64) error
@@ -480,7 +481,7 @@ func HandleTokenPost(
 			//
 			// A false return does NOT mean specifically "another rotation claimed it".
 			// It means the row is no longer live, which a concurrent rotation, a
-			// concurrent security revocation such as RevokeUserAuthState, or the row
+			// concurrent security revocation such as revocation.RevokeUserAuthState, or the row
 			// having been deleted all produce.
 			//
 			// Refusing without any family cascade follows from that AMBIGUITY, not from
@@ -707,7 +708,7 @@ func revokeOnAuthCodeReuse(ctx context.Context, database tokenDatabase, code *mo
 			return err
 		}
 
-		revokedJtis, err = revokeRefreshTokens(ctx, database, tx, refreshTokens)
+		revokedJtis, err = revocation.RevokeRefreshTokens(ctx, database, tx, refreshTokens)
 		if err != nil {
 			return err
 		}

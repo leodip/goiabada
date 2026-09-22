@@ -15,6 +15,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
+	"github.com/leodip/goiabada/authserver/internal/revocation"
 	"github.com/leodip/goiabada/authserver/internal/usersession"
 	"github.com/leodip/goiabada/core/errs"
 )
@@ -24,10 +25,10 @@ import (
 //
 // It embeds the authorize port because a refusal here is answered through redirToClientWithError,
 // and the revocation port because an unusable session is terminated through
-// TerminateUserSessionTx.
+// revocation.TerminateUserSessionTx.
 type authCompletedDatabase interface {
 	authorizeDatabase
-	RevocationDatabase
+	revocation.Database
 
 	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*models.Client, error)
 	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*models.User, error)
@@ -268,7 +269,7 @@ func HandleAuthCompletedGet(
 			// arrived here. A failure returns 500 with the browser still cookied to the old
 			// session and no new session and no code minted, which is the fail-closed direction.
 			if userSession != nil && !sessionBelongsToCeremony {
-				terminationResult, err := TerminateUserSessionTx(r.Context(), database, userSession)
+				terminationResult, err := revocation.TerminateUserSessionTx(r.Context(), database, userSession)
 				if err != nil {
 					httpHelper.InternalServerError(w, r, err)
 					return
@@ -298,7 +299,7 @@ func HandleAuthCompletedGet(
 				})
 
 				// deleted_user_session beside terminated_user_session, the pairing every caller of
-				// TerminateUserSessionTx writes (#129 decision 9): the lifecycle record that a
+				// revocation.TerminateUserSessionTx writes (#129 decision 9): the lifecycle record that a
 				// session row is gone, next to the security record of what its grants authorized.
 				// Emitting one without the other would make a browser handover the only
 				// termination that never reaches a consumer watching the lifecycle stream, and it
@@ -307,7 +308,7 @@ func HandleAuthCompletedGet(
 					"userSessionId": userSession.Id,
 					"loggedInUser":  "",
 				})
-				LogTerminatedUserSession(r.Context(), auditLogger, userSession, "", terminationResult)
+				revocation.LogTerminatedUserSession(r.Context(), auditLogger, userSession, "", terminationResult)
 			}
 
 			// start new session

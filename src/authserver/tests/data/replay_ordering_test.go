@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/data"
-	"github.com/leodip/goiabada/authserver/internal/handlers"
+	"github.com/leodip/goiabada/authserver/internal/revocation"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -91,7 +91,7 @@ func TestLockOrder_ReplayResponseAgainstTermination(t *testing.T) {
 		// Its first statement is the delete, which is what makes it wait.
 		termination := goBlocked(t, "the termination", tx, func(reached func()) error {
 			reached()
-			_, err := handlers.TerminateUserSessionTx(context.Background(), other, session)
+			_, err := revocation.TerminateUserSessionTx(context.Background(), other, session)
 			return err
 		})
 

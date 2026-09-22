@@ -1,4 +1,4 @@
-package handlers
+package revocation
 
 import (
 	"context"
@@ -410,7 +410,7 @@ func TestRevokeRefreshTokens(t *testing.T) {
 	t.Run("empty input writes nothing and returns an empty list", func(t *testing.T) {
 		db := mocks_data.NewDatabase(t)
 
-		jtis, err := revokeRefreshTokens(context.Background(), db, revokeTx, nil)
+		jtis, err := RevokeRefreshTokens(context.Background(), db, revokeTx, nil)
 
 		require.NoError(t, err)
 		assert.Empty(t, jtis)
@@ -426,7 +426,7 @@ func TestRevokeRefreshTokens(t *testing.T) {
 			{Id: 2, RefreshTokenJti: "b", Revoked: true},
 		}
 
-		jtis, err := revokeRefreshTokens(context.Background(), db, revokeTx, tokens)
+		jtis, err := RevokeRefreshTokens(context.Background(), db, revokeTx, tokens)
 
 		require.NoError(t, err)
 		// The load-bearing case for #77: an empty return here is what tells
@@ -445,7 +445,7 @@ func TestRevokeRefreshTokens(t *testing.T) {
 		db.On("UpdateRefreshToken", mock.Anything, revokeTx, tokens[0]).Return(nil).Once()
 		db.On("UpdateRefreshToken", mock.Anything, revokeTx, tokens[2]).Return(nil).Once()
 
-		jtis, err := revokeRefreshTokens(context.Background(), db, revokeTx, tokens)
+		jtis, err := RevokeRefreshTokens(context.Background(), db, revokeTx, tokens)
 
 		require.NoError(t, err)
 		assert.Equal(t, []string{"live-1", "live-2"}, jtis)
@@ -463,7 +463,7 @@ func TestRevokeRefreshTokens(t *testing.T) {
 		db.On("UpdateRefreshToken", mock.Anything, revokeTx, tokens[0]).Return(nil).Once()
 		db.On("UpdateRefreshToken", mock.Anything, revokeTx, tokens[1]).Return(boom).Once()
 
-		jtis, err := revokeRefreshTokens(context.Background(), db, revokeTx, tokens)
+		jtis, err := RevokeRefreshTokens(context.Background(), db, revokeTx, tokens)
 
 		require.ErrorIs(t, err, boom)
 		// Nil, not ["live-1"]. The caller rolls the transaction back, so reporting a JTI as
@@ -768,29 +768,6 @@ func assertNotAttempted(t *testing.T, db *mocks_data.Database, methods ...string
 			assert.NotEqual(t, method, call.Method, "%v must not be attempted on this path", method)
 		}
 	}
-}
-
-// stubRevocationSweepTx registers every database call RevokeUserAuthStateTx makes for a user
-// with no live sessions and no refresh tokens, which is the shape a HANDLER test wants: it
-// exercises the wiring without restating the sweep table this file already owns exhaustively.
-//
-// Note it stubs RollbackTransaction as well as CommitTransaction. The deferred rollback runs on
-// the success path too, where it is a no-op against a committed transaction, and a test that
-// omits it fails on the strict mock.
-//
-// It also proves the transaction is real: BeginTransaction returns a non-nil tx, so every
-// nested call is asserted to receive that exact pointer. A nil one would be rejected by
-// RevokeUserAuthState's precondition.
-func stubRevocationSweepTx(database *mocks_data.Database, userId int64, newGeneration int64) {
-	expectRunInTransaction(database, revokeTx)
-	database.On("IncrementUserAuthStateGeneration", mock.Anything, revokeTx, userId).
-		Return(newGeneration, nil).Once()
-	database.On("GetRefreshTokensByUserId", mock.Anything, revokeTx, userId).
-		Return([]*models.RefreshToken{}, nil).Once()
-	database.On("PromoteRefreshTokenGenerations", mock.Anything, revokeTx, []int64{}, newGeneration).
-		Return(nil).Once()
-	database.On("GetUserSessionsByUserId", mock.Anything, revokeTx, userId).
-		Return([]models.UserSession{}, nil).Once()
 }
 
 // The client whose grants are revoked (#245 stage 4). A different id from every fixture above,
