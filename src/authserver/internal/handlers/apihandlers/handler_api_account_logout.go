@@ -15,6 +15,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/signingkeys"
 	"github.com/leodip/goiabada/core/api"
 )
 
@@ -150,7 +151,7 @@ func HandleAPIAccountLogoutRequestPost(
 			writeInternalServerError(w, r, err)
 			return
 		}
-		privKey, err := privKeyPair.ParsePrivateKey()
+		privKey, err := signingkeys.ParsePrivateKey(privKeyPair)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
