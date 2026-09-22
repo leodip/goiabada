@@ -105,18 +105,18 @@ func presentRefreshToken(t *testing.T, clientIdentifier, refreshToken, clientSec
 func requireDatabaseAuditLogs(t *testing.T) {
 	t.Helper()
 
-	settings, err := database.GetSettingsById(nil, 1)
+	settings, err := database.GetSettingsById(context.Background(), nil, 1)
 	require.NoError(t, err)
 	if settings.AuditLogsInDatabaseEnabled {
 		return
 	}
 	settings.AuditLogsInDatabaseEnabled = true
-	require.NoError(t, database.UpdateSettings(nil, settings))
+	require.NoError(t, database.UpdateSettings(context.Background(), nil, settings))
 	t.Cleanup(func() {
-		current, err := database.GetSettingsById(nil, 1)
+		current, err := database.GetSettingsById(context.Background(), nil, 1)
 		if err == nil {
 			current.AuditLogsInDatabaseEnabled = false
-			_ = database.UpdateSettings(nil, current)
+			_ = database.UpdateSettings(context.Background(), nil, current)
 		}
 	})
 }
@@ -244,16 +244,16 @@ func TestAPIClientAuthenticationPut_FlipToPublic_LeavesTheUsersOtherClientAlone(
 func TestAPIClientAuthenticationPut_FlipToPublic_RevokesROPCGrantsToo(t *testing.T) {
 	adminToken, _ := createAdminClientWithToken(t)
 
-	settings, err := database.GetSettingsById(nil, 1)
+	settings, err := database.GetSettingsById(context.Background(), nil, 1)
 	require.NoError(t, err)
 	originalROPC := settings.ResourceOwnerPasswordCredentialsEnabled
 	settings.ResourceOwnerPasswordCredentialsEnabled = true
-	require.NoError(t, database.UpdateSettings(nil, settings))
+	require.NoError(t, database.UpdateSettings(context.Background(), nil, settings))
 	defer func() {
-		current, err := database.GetSettingsById(nil, 1)
+		current, err := database.GetSettingsById(context.Background(), nil, 1)
 		if err == nil {
 			current.ResourceOwnerPasswordCredentialsEnabled = originalROPC
-			_ = database.UpdateSettings(nil, current)
+			_ = database.UpdateSettings(context.Background(), nil, current)
 		}
 	}()
 

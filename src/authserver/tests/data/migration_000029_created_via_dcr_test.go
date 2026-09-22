@@ -53,13 +53,13 @@ import (
 func TestMigration000029_CreatedViaDCR(t *testing.T) {
 	h := newIsolatedDB(t)
 
-	require.NoError(t, h.Migrator.Migrate(28), "migrate to 000028")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 28), "migrate to 000028")
 
 	// 1. Absent before the migration.
 	exists, _, _ := createdViaDCRShape000029(t, h)
 	assert.False(t, exists, "clients.created_via_dcr must not exist at 000028")
 
-	require.NoError(t, h.Migrator.Migrate(29), "apply 000029")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 29), "apply 000029")
 
 	// 2. NOT NULL, defaulting to false.
 	assertCreatedViaDCRShape000029(t, h, "after apply")
@@ -77,7 +77,7 @@ func TestMigration000029_CreatedViaDCR(t *testing.T) {
 	// the ORM writes every column the Go models carry, so seeding at 000029 would break
 	// the moment a migration adds one, exactly as it broke the 000026 test when #111
 	// landed users.last_otp_step at 000027.
-	if err := h.Migrator.Up(); err != nil && !errors.Is(err, migrator.ErrNoChange) {
+	if err := h.Migrator.Up(context.Background()); err != nil && !errors.Is(err, migrator.ErrNoChange) {
 		require.NoError(t, err, "migrate to head before seeding through the ORM")
 	}
 
@@ -110,8 +110,8 @@ func TestMigration000029_CreatedViaDCR(t *testing.T) {
 		ids[i] = client.Id
 	}
 
-	require.NoError(t, h.Migrator.Migrate(28), "roll back to 000028")
-	require.NoError(t, h.Migrator.Migrate(29), "re-apply 000029")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 28), "roll back to 000028")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 29), "re-apply 000029")
 
 	for i, c := range cases {
 		gotDCR, gotConsent := readClientFlags000029(t, h, ids[i])

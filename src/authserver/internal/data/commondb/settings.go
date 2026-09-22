@@ -10,7 +10,7 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 )
 
-func (d *CommonDatabase) CreateSettings(tx *sql.Tx, settings *models.Settings) error {
+func (d *CommonDatabase) CreateSettings(ctx context.Context, tx *sql.Tx, settings *models.Settings) error {
 
 	now := time.Now().UTC()
 
@@ -24,7 +24,7 @@ func (d *CommonDatabase) CreateSettings(tx *sql.Tx, settings *models.Settings) e
 
 	insertBuilder := settingsStruct.WithoutTag("pk").InsertInto("settings", settings)
 
-	id, err := d.insertReturningId(context.Background(), tx, insertBuilder, "settings")
+	id, err := d.insertReturningId(ctx, tx, insertBuilder, "settings")
 	if err != nil {
 		settings.CreatedAt = originalCreatedAt
 		settings.UpdatedAt = originalUpdatedAt
@@ -35,7 +35,7 @@ func (d *CommonDatabase) CreateSettings(tx *sql.Tx, settings *models.Settings) e
 	return nil
 }
 
-func (d *CommonDatabase) UpdateSettings(tx *sql.Tx, settings *models.Settings) error {
+func (d *CommonDatabase) UpdateSettings(ctx context.Context, tx *sql.Tx, settings *models.Settings) error {
 
 	if settings.Id == 0 {
 		return errs.New("can't update settings with id 0")
@@ -51,7 +51,7 @@ func (d *CommonDatabase) UpdateSettings(tx *sql.Tx, settings *models.Settings) e
 	updateBuilder.Where(updateBuilder.Equal("id", settings.Id))
 
 	sql, args := updateBuilder.Build()
-	_, err := d.ExecSql(context.Background(), tx, sql, args...)
+	_, err := d.ExecSql(ctx, tx, sql, args...)
 	if err != nil {
 		settings.UpdatedAt = originalUpdatedAt
 		return errs.Wrap(err, "unable to update settings")
@@ -60,11 +60,11 @@ func (d *CommonDatabase) UpdateSettings(tx *sql.Tx, settings *models.Settings) e
 	return nil
 }
 
-func (d *CommonDatabase) getSettingsCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
+func (d *CommonDatabase) getSettingsCommon(ctx context.Context, tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
 	settingsStruct *sqlbuilder.Struct) (*models.Settings, error) {
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(context.Background(), tx, sql, args...)
+	rows, err := d.QuerySql(ctx, tx, sql, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -86,7 +86,7 @@ func (d *CommonDatabase) getSettingsCommon(tx *sql.Tx, selectBuilder *sqlbuilder
 	return nil, nil
 }
 
-func (d *CommonDatabase) GetSettingsById(tx *sql.Tx, settingsId int64) (*models.Settings, error) {
+func (d *CommonDatabase) GetSettingsById(ctx context.Context, tx *sql.Tx, settingsId int64) (*models.Settings, error) {
 
 	settingsStruct := sqlbuilder.NewStruct(new(models.Settings)).
 		For(d.Flavor)
@@ -94,7 +94,7 @@ func (d *CommonDatabase) GetSettingsById(tx *sql.Tx, settingsId int64) (*models.
 	selectBuilder := settingsStruct.SelectFrom("settings")
 	selectBuilder.Where(selectBuilder.Equal("id", settingsId))
 
-	settings, err := d.getSettingsCommon(tx, selectBuilder, settingsStruct)
+	settings, err := d.getSettingsCommon(ctx, tx, selectBuilder, settingsStruct)
 	if err != nil {
 		return nil, err
 	}
@@ -120,7 +120,7 @@ func (d *CommonDatabase) GetSettingsById(tx *sql.Tx, settingsId int64) (*models.
 //
 // The claim is taken BEFORE the work runs, so a crash mid-cleanup delays the next
 // attempt by one interval rather than letting every instance retry immediately.
-func (d *CommonDatabase) TryClaimCleanupRun(tx *sql.Tx, now time.Time, claimableBefore time.Time) (bool, error) {
+func (d *CommonDatabase) TryClaimCleanupRun(ctx context.Context, tx *sql.Tx, now time.Time, claimableBefore time.Time) (bool, error) {
 
 	ub := sqlbuilder.NewUpdateBuilder()
 	ub.Update("settings")
@@ -137,7 +137,7 @@ func (d *CommonDatabase) TryClaimCleanupRun(tx *sql.Tx, now time.Time, claimable
 	)
 
 	query, args := ub.BuildWithFlavor(d.Flavor)
-	result, err := d.ExecSql(context.Background(), tx, query, args...)
+	result, err := d.ExecSql(ctx, tx, query, args...)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to claim the cleanup run")
 	}

@@ -327,15 +327,15 @@ func userAccessTokenViaAuthCodeRefresh(t *testing.T) (string, *models.User) {
 func userAccessTokenViaROPC(t *testing.T) (string, *models.User, string) {
 	t.Helper()
 
-	settings, err := database.GetSettingsById(nil, 1)
+	settings, err := database.GetSettingsById(context.Background(), nil, 1)
 	require.NoError(t, err)
 	original := settings.ResourceOwnerPasswordCredentialsEnabled
 	settings.ResourceOwnerPasswordCredentialsEnabled = true
-	err = database.UpdateSettings(nil, settings)
+	err = database.UpdateSettings(context.Background(), nil, settings)
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		settings.ResourceOwnerPasswordCredentialsEnabled = original
-		_ = database.UpdateSettings(nil, settings)
+		_ = database.UpdateSettings(context.Background(), nil, settings)
 	})
 
 	clientSecret := fake.Password(32)
@@ -427,15 +427,15 @@ func refreshROPCToken(t *testing.T, refreshToken string) string {
 func userAccessTokenViaImplicit(t *testing.T) string {
 	t.Helper()
 
-	settings, err := database.GetSettingsById(nil, 1)
+	settings, err := database.GetSettingsById(context.Background(), nil, 1)
 	require.NoError(t, err)
 	original := settings.ImplicitFlowEnabled
 	settings.ImplicitFlowEnabled = true
-	err = database.UpdateSettings(nil, settings)
+	err = database.UpdateSettings(context.Background(), nil, settings)
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		settings.ImplicitFlowEnabled = original
-		_ = database.UpdateSettings(nil, settings)
+		_ = database.UpdateSettings(context.Background(), nil, settings)
 	})
 
 	client, redirectUri := createImplicitFlowClient(t, nil)

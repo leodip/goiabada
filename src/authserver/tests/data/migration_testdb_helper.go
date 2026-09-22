@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"net/url"
@@ -186,7 +187,7 @@ func readDatabaseDefaultCollation(t *testing.T, sqlDB *sql.DB) string {
 // NewMigrator via the seam added in chunk 3).
 type migratable interface {
 	data.Database
-	NewMigrator() (*migrator.Migrator, error)
+	NewMigrator(ctx context.Context) (*migrator.Migrator, error)
 }
 
 // newIsolated binds a migrator to the database and registers no cleanup for it. There is
@@ -196,7 +197,7 @@ type migratable interface {
 // still registered by the caller, and they are now the whole of it.
 func newIsolated(t *testing.T, db migratable, sqlDB *sql.DB, name string) *isolatedDB {
 	t.Helper()
-	m, err := db.NewMigrator()
+	m, err := db.NewMigrator(context.Background())
 	require.NoError(t, err, "NewMigrator")
 	return &isolatedDB{DB: db, SQL: sqlDB, Migrator: m, Name: name}
 }
@@ -234,7 +235,7 @@ func dumpDialect(t *testing.T) schemadump.Dialect {
 // columns, or one carrying a construct the shape cannot record.
 func dumpTable(t *testing.T, h *isolatedDB, table string) tableShape {
 	t.Helper()
-	shape, err := schemadump.DumpTable(h.SQL, dumpDialect(t), table)
+	shape, err := schemadump.DumpTable(context.Background(), h.SQL, dumpDialect(t), table)
 	require.NoErrorf(t, err, "dump table %s on %s", table, dbType())
 	return tableShape(shape)
 }
@@ -244,7 +245,7 @@ func dumpTable(t *testing.T, h *isolatedDB, table string) tableShape {
 // carry it.
 func describeIndex(t *testing.T, h *isolatedDB, table, index string) indexShape {
 	t.Helper()
-	shape, err := schemadump.DescribeIndex(h.SQL, dumpDialect(t), table, index)
+	shape, err := schemadump.DescribeIndex(context.Background(), h.SQL, dumpDialect(t), table, index)
 	require.NoErrorf(t, err, "describe index %s on %s (%s)", index, table, dbType())
 	return shape
 }
@@ -254,7 +255,7 @@ func describeIndex(t *testing.T, h *isolatedDB, table, index string) indexShape 
 // tables compared against a golden file of no tables reads as "nothing changed".
 func listTables(t *testing.T, h *isolatedDB) []string {
 	t.Helper()
-	names, err := schemadump.Tables(h.SQL, dumpDialect(t))
+	names, err := schemadump.Tables(context.Background(), h.SQL, dumpDialect(t))
 	require.NoErrorf(t, err, "list tables on %s", dbType())
 	return names
 }
@@ -263,7 +264,7 @@ func listTables(t *testing.T, h *isolatedDB) []string {
 // golden file from and what the per-engine assertion reads through.
 func dumpSchema(t *testing.T, h *isolatedDB) schemadump.Schema {
 	t.Helper()
-	schema, err := schemadump.Dump(h.SQL, dumpDialect(t))
+	schema, err := schemadump.Dump(context.Background(), h.SQL, dumpDialect(t))
 	require.NoErrorf(t, err, "dump the whole schema on %s", dbType())
 	return schema
 }

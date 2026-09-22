@@ -79,7 +79,7 @@ func TestHandleAPIAuditLogsGet_ErrorRecordBoundsBothFilters(t *testing.T) {
 	rawRequestId, wantRequestId := oversized(t, "abc\ndef")
 
 	database := mocks_data.NewDatabase(t)
-	database.On("GetAuditLogsPaginated", mock.Anything, 1, 20, rawEvent, rawRequestId).
+	database.On("GetAuditLogsPaginated", mock.Anything, mock.Anything, 1, 20, rawEvent, rawRequestId).
 		Return([]models.AuditLog(nil), 0, errs.New("engine is down"))
 
 	capture := testutil.CaptureSlog(t)
@@ -136,7 +136,7 @@ func TestErrorRecordFiltersOfOrdinaryLengthAreUnchanged(t *testing.T) {
 	const filterId = "goiabada/abc123-7"
 
 	database := mocks_data.NewDatabase(t)
-	database.On("GetAuditLogsPaginated", mock.Anything, 1, 20, event, filterId).
+	database.On("GetAuditLogsPaginated", mock.Anything, mock.Anything, 1, 20, event, filterId).
 		Return([]models.AuditLog(nil), 0, errs.New("engine is down"))
 
 	capture := testutil.CaptureSlog(t)
@@ -170,7 +170,7 @@ func TestHandleAPIUsersSearchGet_ErrorRecordBoundsTheQueryWhenTheGroupLookupFail
 
 	database := mocks_data.NewDatabase(t)
 	searchThatSucceeds(database, rawQuery)
-	database.On("GetGroupById", mock.Anything, int64(7)).
+	database.On("GetGroupById", mock.Anything, mock.Anything, int64(7)).
 		Return(nil, errs.New("engine is down"))
 
 	capture := testutil.CaptureSlog(t)
@@ -195,7 +195,7 @@ func TestHandleAPIUsersSearchGet_ErrorRecordBoundsTheQueryWhenLoadingGroupsFails
 
 	database := mocks_data.NewDatabase(t)
 	searchThatSucceeds(database, rawQuery)
-	database.On("GetGroupById", mock.Anything, int64(7)).Return(&models.Group{Id: 7}, nil)
+	database.On("GetGroupById", mock.Anything, mock.Anything, int64(7)).Return(&models.Group{Id: 7}, nil)
 	database.On("UsersLoadGroups", mock.Anything, mock.Anything, mock.Anything).
 		Return(errs.New("engine is down"))
 

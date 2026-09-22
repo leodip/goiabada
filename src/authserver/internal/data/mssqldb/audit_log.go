@@ -12,11 +12,11 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 )
 
-func (d *MsSQLDatabase) DeleteOldAuditLogs(tx *sql.Tx, cutoff time.Time, maxDeletions int) (int, error) {
+func (d *MsSQLDatabase) DeleteOldAuditLogs(ctx context.Context, tx *sql.Tx, cutoff time.Time, maxDeletions int) (int, error) {
 	// MSSQL uses DELETE TOP(n) syntax
 	sqlStr := fmt.Sprintf("DELETE TOP (%d) FROM audit_logs WHERE created_at < @p1", maxDeletions)
 
-	result, err := d.ExecSql(context.Background(), tx, sqlStr, cutoff)
+	result, err := d.ExecSql(ctx, tx, sqlStr, cutoff)
 	if err != nil {
 		return 0, errs.Wrap(err, "unable to delete old audit logs")
 	}
@@ -49,7 +49,7 @@ func requestIdIsByteExact(b interface{ Var(arg interface{}) string }, requestId 
 	return "CAST(request_id AS VARBINARY(512)) = CAST(" + b.Var(requestId) + " AS VARBINARY(512))"
 }
 
-func (d *MsSQLDatabase) GetAuditLogsPaginated(tx *sql.Tx, page int, pageSize int, auditEvent string,
+func (d *MsSQLDatabase) GetAuditLogsPaginated(ctx context.Context, tx *sql.Tx, page int, pageSize int, auditEvent string,
 	requestId string) ([]models.AuditLog, int, error) {
 	if page < 1 {
 		page = 1
@@ -81,7 +81,7 @@ func (d *MsSQLDatabase) GetAuditLogsPaginated(tx *sql.Tx, page int, pageSize int
 	// MSSQL requires OFFSET...FETCH syntax for pagination
 	sqlStr = fmt.Sprintf("%s OFFSET %d ROWS FETCH NEXT %d ROWS ONLY", sqlStr, offset, pageSize)
 
-	rows, err := d.QuerySql(context.Background(), tx, sqlStr, args...)
+	rows, err := d.QuerySql(ctx, tx, sqlStr, args...)
 	if err != nil {
 		return nil, 0, errs.Wrap(err, "unable to query database")
 	}
@@ -110,7 +110,7 @@ func (d *MsSQLDatabase) GetAuditLogsPaginated(tx *sql.Tx, page int, pageSize int
 	}
 
 	countSql, countArgs := countBuilder.Build()
-	countRows, err := d.QuerySql(context.Background(), tx, countSql, countArgs...)
+	countRows, err := d.QuerySql(ctx, tx, countSql, countArgs...)
 	if err != nil {
 		return nil, 0, errs.Wrap(err, "unable to query count")
 	}

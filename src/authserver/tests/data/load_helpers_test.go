@@ -333,7 +333,7 @@ func TestGroupLoadPermissions(t *testing.T) {
 	permission := createTestPermission(t, resource)
 	createTestGroupPermission(t, group.Id, permission.Id)
 
-	if err := database.GroupLoadPermissions(nil, group); err != nil {
+	if err := database.GroupLoadPermissions(context.Background(), nil, group); err != nil {
 		t.Fatalf("GroupLoadPermissions failed: %v", err)
 	}
 
@@ -348,7 +348,7 @@ func TestGroupLoadPermissions(t *testing.T) {
 func TestGroupLoadPermissions_NoPermissions(t *testing.T) {
 	group := createTestGroup(t)
 
-	if err := database.GroupLoadPermissions(nil, group); err != nil {
+	if err := database.GroupLoadPermissions(context.Background(), nil, group); err != nil {
 		t.Fatalf("GroupLoadPermissions failed: %v", err)
 	}
 
@@ -373,7 +373,7 @@ func TestGroupsLoadPermissions(t *testing.T) {
 
 	groups := []models.Group{*groupA, *groupB, *groupC}
 
-	if err := database.GroupsLoadPermissions(nil, groups); err != nil {
+	if err := database.GroupsLoadPermissions(context.Background(), nil, groups); err != nil {
 		t.Fatalf("GroupsLoadPermissions failed: %v", err)
 	}
 
@@ -389,10 +389,10 @@ func TestGroupsLoadPermissions(t *testing.T) {
 }
 
 func TestGroupsLoadPermissions_NilAndEmptySlices(t *testing.T) {
-	if err := database.GroupsLoadPermissions(nil, nil); err != nil {
+	if err := database.GroupsLoadPermissions(context.Background(), nil, nil); err != nil {
 		t.Errorf("GroupsLoadPermissions(nil) should be a no-op, got: %v", err)
 	}
-	if err := database.GroupsLoadPermissions(nil, []models.Group{}); err != nil {
+	if err := database.GroupsLoadPermissions(context.Background(), nil, []models.Group{}); err != nil {
 		t.Errorf("GroupsLoadPermissions(empty) should be a no-op, got: %v", err)
 	}
 }
@@ -405,7 +405,7 @@ func TestGroupsLoadAttributes(t *testing.T) {
 
 	groups := []models.Group{*groupA, *groupB}
 
-	if err := database.GroupsLoadAttributes(nil, groups); err != nil {
+	if err := database.GroupsLoadAttributes(context.Background(), nil, groups); err != nil {
 		t.Fatalf("GroupsLoadAttributes failed: %v", err)
 	}
 
@@ -418,10 +418,10 @@ func TestGroupsLoadAttributes(t *testing.T) {
 }
 
 func TestGroupsLoadAttributes_NilAndEmptySlices(t *testing.T) {
-	if err := database.GroupsLoadAttributes(nil, nil); err != nil {
+	if err := database.GroupsLoadAttributes(context.Background(), nil, nil); err != nil {
 		t.Errorf("GroupsLoadAttributes(nil) should be a no-op, got: %v", err)
 	}
-	if err := database.GroupsLoadAttributes(nil, []models.Group{}); err != nil {
+	if err := database.GroupsLoadAttributes(context.Background(), nil, []models.Group{}); err != nil {
 		t.Errorf("GroupsLoadAttributes(empty) should be a no-op, got: %v", err)
 	}
 }
@@ -432,7 +432,7 @@ func TestGetGroupsByIds(t *testing.T) {
 	groupC := createTestGroup(t)
 
 	// Deliberately ask for only two of the three.
-	groups, err := database.GetGroupsByIds(nil, []int64{groupA.Id, groupC.Id})
+	groups, err := database.GetGroupsByIds(context.Background(), nil, []int64{groupA.Id, groupC.Id})
 	if err != nil {
 		t.Fatalf("GetGroupsByIds failed: %v", err)
 	}
@@ -457,7 +457,7 @@ func TestGetGroupsByIds(t *testing.T) {
 }
 
 func TestGetGroupsByIds_EmptyInput(t *testing.T) {
-	groups, err := database.GetGroupsByIds(nil, []int64{})
+	groups, err := database.GetGroupsByIds(context.Background(), nil, []int64{})
 	if err != nil {
 		t.Fatalf("GetGroupsByIds(empty) failed: %v", err)
 	}
@@ -465,7 +465,7 @@ func TestGetGroupsByIds_EmptyInput(t *testing.T) {
 		t.Errorf("Expected nil for an empty id list, got %+v", groups)
 	}
 
-	groups, err = database.GetGroupsByIds(nil, nil)
+	groups, err = database.GetGroupsByIds(context.Background(), nil, nil)
 	if err != nil {
 		t.Fatalf("GetGroupsByIds(nil) failed: %v", err)
 	}
@@ -477,7 +477,7 @@ func TestGetGroupsByIds_EmptyInput(t *testing.T) {
 func TestGetGroupsByIds_UnknownIdIsSkipped(t *testing.T) {
 	group := createTestGroup(t)
 
-	groups, err := database.GetGroupsByIds(nil, []int64{group.Id, 999999999})
+	groups, err := database.GetGroupsByIds(context.Background(), nil, []int64{group.Id, 999999999})
 	if err != nil {
 		t.Fatalf("GetGroupsByIds failed: %v", err)
 	}
@@ -494,7 +494,7 @@ func TestGetGroupsByIds_UnknownIdIsSkipped(t *testing.T) {
 func TestCountGroupMembers(t *testing.T) {
 	group := createTestGroup(t)
 
-	count, err := database.CountGroupMembers(nil, group.Id)
+	count, err := database.CountGroupMembers(context.Background(), nil, group.Id)
 	if err != nil {
 		t.Fatalf("CountGroupMembers failed: %v", err)
 	}
@@ -507,7 +507,7 @@ func TestCountGroupMembers(t *testing.T) {
 	createTestUserGroupWithUserAndGroup(t, userA.Id, group.Id)
 	createTestUserGroupWithUserAndGroup(t, userB.Id, group.Id)
 
-	count, err = database.CountGroupMembers(nil, group.Id)
+	count, err = database.CountGroupMembers(context.Background(), nil, group.Id)
 	if err != nil {
 		t.Fatalf("CountGroupMembers failed: %v", err)
 	}
@@ -529,7 +529,7 @@ func TestGetGroupMembersPaginated(t *testing.T) {
 	}
 
 	t.Run("first page", func(t *testing.T) {
-		users, total, err := database.GetGroupMembersPaginated(nil, group.Id, 1, 2)
+		users, total, err := database.GetGroupMembersPaginated(context.Background(), nil, group.Id, 1, 2)
 		if err != nil {
 			t.Fatalf("GetGroupMembersPaginated failed: %v", err)
 		}
@@ -546,7 +546,7 @@ func TestGetGroupMembersPaginated(t *testing.T) {
 	})
 
 	t.Run("second page", func(t *testing.T) {
-		users, total, err := database.GetGroupMembersPaginated(nil, group.Id, 2, 2)
+		users, total, err := database.GetGroupMembersPaginated(context.Background(), nil, group.Id, 2, 2)
 		if err != nil {
 			t.Fatalf("GetGroupMembersPaginated failed: %v", err)
 		}
@@ -562,7 +562,7 @@ func TestGetGroupMembersPaginated(t *testing.T) {
 	})
 
 	t.Run("page past the end", func(t *testing.T) {
-		users, total, err := database.GetGroupMembersPaginated(nil, group.Id, 99, 2)
+		users, total, err := database.GetGroupMembersPaginated(context.Background(), nil, group.Id, 99, 2)
 		if err != nil {
 			t.Fatalf("GetGroupMembersPaginated failed: %v", err)
 		}
@@ -576,7 +576,7 @@ func TestGetGroupMembersPaginated(t *testing.T) {
 
 	// page < 1 and pageSize < 1 are clamped to 1 and 10 respectively.
 	t.Run("non-positive page and size are clamped", func(t *testing.T) {
-		users, total, err := database.GetGroupMembersPaginated(nil, group.Id, 0, 0)
+		users, total, err := database.GetGroupMembersPaginated(context.Background(), nil, group.Id, 0, 0)
 		if err != nil {
 			t.Fatalf("GetGroupMembersPaginated failed: %v", err)
 		}
@@ -592,7 +592,7 @@ func TestGetGroupMembersPaginated(t *testing.T) {
 func TestGetGroupMembersPaginated_EmptyGroup(t *testing.T) {
 	group := createTestGroup(t)
 
-	users, total, err := database.GetGroupMembersPaginated(nil, group.Id, 1, 10)
+	users, total, err := database.GetGroupMembersPaginated(context.Background(), nil, group.Id, 1, 10)
 	if err != nil {
 		t.Fatalf("GetGroupMembersPaginated failed: %v", err)
 	}
@@ -606,7 +606,7 @@ func TestGetGroupMembersPaginated_EmptyGroup(t *testing.T) {
 
 func TestGetGroupMembersPaginated_InvalidGroupId(t *testing.T) {
 	for _, groupId := range []int64{0, -1} {
-		if _, _, err := database.GetGroupMembersPaginated(nil, groupId, 1, 10); err == nil {
+		if _, _, err := database.GetGroupMembersPaginated(context.Background(), nil, groupId, 1, 10); err == nil {
 			t.Errorf("Expected an error for group id %d", groupId)
 		}
 	}
@@ -875,12 +875,12 @@ func TestDeleteAllUserConsent_Idempotent(t *testing.T) {
 // asserting a fixed answer here would be order-dependent. Instead this pins the
 // contract: IsEmpty is true exactly when that row is absent.
 func TestIsEmpty(t *testing.T) {
-	empty, err := database.IsEmpty()
+	empty, err := database.IsEmpty(context.Background())
 	if err != nil {
 		t.Fatalf("IsEmpty failed: %v", err)
 	}
 
-	settings, err := database.GetSettingsById(nil, 1)
+	settings, err := database.GetSettingsById(context.Background(), nil, 1)
 	if err != nil {
 		t.Fatalf("Failed to read settings: %v", err)
 	}

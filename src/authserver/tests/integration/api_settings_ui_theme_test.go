@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -18,7 +19,7 @@ func TestAPISettingsUIThemeGet_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Fetch current settings directly from DB for expected values
-	settings, err := database.GetSettingsById(nil, 1)
+	settings, err := database.GetSettingsById(context.Background(), nil, 1)
 	assert.NoError(t, err)
 	assert.NotNil(t, settings)
 
@@ -60,7 +61,7 @@ func TestAPISettingsUIThemePut_Success(t *testing.T) {
 	assert.ElementsMatch(t, uithemes.Get(), body.AvailableThemes)
 
 	// DB persisted
-	settings, err := database.GetSettingsById(nil, 1)
+	settings, err := database.GetSettingsById(context.Background(), nil, 1)
 	assert.NoError(t, err)
 	assert.Equal(t, valid, settings.UITheme)
 
@@ -74,7 +75,7 @@ func TestAPISettingsUIThemePut_Success(t *testing.T) {
 	assert.ElementsMatch(t, uithemes.Get(), body2.AvailableThemes)
 
 	// DB persisted default
-	settings2, err2 := database.GetSettingsById(nil, 1)
+	settings2, err2 := database.GetSettingsById(context.Background(), nil, 1)
 	assert.NoError(t, err2)
 	assert.Equal(t, "", settings2.UITheme)
 }

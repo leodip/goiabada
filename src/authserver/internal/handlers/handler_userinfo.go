@@ -74,7 +74,7 @@ func HandleUserInfoGetPost(
 			return
 		}
 
-		err = database.GroupsLoadAttributes(nil, user.Groups)
+		err = database.GroupsLoadAttributes(r.Context(), nil, user.Groups)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return

@@ -88,9 +88,9 @@ func (d *CommonDatabase) BeginTransaction(ctx context.Context) (*sql.Tx, error) 
 	return tx, nil
 }
 
-func (d *CommonDatabase) CommitTransaction(tx *sql.Tx) error {
+func (d *CommonDatabase) CommitTransaction(ctx context.Context, tx *sql.Tx) error {
 	if d.logSQL {
-		slog.Info("committing transaction")
+		slog.InfoContext(ctx, "committing transaction")
 	}
 
 	err := tx.Commit()
@@ -100,9 +100,9 @@ func (d *CommonDatabase) CommitTransaction(tx *sql.Tx) error {
 	return nil
 }
 
-func (d *CommonDatabase) RollbackTransaction(tx *sql.Tx) error {
+func (d *CommonDatabase) RollbackTransaction(ctx context.Context, tx *sql.Tx) error {
 	if d.logSQL {
-		slog.Info("rolling back transaction")
+		slog.InfoContext(ctx, "rolling back transaction")
 	}
 
 	err := tx.Rollback()
@@ -242,7 +242,7 @@ func (d *CommonDatabase) runTransactionOnce(ctx context.Context, fn func(tx *sql
 		if committing {
 			return
 		}
-		rollbackErr := d.RollbackTransaction(tx)
+		rollbackErr := d.RollbackTransaction(ctx, tx)
 		if rollbackErr == nil || (ctx.Err() != nil && errors.Is(rollbackErr, sql.ErrTxDone)) {
 			return
 		}
@@ -255,7 +255,7 @@ func (d *CommonDatabase) runTransactionOnce(ctx context.Context, fn func(tx *sql
 	}
 
 	committing = true
-	return d.CommitTransaction(tx)
+	return d.CommitTransaction(ctx, tx)
 }
 
 // deadlock consults the dialect's classifier, treating none as "nothing is a deadlock".
@@ -438,8 +438,8 @@ func (d *CommonDatabase) insertReturningId(ctx context.Context, tx *sql.Tx,
 	return id, nil
 }
 
-func (d *CommonDatabase) IsEmpty() (bool, error) {
-	settings, err := d.GetSettingsById(nil, 1)
+func (d *CommonDatabase) IsEmpty(ctx context.Context) (bool, error) {
+	settings, err := d.GetSettingsById(ctx, nil, 1)
 	if err != nil {
 		return false, errs.Wrap(err, "failed to check if database is empty")
 	}

@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -44,13 +45,13 @@ func TestMigrationDowns_DropOnlyTheirOwnDefaultConstraints(t *testing.T) {
 	// Up to the highest version whose down carries a discovery query. Going further would work
 	// too and costs the rest of the chain for nothing.
 	const highestDiscoveringDown = 18
-	require.NoErrorf(t, h.Migrator.Migrate(highestDiscoveringDown),
+	require.NoErrorf(t, h.Migrator.Migrate(context.Background(), highestDiscoveringDown),
 		"apply the chain up to %06d on %s", highestDiscoveringDown, dbType())
 
 	seedCompanionSchema(t, h)
 
 	// All the way down, which runs every one of the eight.
-	require.NoErrorf(t, h.Migrator.Migrate(migrator.NilVersion),
+	require.NoErrorf(t, h.Migrator.Migrate(context.Background(), migrator.NilVersion),
 		"roll the whole chain back on %s", dbType())
 
 	for _, c := range companionDefaults {

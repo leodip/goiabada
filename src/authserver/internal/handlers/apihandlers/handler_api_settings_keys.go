@@ -22,7 +22,7 @@ func HandleAPISettingsKeysGet(
 	database data.Database,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		allSigningKeys, err := database.GetAllSigningKeys(nil)
+		allSigningKeys, err := database.GetAllSigningKeys(r.Context(), nil)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -137,7 +137,7 @@ func HandleAPISettingsKeyDelete(
 			return
 		}
 
-		kp, err := database.GetKeyPairById(nil, id)
+		kp, err := database.GetKeyPairById(r.Context(), nil, id)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -157,7 +157,7 @@ func HandleAPISettingsKeyDelete(
 			return
 		}
 
-		if err := database.DeleteKeyPair(nil, kp.Id); err != nil {
+		if err := database.DeleteKeyPair(r.Context(), nil, kp.Id); err != nil {
 			writeInternalServerError(w, r, err)
 			return
 		}

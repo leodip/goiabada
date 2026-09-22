@@ -75,7 +75,7 @@ func HandleAPIUserGroupsGet(
 		// Get member counts for user's groups
 		memberCounts := make(map[int64]int)
 		for _, group := range user.Groups {
-			count, err := database.CountGroupMembers(nil, group.Id)
+			count, err := database.CountGroupMembers(r.Context(), nil, group.Id)
 			if err != nil {
 				// Log error but continue with 0 count
 				count = 0
@@ -137,7 +137,7 @@ func HandleAPIUserGroupsPut(
 
 		// Validate all requested groups exist
 		if len(request.GroupIds) > 0 {
-			groups, err := database.GetGroupsByIds(nil, request.GroupIds)
+			groups, err := database.GetGroupsByIds(r.Context(), nil, request.GroupIds)
 			if err != nil {
 				writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting groups by IDs for validation"), "group_ids", request.GroupIds, "user_id", user.Id)
 				return
@@ -224,7 +224,7 @@ func HandleAPIUserGroupsPut(
 		// Get member counts for user's groups
 		memberCounts := make(map[int64]int)
 		for _, group := range user.Groups {
-			count, err := database.CountGroupMembers(nil, group.Id)
+			count, err := database.CountGroupMembers(r.Context(), nil, group.Id)
 			if err != nil {
 				// Log error but continue with 0 count
 				count = 0

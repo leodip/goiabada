@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -38,19 +39,19 @@ import (
 func TestMigration000035_BrowserSessions(t *testing.T) {
 	h := newIsolatedDB(t)
 
-	require.NoError(t, h.Migrator.Migrate(34), "migrate to 000034")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 34), "migrate to 000034")
 
 	assert.False(t, tableExists000035(t, h, "browser_sessions"),
 		"browser_sessions must not exist at 000034, so what is found afterwards is what 000035 added")
 
 	seedInstallation000035(t, h)
 
-	require.NoError(t, h.Migrator.Migrate(35), "apply 000035")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 35), "apply 000035")
 	assertAfter000035(t, h, "after apply")
 
 	// Down, then up again. SQL Server's constraints bite in both directions, and this is
 	// the arm 000031's entry records catching them.
-	require.NoError(t, h.Migrator.Migrate(34), "roll back 000035")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 34), "roll back 000035")
 
 	assert.False(t, tableExists000035(t, h, "browser_sessions"),
 		"the down migration must drop browser_sessions")
@@ -61,7 +62,7 @@ func TestMigration000035_BrowserSessions(t *testing.T) {
 	assert.False(t, clientCredentialsEnabled000035(t, h),
 		"the down migration must put client_credentials_enabled back")
 
-	require.NoError(t, h.Migrator.Migrate(35), "apply 000035 again")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 35), "apply 000035 again")
 	assertAfter000035(t, h, "after down then up")
 }
 
@@ -74,7 +75,7 @@ func TestMigration000035_BrowserSessions(t *testing.T) {
 func TestMigration000035_GuardedInsertsAreIdempotent(t *testing.T) {
 	h := newIsolatedDB(t)
 
-	require.NoError(t, h.Migrator.Migrate(34), "migrate to 000034")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 34), "migrate to 000034")
 	resourceId, clientId := seedInstallation000035(t, h)
 
 	// The end state 000035 produces, already present before it runs.
@@ -84,7 +85,7 @@ func TestMigration000035_GuardedInsertsAreIdempotent(t *testing.T) {
 	require.Equal(t, 1, countBrowserSessionsPermission000035(t, h), "fixture: one permission")
 	require.Equal(t, 1, countBrowserSessionsGrant000035(t, h), "fixture: one grant")
 
-	require.NoError(t, h.Migrator.Migrate(35), "apply 000035 over a fixture that already has both rows")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 35), "apply 000035 over a fixture that already has both rows")
 
 	assert.Equal(t, 1, countBrowserSessionsPermission000035(t, h),
 		"the guarded permission insert must add nothing when the permission is already there")
@@ -121,7 +122,7 @@ func TestMigration000035_GuardedInsertsAreIdempotent(t *testing.T) {
 func TestMigration000035_StripsWiderGrantsFromTheAdminConsoleClient(t *testing.T) {
 	h := newIsolatedDB(t)
 
-	require.NoError(t, h.Migrator.Migrate(34), "migrate to 000034")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 34), "migrate to 000034")
 	resourceId, clientId := seedInstallation000035(t, h)
 
 	managePermissionId := seedPermission000035(t, h, resourceId, "manage",
@@ -136,7 +137,7 @@ func TestMigration000035_StripsWiderGrantsFromTheAdminConsoleClient(t *testing.T
 	require.Equal(t, 1, countGrantOfPermission000035(t, h, "some-other-client", "manage"),
 		"fixture: another client holds the same permission")
 
-	require.NoError(t, h.Migrator.Migrate(35), "apply 000035")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 35), "apply 000035")
 
 	assert.Equal(t, 0, countGrantOfPermission000035(t, h, "admin-console-client", "manage"),
 		"the upgrade must remove the wide grant, or it becomes usable the moment the migration "+
@@ -188,7 +189,7 @@ func TestMigration000035_StripsWiderGrantsFromTheAdminConsoleClient(t *testing.T
 func TestMigration000035_StripsBrowserSessionsGrantsFromEveryOtherPrincipal(t *testing.T) {
 	h := newIsolatedDB(t)
 
-	require.NoError(t, h.Migrator.Migrate(34), "migrate to 000034")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 34), "migrate to 000034")
 	resourceId, _ := seedInstallation000035(t, h)
 
 	// The administrator's own permission of that name, made before this release existed.
@@ -218,7 +219,7 @@ func TestMigration000035_StripsBrowserSessionsGrantsFromEveryOtherPrincipal(t *t
 	require.Equal(t, 1, countGroupGrant000035(t, h, "browser-sessions"),
 		"fixture: a group holds it")
 
-	require.NoError(t, h.Migrator.Migrate(35), "apply 000035")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 35), "apply 000035")
 
 	assert.Equal(t, 0, countGrantOfPermission000035(t, h, "some-other-client", "browser-sessions"),
 		"another client's grant must go: the endpoint admits whoever carries the scope, so leaving "+

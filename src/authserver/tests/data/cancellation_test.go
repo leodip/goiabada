@@ -74,7 +74,7 @@ func TestBeginTransaction_OnSqliteABlockedOpenReturnsOnItsDeadline(t *testing.T)
 
 	held, err := database.BeginTransaction(context.Background())
 	require.NoError(t, err, "the holder takes the only connection")
-	defer func() { _ = database.RollbackTransaction(held) }()
+	defer func() { _ = database.RollbackTransaction(context.Background(), held) }()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
 	defer cancel()
@@ -103,7 +103,7 @@ func TestBeginTransaction_OnSqliteABlockedOpenReturnsOnItsDeadline(t *testing.T)
 		case answered <- opened{tx: tx, err: err}:
 		case <-gaveUp:
 			if tx != nil {
-				_ = database.RollbackTransaction(tx)
+				_ = database.RollbackTransaction(context.Background(), tx)
 			}
 		}
 	}()
@@ -257,7 +257,7 @@ func TestAcquireUserSessionRow_RefusesAnAlreadyCancelledContext(t *testing.T) {
 
 	tx, err := database.BeginTransaction(context.Background())
 	require.NoError(t, err)
-	defer func() { _ = database.RollbackTransaction(tx) }()
+	defer func() { _ = database.RollbackTransaction(context.Background(), tx) }()
 
 	live, err := database.AcquireUserSessionRow(cancelled(), tx, session.SessionIdentifier)
 
@@ -379,7 +379,7 @@ func TestAcquireClientRow_RefusesAnAlreadyCancelledContext(t *testing.T) {
 
 	tx, err := database.BeginTransaction(context.Background())
 	require.NoError(t, err)
-	defer func() { _ = database.RollbackTransaction(tx) }()
+	defer func() { _ = database.RollbackTransaction(context.Background(), tx) }()
 
 	err = database.AcquireClientRow(cancelled(), tx, client.Id)
 

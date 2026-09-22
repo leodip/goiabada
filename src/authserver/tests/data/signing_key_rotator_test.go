@@ -44,7 +44,7 @@ func TestSigningKeyRotator_Rotate_MovesEveryKeyOneStep(t *testing.T) {
 		t.Fatalf("Rotate failed: %v", err)
 	}
 
-	keyPairs, err := database.GetAllSigningKeys(nil)
+	keyPairs, err := database.GetAllSigningKeys(context.Background(), nil)
 	if err != nil {
 		t.Fatalf("Failed to get all signing keys: %v", err)
 	}
@@ -84,7 +84,7 @@ func TestSigningKeyRotator_Rotate_MovesEveryKeyOneStep(t *testing.T) {
 
 	// The key that was previous before the rotation is gone, which is the one deletion
 	// the rotation is entitled to make.
-	deleted, err := database.GetKeyPairById(nil, previous.Id)
+	deleted, err := database.GetKeyPairById(context.Background(), nil, previous.Id)
 	if err != nil {
 		t.Fatalf("Failed to look up the old previous key: %v", err)
 	}
@@ -123,7 +123,7 @@ func TestSigningKeyRotator_Rotate_MovesEveryKeyOneStep(t *testing.T) {
 
 	// GetCurrentSigningKey is what every token issuer asks, so the promotion has to be
 	// visible through it and not only through GetAllSigningKeys.
-	signingKey, err := database.GetCurrentSigningKey(nil)
+	signingKey, err := database.GetCurrentSigningKey(context.Background(), nil)
 	if err != nil {
 		t.Fatalf("Failed to get the current signing key: %v", err)
 	}
@@ -149,7 +149,7 @@ func TestSigningKeyRotator_Rotate_RefusesWithNoNextKeyAndKeepsThePrevious(t *tes
 
 	// Nothing moved. The previous key is the whole point: the old code deleted it before
 	// discovering it could not rotate, retiring every token it had signed (#251).
-	survivor, err := database.GetKeyPairById(nil, previous.Id)
+	survivor, err := database.GetKeyPairById(context.Background(), nil, previous.Id)
 	if err != nil {
 		t.Fatalf("Failed to look up the previous key: %v", err)
 	}
@@ -160,7 +160,7 @@ func TestSigningKeyRotator_Rotate_RefusesWithNoNextKeyAndKeepsThePrevious(t *tes
 		t.Errorf("Expected the previous key to be untouched, it is in state %s", survivor.State)
 	}
 
-	stillCurrent, err := database.GetKeyPairById(nil, current.Id)
+	stillCurrent, err := database.GetKeyPairById(context.Background(), nil, current.Id)
 	if err != nil {
 		t.Fatalf("Failed to look up the current key: %v", err)
 	}
@@ -168,7 +168,7 @@ func TestSigningKeyRotator_Rotate_RefusesWithNoNextKeyAndKeepsThePrevious(t *tes
 		t.Error("Expected the current key to be untouched by the refused rotation")
 	}
 
-	keyPairs, err := database.GetAllSigningKeys(nil)
+	keyPairs, err := database.GetAllSigningKeys(context.Background(), nil)
 	if err != nil {
 		t.Fatalf("Failed to get all signing keys: %v", err)
 	}

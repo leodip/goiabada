@@ -1,6 +1,7 @@
 package datafactory
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -36,9 +37,9 @@ func TestRunStartupDataTasks_IsFailClosed(t *testing.T) {
 
 	t.Run("the env-to-env key rotation", func(t *testing.T) {
 		db := mocks_data.NewDatabase(t)
-		db.EXPECT().RotateEncryptionKeyIfNeeded(startupKey, make([]byte, 32)).Return(false, boom)
+		db.EXPECT().RotateEncryptionKeyIfNeeded(mock.Anything, startupKey, make([]byte, 32)).Return(false, boom)
 
-		err := runStartupDataTasks(db, startupKey, make([]byte, 32))
+		err := runStartupDataTasks(context.Background(), db, startupKey, make([]byte, 32))
 
 		require.Error(t, err,
 			"a rotation failure must stop startup: half the rows would read under the current key and half under the previous one")
@@ -49,9 +50,9 @@ func TestRunStartupDataTasks_IsFailClosed(t *testing.T) {
 	t.Run("a previous key of the wrong length skips the rotation entirely", func(t *testing.T) {
 		db := mocks_data.NewDatabase(t)
 
-		assert.NoError(t, runStartupDataTasks(db, startupKey, []byte("too short")),
+		assert.NoError(t, runStartupDataTasks(context.Background(), db, startupKey, []byte("too short")),
 			"rotation is acted on only at 32 bytes, so nothing must be called here")
-		db.AssertNotCalled(t, "RotateEncryptionKeyIfNeeded", mock.Anything, mock.Anything)
+		db.AssertNotCalled(t, "RotateEncryptionKeyIfNeeded", mock.Anything, mock.Anything, mock.Anything)
 	})
 
 	// The assertion that fails if someone re-adds a settings read. runStartupDataTasks read
@@ -62,10 +63,10 @@ func TestRunStartupDataTasks_IsFailClosed(t *testing.T) {
 	// an assertion that is only the absence of a line is not one a reader can see.
 	t.Run("and the surviving sequence reads no settings at all", func(t *testing.T) {
 		db := mocks_data.NewDatabase(t)
-		db.EXPECT().RotateEncryptionKeyIfNeeded(startupKey, make([]byte, 32)).Return(true, nil)
+		db.EXPECT().RotateEncryptionKeyIfNeeded(mock.Anything, startupKey, make([]byte, 32)).Return(true, nil)
 
-		assert.NoError(t, runStartupDataTasks(db, startupKey, make([]byte, 32)),
+		assert.NoError(t, runStartupDataTasks(context.Background(), db, startupKey, make([]byte, 32)),
 			"a successful rotation is a successful startup, so the case above fails because of the injected error")
-		db.AssertNotCalled(t, "GetSettingsById", mock.Anything, mock.Anything)
+		db.AssertNotCalled(t, "GetSettingsById", mock.Anything, mock.Anything, mock.Anything)
 	})
 }

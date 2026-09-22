@@ -55,7 +55,7 @@ func byIdReaders() []byIdReader {
 			return v != nil, err
 		}},
 		{"GetKeyPairById", func(tx *sql.Tx, id int64) (bool, error) {
-			v, err := database.GetKeyPairById(tx, id)
+			v, err := database.GetKeyPairById(context.Background(), tx, id)
 			return v != nil, err
 		}},
 		{"GetRedirectURIById", func(tx *sql.Tx, id int64) (bool, error) {
@@ -67,7 +67,7 @@ func byIdReaders() []byIdReader {
 			return v != nil, err
 		}},
 		{"GetSettingsById", func(tx *sql.Tx, id int64) (bool, error) {
-			v, err := database.GetSettingsById(tx, id)
+			v, err := database.GetSettingsById(context.Background(), tx, id)
 			return v != nil, err
 		}},
 		{"GetUserPermissionById", func(tx *sql.Tx, id int64) (bool, error) {
@@ -75,7 +75,7 @@ func byIdReaders() []byIdReader {
 			return v != nil, err
 		}},
 		{"GetGroupById", func(tx *sql.Tx, id int64) (bool, error) {
-			v, err := database.GetGroupById(tx, id)
+			v, err := database.GetGroupById(context.Background(), tx, id)
 			return v != nil, err
 		}},
 		{"GetUserAttributeById", func(tx *sql.Tx, id int64) (bool, error) {
@@ -103,7 +103,7 @@ func byIdReaders() []byIdReader {
 			return v != nil, err
 		}},
 		{"GetPreRegistrationById", func(tx *sql.Tx, id int64) (bool, error) {
-			v, err := database.GetPreRegistrationById(tx, id)
+			v, err := database.GetPreRegistrationById(context.Background(), tx, id)
 			return v != nil, err
 		}},
 		{"GetUserGroupById", func(tx *sql.Tx, id int64) (bool, error) {
@@ -111,11 +111,11 @@ func byIdReaders() []byIdReader {
 			return v != nil, err
 		}},
 		{"GetGroupAttributeById", func(tx *sql.Tx, id int64) (bool, error) {
-			v, err := database.GetGroupAttributeById(tx, id)
+			v, err := database.GetGroupAttributeById(context.Background(), tx, id)
 			return v != nil, err
 		}},
 		{"GetGroupPermissionById", func(tx *sql.Tx, id int64) (bool, error) {
-			v, err := database.GetGroupPermissionById(tx, id)
+			v, err := database.GetGroupPermissionById(context.Background(), tx, id)
 			return v != nil, err
 		}},
 		{"GetRefreshTokenById", func(tx *sql.Tx, id int64) (bool, error) {
@@ -182,7 +182,7 @@ func byValueReaders() []byValueReader {
 			return r != nil, err
 		}},
 		{"GetGroupByGroupIdentifier", randomWord, func(tx *sql.Tx, v string) (bool, error) {
-			g, err := database.GetGroupByGroupIdentifier(tx, v)
+			g, err := database.GetGroupByGroupIdentifier(context.Background(), tx, v)
 			return g != nil, err
 		}},
 		{"GetUserSessionBySessionIdentifier", randomUUID, func(tx *sql.Tx, v string) (bool, error) {
@@ -191,7 +191,7 @@ func byValueReaders() []byValueReader {
 		}},
 		{"GetPreRegistrationByEmail", func() string { return "missing_" + fake.LetterN(12) + "@example.com" },
 			func(tx *sql.Tx, v string) (bool, error) {
-				p, err := database.GetPreRegistrationByEmail(tx, v)
+				p, err := database.GetPreRegistrationByEmail(context.Background(), tx, v)
 				return p != nil, err
 			}},
 		{"GetRefreshTokenByJti", randomUUID, func(tx *sql.Tx, v string) (bool, error) {
@@ -234,5 +234,5 @@ func TestUnknownId_ReturnsNilWithoutErrorInTransaction(t *testing.T) {
 		assert.Falsef(t, found, "%s must return nil for a missing row in a transaction", reader.name)
 	}
 
-	require.NoError(t, database.RollbackTransaction(tx), "RollbackTransaction")
+	require.NoError(t, database.RollbackTransaction(context.Background(), tx), "RollbackTransaction")
 }

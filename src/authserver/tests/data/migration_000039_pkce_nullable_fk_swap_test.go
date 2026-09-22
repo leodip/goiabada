@@ -59,7 +59,7 @@ func TestMigration000039_ShapeDifferenceIsExactlyIntended(t *testing.T) {
 	h := newIsolatedDB(t)
 
 	pred := predecessor000039()
-	require.NoErrorf(t, h.Migrator.Migrate(pred), "migrate to %06d", pred)
+	require.NoErrorf(t, h.Migrator.Migrate(context.Background(), pred), "migrate to %06d", pred)
 
 	codesBefore := dumpTable(t, h, "codes")
 	rtBefore := dumpTable(t, h, "refresh_tokens")
@@ -77,14 +77,14 @@ func TestMigration000039_ShapeDifferenceIsExactlyIntended(t *testing.T) {
 		return
 	}
 
-	require.NoError(t, h.Migrator.Migrate(39), "apply 000039")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 39), "apply 000039")
 	assertShape000039(t, h, "after apply", codesWant, rtWant)
 	assertFinalShape000039(t, "after apply", dumpTable(t, h, "codes"), dumpTable(t, h, "refresh_tokens"))
 
-	require.NoErrorf(t, h.Migrator.Migrate(pred), "roll back to %06d", pred)
+	require.NoErrorf(t, h.Migrator.Migrate(context.Background(), pred), "roll back to %06d", pred)
 	assertShape000039(t, h, "after down", codesBefore, rtBefore)
 
-	require.NoError(t, h.Migrator.Migrate(39), "re-apply 000039")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 39), "re-apply 000039")
 	assertShape000039(t, h, "after down/up round trip", codesWant, rtWant)
 	assertFinalShape000039(t, "after round trip", dumpTable(t, h, "codes"), dumpTable(t, h, "refresh_tokens"))
 }
@@ -186,7 +186,7 @@ func TestMigration000039_RowValuesSurviveTheRebuild(t *testing.T) {
 	h := newIsolatedDB(t)
 
 	pred := predecessor000039()
-	require.NoErrorf(t, h.Migrator.Migrate(pred), "migrate to %06d", pred)
+	require.NoErrorf(t, h.Migrator.Migrate(context.Background(), pred), "migrate to %06d", pred)
 
 	client := seedClient000039(t, h)
 	user := seedUser000039(t, h)
@@ -225,13 +225,13 @@ func TestMigration000039_RowValuesSurviveTheRebuild(t *testing.T) {
 		return
 	}
 
-	require.NoError(t, h.Migrator.Migrate(39), "apply 000039")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 39), "apply 000039")
 	assertRows000039("after apply")
 
-	require.NoErrorf(t, h.Migrator.Migrate(pred), "roll back to %06d", pred)
+	require.NoErrorf(t, h.Migrator.Migrate(context.Background(), pred), "roll back to %06d", pred)
 	assertRows000039("after down")
 
-	require.NoError(t, h.Migrator.Migrate(39), "re-apply 000039")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 39), "re-apply 000039")
 	assertRows000039("after down/up round trip")
 }
 
@@ -246,7 +246,7 @@ func TestMigration000039_ChallengelessCodeIsStorable(t *testing.T) {
 	h := newIsolatedDB(t)
 
 	pred := predecessor000039()
-	require.NoErrorf(t, h.Migrator.Migrate(pred), "migrate to %06d", pred)
+	require.NoErrorf(t, h.Migrator.Migrate(context.Background(), pred), "migrate to %06d", pred)
 
 	client := seedClient000039(t, h)
 	user := seedUser000039(t, h)
@@ -262,7 +262,7 @@ func TestMigration000039_ChallengelessCodeIsStorable(t *testing.T) {
 		return // SQL Server is already at the final state, asserted above
 	}
 
-	require.NoError(t, h.Migrator.Migrate(39), "apply 000039")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 39), "apply 000039")
 
 	var applied models.Code
 	require.NoErrorf(t, createChallengelessCode000039(t, h, client, user, &applied),
@@ -271,7 +271,7 @@ func TestMigration000039_ChallengelessCodeIsStorable(t *testing.T) {
 	assert.False(t, stored.CodeChallenge.Valid, "the stored challenge must be NULL, not an empty string")
 	assert.False(t, stored.CodeChallengeMethod.Valid, "the stored method must be NULL, not an empty string")
 
-	require.NoErrorf(t, h.Migrator.Migrate(pred), "roll back to %06d", pred)
+	require.NoErrorf(t, h.Migrator.Migrate(context.Background(), pred), "roll back to %06d", pred)
 
 	if isSQLite000039() {
 		// The down's UPDATE, doing its job: the row written while 000039 was applied
@@ -291,7 +291,7 @@ func TestMigration000039_ChallengelessCodeIsStorable(t *testing.T) {
 			"the down does not touch nullability on %s, which was never the divergence there", dbType())
 	}
 
-	require.NoError(t, h.Migrator.Migrate(39), "re-apply 000039")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 39), "re-apply 000039")
 	require.NoErrorf(t, createChallengelessCode000039(t, h, client, user, nil),
 		"a challenge-less code must be storable again after the round trip on %s", dbType())
 }
@@ -309,7 +309,7 @@ func TestMigration000039_RopcTokenBlocksUserDelete(t *testing.T) {
 	h := newIsolatedDB(t)
 
 	pred := predecessor000039()
-	require.NoErrorf(t, h.Migrator.Migrate(pred), "migrate to %06d", pred)
+	require.NoErrorf(t, h.Migrator.Migrate(context.Background(), pred), "migrate to %06d", pred)
 
 	client := seedClient000039(t, h)
 
@@ -327,7 +327,7 @@ func TestMigration000039_RopcTokenBlocksUserDelete(t *testing.T) {
 		assert.Zerof(t, countRefreshTokens000039(t, h, token.Id),
 			"at %06d the cascade removes the token with its user on %s", pred, dbType())
 
-		require.NoError(t, h.Migrator.Migrate(39), "apply 000039")
+		require.NoError(t, h.Migrator.Migrate(context.Background(), 39), "apply 000039")
 	}
 
 	user := seedUser000039(t, h)
@@ -348,7 +348,7 @@ func TestMigration000039_RopcTokenBlocksUserDelete(t *testing.T) {
 	// session sweep select a column an older catalog does not have. Everything asserted above
 	// this line is what 000039 changed, and none of it is reversed between here and the head, so
 	// the claim below is the same claim with the schema the code actually runs against (#281).
-	require.NoError(t, h.Migrator.Up(), "migrate to the head before exercising the Go layer")
+	require.NoError(t, h.Migrator.Up(context.Background()), "migrate to the head before exercising the Go layer")
 
 	// And the invariant that makes all of this unobservable: DeleteUser clears the
 	// user's refresh tokens inside the same transaction, so the supported path still

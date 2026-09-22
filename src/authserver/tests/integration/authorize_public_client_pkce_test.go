@@ -138,15 +138,15 @@ func TestAuthorize_PublicClient_StoredPKCERequiredFalse_IsStillRefused(t *testin
 // row is one no supported path produces. It is inserted directly here because what is under test
 // is the model rule, which has to answer required for a row whatever wrote it.
 func TestAuthorize_PublicClient_NullColumnAndGlobalPKCEOff_IsStillRefused(t *testing.T) {
-	settings, err := database.GetSettingsById(nil, 1)
+	settings, err := database.GetSettingsById(context.Background(), nil, 1)
 	require.NoError(t, err)
 
 	original := settings.PKCERequired
 	settings.PKCERequired = false
-	require.NoError(t, database.UpdateSettings(nil, settings))
+	require.NoError(t, database.UpdateSettings(context.Background(), nil, settings))
 	defer func() {
 		settings.PKCERequired = original
-		_ = database.UpdateSettings(nil, settings)
+		_ = database.UpdateSettings(context.Background(), nil, settings)
 	}()
 
 	client, redirectURI, user, password := newPublicPKCEClient(t, nil)

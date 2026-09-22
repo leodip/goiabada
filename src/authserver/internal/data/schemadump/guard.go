@@ -1,6 +1,7 @@
 package schemadump
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"strings"
@@ -273,14 +274,14 @@ var unrepresentableChecks = []unrepresentable{
 }
 
 // guardTable refuses a table carrying anything TableShape cannot record.
-func guardTable(db *sql.DB, d Dialect, table string) error {
+func guardTable(ctx context.Context, db *sql.DB, d Dialect, table string) error {
 	for _, check := range unrepresentableChecks {
 		q, ok := check.count[d]
 		if !ok {
 			continue
 		}
 		var n int
-		if err := db.QueryRow(fmt.Sprintf(q, table)).Scan(&n); err != nil {
+		if err := db.QueryRowContext(ctx, fmt.Sprintf(q, table)).Scan(&n); err != nil {
 			return errs.Errorf("schemadump: look for %s on %s.%s: %w", check.construct, d, table, err)
 		}
 		if n > 0 {
@@ -289,7 +290,7 @@ func guardTable(db *sql.DB, d Dialect, table string) error {
 		}
 	}
 	if d == SQLite {
-		return sqliteUnrepresentableDeclarations(db, table)
+		return sqliteUnrepresentableDeclarations(ctx, db, table)
 	}
 	return nil
 }
@@ -298,8 +299,8 @@ func guardTable(db *sql.DB, d Dialect, table string) error {
 // for. It has no table for constraints at all, so CHECK and DEFERRABLE are read out of the
 // CREATE TABLE text, which is the same source the collation and AUTOINCREMENT facts come
 // from.
-func sqliteUnrepresentableDeclarations(db *sql.DB, table string) error {
-	ddl, err := sqliteTableDDL(db, table)
+func sqliteUnrepresentableDeclarations(ctx context.Context, db *sql.DB, table string) error {
+	ddl, err := sqliteTableDDL(ctx, db, table)
 	if err != nil {
 		return err
 	}

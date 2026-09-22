@@ -33,15 +33,15 @@ var aesProtectedColumns = []struct{ table, column string }{
 // ReencryptDataToNewKey until #359 deleted the 1.5.x startup conversion that was the other one
 // (#262); with that gone it re-keys and does nothing else, in particular it no longer blanks
 // settings.aes_encryption_key, which was the conversion's own bookkeeping.
-func (d *CommonDatabase) reencryptToKey(oldKey, newKey []byte) error {
+func (d *CommonDatabase) reencryptToKey(ctx context.Context, oldKey, newKey []byte) error {
 	if len(oldKey) != 32 || len(newKey) != 32 {
 		return errs.New("re-encryption requires 32-byte old and new keys")
 	}
 
 	// Opened through RunInTransaction, so a deadlock reruns the body (#301); every read and
 	// write is inside it, so a rerun starts from the data as it was under oldKey.
-	return d.RunInTransaction(context.Background(), func(tx *sql.Tx) error {
-		return d.reencryptAll(tx, oldKey, newKey)
+	return d.RunInTransaction(ctx, func(tx *sql.Tx) error {
+		return d.reencryptAll(ctx, tx, oldKey, newKey)
 	})
 }
 
@@ -56,7 +56,7 @@ func (d *CommonDatabase) reencryptToKey(oldKey, newKey []byte) error {
 // It is a no-op when previousKey is empty, equals currentKey, or there is no
 // encrypted data yet (fresh database). If the canary decrypts under neither key,
 // it errors (misconfiguration) rather than risk corrupting data.
-func (d *CommonDatabase) RotateEncryptionKeyIfNeeded(currentKey, previousKey []byte) (bool, error) {
+func (d *CommonDatabase) RotateEncryptionKeyIfNeeded(ctx context.Context, currentKey, previousKey []byte) (bool, error) {
 	if len(currentKey) != 32 {
 		return false, errs.New("rotation requires a 32-byte current key")
 	}
@@ -64,7 +64,7 @@ func (d *CommonDatabase) RotateEncryptionKeyIfNeeded(currentKey, previousKey []b
 		return false, nil
 	}
 
-	keys, err := d.GetAllSigningKeys(nil)
+	keys, err := d.GetAllSigningKeys(ctx, nil)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to load signing keys for rotation check")
 	}
@@ -87,19 +87,19 @@ func (d *CommonDatabase) RotateEncryptionKeyIfNeeded(currentKey, previousKey []b
 			"data-at-rest decrypts under neither GOIABADA_AES_ENCRYPTION_KEY nor GOIABADA_AES_ENCRYPTION_KEY_PREVIOUS")
 	}
 
-	if err := d.reencryptToKey(previousKey, currentKey); err != nil {
+	if err := d.reencryptToKey(ctx, previousKey, currentKey); err != nil {
 		return false, err
 	}
 	return true, nil
 }
 
-func (d *CommonDatabase) reencryptAll(tx *sql.Tx, oldKey, newKey []byte) error {
+func (d *CommonDatabase) reencryptAll(ctx context.Context, tx *sql.Tx, oldKey, newKey []byte) error {
 	for _, c := range aesProtectedColumns {
-		if err := d.reencryptStringColumn(tx, c.table, c.column, oldKey, newKey); err != nil {
+		if err := d.reencryptStringColumn(ctx, tx, c.table, c.column, oldKey, newKey); err != nil {
 			return errs.Wrapf(err, "re-encrypting %s.%s", c.table, c.column)
 		}
 	}
-	if err := d.reencryptPrivateKeys(tx, oldKey, newKey); err != nil {
+	if err := d.reencryptPrivateKeys(ctx, tx, oldKey, newKey); err != nil {
 		return errs.Wrap(err, "re-encrypting RSA private keys")
 	}
 	// settings.aes_encryption_key is deliberately left alone. Blanking it was the 1.5.x startup
@@ -112,12 +112,12 @@ func (d *CommonDatabase) reencryptAll(tx *sql.Tx, oldKey, newKey []byte) error {
 // reencryptStringColumn re-encrypts one string-secret column across a table. It
 // reads each row fully before writing (SQLite runs on a single connection), and
 // skips rows whose ciphertext is empty/NULL.
-func (d *CommonDatabase) reencryptStringColumn(tx *sql.Tx, table, column string, oldKey, newKey []byte) error {
+func (d *CommonDatabase) reencryptStringColumn(ctx context.Context, tx *sql.Tx, table, column string, oldKey, newKey []byte) error {
 	sb := sqlbuilder.NewSelectBuilder()
 	sb.Select("id", column).From(table)
 	query, args := sb.BuildWithFlavor(d.Flavor)
 
-	rows, err := d.QuerySql(context.Background(), tx, query, args...)
+	rows, err := d.QuerySql(ctx, tx, query, args...)
 	if err != nil {
 		return err
 	}
@@ -158,7 +158,7 @@ func (d *CommonDatabase) reencryptStringColumn(tx *sql.Tx, table, column string,
 		ub.Set(ub.Assign(column, newCt))
 		ub.Where(ub.Equal("id", it.id))
 		uq, uargs := ub.BuildWithFlavor(d.Flavor)
-		if _, err := d.ExecSql(context.Background(), tx, uq, uargs...); err != nil {
+		if _, err := d.ExecSql(ctx, tx, uq, uargs...); err != nil {
 			return err
 		}
 	}
@@ -174,12 +174,12 @@ func (d *CommonDatabase) reencryptStringColumn(tx *sql.Tx, table, column string,
 // canary and errors before calling here when it decrypts under neither key. So a plaintext PEM
 // fails closed at the canary, never reaching this branch. It is kept because deleting it would
 // change a crypto path for no observable gain.
-func (d *CommonDatabase) reencryptPrivateKeys(tx *sql.Tx, oldKey, newKey []byte) error {
+func (d *CommonDatabase) reencryptPrivateKeys(ctx context.Context, tx *sql.Tx, oldKey, newKey []byte) error {
 	sb := sqlbuilder.NewSelectBuilder()
 	sb.Select("id", "private_key_pem").From("key_pairs")
 	query, args := sb.BuildWithFlavor(d.Flavor)
 
-	rows, err := d.QuerySql(context.Background(), tx, query, args...)
+	rows, err := d.QuerySql(ctx, tx, query, args...)
 	if err != nil {
 		return err
 	}
@@ -226,7 +226,7 @@ func (d *CommonDatabase) reencryptPrivateKeys(tx *sql.Tx, oldKey, newKey []byte)
 		ub.Set(ub.Assign("private_key_pem", enc))
 		ub.Where(ub.Equal("id", it.id))
 		uq, uargs := ub.BuildWithFlavor(d.Flavor)
-		if _, err := d.ExecSql(context.Background(), tx, uq, uargs...); err != nil {
+		if _, err := d.ExecSql(ctx, tx, uq, uargs...); err != nil {
 			return err
 		}
 	}

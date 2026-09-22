@@ -25,7 +25,7 @@ func HandleAPIGroupsGet(
 
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		groups, err := database.GetAllGroups(nil)
+		groups, err := database.GetAllGroups(r.Context(), nil)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting all groups"))
 			return
@@ -34,7 +34,7 @@ func HandleAPIGroupsGet(
 		// Get member counts for all groups
 		memberCounts := make(map[int64]int)
 		for _, group := range groups {
-			count, err := database.CountGroupMembers(nil, group.Id)
+			count, err := database.CountGroupMembers(r.Context(), nil, group.Id)
 			if err != nil {
 				// Log error but continue with 0 count
 				count = 0
@@ -98,7 +98,7 @@ func HandleAPIGroupCreatePost(
 		}
 
 		// Check if group identifier already exists
-		existingGroup, err := database.GetGroupByGroupIdentifier(nil, createReq.GroupIdentifier)
+		existingGroup, err := database.GetGroupByGroupIdentifier(r.Context(), nil, createReq.GroupIdentifier)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error checking group existence by identifier"), "group_identifier", createReq.GroupIdentifier)
 			return
@@ -116,7 +116,7 @@ func HandleAPIGroupCreatePost(
 			IncludeInAccessToken: createReq.IncludeInAccessToken,
 		}
 
-		err = database.CreateGroup(nil, group)
+		err = database.CreateGroup(r.Context(), nil, group)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error creating group"), "group_identifier", group.GroupIdentifier)
 			return
@@ -156,7 +156,7 @@ func HandleAPIGroupGet(
 			return
 		}
 
-		group, err := database.GetGroupById(nil, id)
+		group, err := database.GetGroupById(r.Context(), nil, id)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting group by ID"), "group_id", id)
 			return
@@ -167,7 +167,7 @@ func HandleAPIGroupGet(
 		}
 
 		// Get member count
-		memberCount, err := database.CountGroupMembers(nil, group.Id)
+		memberCount, err := database.CountGroupMembers(r.Context(), nil, group.Id)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error counting group members"), "group_id", group.Id)
 			return
@@ -201,7 +201,7 @@ func HandleAPIGroupUpdatePut(
 			return
 		}
 
-		group, err := database.GetGroupById(nil, id)
+		group, err := database.GetGroupById(r.Context(), nil, id)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting group by ID for update"), "group_id", id)
 			return
@@ -244,7 +244,7 @@ func HandleAPIGroupUpdatePut(
 		}
 
 		// Check if group identifier already exists (but not for this group)
-		existingGroup, err := database.GetGroupByGroupIdentifier(nil, updateReq.GroupIdentifier)
+		existingGroup, err := database.GetGroupByGroupIdentifier(r.Context(), nil, updateReq.GroupIdentifier)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error checking group existence by identifier for update"), "group_identifier", updateReq.GroupIdentifier, "group_id", group.Id)
 			return
@@ -260,7 +260,7 @@ func HandleAPIGroupUpdatePut(
 		group.IncludeInIdToken = updateReq.IncludeInIdToken
 		group.IncludeInAccessToken = updateReq.IncludeInAccessToken
 
-		err = database.UpdateGroup(nil, group)
+		err = database.UpdateGroup(r.Context(), nil, group)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error updating group"), "group_id", group.Id, "group_identifier", group.GroupIdentifier)
 			return
@@ -274,7 +274,7 @@ func HandleAPIGroupUpdatePut(
 		})
 
 		// Get member count for response
-		memberCount, err := database.CountGroupMembers(nil, group.Id)
+		memberCount, err := database.CountGroupMembers(r.Context(), nil, group.Id)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error counting group members for update response"), "group_id", group.Id)
 			return
@@ -309,7 +309,7 @@ func HandleAPIGroupDelete(
 		}
 
 		// Check if group exists
-		group, err := database.GetGroupById(nil, id)
+		group, err := database.GetGroupById(r.Context(), nil, id)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting group by ID for deletion"), "group_id", id)
 			return
@@ -320,7 +320,7 @@ func HandleAPIGroupDelete(
 		}
 
 		// Delete the group
-		err = database.DeleteGroup(nil, group.Id)
+		err = database.DeleteGroup(r.Context(), nil, group.Id)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error deleting group"), "group_id", group.Id, "group_identifier", group.GroupIdentifier)
 			return

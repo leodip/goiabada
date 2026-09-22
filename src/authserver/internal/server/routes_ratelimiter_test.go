@@ -136,7 +136,7 @@ func newRoutesTestServer(t *testing.T) *Server {
 	assert.NoError(t, err)
 
 	database := mocks_data.NewDatabase(t)
-	database.On("GetSettingsById", mock.Anything, int64(1)).Return(routesTestSettings(), nil).Maybe()
+	database.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(routesTestSettings(), nil).Maybe()
 	database.On("GetUserBySubject", mock.Anything, mock.Anything, routesTestSubject).Return(&models.User{
 		Id:           1,
 		Enabled:      true,

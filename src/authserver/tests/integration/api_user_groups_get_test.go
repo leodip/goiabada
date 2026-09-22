@@ -40,10 +40,10 @@ func TestAPIUserGroupsGet_Success(t *testing.T) {
 		Description:      "User Group 1",
 		IncludeInIdToken: true,
 	}
-	err = database.CreateGroup(nil, testGroup1)
+	err = database.CreateGroup(context.Background(), nil, testGroup1)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteGroup(nil, testGroup1.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup1.Id)
 	}()
 
 	testGroup2 := &models.Group{
@@ -51,10 +51,10 @@ func TestAPIUserGroupsGet_Success(t *testing.T) {
 		Description:      "User Group 2",
 		IncludeInIdToken: false,
 	}
-	err = database.CreateGroup(nil, testGroup2)
+	err = database.CreateGroup(context.Background(), nil, testGroup2)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteGroup(nil, testGroup2.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup2.Id)
 	}()
 
 	// Setup: Assign user to group1 only

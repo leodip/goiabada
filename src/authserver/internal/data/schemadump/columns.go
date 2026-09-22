@@ -1,6 +1,7 @@
 package schemadump
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 
@@ -15,7 +16,7 @@ import (
 // The default expression and the has-a-default flag are two values because one cannot carry
 // both facts: MySQL's catalog reports DEFAULT ” as the empty string, which is also what a
 // column with no default reads as (#284).
-func dumpColumns(db *sql.DB, d Dialect, table string) ([]ColumnShape, error) {
+func dumpColumns(ctx context.Context, db *sql.DB, d Dialect, table string) ([]ColumnShape, error) {
 	var q string
 	switch d {
 	case MySQL:
@@ -110,7 +111,7 @@ func dumpColumns(db *sql.DB, d Dialect, table string) ([]ColumnShape, error) {
 			FROM pragma_table_info('%s')`, table)
 	}
 
-	rows, err := db.Query(q)
+	rows, err := db.QueryContext(ctx, q)
 	if err != nil {
 		return nil, errs.Errorf("schemadump: column catalog lookup on %s.%s: %w", d, table, err)
 	}
@@ -135,7 +136,7 @@ func dumpColumns(db *sql.DB, d Dialect, table string) ([]ColumnShape, error) {
 	}
 
 	if d == SQLite && len(cols) > 0 {
-		declared, err := sqliteDeclaredColumnFacts(db, table)
+		declared, err := sqliteDeclaredColumnFacts(ctx, db, table)
 		if err != nil {
 			return nil, err
 		}

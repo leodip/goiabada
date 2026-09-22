@@ -22,12 +22,12 @@ import (
 // the collision check unable to see the lowercase twin of a mixed-case address, which is the row
 // that makes it a collision. It runs once per upgrade, before the migration chain, and never
 // again afterwards.
-func (d *CommonDatabase) ScanEmailCase() ([]models.EmailCaseRow, error) {
+func (d *CommonDatabase) ScanEmailCase(ctx context.Context) ([]models.EmailCaseRow, error) {
 	sb := sqlbuilder.NewSelectBuilder()
 	sb.Select("id", "email", "LOWER(email)").From("users")
 	query, args := sb.BuildWithFlavor(d.Flavor)
 
-	rows, err := d.QuerySql(context.Background(), nil, query, args...)
+	rows, err := d.QuerySql(ctx, nil, query, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query users for the email case pre-flight")
 	}

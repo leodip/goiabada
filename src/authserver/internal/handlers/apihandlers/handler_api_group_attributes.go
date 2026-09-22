@@ -37,7 +37,7 @@ func HandleAPIGroupAttributesGet(
 		}
 
 		// Verify group exists
-		group, err := database.GetGroupById(nil, id)
+		group, err := database.GetGroupById(r.Context(), nil, id)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting group by ID for attributes"), "group_id", id)
 			return
@@ -48,7 +48,7 @@ func HandleAPIGroupAttributesGet(
 		}
 
 		// Get group attributes
-		attributes, err := database.GetGroupAttributesByGroupId(nil, id)
+		attributes, err := database.GetGroupAttributesByGroupId(r.Context(), nil, id)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting group attributes by group ID"), "group_id", id)
 			return
@@ -91,7 +91,7 @@ func HandleAPIGroupAttributeGet(
 		}
 
 		// Get group attribute
-		attribute, err := database.GetGroupAttributeById(nil, id)
+		attribute, err := database.GetGroupAttributeById(r.Context(), nil, id)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting group attribute by ID"), "attribute_id", id)
 			return
@@ -155,7 +155,7 @@ func HandleAPIGroupAttributeCreatePost(
 		}
 
 		// Verify group exists
-		group, err := database.GetGroupById(nil, createReq.GroupId)
+		group, err := database.GetGroupById(r.Context(), nil, createReq.GroupId)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -174,7 +174,7 @@ func HandleAPIGroupAttributeCreatePost(
 			GroupId:              createReq.GroupId,
 		}
 
-		err = database.CreateGroupAttribute(nil, groupAttribute)
+		err = database.CreateGroupAttribute(r.Context(), nil, groupAttribute)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error creating group attribute"), "group_id", groupAttribute.GroupId, "key", groupAttribute.Key)
 			return
@@ -223,7 +223,7 @@ func HandleAPIGroupAttributeUpdatePut(
 		}
 
 		// Get existing attribute
-		attribute, err := database.GetGroupAttributeById(nil, id)
+		attribute, err := database.GetGroupAttributeById(r.Context(), nil, id)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting group attribute by ID"), "attribute_id", id)
 			return
@@ -266,7 +266,7 @@ func HandleAPIGroupAttributeUpdatePut(
 		}
 
 		// Get group for audit log
-		group, err := database.GetGroupById(nil, attribute.GroupId)
+		group, err := database.GetGroupById(r.Context(), nil, attribute.GroupId)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -278,7 +278,7 @@ func HandleAPIGroupAttributeUpdatePut(
 		attribute.IncludeInIdToken = updateReq.IncludeInIdToken
 		attribute.IncludeInAccessToken = updateReq.IncludeInAccessToken
 
-		err = database.UpdateGroupAttribute(nil, attribute)
+		err = database.UpdateGroupAttribute(r.Context(), nil, attribute)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error updating group attribute"), "attribute_id", attribute.Id, "group_id", attribute.GroupId, "key", attribute.Key)
 			return
@@ -326,7 +326,7 @@ func HandleAPIGroupAttributeDelete(
 		}
 
 		// Get existing attribute for audit log
-		attribute, err := database.GetGroupAttributeById(nil, id)
+		attribute, err := database.GetGroupAttributeById(r.Context(), nil, id)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting group attribute by ID"), "attribute_id", id)
 			return
@@ -337,14 +337,14 @@ func HandleAPIGroupAttributeDelete(
 		}
 
 		// Get group for audit log
-		group, err := database.GetGroupById(nil, attribute.GroupId)
+		group, err := database.GetGroupById(r.Context(), nil, attribute.GroupId)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
 		}
 
 		// Delete attribute
-		err = database.DeleteGroupAttribute(nil, id)
+		err = database.DeleteGroupAttribute(r.Context(), nil, id)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error deleting group attribute"), "attribute_id", id, "group_id", attribute.GroupId, "key", attribute.Key)
 			return

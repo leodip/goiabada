@@ -211,7 +211,7 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 		store := newMarkerTestStore()
 
 		preReg, codeHash := preRegistrationWithCode(t, 7, activateTestEmail, code, time.Now().UTC().Add(-time.Minute))
-		database.On("GetPreRegistrationByVerificationCodeHash", (*sql.Tx)(nil), codeHash).Return(preReg, nil).Once()
+		database.On("GetPreRegistrationByVerificationCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).Return(preReg, nil).Once()
 
 		handler := HandleAccountActivateGet(httpHelper, store, database, userCreator, auditLogger)
 		rr := httptest.NewRecorder()
@@ -229,7 +229,7 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 		// The account is NOT created on this hop, and the row is NOT consumed: a link
 		// previewer prefetching the URL must leave the code usable (#112 decision 7).
 		userCreator.AssertNotCalled(t, "CreateUser", mock.Anything, mock.Anything)
-		database.AssertNotCalled(t, "DeletePreRegistration", mock.Anything, mock.Anything)
+		database.AssertNotCalled(t, "DeletePreRegistration", mock.Anything, mock.Anything, mock.Anything)
 
 		marker, rejection, err := handlers.GetLinkMarker(store, nextBrowserRequest(t, sent, rr),
 			handlers.LinkMarkerFlowAccountActivate)
@@ -252,7 +252,7 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 
 		codeHash, err := hashutil.HashString(code)
 		require.NoError(t, err)
-		database.On("GetPreRegistrationByVerificationCodeHash", (*sql.Tx)(nil), codeHash).Return(nil, nil).Once()
+		database.On("GetPreRegistrationByVerificationCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).Return(nil, nil).Once()
 		httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).Once()
 
 		handler := HandleAccountActivateGet(httpHelper, store, database, userCreator, auditLogger)
@@ -275,7 +275,7 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 		preReg, _ := preRegistrationWithCode(t, 7, activateTestEmail, "a-different-code", time.Now().UTC())
 		codeHash, err := hashutil.HashString(code)
 		require.NoError(t, err)
-		database.On("GetPreRegistrationByVerificationCodeHash", (*sql.Tx)(nil), codeHash).Return(preReg, nil).Once()
+		database.On("GetPreRegistrationByVerificationCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).Return(preReg, nil).Once()
 		httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).Once()
 
 		handler := HandleAccountActivateGet(httpHelper, store, database, userCreator, auditLogger)
@@ -308,7 +308,7 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 		// The second link is valid on its own: it is refused for the marker it would have
 		// replaced, not for anything wrong with it.
 		preReg, codeHash := preRegistrationWithCode(t, 99, "second@example.com", code, time.Now().UTC().Add(-time.Minute))
-		database.On("GetPreRegistrationByVerificationCodeHash", (*sql.Tx)(nil), codeHash).Return(preReg, nil).Once()
+		database.On("GetPreRegistrationByVerificationCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).Return(preReg, nil).Once()
 		expectRenderedLinkExpired(httpHelper)
 
 		sent := withMarker(t, store, linkFollowedRequest(code),
@@ -320,7 +320,7 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 
 		assert.NotEqual(t, http.StatusSeeOther, rr.Code, "a refused second link must not redirect")
 		userCreator.AssertNotCalled(t, "CreateUser", mock.Anything, mock.Anything)
-		database.AssertNotCalled(t, "DeletePreRegistration", mock.Anything, mock.Anything)
+		database.AssertNotCalled(t, "DeletePreRegistration", mock.Anything, mock.Anything, mock.Anything)
 
 		// The first continuation survives, so the redirect already in flight still activates
 		// the registration whose link produced it.
@@ -349,7 +349,7 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 		store := newMarkerTestStore()
 
 		preReg, codeHash := preRegistrationWithCode(t, 99, "second@example.com", code, time.Now().UTC().Add(-time.Minute))
-		database.On("GetPreRegistrationByVerificationCodeHash", (*sql.Tx)(nil), codeHash).Return(preReg, nil).Once()
+		database.On("GetPreRegistrationByVerificationCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).Return(preReg, nil).Once()
 		expectRenderedLinkExpired(httpHelper)
 
 		sent := withMarker(t, store, linkFollowedRequest(code),
@@ -361,7 +361,7 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 
 		assert.NotEqual(t, http.StatusSeeOther, rr.Code, "a refused link must not redirect")
 		userCreator.AssertNotCalled(t, "CreateUser", mock.Anything, mock.Anything)
-		database.AssertNotCalled(t, "DeletePreRegistration", mock.Anything, mock.Anything)
+		database.AssertNotCalled(t, "DeletePreRegistration", mock.Anything, mock.Anything, mock.Anything)
 
 		marker, rejection, err := handlers.GetLinkMarker(store, nextBrowserRequest(t, sent, rr),
 			handlers.LinkMarkerFlowResetPassword)
@@ -383,8 +383,8 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 		store := newMarkerTestStore()
 
 		preReg, codeHash := preRegistrationWithCode(t, 7, activateTestEmail, code, time.Now().UTC().Add(-6*time.Minute))
-		database.On("GetPreRegistrationByVerificationCodeHash", (*sql.Tx)(nil), codeHash).Return(preReg, nil).Once()
-		database.On("DeletePreRegistration", (*sql.Tx)(nil), int64(7)).Return(nil).Once()
+		database.On("GetPreRegistrationByVerificationCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).Return(preReg, nil).Once()
+		database.On("DeletePreRegistration", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(nil).Once()
 		expectRenderedLinkExpired(httpHelper)
 
 		handler := HandleAccountActivateGet(httpHelper, store, database, userCreator, auditLogger)
@@ -414,9 +414,9 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 				store := newMarkerTestStore()
 
 				preReg, codeHash := preRegistrationWithCode(t, 7, activateTestEmail, code, tc.issuedAt)
-				database.On("GetPreRegistrationByVerificationCodeHash", (*sql.Tx)(nil), codeHash).Return(preReg, nil).Once()
+				database.On("GetPreRegistrationByVerificationCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).Return(preReg, nil).Once()
 				if tc.expired {
-					database.On("DeletePreRegistration", (*sql.Tx)(nil), int64(7)).Return(nil).Once()
+					database.On("DeletePreRegistration", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(nil).Once()
 					expectRenderedLinkExpired(httpHelper)
 				}
 
@@ -452,7 +452,7 @@ func TestHandleAccountActivateGet_Clean(t *testing.T) {
 		store := newMarkerTestStore()
 
 		preReg, codeHash := preRegistrationWithCode(t, 7, activateTestEmail, code, time.Now().UTC())
-		database.On("GetPreRegistrationByVerificationCodeHash", (*sql.Tx)(nil), codeHash).Return(preReg, nil).Once()
+		database.On("GetPreRegistrationByVerificationCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).Return(preReg, nil).Once()
 
 		createdUser := &models.User{Id: 3, Email: activateTestEmail}
 		userCreator.On("CreateUser", mock.Anything, &usercreation.CreateUserInput{
@@ -461,7 +461,7 @@ func TestHandleAccountActivateGet_Clean(t *testing.T) {
 			PasswordHash:  "password_hash",
 		}).Return(createdUser, nil).Once()
 
-		database.On("DeletePreRegistration", (*sql.Tx)(nil), int64(7)).Return(nil).Once()
+		database.On("DeletePreRegistration", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(nil).Once()
 		auditLogger.On("Log", mock.Anything, audit.AuditCreatedUser, mock.MatchedBy(func(details map[string]interface{}) bool {
 			return details["email"] == activateTestEmail
 		})).Return().Once()
@@ -539,7 +539,7 @@ func TestHandleAccountActivateGet_Clean(t *testing.T) {
 				store := newMarkerTestStore()
 
 				if tc.resolves {
-					database.On("GetPreRegistrationByVerificationCodeHash", (*sql.Tx)(nil), codeHash).Return(nil, nil).Once()
+					database.On("GetPreRegistrationByVerificationCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).Return(nil, nil).Once()
 				}
 				expectRenderedLinkExpired(httpHelper)
 
@@ -547,7 +547,7 @@ func TestHandleAccountActivateGet_Clean(t *testing.T) {
 				handler.ServeHTTP(httptest.NewRecorder(), tc.request(t, store))
 
 				userCreator.AssertNotCalled(t, "CreateUser", mock.Anything, mock.Anything)
-				database.AssertNotCalled(t, "DeletePreRegistration", mock.Anything, mock.Anything)
+				database.AssertNotCalled(t, "DeletePreRegistration", mock.Anything, mock.Anything, mock.Anything)
 				database.AssertExpectations(t)
 				httpHelper.AssertExpectations(t)
 			})

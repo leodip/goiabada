@@ -131,7 +131,7 @@ func HandleAPIAccountLogoutRequestPost(
 		}
 
 		// Build a short-lived ID Token (id_token_hint)
-		privKeyPair, err := database.GetCurrentSigningKey(nil)
+		privKeyPair, err := database.GetCurrentSigningKey(r.Context(), nil)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return

@@ -21,7 +21,7 @@ func TestAPIGroupPermissionsGet_Success(t *testing.T) {
 	// Setup: Create test group
 	testGroup := createTestGroup(t)
 	defer func() {
-		_ = database.DeleteGroup(nil, testGroup.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
 	}()
 
 	// Setup: Create test resource and permissions
@@ -41,8 +41,8 @@ func TestAPIGroupPermissionsGet_Success(t *testing.T) {
 	groupPerm1 := createTestGroupPermission(t, testGroup.Id, perm1.Id)
 	groupPerm2 := createTestGroupPermission(t, testGroup.Id, perm2.Id)
 	defer func() {
-		_ = database.DeleteGroupPermission(nil, groupPerm1.Id)
-		_ = database.DeleteGroupPermission(nil, groupPerm2.Id)
+		_ = database.DeleteGroupPermission(context.Background(), nil, groupPerm1.Id)
+		_ = database.DeleteGroupPermission(context.Background(), nil, groupPerm2.Id)
 	}()
 
 	// Test: Get group permissions
@@ -120,7 +120,7 @@ func TestAPIGroupPermissionsGet_NoPermissions(t *testing.T) {
 	// Setup: Create test group without permissions
 	testGroup := createTestGroup(t)
 	defer func() {
-		_ = database.DeleteGroup(nil, testGroup.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
 	}()
 
 	// Test: Get group permissions for group with no permissions
@@ -145,7 +145,7 @@ func TestAPIGroupPermissionsGet_Unauthorized(t *testing.T) {
 	// Setup: Create test group
 	testGroup := createTestGroup(t)
 	defer func() {
-		_ = database.DeleteGroup(nil, testGroup.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
 	}()
 
 	// Test: Request without access token
@@ -170,7 +170,7 @@ func TestAPIGroupPermissionsPut_Success(t *testing.T) {
 	// Setup: Create test group
 	testGroup := createTestGroup(t)
 	defer func() {
-		_ = database.DeleteGroup(nil, testGroup.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
 	}()
 
 	// Setup: Create test resource and permissions
@@ -191,7 +191,7 @@ func TestAPIGroupPermissionsPut_Success(t *testing.T) {
 	// Setup: Initially assign one permission
 	initialGroupPerm := createTestGroupPermission(t, testGroup.Id, perm1.Id)
 	defer func() {
-		_ = database.DeleteGroupPermission(nil, initialGroupPerm.Id)
+		_ = database.DeleteGroupPermission(context.Background(), nil, initialGroupPerm.Id)
 	}()
 
 	// Test: Update group permissions (replace with two different permissions)
@@ -213,7 +213,7 @@ func TestAPIGroupPermissionsPut_Success(t *testing.T) {
 	assert.True(t, updateResponse.Success)
 
 	// Verify permissions were updated correctly in database
-	groupPerms, err := database.GetGroupPermissionsByGroupId(nil, testGroup.Id)
+	groupPerms, err := database.GetGroupPermissionsByGroupId(context.Background(), nil, testGroup.Id)
 	assert.NoError(t, err)
 	assert.Len(t, groupPerms, 2)
 
@@ -234,7 +234,7 @@ func TestAPIGroupPermissionsPut_RemoveAllPermissions(t *testing.T) {
 	// Setup: Create test group
 	testGroup := createTestGroup(t)
 	defer func() {
-		_ = database.DeleteGroup(nil, testGroup.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
 	}()
 
 	// Setup: Create test resource and permission
@@ -270,12 +270,12 @@ func TestAPIGroupPermissionsPut_RemoveAllPermissions(t *testing.T) {
 	assert.True(t, updateResponse.Success)
 
 	// Verify permission was removed
-	groupPerms, err := database.GetGroupPermissionsByGroupId(nil, testGroup.Id)
+	groupPerms, err := database.GetGroupPermissionsByGroupId(context.Background(), nil, testGroup.Id)
 	assert.NoError(t, err)
 	assert.Len(t, groupPerms, 0)
 
 	// Verify the group permission record was actually deleted
-	deletedGroupPerm, err := database.GetGroupPermissionById(nil, groupPerm.Id)
+	deletedGroupPerm, err := database.GetGroupPermissionById(context.Background(), nil, groupPerm.Id)
 	assert.NoError(t, err)
 	assert.Nil(t, deletedGroupPerm)
 }
@@ -287,7 +287,7 @@ func TestAPIGroupPermissionsPut_AddPermissionsToEmptyGroup(t *testing.T) {
 	// Setup: Create test group (with no initial permissions)
 	testGroup := createTestGroup(t)
 	defer func() {
-		_ = database.DeleteGroup(nil, testGroup.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
 	}()
 
 	// Setup: Create test resource and permissions
@@ -322,13 +322,13 @@ func TestAPIGroupPermissionsPut_AddPermissionsToEmptyGroup(t *testing.T) {
 	assert.True(t, updateResponse.Success)
 
 	// Verify permissions were added correctly
-	groupPerms, err := database.GetGroupPermissionsByGroupId(nil, testGroup.Id)
+	groupPerms, err := database.GetGroupPermissionsByGroupId(context.Background(), nil, testGroup.Id)
 	assert.NoError(t, err)
 	assert.Len(t, groupPerms, 2)
 
 	// Cleanup: Delete created group permissions
 	for _, gp := range groupPerms {
-		_ = database.DeleteGroupPermission(nil, gp.Id)
+		_ = database.DeleteGroupPermission(context.Background(), nil, gp.Id)
 	}
 
 	// Verify the correct permissions are assigned
@@ -364,7 +364,7 @@ func TestAPIGroupPermissionsPut_PermissionNotFound(t *testing.T) {
 	// Setup: Create test group
 	testGroup := createTestGroup(t)
 	defer func() {
-		_ = database.DeleteGroup(nil, testGroup.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
 	}()
 
 	// Test: Update with non-existent permission
@@ -387,7 +387,7 @@ func TestAPIGroupPermissionsPut_InvalidRequestBody(t *testing.T) {
 	// Setup: Create test group
 	testGroup := createTestGroup(t)
 	defer func() {
-		_ = database.DeleteGroup(nil, testGroup.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
 	}()
 
 	// Test: Invalid JSON request body
@@ -442,7 +442,7 @@ func TestAPIGroupPermissionsPut_DuplicatePermissionIds(t *testing.T) {
 	// Setup: Create test group
 	testGroup := createTestGroup(t)
 	defer func() {
-		_ = database.DeleteGroup(nil, testGroup.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
 	}()
 
 	// Setup: Create test resource and permission
@@ -469,14 +469,14 @@ func TestAPIGroupPermissionsPut_DuplicatePermissionIds(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 	// Verify only one permission was assigned (no duplicates in database)
-	groupPerms, err := database.GetGroupPermissionsByGroupId(nil, testGroup.Id)
+	groupPerms, err := database.GetGroupPermissionsByGroupId(context.Background(), nil, testGroup.Id)
 	assert.NoError(t, err)
 	assert.Len(t, groupPerms, 1)
 	assert.Equal(t, perm.Id, groupPerms[0].PermissionId)
 
 	// Cleanup
 	for _, gp := range groupPerms {
-		_ = database.DeleteGroupPermission(nil, gp.Id)
+		_ = database.DeleteGroupPermission(context.Background(), nil, gp.Id)
 	}
 }
 
@@ -484,7 +484,7 @@ func TestAPIGroupPermissionsPut_Unauthorized(t *testing.T) {
 	// Setup: Create test group
 	testGroup := createTestGroup(t)
 	defer func() {
-		_ = database.DeleteGroup(nil, testGroup.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
 	}()
 
 	// Test: Request without access token
@@ -512,7 +512,7 @@ func TestAPIGroupPermissionsPut_ComplexScenario(t *testing.T) {
 	// Setup: Create test group
 	testGroup := createTestGroup(t)
 	defer func() {
-		_ = database.DeleteGroup(nil, testGroup.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
 	}()
 
 	// Setup: Create test resource and permissions
@@ -537,9 +537,9 @@ func TestAPIGroupPermissionsPut_ComplexScenario(t *testing.T) {
 	groupPermB := createTestGroupPermission(t, testGroup.Id, permB.Id)
 	groupPermC := createTestGroupPermission(t, testGroup.Id, permC.Id)
 	defer func() {
-		_ = database.DeleteGroupPermission(nil, groupPermA.Id)
-		_ = database.DeleteGroupPermission(nil, groupPermB.Id)
-		_ = database.DeleteGroupPermission(nil, groupPermC.Id)
+		_ = database.DeleteGroupPermission(context.Background(), nil, groupPermA.Id)
+		_ = database.DeleteGroupPermission(context.Background(), nil, groupPermB.Id)
+		_ = database.DeleteGroupPermission(context.Background(), nil, groupPermC.Id)
 	}()
 
 	// Test: Update to permissions B, C, D (should remove A, keep B and C, add D)
@@ -555,13 +555,13 @@ func TestAPIGroupPermissionsPut_ComplexScenario(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 	// Verify final permissions are correct
-	groupPerms, err := database.GetGroupPermissionsByGroupId(nil, testGroup.Id)
+	groupPerms, err := database.GetGroupPermissionsByGroupId(context.Background(), nil, testGroup.Id)
 	assert.NoError(t, err)
 	assert.Len(t, groupPerms, 3)
 
 	// Cleanup: Delete any remaining group permissions
 	for _, gp := range groupPerms {
-		_ = database.DeleteGroupPermission(nil, gp.Id)
+		_ = database.DeleteGroupPermission(context.Background(), nil, gp.Id)
 	}
 
 	// Verify the correct permissions are assigned
@@ -581,7 +581,7 @@ func createTestGroupPermission(t *testing.T, groupId, permissionId int64) *model
 		GroupId:      groupId,
 		PermissionId: permissionId,
 	}
-	err := database.CreateGroupPermission(nil, groupPermission)
+	err := database.CreateGroupPermission(context.Background(), nil, groupPermission)
 	assert.NoError(t, err)
 	return groupPermission
 }

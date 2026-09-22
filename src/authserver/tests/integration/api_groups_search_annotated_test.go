@@ -2,6 +2,7 @@ package integrationtests
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -26,16 +27,16 @@ func TestAPIGroupsSearch_Annotated_Success(t *testing.T) {
 
 	// Create three groups; grant the permission to two of them
 	g1 := createTestGroup(t)
-	defer func() { _ = database.DeleteGroup(nil, g1.Id) }()
+	defer func() { _ = database.DeleteGroup(context.Background(), nil, g1.Id) }()
 	g2 := createTestGroup(t)
-	defer func() { _ = database.DeleteGroup(nil, g2.Id) }()
+	defer func() { _ = database.DeleteGroup(context.Background(), nil, g2.Id) }()
 	g3 := createTestGroup(t)
-	defer func() { _ = database.DeleteGroup(nil, g3.Id) }()
+	defer func() { _ = database.DeleteGroup(context.Background(), nil, g3.Id) }()
 
 	// Assign permission to g1 and g3
-	err := database.CreateGroupPermission(nil, &models.GroupPermission{GroupId: g1.Id, PermissionId: perm.Id})
+	err := database.CreateGroupPermission(context.Background(), nil, &models.GroupPermission{GroupId: g1.Id, PermissionId: perm.Id})
 	assert.NoError(t, err)
-	err = database.CreateGroupPermission(nil, &models.GroupPermission{GroupId: g3.Id, PermissionId: perm.Id})
+	err = database.CreateGroupPermission(context.Background(), nil, &models.GroupPermission{GroupId: g3.Id, PermissionId: perm.Id})
 	assert.NoError(t, err)
 
 	// Query page 1 with a large size to increase chance our groups are returned

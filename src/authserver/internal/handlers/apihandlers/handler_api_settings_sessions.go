@@ -79,7 +79,7 @@ func HandleAPISettingsSessionsPut(
 		currentSettings.UserSessionIdleTimeoutInSeconds = req.UserSessionIdleTimeoutInSeconds
 		currentSettings.UserSessionMaxLifetimeInSeconds = req.UserSessionMaxLifetimeInSeconds
 
-		if err := database.UpdateSettings(nil, currentSettings); err != nil {
+		if err := database.UpdateSettings(r.Context(), nil, currentSettings); err != nil {
 			writeInternalServerError(w, r, err)
 			return
 		}

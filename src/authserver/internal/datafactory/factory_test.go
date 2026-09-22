@@ -384,7 +384,7 @@ func TestOpenDatabase_PassesLogSQLToTheEngine(t *testing.T) {
 
 			tx, err := database.BeginTransaction(context.Background())
 			require.NoError(t, err)
-			require.NoError(t, database.RollbackTransaction(tx))
+			require.NoError(t, database.RollbackTransaction(context.Background(), tx))
 
 			text := capture.Text()
 			assert.Equalf(t, tc.want, strings.Contains(text, "beginning transaction"),

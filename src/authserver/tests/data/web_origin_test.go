@@ -231,7 +231,7 @@ func TestWebOriginExists_Transaction(t *testing.T) {
 		t.Error("a write made through the transaction must be visible to a read through the same transaction")
 	}
 
-	if err := database.RollbackTransaction(tx); err != nil {
+	if err := database.RollbackTransaction(context.Background(), tx); err != nil {
 		t.Fatalf("RollbackTransaction: %v", err)
 	}
 

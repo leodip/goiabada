@@ -62,6 +62,13 @@ func NewSQLiteDatabase(dbConfig *DatabaseConfig, logSQL bool) (*SQLiteDatabase, 
 	db.SetMaxIdleConns(1)
 	db.SetConnMaxLifetime(0)
 
+	// The constructor owns this root, because nothing is waiting on it: the process is starting
+	// and there is no request and no operator to cancel. What the context buys here is that the
+	// pragma statements below go through the *Context calls like every other statement this
+	// package issues, so the shape has no exception to remember and no exemption to maintain
+	// (#386).
+	ctx := context.Background()
+
 	// Execute PRAGMA statements directly
 	pragmaStatements := []string{
 		"PRAGMA foreign_keys = ON;",
@@ -75,7 +82,7 @@ func NewSQLiteDatabase(dbConfig *DatabaseConfig, logSQL bool) (*SQLiteDatabase, 
 	}
 
 	for _, stmt := range pragmaStatements {
-		_, err = db.Exec(stmt)
+		_, err = db.ExecContext(ctx, stmt)
 		if err != nil {
 			return nil, errs.Wrapf(err, "failed to execute %s", stmt)
 		}
@@ -102,7 +109,7 @@ func NewSQLiteDatabase(dbConfig *DatabaseConfig, logSQL bool) (*SQLiteDatabase, 
 
 	for _, check := range pragmaChecks {
 		var value interface{}
-		err = db.QueryRow(check.query).Scan(&value)
+		err = db.QueryRowContext(ctx, check.query).Scan(&value)
 		if err != nil {
 			return nil, errs.Wrapf(err, "unable to check %s status", check.name)
 		}
@@ -111,7 +118,7 @@ func NewSQLiteDatabase(dbConfig *DatabaseConfig, logSQL bool) (*SQLiteDatabase, 
 		}
 	}
 
-	if err := db.PingContext(context.Background()); err != nil {
+	if err := db.PingContext(ctx); err != nil {
 		if errWithCode, ok := err.(*sqlitedriver.Error); ok {
 			err = errs.New(sqlitedriver.ErrorCodeString[errWithCode.Code()])
 		}
@@ -214,11 +221,11 @@ const schemaMigrationsIndexDDL = `CREATE UNIQUE INDEX IF NOT EXISTS version_uniq
 // ensureSchemaMigrationsTable creates the version table at Goiabada's shape, and its index,
 // when they are not there yet. Both statements are idempotent, so two processes starting
 // against one empty database cannot make each other fail.
-func (d *SQLiteDatabase) ensureSchemaMigrationsTable() error {
-	if _, err := d.DB.Exec(schemaMigrationsTableDDL); err != nil {
+func (d *SQLiteDatabase) ensureSchemaMigrationsTable(ctx context.Context) error {
+	if _, err := d.DB.ExecContext(ctx, schemaMigrationsTableDDL); err != nil {
 		return errs.Wrap(err, "unable to create the schema_migrations table")
 	}
-	if _, err := d.DB.Exec(schemaMigrationsIndexDDL); err != nil {
+	if _, err := d.DB.ExecContext(ctx, schemaMigrationsIndexDDL); err != nil {
 		return errs.Wrap(err, "unable to create the schema_migrations version index")
 	}
 	return nil
@@ -230,8 +237,8 @@ func (d *SQLiteDatabase) ensureSchemaMigrationsTable() error {
 //
 // There is nothing to close. The runner takes a connection out of the pool for the duration
 // of one operation and gives it back before returning (#268 decision 8).
-func (d *SQLiteDatabase) NewMigrator() (*migrator.Migrator, error) {
-	if err := d.ensureSchemaMigrationsTable(); err != nil {
+func (d *SQLiteDatabase) NewMigrator(ctx context.Context) (*migrator.Migrator, error) {
+	if err := d.ensureSchemaMigrationsTable(ctx); err != nil {
 		return nil, err
 	}
 
@@ -242,18 +249,18 @@ func (d *SQLiteDatabase) NewMigrator() (*migrator.Migrator, error) {
 	return m, nil
 }
 
-func (d *SQLiteDatabase) Migrate() error {
-	m, err := d.NewMigrator()
+func (d *SQLiteDatabase) Migrate(ctx context.Context) error {
+	m, err := d.NewMigrator(ctx)
 	if err != nil {
 		return err
 	}
 
-	err = m.Up()
+	err = m.Up(ctx)
 	// IsNoChange rather than errors.Is: a run whose unlock failed answers the sentinel JOINED
 	// with that failure, and errors.Is would report this start as successful while the migration
 	// lock stays held against every other process on the database (#268).
 	if migrator.IsNoChange(err) {
-		slog.Info("no need to migrate the database")
+		slog.InfoContext(ctx, "no need to migrate the database")
 		return nil
 	}
 	if err != nil {

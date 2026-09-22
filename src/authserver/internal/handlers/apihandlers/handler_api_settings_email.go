@@ -78,7 +78,7 @@ func HandleAPISettingsEmailPut(
 			currentSettings.SMTPFromName = ""
 			currentSettings.SMTPFromEmail = ""
 
-			if err := database.UpdateSettings(nil, currentSettings); err != nil {
+			if err := database.UpdateSettings(r.Context(), nil, currentSettings); err != nil {
 				writeInternalServerError(w, r, err)
 				return
 			}
@@ -194,7 +194,7 @@ func HandleAPISettingsEmailPut(
 		currentSettings.SMTPFromName = strings.TrimSpace(req.SMTPFromName)
 		currentSettings.SMTPFromEmail = strings.ToLower(req.SMTPFromEmail)
 
-		if err := database.UpdateSettings(nil, currentSettings); err != nil {
+		if err := database.UpdateSettings(r.Context(), nil, currentSettings); err != nil {
 			writeInternalServerError(w, r, err)
 			return
 		}

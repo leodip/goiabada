@@ -27,10 +27,10 @@ func TestAPIGroupsGet_Success(t *testing.T) {
 		IncludeInIdToken:     true,
 		IncludeInAccessToken: false,
 	}
-	err := database.CreateGroup(nil, testGroup1)
+	err := database.CreateGroup(context.Background(), nil, testGroup1)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteGroup(nil, testGroup1.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup1.Id)
 	}()
 
 	testGroup2 := &models.Group{
@@ -39,10 +39,10 @@ func TestAPIGroupsGet_Success(t *testing.T) {
 		IncludeInIdToken:     false,
 		IncludeInAccessToken: true,
 	}
-	err = database.CreateGroup(nil, testGroup2)
+	err = database.CreateGroup(context.Background(), nil, testGroup2)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteGroup(nil, testGroup2.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup2.Id)
 	}()
 
 	// Test: Get all groups
@@ -170,10 +170,10 @@ func TestAPIGroupsGet_EnhancedResponseStructure(t *testing.T) {
 		IncludeInIdToken:     true,
 		IncludeInAccessToken: true,
 	}
-	err := database.CreateGroup(nil, testGroup)
+	err := database.CreateGroup(context.Background(), nil, testGroup)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteGroup(nil, testGroup.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
 	}()
 
 	// Test: Get all groups
@@ -250,7 +250,7 @@ func TestAPIGroupsGet_MixedTokenInclusion(t *testing.T) {
 			IncludeInIdToken:     tc.includeInIdToken,
 			IncludeInAccessToken: tc.includeInAccessToken,
 		}
-		err := database.CreateGroup(nil, group)
+		err := database.CreateGroup(context.Background(), nil, group)
 		assert.NoError(t, err)
 		createdGroups = append(createdGroups, group)
 	}
@@ -258,7 +258,7 @@ func TestAPIGroupsGet_MixedTokenInclusion(t *testing.T) {
 	defer func() {
 		// Cleanup: Delete all created groups
 		for _, group := range createdGroups {
-			_ = database.DeleteGroup(nil, group.Id)
+			_ = database.DeleteGroup(context.Background(), nil, group.Id)
 		}
 	}()
 
@@ -298,7 +298,7 @@ func TestAPIGroupsGet_MemberCountAccuracy(t *testing.T) {
 	// Setup: Create test group
 	testGroup := createTestGroup(t)
 	defer func() {
-		_ = database.DeleteGroup(nil, testGroup.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
 	}()
 
 	// Setup: Create test users

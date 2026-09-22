@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -34,7 +35,7 @@ import (
 func TestMigration000032_OTPEnrollment(t *testing.T) {
 	h := newIsolatedDB(t)
 
-	require.NoError(t, h.Migrator.Migrate(31), "migrate to 000031")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 31), "migrate to 000031")
 
 	// 1. Absent before the migration.
 	for _, col := range otpEnrollmentColumns000032 {
@@ -47,20 +48,20 @@ func TestMigration000032_OTPEnrollment(t *testing.T) {
 	// seedPreMigration000031User.
 	userId := seedPreMigration000032User(t, h)
 
-	require.NoError(t, h.Migrator.Migrate(32), "apply 000032")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 32), "apply 000032")
 
 	// 2 and 3.
 	assertPendingEnrollmentShape000032(t, h, "after apply")
 	assertPendingEnrollmentIsNull000032(t, h, userId, "after apply")
 
 	// 4. Down, then up again.
-	require.NoError(t, h.Migrator.Migrate(31), "roll back 000032")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 31), "roll back 000032")
 	for _, col := range otpEnrollmentColumns000032 {
 		exists, _, _ := columnShape000031(t, h, "users", col)
 		assert.Falsef(t, exists, "the down migration must drop users.%s", col)
 	}
 
-	require.NoError(t, h.Migrator.Migrate(32), "re-apply 000032")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 32), "re-apply 000032")
 	assertPendingEnrollmentShape000032(t, h, "after down/up round trip")
 	assertPendingEnrollmentIsNull000032(t, h, userId, "after down/up round trip")
 }

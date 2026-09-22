@@ -186,9 +186,10 @@ const (
 	// httpShutdownTimeout bounds how long in-flight requests get to finish.
 	httpShutdownTimeout = 15 * time.Second
 
-	// workerStopTimeout bounds the wait for the background worker. It cannot be
-	// interrupted mid-statement (data.Database takes no context), so this is a
-	// ceiling on how long a cleanup delete may hold up shutdown.
+	// workerStopTimeout bounds the wait for the background worker. Cancelling now reaches
+	// the statement, since every data.Database call takes the worker's context (#386), so
+	// this is no longer the only thing bounding a cleanup delete -- it is the ceiling for
+	// the case where the driver does something else with the cancellation than stop.
 	workerStopTimeout = 20 * time.Second
 )
 

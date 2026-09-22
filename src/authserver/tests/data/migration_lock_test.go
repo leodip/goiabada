@@ -66,7 +66,7 @@ func TestMigrationLock_ARunnerWaitsForTheResourceAndGivesItBack(t *testing.T) {
 	eng := migrationLockEngine(t, h.Name)
 
 	release := holdMigrationLock(t, h, eng)
-	done := runInBackground(func() error { return h.Migrator.Up() })
+	done := runInBackground(func() error { return h.Migrator.Up(context.Background()) })
 
 	select {
 	case err := <-done:
@@ -113,13 +113,13 @@ func TestMigrationLock_AFailedMigrationStillGivesTheResourceBack(t *testing.T) {
 	_, err := h.SQL.Exec("CREATE TABLE clients (id BIGINT NOT NULL)")
 	require.NoErrorf(t, err, "seed the collision migration 000001 will hit on %s", dbType())
 
-	require.Errorf(t, h.Migrator.Up(),
+	require.Errorf(t, h.Migrator.Up(context.Background()),
 		"000001 must fail against a clients table that already exists on %s", dbType())
 
 	// The dirty marker is the evidence the failure was the migration's and not the fixture's:
 	// the runner writes it before the file runs and clears it after, so a run that never
 	// reached the file would have left the table empty.
-	version, dirty, err := h.Migrator.Version()
+	version, dirty, err := h.Migrator.Version(context.Background())
 	require.NoErrorf(t, err, "read the version the failed migration recorded on %s", dbType())
 	require.Truef(t, dirty, "the failed migration must leave the database dirty on %s", dbType())
 	require.Equalf(t, 1, version, "and dirty at the version whose file failed on %s", dbType())
@@ -153,7 +153,7 @@ func TestMigrationLock_ThePreCreateGivesTheResourceBack(t *testing.T) {
 	// rather than the runner's own.
 	source, ok := h.DB.(migratable)
 	require.Truef(t, ok, "the %s database must expose NewMigrator", dbType())
-	_, err := source.NewMigrator()
+	_, err := source.NewMigrator(context.Background())
 	require.NoErrorf(t, err, "construct a second migrator, which pre-creates schema_migrations again on %s", dbType())
 
 	requireMigrationLockIsFree(t, h, eng, "after the schema_migrations pre-create")
@@ -225,7 +225,7 @@ func TestMigrationLock_ThePreCreateGivesTheResourceBackWhenTheReleaseFails(t *te
 			db.DB = faultPool
 			t.Cleanup(func() { db.DB = original })
 
-			_, err = db.NewMigrator()
+			_, err = db.NewMigrator(context.Background())
 			require.ErrorIs(t, err, errPrecreateUnlockFault,
 				"a release that failed must reach the caller: it is the only notice that this database now carries a lock held against every later migrator")
 			if failDDL {

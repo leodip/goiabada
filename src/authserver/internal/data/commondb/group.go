@@ -10,7 +10,7 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 )
 
-func (d *CommonDatabase) CreateGroup(tx *sql.Tx, group *models.Group) error {
+func (d *CommonDatabase) CreateGroup(ctx context.Context, tx *sql.Tx, group *models.Group) error {
 
 	now := time.Now().UTC()
 
@@ -24,7 +24,7 @@ func (d *CommonDatabase) CreateGroup(tx *sql.Tx, group *models.Group) error {
 
 	insertBuilder := groupStruct.WithoutTag("pk").InsertInto(d.Flavor.Quote("groups"), group)
 
-	id, err := d.insertReturningId(context.Background(), tx, insertBuilder, "group")
+	id, err := d.insertReturningId(ctx, tx, insertBuilder, "group")
 	if err != nil {
 		group.CreatedAt = originalCreatedAt
 		group.UpdatedAt = originalUpdatedAt
@@ -35,7 +35,7 @@ func (d *CommonDatabase) CreateGroup(tx *sql.Tx, group *models.Group) error {
 	return nil
 }
 
-func (d *CommonDatabase) UpdateGroup(tx *sql.Tx, group *models.Group) error {
+func (d *CommonDatabase) UpdateGroup(ctx context.Context, tx *sql.Tx, group *models.Group) error {
 
 	if group.Id == 0 {
 		return errs.New("can't update group with id 0")
@@ -51,7 +51,7 @@ func (d *CommonDatabase) UpdateGroup(tx *sql.Tx, group *models.Group) error {
 	updateBuilder.Where(updateBuilder.Equal("id", group.Id))
 
 	sql, args := updateBuilder.Build()
-	_, err := d.ExecSql(context.Background(), tx, sql, args...)
+	_, err := d.ExecSql(ctx, tx, sql, args...)
 	if err != nil {
 		group.UpdatedAt = originalUpdatedAt
 		return errs.Wrap(err, "unable to update group")
@@ -60,11 +60,11 @@ func (d *CommonDatabase) UpdateGroup(tx *sql.Tx, group *models.Group) error {
 	return nil
 }
 
-func (d *CommonDatabase) getGroupCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
+func (d *CommonDatabase) getGroupCommon(ctx context.Context, tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
 	groupStruct *sqlbuilder.Struct) (*models.Group, error) {
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(context.Background(), tx, sql, args...)
+	rows, err := d.QuerySql(ctx, tx, sql, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -86,7 +86,7 @@ func (d *CommonDatabase) getGroupCommon(tx *sql.Tx, selectBuilder *sqlbuilder.Se
 	return nil, nil
 }
 
-func (d *CommonDatabase) GetGroupById(tx *sql.Tx, groupId int64) (*models.Group, error) {
+func (d *CommonDatabase) GetGroupById(ctx context.Context, tx *sql.Tx, groupId int64) (*models.Group, error) {
 
 	groupStruct := sqlbuilder.NewStruct(new(models.Group)).
 		For(d.Flavor)
@@ -94,7 +94,7 @@ func (d *CommonDatabase) GetGroupById(tx *sql.Tx, groupId int64) (*models.Group,
 	selectBuilder := groupStruct.SelectFrom(d.Flavor.Quote("groups"))
 	selectBuilder.Where(selectBuilder.Equal("id", groupId))
 
-	group, err := d.getGroupCommon(tx, selectBuilder, groupStruct)
+	group, err := d.getGroupCommon(ctx, tx, selectBuilder, groupStruct)
 	if err != nil {
 		return nil, err
 	}
@@ -102,7 +102,7 @@ func (d *CommonDatabase) GetGroupById(tx *sql.Tx, groupId int64) (*models.Group,
 	return group, nil
 }
 
-func (d *CommonDatabase) GetGroupsByIds(tx *sql.Tx, groupIds []int64) ([]models.Group, error) {
+func (d *CommonDatabase) GetGroupsByIds(ctx context.Context, tx *sql.Tx, groupIds []int64) ([]models.Group, error) {
 
 	if len(groupIds) == 0 {
 		return nil, nil
@@ -118,7 +118,7 @@ func (d *CommonDatabase) GetGroupsByIds(tx *sql.Tx, groupIds []int64) ([]models.
 		selectBuilder.Where(selectBuilder.In("id", sqlbuilder.Flatten(batch)...))
 
 		sql, args := selectBuilder.Build()
-		rows, err := d.QuerySql(context.Background(), tx, sql, args...)
+		rows, err := d.QuerySql(ctx, tx, sql, args...)
 		if err != nil {
 			return errs.Wrap(err, "unable to query database")
 		}
@@ -147,13 +147,13 @@ func (d *CommonDatabase) GetGroupsByIds(tx *sql.Tx, groupIds []int64) ([]models.
 	return groups, nil
 }
 
-func (d *CommonDatabase) GroupLoadPermissions(tx *sql.Tx, group *models.Group) error {
+func (d *CommonDatabase) GroupLoadPermissions(ctx context.Context, tx *sql.Tx, group *models.Group) error {
 
 	if group == nil {
 		return nil
 	}
 
-	groupPermissions, err := d.GetGroupPermissionsByGroupIds(tx, []int64{group.Id})
+	groupPermissions, err := d.GetGroupPermissionsByGroupIds(ctx, tx, []int64{group.Id})
 	if err != nil {
 		return errs.Wrap(err, "unable to get group permissions")
 	}
@@ -163,7 +163,7 @@ func (d *CommonDatabase) GroupLoadPermissions(tx *sql.Tx, group *models.Group) e
 		permissionIds[i] = groupPermission.PermissionId
 	}
 
-	permissions, err := d.GetPermissionsByIds(context.Background(), tx, permissionIds)
+	permissions, err := d.GetPermissionsByIds(ctx, tx, permissionIds)
 	if err != nil {
 		return errs.Wrap(err, "unable to get permissions")
 	}
@@ -174,7 +174,7 @@ func (d *CommonDatabase) GroupLoadPermissions(tx *sql.Tx, group *models.Group) e
 	return nil
 }
 
-func (d *CommonDatabase) GroupsLoadPermissions(tx *sql.Tx, groups []models.Group) error {
+func (d *CommonDatabase) GroupsLoadPermissions(ctx context.Context, tx *sql.Tx, groups []models.Group) error {
 
 	if groups == nil {
 		return nil
@@ -185,7 +185,7 @@ func (d *CommonDatabase) GroupsLoadPermissions(tx *sql.Tx, groups []models.Group
 		groupIds[i] = group.Id
 	}
 
-	groupPermissions, err := d.GetGroupPermissionsByGroupIds(tx, groupIds)
+	groupPermissions, err := d.GetGroupPermissionsByGroupIds(ctx, tx, groupIds)
 	if err != nil {
 		return errs.Wrap(err, "unable to get group permissions")
 	}
@@ -195,7 +195,7 @@ func (d *CommonDatabase) GroupsLoadPermissions(tx *sql.Tx, groups []models.Group
 		permissionIds[i] = groupPermission.PermissionId
 	}
 
-	permissions, err := d.GetPermissionsByIds(context.Background(), tx, permissionIds)
+	permissions, err := d.GetPermissionsByIds(ctx, tx, permissionIds)
 	if err != nil {
 		return errs.Wrap(err, "unable to get permissions")
 	}
@@ -221,7 +221,7 @@ func (d *CommonDatabase) GroupsLoadPermissions(tx *sql.Tx, groups []models.Group
 	return nil
 }
 
-func (d *CommonDatabase) GroupsLoadAttributes(tx *sql.Tx, groups []models.Group) error {
+func (d *CommonDatabase) GroupsLoadAttributes(ctx context.Context, tx *sql.Tx, groups []models.Group) error {
 
 	if groups == nil {
 		return nil
@@ -232,7 +232,7 @@ func (d *CommonDatabase) GroupsLoadAttributes(tx *sql.Tx, groups []models.Group)
 		groupIds[i] = group.Id
 	}
 
-	groupAttributes, err := d.GetGroupAttributesByGroupIds(tx, groupIds)
+	groupAttributes, err := d.GetGroupAttributesByGroupIds(ctx, tx, groupIds)
 	if err != nil {
 		return errs.Wrap(err, "unable to get group attributes")
 	}
@@ -250,7 +250,7 @@ func (d *CommonDatabase) GroupsLoadAttributes(tx *sql.Tx, groups []models.Group)
 	return nil
 }
 
-func (d *CommonDatabase) GetGroupByGroupIdentifier(tx *sql.Tx, groupIdentifier string) (*models.Group, error) {
+func (d *CommonDatabase) GetGroupByGroupIdentifier(ctx context.Context, tx *sql.Tx, groupIdentifier string) (*models.Group, error) {
 
 	groupStruct := sqlbuilder.NewStruct(new(models.Group)).
 		For(d.Flavor)
@@ -258,7 +258,7 @@ func (d *CommonDatabase) GetGroupByGroupIdentifier(tx *sql.Tx, groupIdentifier s
 	selectBuilder := groupStruct.SelectFrom(d.Flavor.Quote("groups"))
 	selectBuilder.Where(selectBuilder.Equal("group_identifier", groupIdentifier))
 
-	group, err := d.getGroupCommon(tx, selectBuilder, groupStruct)
+	group, err := d.getGroupCommon(ctx, tx, selectBuilder, groupStruct)
 	if err != nil {
 		return nil, err
 	}
@@ -271,7 +271,7 @@ func (d *CommonDatabase) GetGroupByGroupIdentifier(tx *sql.Tx, groupIdentifier s
 	return group, nil
 }
 
-func (d *CommonDatabase) GetAllGroups(tx *sql.Tx) ([]models.Group, error) {
+func (d *CommonDatabase) GetAllGroups(ctx context.Context, tx *sql.Tx) ([]models.Group, error) {
 
 	groupStruct := sqlbuilder.NewStruct(new(models.Group)).
 		For(d.Flavor)
@@ -279,7 +279,7 @@ func (d *CommonDatabase) GetAllGroups(tx *sql.Tx) ([]models.Group, error) {
 	selectBuilder := groupStruct.SelectFrom(d.Flavor.Quote("groups"))
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(context.Background(), tx, sql, args...)
+	rows, err := d.QuerySql(ctx, tx, sql, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -303,7 +303,7 @@ func (d *CommonDatabase) GetAllGroups(tx *sql.Tx) ([]models.Group, error) {
 	return groups, nil
 }
 
-func (d *CommonDatabase) GetAllGroupsPaginated(tx *sql.Tx, page int, pageSize int) ([]models.Group, int, error) {
+func (d *CommonDatabase) GetAllGroupsPaginated(ctx context.Context, tx *sql.Tx, page int, pageSize int) ([]models.Group, int, error) {
 	if page < 1 {
 		page = 1
 	}
@@ -321,7 +321,7 @@ func (d *CommonDatabase) GetAllGroupsPaginated(tx *sql.Tx, page int, pageSize in
 	selectBuilder.Limit(pageSize)
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(context.Background(), tx, sql, args...)
+	rows, err := d.QuerySql(ctx, tx, sql, args...)
 	if err != nil {
 		return nil, 0, errs.Wrap(err, "unable to query database")
 	}
@@ -342,7 +342,7 @@ func (d *CommonDatabase) GetAllGroupsPaginated(tx *sql.Tx, page int, pageSize in
 	selectBuilder.Select("count(*)").From(d.Flavor.Quote("groups"))
 
 	sql, args = selectBuilder.Build()
-	rows2, err := d.QuerySql(context.Background(), tx, sql, args...)
+	rows2, err := d.QuerySql(ctx, tx, sql, args...)
 	if err != nil {
 		return nil, 0, errs.Wrap(err, "unable to query database")
 	}
@@ -366,7 +366,7 @@ func (d *CommonDatabase) GetAllGroupsPaginated(tx *sql.Tx, page int, pageSize in
 	return groups, total, nil
 }
 
-func (d *CommonDatabase) GetGroupMembersPaginated(tx *sql.Tx, groupId int64, page int, pageSize int) ([]models.User, int, error) {
+func (d *CommonDatabase) GetGroupMembersPaginated(ctx context.Context, tx *sql.Tx, groupId int64, page int, pageSize int) ([]models.User, int, error) {
 	if groupId <= 0 {
 		return nil, 0, errs.New("group id must be greater than 0")
 	}
@@ -392,7 +392,7 @@ func (d *CommonDatabase) GetGroupMembersPaginated(tx *sql.Tx, groupId int64, pag
 	selectBuilder.Limit(pageSize)
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(context.Background(), tx, sql, args...)
+	rows, err := d.QuerySql(ctx, tx, sql, args...)
 	if err != nil {
 		return nil, 0, errs.Wrap(err, "unable to query database")
 	}
@@ -415,7 +415,7 @@ func (d *CommonDatabase) GetGroupMembersPaginated(tx *sql.Tx, groupId int64, pag
 	selectBuilder.Where(selectBuilder.Equal("users_groups.group_id", groupId))
 
 	sql, args = selectBuilder.Build()
-	rows2, err := d.QuerySql(context.Background(), tx, sql, args...)
+	rows2, err := d.QuerySql(ctx, tx, sql, args...)
 	if err != nil {
 		return nil, 0, errs.Wrap(err, "unable to query database")
 	}
@@ -439,7 +439,7 @@ func (d *CommonDatabase) GetGroupMembersPaginated(tx *sql.Tx, groupId int64, pag
 	return users, total, nil
 }
 
-func (d *CommonDatabase) CountGroupMembers(tx *sql.Tx, groupId int64) (int, error) {
+func (d *CommonDatabase) CountGroupMembers(ctx context.Context, tx *sql.Tx, groupId int64) (int, error) {
 	if groupId <= 0 {
 		return 0, errs.New("group id must be greater than 0")
 	}
@@ -449,7 +449,7 @@ func (d *CommonDatabase) CountGroupMembers(tx *sql.Tx, groupId int64) (int, erro
 	selectBuilder.Where(selectBuilder.Equal("group_id", groupId))
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(context.Background(), tx, sql, args...)
+	rows, err := d.QuerySql(ctx, tx, sql, args...)
 	if err != nil {
 		return 0, errs.Wrap(err, "unable to query database")
 	}
@@ -470,7 +470,7 @@ func (d *CommonDatabase) CountGroupMembers(tx *sql.Tx, groupId int64) (int, erro
 	return 0, nil
 }
 
-func (d *CommonDatabase) DeleteGroup(tx *sql.Tx, groupId int64) error {
+func (d *CommonDatabase) DeleteGroup(ctx context.Context, tx *sql.Tx, groupId int64) error {
 
 	clientStruct := sqlbuilder.NewStruct(new(models.Group)).
 		For(d.Flavor)
@@ -479,7 +479,7 @@ func (d *CommonDatabase) DeleteGroup(tx *sql.Tx, groupId int64) error {
 	deleteBuilder.Where(deleteBuilder.Equal("id", groupId))
 
 	sql, args := deleteBuilder.Build()
-	_, err := d.ExecSql(context.Background(), tx, sql, args...)
+	_, err := d.ExecSql(ctx, tx, sql, args...)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete group")
 	}

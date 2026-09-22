@@ -198,7 +198,7 @@ func TestDeleteUser_RemovesAllDependentRows(t *testing.T) {
 
 	// The group, resource and permission are independent of the user and must
 	// survive: cascade must not travel up an association table.
-	survivingGroup, err := database.GetGroupById(nil, group.Id)
+	survivingGroup, err := database.GetGroupById(context.Background(), nil, group.Id)
 	assert.NoError(t, err, "GetGroupById")
 	assert.NotNil(t, survivingGroup, "deleting a user must not delete the group")
 	survivingPermission, err := database.GetPermissionById(context.Background(), nil, permission.Id)

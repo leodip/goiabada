@@ -9,6 +9,7 @@
 package datafactory
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -32,7 +33,7 @@ import (
 // type-asserts to this, because it must be able to step DOWN, and anything that went through
 // NewDatabase would have migrated up before it got the chance (#268).
 type MigratorProvider interface {
-	NewMigrator() (*migrator.Migrator, error)
+	NewMigrator(ctx context.Context) (*migrator.Migrator, error)
 }
 
 // OpenDatabase constructs the concrete database for the configured engine and returns it having
@@ -156,17 +157,17 @@ func mssqlConfig(c *config.DatabaseConfig) *mssqldb.DatabaseConfig {
 // that the refusal below is one call away from a test rather than unreachable (#351). aesKey is
 // required and must be 32 bytes; previousAESKey is optional and is acted on only at that length,
 // by the env-to-env rotation inside runStartupDataTasks.
-func NewDatabase(dbConfig *config.DatabaseConfig, aesKey []byte, previousAESKey []byte, logSQL bool) (data.Database, error) {
+func NewDatabase(ctx context.Context, dbConfig *config.DatabaseConfig, aesKey []byte, previousAESKey []byte, logSQL bool) (data.Database, error) {
 	database, err := OpenDatabase(dbConfig, logSQL)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := preflightEmailCase(database); err != nil {
+	if err := preflightEmailCase(ctx, database); err != nil {
 		return nil, err
 	}
 
-	err = database.Migrate()
+	err = database.Migrate(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -179,7 +180,7 @@ func NewDatabase(dbConfig *config.DatabaseConfig, aesKey []byte, previousAESKey 
 		return nil, errs.New("GOIABADA_AES_ENCRYPTION_KEY must be set to a 32-byte hex key")
 	}
 
-	if err := runStartupDataTasks(database, aesKey, previousAESKey); err != nil {
+	if err := runStartupDataTasks(ctx, database, aesKey, previousAESKey); err != nil {
 		return nil, err
 	}
 

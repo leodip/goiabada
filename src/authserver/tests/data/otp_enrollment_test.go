@@ -231,7 +231,7 @@ func TestPendingOTPEnrollment_EnlistsInTheCallersTransaction(t *testing.T) {
 		now.Add(-15*time.Minute))
 	require.NoError(t, err)
 	require.True(t, installed, "inside the transaction the install reports that it won")
-	require.NoError(t, database.RollbackTransaction(tx), "RollbackTransaction")
+	require.NoError(t, database.RollbackTransaction(context.Background(), tx), "RollbackTransaction")
 
 	assert.Nil(t, reloadUser(t, user.Id).OtpEnrollmentSecretEncrypted,
 		"a rolled back transaction must leave nothing installed; if this is set, the install ran "+
@@ -246,7 +246,7 @@ func TestPendingOTPEnrollment_EnlistsInTheCallersTransaction(t *testing.T) {
 	tx, err = database.BeginTransaction(context.Background())
 	require.NoError(t, err, "BeginTransaction")
 	require.NoError(t, database.ClearPendingOTPEnrollment(context.Background(), tx, user.Id), "ClearPendingOTPEnrollment")
-	require.NoError(t, database.RollbackTransaction(tx), "RollbackTransaction")
+	require.NoError(t, database.RollbackTransaction(context.Background(), tx), "RollbackTransaction")
 
 	assert.Equal(t, ciphertext, reloadUser(t, user.Id).OtpEnrollmentSecretEncrypted,
 		"a rolled back transaction must leave the pending enrolment where it was; if this is nil, "+

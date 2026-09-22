@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"database/sql"
 	"strconv"
 	"testing"
@@ -48,20 +49,20 @@ func seedEmail(t *testing.T, sqlDB *sql.DB, id int64, email string) {
 // recorded version did not move, the database is not dirty, and the message names the rows.
 func TestMigrateTo_RefusesAnEmailCaseCollisionAndLeavesTheSchemaAlone(t *testing.T) {
 	db, m, sqlDB := newTestMigrator(t)
-	require.NoError(t, m.Migrate(beforeLowercaseEmails), "step up to the version below 000047")
+	require.NoError(t, m.Migrate(context.Background(), beforeLowercaseEmails), "step up to the version below 000047")
 
 	seedEmail(t, sqlDB, 1, "Alice@example.com")
 	seedEmail(t, sqlDB, 2, "alice@example.com")
 
 	var out bytes.Buffer
-	code := runMigrate([]string{"to", strconv.Itoa(datafactory.LowercaseEmailsVersion)}, db, m, rollbackFloor, &out)
+	code := runMigrate(context.Background(), []string{"to", strconv.Itoa(datafactory.LowercaseEmailsVersion)}, db, m, rollbackFloor, &out)
 
 	require.Equal(t, 1, code, "a collision must refuse: %s", out.String())
 	assert.Contains(t, out.String(), "users.id=1")
 	assert.Contains(t, out.String(), "users.id=2")
 	assert.Contains(t, out.String(), "Alice@example.com")
 
-	version, dirty, err := m.Version()
+	version, dirty, err := m.Version(context.Background())
 	require.NoError(t, err)
 	assert.Equal(t, beforeLowercaseEmails, version,
 		"the schema must not have moved: the whole point of checking before Migrate is that the operator can fix the rows and run the same command again")
@@ -78,19 +79,19 @@ func TestMigrateTo_RefusesAnEmailCaseCollisionAndLeavesTheSchemaAlone(t *testing
 // UNIQUE index; this one does not announce itself at all.
 func TestMigrateTo_RefusesAnAddressSQLiteWillNotLowercase(t *testing.T) {
 	db, m, sqlDB := newTestMigrator(t)
-	require.NoError(t, m.Migrate(beforeLowercaseEmails))
+	require.NoError(t, m.Migrate(context.Background(), beforeLowercaseEmails))
 
 	seedEmail(t, sqlDB, 1, "Ädmin@example.com")
 
 	var out bytes.Buffer
-	code := runMigrate([]string{"to", strconv.Itoa(datafactory.LowercaseEmailsVersion)}, db, m, rollbackFloor, &out)
+	code := runMigrate(context.Background(), []string{"to", strconv.Itoa(datafactory.LowercaseEmailsVersion)}, db, m, rollbackFloor, &out)
 
 	require.Equal(t, 1, code, "an address this engine's LOWER() will not reduce must refuse: %s", out.String())
 	assert.Contains(t, out.String(), "users.id=1")
 	assert.Contains(t, out.String(), "ädmin@example.com",
 		"the message must say what the address has to become, because the remedy is an UPDATE the operator writes")
 
-	version, dirty, err := m.Version()
+	version, dirty, err := m.Version(context.Background())
 	require.NoError(t, err)
 	assert.Equal(t, beforeLowercaseEmails, version)
 	assert.False(t, dirty)
@@ -102,17 +103,17 @@ func TestMigrateTo_RefusesAnAddressSQLiteWillNotLowercase(t *testing.T) {
 // must go through and be repaired.
 func TestMigrateTo_LowercasesAndDoesNotRefuseWhatItCanRepair(t *testing.T) {
 	db, m, sqlDB := newTestMigrator(t)
-	require.NoError(t, m.Migrate(beforeLowercaseEmails))
+	require.NoError(t, m.Migrate(context.Background(), beforeLowercaseEmails))
 
 	seedEmail(t, sqlDB, 1, "Legacy.User@Example.COM")
 	seedEmail(t, sqlDB, 2, "already@example.com")
 
 	var out bytes.Buffer
-	code := runMigrate([]string{"to", strconv.Itoa(datafactory.LowercaseEmailsVersion)}, db, m, rollbackFloor, &out)
+	code := runMigrate(context.Background(), []string{"to", strconv.Itoa(datafactory.LowercaseEmailsVersion)}, db, m, rollbackFloor, &out)
 
 	require.Equal(t, 0, code, "nothing here is a hazard: %s", out.String())
 
-	version, dirty, err := m.Version()
+	version, dirty, err := m.Version(context.Background())
 	require.NoError(t, err)
 	assert.Equal(t, datafactory.LowercaseEmailsVersion, version)
 	assert.False(t, dirty)
@@ -128,18 +129,18 @@ func TestMigrateTo_LowercasesAndDoesNotRefuseWhatItCanRepair(t *testing.T) {
 // succeeding is what says it did not.
 func TestMigrateTo_DoesNotCheckAStepThatDoesNotCross000047(t *testing.T) {
 	db, m, sqlDB := newTestMigrator(t)
-	require.NoError(t, m.Migrate(beforeLowercaseEmails-1))
+	require.NoError(t, m.Migrate(context.Background(), beforeLowercaseEmails-1))
 
 	seedEmail(t, sqlDB, 1, "Alice@example.com")
 	seedEmail(t, sqlDB, 2, "alice@example.com")
 
 	var out bytes.Buffer
-	code := runMigrate([]string{"to", strconv.Itoa(beforeLowercaseEmails)}, db, m, rollbackFloor, &out)
+	code := runMigrate(context.Background(), []string{"to", strconv.Itoa(beforeLowercaseEmails)}, db, m, rollbackFloor, &out)
 
 	require.Equal(t, 0, code,
 		"this step stops below 000047, so nothing will lowercase anything and the collision is not this command's business: %s", out.String())
 
-	version, _, err := m.Version()
+	version, _, err := m.Version(context.Background())
 	require.NoError(t, err)
 	assert.Equal(t, beforeLowercaseEmails, version)
 }
@@ -149,13 +150,13 @@ func TestMigrateTo_DoesNotCheckAStepThatDoesNotCross000047(t *testing.T) {
 // refusal, and a check that fired here would leave them unable to see where the schema stands.
 func TestMigrateVersion_AnswersOverACollision(t *testing.T) {
 	db, m, sqlDB := newTestMigrator(t)
-	require.NoError(t, m.Migrate(beforeLowercaseEmails))
+	require.NoError(t, m.Migrate(context.Background(), beforeLowercaseEmails))
 
 	seedEmail(t, sqlDB, 1, "Alice@example.com")
 	seedEmail(t, sqlDB, 2, "alice@example.com")
 
 	var out bytes.Buffer
-	code := runMigrate([]string{"version"}, db, m, rollbackFloor, &out)
+	code := runMigrate(context.Background(), []string{"version"}, db, m, rollbackFloor, &out)
 
 	require.Equal(t, 0, code)
 	assert.Contains(t, out.String(), "000046")
@@ -168,11 +169,11 @@ func TestMigrateVersion_AnswersOverACollision(t *testing.T) {
 func TestMigrateTo_SkipsANeverMigratedDatabase(t *testing.T) {
 	db, m, _ := newTestMigrator(t)
 
-	_, _, err := m.Version()
+	_, _, err := m.Version(context.Background())
 	require.ErrorIs(t, err, migrator.ErrNilVersion, "the database must start with no recorded version")
 
 	var out bytes.Buffer
-	code := runMigrate([]string{"to", strconv.Itoa(head(m))}, db, m, rollbackFloor, &out)
+	code := runMigrate(context.Background(), []string{"to", strconv.Itoa(head(m))}, db, m, rollbackFloor, &out)
 
 	require.Equal(t, 0, code,
 		"a database with no users table must migrate, or no installation could ever be created: %s", out.String())

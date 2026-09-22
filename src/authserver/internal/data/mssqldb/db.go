@@ -346,8 +346,7 @@ const schemaMigrationsTableDDL = `IF OBJECT_ID(N'schema_migrations', N'U') IS NU
 // taken, used and released on a single connection pinned out of the pool. Issued against
 // the pooled *sql.DB, the release could land on a different session and leave the lock held
 // for the life of the process, blocking every later migrator.
-func (d *MsSQLDatabase) ensureSchemaMigrationsTable() (err error) {
-	ctx := context.Background()
+func (d *MsSQLDatabase) ensureSchemaMigrationsTable(ctx context.Context) (err error) {
 	eng := migrator.SQLServer(d.dbConfig.Name)
 
 	conn, err := d.DB.Conn(ctx)
@@ -392,8 +391,8 @@ func (d *MsSQLDatabase) ensureSchemaMigrationsTable() (err error) {
 //
 // There is nothing to close. The runner takes a connection out of the pool for the duration
 // of one operation and gives it back before returning (#268 decision 8).
-func (d *MsSQLDatabase) NewMigrator() (*migrator.Migrator, error) {
-	if err := d.ensureSchemaMigrationsTable(); err != nil {
+func (d *MsSQLDatabase) NewMigrator(ctx context.Context) (*migrator.Migrator, error) {
+	if err := d.ensureSchemaMigrationsTable(ctx); err != nil {
 		return nil, err
 	}
 
@@ -404,18 +403,18 @@ func (d *MsSQLDatabase) NewMigrator() (*migrator.Migrator, error) {
 	return m, nil
 }
 
-func (d *MsSQLDatabase) Migrate() error {
-	m, err := d.NewMigrator()
+func (d *MsSQLDatabase) Migrate(ctx context.Context) error {
+	m, err := d.NewMigrator(ctx)
 	if err != nil {
 		return err
 	}
 
-	err = m.Up()
+	err = m.Up(ctx)
 	// IsNoChange rather than errors.Is: a run whose unlock failed answers the sentinel JOINED
 	// with that failure, and errors.Is would report this start as successful while the migration
 	// lock stays held against every other process on the database (#268).
 	if migrator.IsNoChange(err) {
-		slog.Info("no need to migrate the database")
+		slog.InfoContext(ctx, "no need to migrate the database")
 		return nil
 	}
 	if err != nil {

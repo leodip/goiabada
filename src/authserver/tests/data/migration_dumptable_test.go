@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"testing"
@@ -33,7 +34,7 @@ import (
 func TestDumpTable_ReadsTheCatalog(t *testing.T) {
 	h := newIsolatedDB(t)
 
-	require.NoError(t, h.Migrator.Migrate(35), "migrate to 000035")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 35), "migrate to 000035")
 
 	refreshTokens := dumpTable(t, h, "refresh_tokens")
 	codes := dumpTable(t, h, "codes")

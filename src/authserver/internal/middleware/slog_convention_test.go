@@ -23,7 +23,7 @@ func TestSlogConvention_SettingsReadFailureIsError(t *testing.T) {
 	logged := testutil.CaptureSlog(t)
 
 	mockDB := mocks_data.NewDatabase(t)
-	mockDB.On("GetSettingsById", mock.Anything, int64(1)).Return(nil, errors.New("database error"))
+	mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(nil, errors.New("database error"))
 
 	rr := httptest.NewRecorder()
 	chimiddleware.RequestID(MiddlewareSettings(mockDB)(http.HandlerFunc(

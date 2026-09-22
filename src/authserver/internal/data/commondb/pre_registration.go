@@ -10,7 +10,7 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 )
 
-func (d *CommonDatabase) CreatePreRegistration(tx *sql.Tx, preRegistration *models.PreRegistration) error {
+func (d *CommonDatabase) CreatePreRegistration(ctx context.Context, tx *sql.Tx, preRegistration *models.PreRegistration) error {
 
 	now := time.Now().UTC()
 
@@ -24,7 +24,7 @@ func (d *CommonDatabase) CreatePreRegistration(tx *sql.Tx, preRegistration *mode
 
 	insertBuilder := preRegistrationStruct.WithoutTag("pk").InsertInto("pre_registrations", preRegistration)
 
-	id, err := d.insertReturningId(context.Background(), tx, insertBuilder, "preRegistration")
+	id, err := d.insertReturningId(ctx, tx, insertBuilder, "preRegistration")
 	if err != nil {
 		preRegistration.CreatedAt = originalCreatedAt
 		preRegistration.UpdatedAt = originalUpdatedAt
@@ -35,7 +35,7 @@ func (d *CommonDatabase) CreatePreRegistration(tx *sql.Tx, preRegistration *mode
 	return nil
 }
 
-func (d *CommonDatabase) UpdatePreRegistration(tx *sql.Tx, preRegistration *models.PreRegistration) error {
+func (d *CommonDatabase) UpdatePreRegistration(ctx context.Context, tx *sql.Tx, preRegistration *models.PreRegistration) error {
 
 	if preRegistration.Id == 0 {
 		return errs.New("can't update preRegistration with id 0")
@@ -51,7 +51,7 @@ func (d *CommonDatabase) UpdatePreRegistration(tx *sql.Tx, preRegistration *mode
 	updateBuilder.Where(updateBuilder.Equal("id", preRegistration.Id))
 
 	sql, args := updateBuilder.Build()
-	_, err := d.ExecSql(context.Background(), tx, sql, args...)
+	_, err := d.ExecSql(ctx, tx, sql, args...)
 	if err != nil {
 		preRegistration.UpdatedAt = originalUpdatedAt
 		return errs.Wrap(err, "unable to update preRegistration")
@@ -60,11 +60,11 @@ func (d *CommonDatabase) UpdatePreRegistration(tx *sql.Tx, preRegistration *mode
 	return nil
 }
 
-func (d *CommonDatabase) getPreRegistrationCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
+func (d *CommonDatabase) getPreRegistrationCommon(ctx context.Context, tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
 	preRegistrationStruct *sqlbuilder.Struct) (*models.PreRegistration, error) {
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(context.Background(), tx, sql, args...)
+	rows, err := d.QuerySql(ctx, tx, sql, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -86,7 +86,7 @@ func (d *CommonDatabase) getPreRegistrationCommon(tx *sql.Tx, selectBuilder *sql
 	return nil, nil
 }
 
-func (d *CommonDatabase) GetPreRegistrationById(tx *sql.Tx, preRegistrationId int64) (*models.PreRegistration, error) {
+func (d *CommonDatabase) GetPreRegistrationById(ctx context.Context, tx *sql.Tx, preRegistrationId int64) (*models.PreRegistration, error) {
 
 	preRegistrationStruct := sqlbuilder.NewStruct(new(models.PreRegistration)).
 		For(d.Flavor)
@@ -94,7 +94,7 @@ func (d *CommonDatabase) GetPreRegistrationById(tx *sql.Tx, preRegistrationId in
 	selectBuilder := preRegistrationStruct.SelectFrom("pre_registrations")
 	selectBuilder.Where(selectBuilder.Equal("id", preRegistrationId))
 
-	preRegistration, err := d.getPreRegistrationCommon(tx, selectBuilder, preRegistrationStruct)
+	preRegistration, err := d.getPreRegistrationCommon(ctx, tx, selectBuilder, preRegistrationStruct)
 	if err != nil {
 		return nil, err
 	}
@@ -102,7 +102,7 @@ func (d *CommonDatabase) GetPreRegistrationById(tx *sql.Tx, preRegistrationId in
 	return preRegistration, nil
 }
 
-func (d *CommonDatabase) DeletePreRegistration(tx *sql.Tx, preRegistrationId int64) error {
+func (d *CommonDatabase) DeletePreRegistration(ctx context.Context, tx *sql.Tx, preRegistrationId int64) error {
 
 	clientStruct := sqlbuilder.NewStruct(new(models.PreRegistration)).
 		For(d.Flavor)
@@ -111,7 +111,7 @@ func (d *CommonDatabase) DeletePreRegistration(tx *sql.Tx, preRegistrationId int
 	deleteBuilder.Where(deleteBuilder.Equal("id", preRegistrationId))
 
 	sql, args := deleteBuilder.Build()
-	_, err := d.ExecSql(context.Background(), tx, sql, args...)
+	_, err := d.ExecSql(ctx, tx, sql, args...)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete preRegistration")
 	}
@@ -126,7 +126,7 @@ func (d *CommonDatabase) DeletePreRegistration(tx *sql.Tx, preRegistrationId int
 //
 // Locating the row is not authenticating it. The caller still compares the submitted code
 // against the encrypted column and checks the code's expiry.
-func (d *CommonDatabase) GetPreRegistrationByVerificationCodeHash(tx *sql.Tx, codeHash string) (*models.PreRegistration, error) {
+func (d *CommonDatabase) GetPreRegistrationByVerificationCodeHash(ctx context.Context, tx *sql.Tx, codeHash string) (*models.PreRegistration, error) {
 
 	// As on the user lookup: '' is the dormant value, so an empty codeHash reaching the
 	// query could match a row nobody supplied a code for.
@@ -140,7 +140,7 @@ func (d *CommonDatabase) GetPreRegistrationByVerificationCodeHash(tx *sql.Tx, co
 	selectBuilder := preRegistrationStruct.SelectFrom("pre_registrations")
 	selectBuilder.Where(selectBuilder.Equal("verification_code_hash", codeHash))
 
-	preRegistration, err := d.getPreRegistrationCommon(tx, selectBuilder, preRegistrationStruct)
+	preRegistration, err := d.getPreRegistrationCommon(ctx, tx, selectBuilder, preRegistrationStruct)
 	if err != nil {
 		return nil, err
 	}
@@ -148,7 +148,7 @@ func (d *CommonDatabase) GetPreRegistrationByVerificationCodeHash(tx *sql.Tx, co
 	return preRegistration, nil
 }
 
-func (d *CommonDatabase) GetPreRegistrationByEmail(tx *sql.Tx, email string) (*models.PreRegistration, error) {
+func (d *CommonDatabase) GetPreRegistrationByEmail(ctx context.Context, tx *sql.Tx, email string) (*models.PreRegistration, error) {
 
 	preRegistrationStruct := sqlbuilder.NewStruct(new(models.PreRegistration)).
 		For(d.Flavor)
@@ -156,7 +156,7 @@ func (d *CommonDatabase) GetPreRegistrationByEmail(tx *sql.Tx, email string) (*m
 	selectBuilder := preRegistrationStruct.SelectFrom("pre_registrations")
 	selectBuilder.Where(selectBuilder.Equal("email", email))
 
-	preRegistration, err := d.getPreRegistrationCommon(tx, selectBuilder, preRegistrationStruct)
+	preRegistration, err := d.getPreRegistrationCommon(ctx, tx, selectBuilder, preRegistrationStruct)
 	if err != nil {
 		return nil, err
 	}

@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -44,7 +45,7 @@ func TestMigration000043_BrowserSessionsDataText(t *testing.T) {
 	h := newIsolatedDB(t)
 
 	if !isSQLite000041() {
-		require.NoError(t, h.Migrator.Up(), "migrate to head")
+		require.NoError(t, h.Migrator.Up(context.Background()), "migrate to head")
 		// Each of the other three already declares the column in its own vocabulary, and
 		// on MySQL that spelling IS longtext: there the name is real and it is the right
 		// choice, being the engine's largest string. That is precisely why the SQLite
@@ -56,7 +57,7 @@ func TestMigration000043_BrowserSessionsDataText(t *testing.T) {
 		return
 	}
 
-	require.NoError(t, h.Migrator.Migrate(sqliteVersionBefore000043), "migrate to 000041")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), sqliteVersionBefore000043), "migrate to 000041")
 
 	// The before-state, asserted rather than assumed. Without this the test would pass
 	// whatever the migration did, on a column that had already been corrected upstream.
@@ -71,7 +72,7 @@ func TestMigration000043_BrowserSessionsDataText(t *testing.T) {
 		VALUES (7, 'authserver', 'hash-000043', 'payload-000043', '2026-01-01 00:00:00', '2030-01-01 00:00:00')`)
 	require.NoError(t, err, "seed a row through the pre-migration shape")
 
-	require.NoError(t, h.Migrator.Migrate(43), "apply 000043")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 43), "apply 000043")
 
 	after := dumpTable(t, h, "browser_sessions")
 	assert.Equal(t, "TEXT", after.column(t, "data").Type,
@@ -111,13 +112,13 @@ func TestMigration000043_BrowserSessionsDataText(t *testing.T) {
 		VALUES ('authserver', 'hash-000043', '2026-01-01 00:00:00', '2030-01-01 00:00:00')`)
 	assert.Error(t, err, "(owner, session_id_hash) is still unique after the rebuild")
 
-	require.NoError(t, h.Migrator.Migrate(sqliteVersionBefore000043), "roll back 000043")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), sqliteVersionBefore000043), "roll back 000043")
 	rolledBack := dumpTable(t, h, "browser_sessions")
 	assert.Equal(t, "longtext", rolledBack.column(t, "data").Type,
 		"the down migration restores the previous state, wrong spelling and all")
 	assert.Equal(t, before.Indexes, rolledBack.Indexes, "the down migration recreates both indexes too")
 
-	require.NoError(t, h.Migrator.Migrate(43), "re-apply 000043")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 43), "re-apply 000043")
 	assert.Equal(t, "TEXT", dumpTable(t, h, "browser_sessions").column(t, "data").Type,
 		"the shape is the same after a down/up round trip")
 }

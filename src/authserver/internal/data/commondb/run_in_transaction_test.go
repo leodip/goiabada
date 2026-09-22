@@ -352,7 +352,7 @@ func TestInTransaction_OnlyTheOwnerRetries(t *testing.T) {
 		held := d.counts()
 		assert.Zero(t, held.commits, "and it neither commits nor rolls back what is not its own")
 		assert.Zero(t, held.rollbacks)
-		require.NoError(t, db.RollbackTransaction(tx))
+		require.NoError(t, db.RollbackTransaction(context.Background(), tx))
 	})
 }
 

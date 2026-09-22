@@ -24,7 +24,7 @@ func TestDecodeAndValidateTokenResponse_ValidTokens(t *testing.T) {
 	privateKey, _ := rsa.GenerateKey(rand.Reader, 2048)
 	publicKeyPEM := exportRSAPublicKeyAsPEMStr(&privateKey.PublicKey)
 
-	mockDB.On("GetCurrentSigningKey", mock.Anything).Return(&models.KeyPair{
+	mockDB.On("GetCurrentSigningKey", mock.Anything, mock.Anything).Return(&models.KeyPair{
 		PublicKeyPEM: []byte(publicKeyPEM),
 	}, nil)
 
@@ -109,7 +109,7 @@ func TestDecodeAndValidateTokenResponse_ExpiredAccessToken(t *testing.T) {
 	privateKey, _ := rsa.GenerateKey(rand.Reader, 2048)
 	publicKeyPEM := exportRSAPublicKeyAsPEMStr(&privateKey.PublicKey)
 
-	mockDB.On("GetCurrentSigningKey", mock.Anything).Return(&models.KeyPair{
+	mockDB.On("GetCurrentSigningKey", mock.Anything, mock.Anything).Return(&models.KeyPair{
 		PublicKeyPEM: []byte(publicKeyPEM),
 	}, nil)
 
@@ -135,7 +135,7 @@ func TestDecodeAndValidateTokenResponse_EmptyTokens(t *testing.T) {
 	publicKeyPEM := exportRSAPublicKeyAsPEMStr(&privateKey.PublicKey)
 
 	// Even with empty tokens, getPublicKey() is called at the start
-	mockDB.On("GetCurrentSigningKey", mock.Anything).Return(&models.KeyPair{
+	mockDB.On("GetCurrentSigningKey", mock.Anything, mock.Anything).Return(&models.KeyPair{
 		PublicKeyPEM: []byte(publicKeyPEM),
 	}, nil)
 
@@ -220,7 +220,7 @@ func TestDecodeAndValidateTokenString_InvalidSignature(t *testing.T) {
 	publicKey := &privateKey.PublicKey
 
 	// When signature validation fails, the parser tries all signing keys as fallback
-	mockDB.On("GetAllSigningKeys", mock.Anything).Return([]models.KeyPair{}, nil)
+	mockDB.On("GetAllSigningKeys", mock.Anything, mock.Anything).Return([]models.KeyPair{}, nil)
 
 	claims := jwt.MapClaims{
 		"sub": "1234567890",
@@ -243,7 +243,7 @@ func TestDecodeAndValidateTokenString_RejectsNonRS256Token(t *testing.T) {
 	privateKey, _ := rsa.GenerateKey(rand.Reader, 2048)
 	publicKey := &privateKey.PublicKey
 
-	mockDB.On("GetAllSigningKeys", mock.Anything).Return([]models.KeyPair{}, nil)
+	mockDB.On("GetAllSigningKeys", mock.Anything, mock.Anything).Return([]models.KeyPair{}, nil)
 
 	claims := jwt.MapClaims{
 		"sub": "1234567890",

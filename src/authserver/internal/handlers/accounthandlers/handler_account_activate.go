@@ -100,7 +100,7 @@ func handleActivationLinkFollowed(httpHelper handlers.HttpHelper, httpSession se
 		return
 	}
 
-	preRegistration, err := database.GetPreRegistrationByVerificationCodeHash(nil, codeHash)
+	preRegistration, err := database.GetPreRegistrationByVerificationCodeHash(r.Context(), nil, codeHash)
 	if err != nil {
 		httpHelper.InternalServerError(w, r, err)
 		return
@@ -127,7 +127,7 @@ func handleActivationLinkFollowed(httpHelper handlers.HttpHelper, httpSession se
 
 	if isVerificationCodeExpired(preRegistration) {
 		// The code has expired: delete the pre-registration and ask the user to register again.
-		if err := database.DeletePreRegistration(nil, preRegistration.Id); err != nil {
+		if err := database.DeletePreRegistration(r.Context(), nil, preRegistration.Id); err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}
@@ -198,7 +198,7 @@ func handleActivationCleanHop(httpHelper handlers.HttpHelper, httpSession sessio
 	// The resolved row is the authority for which registration this is, not marker.Id: the
 	// marker travels in a cookie, so the id it carries is a label rather than something this
 	// request established.
-	preRegistration, err := database.GetPreRegistrationByVerificationCodeHash(nil, marker.CodeHash)
+	preRegistration, err := database.GetPreRegistrationByVerificationCodeHash(r.Context(), nil, marker.CodeHash)
 	if err != nil {
 		httpHelper.InternalServerError(w, r, err)
 		return
@@ -226,7 +226,7 @@ func handleActivationCleanHop(httpHelper handlers.HttpHelper, httpSession sessio
 	// replayed copy of the cookie lands on the expired rendering. Two copies racing before
 	// either gets here are bounded instead by the UNIQUE index on users.email, which refuses
 	// the second insert, so exactly one account exists either way.
-	err = database.DeletePreRegistration(nil, preRegistration.Id)
+	err = database.DeletePreRegistration(r.Context(), nil, preRegistration.Id)
 	if err != nil {
 		httpHelper.InternalServerError(w, r, err)
 		return

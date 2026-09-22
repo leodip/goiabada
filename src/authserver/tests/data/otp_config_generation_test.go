@@ -43,7 +43,7 @@ func TestIncrementUserOtpConfigGeneration(t *testing.T) {
 	require.NoError(t, err, "BeginTransaction")
 	got, err := database.IncrementUserOtpConfigGeneration(context.Background(), tx, moved.Id)
 	require.NoError(t, err, "IncrementUserOtpConfigGeneration")
-	require.NoError(t, database.CommitTransaction(tx), "CommitTransaction")
+	require.NoError(t, database.CommitTransaction(context.Background(), tx), "CommitTransaction")
 
 	assert.EqualValues(t, 1, got, "the returned value must be the one that landed")
 	assert.EqualValues(t, 1, reload(moved.Id))
@@ -56,7 +56,7 @@ func TestIncrementUserOtpConfigGeneration(t *testing.T) {
 		require.NoError(t, err, "BeginTransaction")
 		got, err := database.IncrementUserOtpConfigGeneration(context.Background(), tx, moved.Id)
 		require.NoError(t, err, "IncrementUserOtpConfigGeneration")
-		require.NoError(t, database.CommitTransaction(tx), "CommitTransaction")
+		require.NoError(t, database.CommitTransaction(context.Background(), tx), "CommitTransaction")
 		assert.EqualValues(t, want, got)
 	}
 	assert.EqualValues(t, 3, reload(moved.Id))
@@ -76,7 +76,7 @@ func TestIncrementUserOtpConfigGeneration(t *testing.T) {
 	require.NoError(t, err, "BeginTransaction")
 	_, err = database.IncrementUserOtpConfigGeneration(context.Background(), tx, 0)
 	assert.Error(t, err, "user id 0 must be refused")
-	require.NoError(t, database.RollbackTransaction(tx), "RollbackTransaction")
+	require.NoError(t, database.RollbackTransaction(context.Background(), tx), "RollbackTransaction")
 
 	// An id that matches no row is an error, not a no-op. The caller is establishing or
 	// removing an authenticator and the counter is what tells every session about it; a silent
@@ -85,7 +85,7 @@ func TestIncrementUserOtpConfigGeneration(t *testing.T) {
 	require.NoError(t, err, "BeginTransaction")
 	_, err = database.IncrementUserOtpConfigGeneration(context.Background(), tx, bystander.Id+1_000_000)
 	assert.Error(t, err, "an unknown user id must be refused")
-	require.NoError(t, database.RollbackTransaction(tx), "RollbackTransaction")
+	require.NoError(t, database.RollbackTransaction(context.Background(), tx), "RollbackTransaction")
 }
 
 // TestIncrementUserOtpConfigGeneration_EnlistsInTheCallersTransaction is the case that cannot
@@ -103,7 +103,7 @@ func TestIncrementUserOtpConfigGeneration_EnlistsInTheCallersTransaction(t *test
 	require.NoError(t, err, "IncrementUserOtpConfigGeneration")
 	assert.EqualValues(t, 1, got, "inside the transaction the increment is visible to its own read-back")
 
-	require.NoError(t, database.RollbackTransaction(tx), "RollbackTransaction")
+	require.NoError(t, database.RollbackTransaction(context.Background(), tx), "RollbackTransaction")
 
 	after, err := database.GetUserById(context.Background(), nil, user.Id)
 	require.NoError(t, err, "reload user")
@@ -160,7 +160,7 @@ func TestPromoteUserSessionOtpConfigGeneration_EnlistsInTheCallersTransaction(t 
 	require.NoError(t, database.PromoteUserSessionOtpConfigGeneration(context.Background(), tx, session.Id, 7),
 		"PromoteUserSessionOtpConfigGeneration")
 
-	require.NoError(t, database.RollbackTransaction(tx), "RollbackTransaction")
+	require.NoError(t, database.RollbackTransaction(context.Background(), tx), "RollbackTransaction")
 
 	after, err := database.GetUserSessionById(context.Background(), nil, session.Id)
 	require.NoError(t, err, "reload user session")
@@ -184,7 +184,7 @@ func TestUpdateUser_DoesNotClobberOtpConfigGeneration(t *testing.T) {
 	require.NoError(t, err, "BeginTransaction")
 	_, err = database.IncrementUserOtpConfigGeneration(context.Background(), tx, user.Id)
 	require.NoError(t, err, "IncrementUserOtpConfigGeneration")
-	require.NoError(t, database.CommitTransaction(tx), "CommitTransaction")
+	require.NoError(t, database.CommitTransaction(context.Background(), tx), "CommitTransaction")
 
 	stale, err := database.GetUserById(context.Background(), nil, user.Id)
 	require.NoError(t, err, "reload user")

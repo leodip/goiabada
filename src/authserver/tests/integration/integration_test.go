@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"os"
@@ -47,14 +48,14 @@ func TestMain(m *testing.M) {
 	}
 
 	var err error
-	database, err = datafactory.NewDatabase(config.GetDatabase(),
+	database, err = datafactory.NewDatabase(context.Background(), config.GetDatabase(),
 		config.GetAESEncryptionKey(), config.GetAESEncryptionKeyPrevious(), false)
 	if err != nil {
 		panic(err)
 	}
 
 	// configure mailpit
-	settings, err := database.GetSettingsById(nil, 1)
+	settings, err := database.GetSettingsById(context.Background(), nil, 1)
 	if err != nil {
 		slog.Error(fmt.Sprintf("%+v", err))
 		os.Exit(1)
@@ -64,7 +65,7 @@ func TestMain(m *testing.M) {
 	settings.SMTPFromName = "Goiabada"
 	settings.SMTPFromEmail = "noreply@goiabada.dev"
 
-	err = database.UpdateSettings(nil, settings)
+	err = database.UpdateSettings(context.Background(), nil, settings)
 	if err != nil {
 		slog.Error(fmt.Sprintf("%+v", err))
 		os.Exit(1)

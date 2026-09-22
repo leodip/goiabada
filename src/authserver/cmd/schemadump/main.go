@@ -19,6 +19,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"log/slog"
@@ -141,6 +142,11 @@ func run() error {
 // The drop is deferred, so a database that failed to migrate is cleaned up like any other
 // rather than left behind for the next run to trip over.
 func dumpOne(t target) ([]byte, error) {
+	// The command owns this root: it is a one-shot generator with no request above it. It
+	// exists so that every driver call below takes a context rather than opening one where it
+	// lands (#386).
+	ctx := context.Background()
+
 	name := scratchName(t.dialect)
 
 	db, sqlDB, cleanup, err := open(t, name)
@@ -149,17 +155,17 @@ func dumpOne(t target) ([]byte, error) {
 	}
 	defer cleanup()
 
-	if err := db.Migrate(); err != nil {
+	if err := db.Migrate(ctx); err != nil {
 		return nil, errs.Errorf("migrate the scratch database to head: %w", err)
 	}
 	// Read off the database that was just migrated rather than counted from the files on
 	// disk, so the header records what the chain actually reached. The two agree unless a
 	// migration was skipped, and that disagreement is the one worth catching.
-	migrated, err := schemadump.MigratedVersion(sqlDB, t.dialect)
+	migrated, err := schemadump.MigratedVersion(ctx, sqlDB, t.dialect)
 	if err != nil {
 		return nil, err
 	}
-	schema, err := schemadump.Dump(sqlDB, t.dialect)
+	schema, err := schemadump.Dump(ctx, sqlDB, t.dialect)
 	if err != nil {
 		return nil, err
 	}
@@ -170,7 +176,7 @@ func dumpOne(t target) ([]byte, error) {
 // two methods this command calls rather than over data.Database, whose seventy-odd methods
 // none of this needs.
 type migratable interface {
-	Migrate() error
+	Migrate(ctx context.Context) error
 }
 
 // open creates the scratch database and returns a handle to it plus the cleanup that closes

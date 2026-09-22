@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -48,7 +49,7 @@ const keyPairsStateIndex000030 = "idx_key_pairs_state"
 func TestMigration000030_KeyPairsStateUnique(t *testing.T) {
 	h := newIsolatedDB(t)
 
-	require.NoError(t, h.Migrator.Migrate(29), "migrate to 000029")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 29), "migrate to 000029")
 
 	// 2. Control: a known non-unique index on the same column must read as non-unique
 	// here. This is what makes the "unique" assertion below mean something.
@@ -75,7 +76,7 @@ func TestMigration000030_KeyPairsStateUnique(t *testing.T) {
 	}
 	require.EqualValues(t, 7, countKeyPairs000030(t, h, ""), "seven rows seeded at 000029")
 
-	require.NoError(t, h.Migrator.Migrate(30), "apply 000030")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 30), "apply 000030")
 
 	// 3. One row per state, and it is the highest id of that state.
 	require.EqualValues(t, 3, countKeyPairs000030(t, h, ""),
@@ -98,11 +99,11 @@ func TestMigration000030_KeyPairsStateUnique(t *testing.T) {
 	assertKeyPairsStateIndex000030(t, h, "after apply")
 
 	// 6. Down, then up again.
-	require.NoError(t, h.Migrator.Migrate(29), "roll back 000030")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 29), "roll back 000030")
 	assert.False(t, describeIndex(t, h, "key_pairs", keyPairsStateIndex000030).Exists,
 		"%s must be gone after rolling back to 000029", keyPairsStateIndex000030)
 
-	require.NoError(t, h.Migrator.Migrate(30), "re-apply 000030")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 30), "re-apply 000030")
 	assertKeyPairsStateIndex000030(t, h, "after down/up round trip")
 }
 

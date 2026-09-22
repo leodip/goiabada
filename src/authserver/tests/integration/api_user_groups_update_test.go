@@ -42,10 +42,10 @@ func TestAPIUserGroupsPut_Success(t *testing.T) {
 			Description:      "Update Group " + strconv.Itoa(i+1),
 			IncludeInIdToken: i%2 == 0, // alternate true/false
 		}
-		err = database.CreateGroup(nil, groups[i])
+		err = database.CreateGroup(context.Background(), nil, groups[i])
 		assert.NoError(t, err)
 		defer func(group *models.Group) {
-			_ = database.DeleteGroup(nil, group.Id)
+			_ = database.DeleteGroup(context.Background(), nil, group.Id)
 		}(groups[i])
 	}
 
@@ -132,10 +132,10 @@ func TestAPIUserGroupsPut_EmptyGroups(t *testing.T) {
 		GroupIdentifier: "remove-all-group",
 		Description:     "Group to be removed",
 	}
-	err = database.CreateGroup(nil, testGroup)
+	err = database.CreateGroup(context.Background(), nil, testGroup)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteGroup(nil, testGroup.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
 	}()
 
 	userGroup := &models.UserGroup{

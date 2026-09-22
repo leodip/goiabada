@@ -245,20 +245,25 @@ var slogSpreadSites = []slogSpreadSite{
 // later, and a directory absent from this list costs coverage silently, since the walk only fails
 // when it reaches no files at all.
 //
-// Left out on purpose, each a ceiling recorded in the PR of #320 rather than a site this rule
-// admits: authserver/internal/data, whose transaction and statement records run under
-// RunInTransaction with no context to reach them short of changing every Database method (it was
-// core/data until #359 moved it, and the ceiling moved with it, unchanged); and core/stringutil,
-// whose one record is written from a template function like addUrlParam below. A startup, worker
-// or main package is not a request path and is not listed.
+// Left out on purpose, and the one ceiling left here: core/stringutil, whose one record is
+// written from a template function like addUrlParam below. A startup, worker or main package is
+// not a request path and is not listed.
 //
-// authserver/internal/audit was the third such ceiling and is now listed: AuditLogger.Log takes a
-// context and its 126 call sites pass the request's, so a plain record there is refused from #328
-// onward. The compiler forces the parameter; what it cannot force is that the context is the
-// request's, which is AssertAuditLogContext's rule over this same list. It was two packages until
-// #359 folded core/auditlog, which held the console record's one writer, into it.
+// authserver/internal/audit was a ceiling until #328 gave AuditLogger.Log a context and its 126
+// call sites the request's, so a plain record there is refused from then onward. The compiler
+// forces the parameter; what it cannot force is that the context is the request's, which is
+// AssertAuditLogContext's rule over this same list. It was two packages until #359 folded
+// core/auditlog, which held the console record's one writer, into it.
+//
+// authserver/internal/data/commondb was the other, and is now listed: #386 gave all 215 Database
+// methods a leading context and carried it into RunInTransaction, ExecSql and QuerySql, so the
+// transaction and statement records finally have one to take request_id from. commondb rather
+// than the whole of authserver/internal/data, because the match below is a path prefix and the
+// wider name would also reach the seeder's startup records and the four adapters' connection
+// records, which have no request above them and are the shape this list's own rule excludes.
 var slogRequestPathDirs = []string{
 	"authserver/internal/audit",
+	"authserver/internal/data/commondb",
 	"authserver/internal/handlerhelpers",
 	"authserver/internal/handlers",
 	"authserver/internal/middleware",

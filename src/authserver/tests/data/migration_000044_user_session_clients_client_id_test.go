@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -43,7 +44,7 @@ func TestMigration000044_UserSessionClientsClientIdIndex(t *testing.T) {
 	// has to be named rather than assumed to be 43.
 	previous := previousVersion000044()
 
-	require.NoErrorf(t, h.Migrator.Migrate(previous), "migrate to %06d", previous)
+	require.NoErrorf(t, h.Migrator.Migrate(context.Background(), previous), "migrate to %06d", previous)
 
 	// The control, which is what makes the uniqueness reading below mean anything. Each catalog
 	// reports uniqueness differently and MySQL reports it inverted, so an index read as
@@ -65,10 +66,10 @@ func TestMigration000044_UserSessionClientsClientIdIndex(t *testing.T) {
 			innodbForeignKeyIndex000044)
 	}
 
-	require.NoError(t, h.Migrator.Migrate(44), "apply 000044")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 44), "apply 000044")
 	assertUserSessionClientsClientIdIndex000044(t, h, "after apply")
 
-	require.NoErrorf(t, h.Migrator.Migrate(previous), "roll back 000044 to %06d", previous)
+	require.NoErrorf(t, h.Migrator.Migrate(context.Background(), previous), "roll back 000044 to %06d", previous)
 	assert.Falsef(t, describeIndex(t, h, "user_session_clients", userSessionClientsClientIdIndex000044).Exists,
 		"%s must be gone after rolling back 000044", userSessionClientsClientIdIndex000044)
 	if isMySQL000044() {
@@ -77,7 +78,7 @@ func TestMigration000044_UserSessionClientsClientIdIndex(t *testing.T) {
 			innodbForeignKeyIndex000044)
 	}
 
-	require.NoError(t, h.Migrator.Migrate(44), "re-apply 000044")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 44), "re-apply 000044")
 	assertUserSessionClientsClientIdIndex000044(t, h, "after down/up round trip")
 }
 

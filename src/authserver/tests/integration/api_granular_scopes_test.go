@@ -537,7 +537,7 @@ func TestGranularScopes_GroupsRequireUsersScope(t *testing.T) {
 	// Create a test group
 	testGroup := createTestGroup(t)
 	defer func() {
-		_ = database.DeleteGroup(nil, testGroup.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
 	}()
 
 	baseURL := config.GetAuthServer().BaseURL
@@ -755,7 +755,7 @@ func TestGranularScopes_WriteOperationsRequireSpecificScopes(t *testing.T) {
 			var result map[string]interface{}
 			_ = json.NewDecoder(resp.Body).Decode(&result)
 			if groupId, ok := result["id"].(float64); ok {
-				_ = database.DeleteGroup(nil, int64(groupId))
+				_ = database.DeleteGroup(context.Background(), nil, int64(groupId))
 			}
 		}
 		_ = resp.Body.Close()

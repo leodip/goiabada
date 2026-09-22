@@ -445,7 +445,7 @@ func TestBrowserSession_StorageFailuresAreErrors(t *testing.T) {
 		t.Helper()
 		tx, err := database.BeginTransaction(context.Background())
 		require.NoError(t, err, "BeginTransaction")
-		require.NoError(t, database.RollbackTransaction(tx), "RollbackTransaction")
+		require.NoError(t, database.RollbackTransaction(context.Background(), tx), "RollbackTransaction")
 		return tx
 	}
 
@@ -559,7 +559,7 @@ func TestBrowserSession_EnlistsInTheCallersTransaction(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotNil(t, inside, "inside the transaction the insert is visible to its own read-back")
 
-		require.NoError(t, database.RollbackTransaction(tx), "RollbackTransaction")
+		require.NoError(t, database.RollbackTransaction(context.Background(), tx), "RollbackTransaction")
 
 		after, err := database.GetBrowserSessionByOwnerAndSessionIdHash(context.Background(), nil, bs.Owner, bs.SessionIdHash, now)
 		require.NoError(t, err)
@@ -578,7 +578,7 @@ func TestBrowserSession_EnlistsInTheCallersTransaction(t *testing.T) {
 		require.NoError(t, err)
 		require.True(t, moved)
 
-		require.NoError(t, database.RollbackTransaction(tx), "RollbackTransaction")
+		require.NoError(t, database.RollbackTransaction(context.Background(), tx), "RollbackTransaction")
 
 		after, err := database.GetBrowserSessionByOwnerAndSessionIdHash(context.Background(), nil, bs.Owner, bs.SessionIdHash, now)
 		require.NoError(t, err)
@@ -593,7 +593,7 @@ func TestBrowserSession_EnlistsInTheCallersTransaction(t *testing.T) {
 		require.NoError(t, err, "BeginTransaction")
 
 		require.NoError(t, database.DeleteBrowserSession(context.Background(), tx, bs.Owner, bs.SessionIdHash))
-		require.NoError(t, database.RollbackTransaction(tx), "RollbackTransaction")
+		require.NoError(t, database.RollbackTransaction(context.Background(), tx), "RollbackTransaction")
 
 		after, err := database.GetBrowserSessionByOwnerAndSessionIdHash(context.Background(), nil, bs.Owner, bs.SessionIdHash, now)
 		require.NoError(t, err)

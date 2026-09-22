@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -41,7 +42,7 @@ const familyIndexName000025 = "idx_refresh_tokens_first_refresh_token_jti"
 func TestMigration000025_RefreshTokenFamilyIndex(t *testing.T) {
 	h := newIsolatedDB(t)
 
-	require.NoError(t, h.Migrator.Migrate(24), "migrate to 000024")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 24), "migrate to 000024")
 
 	// 3. Control: a known-UNIQUE index on the same table must read as unique here.
 	// This is what makes the "not unique" assertion below mean something.
@@ -54,17 +55,17 @@ func TestMigration000025_RefreshTokenFamilyIndex(t *testing.T) {
 	assert.False(t, describeIndex(t, h, "refresh_tokens", familyIndexName000025).Exists,
 		"%s must not exist at 000024", familyIndexName000025)
 
-	require.NoError(t, h.Migrator.Migrate(25), "apply 000025")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 25), "apply 000025")
 
 	// 2. Present, on the right column, non-unique.
 	assertFamilyIndexShape000025(t, h, "after apply")
 
 	// 4. Down, then up again.
-	require.NoError(t, h.Migrator.Migrate(24), "roll back 000025")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 24), "roll back 000025")
 	assert.False(t, describeIndex(t, h, "refresh_tokens", familyIndexName000025).Exists,
 		"%s must be gone after rolling back to 000024", familyIndexName000025)
 
-	require.NoError(t, h.Migrator.Migrate(25), "re-apply 000025")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 25), "re-apply 000025")
 	assertFamilyIndexShape000025(t, h, "after down/up round trip")
 }
 

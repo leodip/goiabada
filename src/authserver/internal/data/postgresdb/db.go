@@ -334,8 +334,8 @@ const schemaMigrationsTableDDL = "CREATE TABLE IF NOT EXISTS schema_migrations "
 
 // ensureSchemaMigrationsTable creates the version table at Goiabada's shape when it is not
 // there yet.
-func (d *PostgresDatabase) ensureSchemaMigrationsTable() error {
-	if _, err := d.DB.Exec(schemaMigrationsTableDDL); err != nil {
+func (d *PostgresDatabase) ensureSchemaMigrationsTable(ctx context.Context) error {
+	if _, err := d.DB.ExecContext(ctx, schemaMigrationsTableDDL); err != nil {
 		return errs.Wrap(err, "unable to create the schema_migrations table")
 	}
 	return nil
@@ -347,8 +347,8 @@ func (d *PostgresDatabase) ensureSchemaMigrationsTable() error {
 //
 // There is nothing to close. The runner takes a connection out of the pool for the duration
 // of one operation and gives it back before returning (#268 decision 8).
-func (d *PostgresDatabase) NewMigrator() (*migrator.Migrator, error) {
-	if err := d.ensureSchemaMigrationsTable(); err != nil {
+func (d *PostgresDatabase) NewMigrator(ctx context.Context) (*migrator.Migrator, error) {
+	if err := d.ensureSchemaMigrationsTable(ctx); err != nil {
 		return nil, err
 	}
 
@@ -359,18 +359,18 @@ func (d *PostgresDatabase) NewMigrator() (*migrator.Migrator, error) {
 	return m, nil
 }
 
-func (d *PostgresDatabase) Migrate() error {
-	m, err := d.NewMigrator()
+func (d *PostgresDatabase) Migrate(ctx context.Context) error {
+	m, err := d.NewMigrator(ctx)
 	if err != nil {
 		return err
 	}
 
-	err = m.Up()
+	err = m.Up(ctx)
 	// IsNoChange rather than errors.Is: a run whose unlock failed answers the sentinel JOINED
 	// with that failure, and errors.Is would report this start as successful while the migration
 	// lock stays held against every other process on the database (#268).
 	if migrator.IsNoChange(err) {
-		slog.Info("no need to migrate the database")
+		slog.InfoContext(ctx, "no need to migrate the database")
 		return nil
 	}
 	if err != nil {

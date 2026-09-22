@@ -395,7 +395,7 @@ func TestGetUsersByPermissionIdPaginated_EnlistsInTheCallersTransaction(t *testi
 			"the count query ran outside the caller's transaction (#413)", total)
 	}
 
-	if err := database.RollbackTransaction(tx); err != nil {
+	if err := database.RollbackTransaction(context.Background(), tx); err != nil {
 		t.Fatalf("RollbackTransaction: %v", err)
 	}
 }

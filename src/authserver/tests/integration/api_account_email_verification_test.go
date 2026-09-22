@@ -25,15 +25,15 @@ func TestAPIAccountEmailVerificationSend_Success(t *testing.T) {
 	accessToken, u := getUserAccessTokenWithAccountScope_EmailVerification(t)
 
 	// Ensure SMTP enabled
-	settings, err := database.GetSettingsById(nil, 1)
+	settings, err := database.GetSettingsById(context.Background(), nil, 1)
 	assert.NoError(t, err)
 	prevSMTP := settings.SMTPEnabled
 	settings.SMTPEnabled = true
-	err = database.UpdateSettings(nil, settings)
+	err = database.UpdateSettings(context.Background(), nil, settings)
 	assert.NoError(t, err)
 	defer func() {
 		settings.SMTPEnabled = prevSMTP
-		_ = database.UpdateSettings(nil, settings)
+		_ = database.UpdateSettings(context.Background(), nil, settings)
 	}()
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/account/email/verification/send"
@@ -67,13 +67,16 @@ func TestAPIAccountEmailVerificationSend_TooManyRequests(t *testing.T) {
 	accessToken, _ := getUserAccessTokenWithAccountScope_EmailVerification(t)
 
 	// Ensure SMTP enabled
-	settings, err := database.GetSettingsById(nil, 1)
+	settings, err := database.GetSettingsById(context.Background(), nil, 1)
 	assert.NoError(t, err)
 	prevSMTP := settings.SMTPEnabled
 	settings.SMTPEnabled = true
-	err = database.UpdateSettings(nil, settings)
+	err = database.UpdateSettings(context.Background(), nil, settings)
 	assert.NoError(t, err)
-	defer func() { settings.SMTPEnabled = prevSMTP; _ = database.UpdateSettings(nil, settings) }()
+	defer func() {
+		settings.SMTPEnabled = prevSMTP
+		_ = database.UpdateSettings(context.Background(), nil, settings)
+	}()
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/account/email/verification/send"
 	// First send
@@ -100,13 +103,16 @@ func TestAPIAccountEmailVerificationSend_AlreadyVerified(t *testing.T) {
 	accessToken, u := getUserAccessTokenWithAccountScope_EmailVerification(t)
 
 	// Enable SMTP
-	settings, err := database.GetSettingsById(nil, 1)
+	settings, err := database.GetSettingsById(context.Background(), nil, 1)
 	assert.NoError(t, err)
 	prevSMTP := settings.SMTPEnabled
 	settings.SMTPEnabled = true
-	err = database.UpdateSettings(nil, settings)
+	err = database.UpdateSettings(context.Background(), nil, settings)
 	assert.NoError(t, err)
-	defer func() { settings.SMTPEnabled = prevSMTP; _ = database.UpdateSettings(nil, settings) }()
+	defer func() {
+		settings.SMTPEnabled = prevSMTP
+		_ = database.UpdateSettings(context.Background(), nil, settings)
+	}()
 
 	// Mark user as verified
 	user, err := database.GetUserById(context.Background(), nil, u.Id)
@@ -131,13 +137,13 @@ func TestAPIAccountEmailVerificationSend_AlreadyVerified(t *testing.T) {
 func TestAPIAccountEmailVerificationSend_SMTPDisabled(t *testing.T) {
 	accessToken, _ := getUserAccessTokenWithAccountScope_EmailVerification(t)
 
-	settings, err := database.GetSettingsById(nil, 1)
+	settings, err := database.GetSettingsById(context.Background(), nil, 1)
 	assert.NoError(t, err)
 	prev := settings.SMTPEnabled
 	settings.SMTPEnabled = false
-	err = database.UpdateSettings(nil, settings)
+	err = database.UpdateSettings(context.Background(), nil, settings)
 	assert.NoError(t, err)
-	defer func() { settings.SMTPEnabled = prev; _ = database.UpdateSettings(nil, settings) }()
+	defer func() { settings.SMTPEnabled = prev; _ = database.UpdateSettings(context.Background(), nil, settings) }()
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/account/email/verification/send"
 	resp := makeAPIRequest(t, "POST", url, accessToken, map[string]string{})
@@ -168,13 +174,16 @@ func TestAPIAccountEmailVerification_VerifySuccess(t *testing.T) {
 	accessToken, u := getUserAccessTokenWithAccountScope_EmailVerification(t)
 
 	// Ensure SMTP enabled
-	settings, err := database.GetSettingsById(nil, 1)
+	settings, err := database.GetSettingsById(context.Background(), nil, 1)
 	assert.NoError(t, err)
 	prevSMTP := settings.SMTPEnabled
 	settings.SMTPEnabled = true
-	err = database.UpdateSettings(nil, settings)
+	err = database.UpdateSettings(context.Background(), nil, settings)
 	assert.NoError(t, err)
-	defer func() { settings.SMTPEnabled = prevSMTP; _ = database.UpdateSettings(nil, settings) }()
+	defer func() {
+		settings.SMTPEnabled = prevSMTP
+		_ = database.UpdateSettings(context.Background(), nil, settings)
+	}()
 
 	// Trigger send to generate code
 	sendURL := config.GetAuthServer().BaseURL + "/api/v1/account/email/verification/send"
@@ -207,13 +216,16 @@ func TestAPIAccountEmailVerification_VerifyInvalidCode(t *testing.T) {
 	accessToken, _ := getUserAccessTokenWithAccountScope_EmailVerification(t)
 
 	// Ensure SMTP enabled
-	settings, err := database.GetSettingsById(nil, 1)
+	settings, err := database.GetSettingsById(context.Background(), nil, 1)
 	assert.NoError(t, err)
 	prevSMTP := settings.SMTPEnabled
 	settings.SMTPEnabled = true
-	err = database.UpdateSettings(nil, settings)
+	err = database.UpdateSettings(context.Background(), nil, settings)
 	assert.NoError(t, err)
-	defer func() { settings.SMTPEnabled = prevSMTP; _ = database.UpdateSettings(nil, settings) }()
+	defer func() {
+		settings.SMTPEnabled = prevSMTP
+		_ = database.UpdateSettings(context.Background(), nil, settings)
+	}()
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/account/email/verification"
 	resp := makeAPIRequest(t, "POST", url, accessToken, api.VerifyAccountEmailRequest{VerificationCode: "WRONG"})
@@ -229,13 +241,16 @@ func TestAPIAccountEmailVerification_VerifyExpiredCode(t *testing.T) {
 	accessToken, u := getUserAccessTokenWithAccountScope_EmailVerification(t)
 
 	// Ensure SMTP enabled
-	settings, err := database.GetSettingsById(nil, 1)
+	settings, err := database.GetSettingsById(context.Background(), nil, 1)
 	assert.NoError(t, err)
 	prevSMTP := settings.SMTPEnabled
 	settings.SMTPEnabled = true
-	err = database.UpdateSettings(nil, settings)
+	err = database.UpdateSettings(context.Background(), nil, settings)
 	assert.NoError(t, err)
-	defer func() { settings.SMTPEnabled = prevSMTP; _ = database.UpdateSettings(nil, settings) }()
+	defer func() {
+		settings.SMTPEnabled = prevSMTP
+		_ = database.UpdateSettings(context.Background(), nil, settings)
+	}()
 
 	// Manually set a code that is already expired
 	user, err := database.GetUserById(context.Background(), nil, u.Id)
@@ -261,13 +276,16 @@ func TestAPIAccountEmailVerification_VerifyAlreadyVerified(t *testing.T) {
 	accessToken, u := getUserAccessTokenWithAccountScope_EmailVerification(t)
 
 	// Enable SMTP
-	settings, err := database.GetSettingsById(nil, 1)
+	settings, err := database.GetSettingsById(context.Background(), nil, 1)
 	assert.NoError(t, err)
 	prevSMTP := settings.SMTPEnabled
 	settings.SMTPEnabled = true
-	err = database.UpdateSettings(nil, settings)
+	err = database.UpdateSettings(context.Background(), nil, settings)
 	assert.NoError(t, err)
-	defer func() { settings.SMTPEnabled = prevSMTP; _ = database.UpdateSettings(nil, settings) }()
+	defer func() {
+		settings.SMTPEnabled = prevSMTP
+		_ = database.UpdateSettings(context.Background(), nil, settings)
+	}()
 
 	user, err := database.GetUserById(context.Background(), nil, u.Id)
 	assert.NoError(t, err)
@@ -288,13 +306,13 @@ func TestAPIAccountEmailVerification_VerifyAlreadyVerified(t *testing.T) {
 
 func TestAPIAccountEmailVerification_VerifySMTPDisabled(t *testing.T) {
 	accessToken, _ := getUserAccessTokenWithAccountScope_EmailVerification(t)
-	settings, err := database.GetSettingsById(nil, 1)
+	settings, err := database.GetSettingsById(context.Background(), nil, 1)
 	assert.NoError(t, err)
 	prev := settings.SMTPEnabled
 	settings.SMTPEnabled = false
-	err = database.UpdateSettings(nil, settings)
+	err = database.UpdateSettings(context.Background(), nil, settings)
 	assert.NoError(t, err)
-	defer func() { settings.SMTPEnabled = prev; _ = database.UpdateSettings(nil, settings) }()
+	defer func() { settings.SMTPEnabled = prev; _ = database.UpdateSettings(context.Background(), nil, settings) }()
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/account/email/verification"
 	resp := makeAPIRequest(t, "POST", url, accessToken, api.VerifyAccountEmailRequest{VerificationCode: "ABC123"})
@@ -310,13 +328,16 @@ func TestAPIAccountEmailVerification_VerifyInvalidRequestBody(t *testing.T) {
 	accessToken, _ := getUserAccessTokenWithAccountScope_EmailVerification(t)
 
 	// Enable SMTP
-	settings, err := database.GetSettingsById(nil, 1)
+	settings, err := database.GetSettingsById(context.Background(), nil, 1)
 	assert.NoError(t, err)
 	prevSMTP := settings.SMTPEnabled
 	settings.SMTPEnabled = true
-	err = database.UpdateSettings(nil, settings)
+	err = database.UpdateSettings(context.Background(), nil, settings)
 	assert.NoError(t, err)
-	defer func() { settings.SMTPEnabled = prevSMTP; _ = database.UpdateSettings(nil, settings) }()
+	defer func() {
+		settings.SMTPEnabled = prevSMTP
+		_ = database.UpdateSettings(context.Background(), nil, settings)
+	}()
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/account/email/verification"
 	req, err := http.NewRequest("POST", url, nil)

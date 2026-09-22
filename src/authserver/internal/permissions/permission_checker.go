@@ -39,7 +39,7 @@ func (pc *PermissionChecker) UserHasScopePermission(ctx context.Context, userId 
 		return false, err
 	}
 
-	err = pc.database.GroupsLoadPermissions(nil, user.Groups)
+	err = pc.database.GroupsLoadPermissions(ctx, nil, user.Groups)
 	if err != nil {
 		return false, err
 	}

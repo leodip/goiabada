@@ -29,7 +29,7 @@ func (h *HandlerPublicSettings) ServeHTTP(w http.ResponseWriter, r *http.Request
 	}
 
 	// Get settings from database
-	settings, err := h.database.GetSettingsById(nil, 1)
+	settings, err := h.database.GetSettingsById(r.Context(), nil, 1)
 	if err != nil {
 		apiresponse.WriteInternalServerError(w, r, errs.Wrap(err, "unable to retrieve the settings"))
 		return

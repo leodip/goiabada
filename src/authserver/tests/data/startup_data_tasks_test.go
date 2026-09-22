@@ -2,6 +2,7 @@ package datatests
 
 import (
 	"bytes"
+	"context"
 	"path/filepath"
 	"testing"
 
@@ -27,7 +28,7 @@ func seedThrowawayDatabase(t *testing.T, name string, seed func(db data.Database
 	dsn := filepath.Join(t.TempDir(), name)
 	db, err := sqlitedb.NewSQLiteDatabase(&sqlitedb.DatabaseConfig{Type: "sqlite", DSN: dsn}, false)
 	require.NoError(t, err, "the seeding handle has to open before anything can be seeded")
-	require.NoError(t, db.Migrate(), "seeding writes rows, so the schema has to be at head first")
+	require.NoError(t, db.Migrate(context.Background()), "seeding writes rows, so the schema has to be at head first")
 
 	seed(db)
 
@@ -64,7 +65,7 @@ func TestNewDatabase_HandsTheStartupTasksThePreviousKey(t *testing.T) {
 	require.NoError(t, err)
 
 	cfg := seedThrowawayDatabase(t, "startup_rotation.db", func(db data.Database) {
-		require.NoError(t, db.CreateKeyPair(nil, &models.KeyPair{
+		require.NoError(t, db.CreateKeyPair(context.Background(), nil, &models.KeyPair{
 			State:         models.KeyStateCurrent.String(),
 			KeyIdentifier: fake.UUID(),
 			Type:          "RSA",
@@ -73,11 +74,11 @@ func TestNewDatabase_HandsTheStartupTasksThePreviousKey(t *testing.T) {
 		}), "the canary is the whole fixture")
 	})
 
-	opened, err := datafactory.NewDatabase(cfg, currentKey, previousKey, false)
+	opened, err := datafactory.NewDatabase(context.Background(), cfg, currentKey, previousKey, false)
 	require.NoError(t, err, "data under the previous key is exactly the configuration rotation exists to accept")
 	require.NotNil(t, opened)
 
-	keys, err := opened.GetAllSigningKeys(nil)
+	keys, err := opened.GetAllSigningKeys(context.Background(), nil)
 	require.NoError(t, err)
 	require.Len(t, keys, 1, "the second open must not have added or dropped a key pair")
 
@@ -128,7 +129,7 @@ func TestNewDatabase_RefusesAStartupWhoseDataTasksFailed(t *testing.T) {
 	require.NoError(t, err)
 
 	cfg := seedThrowawayDatabase(t, "startup_tasks_failed.db", func(db data.Database) {
-		require.NoError(t, db.CreateKeyPair(nil, &models.KeyPair{
+		require.NoError(t, db.CreateKeyPair(context.Background(), nil, &models.KeyPair{
 			State:         models.KeyStateCurrent.String(),
 			KeyIdentifier: fake.UUID(),
 			Type:          "RSA",
@@ -137,7 +138,7 @@ func TestNewDatabase_RefusesAStartupWhoseDataTasksFailed(t *testing.T) {
 		}), "the unreadable canary is the whole fixture")
 	})
 
-	opened, err := datafactory.NewDatabase(cfg, currentKey, previousKey, false)
+	opened, err := datafactory.NewDatabase(context.Background(), cfg, currentKey, previousKey, false)
 
 	require.Error(t, err,
 		"a startup data task that failed must not be reported as a successful startup")
@@ -163,7 +164,7 @@ func TestNewDatabase_RefusesAStartupWhoseDataTasksFailed(t *testing.T) {
 func TestNewDatabase_RefusesAStartupWhoseOpenFailed(t *testing.T) {
 	cfg := &config.DatabaseConfig{Type: "wat"}
 
-	opened, err := datafactory.NewDatabase(cfg, make([]byte, 32), nil, false)
+	opened, err := datafactory.NewDatabase(context.Background(), cfg, make([]byte, 32), nil, false)
 
 	require.Error(t, err,
 		"an engine name nothing can open must not be reported as a successful startup")
@@ -207,7 +208,7 @@ func TestNewDatabase_RefusesADirtyDatabase(t *testing.T) {
 		"the runner writes exactly one row and refuses a table holding two, so the fixture has to be that row")
 	require.NoError(t, marker.DB.Close(), "released so the startup open is a fresh one")
 
-	opened, err := datafactory.NewDatabase(cfg, config.GetAESEncryptionKey(), nil, false)
+	opened, err := datafactory.NewDatabase(context.Background(), cfg, config.GetAESEncryptionKey(), nil, false)
 
 	require.Error(t, err,
 		"a database whose migration did not finish must not be reported as a successful startup")

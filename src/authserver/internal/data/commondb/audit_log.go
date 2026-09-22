@@ -10,7 +10,7 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 )
 
-func (d *CommonDatabase) CreateAuditLog(tx *sql.Tx, auditLog *models.AuditLog) error {
+func (d *CommonDatabase) CreateAuditLog(ctx context.Context, tx *sql.Tx, auditLog *models.AuditLog) error {
 
 	if auditLog.AuditEvent == "" {
 		return errs.New("can't create audit log with empty audit_event")
@@ -24,7 +24,7 @@ func (d *CommonDatabase) CreateAuditLog(tx *sql.Tx, auditLog *models.AuditLog) e
 
 	insertBuilder := auditLogStruct.WithoutTag("pk").InsertInto("audit_logs", auditLog)
 
-	id, err := d.insertReturningId(context.Background(), tx, insertBuilder, "audit log")
+	id, err := d.insertReturningId(ctx, tx, insertBuilder, "audit log")
 	if err != nil {
 		return err
 	}
@@ -33,7 +33,7 @@ func (d *CommonDatabase) CreateAuditLog(tx *sql.Tx, auditLog *models.AuditLog) e
 	return nil
 }
 
-func (d *CommonDatabase) DeleteOldAuditLogs(tx *sql.Tx, cutoff time.Time, maxDeletions int) (int, error) {
+func (d *CommonDatabase) DeleteOldAuditLogs(ctx context.Context, tx *sql.Tx, cutoff time.Time, maxDeletions int) (int, error) {
 
 	// SQLite and MySQL support LIMIT on DELETE
 	deleteBuilder := d.Flavor.NewDeleteBuilder()
@@ -42,7 +42,7 @@ func (d *CommonDatabase) DeleteOldAuditLogs(tx *sql.Tx, cutoff time.Time, maxDel
 	deleteBuilder.Limit(maxDeletions)
 
 	sql, args := deleteBuilder.Build()
-	result, err := d.ExecSql(context.Background(), tx, sql, args...)
+	result, err := d.ExecSql(ctx, tx, sql, args...)
 	if err != nil {
 		return 0, errs.Wrap(err, "unable to delete old audit logs")
 	}
@@ -55,7 +55,7 @@ func (d *CommonDatabase) DeleteOldAuditLogs(tx *sql.Tx, cutoff time.Time, maxDel
 	return int(rowsAffected), nil
 }
 
-func (d *CommonDatabase) GetAuditLogsPaginated(tx *sql.Tx, page int, pageSize int, auditEvent string,
+func (d *CommonDatabase) GetAuditLogsPaginated(ctx context.Context, tx *sql.Tx, page int, pageSize int, auditEvent string,
 	requestId string) ([]models.AuditLog, int, error) {
 
 	if page < 1 {
@@ -86,7 +86,7 @@ func (d *CommonDatabase) GetAuditLogsPaginated(tx *sql.Tx, page int, pageSize in
 	selectBuilder.Offset(offset)
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(context.Background(), tx, sql, args...)
+	rows, err := d.QuerySql(ctx, tx, sql, args...)
 	if err != nil {
 		return nil, 0, errs.Wrap(err, "unable to query database")
 	}
@@ -132,7 +132,7 @@ func (d *CommonDatabase) GetAuditLogsPaginated(tx *sql.Tx, page int, pageSize in
 	}
 
 	countSql, countArgs := countBuilder.Build()
-	countRows, err := d.QuerySql(context.Background(), tx, countSql, countArgs...)
+	countRows, err := d.QuerySql(ctx, tx, countSql, countArgs...)
 	if err != nil {
 		return nil, 0, errs.Wrap(err, "unable to query count")
 	}

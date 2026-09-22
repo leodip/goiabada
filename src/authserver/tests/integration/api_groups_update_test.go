@@ -23,7 +23,7 @@ func TestAPIGroupUpdatePut_Success(t *testing.T) {
 	// Setup: Create test group
 	testGroup := createTestGroup(t)
 	defer func() {
-		_ = database.DeleteGroup(nil, testGroup.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
 	}()
 
 	// Test: Update group
@@ -56,7 +56,7 @@ func TestAPIGroupUpdatePut_Success(t *testing.T) {
 	assert.GreaterOrEqual(t, updateResponse.Group.MemberCount, 0, "MemberCount should be non-negative")
 
 	// Verify changes were persisted to database
-	updatedGroup, err := database.GetGroupById(nil, testGroup.Id)
+	updatedGroup, err := database.GetGroupById(context.Background(), nil, testGroup.Id)
 	assert.NoError(t, err)
 	assert.NotNil(t, updatedGroup)
 	assert.Equal(t, updateReq.GroupIdentifier, updatedGroup.GroupIdentifier)
@@ -72,7 +72,7 @@ func TestAPIGroupUpdatePut_ValidationErrors(t *testing.T) {
 	// Setup: Create test group
 	testGroup := createTestGroup(t)
 	defer func() {
-		_ = database.DeleteGroup(nil, testGroup.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
 	}()
 
 	testCases := []struct {
@@ -124,12 +124,12 @@ func TestAPIGroupUpdatePut_DuplicateIdentifier(t *testing.T) {
 	// Setup: Create two test groups
 	testGroup1 := createTestGroup(t)
 	defer func() {
-		_ = database.DeleteGroup(nil, testGroup1.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup1.Id)
 	}()
 
 	testGroup2 := createTestGroup(t)
 	defer func() {
-		_ = database.DeleteGroup(nil, testGroup2.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup2.Id)
 	}()
 
 	// Test: Try to update group2 with group1's identifier
@@ -153,7 +153,7 @@ func TestAPIGroupUpdatePut_SameIdentifier(t *testing.T) {
 	// Setup: Create test group
 	testGroup := createTestGroup(t)
 	defer func() {
-		_ = database.DeleteGroup(nil, testGroup.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
 	}()
 
 	// Test: Update group with same identifier (should be allowed)
@@ -236,7 +236,7 @@ func TestAPIGroupUpdatePut_InvalidRequestBody(t *testing.T) {
 	// Setup: Create test group
 	testGroup := createTestGroup(t)
 	defer func() {
-		_ = database.DeleteGroup(nil, testGroup.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
 	}()
 
 	// Test: Invalid JSON
@@ -259,7 +259,7 @@ func TestAPIGroupUpdatePut_Unauthorized(t *testing.T) {
 	// Setup: Create test group
 	testGroup := createTestGroup(t)
 	defer func() {
-		_ = database.DeleteGroup(nil, testGroup.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
 	}()
 
 	// Test: Request without access token
@@ -283,7 +283,7 @@ func TestAPIGroupUpdatePut_WhitespaceHandling(t *testing.T) {
 	// Setup: Create test group
 	testGroup := createTestGroup(t)
 	defer func() {
-		_ = database.DeleteGroup(nil, testGroup.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
 	}()
 
 	// Test: Update with whitespace that should fail validation
@@ -330,10 +330,10 @@ func TestAPIGroupUpdatePut_BooleanFlags(t *testing.T) {
 		IncludeInIdToken:     false,
 		IncludeInAccessToken: false,
 	}
-	err := database.CreateGroup(nil, testGroup)
+	err := database.CreateGroup(context.Background(), nil, testGroup)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteGroup(nil, testGroup.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
 	}()
 
 	testCases := []struct {
@@ -382,7 +382,7 @@ func TestAPIGroupUpdatePut_MemberCountInResponse(t *testing.T) {
 	// Setup: Create test group
 	testGroup := createTestGroup(t)
 	defer func() {
-		_ = database.DeleteGroup(nil, testGroup.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
 	}()
 
 	// Setup: Create test user and add to group
@@ -446,7 +446,7 @@ func TestAPIGroupUpdatePut_AngleBracketsRejected(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	testGroup := createTestGroup(t)
-	defer func() { _ = database.DeleteGroup(nil, testGroup.Id) }()
+	defer func() { _ = database.DeleteGroup(context.Background(), nil, testGroup.Id) }()
 
 	updateReq := api.UpdateGroupRequest{
 		GroupIdentifier:      testGroup.GroupIdentifier,
@@ -464,7 +464,7 @@ func TestAPIGroupUpdatePut_AngleBracketsRejected(t *testing.T) {
 	_ = json.NewDecoder(resp.Body).Decode(&errResp)
 	assert.Equal(t, "validator.description.angle_brackets", errResp.ErrorCode)
 
-	stored, err := database.GetGroupById(nil, testGroup.Id)
+	stored, err := database.GetGroupById(context.Background(), nil, testGroup.Id)
 	assert.NoError(t, err)
 	assert.Equal(t, testGroup.Description, stored.Description)
 }
@@ -474,7 +474,7 @@ func TestAPIGroupUpdatePut_AmpersandsAndQuotesStoredVerbatim(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	testGroup := createTestGroup(t)
-	defer func() { _ = database.DeleteGroup(nil, testGroup.Id) }()
+	defer func() { _ = database.DeleteGroup(context.Background(), nil, testGroup.Id) }()
 
 	updateReq := api.UpdateGroupRequest{
 		GroupIdentifier:      testGroup.GroupIdentifier,
@@ -489,7 +489,7 @@ func TestAPIGroupUpdatePut_AmpersandsAndQuotesStoredVerbatim(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
-	stored, err := database.GetGroupById(nil, testGroup.Id)
+	stored, err := database.GetGroupById(context.Background(), nil, testGroup.Id)
 	assert.NoError(t, err)
 	assert.Equal(t, `R&D "phase 2"`, stored.Description)
 }

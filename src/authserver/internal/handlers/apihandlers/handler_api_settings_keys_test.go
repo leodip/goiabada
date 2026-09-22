@@ -51,7 +51,7 @@ func signingKey(id int64, state models.KeyState) models.KeyPair {
 // assert that nothing was committed.
 func stubRotateRead(database *mocks_data.Database, keys []models.KeyPair) *runInTransactionStub {
 	stub := expectRunInTransaction(database, rotateTx)
-	database.On("GetAllSigningKeys", rotateTx).Return(keys, nil).Once()
+	database.On("GetAllSigningKeys", mock.Anything, rotateTx).Return(keys, nil).Once()
 	return stub
 }
 
@@ -81,12 +81,12 @@ func TestHandleAPISettingsKeysRotatePost_Success(t *testing.T) {
 		signingKey(2, models.KeyStateCurrent),
 		signingKey(3, models.KeyStateNext),
 	})
-	database.On("DeleteKeyPair", rotateTx, int64(1)).Return(nil).Once()
-	database.On("UpdateKeyPairState", rotateTx, int64(2),
+	database.On("DeleteKeyPair", mock.Anything, rotateTx, int64(1)).Return(nil).Once()
+	database.On("UpdateKeyPairState", mock.Anything, rotateTx, int64(2),
 		models.KeyStateCurrent.String(), models.KeyStatePrevious.String()).Return(true, nil).Once()
-	database.On("UpdateKeyPairState", rotateTx, int64(3),
+	database.On("UpdateKeyPairState", mock.Anything, rotateTx, int64(3),
 		models.KeyStateNext.String(), models.KeyStateCurrent.String()).Return(true, nil).Once()
-	database.On("CreateKeyPair", rotateTx, mock.MatchedBy(func(kp *models.KeyPair) bool {
+	database.On("CreateKeyPair", mock.Anything, rotateTx, mock.MatchedBy(func(kp *models.KeyPair) bool {
 		return kp.State == models.KeyStateNext.String()
 	})).Return(nil).Once()
 
@@ -120,7 +120,7 @@ func TestHandleAPISettingsKeysRotatePost_RotationInProgress(t *testing.T) {
 		signingKey(3, models.KeyStateNext),
 	})
 	// The compare-and-set transitions no row: another rotation already moved this key.
-	database.On("UpdateKeyPairState", rotateTx, int64(2),
+	database.On("UpdateKeyPairState", mock.Anything, rotateTx, int64(2),
 		models.KeyStateCurrent.String(), models.KeyStatePrevious.String()).Return(false, nil).Once()
 
 	rr := httptest.NewRecorder()
@@ -188,7 +188,7 @@ func TestHandleAPISettingsKeysRotatePost_InternalError(t *testing.T) {
 	auditLogger := mocks_audit.NewAuditLogger(t)
 
 	expectRunInTransaction(database, rotateTx)
-	database.On("GetAllSigningKeys", rotateTx).
+	database.On("GetAllSigningKeys", mock.Anything, rotateTx).
 		Return([]models.KeyPair(nil), assert.AnError).Once()
 
 	rr := httptest.NewRecorder()
@@ -264,7 +264,7 @@ func TestHandleAPISettingsKeysGet_OrdersNextCurrentPrevious(t *testing.T) {
 			}
 			// The typed nil the handler passes, not an untyped one: testify compares the
 			// argument's dynamic type too, so `nil` here never matches `(*sql.Tx)(nil)`.
-			database.On("GetAllSigningKeys", (*sql.Tx)(nil)).Return(keys, nil).Once()
+			database.On("GetAllSigningKeys", mock.Anything, (*sql.Tx)(nil)).Return(keys, nil).Once()
 
 			rr := httptest.NewRecorder()
 			req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/settings/keys", nil)

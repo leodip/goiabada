@@ -105,7 +105,12 @@ func main() {
 		"local_time", now,
 		"utc_time", now.UTC())
 
-	database, err := datafactory.NewDatabase(config.GetDatabase(),
+	// main owns this root: the startup sequence below is what the process exists to complete,
+	// and there is no request and no operator above it to cancel. Everything it reaches takes a
+	// context rather than opening one where it lands (#386).
+	startupCtx := context.Background()
+
+	database, err := datafactory.NewDatabase(startupCtx, config.GetDatabase(),
 		config.GetAESEncryptionKey(), config.GetAESEncryptionKeyPrevious(),
 		config.GetAuthServer().LogSQL)
 	if err != nil {
@@ -114,7 +119,7 @@ func main() {
 	}
 	slog.Info("created database connection")
 
-	isEmpty, err := database.IsEmpty()
+	isEmpty, err := database.IsEmpty(startupCtx)
 	if err != nil {
 		slog.Error("unable to check whether the database is empty", "error", err)
 		os.Exit(1)

@@ -158,7 +158,7 @@ func TestAPISessions_RoundTrip(t *testing.T) {
 
 	// Read the settings rather than assuming the defaults: other tests in this package
 	// write them, and the claim is that the endpoint follows whatever they say.
-	settings, err := database.GetSettingsById(nil, 1)
+	settings, err := database.GetSettingsById(context.Background(), nil, 1)
 	require.NoError(t, err)
 	expectedExpiry := time.Now().UTC().Add(time.Duration(settings.UserSessionIdleTimeoutInSeconds) * time.Second)
 	if absolute := time.Now().UTC().Add(time.Duration(settings.UserSessionMaxLifetimeInSeconds) * time.Second); absolute.Before(expectedExpiry) {

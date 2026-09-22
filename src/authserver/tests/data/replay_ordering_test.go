@@ -81,7 +81,7 @@ func TestLockOrder_ReplayResponseAgainstTermination(t *testing.T) {
 
 		tx, err := database.BeginTransaction(context.Background())
 		require.NoError(t, err, "opening the replay's transaction")
-		defer func() { _ = database.RollbackTransaction(tx) }()
+		defer func() { _ = database.RollbackTransaction(context.Background(), tx) }()
 
 		live, err := replayResponse(database, tx, session.SessionIdentifier)
 		require.NoError(t, err, "the replay response on a session nothing else has touched yet")
@@ -97,7 +97,7 @@ func TestLockOrder_ReplayResponseAgainstTermination(t *testing.T) {
 
 		termination.requireBlocked(t)
 		termination.requireStillWaiting(t)
-		require.NoError(t, database.CommitTransaction(tx), "committing the replay")
+		require.NoError(t, database.CommitTransaction(context.Background(), tx), "committing the replay")
 
 		require.NoError(t, termination.await(t),
 			"the termination must wait for the replay and then commit, not deadlock with it")
@@ -118,7 +118,7 @@ func TestLockOrder_ReplayResponseAgainstTermination(t *testing.T) {
 
 		tx, err := database.BeginTransaction(context.Background())
 		require.NoError(t, err, "opening the termination's transaction")
-		defer func() { _ = database.RollbackTransaction(tx) }()
+		defer func() { _ = database.RollbackTransaction(context.Background(), tx) }()
 
 		require.NoError(t, terminationStatements(database, tx, session),
 			"the termination's statements on a session nothing else has touched yet")
@@ -133,19 +133,19 @@ func TestLockOrder_ReplayResponseAgainstTermination(t *testing.T) {
 				reached()
 				return replayOutcome{err: err}
 			}
-			defer func() { _ = other.RollbackTransaction(otherTx) }()
+			defer func() { _ = other.RollbackTransaction(context.Background(), otherTx) }()
 
 			reached()
 			live, err := replayResponse(other, otherTx, session.SessionIdentifier)
 			if err != nil {
 				return replayOutcome{live: live, err: err}
 			}
-			return replayOutcome{live: live, err: other.CommitTransaction(otherTx)}
+			return replayOutcome{live: live, err: other.CommitTransaction(context.Background(), otherTx)}
 		})
 
 		replay.requireBlocked(t)
 		replay.requireStillWaiting(t)
-		require.NoError(t, database.CommitTransaction(tx), "committing the termination")
+		require.NoError(t, database.CommitTransaction(context.Background(), tx), "committing the termination")
 
 		outcome := replay.await(t)
 		require.NoError(t, outcome.err,

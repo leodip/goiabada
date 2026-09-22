@@ -101,18 +101,18 @@ func TestPaginatedReads_AnOverflowingPageIsAnEmptyPage(t *testing.T) {
 		// package adds to, so it needs no fixture of its own -- but one group
 		// makes the total certainly non-zero even on an empty database.
 		group := createTestGroup(t)
-		t.Cleanup(func() { _ = database.DeleteGroup(nil, group.Id) })
+		t.Cleanup(func() { _ = database.DeleteGroup(context.Background(), nil, group.Id) })
 
 		assertEmptyPagePastTheEnd(t, "GetAllGroupsPaginated", 10,
 			func(page, pageSize int) (int, int, error) {
-				groups, total, err := database.GetAllGroupsPaginated(nil, page, pageSize)
+				groups, total, err := database.GetAllGroupsPaginated(context.Background(), nil, page, pageSize)
 				return len(groups), total, err
 			})
 	})
 
 	t.Run("GetGroupMembersPaginated", func(t *testing.T) {
 		group := createTestGroup(t)
-		t.Cleanup(func() { _ = database.DeleteGroup(nil, group.Id) })
+		t.Cleanup(func() { _ = database.DeleteGroup(context.Background(), nil, group.Id) })
 		for i := 0; i < 3; i++ {
 			user := createTestUser(t)
 			createTestUserGroupWithUserAndGroup(t, user.Id, group.Id)
@@ -121,7 +121,7 @@ func TestPaginatedReads_AnOverflowingPageIsAnEmptyPage(t *testing.T) {
 
 		assertEmptyPagePastTheEnd(t, "GetGroupMembersPaginated", 10,
 			func(page, pageSize int) (int, int, error) {
-				users, total, err := database.GetGroupMembersPaginated(nil, group.Id, page, pageSize)
+				users, total, err := database.GetGroupMembersPaginated(context.Background(), nil, group.Id, page, pageSize)
 				return len(users), total, err
 			})
 	})
@@ -164,14 +164,14 @@ func TestPaginatedReads_AnOverflowingPageIsAnEmptyPage(t *testing.T) {
 	auditEvent := "PageOffsetOverflowTest"
 	for i := 0; i < 3; i++ {
 		auditLog := &models.AuditLog{AuditEvent: auditEvent, Details: `{"n":1}`}
-		require.NoError(t, database.CreateAuditLog(nil, auditLog))
+		require.NoError(t, database.CreateAuditLog(context.Background(), nil, auditLog))
 	}
 
 	for _, pageSize := range []int{20, 200} {
 		t.Run("GetAuditLogsPaginated_size"+itoa(pageSize), func(t *testing.T) {
 			assertEmptyPagePastTheEnd(t, "GetAuditLogsPaginated", pageSize,
 				func(page, pageSize int) (int, int, error) {
-					logs, total, err := database.GetAuditLogsPaginated(nil, page, pageSize, auditEvent, "")
+					logs, total, err := database.GetAuditLogsPaginated(context.Background(), nil, page, pageSize, auditEvent, "")
 					return len(logs), total, err
 				})
 		})

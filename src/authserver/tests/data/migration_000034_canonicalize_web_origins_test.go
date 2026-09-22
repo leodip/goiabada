@@ -94,10 +94,10 @@ func TestMigration000034_CanonicalizeWebOrigins(t *testing.T) {
 	// what keeps this test working when later migrations add a column, since the
 	// ORM writes every column the Go models carry. ErrNoChange is tolerated
 	// because 000034 is currently head.
-	if err := h.Migrator.Up(); err != nil && !errors.Is(err, migrator.ErrNoChange) {
+	if err := h.Migrator.Up(context.Background()); err != nil && !errors.Is(err, migrator.ErrNoChange) {
 		require.NoError(t, err, "migrate to head before seeding through the ORM")
 	}
-	require.NoError(t, h.Migrator.Migrate(33), "roll back to 000033")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 33), "roll back to 000033")
 
 	// 2. Control: a known non-unique index must read as non-unique here. This is
 	// what makes the "unique" assertion below mean something.
@@ -131,7 +131,7 @@ func TestMigration000034_CanonicalizeWebOrigins(t *testing.T) {
 	// label, not a boundary, so two clients may each list an origin.
 	otherClientDup := seedWebOrigin000034(t, h, clientB.Id, "https://dup.example.com/")
 
-	require.NoError(t, h.Migrator.Migrate(34), "apply 000034")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 34), "apply 000034")
 
 	// 3. Every seeded shape lands where the table says.
 	for i, c := range cases {
@@ -173,11 +173,11 @@ func TestMigration000034_CanonicalizeWebOrigins(t *testing.T) {
 	assertWebOriginsIndex000034(t, h, clientA.Id, clientB.Id, "after apply")
 
 	// 7. Down, then up again.
-	require.NoError(t, h.Migrator.Migrate(33), "roll back 000034")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 33), "roll back 000034")
 	assert.False(t, describeIndex(t, h, "web_origins", webOriginsIndex000034).Exists,
 		"%s must be gone after rolling back to 000033", webOriginsIndex000034)
 
-	require.NoError(t, h.Migrator.Migrate(34), "re-apply 000034")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 34), "re-apply 000034")
 	assertWebOriginsIndex000034(t, h, clientA.Id, clientB.Id, "after down/up round trip")
 }
 

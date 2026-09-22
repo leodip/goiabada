@@ -1,6 +1,7 @@
 package sqlitedb
 
 import (
+	"context"
 	"path/filepath"
 	"testing"
 
@@ -33,10 +34,10 @@ func TestNewMigrator_PinsTheSchemaMigrationsShape(t *testing.T) {
 
 	// Constructed and then dropped: NewMigrator is what runs the pre-create, and there is
 	// nothing to close (#268 decision 8).
-	_, err = db.NewMigrator()
+	_, err = db.NewMigrator(context.Background())
 	require.NoError(t, err, "NewMigrator")
 
-	shape, err := schemadump.DumpTable(db.DB, schemadump.SQLite, "schema_migrations")
+	shape, err := schemadump.DumpTable(context.Background(), db.DB, schemadump.SQLite, "schema_migrations")
 	require.NoError(t, err, "dump schema_migrations")
 
 	version, ok := shape.Column("version")

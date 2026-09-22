@@ -22,14 +22,14 @@ import (
 // returns a restore function meant to be deferred. This keeps tests isolated
 // from each other and from the rest of the suite.
 func saveAndRestoreRegSettings(t *testing.T) func() {
-	settings, err := database.GetSettingsById(nil, 1)
+	settings, err := database.GetSettingsById(context.Background(), nil, 1)
 	assert.NoError(t, err)
 	origSelfReg := settings.SelfRegistrationEnabled
 	origRequiresVerify := settings.SelfRegistrationRequiresEmailVerification
 	origSMTPEnabled := settings.SMTPEnabled
 
 	return func() {
-		s, err := database.GetSettingsById(nil, 1)
+		s, err := database.GetSettingsById(context.Background(), nil, 1)
 		if err != nil {
 			t.Logf("could not restore settings: %v", err)
 			return
@@ -37,17 +37,17 @@ func saveAndRestoreRegSettings(t *testing.T) func() {
 		s.SelfRegistrationEnabled = origSelfReg
 		s.SelfRegistrationRequiresEmailVerification = origRequiresVerify
 		s.SMTPEnabled = origSMTPEnabled
-		_ = database.UpdateSettings(nil, s)
+		_ = database.UpdateSettings(context.Background(), nil, s)
 	}
 }
 
 func setRegSettings(t *testing.T, selfRegEnabled, requiresVerify, smtpEnabled bool) {
-	settings, err := database.GetSettingsById(nil, 1)
+	settings, err := database.GetSettingsById(context.Background(), nil, 1)
 	assert.NoError(t, err)
 	settings.SelfRegistrationEnabled = selfRegEnabled
 	settings.SelfRegistrationRequiresEmailVerification = requiresVerify
 	settings.SMTPEnabled = smtpEnabled
-	err = database.UpdateSettings(nil, settings)
+	err = database.UpdateSettings(context.Background(), nil, settings)
 	assert.NoError(t, err)
 }
 
@@ -148,7 +148,7 @@ func TestSelfRegister_Post_SMTPDisabled_RendersSuccessPage(t *testing.T) {
 		assert.False(t, user.EmailVerified)
 	}
 
-	preReg, err := database.GetPreRegistrationByEmail(nil, email)
+	preReg, err := database.GetPreRegistrationByEmail(context.Background(), nil, email)
 	assert.NoError(t, err)
 	assert.Nil(t, preReg)
 }
@@ -179,7 +179,7 @@ func TestSelfRegister_Post_SMTPEnabled_NoVerification_RendersSuccess(t *testing.
 		assert.False(t, user.EmailVerified)
 	}
 
-	preReg, err := database.GetPreRegistrationByEmail(nil, email)
+	preReg, err := database.GetPreRegistrationByEmail(context.Background(), nil, email)
 	assert.NoError(t, err)
 	assert.Nil(t, preReg)
 }
@@ -262,7 +262,7 @@ func TestSelfRegister_Post_SMTPEnabled_RequiresVerification_FullFlow(t *testing.
 	assert.NoError(t, err)
 	assert.Nil(t, user, "user should not exist before activation")
 
-	preReg, err := database.GetPreRegistrationByEmail(nil, email)
+	preReg, err := database.GetPreRegistrationByEmail(context.Background(), nil, email)
 	assert.NoError(t, err)
 	if !assert.NotNil(t, preReg, "pre-registration should exist after POST") {
 		return
@@ -294,7 +294,7 @@ func TestSelfRegister_Post_SMTPEnabled_RequiresVerification_FullFlow(t *testing.
 		assert.True(t, user.EmailVerified)
 	}
 
-	preReg, err = database.GetPreRegistrationByEmail(nil, email)
+	preReg, err = database.GetPreRegistrationByEmail(context.Background(), nil, email)
 	assert.NoError(t, err)
 	assert.Nil(t, preReg, "pre-registration should be deleted after activation")
 }
@@ -398,7 +398,7 @@ func TestSelfRegister_ASecondLinkDoesNotRetargetTheRedirectInFlight(t *testing.T
 	require.NoError(t, err)
 	assert.Nil(t, second, "the second registration must not have been activated")
 
-	stillPending, err := database.GetPreRegistrationByEmail(nil, secondEmail)
+	stillPending, err := database.GetPreRegistrationByEmail(context.Background(), nil, secondEmail)
 	require.NoError(t, err)
 	assert.NotNil(t, stillPending, "the second registration must still be pending, so its own link still works")
 }
@@ -458,7 +458,7 @@ func TestSelfRegister_Post_DuplicatePreRegistration(t *testing.T) {
 	_ = resp1.Body.Close()
 	assert.Equal(t, http.StatusOK, resp1.StatusCode)
 
-	preReg, err := database.GetPreRegistrationByEmail(nil, email)
+	preReg, err := database.GetPreRegistrationByEmail(context.Background(), nil, email)
 	assert.NoError(t, err)
 	assert.NotNil(t, preReg, "pre-registration should exist after first POST")
 

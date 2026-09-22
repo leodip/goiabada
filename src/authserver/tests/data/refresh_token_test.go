@@ -1034,7 +1034,7 @@ func TestGetRefreshTokensByClientId_TransactionAndFailurePath(t *testing.T) {
 		t.Fatalf("expected the transaction's own uncommitted token, got %d rows", len(got))
 	}
 
-	if err := database.RollbackTransaction(tx); err != nil {
+	if err := database.RollbackTransaction(context.Background(), tx); err != nil {
 		t.Fatalf("RollbackTransaction: %v", err)
 	}
 

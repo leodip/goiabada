@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -37,7 +38,7 @@ func TestCreateSettings(t *testing.T) {
 		ResourceOwnerPasswordCredentialsEnabled:   true,
 	}
 
-	err := database.CreateSettings(nil, settings)
+	err := database.CreateSettings(context.Background(), nil, settings)
 	if err != nil {
 		t.Fatalf("Failed to create settings: %v", err)
 	}
@@ -52,7 +53,7 @@ func TestCreateSettings(t *testing.T) {
 		t.Error("Expected UpdatedAt to be set")
 	}
 
-	retrievedSettings, err := database.GetSettingsById(nil, settings.Id)
+	retrievedSettings, err := database.GetSettingsById(context.Background(), nil, settings.Id)
 	if err != nil {
 		t.Fatalf("Failed to retrieve created settings: %v", err)
 	}
@@ -94,12 +95,12 @@ func TestUpdateSettings(t *testing.T) {
 
 	time.Sleep(timestampTick)
 
-	err := database.UpdateSettings(nil, settings)
+	err := database.UpdateSettings(context.Background(), nil, settings)
 	if err != nil {
 		t.Fatalf("Failed to update settings: %v", err)
 	}
 
-	updatedSettings, err := database.GetSettingsById(nil, settings.Id)
+	updatedSettings, err := database.GetSettingsById(context.Background(), nil, settings.Id)
 	if err != nil {
 		t.Fatalf("Failed to retrieve updated settings: %v", err)
 	}
@@ -114,14 +115,14 @@ func TestUpdateSettings(t *testing.T) {
 func TestGetSettingsById(t *testing.T) {
 	settings := createTestSettings(t)
 
-	retrievedSettings, err := database.GetSettingsById(nil, settings.Id)
+	retrievedSettings, err := database.GetSettingsById(context.Background(), nil, settings.Id)
 	if err != nil {
 		t.Fatalf("Failed to get settings by ID: %v", err)
 	}
 
 	compareSettings(t, settings, retrievedSettings)
 
-	nonExistentSettings, err := database.GetSettingsById(nil, 99999)
+	nonExistentSettings, err := database.GetSettingsById(context.Background(), nil, 99999)
 	if err != nil {
 		t.Errorf("Expected no error for non-existent settings, got: %v", err)
 	}
@@ -159,7 +160,7 @@ func createTestSettings(t *testing.T) *models.Settings {
 		ImplicitFlowEnabled:                       true,
 		ResourceOwnerPasswordCredentialsEnabled:   true,
 	}
-	err := database.CreateSettings(nil, settings)
+	err := database.CreateSettings(context.Background(), nil, settings)
 	if err != nil {
 		t.Fatalf("Failed to create test settings: %v", err)
 	}

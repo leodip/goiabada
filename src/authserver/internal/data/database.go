@@ -11,8 +11,8 @@ import (
 
 type Database interface {
 	BeginTransaction(ctx context.Context) (*sql.Tx, error)
-	CommitTransaction(tx *sql.Tx) error
-	RollbackTransaction(tx *sql.Tx) error
+	CommitTransaction(ctx context.Context, tx *sql.Tx) error
+	RollbackTransaction(ctx context.Context, tx *sql.Tx) error
 	// RunInTransaction opens a transaction, runs fn on it, commits when fn returns nil and rolls
 	// back when it does not, returning fn's error unchanged. When the engine aborts the
 	// transaction as a deadlock victim, inside fn or at the commit, the whole body is rerun,
@@ -27,16 +27,16 @@ type Database interface {
 	// context.DeadlineExceeded, with the deadlock that caused the retry joined to it where
 	// there was one (#386 decision 13).
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
-	Migrate() error
+	Migrate(ctx context.Context) error
 	// ScanEmailCase reads every users row as its id, its stored address and that address as
 	// THIS engine's own LOWER() reduces it, which is the read behind the startup pre-flight
 	// (the auth server's datafactory.CheckEmailCaseBeforeMigrating). It compares nothing: the
 	// engines disagree about what LOWER() means and the rule is Go's strings.ToLower, so the
 	// comparison is the caller's (#351). It replaced BackfillLowercaseEmails, which repaired
 	// the data at startup rather than refusing to migrate it.
-	ScanEmailCase() ([]models.EmailCaseRow, error)
-	RotateEncryptionKeyIfNeeded(currentKey, previousKey []byte) (bool, error)
-	IsEmpty() (bool, error)
+	ScanEmailCase(ctx context.Context) ([]models.EmailCaseRow, error)
+	RotateEncryptionKeyIfNeeded(ctx context.Context, currentKey, previousKey []byte) (bool, error)
+	IsEmpty(ctx context.Context) (bool, error)
 
 	CreateClient(ctx context.Context, tx *sql.Tx, client *models.Client) error
 	UpdateClient(ctx context.Context, tx *sql.Tx, client *models.Client) error
@@ -228,8 +228,8 @@ type Database interface {
 	DeletePermission(ctx context.Context, tx *sql.Tx, permissionId int64) error
 	PermissionsLoadResources(ctx context.Context, tx *sql.Tx, permissions []models.Permission) error
 
-	CreateKeyPair(tx *sql.Tx, keyPair *models.KeyPair) error
-	UpdateKeyPair(tx *sql.Tx, keyPair *models.KeyPair) error
+	CreateKeyPair(ctx context.Context, tx *sql.Tx, keyPair *models.KeyPair) error
+	UpdateKeyPair(ctx context.Context, tx *sql.Tx, keyPair *models.KeyPair) error
 	// UpdateKeyPairState moves one key from an expected state to a new one, and reports
 	// whether this call is the one that made the transition. Compare-and-set for the same
 	// reason MarkCodeAsUsed is: a read-then-unconditional-write lets two concurrent
@@ -238,9 +238,9 @@ type Database interface {
 	//
 	// A false return means no row transitioned, so the caller lost a race or the row is
 	// gone. It is not an error.
-	UpdateKeyPairState(tx *sql.Tx, keyPairId int64, fromState string, toState string) (bool, error)
-	GetKeyPairById(tx *sql.Tx, keyPairId int64) (*models.KeyPair, error)
-	GetAllSigningKeys(tx *sql.Tx) ([]models.KeyPair, error)
+	UpdateKeyPairState(ctx context.Context, tx *sql.Tx, keyPairId int64, fromState string, toState string) (bool, error)
+	GetKeyPairById(ctx context.Context, tx *sql.Tx, keyPairId int64) (*models.KeyPair, error)
+	GetAllSigningKeys(ctx context.Context, tx *sql.Tx) ([]models.KeyPair, error)
 	// GetCurrentSigningKey returns an error when no key is in the current state, rather
 	// than the (nil, nil) this codebase returns for a lookup that may legitimately miss.
 	// The current signing key is a singleton the server cannot run without: every caller
@@ -248,8 +248,8 @@ type Database interface {
 	// at each of them and one more at every call site added later. Narrowing the contract
 	// here is what makes all of them correct at once, as IncrementUserAuthStateGeneration
 	// rejects a nil transaction rather than tolerating it (#251).
-	GetCurrentSigningKey(tx *sql.Tx) (*models.KeyPair, error)
-	DeleteKeyPair(tx *sql.Tx, keyPairId int64) error
+	GetCurrentSigningKey(ctx context.Context, tx *sql.Tx) (*models.KeyPair, error)
+	DeleteKeyPair(ctx context.Context, tx *sql.Tx, keyPairId int64) error
 
 	CreateRedirectURI(ctx context.Context, tx *sql.Tx, redirectURI *models.RedirectURI) error
 	GetRedirectURIById(ctx context.Context, tx *sql.Tx, redirectURIId int64) (*models.RedirectURI, error)
@@ -263,15 +263,15 @@ type Database interface {
 	WebOriginExists(ctx context.Context, tx *sql.Tx, origin string) (bool, error)
 	DeleteWebOrigin(ctx context.Context, tx *sql.Tx, webOriginId int64) error
 
-	CreateSettings(tx *sql.Tx, settings *models.Settings) error
-	UpdateSettings(tx *sql.Tx, settings *models.Settings) error
-	GetSettingsById(tx *sql.Tx, settingsId int64) (*models.Settings, error)
+	CreateSettings(ctx context.Context, tx *sql.Tx, settings *models.Settings) error
+	UpdateSettings(ctx context.Context, tx *sql.Tx, settings *models.Settings) error
+	GetSettingsById(ctx context.Context, tx *sql.Tx, settingsId int64) (*models.Settings, error)
 	// TryClaimCleanupRun atomically claims the next background cleanup run via a
 	// conditional update on settings.last_cleanup_at, and reports whether this
 	// caller won it. claimableBefore is the cutoff (pass now minus the interval).
 	// This is what keeps the cleanup single-flight across instances and puts the
 	// schedule on the wall clock instead of one process's uptime.
-	TryClaimCleanupRun(tx *sql.Tx, now time.Time, claimableBefore time.Time) (bool, error)
+	TryClaimCleanupRun(ctx context.Context, tx *sql.Tx, now time.Time, claimableBefore time.Time) (bool, error)
 
 	CreateUserPermission(ctx context.Context, tx *sql.Tx, userPermission *models.UserPermission) error
 	UpdateUserPermission(ctx context.Context, tx *sql.Tx, userPermission *models.UserPermission) error
@@ -282,19 +282,19 @@ type Database interface {
 	GetUserPermissionsByUserIds(ctx context.Context, tx *sql.Tx, userIds []int64) ([]models.UserPermission, error)
 	DeleteUserPermission(ctx context.Context, tx *sql.Tx, userPermissionId int64) error
 
-	CreateGroup(tx *sql.Tx, group *models.Group) error
-	UpdateGroup(tx *sql.Tx, group *models.Group) error
-	GetGroupById(tx *sql.Tx, groupId int64) (*models.Group, error)
-	GetGroupByGroupIdentifier(tx *sql.Tx, groupIdentifier string) (*models.Group, error)
-	GetGroupsByIds(tx *sql.Tx, groupIds []int64) ([]models.Group, error)
-	GetAllGroups(tx *sql.Tx) ([]models.Group, error)
-	GetAllGroupsPaginated(tx *sql.Tx, page int, pageSize int) ([]models.Group, int, error)
-	GetGroupMembersPaginated(tx *sql.Tx, groupId int64, page int, pageSize int) ([]models.User, int, error)
-	CountGroupMembers(tx *sql.Tx, groupId int64) (int, error)
-	DeleteGroup(tx *sql.Tx, groupId int64) error
-	GroupsLoadAttributes(tx *sql.Tx, groups []models.Group) error
-	GroupsLoadPermissions(tx *sql.Tx, groups []models.Group) error
-	GroupLoadPermissions(tx *sql.Tx, group *models.Group) error
+	CreateGroup(ctx context.Context, tx *sql.Tx, group *models.Group) error
+	UpdateGroup(ctx context.Context, tx *sql.Tx, group *models.Group) error
+	GetGroupById(ctx context.Context, tx *sql.Tx, groupId int64) (*models.Group, error)
+	GetGroupByGroupIdentifier(ctx context.Context, tx *sql.Tx, groupIdentifier string) (*models.Group, error)
+	GetGroupsByIds(ctx context.Context, tx *sql.Tx, groupIds []int64) ([]models.Group, error)
+	GetAllGroups(ctx context.Context, tx *sql.Tx) ([]models.Group, error)
+	GetAllGroupsPaginated(ctx context.Context, tx *sql.Tx, page int, pageSize int) ([]models.Group, int, error)
+	GetGroupMembersPaginated(ctx context.Context, tx *sql.Tx, groupId int64, page int, pageSize int) ([]models.User, int, error)
+	CountGroupMembers(ctx context.Context, tx *sql.Tx, groupId int64) (int, error)
+	DeleteGroup(ctx context.Context, tx *sql.Tx, groupId int64) error
+	GroupsLoadAttributes(ctx context.Context, tx *sql.Tx, groups []models.Group) error
+	GroupsLoadPermissions(ctx context.Context, tx *sql.Tx, groups []models.Group) error
+	GroupLoadPermissions(ctx context.Context, tx *sql.Tx, group *models.Group) error
 
 	CreateUserAttribute(ctx context.Context, tx *sql.Tx, userAttribute *models.UserAttribute) error
 	UpdateUserAttribute(ctx context.Context, tx *sql.Tx, userAttribute *models.UserAttribute) error
@@ -314,9 +314,9 @@ type Database interface {
 	DeleteClientLogo(ctx context.Context, tx *sql.Tx, clientId int64) error
 	ClientHasLogo(ctx context.Context, tx *sql.Tx, clientId int64) (bool, error)
 
-	CreateAuditLog(tx *sql.Tx, auditLog *models.AuditLog) error
-	DeleteOldAuditLogs(tx *sql.Tx, cutoff time.Time, maxDeletions int) (int, error)
-	GetAuditLogsPaginated(tx *sql.Tx, page int, pageSize int, auditEvent string, requestId string) ([]models.AuditLog, int, error)
+	CreateAuditLog(ctx context.Context, tx *sql.Tx, auditLog *models.AuditLog) error
+	DeleteOldAuditLogs(ctx context.Context, tx *sql.Tx, cutoff time.Time, maxDeletions int) (int, error)
+	GetAuditLogsPaginated(ctx context.Context, tx *sql.Tx, page int, pageSize int, auditEvent string, requestId string) ([]models.AuditLog, int, error)
 
 	CreateClientPermission(ctx context.Context, tx *sql.Tx, clientPermission *models.ClientPermission) error
 	UpdateClientPermission(ctx context.Context, tx *sql.Tx, clientPermission *models.ClientPermission) error
@@ -427,17 +427,17 @@ type Database interface {
 	DeleteAllUserConsent(ctx context.Context, tx *sql.Tx) error
 	UserConsentsLoadClients(ctx context.Context, tx *sql.Tx, userConsents []models.UserConsent) error
 
-	CreatePreRegistration(tx *sql.Tx, preRegistration *models.PreRegistration) error
-	UpdatePreRegistration(tx *sql.Tx, preRegistration *models.PreRegistration) error
-	GetPreRegistrationById(tx *sql.Tx, preRegistrationId int64) (*models.PreRegistration, error)
-	GetPreRegistrationByEmail(tx *sql.Tx, email string) (*models.PreRegistration, error)
+	CreatePreRegistration(ctx context.Context, tx *sql.Tx, preRegistration *models.PreRegistration) error
+	UpdatePreRegistration(ctx context.Context, tx *sql.Tx, preRegistration *models.PreRegistration) error
+	GetPreRegistrationById(ctx context.Context, tx *sql.Tx, preRegistrationId int64) (*models.PreRegistration, error)
+	GetPreRegistrationByEmail(ctx context.Context, tx *sql.Tx, email string) (*models.PreRegistration, error)
 	// GetPreRegistrationByVerificationCodeHash finds the pre-registration an activation
 	// code belongs to, by an unsalted SHA-256 of that code. This is what lets the
 	// activation link carry the code and nothing else, so no email address travels in it
 	// (#112). An empty codeHash returns (nil, nil) without querying, as the user lookup
 	// does.
-	GetPreRegistrationByVerificationCodeHash(tx *sql.Tx, codeHash string) (*models.PreRegistration, error)
-	DeletePreRegistration(tx *sql.Tx, preRegistrationId int64) error
+	GetPreRegistrationByVerificationCodeHash(ctx context.Context, tx *sql.Tx, codeHash string) (*models.PreRegistration, error)
+	DeletePreRegistration(ctx context.Context, tx *sql.Tx, preRegistrationId int64) error
 
 	CreateUserGroup(ctx context.Context, tx *sql.Tx, userGroup *models.UserGroup) error
 	UpdateUserGroup(ctx context.Context, tx *sql.Tx, userGroup *models.UserGroup) error
@@ -447,20 +447,20 @@ type Database interface {
 	GetUserGroupsByUserIds(ctx context.Context, tx *sql.Tx, userIds []int64) ([]models.UserGroup, error)
 	DeleteUserGroup(ctx context.Context, tx *sql.Tx, userGroupId int64) error
 
-	CreateGroupAttribute(tx *sql.Tx, groupAttribute *models.GroupAttribute) error
-	UpdateGroupAttribute(tx *sql.Tx, groupAttribute *models.GroupAttribute) error
-	GetGroupAttributeById(tx *sql.Tx, groupAttributeId int64) (*models.GroupAttribute, error)
-	GetGroupAttributesByGroupId(tx *sql.Tx, groupId int64) ([]models.GroupAttribute, error)
-	GetGroupAttributesByGroupIds(tx *sql.Tx, groupIds []int64) ([]models.GroupAttribute, error)
-	DeleteGroupAttribute(tx *sql.Tx, groupAttributeId int64) error
+	CreateGroupAttribute(ctx context.Context, tx *sql.Tx, groupAttribute *models.GroupAttribute) error
+	UpdateGroupAttribute(ctx context.Context, tx *sql.Tx, groupAttribute *models.GroupAttribute) error
+	GetGroupAttributeById(ctx context.Context, tx *sql.Tx, groupAttributeId int64) (*models.GroupAttribute, error)
+	GetGroupAttributesByGroupId(ctx context.Context, tx *sql.Tx, groupId int64) ([]models.GroupAttribute, error)
+	GetGroupAttributesByGroupIds(ctx context.Context, tx *sql.Tx, groupIds []int64) ([]models.GroupAttribute, error)
+	DeleteGroupAttribute(ctx context.Context, tx *sql.Tx, groupAttributeId int64) error
 
-	CreateGroupPermission(tx *sql.Tx, groupPermission *models.GroupPermission) error
-	UpdateGroupPermission(tx *sql.Tx, groupPermission *models.GroupPermission) error
-	GetGroupPermissionById(tx *sql.Tx, groupPermissionId int64) (*models.GroupPermission, error)
-	GetGroupPermissionByGroupIdAndPermissionId(tx *sql.Tx, groupId, permissionId int64) (*models.GroupPermission, error)
-	GetGroupPermissionsByGroupIds(tx *sql.Tx, groupIds []int64) ([]models.GroupPermission, error)
-	GetGroupPermissionsByGroupId(tx *sql.Tx, groupId int64) ([]models.GroupPermission, error)
-	DeleteGroupPermission(tx *sql.Tx, groupPermissionId int64) error
+	CreateGroupPermission(ctx context.Context, tx *sql.Tx, groupPermission *models.GroupPermission) error
+	UpdateGroupPermission(ctx context.Context, tx *sql.Tx, groupPermission *models.GroupPermission) error
+	GetGroupPermissionById(ctx context.Context, tx *sql.Tx, groupPermissionId int64) (*models.GroupPermission, error)
+	GetGroupPermissionByGroupIdAndPermissionId(ctx context.Context, tx *sql.Tx, groupId, permissionId int64) (*models.GroupPermission, error)
+	GetGroupPermissionsByGroupIds(ctx context.Context, tx *sql.Tx, groupIds []int64) ([]models.GroupPermission, error)
+	GetGroupPermissionsByGroupId(ctx context.Context, tx *sql.Tx, groupId int64) ([]models.GroupPermission, error)
+	DeleteGroupPermission(ctx context.Context, tx *sql.Tx, groupPermissionId int64) error
 
 	CreateRefreshToken(ctx context.Context, tx *sql.Tx, refreshToken *models.RefreshToken) error
 	UpdateRefreshToken(ctx context.Context, tx *sql.Tx, refreshToken *models.RefreshToken) error

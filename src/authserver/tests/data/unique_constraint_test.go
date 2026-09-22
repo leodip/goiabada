@@ -61,7 +61,7 @@ func TestUnique_GroupIdentifier(t *testing.T) {
 		GroupIdentifier: existing.GroupIdentifier,
 		Description:     "Duplicate group identifier",
 	}
-	err := database.CreateGroup(nil, duplicate)
+	err := database.CreateGroup(context.Background(), nil, duplicate)
 	assert.Error(t, err, "two groups must not share a group_identifier")
 }
 
@@ -116,7 +116,7 @@ func TestUnique_KeyPairState(t *testing.T) {
 		Type:          "RSA",
 		Algorithm:     "RS256",
 	}
-	err := database.CreateKeyPair(nil, duplicate)
+	err := database.CreateKeyPair(context.Background(), nil, duplicate)
 	assert.Error(t, err, "two key pairs must not share a state")
 }
 
@@ -222,16 +222,16 @@ func TestUnique_PermissionIdentifierPerResource(t *testing.T) {
 func TestUnique_RejectedDuplicateInsertsNothing(t *testing.T) {
 	existing := createTestGroup(t)
 
-	before, err := database.GetAllGroups(nil)
+	before, err := database.GetAllGroups(context.Background(), nil)
 	require.NoError(t, err, "GetAllGroups")
 
 	duplicate := &models.Group{
 		GroupIdentifier: existing.GroupIdentifier,
 		Description:     "Duplicate group identifier",
 	}
-	require.Error(t, database.CreateGroup(nil, duplicate), "expected the duplicate to be rejected")
+	require.Error(t, database.CreateGroup(context.Background(), nil, duplicate), "expected the duplicate to be rejected")
 
-	after, err := database.GetAllGroups(nil)
+	after, err := database.GetAllGroups(context.Background(), nil)
 	require.NoError(t, err, "GetAllGroups")
 	assert.Len(t, after, len(before), "a rejected duplicate must not add a row")
 }

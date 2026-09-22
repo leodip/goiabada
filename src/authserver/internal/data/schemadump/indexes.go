@@ -1,6 +1,7 @@
 package schemadump
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 
@@ -13,7 +14,7 @@ import (
 //
 // Origin is the catalog's own answer to who named the index, never a pattern matched
 // against the name: see IndexOrigin.
-func dumpIndexes(db *sql.DB, d Dialect, table string) ([]IndexShape, error) {
+func dumpIndexes(ctx context.Context, db *sql.DB, d Dialect, table string) ([]IndexShape, error) {
 	var q string
 	switch d {
 	case MySQL:
@@ -74,7 +75,7 @@ func dumpIndexes(db *sql.DB, d Dialect, table string) ([]IndexShape, error) {
 			ORDER BY il.name, ii.seqno`, table)
 	}
 
-	rows, err := db.Query(q)
+	rows, err := db.QueryContext(ctx, q)
 	if err != nil {
 		return nil, errs.Errorf("schemadump: index catalog sweep on %s.%s: %w", d, table, err)
 	}

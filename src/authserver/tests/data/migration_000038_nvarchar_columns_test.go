@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"testing"
@@ -71,7 +72,7 @@ func TestMigration000038_NvarcharColumns(t *testing.T) {
 
 	h := newIsolatedDB(t)
 
-	require.NoError(t, h.Migrator.Migrate(35), "migrate to 000035")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 35), "migrate to 000035")
 
 	clientId := seedClient000035(t, h, "mig38-client")
 	setOidcClaimsSetting000038(t, h, clientId, "on")
@@ -82,7 +83,7 @@ func TestMigration000038_NvarcharColumns(t *testing.T) {
 		"at 000035 the default constraint must still be the auto-generated one 000013 left; got %q",
 		oidcClaimsConstraintName000038(t, h))
 
-	require.NoError(t, h.Migrator.Migrate(38), "apply 000038")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 38), "apply 000038")
 
 	after := dumpAffectedTables000038(t, h)
 	assertNvarcharColumnTypes000038(t, h, after, "after apply", func(c int) string { return nvarcharColumns000038[c].after })
@@ -92,7 +93,7 @@ func TestMigration000038_NvarcharColumns(t *testing.T) {
 	assert.Equal(t, oidcClaimsDefaultConstraint000038, oidcClaimsConstraintName000038(t, h),
 		"after apply, the default constraint must carry the name a later migration can drop it by")
 
-	require.NoError(t, h.Migrator.Migrate(35), "roll back 000038")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 35), "roll back 000038")
 
 	down := dumpAffectedTables000038(t, h)
 	assertNvarcharColumnTypes000038(t, h, down, "after roll back", func(c int) string { return nvarcharColumns000038[c].before })
@@ -102,7 +103,7 @@ func TestMigration000038_NvarcharColumns(t *testing.T) {
 	assert.Truef(t, strings.HasPrefix(oidcClaimsConstraintName000038(t, h), "DF__"),
 		"the down migration must restore an UNNAMED default, so 000035 is the shape 000013 left")
 
-	require.NoError(t, h.Migrator.Migrate(38), "re-apply 000038")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 38), "re-apply 000038")
 
 	reapplied := dumpAffectedTables000038(t, h)
 	assertNvarcharColumnTypes000038(t, h, reapplied, "after down/up round trip", func(c int) string { return nvarcharColumns000038[c].after })

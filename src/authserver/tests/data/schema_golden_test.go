@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -25,9 +26,9 @@ import (
 // asserted equal is the thing they are looking at.
 func TestSchemaGolden_MatchesTheCommittedFile(t *testing.T) {
 	h := newIsolatedDB(t)
-	require.NoError(t, h.Migrator.Up(), "migrate the isolated database to head on %s", dbType())
+	require.NoError(t, h.Migrator.Up(context.Background()), "migrate the isolated database to head on %s", dbType())
 
-	migrated, err := schemadump.MigratedVersion(h.SQL, dumpDialect(t))
+	migrated, err := schemadump.MigratedVersion(context.Background(), h.SQL, dumpDialect(t))
 	require.NoErrorf(t, err, "read the migration version of the freshly migrated %s database", dbType())
 
 	encoded, err := schemadump.Encode(schemadump.Golden{
@@ -79,8 +80,8 @@ func TestSchemaGolden_CommittedFileParses(t *testing.T) {
 	// for (#288). The four numbers legitimately differ between engines, which is why this is
 	// asserted per engine and never across them.
 	h := newIsolatedDB(t)
-	require.NoError(t, h.Migrator.Up(), "migrate the isolated database to head on %s", dbType())
-	migrated, err := schemadump.MigratedVersion(h.SQL, dumpDialect(t))
+	require.NoError(t, h.Migrator.Up(context.Background()), "migrate the isolated database to head on %s", dbType())
+	migrated, err := schemadump.MigratedVersion(context.Background(), h.SQL, dumpDialect(t))
 	require.NoErrorf(t, err, "read the migration version of the freshly migrated %s database", dbType())
 	assert.Equalf(t, migrated, g.Migrated,
 		"%s records migration version %d, but %s migrates to %d. Regenerate all four with:\n"+

@@ -1,6 +1,7 @@
 package schemadump
 
 import (
+	"context"
 	"database/sql"
 	"strings"
 
@@ -19,9 +20,9 @@ type sqliteColumnFacts struct {
 
 // sqliteTableDDL returns the CREATE TABLE text SQLite keeps in its own catalog, which is
 // not the schema documentation snapshot beside the migrations.
-func sqliteTableDDL(db *sql.DB, table string) (string, error) {
+func sqliteTableDDL(ctx context.Context, db *sql.DB, table string) (string, error) {
 	var ddl string
-	err := db.QueryRow(`SELECT sql FROM sqlite_schema WHERE type = 'table' AND name = ?`, table).Scan(&ddl)
+	err := db.QueryRowContext(ctx, `SELECT sql FROM sqlite_schema WHERE type = 'table' AND name = ?`, table).Scan(&ddl)
 	if err != nil {
 		return "", errs.Errorf("schemadump: read the CREATE TABLE text for %q out of sqlite_schema: %w", table, err)
 	}
@@ -38,8 +39,8 @@ func sqliteTableDDL(db *sql.DB, table string) (string, error) {
 // a migrated-but-empty database, which is what the generator dumps, every table would read
 // as not auto-numbered. Filling either field from a constant instead would make it assert
 // nothing, which is the trap this exists to avoid.
-func sqliteDeclaredColumnFacts(db *sql.DB, table string) (map[string]sqliteColumnFacts, error) {
-	ddl, err := sqliteTableDDL(db, table)
+func sqliteDeclaredColumnFacts(ctx context.Context, db *sql.DB, table string) (map[string]sqliteColumnFacts, error) {
+	ddl, err := sqliteTableDDL(ctx, db, table)
 	if err != nil {
 		return nil, err
 	}

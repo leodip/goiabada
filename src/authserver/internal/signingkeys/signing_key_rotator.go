@@ -88,7 +88,7 @@ func (r *SigningKeyRotator) Rotate(ctx context.Context) error {
 	// one value the body captures, and the id CreateKeyPair assigns onto it is reassigned by
 	// the next attempt.
 	return r.database.RunInTransaction(ctx, func(tx *sql.Tx) error {
-		allSigningKeys, err := r.database.GetAllSigningKeys(tx)
+		allSigningKeys, err := r.database.GetAllSigningKeys(ctx, tx)
 		if err != nil {
 			return err
 		}
@@ -122,12 +122,12 @@ func (r *SigningKeyRotator) Rotate(ctx context.Context) error {
 		// still there would put two rows in the previous state within one statement, which
 		// the unique index on key_pairs (state) refuses on every engine.
 		if previousKey != nil {
-			if err := r.database.DeleteKeyPair(tx, previousKey.Id); err != nil {
+			if err := r.database.DeleteKeyPair(ctx, tx, previousKey.Id); err != nil {
 				return err
 			}
 		}
 
-		moved, err := r.database.UpdateKeyPairState(tx, currentKey.Id,
+		moved, err := r.database.UpdateKeyPairState(ctx, tx, currentKey.Id,
 			models.KeyStateCurrent.String(), models.KeyStatePrevious.String())
 		if err != nil {
 			return err
@@ -136,7 +136,7 @@ func (r *SigningKeyRotator) Rotate(ctx context.Context) error {
 			return errs.WithStack(ErrRotationInProgress)
 		}
 
-		moved, err = r.database.UpdateKeyPairState(tx, nextKey.Id,
+		moved, err = r.database.UpdateKeyPairState(ctx, tx, nextKey.Id,
 			models.KeyStateNext.String(), models.KeyStateCurrent.String())
 		if err != nil {
 			return err
@@ -145,7 +145,7 @@ func (r *SigningKeyRotator) Rotate(ctx context.Context) error {
 			return errs.WithStack(ErrRotationInProgress)
 		}
 
-		return r.database.CreateKeyPair(tx, newNextKey)
+		return r.database.CreateKeyPair(ctx, tx, newNextKey)
 	})
 }
 

@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"strings"
@@ -37,7 +38,7 @@ import (
 func TestMigration000027_LastOTPStep(t *testing.T) {
 	h := newIsolatedDB(t)
 
-	require.NoError(t, h.Migrator.Migrate(26), "migrate to 000026")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 26), "migrate to 000026")
 
 	// 1. Absent before the migration.
 	exists, _, _ := lastOTPStepShape000027(t, h)
@@ -48,7 +49,7 @@ func TestMigration000027_LastOTPStep(t *testing.T) {
 	// exist yet.
 	userId := seedPreMigration000027User(t, h)
 
-	require.NoError(t, h.Migrator.Migrate(27), "apply 000027")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 27), "apply 000027")
 
 	// 2. NOT NULL, defaulting to 0.
 	assertLastOTPStepShape000027(t, h, "after apply")
@@ -65,8 +66,8 @@ func TestMigration000027_LastOTPStep(t *testing.T) {
 	// 4. Down, then up again. Nothing else in the suite executes a down migration
 	// except the 000024, 000025 and 000026 tests, and this one carries mssql's
 	// named-constraint drop.
-	require.NoError(t, h.Migrator.Migrate(26), "roll back 000027")
-	require.NoError(t, h.Migrator.Migrate(27), "re-apply 000027")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 26), "roll back 000027")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 27), "re-apply 000027")
 
 	assert.EqualValues(t, 0, readUserLastOTPStep000027(t, h, userId),
 		"step after the down/up round trip")

@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -41,7 +42,7 @@ const refreshTokensClientIdIndex000036 = "idx_refresh_tokens_client_id"
 func TestMigration000036_RefreshTokensClientIdIndex(t *testing.T) {
 	h := newIsolatedDB(t)
 
-	require.NoError(t, h.Migrator.Migrate(35), "migrate to 000035")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 35), "migrate to 000035")
 
 	// 1. Control.
 	control := describeIndex(t, h, "refresh_tokens", "idx_refresh_token_jti")
@@ -58,14 +59,14 @@ func TestMigration000036_RefreshTokensClientIdIndex(t *testing.T) {
 		"%s must not exist on SQLite at 000035: that absence is the divergence #282 reports",
 		refreshTokensClientIdIndex000036)
 
-	require.NoError(t, h.Migrator.Migrate(36), "apply 000036")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 36), "apply 000036")
 	assertRefreshTokensClientIdIndex000036(t, h, "after apply")
 
-	require.NoError(t, h.Migrator.Migrate(35), "roll back 000036")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 35), "roll back 000036")
 	assert.False(t, describeIndex(t, h, "refresh_tokens", refreshTokensClientIdIndex000036).Exists,
 		"%s must be gone after rolling back to 000035", refreshTokensClientIdIndex000036)
 
-	require.NoError(t, h.Migrator.Migrate(36), "re-apply 000036")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 36), "re-apply 000036")
 	assertRefreshTokensClientIdIndex000036(t, h, "after down/up round trip")
 }
 

@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"database/sql"
 	"fmt"
 	"path/filepath"
@@ -34,7 +35,7 @@ func newTestMigrator(t *testing.T) (data.Database, *migrator.Migrator, *sql.DB) 
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.DB.Close() })
 
-	m, err := db.NewMigrator()
+	m, err := db.NewMigrator(context.Background())
 	require.NoError(t, err)
 	return db, m, db.DB
 }
@@ -56,7 +57,7 @@ func TestMigrateVersion_NeverMigratedDatabase(t *testing.T) {
 	db, m, _ := newTestMigrator(t)
 	var out bytes.Buffer
 
-	code := runMigrate([]string{"version"}, db, m, rollbackFloor, &out)
+	code := runMigrate(context.Background(), []string{"version"}, db, m, rollbackFloor, &out)
 
 	require.Equal(t, 0, code)
 	assert.Contains(t, out.String(), "engine: sqlite")
@@ -66,10 +67,10 @@ func TestMigrateVersion_NeverMigratedDatabase(t *testing.T) {
 
 func TestMigrateVersion_ReportsWhatTheDatabaseRecords(t *testing.T) {
 	db, m, _ := newTestMigrator(t)
-	require.NoError(t, m.Up())
+	require.NoError(t, m.Up(context.Background()))
 
 	var out bytes.Buffer
-	code := runMigrate([]string{"version"}, db, m, rollbackFloor, &out)
+	code := runMigrate(context.Background(), []string{"version"}, db, m, rollbackFloor, &out)
 
 	require.Equal(t, 0, code)
 	assert.Contains(t, out.String(), "the database records schema version "+headf(m))
@@ -80,11 +81,11 @@ func TestMigrateVersion_ReportsWhatTheDatabaseRecords(t *testing.T) {
 // there and say which of the two problems it is looking at.
 func TestMigrateVersion_AnnouncesADirtyDatabase(t *testing.T) {
 	db, m, sqlDB := newTestMigrator(t)
-	require.NoError(t, m.Up())
+	require.NoError(t, m.Up(context.Background()))
 	markDirty(t, m, sqlDB, head(m))
 
 	var out bytes.Buffer
-	code := runMigrate([]string{"version"}, db, m, rollbackFloor, &out)
+	code := runMigrate(context.Background(), []string{"version"}, db, m, rollbackFloor, &out)
 
 	require.Equal(t, 0, code)
 	assert.Contains(t, out.String(), headf(m))
@@ -96,7 +97,7 @@ func TestMigrateTo_StepsUpToTheHeadAndPrintsThePlan(t *testing.T) {
 	db, m, _ := newTestMigrator(t)
 	var out bytes.Buffer
 
-	code := runMigrate([]string{"to", strconv.Itoa(head(m))}, db, m, rollbackFloor, &out)
+	code := runMigrate(context.Background(), []string{"to", strconv.Itoa(head(m))}, db, m, rollbackFloor, &out)
 
 	require.Equal(t, 0, code, out.String())
 	assert.Contains(t, out.String(), "current schema version: none (never migrated)")
@@ -106,7 +107,7 @@ func TestMigrateTo_StepsUpToTheHeadAndPrintsThePlan(t *testing.T) {
 	assert.Contains(t, out.String(), headf(m))
 	assert.Contains(t, out.String(), "now at schema version "+headf(m))
 
-	version, dirty, err := m.Version()
+	version, dirty, err := m.Version(context.Background())
 	require.NoError(t, err)
 	assert.Equal(t, head(m), version)
 	assert.False(t, dirty)
@@ -114,10 +115,10 @@ func TestMigrateTo_StepsUpToTheHeadAndPrintsThePlan(t *testing.T) {
 
 func TestMigrateTo_AlreadyThereIsNotAFailure(t *testing.T) {
 	db, m, _ := newTestMigrator(t)
-	require.NoError(t, m.Up())
+	require.NoError(t, m.Up(context.Background()))
 
 	var out bytes.Buffer
-	code := runMigrate([]string{"to", headf(m)}, db, m, rollbackFloor, &out)
+	code := runMigrate(context.Background(), []string{"to", headf(m)}, db, m, rollbackFloor, &out)
 
 	require.Equal(t, 0, code)
 	assert.Contains(t, out.String(), "already at schema version "+headf(m))
@@ -129,10 +130,10 @@ func TestMigrateTo_AlreadyThereIsNotAFailure(t *testing.T) {
 // asserted is a long multi-step one, which is where the order and the listing matter.
 func TestMigrateTo_StepsDownUnderALoweredFloor(t *testing.T) {
 	db, m, _ := newTestMigrator(t)
-	require.NoError(t, m.Up())
+	require.NoError(t, m.Up(context.Background()))
 
 	var out bytes.Buffer
-	code := runMigrate([]string{"to", "000041"}, db, m, 24, &out)
+	code := runMigrate(context.Background(), []string{"to", "000041"}, db, m, 24, &out)
 
 	require.Equal(t, 0, code, out.String())
 	assert.Contains(t, out.String(), "current schema version: "+headf(m))
@@ -144,7 +145,7 @@ func TestMigrateTo_StepsDownUnderALoweredFloor(t *testing.T) {
 	assert.Contains(t, out.String(), "migrations to run, in order: 000048, 000047, 000046, 000045, 000044, 000043\n")
 	assert.Contains(t, out.String(), "now at schema version 000041")
 
-	version, dirty, err := m.Version()
+	version, dirty, err := m.Version(context.Background())
 	require.NoError(t, err)
 	assert.Equal(t, 41, version)
 	assert.False(t, dirty)
@@ -157,7 +158,7 @@ func TestMigrateTo_AcceptsBareAndPaddedVersions(t *testing.T) {
 			db, m, _ := newTestMigrator(t)
 			var out bytes.Buffer
 
-			code := runMigrate([]string{"to", arg}, db, m, rollbackFloor, &out)
+			code := runMigrate(context.Background(), []string{"to", arg}, db, m, rollbackFloor, &out)
 
 			// Below the floor, so refused, and the refusal names the number it parsed: 000041
 			// for both forms, which is what shows the padded one was not read as octal 33.
@@ -170,10 +171,10 @@ func TestMigrateTo_AcceptsBareAndPaddedVersions(t *testing.T) {
 
 func TestMigrateTo_RefusesATargetBelowTheRollbackFloor(t *testing.T) {
 	db, m, _ := newTestMigrator(t)
-	require.NoError(t, m.Up())
+	require.NoError(t, m.Up(context.Background()))
 
 	var out bytes.Buffer
-	code := runMigrate([]string{"to", "30"}, db, m, rollbackFloor, &out)
+	code := runMigrate(context.Background(), []string{"to", "30"}, db, m, rollbackFloor, &out)
 
 	require.Equal(t, 1, code)
 	assert.Contains(t, out.String(), "000030")
@@ -182,17 +183,17 @@ func TestMigrateTo_RefusesATargetBelowTheRollbackFloor(t *testing.T) {
 		"the refusal names the FLOOR it enforces, which is not the head and does not move with it")
 
 	// It refused before touching anything.
-	version, _, err := m.Version()
+	version, _, err := m.Version(context.Background())
 	require.NoError(t, err)
 	assert.Equal(t, head(m), version)
 }
 
 func TestMigrateTo_RefusesATargetAboveTheHead(t *testing.T) {
 	db, m, _ := newTestMigrator(t)
-	require.NoError(t, m.Up())
+	require.NoError(t, m.Up(context.Background()))
 
 	var out bytes.Buffer
-	code := runMigrate([]string{"to", "99"}, db, m, rollbackFloor, &out)
+	code := runMigrate(context.Background(), []string{"to", "99"}, db, m, rollbackFloor, &out)
 
 	require.Equal(t, 1, code)
 	assert.Contains(t, out.String(), "000099")
@@ -204,11 +205,11 @@ func TestMigrateTo_RefusesATargetAboveTheHead(t *testing.T) {
 // about to run and the message is the runner's, which carries the two legal end states.
 func TestMigrateTo_RefusesADirtyDatabase(t *testing.T) {
 	db, m, sqlDB := newTestMigrator(t)
-	require.NoError(t, m.Up())
+	require.NoError(t, m.Up(context.Background()))
 	markDirty(t, m, sqlDB, head(m))
 
 	var out bytes.Buffer
-	code := runMigrate([]string{"to", strconv.Itoa(head(m))}, db, m, rollbackFloor, &out)
+	code := runMigrate(context.Background(), []string{"to", strconv.Itoa(head(m))}, db, m, rollbackFloor, &out)
 
 	require.Equal(t, 1, code)
 	assert.Contains(t, out.String(), "dirty")
@@ -236,7 +237,7 @@ func TestRunMigrate_UsageRefusals(t *testing.T) {
 			db, m, _ := newTestMigrator(t)
 			var out bytes.Buffer
 
-			code := runMigrate(c.args, db, m, rollbackFloor, &out)
+			code := runMigrate(context.Background(), c.args, db, m, rollbackFloor, &out)
 
 			// 2, not 1: a mistyped command and a database that refused need different
 			// responses, and the number is what a deployment script branches on. Asserted as
@@ -246,7 +247,7 @@ func TestRunMigrate_UsageRefusals(t *testing.T) {
 			assert.Contains(t, out.String(), c.says)
 
 			// Nothing was run.
-			_, _, err := m.Version()
+			_, _, err := m.Version(context.Background())
 			assert.ErrorIs(t, err, migrator.ErrNilVersion)
 		})
 	}
@@ -257,7 +258,7 @@ func TestRunMigrate_UsageRefusals(t *testing.T) {
 // runner has no way to produce it deliberately, by design.
 func markDirty(t *testing.T, m *migrator.Migrator, sqlDB *sql.DB, version int) {
 	t.Helper()
-	require.NoError(t, m.Force(version))
+	require.NoError(t, m.Force(context.Background(), version))
 	// Force records the version clean, so the flag is flipped directly: the runner has no way to
 	// leave a dirty row on purpose, which is the point of it.
 	_, err := sqlDB.Exec("UPDATE schema_migrations SET dirty = 1")

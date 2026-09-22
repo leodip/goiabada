@@ -21,16 +21,16 @@ import (
 // TestDCR_Disabled_Returns403 verifies that DCR returns 403 when feature is disabled (RFC 7591 §3)
 func TestDCR_Disabled_Returns403(t *testing.T) {
 	// Ensure DCR is disabled
-	settings, err := database.GetSettingsById(nil, 1)
+	settings, err := database.GetSettingsById(context.Background(), nil, 1)
 	assert.NoError(t, err)
 	originalDCREnabled := settings.DynamicClientRegistrationEnabled
 	settings.DynamicClientRegistrationEnabled = false
-	err = database.UpdateSettings(nil, settings)
+	err = database.UpdateSettings(context.Background(), nil, settings)
 	assert.NoError(t, err)
 	defer func() {
 		// Restore original setting
 		settings.DynamicClientRegistrationEnabled = originalDCREnabled
-		_ = database.UpdateSettings(nil, settings)
+		_ = database.UpdateSettings(context.Background(), nil, settings)
 	}()
 
 	// Attempt to register a client
@@ -531,13 +531,13 @@ func TestDCR_ClientName_Validation(t *testing.T) {
 
 // TestDCR_WellKnown_Metadata tests that registration endpoint appears in discovery when enabled
 func TestDCR_WellKnown_Metadata(t *testing.T) {
-	settings, err := database.GetSettingsById(nil, 1)
+	settings, err := database.GetSettingsById(context.Background(), nil, 1)
 	assert.NoError(t, err)
 	originalDCREnabled := settings.DynamicClientRegistrationEnabled
 
 	t.Run("DCR enabled - registration_endpoint present", func(t *testing.T) {
 		settings.DynamicClientRegistrationEnabled = true
-		err = database.UpdateSettings(nil, settings)
+		err = database.UpdateSettings(context.Background(), nil, settings)
 		assert.NoError(t, err)
 
 		httpClient := createHttpClient(t)
@@ -560,7 +560,7 @@ func TestDCR_WellKnown_Metadata(t *testing.T) {
 
 	t.Run("DCR disabled - registration_endpoint absent", func(t *testing.T) {
 		settings.DynamicClientRegistrationEnabled = false
-		err = database.UpdateSettings(nil, settings)
+		err = database.UpdateSettings(context.Background(), nil, settings)
 		assert.NoError(t, err)
 
 		httpClient := createHttpClient(t)
@@ -582,7 +582,7 @@ func TestDCR_WellKnown_Metadata(t *testing.T) {
 
 	// Restore original setting
 	settings.DynamicClientRegistrationEnabled = originalDCREnabled
-	_ = database.UpdateSettings(nil, settings)
+	_ = database.UpdateSettings(context.Background(), nil, settings)
 }
 
 // TestDCR_MultipleRedirectURIs tests registering multiple redirect URIs
@@ -655,7 +655,7 @@ func TestDCR_ConfidentialClient_DefaultAcrLevel(t *testing.T) {
 	assert.Equal(t, models.AcrLevel2Optional, client.DefaultAcrLevel, "Should default to level 2 optional")
 
 	// Verify token expiration uses global settings
-	settings, err := database.GetSettingsById(nil, 1)
+	settings, err := database.GetSettingsById(context.Background(), nil, 1)
 	assert.NoError(t, err)
 	assert.Equal(t, settings.TokenExpirationInSeconds, client.TokenExpirationInSeconds)
 	assert.Equal(t, settings.RefreshTokenOfflineIdleTimeoutInSeconds, client.RefreshTokenOfflineIdleTimeoutInSeconds)
@@ -711,19 +711,19 @@ func registerDCRClient(t *testing.T, clientName string, redirectURI string) *mod
 
 // enableDCR enables Dynamic Client Registration for a test
 func enableDCR(t *testing.T) {
-	settings, err := database.GetSettingsById(nil, 1)
+	settings, err := database.GetSettingsById(context.Background(), nil, 1)
 	assert.NoError(t, err)
 	settings.DynamicClientRegistrationEnabled = true
-	err = database.UpdateSettings(nil, settings)
+	err = database.UpdateSettings(context.Background(), nil, settings)
 	assert.NoError(t, err)
 }
 
 // disableDCR disables Dynamic Client Registration after a test
 func disableDCR(t *testing.T) {
-	settings, err := database.GetSettingsById(nil, 1)
+	settings, err := database.GetSettingsById(context.Background(), nil, 1)
 	assert.NoError(t, err)
 	settings.DynamicClientRegistrationEnabled = false
-	err = database.UpdateSettings(nil, settings)
+	err = database.UpdateSettings(context.Background(), nil, settings)
 	assert.NoError(t, err)
 }
 

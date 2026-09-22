@@ -228,7 +228,7 @@ import (
 const message = "errors.Is(err, migrator.ErrNilVersion)"
 
 func migrate(m *migrator.Migrator) error {
-	err := m.Up()
+	err := m.Up(context.Background())
 	if migrator.IsNoChange(err) {
 		return nil
 	}
@@ -257,11 +257,11 @@ import (
 )
 
 func migrate(m *migrator.Migrator) error {
-	err := m.Up()
+	err := m.Up(context.Background())
 	if errors.Is(err, migrator.ErrNoChange) {
 		return nil
 	}
-	_, _, verr := m.Version()
+	_, _, verr := m.Version(context.Background())
 	if errors.Is(verr, migrator.ErrNilVersion) {
 		return nil
 	}
@@ -287,11 +287,11 @@ import (
 )
 
 func migrate(m *mig.Migrator) error {
-	err := m.Up()
+	err := m.Up(context.Background())
 	if goerrors.Is(err, mig.ErrNoChange) {
 		return nil
 	}
-	_, _, verr := m.Version()
+	_, _, verr := m.Version(context.Background())
 	if goerrors.Is(verr, mig.ErrNilVersion) {
 		return nil
 	}
@@ -310,7 +310,7 @@ import (
 )
 
 func migrate(m *migrator.Migrator) error {
-	err := m.Up()
+	err := m.Up(context.Background())
 	if errors.Is(err, migrator.ErrNoChange) {
 		return nil
 	}
@@ -363,7 +363,7 @@ import (
 )
 
 func migrate(m *migrator.Migrator) error {
-	if err := m.Up(); err != nil && !errors.Is(err, migrator.ErrNoChange) {
+	if err := m.Up(context.Background()); err != nil && !errors.Is(err, migrator.ErrNoChange) {
 		return err
 	}
 	return nil
@@ -391,7 +391,7 @@ func TestNoErrorsIsOnABenignMigratorSentinel_TheGuardPassesTheHelper(t *testing.
 import "github.com/leodip/goiabada/authserver/internal/data/migrator"
 
 func migrate(m *migrator.Migrator) error {
-	if err := m.Up(); err != nil && !migrator.IsNoChange(err) {
+	if err := m.Up(context.Background()); err != nil && !migrator.IsNoChange(err) {
 		return err
 	}
 	return nil

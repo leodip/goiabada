@@ -111,7 +111,7 @@ func (t *TokenIssuer) GenerateTokenResponseForAuthCode(ctx context.Context,
 		ExpiresIn: int64(tokenExpirationInSeconds),
 	}
 
-	keyPair, err := t.database.GetCurrentSigningKey(nil)
+	keyPair, err := t.database.GetCurrentSigningKey(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -135,7 +135,7 @@ func (t *TokenIssuer) GenerateTokenResponseForAuthCode(ctx context.Context,
 		return nil, err
 	}
 
-	err = t.database.GroupsLoadAttributes(nil, code.User.Groups)
+	err = t.database.GroupsLoadAttributes(ctx, nil, code.User.Groups)
 	if err != nil {
 		return nil, err
 	}
@@ -387,7 +387,7 @@ func (t *TokenIssuer) GenerateTokenResponseForClientCred(ctx context.Context, cl
 		Scope:     scope,
 	}
 
-	keyPair, err := t.database.GetCurrentSigningKey(nil)
+	keyPair, err := t.database.GetCurrentSigningKey(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -468,7 +468,7 @@ func (t *TokenIssuer) GenerateTokenResponseForRefresh(ctx context.Context, input
 		ExpiresIn: int64(tokenExpirationInSeconds),
 	}
 
-	keyPair, err := t.database.GetCurrentSigningKey(nil)
+	keyPair, err := t.database.GetCurrentSigningKey(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -492,7 +492,7 @@ func (t *TokenIssuer) GenerateTokenResponseForRefresh(ctx context.Context, input
 		return nil, err
 	}
 
-	err = t.database.GroupsLoadAttributes(nil, input.Code.User.Groups)
+	err = t.database.GroupsLoadAttributes(ctx, nil, input.Code.User.Groups)
 	if err != nil {
 		return nil, err
 	}
@@ -567,7 +567,7 @@ func (t *TokenIssuer) GenerateTokenResponseForRefreshROPC(ctx context.Context, i
 		ExpiresIn: int64(tokenExpirationInSeconds),
 	}
 
-	keyPair, err := t.database.GetCurrentSigningKey(nil)
+	keyPair, err := t.database.GetCurrentSigningKey(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -585,7 +585,7 @@ func (t *TokenIssuer) GenerateTokenResponseForRefreshROPC(ctx context.Context, i
 		return nil, err
 	}
 
-	err = t.database.GroupsLoadAttributes(nil, input.RefreshToken.User.Groups)
+	err = t.database.GroupsLoadAttributes(ctx, nil, input.RefreshToken.User.Groups)
 	if err != nil {
 		return nil, err
 	}
@@ -1030,7 +1030,7 @@ func (t *TokenIssuer) GenerateTokenResponseForImplicit(ctx context.Context,
 		ExpiresIn: int64(tokenExpirationInSeconds),
 	}
 
-	keyPair, err := t.database.GetCurrentSigningKey(nil)
+	keyPair, err := t.database.GetCurrentSigningKey(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -1048,7 +1048,7 @@ func (t *TokenIssuer) GenerateTokenResponseForImplicit(ctx context.Context,
 		return nil, err
 	}
 
-	err = t.database.GroupsLoadAttributes(nil, input.User.Groups)
+	err = t.database.GroupsLoadAttributes(ctx, nil, input.User.Groups)
 	if err != nil {
 		return nil, err
 	}
@@ -1164,7 +1164,7 @@ func (t *TokenIssuer) GenerateTokenResponseForROPC(ctx context.Context,
 		ExpiresIn: int64(tokenExpirationInSeconds),
 	}
 
-	keyPair, err := t.database.GetCurrentSigningKey(nil)
+	keyPair, err := t.database.GetCurrentSigningKey(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -1182,7 +1182,7 @@ func (t *TokenIssuer) GenerateTokenResponseForROPC(ctx context.Context,
 		return nil, err
 	}
 
-	err = t.database.GroupsLoadAttributes(nil, input.User.Groups)
+	err = t.database.GroupsLoadAttributes(ctx, nil, input.User.Groups)
 	if err != nil {
 		return nil, err
 	}

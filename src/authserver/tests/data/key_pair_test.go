@@ -23,7 +23,7 @@ func TestCreateKeyPair(t *testing.T) {
 		t.Error("Expected UpdatedAt to be set")
 	}
 
-	retrievedKeyPair, err := database.GetKeyPairById(nil, keyPair.Id)
+	retrievedKeyPair, err := database.GetKeyPairById(context.Background(), nil, keyPair.Id)
 	if err != nil {
 		t.Fatalf("Failed to retrieve created key pair: %v", err)
 	}
@@ -53,12 +53,12 @@ func TestUpdateKeyPair(t *testing.T) {
 
 	time.Sleep(timestampTick)
 
-	err := database.UpdateKeyPair(nil, keyPair)
+	err := database.UpdateKeyPair(context.Background(), nil, keyPair)
 	if err != nil {
 		t.Fatalf("Failed to update key pair: %v", err)
 	}
 
-	updatedKeyPair, err := database.GetKeyPairById(nil, keyPair.Id)
+	updatedKeyPair, err := database.GetKeyPairById(context.Background(), nil, keyPair.Id)
 	if err != nil {
 		t.Fatalf("Failed to retrieve updated key pair: %v", err)
 	}
@@ -97,14 +97,14 @@ func TestUpdateKeyPair(t *testing.T) {
 func TestGetKeyPairById(t *testing.T) {
 	keyPair := createKeyPairInState(t, models.KeyStateCurrent.String())
 
-	retrievedKeyPair, err := database.GetKeyPairById(nil, keyPair.Id)
+	retrievedKeyPair, err := database.GetKeyPairById(context.Background(), nil, keyPair.Id)
 	if err != nil {
 		t.Fatalf("Failed to get key pair by ID: %v", err)
 	}
 
 	compareKeyPairs(t, keyPair, retrievedKeyPair)
 
-	nonExistentKeyPair, err := database.GetKeyPairById(nil, 99999)
+	nonExistentKeyPair, err := database.GetKeyPairById(context.Background(), nil, 99999)
 	if err != nil {
 		t.Errorf("Expected no error for non-existent key pair, got: %v", err)
 	}
@@ -116,13 +116,13 @@ func TestGetKeyPairById(t *testing.T) {
 func TestGetAllSigningKeys(t *testing.T) {
 
 	// delete all key pairs
-	keyPairs, err := database.GetAllSigningKeys(nil)
+	keyPairs, err := database.GetAllSigningKeys(context.Background(), nil)
 	if err != nil {
 		t.Fatalf("Failed to get all signing keys: %v", err)
 	}
 
 	for _, kp := range keyPairs {
-		err := database.DeleteKeyPair(nil, kp.Id)
+		err := database.DeleteKeyPair(context.Background(), nil, kp.Id)
 		if err != nil {
 			t.Fatalf("Failed to delete key pair: %v", err)
 		}
@@ -136,7 +136,7 @@ func TestGetAllSigningKeys(t *testing.T) {
 	keyPair1 := createKeyPairInState(t, models.KeyStateCurrent.String())
 	keyPair2 := createKeyPairInState(t, models.KeyStateNext.String())
 
-	keyPairs, err = database.GetAllSigningKeys(nil)
+	keyPairs, err = database.GetAllSigningKeys(context.Background(), nil)
 	if err != nil {
 		t.Fatalf("Failed to get all signing keys: %v", err)
 	}
@@ -163,13 +163,13 @@ func TestGetAllSigningKeys(t *testing.T) {
 
 func TestGetCurrentSigningKey(t *testing.T) {
 	// delete all key pairs
-	keyPairs, err := database.GetAllSigningKeys(nil)
+	keyPairs, err := database.GetAllSigningKeys(context.Background(), nil)
 	if err != nil {
 		t.Fatalf("Failed to get all signing keys: %v", err)
 	}
 
 	for _, kp := range keyPairs {
-		err := database.DeleteKeyPair(nil, kp.Id)
+		err := database.DeleteKeyPair(context.Background(), nil, kp.Id)
 		if err != nil {
 			t.Fatalf("Failed to delete key pair: %v", err)
 		}
@@ -180,13 +180,13 @@ func TestGetCurrentSigningKey(t *testing.T) {
 	// returns an error rather than (nil, nil) because every caller dereferences the
 	// result, so a missing current key is a panic at eight sites instead of a
 	// diagnosable failure (#251). Reverse that and this assertion fails.
-	if _, err := database.GetCurrentSigningKey(nil); err == nil {
+	if _, err := database.GetCurrentSigningKey(context.Background(), nil); err == nil {
 		t.Fatal("Expected an error when no key pair is in the current state, got nil")
 	}
 
 	keyPair := createKeyPairInState(t, models.KeyStateCurrent.String())
 
-	currentKeyPair, err := database.GetCurrentSigningKey(nil)
+	currentKeyPair, err := database.GetCurrentSigningKey(context.Background(), nil)
 	if err != nil {
 		t.Fatalf("Failed to get current signing key: %v", err)
 	}
@@ -201,12 +201,12 @@ func TestGetCurrentSigningKey(t *testing.T) {
 func TestDeleteKeyPair(t *testing.T) {
 	keyPair := createKeyPairInState(t, models.KeyStateCurrent.String())
 
-	err := database.DeleteKeyPair(nil, keyPair.Id)
+	err := database.DeleteKeyPair(context.Background(), nil, keyPair.Id)
 	if err != nil {
 		t.Fatalf("Failed to delete key pair: %v", err)
 	}
 
-	deletedKeyPair, err := database.GetKeyPairById(nil, keyPair.Id)
+	deletedKeyPair, err := database.GetKeyPairById(context.Background(), nil, keyPair.Id)
 	if err != nil {
 		t.Fatalf("Error while checking for deleted key pair: %v", err)
 	}
@@ -214,7 +214,7 @@ func TestDeleteKeyPair(t *testing.T) {
 		t.Errorf("Key pair still exists after deletion")
 	}
 
-	err = database.DeleteKeyPair(nil, 99999)
+	err = database.DeleteKeyPair(context.Background(), nil, 99999)
 	if err != nil {
 		t.Errorf("Expected no error when deleting non-existent key pair, got: %v", err)
 	}
@@ -265,7 +265,7 @@ const contentionHold = 300 * time.Millisecond
 func clearKeyPairState(t *testing.T, state string) {
 	t.Helper()
 
-	keyPairs, err := database.GetAllSigningKeys(nil)
+	keyPairs, err := database.GetAllSigningKeys(context.Background(), nil)
 	if err != nil {
 		t.Fatalf("Failed to get all signing keys: %v", err)
 	}
@@ -273,7 +273,7 @@ func clearKeyPairState(t *testing.T, state string) {
 		if kp.State != state {
 			continue
 		}
-		if err := database.DeleteKeyPair(nil, kp.Id); err != nil {
+		if err := database.DeleteKeyPair(context.Background(), nil, kp.Id); err != nil {
 			t.Fatalf("Failed to delete key pair in state %s: %v", state, err)
 		}
 	}
@@ -299,7 +299,7 @@ func createKeyPairInState(t *testing.T, state string) *models.KeyPair {
 		PublicKeyASN1_DER: []byte(fake.Sentence(30)),
 		PublicKeyJWK:      []byte(fake.Sentence(40)),
 	}
-	if err := database.CreateKeyPair(nil, keyPair); err != nil {
+	if err := database.CreateKeyPair(context.Background(), nil, keyPair); err != nil {
 		t.Fatalf("Failed to create test key pair in state %s: %v", state, err)
 	}
 	return keyPair
@@ -312,7 +312,7 @@ func TestUpdateKeyPairState_TransitionsAndReadsBack(t *testing.T) {
 	keyPair := createKeyPairInState(t, current)
 	clearKeyPairState(t, previous)
 
-	moved, err := database.UpdateKeyPairState(nil, keyPair.Id, current, previous)
+	moved, err := database.UpdateKeyPairState(context.Background(), nil, keyPair.Id, current, previous)
 	if err != nil {
 		t.Fatalf("Failed to update key pair state: %v", err)
 	}
@@ -320,7 +320,7 @@ func TestUpdateKeyPairState_TransitionsAndReadsBack(t *testing.T) {
 		t.Fatal("Expected the transition to be made by this call")
 	}
 
-	retrieved, err := database.GetKeyPairById(nil, keyPair.Id)
+	retrieved, err := database.GetKeyPairById(context.Background(), nil, keyPair.Id)
 	if err != nil {
 		t.Fatalf("Failed to retrieve key pair: %v", err)
 	}
@@ -336,7 +336,7 @@ func TestUpdateKeyPairState_RepeatedCallDoesNotTransition(t *testing.T) {
 	keyPair := createKeyPairInState(t, current)
 	clearKeyPairState(t, previous)
 
-	moved, err := database.UpdateKeyPairState(nil, keyPair.Id, current, previous)
+	moved, err := database.UpdateKeyPairState(context.Background(), nil, keyPair.Id, current, previous)
 	if err != nil {
 		t.Fatalf("Failed to update key pair state: %v", err)
 	}
@@ -347,7 +347,7 @@ func TestUpdateKeyPairState_RepeatedCallDoesNotTransition(t *testing.T) {
 	// The id still matches, so the state = fromState predicate is the only thing that
 	// can reject this. Remove it and the same row transitions twice, which is exactly
 	// what lets a losing rotation act on a snapshot the winner has already moved past.
-	moved, err = database.UpdateKeyPairState(nil, keyPair.Id, current, previous)
+	moved, err = database.UpdateKeyPairState(context.Background(), nil, keyPair.Id, current, previous)
 	if err != nil {
 		t.Fatalf("Expected no error on the repeated call, got: %v", err)
 	}
@@ -366,7 +366,7 @@ func TestUpdateKeyPairState_WrongFromStateDoesNotTransition(t *testing.T) {
 	keyPair := createKeyPairInState(t, next)
 	clearKeyPairState(t, previous)
 
-	moved, err := database.UpdateKeyPairState(nil, keyPair.Id, current, previous)
+	moved, err := database.UpdateKeyPairState(context.Background(), nil, keyPair.Id, current, previous)
 	if err != nil {
 		t.Fatalf("Expected no error, got: %v", err)
 	}
@@ -374,7 +374,7 @@ func TestUpdateKeyPairState_WrongFromStateDoesNotTransition(t *testing.T) {
 		t.Error("Expected no transition for a row that is not in the from-state")
 	}
 
-	retrieved, err := database.GetKeyPairById(nil, keyPair.Id)
+	retrieved, err := database.GetKeyPairById(context.Background(), nil, keyPair.Id)
 	if err != nil {
 		t.Fatalf("Failed to retrieve key pair: %v", err)
 	}
@@ -384,7 +384,7 @@ func TestUpdateKeyPairState_WrongFromStateDoesNotTransition(t *testing.T) {
 }
 
 func TestUpdateKeyPairState_MissingIdDoesNotTransition(t *testing.T) {
-	moved, err := database.UpdateKeyPairState(nil, 99999,
+	moved, err := database.UpdateKeyPairState(context.Background(), nil, 99999,
 		models.KeyStateCurrent.String(), models.KeyStatePrevious.String())
 	if err != nil {
 		t.Fatalf("Expected no error for a non-existent key pair, got: %v", err)
@@ -395,7 +395,7 @@ func TestUpdateKeyPairState_MissingIdDoesNotTransition(t *testing.T) {
 }
 
 func TestUpdateKeyPairState_ZeroIdIsAnError(t *testing.T) {
-	moved, err := database.UpdateKeyPairState(nil, 0,
+	moved, err := database.UpdateKeyPairState(context.Background(), nil, 0,
 		models.KeyStateCurrent.String(), models.KeyStatePrevious.String())
 	if err == nil {
 		t.Fatal("Expected an error for a zero key pair id, got nil")
@@ -417,23 +417,23 @@ func TestUpdateKeyPairState_EnlistsInCallersTransaction(t *testing.T) {
 		t.Fatalf("Failed to begin transaction: %v", err)
 	}
 
-	moved, err := database.UpdateKeyPairState(tx, keyPair.Id, current, previous)
+	moved, err := database.UpdateKeyPairState(context.Background(), tx, keyPair.Id, current, previous)
 	if err != nil {
-		_ = database.RollbackTransaction(tx)
+		_ = database.RollbackTransaction(context.Background(), tx)
 		t.Fatalf("Failed to update key pair state: %v", err)
 	}
 	if !moved {
-		_ = database.RollbackTransaction(tx)
+		_ = database.RollbackTransaction(context.Background(), tx)
 		t.Fatal("Expected the transition to be made by this call")
 	}
 
-	if err := database.RollbackTransaction(tx); err != nil {
+	if err := database.RollbackTransaction(context.Background(), tx); err != nil {
 		t.Fatalf("Failed to roll back transaction: %v", err)
 	}
 
 	// A statement that ignored the caller's tx and used the pool instead would have
 	// committed, and the rollback would not have undone it.
-	retrieved, err := database.GetKeyPairById(nil, keyPair.Id)
+	retrieved, err := database.GetKeyPairById(context.Background(), nil, keyPair.Id)
 	if err != nil {
 		t.Fatalf("Failed to retrieve key pair: %v", err)
 	}
@@ -468,11 +468,11 @@ func TestUpdateKeyPairState_StorageFailureIsAnError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to begin transaction: %v", err)
 	}
-	if err := database.RollbackTransaction(tx); err != nil {
+	if err := database.RollbackTransaction(context.Background(), tx); err != nil {
 		t.Fatalf("Failed to roll back transaction: %v", err)
 	}
 
-	moved, err := database.UpdateKeyPairState(tx, keyPair.Id, current, previous)
+	moved, err := database.UpdateKeyPairState(context.Background(), tx, keyPair.Id, current, previous)
 	if err == nil {
 		t.Fatal("Expected an error when the statement could not execute, got nil")
 	}
@@ -482,7 +482,7 @@ func TestUpdateKeyPairState_StorageFailureIsAnError(t *testing.T) {
 
 	// And the row is genuinely untouched, so the error is not reporting a failure
 	// after a transition that happened anyway.
-	retrieved, err := database.GetKeyPairById(nil, keyPair.Id)
+	retrieved, err := database.GetKeyPairById(context.Background(), nil, keyPair.Id)
 	if err != nil {
 		t.Fatalf("Failed to retrieve key pair: %v", err)
 	}
@@ -538,10 +538,10 @@ func TestUpdateKeyPairState_Concurrent(t *testing.T) {
 				outcomes[i] = outcome{err: err, span: time.Since(began)}
 				return
 			}
-			moved, err := database.UpdateKeyPairState(tx, keyPair.Id, current, previous)
+			moved, err := database.UpdateKeyPairState(context.Background(), tx, keyPair.Id, current, previous)
 			span := time.Since(began)
 			if err != nil {
-				_ = database.RollbackTransaction(tx)
+				_ = database.RollbackTransaction(context.Background(), tx)
 				outcomes[i] = outcome{err: err, span: span}
 				return
 			}
@@ -550,7 +550,7 @@ func TestUpdateKeyPairState_Concurrent(t *testing.T) {
 			// loser's wait is observable.
 			time.Sleep(contentionHold)
 
-			if err := database.CommitTransaction(tx); err != nil {
+			if err := database.CommitTransaction(context.Background(), tx); err != nil {
 				outcomes[i] = outcome{moved: moved, err: err, span: span}
 				return
 			}
