@@ -15,6 +15,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
+	"github.com/leodip/goiabada/authserver/internal/emaillinks"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/hashutil"
@@ -229,10 +230,10 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 			"the stored hash must be the hash of the code that was issued")
 
 		// This site's only job is to hand the issued code to the shared builder; the link's
-		// shape and the absence of an address in it belong to ResetPasswordLink's own tests
+		// shape and the absence of an address in it belong to emaillinks.ResetPasswordLink's own tests
 		// (#112 decision 5). Asserting the exact string here would pin the shape in a
 		// second place and let the two disagree.
-		assert.Equal(t, ResetPasswordLink(issuedCode), emailedLink,
+		assert.Equal(t, emaillinks.ResetPasswordLink(issuedCode), emailedLink,
 			"the emailed link must be the shared builder's output for the code that was issued")
 
 		httpHelper.AssertExpectations(t)

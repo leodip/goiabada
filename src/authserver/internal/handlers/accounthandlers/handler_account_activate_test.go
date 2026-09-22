@@ -18,9 +18,9 @@ import (
 	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/emaillinks"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	mocks_handlerhelpers "github.com/leodip/goiabada/authserver/internal/handlerhelpers/mocks"
-	"github.com/leodip/goiabada/authserver/internal/handlers"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/usercreation"
@@ -61,7 +61,7 @@ func newMarkerTestStore() *sessionstore.ServerSideStore {
 
 // linkFollowedRequest is the emailed link being followed: the code, and nothing else.
 func linkFollowedRequest(code string) *http.Request {
-	target := handlers.AccountActivatePath
+	target := emaillinks.AccountActivatePath
 	if code != "" {
 		target += "?" + url.Values{"code": {code}}.Encode()
 	}
@@ -70,17 +70,17 @@ func linkFollowedRequest(code string) *http.Request {
 
 // cleanGetRequest is where the first hop's 303 lands: the same path, no query at all.
 func cleanGetRequest() *http.Request {
-	return httptest.NewRequest("GET", handlers.AccountActivatePath, nil)
+	return httptest.NewRequest("GET", emaillinks.AccountActivatePath, nil)
 }
 
 // withMarker attaches the session cookies a first hop would have set, which is what makes a
 // request a clean-hop request rather than a bare one.
-func withMarker(t *testing.T, store sessionstore.Store, req *http.Request, flow handlers.LinkMarkerFlow,
+func withMarker(t *testing.T, store sessionstore.Store, req *http.Request, flow emaillinks.LinkMarkerFlow,
 	id int64, codeHash string) *http.Request {
 	t.Helper()
 
 	rr := httptest.NewRecorder()
-	rejection, err := handlers.SaveLinkMarker(store, rr, cleanGetRequest(), flow, id, codeHash)
+	rejection, err := emaillinks.SaveLinkMarker(store, rr, cleanGetRequest(), flow, id, codeHash)
 	require.NoError(t, err)
 	require.Empty(t, rejection)
 	for _, c := range rr.Result().Cookies() {
@@ -108,10 +108,10 @@ func withRawMarker(t *testing.T, store sessionstore.Store, req *http.Request, va
 }
 
 // expiredMarkerJSON is a marker already past its window.
-func expiredMarkerJSON(t *testing.T, flow handlers.LinkMarkerFlow, id int64, codeHash string) string {
+func expiredMarkerJSON(t *testing.T, flow emaillinks.LinkMarkerFlow, id int64, codeHash string) string {
 	t.Helper()
 
-	data, err := json.Marshal(&handlers.LinkMarker{
+	data, err := json.Marshal(&emaillinks.LinkMarker{
 		Flow:      flow,
 		Id:        id,
 		CodeHash:  codeHash,
@@ -222,7 +222,7 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 
 		location, err := url.Parse(rr.Header().Get("Location"))
 		require.NoError(t, err)
-		assert.Equal(t, handlers.AccountActivatePath, location.Path)
+		assert.Equal(t, emaillinks.AccountActivatePath, location.Path)
 		assert.Empty(t, location.RawQuery,
 			"the redirect target must carry no query, so the code cannot persist in history or a Referer")
 
@@ -231,8 +231,8 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 		userCreator.AssertNotCalled(t, "CreateUser", mock.Anything, mock.Anything)
 		database.AssertNotCalled(t, "DeletePreRegistration", mock.Anything, mock.Anything, mock.Anything)
 
-		marker, rejection, err := handlers.GetLinkMarker(store, nextBrowserRequest(t, sent, rr),
-			handlers.LinkMarkerFlowAccountActivate)
+		marker, rejection, err := emaillinks.GetLinkMarker(store, nextBrowserRequest(t, sent, rr),
+			emaillinks.LinkMarkerFlowAccountActivate)
 		require.NoError(t, err)
 		require.Empty(t, rejection)
 		require.NotNil(t, marker)
@@ -285,10 +285,10 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 
 		userCreator.AssertNotCalled(t, "CreateUser", mock.Anything, mock.Anything)
 
-		_, rejection, err := handlers.GetLinkMarker(store, nextBrowserRequest(t, sent, rr),
-			handlers.LinkMarkerFlowAccountActivate)
+		_, rejection, err := emaillinks.GetLinkMarker(store, nextBrowserRequest(t, sent, rr),
+			emaillinks.LinkMarkerFlowAccountActivate)
 		require.NoError(t, err)
-		assert.Equal(t, handlers.LinkMarkerMissing, rejection,
+		assert.Equal(t, emaillinks.LinkMarkerMissing, rejection,
 			"a refused code must not leave a usable marker behind")
 
 		database.AssertExpectations(t)
@@ -312,7 +312,7 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 		expectRenderedLinkExpired(httpHelper)
 
 		sent := withMarker(t, store, linkFollowedRequest(code),
-			handlers.LinkMarkerFlowAccountActivate, 7, "the-first-hash")
+			emaillinks.LinkMarkerFlowAccountActivate, 7, "the-first-hash")
 
 		handler := HandleAccountActivateGet(httpHelper, store, database, userCreator, auditLogger)
 		rr := httptest.NewRecorder()
@@ -324,8 +324,8 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 
 		// The first continuation survives, so the redirect already in flight still activates
 		// the registration whose link produced it.
-		marker, rejection, err := handlers.GetLinkMarker(store, nextBrowserRequest(t, sent, rr),
-			handlers.LinkMarkerFlowAccountActivate)
+		marker, rejection, err := emaillinks.GetLinkMarker(store, nextBrowserRequest(t, sent, rr),
+			emaillinks.LinkMarkerFlowAccountActivate)
 		require.NoError(t, err)
 		require.Empty(t, rejection)
 		require.NotNil(t, marker)
@@ -353,7 +353,7 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 		expectRenderedLinkExpired(httpHelper)
 
 		sent := withMarker(t, store, linkFollowedRequest(code),
-			handlers.LinkMarkerFlowResetPassword, 42, "the-reset-hash")
+			emaillinks.LinkMarkerFlowResetPassword, 42, "the-reset-hash")
 
 		handler := HandleAccountActivateGet(httpHelper, store, database, userCreator, auditLogger)
 		rr := httptest.NewRecorder()
@@ -363,8 +363,8 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 		userCreator.AssertNotCalled(t, "CreateUser", mock.Anything, mock.Anything)
 		database.AssertNotCalled(t, "DeletePreRegistration", mock.Anything, mock.Anything, mock.Anything)
 
-		marker, rejection, err := handlers.GetLinkMarker(store, nextBrowserRequest(t, sent, rr),
-			handlers.LinkMarkerFlowResetPassword)
+		marker, rejection, err := emaillinks.GetLinkMarker(store, nextBrowserRequest(t, sent, rr),
+			emaillinks.LinkMarkerFlowResetPassword)
 		require.NoError(t, err)
 		require.Empty(t, rejection)
 		require.NotNil(t, marker)
@@ -476,13 +476,13 @@ func TestHandleAccountActivateGet_Clean(t *testing.T) {
 
 		handler := HandleAccountActivateGet(httpHelper, store, database, userCreator, auditLogger)
 		rr := httptest.NewRecorder()
-		sent := withMarker(t, store, cleanGetRequest(), handlers.LinkMarkerFlowAccountActivate, 7, codeHash)
+		sent := withMarker(t, store, cleanGetRequest(), emaillinks.LinkMarkerFlowAccountActivate, 7, codeHash)
 		handler.ServeHTTP(rr, sent)
 
-		_, rejection, err := handlers.GetLinkMarker(store, nextBrowserRequest(t, sent, rr),
-			handlers.LinkMarkerFlowAccountActivate)
+		_, rejection, err := emaillinks.GetLinkMarker(store, nextBrowserRequest(t, sent, rr),
+			emaillinks.LinkMarkerFlowAccountActivate)
 		require.NoError(t, err)
-		assert.Equal(t, handlers.LinkMarkerMissing, rejection,
+		assert.Equal(t, emaillinks.LinkMarkerMissing, rejection,
 			"a completed activation must clear the marker from the session")
 
 		database.AssertExpectations(t)
@@ -510,14 +510,14 @@ func TestHandleAccountActivateGet_Clean(t *testing.T) {
 			{
 				name: "a marker left by the reset flow",
 				request: func(t *testing.T, store sessionstore.Store) *http.Request {
-					return withMarker(t, store, cleanGetRequest(), handlers.LinkMarkerFlowResetPassword, 7, codeHash)
+					return withMarker(t, store, cleanGetRequest(), emaillinks.LinkMarkerFlowResetPassword, 7, codeHash)
 				},
 			},
 			{
 				name: "a marker past its window",
 				request: func(t *testing.T, store sessionstore.Store) *http.Request {
 					return withRawMarker(t, store, cleanGetRequest(),
-						expiredMarkerJSON(t, handlers.LinkMarkerFlowAccountActivate, 7, codeHash))
+						expiredMarkerJSON(t, emaillinks.LinkMarkerFlowAccountActivate, 7, codeHash))
 				},
 			},
 			{
@@ -526,7 +526,7 @@ func TestHandleAccountActivateGet_Clean(t *testing.T) {
 				// longer resolving, since a client-side cookie cannot be recalled.
 				name: "a live marker whose code hash no longer resolves",
 				request: func(t *testing.T, store sessionstore.Store) *http.Request {
-					return withMarker(t, store, cleanGetRequest(), handlers.LinkMarkerFlowAccountActivate, 7, codeHash)
+					return withMarker(t, store, cleanGetRequest(), emaillinks.LinkMarkerFlowAccountActivate, 7, codeHash)
 				},
 				resolves: true,
 			},

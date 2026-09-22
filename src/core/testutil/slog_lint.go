@@ -268,6 +268,12 @@ var slogSpreadSites = []slogSpreadSite{
 // this list gates -- the slog convention, AssertAuditLogContext and AssertRequestPathContext --
 // with nothing going red, since the walk fails only when it reaches no files at all. The three
 // Log* helpers are exactly what #328 gave a context so an audit record joins its request.
+//
+// authserver/internal/emaillinks is listed by the same commit series and for the same reason,
+// though it writes no record today: it is the session marker and the link builder that the
+// forgot-password, reset-password and activation handlers run through on a request, so it is a
+// request-path package by this list's own definition, and the rule is what refuses a plain
+// slog.Warn written beside the marker later (#387).
 var slogRequestPathDirs = []string{
 	"authserver/internal/audit",
 	"authserver/internal/data/commondb",
@@ -287,6 +293,7 @@ var slogRequestPathDirs = []string{
 	"authserver/internal/usersession",
 	"authserver/internal/useragent",
 	"authserver/internal/emaildelivery",
+	"authserver/internal/emaillinks",
 	"authserver/internal/otp",
 	"authserver/internal/imaging",
 	"authserver/internal/uithemes",

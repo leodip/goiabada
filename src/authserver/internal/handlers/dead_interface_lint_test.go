@@ -26,5 +26,6 @@ import (
 // out of here as it lands: the interfaces leaving this directory would otherwise stop being
 // guarded by the move itself, which is the silent-unguarding shape #333 exists to refuse.
 func TestHandlers_NoDeadInterfaces(t *testing.T) {
-	testutil.AssertNoDeadInterfaces(t, "authserver/internal/handlers", "authserver/internal/revocation")
+	testutil.AssertNoDeadInterfaces(t, "authserver/internal/handlers", "authserver/internal/revocation",
+		"authserver/internal/emaillinks")
 }

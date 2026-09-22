@@ -12,6 +12,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/config"
+	"github.com/leodip/goiabada/authserver/internal/emaillinks"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/models"
@@ -147,7 +148,7 @@ func handleActivationLinkFollowed(httpHelper handlers.HttpHelper, httpSession se
 	// The marker names the code hash, not only the pre-registration id: a marker naming a
 	// durable id alone would still resolve after the row was deleted, where the hash stops
 	// resolving the moment the activation completes. See handleActivationCleanHop.
-	rejection, err := handlers.SaveLinkMarker(httpSession, w, r, handlers.LinkMarkerFlowAccountActivate,
+	rejection, err := emaillinks.SaveLinkMarker(httpSession, w, r, emaillinks.LinkMarkerFlowAccountActivate,
 		preRegistration.Id, codeHash)
 	if err != nil {
 		httpHelper.InternalServerError(w, r, err)
@@ -171,7 +172,7 @@ func handleActivationLinkFollowed(httpHelper handlers.HttpHelper, httpSession se
 
 	// 303 rather than 302, so the browser is required to follow with a GET regardless of what
 	// this request was, and the code is gone from the request target from here on.
-	http.Redirect(w, r, handlers.AccountActivatePath, http.StatusSeeOther)
+	http.Redirect(w, r, emaillinks.AccountActivatePath, http.StatusSeeOther)
 }
 
 // isVerificationCodeExpired reports whether the activation code issued for this
@@ -193,7 +194,7 @@ func handleActivationCleanHop(httpHelper handlers.HttpHelper, httpSession sessio
 	database accountActivateDatabase, userCreator handlers.UserCreator, auditLogger handlers.AuditLogger,
 	w http.ResponseWriter, r *http.Request) {
 
-	marker, rejection, err := handlers.GetLinkMarker(httpSession, r, handlers.LinkMarkerFlowAccountActivate)
+	marker, rejection, err := emaillinks.GetLinkMarker(httpSession, r, emaillinks.LinkMarkerFlowAccountActivate)
 	if err != nil {
 		httpHelper.InternalServerError(w, r, err)
 		return
@@ -247,7 +248,7 @@ func handleActivationCleanHop(httpHelper handlers.HttpHelper, httpSession sessio
 	// Hygiene, and not the thing that makes the marker single-use: the deletion above is. A
 	// failure here is logged rather than answered with a 500, because the account has already
 	// been created and telling the caller the activation failed would be false.
-	if err := handlers.ClearLinkMarker(httpSession, w, r); err != nil {
+	if err := emaillinks.ClearLinkMarker(httpSession, w, r); err != nil {
 		slog.ErrorContext(r.Context(), "unable to clear the account activation link marker after a completed activation",
 			"email", createdUser.Email, "error", err)
 	}

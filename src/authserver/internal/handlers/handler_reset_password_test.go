@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/core/sessionstore"
+	"github.com/leodip/goiabada/core/sessionstore/sessiontest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -21,6 +23,7 @@ import (
 	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/emaillinks"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	mocks_handlerhelpers "github.com/leodip/goiabada/authserver/internal/handlerhelpers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
@@ -90,7 +93,7 @@ func expectAuditFailedCode(auditLogger *mocks_audit.AuditLogger, wantReason stri
 
 // linkFollowedRequest is the emailed link being followed: the code, and nothing else.
 func linkFollowedRequest(code string) *http.Request {
-	target := ResetPasswordPath
+	target := emaillinks.ResetPasswordPath
 	if code != "" {
 		target += "?" + url.Values{"code": {code}}.Encode()
 	}
@@ -99,7 +102,7 @@ func linkFollowedRequest(code string) *http.Request {
 
 // cleanGetRequest is where the first hop's 303 lands: the same path, no query at all.
 func cleanGetRequest() *http.Request {
-	return httptest.NewRequest("GET", ResetPasswordPath, nil)
+	return httptest.NewRequest("GET", emaillinks.ResetPasswordPath, nil)
 }
 
 // postResetRequest builds the form submission. It carries no query either: the template's
@@ -115,7 +118,7 @@ func postResetRequest(password, passwordConfirmation, continuationId string) *ht
 		form.Set(continuationIdField, continuationId)
 	}
 
-	req := httptest.NewRequest("POST", ResetPasswordPath, strings.NewReader(form.Encode()))
+	req := httptest.NewRequest("POST", emaillinks.ResetPasswordPath, strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	return req
 }
@@ -125,11 +128,11 @@ func postResetRequest(password, passwordConfirmation, continuationId string) *ht
 // because the id only exists once the marker does, which is exactly the coupling the check
 // enforces at runtime.
 func postWithMarker(t *testing.T, store sessionstore.Store, password, passwordConfirmation string,
-	flow LinkMarkerFlow, id int64, codeHash string) *http.Request {
+	flow emaillinks.LinkMarkerFlow, id int64, codeHash string) *http.Request {
 	t.Helper()
 
 	rr := httptest.NewRecorder()
-	rejection, err := SaveLinkMarker(store, rr, cleanGetRequest(), flow, id, codeHash)
+	rejection, err := emaillinks.SaveLinkMarker(store, rr, cleanGetRequest(), flow, id, codeHash)
 	require.NoError(t, err)
 	require.Empty(t, rejection)
 
@@ -139,7 +142,7 @@ func postWithMarker(t *testing.T, store sessionstore.Store, password, passwordCo
 	for _, c := range rr.Result().Cookies() {
 		carrying.AddCookie(c)
 	}
-	marker, rejection, err := GetLinkMarker(store, carrying, flow)
+	marker, rejection, err := emaillinks.GetLinkMarker(store, carrying, flow)
 	require.NoError(t, err)
 	require.Empty(t, rejection)
 	require.NotNil(t, marker)
@@ -153,12 +156,12 @@ func postWithMarker(t *testing.T, store sessionstore.Store, password, passwordCo
 
 // withMarker attaches the session cookies a first hop would have set, which is what makes a
 // request a clean-hop request rather than a bare one.
-func withMarker(t *testing.T, store sessionstore.Store, req *http.Request, flow LinkMarkerFlow,
+func withMarker(t *testing.T, store sessionstore.Store, req *http.Request, flow emaillinks.LinkMarkerFlow,
 	id int64, codeHash string) *http.Request {
 	t.Helper()
 
 	rr := httptest.NewRecorder()
-	rejection, err := SaveLinkMarker(store, rr, cleanGetRequest(), flow, id, codeHash)
+	rejection, err := emaillinks.SaveLinkMarker(store, rr, cleanGetRequest(), flow, id, codeHash)
 	require.NoError(t, err)
 	require.Empty(t, rejection)
 	for _, c := range rr.Result().Cookies() {
@@ -183,7 +186,7 @@ func postResetWithCredentialsInQuery(password, passwordConfirmation, continuatio
 	query.Set("password", password)
 	query.Set("passwordConfirmation", passwordConfirmation)
 
-	req := httptest.NewRequest("POST", ResetPasswordPath+"?"+query.Encode(),
+	req := httptest.NewRequest("POST", emaillinks.ResetPasswordPath+"?"+query.Encode(),
 		strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	return req
@@ -191,16 +194,16 @@ func postResetWithCredentialsInQuery(password, passwordConfirmation, continuatio
 
 // postWithMarkerContinuationInQuery is postWithMarker with the continuation id moved into the
 // request target and left out of the body. The id is the marker's own live one, read back
-// through GetLinkMarker exactly as postWithMarker does so the test cannot invent one the
+// through emaillinks.GetLinkMarker exactly as postWithMarker does so the test cannot invent one the
 // handler would never have rendered: the gate must still refuse it, because a marker supplied
 // by a URL is not a submission and reading one from a URL reintroduces the shape #201 removed
 // from the reset link, one indirection later (#202, decision 3).
 func postWithMarkerContinuationInQuery(t *testing.T, store sessionstore.Store,
-	password, passwordConfirmation string, flow LinkMarkerFlow, id int64, codeHash string) *http.Request {
+	password, passwordConfirmation string, flow emaillinks.LinkMarkerFlow, id int64, codeHash string) *http.Request {
 	t.Helper()
 
 	rr := httptest.NewRecorder()
-	rejection, err := SaveLinkMarker(store, rr, cleanGetRequest(), flow, id, codeHash)
+	rejection, err := emaillinks.SaveLinkMarker(store, rr, cleanGetRequest(), flow, id, codeHash)
 	require.NoError(t, err)
 	require.Empty(t, rejection)
 
@@ -208,7 +211,7 @@ func postWithMarkerContinuationInQuery(t *testing.T, store sessionstore.Store,
 	for _, c := range rr.Result().Cookies() {
 		carrying.AddCookie(c)
 	}
-	marker, rejection, err := GetLinkMarker(store, carrying, flow)
+	marker, rejection, err := emaillinks.GetLinkMarker(store, carrying, flow)
 	require.NoError(t, err)
 	require.Empty(t, rejection)
 	require.NotNil(t, marker)
@@ -219,7 +222,7 @@ func postWithMarkerContinuationInQuery(t *testing.T, store sessionstore.Store,
 	form.Set("passwordConfirmation", passwordConfirmation)
 
 	query := url.Values{continuationIdField: {marker.ContinuationId}}
-	req := httptest.NewRequest("POST", ResetPasswordPath+"?"+query.Encode(),
+	req := httptest.NewRequest("POST", emaillinks.ResetPasswordPath+"?"+query.Encode(),
 		strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	for _, c := range rr.Result().Cookies() {
@@ -244,7 +247,7 @@ func postResetWithConfirmationInQuery(password, passwordConfirmation, continuati
 	query := url.Values{}
 	query.Set("passwordConfirmation", passwordConfirmation)
 
-	req := httptest.NewRequest("POST", ResetPasswordPath+"?"+query.Encode(),
+	req := httptest.NewRequest("POST", emaillinks.ResetPasswordPath+"?"+query.Encode(),
 		strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	return req
@@ -261,14 +264,14 @@ func postResetWithContinuationInQuery(password, passwordConfirmation, continuati
 	form.Set("passwordConfirmation", passwordConfirmation)
 
 	query := url.Values{continuationIdField: {continuationId}}
-	req := httptest.NewRequest("POST", ResetPasswordPath+"?"+query.Encode(),
+	req := httptest.NewRequest("POST", emaillinks.ResetPasswordPath+"?"+query.Encode(),
 		strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	return req
 }
 
 // withRawMarker attaches cookies holding an arbitrary marker value, for the states
-// SaveLinkMarker cannot produce: an already-expired marker, and a corrupt one.
+// emaillinks.SaveLinkMarker cannot produce: an already-expired marker, and a corrupt one.
 func withRawMarker(t *testing.T, store sessionstore.Store, req *http.Request, value interface{}) *http.Request {
 	t.Helper()
 
@@ -319,10 +322,56 @@ func nextBrowserRequest(t *testing.T, sent *http.Request, rr *httptest.ResponseR
 	return next
 }
 
-// expiredMarkerJSON is a marker already past its window, which SaveLinkMarker cannot write.
-func expiredMarkerJSON(t *testing.T, flow LinkMarkerFlow, id int64, codeHash string) string {
+// newMarkerTestStore, requestCarrying and marshalMarker are this package's copies of the
+// helpers emaillinks's own tests use. Copied rather than exported alongside the package,
+// the way accounthandlers already carries its own newMarkerTestStore and the way four
+// packages each carry a run_in_transaction stub: a test helper exported from production
+// code widens that package's surface for nobody's benefit but the test (#387).
+//
+// A ServerSideStore over an in-memory backend, since #266 moved the session out of the
+// browser: every copy of the cookie names the same row, so clearing the marker reaches
+// all of them.
+func newMarkerTestStore() *sessionstore.ServerSideStore {
+	store, err := sessionstore.NewServerSideStore(
+		sessiontest.NewMemoryBackend(),
+		constants.SessionKeySessionIdentifier,
+		false,
+		sessionstore.KeyPair{
+			AuthenticationKey: []byte("12345678901234567890123456789012"),
+			EncryptionKey:     []byte("abcdefghijklmnopqrstuvwxyz123456"),
+		},
+		nil,
+	)
+	if err != nil {
+		// The keys are literals above and the derivation cannot fail on them, so this is
+		// unreachable. Panicking rather than dropping it keeps it that way.
+		panic(err)
+	}
+	return store
+}
+
+// requestCarrying builds a request holding the cookies a previous response set, which
+// is what a browser does on the next hop.
+func requestCarrying(t *testing.T, rr *httptest.ResponseRecorder) *http.Request {
 	t.Helper()
-	return marshalMarker(t, &LinkMarker{
+	req := httptest.NewRequest("GET", "/reset-password", nil)
+	for _, c := range rr.Result().Cookies() {
+		req.AddCookie(c)
+	}
+	return req
+}
+
+func marshalMarker(t *testing.T, marker *emaillinks.LinkMarker) string {
+	t.Helper()
+	data, err := json.Marshal(marker)
+	require.NoError(t, err)
+	return string(data)
+}
+
+// expiredMarkerJSON is a marker already past its window, which emaillinks.SaveLinkMarker cannot write.
+func expiredMarkerJSON(t *testing.T, flow emaillinks.LinkMarkerFlow, id int64, codeHash string) string {
+	t.Helper()
+	return marshalMarker(t, &emaillinks.LinkMarker{
 		Flow:      flow,
 		Id:        id,
 		CodeHash:  codeHash,
@@ -374,11 +423,11 @@ func TestHandleResetPasswordGet_LinkFollowed(t *testing.T) {
 		require.Equal(t, http.StatusSeeOther, rr.Code)
 		location, err := url.Parse(rr.Header().Get("Location"))
 		require.NoError(t, err)
-		assert.Equal(t, ResetPasswordPath, location.Path)
+		assert.Equal(t, emaillinks.ResetPasswordPath, location.Path)
 		assert.Empty(t, location.RawQuery, "the redirect target must carry no query at all")
 
 		// The marker names the code hash, which is what the clean steps re-resolve.
-		marker, rejection, err := GetLinkMarker(store, requestCarrying(t, rr), LinkMarkerFlowResetPassword)
+		marker, rejection, err := emaillinks.GetLinkMarker(store, requestCarrying(t, rr), emaillinks.LinkMarkerFlowResetPassword)
 		require.NoError(t, err)
 		require.Empty(t, rejection)
 		require.NotNil(t, marker)
@@ -461,9 +510,9 @@ func TestHandleResetPasswordGet_LinkFollowed(t *testing.T) {
 
 			assert.NotEqual(t, http.StatusSeeOther, rr.Code, "a refused code must not redirect")
 
-			_, rejection, err := GetLinkMarker(store, requestCarrying(t, rr), LinkMarkerFlowResetPassword)
+			_, rejection, err := emaillinks.GetLinkMarker(store, requestCarrying(t, rr), emaillinks.LinkMarkerFlowResetPassword)
 			require.NoError(t, err)
-			assert.Equal(t, LinkMarkerMissing, rejection, "a refused code must leave no marker")
+			assert.Equal(t, emaillinks.LinkMarkerMissing, rejection, "a refused code must leave no marker")
 
 			httpHelper.AssertExpectations(t)
 			database.AssertExpectations(t)
@@ -491,10 +540,10 @@ func TestHandleResetPasswordGet_SecondLinkWhileOneIsInFlight(t *testing.T) {
 
 	// The entry names the link that was refused, which did resolve. The account holding the
 	// live marker is not in the payload.
-	expectAuditFailedCode(auditLogger, string(LinkMarkerContinuationInFlight), 99)
+	expectAuditFailedCode(auditLogger, string(emaillinks.LinkMarkerContinuationInFlight), 99)
 	expectRenderedCodeInvalid(httpHelper, 0)
 
-	req := withMarker(t, store, linkFollowedRequest(secondCode), LinkMarkerFlowResetPassword, 42, "the-first-hash")
+	req := withMarker(t, store, linkFollowedRequest(secondCode), emaillinks.LinkMarkerFlowResetPassword, 42, "the-first-hash")
 
 	handler := HandleResetPasswordGet(httpHelper, store, database, auditLogger)
 	rr := httptest.NewRecorder()
@@ -504,7 +553,7 @@ func TestHandleResetPasswordGet_SecondLinkWhileOneIsInFlight(t *testing.T) {
 
 	// The first continuation survives untouched, so the form on screen still writes into the
 	// account whose link produced it.
-	marker, rejection, err := GetLinkMarker(store, nextBrowserRequest(t, req, rr), LinkMarkerFlowResetPassword)
+	marker, rejection, err := emaillinks.GetLinkMarker(store, nextBrowserRequest(t, req, rr), emaillinks.LinkMarkerFlowResetPassword)
 	require.NoError(t, err)
 	require.Empty(t, rejection)
 	require.NotNil(t, marker)
@@ -532,10 +581,10 @@ func TestHandleResetPasswordGet_SecondLinkWhileAnActivationIsInFlight(t *testing
 	secondUser, secondHash := userWithCode(t, 99, secondCode, time.Now().UTC().Add(-time.Minute))
 	database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), secondHash).Return(secondUser, nil).Once()
 
-	expectAuditFailedCode(auditLogger, string(LinkMarkerContinuationInFlight), 99)
+	expectAuditFailedCode(auditLogger, string(emaillinks.LinkMarkerContinuationInFlight), 99)
 	expectRenderedCodeInvalid(httpHelper, 0)
 
-	req := withMarker(t, store, linkFollowedRequest(secondCode), LinkMarkerFlowAccountActivate, 7, "the-activation-hash")
+	req := withMarker(t, store, linkFollowedRequest(secondCode), emaillinks.LinkMarkerFlowAccountActivate, 7, "the-activation-hash")
 
 	handler := HandleResetPasswordGet(httpHelper, store, database, auditLogger)
 	rr := httptest.NewRecorder()
@@ -543,7 +592,7 @@ func TestHandleResetPasswordGet_SecondLinkWhileAnActivationIsInFlight(t *testing
 
 	assert.NotEqual(t, http.StatusSeeOther, rr.Code, "a refused second link must not redirect")
 
-	marker, rejection, err := GetLinkMarker(store, nextBrowserRequest(t, req, rr), LinkMarkerFlowAccountActivate)
+	marker, rejection, err := emaillinks.GetLinkMarker(store, nextBrowserRequest(t, req, rr), emaillinks.LinkMarkerFlowAccountActivate)
 	require.NoError(t, err)
 	require.Empty(t, rejection)
 	require.NotNil(t, marker)
@@ -616,11 +665,11 @@ func TestHandleResetPasswordGet_Clean(t *testing.T) {
 		database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).
 			Return(&models.User{Id: 1}, nil).Once()
 		handler := HandleResetPasswordGet(httpHelper, store, database, auditLogger)
-		req := withMarker(t, store, cleanGetRequest(), LinkMarkerFlowResetPassword, 1, codeHash)
+		req := withMarker(t, store, cleanGetRequest(), emaillinks.LinkMarkerFlowResetPassword, 1, codeHash)
 
 		// The id the marker actually holds, so the assertion below cannot pass against a
 		// handler binding some other value.
-		marker, rejection, err := GetLinkMarker(store, req, LinkMarkerFlowResetPassword)
+		marker, rejection, err := emaillinks.GetLinkMarker(store, req, emaillinks.LinkMarkerFlowResetPassword)
 		require.NoError(t, err)
 		require.Empty(t, rejection)
 		require.NotEmpty(t, marker.ContinuationId)
@@ -645,27 +694,27 @@ func TestHandleResetPasswordGet_Clean(t *testing.T) {
 		database.AssertExpectations(t)
 	})
 
-	// Each of these is audited under the reason GetLinkMarker itself reported, so the audit
+	// Each of these is audited under the reason emaillinks.GetLinkMarker itself reported, so the audit
 	// vocabulary and the control flow cannot drift apart.
 	t.Run("no marker at all", func(t *testing.T) {
-		assertCleanGetRefused(t, string(LinkMarkerMissing), func(t *testing.T, store sessionstore.Store,
+		assertCleanGetRefused(t, string(emaillinks.LinkMarkerMissing), func(t *testing.T, store sessionstore.Store,
 			database *mocks_data.Database) *http.Request {
 			return cleanGetRequest()
 		})
 	})
 
 	t.Run("a marker left by the activation flow", func(t *testing.T) {
-		assertCleanGetRefused(t, string(LinkMarkerWrongFlow), func(t *testing.T, store sessionstore.Store,
+		assertCleanGetRefused(t, string(emaillinks.LinkMarkerWrongFlow), func(t *testing.T, store sessionstore.Store,
 			database *mocks_data.Database) *http.Request {
-			return withMarker(t, store, cleanGetRequest(), LinkMarkerFlowAccountActivate, 7, codeHash)
+			return withMarker(t, store, cleanGetRequest(), emaillinks.LinkMarkerFlowAccountActivate, 7, codeHash)
 		})
 	})
 
 	t.Run("a marker past its window", func(t *testing.T) {
-		assertCleanGetRefused(t, string(LinkMarkerExpired), func(t *testing.T, store sessionstore.Store,
+		assertCleanGetRefused(t, string(emaillinks.LinkMarkerExpired), func(t *testing.T, store sessionstore.Store,
 			database *mocks_data.Database) *http.Request {
 			return withRawMarker(t, store, cleanGetRequest(),
-				expiredMarkerJSON(t, LinkMarkerFlowResetPassword, 1, codeHash))
+				expiredMarkerJSON(t, emaillinks.LinkMarkerFlowResetPassword, 1, codeHash))
 		})
 	})
 
@@ -677,7 +726,7 @@ func TestHandleResetPasswordGet_Clean(t *testing.T) {
 			database *mocks_data.Database) *http.Request {
 			database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).
 				Return(nil, nil).Once()
-			return withMarker(t, store, cleanGetRequest(), LinkMarkerFlowResetPassword, 1, codeHash)
+			return withMarker(t, store, cleanGetRequest(), emaillinks.LinkMarkerFlowResetPassword, 1, codeHash)
 		})
 	})
 }
@@ -853,25 +902,25 @@ func TestHandleResetPasswordPost_MarkerRejectionsDoNotChangeThePassword(t *testi
 	}{
 		{
 			name:       "no marker at all",
-			wantReason: string(LinkMarkerMissing),
+			wantReason: string(emaillinks.LinkMarkerMissing),
 			arrange: func(t *testing.T, store sessionstore.Store, database *mocks_data.Database) *http.Request {
 				return postResetRequest(newPassword, newPassword, "")
 			},
 		},
 		{
 			name:       "a marker left by the activation flow",
-			wantReason: string(LinkMarkerWrongFlow),
+			wantReason: string(emaillinks.LinkMarkerWrongFlow),
 			arrange: func(t *testing.T, store sessionstore.Store, database *mocks_data.Database) *http.Request {
 				return postWithMarker(t, store, newPassword, newPassword,
-					LinkMarkerFlowAccountActivate, 7, codeHash)
+					emaillinks.LinkMarkerFlowAccountActivate, 7, codeHash)
 			},
 		},
 		{
 			name:       "a marker past its window",
-			wantReason: string(LinkMarkerExpired),
+			wantReason: string(emaillinks.LinkMarkerExpired),
 			arrange: func(t *testing.T, store sessionstore.Store, database *mocks_data.Database) *http.Request {
 				return withRawMarker(t, store, postResetRequest(newPassword, newPassword, ""),
-					expiredMarkerJSON(t, LinkMarkerFlowResetPassword, 1, codeHash))
+					expiredMarkerJSON(t, emaillinks.LinkMarkerFlowResetPassword, 1, codeHash))
 			},
 		},
 		{
@@ -881,7 +930,7 @@ func TestHandleResetPasswordPost_MarkerRejectionsDoNotChangeThePassword(t *testi
 				database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).
 					Return(nil, nil).Once()
 				return postWithMarker(t, store, newPassword, newPassword,
-					LinkMarkerFlowResetPassword, 1, codeHash)
+					emaillinks.LinkMarkerFlowResetPassword, 1, codeHash)
 			},
 		},
 		// The retarget the continuation id exists for, and the reason no rule about
@@ -898,7 +947,7 @@ func TestHandleResetPasswordPost_MarkerRejectionsDoNotChangeThePassword(t *testi
 					Return(&models.User{Id: 1}, nil).Once()
 				return withMarker(t, store,
 					postResetRequest(newPassword, newPassword, "a-continuation-that-is-gone"),
-					LinkMarkerFlowResetPassword, 1, codeHash)
+					emaillinks.LinkMarkerFlowResetPassword, 1, codeHash)
 			},
 		},
 		{
@@ -909,7 +958,7 @@ func TestHandleResetPasswordPost_MarkerRejectionsDoNotChangeThePassword(t *testi
 				database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).
 					Return(&models.User{Id: 1}, nil).Once()
 				return withMarker(t, store, postResetRequest(newPassword, newPassword, ""),
-					LinkMarkerFlowResetPassword, 1, codeHash)
+					emaillinks.LinkMarkerFlowResetPassword, 1, codeHash)
 			},
 		},
 		// The live id, correct in every respect but its source: in the request target
@@ -924,7 +973,7 @@ func TestHandleResetPasswordPost_MarkerRejectionsDoNotChangeThePassword(t *testi
 				database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).
 					Return(&models.User{Id: 1}, nil).Once()
 				return postWithMarkerContinuationInQuery(t, store, newPassword, newPassword,
-					LinkMarkerFlowResetPassword, 1, codeHash)
+					emaillinks.LinkMarkerFlowResetPassword, 1, codeHash)
 			},
 		},
 		// A marker carrying no id is what a cookie written by an older binary looks like.
@@ -938,11 +987,14 @@ func TestHandleResetPasswordPost_MarkerRejectionsDoNotChangeThePassword(t *testi
 				database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).
 					Return(&models.User{Id: 1}, nil).Once()
 				return withRawMarker(t, store, postResetRequest(newPassword, newPassword, ""),
-					marshalMarker(t, &LinkMarker{
-						Flow:      LinkMarkerFlowResetPassword,
-						Id:        1,
-						CodeHash:  codeHash,
-						ExpiresAt: time.Now().UTC().Add(linkMarkerLifetime),
+					marshalMarker(t, &emaillinks.LinkMarker{
+						Flow:     emaillinks.LinkMarkerFlowResetPassword,
+						Id:       1,
+						CodeHash: codeHash,
+						// A minute rather than emaillinks's own lifetime, which stays
+						// unexported: all this case needs is a marker that is still
+						// live, and the window it was written with is not its subject.
+						ExpiresAt: time.Now().UTC().Add(time.Minute),
 					}))
 			},
 		},
@@ -1012,7 +1064,7 @@ func TestHandleResetPasswordPost_HappyPath(t *testing.T) {
 	handler := HandleResetPasswordPost(httpHelper, store, database, passwordValidator, auditLogger)
 	rr := httptest.NewRecorder()
 	req := postWithMarker(t, store, newPassword, newPassword,
-		LinkMarkerFlowResetPassword, 1, codeHash)
+		emaillinks.LinkMarkerFlowResetPassword, 1, codeHash)
 	handler.ServeHTTP(rr, req)
 
 	httpHelper.AssertExpectations(t)
@@ -1027,9 +1079,9 @@ func TestHandleResetPasswordPost_HappyPath(t *testing.T) {
 	// what refuses a captured copy is the claim above, which the integration tier observes
 	// with a real cookie jar. Read through nextBrowserRequest so this cannot pass against a
 	// handler that simply never touched the session.
-	_, rejection, err := GetLinkMarker(store, nextBrowserRequest(t, req, rr), LinkMarkerFlowResetPassword)
+	_, rejection, err := emaillinks.GetLinkMarker(store, nextBrowserRequest(t, req, rr), emaillinks.LinkMarkerFlowResetPassword)
 	require.NoError(t, err)
-	assert.Equal(t, LinkMarkerMissing, rejection)
+	assert.Equal(t, emaillinks.LinkMarkerMissing, rejection)
 
 	// The narrow conditional write is the only one: a full-row update would undo a
 	// concurrent admin disable (#106 decision 14).
@@ -1064,7 +1116,7 @@ func TestHandleResetPasswordPost_ClaimLost(t *testing.T) {
 	handler := HandleResetPasswordPost(httpHelper, store, database, passwordValidator, auditLogger)
 	handler.ServeHTTP(httptest.NewRecorder(),
 		postWithMarker(t, store, newPassword, newPassword,
-			LinkMarkerFlowResetPassword, 1, codeHash))
+			emaillinks.LinkMarkerFlowResetPassword, 1, codeHash))
 
 	httpHelper.AssertExpectations(t)
 	database.AssertExpectations(t)
@@ -1102,7 +1154,7 @@ func TestHandleResetPasswordPost_ClaimFails(t *testing.T) {
 	handler := HandleResetPasswordPost(httpHelper, store, database, passwordValidator, auditLogger)
 	handler.ServeHTTP(httptest.NewRecorder(),
 		postWithMarker(t, store, "Str0ngP4ss!", "Str0ngP4ss!",
-			LinkMarkerFlowResetPassword, 1, codeHash))
+			emaillinks.LinkMarkerFlowResetPassword, 1, codeHash))
 
 	httpHelper.AssertExpectations(t)
 	database.AssertExpectations(t)
@@ -1223,7 +1275,7 @@ func TestHandleResetPasswordPost_TransactionFailureHandling(t *testing.T) {
 			handler := HandleResetPasswordPost(httpHelper, store, database, passwordValidator, auditLogger)
 			handler.ServeHTTP(httptest.NewRecorder(),
 				postWithMarker(t, store, newPassword, newPassword,
-					LinkMarkerFlowResetPassword, 1, codeHash))
+					emaillinks.LinkMarkerFlowResetPassword, 1, codeHash))
 
 			httpHelper.AssertExpectations(t)
 			database.AssertExpectations(t)
@@ -1355,7 +1407,7 @@ func TestResetPassword_LinkFailuresAreIndistinguishable(t *testing.T) {
 				database := mocks_data.NewDatabase(t)
 				auditLogger := mocks_audit.NewAuditLogger(t)
 				store := newMarkerTestStore()
-				expectAuditFailedCode(auditLogger, string(LinkMarkerMissing), 0)
+				expectAuditFailedCode(auditLogger, string(emaillinks.LinkMarkerMissing), 0)
 				bind := captureResetRender(t, httpHelper)
 				handler := HandleResetPasswordGet(httpHelper, store, database, auditLogger)
 				req := cleanGetRequest()
@@ -1375,7 +1427,7 @@ func TestResetPassword_LinkFailuresAreIndistinguishable(t *testing.T) {
 				expectAuditFailedCode(auditLogger, auditReasonCodeNoLongerOutstanding, 0)
 				bind := captureResetRender(t, httpHelper)
 				handler := HandleResetPasswordGet(httpHelper, store, database, auditLogger)
-				req := withMarker(t, store, cleanGetRequest(), LinkMarkerFlowResetPassword, 1, codeHash)
+				req := withMarker(t, store, cleanGetRequest(), emaillinks.LinkMarkerFlowResetPassword, 1, codeHash)
 				return bind, func() { handler.ServeHTTP(httptest.NewRecorder(), req) }
 			},
 		},
@@ -1390,7 +1442,7 @@ func TestResetPassword_LinkFailuresAreIndistinguishable(t *testing.T) {
 				auditLogger := mocks_audit.NewAuditLogger(t)
 				store := newMarkerTestStore()
 				passwordValidator.On("ValidatePassword", mock.Anything, newPassword).Return(nil).Once()
-				expectAuditFailedCode(auditLogger, string(LinkMarkerMissing), 0)
+				expectAuditFailedCode(auditLogger, string(emaillinks.LinkMarkerMissing), 0)
 				bind := captureResetRender(t, httpHelper)
 				handler := HandleResetPasswordPost(httpHelper, store, database, passwordValidator, auditLogger)
 				req := postResetRequest(newPassword, newPassword, "")
@@ -1414,7 +1466,7 @@ func TestResetPassword_LinkFailuresAreIndistinguishable(t *testing.T) {
 				bind := captureResetRender(t, httpHelper)
 				handler := HandleResetPasswordPost(httpHelper, store, database, passwordValidator, auditLogger)
 				req := postWithMarker(t, store, newPassword, newPassword,
-					LinkMarkerFlowResetPassword, 1, codeHash)
+					emaillinks.LinkMarkerFlowResetPassword, 1, codeHash)
 				return bind, func() { handler.ServeHTTP(httptest.NewRecorder(), req) }
 			},
 		},
@@ -1436,7 +1488,7 @@ func TestResetPassword_LinkFailuresAreIndistinguishable(t *testing.T) {
 				handler := HandleResetPasswordPost(httpHelper, store, database, passwordValidator, auditLogger)
 				req := withMarker(t, store,
 					postResetRequest(newPassword, newPassword, "a-continuation-that-is-gone"),
-					LinkMarkerFlowResetPassword, 1, codeHash)
+					emaillinks.LinkMarkerFlowResetPassword, 1, codeHash)
 				return bind, func() { handler.ServeHTTP(httptest.NewRecorder(), req) }
 			},
 		},
@@ -1460,7 +1512,7 @@ func TestResetPassword_LinkFailuresAreIndistinguishable(t *testing.T) {
 				bind := captureResetRender(t, httpHelper)
 				handler := HandleResetPasswordPost(httpHelper, store, database, passwordValidator, auditLogger)
 				req := postWithMarker(t, store, newPassword, newPassword,
-					LinkMarkerFlowResetPassword, 1, codeHash)
+					emaillinks.LinkMarkerFlowResetPassword, 1, codeHash)
 				return bind, func() { handler.ServeHTTP(httptest.NewRecorder(), req) }
 			},
 		},
@@ -1551,7 +1603,7 @@ func TestResetPassword_GenuineFaultsStayInternalServerErrors(t *testing.T) {
 
 		handler := HandleResetPasswordGet(httpHelper, store, database, auditLogger)
 		handler.ServeHTTP(httptest.NewRecorder(),
-			withMarker(t, store, cleanGetRequest(), LinkMarkerFlowResetPassword, 1, "the-code-hash"))
+			withMarker(t, store, cleanGetRequest(), emaillinks.LinkMarkerFlowResetPassword, 1, "the-code-hash"))
 
 		httpHelper.AssertExpectations(t)
 	})
@@ -1605,7 +1657,7 @@ func TestRenderResetPasswordCodeInvalid_RenderFailureFallsBackToInternalServerEr
 	auditLogger := mocks_audit.NewAuditLogger(t)
 	store := newMarkerTestStore()
 
-	expectAuditFailedCode(auditLogger, string(LinkMarkerMissing), 0)
+	expectAuditFailedCode(auditLogger, string(emaillinks.LinkMarkerMissing), 0)
 	httpHelper.On("RenderTemplate",
 		mock.Anything, mock.Anything,
 		"/layouts/auth_layout.html", "/reset_password.html", mock.Anything,
