@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"context"
 	"path/filepath"
 	"testing"
 
@@ -45,7 +46,7 @@ func TestNewDatabase_RefusesAnAESKeyOfTheWrongLength(t *testing.T) {
 	}
 	for _, tc := range refusals {
 		t.Run(tc.name, func(t *testing.T) {
-			opened, err := datafactory.NewDatabase(cfg, tc.key, nil, false)
+			opened, err := datafactory.NewDatabase(context.Background(), cfg, tc.key, nil, false)
 
 			require.Error(t, err, "a key of %d bytes must not be accepted", len(tc.key))
 			assert.Nil(t, opened, "a refused startup must hand back no database")
@@ -59,7 +60,7 @@ func TestNewDatabase_RefusesAnAESKeyOfTheWrongLength(t *testing.T) {
 	// purpose: by now the schema is at head, so this call exercises the guard and the startup
 	// tasks and nothing else.
 	t.Run("a 32-byte key is accepted", func(t *testing.T) {
-		opened, err := datafactory.NewDatabase(cfg, make([]byte, 32), nil, false)
+		opened, err := datafactory.NewDatabase(context.Background(), cfg, make([]byte, 32), nil, false)
 
 		require.NoError(t, err, "a 32-byte key is the configuration the guard exists to admit")
 		assert.NotNil(t, opened, "an accepted startup must hand back a database")

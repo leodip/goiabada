@@ -70,7 +70,7 @@ func HandleAPIUsersSearchGet(
 			}
 
 			// Verify group exists
-			group, err := database.GetGroupById(nil, annotateGroupId)
+			group, err := database.GetGroupById(r.Context(), nil, annotateGroupId)
 			if err != nil {
 				writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: failed to get group by ID"), "group_id", annotateGroupId, "query", logging.FieldForLog(query), "page", page)
 				return

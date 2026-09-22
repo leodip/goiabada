@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -20,15 +21,15 @@ func TestAPIGroupAttributesGet_Success(t *testing.T) {
 	// Setup: Create test group
 	testGroup := createTestGroup(t)
 	defer func() {
-		_ = database.DeleteGroup(nil, testGroup.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
 	}()
 
 	// Setup: Create test attributes
 	attr1 := createTestGroupAttribute(t, testGroup.Id, "department", "engineering")
 	attr2 := createTestGroupAttribute(t, testGroup.Id, "role", "developer")
 	defer func() {
-		_ = database.DeleteGroupAttribute(nil, attr1.Id)
-		_ = database.DeleteGroupAttribute(nil, attr2.Id)
+		_ = database.DeleteGroupAttribute(context.Background(), nil, attr1.Id)
+		_ = database.DeleteGroupAttribute(context.Background(), nil, attr2.Id)
 	}()
 
 	// Test: Get group attributes
@@ -74,7 +75,7 @@ func TestAPIGroupAttributesGet_EmptyAttributes(t *testing.T) {
 	// Setup: Create test group without attributes
 	testGroup := createTestGroup(t)
 	defer func() {
-		_ = database.DeleteGroup(nil, testGroup.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
 	}()
 
 	// Test: Get group attributes for group with no attributes
@@ -136,7 +137,7 @@ func TestAPIGroupAttributesGet_Unauthorized(t *testing.T) {
 	// Setup: Create test group
 	testGroup := createTestGroup(t)
 	defer func() {
-		_ = database.DeleteGroup(nil, testGroup.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
 	}()
 
 	// Test: Request without access token
@@ -161,13 +162,13 @@ func TestAPIGroupAttributeGet_Success(t *testing.T) {
 	// Setup: Create test group
 	testGroup := createTestGroup(t)
 	defer func() {
-		_ = database.DeleteGroup(nil, testGroup.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
 	}()
 
 	// Setup: Create test attribute
 	attr := createTestGroupAttribute(t, testGroup.Id, "team", "backend")
 	defer func() {
-		_ = database.DeleteGroupAttribute(nil, attr.Id)
+		_ = database.DeleteGroupAttribute(context.Background(), nil, attr.Id)
 	}()
 
 	// Test: Get specific group attribute
@@ -235,12 +236,12 @@ func TestAPIGroupAttributeGet_Unauthorized(t *testing.T) {
 	// Setup: Create test group and attribute
 	testGroup := createTestGroup(t)
 	defer func() {
-		_ = database.DeleteGroup(nil, testGroup.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
 	}()
 
 	attr := createTestGroupAttribute(t, testGroup.Id, "level", "senior")
 	defer func() {
-		_ = database.DeleteGroupAttribute(nil, attr.Id)
+		_ = database.DeleteGroupAttribute(context.Background(), nil, attr.Id)
 	}()
 
 	// Test: Request without access token
@@ -265,7 +266,7 @@ func TestAPIGroupAttributeCreatePost_Success(t *testing.T) {
 	// Setup: Create test group
 	testGroup := createTestGroup(t)
 	defer func() {
-		_ = database.DeleteGroup(nil, testGroup.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
 	}()
 
 	// Test: Create group attribute
@@ -301,12 +302,12 @@ func TestAPIGroupAttributeCreatePost_Success(t *testing.T) {
 	// Cleanup: Delete created attribute
 	defer func() {
 		if createResponse.Attribute.Id > 0 {
-			_ = database.DeleteGroupAttribute(nil, createResponse.Attribute.Id)
+			_ = database.DeleteGroupAttribute(context.Background(), nil, createResponse.Attribute.Id)
 		}
 	}()
 
 	// Verify attribute was created in database
-	createdAttr, err := database.GetGroupAttributeById(nil, createResponse.Attribute.Id)
+	createdAttr, err := database.GetGroupAttributeById(context.Background(), nil, createResponse.Attribute.Id)
 	assert.NoError(t, err)
 	assert.NotNil(t, createdAttr)
 	assert.Equal(t, createReq.Key, createdAttr.Key)
@@ -320,7 +321,7 @@ func TestAPIGroupAttributeCreatePost_ValidationErrors(t *testing.T) {
 	// Setup: Create test group
 	testGroup := createTestGroup(t)
 	defer func() {
-		_ = database.DeleteGroup(nil, testGroup.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
 	}()
 
 	testCases := []struct {
@@ -428,13 +429,13 @@ func TestAPIGroupAttributeUpdatePut_Success(t *testing.T) {
 	// Setup: Create test group
 	testGroup := createTestGroup(t)
 	defer func() {
-		_ = database.DeleteGroup(nil, testGroup.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
 	}()
 
 	// Setup: Create test attribute
 	attr := createTestGroupAttribute(t, testGroup.Id, "status", "active")
 	defer func() {
-		_ = database.DeleteGroupAttribute(nil, attr.Id)
+		_ = database.DeleteGroupAttribute(context.Background(), nil, attr.Id)
 	}()
 
 	// Test: Update attribute
@@ -466,7 +467,7 @@ func TestAPIGroupAttributeUpdatePut_Success(t *testing.T) {
 	assert.Equal(t, updateReq.IncludeInAccessToken, updateResponse.Attribute.IncludeInAccessToken)
 
 	// Verify changes were persisted to database
-	updatedAttr, err := database.GetGroupAttributeById(nil, attr.Id)
+	updatedAttr, err := database.GetGroupAttributeById(context.Background(), nil, attr.Id)
 	assert.NoError(t, err)
 	assert.NotNil(t, updatedAttr)
 	assert.Equal(t, updateReq.Key, updatedAttr.Key)
@@ -500,12 +501,12 @@ func TestAPIGroupAttributeUpdatePut_ValidationErrors(t *testing.T) {
 	// Setup: Create test group and attribute
 	testGroup := createTestGroup(t)
 	defer func() {
-		_ = database.DeleteGroup(nil, testGroup.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
 	}()
 
 	attr := createTestGroupAttribute(t, testGroup.Id, "test_key", "test_value")
 	defer func() {
-		_ = database.DeleteGroupAttribute(nil, attr.Id)
+		_ = database.DeleteGroupAttribute(context.Background(), nil, attr.Id)
 	}()
 
 	testCases := []struct {
@@ -594,12 +595,12 @@ func TestAPIGroupAttributeUpdatePut_InvalidRequestBody(t *testing.T) {
 	// Setup: Create test group and attribute
 	testGroup := createTestGroup(t)
 	defer func() {
-		_ = database.DeleteGroup(nil, testGroup.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
 	}()
 
 	attr := createTestGroupAttribute(t, testGroup.Id, "test_key", "test_value")
 	defer func() {
-		_ = database.DeleteGroupAttribute(nil, attr.Id)
+		_ = database.DeleteGroupAttribute(context.Background(), nil, attr.Id)
 	}()
 
 	// Test: Invalid JSON
@@ -622,12 +623,12 @@ func TestAPIGroupAttributeUpdatePut_Unauthorized(t *testing.T) {
 	// Setup: Create test group and attribute
 	testGroup := createTestGroup(t)
 	defer func() {
-		_ = database.DeleteGroup(nil, testGroup.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
 	}()
 
 	attr := createTestGroupAttribute(t, testGroup.Id, "test_key", "test_value")
 	defer func() {
-		_ = database.DeleteGroupAttribute(nil, attr.Id)
+		_ = database.DeleteGroupAttribute(context.Background(), nil, attr.Id)
 	}()
 
 	// Test: Request without access token
@@ -652,7 +653,7 @@ func TestAPIGroupAttributeDelete_Success(t *testing.T) {
 	// Setup: Create test group
 	testGroup := createTestGroup(t)
 	defer func() {
-		_ = database.DeleteGroup(nil, testGroup.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
 	}()
 
 	// Setup: Create test attribute
@@ -676,7 +677,7 @@ func TestAPIGroupAttributeDelete_Success(t *testing.T) {
 	assert.True(t, deleteResponse.Success)
 
 	// Verify attribute was actually deleted from database
-	deletedAttr, err := database.GetGroupAttributeById(nil, attr.Id)
+	deletedAttr, err := database.GetGroupAttributeById(context.Background(), nil, attr.Id)
 	assert.NoError(t, err)
 	assert.Nil(t, deletedAttr)
 }
@@ -723,12 +724,12 @@ func TestAPIGroupAttributeDelete_Unauthorized(t *testing.T) {
 	// Setup: Create test group and attribute
 	testGroup := createTestGroup(t)
 	defer func() {
-		_ = database.DeleteGroup(nil, testGroup.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
 	}()
 
 	attr := createTestGroupAttribute(t, testGroup.Id, "persistent", "value")
 	defer func() {
-		_ = database.DeleteGroupAttribute(nil, attr.Id)
+		_ = database.DeleteGroupAttribute(context.Background(), nil, attr.Id)
 	}()
 
 	// Test: Request without access token
@@ -745,7 +746,7 @@ func TestAPIGroupAttributeDelete_Unauthorized(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 
 	// Verify attribute was not deleted
-	stillExists, err := database.GetGroupAttributeById(nil, attr.Id)
+	stillExists, err := database.GetGroupAttributeById(context.Background(), nil, attr.Id)
 	assert.NoError(t, err)
 	assert.NotNil(t, stillExists)
 }
@@ -759,7 +760,7 @@ func createTestGroupAttribute(t *testing.T, groupId int64, key, value string) *m
 		IncludeInAccessToken: false,
 		GroupId:              groupId,
 	}
-	err := database.CreateGroupAttribute(nil, attr)
+	err := database.CreateGroupAttribute(context.Background(), nil, attr)
 	assert.NoError(t, err)
 	return attr
 }
@@ -770,10 +771,10 @@ func TestAPIGroupAttribute_AngleBracketsRejected(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	testGroup := createTestGroup(t)
-	defer func() { _ = database.DeleteGroup(nil, testGroup.Id) }()
+	defer func() { _ = database.DeleteGroup(context.Background(), nil, testGroup.Id) }()
 
 	attr := createTestGroupAttribute(t, testGroup.Id, "status", "active")
-	defer func() { _ = database.DeleteGroupAttribute(nil, attr.Id) }()
+	defer func() { _ = database.DeleteGroupAttribute(context.Background(), nil, attr.Id) }()
 
 	base := config.GetAuthServer().BaseURL + "/api/v1/admin/group-attributes"
 
@@ -801,7 +802,7 @@ func TestAPIGroupAttribute_AngleBracketsRejected(t *testing.T) {
 		_ = json.NewDecoder(resp.Body).Decode(&errResp)
 		assert.Equal(t, "validator.attribute.value_angle_brackets", errResp.ErrorCode)
 
-		stored, err := database.GetGroupAttributeById(nil, attr.Id)
+		stored, err := database.GetGroupAttributeById(context.Background(), nil, attr.Id)
 		assert.NoError(t, err)
 		assert.Equal(t, "active", stored.Value)
 	})
@@ -815,7 +816,7 @@ func TestAPIGroupAttribute_AmpersandsAndQuotesStoredVerbatim(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	testGroup := createTestGroup(t)
-	defer func() { _ = database.DeleteGroup(nil, testGroup.Id) }()
+	defer func() { _ = database.DeleteGroup(context.Background(), nil, testGroup.Id) }()
 
 	value := `  R&D "phase 2"  `
 	resp := makeAPIRequest(t, "POST", config.GetAuthServer().BaseURL+"/api/v1/admin/group-attributes",
@@ -829,10 +830,10 @@ func TestAPIGroupAttribute_AmpersandsAndQuotesStoredVerbatim(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, value, createResponse.Attribute.Value)
 
-	stored, err := database.GetGroupAttributeById(nil, createResponse.Attribute.Id)
+	stored, err := database.GetGroupAttributeById(context.Background(), nil, createResponse.Attribute.Id)
 	assert.NoError(t, err)
 	assert.Equal(t, value, stored.Value)
-	defer func() { _ = database.DeleteGroupAttribute(nil, createResponse.Attribute.Id) }()
+	defer func() { _ = database.DeleteGroupAttribute(context.Background(), nil, createResponse.Attribute.Id) }()
 
 	updated := `  AT&T "phase 3"  `
 	updateResp := makeAPIRequest(t, "PUT", config.GetAuthServer().BaseURL+"/api/v1/admin/group-attributes/"+
@@ -847,7 +848,7 @@ func TestAPIGroupAttribute_AmpersandsAndQuotesStoredVerbatim(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, updated, updateResponse.Attribute.Value)
 
-	stored, err = database.GetGroupAttributeById(nil, createResponse.Attribute.Id)
+	stored, err = database.GetGroupAttributeById(context.Background(), nil, createResponse.Attribute.Id)
 	assert.NoError(t, err)
 	assert.Equal(t, updated, stored.Value)
 }

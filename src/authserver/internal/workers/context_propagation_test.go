@@ -30,6 +30,10 @@ func lifecycleContext() context.Context {
 	return context.WithValue(context.Background(), workerCtxKey{}, "lifecycle")
 }
 
+// Stage 8 tightens two of the stubs below from mock.Anything to theWorkersContext(), because
+// TryClaimCleanupRun and GetSettingsById only took a context from that stage onward, and adds the
+// audit-log batch loop, which is the one sweep whose statement runs up to a hundred times.
+
 // The accept arm: the browser-session reap runs on the poll's own context. It is the sweep that
 // runs outside the claim, every five minutes, and the one whose DELETE grows with an
 // unauthenticated caller's request rate (#266 decision 19) -- so it is the sweep most worth being
@@ -40,7 +44,7 @@ func TestWorker_Poll_ReapsUnderTheWorkersContext(t *testing.T) {
 
 	mockDB.On("DeleteExpiredBrowserSessions", theWorkersContext(), mock.Anything, mock.Anything).
 		Return(nil).Once()
-	mockDB.On("TryClaimCleanupRun", mock.Anything, mock.Anything, mock.Anything).
+	mockDB.On("TryClaimCleanupRun", theWorkersContext(), mock.Anything, mock.Anything, mock.Anything).
 		Return(false, nil).Once()
 
 	worker.poll(lifecycleContext())
@@ -57,7 +61,7 @@ func TestWorker_Poll_LostClaimReachesNoSweepPort(t *testing.T) {
 
 	mockDB.On("DeleteExpiredBrowserSessions", theWorkersContext(), mock.Anything, mock.Anything).
 		Return(nil).Once()
-	mockDB.On("TryClaimCleanupRun", mock.Anything, mock.Anything, mock.Anything).
+	mockDB.On("TryClaimCleanupRun", theWorkersContext(), mock.Anything, mock.Anything, mock.Anything).
 		Return(false, nil).Once()
 
 	worker.poll(lifecycleContext())
@@ -81,9 +85,26 @@ func TestWorker_PerformTask_SweepsUnderTheWorkersContext(t *testing.T) {
 		Return(nil).Once()
 	// The settings row is absent, which stops the task before the two session sweeps. That keeps
 	// this case about the context and not about the sweep order, which its own tests own.
-	mockDB.On("GetSettingsById", mock.Anything, int64(1)).Return(nil, nil).Once()
+	mockDB.On("GetSettingsById", theWorkersContext(), mock.Anything, int64(1)).Return(nil, nil).Once()
 
 	worker.performTask(lifecycleContext())
+
+	mockDB.AssertExpectations(t)
+}
+
+// The audit-log sweep is the last of performTask's, and the one worth its own case: it is a loop
+// that issues up to auditLogDeleteMaxBatches deletes, so it is the sweep a shutdown is most
+// likely to land in the middle of, and every iteration has to be issued under the context that
+// shutdown cancels rather than under one the loop invented.
+func TestWorker_DeleteOldAuditLogs_SweepsUnderTheWorkersContext(t *testing.T) {
+	mockDB := mocks.NewDatabase(t)
+	worker := NewWorker(mockDB)
+
+	// One short batch, which is what ends the loop after a single statement.
+	mockDB.On("DeleteOldAuditLogs", theWorkersContext(), mock.Anything, mock.Anything, auditLogDeleteBatchSize).
+		Return(1, nil).Once()
+
+	worker.deleteOldAuditLogs(lifecycleContext(), 30)
 
 	mockDB.AssertExpectations(t)
 }

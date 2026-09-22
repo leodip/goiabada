@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"strings"
@@ -58,7 +59,7 @@ import (
 func TestMigration000031_OTPConfigGeneration(t *testing.T) {
 	h := newIsolatedDB(t)
 
-	require.NoError(t, h.Migrator.Migrate(30), "migrate to 000030")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 30), "migrate to 000030")
 
 	// 1. Absent before the migration, and the old column present.
 	exists, _, _ := columnShape000031(t, h, "users", "otp_config_generation")
@@ -80,7 +81,7 @@ func TestMigration000031_OTPConfigGeneration(t *testing.T) {
 	flaggedNotEnrolled := seedPreMigration000031Session(t, h, notEnrolled, true)
 	unflaggedNotEnrolled := seedPreMigration000031Session(t, h, notEnrolled, false)
 
-	require.NoError(t, h.Migrator.Migrate(31), "apply 000031")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 31), "apply 000031")
 
 	// 2. The four combinations. The three the union covers land at -1 and the fourth at 0.
 	assert.EqualValues(t, -1, readSessionGeneration000031(t, h, flaggedEnrolled),
@@ -114,7 +115,7 @@ func TestMigration000031_OTPConfigGeneration(t *testing.T) {
 	assert.False(t, exists, "user_sessions.level2_auth_config_has_changed must be gone after 000031")
 
 	// 6. Down, then up again.
-	require.NoError(t, h.Migrator.Migrate(30), "roll back 000031")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 30), "roll back 000031")
 
 	exists, notNull, def := columnShape000031(t, h, "user_sessions", "level2_auth_config_has_changed")
 	require.True(t, exists, "the down migration must restore level2_auth_config_has_changed")
@@ -136,7 +137,7 @@ func TestMigration000031_OTPConfigGeneration(t *testing.T) {
 			dbType())
 	}
 
-	require.NoError(t, h.Migrator.Migrate(31), "re-apply 000031")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 31), "re-apply 000031")
 
 	assertShape000031(t, h, "after down/up round trip")
 	exists, _, _ = columnShape000031(t, h, "user_sessions", "level2_auth_config_has_changed")

@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -19,7 +20,7 @@ func TestAPISettingsGeneralGet_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Fetch current settings directly from DB for expected values
-	settings, err := database.GetSettingsById(nil, 1)
+	settings, err := database.GetSettingsById(context.Background(), nil, 1)
 	assert.NoError(t, err)
 	assert.NotNil(t, settings)
 
@@ -73,7 +74,7 @@ func TestAPISettingsGeneralPut_Success(t *testing.T) {
 	assert.Equal(t, strings.ToLower(req.PasswordPolicy), strings.ToLower(body.PasswordPolicy))
 
 	// Verify DB persisted
-	settings, err2 := database.GetSettingsById(nil, 1)
+	settings, err2 := database.GetSettingsById(context.Background(), nil, 1)
 	assert.NoError(t, err2)
 	assert.Equal(t, "My New App", settings.AppName)
 	assert.Equal(t, req.Issuer, settings.Issuer)
@@ -115,7 +116,7 @@ func TestAPISettingsGeneralPut_DisableSelfRegForcesVerificationFalse(t *testing.
 	assert.Equal(t, false, body.SelfRegistrationRequiresEmailVerification)
 
 	// Also verify DB persisted override
-	settings, err := database.GetSettingsById(nil, 1)
+	settings, err := database.GetSettingsById(context.Background(), nil, 1)
 	assert.NoError(t, err)
 	assert.Equal(t, false, settings.SelfRegistrationEnabled)
 	assert.Equal(t, false, settings.SelfRegistrationRequiresEmailVerification)
@@ -215,12 +216,12 @@ func TestAPISettingsGeneralPut_ImplicitFlowEnabled(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Save original settings
-	settings, err := database.GetSettingsById(nil, 1)
+	settings, err := database.GetSettingsById(context.Background(), nil, 1)
 	assert.NoError(t, err)
 	originalImplicitFlow := settings.ImplicitFlowEnabled
 	defer func() {
 		settings.ImplicitFlowEnabled = originalImplicitFlow
-		_ = database.UpdateSettings(nil, settings)
+		_ = database.UpdateSettings(context.Background(), nil, settings)
 	}()
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/general"
@@ -243,7 +244,7 @@ func TestAPISettingsGeneralPut_ImplicitFlowEnabled(t *testing.T) {
 	assert.True(t, body.ImplicitFlowEnabled, "ImplicitFlowEnabled should be true in response")
 
 	// Verify DB persisted
-	updatedSettings, err := database.GetSettingsById(nil, 1)
+	updatedSettings, err := database.GetSettingsById(context.Background(), nil, 1)
 	assert.NoError(t, err)
 	assert.True(t, updatedSettings.ImplicitFlowEnabled, "ImplicitFlowEnabled should be true in DB")
 
@@ -259,7 +260,7 @@ func TestAPISettingsGeneralPut_ImplicitFlowEnabled(t *testing.T) {
 	assert.False(t, body2.ImplicitFlowEnabled, "ImplicitFlowEnabled should be false in response")
 
 	// Verify DB persisted
-	updatedSettings2, err := database.GetSettingsById(nil, 1)
+	updatedSettings2, err := database.GetSettingsById(context.Background(), nil, 1)
 	assert.NoError(t, err)
 	assert.False(t, updatedSettings2.ImplicitFlowEnabled, "ImplicitFlowEnabled should be false in DB")
 }
@@ -268,7 +269,7 @@ func TestAPISettingsGeneralGet_IncludesImplicitFlowEnabled(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Get current settings
-	settings, err := database.GetSettingsById(nil, 1)
+	settings, err := database.GetSettingsById(context.Background(), nil, 1)
 	assert.NoError(t, err)
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/general"
@@ -291,12 +292,12 @@ func TestAPISettingsGeneralPut_ResourceOwnerPasswordCredentialsEnabled(t *testin
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Save original settings
-	settings, err := database.GetSettingsById(nil, 1)
+	settings, err := database.GetSettingsById(context.Background(), nil, 1)
 	assert.NoError(t, err)
 	originalROPC := settings.ResourceOwnerPasswordCredentialsEnabled
 	defer func() {
 		settings.ResourceOwnerPasswordCredentialsEnabled = originalROPC
-		_ = database.UpdateSettings(nil, settings)
+		_ = database.UpdateSettings(context.Background(), nil, settings)
 	}()
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/general"
@@ -320,7 +321,7 @@ func TestAPISettingsGeneralPut_ResourceOwnerPasswordCredentialsEnabled(t *testin
 	assert.True(t, body.ResourceOwnerPasswordCredentialsEnabled, "ResourceOwnerPasswordCredentialsEnabled should be true in response")
 
 	// Verify DB persisted
-	updatedSettings, err := database.GetSettingsById(nil, 1)
+	updatedSettings, err := database.GetSettingsById(context.Background(), nil, 1)
 	assert.NoError(t, err)
 	assert.True(t, updatedSettings.ResourceOwnerPasswordCredentialsEnabled, "ResourceOwnerPasswordCredentialsEnabled should be true in DB")
 
@@ -336,7 +337,7 @@ func TestAPISettingsGeneralPut_ResourceOwnerPasswordCredentialsEnabled(t *testin
 	assert.False(t, body2.ResourceOwnerPasswordCredentialsEnabled, "ResourceOwnerPasswordCredentialsEnabled should be false in response")
 
 	// Verify DB persisted
-	updatedSettings2, err := database.GetSettingsById(nil, 1)
+	updatedSettings2, err := database.GetSettingsById(context.Background(), nil, 1)
 	assert.NoError(t, err)
 	assert.False(t, updatedSettings2.ResourceOwnerPasswordCredentialsEnabled, "ResourceOwnerPasswordCredentialsEnabled should be false in DB")
 }
@@ -345,7 +346,7 @@ func TestAPISettingsGeneralGet_IncludesROPCEnabled(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Get current settings
-	settings, err := database.GetSettingsById(nil, 1)
+	settings, err := database.GetSettingsById(context.Background(), nil, 1)
 	assert.NoError(t, err)
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/general"
@@ -409,7 +410,7 @@ func TestAPISettingsGeneralPut_AngleBracketsRejected(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/general"
 
-	before, err := database.GetSettingsById(nil, 1)
+	before, err := database.GetSettingsById(context.Background(), nil, 1)
 	assert.NoError(t, err)
 
 	cases := []struct {
@@ -439,7 +440,7 @@ func TestAPISettingsGeneralPut_AngleBracketsRejected(t *testing.T) {
 			_ = json.NewDecoder(resp.Body).Decode(&errResp)
 			assert.Equal(t, tc.wantCode, errResp.ErrorCode)
 
-			stored, err := database.GetSettingsById(nil, 1)
+			stored, err := database.GetSettingsById(context.Background(), nil, 1)
 			assert.NoError(t, err)
 			assert.Equal(t, before.AppName, stored.AppName)
 			assert.Equal(t, before.Issuer, stored.Issuer)
@@ -467,7 +468,7 @@ func TestAPISettingsGeneralPut_AmpersandsAndQuotesStoredVerbatim(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, `R&D "labs"`, body.AppName)
 
-	stored, err := database.GetSettingsById(nil, 1)
+	stored, err := database.GetSettingsById(context.Background(), nil, 1)
 	assert.NoError(t, err)
 	assert.Equal(t, `R&D "labs"`, stored.AppName)
 }

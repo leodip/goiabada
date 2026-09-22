@@ -6,11 +6,11 @@ import (
 	"time"
 )
 
-func (d *MySQLDatabase) DeleteOldAuditLogs(tx *sql.Tx, cutoff time.Time, maxDeletions int) (int, error) {
+func (d *MySQLDatabase) DeleteOldAuditLogs(ctx context.Context, tx *sql.Tx, cutoff time.Time, maxDeletions int) (int, error) {
 	// MySQL supports ORDER BY with LIMIT on DELETE
 	deleteSQL := "DELETE FROM audit_logs WHERE created_at < ? ORDER BY id LIMIT ?"
 
-	result, err := d.ExecSql(context.Background(), tx, deleteSQL, cutoff, maxDeletions)
+	result, err := d.ExecSql(ctx, tx, deleteSQL, cutoff, maxDeletions)
 	if err != nil {
 		return 0, err
 	}

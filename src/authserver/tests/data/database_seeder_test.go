@@ -30,7 +30,7 @@ import (
 //	--run TestSeederLowercasesAdminEmail
 func TestSeederLowercasesAdminEmail(t *testing.T) {
 	h := newIsolatedDB(t)
-	if err := h.Migrator.Up(); err != nil && !errors.Is(err, migrator.ErrNoChange) {
+	if err := h.Migrator.Up(context.Background()); err != nil && !errors.Is(err, migrator.ErrNoChange) {
 		require.NoError(t, err, "migrate to head before seeding")
 	}
 

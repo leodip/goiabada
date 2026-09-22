@@ -256,7 +256,7 @@ func TestToken_Refresh_TokenExpired(t *testing.T) {
 	httpClient := createHttpClient(t)
 
 	clientSecret := fake.Password(32)
-	settings, err := database.GetSettingsById(nil, 1)
+	settings, err := database.GetSettingsById(context.Background(), nil, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -294,7 +294,7 @@ func TestToken_Refresh_TokenExpired(t *testing.T) {
 	claims["exp"] = exp.Unix()
 	claims["sub"] = fake.UUID()
 
-	keyPair, err := database.GetCurrentSigningKey(nil)
+	keyPair, err := database.GetCurrentSigningKey(context.Background(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}

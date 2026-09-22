@@ -42,7 +42,7 @@ func TestHandleCertsGet(t *testing.T) {
 
 		allKeys := []models.KeyPair{nextKey, currentKey, previousKey}
 
-		database.On("GetAllSigningKeys", mock.Anything).Return(allKeys, nil)
+		database.On("GetAllSigningKeys", mock.Anything, mock.Anything).Return(allKeys, nil)
 
 		httpHelper.On("EncodeJson", rr, req, mock.AnythingOfType("oauth.Jwks")).Run(func(args mock.Arguments) {
 			jwks := args.Get(2).(oauth.Jwks)
@@ -77,7 +77,7 @@ func TestHandleCertsGet(t *testing.T) {
 
 		allKeys := []models.KeyPair{currentKey}
 
-		database.On("GetAllSigningKeys", mock.Anything).Return(allKeys, nil)
+		database.On("GetAllSigningKeys", mock.Anything, mock.Anything).Return(allKeys, nil)
 
 		httpHelper.On("EncodeJson", rr, req, mock.AnythingOfType("oauth.Jwks")).Run(func(args mock.Arguments) {
 			jwks := args.Get(2).(oauth.Jwks)
@@ -103,7 +103,7 @@ func TestHandleCertsGet(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		database.On("GetAllSigningKeys", mock.Anything).Return(nil, errors.New("database error"))
+		database.On("GetAllSigningKeys", mock.Anything, mock.Anything).Return(nil, errors.New("database error"))
 
 		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err.Error() == "database error"
@@ -133,7 +133,7 @@ func TestHandleCertsGet(t *testing.T) {
 
 		allKeys := []models.KeyPair{invalidKey}
 
-		database.On("GetAllSigningKeys", mock.Anything).Return(allKeys, nil)
+		database.On("GetAllSigningKeys", mock.Anything, mock.Anything).Return(allKeys, nil)
 
 		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err.Error() == "invalid key state invalid"
@@ -163,7 +163,7 @@ func TestHandleCertsGet(t *testing.T) {
 
 		allKeys := []models.KeyPair{invalidJSONKey}
 
-		database.On("GetAllSigningKeys", mock.Anything).Return(allKeys, nil)
+		database.On("GetAllSigningKeys", mock.Anything, mock.Anything).Return(allKeys, nil)
 
 		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err.Error() == "invalid character 'i' looking for beginning of value"
@@ -186,7 +186,7 @@ func TestHandleCertsGet(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 
-		database.On("GetAllSigningKeys", mock.Anything).Return([]models.KeyPair{}, nil)
+		database.On("GetAllSigningKeys", mock.Anything, mock.Anything).Return([]models.KeyPair{}, nil)
 
 		httpHelper.On("EncodeJson", rr, req, mock.MatchedBy(func(jwks oauth.Jwks) bool {
 			return len(jwks.Keys) == 0

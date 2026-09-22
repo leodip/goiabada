@@ -49,7 +49,7 @@ func (al *AuditLogger) Log(ctx context.Context, auditEvent string, details map[s
 	// the field reads below with one would panic in the audit path of every event.
 	if !ok || settings == nil {
 		var err error
-		settings, err = al.database.GetSettingsById(nil, 1)
+		settings, err = al.database.GetSettingsById(ctx, nil, 1)
 		if err != nil {
 			slog.ErrorContext(ctx, "unable to read the settings row for audit logging", "error", err, "event", auditEvent)
 			return
@@ -84,7 +84,7 @@ func (al *AuditLogger) Log(ctx context.Context, auditEvent string, details map[s
 			// CreatedAt set by CreateAuditLog
 		}
 
-		err = al.database.CreateAuditLog(nil, auditLog)
+		err = al.database.CreateAuditLog(ctx, nil, auditLog)
 		if err != nil {
 			slog.ErrorContext(ctx, "unable to persist the audit log to the database", "error", err, "event", auditEvent)
 			// Non-blocking: do not return error to caller

@@ -1068,7 +1068,7 @@ func TestRevokeCodesBySessionIdentifier_TransactionAndFailurePath(t *testing.T) 
 		t.Fatalf("expected 1 code revoked inside the transaction, got %d", count)
 	}
 
-	if err := database.RollbackTransaction(tx); err != nil {
+	if err := database.RollbackTransaction(context.Background(), tx); err != nil {
 		t.Fatalf("RollbackTransaction: %v", err)
 	}
 
@@ -1174,7 +1174,7 @@ func TestRevokeCodesByClientId_TransactionAndFailurePath(t *testing.T) {
 		t.Fatalf("expected 1 code revoked inside the transaction, got %d", count)
 	}
 
-	if err := database.RollbackTransaction(tx); err != nil {
+	if err := database.RollbackTransaction(context.Background(), tx); err != nil {
 		t.Fatalf("RollbackTransaction: %v", err)
 	}
 

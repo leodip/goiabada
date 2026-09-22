@@ -30,7 +30,7 @@ func TestRotateEncryptionKeyIfNeeded(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewSQLiteDatabase: %v", err)
 	}
-	if err := db.Migrate(); err != nil {
+	if err := db.Migrate(context.Background()); err != nil {
 		t.Fatalf("Migrate: %v", err)
 	}
 
@@ -47,7 +47,7 @@ func TestRotateEncryptionKeyIfNeeded(t *testing.T) {
 	}
 
 	// No data yet: no canary, so nothing to rotate.
-	if rotated, err := db.RotateEncryptionKeyIfNeeded(keyB, keyA); err != nil || rotated {
+	if rotated, err := db.RotateEncryptionKeyIfNeeded(context.Background(), keyB, keyA); err != nil || rotated {
 		t.Errorf("rotate on empty db = (%v, %v), want (false, nil)", rotated, err)
 	}
 
@@ -70,7 +70,7 @@ func TestRotateEncryptionKeyIfNeeded(t *testing.T) {
 	// It is neither keyA nor keyB: rotation must not read it and must not write it.
 	legacyKey := []byte("legacy-key-legacy-key-legacy-key")
 
-	if err := db.CreateKeyPair(nil, &models.KeyPair{
+	if err := db.CreateKeyPair(context.Background(), nil, &models.KeyPair{
 		State: "current", KeyIdentifier: fake.UUID(), Type: "RSA", Algorithm: "RS256",
 		PrivateKeyPEM: encA(pem), // canary, encrypted under keyA
 	}); err != nil {
@@ -80,7 +80,7 @@ func TestRotateEncryptionKeyIfNeeded(t *testing.T) {
 		AESEncryptionKeyLegacy: legacyKey,
 		SMTPPasswordEncrypted:  encA(smtpPass),
 	}
-	if err := db.CreateSettings(nil, settings); err != nil {
+	if err := db.CreateSettings(context.Background(), nil, settings); err != nil {
 		t.Fatalf("CreateSettings: %v", err)
 	}
 	client := &models.Client{
@@ -109,26 +109,26 @@ func TestRotateEncryptionKeyIfNeeded(t *testing.T) {
 		PasswordHash:              "x",
 		VerificationCodeEncrypted: encA(preRegCode),
 	}
-	if err := db.CreatePreRegistration(nil, preReg); err != nil {
+	if err := db.CreatePreRegistration(context.Background(), nil, preReg); err != nil {
 		t.Fatalf("CreatePreRegistration: %v", err)
 	}
 
 	// Same key, or no previous key: no-op.
-	if rotated, err := db.RotateEncryptionKeyIfNeeded(keyA, keyA); err != nil || rotated {
+	if rotated, err := db.RotateEncryptionKeyIfNeeded(context.Background(), keyA, keyA); err != nil || rotated {
 		t.Errorf("same key = (%v, %v), want (false, nil)", rotated, err)
 	}
-	if rotated, err := db.RotateEncryptionKeyIfNeeded(keyA, nil); err != nil || rotated {
+	if rotated, err := db.RotateEncryptionKeyIfNeeded(context.Background(), keyA, nil); err != nil || rotated {
 		t.Errorf("no previous = (%v, %v), want (false, nil)", rotated, err)
 	}
 
 	// Data is under keyA; asking to rotate between keyB (current) and keyC
 	// (previous) matches neither -> fail-closed.
-	if _, err := db.RotateEncryptionKeyIfNeeded(keyB, keyC); err == nil {
+	if _, err := db.RotateEncryptionKeyIfNeeded(context.Background(), keyB, keyC); err == nil {
 		t.Error("expected error when data decrypts under neither key")
 	}
 
 	// Rotate keyA -> keyB.
-	rotated, err := db.RotateEncryptionKeyIfNeeded(keyB, keyA)
+	rotated, err := db.RotateEncryptionKeyIfNeeded(context.Background(), keyB, keyA)
 	if err != nil {
 		t.Fatalf("rotate: %v", err)
 	}
@@ -153,7 +153,7 @@ func TestRotateEncryptionKeyIfNeeded(t *testing.T) {
 		}
 	}
 
-	gotSettings, err := db.GetSettingsById(nil, settings.Id)
+	gotSettings, err := db.GetSettingsById(context.Background(), nil, settings.Id)
 	if err != nil {
 		t.Fatalf("GetSettingsById: %v", err)
 	}
@@ -182,20 +182,20 @@ func TestRotateEncryptionKeyIfNeeded(t *testing.T) {
 	rekeyed("users.forgot_password_code_encrypted", gotUser.ForgotPasswordCodeEncrypted, forgotCode)
 	rekeyed("users.otp_enrollment_secret_encrypted", gotUser.OtpEnrollmentSecretEncrypted, otpEnrolment)
 
-	gotPreReg, err := db.GetPreRegistrationById(nil, preReg.Id)
+	gotPreReg, err := db.GetPreRegistrationById(context.Background(), nil, preReg.Id)
 	if err != nil {
 		t.Fatalf("GetPreRegistrationById: %v", err)
 	}
 	rekeyed("pre_registrations.verification_code_encrypted", gotPreReg.VerificationCodeEncrypted, preRegCode)
 
-	keys, err := db.GetAllSigningKeys(nil)
+	keys, err := db.GetAllSigningKeys(context.Background(), nil)
 	if err != nil {
 		t.Fatalf("GetAllSigningKeys: %v", err)
 	}
 	rekeyed("key_pairs.private_key_pem", keys[0].PrivateKeyPEM, pem)
 
 	// Idempotent: data is already under keyB, so a repeat is a no-op.
-	if rotated, err := db.RotateEncryptionKeyIfNeeded(keyB, keyA); err != nil || rotated {
+	if rotated, err := db.RotateEncryptionKeyIfNeeded(context.Background(), keyB, keyA); err != nil || rotated {
 		t.Errorf("second rotate = (%v, %v), want (false, nil)", rotated, err)
 	}
 }
@@ -218,7 +218,7 @@ func TestRotateEncryptionKeyIfNeeded_PlaintextPemFailsClosed(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewSQLiteDatabase: %v", err)
 	}
-	if err := db.Migrate(); err != nil {
+	if err := db.Migrate(context.Background()); err != nil {
 		t.Fatalf("Migrate: %v", err)
 	}
 
@@ -230,7 +230,7 @@ func TestRotateEncryptionKeyIfNeeded_PlaintextPemFailsClosed(t *testing.T) {
 		clientSec = "client-secret"
 	)
 
-	if err := db.CreateKeyPair(nil, &models.KeyPair{
+	if err := db.CreateKeyPair(context.Background(), nil, &models.KeyPair{
 		State: "current", KeyIdentifier: fake.UUID(), Type: "RSA", Algorithm: "RS256",
 		PrivateKeyPEM: []byte(pemPlain), // the pre-1.6.0 state: never encrypted
 	}); err != nil {
@@ -248,7 +248,7 @@ func TestRotateEncryptionKeyIfNeeded_PlaintextPemFailsClosed(t *testing.T) {
 		t.Fatalf("CreateClient: %v", err)
 	}
 
-	rotated, err := db.RotateEncryptionKeyIfNeeded(keyB, keyA)
+	rotated, err := db.RotateEncryptionKeyIfNeeded(context.Background(), keyB, keyA)
 	if err == nil {
 		t.Fatal("expected an error: a plaintext PEM decrypts under neither key")
 	}
@@ -258,7 +258,7 @@ func TestRotateEncryptionKeyIfNeeded_PlaintextPemFailsClosed(t *testing.T) {
 
 	// Nothing was re-keyed. The PEM is still the plaintext it was, and the client secret still
 	// reads under keyA: the refusal happens before reencryptToKey opens its transaction.
-	keys, err := db.GetAllSigningKeys(nil)
+	keys, err := db.GetAllSigningKeys(context.Background(), nil)
 	if err != nil {
 		t.Fatalf("GetAllSigningKeys: %v", err)
 	}

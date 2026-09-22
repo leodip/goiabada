@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"strings"
@@ -39,14 +40,14 @@ import (
 func TestMigration000024_AuthStateGeneration(t *testing.T) {
 	h := newIsolatedDB(t)
 
-	require.NoError(t, h.Migrator.Migrate(23), "migrate to 000023")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 23), "migrate to 000023")
 
 	// Seeded with raw SQL rather than CreateUser: the Go model already carries
 	// AuthStateGeneration, so an ORM insert at 000023 would target a column that
 	// does not exist yet.
 	userId := seedPreMigration000024User(t, h)
 
-	require.NoError(t, h.Migrator.Migrate(24), "apply 000024")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 24), "apply 000024")
 
 	// 1. Pre-existing rows land at generation 0.
 	//
@@ -73,8 +74,8 @@ func TestMigration000024_AuthStateGeneration(t *testing.T) {
 	// unverified, and this one has an engine-specific hazard worth covering: SQL
 	// Server refuses to drop a column while a default constraint depends on it, so
 	// 000024 names its default constraints and drops them by name first.
-	require.NoError(t, h.Migrator.Migrate(23), "roll back 000024")
-	require.NoError(t, h.Migrator.Migrate(24), "re-apply 000024")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 23), "roll back 000024")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 24), "re-apply 000024")
 
 	assert.EqualValues(t, 0, readUserGeneration000024(t, h, userId),
 		"generation after the down/up round trip")

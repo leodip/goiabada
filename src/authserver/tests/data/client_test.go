@@ -1454,7 +1454,7 @@ func TestSetClientPublic(t *testing.T) {
 	if !becamePublic {
 		t.Errorf("making a confidential client public must report the transition")
 	}
-	if err := database.CommitTransaction(tx); err != nil {
+	if err := database.CommitTransaction(context.Background(), tx); err != nil {
 		t.Fatalf("CommitTransaction: %v", err)
 	}
 
@@ -1479,7 +1479,7 @@ func TestSetClientPublic(t *testing.T) {
 	if becamePublic {
 		t.Errorf("saving an already-public client must not report a transition")
 	}
-	if err := database.CommitTransaction(tx); err != nil {
+	if err := database.CommitTransaction(context.Background(), tx); err != nil {
 		t.Fatalf("CommitTransaction: %v", err)
 	}
 
@@ -1490,14 +1490,14 @@ func TestSetClientPublic(t *testing.T) {
 	if _, err := database.SetClientPublic(context.Background(), tx, client.Id+1_000_000); err == nil {
 		t.Errorf("expected an error for a client id that does not exist")
 	}
-	_ = database.RollbackTransaction(tx)
+	_ = database.RollbackTransaction(context.Background(), tx)
 
 	// A zero id is a caller bug rather than a filter, exactly as it is in RevokeCodesByClientId.
 	tx = beginTx(t)
 	if _, err := database.SetClientPublic(context.Background(), tx, 0); err == nil {
 		t.Errorf("expected an error for a client id of 0")
 	}
-	_ = database.RollbackTransaction(tx)
+	_ = database.RollbackTransaction(context.Background(), tx)
 
 	// Without a transaction the two statements autocommit separately, so the row is released
 	// between acquiring it and classifying the write and the whole mechanism is gone. Refused
@@ -1567,7 +1567,7 @@ func TestSetClientPublic_ClassifiesAgainstACommittedConcurrentWrite(t *testing.T
 	case <-time.After(500 * time.Millisecond):
 	}
 
-	if err := database.CommitTransaction(other); err != nil {
+	if err := database.CommitTransaction(context.Background(), other); err != nil {
 		t.Fatalf("committing the concurrent confidential write: %v", err)
 	}
 
@@ -1585,7 +1585,7 @@ func TestSetClientPublic_ClassifiesAgainstACommittedConcurrentWrite(t *testing.T
 			"or the flip commits a public client still holding the grants that secret protected")
 	}
 
-	if err := database.CommitTransaction(saver); err != nil {
+	if err := database.CommitTransaction(context.Background(), saver); err != nil {
 		t.Fatalf("committing the save: %v", err)
 	}
 	stored, err := database.GetClientById(context.Background(), nil, client.Id)
@@ -1621,7 +1621,7 @@ func TestAcquireClientRow(t *testing.T) {
 		held.Description != client.Description {
 		t.Errorf("acquiring the row changed it: %+v", held)
 	}
-	if err := database.CommitTransaction(tx); err != nil {
+	if err := database.CommitTransaction(context.Background(), tx); err != nil {
 		t.Fatalf("CommitTransaction: %v", err)
 	}
 
@@ -1633,7 +1633,7 @@ func TestAcquireClientRow(t *testing.T) {
 	if err := database.AcquireClientRow(context.Background(), tx, client.Id+1_000_000); err != nil {
 		t.Errorf("acquiring a row that does not exist must not error, got %v", err)
 	}
-	_ = database.RollbackTransaction(tx)
+	_ = database.RollbackTransaction(context.Background(), tx)
 
 	// A zero id is a caller bug rather than a filter, exactly as it is in SetClientPublic and
 	// RevokeCodesByClientId.
@@ -1641,7 +1641,7 @@ func TestAcquireClientRow(t *testing.T) {
 	if err := database.AcquireClientRow(context.Background(), tx, 0); err == nil {
 		t.Errorf("expected an error for a client id of 0")
 	}
-	_ = database.RollbackTransaction(tx)
+	_ = database.RollbackTransaction(context.Background(), tx)
 
 	// Without a transaction the statement autocommits and drops the row before the caller can
 	// read it, which is the whole of what this buys. Refused rather than silently degraded.
@@ -1720,7 +1720,7 @@ func TestAcquireClientRow_MakesALaterReadSeeAConcurrentCommit(t *testing.T) {
 	case <-time.After(500 * time.Millisecond):
 	}
 
-	if err := database.CommitTransaction(other); err != nil {
+	if err := database.CommitTransaction(context.Background(), other); err != nil {
 		t.Fatalf("committing the concurrent confidential write: %v", err)
 	}
 
@@ -1744,7 +1744,7 @@ func TestAcquireClientRow_MakesALaterReadSeeAConcurrentCommit(t *testing.T) {
 		t.Errorf("the read must see the committed secret, or the save deletes it; got %q",
 			string(o.refreshed.ClientSecretEncrypted))
 	}
-	_ = database.RollbackTransaction(saver)
+	_ = database.RollbackTransaction(context.Background(), saver)
 }
 
 // TestGetClientByClientIdentifierIsCaseSensitive is RFC 6749 section 1.9 in the data tier:
@@ -1886,7 +1886,7 @@ func TestClientLoadPermissions_EnlistsInTheCallersTransaction(t *testing.T) {
 		t.Errorf("Expected permission %d, got %d", permission.Id, client.Permissions[0].Id)
 	}
 
-	if err := database.RollbackTransaction(tx); err != nil {
+	if err := database.RollbackTransaction(context.Background(), tx); err != nil {
 		t.Fatalf("RollbackTransaction: %v", err)
 	}
 }

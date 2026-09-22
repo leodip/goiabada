@@ -111,10 +111,10 @@ func TestMigration000047_LowercaseEmails(t *testing.T) {
 	// To head first, then back down, on migration_000034's pattern: the ORM writes every column
 	// the Go models carry, so seeding at an older version only works if the columns are there.
 	// 000047's down is a no-op, so stepping back to 000046 undoes nothing and changes no shape.
-	if err := h.Migrator.Up(); err != nil && !errors.Is(err, migrator.ErrNoChange) {
+	if err := h.Migrator.Up(context.Background()); err != nil && !errors.Is(err, migrator.ErrNoChange) {
 		require.NoError(t, err, "migrate to head before seeding through the ORM")
 	}
-	require.NoError(t, h.Migrator.Migrate(beforeLowercaseEmails000047), "roll back to 000046")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), beforeLowercaseEmails000047), "roll back to 000046")
 
 	cases := lowercaseCases000047()
 	ids := make([]int64, len(cases))
@@ -124,7 +124,7 @@ func TestMigration000047_LowercaseEmails(t *testing.T) {
 
 	// 2, first half: what the pre-flight says BEFORE the migration runs. Collected here so the
 	// same set can be compared against what the migration actually leaves behind.
-	preflightErr := datafactory.CheckEmailCaseBeforeMigrating(h.DB, beforeLowercaseEmails000047, datafactory.LowercaseEmailsVersion)
+	preflightErr := datafactory.CheckEmailCaseBeforeMigrating(context.Background(), h.DB, beforeLowercaseEmails000047, datafactory.LowercaseEmailsVersion)
 
 	// Ordinary upgrades must not be refused, so the engines that agree about all five characters
 	// have to pass this table outright. That is what says the refusals below are about the rows.
@@ -145,7 +145,7 @@ func TestMigration000047_LowercaseEmails(t *testing.T) {
 	// The migration itself. It must SUCCEED on every engine: nothing seeded here collides, and a
 	// row the engine cannot reduce is left behind rather than failing the statement, which is
 	// precisely why the pre-flight and not the UPDATE is what refuses.
-	require.NoErrorf(t, h.Migrator.Migrate(datafactory.LowercaseEmailsVersion), "apply 000047 on %s", engine)
+	require.NoErrorf(t, h.Migrator.Migrate(context.Background(), datafactory.LowercaseEmailsVersion), "apply 000047 on %s", engine)
 
 	// 1 and 2, second half.
 	var leftBehind []int64
@@ -188,10 +188,10 @@ func TestMigration000047_LowercaseEmails(t *testing.T) {
 
 	// The down migration is a no-op and re-applying is clean: the repaired values stay repaired,
 	// which the file says, because the original casing is recorded nowhere.
-	require.NoError(t, h.Migrator.Migrate(beforeLowercaseEmails000047), "roll back 000047")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), beforeLowercaseEmails000047), "roll back 000047")
 	assert.Equal(t, strings.ToLower(cases[0].raw), storedEmail000047(t, h, ids[0]),
 		"the down migration is a no-op: a repaired address must stay repaired")
-	require.NoError(t, h.Migrator.Migrate(datafactory.LowercaseEmailsVersion), "re-apply 000047")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), datafactory.LowercaseEmailsVersion), "re-apply 000047")
 	assertEmailIndex000047(t, h, "after a down/up round trip")
 }
 
@@ -212,15 +212,15 @@ func TestMigration000047_LowercaseEmails(t *testing.T) {
 func TestMigration000047_ACollisionWouldFailTheMigration(t *testing.T) {
 	h := newIsolatedDB(t)
 
-	if err := h.Migrator.Up(); err != nil && !errors.Is(err, migrator.ErrNoChange) {
+	if err := h.Migrator.Up(context.Background()); err != nil && !errors.Is(err, migrator.ErrNoChange) {
 		require.NoError(t, err, "migrate to head before seeding through the ORM")
 	}
-	require.NoError(t, h.Migrator.Migrate(beforeLowercaseEmails000047), "roll back to 000046")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), beforeLowercaseEmails000047), "roll back to 000046")
 
 	upper := seedUserEmail000047(t, h, 0, "Collide@example.com")
 	lower := seedUserEmail000047(t, h, 1, "collide@example.com")
 
-	err := datafactory.CheckEmailCaseBeforeMigrating(h.DB, beforeLowercaseEmails000047, datafactory.LowercaseEmailsVersion)
+	err := datafactory.CheckEmailCaseBeforeMigrating(context.Background(), h.DB, beforeLowercaseEmails000047, datafactory.LowercaseEmailsVersion)
 	require.Errorf(t, err, "two addresses differing only by case must refuse the upgrade on %s", engineName000047())
 	assert.Contains(t, err.Error(), fmt.Sprintf("users.id=%d", upper))
 	assert.Contains(t, err.Error(), fmt.Sprintf("users.id=%d", lower),
@@ -228,7 +228,7 @@ func TestMigration000047_ACollisionWouldFailTheMigration(t *testing.T) {
 
 	// And the refusal is not theatre. Nothing else in this suite shows that the alternative is a
 	// failed migration rather than a tidier one.
-	assert.Errorf(t, h.Migrator.Migrate(datafactory.LowercaseEmailsVersion),
+	assert.Errorf(t, h.Migrator.Migrate(context.Background(), datafactory.LowercaseEmailsVersion),
 		"lowercasing both rows onto one value must trip the UNIQUE idx_email on %s; if this passes, the unique index is not being enforced and the pre-flight is guarding nothing",
 		engineName000047())
 }
@@ -307,9 +307,9 @@ func TestNewDatabase_RefusesAnEmailCaseCollisionAtStartup(t *testing.T) {
 	// deployment upgrading across this release looks like.
 	seed, err := sqlitedb.NewSQLiteDatabase(&sqlitedb.DatabaseConfig{Type: "sqlite", DSN: dsn}, false)
 	require.NoError(t, err, "open the throwaway database")
-	m, err := seed.NewMigrator()
+	m, err := seed.NewMigrator(context.Background())
 	require.NoError(t, err)
-	require.NoError(t, m.Migrate(beforeLowercaseEmails000047), "step the throwaway database to 000046")
+	require.NoError(t, m.Migrate(context.Background(), beforeLowercaseEmails000047), "step the throwaway database to 000046")
 	require.NoError(t, seed.CreateUser(context.Background(), nil, &models.User{
 		Enabled: true, Subject: "00000000-0000-0000-0000-000000047101",
 		Username: "mig47start0", Email: "Startup@example.com", PasswordHash: "not-a-real-hash",
@@ -320,7 +320,7 @@ func TestNewDatabase_RefusesAnEmailCaseCollisionAtStartup(t *testing.T) {
 	}))
 	require.NoError(t, seed.DB.Close(), "close the seeding handle before the server opens its own")
 
-	opened, err := datafactory.NewDatabase(cfg,
+	opened, err := datafactory.NewDatabase(context.Background(), cfg,
 		config.GetAESEncryptionKey(), config.GetAESEncryptionKeyPrevious(), false)
 
 	require.Error(t, err, "startup must refuse a database holding a collision rather than migrate it")
@@ -332,9 +332,9 @@ func TestNewDatabase_RefusesAnEmailCaseCollisionAtStartup(t *testing.T) {
 	check, err := sqlitedb.NewSQLiteDatabase(&sqlitedb.DatabaseConfig{Type: "sqlite", DSN: dsn}, false)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = check.DB.Close() })
-	checkMigrator, err := check.NewMigrator()
+	checkMigrator, err := check.NewMigrator(context.Background())
 	require.NoError(t, err)
-	version, dirty, err := checkMigrator.Version()
+	version, dirty, err := checkMigrator.Version(context.Background())
 	require.NoError(t, err)
 	assert.Equal(t, beforeLowercaseEmails000047, version,
 		"the schema must not have moved, so the operator can fix the rows and start the server again")

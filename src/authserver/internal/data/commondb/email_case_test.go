@@ -1,6 +1,7 @@
 package commondb
 
 import (
+	"context"
 	"database/sql/driver"
 	"errors"
 	"testing"
@@ -39,7 +40,7 @@ func TestScanEmailCase_ReadsEveryRowAsStoredAndAsTheEngineLoweredIt(t *testing.T
 	}}}
 	db := scriptedDB(t, d)
 
-	rows, err := db.ScanEmailCase()
+	rows, err := db.ScanEmailCase(context.Background())
 
 	require.NoError(t, err)
 	require.Len(t, rows, 2)
@@ -61,7 +62,7 @@ func TestScanEmailCase_AnEmptyTableIsNoRowsAndNoError(t *testing.T) {
 	d := &scriptedDriver{rows: []*scriptedRows{{cols: emailCaseColumns}}}
 	db := scriptedDB(t, d)
 
-	rows, err := db.ScanEmailCase()
+	rows, err := db.ScanEmailCase(context.Background())
 
 	require.NoError(t, err)
 	assert.Empty(t, rows)
@@ -76,7 +77,7 @@ func TestScanEmailCase_ReturnsTheQueryFailureRatherThanAnEmptyTable(t *testing.T
 	d := &scriptedDriver{rows: []*scriptedRows{{openErr: errStorage}}}
 	db := scriptedDB(t, d)
 
-	rows, err := db.ScanEmailCase()
+	rows, err := db.ScanEmailCase(context.Background())
 
 	require.Error(t, err)
 	assert.ErrorIs(t, err, errStorage, "the sentinel must stay discoverable through the wrapping")
@@ -95,7 +96,7 @@ func TestScanEmailCase_ReturnsAScanFailureRatherThanSkippingTheRow(t *testing.T)
 	}}}
 	db := scriptedDB(t, d)
 
-	rows, err := db.ScanEmailCase()
+	rows, err := db.ScanEmailCase(context.Background())
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unable to scan a user email")
@@ -118,7 +119,7 @@ func TestScanEmailCase_ReturnsAnIterationFailureRatherThanThePartialRead(t *test
 	}}}
 	db := scriptedDB(t, d)
 
-	rows, err := db.ScanEmailCase()
+	rows, err := db.ScanEmailCase(context.Background())
 
 	require.Error(t, err)
 	assert.ErrorIs(t, err, errStorage)

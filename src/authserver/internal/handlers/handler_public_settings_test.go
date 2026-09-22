@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"github.com/stretchr/testify/mock"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -33,7 +34,7 @@ func TestPublicSettings_Success(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	handler := NewHandlerPublicSettings(database)
 
-	database.On("GetSettingsById", (*sql.Tx)(nil), int64(1)).Return(&models.Settings{
+	database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(&models.Settings{
 		Id:          1,
 		AppName:     "Goiabada Test",
 		UITheme:     "dark",
@@ -79,7 +80,7 @@ func TestPublicSettings_DatabaseError(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	handler := NewHandlerPublicSettings(database)
 
-	database.On("GetSettingsById", (*sql.Tx)(nil), int64(1)).
+	database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).
 		Return(nil, errors.New("database is down")).Once()
 
 	recorder := httptest.NewRecorder()
@@ -99,7 +100,7 @@ func TestPublicSettings_MissingSettingsRowDoesNotPanic(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	handler := NewHandlerPublicSettings(database)
 
-	database.On("GetSettingsById", (*sql.Tx)(nil), int64(1)).Return(nil, nil).Once()
+	database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(nil, nil).Once()
 
 	recorder := httptest.NewRecorder()
 	assert.NotPanics(t, func() {
@@ -135,7 +136,7 @@ func TestPublicSettings_EncodeFailure(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	handler := NewHandlerPublicSettings(database)
 
-	database.On("GetSettingsById", (*sql.Tx)(nil), int64(1)).Return(&models.Settings{
+	database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(&models.Settings{
 		Id: 1, AppName: "Goiabada",
 	}, nil).Once()
 
@@ -208,7 +209,7 @@ func TestPublicSettings_DoesNotLeakSensitiveSettings(t *testing.T) {
 		SMTPPort:               2525,
 	}
 
-	database.On("GetSettingsById", (*sql.Tx)(nil), int64(1)).Return(settings, nil).Once()
+	database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(settings, nil).Once()
 
 	recorder := httptest.NewRecorder()
 	handler.ServeHTTP(recorder, httptest.NewRequest("GET", "/api/public/settings", nil))

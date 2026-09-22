@@ -42,8 +42,8 @@ func TestMigration000021_CountryData(t *testing.T) {
 	// "Unknown column". Force changes the marker without touching the schema, which
 	// is exactly the trick the idempotency check at the end of this test already
 	// used, so 000021's data transformation is still applied to pre-migration data.
-	require.NoError(t, h.Migrator.Up(), "migrate to head")
-	require.NoError(t, h.Migrator.Force(20), "force marker to 000020")
+	require.NoError(t, h.Migrator.Up(context.Background()), "migrate to head")
+	require.NoError(t, h.Migrator.Force(context.Background(), 20), "force marker to 000020")
 
 	fixtures := migration000021Fixtures()
 
@@ -55,13 +55,13 @@ func TestMigration000021_CountryData(t *testing.T) {
 	}
 
 	// Apply 000021.
-	require.NoError(t, h.Migrator.Migrate(21), "apply 000021")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 21), "apply 000021")
 	assertMigration000021(t, h, fixtures, ids, "after first apply")
 
 	// Idempotency / restart-safety: re-run 000021 against already-migrated data.
 	// Force back to 20 (the down is a no-op, so don't execute it) then step up.
-	require.NoError(t, h.Migrator.Force(20), "force to 000020")
-	require.NoError(t, h.Migrator.Migrate(21), "re-apply 000021")
+	require.NoError(t, h.Migrator.Force(context.Background(), 20), "force to 000020")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 21), "re-apply 000021")
 	assertMigration000021(t, h, fixtures, ids, "after re-apply (idempotency)")
 }
 

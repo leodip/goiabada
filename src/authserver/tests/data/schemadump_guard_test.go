@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"context"
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/data/schemadump"
@@ -18,26 +19,26 @@ import (
 //	--run TestSchemaDump_RefusesWhatItCannotRead
 func TestSchemaDump_RefusesWhatItCannotRead(t *testing.T) {
 	h := newIsolatedDB(t)
-	require.NoError(t, h.Migrator.Migrate(35), "migrate to 000035")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 35), "migrate to 000035")
 
 	// An unrecognised dialect. Every switch this package replaced fell through its default
 	// arm to SQLite, so in the generator's four-engine process a misspelling would have read
 	// SQLite's catalog against another engine's connection and reported success.
-	_, err := schemadump.DumpTable(h.SQL, schemadump.Dialect("postgresql"), "refresh_tokens")
+	_, err := schemadump.DumpTable(context.Background(), h.SQL, schemadump.Dialect("postgresql"), "refresh_tokens")
 	assert.ErrorContains(t, err, "unrecognised database dialect",
 		"an unrecognised dialect must be refused, not treated as SQLite")
-	_, err = schemadump.Tables(h.SQL, schemadump.Dialect(""))
+	_, err = schemadump.Tables(context.Background(), h.SQL, schemadump.Dialect(""))
 	assert.ErrorContains(t, err, "unrecognised database dialect",
 		"the zero Dialect selects no engine")
 
 	// A table that does not exist. Every catalog answers with an empty row set rather than
 	// an error, so this is the dumper's own guard and not the driver's.
-	_, err = schemadump.DumpTable(h.SQL, dumpDialect(t), "no_such_table")
+	_, err = schemadump.DumpTable(context.Background(), h.SQL, dumpDialect(t), "no_such_table")
 	assert.ErrorContains(t, err, "read no columns",
 		"a table with no columns is not something any of the four engines can produce")
 
 	// A name the package would have to interpolate into a catalog query.
-	_, err = schemadump.DumpTable(h.SQL, dumpDialect(t), "refresh_tokens; DROP TABLE codes")
+	_, err = schemadump.DumpTable(context.Background(), h.SQL, dumpDialect(t), "refresh_tokens; DROP TABLE codes")
 	assert.ErrorContains(t, err, "not a plain identifier")
 }
 
@@ -58,10 +59,10 @@ func TestSchemaDump_RefusesAnEmptyTableList(t *testing.T) {
 	_, err := h.SQL.Exec("DROP TABLE schema_migrations")
 	require.NoErrorf(t, err, "drop schema_migrations on %s", dbType())
 
-	_, err = schemadump.Tables(h.SQL, dumpDialect(t))
+	_, err = schemadump.Tables(context.Background(), h.SQL, dumpDialect(t))
 	assert.ErrorContains(t, err, "reported no tables at all",
 		"an empty dump compared against an empty golden file reads as no change and passes")
-	_, err = schemadump.Dump(h.SQL, dumpDialect(t))
+	_, err = schemadump.Dump(context.Background(), h.SQL, dumpDialect(t))
 	assert.ErrorContains(t, err, "reported no tables at all",
 		"Dump fails for the same reason Tables does, rather than returning an empty schema")
 }
@@ -112,7 +113,7 @@ func TestSchemaDump_RefusesUnrepresentableConstructs(t *testing.T) {
 			}
 			defer func() { _, _ = h.SQL.Exec("DROP TABLE guard_probe") }()
 
-			_, err := schemadump.DumpTable(h.SQL, d, "guard_probe")
+			_, err := schemadump.DumpTable(context.Background(), h.SQL, d, "guard_probe")
 			require.Errorf(t, err, "%s must be refused on %s, not dropped from the dump", c.construct, dbType())
 			assert.ErrorContains(t, err, c.construct)
 		})

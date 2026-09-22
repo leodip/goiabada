@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -40,7 +41,7 @@ import (
 func TestMigration000037_AuditLogsDetailsDefault(t *testing.T) {
 	h := newIsolatedDB(t)
 
-	require.NoError(t, h.Migrator.Migrate(35), "migrate to 000035")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 35), "migrate to 000035")
 
 	if dbType() != "mysql" {
 		details, err := insertAuditLogWithoutDetails000037(t, h, "already-defaulted")
@@ -55,18 +56,18 @@ func TestMigration000037_AuditLogsDetailsDefault(t *testing.T) {
 		"MySQL's audit_logs.details must carry no default at 000035: that absence is the divergence #282 reports")
 	assertDetailsOmissionCannotYieldEmptyObject000037(t, h, "at 000035", "before-migration")
 
-	require.NoError(t, h.Migrator.Migrate(37), "apply 000037")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 37), "apply 000037")
 
 	assert.NotEmpty(t, dumpTable(t, h, "audit_logs").column(t, "details").Default,
 		"audit_logs.details must carry a default after 000037; its recorded TEXT is deliberately not asserted")
 	assertDetailsOmissionYieldsEmptyObject000037(t, h, "after apply", "after-migration")
 
-	require.NoError(t, h.Migrator.Migrate(35), "roll back 000037")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 35), "roll back 000037")
 	assert.Empty(t, dumpTable(t, h, "audit_logs").column(t, "details").Default,
 		"the default must be gone after rolling back to 000035")
 	assertDetailsOmissionCannotYieldEmptyObject000037(t, h, "after roll back", "after-down")
 
-	require.NoError(t, h.Migrator.Migrate(37), "re-apply 000037")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 37), "re-apply 000037")
 	assertDetailsOmissionYieldsEmptyObject000037(t, h, "after down/up round trip", "after-reapply")
 }
 

@@ -79,10 +79,11 @@ func (w *Worker) Start() {
 
 // Stop signals the worker and waits, up to timeout, for it to finish.
 //
-// The wait is bounded on purpose. data.Database takes no context, so a delete
-// already in flight cannot be interrupted; without a timeout, shutdown would be
-// hostage to however long the current statement takes. Stop is also safe to call
-// more than once, and safe to call on a worker that was never started.
+// Cancelling now reaches the statement itself: every data.Database call this worker makes is
+// issued under the context Start opened, so a sweep already in flight is abandoned rather than
+// waited out (#386). The wait stays bounded anyway, because what the driver does with a
+// cancellation is the driver's to decide and shutdown is not the place to find out. Stop is also
+// safe to call more than once, and safe to call on a worker that was never started.
 func (w *Worker) Stop(timeout time.Duration) {
 	if w.cancel == nil {
 		return
@@ -160,7 +161,7 @@ func (w *Worker) reapBrowserSessions(ctx context.Context) {
 func (w *Worker) runIfClaimed(ctx context.Context) {
 	now := time.Now().UTC()
 
-	claimed, err := w.database.TryClaimCleanupRun(nil, now, now.Add(-cleanupInterval))
+	claimed, err := w.database.TryClaimCleanupRun(ctx, nil, now, now.Add(-cleanupInterval))
 	if err != nil {
 		slog.ErrorContext(ctx, "unable to claim the cleanup run", "error", err)
 		return
@@ -197,9 +198,10 @@ func jitter(max time.Duration) time.Duration {
 // performTask executes the main worker task.
 //
 // Each step logs its own failure and the next one still runs: this is
-// housekeeping, so one failing delete should not block the others. Cancellation
-// is checked between steps, which is the granularity shutdown gets given that the
-// individual database calls cannot be interrupted.
+// housekeeping, so one failing delete should not block the others. Cancellation is checked
+// between steps AND reaches into each of them, since every call below is issued under this
+// context (#386): the check between steps is what stops the next delete from starting, and the
+// context is what abandons the one already running.
 func (w *Worker) performTask(ctx context.Context) {
 	slog.InfoContext(ctx, "worker task started")
 
@@ -227,7 +229,7 @@ func (w *Worker) performTask(ctx context.Context) {
 		return
 	}
 
-	settings, err := w.database.GetSettingsById(nil, 1)
+	settings, err := w.database.GetSettingsById(ctx, nil, 1)
 	if err != nil {
 		slog.ErrorContext(ctx, "unable to read the settings row", "error", err)
 		return
@@ -286,7 +288,7 @@ func (w *Worker) deleteOldAuditLogs(ctx context.Context, retentionDays int) {
 			break
 		}
 
-		deleted, err := w.database.DeleteOldAuditLogs(nil, cutoff, auditLogDeleteBatchSize)
+		deleted, err := w.database.DeleteOldAuditLogs(ctx, nil, cutoff, auditLogDeleteBatchSize)
 		if err != nil {
 			slog.ErrorContext(ctx, "unable to delete old audit logs", "error", err)
 			break

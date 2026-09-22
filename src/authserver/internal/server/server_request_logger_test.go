@@ -2,6 +2,7 @@ package server
 
 import (
 	"database/sql"
+	"github.com/stretchr/testify/mock"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -57,7 +58,7 @@ func newLoggerTestServer(t *testing.T, logHttpRequests bool, handlerRan *bool) *
 	withLogHttpRequests(t, logHttpRequests)
 
 	database := mocks_data.NewDatabase(t)
-	database.On("GetSettingsById", (*sql.Tx)(nil), int64(1)).Return(&models.Settings{Id: 1}, nil)
+	database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(&models.Settings{Id: 1}, nil)
 
 	s := &Server{
 		router:       chi.NewRouter(),

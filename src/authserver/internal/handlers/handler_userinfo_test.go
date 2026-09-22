@@ -230,7 +230,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 
 		database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), sub).Return(user, nil)
 		database.On("UserLoadGroups", mock.Anything, (*sql.Tx)(nil), user).Return(nil)
-		database.On("GroupsLoadAttributes", (*sql.Tx)(nil), user.Groups).Return(nil)
+		database.On("GroupsLoadAttributes", mock.Anything, (*sql.Tx)(nil), user.Groups).Return(nil)
 		database.On("UserLoadAttributes", mock.Anything, (*sql.Tx)(nil), user).Return(nil)
 		database.On("UserHasProfilePicture", mock.Anything, (*sql.Tx)(nil), user.Id).Return(false, nil)
 

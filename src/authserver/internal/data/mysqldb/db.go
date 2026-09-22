@@ -1,6 +1,7 @@
 package mysqldb
 
 import (
+	"context"
 	"database/sql"
 	"embed"
 	"errors"
@@ -48,6 +49,13 @@ func NewMySQLDatabase(dbConfig *DatabaseConfig, logSQL bool) (*MySQLDatabase, er
 	slog.Info("using database", "type", "mysql", "username", dbConfig.Username,
 		"host", dbConfig.Host, "port", dbConfig.Port, "name", dbConfig.Name)
 
+	// The constructor owns this root, because nothing is waiting on it: the process is starting
+	// and there is no request and no operator to cancel. What the context buys here is that the
+	// CREATE DATABASE below goes through the *Context calls like every other statement this
+	// package issues, so the shape has no exception to remember and no exemption to maintain
+	// (#386).
+	ctx := context.Background()
+
 	dsnWithoutDBname := fmt.Sprintf("%v:%v@tcp(%v:%v)/?charset=utf8mb4&parseTime=True&loc=UTC",
 		dbConfig.Username,
 		dbConfig.Password,
@@ -86,7 +94,7 @@ func NewMySQLDatabase(dbConfig *DatabaseConfig, logSQL bool) (*MySQLDatabase, er
 		// client registered as MyApp (#283). Migration 000040 converts an existing database,
 		// its default included, so a fresh install and a migrated one agree.
 		createDatabaseCommand := fmt.Sprintf("CREATE DATABASE IF NOT EXISTS %s CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_as_cs;", quoteIdentifier(dbConfig.Name))
-		_, err = tempDB.Exec(createDatabaseCommand)
+		_, err = tempDB.ExecContext(ctx, createDatabaseCommand)
 		if err != nil {
 			return nil, errs.Wrap(err, "unable to create database")
 		}
@@ -167,8 +175,8 @@ const schemaMigrationsTableDDL = "CREATE TABLE IF NOT EXISTS schema_migrations "
 // ensureSchemaMigrationsTable creates the version table at Goiabada's shape when it is not
 // there yet. MySQL's CREATE TABLE IF NOT EXISTS takes a metadata lock, so two processes
 // starting against one empty database cannot both create it.
-func (d *MySQLDatabase) ensureSchemaMigrationsTable() error {
-	if _, err := d.DB.Exec(schemaMigrationsTableDDL); err != nil {
+func (d *MySQLDatabase) ensureSchemaMigrationsTable(ctx context.Context) error {
+	if _, err := d.DB.ExecContext(ctx, schemaMigrationsTableDDL); err != nil {
 		return errs.Wrap(err, "unable to create the schema_migrations table")
 	}
 	return nil
@@ -180,8 +188,8 @@ func (d *MySQLDatabase) ensureSchemaMigrationsTable() error {
 //
 // There is nothing to close. The runner takes a connection out of the pool for the duration
 // of one operation and gives it back before returning (#268 decision 8).
-func (d *MySQLDatabase) NewMigrator() (*migrator.Migrator, error) {
-	if err := d.ensureSchemaMigrationsTable(); err != nil {
+func (d *MySQLDatabase) NewMigrator(ctx context.Context) (*migrator.Migrator, error) {
+	if err := d.ensureSchemaMigrationsTable(ctx); err != nil {
 		return nil, err
 	}
 
@@ -192,18 +200,18 @@ func (d *MySQLDatabase) NewMigrator() (*migrator.Migrator, error) {
 	return m, nil
 }
 
-func (d *MySQLDatabase) Migrate() error {
-	m, err := d.NewMigrator()
+func (d *MySQLDatabase) Migrate(ctx context.Context) error {
+	m, err := d.NewMigrator(ctx)
 	if err != nil {
 		return err
 	}
 
-	err = m.Up()
+	err = m.Up(ctx)
 	// IsNoChange rather than errors.Is: a run whose unlock failed answers the sentinel JOINED
 	// with that failure, and errors.Is would report this start as successful while the migration
 	// lock stays held against every other process on the database (#268).
 	if migrator.IsNoChange(err) {
-		slog.Info("no need to migrate the database")
+		slog.InfoContext(ctx, "no need to migrate the database")
 		return nil
 	}
 	if err != nil {

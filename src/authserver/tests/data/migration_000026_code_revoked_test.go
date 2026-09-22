@@ -40,13 +40,13 @@ import (
 func TestMigration000026_CodeRevoked(t *testing.T) {
 	h := newIsolatedDB(t)
 
-	require.NoError(t, h.Migrator.Migrate(25), "migrate to 000025")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 25), "migrate to 000025")
 
 	// 1. Absent before the migration.
 	exists, _, _ := codeRevokedShape000026(t, h)
 	assert.False(t, exists, "codes.revoked must not exist at 000025")
 
-	require.NoError(t, h.Migrator.Migrate(26), "apply 000026")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 26), "apply 000026")
 
 	// 2. NOT NULL, defaulting to false.
 	assertCodeRevokedShape000026(t, h, "after apply")
@@ -65,11 +65,11 @@ func TestMigration000026_CodeRevoked(t *testing.T) {
 	// column that version of the schema does not have. Up() keeps this test working as
 	// later migrations arrive; the assertions still run at 000026, which is what the
 	// round trip below restores.
-	require.NoError(t, h.Migrator.Up(), "migrate to head before seeding through the ORM")
+	require.NoError(t, h.Migrator.Up(context.Background()), "migrate to head before seeding through the ORM")
 	codeId := seedCode000026(t, h)
 
-	require.NoError(t, h.Migrator.Migrate(25), "roll back to 000025")
-	require.NoError(t, h.Migrator.Migrate(26), "re-apply 000026")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 25), "roll back to 000025")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 26), "re-apply 000026")
 
 	assert.False(t, readCodeRevoked000026(t, h, codeId),
 		"a codes row that predates the column must land revoked = false")

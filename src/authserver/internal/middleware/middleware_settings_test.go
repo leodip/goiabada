@@ -20,7 +20,7 @@ func TestMiddlewareSettings(t *testing.T) {
 			Id:      1,
 			AppName: "TestApp",
 		}
-		mockDB.On("GetSettingsById", mock.Anything, int64(1)).Return(expectedSettings, nil)
+		mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(expectedSettings, nil)
 
 		middleware := MiddlewareSettings(mockDB)
 
@@ -38,7 +38,7 @@ func TestMiddlewareSettings(t *testing.T) {
 
 	t.Run("Database error", func(t *testing.T) {
 		mockDB := mocks_data.NewDatabase(t)
-		mockDB.On("GetSettingsById", mock.Anything, int64(1)).Return(nil, errors.New("database error"))
+		mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(nil, errors.New("database error"))
 
 		middleware := MiddlewareSettings(mockDB)
 

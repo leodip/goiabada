@@ -31,7 +31,7 @@ func expectUserLoaded(mockDB *mocks_data.Database, user *models.User, times int)
 	mockDB.On("GetUserById", mock.Anything, mock.Anything, user.Id).Return(user, nil).Times(times)
 	mockDB.On("UserLoadPermissions", mock.Anything, mock.Anything, user).Return(nil).Times(times)
 	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(nil).Times(times)
-	mockDB.On("GroupsLoadPermissions", mock.Anything, mock.Anything).Return(nil).Times(times)
+	mockDB.On("GroupsLoadPermissions", mock.Anything, mock.Anything, mock.Anything).Return(nil).Times(times)
 }
 
 func TestUserHasScopePermission_GrantedViaDirectUserPermission(t *testing.T) {
@@ -291,7 +291,7 @@ func TestUserHasScopePermission_DatabaseErrorsPropagate(t *testing.T) {
 				mockDB.On("GetUserById", mock.Anything, mock.Anything, int64(1)).Return(user, nil).Once()
 				mockDB.On("UserLoadPermissions", mock.Anything, mock.Anything, user).Return(nil).Once()
 				mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(nil).Once()
-				mockDB.On("GroupsLoadPermissions", mock.Anything, mock.Anything).Return(dbErr).Once()
+				mockDB.On("GroupsLoadPermissions", mock.Anything, mock.Anything, mock.Anything).Return(dbErr).Once()
 			},
 		},
 		{
@@ -520,7 +520,7 @@ func TestUserHasScopePermission_CarriesTheCallersContextToEveryRead(t *testing.T
 	mockDB.On("GetUserById", callersContext, mock.Anything, user.Id).Return(user, nil).Once()
 	mockDB.On("UserLoadPermissions", callersContext, mock.Anything, user).Return(nil).Once()
 	mockDB.On("UserLoadGroups", callersContext, mock.Anything, user).Return(nil).Once()
-	mockDB.On("GroupsLoadPermissions", mock.Anything, mock.Anything).Return(nil).Once()
+	mockDB.On("GroupsLoadPermissions", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 	mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "backend-svc").
 		Return(&models.Resource{Id: 10, ResourceIdentifier: "backend-svc"}, nil).Once()
 	mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(10)).
@@ -550,7 +550,7 @@ func TestFilterOutScopesWhereUserIsNotAuthorized_CarriesTheCallersContextAndSkip
 	mockDB.On("GetUserById", callersContext, mock.Anything, user.Id).Return(user, nil).Once()
 	mockDB.On("UserLoadPermissions", callersContext, mock.Anything, user).Return(nil).Once()
 	mockDB.On("UserLoadGroups", callersContext, mock.Anything, user).Return(nil).Once()
-	mockDB.On("GroupsLoadPermissions", mock.Anything, mock.Anything).Return(nil).Once()
+	mockDB.On("GroupsLoadPermissions", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 	mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "backend-svc").
 		Return(&models.Resource{Id: 10, ResourceIdentifier: "backend-svc"}, nil).Once()
 	mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(10)).

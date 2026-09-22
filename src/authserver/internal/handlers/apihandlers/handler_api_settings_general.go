@@ -138,7 +138,7 @@ func HandleAPISettingsGeneralPut(
 		currentSettings.ImplicitFlowEnabled = req.ImplicitFlowEnabled
 		currentSettings.ResourceOwnerPasswordCredentialsEnabled = req.ResourceOwnerPasswordCredentialsEnabled
 
-		if err := database.UpdateSettings(nil, currentSettings); err != nil {
+		if err := database.UpdateSettings(r.Context(), nil, currentSettings); err != nil {
 			writeInternalServerError(w, r, err)
 			return
 		}

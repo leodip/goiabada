@@ -57,8 +57,8 @@ func (m *Migrator) Engine() string { return m.eng.name }
 // Version answers the version recorded in schema_migrations and whether it is dirty. A database
 // with no row answers ErrNilVersion, which is what a caller distinguishing "never migrated" from
 // "at version 0" tests for.
-func (m *Migrator) Version() (version int, dirty bool, err error) {
-	err = m.withConn(func(ctx context.Context, conn *sql.Conn) error {
+func (m *Migrator) Version(ctx context.Context) (version int, dirty bool, err error) {
+	err = m.withConn(ctx, func(ctx context.Context, conn *sql.Conn) error {
 		v, d, err := m.readVersion(ctx, conn)
 		if err != nil {
 			return err
@@ -82,8 +82,8 @@ func (m *Migrator) Version() (version int, dirty bool, err error) {
 // not carry. That is what stops an older binary migrating a database a newer release already
 // migrated: the recorded version is simply not among its files, and running its own chain from
 // there would apply migrations that have already been applied.
-func (m *Migrator) Up() error {
-	return m.run(func(ctx context.Context, conn *sql.Conn) error {
+func (m *Migrator) Up(ctx context.Context) error {
+	return m.run(ctx, func(ctx context.Context, conn *sql.Conn) error {
 		current, err := m.currentVersion(ctx, conn)
 		if err != nil {
 			return err
@@ -99,8 +99,8 @@ func (m *Migrator) Up() error {
 // Migrate steps the schema to target in whichever direction that is, one migration at a time.
 // Pass NilVersion to step all the way down to an unmigrated database. It answers ErrNoChange when
 // the database is already there.
-func (m *Migrator) Migrate(target int) error {
-	return m.run(func(ctx context.Context, conn *sql.Conn) error {
+func (m *Migrator) Migrate(ctx context.Context, target int) error {
+	return m.run(ctx, func(ctx context.Context, conn *sql.Conn) error {
 		current, err := m.currentVersion(ctx, conn)
 		if err != nil {
 			return err
@@ -119,8 +119,8 @@ func (m *Migrator) Migrate(target int) error {
 // Force records a version and clears the dirty flag without running anything. It is the manual
 // repair after an interrupted migration, and the tests use it to place a database at a version so
 // one migration can be exercised on its own.
-func (m *Migrator) Force(version int) error {
-	return m.run(func(ctx context.Context, conn *sql.Conn) error {
+func (m *Migrator) Force(ctx context.Context, version int) error {
+	return m.run(ctx, func(ctx context.Context, conn *sql.Conn) error {
 		return m.setVersion(ctx, conn, version, false)
 	})
 }
@@ -129,9 +129,9 @@ func (m *Migrator) Force(version int) error {
 // would run them, and runs nothing. Going up those are the .up.sql files being applied; going
 // down they are the .down.sql files being rolled back, so the list reads highest first. It is
 // what an operator is shown before a step down, and it answers the same refusals Migrate would.
-func (m *Migrator) Plan(target int) ([]int, error) {
+func (m *Migrator) Plan(ctx context.Context, target int) ([]int, error) {
 	var versions []int
-	err := m.withConn(func(ctx context.Context, conn *sql.Conn) error {
+	err := m.withConn(ctx, func(ctx context.Context, conn *sql.Conn) error {
 		current, err := m.currentVersion(ctx, conn)
 		if err != nil {
 			return err
@@ -162,8 +162,12 @@ func (m *Migrator) Plan(target int) ([]int, error) {
 // withConn takes one connection from the pool, runs fn on it, and gives it back before returning.
 // Every version read, every bookkeeping write and every migration file in one operation goes
 // through that single connection, which is what makes a session-scoped lock cover them.
-func (m *Migrator) withConn(fn func(ctx context.Context, conn *sql.Conn) error) (err error) {
-	ctx := context.Background()
+//
+// The context is the caller's. It used to be a context.Background() opened here, which made every
+// driver call in this package uncancellable however the operation was started: an operator who
+// interrupted `goiabada-authserver migrate` and a start that gave up both waited for the engine
+// regardless. Whoever owns the operation owns its lifetime (#386).
+func (m *Migrator) withConn(ctx context.Context, fn func(ctx context.Context, conn *sql.Conn) error) (err error) {
 	conn, err := m.db.Conn(ctx)
 	if err != nil {
 		return errs.Errorf("unable to take a connection for the migration: %w", err)
@@ -190,8 +194,8 @@ func (m *Migrator) withConn(fn func(ctx context.Context, conn *sql.Conn) error) 
 // driver.ErrBadConn so database/sql discards it, rather than lending the next borrower a
 // connection that holds a migration lock for the rest of the process's life. Returning it is
 // exactly the leak this package exists to end, in the one case where it is invisible.
-func (m *Migrator) run(fn func(ctx context.Context, conn *sql.Conn) error) error {
-	return m.withConn(func(ctx context.Context, conn *sql.Conn) (err error) {
+func (m *Migrator) run(ctx context.Context, fn func(ctx context.Context, conn *sql.Conn) error) error {
+	return m.withConn(ctx, func(ctx context.Context, conn *sql.Conn) (err error) {
 		if m.eng.lock == nil {
 			// SQLite: no session-scoped lock statement exists, so the exclusion is in-process.
 			sqliteMigrationMu.Lock()

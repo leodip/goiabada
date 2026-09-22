@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -45,14 +46,14 @@ func TestMigrationChain_EveryDownRestoresTheCatalog(t *testing.T) {
 	// (postgres has no 000002, three engines have no 000015, and 000036 to 000043 are each on
 	// one or two engines) come from the source rather than from a list written down here that
 	// the next migration would make wrong.
-	versions, err := h.Migrator.Plan(h.Migrator.Head())
+	versions, err := h.Migrator.Plan(context.Background(), h.Migrator.Head())
 	require.NoErrorf(t, err, "plan the whole chain on %s", dbType())
 	require.NotEmptyf(t, versions, "%s carries no migrations at all", dbType())
 
 	// Up, recording the catalog at every version.
 	recorded := make(map[int]string, len(versions))
 	for _, v := range versions {
-		require.NoErrorf(t, h.Migrator.Migrate(v), "apply %06d on %s", v, dbType())
+		require.NoErrorf(t, h.Migrator.Migrate(context.Background(), v), "apply %06d on %s", v, dbType())
 		recorded[v] = encodeCatalogAt(t, h, v, "on the way up")
 	}
 	require.Equalf(t, h.Migrator.Head(), versions[len(versions)-1],
@@ -68,7 +69,7 @@ func TestMigrationChain_EveryDownRestoresTheCatalog(t *testing.T) {
 		if i > 0 {
 			target = versions[i-1]
 		}
-		require.NoErrorf(t, h.Migrator.Migrate(target),
+		require.NoErrorf(t, h.Migrator.Migrate(context.Background(), target),
 			"roll back %06d on %s. A down that will not run is a rollback an operator cannot perform",
 			versions[i], dbType())
 
@@ -85,7 +86,7 @@ func TestMigrationChain_EveryDownRestoresTheCatalog(t *testing.T) {
 	// catalog comparison cannot see but the next up can: a row a data migration re-inserts, or
 	// a column an ALTER refuses to add twice.
 	for _, v := range versions {
-		require.NoErrorf(t, h.Migrator.Migrate(v), "re-apply %06d on %s after the full rollback", v, dbType())
+		require.NoErrorf(t, h.Migrator.Migrate(context.Background(), v), "re-apply %06d on %s after the full rollback", v, dbType())
 		mismatches.compare(t, recorded[v], encodeCatalogAt(t, h, v, "on the second way up"),
 			v, fmt.Sprintf("re-applying %06d after a full rollback built a different catalog from the first time", v))
 	}
@@ -100,7 +101,7 @@ func TestMigrationChain_EveryDownRestoresTheCatalog(t *testing.T) {
 func encodeCatalogAt(t *testing.T, h *isolatedDB, want int, when string) string {
 	t.Helper()
 
-	migrated, err := schemadump.MigratedVersion(h.SQL, dumpDialect(t))
+	migrated, err := schemadump.MigratedVersion(context.Background(), h.SQL, dumpDialect(t))
 	require.NoErrorf(t, err, "read the recorded version %s at %06d on %s", when, want, dbType())
 
 	encoded, err := schemadump.Encode(schemadump.Golden{

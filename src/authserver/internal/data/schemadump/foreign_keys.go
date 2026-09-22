@@ -1,6 +1,7 @@
 package schemadump
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 
@@ -8,7 +9,7 @@ import (
 )
 
 // dumpForeignKeys reads one table's foreign keys as the tuple ForeignKeyShape documents.
-func dumpForeignKeys(db *sql.DB, d Dialect, table string) ([]ForeignKeyShape, error) {
+func dumpForeignKeys(ctx context.Context, db *sql.DB, d Dialect, table string) ([]ForeignKeyShape, error) {
 	var q string
 	switch d {
 	case MySQL:
@@ -53,7 +54,7 @@ func dumpForeignKeys(db *sql.DB, d Dialect, table string) ([]ForeignKeyShape, er
 			FROM pragma_foreign_key_list('%s')`, table)
 	}
 
-	rows, err := db.Query(q)
+	rows, err := db.QueryContext(ctx, q)
 	if err != nil {
 		return nil, errs.Errorf("schemadump: foreign key catalog lookup on %s.%s: %w", d, table, err)
 	}

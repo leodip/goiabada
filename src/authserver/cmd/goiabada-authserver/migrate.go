@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -52,6 +53,11 @@ const (
 // database behind this binary a lie, since the read would happen after the migration it was meant
 // to report on.
 func migrateCommand(args []string) int {
+	// The subcommand owns this root: it is a one-shot process with no request above it, and
+	// nothing else is waiting on the migration it runs. It exists so that every driver call
+	// below takes a context rather than opening one where it lands (#386).
+	ctx := context.Background()
+
 	database, err := datafactory.OpenDatabase(config.GetDatabase(), false)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "unable to open the database: %+v\n", err)
@@ -65,13 +71,13 @@ func migrateCommand(args []string) int {
 		return migrateExitError
 	}
 
-	m, err := provider.NewMigrator()
+	m, err := provider.NewMigrator(ctx)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "unable to prepare the migration runner: %+v\n", err)
 		return migrateExitError
 	}
 
-	return runMigrate(args, database, m, rollbackFloor, os.Stdout)
+	return runMigrate(ctx, args, database, m, rollbackFloor, os.Stdout)
 }
 
 // runMigrate is the whole of the `migrate` subcommand: the arguments that followed the word
@@ -87,7 +93,7 @@ func migrateCommand(args []string) int {
 // database above the floor and step it down. On a release where the floor is the head, which is
 // this one, no downward step is reachable through the constant at all, and the direction the
 // command exists for would go untested.
-func runMigrate(args []string, database data.Database, m *migrator.Migrator, floor int, out io.Writer) int {
+func runMigrate(ctx context.Context, args []string, database data.Database, m *migrator.Migrator, floor int, out io.Writer) int {
 	if len(args) == 0 {
 		outf(out, "%s\n", migrateUsage)
 		return migrateExitUsage
@@ -99,7 +105,7 @@ func runMigrate(args []string, database data.Database, m *migrator.Migrator, flo
 			outf(out, "migrate version takes no arguments\n\n%s\n", migrateUsage)
 			return migrateExitUsage
 		}
-		return migrateVersion(m, out)
+		return migrateVersion(ctx, m, out)
 	case "to":
 		if len(args) != 2 {
 			outf(out, "migrate to takes exactly one version\n\n%s\n", migrateUsage)
@@ -110,7 +116,7 @@ func runMigrate(args []string, database data.Database, m *migrator.Migrator, flo
 			outf(out, "%s\n\n%s\n", err, migrateUsage)
 			return migrateExitUsage
 		}
-		return migrateTo(database, m, target, floor, out)
+		return migrateTo(ctx, database, m, target, floor, out)
 	default:
 		outf(out, "unknown migrate subcommand %q\n\n%s\n", args[0], migrateUsage)
 		return migrateExitUsage
@@ -136,11 +142,11 @@ func parseTargetVersion(arg string) (int, error) {
 // migrateVersion reports both halves of the question an operator has before a rollback: what this
 // binary carries and what the database is actually at. It reads and never writes, so it answers on
 // a dirty database too, where it is the first thing to run.
-func migrateVersion(m *migrator.Migrator, out io.Writer) int {
+func migrateVersion(ctx context.Context, m *migrator.Migrator, out io.Writer) int {
 	outf(out, "engine: %s\n", m.Engine())
 	outf(out, "this binary expects schema version %06d\n", m.Head())
 
-	version, dirty, err := m.Version()
+	version, dirty, err := m.Version(ctx)
 	switch {
 	case migrator.IsNilVersion(err):
 		outf(out, "the database records no version: it has never been migrated\n")
@@ -164,7 +170,7 @@ func migrateVersion(m *migrator.Migrator, out io.Writer) int {
 // which is a fact about the data rather than about the schema (#351). Everything else is printed
 // as the runner phrased it, because ErrDirty and ErrUnknownVersion already carry the facts an
 // operator needs (decision 7 of #268).
-func migrateTo(database data.Database, m *migrator.Migrator, target int, floor int, out io.Writer) int {
+func migrateTo(ctx context.Context, database data.Database, m *migrator.Migrator, target int, floor int, out io.Writer) int {
 	if target < floor {
 		// Neutral about direction on purpose: the floor refuses any target below it, and a
 		// database still at an old version can ask for one on the way UP as easily as down.
@@ -183,7 +189,7 @@ func migrateTo(database data.Database, m *migrator.Migrator, target int, floor i
 
 	// Plan runs nothing and answers every refusal Migrate would, so a dirty database or an
 	// unknown version is reported before anything is written rather than half way up the chain.
-	plan, err := m.Plan(target)
+	plan, err := m.Plan(ctx, target)
 	// IsNoChange rather than errors.Is, here and below: the runner joins a failed unlock onto
 	// whatever the operation returned, so errors.Is would print "nothing to do" and exit 0 on a
 	// database whose migration lock is still held (#268).
@@ -196,7 +202,7 @@ func migrateTo(database data.Database, m *migrator.Migrator, target int, floor i
 		return migrateExitError
 	}
 
-	current, _, versionErr := m.Version()
+	current, _, versionErr := m.Version(ctx)
 	if migrator.IsNilVersion(versionErr) {
 		outf(out, "current schema version: none (never migrated)\n")
 	} else if versionErr == nil {
@@ -223,12 +229,12 @@ func migrateTo(database data.Database, m *migrator.Migrator, target int, floor i
 		return migrateExitError
 	}
 
-	if err := datafactory.CheckEmailCaseBeforeMigrating(database, current, target); err != nil {
+	if err := datafactory.CheckEmailCaseBeforeMigrating(ctx, database, current, target); err != nil {
 		outf(out, "%+v\n", err)
 		return migrateExitError
 	}
 
-	if err := m.Migrate(target); err != nil {
+	if err := m.Migrate(ctx, target); err != nil {
 		if migrator.IsNoChange(err) {
 			outf(out, "the database is already at schema version %06d; nothing to do\n", target)
 			return migrateExitOK

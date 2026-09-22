@@ -1718,12 +1718,12 @@ func advanceOtpConfigGeneration(t *testing.T, userId int64) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = database.RollbackTransaction(tx) }()
+	defer func() { _ = database.RollbackTransaction(context.Background(), tx) }()
 
 	if _, err := database.IncrementUserOtpConfigGeneration(context.Background(), tx, userId); err != nil {
 		t.Fatal(err)
 	}
-	if err := database.CommitTransaction(tx); err != nil {
+	if err := database.CommitTransaction(context.Background(), tx); err != nil {
 		t.Fatal(err)
 	}
 }

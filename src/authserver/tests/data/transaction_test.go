@@ -47,11 +47,11 @@ func TestTransaction_CommitPersists(t *testing.T) {
 	tx := beginTx(t)
 	group := newTestGroup()
 
-	require.NoError(t, database.CreateGroup(tx, group), "CreateGroup in a transaction")
+	require.NoError(t, database.CreateGroup(context.Background(), tx, group), "CreateGroup in a transaction")
 	require.NotZero(t, group.Id, "expected an id to be assigned inside the transaction")
-	require.NoError(t, database.CommitTransaction(tx), "CommitTransaction")
+	require.NoError(t, database.CommitTransaction(context.Background(), tx), "CommitTransaction")
 
-	committed, err := database.GetGroupById(nil, group.Id)
+	committed, err := database.GetGroupById(context.Background(), nil, group.Id)
 	require.NoError(t, err, "GetGroupById after commit")
 	require.NotNil(t, committed, "a committed row must be visible outside the transaction")
 	assert.Equal(t, group.GroupIdentifier, committed.GroupIdentifier)
@@ -65,11 +65,11 @@ func TestTransaction_RollbackDiscards(t *testing.T) {
 	tx := beginTx(t)
 	group := newTestGroup()
 
-	require.NoError(t, database.CreateGroup(tx, group), "CreateGroup in a transaction")
+	require.NoError(t, database.CreateGroup(context.Background(), tx, group), "CreateGroup in a transaction")
 	require.NotZero(t, group.Id, "expected an id to be assigned inside the transaction")
-	require.NoError(t, database.RollbackTransaction(tx), "RollbackTransaction")
+	require.NoError(t, database.RollbackTransaction(context.Background(), tx), "RollbackTransaction")
 
-	rolledBack, err := database.GetGroupById(nil, group.Id)
+	rolledBack, err := database.GetGroupById(context.Background(), nil, group.Id)
 	require.NoError(t, err, "GetGroupById after rollback")
 	assert.Nil(t, rolledBack, "a rolled-back row must not exist")
 }
@@ -80,19 +80,19 @@ func TestTransaction_ReadYourWritesInsideTransaction(t *testing.T) {
 	tx := beginTx(t)
 	group := newTestGroup()
 
-	require.NoError(t, database.CreateGroup(tx, group), "CreateGroup in a transaction")
+	require.NoError(t, database.CreateGroup(context.Background(), tx, group), "CreateGroup in a transaction")
 
-	found, err := database.GetGroupById(tx, group.Id)
+	found, err := database.GetGroupById(context.Background(), tx, group.Id)
 	require.NoError(t, err, "GetGroupById through the same transaction")
 	require.NotNil(t, found, "the transaction must see its own uncommitted write")
 	assert.Equal(t, group.GroupIdentifier, found.GroupIdentifier)
 
 	// Also through a query that filters on a column rather than the primary key.
-	byIdentifier, err := database.GetGroupByGroupIdentifier(tx, group.GroupIdentifier)
+	byIdentifier, err := database.GetGroupByGroupIdentifier(context.Background(), tx, group.GroupIdentifier)
 	require.NoError(t, err, "GetGroupByGroupIdentifier through the same transaction")
 	assert.NotNil(t, byIdentifier, "the transaction must see its own uncommitted write")
 
-	require.NoError(t, database.RollbackTransaction(tx), "RollbackTransaction")
+	require.NoError(t, database.RollbackTransaction(context.Background(), tx), "RollbackTransaction")
 }
 
 // Isolation: an uncommitted write is not visible to a reader outside the
@@ -112,14 +112,14 @@ func TestTransaction_UncommittedWriteIsNotVisibleOutside(t *testing.T) {
 	tx := beginTx(t)
 	group := newTestGroup()
 
-	require.NoError(t, database.CreateGroup(tx, group), "CreateGroup in a transaction")
+	require.NoError(t, database.CreateGroup(context.Background(), tx, group), "CreateGroup in a transaction")
 	require.NotZero(t, group.Id, "expected an id to be assigned inside the transaction")
 
-	outside, err := database.GetGroupById(nil, group.Id)
+	outside, err := database.GetGroupById(context.Background(), nil, group.Id)
 	require.NoError(t, err, "GetGroupById outside the transaction")
 	assert.Nil(t, outside, "an uncommitted row must not be visible outside its transaction")
 
-	require.NoError(t, database.RollbackTransaction(tx), "RollbackTransaction")
+	require.NoError(t, database.RollbackTransaction(context.Background(), tx), "RollbackTransaction")
 }
 
 // DeleteUser issues two statements (it clears refresh tokens before deleting the
@@ -140,7 +140,7 @@ func TestTransaction_RollbackUndoesMultiStatementDelete(t *testing.T) {
 	require.NoError(t, err, "GetUserById through the transaction")
 	require.Nil(t, deletedInTx, "the transaction must see its own delete")
 
-	require.NoError(t, database.RollbackTransaction(tx), "RollbackTransaction")
+	require.NoError(t, database.RollbackTransaction(context.Background(), tx), "RollbackTransaction")
 
 	restoredUser, err := database.GetUserById(context.Background(), nil, user.Id)
 	require.NoError(t, err, "GetUserById after rollback")
@@ -161,7 +161,7 @@ func TestTransaction_CommitAppliesMultiStatementDelete(t *testing.T) {
 
 	tx := beginTx(t)
 	require.NoError(t, database.DeleteUser(context.Background(), tx, user.Id), "DeleteUser in a transaction")
-	require.NoError(t, database.CommitTransaction(tx), "CommitTransaction")
+	require.NoError(t, database.CommitTransaction(context.Background(), tx), "CommitTransaction")
 
 	deletedUser, err := database.GetUserById(context.Background(), nil, user.Id)
 	require.NoError(t, err, "GetUserById after commit")

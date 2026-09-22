@@ -204,7 +204,7 @@ func TestDatabaseBackend_Update(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, want, expiresAt)
 		database.AssertNotCalled(t, "GetBrowserSessionByOwnerAndSessionIdHash", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
-		database.AssertNotCalled(t, "GetSettingsById", mock.Anything, mock.Anything)
+		database.AssertNotCalled(t, "GetSettingsById", mock.Anything, mock.Anything, mock.Anything)
 	})
 
 	t.Run("write failure wraps its cause", func(t *testing.T) {
@@ -285,7 +285,7 @@ func TestDatabaseBackend_Touch(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, want, expiresAt)
 		database.AssertNotCalled(t, "GetBrowserSessionByOwnerAndSessionIdHash", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
-		database.AssertNotCalled(t, "GetSettingsById", mock.Anything, mock.Anything)
+		database.AssertNotCalled(t, "GetSettingsById", mock.Anything, mock.Anything, mock.Anything)
 	})
 
 	t.Run("write failure wraps its cause", func(t *testing.T) {
@@ -355,12 +355,12 @@ func TestDatabaseBackend_Lifetimes(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, 2*time.Hour, idle)
 		assert.Equal(t, 90*time.Minute, maximum)
-		database.AssertNotCalled(t, "GetSettingsById", mock.Anything, mock.Anything)
+		database.AssertNotCalled(t, "GetSettingsById", mock.Anything, mock.Anything, mock.Anything)
 	})
 
 	t.Run("reads settings without a request value", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
-		database.EXPECT().GetSettingsById((*sql.Tx)(nil), int64(1)).Return(testSettings(), nil)
+		database.EXPECT().GetSettingsById(mock.Anything, (*sql.Tx)(nil), int64(1)).Return(testSettings(), nil)
 
 		idle, maximum, err := testBackend(database, "owner").lifetimes(context.Background())
 
@@ -371,7 +371,7 @@ func TestDatabaseBackend_Lifetimes(t *testing.T) {
 
 	t.Run("missing settings is an error", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
-		database.EXPECT().GetSettingsById((*sql.Tx)(nil), int64(1)).Return(nil, nil)
+		database.EXPECT().GetSettingsById(mock.Anything, (*sql.Tx)(nil), int64(1)).Return(nil, nil)
 
 		_, _, err := testBackend(database, "owner").lifetimes(context.Background())
 
@@ -382,7 +382,7 @@ func TestDatabaseBackend_Lifetimes(t *testing.T) {
 	t.Run("failed settings read wraps", func(t *testing.T) {
 		cause := errors.New("settings failed")
 		database := mocks_data.NewDatabase(t)
-		database.EXPECT().GetSettingsById((*sql.Tx)(nil), int64(1)).Return(nil, cause)
+		database.EXPECT().GetSettingsById(mock.Anything, (*sql.Tx)(nil), int64(1)).Return(nil, cause)
 
 		_, _, err := testBackend(database, "owner").lifetimes(context.Background())
 

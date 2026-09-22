@@ -1,6 +1,7 @@
 package datafactory
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"strings"
@@ -51,7 +52,7 @@ const LowercaseEmailsVersion = 47
 // still serving traffic can insert the lowercase twin of a legacy address between this read and
 // 000047's UPDATE. #351 decision 18 answered that with downtime and a release note rather than
 // machinery, so an upgrade across 000047 wants traffic stopped first.
-func CheckEmailCaseBeforeMigrating(database data.Database, recorded int, target int) error {
+func CheckEmailCaseBeforeMigrating(ctx context.Context, database data.Database, recorded int, target int) error {
 	if recorded == migrator.NilVersion || recorded >= LowercaseEmailsVersion {
 		return nil
 	}
@@ -59,7 +60,7 @@ func CheckEmailCaseBeforeMigrating(database data.Database, recorded int, target 
 		return nil
 	}
 
-	rows, err := database.ScanEmailCase()
+	rows, err := database.ScanEmailCase(ctx)
 	if err != nil {
 		return errs.Wrap(err, "unable to read stored email addresses before migrating")
 	}
@@ -171,18 +172,18 @@ func describeEmailCaseHazards(collisions [][]models.EmailCaseRow, unreachable []
 // implements NewMigrator, so the only way to land here is a new engine that did not, which
 // database.Migrate() is about to fail on anyway with a message about migrating rather than about
 // email addresses.
-func preflightEmailCase(database data.Database) error {
+func preflightEmailCase(ctx context.Context, database data.Database) error {
 	provider, ok := database.(MigratorProvider)
 	if !ok {
 		return nil
 	}
 
-	m, err := provider.NewMigrator()
+	m, err := provider.NewMigrator(ctx)
 	if err != nil {
 		return errs.Wrap(err, "unable to prepare the migration runner for the email case pre-flight")
 	}
 
-	recorded, _, err := m.Version()
+	recorded, _, err := m.Version(ctx)
 	if migrator.IsNilVersion(err) {
 		recorded = migrator.NilVersion
 	} else if err != nil {
@@ -192,5 +193,5 @@ func preflightEmailCase(database data.Database) error {
 	}
 
 	// NewDatabase always migrates to head, so head is the target.
-	return CheckEmailCaseBeforeMigrating(database, recorded, m.Head())
+	return CheckEmailCaseBeforeMigrating(ctx, database, recorded, m.Head())
 }

@@ -60,7 +60,7 @@ func TestMigration000048_DropOtpSecret(t *testing.T) {
 	//
 	// Migrating up is also enough to seed through the ORM. models.User carries no OTPSecret field
 	// since #98, and every column it does carry exists at 000047.
-	require.NoErrorf(t, h.Migrator.Migrate(beforeDropOtpSecret000048),
+	require.NoErrorf(t, h.Migrator.Migrate(context.Background(), beforeDropOtpSecret000048),
 		"migrate an empty database up to 000047 on %s", dbType())
 
 	// 3, first half: the shape 000047 leaves the column in, which is what a roll back has to
@@ -85,7 +85,7 @@ func TestMigration000048_DropOtpSecret(t *testing.T) {
 	}
 	require.NoErrorf(t, h.DB.CreateUser(context.Background(), nil, user), "seed a user at 000047 on %s", dbType())
 
-	require.NoErrorf(t, h.Migrator.Migrate(dropOtpSecret000048), "apply 000048 on %s", dbType())
+	require.NoErrorf(t, h.Migrator.Migrate(context.Background(), dropOtpSecret000048), "apply 000048 on %s", dbType())
 
 	// 1. Gone from the catalog.
 	afterDrop := schemadump.TableShape(dumpTable(t, h, "users"))
@@ -116,7 +116,7 @@ func TestMigration000048_DropOtpSecret(t *testing.T) {
 
 	// 3, second half. The down statement restores the shape, verbatim, and nothing else about the
 	// table moves.
-	require.NoErrorf(t, h.Migrator.Migrate(beforeDropOtpSecret000048), "roll back 000048 on %s", dbType())
+	require.NoErrorf(t, h.Migrator.Migrate(context.Background(), beforeDropOtpSecret000048), "roll back 000048 on %s", dbType())
 
 	restored, ok := schemadump.TableShape(dumpTable(t, h, "users")).Column("otp_secret")
 	require.Truef(t, ok, "000048's down must re-add users.otp_secret on %s", dbType())
@@ -143,7 +143,7 @@ func TestMigration000048_DropOtpSecret(t *testing.T) {
 		"a down migration that restores a shape must not disturb the column that actually carries the seed")
 
 	// And forward again, which is what an operator who rolled back and retried does.
-	require.NoErrorf(t, h.Migrator.Migrate(dropOtpSecret000048), "re-apply 000048 on %s", dbType())
+	require.NoErrorf(t, h.Migrator.Migrate(context.Background(), dropOtpSecret000048), "re-apply 000048 on %s", dbType())
 	_, thereAgain := schemadump.TableShape(dumpTable(t, h, "users")).Column("otp_secret")
 	assert.Falsef(t, thereAgain, "000048 must be re-appliable after a down/up round trip on %s", dbType())
 }

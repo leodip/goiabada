@@ -964,7 +964,7 @@ func TestAcquireUserSessionRow(t *testing.T) {
 	if !live {
 		t.Fatal("expected a live session to report true")
 	}
-	if err := database.CommitTransaction(tx); err != nil {
+	if err := database.CommitTransaction(context.Background(), tx); err != nil {
 		t.Fatalf("CommitTransaction: %v", err)
 	}
 
@@ -998,7 +998,7 @@ func TestAcquireUserSessionRow(t *testing.T) {
 	if live {
 		t.Error("expected a deleted session to report false")
 	}
-	if err := database.RollbackTransaction(gone); err != nil {
+	if err := database.RollbackTransaction(context.Background(), gone); err != nil {
 		t.Fatalf("RollbackTransaction: %v", err)
 	}
 }
@@ -1059,7 +1059,7 @@ func TestAcquireUserSessionRow_TransactionAndFailurePath(t *testing.T) {
 	if !live {
 		t.Fatal("expected a live session to report true inside the transaction")
 	}
-	if err := database.RollbackTransaction(tx); err != nil {
+	if err := database.RollbackTransaction(context.Background(), tx); err != nil {
 		t.Fatalf("RollbackTransaction: %v", err)
 	}
 
@@ -1187,7 +1187,7 @@ func TestGetUserSessionsByClientIdPaginated_EnlistsInTheCallersTransaction(t *te
 			"the count query ran outside the caller's transaction (#413)", total)
 	}
 
-	if err := database.RollbackTransaction(tx); err != nil {
+	if err := database.RollbackTransaction(context.Background(), tx); err != nil {
 		t.Fatalf("RollbackTransaction: %v", err)
 	}
 }

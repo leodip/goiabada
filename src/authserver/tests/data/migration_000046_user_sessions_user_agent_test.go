@@ -42,12 +42,12 @@ import (
 func TestMigration000046_UserSessionsUserAgent(t *testing.T) {
 	h := newIsolatedDB(t)
 
-	require.NoError(t, h.Migrator.Migrate(45), "migrate to 000045")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 45), "migrate to 000045")
 
 	_, exists := columnNames000046(dumpTable(t, h, "user_sessions"))["user_agent"]
 	require.False(t, exists, "user_sessions.user_agent must not exist at 000045 on any engine")
 
-	require.NoError(t, h.Migrator.Migrate(46), "apply 000046")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 46), "apply 000046")
 	assertUserAgentColumn000046(t, h, "after apply")
 
 	// Decision 7's legacy row, seeded exactly as a pre-upgrade row arrives: a session written by
@@ -70,11 +70,11 @@ func TestMigration000046_UserSessionsUserAgent(t *testing.T) {
 	require.Equal(t, 128, utf8.RuneCountInString(fourByteRunes), "512 bytes of 4-byte runes is 128 runes")
 	assertUserAgentRoundTrip000046(t, h, userId, "512 bytes of 4-byte runes", fourByteRunes)
 
-	require.NoError(t, h.Migrator.Migrate(45), "roll back 000046")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 45), "roll back 000046")
 	_, exists = columnNames000046(dumpTable(t, h, "user_sessions"))["user_agent"]
 	assert.False(t, exists, "user_sessions.user_agent must be gone after rolling back 000046")
 
-	require.NoError(t, h.Migrator.Migrate(46), "re-apply 000046")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 46), "re-apply 000046")
 	assertUserAgentColumn000046(t, h, "after down/up round trip")
 
 	// The default survives the round trip, which on SQL Server is the named constraint working: an

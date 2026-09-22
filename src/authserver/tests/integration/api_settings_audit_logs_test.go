@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -24,7 +25,7 @@ const settingsAuditLogsURL = "/api/v1/admin/settings/audit-logs"
 func restoreAuditLogSettings(t *testing.T) {
 	t.Helper()
 
-	settings, err := database.GetSettingsById(nil, 1)
+	settings, err := database.GetSettingsById(context.Background(), nil, 1)
 	assert.NoError(t, err)
 	assert.NotNil(t, settings)
 
@@ -33,21 +34,21 @@ func restoreAuditLogSettings(t *testing.T) {
 	retention := settings.AuditLogRetentionDays
 
 	t.Cleanup(func() {
-		current, err := database.GetSettingsById(nil, 1)
+		current, err := database.GetSettingsById(context.Background(), nil, 1)
 		if err != nil || current == nil {
 			return
 		}
 		current.AuditLogsInConsoleEnabled = console
 		current.AuditLogsInDatabaseEnabled = db
 		current.AuditLogRetentionDays = retention
-		_ = database.UpdateSettings(nil, current)
+		_ = database.UpdateSettings(context.Background(), nil, current)
 	})
 }
 
 func TestAPISettingsAuditLogsGet_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
-	settings, err := database.GetSettingsById(nil, 1)
+	settings, err := database.GetSettingsById(context.Background(), nil, 1)
 	assert.NoError(t, err)
 	assert.NotNil(t, settings)
 
@@ -93,7 +94,7 @@ func TestAPISettingsAuditLogsPut_Success(t *testing.T) {
 	assert.Equal(t, req.AuditLogRetentionDays, body.AuditLogRetentionDays)
 
 	// Persisted, not just echoed back.
-	settings, err := database.GetSettingsById(nil, 1)
+	settings, err := database.GetSettingsById(context.Background(), nil, 1)
 	assert.NoError(t, err)
 	assert.Equal(t, req.AuditLogsInConsoleEnabled, settings.AuditLogsInConsoleEnabled)
 	assert.Equal(t, req.AuditLogsInDatabaseEnabled, settings.AuditLogsInDatabaseEnabled)
@@ -118,7 +119,7 @@ func TestAPISettingsAuditLogsPut_CanDisableBothSinks(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
-	settings, err := database.GetSettingsById(nil, 1)
+	settings, err := database.GetSettingsById(context.Background(), nil, 1)
 	assert.NoError(t, err)
 	assert.False(t, settings.AuditLogsInConsoleEnabled)
 	assert.False(t, settings.AuditLogsInDatabaseEnabled)
@@ -188,7 +189,7 @@ func TestAPISettingsAuditLogsPut_ValidationErrors(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			// Capture the stored value so we can prove a rejected request changed nothing.
-			before, err := database.GetSettingsById(nil, 1)
+			before, err := database.GetSettingsById(context.Background(), nil, 1)
 			assert.NoError(t, err)
 
 			resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsAuditLogsRequest{
@@ -204,7 +205,7 @@ func TestAPISettingsAuditLogsPut_ValidationErrors(t *testing.T) {
 			_ = json.NewDecoder(resp.Body).Decode(&errResp)
 			assert.Equal(t, tc.wantMsg, errResp.ErrorDescription)
 
-			after, err := database.GetSettingsById(nil, 1)
+			after, err := database.GetSettingsById(context.Background(), nil, 1)
 			assert.NoError(t, err)
 			assert.Equal(t, before.AuditLogRetentionDays, after.AuditLogRetentionDays,
 				"a rejected request must not change the stored retention")
@@ -240,13 +241,13 @@ func TestAPISettingsAuditLogsPut_IsItselfAudited(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Database logging must be on for the event to be queryable.
-	settings, err := database.GetSettingsById(nil, 1)
+	settings, err := database.GetSettingsById(context.Background(), nil, 1)
 	assert.NoError(t, err)
 	settings.AuditLogsInDatabaseEnabled = true
-	err = database.UpdateSettings(nil, settings)
+	err = database.UpdateSettings(context.Background(), nil, settings)
 	assert.NoError(t, err)
 
-	before, _, err := database.GetAuditLogsPaginated(nil, 1, 1, audit.AuditUpdatedAuditLogsSettings, "")
+	before, _, err := database.GetAuditLogsPaginated(context.Background(), nil, 1, 1, audit.AuditUpdatedAuditLogsSettings, "")
 	assert.NoError(t, err)
 	var lastIdBefore int64
 	if len(before) > 0 {
@@ -262,7 +263,7 @@ func TestAPISettingsAuditLogsPut_IsItselfAudited(t *testing.T) {
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
-	after, total, err := database.GetAuditLogsPaginated(nil, 1, 1, audit.AuditUpdatedAuditLogsSettings, "")
+	after, total, err := database.GetAuditLogsPaginated(context.Background(), nil, 1, 1, audit.AuditUpdatedAuditLogsSettings, "")
 	assert.NoError(t, err)
 	assert.Greater(t, total, 0, "the settings change must be recorded")
 	assert.NotEmpty(t, after)

@@ -672,7 +672,7 @@ func TestIncrementUserAuthStateGeneration(t *testing.T) {
 		t.Errorf("second increment returned %d, want 2 (is the counter monotonic?)", second)
 	}
 
-	if err := database.CommitTransaction(tx); err != nil {
+	if err := database.CommitTransaction(context.Background(), tx); err != nil {
 		t.Fatalf("CommitTransaction failed: %v", err)
 	}
 
@@ -1088,7 +1088,7 @@ func TestTryConsumeUserOTPStep_EnlistsInTransactionAndFailsClosed(t *testing.T) 
 		t.Fatal("claim inside a transaction should report the transition")
 	}
 
-	if err := database.RollbackTransaction(tx); err != nil {
+	if err := database.RollbackTransaction(context.Background(), tx); err != nil {
 		t.Fatalf("RollbackTransaction failed: %v", err)
 	}
 
@@ -1451,7 +1451,7 @@ func TestGetUserByForgotPasswordCodeHash_Transaction(t *testing.T) {
 		t.Errorf("found user id %d through the transaction, want %d", inTx.Id, user.Id)
 	}
 
-	if err := database.RollbackTransaction(tx); err != nil {
+	if err := database.RollbackTransaction(context.Background(), tx); err != nil {
 		t.Fatalf("RollbackTransaction failed: %v", err)
 	}
 
@@ -1591,7 +1591,7 @@ func TestTryConsumeForgotPasswordCode_EnlistsInTransactionAndFailsClosed(t *test
 		t.Fatal("claim inside a transaction should report the transition")
 	}
 
-	if err := database.RollbackTransaction(tx); err != nil {
+	if err := database.RollbackTransaction(context.Background(), tx); err != nil {
 		t.Fatalf("RollbackTransaction failed: %v", err)
 	}
 
@@ -1876,7 +1876,7 @@ func TestSearchUsersPaginated_EnlistsInTheCallersTransaction(t *testing.T) {
 			"the count query ran outside the caller's transaction (#413)", total)
 	}
 
-	if err := database.RollbackTransaction(tx); err != nil {
+	if err := database.RollbackTransaction(context.Background(), tx); err != nil {
 		t.Fatalf("RollbackTransaction: %v", err)
 	}
 }

@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -63,7 +64,7 @@ func TestMigration000042_MySQLIndexNamesAndDetailsWidth(t *testing.T) {
 	h := newIsolatedDB(t)
 
 	if !isMySQL000042() {
-		require.NoError(t, h.Migrator.Up(), "migrate to head on %s", dbType())
+		require.NoError(t, h.Migrator.Up(context.Background()), "migrate to head on %s", dbType())
 		assertRenamedIndexes000042(t, h, "at head")
 		assert.Equalf(t, auditDetailsType000042[dbType()],
 			dumpTable(t, h, "audit_logs").column(t, "details").Type,
@@ -71,7 +72,7 @@ func TestMigration000042_MySQLIndexNamesAndDetailsWidth(t *testing.T) {
 		return
 	}
 
-	require.NoError(t, h.Migrator.Migrate(mysqlVersionBefore000042), "migrate to 000040")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), mysqlVersionBefore000042), "migrate to 000040")
 
 	// The before-state, asserted rather than assumed. Everything below passes trivially if
 	// the indexes already carried the names this migration gives them.
@@ -88,7 +89,7 @@ func TestMigration000042_MySQLIndexNamesAndDetailsWidth(t *testing.T) {
 	require.Error(t, insertAuditLog000042(t, h, 70*1024),
 		"a 70 KiB audit record must be refused at 000040: that refusal is what the widening is for")
 
-	require.NoError(t, h.Migrator.Migrate(42), "apply 000042")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 42), "apply 000042")
 	assertRenamedIndexes000042(t, h, "after apply")
 	assertAuditDetailsWidened000042(t, h, "after apply")
 
@@ -104,7 +105,7 @@ func TestMigration000042_MySQLIndexNamesAndDetailsWidth(t *testing.T) {
 	_, err := h.SQL.Exec("DELETE FROM audit_logs")
 	require.NoError(t, err, "clear the oversized audit record before rolling back")
 
-	require.NoError(t, h.Migrator.Migrate(mysqlVersionBefore000042), "roll back 000042")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), mysqlVersionBefore000042), "roll back 000042")
 	for _, ix := range renamedIndexes000042 {
 		assert.Truef(t, describeIndex(t, h, ix.table, ix.before).Exists,
 			"the down migration restores %s.%s", ix.table, ix.before)
@@ -114,7 +115,7 @@ func TestMigration000042_MySQLIndexNamesAndDetailsWidth(t *testing.T) {
 	assert.Equal(t, "text", dumpTable(t, h, "audit_logs").column(t, "details").Type,
 		"the down migration restores the TEXT ceiling")
 
-	require.NoError(t, h.Migrator.Migrate(42), "re-apply 000042")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 42), "re-apply 000042")
 	assertRenamedIndexes000042(t, h, "after down/up round trip")
 	assertAuditDetailsWidened000042(t, h, "after down/up round trip")
 }

@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -37,7 +38,7 @@ import (
 func TestMigration000045_AuditLogsRequestId(t *testing.T) {
 	h := newIsolatedDB(t)
 
-	require.NoError(t, h.Migrator.Migrate(44), "migrate to 000044")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 44), "migrate to 000044")
 
 	assert.Falsef(t, auditLogsHasRequestId000045(t, h),
 		"audit_logs must not carry request_id at 000044 on %s", dbType())
@@ -47,7 +48,7 @@ func TestMigration000045_AuditLogsRequestId(t *testing.T) {
 	// A row from before the column, which is every row in an existing deployment.
 	seedAuditLogWithoutRequestId000045(t, h, "written-at-000044")
 
-	require.NoError(t, h.Migrator.Migrate(45), "apply 000045")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 45), "apply 000045")
 
 	column := dumpTable(t, h, "audit_logs").column(t, "request_id")
 	assert.Falsef(t, column.Nullable,
@@ -69,13 +70,13 @@ func TestMigration000045_AuditLogsRequestId(t *testing.T) {
 	assert.Equalf(t, "", readRequestId000045(t, h, "omitting-at-000045"),
 		"an insert that names no request_id must be accepted and default to '' on %s", dbType())
 
-	require.NoError(t, h.Migrator.Migrate(44), "roll back 000045")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 44), "roll back 000045")
 	assert.Falsef(t, auditLogsHasRequestId000045(t, h),
 		"the column must be gone after rolling back to 000044 on %s", dbType())
 	assert.Falsef(t, describeIndex(t, h, "audit_logs", "idx_audit_logs_request_id").Exists,
 		"the index must be gone after rolling back to 000044 on %s", dbType())
 
-	require.NoError(t, h.Migrator.Migrate(45), "re-apply 000045")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 45), "re-apply 000045")
 	assert.Truef(t, auditLogsHasRequestId000045(t, h),
 		"the column must return after a down/up round trip on %s", dbType())
 	assert.Truef(t, describeIndex(t, h, "audit_logs", "idx_audit_logs_request_id").Exists,

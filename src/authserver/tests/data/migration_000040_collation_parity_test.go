@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"strings"
@@ -91,7 +92,7 @@ func TestMigration000040_CollationParity(t *testing.T) {
 	h := newFixture000040(t)
 	prior := priorVersion000040()
 
-	require.NoErrorf(t, h.Migrator.Migrate(prior), "migrate to %d", prior)
+	require.NoErrorf(t, h.Migrator.Migrate(context.Background(), prior), "migrate to %d", prior)
 
 	clientId := seedClient000035(t, h, "mig40-client")
 	userId := seedUser000035(t, h, "mig40user")
@@ -101,7 +102,7 @@ func TestMigration000040_CollationParity(t *testing.T) {
 	assertDatabaseDefault000040(t, h, databaseDefaultBefore000040(), "at "+fmt.Sprint(prior))
 	assertDefaultsAreAutoNamed000040(t, before, "at "+fmt.Sprint(prior))
 
-	require.NoError(t, h.Migrator.Migrate(40), "apply 000040")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 40), "apply 000040")
 
 	after := dumpTables000040(t, h)
 	assertCollations000040(t, h, collationAfter000040, "after apply")
@@ -110,7 +111,7 @@ func TestMigration000040_CollationParity(t *testing.T) {
 	assertDefaultsAreNamed000040(t, after, "after apply")
 	assertSeededRowsSurvive000040(t, h, clientId, userId, "after apply")
 
-	require.NoErrorf(t, h.Migrator.Migrate(prior), "roll back 000040")
+	require.NoErrorf(t, h.Migrator.Migrate(context.Background(), prior), "roll back 000040")
 
 	down := dumpTables000040(t, h)
 	assertCollations000040(t, h, collationBefore000040, "after roll back")
@@ -119,7 +120,7 @@ func TestMigration000040_CollationParity(t *testing.T) {
 	assertDefaultsAreAutoNamed000040(t, down, "after roll back")
 	assertSeededRowsSurvive000040(t, h, clientId, userId, "after roll back")
 
-	require.NoError(t, h.Migrator.Migrate(40), "re-apply 000040")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 40), "re-apply 000040")
 
 	reapplied := dumpTables000040(t, h)
 	assertCollations000040(t, h, collationAfter000040, "after down/up round trip")
@@ -145,7 +146,7 @@ func TestMigration000040_DownRefusesACaseVariantPair(t *testing.T) {
 	}
 
 	h := newFixture000040(t)
-	require.NoError(t, h.Migrator.Migrate(40), "apply 000040")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 40), "apply 000040")
 
 	// The pair that could not have existed before this migration. That it can be inserted at
 	// all is the whole of what #283 fixes, so seeding it is also an assertion.
@@ -161,7 +162,7 @@ func TestMigration000040_DownRefusesACaseVariantPair(t *testing.T) {
 		require.NotEmpty(t, shapeBefore, "the catalog sweep read no index or default at all")
 	}
 
-	err := h.Migrator.Migrate(priorVersion000040())
+	err := h.Migrator.Migrate(context.Background(), priorVersion000040())
 	require.Errorf(t, err, "the down migration must refuse a case-variant pair the new collation permitted")
 	assert.Containsf(t, strings.ToLower(err.Error()), "dupe40client",
 		"the engine must name the offending value, so an operator can resolve it: %v", err)
@@ -195,9 +196,9 @@ func TestMigration000040_DownRefusesACaseVariantPair(t *testing.T) {
 	// By id, not by identifier: on MySQL the clients table may or may not have been converted
 	// back to the folding collation by the failed attempt, and a predicate on
 	// client_identifier would mean different things in the two cases.
-	require.NoError(t, h.Migrator.Force(40),
+	require.NoError(t, h.Migrator.Force(context.Background(), 40),
 		"clear the dirty version the deliberate failure left, which is the operator's own step")
-	require.NoError(t, h.Migrator.Migrate(priorVersion000040()),
+	require.NoError(t, h.Migrator.Migrate(context.Background(), priorVersion000040()),
 		"the rollback must succeed once the duplicate is gone; if it does not, the first attempt destroyed something it cannot rebuild")
 
 	assertCollations000040(t, h, collationBefore000040, "after the retried rollback")
@@ -234,7 +235,7 @@ func TestMigration000040_UpRollsBackALateFailure(t *testing.T) {
 
 	h := newFixture000040(t)
 	prior := priorVersion000040()
-	require.NoErrorf(t, h.Migrator.Migrate(prior), "migrate to %d", prior)
+	require.NoErrorf(t, h.Migrator.Migrate(context.Background(), prior), "migrate to %d", prior)
 
 	// The failure, injected as a dependency the migration knows nothing about: an index of the
 	// operator's own on a string column 000040 has to ALTER. SQL Server refuses that with
@@ -255,7 +256,7 @@ func TestMigration000040_UpRollsBackALateFailure(t *testing.T) {
 	shapeBefore := mssqlSchemaShape000040(t, h)
 	require.NotEmpty(t, shapeBefore, "the catalog sweep read no index or default at all")
 
-	err = h.Migrator.Migrate(40)
+	err = h.Migrator.Migrate(context.Background(), 40)
 	require.Error(t, err, "an ALTER COLUMN under an index the migration does not manage must fail")
 
 	// Msg 5074 names the COLUMN and not the object: "ALTER TABLE ALTER COLUMN
@@ -284,9 +285,9 @@ func TestMigration000040_UpRollsBackALateFailure(t *testing.T) {
 	_, err = h.SQL.Exec(fmt.Sprintf("DROP INDEX [%s] ON [users]", unmanagedIndex))
 	require.NoError(t, err, "resolve the dependency by hand")
 
-	require.NoError(t, h.Migrator.Force(prior),
+	require.NoError(t, h.Migrator.Force(context.Background(), prior),
 		"clear the dirty version the deliberate failure left, which is the operator's own step")
-	require.NoError(t, h.Migrator.Migrate(40),
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 40),
 		"the retry must reach 40; if it does not, the first attempt destroyed something it cannot rebuild")
 
 	assertCollations000040(t, h, collationAfter000040, "after the retried up")
@@ -634,7 +635,7 @@ func TestMigration000040_PreCreatedDatabaseIsFullyCollated(t *testing.T) {
 
 	// Up() rather than a target version: the guard is about every migration in the chain, not
 	// about 000040, and the one that breaks it will be a migration nobody has written yet.
-	require.NoError(t, h.Migrator.Up(), "migrate the full chain into a pre-created database")
+	require.NoError(t, h.Migrator.Up(context.Background()), "migrate the full chain into a pre-created database")
 
 	// The database default is still the operator's, which is what makes the sweep below mean
 	// anything: every column it reads is pinned by its own COLLATE clause rather than by

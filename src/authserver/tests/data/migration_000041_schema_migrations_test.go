@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"context"
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/data/schemadump"
@@ -106,12 +107,12 @@ func TestMigration000041_SchemaMigrationsShape(t *testing.T) {
 	h := newIsolatedDB(t)
 
 	if !isSQLite000041() {
-		require.NoError(t, h.Migrator.Up(), "migrate to head")
+		require.NoError(t, h.Migrator.Up(context.Background()), "migrate to head")
 		assertSchemaMigrationsPinnedShape(t, h, "at head")
 		return
 	}
 
-	require.NoError(t, h.Migrator.Migrate(sqliteVersionBefore000041), "migrate to 000039")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), sqliteVersionBefore000041), "migrate to 000039")
 	rewriteSchemaMigrationsToDriverShape000041(t, h)
 
 	// The before-state, asserted rather than assumed: if the rewrite above ever stopped
@@ -133,7 +134,7 @@ func TestMigration000041_SchemaMigrationsShape(t *testing.T) {
 	_, err = h.SQL.Exec("DELETE FROM schema_migrations WHERE version IS NULL")
 	require.NoError(t, err, "clear the NULL row before migrating, which the pinned shape would refuse to carry")
 
-	require.NoError(t, h.Migrator.Migrate(41), "apply 000041")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 41), "apply 000041")
 	assertSchemaMigrationsPinnedShape(t, h, "after apply")
 
 	// The recorded version survived the rebuild. Losing it would leave golang-migrate
@@ -171,7 +172,7 @@ func TestMigration000041_SchemaMigrationsShape(t *testing.T) {
 	assert.Equal(t, "INTEGER", dumpTable(t, h, "schema_migrations").column(t, "version").Type,
 		"only INTEGER PRIMARY KEY is a rowid alias on SQLite")
 
-	require.NoError(t, h.Migrator.Migrate(sqliteVersionBefore000041), "roll back 000041")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), sqliteVersionBefore000041), "roll back 000041")
 	rolledBack := dumpTable(t, h, "schema_migrations")
 	assert.True(t, rolledBack.column(t, "version").Nullable,
 		"the down migration restores the driver's own shape")
@@ -179,7 +180,7 @@ func TestMigration000041_SchemaMigrationsShape(t *testing.T) {
 		"version_unique is recreated by the down migration, so the shape does not depend on when the process next restarts; got %v",
 		rolledBack.Indexes)
 
-	require.NoError(t, h.Migrator.Migrate(41), "re-apply 000041")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 41), "re-apply 000041")
 	assertSchemaMigrationsPinnedShape(t, h, "after down/up round trip")
 }
 

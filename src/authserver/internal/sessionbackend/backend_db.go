@@ -186,7 +186,7 @@ func (b *dbBackend) expiryFor(ctx context.Context, hash string, authenticated bo
 func (b *dbBackend) lifetimes(ctx context.Context) (idleTimeout, maxLifetime time.Duration, err error) {
 	settings, ok := ctx.Value(constants.ContextKeySettings).(*models.Settings)
 	if !ok || settings == nil {
-		settings, err = b.database.GetSettingsById(nil, 1)
+		settings, err = b.database.GetSettingsById(ctx, nil, 1)
 		if err != nil {
 			return 0, 0, errs.Wrap(err, "unable to read the settings")
 		}

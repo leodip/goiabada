@@ -1,6 +1,7 @@
 package schemadump
 
 import (
+	"context"
 	"database/sql"
 	"sort"
 
@@ -16,7 +17,7 @@ import (
 // An empty list is an error. A dump of no tables compared against a golden file of no
 // tables reads as "nothing changed" and passes, which is the failure mode that would make
 // the whole check worthless.
-func Tables(db *sql.DB, d Dialect) ([]string, error) {
+func Tables(ctx context.Context, db *sql.DB, d Dialect) ([]string, error) {
 	if !d.valid() {
 		return nil, errs.Errorf("schemadump: unrecognised database dialect %q", d)
 	}
@@ -40,7 +41,7 @@ func Tables(db *sql.DB, d Dialect) ([]string, error) {
 			WHERE type = 'table' AND name NOT LIKE 'sqlite_%'`
 	}
 
-	rows, err := db.Query(q)
+	rows, err := db.QueryContext(ctx, q)
 	if err != nil {
 		return nil, errs.Errorf("schemadump: list tables on %s: %w", d, err)
 	}
@@ -68,15 +69,15 @@ func Tables(db *sql.DB, d Dialect) ([]string, error) {
 // Dump reads every table in the connected database. This is the seam the generator writes a
 // golden file from and the seam the per-engine data test reads through, so the file cannot
 // record a shape the checker could not have produced.
-func Dump(db *sql.DB, d Dialect) (Schema, error) {
-	names, err := Tables(db, d)
+func Dump(ctx context.Context, db *sql.DB, d Dialect) (Schema, error) {
+	names, err := Tables(ctx, db, d)
 	if err != nil {
 		return nil, err
 	}
 
 	schema := make(Schema, 0, len(names))
 	for _, name := range names {
-		shape, err := DumpTable(db, d, name)
+		shape, err := DumpTable(ctx, db, d, name)
 		if err != nil {
 			return nil, err
 		}
@@ -99,7 +100,7 @@ func Dump(db *sql.DB, d Dialect) (Schema, error) {
 // It refuses a table carrying a construct this shape cannot represent, rather than dropping
 // it silently: see guardTable. Dropping it would put the omission in the golden file too,
 // where nothing downstream could recover it.
-func DumpTable(db *sql.DB, d Dialect, table string) (TableShape, error) {
+func DumpTable(ctx context.Context, db *sql.DB, d Dialect, table string) (TableShape, error) {
 	if !d.valid() {
 		return TableShape{}, errs.Errorf("schemadump: unrecognised database dialect %q", d)
 	}
@@ -107,7 +108,7 @@ func DumpTable(db *sql.DB, d Dialect, table string) (TableShape, error) {
 		return TableShape{}, err
 	}
 
-	columns, err := dumpColumns(db, d, table)
+	columns, err := dumpColumns(ctx, db, d, table)
 	if err != nil {
 		return TableShape{}, err
 	}
@@ -126,15 +127,15 @@ func DumpTable(db *sql.DB, d Dialect, table string) (TableShape, error) {
 	// construct. Guarding first means one sentence a migration author can act on. It runs
 	// after the columns, so a table that does not exist is still answered by the
 	// read-no-columns error above rather than by a guard query returning zero of everything.
-	if err := guardTable(db, d, table); err != nil {
+	if err := guardTable(ctx, db, d, table); err != nil {
 		return TableShape{}, err
 	}
 
-	indexes, err := dumpIndexes(db, d, table)
+	indexes, err := dumpIndexes(ctx, db, d, table)
 	if err != nil {
 		return TableShape{}, err
 	}
-	foreignKeys, err := dumpForeignKeys(db, d, table)
+	foreignKeys, err := dumpForeignKeys(ctx, db, d, table)
 	if err != nil {
 		return TableShape{}, err
 	}
@@ -163,7 +164,7 @@ func DumpTable(db *sql.DB, d Dialect, table string) (TableShape, error) {
 // repeated, both of which are the failures worth catching. Unlike DumpTable it does not run
 // the guard, because a migration test calls it against a table part way through the chain
 // rather than against a finished schema.
-func DescribeIndex(db *sql.DB, d Dialect, table, index string) (IndexShape, error) {
+func DescribeIndex(ctx context.Context, db *sql.DB, d Dialect, table, index string) (IndexShape, error) {
 	if !d.valid() {
 		return IndexShape{}, errs.Errorf("schemadump: unrecognised database dialect %q", d)
 	}
@@ -174,7 +175,7 @@ func DescribeIndex(db *sql.DB, d Dialect, table, index string) (IndexShape, erro
 		return IndexShape{}, err
 	}
 
-	indexes, err := dumpIndexes(db, d, table)
+	indexes, err := dumpIndexes(ctx, db, d, table)
 	if err != nil {
 		return IndexShape{}, err
 	}

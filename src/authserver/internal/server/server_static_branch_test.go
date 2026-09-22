@@ -2,6 +2,7 @@ package server
 
 import (
 	"database/sql"
+	"github.com/stretchr/testify/mock"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -51,14 +52,14 @@ func TestInitMiddleware_StaticFilesSkipTheSettingsAndSessionChain(t *testing.T) 
 	defer func() { _ = result.Body.Close() }()
 
 	require.Equal(t, http.StatusOK, result.StatusCode, "the file must still be served")
-	database.AssertNotCalled(t, "GetSettingsById", nilTx, int64(1))
+	database.AssertNotCalled(t, "GetSettingsById", mock.Anything, nilTx, int64(1))
 }
 
 // TestInitMiddleware_ApplicationRoutesKeepTheSettingsAndSessionChain is the other half, and
 // without it the case above is satisfied by a chain that was never mounted at all.
 func TestInitMiddleware_ApplicationRoutesKeepTheSettingsAndSessionChain(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	database.On("GetSettingsById", (*sql.Tx)(nil), int64(1)).Return(&models.Settings{Id: 1}, nil).Once()
+	database.On("GetSettingsById", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(&models.Settings{Id: 1}, nil).Once()
 
 	s := newStaticBranchTestServer(database)
 	app := s.initMiddleware()

@@ -114,7 +114,7 @@ func TestAPIUsersSearch_AnnotatePermission_ConflictWithGroupAnnotation(t *testin
 
 	// Create a group to reference
 	grp := createTestGroup(t)
-	defer func() { _ = database.DeleteGroup(nil, grp.Id) }()
+	defer func() { _ = database.DeleteGroup(context.Background(), nil, grp.Id) }()
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/search?annotatePermissionId=" + strconv.FormatInt(perm.Id, 10) + "&annotateGroupMembership=" + strconv.FormatInt(grp.Id, 10)
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)

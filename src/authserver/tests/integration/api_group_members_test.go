@@ -26,10 +26,10 @@ func TestAPIGroupMembersGet_Success(t *testing.T) {
 		IncludeInIdToken:     true,
 		IncludeInAccessToken: false,
 	}
-	err := database.CreateGroup(nil, testGroup)
+	err := database.CreateGroup(context.Background(), nil, testGroup)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteGroup(nil, testGroup.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
 	}()
 
 	// Setup: Create test users and add to group. The addresses are asserted
@@ -118,10 +118,10 @@ func TestAPIGroupMembersGet_EmptyGroup(t *testing.T) {
 		IncludeInIdToken:     true,
 		IncludeInAccessToken: false,
 	}
-	err := database.CreateGroup(nil, testGroup)
+	err := database.CreateGroup(context.Background(), nil, testGroup)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteGroup(nil, testGroup.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
 	}()
 
 	// Test: Get group members
@@ -151,10 +151,10 @@ func TestAPIGroupMembersGet_Pagination(t *testing.T) {
 		GroupIdentifier: "pagination-group",
 		Description:     "Pagination Test Group",
 	}
-	err := database.CreateGroup(nil, testGroup)
+	err := database.CreateGroup(context.Background(), nil, testGroup)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteGroup(nil, testGroup.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
 	}()
 
 	// Setup: Create multiple users and add to group
@@ -254,10 +254,10 @@ func TestAPIGroupMemberAdd_Success(t *testing.T) {
 		GroupIdentifier: "test-add-member",
 		Description:     "Test Group for Adding Member",
 	}
-	err := database.CreateGroup(nil, testGroup)
+	err := database.CreateGroup(context.Background(), nil, testGroup)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteGroup(nil, testGroup.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
 	}()
 
 	// Setup: Create test user
@@ -312,10 +312,10 @@ func TestAPIGroupMemberAdd_UserAlreadyInGroup(t *testing.T) {
 		GroupIdentifier: "duplicate-member-group",
 		Description:     "Test Group for Duplicate Member",
 	}
-	err := database.CreateGroup(nil, testGroup)
+	err := database.CreateGroup(context.Background(), nil, testGroup)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteGroup(nil, testGroup.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
 	}()
 
 	// Setup: Create test user and add to group
@@ -360,10 +360,10 @@ func TestAPIGroupMemberAdd_UserNotFound(t *testing.T) {
 		GroupIdentifier: "test-user-not-found",
 		Description:     "Test Group for User Not Found",
 	}
-	err := database.CreateGroup(nil, testGroup)
+	err := database.CreateGroup(context.Background(), nil, testGroup)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteGroup(nil, testGroup.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
 	}()
 
 	// Test: Try to add non-existent user to group
@@ -403,10 +403,10 @@ func TestAPIGroupMemberAdd_InvalidRequestBody(t *testing.T) {
 		GroupIdentifier: "invalid-request-group",
 		Description:     "Test Group for Invalid Request",
 	}
-	err := database.CreateGroup(nil, testGroup)
+	err := database.CreateGroup(context.Background(), nil, testGroup)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteGroup(nil, testGroup.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
 	}()
 
 	// Test: Send request with no body
@@ -435,10 +435,10 @@ func TestAPIGroupMemberRemove_Success(t *testing.T) {
 		GroupIdentifier: "test-remove-member",
 		Description:     "Test Group for Removing Member",
 	}
-	err := database.CreateGroup(nil, testGroup)
+	err := database.CreateGroup(context.Background(), nil, testGroup)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteGroup(nil, testGroup.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
 	}()
 
 	// Setup: Create test user and add to group
@@ -489,10 +489,10 @@ func TestAPIGroupMemberRemove_UserNotInGroup(t *testing.T) {
 		GroupIdentifier: "test-not-in-group",
 		Description:     "Test Group for User Not In Group",
 	}
-	err := database.CreateGroup(nil, testGroup)
+	err := database.CreateGroup(context.Background(), nil, testGroup)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteGroup(nil, testGroup.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
 	}()
 
 	// Setup: Create test user (not in group)
@@ -527,10 +527,10 @@ func TestAPIGroupMemberRemove_UserNotFound(t *testing.T) {
 		GroupIdentifier: "test-remove-user-not-found",
 		Description:     "Test Group for Remove User Not Found",
 	}
-	err := database.CreateGroup(nil, testGroup)
+	err := database.CreateGroup(context.Background(), nil, testGroup)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteGroup(nil, testGroup.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
 	}()
 
 	// Test: Try to remove non-existent user from group
@@ -589,10 +589,10 @@ func TestAPIGroupMembers_Unauthorized(t *testing.T) {
 		GroupIdentifier: "unauthorized-test",
 		Description:     "Test Group for Unauthorized",
 	}
-	err := database.CreateGroup(nil, testGroup)
+	err := database.CreateGroup(context.Background(), nil, testGroup)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteGroup(nil, testGroup.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
 	}()
 
 	testCases := []struct {

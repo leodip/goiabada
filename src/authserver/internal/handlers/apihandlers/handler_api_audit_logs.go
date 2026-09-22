@@ -44,7 +44,7 @@ func HandleAPIAuditLogsGet(
 		}
 
 		// Get audit logs
-		auditLogs, total, err := database.GetAuditLogsPaginated(nil, page, size, auditEvent, requestId)
+		auditLogs, total, err := database.GetAuditLogsPaginated(r.Context(), nil, page, size, auditEvent, requestId)
 		if err != nil {
 			// Both filter values are client-chosen, so both go on the record through
 			// FieldForLog: without it a multi-kilobyte auditEvent lands whole, carrying

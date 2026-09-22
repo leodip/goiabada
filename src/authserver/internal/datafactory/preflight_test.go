@@ -1,7 +1,9 @@
 package datafactory
 
 import (
+	"context"
 	"errors"
+	"github.com/stretchr/testify/mock"
 	"strings"
 	"testing"
 
@@ -79,7 +81,7 @@ func TestCheckEmailCaseBeforeMigrating_Skips(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			db := mocks_data.NewDatabase(t)
 
-			err := CheckEmailCaseBeforeMigrating(db, tc.recorded, tc.target)
+			err := CheckEmailCaseBeforeMigrating(context.Background(), db, tc.recorded, tc.target)
 
 			assert.NoErrorf(t, err, "must not refuse: %s", tc.why)
 		})
@@ -92,13 +94,13 @@ func TestCheckEmailCaseBeforeMigrating_Skips(t *testing.T) {
 // them, so a message naming one row of a pair turns one outage into two.
 func TestCheckEmailCaseBeforeMigrating_RefusesACollision(t *testing.T) {
 	db := mocks_data.NewDatabase(t)
-	db.EXPECT().ScanEmailCase().Return([]models.EmailCaseRow{
+	db.EXPECT().ScanEmailCase(mock.Anything).Return([]models.EmailCaseRow{
 		row(1, "Alice@example.com"),
 		row(2, "alice@example.com"),
 		row(3, "bob@example.com"),
 	}, nil)
 
-	err := CheckEmailCaseBeforeMigrating(db, LowercaseEmailsVersion-1, LowercaseEmailsVersion)
+	err := CheckEmailCaseBeforeMigrating(context.Background(), db, LowercaseEmailsVersion-1, LowercaseEmailsVersion)
 
 	require.Error(t, err,
 		"two addresses differing only by case cannot both survive the UPDATE, so the migration would trip idx_email and leave the schema dirty")
@@ -124,7 +126,7 @@ func TestCheckEmailCaseBeforeMigrating_RefusesACollision(t *testing.T) {
 // outcome this refusal exists to prevent.
 func TestCheckEmailCaseBeforeMigrating_RefusesAnAddressTheEngineWillNotReduce(t *testing.T) {
 	db := mocks_data.NewDatabase(t)
-	db.EXPECT().ScanEmailCase().Return([]models.EmailCaseRow{
+	db.EXPECT().ScanEmailCase(mock.Anything).Return([]models.EmailCaseRow{
 		row(1, "alice@example.com"),
 		// SQL Server and SQLite both leave U+1E9E alone; Go maps it to U+00DF.
 		divergentRow(2, "ẞ@example.com", "ẞ@example.com"),
@@ -133,7 +135,7 @@ func TestCheckEmailCaseBeforeMigrating_RefusesAnAddressTheEngineWillNotReduce(t 
 		divergentRow(3, "ÄDMIN@EXAMPLE.com", "Ädmin@example.com"),
 	}, nil)
 
-	err := CheckEmailCaseBeforeMigrating(db, LowercaseEmailsVersion-1, LowercaseEmailsVersion)
+	err := CheckEmailCaseBeforeMigrating(context.Background(), db, LowercaseEmailsVersion-1, LowercaseEmailsVersion)
 
 	require.Error(t, err, "the migration cannot reduce these rows, so it would report success and leave them unreachable")
 	msg := err.Error()
@@ -152,13 +154,13 @@ func TestCheckEmailCaseBeforeMigrating_RefusesAnAddressTheEngineWillNotReduce(t 
 // that differ by more than case.
 func TestCheckEmailCaseBeforeMigrating_PassesACleanTable(t *testing.T) {
 	db := mocks_data.NewDatabase(t)
-	db.EXPECT().ScanEmailCase().Return([]models.EmailCaseRow{
+	db.EXPECT().ScanEmailCase(mock.Anything).Return([]models.EmailCaseRow{
 		row(1, "alice@example.com"),
 		row(2, "Bob@example.com"),
 		row(3, "bobby@example.com"),
 	}, nil)
 
-	assert.NoError(t, CheckEmailCaseBeforeMigrating(db, LowercaseEmailsVersion-1, LowercaseEmailsVersion),
+	assert.NoError(t, CheckEmailCaseBeforeMigrating(context.Background(), db, LowercaseEmailsVersion-1, LowercaseEmailsVersion),
 		"a mixed-case address with no twin is exactly what 000047 exists to repair, and two addresses differing by more than case are not a collision")
 }
 
@@ -166,9 +168,9 @@ func TestCheckEmailCaseBeforeMigrating_PassesACleanTable(t *testing.T) {
 // table and nothing in it, which is every install between the first migration and the seeder.
 func TestCheckEmailCaseBeforeMigrating_PassesAnEmptyTable(t *testing.T) {
 	db := mocks_data.NewDatabase(t)
-	db.EXPECT().ScanEmailCase().Return(nil, nil)
+	db.EXPECT().ScanEmailCase(mock.Anything).Return(nil, nil)
 
-	assert.NoError(t, CheckEmailCaseBeforeMigrating(db, LowercaseEmailsVersion-1, LowercaseEmailsVersion))
+	assert.NoError(t, CheckEmailCaseBeforeMigrating(context.Background(), db, LowercaseEmailsVersion-1, LowercaseEmailsVersion))
 }
 
 // TestCheckEmailCaseBeforeMigrating_AScanFailureIsFatal pins the fail-closed direction. A read
@@ -177,9 +179,9 @@ func TestCheckEmailCaseBeforeMigrating_PassesAnEmptyTable(t *testing.T) {
 func TestCheckEmailCaseBeforeMigrating_AScanFailureIsFatal(t *testing.T) {
 	boom := errors.New("storage is unavailable")
 	db := mocks_data.NewDatabase(t)
-	db.EXPECT().ScanEmailCase().Return(nil, boom)
+	db.EXPECT().ScanEmailCase(mock.Anything).Return(nil, boom)
 
-	err := CheckEmailCaseBeforeMigrating(db, LowercaseEmailsVersion-1, LowercaseEmailsVersion)
+	err := CheckEmailCaseBeforeMigrating(context.Background(), db, LowercaseEmailsVersion-1, LowercaseEmailsVersion)
 
 	require.Error(t, err, "an unreadable users table must stop the migration rather than be read as clean")
 	assert.Contains(t, err.Error(), "unable to read stored email addresses",
@@ -204,6 +206,6 @@ func TestPreflightEmailCase_PassesADatabaseWithNoMigrator(t *testing.T) {
 	require.False(t, isProvider,
 		"the mock must not implement MigratorProvider, or this test exercises the migrator arm while claiming to cover the leniency")
 
-	assert.NoError(t, preflightEmailCase(db),
+	assert.NoError(t, preflightEmailCase(context.Background(), db),
 		"a database that cannot produce a migrator is passed, because the recorded version is what decides whether the check applies")
 }

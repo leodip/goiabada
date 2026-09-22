@@ -75,15 +75,15 @@ func createROPCUser(t *testing.T, password string) *models.User {
 // TestROPC_Success tests a successful ROPC flow with a public client
 func TestROPC_Success(t *testing.T) {
 	// Enable ROPC globally
-	settings, err := database.GetSettingsById(nil, 1)
+	settings, err := database.GetSettingsById(context.Background(), nil, 1)
 	assert.Nil(t, err)
 	originalROPCSetting := settings.ResourceOwnerPasswordCredentialsEnabled
 	settings.ResourceOwnerPasswordCredentialsEnabled = true
-	err = database.UpdateSettings(nil, settings)
+	err = database.UpdateSettings(context.Background(), nil, settings)
 	assert.Nil(t, err)
 	defer func() {
 		settings.ResourceOwnerPasswordCredentialsEnabled = originalROPCSetting
-		_ = database.UpdateSettings(nil, settings)
+		_ = database.UpdateSettings(context.Background(), nil, settings)
 	}()
 
 	// Create client and user
@@ -115,15 +115,15 @@ func TestROPC_Success(t *testing.T) {
 // TestROPC_ConfidentialClient tests ROPC with a confidential client
 func TestROPC_ConfidentialClient(t *testing.T) {
 	// Enable ROPC globally
-	settings, err := database.GetSettingsById(nil, 1)
+	settings, err := database.GetSettingsById(context.Background(), nil, 1)
 	assert.Nil(t, err)
 	originalROPCSetting := settings.ResourceOwnerPasswordCredentialsEnabled
 	settings.ResourceOwnerPasswordCredentialsEnabled = true
-	err = database.UpdateSettings(nil, settings)
+	err = database.UpdateSettings(context.Background(), nil, settings)
 	assert.Nil(t, err)
 	defer func() {
 		settings.ResourceOwnerPasswordCredentialsEnabled = originalROPCSetting
-		_ = database.UpdateSettings(nil, settings)
+		_ = database.UpdateSettings(context.Background(), nil, settings)
 	}()
 
 	// Create confidential client and user
@@ -156,15 +156,15 @@ func TestROPC_ConfidentialClient(t *testing.T) {
 // TestROPC_GlobalDisabled tests that ROPC fails when globally disabled
 func TestROPC_GlobalDisabled(t *testing.T) {
 	// Ensure ROPC is globally disabled
-	settings, err := database.GetSettingsById(nil, 1)
+	settings, err := database.GetSettingsById(context.Background(), nil, 1)
 	assert.Nil(t, err)
 	originalROPCSetting := settings.ResourceOwnerPasswordCredentialsEnabled
 	settings.ResourceOwnerPasswordCredentialsEnabled = false
-	err = database.UpdateSettings(nil, settings)
+	err = database.UpdateSettings(context.Background(), nil, settings)
 	assert.Nil(t, err)
 	defer func() {
 		settings.ResourceOwnerPasswordCredentialsEnabled = originalROPCSetting
-		_ = database.UpdateSettings(nil, settings)
+		_ = database.UpdateSettings(context.Background(), nil, settings)
 	}()
 
 	// Create client with ROPC set to nil (follows global setting) and user
@@ -202,15 +202,15 @@ func TestROPC_GlobalDisabled(t *testing.T) {
 // TestROPC_ClientOverrideDisabled tests that client-level override can disable ROPC
 func TestROPC_ClientOverrideDisabled(t *testing.T) {
 	// Enable ROPC globally
-	settings, err := database.GetSettingsById(nil, 1)
+	settings, err := database.GetSettingsById(context.Background(), nil, 1)
 	assert.Nil(t, err)
 	originalROPCSetting := settings.ResourceOwnerPasswordCredentialsEnabled
 	settings.ResourceOwnerPasswordCredentialsEnabled = true
-	err = database.UpdateSettings(nil, settings)
+	err = database.UpdateSettings(context.Background(), nil, settings)
 	assert.Nil(t, err)
 	defer func() {
 		settings.ResourceOwnerPasswordCredentialsEnabled = originalROPCSetting
-		_ = database.UpdateSettings(nil, settings)
+		_ = database.UpdateSettings(context.Background(), nil, settings)
 	}()
 
 	// Create client with ROPC disabled at client level
@@ -250,15 +250,15 @@ func TestROPC_ClientOverrideDisabled(t *testing.T) {
 // TestROPC_MissingUsername tests that missing username returns error
 func TestROPC_MissingUsername(t *testing.T) {
 	// Enable ROPC globally
-	settings, err := database.GetSettingsById(nil, 1)
+	settings, err := database.GetSettingsById(context.Background(), nil, 1)
 	assert.Nil(t, err)
 	originalROPCSetting := settings.ResourceOwnerPasswordCredentialsEnabled
 	settings.ResourceOwnerPasswordCredentialsEnabled = true
-	err = database.UpdateSettings(nil, settings)
+	err = database.UpdateSettings(context.Background(), nil, settings)
 	assert.Nil(t, err)
 	defer func() {
 		settings.ResourceOwnerPasswordCredentialsEnabled = originalROPCSetting
-		_ = database.UpdateSettings(nil, settings)
+		_ = database.UpdateSettings(context.Background(), nil, settings)
 	}()
 
 	client := createROPCClient(t, "", true)
@@ -282,15 +282,15 @@ func TestROPC_MissingUsername(t *testing.T) {
 // TestROPC_MissingPassword tests that missing password returns error
 func TestROPC_MissingPassword(t *testing.T) {
 	// Enable ROPC globally
-	settings, err := database.GetSettingsById(nil, 1)
+	settings, err := database.GetSettingsById(context.Background(), nil, 1)
 	assert.Nil(t, err)
 	originalROPCSetting := settings.ResourceOwnerPasswordCredentialsEnabled
 	settings.ResourceOwnerPasswordCredentialsEnabled = true
-	err = database.UpdateSettings(nil, settings)
+	err = database.UpdateSettings(context.Background(), nil, settings)
 	assert.Nil(t, err)
 	defer func() {
 		settings.ResourceOwnerPasswordCredentialsEnabled = originalROPCSetting
-		_ = database.UpdateSettings(nil, settings)
+		_ = database.UpdateSettings(context.Background(), nil, settings)
 	}()
 
 	client := createROPCClient(t, "", true)
@@ -315,15 +315,15 @@ func TestROPC_MissingPassword(t *testing.T) {
 // TestROPC_InvalidCredentials tests that invalid password returns error
 func TestROPC_InvalidCredentials(t *testing.T) {
 	// Enable ROPC globally
-	settings, err := database.GetSettingsById(nil, 1)
+	settings, err := database.GetSettingsById(context.Background(), nil, 1)
 	assert.Nil(t, err)
 	originalROPCSetting := settings.ResourceOwnerPasswordCredentialsEnabled
 	settings.ResourceOwnerPasswordCredentialsEnabled = true
-	err = database.UpdateSettings(nil, settings)
+	err = database.UpdateSettings(context.Background(), nil, settings)
 	assert.Nil(t, err)
 	defer func() {
 		settings.ResourceOwnerPasswordCredentialsEnabled = originalROPCSetting
-		_ = database.UpdateSettings(nil, settings)
+		_ = database.UpdateSettings(context.Background(), nil, settings)
 	}()
 
 	password := fake.Password(12)
@@ -351,15 +351,15 @@ func TestROPC_InvalidCredentials(t *testing.T) {
 // Note: For security reasons, the error message doesn't reveal whether the user exists
 func TestROPC_UserNotFound(t *testing.T) {
 	// Enable ROPC globally
-	settings, err := database.GetSettingsById(nil, 1)
+	settings, err := database.GetSettingsById(context.Background(), nil, 1)
 	assert.Nil(t, err)
 	originalROPCSetting := settings.ResourceOwnerPasswordCredentialsEnabled
 	settings.ResourceOwnerPasswordCredentialsEnabled = true
-	err = database.UpdateSettings(nil, settings)
+	err = database.UpdateSettings(context.Background(), nil, settings)
 	assert.Nil(t, err)
 	defer func() {
 		settings.ResourceOwnerPasswordCredentialsEnabled = originalROPCSetting
-		_ = database.UpdateSettings(nil, settings)
+		_ = database.UpdateSettings(context.Background(), nil, settings)
 	}()
 
 	client := createROPCClient(t, "", true)
@@ -385,15 +385,15 @@ func TestROPC_UserNotFound(t *testing.T) {
 // TestROPC_DisabledUser tests that disabled user cannot authenticate
 func TestROPC_DisabledUser(t *testing.T) {
 	// Enable ROPC globally
-	settings, err := database.GetSettingsById(nil, 1)
+	settings, err := database.GetSettingsById(context.Background(), nil, 1)
 	assert.Nil(t, err)
 	originalROPCSetting := settings.ResourceOwnerPasswordCredentialsEnabled
 	settings.ResourceOwnerPasswordCredentialsEnabled = true
-	err = database.UpdateSettings(nil, settings)
+	err = database.UpdateSettings(context.Background(), nil, settings)
 	assert.Nil(t, err)
 	defer func() {
 		settings.ResourceOwnerPasswordCredentialsEnabled = originalROPCSetting
-		_ = database.UpdateSettings(nil, settings)
+		_ = database.UpdateSettings(context.Background(), nil, settings)
 	}()
 
 	password := fake.Password(12)
@@ -431,15 +431,15 @@ func TestROPC_DisabledUser(t *testing.T) {
 // TestROPC_WithOfflineAccess tests ROPC with offline_access scope
 func TestROPC_WithOfflineAccess(t *testing.T) {
 	// Enable ROPC globally
-	settings, err := database.GetSettingsById(nil, 1)
+	settings, err := database.GetSettingsById(context.Background(), nil, 1)
 	assert.Nil(t, err)
 	originalROPCSetting := settings.ResourceOwnerPasswordCredentialsEnabled
 	settings.ResourceOwnerPasswordCredentialsEnabled = true
-	err = database.UpdateSettings(nil, settings)
+	err = database.UpdateSettings(context.Background(), nil, settings)
 	assert.Nil(t, err)
 	defer func() {
 		settings.ResourceOwnerPasswordCredentialsEnabled = originalROPCSetting
-		_ = database.UpdateSettings(nil, settings)
+		_ = database.UpdateSettings(context.Background(), nil, settings)
 	}()
 
 	password := fake.Password(12)
@@ -474,15 +474,15 @@ func TestROPC_WithOfflineAccess(t *testing.T) {
 // TestROPC_ConfidentialClient_MissingSecret tests that confidential client requires secret
 func TestROPC_ConfidentialClient_MissingSecret(t *testing.T) {
 	// Enable ROPC globally
-	settings, err := database.GetSettingsById(nil, 1)
+	settings, err := database.GetSettingsById(context.Background(), nil, 1)
 	assert.Nil(t, err)
 	originalROPCSetting := settings.ResourceOwnerPasswordCredentialsEnabled
 	settings.ResourceOwnerPasswordCredentialsEnabled = true
-	err = database.UpdateSettings(nil, settings)
+	err = database.UpdateSettings(context.Background(), nil, settings)
 	assert.Nil(t, err)
 	defer func() {
 		settings.ResourceOwnerPasswordCredentialsEnabled = originalROPCSetting
-		_ = database.UpdateSettings(nil, settings)
+		_ = database.UpdateSettings(context.Background(), nil, settings)
 	}()
 
 	// Create confidential client
@@ -513,15 +513,15 @@ func TestROPC_ConfidentialClient_MissingSecret(t *testing.T) {
 // TestROPC_ConfidentialClient_InvalidSecret tests that invalid client secret fails
 func TestROPC_ConfidentialClient_InvalidSecret(t *testing.T) {
 	// Enable ROPC globally
-	settings, err := database.GetSettingsById(nil, 1)
+	settings, err := database.GetSettingsById(context.Background(), nil, 1)
 	assert.Nil(t, err)
 	originalROPCSetting := settings.ResourceOwnerPasswordCredentialsEnabled
 	settings.ResourceOwnerPasswordCredentialsEnabled = true
-	err = database.UpdateSettings(nil, settings)
+	err = database.UpdateSettings(context.Background(), nil, settings)
 	assert.Nil(t, err)
 	defer func() {
 		settings.ResourceOwnerPasswordCredentialsEnabled = originalROPCSetting
-		_ = database.UpdateSettings(nil, settings)
+		_ = database.UpdateSettings(context.Background(), nil, settings)
 	}()
 
 	// Create confidential client
@@ -553,15 +553,15 @@ func TestROPC_ConfidentialClient_InvalidSecret(t *testing.T) {
 // This is a security feature - ROPC cannot securely support a second authentication factor
 func TestROPC_UserWith2FAEnabled(t *testing.T) {
 	// Enable ROPC globally
-	settings, err := database.GetSettingsById(nil, 1)
+	settings, err := database.GetSettingsById(context.Background(), nil, 1)
 	assert.Nil(t, err)
 	originalROPCSetting := settings.ResourceOwnerPasswordCredentialsEnabled
 	settings.ResourceOwnerPasswordCredentialsEnabled = true
-	err = database.UpdateSettings(nil, settings)
+	err = database.UpdateSettings(context.Background(), nil, settings)
 	assert.Nil(t, err)
 	defer func() {
 		settings.ResourceOwnerPasswordCredentialsEnabled = originalROPCSetting
-		_ = database.UpdateSettings(nil, settings)
+		_ = database.UpdateSettings(context.Background(), nil, settings)
 	}()
 
 	password := fake.Password(12)
@@ -603,15 +603,15 @@ func TestROPC_UserWith2FAEnabled(t *testing.T) {
 // TestROPC_WithResourcePermissions tests ROPC with resource permissions
 func TestROPC_WithResourcePermissions(t *testing.T) {
 	// Enable ROPC globally
-	settings, err := database.GetSettingsById(nil, 1)
+	settings, err := database.GetSettingsById(context.Background(), nil, 1)
 	assert.Nil(t, err)
 	originalROPCSetting := settings.ResourceOwnerPasswordCredentialsEnabled
 	settings.ResourceOwnerPasswordCredentialsEnabled = true
-	err = database.UpdateSettings(nil, settings)
+	err = database.UpdateSettings(context.Background(), nil, settings)
 	assert.Nil(t, err)
 	defer func() {
 		settings.ResourceOwnerPasswordCredentialsEnabled = originalROPCSetting
-		_ = database.UpdateSettings(nil, settings)
+		_ = database.UpdateSettings(context.Background(), nil, settings)
 	}()
 
 	// Create resource and permission
@@ -662,15 +662,15 @@ func TestROPC_WithResourcePermissions(t *testing.T) {
 // permission grants, and is exactly the case that failed. A test that also requested a resource
 // scope could pass for the wrong reason if the user happened to hold it.
 func TestROPC_RefreshToken_OpenIdOnly(t *testing.T) {
-	settings, err := database.GetSettingsById(nil, 1)
+	settings, err := database.GetSettingsById(context.Background(), nil, 1)
 	assert.Nil(t, err)
 	originalROPCSetting := settings.ResourceOwnerPasswordCredentialsEnabled
 	settings.ResourceOwnerPasswordCredentialsEnabled = true
-	err = database.UpdateSettings(nil, settings)
+	err = database.UpdateSettings(context.Background(), nil, settings)
 	assert.Nil(t, err)
 	defer func() {
 		settings.ResourceOwnerPasswordCredentialsEnabled = originalROPCSetting
-		_ = database.UpdateSettings(nil, settings)
+		_ = database.UpdateSettings(context.Background(), nil, settings)
 	}()
 
 	clientSecret := fake.Password(32)
@@ -772,13 +772,13 @@ func TestROPC_RefreshToken_StopsWhenROPCDisabled(t *testing.T) {
 				client.ResourceOwnerPasswordCredentialsEnabled = nil
 				assert.Nil(t, database.UpdateClient(context.Background(), nil, client))
 
-				settings, err := database.GetSettingsById(nil, 1)
+				settings, err := database.GetSettingsById(context.Background(), nil, 1)
 				assert.Nil(t, err)
 				settings.ResourceOwnerPasswordCredentialsEnabled = false
-				assert.Nil(t, database.UpdateSettings(nil, settings))
+				assert.Nil(t, database.UpdateSettings(context.Background(), nil, settings))
 				return func() {
 					settings.ResourceOwnerPasswordCredentialsEnabled = true
-					_ = database.UpdateSettings(nil, settings)
+					_ = database.UpdateSettings(context.Background(), nil, settings)
 				}
 			},
 		},
@@ -786,17 +786,17 @@ func TestROPC_RefreshToken_StopsWhenROPCDisabled(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			settings, err := database.GetSettingsById(nil, 1)
+			settings, err := database.GetSettingsById(context.Background(), nil, 1)
 			assert.Nil(t, err)
 			originalROPCSetting := settings.ResourceOwnerPasswordCredentialsEnabled
 			settings.ResourceOwnerPasswordCredentialsEnabled = true
-			err = database.UpdateSettings(nil, settings)
+			err = database.UpdateSettings(context.Background(), nil, settings)
 			assert.Nil(t, err)
 			defer func() {
-				current, err := database.GetSettingsById(nil, 1)
+				current, err := database.GetSettingsById(context.Background(), nil, 1)
 				if err == nil {
 					current.ResourceOwnerPasswordCredentialsEnabled = originalROPCSetting
-					_ = database.UpdateSettings(nil, current)
+					_ = database.UpdateSettings(context.Background(), nil, current)
 				}
 			}()
 

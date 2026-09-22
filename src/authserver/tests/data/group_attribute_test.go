@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -21,13 +22,13 @@ func TestCreateGroupAttribute(t *testing.T) {
 		IncludeInAccessToken: false,
 	}
 
-	err := database.CreateGroupAttribute(nil, groupAttribute)
+	err := database.CreateGroupAttribute(context.Background(), nil, groupAttribute)
 	if err != nil {
 		t.Fatalf("Failed to create group attribute: %v", err)
 	}
 
 	// Verify the group attribute was created
-	createdGroupAttribute, err := database.GetGroupAttributeById(nil, groupAttribute.Id)
+	createdGroupAttribute, err := database.GetGroupAttributeById(context.Background(), nil, groupAttribute.Id)
 	if err != nil {
 		t.Fatalf("Failed to retrieve created group attribute: %v", err)
 	}
@@ -61,7 +62,7 @@ func TestCreateGroupAttribute(t *testing.T) {
 		Key:     "invalidkey",
 		Value:   "invalidvalue",
 	}
-	err = database.CreateGroupAttribute(nil, invalidGroupAttribute)
+	err = database.CreateGroupAttribute(context.Background(), nil, invalidGroupAttribute)
 	if err == nil {
 		t.Errorf("Expected error when creating group attribute with invalid group ID, got nil")
 	}
@@ -80,13 +81,13 @@ func TestUpdateGroupAttribute(t *testing.T) {
 
 	time.Sleep(timestampTick) // Ensure some time passes before update
 
-	err := database.UpdateGroupAttribute(nil, groupAttribute)
+	err := database.UpdateGroupAttribute(context.Background(), nil, groupAttribute)
 	if err != nil {
 		t.Fatalf("Failed to update group attribute: %v", err)
 	}
 
 	// Fetch the updated group attribute
-	updatedGroupAttribute, err := database.GetGroupAttributeById(nil, groupAttribute.Id)
+	updatedGroupAttribute, err := database.GetGroupAttributeById(context.Background(), nil, groupAttribute.Id)
 	if err != nil {
 		t.Fatalf("Failed to retrieve updated group attribute: %v", err)
 	}
@@ -115,7 +116,7 @@ func TestGetGroupAttributeById(t *testing.T) {
 	groupAttribute := createTestGroupAttribute(t, group.Id)
 
 	// Retrieve the group attribute
-	retrievedGroupAttribute, err := database.GetGroupAttributeById(nil, groupAttribute.Id)
+	retrievedGroupAttribute, err := database.GetGroupAttributeById(context.Background(), nil, groupAttribute.Id)
 	if err != nil {
 		t.Fatalf("Failed to retrieve group attribute by ID: %v", err)
 	}
@@ -147,7 +148,7 @@ func TestGetGroupAttributeById(t *testing.T) {
 	}
 
 	// Test retrieving a non-existent group attribute
-	nonExistentGroupAttribute, err := database.GetGroupAttributeById(nil, 99999)
+	nonExistentGroupAttribute, err := database.GetGroupAttributeById(context.Background(), nil, 99999)
 	if err != nil {
 		t.Errorf("Expected no error for non-existent group attribute, got: %v", err)
 	}
@@ -164,7 +165,7 @@ func TestGetGroupAttributesByGroupIds(t *testing.T) {
 	createTestGroupAttribute(t, group2.Id)
 
 	// Retrieve group attributes by group IDs
-	groupAttributes, err := database.GetGroupAttributesByGroupIds(nil, []int64{group1.Id, group2.Id})
+	groupAttributes, err := database.GetGroupAttributesByGroupIds(context.Background(), nil, []int64{group1.Id, group2.Id})
 	if err != nil {
 		t.Fatalf("Failed to retrieve group attributes by group IDs: %v", err)
 	}
@@ -193,7 +194,7 @@ func TestGetGroupAttributesByGroupIds(t *testing.T) {
 	}
 
 	// Test retrieving group attributes for non-existent group IDs
-	nonExistentGroupAttributes, err := database.GetGroupAttributesByGroupIds(nil, []int64{99999})
+	nonExistentGroupAttributes, err := database.GetGroupAttributesByGroupIds(context.Background(), nil, []int64{99999})
 	if err != nil {
 		t.Errorf("Expected no error for non-existent group IDs, got: %v", err)
 	}
@@ -209,7 +210,7 @@ func TestGetGroupAttributesByGroupId(t *testing.T) {
 	createTestGroupAttribute(t, group.Id)
 
 	// Retrieve group attributes by group ID
-	groupAttributes, err := database.GetGroupAttributesByGroupId(nil, group.Id)
+	groupAttributes, err := database.GetGroupAttributesByGroupId(context.Background(), nil, group.Id)
 	if err != nil {
 		t.Fatalf("Failed to retrieve group attributes by group ID: %v", err)
 	}
@@ -238,7 +239,7 @@ func TestGetGroupAttributesByGroupId(t *testing.T) {
 	}
 
 	// Test retrieving group attributes for a non-existent group ID
-	nonExistentGroupAttributes, err := database.GetGroupAttributesByGroupId(nil, 99999)
+	nonExistentGroupAttributes, err := database.GetGroupAttributesByGroupId(context.Background(), nil, 99999)
 	if err != nil {
 		t.Errorf("Expected no error for non-existent group ID, got: %v", err)
 	}
@@ -253,13 +254,13 @@ func TestDeleteGroupAttribute(t *testing.T) {
 	groupAttribute := createTestGroupAttribute(t, group.Id)
 
 	// Delete the group attribute
-	err := database.DeleteGroupAttribute(nil, groupAttribute.Id)
+	err := database.DeleteGroupAttribute(context.Background(), nil, groupAttribute.Id)
 	if err != nil {
 		t.Fatalf("Failed to delete group attribute: %v", err)
 	}
 
 	// Try to retrieve the deleted group attribute
-	deletedGroupAttribute, err := database.GetGroupAttributeById(nil, groupAttribute.Id)
+	deletedGroupAttribute, err := database.GetGroupAttributeById(context.Background(), nil, groupAttribute.Id)
 	if err != nil {
 		t.Fatalf("Error while checking for deleted group attribute: %v", err)
 	}
@@ -268,7 +269,7 @@ func TestDeleteGroupAttribute(t *testing.T) {
 	}
 
 	// Test deleting a non-existent group attribute
-	err = database.DeleteGroupAttribute(nil, 99999)
+	err = database.DeleteGroupAttribute(context.Background(), nil, 99999)
 	if err != nil {
 		t.Errorf("Expected no error when deleting non-existent group attribute, got: %v", err)
 	}
@@ -283,7 +284,7 @@ func createTestGroupAttribute(t *testing.T, groupId int64) *models.GroupAttribut
 		IncludeInIdToken:     true,
 		IncludeInAccessToken: false,
 	}
-	err := database.CreateGroupAttribute(nil, groupAttribute)
+	err := database.CreateGroupAttribute(context.Background(), nil, groupAttribute)
 	if err != nil {
 		t.Fatalf("Failed to create test group attribute: %v", err)
 	}

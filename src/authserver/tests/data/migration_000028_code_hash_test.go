@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"strings"
@@ -41,7 +42,7 @@ import (
 func TestMigration000028_CodeHashColumns(t *testing.T) {
 	h := newIsolatedDB(t)
 
-	require.NoError(t, h.Migrator.Migrate(27), "migrate to 000027")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 27), "migrate to 000027")
 
 	// 1. Absent before the migration.
 	exists, _, _ := columnShape000028(t, h, "users", "forgot_password_code_hash")
@@ -62,7 +63,7 @@ func TestMigration000028_CodeHashColumns(t *testing.T) {
 
 	// 5a. The migration succeeds. Without the DELETE, CREATE UNIQUE INDEX refuses the two
 	// '' values and this line is where the case fails.
-	require.NoError(t, h.Migrator.Migrate(28), "apply 000028")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 28), "apply 000028")
 
 	// 2 and 4.
 	assertShape000028(t, h, "after apply")
@@ -90,13 +91,13 @@ func TestMigration000028_CodeHashColumns(t *testing.T) {
 	// 6. Down, then up again. The down migration is not a true inverse (the deleted rows
 	// are gone for good), but it must run, and on SQL Server it is where the index and
 	// named-constraint drops are exercised.
-	require.NoError(t, h.Migrator.Migrate(27), "roll back 000028")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 27), "roll back 000028")
 	exists, _, _ = columnShape000028(t, h, "users", "forgot_password_code_hash")
 	assert.False(t, exists, "users.forgot_password_code_hash must be gone after the down migration")
 	exists, _, _ = columnShape000028(t, h, "pre_registrations", "verification_code_hash")
 	assert.False(t, exists, "pre_registrations.verification_code_hash must be gone after the down migration")
 
-	require.NoError(t, h.Migrator.Migrate(28), "re-apply 000028")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 28), "re-apply 000028")
 	assertShape000028(t, h, "after down/up round trip")
 }
 

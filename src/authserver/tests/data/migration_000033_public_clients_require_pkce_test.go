@@ -71,7 +71,7 @@ func TestMigration000033_PublicClientsRequirePKCE(t *testing.T) {
 	// do. Calling it anyway is what keeps the seed at head once later migrations land: the ORM
 	// writes every column the Go models carry, so seeding at 000033 would break the moment a
 	// migration adds one.
-	if err := h.Migrator.Up(); err != nil && !errors.Is(err, migrator.ErrNoChange) {
+	if err := h.Migrator.Up(context.Background()); err != nil && !errors.Is(err, migrator.ErrNoChange) {
 		require.NoError(t, err, "migrate to head before seeding through the ORM")
 	}
 
@@ -129,7 +129,7 @@ func TestMigration000033_PublicClientsRequirePKCE(t *testing.T) {
 
 	// 1. The down is a no-op: it must not error, and the seeded values must survive it. This
 	// is what stops property 2 below describing the seed instead of the UPDATE.
-	require.NoError(t, h.Migrator.Migrate(32), "roll back to 000032")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 32), "roll back to 000032")
 	for i, c := range cases {
 		seeded := sql.NullBool{Valid: false}
 		if c.seeded != nil {
@@ -142,7 +142,7 @@ func TestMigration000033_PublicClientsRequirePKCE(t *testing.T) {
 
 	// 2 and 3. Re-apply, which is also the second time this UPDATE runs over the rows it
 	// already converted.
-	require.NoError(t, h.Migrator.Migrate(33), "re-apply 000033")
+	require.NoError(t, h.Migrator.Migrate(context.Background(), 33), "re-apply 000033")
 	for i, c := range cases {
 		assert.Equalf(t, c.want, readPKCERequired000033(t, h, ids[i]),
 			"%s: pkce_required after 000033, because %s", c.name, c.why)

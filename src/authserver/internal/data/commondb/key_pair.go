@@ -10,7 +10,7 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 )
 
-func (d *CommonDatabase) CreateKeyPair(tx *sql.Tx, keyPair *models.KeyPair) error {
+func (d *CommonDatabase) CreateKeyPair(ctx context.Context, tx *sql.Tx, keyPair *models.KeyPair) error {
 
 	now := time.Now().UTC()
 
@@ -24,7 +24,7 @@ func (d *CommonDatabase) CreateKeyPair(tx *sql.Tx, keyPair *models.KeyPair) erro
 
 	insertBuilder := keyPairStruct.WithoutTag("pk").InsertInto("key_pairs", keyPair)
 
-	id, err := d.insertReturningId(context.Background(), tx, insertBuilder, "keyPair")
+	id, err := d.insertReturningId(ctx, tx, insertBuilder, "keyPair")
 	if err != nil {
 		keyPair.CreatedAt = originalCreatedAt
 		keyPair.UpdatedAt = originalUpdatedAt
@@ -35,7 +35,7 @@ func (d *CommonDatabase) CreateKeyPair(tx *sql.Tx, keyPair *models.KeyPair) erro
 	return nil
 }
 
-func (d *CommonDatabase) UpdateKeyPair(tx *sql.Tx, keyPair *models.KeyPair) error {
+func (d *CommonDatabase) UpdateKeyPair(ctx context.Context, tx *sql.Tx, keyPair *models.KeyPair) error {
 
 	if keyPair.Id == 0 {
 		return errs.New("can't update keyPair with id 0")
@@ -51,7 +51,7 @@ func (d *CommonDatabase) UpdateKeyPair(tx *sql.Tx, keyPair *models.KeyPair) erro
 	updateBuilder.Where(updateBuilder.Equal("id", keyPair.Id))
 
 	sql, args := updateBuilder.Build()
-	_, err := d.ExecSql(context.Background(), tx, sql, args...)
+	_, err := d.ExecSql(ctx, tx, sql, args...)
 	if err != nil {
 		keyPair.UpdatedAt = originalUpdatedAt
 		return errs.Wrap(err, "unable to update keyPair")
@@ -64,7 +64,7 @@ func (d *CommonDatabase) UpdateKeyPair(tx *sql.Tx, keyPair *models.KeyPair) erro
 // is the one that made the transition. The state predicate is what makes it a compare-and-set:
 // without it two concurrent rotations both write the snapshot they read, and the loser deletes
 // the previous key the winner had just demoted, retiring every token that key signed (#251).
-func (d *CommonDatabase) UpdateKeyPairState(tx *sql.Tx, keyPairId int64, fromState string,
+func (d *CommonDatabase) UpdateKeyPairState(ctx context.Context, tx *sql.Tx, keyPairId int64, fromState string,
 	toState string) (bool, error) {
 
 	if keyPairId == 0 {
@@ -83,7 +83,7 @@ func (d *CommonDatabase) UpdateKeyPairState(tx *sql.Tx, keyPairId int64, fromSta
 	)
 
 	query, args := ub.BuildWithFlavor(d.Flavor)
-	result, err := d.ExecSql(context.Background(), tx, query, args...)
+	result, err := d.ExecSql(ctx, tx, query, args...)
 	if err != nil {
 		return false, errs.Wrap(err, "unable to update keyPair state")
 	}
@@ -96,11 +96,11 @@ func (d *CommonDatabase) UpdateKeyPairState(tx *sql.Tx, keyPairId int64, fromSta
 	return rowsAffected == 1, nil
 }
 
-func (d *CommonDatabase) getKeyPairCommon(tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
+func (d *CommonDatabase) getKeyPairCommon(ctx context.Context, tx *sql.Tx, selectBuilder *sqlbuilder.SelectBuilder,
 	keyPairStruct *sqlbuilder.Struct) (*models.KeyPair, error) {
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(context.Background(), tx, sql, args...)
+	rows, err := d.QuerySql(ctx, tx, sql, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -122,7 +122,7 @@ func (d *CommonDatabase) getKeyPairCommon(tx *sql.Tx, selectBuilder *sqlbuilder.
 	return nil, nil
 }
 
-func (d *CommonDatabase) GetKeyPairById(tx *sql.Tx, keyPairId int64) (*models.KeyPair, error) {
+func (d *CommonDatabase) GetKeyPairById(ctx context.Context, tx *sql.Tx, keyPairId int64) (*models.KeyPair, error) {
 
 	keyPairStruct := sqlbuilder.NewStruct(new(models.KeyPair)).
 		For(d.Flavor)
@@ -130,7 +130,7 @@ func (d *CommonDatabase) GetKeyPairById(tx *sql.Tx, keyPairId int64) (*models.Ke
 	selectBuilder := keyPairStruct.SelectFrom("key_pairs")
 	selectBuilder.Where(selectBuilder.Equal("id", keyPairId))
 
-	keyPair, err := d.getKeyPairCommon(tx, selectBuilder, keyPairStruct)
+	keyPair, err := d.getKeyPairCommon(ctx, tx, selectBuilder, keyPairStruct)
 	if err != nil {
 		return nil, err
 	}
@@ -138,14 +138,14 @@ func (d *CommonDatabase) GetKeyPairById(tx *sql.Tx, keyPairId int64) (*models.Ke
 	return keyPair, nil
 }
 
-func (d *CommonDatabase) GetAllSigningKeys(tx *sql.Tx) ([]models.KeyPair, error) {
+func (d *CommonDatabase) GetAllSigningKeys(ctx context.Context, tx *sql.Tx) ([]models.KeyPair, error) {
 	keyPairStruct := sqlbuilder.NewStruct(new(models.KeyPair)).
 		For(d.Flavor)
 
 	selectBuilder := keyPairStruct.SelectFrom("key_pairs")
 
 	sql, args := selectBuilder.Build()
-	rows, err := d.QuerySql(context.Background(), tx, sql, args...)
+	rows, err := d.QuerySql(ctx, tx, sql, args...)
 	if err != nil {
 		return nil, errs.Wrap(err, "unable to query database")
 	}
@@ -175,14 +175,14 @@ func (d *CommonDatabase) GetAllSigningKeys(tx *sql.Tx) ([]models.KeyPair, error)
 // diagnosable failure, and a deployment with no current key cannot validate the bearer token
 // needed to repair itself. Returning the error here is what makes all of those sites correct
 // at once, including ones added later (#251).
-func (d *CommonDatabase) GetCurrentSigningKey(tx *sql.Tx) (*models.KeyPair, error) {
+func (d *CommonDatabase) GetCurrentSigningKey(ctx context.Context, tx *sql.Tx) (*models.KeyPair, error) {
 	keyPairStruct := sqlbuilder.NewStruct(new(models.KeyPair)).
 		For(d.Flavor)
 
 	selectBuilder := keyPairStruct.SelectFrom("key_pairs")
 	selectBuilder.Where(selectBuilder.Equal("state", models.KeyStateCurrent.String()))
 
-	keyPair, err := d.getKeyPairCommon(tx, selectBuilder, keyPairStruct)
+	keyPair, err := d.getKeyPairCommon(ctx, tx, selectBuilder, keyPairStruct)
 	if err != nil {
 		return nil, err
 	}
@@ -194,7 +194,7 @@ func (d *CommonDatabase) GetCurrentSigningKey(tx *sql.Tx) (*models.KeyPair, erro
 	return keyPair, nil
 }
 
-func (d *CommonDatabase) DeleteKeyPair(tx *sql.Tx, keyPairId int64) error {
+func (d *CommonDatabase) DeleteKeyPair(ctx context.Context, tx *sql.Tx, keyPairId int64) error {
 
 	userConsentStruct := sqlbuilder.NewStruct(new(models.KeyPair)).
 		For(d.Flavor)
@@ -203,7 +203,7 @@ func (d *CommonDatabase) DeleteKeyPair(tx *sql.Tx, keyPairId int64) error {
 	deleteBuilder.Where(deleteBuilder.Equal("id", keyPairId))
 
 	sql, args := deleteBuilder.Build()
-	_, err := d.ExecSql(context.Background(), tx, sql, args...)
+	_, err := d.ExecSql(ctx, tx, sql, args...)
 	if err != nil {
 		return errs.Wrap(err, "unable to delete keyPair")
 	}

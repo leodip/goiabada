@@ -33,7 +33,7 @@ func HandleAPIGroupMembersGet(
 			return
 		}
 
-		group, err := database.GetGroupById(nil, id)
+		group, err := database.GetGroupById(r.Context(), nil, id)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting group by ID for members"), "group_id", id)
 			return
@@ -59,7 +59,7 @@ func HandleAPIGroupMembersGet(
 		}
 
 		// Get group members with pagination
-		members, total, err := database.GetGroupMembersPaginated(nil, group.Id, page, size)
+		members, total, err := database.GetGroupMembersPaginated(r.Context(), nil, group.Id, page, size)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting group members paginated"), "group_id", group.Id, "page", page, "size", size)
 			return
@@ -106,7 +106,7 @@ func HandleAPIGroupMemberAddPost(
 		}
 
 		// Validate group exists
-		group, err := database.GetGroupById(nil, groupId)
+		group, err := database.GetGroupById(r.Context(), nil, groupId)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting group by ID for member add"), "group_id", groupId)
 			return
@@ -196,7 +196,7 @@ func HandleAPIGroupMemberDelete(
 		}
 
 		// Validate group exists
-		group, err := database.GetGroupById(nil, groupId)
+		group, err := database.GetGroupById(r.Context(), nil, groupId)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting group by ID for member delete"), "group_id", groupId)
 			return

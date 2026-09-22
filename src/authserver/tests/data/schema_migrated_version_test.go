@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"context"
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/data/schemadump"
@@ -34,9 +35,9 @@ func TestSchemaMigratedVersion_ReadsTheRecordedVersion(t *testing.T) {
 
 	// A number this test chose, so the reader is held to reporting the version actually
 	// recorded rather than to agreeing with itself about the head.
-	require.NoErrorf(t, h.Migrator.Migrate(migratedVersionKnownNumber),
+	require.NoErrorf(t, h.Migrator.Migrate(context.Background(), migratedVersionKnownNumber),
 		"migrate to %d on %s", migratedVersionKnownNumber, dbType())
-	got, err := schemadump.MigratedVersion(h.SQL, d)
+	got, err := schemadump.MigratedVersion(context.Background(), h.SQL, d)
 	require.NoErrorf(t, err, "read the version at %d on %s", migratedVersionKnownNumber, dbType())
 	assert.Equal(t, migratedVersionKnownNumber, got, "the reader answers the version recorded on %s", dbType())
 
@@ -44,11 +45,11 @@ func TestSchemaMigratedVersion_ReadsTheRecordedVersion(t *testing.T) {
 	// The four heads legitimately differ, so an expectation spelled out per engine would be
 	// a second copy of that list to keep current, and the useful claim is that this reader
 	// and the migrator agree about the database in front of them.
-	require.NoErrorf(t, h.Migrator.Up(), "migrate to head on %s", dbType())
-	head, dirty, err := h.Migrator.Version()
+	require.NoErrorf(t, h.Migrator.Up(context.Background()), "migrate to head on %s", dbType())
+	head, dirty, err := h.Migrator.Version(context.Background())
 	require.NoErrorf(t, err, "the runner reports the head version on %s", dbType())
 	require.Falsef(t, dirty, "the chain applied cleanly on %s", dbType())
-	got, err = schemadump.MigratedVersion(h.SQL, d)
+	got, err = schemadump.MigratedVersion(context.Background(), h.SQL, d)
 	require.NoErrorf(t, err, "read the head version on %s", dbType())
 	assert.Equalf(t, head, got, "the reader agrees with the runner about the head on %s", dbType())
 	require.Greaterf(t, got, migratedVersionKnownNumber,
@@ -59,7 +60,7 @@ func TestSchemaMigratedVersion_ReadsTheRecordedVersion(t *testing.T) {
 	// not a record of any migration chain. Recording it would commit a golden file
 	// describing a schema no chain produces.
 	setSchemaMigrationsDirty(t, h, true)
-	got, err = schemadump.MigratedVersion(h.SQL, d)
+	got, err = schemadump.MigratedVersion(context.Background(), h.SQL, d)
 	assert.Errorf(t, err, "a dirty row is refused on %s", dbType())
 	assert.Zerof(t, got, "a refusal answers 0 alongside the error and never a usable version on %s", dbType())
 	setSchemaMigrationsDirty(t, h, false)
@@ -73,7 +74,7 @@ func TestSchemaMigratedVersion_ReadsTheRecordedVersion(t *testing.T) {
 	// asking only "was there an error" would leave one of them unexercised.
 	_, err = h.SQL.Exec("DELETE FROM schema_migrations")
 	require.NoErrorf(t, err, "empty schema_migrations on %s", dbType())
-	got, err = schemadump.MigratedVersion(h.SQL, d)
+	got, err = schemadump.MigratedVersion(context.Background(), h.SQL, d)
 	if assert.Errorf(t, err, "an empty schema_migrations is refused on %s", dbType()) {
 		assert.Containsf(t, err.Error(), "holds no row",
 			"the refusal names the empty table rather than a version on %s", dbType())
@@ -85,7 +86,7 @@ func TestSchemaMigratedVersion_ReadsTheRecordedVersion(t *testing.T) {
 	// reader would have invented, so a file encoded from it would claim migration 0.
 	_, err = h.SQL.Exec("INSERT INTO schema_migrations (version, dirty) VALUES (0, " + boolLiteral(false) + ")")
 	require.NoErrorf(t, err, "record version 0 on %s", dbType())
-	got, err = schemadump.MigratedVersion(h.SQL, d)
+	got, err = schemadump.MigratedVersion(context.Background(), h.SQL, d)
 	if assert.Errorf(t, err, "version 0 is refused on %s", dbType()) {
 		assert.Containsf(t, err.Error(), "which is not a migration this repository has",
 			"the refusal names the version rather than the empty table on %s", dbType())
@@ -97,11 +98,11 @@ func TestSchemaMigratedVersion_ReadsTheRecordedVersion(t *testing.T) {
 	// table, the same fault a wrong connection or a missing permission produces.
 	_, err = h.SQL.Exec("DROP TABLE schema_migrations")
 	require.NoErrorf(t, err, "drop schema_migrations on %s", dbType())
-	got, err = schemadump.MigratedVersion(h.SQL, d)
+	got, err = schemadump.MigratedVersion(context.Background(), h.SQL, d)
 	assert.Errorf(t, err, "a query failure is an error and not a version on %s", dbType())
 	assert.Zerof(t, got, "a query failure answers 0 alongside the error on %s", dbType())
 
-	_, err = schemadump.MigratedVersion(h.SQL, schemadump.Dialect("oracle"))
+	_, err = schemadump.MigratedVersion(context.Background(), h.SQL, schemadump.Dialect("oracle"))
 	assert.Error(t, err, "an unrecognised dialect is refused before any query runs")
 }
 

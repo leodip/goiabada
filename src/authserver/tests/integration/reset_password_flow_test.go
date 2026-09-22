@@ -53,7 +53,7 @@ func plusAddress() string {
 func useMailpitSMTP(t *testing.T) func() {
 	t.Helper()
 
-	settings, err := database.GetSettingsById(nil, 1)
+	settings, err := database.GetSettingsById(context.Background(), nil, 1)
 	require.NoError(t, err)
 	previous := *settings
 
@@ -63,11 +63,11 @@ func useMailpitSMTP(t *testing.T) func() {
 	settings.SMTPEncryption = emaildelivery.SMTPEncryptionNone.String()
 	settings.SMTPFromName = "Goiabada"
 	settings.SMTPFromEmail = "noreply@goiabada.dev"
-	require.NoError(t, database.UpdateSettings(nil, settings))
+	require.NoError(t, database.UpdateSettings(context.Background(), nil, settings))
 
 	return func() {
 		restored := previous
-		_ = database.UpdateSettings(nil, &restored)
+		_ = database.UpdateSettings(context.Background(), nil, &restored)
 	}
 }
 

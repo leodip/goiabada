@@ -21,19 +21,19 @@ import (
 // enableImplicitFlowGlobally enables implicit flow at the settings level and
 // returns a cleanup function to restore the original setting.
 func enableImplicitFlowGlobally(t *testing.T) func() {
-	settings, err := database.GetSettingsById(nil, 1)
+	settings, err := database.GetSettingsById(context.Background(), nil, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
 	originalImplicitFlow := settings.ImplicitFlowEnabled
 	settings.ImplicitFlowEnabled = true
-	err = database.UpdateSettings(nil, settings)
+	err = database.UpdateSettings(context.Background(), nil, settings)
 	if err != nil {
 		t.Fatal(err)
 	}
 	return func() {
 		settings.ImplicitFlowEnabled = originalImplicitFlow
-		_ = database.UpdateSettings(nil, settings)
+		_ = database.UpdateSettings(context.Background(), nil, settings)
 	}
 }
 

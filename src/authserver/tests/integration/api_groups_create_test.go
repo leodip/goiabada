@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strings"
@@ -50,7 +51,7 @@ func TestHandleAPIGroupCreatePost_Success(t *testing.T) {
 	// Clean up - delete the created group
 	groupId := int64(group["id"].(float64))
 	defer func() {
-		_ = database.DeleteGroup(nil, groupId)
+		_ = database.DeleteGroup(context.Background(), nil, groupId)
 	}()
 }
 
@@ -148,10 +149,10 @@ func TestHandleAPIGroupCreatePost_DuplicateGroupIdentifier(t *testing.T) {
 		IncludeInIdToken:     true,
 		IncludeInAccessToken: false,
 	}
-	err := database.CreateGroup(nil, existingGroup)
+	err := database.CreateGroup(context.Background(), nil, existingGroup)
 	assert.NoError(t, err)
 	defer func() {
-		_ = database.DeleteGroup(nil, existingGroup.Id)
+		_ = database.DeleteGroup(context.Background(), nil, existingGroup.Id)
 	}()
 
 	// Try to create another group with same identifier
@@ -202,7 +203,7 @@ func TestHandleAPIGroupCreatePost_AngleBracketsRejected(t *testing.T) {
 	assert.Equal(t, "validator.description.angle_brackets", errResp.ErrorCode)
 
 	// Nothing was created.
-	stored, err := database.GetGroupByGroupIdentifier(nil, identifier)
+	stored, err := database.GetGroupByGroupIdentifier(context.Background(), nil, identifier)
 	assert.NoError(t, err)
 	assert.Nil(t, stored)
 }
@@ -235,10 +236,10 @@ func TestHandleAPIGroupCreatePost_AmpersandsAndQuotesStoredVerbatim(t *testing.T
 
 	groupId := int64(group["id"].(float64))
 	defer func() {
-		_ = database.DeleteGroup(nil, groupId)
+		_ = database.DeleteGroup(context.Background(), nil, groupId)
 	}()
 
-	stored, err := database.GetGroupById(nil, groupId)
+	stored, err := database.GetGroupById(context.Background(), nil, groupId)
 	assert.NoError(t, err)
 	assert.Equal(t, `Tom & Jerry said "hi"`, stored.Description)
 }

@@ -77,7 +77,7 @@ func HandleAPISettingsAuditLogsPut(
 		currentSettings.AuditLogsInDatabaseEnabled = req.AuditLogsInDatabaseEnabled
 		currentSettings.AuditLogRetentionDays = req.AuditLogRetentionDays
 
-		if err := database.UpdateSettings(nil, currentSettings); err != nil {
+		if err := database.UpdateSettings(r.Context(), nil, currentSettings); err != nil {
 			writeInternalServerError(w, r, err)
 			return
 		}

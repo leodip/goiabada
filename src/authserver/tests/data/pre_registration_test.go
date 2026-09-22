@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"context"
 	"database/sql"
 	"testing"
 	"time"
@@ -22,7 +23,7 @@ func TestCreatePreRegistration(t *testing.T) {
 		t.Error("Expected UpdatedAt to be set")
 	}
 
-	retrievedPreReg, err := database.GetPreRegistrationById(nil, preReg.Id)
+	retrievedPreReg, err := database.GetPreRegistrationById(context.Background(), nil, preReg.Id)
 	if err != nil {
 		t.Fatalf("Failed to retrieve created pre-registration: %v", err)
 	}
@@ -40,12 +41,12 @@ func TestUpdatePreRegistration(t *testing.T) {
 
 	time.Sleep(timestampTick)
 
-	err := database.UpdatePreRegistration(nil, preReg)
+	err := database.UpdatePreRegistration(context.Background(), nil, preReg)
 	if err != nil {
 		t.Fatalf("Failed to update pre-registration: %v", err)
 	}
 
-	updatedPreReg, err := database.GetPreRegistrationById(nil, preReg.Id)
+	updatedPreReg, err := database.GetPreRegistrationById(context.Background(), nil, preReg.Id)
 	if err != nil {
 		t.Fatalf("Failed to retrieve updated pre-registration: %v", err)
 	}
@@ -60,14 +61,14 @@ func TestUpdatePreRegistration(t *testing.T) {
 func TestGetPreRegistrationById(t *testing.T) {
 	preReg := createTestPreRegistration(t)
 
-	retrievedPreReg, err := database.GetPreRegistrationById(nil, preReg.Id)
+	retrievedPreReg, err := database.GetPreRegistrationById(context.Background(), nil, preReg.Id)
 	if err != nil {
 		t.Fatalf("Failed to get pre-registration by ID: %v", err)
 	}
 
 	validatePreRegistration(t, preReg, retrievedPreReg)
 
-	nonExistentPreReg, err := database.GetPreRegistrationById(nil, 99999)
+	nonExistentPreReg, err := database.GetPreRegistrationById(context.Background(), nil, 99999)
 	if err != nil {
 		t.Errorf("Expected no error for non-existent pre-registration, got: %v", err)
 	}
@@ -79,14 +80,14 @@ func TestGetPreRegistrationById(t *testing.T) {
 func TestGetPreRegistrationByEmail(t *testing.T) {
 	preReg := createTestPreRegistration(t)
 
-	retrievedPreReg, err := database.GetPreRegistrationByEmail(nil, preReg.Email)
+	retrievedPreReg, err := database.GetPreRegistrationByEmail(context.Background(), nil, preReg.Email)
 	if err != nil {
 		t.Fatalf("Failed to get pre-registration by email: %v", err)
 	}
 
 	validatePreRegistration(t, preReg, retrievedPreReg)
 
-	nonExistentPreReg, err := database.GetPreRegistrationByEmail(nil, "non_existent_email@example.com")
+	nonExistentPreReg, err := database.GetPreRegistrationByEmail(context.Background(), nil, "non_existent_email@example.com")
 	if err != nil {
 		t.Errorf("Expected no error for non-existent pre-registration, got: %v", err)
 	}
@@ -98,12 +99,12 @@ func TestGetPreRegistrationByEmail(t *testing.T) {
 func TestDeletePreRegistration(t *testing.T) {
 	preReg := createTestPreRegistration(t)
 
-	err := database.DeletePreRegistration(nil, preReg.Id)
+	err := database.DeletePreRegistration(context.Background(), nil, preReg.Id)
 	if err != nil {
 		t.Fatalf("Failed to delete pre-registration: %v", err)
 	}
 
-	deletedPreReg, err := database.GetPreRegistrationById(nil, preReg.Id)
+	deletedPreReg, err := database.GetPreRegistrationById(context.Background(), nil, preReg.Id)
 	if err != nil {
 		t.Fatalf("Error while checking for deleted pre-registration: %v", err)
 	}
@@ -111,7 +112,7 @@ func TestDeletePreRegistration(t *testing.T) {
 		t.Errorf("Pre-registration still exists after deletion")
 	}
 
-	err = database.DeletePreRegistration(nil, 99999)
+	err = database.DeletePreRegistration(context.Background(), nil, 99999)
 	if err != nil {
 		t.Errorf("Expected no error when deleting non-existent pre-registration, got: %v", err)
 	}
@@ -128,7 +129,7 @@ func createTestPreRegistration(t *testing.T) *models.PreRegistration {
 		VerificationCodeIssuedAt:  sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true},
 		VerificationCodeHash:      codeHashOf(t, fake.UUID()),
 	}
-	err := database.CreatePreRegistration(nil, preReg)
+	err := database.CreatePreRegistration(context.Background(), nil, preReg)
 	if err != nil {
 		t.Fatalf("Failed to create test pre-registration: %v", err)
 	}
@@ -163,7 +164,7 @@ func TestGetPreRegistrationByVerificationCodeHash(t *testing.T) {
 	preReg := createTestPreRegistration(t)
 
 	// 8. The hash that was stored finds the row it was stored on.
-	found, err := database.GetPreRegistrationByVerificationCodeHash(nil, preReg.VerificationCodeHash)
+	found, err := database.GetPreRegistrationByVerificationCodeHash(context.Background(), nil, preReg.VerificationCodeHash)
 	if err != nil {
 		t.Fatalf("lookup by the stored hash failed: %v", err)
 	}
@@ -173,7 +174,7 @@ func TestGetPreRegistrationByVerificationCodeHash(t *testing.T) {
 	validatePreRegistration(t, preReg, found)
 
 	// 9. A hash no row carries is a miss, not an error.
-	missing, err := database.GetPreRegistrationByVerificationCodeHash(nil, codeHashOf(t, fake.UUID()))
+	missing, err := database.GetPreRegistrationByVerificationCodeHash(context.Background(), nil, codeHashOf(t, fake.UUID()))
 	if err != nil {
 		t.Errorf("a hash no row carries must not be an error, got: %v", err)
 	}
@@ -200,8 +201,8 @@ func TestGetPreRegistrationByVerificationCodeHash_EmptyNeverMatches(t *testing.T
 	// can find it by hash.
 	const dormantEmail = "dormant-code-hash@goiabada.test"
 	deleteDormant := func() {
-		if leftover, err := database.GetPreRegistrationByEmail(nil, dormantEmail); err == nil && leftover != nil {
-			_ = database.DeletePreRegistration(nil, leftover.Id)
+		if leftover, err := database.GetPreRegistrationByEmail(context.Background(), nil, dormantEmail); err == nil && leftover != nil {
+			_ = database.DeletePreRegistration(context.Background(), nil, leftover.Id)
 		}
 	}
 	deleteDormant()
@@ -211,7 +212,7 @@ func TestGetPreRegistrationByVerificationCodeHash_EmptyNeverMatches(t *testing.T
 		Email:        dormantEmail,
 		PasswordHash: fake.Password(16),
 	}
-	if err := database.CreatePreRegistration(nil, dormant); err != nil {
+	if err := database.CreatePreRegistration(context.Background(), nil, dormant); err != nil {
 		t.Fatalf("Failed to create the dormant pre-registration: %v", err)
 	}
 
@@ -219,7 +220,7 @@ func TestGetPreRegistrationByVerificationCodeHash_EmptyNeverMatches(t *testing.T
 		t.Fatalf("a pre-registration written without a code hash must carry '', got %q", dormant.VerificationCodeHash)
 	}
 
-	found, err := database.GetPreRegistrationByVerificationCodeHash(nil, "")
+	found, err := database.GetPreRegistrationByVerificationCodeHash(context.Background(), nil, "")
 	if err != nil {
 		t.Errorf("an empty hash must not be an error, got: %v", err)
 	}
@@ -229,7 +230,7 @@ func TestGetPreRegistrationByVerificationCodeHash_EmptyNeverMatches(t *testing.T
 
 	// The same fact from the other side: a real hash nobody holds still misses while the
 	// dormant row is present, so the guard is not the only thing answering.
-	found, err = database.GetPreRegistrationByVerificationCodeHash(nil, codeHashOf(t, "a code nobody was ever issued"))
+	found, err = database.GetPreRegistrationByVerificationCodeHash(context.Background(), nil, codeHashOf(t, "a code nobody was ever issued"))
 	if err != nil {
 		t.Errorf("a hash no row carries must not be an error, got: %v", err)
 	}
@@ -254,13 +255,13 @@ func TestGetPreRegistrationByVerificationCodeHash_Transaction(t *testing.T) {
 		VerificationCodeIssuedAt:  sql.NullTime{Time: time.Now().UTC().Truncate(time.Microsecond), Valid: true},
 		VerificationCodeHash:      hash,
 	}
-	if err := database.CreatePreRegistration(tx, preReg); err != nil {
+	if err := database.CreatePreRegistration(context.Background(), tx, preReg); err != nil {
 		t.Fatalf("Failed to create the pre-registration inside the transaction: %v", err)
 	}
 
 	// 11. Visible through the transaction that wrote it. A method ignoring its tx would
 	// query the pool, which cannot see this write.
-	inTx, err := database.GetPreRegistrationByVerificationCodeHash(tx, hash)
+	inTx, err := database.GetPreRegistrationByVerificationCodeHash(context.Background(), tx, hash)
 	if err != nil {
 		t.Fatalf("lookup through the writing transaction failed: %v", err)
 	}
@@ -271,12 +272,12 @@ func TestGetPreRegistrationByVerificationCodeHash_Transaction(t *testing.T) {
 		t.Errorf("found pre-registration id %d through the transaction, want %d", inTx.Id, preReg.Id)
 	}
 
-	if err := database.RollbackTransaction(tx); err != nil {
+	if err := database.RollbackTransaction(context.Background(), tx); err != nil {
 		t.Fatalf("RollbackTransaction failed: %v", err)
 	}
 
 	// 12a. Rolled back, so nothing carries the hash any more.
-	afterRollback, err := database.GetPreRegistrationByVerificationCodeHash(nil, hash)
+	afterRollback, err := database.GetPreRegistrationByVerificationCodeHash(context.Background(), nil, hash)
 	if err != nil {
 		t.Fatalf("lookup after rollback failed: %v", err)
 	}
@@ -285,7 +286,7 @@ func TestGetPreRegistrationByVerificationCodeHash_Transaction(t *testing.T) {
 	}
 
 	// 12b. The finished transaction is the forced fault.
-	failed, err := database.GetPreRegistrationByVerificationCodeHash(tx, hash)
+	failed, err := database.GetPreRegistrationByVerificationCodeHash(context.Background(), tx, hash)
 	if err == nil {
 		t.Error("a lookup through a finished transaction must return an error, not a benign nil")
 	}
@@ -306,11 +307,11 @@ func TestCreatePreRegistration_DistinctCodeHashesCoexist(t *testing.T) {
 		t.Fatal("the two seeded rows must carry different hashes for this case to prove anything")
 	}
 
-	foundFirst, err := database.GetPreRegistrationByVerificationCodeHash(nil, first.VerificationCodeHash)
+	foundFirst, err := database.GetPreRegistrationByVerificationCodeHash(context.Background(), nil, first.VerificationCodeHash)
 	if err != nil || foundFirst == nil || foundFirst.Id != first.Id {
 		t.Fatalf("the first hash must find the first row: row=%v err=%v", foundFirst, err)
 	}
-	foundSecond, err := database.GetPreRegistrationByVerificationCodeHash(nil, second.VerificationCodeHash)
+	foundSecond, err := database.GetPreRegistrationByVerificationCodeHash(context.Background(), nil, second.VerificationCodeHash)
 	if err != nil || foundSecond == nil || foundSecond.Id != second.Id {
 		t.Fatalf("the second hash must find the second row: row=%v err=%v", foundSecond, err)
 	}

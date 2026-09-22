@@ -420,7 +420,7 @@ func (ds *DatabaseSeeder) Seed(ctx context.Context) error {
 		PublicKeyASN1_DER: publicKeyASN1_DER,
 		PublicKeyJWK:      publicKeyJWK,
 	}
-	err = ds.DB.CreateKeyPair(nil, keyPair)
+	err = ds.DB.CreateKeyPair(ctx, nil, keyPair)
 	if err != nil {
 		return err
 	}
@@ -465,7 +465,7 @@ func (ds *DatabaseSeeder) Seed(ctx context.Context) error {
 		PublicKeyASN1_DER: publicKeyASN1_DER,
 		PublicKeyJWK:      publicKeyJWK,
 	}
-	err = ds.DB.CreateKeyPair(nil, keyPair)
+	err = ds.DB.CreateKeyPair(ctx, nil, keyPair)
 	if err != nil {
 		return err
 	}
@@ -501,7 +501,7 @@ func (ds *DatabaseSeeder) Seed(ctx context.Context) error {
 		AuditLogsInDatabaseEnabled:              true,  // Enabled by default for compliance
 		AuditLogRetentionDays:                   180,   // 180 days default retention
 	}
-	err = ds.DB.CreateSettings(nil, settings)
+	err = ds.DB.CreateSettings(ctx, nil, settings)
 	if err != nil {
 		return err
 	}

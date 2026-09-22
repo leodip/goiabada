@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"context"
 	"sync"
 	"testing"
 
@@ -43,7 +44,7 @@ func secondDatabase(t *testing.T) data.Database {
 	t.Helper()
 
 	secondHandleOnce.Do(func() {
-		secondHandle, secondHandleErr = datafactory.NewDatabase(config.GetDatabase(),
+		secondHandle, secondHandleErr = datafactory.NewDatabase(context.Background(), config.GetDatabase(),
 			config.GetAESEncryptionKey(), config.GetAESEncryptionKeyPrevious(), false)
 	})
 

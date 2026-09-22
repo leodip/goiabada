@@ -125,7 +125,7 @@ func HandleAccountRegisterPost(
 			return
 		}
 
-		preRegistration, err := database.GetPreRegistrationByEmail(nil, email)
+		preRegistration, err := database.GetPreRegistrationByEmail(r.Context(), nil, email)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
@@ -195,7 +195,7 @@ func HandleAccountRegisterPost(
 				VerificationCodeHash:      verificationCodeHash,
 			}
 
-			err = database.CreatePreRegistration(nil, preRegistration)
+			err = database.CreatePreRegistration(r.Context(), nil, preRegistration)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
 				return

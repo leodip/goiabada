@@ -18,7 +18,7 @@ func TestCreateGroup(t *testing.T) {
 		IncludeInAccessToken: false,
 	}
 
-	err := database.CreateGroup(nil, group)
+	err := database.CreateGroup(context.Background(), nil, group)
 	if err != nil {
 		t.Fatalf("Failed to create group: %v", err)
 	}
@@ -33,7 +33,7 @@ func TestCreateGroup(t *testing.T) {
 		t.Error("Expected UpdatedAt to be set")
 	}
 
-	retrievedGroup, err := database.GetGroupById(nil, group.Id)
+	retrievedGroup, err := database.GetGroupById(context.Background(), nil, group.Id)
 	if err != nil {
 		t.Fatalf("Failed to retrieve created group: %v", err)
 	}
@@ -62,12 +62,12 @@ func TestUpdateGroup(t *testing.T) {
 	// Wait a moment to ensure UpdatedAt will be different
 	time.Sleep(timestampTick)
 
-	err := database.UpdateGroup(nil, group)
+	err := database.UpdateGroup(context.Background(), nil, group)
 	if err != nil {
 		t.Fatalf("Failed to update group: %v", err)
 	}
 
-	updatedGroup, err := database.GetGroupById(nil, group.Id)
+	updatedGroup, err := database.GetGroupById(context.Background(), nil, group.Id)
 	if err != nil {
 		t.Fatalf("Failed to retrieve updated group: %v", err)
 	}
@@ -89,7 +89,7 @@ func TestUpdateGroup(t *testing.T) {
 func TestGetGroupById(t *testing.T) {
 	group := createTestGroup(t)
 
-	retrievedGroup, err := database.GetGroupById(nil, group.Id)
+	retrievedGroup, err := database.GetGroupById(context.Background(), nil, group.Id)
 	if err != nil {
 		t.Fatalf("Failed to get group by ID: %v", err)
 	}
@@ -101,7 +101,7 @@ func TestGetGroupById(t *testing.T) {
 		t.Errorf("Expected GroupIdentifier %s, got %s", group.GroupIdentifier, retrievedGroup.GroupIdentifier)
 	}
 
-	nonExistentGroup, err := database.GetGroupById(nil, 99999)
+	nonExistentGroup, err := database.GetGroupById(context.Background(), nil, 99999)
 	if err != nil {
 		t.Errorf("Expected no error for non-existent group, got: %v", err)
 	}
@@ -113,7 +113,7 @@ func TestGetGroupById(t *testing.T) {
 func TestGetGroupByGroupIdentifier(t *testing.T) {
 	group := createTestGroup(t)
 
-	retrievedGroup, err := database.GetGroupByGroupIdentifier(nil, group.GroupIdentifier)
+	retrievedGroup, err := database.GetGroupByGroupIdentifier(context.Background(), nil, group.GroupIdentifier)
 	if err != nil {
 		t.Fatalf("Failed to get group by identifier: %v", err)
 	}
@@ -125,7 +125,7 @@ func TestGetGroupByGroupIdentifier(t *testing.T) {
 		t.Errorf("Expected GroupIdentifier %s, got %s", group.GroupIdentifier, retrievedGroup.GroupIdentifier)
 	}
 
-	nonExistentGroup, err := database.GetGroupByGroupIdentifier(nil, "non_existent_identifier")
+	nonExistentGroup, err := database.GetGroupByGroupIdentifier(context.Background(), nil, "non_existent_identifier")
 	if err != nil {
 		t.Errorf("Expected no error for non-existent group, got: %v", err)
 	}
@@ -138,7 +138,7 @@ func TestGetAllGroups(t *testing.T) {
 	group1 := createTestGroup(t)
 	group2 := createTestGroup(t)
 
-	groups, err := database.GetAllGroups(nil)
+	groups, err := database.GetAllGroups(context.Background(), nil)
 	if err != nil {
 		t.Fatalf("Failed to get all groups: %v", err)
 	}
@@ -179,7 +179,7 @@ func TestGetAllGroupsPaginated(t *testing.T) {
 	const numGroups = 25
 
 	// Page size 1 is the cheapest way to read the current total.
-	_, baseline, err := database.GetAllGroupsPaginated(nil, 1, 1)
+	_, baseline, err := database.GetAllGroupsPaginated(context.Background(), nil, 1, 1)
 	if err != nil {
 		t.Fatalf("Failed to read the baseline group count: %v", err)
 	}
@@ -191,7 +191,7 @@ func TestGetAllGroupsPaginated(t *testing.T) {
 		// Remove only what this test made. Unlike the old table-wide wipe this
 		// touches nothing another test owns, and it keeps the table from growing by
 		// 25 rows on every run of the three server databases, which are never reset.
-		t.Cleanup(func() { _ = database.DeleteGroup(nil, group.Id) })
+		t.Cleanup(func() { _ = database.DeleteGroup(context.Background(), nil, group.Id) })
 	}
 
 	expectedTotal := baseline + numGroups
@@ -209,7 +209,7 @@ func TestGetAllGroupsPaginated(t *testing.T) {
 		{"last page holds the remainder", lastPage, expectedOnLastPage},
 		{"page past the end is empty", lastPage + 1, 0},
 	} {
-		groups, total, err := database.GetAllGroupsPaginated(nil, tc.page, pageSize)
+		groups, total, err := database.GetAllGroupsPaginated(context.Background(), nil, tc.page, pageSize)
 		if err != nil {
 			t.Fatalf("%s: failed to get page %d: %v", tc.name, tc.page, err)
 		}
@@ -224,7 +224,7 @@ func TestGetAllGroupsPaginated(t *testing.T) {
 	}
 
 	// Read everything in one page, as the reference for what the pages should tile.
-	all, total, err := database.GetAllGroupsPaginated(nil, 1, expectedTotal)
+	all, total, err := database.GetAllGroupsPaginated(context.Background(), nil, 1, expectedTotal)
 	if err != nil {
 		t.Fatalf("Failed to read all groups in one page: %v", err)
 	}
@@ -254,7 +254,7 @@ func TestGetAllGroupsPaginated(t *testing.T) {
 	// engine no matter which one we picked. Comparing the pages against the full
 	// read tests the offset arithmetic without needing to know the collation.
 	for _, page := range []int{1, 2} {
-		groups, _, err := database.GetAllGroupsPaginated(nil, page, pageSize)
+		groups, _, err := database.GetAllGroupsPaginated(context.Background(), nil, page, pageSize)
 		if err != nil {
 			t.Fatalf("Failed to get page %d: %v", page, err)
 		}
@@ -271,12 +271,12 @@ func TestGetAllGroupsPaginated(t *testing.T) {
 func TestDeleteGroup(t *testing.T) {
 	group := createTestGroup(t)
 
-	err := database.DeleteGroup(nil, group.Id)
+	err := database.DeleteGroup(context.Background(), nil, group.Id)
 	if err != nil {
 		t.Fatalf("Failed to delete group: %v", err)
 	}
 
-	deletedGroup, err := database.GetGroupById(nil, group.Id)
+	deletedGroup, err := database.GetGroupById(context.Background(), nil, group.Id)
 	if err != nil {
 		t.Fatalf("Error while checking for deleted group: %v", err)
 	}
@@ -284,7 +284,7 @@ func TestDeleteGroup(t *testing.T) {
 		t.Errorf("Group still exists after deletion")
 	}
 
-	err = database.DeleteGroup(nil, 99999)
+	err = database.DeleteGroup(context.Background(), nil, 99999)
 	if err != nil {
 		t.Errorf("Expected no error when deleting non-existent group, got: %v", err)
 	}
@@ -296,7 +296,7 @@ func createTestGroup(t *testing.T) *models.Group {
 		GroupIdentifier: "TestGroup_" + random,
 		Description:     "Test Group Description",
 	}
-	err := database.CreateGroup(nil, group)
+	err := database.CreateGroup(context.Background(), nil, group)
 	if err != nil {
 		t.Fatalf("Failed to create test group: %v", err)
 	}
@@ -317,14 +317,14 @@ func TestGetGroupByGroupIdentifierIsCaseSensitive(t *testing.T) {
 	upper := strings.ToUpper(lower)
 
 	lowerGroup := &models.Group{GroupIdentifier: lower, Description: "lowercase"}
-	if err := database.CreateGroup(nil, lowerGroup); err != nil {
+	if err := database.CreateGroup(context.Background(), nil, lowerGroup); err != nil {
 		t.Fatalf("Failed to create the lowercase group: %v", err)
 	}
 
 	// A second group differing from the first only by case, which MySQL and SQL Server
 	// refused before 000040.
 	upperGroup := &models.Group{GroupIdentifier: upper, Description: "uppercase"}
-	if err := database.CreateGroup(nil, upperGroup); err != nil {
+	if err := database.CreateGroup(context.Background(), nil, upperGroup); err != nil {
 		t.Fatalf("Failed to create a group differing only by case, which every engine must now accept: %v", err)
 	}
 
@@ -338,7 +338,7 @@ func TestGetGroupByGroupIdentifierIsCaseSensitive(t *testing.T) {
 		{"a mis-cased name resolves nothing", "Case_Group_" + strings.ToUpper(lower[11:]), 0},
 		{"a trailing space resolves nothing, which SQL Server's padding would otherwise defeat", lower + " ", 0},
 	} {
-		got, err := database.GetGroupByGroupIdentifier(nil, tc.lookup)
+		got, err := database.GetGroupByGroupIdentifier(context.Background(), nil, tc.lookup)
 		if err != nil {
 			t.Fatalf("%s: unexpected error: %v", tc.name, err)
 		}
@@ -372,7 +372,7 @@ func TestGetGroupMembersPaginated_EnlistsInTheCallersTransaction(t *testing.T) {
 		GroupIdentifier: "TxGroup_" + fake.LetterN(8),
 		Description:     "Transaction pass-through group",
 	}
-	if err := database.CreateGroup(tx, group); err != nil {
+	if err := database.CreateGroup(context.Background(), tx, group); err != nil {
 		t.Fatalf("Failed to create group inside the transaction: %v", err)
 	}
 
@@ -392,7 +392,7 @@ func TestGetGroupMembersPaginated_EnlistsInTheCallersTransaction(t *testing.T) {
 		t.Fatalf("Failed to create users_groups row inside the transaction: %v", err)
 	}
 
-	members, total, err := database.GetGroupMembersPaginated(tx, group.Id, 1, 10)
+	members, total, err := database.GetGroupMembersPaginated(context.Background(), tx, group.Id, 1, 10)
 	if err != nil {
 		t.Fatalf("GetGroupMembersPaginated through the transaction: %v", err)
 	}
@@ -408,7 +408,7 @@ func TestGetGroupMembersPaginated_EnlistsInTheCallersTransaction(t *testing.T) {
 			"the count query ran outside the caller's transaction (#413)", total)
 	}
 
-	if err := database.RollbackTransaction(tx); err != nil {
+	if err := database.RollbackTransaction(context.Background(), tx); err != nil {
 		t.Fatalf("RollbackTransaction: %v", err)
 	}
 }

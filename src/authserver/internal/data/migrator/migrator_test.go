@@ -179,7 +179,7 @@ func TestMigrate_UpMarksTheVersionBeingApplied(t *testing.T) {
 	db := openTestDB(t)
 	m := newTestMigrator(t, db, threeVersions())
 
-	require.NoError(t, m.Migrate(2))
+	require.NoError(t, m.Migrate(context.Background(), 2))
 
 	assert.Equal(t, []RecordedVersion{{Version: 2, Dirty: false}}, recorded(t, db))
 	assert.True(t, tableExists(t, db, "t1"), "000001 ran")
@@ -192,7 +192,7 @@ func TestUp_GoesToTheHighestVersionTheBinaryCarries(t *testing.T) {
 	db := openTestDB(t)
 	m := newTestMigrator(t, db, threeVersions())
 
-	require.NoError(t, m.Up())
+	require.NoError(t, m.Up(context.Background()))
 
 	assert.Equal(t, []RecordedVersion{{Version: 5, Dirty: false}}, recorded(t, db))
 	assert.Equal(t, 5, m.Head())
@@ -203,12 +203,12 @@ func TestUp_GoesToTheHighestVersionTheBinaryCarries(t *testing.T) {
 func TestMigrate_DownMarksThePreviousVersionTheEngineCarries(t *testing.T) {
 	db := openTestDB(t)
 	m := newTestMigrator(t, db, threeVersions())
-	require.NoError(t, m.Up())
+	require.NoError(t, m.Up(context.Background()))
 
 	// 000005's down runs and the marker lands on 000002, the previous version this set carries,
 	// not on 000004. The marker names where the schema now is, which is what an interrupted step
 	// has to leave behind for an operator to read.
-	require.NoError(t, m.Migrate(2))
+	require.NoError(t, m.Migrate(context.Background(), 2))
 
 	assert.Equal(t, []RecordedVersion{{Version: 2, Dirty: false}}, recorded(t, db))
 	assert.False(t, tableExists(t, db, "t5"), "000005's down ran")
@@ -219,9 +219,9 @@ func TestMigrate_DownMarksThePreviousVersionTheEngineCarries(t *testing.T) {
 func TestMigrate_DownToTheFloorLeavesTheTableEmpty(t *testing.T) {
 	db := openTestDB(t)
 	m := newTestMigrator(t, db, threeVersions())
-	require.NoError(t, m.Up())
+	require.NoError(t, m.Up(context.Background()))
 
-	require.NoError(t, m.Migrate(NilVersion))
+	require.NoError(t, m.Migrate(context.Background(), NilVersion))
 
 	// Empty, not a row saying -1: a clean nil version is an empty table, which is what a database
 	// that was never migrated looks like, so the two are indistinguishable by design.
@@ -235,13 +235,13 @@ func TestMigrate_DownToTheFloorLeavesTheTableEmpty(t *testing.T) {
 func TestMigrate_NoChangeWhenAlreadyThere(t *testing.T) {
 	db := openTestDB(t)
 	m := newTestMigrator(t, db, threeVersions())
-	require.NoError(t, m.Up())
+	require.NoError(t, m.Up(context.Background()))
 
-	assert.ErrorIs(t, m.Migrate(5), ErrNoChange)
-	assert.ErrorIs(t, m.Up(), ErrNoChange)
+	assert.ErrorIs(t, m.Migrate(context.Background(), 5), ErrNoChange)
+	assert.ErrorIs(t, m.Up(context.Background()), ErrNoChange)
 	// And on a database nothing has touched, where current and target are both the nil version.
 	fresh := openTestDB(t)
-	assert.ErrorIs(t, newTestMigrator(t, fresh, threeVersions()).Migrate(NilVersion), ErrNoChange)
+	assert.ErrorIs(t, newTestMigrator(t, fresh, threeVersions()).Migrate(context.Background(), NilVersion), ErrNoChange)
 	assertPoolReturned(t, db)
 }
 
@@ -255,10 +255,10 @@ func TestMigrate_AVersionWithNoFileInThisDirectionRunsNothingAndStillMoves(t *te
 	})
 	db := openTestDB(t)
 	m := newTestMigrator(t, db, files)
-	require.NoError(t, m.Up())
+	require.NoError(t, m.Up(context.Background()))
 	require.True(t, tableExists(t, db, "t2"))
 
-	require.NoError(t, m.Migrate(1))
+	require.NoError(t, m.Migrate(context.Background(), 1))
 
 	assert.Equal(t, []RecordedVersion{{Version: 1, Dirty: false}}, recorded(t, db))
 	assert.True(t, tableExists(t, db, "t2"), "000002 has no down file, so nothing undid it")
@@ -269,24 +269,24 @@ func TestPlan_ListsTheMigrationsThatWouldRunInBothDirections(t *testing.T) {
 	db := openTestDB(t)
 	m := newTestMigrator(t, db, threeVersions())
 
-	up, err := m.Plan(5)
+	up, err := m.Plan(context.Background(), 5)
 	require.NoError(t, err)
 	assert.Equal(t, []int{1, 2, 5}, up)
 	assert.Empty(t, recorded(t, db), "Plan runs nothing")
 
-	require.NoError(t, m.Up())
+	require.NoError(t, m.Up(context.Background()))
 
-	down, err := m.Plan(1)
+	down, err := m.Plan(context.Background(), 1)
 	require.NoError(t, err)
 	// Highest first, and it names the down files that run rather than the markers they leave, so
 	// an operator sees which migrations are being rolled back.
 	assert.Equal(t, []int{5, 2}, down)
 
-	toFloor, err := m.Plan(NilVersion)
+	toFloor, err := m.Plan(context.Background(), NilVersion)
 	require.NoError(t, err)
 	assert.Equal(t, []int{5, 2, 1}, toFloor)
 
-	_, err = m.Plan(5)
+	_, err = m.Plan(context.Background(), 5)
 	assert.ErrorIs(t, err, ErrNoChange)
 	assertPoolReturned(t, db)
 }
@@ -295,7 +295,7 @@ func TestForce_RecordsAVersionAndRunsNothing(t *testing.T) {
 	db := openTestDB(t)
 	m := newTestMigrator(t, db, threeVersions())
 
-	require.NoError(t, m.Force(2))
+	require.NoError(t, m.Force(context.Background(), 2))
 
 	assert.Equal(t, []RecordedVersion{{Version: 2, Dirty: false}}, recorded(t, db))
 	assert.False(t, tableExists(t, db, "t1"), "Force applies no file")
@@ -310,11 +310,11 @@ func TestVersion_EmptyTableIsNeverMigrated(t *testing.T) {
 	db := openTestDB(t)
 	m := newTestMigrator(t, db, threeVersions())
 
-	_, _, err := m.Version()
+	_, _, err := m.Version(context.Background())
 	assert.ErrorIs(t, err, ErrNilVersion)
 
-	require.NoError(t, m.Migrate(2))
-	v, dirty, err := m.Version()
+	require.NoError(t, m.Migrate(context.Background(), 2))
+	v, dirty, err := m.Version(context.Background())
 	require.NoError(t, err)
 	assert.Equal(t, 2, v)
 	assert.False(t, dirty)
@@ -329,15 +329,15 @@ func TestVersion_RefusesMoreThanOneRow(t *testing.T) {
 
 	// Every entry point refuses, because every one of them starts by reading this table and none
 	// of them can tell which row the schema matches.
-	_, _, err = m.Version()
+	_, _, err = m.Version(context.Background())
 	var multi ErrMultipleVersions
 	require.ErrorAs(t, err, &multi)
 	assert.Contains(t, err.Error(), "000002")
 	assert.Contains(t, err.Error(), "000005")
 
-	assert.ErrorAs(t, m.Up(), &multi)
-	assert.ErrorAs(t, m.Migrate(1), &multi)
-	_, planErr := m.Plan(1)
+	assert.ErrorAs(t, m.Up(context.Background()), &multi)
+	assert.ErrorAs(t, m.Migrate(context.Background(), 1), &multi)
+	_, planErr := m.Plan(context.Background(), 1)
 	assert.ErrorAs(t, planErr, &multi)
 
 	assert.False(t, tableExists(t, db, "t1"), "nothing ran")
@@ -354,11 +354,11 @@ func TestVersionRead_FailsClosedRatherThanRerunningTheChain(t *testing.T) {
 		require.NoError(t, err)
 		m := newTestMigrator(t, db, threeVersions())
 
-		_, _, err = m.Version()
+		_, _, err = m.Version(context.Background())
 		require.Error(t, err)
 		assert.NotErrorIs(t, err, ErrNilVersion)
-		require.Error(t, m.Up())
-		_, planErr := m.Plan(5)
+		require.Error(t, m.Up(context.Background()))
+		_, planErr := m.Plan(context.Background(), 5)
 		require.Error(t, planErr)
 
 		assert.False(t, tableExists(t, db, "t1"), "no migration file ran")
@@ -375,10 +375,10 @@ func TestVersionRead_FailsClosedRatherThanRerunningTheChain(t *testing.T) {
 		require.NoError(t, err)
 		m := newTestMigrator(t, db, threeVersions())
 
-		_, _, err = m.Version()
+		_, _, err = m.Version(context.Background())
 		require.Error(t, err)
 		assert.NotErrorIs(t, err, ErrNilVersion)
-		require.Error(t, m.Up())
+		require.Error(t, m.Up(context.Background()))
 
 		assert.False(t, tableExists(t, db, "t1"), "no migration file ran")
 		assertPoolReturned(t, db)
@@ -393,13 +393,13 @@ func TestBookkeepingWrite_IsOneTransaction(t *testing.T) {
 	t.Run("the dirty write fails", func(t *testing.T) {
 		db := openTestDB(t)
 		m := newTestMigrator(t, db, threeVersions())
-		require.NoError(t, m.Migrate(1))
+		require.NoError(t, m.Migrate(context.Background(), 1))
 
 		_, err := db.Exec(`CREATE TRIGGER refuse_two BEFORE INSERT ON schema_migrations
 			WHEN NEW.version = 2 BEGIN SELECT RAISE(ABORT, 'refused'); END;`)
 		require.NoError(t, err)
 
-		require.Error(t, m.Migrate(2))
+		require.Error(t, m.Migrate(context.Background(), 2))
 
 		assert.Equal(t, []RecordedVersion{{Version: 1, Dirty: false}}, recorded(t, db),
 			"the row the database was at survives the failed write")
@@ -410,13 +410,13 @@ func TestBookkeepingWrite_IsOneTransaction(t *testing.T) {
 	t.Run("the final clean write fails", func(t *testing.T) {
 		db := openTestDB(t)
 		m := newTestMigrator(t, db, threeVersions())
-		require.NoError(t, m.Migrate(1))
+		require.NoError(t, m.Migrate(context.Background(), 1))
 
 		_, err := db.Exec(`CREATE TRIGGER refuse_clean_two BEFORE INSERT ON schema_migrations
 			WHEN NEW.version = 2 AND NEW.dirty = 0 BEGIN SELECT RAISE(ABORT, 'refused'); END;`)
 		require.NoError(t, err)
 
-		require.Error(t, m.Migrate(2))
+		require.Error(t, m.Migrate(context.Background(), 2))
 
 		// The file ran, so the dirty marker is the correct record of where the schema is.
 		assert.Equal(t, []RecordedVersion{{Version: 2, Dirty: true}}, recorded(t, db))
@@ -439,7 +439,7 @@ func TestMigrate_AFailingFileLeavesTheDirtyMarkerAndRollsItsOwnStatementsBack(t 
 	db := openTestDB(t)
 	m := newTestMigrator(t, db, files)
 
-	err := m.Up()
+	err := m.Up(context.Background())
 	require.Error(t, err)
 
 	assert.Equal(t, []RecordedVersion{{Version: 2, Dirty: true}}, recorded(t, db))
@@ -457,9 +457,9 @@ func TestMigrate_RefusesADirtyDatabase(t *testing.T) {
 	m := newTestMigrator(t, db, threeVersions())
 
 	var dirty ErrDirty
-	require.ErrorAs(t, m.Up(), &dirty)
+	require.ErrorAs(t, m.Up(context.Background()), &dirty)
 	assert.Equal(t, 2, dirty.Version)
-	assert.ErrorAs(t, m.Migrate(1), &dirty)
+	assert.ErrorAs(t, m.Migrate(context.Background(), 1), &dirty)
 
 	assert.False(t, tableExists(t, db, "t1"), "nothing ran")
 	assertPoolReturned(t, db)
@@ -475,7 +475,7 @@ func TestMigrate_RefusesAVersionThisBinaryDoesNotCarry(t *testing.T) {
 		m := newTestMigrator(t, db, threeVersions())
 
 		var unknown ErrUnknownVersion
-		require.ErrorAs(t, m.Up(), &unknown)
+		require.ErrorAs(t, m.Up(context.Background()), &unknown)
 		assert.Equal(t, 9, unknown.Version)
 		assert.Equal(t, "sqlite", unknown.Engine)
 		assert.Equal(t, 5, unknown.Head)
@@ -489,10 +489,10 @@ func TestMigrate_RefusesAVersionThisBinaryDoesNotCarry(t *testing.T) {
 	t.Run("asked for as a target", func(t *testing.T) {
 		db := openTestDB(t)
 		m := newTestMigrator(t, db, threeVersions())
-		require.NoError(t, m.Migrate(1))
+		require.NoError(t, m.Migrate(context.Background(), 1))
 
 		var unknown ErrUnknownVersion
-		require.ErrorAs(t, m.Migrate(3), &unknown)
+		require.ErrorAs(t, m.Migrate(context.Background(), 3), &unknown)
 		assert.Equal(t, 3, unknown.Version)
 		assert.Equal(t, 2, unknown.Below)
 		assert.Equal(t, 5, unknown.Above)
@@ -500,7 +500,7 @@ func TestMigrate_RefusesAVersionThisBinaryDoesNotCarry(t *testing.T) {
 		assert.Contains(t, unknown.Error(), "000002")
 		assert.Contains(t, unknown.Error(), "000005")
 
-		_, planErr := m.Plan(3)
+		_, planErr := m.Plan(context.Background(), 3)
 		assert.ErrorAs(t, planErr, &unknown)
 
 		assert.Equal(t, []RecordedVersion{{Version: 1, Dirty: false}}, recorded(t, db), "nothing moved")
@@ -531,7 +531,7 @@ func TestErrDirty_DoesNotNameAPredecessorForAVersionThisBinaryDoesNotCarry(t *te
 		"000004_four.up.sql": "CREATE TABLE four (id INTEGER);",
 		"000005_five.up.sql": "THIS IS NOT SQL;",
 	}))
-	require.Error(t, newer.Up(), "000005 must fail, leaving the marker dirty at 000005")
+	require.Error(t, newer.Up(context.Background()), "000005 must fail, leaving the marker dirty at 000005")
 
 	// The older release, carrying 000001 and 000002 only, reading a marker it has no file for.
 	older := newTestMigrator(t, db, set(map[string]string{
@@ -540,7 +540,7 @@ func TestErrDirty_DoesNotNameAPredecessorForAVersionThisBinaryDoesNotCarry(t *te
 	}))
 
 	var dirty ErrDirty
-	require.ErrorAs(t, older.Up(), &dirty, "a dirty database is refused whatever the version")
+	require.ErrorAs(t, older.Up(context.Background()), &dirty, "a dirty database is refused whatever the version")
 	assert.Equal(t, 5, dirty.Version)
 	assert.False(t, dirty.Carried, "this binary has no file numbered 000005")
 
@@ -567,7 +567,7 @@ func TestErrDirty_NamesTheRecoveryVersionsForTheDirectionThatFailed(t *testing.T
 		db := openTestDB(t)
 		m := newTestMigrator(t, db, files)
 
-		err := m.Up()
+		err := m.Up(context.Background())
 		require.Error(t, err)
 		var dirty ErrDirty
 		require.ErrorAs(t, err, &dirty)
@@ -587,9 +587,9 @@ func TestErrDirty_NamesTheRecoveryVersionsForTheDirectionThatFailed(t *testing.T
 		})
 		db := openTestDB(t)
 		m := newTestMigrator(t, db, files)
-		require.NoError(t, m.Up())
+		require.NoError(t, m.Up(context.Background()))
 
-		err := m.Migrate(1)
+		err := m.Migrate(context.Background(), 1)
 		require.Error(t, err)
 		var dirty ErrDirty
 		require.ErrorAs(t, err, &dirty)
@@ -629,7 +629,7 @@ func TestErrDirty_NamesTheRecoveryVersionsForTheDirectionThatFailed(t *testing.T
 		m := newTestMigrator(t, db, files)
 
 		var dirty ErrDirty
-		require.ErrorAs(t, m.Up(), &dirty)
+		require.ErrorAs(t, m.Up(context.Background()), &dirty)
 		assert.Equal(t, 5, dirty.Version)
 		assert.Equal(t, 5, dirty.Applied)
 		assert.Equal(t, 2, dirty.Below, "the version the SOURCE carries below 000005, not 000004")
@@ -649,7 +649,7 @@ func TestErrDirty_NamesTheRecoveryVersionsForTheDirectionThatFailed(t *testing.T
 		m := newTestMigrator(t, db, files)
 
 		var dirty ErrDirty
-		require.ErrorAs(t, m.Up(), &dirty)
+		require.ErrorAs(t, m.Up(context.Background()), &dirty)
 		assert.Equal(t, 1, dirty.Version)
 		assert.Equal(t, NilVersion, dirty.Below, "there is nothing below the first migration")
 		// The state below 000001 is an unmigrated database, which is an empty table rather than
@@ -665,7 +665,7 @@ func TestErrDirty_NamesTheRecoveryVersionsForTheDirectionThatFailed(t *testing.T
 		m := newTestMigrator(t, db, threeVersions())
 
 		var dirty ErrDirty
-		require.ErrorAs(t, m.Up(), &dirty)
+		require.ErrorAs(t, m.Up(context.Background()), &dirty)
 		assert.Equal(t, AppliedUnknown, dirty.Applied, "the row records no direction")
 		assert.Equal(t, 2, dirty.Below)
 		assert.Contains(t, dirty.Error(), "version 000002 if")
@@ -685,12 +685,12 @@ func TestErrDirty_NamesTheRecoveryVersionsForTheDirectionThatFailed(t *testing.T
 		})
 		db := openTestDB(t)
 		m := newTestMigrator(t, db, files)
-		require.NoError(t, m.Up())
-		require.Error(t, m.Migrate(NilVersion), "000001's down does not run")
+		require.NoError(t, m.Up(context.Background()))
+		require.Error(t, m.Migrate(context.Background(), NilVersion), "000001's down does not run")
 		require.Equal(t, []RecordedVersion{{Version: NilVersion, Dirty: true}}, recorded(t, db))
 
 		var dirty ErrDirty
-		require.ErrorAs(t, m.Up(), &dirty, "and the restarted process refuses that row")
+		require.ErrorAs(t, m.Up(context.Background()), &dirty, "and the restarted process refuses that row")
 		assert.Equal(t, NilVersion, dirty.Version)
 		assert.Equal(t, AppliedUnknown, dirty.Applied)
 		assert.Equal(t, 1, dirty.Above, "the migration whose rollback left it")
@@ -717,10 +717,10 @@ func TestIsNoChange_RejectsTheSentinelJoinedWithAnOperationalFailure(t *testing.
 	db := openTestDB(t)
 	m, err := New(db, threeVersions(), "migrations", eng)
 	require.NoError(t, err)
-	require.Error(t, m.Up(), "the chain runs and the unlock fails")
+	require.Error(t, m.Up(context.Background()), "the chain runs and the unlock fails")
 
 	// Now at head, so the operation itself has nothing to do.
-	err = m.Up()
+	err = m.Up(context.Background())
 	require.ErrorIs(t, err, ErrNoChange, "errors.Is finds the sentinel inside the join")
 	require.ErrorIs(t, err, unlockErr, "and the failure it is joined with is in there too")
 	assert.False(t, IsNoChange(err), "which is what a caller must not read as success")
@@ -820,11 +820,11 @@ func TestRun_AFailedUnlockIsReportedAndTheSessionIsDiscarded(t *testing.T) {
 	okDB := openTestDB(t)
 	okM, err := New(okDB, threeVersions(), "migrations", ok)
 	require.NoError(t, err)
-	require.NoError(t, okM.Migrate(2))
+	require.NoError(t, okM.Migrate(context.Background(), 2))
 	assert.Equal(t, 1, okDB.Stats().OpenConnections, "a released lock leaves the session in the pool")
 
 	// The work itself succeeds, so the unlock failure is the whole of the reported error.
-	err = m.Migrate(2)
+	err = m.Migrate(context.Background(), 2)
 	require.ErrorIs(t, err, unlockErr)
 
 	// Read the pool BEFORE anything else touches it: with SetMaxIdleConns(1) a returned
@@ -838,7 +838,7 @@ func TestRun_AFailedUnlockIsReportedAndTheSessionIsDiscarded(t *testing.T) {
 	assert.Equal(t, []RecordedVersion{{Version: 2, Dirty: false}}, recorded(t, db))
 
 	// And the operation's own error is joined rather than replaced when there is one.
-	err = m.Migrate(2)
+	err = m.Migrate(context.Background(), 2)
 	require.ErrorIs(t, err, ErrNoChange)
 	assert.ErrorIs(t, err, unlockErr)
 
@@ -856,7 +856,7 @@ func TestRun_ALockedDatabaseIsRefusedAndNothingRuns(t *testing.T) {
 	m, err := New(db, threeVersions(), "migrations", eng)
 	require.NoError(t, err)
 
-	assert.ErrorIs(t, m.Up(), ErrLocked)
+	assert.ErrorIs(t, m.Up(context.Background()), ErrLocked)
 	assert.Empty(t, recorded(t, db))
 	assert.False(t, tableExists(t, db, "t1"))
 	assertPoolReturned(t, db)

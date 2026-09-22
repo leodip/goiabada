@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"os"
@@ -57,7 +58,7 @@ func TestMain(m *testing.M) {
 
 	// Initialize database
 	var err error
-	database, err = datafactory.NewDatabase(config.GetDatabase(),
+	database, err = datafactory.NewDatabase(context.Background(), config.GetDatabase(),
 		config.GetAESEncryptionKey(), config.GetAESEncryptionKeyPrevious(), false)
 	if err != nil {
 		slog.Error("failed to initialize database", "error", err)

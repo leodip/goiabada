@@ -89,22 +89,22 @@ func TestSigningKeyRotator_Rotate_Success(t *testing.T) {
 	}
 
 	stub := expectRotatorTransaction(database, nil)
-	database.On("GetAllSigningKeys", rotatorTx).Return(fullKeySet(), nil).Once().
+	database.On("GetAllSigningKeys", mock.Anything, rotatorTx).Return(fullKeySet(), nil).Once().
 		Run(record("GetAllSigningKeys"))
-	database.On("DeleteKeyPair", rotatorTx, int64(3)).Return(nil).Once().
+	database.On("DeleteKeyPair", mock.Anything, rotatorTx, int64(3)).Return(nil).Once().
 		Run(record("DeleteKeyPair"))
-	database.On("UpdateKeyPairState", rotatorTx, int64(1),
+	database.On("UpdateKeyPairState", mock.Anything, rotatorTx, int64(1),
 		models.KeyStateCurrent.String(), models.KeyStatePrevious.String()).
 		Return(true, nil).Once().Run(record("demote"))
-	database.On("UpdateKeyPairState", rotatorTx, int64(2),
+	database.On("UpdateKeyPairState", mock.Anything, rotatorTx, int64(2),
 		models.KeyStateNext.String(), models.KeyStateCurrent.String()).
 		Return(true, nil).Once().Run(record("promote"))
 
 	var created *models.KeyPair
-	database.On("CreateKeyPair", rotatorTx, mock.Anything).Return(nil).Once().
+	database.On("CreateKeyPair", mock.Anything, rotatorTx, mock.Anything).Return(nil).Once().
 		Run(func(args mock.Arguments) {
 			calls = append(calls, "CreateKeyPair")
-			created = args.Get(1).(*models.KeyPair)
+			created = args.Get(2).(*models.KeyPair)
 		})
 
 	err := newTestRotator(database).Rotate(context.Background())
@@ -147,18 +147,18 @@ func TestSigningKeyRotator_Rotate_SucceedsWithNoPreviousKey(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 
 	expectRotatorTransaction(database, nil)
-	database.On("GetAllSigningKeys", rotatorTx).Return([]models.KeyPair{
+	database.On("GetAllSigningKeys", mock.Anything, rotatorTx).Return([]models.KeyPair{
 		keyPairInState(1, models.KeyStateCurrent.String()),
 		keyPairInState(2, models.KeyStateNext.String()),
 	}, nil).Once()
-	database.On("UpdateKeyPairState", rotatorTx, int64(1),
+	database.On("UpdateKeyPairState", mock.Anything, rotatorTx, int64(1),
 		models.KeyStateCurrent.String(), models.KeyStatePrevious.String()).Return(true, nil).Once()
-	database.On("UpdateKeyPairState", rotatorTx, int64(2),
+	database.On("UpdateKeyPairState", mock.Anything, rotatorTx, int64(2),
 		models.KeyStateNext.String(), models.KeyStateCurrent.String()).Return(true, nil).Once()
-	database.On("CreateKeyPair", rotatorTx, mock.Anything).Return(nil).Once()
+	database.On("CreateKeyPair", mock.Anything, rotatorTx, mock.Anything).Return(nil).Once()
 
 	require.NoError(t, newTestRotator(database).Rotate(context.Background()))
-	database.AssertNotCalled(t, "DeleteKeyPair", mock.Anything, mock.Anything)
+	database.AssertNotCalled(t, "DeleteKeyPair", mock.Anything, mock.Anything, mock.Anything)
 }
 
 // TestSigningKeyRotator_Rotate_GuardRefusesBeforeAnyWrite is the defect this change exists
@@ -193,7 +193,7 @@ func TestSigningKeyRotator_Rotate_GuardRefusesBeforeAnyWrite(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			database := mocks_data.NewDatabase(t)
 			stub := expectRotatorTransaction(database, nil)
-			database.On("GetAllSigningKeys", rotatorTx).Return(tc.keys, nil).Once()
+			database.On("GetAllSigningKeys", mock.Anything, rotatorTx).Return(tc.keys, nil).Once()
 
 			err := newTestRotator(database).Rotate(context.Background())
 
@@ -201,10 +201,9 @@ func TestSigningKeyRotator_Rotate_GuardRefusesBeforeAnyWrite(t *testing.T) {
 			assert.ErrorIs(t, stub.bodyErr, ErrKeySetIncomplete, "the refusal reaches the helper, which rolls back")
 			// The previous key survives the refusal. This is the assertion the old
 			// handler could not have made.
-			database.AssertNotCalled(t, "DeleteKeyPair", mock.Anything, mock.Anything)
-			database.AssertNotCalled(t, "UpdateKeyPairState",
-				mock.Anything, mock.Anything, mock.Anything, mock.Anything)
-			database.AssertNotCalled(t, "CreateKeyPair", mock.Anything, mock.Anything)
+			database.AssertNotCalled(t, "DeleteKeyPair", mock.Anything, mock.Anything, mock.Anything)
+			database.AssertNotCalled(t, "UpdateKeyPairState", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+			database.AssertNotCalled(t, "CreateKeyPair", mock.Anything, mock.Anything, mock.Anything)
 		})
 	}
 }
@@ -217,9 +216,9 @@ func TestSigningKeyRotator_Rotate_LosesTheDemotion(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 
 	stub := expectRotatorTransaction(database, nil)
-	database.On("GetAllSigningKeys", rotatorTx).Return(fullKeySet(), nil).Once()
-	database.On("DeleteKeyPair", rotatorTx, int64(3)).Return(nil).Once()
-	database.On("UpdateKeyPairState", rotatorTx, int64(1),
+	database.On("GetAllSigningKeys", mock.Anything, rotatorTx).Return(fullKeySet(), nil).Once()
+	database.On("DeleteKeyPair", mock.Anything, rotatorTx, int64(3)).Return(nil).Once()
+	database.On("UpdateKeyPairState", mock.Anything, rotatorTx, int64(1),
 		models.KeyStateCurrent.String(), models.KeyStatePrevious.String()).
 		Return(false, nil).Once()
 
@@ -229,9 +228,9 @@ func TestSigningKeyRotator_Rotate_LosesTheDemotion(t *testing.T) {
 	// A false compare-and-set is not an error, so the promotion must not have been
 	// attempted and nothing may commit: the body hands the refusal to the helper, which
 	// rolls the delete back with it.
-	database.AssertNotCalled(t, "UpdateKeyPairState", rotatorTx, int64(2),
+	database.AssertNotCalled(t, "UpdateKeyPairState", mock.Anything, rotatorTx, int64(2),
 		models.KeyStateNext.String(), models.KeyStateCurrent.String())
-	database.AssertNotCalled(t, "CreateKeyPair", mock.Anything, mock.Anything)
+	database.AssertNotCalled(t, "CreateKeyPair", mock.Anything, mock.Anything, mock.Anything)
 	assert.ErrorIs(t, stub.bodyErr, ErrRotationInProgress)
 }
 
@@ -241,19 +240,19 @@ func TestSigningKeyRotator_Rotate_LosesThePromotion(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 
 	stub := expectRotatorTransaction(database, nil)
-	database.On("GetAllSigningKeys", rotatorTx).Return(fullKeySet(), nil).Once()
-	database.On("DeleteKeyPair", rotatorTx, int64(3)).Return(nil).Once()
-	database.On("UpdateKeyPairState", rotatorTx, int64(1),
+	database.On("GetAllSigningKeys", mock.Anything, rotatorTx).Return(fullKeySet(), nil).Once()
+	database.On("DeleteKeyPair", mock.Anything, rotatorTx, int64(3)).Return(nil).Once()
+	database.On("UpdateKeyPairState", mock.Anything, rotatorTx, int64(1),
 		models.KeyStateCurrent.String(), models.KeyStatePrevious.String()).
 		Return(true, nil).Once()
-	database.On("UpdateKeyPairState", rotatorTx, int64(2),
+	database.On("UpdateKeyPairState", mock.Anything, rotatorTx, int64(2),
 		models.KeyStateNext.String(), models.KeyStateCurrent.String()).
 		Return(false, nil).Once()
 
 	err := newTestRotator(database).Rotate(context.Background())
 
 	assert.ErrorIs(t, err, ErrRotationInProgress)
-	database.AssertNotCalled(t, "CreateKeyPair", mock.Anything, mock.Anything)
+	database.AssertNotCalled(t, "CreateKeyPair", mock.Anything, mock.Anything, mock.Anything)
 	assert.ErrorIs(t, stub.bodyErr, ErrRotationInProgress)
 }
 
@@ -271,23 +270,23 @@ func TestSigningKeyRotator_Rotate_RollsBackOnFailureAtEveryStep(t *testing.T) {
 		{
 			name: "GetAllSigningKeys",
 			setUp: func(database *mocks_data.Database) {
-				database.On("GetAllSigningKeys", rotatorTx).
+				database.On("GetAllSigningKeys", mock.Anything, rotatorTx).
 					Return([]models.KeyPair(nil), failure).Once()
 			},
 		},
 		{
 			name: "DeleteKeyPair",
 			setUp: func(database *mocks_data.Database) {
-				database.On("GetAllSigningKeys", rotatorTx).Return(fullKeySet(), nil).Once()
-				database.On("DeleteKeyPair", rotatorTx, int64(3)).Return(failure).Once()
+				database.On("GetAllSigningKeys", mock.Anything, rotatorTx).Return(fullKeySet(), nil).Once()
+				database.On("DeleteKeyPair", mock.Anything, rotatorTx, int64(3)).Return(failure).Once()
 			},
 		},
 		{
 			name: "UpdateKeyPairState demote",
 			setUp: func(database *mocks_data.Database) {
-				database.On("GetAllSigningKeys", rotatorTx).Return(fullKeySet(), nil).Once()
-				database.On("DeleteKeyPair", rotatorTx, int64(3)).Return(nil).Once()
-				database.On("UpdateKeyPairState", rotatorTx, int64(1),
+				database.On("GetAllSigningKeys", mock.Anything, rotatorTx).Return(fullKeySet(), nil).Once()
+				database.On("DeleteKeyPair", mock.Anything, rotatorTx, int64(3)).Return(nil).Once()
+				database.On("UpdateKeyPairState", mock.Anything, rotatorTx, int64(1),
 					models.KeyStateCurrent.String(), models.KeyStatePrevious.String()).
 					Return(false, failure).Once()
 			},
@@ -295,12 +294,12 @@ func TestSigningKeyRotator_Rotate_RollsBackOnFailureAtEveryStep(t *testing.T) {
 		{
 			name: "UpdateKeyPairState promote",
 			setUp: func(database *mocks_data.Database) {
-				database.On("GetAllSigningKeys", rotatorTx).Return(fullKeySet(), nil).Once()
-				database.On("DeleteKeyPair", rotatorTx, int64(3)).Return(nil).Once()
-				database.On("UpdateKeyPairState", rotatorTx, int64(1),
+				database.On("GetAllSigningKeys", mock.Anything, rotatorTx).Return(fullKeySet(), nil).Once()
+				database.On("DeleteKeyPair", mock.Anything, rotatorTx, int64(3)).Return(nil).Once()
+				database.On("UpdateKeyPairState", mock.Anything, rotatorTx, int64(1),
 					models.KeyStateCurrent.String(), models.KeyStatePrevious.String()).
 					Return(true, nil).Once()
-				database.On("UpdateKeyPairState", rotatorTx, int64(2),
+				database.On("UpdateKeyPairState", mock.Anything, rotatorTx, int64(2),
 					models.KeyStateNext.String(), models.KeyStateCurrent.String()).
 					Return(false, failure).Once()
 			},
@@ -308,21 +307,21 @@ func TestSigningKeyRotator_Rotate_RollsBackOnFailureAtEveryStep(t *testing.T) {
 		{
 			name: "CreateKeyPair",
 			setUp: func(database *mocks_data.Database) {
-				database.On("GetAllSigningKeys", rotatorTx).Return(fullKeySet(), nil).Once()
-				database.On("DeleteKeyPair", rotatorTx, int64(3)).Return(nil).Once()
-				database.On("UpdateKeyPairState", rotatorTx, int64(1),
+				database.On("GetAllSigningKeys", mock.Anything, rotatorTx).Return(fullKeySet(), nil).Once()
+				database.On("DeleteKeyPair", mock.Anything, rotatorTx, int64(3)).Return(nil).Once()
+				database.On("UpdateKeyPairState", mock.Anything, rotatorTx, int64(1),
 					models.KeyStateCurrent.String(), models.KeyStatePrevious.String()).
 					Return(true, nil).Once()
-				database.On("UpdateKeyPairState", rotatorTx, int64(2),
+				database.On("UpdateKeyPairState", mock.Anything, rotatorTx, int64(2),
 					models.KeyStateNext.String(), models.KeyStateCurrent.String()).
 					Return(true, nil).Once()
-				database.On("CreateKeyPair", rotatorTx, mock.Anything).Return(failure).Once()
+				database.On("CreateKeyPair", mock.Anything, rotatorTx, mock.Anything).Return(failure).Once()
 			},
 		},
 		{
 			name: "unparseable key state",
 			setUp: func(database *mocks_data.Database) {
-				database.On("GetAllSigningKeys", rotatorTx).Return([]models.KeyPair{
+				database.On("GetAllSigningKeys", mock.Anything, rotatorTx).Return([]models.KeyPair{
 					keyPairInState(1, "not-a-state"),
 				}, nil).Once()
 			},
@@ -358,13 +357,13 @@ func TestSigningKeyRotator_Rotate_CommitFailureIsReported(t *testing.T) {
 	failure := errors.New("commit failed")
 
 	expectRotatorTransaction(database, failure)
-	database.On("GetAllSigningKeys", rotatorTx).Return(fullKeySet(), nil).Once()
-	database.On("DeleteKeyPair", rotatorTx, int64(3)).Return(nil).Once()
-	database.On("UpdateKeyPairState", rotatorTx, int64(1),
+	database.On("GetAllSigningKeys", mock.Anything, rotatorTx).Return(fullKeySet(), nil).Once()
+	database.On("DeleteKeyPair", mock.Anything, rotatorTx, int64(3)).Return(nil).Once()
+	database.On("UpdateKeyPairState", mock.Anything, rotatorTx, int64(1),
 		models.KeyStateCurrent.String(), models.KeyStatePrevious.String()).Return(true, nil).Once()
-	database.On("UpdateKeyPairState", rotatorTx, int64(2),
+	database.On("UpdateKeyPairState", mock.Anything, rotatorTx, int64(2),
 		models.KeyStateNext.String(), models.KeyStateCurrent.String()).Return(true, nil).Once()
-	database.On("CreateKeyPair", rotatorTx, mock.Anything).Return(nil).Once()
+	database.On("CreateKeyPair", mock.Anything, rotatorTx, mock.Anything).Return(nil).Once()
 
 	assert.ErrorIs(t, newTestRotator(database).Rotate(context.Background()), failure)
 }
@@ -379,7 +378,7 @@ func TestSigningKeyRotator_Rotate_ATransactionThatCannotOpenIsReported(t *testin
 	database.EXPECT().RunInTransaction(mock.Anything, mock.Anything).Return(failure).Once()
 
 	assert.ErrorIs(t, newTestRotator(database).Rotate(context.Background()), failure)
-	database.AssertNotCalled(t, "GetAllSigningKeys", mock.Anything)
+	database.AssertNotCalled(t, "GetAllSigningKeys", mock.Anything, mock.Anything)
 }
 
 // TestSigningKeyRotator_Rotate_GeneratesTheKeyBeforeOpeningTheTransaction is the only

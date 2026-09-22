@@ -71,7 +71,7 @@ func HandleAPISettingsUIThemePut(
 		oldTheme := currentSettings.UITheme
 		currentSettings.UITheme = desired
 
-		if err := database.UpdateSettings(nil, currentSettings); err != nil {
+		if err := database.UpdateSettings(r.Context(), nil, currentSettings); err != nil {
 			writeInternalServerError(w, r, err)
 			return
 		}

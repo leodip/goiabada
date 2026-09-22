@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -17,7 +18,7 @@ func TestCreateGroupPermission(t *testing.T) {
 		PermissionId: permission.Id,
 	}
 
-	err := database.CreateGroupPermission(nil, groupPermission)
+	err := database.CreateGroupPermission(context.Background(), nil, groupPermission)
 	if err != nil {
 		t.Fatalf("Failed to create group permission: %v", err)
 	}
@@ -27,7 +28,7 @@ func TestCreateGroupPermission(t *testing.T) {
 	}
 
 	// Retrieve the created group permission
-	createdGroupPermission, err := database.GetGroupPermissionById(nil, groupPermission.Id)
+	createdGroupPermission, err := database.GetGroupPermissionById(context.Background(), nil, groupPermission.Id)
 	if err != nil {
 		t.Fatalf("Failed to retrieve created group permission: %v", err)
 	}
@@ -54,7 +55,7 @@ func TestCreateGroupPermission(t *testing.T) {
 		GroupId:      0,
 		PermissionId: permission.Id,
 	}
-	err = database.CreateGroupPermission(nil, invalidGroupPermission)
+	err = database.CreateGroupPermission(context.Background(), nil, invalidGroupPermission)
 	if err == nil {
 		t.Error("Expected error when creating group permission with invalid GroupId")
 	}
@@ -64,7 +65,7 @@ func TestCreateGroupPermission(t *testing.T) {
 		GroupId:      group.Id,
 		PermissionId: 0,
 	}
-	err = database.CreateGroupPermission(nil, invalidGroupPermission)
+	err = database.CreateGroupPermission(context.Background(), nil, invalidGroupPermission)
 	if err == nil {
 		t.Error("Expected error when creating group permission with invalid PermissionId")
 	}
@@ -83,7 +84,7 @@ func TestUpdateGroupPermission(t *testing.T) {
 	permission2 := createTestPermission(t, resource2)
 
 	// Retrieve the original group permission
-	originalGroupPermission, err := database.GetGroupPermissionById(nil, groupPermission.Id)
+	originalGroupPermission, err := database.GetGroupPermissionById(context.Background(), nil, groupPermission.Id)
 	if err != nil {
 		t.Fatalf("Failed to retrieve original group permission: %v", err)
 	}
@@ -95,12 +96,12 @@ func TestUpdateGroupPermission(t *testing.T) {
 	groupPermission.GroupId = group2.Id
 	groupPermission.PermissionId = permission2.Id
 
-	err = database.UpdateGroupPermission(nil, groupPermission)
+	err = database.UpdateGroupPermission(context.Background(), nil, groupPermission)
 	if err != nil {
 		t.Fatalf("Failed to update group permission: %v", err)
 	}
 
-	updatedGroupPermission, err := database.GetGroupPermissionById(nil, groupPermission.Id)
+	updatedGroupPermission, err := database.GetGroupPermissionById(context.Background(), nil, groupPermission.Id)
 	if err != nil {
 		t.Fatalf("Failed to retrieve updated group permission: %v", err)
 	}
@@ -127,7 +128,7 @@ func TestUpdateGroupPermission(t *testing.T) {
 
 	// Test updating with invalid Id
 	invalidGroupPermission := &models.GroupPermission{Id: 0}
-	err = database.UpdateGroupPermission(nil, invalidGroupPermission)
+	err = database.UpdateGroupPermission(context.Background(), nil, invalidGroupPermission)
 	if err == nil {
 		t.Error("Expected error when updating group permission with invalid Id")
 	}
@@ -142,7 +143,7 @@ func TestGetGroupPermissionsByGroupId(t *testing.T) {
 	createTestGroupPermission(t, group.Id, permission1.Id)
 	createTestGroupPermission(t, group.Id, permission2.Id)
 
-	groupPermissions, err := database.GetGroupPermissionsByGroupId(nil, group.Id)
+	groupPermissions, err := database.GetGroupPermissionsByGroupId(context.Background(), nil, group.Id)
 	if err != nil {
 		t.Fatalf("Failed to get group permissions by group id: %v", err)
 	}
@@ -160,7 +161,7 @@ func TestGetGroupPermissionsByGroupIds(t *testing.T) {
 	createTestGroupPermission(t, group1.Id, permission.Id)
 	createTestGroupPermission(t, group2.Id, permission.Id)
 
-	groupPermissions, err := database.GetGroupPermissionsByGroupIds(nil, []int64{group1.Id, group2.Id})
+	groupPermissions, err := database.GetGroupPermissionsByGroupIds(context.Background(), nil, []int64{group1.Id, group2.Id})
 	if err != nil {
 		t.Fatalf("Failed to get group permissions by group ids: %v", err)
 	}
@@ -170,7 +171,7 @@ func TestGetGroupPermissionsByGroupIds(t *testing.T) {
 	}
 
 	// Test with empty slice
-	emptyPermissions, err := database.GetGroupPermissionsByGroupIds(nil, []int64{})
+	emptyPermissions, err := database.GetGroupPermissionsByGroupIds(context.Background(), nil, []int64{})
 	if err != nil {
 		t.Fatalf("Failed to get group permissions with empty slice: %v", err)
 	}
@@ -185,7 +186,7 @@ func TestGetGroupPermissionById(t *testing.T) {
 	permission := createTestPermission(t, resource)
 	groupPermission := createTestGroupPermission(t, group.Id, permission.Id)
 
-	retrievedGroupPermission, err := database.GetGroupPermissionById(nil, groupPermission.Id)
+	retrievedGroupPermission, err := database.GetGroupPermissionById(context.Background(), nil, groupPermission.Id)
 	if err != nil {
 		t.Fatalf("Failed to get group permission by id: %v", err)
 	}
@@ -201,7 +202,7 @@ func TestGetGroupPermissionById(t *testing.T) {
 	}
 
 	// Test with non-existent id
-	nonExistentGroupPermission, err := database.GetGroupPermissionById(nil, 99999)
+	nonExistentGroupPermission, err := database.GetGroupPermissionById(context.Background(), nil, 99999)
 	if err != nil {
 		t.Fatalf("Unexpected error when getting non-existent group permission: %v", err)
 	}
@@ -216,7 +217,7 @@ func TestGetGroupPermissionByGroupIdAndPermissionId(t *testing.T) {
 	permission := createTestPermission(t, resource)
 	groupPermission := createTestGroupPermission(t, group.Id, permission.Id)
 
-	retrievedGroupPermission, err := database.GetGroupPermissionByGroupIdAndPermissionId(nil, group.Id, permission.Id)
+	retrievedGroupPermission, err := database.GetGroupPermissionByGroupIdAndPermissionId(context.Background(), nil, group.Id, permission.Id)
 	if err != nil {
 		t.Fatalf("Failed to get group permission by group id and permission id: %v", err)
 	}
@@ -232,7 +233,7 @@ func TestGetGroupPermissionByGroupIdAndPermissionId(t *testing.T) {
 	}
 
 	// Test with non-existent group id and permission id
-	nonExistentGroupPermission, err := database.GetGroupPermissionByGroupIdAndPermissionId(nil, 99999, 99999)
+	nonExistentGroupPermission, err := database.GetGroupPermissionByGroupIdAndPermissionId(context.Background(), nil, 99999, 99999)
 	if err != nil {
 		t.Fatalf("Unexpected error when getting non-existent group permission: %v", err)
 	}
@@ -247,13 +248,13 @@ func TestDeleteGroupPermission(t *testing.T) {
 	permission := createTestPermission(t, resource)
 	groupPermission := createTestGroupPermission(t, group.Id, permission.Id)
 
-	err := database.DeleteGroupPermission(nil, groupPermission.Id)
+	err := database.DeleteGroupPermission(context.Background(), nil, groupPermission.Id)
 	if err != nil {
 		t.Fatalf("Failed to delete group permission: %v", err)
 	}
 
 	// Verify deletion
-	deletedGroupPermission, err := database.GetGroupPermissionById(nil, groupPermission.Id)
+	deletedGroupPermission, err := database.GetGroupPermissionById(context.Background(), nil, groupPermission.Id)
 	if err != nil {
 		t.Fatalf("Unexpected error when getting deleted group permission: %v", err)
 	}
@@ -262,7 +263,7 @@ func TestDeleteGroupPermission(t *testing.T) {
 	}
 
 	// Test deleting non-existent group permission
-	err = database.DeleteGroupPermission(nil, 99999)
+	err = database.DeleteGroupPermission(context.Background(), nil, 99999)
 	if err != nil {
 		t.Errorf("Unexpected error when deleting non-existent group permission: %v", err)
 	}
@@ -273,7 +274,7 @@ func createTestGroupPermission(t *testing.T, groupId, permissionId int64) *model
 		GroupId:      groupId,
 		PermissionId: permissionId,
 	}
-	err := database.CreateGroupPermission(nil, groupPermission)
+	err := database.CreateGroupPermission(context.Background(), nil, groupPermission)
 	if err != nil {
 		t.Fatalf("Failed to create test group permission: %v", err)
 	}

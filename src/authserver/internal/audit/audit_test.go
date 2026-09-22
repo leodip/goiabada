@@ -66,7 +66,7 @@ func TestAuditLogger_ConsoleRecordCarriesTheEventAndTheDetails(t *testing.T) {
 				AuditLogsInConsoleEnabled:  true,
 				AuditLogsInDatabaseEnabled: false,
 			}
-			mockDB.On("GetSettingsById", mock.Anything, int64(1)).Return(settings, nil)
+			mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(settings, nil)
 
 			NewAuditLogger(mockDB).Log(context.Background(), tc.event, tc.details)
 
@@ -91,7 +91,7 @@ func TestAuditLoggerDisabled(t *testing.T) {
 		AuditLogsInConsoleEnabled:  false,
 		AuditLogsInDatabaseEnabled: false,
 	}
-	mockDB.On("GetSettingsById", mock.Anything, int64(1)).Return(settings, nil)
+	mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(settings, nil)
 
 	// Create an AuditLogger instance with both disabled
 	auditLogger := NewAuditLogger(mockDB)
@@ -108,7 +108,7 @@ func TestAuditLoggerDisabled(t *testing.T) {
 	}
 
 	// Verify no DB write
-	mockDB.AssertNotCalled(t, "CreateAuditLog", mock.Anything, mock.Anything)
+	mockDB.AssertNotCalled(t, "CreateAuditLog", mock.Anything, mock.Anything, mock.Anything)
 }
 
 func TestAuditLogger_DBPersistence_Enabled(t *testing.T) {
@@ -121,10 +121,10 @@ func TestAuditLogger_DBPersistence_Enabled(t *testing.T) {
 		AuditLogsInDatabaseEnabled: true,
 		AuditLogRetentionDays:      90,
 	}
-	mockDB.On("GetSettingsById", mock.Anything, int64(1)).Return(settings, nil)
+	mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(settings, nil)
 
 	// Expect CreateAuditLog to be called
-	mockDB.On("CreateAuditLog", mock.Anything, mock.MatchedBy(func(log *models.AuditLog) bool {
+	mockDB.On("CreateAuditLog", mock.Anything, mock.Anything, mock.MatchedBy(func(log *models.AuditLog) bool {
 		return log.AuditEvent == "test_event" &&
 			log.Details != "" &&
 			log.CreatedAt.IsZero() // CreatedAt should be zero before DB call
@@ -153,7 +153,7 @@ func TestAuditLogger_DBPersistence_Disabled(t *testing.T) {
 		AuditLogsInDatabaseEnabled: false,
 		AuditLogRetentionDays:      90,
 	}
-	mockDB.On("GetSettingsById", mock.Anything, int64(1)).Return(settings, nil)
+	mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(settings, nil)
 
 	// CreateAuditLog should NOT be called
 	// (no mock.On call means assertion will fail if it's called)
@@ -167,7 +167,7 @@ func TestAuditLogger_DBPersistence_Disabled(t *testing.T) {
 	})
 
 	// Verify CreateAuditLog was not called
-	mockDB.AssertNotCalled(t, "CreateAuditLog", mock.Anything, mock.Anything)
+	mockDB.AssertNotCalled(t, "CreateAuditLog", mock.Anything, mock.Anything, mock.Anything)
 }
 
 func TestAuditLogger_SettingsError(t *testing.T) {
@@ -175,7 +175,7 @@ func TestAuditLogger_SettingsError(t *testing.T) {
 	mockDB := mocks.NewDatabase(t)
 
 	// Mock settings call to return error
-	mockDB.On("GetSettingsById", mock.Anything, int64(1)).Return(nil, assert.AnError)
+	mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(nil, assert.AnError)
 
 	// CreateAuditLog should NOT be called due to settings error
 
@@ -194,7 +194,7 @@ func TestAuditLogger_SettingsError(t *testing.T) {
 	assert.Contains(t, output, "unable to read the settings row for audit logging")
 
 	// Verify CreateAuditLog was not called
-	mockDB.AssertNotCalled(t, "CreateAuditLog", mock.Anything, mock.Anything)
+	mockDB.AssertNotCalled(t, "CreateAuditLog", mock.Anything, mock.Anything, mock.Anything)
 }
 
 func TestAuditLogger_DBPersistence_CreateError(t *testing.T) {
@@ -207,10 +207,10 @@ func TestAuditLogger_DBPersistence_CreateError(t *testing.T) {
 		AuditLogsInDatabaseEnabled: true,
 		AuditLogRetentionDays:      90,
 	}
-	mockDB.On("GetSettingsById", mock.Anything, int64(1)).Return(settings, nil)
+	mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(settings, nil)
 
 	// Mock CreateAuditLog to return error
-	mockDB.On("CreateAuditLog", mock.Anything, mock.Anything).Return(assert.AnError)
+	mockDB.On("CreateAuditLog", mock.Anything, mock.Anything, mock.Anything).Return(assert.AnError)
 
 	logs := testutil.CaptureSlog(t)
 
@@ -240,7 +240,7 @@ func TestAuditLogger_DBPersistence_JSONMarshalError(t *testing.T) {
 		AuditLogsInDatabaseEnabled: true,
 		AuditLogRetentionDays:      90,
 	}
-	mockDB.On("GetSettingsById", mock.Anything, int64(1)).Return(settings, nil)
+	mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(settings, nil)
 
 	// CreateAuditLog should NOT be called due to marshal error
 
@@ -259,7 +259,7 @@ func TestAuditLogger_DBPersistence_JSONMarshalError(t *testing.T) {
 	assert.Contains(t, output, "unable to marshal the audit event details for the database")
 
 	// Verify CreateAuditLog was not called
-	mockDB.AssertNotCalled(t, "CreateAuditLog", mock.Anything, mock.Anything)
+	mockDB.AssertNotCalled(t, "CreateAuditLog", mock.Anything, mock.Anything, mock.Anything)
 }
 
 func TestAuditLogger_BothConsoleAndDB(t *testing.T) {
@@ -272,8 +272,8 @@ func TestAuditLogger_BothConsoleAndDB(t *testing.T) {
 		AuditLogsInDatabaseEnabled: true,
 		AuditLogRetentionDays:      90,
 	}
-	mockDB.On("GetSettingsById", mock.Anything, int64(1)).Return(settings, nil)
-	mockDB.On("CreateAuditLog", mock.Anything, mock.Anything).Return(nil)
+	mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(settings, nil)
+	mockDB.On("CreateAuditLog", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 	logs := testutil.CaptureSlog(t)
 
@@ -303,7 +303,7 @@ func TestAuditLogger_ConsoleEnabledDBDisabled(t *testing.T) {
 		AuditLogsInDatabaseEnabled: false,
 		AuditLogRetentionDays:      90,
 	}
-	mockDB.On("GetSettingsById", mock.Anything, int64(1)).Return(settings, nil)
+	mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(settings, nil)
 
 	logs := testutil.CaptureSlog(t)
 
@@ -320,7 +320,7 @@ func TestAuditLogger_ConsoleEnabledDBDisabled(t *testing.T) {
 	assert.Contains(t, output, "test_event")
 
 	// Verify DB was NOT called
-	mockDB.AssertNotCalled(t, "CreateAuditLog", mock.Anything, mock.Anything)
+	mockDB.AssertNotCalled(t, "CreateAuditLog", mock.Anything, mock.Anything, mock.Anything)
 }
 
 func TestAuditLogger_NilDatabase(t *testing.T) {
@@ -366,7 +366,7 @@ func TestAuditLogger_EveryRecordCarriesTheRequestId(t *testing.T) {
 		{
 			name: "the console record",
 			setup: func(mockDB *mocks.Database) {
-				mockDB.On("GetSettingsById", mock.Anything, int64(1)).Return(&models.Settings{
+				mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(&models.Settings{
 					AuditLogsInConsoleEnabled: true,
 				}, nil)
 			},
@@ -377,7 +377,7 @@ func TestAuditLogger_EveryRecordCarriesTheRequestId(t *testing.T) {
 		{
 			name: "the settings row could not be read",
 			setup: func(mockDB *mocks.Database) {
-				mockDB.On("GetSettingsById", mock.Anything, int64(1)).Return(nil, assert.AnError)
+				mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(nil, assert.AnError)
 			},
 			details: map[string]interface{}{"email": "jane@example.com"},
 			level:   slog.LevelError,
@@ -386,7 +386,7 @@ func TestAuditLogger_EveryRecordCarriesTheRequestId(t *testing.T) {
 		{
 			name: "the details could not be marshalled",
 			setup: func(mockDB *mocks.Database) {
-				mockDB.On("GetSettingsById", mock.Anything, int64(1)).Return(&models.Settings{
+				mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(&models.Settings{
 					AuditLogsInDatabaseEnabled: true,
 				}, nil)
 			},
@@ -400,10 +400,10 @@ func TestAuditLogger_EveryRecordCarriesTheRequestId(t *testing.T) {
 		{
 			name: "the row could not be persisted",
 			setup: func(mockDB *mocks.Database) {
-				mockDB.On("GetSettingsById", mock.Anything, int64(1)).Return(&models.Settings{
+				mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(&models.Settings{
 					AuditLogsInDatabaseEnabled: true,
 				}, nil)
-				mockDB.On("CreateAuditLog", mock.Anything, mock.Anything).Return(assert.AnError)
+				mockDB.On("CreateAuditLog", mock.Anything, mock.Anything, mock.Anything).Return(assert.AnError)
 			},
 			details: map[string]interface{}{"email": "jane@example.com"},
 			level:   slog.LevelError,
@@ -454,7 +454,7 @@ func TestAuditLogger_TakesTheSettingsFromTheRequestContext(t *testing.T) {
 	logs := testutil.CaptureSlog(t)
 
 	mockDB := mocks.NewDatabase(t)
-	mockDB.On("CreateAuditLog", mock.Anything, mock.MatchedBy(func(log *models.AuditLog) bool {
+	mockDB.On("CreateAuditLog", mock.Anything, mock.Anything, mock.MatchedBy(func(log *models.AuditLog) bool {
 		return log.AuditEvent == "auth_success_pwd"
 	})).Return(nil).Once()
 
@@ -468,7 +468,7 @@ func TestAuditLogger_TakesTheSettingsFromTheRequestContext(t *testing.T) {
 	assert.Equal(t, "audit event", written[0].Message)
 	assert.Equal(t, "goiabada/req-0000007", written[0].Attrs["request_id"])
 	mockDB.AssertExpectations(t)
-	mockDB.AssertNotCalled(t, "GetSettingsById", mock.Anything, mock.Anything)
+	mockDB.AssertNotCalled(t, "GetSettingsById", mock.Anything, mock.Anything, mock.Anything)
 }
 
 // The fallback, which is what keeps the five root registrations and the rate limiter's three tiers
@@ -501,7 +501,7 @@ func TestAuditLogger_ReadsTheSettingsRowWhenTheContextHasNone(t *testing.T) {
 			logs := testutil.CaptureSlog(t)
 
 			mockDB := mocks.NewDatabase(t)
-			mockDB.On("GetSettingsById", mock.Anything, int64(1)).Return(&models.Settings{
+			mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(&models.Settings{
 				AuditLogsInConsoleEnabled: true,
 			}, nil).Once()
 
@@ -591,12 +591,12 @@ func TestAuditLogger_TheRowCarriesTheRequestIdTheLogCarries(t *testing.T) {
 
 			var row *models.AuditLog
 			mockDB := mocks.NewDatabase(t)
-			mockDB.On("GetSettingsById", mock.Anything, int64(1)).Return(&models.Settings{
+			mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(&models.Settings{
 				AuditLogsInConsoleEnabled:  true,
 				AuditLogsInDatabaseEnabled: true,
 			}, nil)
-			mockDB.On("CreateAuditLog", mock.Anything, mock.Anything).
-				Run(func(args mock.Arguments) { row = args.Get(1).(*models.AuditLog) }).
+			mockDB.On("CreateAuditLog", mock.Anything, mock.Anything, mock.Anything).
+				Run(func(args mock.Arguments) { row = args.Get(2).(*models.AuditLog) }).
 				Return(nil).Once()
 
 			NewAuditLogger(mockDB).Log(tc.ctx, "auth_failed_pwd",

@@ -25,7 +25,7 @@ func NewTokenParser(database data.Database) *TokenParser {
 
 func (tp *TokenParser) DecodeAndValidateTokenResponse(ctx context.Context, tokenResponse *oauth.TokenResponse) (*oauth.JwtInfo, error) {
 
-	pubKey, err := tp.getPublicKey()
+	pubKey, err := tp.getPublicKey(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -58,8 +58,8 @@ func (tp *TokenParser) DecodeAndValidateTokenResponse(ctx context.Context, token
 	return result, nil
 }
 
-func (tp *TokenParser) getPublicKey() (*rsa.PublicKey, error) {
-	keyPair, err := tp.database.GetCurrentSigningKey(nil)
+func (tp *TokenParser) getPublicKey(ctx context.Context) (*rsa.PublicKey, error) {
+	keyPair, err := tp.database.GetCurrentSigningKey(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -100,7 +100,7 @@ func (tp *TokenParser) DecodeAndValidateTokenString(ctx context.Context, token s
 		// Ensure we have at least the current key
 		if pubKey == nil {
 			var err error
-			pubKey, err = tp.getPublicKey()
+			pubKey, err = tp.getPublicKey(ctx)
 			if err != nil {
 				return nil, err
 			}
@@ -131,7 +131,7 @@ func (tp *TokenParser) DecodeAndValidateTokenString(ctx context.Context, token s
 			// This handles tokens signed with rotated/old keys
 
 			// Fallback: try all signing keys (e.g., previous) to allow tokens signed by old key
-			allKeys, derr := tp.database.GetAllSigningKeys(nil)
+			allKeys, derr := tp.database.GetAllSigningKeys(ctx, nil)
 			if derr != nil {
 				return nil, err
 			}

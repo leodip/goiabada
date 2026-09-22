@@ -15,7 +15,7 @@ func MiddlewareSettings(database data.Database) func(next http.Handler) http.Han
 	return func(next http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
-			settings, err := database.GetSettingsById(nil, 1)
+			settings, err := database.GetSettingsById(r.Context(), nil, 1)
 			if err != nil {
 				// Plain text, because this runs before any helper that could render a page:
 				// the settings it is fetching are what the error page's layout reads. The

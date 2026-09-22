@@ -1,6 +1,7 @@
 package datafactory
 
 import (
+	"context"
 	"log/slog"
 
 	"github.com/leodip/goiabada/authserver/internal/data"
@@ -27,19 +28,19 @@ import (
 //
 // The keys are parameters rather than config reads for the same reason. The caller has already
 // validated envKey as 32 bytes; previousKey is optional and is acted on only at that length.
-func runStartupDataTasks(database data.Database, envKey []byte, previousKey []byte) error {
+func runStartupDataTasks(ctx context.Context, database data.Database, envKey []byte, previousKey []byte) error {
 
 	// Env-to-env key rotation (issue #83): if a previous key is supplied and the
 	// data is still encrypted under it, re-encrypt everything to the current key.
 	// Idempotent (safe to leave the previous key set across restarts) and
 	// fail-closed.
 	if len(previousKey) == 32 {
-		rotated, err := database.RotateEncryptionKeyIfNeeded(envKey, previousKey)
+		rotated, err := database.RotateEncryptionKeyIfNeeded(ctx, envKey, previousKey)
 		if err != nil {
 			return errs.Wrap(err, "AES data key rotation failed")
 		}
 		if rotated {
-			slog.Info("rotated data-at-rest encryption to the new GOIABADA_AES_ENCRYPTION_KEY")
+			slog.InfoContext(ctx, "rotated data-at-rest encryption to the new GOIABADA_AES_ENCRYPTION_KEY")
 		}
 	}
 

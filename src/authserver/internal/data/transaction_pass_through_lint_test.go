@@ -395,7 +395,7 @@ func (d *CommonDatabase) GetSettingsById(tx *sql.Tx, id int64) (any, error) {
 
 // IsEmpty holds no transaction, so its nil is the pool's next connection and not a dropped one.
 func (d *CommonDatabase) IsEmpty() (bool, error) {
-	_, err := d.GetSettingsById(nil, 1)
+	_, err := d.GetSettingsById(context.Background(), nil, 1)
 	return false, err
 }
 

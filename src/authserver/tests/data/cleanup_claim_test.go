@@ -1,6 +1,7 @@
 package datatests
 
 import (
+	"context"
 	"strings"
 	"sync"
 	"testing"
@@ -19,7 +20,7 @@ import (
 func setLastCleanupAt(t *testing.T, at *time.Time) *models.Settings {
 	t.Helper()
 
-	settings, err := database.GetSettingsById(nil, 1)
+	settings, err := database.GetSettingsById(context.Background(), nil, 1)
 	if err != nil {
 		t.Fatalf("Failed to read settings: %v", err)
 	}
@@ -30,7 +31,7 @@ func setLastCleanupAt(t *testing.T, at *time.Time) *models.Settings {
 		// the NOT NULL columns, so reuse it rather than hand-rolling an insert.
 		createTestSettings(t)
 
-		settings, err = database.GetSettingsById(nil, 1)
+		settings, err = database.GetSettingsById(context.Background(), nil, 1)
 		if err != nil {
 			t.Fatalf("Failed to read settings after creating them: %v", err)
 		}
@@ -45,7 +46,7 @@ func setLastCleanupAt(t *testing.T, at *time.Time) *models.Settings {
 		settings.LastCleanupAt.Time = *at
 		settings.LastCleanupAt.Valid = true
 	}
-	if err := database.UpdateSettings(nil, settings); err != nil {
+	if err := database.UpdateSettings(context.Background(), nil, settings); err != nil {
 		t.Fatalf("Failed to update settings: %v", err)
 	}
 	return settings
@@ -55,7 +56,7 @@ func TestTryClaimCleanupRun_ClaimableWhenNeverRun(t *testing.T) {
 	setLastCleanupAt(t, nil)
 
 	now := time.Now().UTC().Truncate(time.Second)
-	claimed, err := database.TryClaimCleanupRun(nil, now, now.Add(-12*time.Hour))
+	claimed, err := database.TryClaimCleanupRun(context.Background(), nil, now, now.Add(-12*time.Hour))
 	if err != nil {
 		t.Fatalf("TryClaimCleanupRun failed: %v", err)
 	}
@@ -63,7 +64,7 @@ func TestTryClaimCleanupRun_ClaimableWhenNeverRun(t *testing.T) {
 		t.Error("Expected the first ever run to be claimable")
 	}
 
-	settings, err := database.GetSettingsById(nil, 1)
+	settings, err := database.GetSettingsById(context.Background(), nil, 1)
 	if err != nil {
 		t.Fatalf("Failed to read settings: %v", err)
 	}
@@ -77,7 +78,7 @@ func TestTryClaimCleanupRun_ClaimableWhenTheIntervalHasPassed(t *testing.T) {
 	setLastCleanupAt(t, &longAgo)
 
 	now := time.Now().UTC().Truncate(time.Second)
-	claimed, err := database.TryClaimCleanupRun(nil, now, now.Add(-12*time.Hour))
+	claimed, err := database.TryClaimCleanupRun(context.Background(), nil, now, now.Add(-12*time.Hour))
 	if err != nil {
 		t.Fatalf("TryClaimCleanupRun failed: %v", err)
 	}
@@ -91,7 +92,7 @@ func TestTryClaimCleanupRun_NotClaimableWithinTheInterval(t *testing.T) {
 	setLastCleanupAt(t, &recent)
 
 	now := time.Now().UTC().Truncate(time.Second)
-	claimed, err := database.TryClaimCleanupRun(nil, now, now.Add(-12*time.Hour))
+	claimed, err := database.TryClaimCleanupRun(context.Background(), nil, now, now.Add(-12*time.Hour))
 	if err != nil {
 		t.Fatalf("TryClaimCleanupRun failed: %v", err)
 	}
@@ -100,7 +101,7 @@ func TestTryClaimCleanupRun_NotClaimableWithinTheInterval(t *testing.T) {
 	}
 
 	// And the stored timestamp must be untouched by a lost claim.
-	settings, err := database.GetSettingsById(nil, 1)
+	settings, err := database.GetSettingsById(context.Background(), nil, 1)
 	if err != nil {
 		t.Fatalf("Failed to read settings: %v", err)
 	}
@@ -121,7 +122,7 @@ func TestTryClaimCleanupRun_OnlyOneCallerWinsPerInterval(t *testing.T) {
 
 	wins := 0
 	for i := 0; i < 5; i++ {
-		claimed, err := database.TryClaimCleanupRun(nil, now, claimableBefore)
+		claimed, err := database.TryClaimCleanupRun(context.Background(), nil, now, claimableBefore)
 		if err != nil {
 			t.Fatalf("TryClaimCleanupRun failed on attempt %d: %v", i, err)
 		}
@@ -142,7 +143,7 @@ func TestTryClaimCleanupRun_ClaimBlocksTheNextInterval(t *testing.T) {
 
 	now := time.Now().UTC().Truncate(time.Second)
 
-	claimed, err := database.TryClaimCleanupRun(nil, now, now.Add(-12*time.Hour))
+	claimed, err := database.TryClaimCleanupRun(context.Background(), nil, now, now.Add(-12*time.Hour))
 	if err != nil {
 		t.Fatalf("TryClaimCleanupRun failed: %v", err)
 	}
@@ -152,7 +153,7 @@ func TestTryClaimCleanupRun_ClaimBlocksTheNextInterval(t *testing.T) {
 
 	// A poll a minute later, with the same interval, must lose.
 	later := now.Add(time.Minute)
-	claimed, err = database.TryClaimCleanupRun(nil, later, later.Add(-12*time.Hour))
+	claimed, err = database.TryClaimCleanupRun(context.Background(), nil, later, later.Add(-12*time.Hour))
 	if err != nil {
 		t.Fatalf("TryClaimCleanupRun failed: %v", err)
 	}
@@ -213,7 +214,7 @@ func TestTryClaimCleanupRun_ConcurrentCallersProduceOneWinner(t *testing.T) {
 			go func(i int) {
 				defer wg.Done()
 				<-start
-				claimed, err := database.TryClaimCleanupRun(nil, now, claimableBefore)
+				claimed, err := database.TryClaimCleanupRun(context.Background(), nil, now, claimableBefore)
 				outcomes[i] = outcome{claimed: claimed, err: err}
 			}(i)
 		}
@@ -244,7 +245,7 @@ func TestTryClaimCleanupRun_ConcurrentCallersProduceOneWinner(t *testing.T) {
 		}
 
 		// Exactly one write landed, and it recorded the claim time.
-		settings, err := database.GetSettingsById(nil, 1)
+		settings, err := database.GetSettingsById(context.Background(), nil, 1)
 		if err != nil {
 			t.Fatalf("round %d: failed to read settings: %v", round, err)
 		}

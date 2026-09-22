@@ -109,7 +109,7 @@ func runIssuanceOrderingAgainstTermination(t *testing.T, db data.Database, other
 
 		tx, err := db.BeginTransaction(context.Background())
 		require.NoError(t, err, "opening the ceremony's transaction")
-		defer func() { _ = db.RollbackTransaction(tx) }()
+		defer func() { _ = db.RollbackTransaction(context.Background(), tx) }()
 
 		live, err := db.AcquireUserSessionRow(context.Background(), tx, session.SessionIdentifier)
 		require.NoError(t, err, "the ceremony takes the session row")
@@ -134,7 +134,7 @@ func runIssuanceOrderingAgainstTermination(t *testing.T, db data.Database, other
 		code, err := mintCode(db, tx, client, user, session.SessionIdentifier)
 		require.NoError(t, err, "the ceremony's insert on the transaction holding the row")
 		termination.requireStillWaiting(t)
-		require.NoError(t, db.CommitTransaction(tx), "committing the ceremony")
+		require.NoError(t, db.CommitTransaction(context.Background(), tx), "committing the ceremony")
 
 		outcome := termination.await(t)
 		require.NoError(t, outcome.err,
@@ -160,7 +160,7 @@ func runIssuanceOrderingAgainstTermination(t *testing.T, db data.Database, other
 		// the other subtest drives the real function.
 		tx, err := db.BeginTransaction(context.Background())
 		require.NoError(t, err, "opening the termination's transaction")
-		defer func() { _ = db.RollbackTransaction(tx) }()
+		defer func() { _ = db.RollbackTransaction(context.Background(), tx) }()
 
 		require.NoError(t, terminationStatements(db, tx, session),
 			"the termination's statements on a session nothing else has touched yet")
@@ -171,20 +171,20 @@ func runIssuanceOrderingAgainstTermination(t *testing.T, db data.Database, other
 				reached()
 				return issuanceOutcome{err: err}
 			}
-			defer func() { _ = other.RollbackTransaction(otherTx) }()
+			defer func() { _ = other.RollbackTransaction(context.Background(), otherTx) }()
 
 			reached()
 			outcome := issuanceStatements(other, otherTx, client, user, session.SessionIdentifier)
 			if outcome.err == nil && outcome.code != nil {
 				// Production commits only what it minted; a refusal rolls back.
-				outcome.err = other.CommitTransaction(otherTx)
+				outcome.err = other.CommitTransaction(context.Background(), otherTx)
 			}
 			return outcome
 		})
 
 		ceremony.requireBlocked(t)
 		ceremony.requireStillWaiting(t)
-		require.NoError(t, db.CommitTransaction(tx), "committing the termination")
+		require.NoError(t, db.CommitTransaction(context.Background(), tx), "committing the termination")
 
 		outcome := ceremony.await(t)
 		require.NoError(t, outcome.err,

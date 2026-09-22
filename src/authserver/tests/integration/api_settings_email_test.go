@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -18,7 +19,7 @@ func TestAPISettingsEmailGet_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Read current settings from DB for comparison
-	settings, err := database.GetSettingsById(nil, 1)
+	settings, err := database.GetSettingsById(context.Background(), nil, 1)
 	assert.NoError(t, err)
 	assert.NotNil(t, settings)
 
@@ -79,7 +80,7 @@ func TestAPISettingsEmailPut_EnableSuccess(t *testing.T) {
 	assert.Equal(t, true, body.HasSMTPPassword)
 
 	// Verify DB persisted
-	settings, err2 := database.GetSettingsById(nil, 1)
+	settings, err2 := database.GetSettingsById(context.Background(), nil, 1)
 	assert.NoError(t, err2)
 	assert.True(t, settings.SMTPEnabled)
 	assert.Equal(t, req.SMTPHost, settings.SMTPHost)
@@ -116,7 +117,7 @@ func TestAPISettingsEmailPut_DisableResetsFields(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 	// Verify DB reset
-	settings, err := database.GetSettingsById(nil, 1)
+	settings, err := database.GetSettingsById(context.Background(), nil, 1)
 	assert.NoError(t, err)
 	assert.False(t, settings.SMTPEnabled)
 	assert.Equal(t, "", settings.SMTPHost)
@@ -253,7 +254,7 @@ func TestAPISettingsEmailPut_PasswordAtBoundIsAccepted(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, true, body.HasSMTPPassword)
 
-	settings, err := database.GetSettingsById(nil, 1)
+	settings, err := database.GetSettingsById(context.Background(), nil, 1)
 	assert.NoError(t, err)
 	stored, err := encryption.DecryptData(settings.SMTPPasswordEncrypted)
 	assert.NoError(t, err)
@@ -319,7 +320,7 @@ func TestAPISettingsEmailPut_PasswordLifecycle(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp2.StatusCode)
 
 	// DB should have password cleared
-	settings, err := database.GetSettingsById(nil, 1)
+	settings, err := database.GetSettingsById(context.Background(), nil, 1)
 	assert.NoError(t, err)
 	assert.Equal(t, 0, len(settings.SMTPPasswordEncrypted))
 
@@ -402,7 +403,7 @@ func TestAPISettingsEmailPut_AngleBracketsRejected(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/email"
 
-	before, err := database.GetSettingsById(nil, 1)
+	before, err := database.GetSettingsById(context.Background(), nil, 1)
 	assert.NoError(t, err)
 
 	resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsEmailRequest{
@@ -420,7 +421,7 @@ func TestAPISettingsEmailPut_AngleBracketsRejected(t *testing.T) {
 	_ = json.NewDecoder(resp.Body).Decode(&errResp)
 	assert.Equal(t, "validator.settings.smtp_from_name_angle_brackets", errResp.ErrorCode)
 
-	stored, err := database.GetSettingsById(nil, 1)
+	stored, err := database.GetSettingsById(context.Background(), nil, 1)
 	assert.NoError(t, err)
 	assert.Equal(t, before.SMTPFromName, stored.SMTPFromName)
 }
@@ -448,7 +449,7 @@ func TestAPISettingsEmailPut_AmpersandsAndQuotesStoredVerbatim(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, `Tom & Jerry "QA"`, body.SMTPFromName)
 
-	stored, err := database.GetSettingsById(nil, 1)
+	stored, err := database.GetSettingsById(context.Background(), nil, 1)
 	assert.NoError(t, err)
 	assert.Equal(t, `Tom & Jerry "QA"`, stored.SMTPFromName)
 }

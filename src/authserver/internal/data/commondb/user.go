@@ -259,7 +259,7 @@ func (d *CommonDatabase) UsersLoadGroups(ctx context.Context, tx *sql.Tx, users 
 		groupIds[i] = userGroup.GroupId
 	}
 
-	groups, err := d.GetGroupsByIds(tx, groupIds)
+	groups, err := d.GetGroupsByIds(ctx, tx, groupIds)
 	if err != nil {
 		return err
 	}
@@ -299,7 +299,7 @@ func (d *CommonDatabase) UserLoadGroups(ctx context.Context, tx *sql.Tx, user *m
 		groupIds[i] = group.GroupId
 	}
 
-	groups, err := d.GetGroupsByIds(tx, groupIds)
+	groups, err := d.GetGroupsByIds(ctx, tx, groupIds)
 	if err != nil {
 		return err
 	}

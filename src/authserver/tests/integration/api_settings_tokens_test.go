@@ -1,6 +1,7 @@
 package integrationtests
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -17,7 +18,7 @@ func TestAPISettingsTokensGet_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Read current settings from DB for comparison
-	settings, err := database.GetSettingsById(nil, 1)
+	settings, err := database.GetSettingsById(context.Background(), nil, 1)
 	assert.NoError(t, err)
 	assert.NotNil(t, settings)
 
@@ -69,7 +70,7 @@ func TestAPISettingsTokensPut_Success(t *testing.T) {
 	assert.Equal(t, req.IncludeOpenIDConnectClaimsInIdToken, body.IncludeOpenIDConnectClaimsInIdToken)
 
 	// Verify DB persisted
-	settings, err2 := database.GetSettingsById(nil, 1)
+	settings, err2 := database.GetSettingsById(context.Background(), nil, 1)
 	assert.NoError(t, err2)
 	assert.Equal(t, req.TokenExpirationInSeconds, settings.TokenExpirationInSeconds)
 	assert.Equal(t, req.RefreshTokenOfflineIdleTimeoutInSeconds, settings.RefreshTokenOfflineIdleTimeoutInSeconds)

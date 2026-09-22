@@ -2,6 +2,7 @@ package integrationtests
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -44,7 +45,7 @@ func seedAuditLogs(t *testing.T, count int) string {
 			AuditEvent: auditEvent,
 			Details:    fmt.Sprintf(`{"seq":%d}`, i),
 		}
-		err := database.CreateAuditLog(nil, auditLog)
+		err := database.CreateAuditLog(context.Background(), nil, auditLog)
 		assert.NoError(t, err)
 	}
 	return auditEvent
@@ -319,10 +320,10 @@ func enableAuditLogsInDatabase(t *testing.T) {
 	t.Helper()
 	restoreAuditLogSettings(t)
 
-	settings, err := database.GetSettingsById(nil, 1)
+	settings, err := database.GetSettingsById(context.Background(), nil, 1)
 	assert.NoError(t, err)
 	settings.AuditLogsInDatabaseEnabled = true
-	assert.NoError(t, database.UpdateSettings(nil, settings))
+	assert.NoError(t, database.UpdateSettings(context.Background(), nil, settings))
 }
 
 func TestAPIAuditLogsGet_RequestIdFilter(t *testing.T) {

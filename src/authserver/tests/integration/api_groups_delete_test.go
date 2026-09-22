@@ -31,7 +31,7 @@ func TestAPIGroupDelete_Success(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 	// Verify group was actually deleted from database
-	deletedGroup, err := database.GetGroupById(nil, testGroup.Id)
+	deletedGroup, err := database.GetGroupById(context.Background(), nil, testGroup.Id)
 	assert.NoError(t, err)
 	assert.Nil(t, deletedGroup, "Group should be deleted from database")
 }
@@ -76,7 +76,7 @@ func TestAPIGroupDelete_SuccessWithMembers(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 	// Verify group was actually deleted from database
-	deletedGroup, err := database.GetGroupById(nil, testGroup.Id)
+	deletedGroup, err := database.GetGroupById(context.Background(), nil, testGroup.Id)
 	assert.NoError(t, err)
 	assert.Nil(t, deletedGroup, "Group should be deleted from database")
 
@@ -131,7 +131,7 @@ func TestAPIGroupDelete_Unauthorized(t *testing.T) {
 	// Setup: Create test group
 	testGroup := createTestGroup(t)
 	defer func() {
-		_ = database.DeleteGroup(nil, testGroup.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
 	}()
 
 	// Test: Request without access token
@@ -148,7 +148,7 @@ func TestAPIGroupDelete_Unauthorized(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 
 	// Verify group still exists (not deleted)
-	existingGroup, err := database.GetGroupById(nil, testGroup.Id)
+	existingGroup, err := database.GetGroupById(context.Background(), nil, testGroup.Id)
 	assert.NoError(t, err)
 	assert.NotNil(t, existingGroup, "Group should still exist after unauthorized delete attempt")
 }
@@ -157,7 +157,7 @@ func TestAPIGroupDelete_InvalidToken(t *testing.T) {
 	// Setup: Create test group
 	testGroup := createTestGroup(t)
 	defer func() {
-		_ = database.DeleteGroup(nil, testGroup.Id)
+		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
 	}()
 
 	// Test: Request with invalid access token
@@ -169,7 +169,7 @@ func TestAPIGroupDelete_InvalidToken(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 
 	// Verify group still exists (not deleted)
-	existingGroup, err := database.GetGroupById(nil, testGroup.Id)
+	existingGroup, err := database.GetGroupById(context.Background(), nil, testGroup.Id)
 	assert.NoError(t, err)
 	assert.NotNil(t, existingGroup, "Group should still exist after invalid token delete attempt")
 }
@@ -198,7 +198,7 @@ func TestAPIGroupDelete_WithGroupPermissions(t *testing.T) {
 		GroupId:      testGroup.Id,
 		PermissionId: testPermission.Id,
 	}
-	err = database.CreateGroupPermission(nil, groupPermission)
+	err = database.CreateGroupPermission(context.Background(), nil, groupPermission)
 	assert.NoError(t, err)
 	// Note: GroupPermission should be automatically deleted when group is deleted
 
@@ -211,12 +211,12 @@ func TestAPIGroupDelete_WithGroupPermissions(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 	// Verify group was actually deleted from database
-	deletedGroup, err := database.GetGroupById(nil, testGroup.Id)
+	deletedGroup, err := database.GetGroupById(context.Background(), nil, testGroup.Id)
 	assert.NoError(t, err)
 	assert.Nil(t, deletedGroup, "Group should be deleted from database")
 
 	// Verify group-permission relationship was also deleted
-	groupPermissions, err := database.GetGroupPermissionsByGroupId(nil, testGroup.Id)
+	groupPermissions, err := database.GetGroupPermissionsByGroupId(context.Background(), nil, testGroup.Id)
 	assert.NoError(t, err)
 	assert.Empty(t, groupPermissions, "GroupPermission relationships should be deleted")
 }

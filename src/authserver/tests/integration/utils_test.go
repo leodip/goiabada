@@ -1254,7 +1254,7 @@ func createTestGroup(t *testing.T) *models.Group {
 		IncludeInIdToken:     true,
 		IncludeInAccessToken: false,
 	}
-	err := database.CreateGroup(nil, group)
+	err := database.CreateGroup(context.Background(), nil, group)
 	assert.NoError(t, err)
 	return group
 }
