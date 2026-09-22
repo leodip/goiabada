@@ -1,7 +1,11 @@
 package integrationtests
 
 import (
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/base64"
 	"encoding/json"
+	"encoding/pem"
 	"io"
 	"net/http"
 	"strconv"
@@ -11,6 +15,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // Helper to GET keys
@@ -38,9 +43,21 @@ func TestAPISettingsKeysGet_Success(t *testing.T) {
 	// CreatedAt present
 	assert.NotNil(t, keys[0].CreatedAt)
 	assert.NotNil(t, keys[1].CreatedAt)
-	// Public encodings present; no private key exposed
-	assert.True(t, strings.HasPrefix(keys[0].PublicKeyPEM, "-----BEGIN RSA PUBLIC KEY-----"))
-	assert.NotEmpty(t, keys[0].PublicKeyASN1DER)
+	// Public encodings present; no private key exposed. The PEM's label is not pinned: keys
+	// generated before #424 carry "RSA PUBLIC KEY" and later ones "PUBLIC KEY", and the MySQL,
+	// PostgreSQL and SQL Server integration databases outlive a run, so either may be served. What
+	// both must be is SubjectPublicKeyInfo, the same bytes as the DER field.
+	for _, key := range keys[:2] {
+		block, rest := pem.Decode([]byte(key.PublicKeyPEM))
+		require.NotNil(t, block, "the %s key's PEM does not decode", key.State)
+		assert.Empty(t, strings.TrimSpace(string(rest)))
+		der, err := base64.StdEncoding.DecodeString(key.PublicKeyASN1DER)
+		require.NoError(t, err)
+		assert.Equal(t, der, block.Bytes, "the %s key's PEM and DER disagree", key.State)
+		parsed, err := x509.ParsePKIXPublicKey(block.Bytes)
+		require.NoError(t, err, "the %s key's PEM is not SubjectPublicKeyInfo", key.State)
+		assert.IsType(t, &rsa.PublicKey{}, parsed)
+	}
 	assert.Contains(t, keys[0].PublicKeyJWK, "\"kty\":")
 }
 

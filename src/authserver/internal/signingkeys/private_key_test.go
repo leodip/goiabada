@@ -2,25 +2,33 @@ package signingkeys
 
 import (
 	"crypto/rsa"
+	"crypto/x509"
+	encodingpem "encoding/pem"
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
-	"github.com/leodip/goiabada/authserver/internal/rsautil"
+	"github.com/leodip/goiabada/authserver/internal/rsakey"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// storedKeyPair builds the row SigningKeyRotator.generateNextKey writes: a real RSA key, PEM
-// encoded, then encrypted at rest with the process data cipher (#83). 2048 is what the rotator
-// generates.
+// storedKeyPair builds the private half of the row NewKeyPair builds: a real RSA key, PEM
+// encoded, then encrypted at rest with the process data cipher (#83). The reference key is parsed
+// from the plaintext PEM here, independently of ParsePrivateKey, so the round trip below compares
+// against something the function under test did not produce.
 func storedKeyPair(t *testing.T) (*models.KeyPair, *rsa.PrivateKey, []byte) {
 	t.Helper()
 
-	privateKey, err := rsautil.GeneratePrivateKey(2048)
+	material, err := rsakey.Generate(1024, "kid")
 	require.NoError(t, err)
 
-	pem := rsautil.EncodePrivateKeyToPEM(privateKey)
+	block, _ := encodingpem.Decode(material.PrivateKeyPEM)
+	require.NotNil(t, block)
+	privateKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+	require.NoError(t, err)
+
+	pem := material.PrivateKeyPEM
 	encrypted, err := encryption.EncryptData(string(pem))
 	require.NoError(t, err)
 
