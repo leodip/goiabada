@@ -40,7 +40,7 @@ repository root. It is enforced rather than descriptive: see **Architecture guar
 - `internal/{permissions,usercreation,usersession,useragent,emaildelivery,otp,imaging,uithemes}/` - Application services and leaf helpers: permissions, user creation, sessions, email, OTP, images, themes
 - `internal/{encryption,passwordhash,oidc,rsautil,urlutil,uuidutil}/` - The authserver-only utilities #360 moved out of `core`: AES and bcrypt, discovery metadata, RSA key generation, redirect-URI and origin predicates, UUIDs (#360)
 - `internal/models/` - All domain models (Client, User, Permission, Group, etc.) (#359)
-- `internal/data/` - The `Database` interface, the seeder, `commondb/`, the four engine adapters and the generated `Database` mock (#354, #359). The interface is composition-only: `datafactory` builds one, `server` holds it and hands it to every constructor, the data tier exercises it, and it is the compiler's check that the four adapters implement a complete set. No handler, middleware or application service takes it -- each declares an unexported port beside the function that takes it, naming the operations that file needs. The mock stays, of `Database` and of no port, because Go's structural satisfaction means one double serves every port (#386)
+- `internal/data/` - The composition-only `Database` interface, the seeder, `commondb/`, the four engine adapters, and the generated `Database` mock that every narrow port is tested through (#354, #359, #386)
 - `internal/datafactory/` - Database composition: engine selection, config mapping, the email-case pre-flight, the startup data tasks (#353)
 - `internal/server/routes.go` - All route definitions
 - `web/template/` - HTML templates
@@ -53,8 +53,9 @@ repository root. It is enforced rather than descriptive: see **Architecture guar
 ## Database Pattern
 
 Single `Database` interface (`src/authserver/internal/data/database.go`) with per-DB implementations:
-- All methods accept `ctx context.Context` first and `tx *sql.Tx` second (nil = no transaction); the context reaches `BeginTx`, `QueryContext` and `ExecContext`, so a cancelled request stops the statement (#386)
+- All methods accept `ctx context.Context` then `tx *sql.Tx` (nil = no transaction); the context reaches `BeginTx`, `QueryContext` and `ExecContext` (#386)
 - Uses `sqlbuilder` for query building with DB-specific flavors
+- Nothing above the data layer takes the whole interface: each handler, middleware and service declares an unexported port beside the function that takes it, naming only what that file calls (#386)
 - Schema in `src/authserver/internal/data/sqlitedb/schema.golden` (generated; see **Schema golden files** below)
 - Migrations are applied by Goiabada's own runner in `src/authserver/internal/data/migrator/`, built per engine by each `NewMigrator()`
 
