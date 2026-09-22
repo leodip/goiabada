@@ -14,6 +14,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
+	"github.com/leodip/goiabada/authserver/internal/userclaims"
 	"github.com/leodip/goiabada/authserver/internal/uuidutil"
 	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/errs"
@@ -652,55 +653,16 @@ func (t *TokenIssuer) GenerateTokenResponseForRefreshROPC(ctx context.Context, i
 	return &tokenResponse, nil
 }
 
-func (t *TokenIssuer) addClaimIfNotEmpty(claims jwt.MapClaims, claimName string, claimValue string) {
-	if len(strings.TrimSpace(claimValue)) > 0 {
-		claims[claimName] = claimValue
-	}
-}
-
-// addOpenIdConnectClaimsFromUser adds OIDC claims to token claims using user data directly.
-// This is the unified version used by all OAuth flows (auth code, implicit, ROPC).
-func (t *TokenIssuer) addOpenIdConnectClaimsFromUser(ctx context.Context, claims jwt.MapClaims, user *models.User, scopes []string) {
-
-	if len(scopes) > 1 || (len(scopes) == 1 && scopes[0] != "openid") {
-		claims["updated_at"] = user.UpdatedAt.Time.UTC().Unix()
-	}
-
-	if slices.Contains(scopes, "profile") {
-		t.addClaimIfNotEmpty(claims, "name", user.GetFullName())
-		t.addClaimIfNotEmpty(claims, "given_name", user.GivenName)
-		t.addClaimIfNotEmpty(claims, "middle_name", user.MiddleName)
-		t.addClaimIfNotEmpty(claims, "family_name", user.FamilyName)
-		t.addClaimIfNotEmpty(claims, "nickname", user.Nickname)
-		t.addClaimIfNotEmpty(claims, "preferred_username", user.Username)
-		claims["profile"] = fmt.Sprintf("%v/account/profile", t.baseURL)
-		t.addClaimIfNotEmpty(claims, "website", user.Website)
-		t.addClaimIfNotEmpty(claims, "gender", user.Gender)
-		if user.BirthDate.Valid {
-			claims["birthdate"] = user.BirthDate.Time.Format("2006-01-02")
-		}
-		t.addClaimIfNotEmpty(claims, "zoneinfo", user.ZoneInfo)
-		t.addClaimIfNotEmpty(claims, "locale", user.Locale)
-
-		// Add picture claim if user has a profile picture
-		hasPicture, err := t.database.UserHasProfilePicture(ctx, nil, user.Id)
-		if err == nil && hasPicture {
-			claims["picture"] = fmt.Sprintf("%v/userinfo/picture/%v", t.baseURL, user.Subject)
-		}
-	}
-
-	if slices.Contains(scopes, "email") {
-		t.addClaimIfNotEmpty(claims, "email", user.Email)
-		claims["email_verified"] = user.EmailVerified
-	}
-
-	if slices.Contains(scopes, "address") && user.HasAddress() {
-		claims["address"] = user.GetAddressClaim()
-	}
-
-	if slices.Contains(scopes, "phone") {
-		t.addClaimIfNotEmpty(claims, "phone_number", user.PhoneNumber)
-		claims["phone_number_verified"] = user.PhoneNumberVerified
+// claimMapper builds the user-claims mapper for one token type. The three fields after the port
+// are issuance's side of the three divergences userclaims keeps as inputs rather than merging:
+// the base URL is the one injected into this issuer, updated_at rides with any scope but a lone
+// openid, and the include flag is the token type's own (#387 decision 5).
+func (t *TokenIssuer) claimMapper(inclusion userclaims.Inclusion) userclaims.Mapper {
+	return userclaims.Mapper{
+		Database:  t.database,
+		BaseURL:   t.baseURL,
+		UpdatedAt: userclaims.UpdatedAtBeyondOpenidScope,
+		Inclusion: inclusion,
 	}
 }
 
@@ -799,43 +761,16 @@ func (t *TokenIssuer) generateAccessTokenCore(ctx context.Context, settings *mod
 		includeOpenIDConnectClaimsInAccessToken = input.Client.IncludeOpenIDConnectClaimsInAccessToken == models.ThreeStateSettingOn.String()
 	}
 
+	mapper := t.claimMapper(userclaims.InclusionAccessToken)
+
 	if slices.Contains(scopes, "openid") && includeOpenIDConnectClaimsInAccessToken {
-		t.addOpenIdConnectClaimsFromUser(ctx, claims, input.User, scopes)
+		mapper.AddOpenIdConnectClaims(ctx, claims, input.User, scopes)
 	}
 
-	// groups (using IncludeInAccessToken filter)
-	if slices.Contains(scopes, "groups") {
-		groups := []string{}
-		for _, group := range input.User.Groups {
-			if group.IncludeInAccessToken {
-				groups = append(groups, group.GroupIdentifier)
-			}
-		}
-		if len(groups) > 0 {
-			claims["groups"] = groups
-		}
-	}
-
-	// attributes (using IncludeInAccessToken filter)
-	if slices.Contains(scopes, "attributes") {
-		attributes := map[string]string{}
-		for _, attribute := range input.User.Attributes {
-			if attribute.IncludeInAccessToken {
-				attributes[attribute.Key] = attribute.Value
-			}
-		}
-
-		for _, group := range input.User.Groups {
-			for _, attribute := range group.Attributes {
-				if attribute.IncludeInAccessToken {
-					attributes[attribute.Key] = attribute.Value
-				}
-			}
-		}
-		if len(attributes) > 0 {
-			claims["attributes"] = attributes
-		}
-	}
+	// groups and attributes (using the IncludeInAccessToken filter), outside the OIDC claim
+	// settings above: a client that turned the OIDC claims off still receives these.
+	mapper.AddGroupClaims(claims, input.User, scopes)
+	mapper.AddAttributeClaims(claims, input.User, scopes)
 
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
 	token.Header["kid"] = keyIdentifier
@@ -903,43 +838,16 @@ func (t *TokenIssuer) generateIdTokenCore(ctx context.Context, settings *models.
 		includeOpenIDConnectClaimsInIdToken = input.Client.IncludeOpenIDConnectClaimsInIdToken == models.ThreeStateSettingOn.String()
 	}
 
+	mapper := t.claimMapper(userclaims.InclusionIdToken)
+
 	if includeOpenIDConnectClaimsInIdToken {
-		t.addOpenIdConnectClaimsFromUser(ctx, claims, input.User, scopes)
+		mapper.AddOpenIdConnectClaims(ctx, claims, input.User, scopes)
 	}
 
-	// groups (using IncludeInIdToken filter)
-	if slices.Contains(scopes, "groups") {
-		groups := []string{}
-		for _, group := range input.User.Groups {
-			if group.IncludeInIdToken {
-				groups = append(groups, group.GroupIdentifier)
-			}
-		}
-		if len(groups) > 0 {
-			claims["groups"] = groups
-		}
-	}
-
-	// attributes (using IncludeInIdToken filter)
-	if slices.Contains(scopes, "attributes") {
-		attributes := map[string]string{}
-		for _, attribute := range input.User.Attributes {
-			if attribute.IncludeInIdToken {
-				attributes[attribute.Key] = attribute.Value
-			}
-		}
-
-		for _, group := range input.User.Groups {
-			for _, attribute := range group.Attributes {
-				if attribute.IncludeInIdToken {
-					attributes[attribute.Key] = attribute.Value
-				}
-			}
-		}
-		if len(attributes) > 0 {
-			claims["attributes"] = attributes
-		}
-	}
+	// groups and attributes (using the IncludeInIdToken filter), outside the OIDC claim setting
+	// above, as they are in the access token.
+	mapper.AddGroupClaims(claims, input.User, scopes)
+	mapper.AddAttributeClaims(claims, input.User, scopes)
 
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
 	token.Header["kid"] = keyIdentifier

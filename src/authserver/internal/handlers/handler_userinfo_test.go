@@ -253,10 +253,11 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 			assert.Equal(t, user.PhoneNumberVerified, claims["phone_number_verified"])
 			assert.Equal(t, user.GetFullName(), claims["name"])
 
-			// A literal rather than user.GetAddressClaim(): comparing the handler's own
-			// input to the handler's output cannot fail, so this assertion held nothing
-			// about how the claim is built. Spelled out, it characterizes the map for
-			// #387, which moves the construction off the persistence record.
+			// A literal rather than the builder's own output: comparing the handler's
+			// own input to the handler's output cannot fail, so this assertion held
+			// nothing about how the claim is built. Spelled out, it characterizes the
+			// map for #387, which moved the construction off the persistence record and
+			// into userclaims.
 			assert.Equal(t, map[string]string{
 				"street_address": "123 Test St\r\nApt 4",
 				"locality":       "Test City",
