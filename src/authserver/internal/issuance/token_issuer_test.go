@@ -14,6 +14,7 @@ import (
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 
+	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
@@ -5451,4 +5452,243 @@ func TestAddOpenIdConnectClaimsFromUser_CarriesTheCallersContext(t *testing.T) {
 		assert.NotContains(t, claims, "picture")
 		mockDB.AssertNotCalled(t, "UserHasProfilePicture", mock.Anything, mock.Anything, mock.Anything)
 	})
+}
+
+// ============================================================================
+// Claim characterization for #387
+//
+// The three tests below are issuance's half of the characterization decision 6 of #387
+// requires before the claims mapper that will serve this package and /userinfo from one
+// implementation. Each names a place where the two deliberately disagree today, and the
+// counterpart case lives in handlers/handler_userinfo_test.go. They are written against the
+// public generation path rather than against addOpenIdConnectClaimsFromUser, because part of
+// what diverges is the scope slice each token type hands it.
+// ============================================================================
+
+// issueCharacterizationTokens drives GenerateTokenResponseForAuthCode once for one scope string
+// and returns the decoded ID and access token claims. Both OIDC claim settings are on, so the
+// two token types differ only where the code makes them differ.
+//
+// The profile-picture port is registered only for a scope that carries "profile", so a lookup
+// from any other arm fails the case as an unexpected call.
+func issueCharacterizationTokens(t *testing.T, scope string, baseURL string, user *models.User,
+	hasProfilePicture bool) (jwt.MapClaims, jwt.MapClaims) {
+	t.Helper()
+
+	mockDB := mocks_data.NewDatabase(t)
+	tokenIssuer := NewTokenIssuer(mockDB, baseURL)
+
+	settings := &models.Settings{
+		Issuer:                                  "https://test-issuer.com",
+		TokenExpirationInSeconds:                600,
+		UserSessionIdleTimeoutInSeconds:         1200,
+		UserSessionMaxLifetimeInSeconds:         2400,
+		IncludeOpenIDConnectClaimsInIdToken:     true,
+		IncludeOpenIDConnectClaimsInAccessToken: true,
+	}
+	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+
+	now := time.Now().UTC()
+	sessionIdentifier := "test-session-characterization"
+
+	code := &models.Code{
+		Id:                1,
+		ClientId:          1,
+		UserId:            user.Id,
+		Scope:             scope,
+		AuthenticatedAt:   now.Add(-1 * time.Minute),
+		SessionIdentifier: sessionIdentifier,
+		AcrLevel:          "urn:goiabada:pwd",
+		AuthMethods:       "pwd",
+	}
+	client := &models.Client{Id: 1, ClientIdentifier: "characterization-client"}
+
+	mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, code).Return(nil)
+	code.Client = *client
+	mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, code).Return(nil)
+	code.User = *user
+	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, &code.User).Return(nil)
+	mockDB.On("GroupsLoadAttributes", mock.Anything, mock.Anything, code.User.Groups).Return(nil)
+	mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything, &code.User).Return(nil)
+	if slices.Contains(strings.Split(scope, " "), "profile") {
+		mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, user.Id).
+			Return(hasProfilePicture, nil)
+	}
+	mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).
+		Return(&models.UserSession{
+			Id:           1,
+			UserId:       user.Id,
+			Started:      now.Add(-30 * time.Minute),
+			LastAccessed: now.Add(-5 * time.Minute),
+		}, nil)
+	mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*models.RefreshToken")).
+		Return(nil)
+	mockDB.On("GetCurrentSigningKey", mock.Anything, mock.Anything).Return(&models.KeyPair{
+		KeyIdentifier: "test-key-id",
+		PrivateKeyPEM: encryptPEM(t, getTestPrivateKey(t)),
+	}, nil)
+
+	response, err := tokenIssuer.GenerateTokenResponseForAuthCode(ctx, code)
+	require.NoError(t, err)
+	require.NotNil(t, response)
+
+	publicKeyBytes := getTestPublicKey(t)
+	idClaims := verifyAndDecodeToken(t, response.IdToken, publicKeyBytes)
+	accessClaims := verifyAndDecodeToken(t, response.AccessToken, publicKeyBytes)
+
+	mockDB.AssertExpectations(t)
+	return idClaims, accessClaims
+}
+
+// Divergence 1, issuance's side. The gate here is "any scope beyond openid alone", where
+// /userinfo emits updated_at only inside its profile arm, so at scope=openid email an ID token
+// carries updated_at and the userinfo response for the same grant does not. That is observable
+// and undocumented, and the mapper #387 introduces has to keep it rather than merge the two
+// gates into one.
+//
+// The access token's row for "openid" alone is the part that surprises, and it is recorded here
+// rather than repaired: the scope slice it gates on is not the granted scope.
+// generateAccessTokenCore appends authserver:userinfo to scopes before calling
+// addOpenIdConnectClaimsFromUser, so len(scopes) > 1 already holds and the access token carries
+// updated_at where the ID token, gating on the granted scope verbatim, does not.
+func TestClaimCharacterization_UpdatedAtGate(t *testing.T) {
+	tests := []struct {
+		name                    string
+		scope                   string
+		idTokenHasUpdatedAt     bool
+		accessTokenHasUpdatedAt bool
+	}{
+		{
+			name:                    "openid alone",
+			scope:                   "openid",
+			idTokenHasUpdatedAt:     false,
+			accessTokenHasUpdatedAt: true,
+		},
+		{
+			name:                    "openid email",
+			scope:                   "openid email",
+			idTokenHasUpdatedAt:     true,
+			accessTokenHasUpdatedAt: true,
+		},
+		{
+			name:                    "openid profile",
+			scope:                   "openid profile",
+			idTokenHasUpdatedAt:     true,
+			accessTokenHasUpdatedAt: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			updatedAt := time.Now().UTC().Add(-1 * time.Minute)
+			user := &models.User{
+				Id:            1,
+				Subject:       fake.UUID(),
+				Email:         "characterization@example.com",
+				EmailVerified: true,
+				GivenName:     "Test",
+				FamilyName:    "User",
+				UpdatedAt:     sql.NullTime{Time: updatedAt, Valid: true},
+			}
+
+			idClaims, accessClaims := issueCharacterizationTokens(t, test.scope,
+				"http://localhost:8081", user, false)
+
+			if test.idTokenHasUpdatedAt {
+				assert.Equal(t, float64(updatedAt.Unix()), idClaims["updated_at"])
+			} else {
+				assert.NotContains(t, idClaims, "updated_at")
+			}
+
+			if test.accessTokenHasUpdatedAt {
+				assert.Equal(t, float64(updatedAt.Unix()), accessClaims["updated_at"])
+			} else {
+				assert.NotContains(t, accessClaims, "updated_at")
+			}
+		})
+	}
+}
+
+// Divergence 3, issuance's side: the include predicate is per token type here, where /userinfo
+// reads IncludeInIdToken at all three of its filter sites. A mapper taking one predicate would
+// have to pick a token type, which is why #387 makes the predicate an input.
+func TestClaimCharacterization_GroupsAndAttributesFollowThePerTokenTypeFlag(t *testing.T) {
+	idTokenGroup := models.Group{
+		Id:               1,
+		GroupIdentifier:  "id-token-group",
+		IncludeInIdToken: true, IncludeInAccessToken: false,
+		Attributes: []models.GroupAttribute{
+			{Key: "idTokenGroupAttr", Value: "idTokenGroupValue",
+				IncludeInIdToken: true, IncludeInAccessToken: false},
+		},
+	}
+	accessTokenGroup := models.Group{
+		Id:               2,
+		GroupIdentifier:  "access-token-group",
+		IncludeInIdToken: false, IncludeInAccessToken: true,
+		Attributes: []models.GroupAttribute{
+			{Key: "accessTokenGroupAttr", Value: "accessTokenGroupValue",
+				IncludeInIdToken: false, IncludeInAccessToken: true},
+		},
+	}
+
+	user := &models.User{
+		Id:      1,
+		Subject: fake.UUID(),
+		Groups:  []models.Group{idTokenGroup, accessTokenGroup},
+		Attributes: []models.UserAttribute{
+			{Key: "idTokenAttr", Value: "idTokenValue",
+				IncludeInIdToken: true, IncludeInAccessToken: false},
+			{Key: "accessTokenAttr", Value: "accessTokenValue",
+				IncludeInIdToken: false, IncludeInAccessToken: true},
+		},
+	}
+
+	idClaims, accessClaims := issueCharacterizationTokens(t, "openid groups attributes",
+		"http://localhost:8081", user, false)
+
+	idGroups, ok := idClaims["groups"].([]interface{})
+	require.True(t, ok)
+	assert.ElementsMatch(t, []interface{}{"id-token-group"}, idGroups)
+	assert.Equal(t, map[string]interface{}{
+		"idTokenAttr":      "idTokenValue",
+		"idTokenGroupAttr": "idTokenGroupValue",
+	}, idClaims["attributes"])
+
+	accessGroups, ok := accessClaims["groups"].([]interface{})
+	require.True(t, ok)
+	assert.ElementsMatch(t, []interface{}{"access-token-group"}, accessGroups)
+	assert.Equal(t, map[string]interface{}{
+		"accessTokenAttr":      "accessTokenValue",
+		"accessTokenGroupAttr": "accessTokenGroupValue",
+	}, accessClaims["attributes"])
+}
+
+// Divergence 2, issuance's side: the base URL is the one injected into NewTokenIssuer, and the
+// process configuration is never consulted. /userinfo does the opposite, reading
+// config.GetAuthServer().BaseURL at the moment it builds the claim. The configured value is set
+// to something else here, so a mapper that read it back would fail this case rather than pass
+// it silently.
+func TestClaimCharacterization_ProfileAndPictureComeFromTheInjectedBaseURL(t *testing.T) {
+	authServerConfig := config.GetAuthServer()
+	originalBaseURL := authServerConfig.BaseURL
+	t.Cleanup(func() { authServerConfig.BaseURL = originalBaseURL })
+	authServerConfig.BaseURL = "https://configured.example"
+
+	sub := fake.UUID()
+	user := &models.User{
+		Id:         1,
+		Subject:    sub,
+		GivenName:  "Test",
+		FamilyName: "User",
+		UpdatedAt:  sql.NullTime{Time: time.Now().UTC(), Valid: true},
+	}
+
+	idClaims, accessClaims := issueCharacterizationTokens(t, "openid profile",
+		"https://injected.example", user, true)
+
+	for _, claims := range []jwt.MapClaims{idClaims, accessClaims} {
+		assert.Equal(t, "https://injected.example/account/profile", claims["profile"])
+		assert.Equal(t, "https://injected.example/userinfo/picture/"+sub, claims["picture"])
+	}
 }

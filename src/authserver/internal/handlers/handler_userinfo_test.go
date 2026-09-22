@@ -16,6 +16,7 @@ import (
 	mocks_handlerhelpers "github.com/leodip/goiabada/authserver/internal/handlerhelpers/mocks"
 	authmiddleware "github.com/leodip/goiabada/authserver/internal/middleware"
 
+	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
 	"github.com/leodip/goiabada/authserver/internal/models"
@@ -252,8 +253,18 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 			assert.Equal(t, user.PhoneNumberVerified, claims["phone_number_verified"])
 			assert.Equal(t, user.GetFullName(), claims["name"])
 
-			addressClaim := user.GetAddressClaim()
-			assert.Equal(t, addressClaim, claims["address"])
+			// A literal rather than user.GetAddressClaim(): comparing the handler's own
+			// input to the handler's output cannot fail, so this assertion held nothing
+			// about how the claim is built. Spelled out, it characterizes the map for
+			// #387, which moves the construction off the persistence record.
+			assert.Equal(t, map[string]string{
+				"street_address": "123 Test St\r\nApt 4",
+				"locality":       "Test City",
+				"region":         "Test Region",
+				"postal_code":    "12345",
+				"country":        "Test Country",
+				"formatted":      "123 Test St\r\nApt 4\r\nTest City\r\nTest Region\r\n12345\r\nTest Country",
+			}, claims["address"])
 
 			assert.Equal(t, user.UpdatedAt.Time.UTC().Unix(), claims["updated_at"])
 			assert.ElementsMatch(t, []string{"group1", "group2"}, claims["groups"])
@@ -269,6 +280,248 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		database.AssertExpectations(t)
 		auditLogger.AssertExpectations(t)
 	})
+
+	// The four cases below are characterization, written for #387 before the claims mapper
+	// that will serve this endpoint and issuance from one implementation. Each pins a place
+	// where userinfo and issuance/token_issuer.go deliberately disagree today, so the
+	// extraction has to carry the disagreement across as an input rather than merge it away.
+	// Their counterparts live in issuance/token_issuer_test.go.
+
+	// Divergence 1, userinfo's side. updated_at sits inside the profile arm here, where
+	// issuance emits it for any scope beyond openid alone, so at scope=openid email the two
+	// endpoints answer differently. Neither tier reached this before: the success case above
+	// asks for every scope at once, where the two sides agree.
+	t.Run("userinfo at scope=openid email carries no updated_at", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		database := mocks_data.NewDatabase(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+
+		handler := HandleUserInfoGetPost(httpHelper, database, auditLogger)
+
+		sub := fake.UUID()
+		req := userInfoRequestForScopes(t, sub, "email")
+		rr := httptest.NewRecorder()
+
+		user := &models.User{
+			Id:            1,
+			Subject:       sub,
+			Enabled:       true,
+			Username:      "testuser",
+			Email:         "test@example.com",
+			EmailVerified: true,
+			GivenName:     "Test",
+			FamilyName:    "User",
+			AddressLine1:  "123 Test St",
+			UpdatedAt:     sql.NullTime{Time: time.Now(), Valid: true},
+			Groups:        []models.Group{{Id: 1, GroupIdentifier: "group1", IncludeInIdToken: true}},
+			Attributes:    []models.UserAttribute{{Key: "userAttr", Value: "userValue", IncludeInIdToken: true}},
+		}
+
+		database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), sub).Return(user, nil)
+		database.On("UserLoadGroups", mock.Anything, (*sql.Tx)(nil), user).Return(nil)
+		database.On("GroupsLoadAttributes", mock.Anything, (*sql.Tx)(nil), user.Groups).Return(nil)
+		database.On("UserLoadAttributes", mock.Anything, (*sql.Tx)(nil), user).Return(nil)
+
+		// Not registered, so a profile-picture lookup on this scope would fail the case as
+		// an unexpected call: the picture read lives inside the profile arm.
+		httpHelper.On("EncodeJson", rr, req, mock.MatchedBy(func(claims map[string]interface{}) bool {
+			assert.Equal(t, sub, claims["sub"])
+			assert.Equal(t, user.Email, claims["email"])
+			assert.Equal(t, user.EmailVerified, claims["email_verified"])
+			for _, absent := range []string{"updated_at", "profile", "picture", "name",
+				"preferred_username", "groups", "attributes", "address"} {
+				assert.NotContains(t, claims, absent)
+			}
+			return true
+		})).Return()
+
+		handler.ServeHTTP(rr, req)
+
+		httpHelper.AssertExpectations(t)
+		database.AssertExpectations(t)
+		auditLogger.AssertExpectations(t)
+	})
+
+	// Divergence 1 stated the other way round: the gate is the profile scope, not "any scope
+	// but openid". Together with the case above this is userinfo's whole side of it.
+	t.Run("userinfo puts updated_at inside the profile arm", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		database := mocks_data.NewDatabase(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+
+		handler := HandleUserInfoGetPost(httpHelper, database, auditLogger)
+
+		sub := fake.UUID()
+		req := userInfoRequestForScopes(t, sub, "profile")
+		rr := httptest.NewRecorder()
+
+		updatedAt := time.Now()
+		user := &models.User{
+			Id:            1,
+			Subject:       sub,
+			Enabled:       true,
+			Username:      "testuser",
+			Email:         "test@example.com",
+			EmailVerified: true,
+			GivenName:     "Test",
+			FamilyName:    "User",
+			UpdatedAt:     sql.NullTime{Time: updatedAt, Valid: true},
+		}
+
+		database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), sub).Return(user, nil)
+		database.On("UserLoadGroups", mock.Anything, (*sql.Tx)(nil), user).Return(nil)
+		database.On("GroupsLoadAttributes", mock.Anything, (*sql.Tx)(nil), user.Groups).Return(nil)
+		database.On("UserLoadAttributes", mock.Anything, (*sql.Tx)(nil), user).Return(nil)
+		database.On("UserHasProfilePicture", mock.Anything, (*sql.Tx)(nil), user.Id).Return(false, nil)
+
+		httpHelper.On("EncodeJson", rr, req, mock.MatchedBy(func(claims map[string]interface{}) bool {
+			assert.Equal(t, updatedAt.UTC().Unix(), claims["updated_at"])
+			assert.Equal(t, user.GetFullName(), claims["name"])
+			assert.NotContains(t, claims, "email")
+			assert.NotContains(t, claims, "email_verified")
+			return true
+		})).Return()
+
+		handler.ServeHTTP(rr, req)
+
+		httpHelper.AssertExpectations(t)
+		database.AssertExpectations(t)
+		auditLogger.AssertExpectations(t)
+	})
+
+	// Divergence 3, userinfo's side: all three filter sites here read IncludeInIdToken, where
+	// issuance reads IncludeInAccessToken in the access token and IncludeInIdToken in the ID
+	// token. The success case above cannot show it, because every flag in its fixture is
+	// IncludeInIdToken: true.
+	t.Run("userinfo filters groups and attributes by IncludeInIdToken", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		database := mocks_data.NewDatabase(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+
+		handler := HandleUserInfoGetPost(httpHelper, database, auditLogger)
+
+		sub := fake.UUID()
+		req := userInfoRequestForScopes(t, sub, "groups attributes")
+		rr := httptest.NewRecorder()
+
+		idTokenGroup := models.Group{
+			Id: 1, GroupIdentifier: "id-token-group",
+			IncludeInIdToken: true, IncludeInAccessToken: false,
+			Attributes: []models.GroupAttribute{
+				{Key: "idTokenGroupAttr", Value: "idTokenGroupValue",
+					IncludeInIdToken: true, IncludeInAccessToken: false},
+			},
+		}
+		accessTokenGroup := models.Group{
+			Id: 2, GroupIdentifier: "access-token-group",
+			IncludeInIdToken: false, IncludeInAccessToken: true,
+			Attributes: []models.GroupAttribute{
+				{Key: "accessTokenGroupAttr", Value: "accessTokenGroupValue",
+					IncludeInIdToken: false, IncludeInAccessToken: true},
+			},
+		}
+
+		user := &models.User{
+			Id:      1,
+			Subject: sub,
+			Enabled: true,
+			Groups:  []models.Group{idTokenGroup, accessTokenGroup},
+			Attributes: []models.UserAttribute{
+				{Key: "idTokenAttr", Value: "idTokenValue",
+					IncludeInIdToken: true, IncludeInAccessToken: false},
+				{Key: "accessTokenAttr", Value: "accessTokenValue",
+					IncludeInIdToken: false, IncludeInAccessToken: true},
+			},
+		}
+
+		database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), sub).Return(user, nil)
+		database.On("UserLoadGroups", mock.Anything, (*sql.Tx)(nil), user).Return(nil)
+		database.On("GroupsLoadAttributes", mock.Anything, (*sql.Tx)(nil), user.Groups).Return(nil)
+		database.On("UserLoadAttributes", mock.Anything, (*sql.Tx)(nil), user).Return(nil)
+
+		httpHelper.On("EncodeJson", rr, req, mock.MatchedBy(func(claims map[string]interface{}) bool {
+			assert.Equal(t, []string{"id-token-group"}, claims["groups"])
+			assert.Equal(t, map[string]string{
+				"idTokenAttr":      "idTokenValue",
+				"idTokenGroupAttr": "idTokenGroupValue",
+			}, claims["attributes"])
+			return true
+		})).Return()
+
+		handler.ServeHTTP(rr, req)
+
+		httpHelper.AssertExpectations(t)
+		database.AssertExpectations(t)
+		auditLogger.AssertExpectations(t)
+	})
+
+	// Divergence 2, userinfo's side: the base URL is read from the process configuration at
+	// the moment the claim is built, where issuance carries the value injected into
+	// NewTokenIssuer. The mapper takes it as an input rather than reading it back, so both
+	// callers keep the source they have.
+	t.Run("userinfo builds profile and picture from the configured base URL", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		database := mocks_data.NewDatabase(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+
+		authServerConfig := config.GetAuthServer()
+		originalBaseURL := authServerConfig.BaseURL
+		t.Cleanup(func() { authServerConfig.BaseURL = originalBaseURL })
+		authServerConfig.BaseURL = "https://configured.example"
+
+		handler := HandleUserInfoGetPost(httpHelper, database, auditLogger)
+
+		sub := fake.UUID()
+		req := userInfoRequestForScopes(t, sub, "profile")
+		rr := httptest.NewRecorder()
+
+		user := &models.User{
+			Id:        1,
+			Subject:   sub,
+			Enabled:   true,
+			GivenName: "Test",
+			UpdatedAt: sql.NullTime{Time: time.Now(), Valid: true},
+		}
+
+		database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), sub).Return(user, nil)
+		database.On("UserLoadGroups", mock.Anything, (*sql.Tx)(nil), user).Return(nil)
+		database.On("GroupsLoadAttributes", mock.Anything, (*sql.Tx)(nil), user.Groups).Return(nil)
+		database.On("UserLoadAttributes", mock.Anything, (*sql.Tx)(nil), user).Return(nil)
+		database.On("UserHasProfilePicture", mock.Anything, (*sql.Tx)(nil), user.Id).Return(true, nil)
+
+		httpHelper.On("EncodeJson", rr, req, mock.MatchedBy(func(claims map[string]interface{}) bool {
+			assert.Equal(t, "https://configured.example/account/profile", claims["profile"])
+			assert.Equal(t, "https://configured.example/userinfo/picture/"+sub, claims["picture"])
+			return true
+		})).Return()
+
+		handler.ServeHTTP(rr, req)
+
+		httpHelper.AssertExpectations(t)
+		database.AssertExpectations(t)
+		auditLogger.AssertExpectations(t)
+	})
+}
+
+// userInfoRequestForScopes builds the /userinfo request the cases above drive, carrying a
+// validated token for sub whose scope is the endpoint's own permission plus the OIDC scopes
+// named. The permission is always there because the middleware would refuse the request
+// without it; what each case varies is what follows.
+func userInfoRequestForScopes(t *testing.T, sub string, oidcScopes string) *http.Request {
+	t.Helper()
+	scope := coreconstants.AuthServerResourceIdentifier + ":" + coreconstants.UserinfoPermissionIdentifier
+	if len(oidcScopes) > 0 {
+		scope += " " + oidcScopes
+	}
+	req, err := http.NewRequest("GET", "/userinfo", nil)
+	require.NoError(t, err)
+	jwtToken := oauth.JwtToken{
+		Claims: map[string]interface{}{
+			"sub":   sub,
+			"scope": scope,
+		},
+	}
+	return req.WithContext(context.WithValue(req.Context(), constants.ContextKeyValidatedToken, jwtToken))
 }
 
 // isUserInfoInvalidToken is what both refusal branches of /userinfo now carry: RFC 6750 section

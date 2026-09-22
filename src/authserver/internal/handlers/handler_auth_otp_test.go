@@ -1394,6 +1394,104 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		auditLogger.AssertExpectations(t)
 	})
 
+	// The enrolling arm of the same refusal. #387's three-arm table has three columns —
+	// browser enrolled, browser enrolling, account API enable — and this is the one nothing
+	// pinned: TestHandleAPIAccountOTPPut_Enable_ReplayIsRefused holds the API's column, where
+	// no failure event is raised at all, and the case above holds the enrolled one. The
+	// difference is the whole reason the extracted verify reports an outcome and leaves the
+	// audit set to its caller.
+	t.Run("Replayed OTP code is refused while enrolling", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
+		database := mocks_data.NewDatabase(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+
+		handler := HandleAuthOtpPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{})
+
+		key, err := totp.Generate(totp.GenerateOpts{
+			Issuer:      "TestApp",
+			AccountName: "test@test.com",
+		})
+		assert.Nil(t, err)
+
+		otpCode, err := totp.GenerateCode(key.Secret(), time.Now())
+		assert.Nil(t, err)
+
+		form := url.Values{}
+		form.Add(ceremonyIdField, testCeremonyId)
+		form.Add("otp", otpCode)
+		req, _ := http.NewRequest("POST", "/auth/otp", strings.NewReader(form.Encode()))
+		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		rr := httptest.NewRecorder()
+
+		// The seed is on the ceremony rather than on the user row, which is what makes this
+		// the enrolling arm: the user has no authenticator yet.
+		keyURL := otpTestKeyURL(key.Secret())
+		authContext := &ceremony.AuthContext{
+			AuthState:  ceremony.AuthStateLevel2OTP,
+			CeremonyId: testCeremonyId,
+			UserId:     1,
+			ClientId:   "test-client",
+			OTPKeyURL:  keyURL,
+		}
+		authHelper.On("GetAuthContext", mock.Anything).Return(authContext, nil)
+
+		database.On("GetUserById", mock.Anything, mock.Anything, int64(1)).
+			Return(&models.User{Id: 1, Enabled: true, OTPEnabled: false}, nil)
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").
+			Return(&models.Client{ClientIdentifier: "test-client"}, nil)
+
+		// requireOTPEnabled is false on this arm, for the reason #111 decision 10 gives:
+		// enrollment establishes the authenticator rather than asserting it. The code
+		// matches the seed, so the claim is what refuses the submission.
+		expectedStep := time.Now().UTC().Unix() / otp.StepSeconds
+		database.On("TryConsumeUserOTPStep", mock.Anything, mock.Anything, int64(1), mock.Anything, false).
+			Return(false, nil)
+
+		auditLogger.On("Log", mock.Anything, audit.AuditOTPCodeReplayDetected,
+			mock.MatchedBy(func(payload map[string]interface{}) bool {
+				step, ok := payload["step"].(int64)
+				if !ok {
+					return false
+				}
+				// Same tolerance as the enrolled case: the code is generated at this
+				// instant, so its step is the current one, and the neighbours are allowed
+				// in case the clock crosses a period boundary mid-test. Never the code.
+				if step < expectedStep-1 || step > expectedStep+1 {
+					return false
+				}
+				_, hasCode := payload["otp"]
+				return payload["userId"] == int64(1) && !hasCode
+			})).Return()
+		auditLogger.On("Log", mock.Anything, audit.AuditAuthFailedOtp, mock.Anything).Return()
+
+		// Refused exactly as a wrong enrollment code is, back to the enrollment page with
+		// the same secret and QR code, so the user can retype from the authenticator they
+		// have already scanned.
+		expectedError := i18n.NewLocalizedError(i18n.ErrCodeOtpIncorrectCode, nil).Localize(req.Context())
+		httpHelper.On("RenderTemplate", rr, req, "/layouts/auth_layout.html",
+			"/auth_otp_enrollment.html", mock.MatchedBy(func(bind map[string]interface{}) bool {
+				return bind["error"] == expectedError &&
+					bind["ceremonyId"] == testCeremonyId &&
+					bind["secretKey"] == key.Secret() &&
+					bind["base64Image"] == otpTestRenderedQR(t, keyURL)
+			})).Return(nil)
+
+		handler.ServeHTTP(rr, req)
+
+		// Nothing is written and no transaction opens, so the authenticator is not
+		// established and neither success event can be raised.
+		database.AssertNotCalled(t, "UpdateUser", mock.Anything, mock.Anything, mock.Anything)
+		database.AssertNotCalled(t, "RunInTransaction", mock.Anything, mock.Anything)
+		auditLogger.AssertNotCalled(t, "Log", mock.Anything, audit.AuditEnabledOTP, mock.Anything)
+		auditLogger.AssertNotCalled(t, "Log", mock.Anything, audit.AuditAuthSuccessOtp, mock.Anything)
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+		database.AssertExpectations(t)
+		auditLogger.AssertExpectations(t)
+	})
+
 	t.Run("Error consuming the OTP step", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
