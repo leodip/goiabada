@@ -19,6 +19,12 @@ name: Check
 on:
   pull_request:
     branches: [main]
+    # `ready_for_review` is not one of the default types, and it is the event the
+    # four database jobs below are waiting for: a draft pull request runs the
+    # fast half of this suite on every push, and taking it out of draft runs the
+    # whole thing. Without this line the flip produces no run at all, and the
+    # database tiers would never run on a pull request again.
+    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches: [main]
   workflow_call:
@@ -503,10 +509,30 @@ jobs:
   # check misbehaves. A naive matrix would also boot all three databases for
   # every leg, and GitHub waits for every service health check before running
   # any step, so the sqlite leg would block on an MSSQL container it never uses.
+  #
+  # All four skip while the pull request is a draft, and all four run when it is
+  # taken out of draft. They are 23 of the 36 runner-minutes a run costs and they
+  # set its wall clock -- 6.9 minutes for mssql against 5.1 for the slowest job
+  # left -- and a gbd-drive run pays that on every stage it commits, half a dozen
+  # times before anybody reads the branch. What the draft loses by skipping them
+  # is narrower than it looks: every stage already runs the data and integration
+  # tiers on sqlite locally, in the dev container, before it commits. What these
+  # jobs add is cross-engine parity, the migration sqlite accepts and MSSQL does
+  # not, and that answer is wanted before a human reads the pull request rather
+  # than between two stages of one.
+  #
+  # `github.event_name != 'pull_request'` is what keeps a push to main and
+  # release.yml's workflow_call running all four: neither has a draft flag, and
+  # `github.event.pull_request.draft` is null in both.
+  #
+  # A skipped job is not a hole in the gate. GitHub reports it as `skipped`, and
+  # where.sh ci -- which is what gbd-drive and the run roles ask -- counts
+  # skipped as passing, so a draft's suite concludes green on the fast half.
 
   tests-sqlite:
     name: Tests / sqlite
     needs: versions
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     container: golang:${{ needs.versions.outputs.go }}-bookworm
     services:
@@ -531,6 +557,7 @@ jobs:
   tests-mysql:
     name: Tests / mysql
     needs: versions
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     container: golang:${{ needs.versions.outputs.go }}-bookworm
     services:
@@ -572,6 +599,7 @@ jobs:
   tests-postgres:
     name: Tests / postgres
     needs: versions
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     container: golang:${{ needs.versions.outputs.go }}-bookworm
     services:
@@ -606,6 +634,7 @@ jobs:
   tests-mssql:
     name: Tests / mssql
     needs: versions
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     container: golang:${{ needs.versions.outputs.go }}-bookworm
     services:
