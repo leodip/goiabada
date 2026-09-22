@@ -1,6 +1,7 @@
 package adminuserhandlers
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -33,7 +34,7 @@ type notFoundUserApiClient struct {
 	err    error
 }
 
-func (c *notFoundUserApiClient) GetUserById(accessToken string, id int64) (*api.UserResponse, error) {
+func (c *notFoundUserApiClient) GetUserById(_ context.Context, accessToken string, id int64) (*api.UserResponse, error) {
 	return c.entity, c.err
 }
 

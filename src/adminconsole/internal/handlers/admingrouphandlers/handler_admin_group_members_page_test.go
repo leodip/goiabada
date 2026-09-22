@@ -1,6 +1,7 @@
 package admingrouphandlers
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -30,11 +31,11 @@ type membersPagingApiClient struct {
 	asked []int
 }
 
-func (c *membersPagingApiClient) GetGroupById(accessToken string, groupId int64) (*api.GroupResponse, error) {
+func (c *membersPagingApiClient) GetGroupById(_ context.Context, accessToken string, groupId int64) (*api.GroupResponse, error) {
 	return &api.GroupResponse{Id: groupId, GroupIdentifier: "some-group"}, nil
 }
 
-func (c *membersPagingApiClient) GetGroupMembers(accessToken string, groupId int64,
+func (c *membersPagingApiClient) GetGroupMembers(_ context.Context, accessToken string, groupId int64,
 	page, size int) ([]api.UserResponse, int, error) {
 
 	c.asked = append(c.asked, page)

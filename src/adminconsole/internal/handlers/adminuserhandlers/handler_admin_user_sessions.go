@@ -40,7 +40,7 @@ func HandleAdminUserSessionsGet(
 		}
 
 		// Get user details via API
-		user, err := apiClient.GetUserById(jwtInfo.TokenResponse.AccessToken, id)
+		user, err := apiClient.GetUserById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -51,7 +51,7 @@ func HandleAdminUserSessionsGet(
 		}
 
 		// Get the user's sessions via API
-		sessions, err := apiClient.GetUserSessionsByUserId(jwtInfo.TokenResponse.AccessToken, user.Id)
+		sessions, err := apiClient.GetUserSessionsByUserId(r.Context(), jwtInfo.TokenResponse.AccessToken, user.Id)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -122,7 +122,7 @@ func HandleAdminUserSessionsPost(
 		}
 
 		// Verify user exists via API
-		user, err := apiClient.GetUserById(jwtInfo.TokenResponse.AccessToken, id)
+		user, err := apiClient.GetUserById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
@@ -149,7 +149,7 @@ func HandleAdminUserSessionsPost(
 		// server computes isCurrent from the sid claim of the very token this request forwards,
 		// so this is the same comparison the console used to make for itself, now made once and
 		// in one place (#373).
-		sessions, err := apiClient.GetUserSessionsByUserId(jwtInfo.TokenResponse.AccessToken, user.Id)
+		sessions, err := apiClient.GetUserSessionsByUserId(r.Context(), jwtInfo.TokenResponse.AccessToken, user.Id)
 		if err != nil {
 			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
@@ -179,7 +179,7 @@ func HandleAdminUserSessionsPost(
 		}
 
 		// Delete the user session via API
-		err = apiClient.DeleteUserSessionById(jwtInfo.TokenResponse.AccessToken, int64(userSessionId))
+		err = apiClient.DeleteUserSessionById(r.Context(), jwtInfo.TokenResponse.AccessToken, int64(userSessionId))
 		if err != nil {
 			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return

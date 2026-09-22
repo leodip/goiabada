@@ -51,7 +51,7 @@ func HandleAdminUserProfileGet(
 			return
 		}
 
-		user, err := apiClient.GetUserById(jwtInfo.TokenResponse.AccessToken, id)
+		user, err := apiClient.GetUserById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -154,12 +154,12 @@ func HandleAdminUserProfilePost(
 		}
 
 		// Call the profile update API
-		user, err := apiClient.UpdateUserProfile(jwtInfo.TokenResponse.AccessToken, id, request)
+		user, err := apiClient.UpdateUserProfile(r.Context(), jwtInfo.TokenResponse.AccessToken, id, request)
 		if err != nil {
 			// Handle validation errors by showing them in the form
 			handlers.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(errorMessage string) {
 				// Get user data for form display
-				user, userErr := apiClient.GetUserById(jwtInfo.TokenResponse.AccessToken, id)
+				user, userErr := apiClient.GetUserById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 				if userErr != nil {
 					handlers.HandleAPIError(httpHelper, w, r, userErr)
 					return

@@ -1,6 +1,7 @@
 package apiclient
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -80,7 +81,7 @@ func servesStatus(t *testing.T, status int, body string) (*AuthServerClient, fun
 func TestAuthServerClient_GetUserByIdDecodesEveryFieldTheConsoleBinds(t *testing.T) {
 	client, recorded := serves(t, `{"user":{`+userBodyFields+`}}`)
 
-	user, err := client.GetUserById("an-access-token", 42)
+	user, err := client.GetUserById(context.Background(), "an-access-token", 42)
 	require.NoError(t, err)
 	require.NotNil(t, user)
 
@@ -127,7 +128,7 @@ func TestAuthServerClient_GetUserByIdDecodesEveryFieldTheConsoleBinds(t *testing
 func TestAuthServerClient_SearchUsersPaginatedReturnsThePagesUsersAndItsTotal(t *testing.T) {
 	client, recorded := serves(t, `{"users":[{`+userBodyFields+`},{"id":43,"email":"other@example.com"}],"total":73}`)
 
-	users, total, err := client.SearchUsersPaginated("an-access-token", "jane", 4, 10)
+	users, total, err := client.SearchUsersPaginated(context.Background(), "an-access-token", "jane", 4, 10)
 	require.NoError(t, err)
 
 	gotPath, _ := recorded()
@@ -147,7 +148,7 @@ func TestAuthServerClient_GetUserAttributesByUserIdDecodesTheAttributeShape(t *t
 	client, recorded := serves(t, `{"attributes":[{"id":7,"createdAt":"2026-01-02T03:04:05Z","updatedAt":null,`+
 		`"key":"department","value":"engineering","includeInIdToken":true,"includeInAccessToken":false,"userId":42}]}`)
 
-	attributes, err := client.GetUserAttributesByUserId("an-access-token", 42)
+	attributes, err := client.GetUserAttributesByUserId(context.Background(), "an-access-token", 42)
 	require.NoError(t, err)
 
 	gotPath, _ := recorded()
@@ -173,7 +174,7 @@ func TestAuthServerClient_GetUserConsentsDecodesTheClientColumnsAndTheGrant(t *t
 		`"grantedAt":"2026-02-03T04:05:06Z","clientIdentifier":"web-app","clientDescription":"The web app"},`+
 		`{"id":6,"clientId":4,"userId":42,"scope":"openid","grantedAt":null,"clientIdentifier":"other"}]}`)
 
-	consents, err := client.GetUserConsents("an-access-token", 42)
+	consents, err := client.GetUserConsents(context.Background(), "an-access-token", 42)
 	require.NoError(t, err)
 
 	gotPath, _ := recorded()

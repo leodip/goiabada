@@ -1,6 +1,7 @@
 package admingrouphandlers
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -33,11 +34,11 @@ type groupBindApiClient struct {
 	attributes []api.GroupAttributeResponse
 }
 
-func (c *groupBindApiClient) GetGroupById(accessToken string, groupId int64) (*api.GroupResponse, error) {
+func (c *groupBindApiClient) GetGroupById(_ context.Context, accessToken string, groupId int64) (*api.GroupResponse, error) {
 	return c.group, nil
 }
 
-func (c *groupBindApiClient) GetGroupAttributesByGroupId(accessToken string,
+func (c *groupBindApiClient) GetGroupAttributesByGroupId(_ context.Context, accessToken string,
 	groupId int64) ([]api.GroupAttributeResponse, error) {
 
 	return c.attributes, nil

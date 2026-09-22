@@ -41,7 +41,7 @@ func HandleAdminUserAttributesEditGet(
 			return
 		}
 
-		user, err := apiClient.GetUserById(jwtInfo.TokenResponse.AccessToken, id)
+		user, err := apiClient.GetUserById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -63,7 +63,7 @@ func HandleAdminUserAttributesEditGet(
 			return
 		}
 
-		attribute, err := apiClient.GetUserAttributeById(jwtInfo.TokenResponse.AccessToken, id)
+		attribute, err := apiClient.GetUserAttributeById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -114,7 +114,7 @@ func HandleAdminUserAttributesEditPost(
 			return
 		}
 
-		user, err := apiClient.GetUserById(jwtInfo.TokenResponse.AccessToken, id)
+		user, err := apiClient.GetUserById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -136,7 +136,7 @@ func HandleAdminUserAttributesEditPost(
 			return
 		}
 
-		attribute, err := apiClient.GetUserAttributeById(jwtInfo.TokenResponse.AccessToken, attributeId)
+		attribute, err := apiClient.GetUserAttributeById(r.Context(), jwtInfo.TokenResponse.AccessToken, attributeId)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -180,7 +180,7 @@ func HandleAdminUserAttributesEditPost(
 			IncludeInIdToken:     attribute.IncludeInIdToken,
 		}
 
-		_, err = apiClient.UpdateUserAttribute(jwtInfo.TokenResponse.AccessToken, attributeId, request)
+		_, err = apiClient.UpdateUserAttribute(r.Context(), jwtInfo.TokenResponse.AccessToken, attributeId, request)
 		if err != nil {
 			handlers.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
 			return

@@ -1,6 +1,7 @@
 package adminresourcehandlers
 
 import (
+	"context"
 	"math"
 	"net/http"
 	"net/http/httptest"
@@ -58,7 +59,7 @@ func (c *resourcePagingApiClient) GetPermissionsByResource(accessToken string, r
 }
 
 // GetAllGroups is the whole list, unpaginated: the handler slices it itself.
-func (c *resourcePagingApiClient) GetAllGroups(accessToken string) ([]api.GroupResponse, error) {
+func (c *resourcePagingApiClient) GetAllGroups(_ context.Context, accessToken string) ([]api.GroupResponse, error) {
 	groups := make([]api.GroupResponse, 0, c.total)
 	for i := 0; i < c.total; i++ {
 		groups = append(groups, api.GroupResponse{Id: int64(i + 1), GroupIdentifier: "g" + strconv.Itoa(i+1)})
@@ -66,7 +67,7 @@ func (c *resourcePagingApiClient) GetAllGroups(accessToken string) ([]api.GroupR
 	return groups, nil
 }
 
-func (c *resourcePagingApiClient) SearchGroupsWithPermissionAnnotation(accessToken string,
+func (c *resourcePagingApiClient) SearchGroupsWithPermissionAnnotation(_ context.Context, accessToken string,
 	permissionId int64, page, size int) ([]api.GroupWithPermissionResponse, int, error) {
 
 	c.asked = append(c.asked, page)

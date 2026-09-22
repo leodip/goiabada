@@ -1,6 +1,7 @@
 package adminuserhandlers
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -31,16 +32,16 @@ type userSessionsApiClient struct {
 	deleted []int64
 }
 
-func (c *userSessionsApiClient) GetUserById(accessToken string, userId int64) (*api.UserResponse, error) {
+func (c *userSessionsApiClient) GetUserById(_ context.Context, accessToken string, userId int64) (*api.UserResponse, error) {
 	return c.user, nil
 }
 
-func (c *userSessionsApiClient) GetUserSessionsByUserId(accessToken string,
+func (c *userSessionsApiClient) GetUserSessionsByUserId(_ context.Context, accessToken string,
 	userId int64) ([]api.UserSessionDetailResponse, error) {
 	return c.sessions, c.sessionsErr
 }
 
-func (c *userSessionsApiClient) DeleteUserSessionById(accessToken string, sessionId int64) error {
+func (c *userSessionsApiClient) DeleteUserSessionById(_ context.Context, accessToken string, sessionId int64) error {
 	c.deleted = append(c.deleted, sessionId)
 	return nil
 }

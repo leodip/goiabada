@@ -72,7 +72,7 @@ func HandleAdminGroupNewPost(
 		}
 
 		// Call API to create group
-		_, err := apiClient.CreateGroup(jwtInfo.TokenResponse.AccessToken, createReq)
+		_, err := apiClient.CreateGroup(r.Context(), jwtInfo.TokenResponse.AccessToken, createReq)
 		if err != nil {
 			handlers.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
 			return

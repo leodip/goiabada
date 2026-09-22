@@ -1,187 +1,73 @@
 package apiclient
 
 import (
-	"bytes"
-	"encoding/json"
-	"io"
+	"context"
 	"net/http"
 	"strconv"
 
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/errs"
 )
 
-func (c *AuthServerClient) GetGroupAttributesByGroupId(accessToken string, groupId int64) ([]api.GroupAttributeResponse, error) {
-	fullURL := c.baseURL + "/api/v1/admin/groups/" + strconv.FormatInt(groupId, 10) + "/attributes"
-
-	req, err := http.NewRequest("GET", fullURL, nil)
+func (c *AuthServerClient) GetGroupAttributesByGroupId(ctx context.Context, accessToken string, groupId int64) ([]api.GroupAttributeResponse, error) {
+	response, err := execute[api.GetGroupAttributesResponse](ctx, c, accessToken, apiRequest{
+		method:        "GET",
+		url:           c.baseURL + "/api/v1/admin/groups/" + strconv.FormatInt(groupId, 10) + "/attributes",
+		contentType:   contentTypeJSON,
+		successStatus: http.StatusOK,
+	})
 	if err != nil {
-		return nil, errs.Errorf("failed to create request: %w", err)
+		return nil, err
 	}
-
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, errs.Errorf("failed to make request: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, errs.Errorf("failed to read response body: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, parseAPIError(resp, respBody)
-	}
-
-	var response api.GetGroupAttributesResponse
-	if err := json.Unmarshal(respBody, &response); err != nil {
-		return nil, errs.Errorf("failed to decode response: %w", err)
-	}
-
 	return response.Attributes, nil
 }
 
-func (c *AuthServerClient) GetGroupAttributeById(accessToken string, attributeId int64) (*api.GroupAttributeResponse, error) {
-	fullURL := c.baseURL + "/api/v1/admin/group-attributes/" + strconv.FormatInt(attributeId, 10)
-
-	req, err := http.NewRequest("GET", fullURL, nil)
+func (c *AuthServerClient) GetGroupAttributeById(ctx context.Context, accessToken string, attributeId int64) (*api.GroupAttributeResponse, error) {
+	response, err := execute[api.GetGroupAttributeResponse](ctx, c, accessToken, apiRequest{
+		method:        "GET",
+		url:           c.baseURL + "/api/v1/admin/group-attributes/" + strconv.FormatInt(attributeId, 10),
+		contentType:   contentTypeJSON,
+		successStatus: http.StatusOK,
+	})
 	if err != nil {
-		return nil, errs.Errorf("failed to create request: %w", err)
+		return nil, err
 	}
-
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, errs.Errorf("failed to make request: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, errs.Errorf("failed to read response body: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, parseAPIError(resp, respBody)
-	}
-
-	var response api.GetGroupAttributeResponse
-	if err := json.Unmarshal(respBody, &response); err != nil {
-		return nil, errs.Errorf("failed to decode response: %w", err)
-	}
-
 	return &response.Attribute, nil
 }
 
-func (c *AuthServerClient) CreateGroupAttribute(accessToken string, request *api.CreateGroupAttributeRequest) (*api.GroupAttributeResponse, error) {
-	reqBody, err := json.Marshal(request)
+func (c *AuthServerClient) CreateGroupAttribute(ctx context.Context, accessToken string, request *api.CreateGroupAttributeRequest) (*api.GroupAttributeResponse, error) {
+	response, err := execute[api.CreateGroupAttributeResponse](ctx, c, accessToken, apiRequest{
+		method:        "POST",
+		url:           c.baseURL + "/api/v1/admin/group-attributes",
+		jsonBody:      request,
+		contentType:   contentTypeJSON,
+		successStatus: http.StatusCreated,
+	})
 	if err != nil {
-		return nil, errs.Errorf("failed to marshal request: %w", err)
+		return nil, err
 	}
-
-	fullURL := c.baseURL + "/api/v1/admin/group-attributes"
-
-	req, err := http.NewRequest("POST", fullURL, bytes.NewBuffer(reqBody))
-	if err != nil {
-		return nil, errs.Errorf("failed to create request: %w", err)
-	}
-
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, errs.Errorf("failed to make request: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, errs.Errorf("failed to read response body: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusCreated {
-		return nil, parseAPIError(resp, respBody)
-	}
-
-	var response api.CreateGroupAttributeResponse
-	if err := json.Unmarshal(respBody, &response); err != nil {
-		return nil, errs.Errorf("failed to decode response: %w", err)
-	}
-
 	return &response.Attribute, nil
 }
 
-func (c *AuthServerClient) UpdateGroupAttribute(accessToken string, attributeId int64, request *api.UpdateGroupAttributeRequest) (*api.GroupAttributeResponse, error) {
-	reqBody, err := json.Marshal(request)
+func (c *AuthServerClient) UpdateGroupAttribute(ctx context.Context, accessToken string, attributeId int64, request *api.UpdateGroupAttributeRequest) (*api.GroupAttributeResponse, error) {
+	response, err := execute[api.UpdateGroupAttributeResponse](ctx, c, accessToken, apiRequest{
+		method:        "PUT",
+		url:           c.baseURL + "/api/v1/admin/group-attributes/" + strconv.FormatInt(attributeId, 10),
+		jsonBody:      request,
+		contentType:   contentTypeJSON,
+		successStatus: http.StatusOK,
+	})
 	if err != nil {
-		return nil, errs.Errorf("failed to marshal request: %w", err)
+		return nil, err
 	}
-
-	fullURL := c.baseURL + "/api/v1/admin/group-attributes/" + strconv.FormatInt(attributeId, 10)
-
-	req, err := http.NewRequest("PUT", fullURL, bytes.NewBuffer(reqBody))
-	if err != nil {
-		return nil, errs.Errorf("failed to create request: %w", err)
-	}
-
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, errs.Errorf("failed to make request: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, errs.Errorf("failed to read response body: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, parseAPIError(resp, respBody)
-	}
-
-	var response api.UpdateGroupAttributeResponse
-	if err := json.Unmarshal(respBody, &response); err != nil {
-		return nil, errs.Errorf("failed to decode response: %w", err)
-	}
-
 	return &response.Attribute, nil
 }
 
-func (c *AuthServerClient) DeleteGroupAttribute(accessToken string, attributeId int64) error {
-	fullURL := c.baseURL + "/api/v1/admin/group-attributes/" + strconv.FormatInt(attributeId, 10)
-
-	req, err := http.NewRequest("DELETE", fullURL, nil)
-	if err != nil {
-		return errs.Errorf("failed to create request: %w", err)
-	}
-
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return errs.Errorf("failed to make request: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return errs.Errorf("failed to read response body: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return parseAPIError(resp, respBody)
-	}
-
-	return nil
+func (c *AuthServerClient) DeleteGroupAttribute(ctx context.Context, accessToken string, attributeId int64) error {
+	_, err := c.do(ctx, accessToken, apiRequest{
+		method:        "DELETE",
+		url:           c.baseURL + "/api/v1/admin/group-attributes/" + strconv.FormatInt(attributeId, 10),
+		contentType:   contentTypeJSON,
+		successStatus: http.StatusOK,
+	})
+	return err
 }

@@ -1,6 +1,7 @@
 package adminuserhandlers
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -33,7 +34,7 @@ type flashStubApiClient struct {
 	apiclient.ApiClient
 }
 
-func (flashStubApiClient) GetUserById(accessToken string, id int64) (*api.UserResponse, error) {
+func (flashStubApiClient) GetUserById(_ context.Context, accessToken string, id int64) (*api.UserResponse, error) {
 	return &api.UserResponse{Id: id, Email: "someone@example.com"}, nil
 }
 

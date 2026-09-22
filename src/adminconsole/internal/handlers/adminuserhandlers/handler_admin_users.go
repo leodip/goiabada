@@ -32,7 +32,7 @@ func HandleAdminUsersGet(
 			return
 		}
 
-		users, total, err := apiClient.SearchUsersPaginated(jwtInfo.TokenResponse.AccessToken, query, pageInt, pageSize)
+		users, total, err := apiClient.SearchUsersPaginated(r.Context(), jwtInfo.TokenResponse.AccessToken, query, pageInt, pageSize)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -46,7 +46,7 @@ func HandleAdminUsersGet(
 		// page after it is as good an answer as any.
 		if clamped := pagination.ClampPage(total, pageSize, pageInt); clamped != pageInt {
 			pageInt = clamped
-			users, total, err = apiClient.SearchUsersPaginated(jwtInfo.TokenResponse.AccessToken, query, pageInt, pageSize)
+			users, total, err = apiClient.SearchUsersPaginated(r.Context(), jwtInfo.TokenResponse.AccessToken, query, pageInt, pageSize)
 			if err != nil {
 				handlers.HandleAPIError(httpHelper, w, r, err)
 				return

@@ -41,7 +41,7 @@ func HandleAdminGroupAttributesAddGet(
 		}
 
 		// Get group via API
-		group, err := apiClient.GetGroupById(jwtInfo.TokenResponse.AccessToken, id)
+		group, err := apiClient.GetGroupById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -94,7 +94,7 @@ func HandleAdminGroupAttributesAddPost(
 		}
 
 		// Get group via API
-		group, err := apiClient.GetGroupById(jwtInfo.TokenResponse.AccessToken, id)
+		group, err := apiClient.GetGroupById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -135,7 +135,7 @@ func HandleAdminGroupAttributesAddPost(
 			GroupId:              group.Id,
 		}
 
-		_, err = apiClient.CreateGroupAttribute(jwtInfo.TokenResponse.AccessToken, createReq)
+		_, err = apiClient.CreateGroupAttribute(r.Context(), jwtInfo.TokenResponse.AccessToken, createReq)
 		if err != nil {
 			handlers.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
 			return

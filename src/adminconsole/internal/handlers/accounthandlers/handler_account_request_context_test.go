@@ -115,6 +115,17 @@ func (s *ctxRecordingApiClient) GetPhoneCountries(ctx context.Context, _ string)
 	return nil, s.record(ctx)
 }
 
+// The two session methods are stage 11's. GetAccountSessions records and succeeds rather than
+// refusing, because the delete below it is reached only through the list it answers.
+func (s *ctxRecordingApiClient) GetAccountSessions(ctx context.Context, _ string) ([]api.UserSessionDetailResponse, error) {
+	s.seen = append(s.seen, ctx)
+	return []api.UserSessionDetailResponse{{Id: 31}}, nil
+}
+
+func (s *ctxRecordingApiClient) DeleteAccountSession(ctx context.Context, _ string, _ int64) error {
+	return s.record(ctx)
+}
+
 func TestAccountHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContext(t *testing.T) {
 	testCases := []struct {
 		name    string
@@ -272,6 +283,23 @@ func TestAccountHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContext(
 			},
 			request: handlertest.Request(http.MethodPost, "/account/profile",
 				handlertest.WithAccessToken(), handlertest.WithForm(url.Values{})),
+		},
+		{
+			name: "HandleAccountSessionsGet",
+			build: func(h *mocks_handlerhelpers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+				return HandleAccountSessionsGet(h, c)
+			},
+			request: handlertest.Request(http.MethodGet, "/account/sessions", handlertest.WithAccessToken()),
+		},
+		{
+			name: "HandleAccountSessionsEndSesssionPost",
+			build: func(h *mocks_handlerhelpers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+				return HandleAccountSessionsEndSesssionPost(h, c)
+			},
+			request: handlertest.Request(http.MethodPost, "/account/sessions",
+				handlertest.WithAccessToken(),
+				handlertest.WithBody(strings.NewReader(`{"userSessionId":31}`)),
+				handlertest.WithContentType("application/json")),
 		},
 	}
 

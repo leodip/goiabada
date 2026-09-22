@@ -1,6 +1,7 @@
 package adminuserhandlers
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -23,11 +24,11 @@ type deleteUserApiClient struct {
 	askedGroup []int64
 }
 
-func (c *deleteUserApiClient) GetUserById(accessToken string, userId int64) (*api.UserResponse, error) {
+func (c *deleteUserApiClient) GetUserById(_ context.Context, accessToken string, userId int64) (*api.UserResponse, error) {
 	return c.user, nil
 }
 
-func (c *deleteUserApiClient) GetUserGroups(accessToken string,
+func (c *deleteUserApiClient) GetUserGroups(_ context.Context, accessToken string,
 	userId int64) (*api.UserResponse, []api.GroupResponse, error) {
 
 	c.askedGroup = append(c.askedGroup, userId)

@@ -46,7 +46,7 @@ func HandleAdminUserEmailGet(
 			return
 		}
 
-		user, err := apiClient.GetUserById(jwtInfo.TokenResponse.AccessToken, id)
+		user, err := apiClient.GetUserById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -116,7 +116,7 @@ func HandleAdminUserEmailPost(
 		}
 
 		// Get user first for error handling template
-		user, err := apiClient.GetUserById(jwtInfo.TokenResponse.AccessToken, id)
+		user, err := apiClient.GetUserById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -133,7 +133,7 @@ func HandleAdminUserEmailPost(
 		}
 
 		// Update user email via API
-		updatedUser, err := apiClient.UpdateUserEmail(jwtInfo.TokenResponse.AccessToken, id, updateReq)
+		updatedUser, err := apiClient.UpdateUserEmail(r.Context(), jwtInfo.TokenResponse.AccessToken, id, updateReq)
 		if err != nil {
 			// Handle API validation errors by displaying them in template
 			var apiErr *apiclient.APIError

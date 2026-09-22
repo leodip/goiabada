@@ -45,7 +45,7 @@ func HandleAdminUserAuthenticationGet(
 		}
 		accessToken := jwtInfo.TokenResponse.AccessToken
 
-		user, err := apiClient.GetUserById(accessToken, id)
+		user, err := apiClient.GetUserById(r.Context(), accessToken, id)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -114,7 +114,7 @@ func HandleAdminUserAuthenticationPost(
 		}
 		accessToken := jwtInfo.TokenResponse.AccessToken
 
-		user, err := apiClient.GetUserById(accessToken, id)
+		user, err := apiClient.GetUserById(r.Context(), accessToken, id)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -152,7 +152,7 @@ func HandleAdminUserAuthenticationPost(
 			passwordReq := &api.UpdateUserPasswordRequest{
 				NewPassword: newPassword,
 			}
-			_, err := apiClient.UpdateUserPassword(accessToken, id, passwordReq)
+			_, err := apiClient.UpdateUserPassword(r.Context(), accessToken, id, passwordReq)
 			if err != nil {
 				handlers.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
 				return
@@ -166,7 +166,7 @@ func HandleAdminUserAuthenticationPost(
 				otpReq := &api.UpdateUserOTPRequest{
 					Enabled: false,
 				}
-				_, err := apiClient.UpdateUserOTP(accessToken, id, otpReq)
+				_, err := apiClient.UpdateUserOTP(r.Context(), accessToken, id, otpReq)
 				if err != nil {
 					handlers.HandleAPIError(httpHelper, w, r, err)
 					return

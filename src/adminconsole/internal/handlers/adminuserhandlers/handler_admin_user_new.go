@@ -100,7 +100,7 @@ func HandleAdminUserNewPost(
 			password = r.PostFormValue("password")
 		}
 
-		user, err := apiClient.CreateUserAdmin(jwtInfo.TokenResponse.AccessToken, &api.CreateUserAdminRequest{
+		user, err := apiClient.CreateUserAdmin(r.Context(), jwtInfo.TokenResponse.AccessToken, &api.CreateUserAdminRequest{
 			Email:           email,
 			EmailVerified:   r.FormValue("emailVerified") == "on",
 			GivenName:       r.FormValue("givenName"),

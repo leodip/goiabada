@@ -63,7 +63,7 @@ func HandleAdminUserProfilePicturePost(
 		}
 
 		// Call API client to upload
-		response, err := apiClient.UploadUserProfilePicture(jwtInfo.TokenResponse.AccessToken, userId, pictureData, header.Filename)
+		response, err := apiClient.UploadUserProfilePicture(r.Context(), jwtInfo.TokenResponse.AccessToken, userId, pictureData, header.Filename)
 		if err != nil {
 			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
@@ -99,7 +99,7 @@ func HandleAdminUserProfilePictureDelete(
 		}
 
 		// Call API client to delete
-		err = apiClient.DeleteUserProfilePicture(jwtInfo.TokenResponse.AccessToken, userId)
+		err = apiClient.DeleteUserProfilePicture(r.Context(), jwtInfo.TokenResponse.AccessToken, userId)
 		if err != nil {
 			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return

@@ -407,7 +407,7 @@ func sessionListMethods() []sessionListMethod {
 			name:    "GetUserSessionsByUserId",
 			wantURI: "/api/v1/admin/users/42/sessions",
 			call: func(c *AuthServerClient) ([]api.UserSessionDetailResponse, error) {
-				return c.GetUserSessionsByUserId("an-access-token", 42)
+				return c.GetUserSessionsByUserId(context.Background(), "an-access-token", 42)
 			},
 		},
 		{
@@ -418,7 +418,7 @@ func sessionListMethods() []sessionListMethod {
 				// its sessions span users, so it carries their owners too. The users half is
 				// decoded by its own case below, because the table's other two methods have
 				// no such field to assert (#373).
-				resp, err := c.GetClientSessionsByClientId("an-access-token", 7, 2, 10)
+				resp, err := c.GetClientSessionsByClientId(context.Background(), "an-access-token", 7, 2, 10)
 				if err != nil {
 					return nil, err
 				}
@@ -429,7 +429,7 @@ func sessionListMethods() []sessionListMethod {
 			name:    "GetAccountSessions",
 			wantURI: "/api/v1/account/sessions",
 			call: func(c *AuthServerClient) ([]api.UserSessionDetailResponse, error) {
-				return c.GetAccountSessions("an-access-token")
+				return c.GetAccountSessions(context.Background(), "an-access-token")
 			},
 		},
 	}
@@ -507,7 +507,7 @@ func TestAuthServerClient_GetClientSessionsByClientIdBuildsThePaginationQuery(t 
 		t.Run(tc.name, func(t *testing.T) {
 			client, recorded := servesSessions(t, `{"sessions":[]}`)
 
-			_, err := client.GetClientSessionsByClientId("an-access-token", 7, tc.page, tc.size)
+			_, err := client.GetClientSessionsByClientId(context.Background(), "an-access-token", 7, tc.page, tc.size)
 			require.NoError(t, err)
 
 			gotURI, _ := recorded()
@@ -529,7 +529,7 @@ func TestAuthServerClient_ClientSessionsDecodeTheOwnersArray(t *testing.T) {
 		{"id":43,"email":"sam@example.com","givenName":"Sam","middleName":"","familyName":"Reed",
 		 "somethingAddedLater":"ignored"}]}`)
 
-	resp, err := client.GetClientSessionsByClientId("an-access-token", 7, 1, 50)
+	resp, err := client.GetClientSessionsByClientId(context.Background(), "an-access-token", 7, 1, 50)
 	require.NoError(t, err)
 	require.Len(t, resp.Sessions, 1)
 	require.Len(t, resp.Users, 2)
@@ -552,8 +552,59 @@ func TestAuthServerClient_ClientSessionsDecodeTheOwnersArray(t *testing.T) {
 func TestAuthServerClient_ClientSessionsAcceptAnAbsentUsersArray(t *testing.T) {
 	client, _ := servesSessions(t, `{"sessions":[{`+sessionBodyFields+`}]}`)
 
-	resp, err := client.GetClientSessionsByClientId("an-access-token", 7, 1, 50)
+	resp, err := client.GetClientSessionsByClientId(context.Background(), "an-access-token", 7, 1, 50)
 	require.NoError(t, err)
 	require.Len(t, resp.Sessions, 1)
 	assert.Empty(t, resp.Users)
+}
+
+// The two session deletes return only an error and still decode: a 200 carrying `success:false`
+// is refused. Nothing else in this package behaves that way, the characterization rows answer
+// both with `success:true`, and stage 11 moved the code holding the check onto the shared
+// executor -- so this is the case that says the false arm survived the move (#386).
+func TestAuthServerClient_ASessionDeleteRefusesASuccessFalseBody(t *testing.T) {
+	testCases := []struct {
+		name string
+		call func(c *AuthServerClient) error
+	}{
+		{
+			name: "DeleteUserSessionById",
+			call: func(c *AuthServerClient) error {
+				return c.DeleteUserSessionById(context.Background(), "an-access-token", 31)
+			},
+		},
+		{
+			name: "DeleteAccountSession",
+			call: func(c *AuthServerClient) error {
+				return c.DeleteAccountSession(context.Background(), "an-access-token", 31)
+			},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Run("success false is refused", func(t *testing.T) {
+				server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					_, _ = w.Write([]byte(`{"success":false}`))
+				}))
+				t.Cleanup(server.Close)
+
+				err := testCase.call(NewAuthServerClient(server.URL))
+
+				require.Error(t, err, "a 200 the endpoint marked unsuccessful must not read as a deletion")
+				assert.Contains(t, err.Error(), "success=false")
+			})
+
+			// The other half: without it a method that returned an error unconditionally would
+			// pass the case above.
+			t.Run("success true is the deletion", func(t *testing.T) {
+				server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					_, _ = w.Write([]byte(`{"success":true}`))
+				}))
+				t.Cleanup(server.Close)
+
+				assert.NoError(t, testCase.call(NewAuthServerClient(server.URL)))
+			})
+		})
+	}
 }

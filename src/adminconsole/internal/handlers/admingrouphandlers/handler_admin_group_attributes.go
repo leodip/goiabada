@@ -39,7 +39,7 @@ func HandleAdminGroupAttributesGet(
 		}
 
 		// Get group via API
-		group, err := apiClient.GetGroupById(jwtInfo.TokenResponse.AccessToken, id)
+		group, err := apiClient.GetGroupById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -50,7 +50,7 @@ func HandleAdminGroupAttributesGet(
 		}
 
 		// Get group attributes via API
-		attributes, err := apiClient.GetGroupAttributesByGroupId(jwtInfo.TokenResponse.AccessToken, group.Id)
+		attributes, err := apiClient.GetGroupAttributesByGroupId(r.Context(), jwtInfo.TokenResponse.AccessToken, group.Id)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -98,7 +98,7 @@ func HandleAdminGroupAttributesRemovePost(
 		}
 
 		// Delete group attribute via API (audit logging handled by AuthServer)
-		err = apiClient.DeleteGroupAttribute(jwtInfo.TokenResponse.AccessToken, attributeId)
+		err = apiClient.DeleteGroupAttribute(r.Context(), jwtInfo.TokenResponse.AccessToken, attributeId)
 		if err != nil {
 			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return

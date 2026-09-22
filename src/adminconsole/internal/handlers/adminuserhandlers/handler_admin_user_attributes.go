@@ -38,7 +38,7 @@ func HandleAdminUserAttributesGet(
 			return
 		}
 
-		user, err := apiClient.GetUserById(jwtInfo.TokenResponse.AccessToken, id)
+		user, err := apiClient.GetUserById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -48,7 +48,7 @@ func HandleAdminUserAttributesGet(
 			return
 		}
 
-		attributes, err := apiClient.GetUserAttributesByUserId(jwtInfo.TokenResponse.AccessToken, user.Id)
+		attributes, err := apiClient.GetUserAttributesByUserId(r.Context(), jwtInfo.TokenResponse.AccessToken, user.Id)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -95,7 +95,7 @@ func HandleAdminUserAttributesRemovePost(
 			return
 		}
 
-		user, err := apiClient.GetUserById(jwtInfo.TokenResponse.AccessToken, id)
+		user, err := apiClient.GetUserById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
@@ -105,7 +105,7 @@ func HandleAdminUserAttributesRemovePost(
 			return
 		}
 
-		attributes, err := apiClient.GetUserAttributesByUserId(jwtInfo.TokenResponse.AccessToken, user.Id)
+		attributes, err := apiClient.GetUserAttributesByUserId(r.Context(), jwtInfo.TokenResponse.AccessToken, user.Id)
 		if err != nil {
 			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
@@ -136,7 +136,7 @@ func HandleAdminUserAttributesRemovePost(
 			return
 		}
 
-		err = apiClient.DeleteUserAttribute(jwtInfo.TokenResponse.AccessToken, attributeId)
+		err = apiClient.DeleteUserAttribute(r.Context(), jwtInfo.TokenResponse.AccessToken, attributeId)
 		if err != nil {
 			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return

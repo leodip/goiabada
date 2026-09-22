@@ -1,6 +1,7 @@
 package accounthandlers
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -31,11 +32,11 @@ type accountSessionsApiClient struct {
 	deleted []int64
 }
 
-func (c *accountSessionsApiClient) GetAccountSessions(accessToken string) ([]api.UserSessionDetailResponse, error) {
+func (c *accountSessionsApiClient) GetAccountSessions(_ context.Context, accessToken string) ([]api.UserSessionDetailResponse, error) {
 	return c.sessions, c.sessionsErr
 }
 
-func (c *accountSessionsApiClient) DeleteAccountSession(accessToken string, sessionId int64) error {
+func (c *accountSessionsApiClient) DeleteAccountSession(_ context.Context, accessToken string, sessionId int64) error {
 	c.deleted = append(c.deleted, sessionId)
 	return nil
 }

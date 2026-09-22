@@ -1,9 +1,8 @@
 package apiclient
 
 import (
-	"encoding/json"
+	"context"
 	"fmt"
-	"io"
 	"net/http"
 	"strconv"
 
@@ -11,85 +10,44 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 )
 
-func (c *AuthServerClient) GetUserSessionsByUserId(accessToken string, userId int64) ([]api.UserSessionDetailResponse, error) {
-	fullURL := c.baseURL + "/api/v1/admin/users/" + strconv.FormatInt(userId, 10) + "/sessions"
-
-	req, err := http.NewRequest("GET", fullURL, nil)
+func (c *AuthServerClient) GetUserSessionsByUserId(ctx context.Context, accessToken string, userId int64) ([]api.UserSessionDetailResponse, error) {
+	response, err := execute[api.GetUserSessionsResponse](ctx, c, accessToken, apiRequest{
+		method:        "GET",
+		url:           c.baseURL + "/api/v1/admin/users/" + strconv.FormatInt(userId, 10) + "/sessions",
+		contentType:   contentTypeJSON,
+		successStatus: http.StatusOK,
+	})
 	if err != nil {
-		return nil, errs.Errorf("failed to create request: %w", err)
+		return nil, err
 	}
-
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, errs.Errorf("failed to make request: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, errs.Errorf("failed to read response body: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, parseAPIError(resp, respBody)
-	}
-
-	var response api.GetUserSessionsResponse
-	if err := json.Unmarshal(respBody, &response); err != nil {
-		return nil, errs.Errorf("failed to decode response: %w", err)
-	}
-
 	return response.Sessions, nil
 }
 
-func (c *AuthServerClient) DeleteUserSessionById(accessToken string, sessionId int64) error {
-	fullURL := c.baseURL + "/api/v1/admin/user-sessions/" + strconv.FormatInt(sessionId, 10)
-
-	req, err := http.NewRequest("DELETE", fullURL, nil)
+// DeleteUserSessionById returns only an error and still decodes: a 200 carrying `success:false` is
+// refused. The same is true of DeleteAccountSession below, and of no other method in this package.
+func (c *AuthServerClient) DeleteUserSessionById(ctx context.Context, accessToken string, sessionId int64) error {
+	response, err := execute[api.SuccessResponse](ctx, c, accessToken, apiRequest{
+		method:        "DELETE",
+		url:           c.baseURL + "/api/v1/admin/user-sessions/" + strconv.FormatInt(sessionId, 10),
+		contentType:   contentTypeJSON,
+		successStatus: http.StatusOK,
+	})
 	if err != nil {
-		return errs.Errorf("failed to create request: %w", err)
+		return err
 	}
-
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return errs.Errorf("failed to make request: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return errs.Errorf("failed to read response body: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return parseAPIError(resp, respBody)
-	}
-
-	var response api.SuccessResponse
-	if err := json.Unmarshal(respBody, &response); err != nil {
-		return errs.Errorf("failed to decode response: %w", err)
-	}
-
 	if !response.Success {
 		return errs.Errorf("API returned success=false")
 	}
-
 	return nil
 }
 
 // GetClientSessionsByClientId answers the whole envelope rather than the sessions alone: this
 // endpoint is the only one listing sessions across users, and it returns their owners so the
 // caller does not read them back one at a time (#373).
-func (c *AuthServerClient) GetClientSessionsByClientId(accessToken string, clientId int64, page, size int) (*api.GetClientSessionsResponse, error) {
-	// Build URL with pagination params
+func (c *AuthServerClient) GetClientSessionsByClientId(ctx context.Context, accessToken string, clientId int64, page, size int) (*api.GetClientSessionsResponse, error) {
+	// Pagination is defaulted at the caller, so a non-positive page or size is left off the query
+	// entirely rather than sent as a zero.
 	fullURL := c.baseURL + "/api/v1/admin/clients/" + strconv.FormatInt(clientId, 10) + "/sessions"
-	// simple defaulting at caller, but include if provided
 	if page > 0 || size > 0 {
 		q := "?"
 		if page > 0 {
@@ -104,97 +62,36 @@ func (c *AuthServerClient) GetClientSessionsByClientId(accessToken string, clien
 		fullURL += q
 	}
 
-	req, err := http.NewRequest("GET", fullURL, nil)
-	if err != nil {
-		return nil, errs.Errorf("failed to create request: %w", err)
-	}
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, errs.Errorf("failed to make request: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, errs.Errorf("failed to read response body: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, parseAPIError(resp, respBody)
-	}
-
-	var response api.GetClientSessionsResponse
-	if err := json.Unmarshal(respBody, &response); err != nil {
-		return nil, errs.Errorf("failed to decode response: %w", err)
-	}
-
-	return &response, nil
+	return execute[api.GetClientSessionsResponse](ctx, c, accessToken, apiRequest{
+		method:        "GET",
+		url:           fullURL,
+		contentType:   contentTypeJSON,
+		successStatus: http.StatusOK,
+	})
 }
 
-func (c *AuthServerClient) GetAccountSessions(accessToken string) ([]api.UserSessionDetailResponse, error) {
-	fullURL := c.baseURL + "/api/v1/account/sessions"
-
-	req, err := http.NewRequest("GET", fullURL, nil)
+func (c *AuthServerClient) GetAccountSessions(ctx context.Context, accessToken string) ([]api.UserSessionDetailResponse, error) {
+	response, err := execute[api.GetUserSessionsResponse](ctx, c, accessToken, apiRequest{
+		method:        "GET",
+		url:           c.baseURL + "/api/v1/account/sessions",
+		contentType:   contentTypeJSON,
+		successStatus: http.StatusOK,
+	})
 	if err != nil {
-		return nil, errs.Errorf("failed to create request: %w", err)
+		return nil, err
 	}
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, errs.Errorf("failed to make request: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, errs.Errorf("failed to read response body: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, parseAPIError(resp, respBody)
-	}
-
-	var response api.GetUserSessionsResponse
-	if err := json.Unmarshal(respBody, &response); err != nil {
-		return nil, errs.Errorf("failed to decode response: %w", err)
-	}
-
 	return response.Sessions, nil
 }
 
-func (c *AuthServerClient) DeleteAccountSession(accessToken string, sessionId int64) error {
-	fullURL := c.baseURL + "/api/v1/account/sessions/" + strconv.FormatInt(sessionId, 10)
-
-	req, err := http.NewRequest("DELETE", fullURL, nil)
+func (c *AuthServerClient) DeleteAccountSession(ctx context.Context, accessToken string, sessionId int64) error {
+	response, err := execute[api.SuccessResponse](ctx, c, accessToken, apiRequest{
+		method:        "DELETE",
+		url:           c.baseURL + "/api/v1/account/sessions/" + strconv.FormatInt(sessionId, 10),
+		contentType:   contentTypeJSON,
+		successStatus: http.StatusOK,
+	})
 	if err != nil {
-		return errs.Errorf("failed to create request: %w", err)
-	}
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return errs.Errorf("failed to make request: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return errs.Errorf("failed to read response body: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return parseAPIError(resp, respBody)
-	}
-
-	var response api.SuccessResponse
-	if err := json.Unmarshal(respBody, &response); err != nil {
-		return errs.Errorf("failed to decode response: %w", err)
+		return err
 	}
 	if !response.Success {
 		return errs.Errorf("API returned success=false")
@@ -202,65 +99,25 @@ func (c *AuthServerClient) DeleteAccountSession(accessToken string, sessionId in
 	return nil
 }
 
-func (c *AuthServerClient) GetUserConsents(accessToken string, userId int64) ([]api.UserConsentResponse, error) {
-	fullURL := fmt.Sprintf("%s/api/v1/admin/users/%d/consents", c.baseURL, userId)
-
-	req, err := http.NewRequest("GET", fullURL, nil)
+func (c *AuthServerClient) GetUserConsents(ctx context.Context, accessToken string, userId int64) ([]api.UserConsentResponse, error) {
+	response, err := execute[api.GetUserConsentsResponse](ctx, c, accessToken, apiRequest{
+		method:        "GET",
+		url:           fmt.Sprintf("%s/api/v1/admin/users/%d/consents", c.baseURL, userId),
+		contentType:   contentTypeJSON,
+		successStatus: http.StatusOK,
+	})
 	if err != nil {
-		return nil, errs.Errorf("failed to create request: %w", err)
+		return nil, err
 	}
-
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, errs.Errorf("failed to make request: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, errs.Errorf("failed to read response body: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, parseAPIError(resp, respBody)
-	}
-
-	var response api.GetUserConsentsResponse
-	if err := json.Unmarshal(respBody, &response); err != nil {
-		return nil, errs.Errorf("failed to unmarshal response: %w", err)
-	}
-
 	return response.Consents, nil
 }
 
-func (c *AuthServerClient) DeleteUserConsent(accessToken string, consentId int64) error {
-	fullURL := fmt.Sprintf("%s/api/v1/admin/user-consents/%d", c.baseURL, consentId)
-
-	req, err := http.NewRequest("DELETE", fullURL, nil)
-	if err != nil {
-		return errs.Errorf("failed to create request: %w", err)
-	}
-
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return errs.Errorf("failed to make request: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return errs.Errorf("failed to read response body: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return parseAPIError(resp, respBody)
-	}
-
-	return nil
+func (c *AuthServerClient) DeleteUserConsent(ctx context.Context, accessToken string, consentId int64) error {
+	_, err := c.do(ctx, accessToken, apiRequest{
+		method:        "DELETE",
+		url:           fmt.Sprintf("%s/api/v1/admin/user-consents/%d", c.baseURL, consentId),
+		contentType:   contentTypeJSON,
+		successStatus: http.StatusOK,
+	})
+	return err
 }

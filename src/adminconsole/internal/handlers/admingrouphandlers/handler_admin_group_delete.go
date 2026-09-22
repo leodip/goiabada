@@ -39,7 +39,7 @@ func HandleAdminGroupDeleteGet(
 			return
 		}
 
-		group, err := apiClient.GetGroupById(jwtInfo.TokenResponse.AccessToken, id)
+		group, err := apiClient.GetGroupById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -90,7 +90,7 @@ func HandleAdminGroupDeletePost(
 			return
 		}
 
-		group, err := apiClient.GetGroupById(jwtInfo.TokenResponse.AccessToken, id)
+		group, err := apiClient.GetGroupById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -127,7 +127,7 @@ func HandleAdminGroupDeletePost(
 		}
 
 		// Delete the group via API
-		err = apiClient.DeleteGroup(jwtInfo.TokenResponse.AccessToken, group.Id)
+		err = apiClient.DeleteGroup(r.Context(), jwtInfo.TokenResponse.AccessToken, group.Id)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return

@@ -1,6 +1,7 @@
 package admingrouphandlers
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -33,7 +34,7 @@ type notFoundGroupApiClient struct {
 	err    error
 }
 
-func (c *notFoundGroupApiClient) GetGroupById(accessToken string, id int64) (*api.GroupResponse, error) {
+func (c *notFoundGroupApiClient) GetGroupById(_ context.Context, accessToken string, id int64) (*api.GroupResponse, error) {
 	return c.entity, c.err
 }
 
