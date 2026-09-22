@@ -12,7 +12,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/constants"
-	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
@@ -66,9 +65,28 @@ func livePendingEnrollmentKeyURL(user *models.User, staleBefore time.Time) (stri
 	return encryption.DecryptData(user.OtpEnrollmentSecretEncrypted)
 }
 
+// accountOTPDatabase is what the account OTP endpoints need: the caller's user row, the enrolment
+// counters, and the step the replay window consumes.
+//
+// It embeds the enrolment port because the install path is handlers.EnableUserOTPTx rather than a
+// write of its own.
+type accountOTPDatabase interface {
+	handlers.OTPEnrolmentDatabase
+
+	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*models.User, error)
+	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*models.User, error)
+	IncrementUserOtpConfigGeneration(ctx context.Context, tx *sql.Tx, userId int64) (int64, error)
+	ResetUserOTPStep(ctx context.Context, tx *sql.Tx, userId int64) error
+	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
+	TryConsumeUserOTPStep(ctx context.Context, tx *sql.Tx, userId int64, step int64, requireOTPEnabled bool) (bool, error)
+	TryInstallPendingOTPEnrollment(ctx context.Context, tx *sql.Tx, userId int64, secretEncrypted []byte,
+		issuedAt time.Time, staleBefore time.Time) (bool, error)
+	UpdateUser(ctx context.Context, tx *sql.Tx, user *models.User) error
+}
+
 // HandleAPIAccountOTPEnrollmentGet - GET /api/v1/account/otp/enrollment
 func HandleAPIAccountOTPEnrollmentGet(
-	database data.Database,
+	database accountOTPDatabase,
 	otpSecretGenerator handlers.OtpSecretGenerator,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -203,7 +221,7 @@ func HandleAPIAccountOTPEnrollmentGet(
 
 // HandleAPIAccountOTPPut - PUT /api/v1/account/otp
 func HandleAPIAccountOTPPut(
-	database data.Database,
+	database accountOTPDatabase,
 	auditLogger handlers.AuditLogger,
 	credentialFailures handlers.CredentialFailureRecorder,
 ) http.HandlerFunc {
@@ -474,7 +492,7 @@ func HandleAPIAccountOTPPut(
 //
 // Shared by the two sites decision 4 names, HandleAPIAccountOTPPut's disable branch and
 // HandleAPIUserOTPPut. There is no third: the browser flow enrolls but never disables.
-func disableUserOTP(ctx context.Context, database data.Database, user *models.User) error {
+func disableUserOTP(ctx context.Context, database accountOTPDatabase, user *models.User) error {
 	user.ClearOTPSecret()
 	user.OTPEnabled = false
 

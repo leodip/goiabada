@@ -1,6 +1,8 @@
 package apihandlers
 
 import (
+	"context"
+	"database/sql"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -8,15 +10,25 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
 )
 
+// groupMembersDatabase is what the group membership endpoints need: the group, its members, and
+// the rows that join them.
+type groupMembersDatabase interface {
+	CreateUserGroup(ctx context.Context, tx *sql.Tx, userGroup *models.UserGroup) error
+	DeleteUserGroup(ctx context.Context, tx *sql.Tx, userGroupId int64) error
+	GetGroupById(ctx context.Context, tx *sql.Tx, groupId int64) (*models.Group, error)
+	GetGroupMembersPaginated(ctx context.Context, tx *sql.Tx, groupId int64, page int, pageSize int) ([]models.User, int, error)
+	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*models.User, error)
+	GetUserGroupByUserIdAndGroupId(ctx context.Context, tx *sql.Tx, userId, groupId int64) (*models.UserGroup, error)
+}
+
 func HandleAPIGroupMembersGet(
-	database data.Database,
+	database groupMembersDatabase,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -80,7 +92,7 @@ func HandleAPIGroupMembersGet(
 }
 
 func HandleAPIGroupMemberAddPost(
-	database data.Database,
+	database groupMembersDatabase,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 
@@ -165,7 +177,7 @@ func HandleAPIGroupMemberAddPost(
 }
 
 func HandleAPIGroupMemberDelete(
-	database data.Database,
+	database groupMembersDatabase,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 

@@ -1,6 +1,8 @@
 package accounthandlers
 
 import (
+	"context"
+	"database/sql"
 	"log/slog"
 	"net/http"
 	"time"
@@ -10,7 +12,6 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/config"
-	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/models"
@@ -49,6 +50,13 @@ func renderActivationLinkExpired(httpHelper handlers.HttpHelper, w http.Response
 	}
 }
 
+// accountActivateDatabase is what the self-registration activation page needs: the pre-
+// registration it consumes.
+type accountActivateDatabase interface {
+	DeletePreRegistration(ctx context.Context, tx *sql.Tx, preRegistrationId int64) error
+	GetPreRegistrationByVerificationCodeHash(ctx context.Context, tx *sql.Tx, codeHash string) (*models.PreRegistration, error)
+}
+
 // HandleAccountActivateGet serves both halves of the activation link's journey.
 //
 // A request carrying ?code= is the emailed link being followed: it validates the code, marks
@@ -70,7 +78,7 @@ func renderActivationLinkExpired(httpHelper handlers.HttpHelper, w http.Response
 func HandleAccountActivateGet(
 	httpHelper handlers.HttpHelper,
 	httpSession sessionstore.Store,
-	database data.Database,
+	database accountActivateDatabase,
 	userCreator handlers.UserCreator,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
@@ -92,7 +100,7 @@ func HandleAccountActivateGet(
 // the URL writes a marker into its own throwaway cookie jar and leaves the code usable for the
 // real user.
 func handleActivationLinkFollowed(httpHelper handlers.HttpHelper, httpSession sessionstore.Store,
-	database data.Database, w http.ResponseWriter, r *http.Request, code string) {
+	database accountActivateDatabase, w http.ResponseWriter, r *http.Request, code string) {
 
 	codeHash, err := hashutil.HashString(code)
 	if err != nil {
@@ -182,7 +190,7 @@ func isVerificationCodeExpired(preRegistration *models.PreRegistration) bool {
 // is a database row rather than a browser cookie, so this is defence in depth rather than
 // the whole boundary it was written as (#112, #266).
 func handleActivationCleanHop(httpHelper handlers.HttpHelper, httpSession sessionstore.Store,
-	database data.Database, userCreator handlers.UserCreator, auditLogger handlers.AuditLogger,
+	database accountActivateDatabase, userCreator handlers.UserCreator, auditLogger handlers.AuditLogger,
 	w http.ResponseWriter, r *http.Request) {
 
 	marker, rejection, err := handlers.GetLinkMarker(httpSession, r, handlers.LinkMarkerFlowAccountActivate)

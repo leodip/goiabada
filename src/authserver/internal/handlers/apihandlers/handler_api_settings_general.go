@@ -1,6 +1,8 @@
 package apihandlers
 
 import (
+	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -11,7 +13,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/constants"
-	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/api"
@@ -46,9 +47,14 @@ func HandleAPISettingsGeneralGet(
 	}
 }
 
+// settingsGeneralDatabase is what the general settings endpoint needs: the settings write.
+type settingsGeneralDatabase interface {
+	UpdateSettings(ctx context.Context, tx *sql.Tx, settings *models.Settings) error
+}
+
 // HandleAPISettingsGeneralPut - PUT /api/v1/admin/settings/general
 func HandleAPISettingsGeneralPut(
-	database data.Database,
+	database settingsGeneralDatabase,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

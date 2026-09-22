@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"context"
+	"database/sql"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -11,7 +13,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/constants"
-	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
@@ -19,10 +20,22 @@ import (
 	"github.com/leodip/goiabada/core/i18n"
 )
 
+// authPwdDatabase is what the password hop needs: the client, the user being authenticated, and
+// the session that may already exist.
+//
+// It embeds the client display port because the screen renders through getClientDisplayInfo.
+type authPwdDatabase interface {
+	clientDisplayDatabase
+
+	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*models.Client, error)
+	GetUserByEmail(ctx context.Context, tx *sql.Tx, email string) (*models.User, error)
+	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*models.UserSession, error)
+}
+
 func HandleAuthPwdGet(
 	httpHelper HttpHelper,
 	authHelper AuthHelper,
-	database data.Database,
+	database authPwdDatabase,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -109,7 +122,7 @@ func HandleAuthPwdGet(
 func HandleAuthPwdPost(
 	httpHelper HttpHelper,
 	authHelper AuthHelper,
-	database data.Database,
+	database authPwdDatabase,
 	auditLogger AuditLogger,
 	credentialFailures CredentialFailureRecorder,
 ) http.HandlerFunc {

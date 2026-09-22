@@ -1,6 +1,8 @@
 package apihandlers
 
 import (
+	"context"
+	"database/sql"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -9,7 +11,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/api"
@@ -18,8 +19,19 @@ import (
 	"github.com/leodip/goiabada/core/validators"
 )
 
+// groupAttributesDatabase is what the group attribute endpoints need: the group and the
+// attributes hanging off it.
+type groupAttributesDatabase interface {
+	CreateGroupAttribute(ctx context.Context, tx *sql.Tx, groupAttribute *models.GroupAttribute) error
+	DeleteGroupAttribute(ctx context.Context, tx *sql.Tx, groupAttributeId int64) error
+	GetGroupAttributeById(ctx context.Context, tx *sql.Tx, groupAttributeId int64) (*models.GroupAttribute, error)
+	GetGroupAttributesByGroupId(ctx context.Context, tx *sql.Tx, groupId int64) ([]models.GroupAttribute, error)
+	GetGroupById(ctx context.Context, tx *sql.Tx, groupId int64) (*models.Group, error)
+	UpdateGroupAttribute(ctx context.Context, tx *sql.Tx, groupAttribute *models.GroupAttribute) error
+}
+
 func HandleAPIGroupAttributesGet(
-	database data.Database,
+	database groupAttributesDatabase,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -68,7 +80,7 @@ func HandleAPIGroupAttributesGet(
 }
 
 func HandleAPIGroupAttributeGet(
-	database data.Database,
+	database groupAttributesDatabase,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -110,7 +122,7 @@ func HandleAPIGroupAttributeGet(
 }
 
 func HandleAPIGroupAttributeCreatePost(
-	database data.Database,
+	database groupAttributesDatabase,
 	identifierValidator *validators.IdentifierValidator,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
@@ -198,7 +210,7 @@ func HandleAPIGroupAttributeCreatePost(
 }
 
 func HandleAPIGroupAttributeUpdatePut(
-	database data.Database,
+	database groupAttributesDatabase,
 	identifierValidator *validators.IdentifierValidator,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
@@ -302,7 +314,7 @@ func HandleAPIGroupAttributeUpdatePut(
 }
 
 func HandleAPIGroupAttributeDelete(
-	database data.Database,
+	database groupAttributesDatabase,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 

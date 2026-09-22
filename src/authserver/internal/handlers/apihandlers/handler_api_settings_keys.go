@@ -1,6 +1,8 @@
 package apihandlers
 
 import (
+	"context"
+	"database/sql"
 	"encoding/base64"
 	"errors"
 	"net/http"
@@ -9,7 +11,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/signingkeys"
@@ -17,9 +18,21 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 )
 
+// settingsKeysDatabase is what the signing key endpoints need: the key rows they list and delete.
+//
+// It embeds the rotator's port because rotating a key is signingkeys.SigningKeyRotator's job, not
+// this endpoint's.
+type settingsKeysDatabase interface {
+	signingkeys.RotationDatabase
+
+	DeleteKeyPair(ctx context.Context, tx *sql.Tx, keyPairId int64) error
+	GetAllSigningKeys(ctx context.Context, tx *sql.Tx) ([]models.KeyPair, error)
+	GetKeyPairById(ctx context.Context, tx *sql.Tx, keyPairId int64) (*models.KeyPair, error)
+}
+
 // HandleAPISettingsKeysGet - GET /api/v1/admin/settings/keys
 func HandleAPISettingsKeysGet(
-	database data.Database,
+	database settingsKeysDatabase,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		allSigningKeys, err := database.GetAllSigningKeys(r.Context(), nil)
@@ -81,7 +94,7 @@ func HandleAPISettingsKeysGet(
 // before the check that a next key even existed, so a rotation that was about to be refused
 // had already destroyed the key still signing live tokens (#251).
 func HandleAPISettingsKeysRotatePost(
-	database data.Database,
+	database settingsKeysDatabase,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 
@@ -126,7 +139,7 @@ func HandleAPISettingsKeysRotatePost(
 
 // HandleAPISettingsKeyDelete - DELETE /api/v1/admin/settings/keys/{id}
 func HandleAPISettingsKeyDelete(
-	database data.Database,
+	database settingsKeysDatabase,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

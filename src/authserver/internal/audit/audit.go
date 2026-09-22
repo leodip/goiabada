@@ -2,21 +2,28 @@ package audit
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"log/slog"
 
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/authserver/internal/constants"
-	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/logging"
 )
 
-type AuditLogger struct {
-	database data.Database
+// auditDatabase is what the audit logger needs: the settings that say whether auditing is
+// enabled, and the record it writes.
+type auditDatabase interface {
+	CreateAuditLog(ctx context.Context, tx *sql.Tx, auditLog *models.AuditLog) error
+	GetSettingsById(ctx context.Context, tx *sql.Tx, settingsId int64) (*models.Settings, error)
 }
 
-func NewAuditLogger(database data.Database) *AuditLogger {
+type AuditLogger struct {
+	database auditDatabase
+}
+
+func NewAuditLogger(database auditDatabase) *AuditLogger {
 	return &AuditLogger{
 		database: database,
 	}

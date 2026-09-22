@@ -1,15 +1,21 @@
 package middleware
 
 import (
+	"context"
+	"database/sql"
 	"log/slog"
 	"net/http"
 	"strings"
 
 	"github.com/go-chi/cors"
-	"github.com/leodip/goiabada/authserver/internal/data"
 )
 
-func MiddlewareCors(database data.Database) func(next http.Handler) http.Handler {
+// corsDatabase is what the CORS origin check needs: whether any client registered this origin.
+type corsDatabase interface {
+	WebOriginExists(ctx context.Context, tx *sql.Tx, origin string) (bool, error)
+}
+
+func MiddlewareCors(database corsDatabase) func(next http.Handler) http.Handler {
 	return cors.Handler(cors.Options{
 		AllowOriginFunc: func(r *http.Request, origin string) bool {
 			// StripSlashes runs below this middleware, so the slashed form of a covered path

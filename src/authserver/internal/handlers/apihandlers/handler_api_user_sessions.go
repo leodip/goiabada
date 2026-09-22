@@ -1,17 +1,25 @@
 package apihandlers
 
 import (
+	"context"
+	"database/sql"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
-	"github.com/leodip/goiabada/authserver/internal/data"
+	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/api"
 )
 
+// userSessionsDatabase is what the single session endpoint needs: the session named by an
+// identifier.
+type userSessionsDatabase interface {
+	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*models.UserSession, error)
+}
+
 // HandleAPIUserSessionGet - GET /api/v1/admin/user-sessions/{sessionIdentifier}
 func HandleAPIUserSessionGet(
-	database data.Database,
+	database userSessionsDatabase,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Authentication and authorization handled by middleware

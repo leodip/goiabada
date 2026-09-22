@@ -1,19 +1,31 @@
 package apihandlers
 
 import (
+	"context"
+	"database/sql"
 	"net/http"
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
+	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/api"
 )
 
+// userConsentsDatabase is what the administrator's user consent endpoints need: one user's
+// consents and the clients they name.
+type userConsentsDatabase interface {
+	DeleteUserConsent(ctx context.Context, tx *sql.Tx, userConsentId int64) error
+	GetConsentsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]models.UserConsent, error)
+	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*models.User, error)
+	GetUserConsentById(ctx context.Context, tx *sql.Tx, userConsentId int64) (*models.UserConsent, error)
+	UserConsentsLoadClients(ctx context.Context, tx *sql.Tx, userConsents []models.UserConsent) error
+}
+
 func HandleAPIUserConsentsGet(
-	database data.Database,
+	database userConsentsDatabase,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		idStr := chi.URLParam(r, "id")
@@ -62,7 +74,7 @@ func HandleAPIUserConsentsGet(
 }
 
 func HandleAPIUserConsentDelete(
-	database data.Database,
+	database userConsentsDatabase,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

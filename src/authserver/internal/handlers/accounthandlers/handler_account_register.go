@@ -1,6 +1,7 @@
 package accounthandlers
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"net/http"
@@ -10,7 +11,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/constants"
-	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
@@ -46,9 +46,17 @@ func HandleAccountRegisterGet(
 	}
 }
 
+// accountRegisterDatabase is what the self-registration page needs: the address it must not
+// duplicate, and the pre-registration it parks.
+type accountRegisterDatabase interface {
+	CreatePreRegistration(ctx context.Context, tx *sql.Tx, preRegistration *models.PreRegistration) error
+	GetPreRegistrationByEmail(ctx context.Context, tx *sql.Tx, email string) (*models.PreRegistration, error)
+	GetUserByEmail(ctx context.Context, tx *sql.Tx, email string) (*models.User, error)
+}
+
 func HandleAccountRegisterPost(
 	httpHelper handlers.HttpHelper,
-	database data.Database,
+	database accountRegisterDatabase,
 	userCreator handlers.UserCreator,
 	emailValidator handlers.EmailValidator,
 	passwordValidator handlers.PasswordValidator,

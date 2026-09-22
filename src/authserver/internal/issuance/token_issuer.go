@@ -12,7 +12,6 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/leodip/goiabada/authserver/internal/constants"
-	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/uuidutil"
@@ -23,12 +22,28 @@ import (
 	"slices"
 )
 
+// tokenIssuerDatabase is what the token issuer needs: the signing key, the code or refresh token
+// being redeemed, and the claims that go into the tokens.
+type tokenIssuerDatabase interface {
+	CodeLoadClient(ctx context.Context, tx *sql.Tx, code *models.Code) error
+	CodeLoadUser(ctx context.Context, tx *sql.Tx, code *models.Code) error
+	CreateRefreshToken(ctx context.Context, tx *sql.Tx, refreshToken *models.RefreshToken) error
+	GetCurrentSigningKey(ctx context.Context, tx *sql.Tx) (*models.KeyPair, error)
+	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*models.UserSession, error)
+	GroupsLoadAttributes(ctx context.Context, tx *sql.Tx, groups []models.Group) error
+	RefreshTokenLoadClient(ctx context.Context, tx *sql.Tx, refreshToken *models.RefreshToken) error
+	RefreshTokenLoadUser(ctx context.Context, tx *sql.Tx, refreshToken *models.RefreshToken) error
+	UserHasProfilePicture(ctx context.Context, tx *sql.Tx, userId int64) (bool, error)
+	UserLoadAttributes(ctx context.Context, tx *sql.Tx, user *models.User) error
+	UserLoadGroups(ctx context.Context, tx *sql.Tx, user *models.User) error
+}
+
 type TokenIssuer struct {
-	database data.Database
+	database tokenIssuerDatabase
 	baseURL  string
 }
 
-func NewTokenIssuer(database data.Database, baseURL string) *TokenIssuer {
+func NewTokenIssuer(database tokenIssuerDatabase, baseURL string) *TokenIssuer {
 	return &TokenIssuer{
 		database: database,
 		baseURL:  baseURL,

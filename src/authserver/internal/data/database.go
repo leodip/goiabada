@@ -9,6 +9,22 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 )
 
+// Database is composition-only. No handler, middleware or application service takes it: each
+// declares a port of its own, beside the function that takes it, naming the operations that file
+// needs (#386 decisions 3 and 8). Four things still need the whole list, and they are the whole of
+// the list:
+//
+//   - datafactory, which builds one and returns it, and the `migrate` subcommand that feeds
+//     datafactory's pre-flight the handle it built;
+//   - server.Server, which holds it and hands it to every constructor, each of which narrows it;
+//   - tests/data, which exercises 214 of these 215 methods on every engine, and is the tier that
+//     proves each one works there;
+//   - this declaration itself, which is the compiler's check that the four engine adapters still
+//     implement a complete set -- worth more since #416 replaced their explicit delegations with
+//     embedding, because a method lost in commondb is no longer lost in four visible places.
+//
+// The generated mock is of this interface and of no port, which is what lets a handler declaring a
+// three-method port still be tested with the double every other test uses (#386 decision 12).
 type Database interface {
 	BeginTransaction(ctx context.Context) (*sql.Tx, error)
 	CommitTransaction(ctx context.Context, tx *sql.Tx) error

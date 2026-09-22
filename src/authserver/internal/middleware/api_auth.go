@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"log/slog"
 	"net/http"
@@ -9,7 +10,6 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/apiresponse"
 	"github.com/leodip/goiabada/authserver/internal/constants"
-	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
@@ -170,6 +170,13 @@ func RequireUserBoundToken() func(http.Handler) http.Handler {
 	}
 }
 
+// apiAuthDatabase is what the API session check needs: the bearer's user row and the session the
+// token names.
+type apiAuthDatabase interface {
+	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*models.User, error)
+	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*models.UserSession, error)
+}
+
 // RequireValidSession rejects bearer tokens that no longer represent live, current
 // authentication state.
 //
@@ -212,7 +219,7 @@ func RequireUserBoundToken() func(http.Handler) http.Handler {
 // Reads constants.ContextKeyBearerToken (set by JwtAuthorizationHeaderToContext),
 // not ContextKeyValidatedToken, so it works regardless of whether a scope
 // middleware ran first.
-func RequireValidSession(database data.Database) func(http.Handler) http.Handler {
+func RequireValidSession(database apiAuthDatabase) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			bearerTokenValue := r.Context().Value(constants.ContextKeyBearerToken)

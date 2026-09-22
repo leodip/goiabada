@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"database/sql"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -10,7 +11,6 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/constants"
-	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/issuance"
 	"github.com/leodip/goiabada/authserver/internal/models"
@@ -20,10 +20,23 @@ import (
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
+// accountLogoutDatabase is what the logout ceremony needs: the session it ends, the clients it
+// must notify, and the deletes that end it.
+type accountLogoutDatabase interface {
+	ClientLoadRedirectURIs(ctx context.Context, tx *sql.Tx, client *models.Client) error
+	DeleteUserSession(ctx context.Context, tx *sql.Tx, userSessionId int64) error
+	DeleteUserSessionClient(ctx context.Context, tx *sql.Tx, userSessionClientId int64) error
+	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*models.Client, error)
+	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*models.User, error)
+	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*models.UserSession, error)
+	UserSessionClientsLoadClients(ctx context.Context, tx *sql.Tx, userSessionClients []models.UserSessionClient) error
+	UserSessionLoadClients(ctx context.Context, tx *sql.Tx, userSession *models.UserSession) error
+}
+
 func HandleAccountLogoutGet(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
-	database data.Database,
+	database accountLogoutDatabase,
 	tokenParser TokenParser,
 	auditLogger AuditLogger,
 ) http.HandlerFunc {
@@ -130,7 +143,7 @@ func isEncryptedIDTokenHint(hint string) bool {
 // The returned error is for the server log and never for the End-User. Every failure here means the
 // hint cannot be confirmed, and the spec's answer to a hint the OP cannot confirm is to ask the
 // End-User rather than to show them a diagnostic about a request their relying party built (#109).
-func decryptIDTokenHint(ctx context.Context, idTokenHint, clientID string, database data.Database) (string, error) {
+func decryptIDTokenHint(ctx context.Context, idTokenHint, clientID string, database accountLogoutDatabase) (string, error) {
 	client, err := database.GetClientByClientIdentifier(ctx, nil, clientID)
 	if err != nil {
 		slog.ErrorContext(ctx, "unable to look up the client an id_token_hint names, so the hint cannot be decrypted",
@@ -269,7 +282,7 @@ func rejectIdTokenHint(ctx context.Context, gate string, args ...any) (hintClass
 func classifyIdTokenHint(
 	r *http.Request,
 	httpHelper HttpHelper,
-	database data.Database,
+	database accountLogoutDatabase,
 	tokenParser TokenParser,
 ) (hintClassification, error) {
 
@@ -508,7 +521,7 @@ func handleExistingSessionOnLogout(
 	r *http.Request,
 	sessionIdentifier string,
 	client *models.Client,
-	database data.Database,
+	database accountLogoutDatabase,
 	auditLogger AuditLogger,
 ) error {
 	userSession, err := database.GetUserSessionBySessionIdentifier(r.Context(), nil, sessionIdentifier)
@@ -572,7 +585,7 @@ func handleExistingSessionOnLogout(
 func HandleAccountLogoutPost(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
-	database data.Database,
+	database accountLogoutDatabase,
 	tokenParser TokenParser,
 	auditLogger AuditLogger,
 ) http.HandlerFunc {
@@ -600,7 +613,7 @@ func doLogout(
 	r *http.Request,
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
-	database data.Database,
+	database accountLogoutDatabase,
 	tokenParser TokenParser,
 	auditLogger AuditLogger,
 ) {
@@ -781,7 +794,7 @@ func redirectToHintlessLogout(w http.ResponseWriter, r *http.Request, httpHelper
 func deleteWholeUserSession(
 	r *http.Request,
 	sessionIdentifier string,
-	database data.Database,
+	database accountLogoutDatabase,
 	auditLogger AuditLogger,
 ) (int64, error) {
 	userSession, err := database.GetUserSessionBySessionIdentifier(r.Context(), nil, sessionIdentifier)
@@ -820,7 +833,7 @@ func deleteWholeUserSession(
 // the teardown, so turning it into a 500 would put the End-User back on a terminal page while still
 // signed in, which is the defect #109 exists to remove. Losing a redirect is the safe direction; the
 // reason is logged.
-func clientForPostLogoutRedirect(ctx context.Context, clientId string, database data.Database) *models.Client {
+func clientForPostLogoutRedirect(ctx context.Context, clientId string, database accountLogoutDatabase) *models.Client {
 	if len(clientId) == 0 {
 		// RP-Initiated Logout 1.0 section 3: "if it is not supplied with post_logout_redirect_uri,
 		// the OP MUST NOT perform post-logout redirection unless the OP has other means of
@@ -868,7 +881,7 @@ func clientForPostLogoutRedirect(ctx context.Context, clientId string, database 
 func postLogoutRedirectLocation(
 	r *http.Request,
 	httpHelper HttpHelper,
-	database data.Database,
+	database accountLogoutDatabase,
 	client *models.Client,
 	postLogoutRedirectURI string,
 ) string {

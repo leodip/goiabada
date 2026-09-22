@@ -1,19 +1,27 @@
 package handlers
 
 import (
+	"context"
 	"crypto/sha256"
+	"database/sql"
 	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/leodip/goiabada/authserver/internal/data"
+	"github.com/leodip/goiabada/authserver/internal/models"
 )
+
+// clientLogoDatabase is what the client logo page needs: the client and its logo.
+type clientLogoDatabase interface {
+	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*models.Client, error)
+	GetClientLogoByClientId(ctx context.Context, tx *sql.Tx, clientId int64) (*models.ClientLogo, error)
+}
 
 func HandleClientLogoGet(
 	httpHelper HttpHelper,
-	database data.Database,
+	database clientLogoDatabase,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {

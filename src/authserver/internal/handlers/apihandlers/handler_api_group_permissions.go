@@ -1,6 +1,8 @@
 package apihandlers
 
 import (
+	"context"
+	"database/sql"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -8,15 +10,27 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
 )
 
+// groupPermissionsDatabase is what the group permission endpoints need: the group's grants and
+// the catalogue they are granted from.
+type groupPermissionsDatabase interface {
+	CountGroupMembers(ctx context.Context, tx *sql.Tx, groupId int64) (int, error)
+	CreateGroupPermission(ctx context.Context, tx *sql.Tx, groupPermission *models.GroupPermission) error
+	DeleteGroupPermission(ctx context.Context, tx *sql.Tx, groupPermissionId int64) error
+	GetGroupById(ctx context.Context, tx *sql.Tx, groupId int64) (*models.Group, error)
+	GetGroupPermissionByGroupIdAndPermissionId(ctx context.Context, tx *sql.Tx, groupId, permissionId int64) (*models.GroupPermission, error)
+	GetPermissionById(ctx context.Context, tx *sql.Tx, permissionId int64) (*models.Permission, error)
+	GetResourceById(ctx context.Context, tx *sql.Tx, resourceId int64) (*models.Resource, error)
+	GroupLoadPermissions(ctx context.Context, tx *sql.Tx, group *models.Group) error
+}
+
 func HandleAPIGroupPermissionsGet(
-	database data.Database,
+	database groupPermissionsDatabase,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		idStr := chi.URLParam(r, "id")
@@ -75,7 +89,7 @@ func HandleAPIGroupPermissionsGet(
 }
 
 func HandleAPIGroupPermissionsPut(
-	database data.Database,
+	database groupPermissionsDatabase,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

@@ -1,14 +1,15 @@
 package handlers
 
 import (
+	"context"
 	"database/sql"
 	"net/http"
 	"strings"
 	"time"
 
-	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
+	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/stringutil"
@@ -33,9 +34,16 @@ func HandleForgotPasswordGet(
 	}
 }
 
+// forgotPasswordDatabase is what the forgot password page needs: the user it stamps with a reset
+// code.
+type forgotPasswordDatabase interface {
+	GetUserByEmail(ctx context.Context, tx *sql.Tx, email string) (*models.User, error)
+	UpdateUser(ctx context.Context, tx *sql.Tx, user *models.User) error
+}
+
 func HandleForgotPasswordPost(
 	httpHelper HttpHelper,
-	database data.Database,
+	database forgotPasswordDatabase,
 	emailSender EmailSender,
 ) http.HandlerFunc {
 

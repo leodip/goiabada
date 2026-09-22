@@ -16,7 +16,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/constants"
-	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/models"
@@ -27,6 +26,31 @@ import (
 	"github.com/leodip/goiabada/core/stringutil"
 	"github.com/leodip/goiabada/core/validators"
 )
+
+// clientsDatabase is what the client endpoints need: the client row, its redirect URIs and web
+// origins, and the transaction that changes them together.
+//
+// It embeds the revocation port because making a confidential client public revokes the grants it
+// held while it still had to authenticate.
+type clientsDatabase interface {
+	handlers.RevocationDatabase
+
+	AcquireClientRow(ctx context.Context, tx *sql.Tx, clientId int64) error
+	ClientLoadRedirectURIs(ctx context.Context, tx *sql.Tx, client *models.Client) error
+	ClientLoadWebOrigins(ctx context.Context, tx *sql.Tx, client *models.Client) error
+	CreateClient(ctx context.Context, tx *sql.Tx, client *models.Client) error
+	CreateRedirectURI(ctx context.Context, tx *sql.Tx, redirectURI *models.RedirectURI) error
+	CreateWebOrigin(ctx context.Context, tx *sql.Tx, webOrigin *models.WebOrigin) error
+	DeleteClient(ctx context.Context, tx *sql.Tx, clientId int64) error
+	DeleteRedirectURI(ctx context.Context, tx *sql.Tx, redirectURIId int64) error
+	DeleteWebOrigin(ctx context.Context, tx *sql.Tx, webOriginId int64) error
+	GetAllClients(ctx context.Context, tx *sql.Tx) ([]models.Client, error)
+	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*models.Client, error)
+	GetClientById(ctx context.Context, tx *sql.Tx, clientId int64) (*models.Client, error)
+	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
+	SetClientPublic(ctx context.Context, tx *sql.Tx, clientId int64) (bool, error)
+	UpdateClient(ctx context.Context, tx *sql.Tx, client *models.Client) error
+}
 
 // updateClientNotOwningAuthenticationMode writes a client through an endpoint that changes some
 // other part of it. Three of them exist (general settings, OAuth2 flows, token settings) and none
@@ -68,7 +92,7 @@ import (
 // It does not close the lost update on the columns each endpoint DOES own: two concurrent saves
 // of the same section still last-write-wins, which is how every entity in this codebase behaves
 // and is a separate, wider question.
-func updateClientNotOwningAuthenticationMode(ctx context.Context, database data.Database, client *models.Client) error {
+func updateClientNotOwningAuthenticationMode(ctx context.Context, database clientsDatabase, client *models.Client) error {
 	// Opened through RunInTransaction, so a deadlock reruns the acquisition, the re-read and the
 	// write together (#301). Safe to rerun: the two columns are copied from the row re-read under
 	// this attempt's own lock, and applyPublicClientInvariants is idempotent on the result.
@@ -120,7 +144,7 @@ func applyPublicClientInvariants(client *models.Client) {
 
 // HandleAPIClientsGet - GET /api/v1/admin/clients
 func HandleAPIClientsGet(
-	database data.Database,
+	database clientsDatabase,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -158,7 +182,7 @@ func HandleAPIClientsGet(
 
 // HandleAPIClientGet - GET /api/v1/admin/clients/{id}
 func HandleAPIClientGet(
-	database data.Database,
+	database clientsDatabase,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -223,7 +247,7 @@ func HandleAPIClientGet(
 
 // HandleAPIClientDelete - DELETE /api/v1/admin/clients/{id}
 func HandleAPIClientDelete(
-	database data.Database,
+	database clientsDatabase,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 
@@ -274,7 +298,7 @@ func HandleAPIClientDelete(
 
 // HandleAPIClientCreatePost - POST /api/v1/admin/clients
 func HandleAPIClientCreatePost(
-	database data.Database,
+	database clientsDatabase,
 	identifierValidator *validators.IdentifierValidator,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
@@ -391,7 +415,7 @@ func HandleAPIClientCreatePost(
 
 // HandleAPIClientUpdatePut - PUT /api/v1/admin/clients/{id}
 func HandleAPIClientUpdatePut(
-	database data.Database,
+	database clientsDatabase,
 	identifierValidator *validators.IdentifierValidator,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
@@ -596,7 +620,7 @@ func HandleAPIClientUpdatePut(
 // HandleAPIClientAuthenticationPut - PUT /api/v1/admin/clients/{id}/authentication
 // Changes client's public/confidential mode and client secret.
 func HandleAPIClientAuthenticationPut(
-	database data.Database,
+	database clientsDatabase,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -740,7 +764,7 @@ func validateClientSecret(secret string) error {
 // HandleAPIClientOAuth2FlowsPut - PUT /api/v1/admin/clients/{id}/oauth2-flows
 // Updates which OAuth2 flows are enabled for the client.
 func HandleAPIClientOAuth2FlowsPut(
-	database data.Database,
+	database clientsDatabase,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -815,7 +839,7 @@ func HandleAPIClientOAuth2FlowsPut(
 // Replaces the full set of redirect URIs for the client. The server validates
 // inputs, enforces business rules, computes add/remove, and returns the updated client.
 func HandleAPIClientRedirectURIsPut(
-	database data.Database,
+	database clientsDatabase,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -974,7 +998,7 @@ const maxWebOriginLength = 256
 // canonicalized to the exact string a browser sends in an Origin header, or refused, so a stored
 // origin is always one CORS can match.
 func HandleAPIClientWebOriginsPut(
-	database data.Database,
+	database clientsDatabase,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -1174,7 +1198,7 @@ func (f *webOriginsWriteFailure) Unwrap() error { return f.err }
 // HandleAPIClientTokensPut - PUT /api/v1/admin/clients/{id}/tokens
 // Updates token-related settings for a client.
 func HandleAPIClientTokensPut(
-	database data.Database,
+	database clientsDatabase,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

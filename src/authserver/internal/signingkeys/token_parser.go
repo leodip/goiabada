@@ -3,21 +3,28 @@ package signingkeys
 import (
 	"context"
 	"crypto/rsa"
+	"database/sql"
 	"errors"
 	"log/slog"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/leodip/goiabada/authserver/internal/data"
+	"github.com/leodip/goiabada/authserver/internal/models"
 	oauth "github.com/leodip/goiabada/core/oauth"
 )
+
+// tokenParserDatabase is what token parsing needs: the keys a signature may have been made with.
+type tokenParserDatabase interface {
+	GetAllSigningKeys(ctx context.Context, tx *sql.Tx) ([]models.KeyPair, error)
+	GetCurrentSigningKey(ctx context.Context, tx *sql.Tx) (*models.KeyPair, error)
+}
 
 // TokenParser validates tokens using keys loaded from the database.
 // This is used by the auth server. Admin console should use the JWKS parser.
 type TokenParser struct {
-	database data.Database
+	database tokenParserDatabase
 }
 
-func NewTokenParser(database data.Database) *TokenParser {
+func NewTokenParser(database tokenParserDatabase) *TokenParser {
 	return &TokenParser{
 		database: database,
 	}

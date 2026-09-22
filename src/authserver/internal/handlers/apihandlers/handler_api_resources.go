@@ -1,6 +1,8 @@
 package apihandlers
 
 import (
+	"context"
+	"database/sql"
 	"encoding/json"
 	"net/http"
 	"sort"
@@ -11,7 +13,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/api"
@@ -20,8 +21,18 @@ import (
 	"github.com/leodip/goiabada/core/validators"
 )
 
+// resourcesDatabase is what the resource endpoints need: the resource row.
+type resourcesDatabase interface {
+	CreateResource(ctx context.Context, tx *sql.Tx, resource *models.Resource) error
+	DeleteResource(ctx context.Context, tx *sql.Tx, resourceId int64) error
+	GetAllResources(ctx context.Context, tx *sql.Tx) ([]models.Resource, error)
+	GetResourceById(ctx context.Context, tx *sql.Tx, resourceId int64) (*models.Resource, error)
+	GetResourceByResourceIdentifier(ctx context.Context, tx *sql.Tx, resourceIdentifier string) (*models.Resource, error)
+	UpdateResource(ctx context.Context, tx *sql.Tx, resource *models.Resource) error
+}
+
 func HandleAPIResourcesGet(
-	database data.Database,
+	database resourcesDatabase,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		resources, err := database.GetAllResources(r.Context(), nil)
@@ -45,7 +56,7 @@ func HandleAPIResourcesGet(
 
 // HandleAPIResourceCreatePost - POST /api/v1/admin/resources
 func HandleAPIResourceCreatePost(
-	database data.Database,
+	database resourcesDatabase,
 	identifierValidator *validators.IdentifierValidator,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
@@ -118,7 +129,7 @@ func HandleAPIResourceCreatePost(
 
 // HandleAPIResourceGet - GET /api/v1/admin/resources/{id}
 func HandleAPIResourceGet(
-	database data.Database,
+	database resourcesDatabase,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		idStr := chi.URLParam(r, "id")
@@ -152,7 +163,7 @@ func HandleAPIResourceGet(
 
 // HandleAPIResourceUpdatePut - PUT /api/v1/admin/resources/{id}
 func HandleAPIResourceUpdatePut(
-	database data.Database,
+	database resourcesDatabase,
 	identifierValidator *validators.IdentifierValidator,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
@@ -254,7 +265,7 @@ func HandleAPIResourceUpdatePut(
 
 // HandleAPIResourceDelete - DELETE /api/v1/admin/resources/{id}
 func HandleAPIResourceDelete(
-	database data.Database,
+	database resourcesDatabase,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

@@ -1,22 +1,38 @@
 package apihandlers
 
 import (
+	"context"
+	"database/sql"
 	"net/http"
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/constants"
-	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/api"
 )
 
+// usersSessionsDatabase is what the administrator's user session endpoints need: one user's
+// sessions.
+//
+// It embeds the row builder's port because the listing is built by buildSessionDetails, and the
+// revocation port because terminating a session goes through handlers.TerminateUserSessionTx.
+type usersSessionsDatabase interface {
+	sessionDetailsDatabase
+	handlers.RevocationDatabase
+
+	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*models.User, error)
+	GetUserSessionById(ctx context.Context, tx *sql.Tx, userSessionId int64) (*models.UserSession, error)
+	GetUserSessionsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]models.UserSession, error)
+	UserSessionsLoadClients(ctx context.Context, tx *sql.Tx, userSessions []models.UserSession) error
+}
+
 // HandleAPIUserSessionsGet - GET /api/v1/admin/users/{id}/sessions
 func HandleAPIUserSessionsGet(
-	database data.Database,
+	database usersSessionsDatabase,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Authentication and authorization handled by middleware
@@ -87,7 +103,7 @@ func HandleAPIUserSessionsGet(
 
 // HandleAPIUserSessionDelete - DELETE /api/v1/admin/user-sessions/{id}
 func HandleAPIUserSessionDelete(
-	database data.Database,
+	database usersSessionsDatabase,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

@@ -1,6 +1,8 @@
 package apihandlers
 
 import (
+	"context"
+	"database/sql"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -8,7 +10,6 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/api"
@@ -38,8 +39,20 @@ import (
 // contract rather than at runtime.
 const maxGroupIdsPerRequest = 1000
 
+// userGroupsDatabase is what the user group membership endpoints need: the user, the groups, and
+// the rows that join them.
+type userGroupsDatabase interface {
+	CountGroupMembers(ctx context.Context, tx *sql.Tx, groupId int64) (int, error)
+	CreateUserGroup(ctx context.Context, tx *sql.Tx, userGroup *models.UserGroup) error
+	DeleteUserGroup(ctx context.Context, tx *sql.Tx, userGroupId int64) error
+	GetGroupsByIds(ctx context.Context, tx *sql.Tx, groupIds []int64) ([]models.Group, error)
+	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*models.User, error)
+	GetUserGroupByUserIdAndGroupId(ctx context.Context, tx *sql.Tx, userId, groupId int64) (*models.UserGroup, error)
+	UserLoadGroups(ctx context.Context, tx *sql.Tx, user *models.User) error
+}
+
 func HandleAPIUserGroupsGet(
-	database data.Database,
+	database userGroupsDatabase,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -93,7 +106,7 @@ func HandleAPIUserGroupsGet(
 }
 
 func HandleAPIUserGroupsPut(
-	database data.Database,
+	database userGroupsDatabase,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 

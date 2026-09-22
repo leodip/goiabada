@@ -1,6 +1,7 @@
 package apihandlers
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"net/http"
@@ -9,16 +10,28 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
+	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/core/api"
 )
 
+// accountPasswordDatabase is what the account password endpoint needs: the caller's user row and
+// the hash write.
+//
+// It embeds the revocation port because a password change revokes the credentials issued under
+// the old one.
+type accountPasswordDatabase interface {
+	handlers.RevocationDatabase
+
+	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*models.User, error)
+	SetUserPasswordHash(ctx context.Context, tx *sql.Tx, userId int64, passwordHash string) error
+}
+
 // HandleAPIAccountPasswordPut - PUT /api/v1/account/password
 func HandleAPIAccountPasswordPut(
-	database data.Database,
+	database accountPasswordDatabase,
 	passwordValidator *accountvalidation.PasswordValidator,
 	auditLogger handlers.AuditLogger,
 	credentialFailures handlers.CredentialFailureRecorder,

@@ -1,6 +1,7 @@
 package apihandlers
 
 import (
+	"context"
 	"crypto/subtle"
 	"database/sql"
 	"encoding/json"
@@ -12,7 +13,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/constants"
-	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
@@ -23,10 +23,17 @@ import (
 	"github.com/leodip/goiabada/core/i18n"
 )
 
+// accountEmailVerificationDatabase is what the account email verification endpoints need: the
+// caller's own user row.
+type accountEmailVerificationDatabase interface {
+	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*models.User, error)
+	UpdateUser(ctx context.Context, tx *sql.Tx, user *models.User) error
+}
+
 // HandleAPIAccountEmailVerificationSendPost - POST /api/v1/account/email/verification/send
 func HandleAPIAccountEmailVerificationSendPost(
 	httpHelper handlers.HttpHelper,
-	database data.Database,
+	database accountEmailVerificationDatabase,
 	emailSender handlers.EmailSender,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
@@ -133,7 +140,7 @@ func HandleAPIAccountEmailVerificationSendPost(
 
 // HandleAPIAccountEmailVerificationPost - POST /api/v1/account/email/verification
 func HandleAPIAccountEmailVerificationPost(
-	database data.Database,
+	database accountEmailVerificationDatabase,
 	auditLogger handlers.AuditLogger,
 	credentialFailures handlers.CredentialFailureRecorder,
 ) http.HandlerFunc {

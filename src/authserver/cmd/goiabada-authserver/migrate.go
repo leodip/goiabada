@@ -84,6 +84,11 @@ func migrateCommand(args []string) int {
 // "migrate", the opened database, a migrator over the configured engine's embedded set, the
 // lowest version it may step down to, and somewhere to print. It returns the process exit code.
 //
+// The database is the whole data.Database rather than a port, which is what every other consumer
+// now takes (#386). This command calls no method on it: it hands it to
+// datafactory.CheckEmailCaseBeforeMigrating, which is composition and keeps the wide interface,
+// and type-asserts it to datafactory.MigratorProvider. A port would have nothing in it.
+//
 // The database is here for the pre-flight migrateTo runs before an upward step (#351). The
 // migrator alone cannot answer it: the check reads the users table through the engine's own SQL,
 // and this command is the only path to a migrator that does not come through datafactory.NewDatabase,

@@ -3,28 +3,42 @@ package sessionbackend
 import (
 	"context"
 	"crypto/sha256"
+	"database/sql"
 	"encoding/hex"
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/constants"
-	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
+// BrowserSessionDatabase is what the browser session store needs: the row it creates, reads,
+// touches, updates and deletes, and the settings that give it a lifetime.
+//
+// Exported, unlike most ports here, because the endpoint that puts this backend on the wire lives
+// in apihandlers and its own port has to name this capability to hand it on (#386 decision 8).
+type BrowserSessionDatabase interface {
+	CreateBrowserSession(ctx context.Context, tx *sql.Tx, browserSession *models.BrowserSession) error
+	DeleteBrowserSession(ctx context.Context, tx *sql.Tx, owner, sessionIdHash string) error
+	GetBrowserSessionByOwnerAndSessionIdHash(ctx context.Context, tx *sql.Tx, owner, sessionIdHash string, now time.Time) (*models.BrowserSession, error)
+	GetSettingsById(ctx context.Context, tx *sql.Tx, settingsId int64) (*models.Settings, error)
+	TouchBrowserSession(ctx context.Context, tx *sql.Tx, owner, sessionIdHash string, now, expiresAt time.Time) (bool, error)
+	UpdateBrowserSessionData(ctx context.Context, tx *sql.Tx, owner, sessionIdHash, data string, now, expiresAt time.Time) (bool, error)
+}
+
 // dbBackend keeps browser sessions in the database this deployment already runs. It is
 // what the auth server uses directly, and it is also what the session endpoint runs on
 // behalf of the admin console.
 type dbBackend struct {
-	database data.Database
+	database BrowserSessionDatabase
 	owner    string
 	now      func() time.Time
 }
 
 // NewAuthServerBackend returns a database backend scoped to the auth server's rows.
-func NewAuthServerBackend(database data.Database) sessionstore.Backend {
+func NewAuthServerBackend(database BrowserSessionDatabase) sessionstore.Backend {
 	return newBackend(database, constants.AuthServerSessionName)
 }
 
@@ -33,11 +47,11 @@ func NewAuthServerBackend(database data.Database) sessionstore.Backend {
 // One table holds both applications' sessions, and the owner is all that keeps them
 // apart. Fixing it in these constructors rather than accepting it from a caller makes
 // it impossible for the session endpoint to select the auth server's rows (#334).
-func NewAdminConsoleBackend(database data.Database) sessionstore.Backend {
+func NewAdminConsoleBackend(database BrowserSessionDatabase) sessionstore.Backend {
 	return newBackend(database, coreconstants.AdminConsoleSessionName)
 }
 
-func newBackend(database data.Database, owner string) *dbBackend {
+func newBackend(database BrowserSessionDatabase, owner string) *dbBackend {
 	return &dbBackend{
 		database: database,
 		owner:    owner,

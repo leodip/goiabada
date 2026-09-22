@@ -1,6 +1,8 @@
 package apihandlers
 
 import (
+	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -12,7 +14,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/constants"
-	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
@@ -48,9 +49,14 @@ func HandleAPISettingsEmailGet(
 	}
 }
 
+// settingsEmailDatabase is what the email settings endpoint needs: the settings write.
+type settingsEmailDatabase interface {
+	UpdateSettings(ctx context.Context, tx *sql.Tx, settings *models.Settings) error
+}
+
 // HandleAPISettingsEmailPut - PUT /api/v1/admin/settings/email
 func HandleAPISettingsEmailPut(
-	database data.Database,
+	database settingsEmailDatabase,
 	emailValidator handlers.EmailValidator,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {

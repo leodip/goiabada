@@ -1,19 +1,26 @@
 package handlers
 
 import (
+	"context"
+	"database/sql"
 	"net/http"
 
 	"github.com/leodip/goiabada/authserver/internal/apiresponse"
-	"github.com/leodip/goiabada/authserver/internal/data"
+	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
 )
 
-type HandlerPublicSettings struct {
-	database data.Database
+// publicSettingsDatabase is what the public settings endpoint needs: the settings row.
+type publicSettingsDatabase interface {
+	GetSettingsById(ctx context.Context, tx *sql.Tx, settingsId int64) (*models.Settings, error)
 }
 
-func NewHandlerPublicSettings(database data.Database) *HandlerPublicSettings {
+type HandlerPublicSettings struct {
+	database publicSettingsDatabase
+}
+
+func NewHandlerPublicSettings(database publicSettingsDatabase) *HandlerPublicSettings {
 	return &HandlerPublicSettings{
 		database: database,
 	}

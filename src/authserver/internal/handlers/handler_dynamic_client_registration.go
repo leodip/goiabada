@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"context"
+	"database/sql"
 	"encoding/json"
 	"net/http"
 	"net/url"
@@ -10,7 +12,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/apiresponse"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/constants"
-	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
@@ -21,10 +22,18 @@ import (
 	"github.com/leodip/goiabada/core/validators"
 )
 
+// dynamicClientRegistrationDatabase is what RFC 7591 registration needs: the client and redirect
+// URIs it creates, and the delete that undoes a half-built one.
+type dynamicClientRegistrationDatabase interface {
+	CreateClient(ctx context.Context, tx *sql.Tx, client *models.Client) error
+	CreateRedirectURI(ctx context.Context, tx *sql.Tx, redirectURI *models.RedirectURI) error
+	DeleteClient(ctx context.Context, tx *sql.Tx, clientId int64) error
+}
+
 // HandleDynamicClientRegistrationPost implements RFC 7591 §3 Client Registration Endpoint
 func HandleDynamicClientRegistrationPost(
 	httpHelper HttpHelper,
-	database data.Database,
+	database dynamicClientRegistrationDatabase,
 	auditLogger AuditLogger,
 ) http.HandlerFunc {
 

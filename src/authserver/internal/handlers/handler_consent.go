@@ -14,7 +14,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/config"
-	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
@@ -57,10 +56,26 @@ func buildScopeInfoArray(ctx context.Context, scope string, consent *models.User
 	return scopeInfoArr
 }
 
+// consentDatabase is what the consent screen needs: the client, the consent it reads and writes,
+// and the user granting it.
+//
+// It embeds the authorize port because a refusal is answered through redirToClientWithError, and
+// the client display port because the screen renders through getClientDisplayInfo.
+type consentDatabase interface {
+	authorizeDatabase
+	clientDisplayDatabase
+
+	CreateUserConsent(ctx context.Context, tx *sql.Tx, userConsent *models.UserConsent) error
+	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*models.Client, error)
+	GetConsentByUserIdAndClientId(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) (*models.UserConsent, error)
+	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*models.User, error)
+	UpdateUserConsent(ctx context.Context, tx *sql.Tx, userConsent *models.UserConsent) error
+}
+
 func HandleConsentGet(
 	httpHelper HttpHelper,
 	authHelper AuthHelper,
-	database data.Database,
+	database consentDatabase,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		authContext, err := authHelper.GetAuthContext(r)
@@ -173,7 +188,7 @@ func HandleConsentGet(
 func HandleConsentPost(
 	httpHelper HttpHelper,
 	authHelper AuthHelper,
-	database data.Database,
+	database consentDatabase,
 	templateFS fs.FS,
 	auditLogger AuditLogger,
 	permissionChecker PermissionChecker,

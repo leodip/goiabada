@@ -1,17 +1,23 @@
 package handlers
 
 import (
+	"context"
+	"database/sql"
 	"encoding/json"
 	"net/http"
 
-	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/oauth"
 )
 
+// certsDatabase is what the JWKS endpoint needs: the signing keys it publishes.
+type certsDatabase interface {
+	GetAllSigningKeys(ctx context.Context, tx *sql.Tx) ([]models.KeyPair, error)
+}
+
 func HandleCertsGet(
 	httpHelper HttpHelper,
-	database data.Database,
+	database certsDatabase,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {

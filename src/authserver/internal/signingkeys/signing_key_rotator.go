@@ -7,7 +7,6 @@ import (
 	"encoding/pem"
 	"errors"
 
-	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/rsautil"
@@ -32,6 +31,19 @@ var ErrRotationInProgress = errors.New("another signing key rotation is in progr
 // Stdlib errors.New, for the reason ErrRotationInProgress above states (#279 decision 5).
 var ErrKeySetIncomplete = errors.New("expected current and next signing keys to exist")
 
+// RotationDatabase is what key rotation needs: the key rows it reads, advances and retires, in
+// one transaction.
+//
+// Exported, unlike most ports here, because the settings endpoint that builds a rotator lives in
+// apihandlers and its own port has to name this capability to hand it on (#386 decision 8).
+type RotationDatabase interface {
+	CreateKeyPair(ctx context.Context, tx *sql.Tx, keyPair *models.KeyPair) error
+	DeleteKeyPair(ctx context.Context, tx *sql.Tx, keyPairId int64) error
+	GetAllSigningKeys(ctx context.Context, tx *sql.Tx) ([]models.KeyPair, error)
+	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
+	UpdateKeyPairState(ctx context.Context, tx *sql.Tx, keyPairId int64, fromState string, toState string) (bool, error)
+}
+
 // SigningKeyRotator performs the current -> previous -> deleted transition of the signing
 // keys, as one transaction whose every refusal happens before the commit.
 //
@@ -51,7 +63,7 @@ var ErrKeySetIncomplete = errors.New("expected current and next signing keys to 
 // deadlock victim is rerun; the rerun reads the key set afresh, and if it lost the race
 // meanwhile its own compare-and-set refuses it (#301).
 type SigningKeyRotator struct {
-	database data.Database
+	database RotationDatabase
 	// keySizeBits is unexported and has no setter, so no production caller can lower it.
 	// It exists as a field only because the replacement key is now generated on every
 	// path, including every refusal, and a 4096-bit generation costs about 300ms against
@@ -59,7 +71,7 @@ type SigningKeyRotator struct {
 	keySizeBits int
 }
 
-func NewSigningKeyRotator(database data.Database) *SigningKeyRotator {
+func NewSigningKeyRotator(database RotationDatabase) *SigningKeyRotator {
 	return &SigningKeyRotator{
 		database:    database,
 		keySizeBits: 4096,

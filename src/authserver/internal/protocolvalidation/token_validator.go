@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rsa"
 	"crypto/subtle"
+	"database/sql"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -14,7 +15,6 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/apiresponse"
 	"github.com/leodip/goiabada/authserver/internal/constants"
-	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
@@ -34,13 +34,37 @@ type TokenParser interface {
 	DecodeAndValidateTokenString(ctx context.Context, token string, pubKey *rsa.PublicKey, withExpirationCheck bool) (*oauth.JwtToken, error)
 }
 
+// tokenValidatorDatabase is what the token request validator needs: the client, the grant being
+// presented, and the consent and permissions that decide the scope.
+type tokenValidatorDatabase interface {
+	scopeResolverDatabase
+
+	ClientLoadPermissions(ctx context.Context, tx *sql.Tx, client *models.Client) error
+	ClientLoadRedirectURIs(ctx context.Context, tx *sql.Tx, client *models.Client) error
+	CodeLoadClient(ctx context.Context, tx *sql.Tx, code *models.Code) error
+	CodeLoadUser(ctx context.Context, tx *sql.Tx, code *models.Code) error
+	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*models.Client, error)
+	GetCodeByCodeHash(ctx context.Context, tx *sql.Tx, codeHash string, used bool) (*models.Code, error)
+	GetConsentByUserIdAndClientId(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) (*models.UserConsent, error)
+	GetRefreshTokenByJti(ctx context.Context, tx *sql.Tx, jti string) (*models.RefreshToken, error)
+	GetUserByEmail(ctx context.Context, tx *sql.Tx, email string) (*models.User, error)
+	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*models.User, error)
+	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*models.UserSession, error)
+	PermissionsLoadResources(ctx context.Context, tx *sql.Tx, permissions []models.Permission) error
+	RefreshTokenLoadClient(ctx context.Context, tx *sql.Tx, refreshToken *models.RefreshToken) error
+	RefreshTokenLoadCode(ctx context.Context, tx *sql.Tx, refreshToken *models.RefreshToken) error
+	RefreshTokenLoadUser(ctx context.Context, tx *sql.Tx, refreshToken *models.RefreshToken) error
+	UserLoadGroups(ctx context.Context, tx *sql.Tx, user *models.User) error
+	UserLoadPermissions(ctx context.Context, tx *sql.Tx, user *models.User) error
+}
+
 type TokenValidator struct {
-	database          data.Database
+	database          tokenValidatorDatabase
 	tokenParser       TokenParser
 	permissionChecker PermissionChecker
 }
 
-func NewTokenValidator(database data.Database, tokenParser TokenParser,
+func NewTokenValidator(database tokenValidatorDatabase, tokenParser TokenParser,
 	permissionChecker PermissionChecker) *TokenValidator {
 	return &TokenValidator{
 		database:          database,
@@ -1124,8 +1148,21 @@ type scopeResolution struct {
 // all three callers hand it to a 500. A rejection is an Outcome, never an error.
 //
 // Package-level rather than a method because the two callers are different types, AuthorizeValidator
-// and TokenValidator, that merely hold the same data.Database.
-func resolveScope(ctx context.Context, db data.Database, scopeStr string) (scopeResolution, error) {
+// and TokenValidator, which hold ports of their own and share only what this function needs.
+
+// scopeResolverDatabase is what resolving one `resource:permission` scope needs: the resource, and
+// the permissions declared on it.
+//
+// Its own port rather than the token validator's, even though it is declared here, because the
+// authorize validator calls resolveScope too and holds two operations of its own. Handing it the
+// token validator's nineteen to reach these two is the shape decision 3 rejected when it chose a
+// port per file over a port per package (#386).
+type scopeResolverDatabase interface {
+	GetResourceByResourceIdentifier(ctx context.Context, tx *sql.Tx, resourceIdentifier string) (*models.Resource, error)
+	GetPermissionsByResourceId(ctx context.Context, tx *sql.Tx, resourceId int64) ([]models.Permission, error)
+}
+
+func resolveScope(ctx context.Context, db scopeResolverDatabase, scopeStr string) (scopeResolution, error) {
 	parts := strings.Split(scopeStr, ":")
 	if len(parts) != 2 {
 		return scopeResolution{Outcome: scopeMalformed}, nil

@@ -1,6 +1,8 @@
 package apihandlers
 
 import (
+	"context"
+	"database/sql"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -10,7 +12,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/api"
@@ -19,8 +20,20 @@ import (
 	"github.com/leodip/goiabada/core/validators"
 )
 
+// groupsDatabase is what the group endpoints need: the group row and the member count that
+// decides whether it can go.
+type groupsDatabase interface {
+	CountGroupMembers(ctx context.Context, tx *sql.Tx, groupId int64) (int, error)
+	CreateGroup(ctx context.Context, tx *sql.Tx, group *models.Group) error
+	DeleteGroup(ctx context.Context, tx *sql.Tx, groupId int64) error
+	GetAllGroups(ctx context.Context, tx *sql.Tx) ([]models.Group, error)
+	GetGroupByGroupIdentifier(ctx context.Context, tx *sql.Tx, groupIdentifier string) (*models.Group, error)
+	GetGroupById(ctx context.Context, tx *sql.Tx, groupId int64) (*models.Group, error)
+	UpdateGroup(ctx context.Context, tx *sql.Tx, group *models.Group) error
+}
+
 func HandleAPIGroupsGet(
-	database data.Database,
+	database groupsDatabase,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -58,7 +71,7 @@ func HandleAPIGroupsGet(
 }
 
 func HandleAPIGroupCreatePost(
-	database data.Database,
+	database groupsDatabase,
 	identifierValidator *validators.IdentifierValidator,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
@@ -139,7 +152,7 @@ func HandleAPIGroupCreatePost(
 }
 
 func HandleAPIGroupGet(
-	database data.Database,
+	database groupsDatabase,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -182,7 +195,7 @@ func HandleAPIGroupGet(
 }
 
 func HandleAPIGroupUpdatePut(
-	database data.Database,
+	database groupsDatabase,
 	identifierValidator *validators.IdentifierValidator,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
@@ -290,7 +303,7 @@ func HandleAPIGroupUpdatePut(
 }
 
 func HandleAPIGroupDelete(
-	database data.Database,
+	database groupsDatabase,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 

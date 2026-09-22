@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"context"
+	"database/sql"
 	"fmt"
 	"net/http"
 	"strings"
@@ -9,14 +11,24 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/apiresponse"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/config"
-	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
+	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/errs"
 )
 
+// userinfoDatabase is what the userinfo endpoint needs: the caller's user row and the claims
+// hanging off it.
+type userinfoDatabase interface {
+	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*models.User, error)
+	GroupsLoadAttributes(ctx context.Context, tx *sql.Tx, groups []models.Group) error
+	UserHasProfilePicture(ctx context.Context, tx *sql.Tx, userId int64) (bool, error)
+	UserLoadAttributes(ctx context.Context, tx *sql.Tx, user *models.User) error
+	UserLoadGroups(ctx context.Context, tx *sql.Tx, user *models.User) error
+}
+
 func HandleUserInfoGetPost(
 	httpHelper HttpHelper,
-	database data.Database,
+	database userinfoDatabase,
 	auditLogger AuditLogger,
 ) http.HandlerFunc {
 

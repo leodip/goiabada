@@ -1,22 +1,32 @@
 package apihandlers
 
 import (
+	"context"
+	"database/sql"
 	"net/http"
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
-	"github.com/leodip/goiabada/authserver/internal/data"
+	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/errs"
 )
 
+// permissionUsersDatabase is what the permission holders endpoint needs: the permission, its
+// resource, and one page of the users holding it.
+type permissionUsersDatabase interface {
+	GetPermissionById(ctx context.Context, tx *sql.Tx, permissionId int64) (*models.Permission, error)
+	GetResourceById(ctx context.Context, tx *sql.Tx, resourceId int64) (*models.Resource, error)
+	GetUsersByPermissionIdPaginated(ctx context.Context, tx *sql.Tx, permissionId int64, page int, pageSize int) ([]models.User, int, error)
+}
+
 // HandleAPIPermissionUsersGet
 // GET /api/v1/admin/permissions/{permissionId}/users?page={page}&size={size}
 // Returns paginated users who have the specified permission.
 func HandleAPIPermissionUsersGet(
-	database data.Database,
+	database permissionUsersDatabase,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		permStr := chi.URLParam(r, "permissionId")

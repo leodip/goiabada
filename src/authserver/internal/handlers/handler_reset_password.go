@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"crypto/subtle"
 	"database/sql"
 	"errors"
@@ -13,7 +14,6 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/config"
-	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/models"
@@ -205,6 +205,17 @@ func rejectResetPassword(httpHelper HttpHelper, auditLogger AuditLogger, w http.
 	renderResetPasswordCodeInvalid(httpHelper, w, r, httpStatus)
 }
 
+// resetPasswordDatabase is what the reset password page needs: the code it consumes.
+//
+// It embeds the revocation port because a completed reset revokes the credentials issued under
+// the old password.
+type resetPasswordDatabase interface {
+	RevocationDatabase
+
+	GetUserByForgotPasswordCodeHash(ctx context.Context, tx *sql.Tx, codeHash string) (*models.User, error)
+	TryConsumeForgotPasswordCode(ctx context.Context, tx *sql.Tx, userId int64, codeHash string, passwordHash string) (bool, error)
+}
+
 // resolveResetPasswordMarker is what both steps after the redirect run before anything else:
 // read the session marker, then re-resolve the code hash it names.
 //
@@ -220,7 +231,7 @@ func rejectResetPassword(httpHelper HttpHelper, auditLogger AuditLogger, w http.
 //
 // Returns (nil, nil) when the request was refused, having already audited and responded.
 func resolveResetPasswordMarker(httpHelper HttpHelper, httpSession sessionstore.Store,
-	database data.Database, auditLogger AuditLogger, w http.ResponseWriter, r *http.Request,
+	database resetPasswordDatabase, auditLogger AuditLogger, w http.ResponseWriter, r *http.Request,
 	httpStatus int) (*LinkMarker, *models.User) {
 
 	marker, rejection, err := GetLinkMarker(httpSession, r, LinkMarkerFlowResetPassword)
@@ -263,7 +274,7 @@ func resolveResetPasswordMarker(httpHelper HttpHelper, httpSession sessionstore.
 func HandleResetPasswordGet(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
-	database data.Database,
+	database resetPasswordDatabase,
 	auditLogger AuditLogger,
 ) http.HandlerFunc {
 
@@ -300,7 +311,7 @@ func HandleResetPasswordGet(
 // jar and leaves the code usable for the real user; consuming here would let any prefetching
 // gateway burn the code before the user ever saw the message.
 func handleResetPasswordLinkFollowed(httpHelper HttpHelper, httpSession sessionstore.Store,
-	database data.Database, auditLogger AuditLogger, w http.ResponseWriter, r *http.Request,
+	database resetPasswordDatabase, auditLogger AuditLogger, w http.ResponseWriter, r *http.Request,
 	code string) {
 
 	codeHash, err := hashutil.HashString(code)
@@ -372,7 +383,7 @@ func handleResetPasswordLinkFollowed(httpHelper HttpHelper, httpSession sessions
 func HandleResetPasswordPost(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
-	database data.Database,
+	database resetPasswordDatabase,
 	passwordValidator PasswordValidator,
 	auditLogger AuditLogger,
 ) http.HandlerFunc {

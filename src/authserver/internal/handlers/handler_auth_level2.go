@@ -1,22 +1,30 @@
 package handlers
 
 import (
+	"context"
+	"database/sql"
 	"errors"
 	"log/slog"
 	"net/http"
 
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/config"
-	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/errs"
 )
 
+// authLevel2Database is what the level 2 hop needs: the client and the user whose OTP enrolment
+// decides the path.
+type authLevel2Database interface {
+	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*models.Client, error)
+	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*models.User, error)
+}
+
 func HandleAuthLevel2Get(
 	httpHelper HttpHelper,
 	authHelper AuthHelper,
-	database data.Database,
+	database authLevel2Database,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 

@@ -2,6 +2,7 @@ package protocolvalidation
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -9,7 +10,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/leodip/goiabada/authserver/internal/data"
+	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/urlutil"
 	"github.com/leodip/goiabada/core/constants"
@@ -17,8 +18,19 @@ import (
 	"github.com/leodip/goiabada/core/i18n"
 )
 
+// authorizeValidatorDatabase is what the authorize request validator needs: the client and its
+// registered redirect URIs.
+//
+// It embeds the scope resolver's port because a requested scope is resolved by resolveScope.
+type authorizeValidatorDatabase interface {
+	scopeResolverDatabase
+
+	ClientLoadRedirectURIs(ctx context.Context, tx *sql.Tx, client *models.Client) error
+	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*models.Client, error)
+}
+
 type AuthorizeValidator struct {
-	database data.Database
+	database authorizeValidatorDatabase
 }
 
 type ValidateClientAndRedirectURIInput struct {
@@ -44,7 +56,7 @@ type ValidateRequestInput struct {
 	Nonce                string // Needed to validate nonce requirement for id_token
 }
 
-func NewAuthorizeValidator(database data.Database) *AuthorizeValidator {
+func NewAuthorizeValidator(database authorizeValidatorDatabase) *AuthorizeValidator {
 	return &AuthorizeValidator{
 		database: database,
 	}

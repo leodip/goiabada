@@ -4,18 +4,27 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/uuidutil"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/errs"
 )
 
-type UserCreator struct {
-	database data.Database
+// userCreatorDatabase is what user creation needs: the user row and the default permission it is
+// given, in one transaction.
+type userCreatorDatabase interface {
+	CreateUser(ctx context.Context, tx *sql.Tx, user *models.User) error
+	CreateUserPermission(ctx context.Context, tx *sql.Tx, userPermission *models.UserPermission) error
+	GetPermissionsByResourceId(ctx context.Context, tx *sql.Tx, resourceId int64) ([]models.Permission, error)
+	GetResourceByResourceIdentifier(ctx context.Context, tx *sql.Tx, resourceIdentifier string) (*models.Resource, error)
+	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 }
 
-func NewUserCreator(database data.Database) *UserCreator {
+type UserCreator struct {
+	database userCreatorDatabase
+}
+
+func NewUserCreator(database userCreatorDatabase) *UserCreator {
 	return &UserCreator{
 		database: database,
 	}

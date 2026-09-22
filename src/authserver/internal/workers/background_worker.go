@@ -2,11 +2,12 @@ package workers
 
 import (
 	"context"
+	"database/sql"
 	"log/slog"
 	"math/rand/v2"
 	"time"
 
-	"github.com/leodip/goiabada/authserver/internal/data"
+	"github.com/leodip/goiabada/authserver/internal/models"
 )
 
 const (
@@ -53,8 +54,21 @@ const (
 	auditLogDeleteMaxBatches = 100
 )
 
+// backgroundWorkerDatabase is what the cleanup worker needs: the claim that makes one instance
+// the sweeper, and the six deletes it sweeps with.
+type backgroundWorkerDatabase interface {
+	DeleteExpiredBrowserSessions(ctx context.Context, tx *sql.Tx, now time.Time) error
+	DeleteExpiredRefreshTokens(ctx context.Context, tx *sql.Tx) error
+	DeleteExpiredSessions(ctx context.Context, tx *sql.Tx, maxLifetime time.Duration) error
+	DeleteIdleSessions(ctx context.Context, tx *sql.Tx, idleTimeout time.Duration) error
+	DeleteOldAuditLogs(ctx context.Context, tx *sql.Tx, cutoff time.Time, maxDeletions int) (int, error)
+	DeleteUsedCodesWithoutRefreshTokens(ctx context.Context, tx *sql.Tx, createdBefore time.Time) error
+	GetSettingsById(ctx context.Context, tx *sql.Tx, settingsId int64) (*models.Settings, error)
+	TryClaimCleanupRun(ctx context.Context, tx *sql.Tx, now time.Time, claimableBefore time.Time) (bool, error)
+}
+
 type Worker struct {
-	database data.Database
+	database backgroundWorkerDatabase
 
 	// cancel and done are created by Start. cancel being nil means the worker was
 	// never started, which Stop treats as a no-op.
@@ -62,7 +76,7 @@ type Worker struct {
 	done   chan struct{}
 }
 
-func NewWorker(database data.Database) *Worker {
+func NewWorker(database backgroundWorkerDatabase) *Worker {
 	return &Worker{
 		database: database,
 	}
@@ -79,7 +93,7 @@ func (w *Worker) Start() {
 
 // Stop signals the worker and waits, up to timeout, for it to finish.
 //
-// Cancelling now reaches the statement itself: every data.Database call this worker makes is
+// Cancelling now reaches the statement itself: every database call this worker makes is
 // issued under the context Start opened, so a sweep already in flight is abandoned rather than
 // waited out (#386). The wait stays bounded anyway, because what the driver does with a
 // cancellation is the driver's to decide and shutdown is not the place to find out. Stop is also

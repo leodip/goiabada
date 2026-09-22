@@ -1,24 +1,39 @@
 package apihandlers
 
 import (
+	"context"
+	"database/sql"
 	"net/http"
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/constants"
-	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/api"
 )
 
+// accountSessionsDatabase is what the account session endpoints need: the caller's own sessions.
+//
+// It embeds the row builder's port because the listing is built by buildSessionDetails, and the
+// revocation port because terminating a session goes through handlers.TerminateUserSessionTx.
+type accountSessionsDatabase interface {
+	sessionDetailsDatabase
+	handlers.RevocationDatabase
+
+	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*models.User, error)
+	GetUserSessionById(ctx context.Context, tx *sql.Tx, userSessionId int64) (*models.UserSession, error)
+	GetUserSessionsByUserId(ctx context.Context, tx *sql.Tx, userId int64) ([]models.UserSession, error)
+	UserSessionsLoadClients(ctx context.Context, tx *sql.Tx, userSessions []models.UserSession) error
+}
+
 // HandleAPIAccountSessionsGet - GET /api/v1/account/sessions
 // Returns the caller's own active sessions, each with the clients it authorized and
 // whether it is the session the caller's own token was issued through.
 func HandleAPIAccountSessionsGet(
-	database data.Database,
+	database accountSessionsDatabase,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Extract validated access token (auth and scope enforced by middleware)
@@ -79,7 +94,7 @@ func HandleAPIAccountSessionsGet(
 // Deletes a user session that belongs to the authenticated user. Deleting the
 // current session is allowed.
 func HandleAPIAccountSessionDelete(
-	database data.Database,
+	database accountSessionsDatabase,
 	auditLogger handlers.AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
