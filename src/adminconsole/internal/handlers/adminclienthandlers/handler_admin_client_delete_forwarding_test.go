@@ -1,6 +1,7 @@
 package adminclienthandlers
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -30,7 +31,7 @@ type deleteClientApiClient struct {
 	err error
 }
 
-func (c *deleteClientApiClient) GetClientPermissions(accessToken string, clientId int64) (*api.ClientResponse, []api.PermissionResponse, error) {
+func (c *deleteClientApiClient) GetClientPermissions(_ context.Context, accessToken string, clientId int64) (*api.ClientResponse, []api.PermissionResponse, error) {
 	if c.err != nil {
 		return nil, nil, c.err
 	}

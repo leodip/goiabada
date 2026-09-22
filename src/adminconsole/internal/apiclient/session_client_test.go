@@ -1,15 +1,19 @@
 package apiclient
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/leodip/goiabada/adminconsole/internal/boundedread"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/oauth"
@@ -208,6 +212,54 @@ func TestSessionTokenSource_AGarbageBodyIsAnError(t *testing.T) {
 
 	_, err := source.Token(context.Background())
 	require.Error(t, err)
+}
+
+// The pair the read bound never had. This source reads the token endpoint's answer under
+// maxSessionTokenResponseBytes, and an answer over it is refused rather than cut: a token
+// response cut at the ceiling that happened to be balanced would decode with the access
+// token missing, and would then arrive at the caller as the empty-bearer refusal above
+// rather than as the oversized answer it was (#386 decision 4).
+func TestSessionTokenSource_RefusesAnAnswerOverTheCap(t *testing.T) {
+	stub := newTokenStub(t, func(w http.ResponseWriter, _ int) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(bytes.Repeat([]byte("x"), maxSessionTokenResponseBytes+1))
+	})
+	source := newTestTokenSource(stub.server.URL)
+
+	token, err := source.Token(context.Background())
+
+	require.Error(t, err)
+	assert.True(t, errors.Is(err, boundedread.ErrResponseTooLarge),
+		"the answer is refused as oversized rather than decoded from a prefix: %v", err)
+	assert.Empty(t, token, "nothing is decoded out of an answer that was refused")
+}
+
+// And the boundary itself: an answer of exactly the cap is served. Without this the case
+// above reads as "large answers are refused" rather than "answers over the cap are".
+func TestSessionTokenSource_AcceptsAnAnswerOfExactlyTheCap(t *testing.T) {
+	stub := newTokenStub(t, func(w http.ResponseWriter, _ int) {
+		encoded, err := json.Marshal(oauth.TokenResponse{
+			AccessToken: "at", TokenType: "Bearer", ExpiresIn: 300,
+		})
+		require.NoError(t, err)
+
+		// Pad the one field of unbounded length until the answer is the cap to the byte.
+		padded, err := json.Marshal(oauth.TokenResponse{
+			AccessToken: "at", TokenType: "Bearer", ExpiresIn: 300,
+			Scope: strings.Repeat("x", maxSessionTokenResponseBytes-len(encoded)-len(`,"scope":""`)),
+		})
+		require.NoError(t, err)
+		require.Len(t, padded, maxSessionTokenResponseBytes)
+
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(padded)
+	})
+	source := newTestTokenSource(stub.server.URL)
+
+	token, err := source.Token(context.Background())
+
+	require.NoError(t, err, "the cap is the largest accepted answer, not the first refused one")
+	assert.Equal(t, "at", token)
 }
 
 // TestSessionTokenSource_AFailureDoesNotLeaveAStaleTokenCached. The token the failure

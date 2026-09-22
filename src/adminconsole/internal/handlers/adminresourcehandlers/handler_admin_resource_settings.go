@@ -44,7 +44,7 @@ func HandleAdminResourceSettingsGet(
 			return
 		}
 
-		resource, err := apiClient.GetResourceById(jwtInfo.TokenResponse.AccessToken, id)
+		resource, err := apiClient.GetResourceById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -108,7 +108,7 @@ func HandleAdminResourceSettingsPost(
 		}
 
 		// Get resource to determine if it's system-level
-		resource, err := apiClient.GetResourceById(jwtInfo.TokenResponse.AccessToken, id)
+		resource, err := apiClient.GetResourceById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -140,7 +140,7 @@ func HandleAdminResourceSettingsPost(
 		}
 
 		// Call API
-		_, err = apiClient.UpdateResource(jwtInfo.TokenResponse.AccessToken, id, req)
+		_, err = apiClient.UpdateResource(r.Context(), jwtInfo.TokenResponse.AccessToken, id, req)
 		if err != nil {
 			handlers.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
 			return

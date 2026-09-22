@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/leodip/goiabada/adminconsole/internal/boundedread"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -54,7 +55,7 @@ func TestExecutor_ABodyOneByteOverTheCeilingIsRefusedAndNeverDecoded(t *testing.
 	got, err := client.GetSettingsGeneral(context.Background(), charAccessToken)
 	require.Error(t, err)
 	assert.Nil(t, got, "nothing decoded out of an oversized answer")
-	assert.True(t, errors.Is(err, ErrResponseTooLarge),
+	assert.True(t, errors.Is(err, boundedread.ErrResponseTooLarge),
 		"an overrun is its own failure, not a parse failure: got %v", err)
 }
 
@@ -79,7 +80,7 @@ func TestExecutor_AnOversizedFailureBodyIsRefusedBeforeClassification(t *testing
 
 	_, err := client.GetSettingsGeneral(context.Background(), charAccessToken)
 	require.Error(t, err)
-	assert.True(t, errors.Is(err, ErrResponseTooLarge))
+	assert.True(t, errors.Is(err, boundedread.ErrResponseTooLarge))
 }
 
 func TestExecutor_MalformedJSONOnASuccessStatusIsADecodeFailure(t *testing.T) {
@@ -91,7 +92,7 @@ func TestExecutor_MalformedJSONOnASuccessStatusIsADecodeFailure(t *testing.T) {
 
 	var apiErr *APIError
 	assert.False(t, errors.As(err, &apiErr), "a 200 that will not parse is not the auth server's refusal")
-	assert.False(t, errors.Is(err, ErrResponseTooLarge))
+	assert.False(t, errors.Is(err, boundedread.ErrResponseTooLarge))
 }
 
 // The request's cancellation reaches the transport. This is the whole point of carrying a context
@@ -172,7 +173,7 @@ func TestSettingsClient_RefusesAnOversizedAnswerRatherThanDecodingAPrefix(t *tes
 	settings, err := NewSettingsClient(server.URL).GetPublicSettings(context.Background())
 	require.Error(t, err)
 	assert.Nil(t, settings)
-	assert.True(t, errors.Is(err, ErrResponseTooLarge), "got %v", err)
+	assert.True(t, errors.Is(err, boundedread.ErrResponseTooLarge), "got %v", err)
 }
 
 func TestSettingsClient_CarriesTheCallersContext(t *testing.T) {

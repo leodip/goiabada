@@ -52,7 +52,7 @@ func HandleAdminClientWebOriginsGet(
 			return
 		}
 
-		clientResp, err := apiClient.GetClientById(jwtInfo.TokenResponse.AccessToken, id)
+		clientResp, err := apiClient.GetClientById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -73,7 +73,7 @@ func HandleAdminClientWebOriginsGet(
 		// This needs no new endpoint: GET /api/v1/admin/clients already loads WebOrigins for
 		// every client it returns. Assembled here rather than in the template, so the template
 		// displays a list it is handed and holds no rule.
-		allClients, err := apiClient.GetAllClients(jwtInfo.TokenResponse.AccessToken)
+		allClients, err := apiClient.GetAllClients(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -180,7 +180,7 @@ func HandleAdminClientWebOriginsPost(
 		req := &api.UpdateClientWebOriginsRequest{
 			WebOrigins: data.WebOrigins,
 		}
-		_, err = apiClient.UpdateClientWebOrigins(jwtInfo.TokenResponse.AccessToken, data.ClientId, req)
+		_, err = apiClient.UpdateClientWebOrigins(r.Context(), jwtInfo.TokenResponse.AccessToken, data.ClientId, req)
 		if err != nil {
 			// Not JsonError directly: the API refuses a web origin with a 400 whose description
 			// names the offending value and says what an origin should look like, and that

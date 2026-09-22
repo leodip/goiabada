@@ -1,6 +1,7 @@
 package adminresourcehandlers
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -36,7 +37,7 @@ type usersWithPermissionApiClient struct {
 	err error
 }
 
-func (c *usersWithPermissionApiClient) GetResourceById(accessToken string, resourceId int64) (*api.ResourceResponse, error) {
+func (c *usersWithPermissionApiClient) GetResourceById(_ context.Context, accessToken string, resourceId int64) (*api.ResourceResponse, error) {
 	return nil, c.err
 }
 

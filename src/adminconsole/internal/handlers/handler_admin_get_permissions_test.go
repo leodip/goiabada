@@ -36,9 +36,13 @@ type permissionsByResourceClient struct {
 	apiclient.ApiClient
 	permissions []api.PermissionResponse
 	err         error
+
+	// seen is the context the call carried, for the seam 4 case at the foot of this file.
+	seen context.Context
 }
 
-func (c *permissionsByResourceClient) GetPermissionsByResource(accessToken string, resourceId int64) ([]api.PermissionResponse, error) {
+func (c *permissionsByResourceClient) GetPermissionsByResource(ctx context.Context, accessToken string, resourceId int64) ([]api.PermissionResponse, error) {
+	c.seen = ctx
 	return c.permissions, c.err
 }
 
@@ -155,4 +159,19 @@ func TestAdminGetPermissions_ReturnsThePermissions(t *testing.T) {
 	assert.JSONEq(t, `{"Permissions":[{"id":3,"permissionIdentifier":"read","description":"",`+
 		`"resourceId":0,"resource":{"id":0,"resourceIdentifier":"","description":"",`+
 		`"isSystemLevelResource":false}}]}`, recorder.Body.String())
+}
+
+// Seam 4 for this package's one API call (#386 stage 12). See admingrouphandlers'
+// handler_admin_group_request_context_test.go for what this owns and why the context is the
+// assertion: the compiler accepts context.Background() where r.Context() belongs, so nothing else
+// in the tree can see a handler that stopped carrying the request's cancellation outward.
+func TestAdminGetPermissions_TheCallCarriesTheRequestsContext(t *testing.T) {
+	client := &permissionsByResourceClient{permissions: []api.PermissionResponse{{Id: 8}}}
+
+	recorder, _ := permissionRecords(t, client, "resourceId=7")
+
+	assert.Equal(t, http.StatusOK, recorder.Code)
+	require.NotNil(t, client.seen, "the handler must consult its API client")
+	assert.NotEmpty(t, middleware.GetReqID(client.seen),
+		"the call carried the request's own context, which is where the request id lives")
 }

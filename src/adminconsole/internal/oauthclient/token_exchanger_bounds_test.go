@@ -2,6 +2,7 @@ package oauthclient
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"strings"
@@ -9,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/leodip/goiabada/adminconsole/internal/boundedread"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -25,9 +27,9 @@ import (
 
 // countingBody serves a fixed body and records how much of it was actually read.
 // The body is deliberately larger than the cap but finite: an unbounded read
-// consumes all of it and succeeds, a bounded one stops at the cap and hands the
-// decoder a truncated object. Endless would prove the same thing by hanging,
-// which is not a failure anyone can read.
+// consumes all of it and succeeds, while the bound stops one byte past the cap
+// and refuses the answer. Endless would prove the same thing by hanging, which
+// is not a failure anyone can read.
 type countingBody struct {
 	remaining []byte
 	read      atomic.Int64
@@ -78,7 +80,7 @@ func clientReturning(status int, body io.ReadCloser) *http.Client {
 // Two assertions, and the pair is the point. With the cap removed this body is
 // read whole and parses cleanly, so the call succeeds and the count runs past
 // MaxTokenResponseBytes; both flip together.
-func TestExchangeCodeForTokens_ReadsAtMostTheCap(t *testing.T) {
+func TestExchangeCodeForTokens_RefusesAnAnswerOverTheCap(t *testing.T) {
 	body := oversizedTokenResponse()
 
 	tokenResponse, err := NewTokenExchanger(clientReturning(http.StatusOK, body)).
@@ -86,12 +88,31 @@ func TestExchangeCodeForTokens_ReadsAtMostTheCap(t *testing.T) {
 			"https://authserver.example/auth/token")
 
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "error parsing response",
-		"the answer reaches the decoder truncated rather than being refused outright")
-	assert.Nil(t, tokenResponse)
+	assert.True(t, errors.Is(err, boundedread.ErrResponseTooLarge),
+		"the answer is refused as oversized rather than reaching the decoder truncated: %v", err)
+	assert.Nil(t, tokenResponse, "nothing is decoded out of an answer that was refused")
 
-	assert.Equal(t, int64(MaxTokenResponseBytes), body.read.Load(),
-		"exactly the cap is read from a peer answering with more than it")
+	assert.Equal(t, int64(MaxTokenResponseBytes)+1, body.read.Load(),
+		"one byte past the cap is read, which is what makes the overrun detectable, and no more")
+}
+
+// The answer exactly at the cap is accepted, so the case above is the overrun and
+// not the size. The case below it pads to half the cap, which leaves the boundary
+// itself untested without this.
+func TestExchangeCodeForTokens_AcceptsABodyOfExactlyTheCap(t *testing.T) {
+	prefix := `{"access_token":"at","scope":"`
+	suffix := `"}`
+	padding := MaxTokenResponseBytes - len(prefix) - len(suffix)
+	body := io.NopCloser(strings.NewReader(prefix + strings.Repeat("x", padding) + suffix))
+
+	tokenResponse, err := NewTokenExchanger(clientReturning(http.StatusOK, body)).
+		ExchangeCodeForTokens(context.Background(), "c", "r", "ci", "cs", "cv",
+			"https://authserver.example/auth/token")
+
+	require.NoError(t, err)
+	require.NotNil(t, tokenResponse)
+	assert.Equal(t, "at", tokenResponse.AccessToken)
+	assert.Len(t, tokenResponse.Scope, padding)
 }
 
 // The benign member of the class: an answer under the cap is unaffected, so the

@@ -4,13 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/leodip/goiabada/adminconsole/internal/boundedread"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/errs"
@@ -28,6 +28,13 @@ const (
 	// sessionTokenTimeout bounds one token request. The session lookup it precedes sits on
 	// the request path of every admin console page, so this cannot be generous.
 	sessionTokenTimeout = 10 * time.Second
+
+	// maxSessionTokenResponseBytes bounds the token endpoint's answer. It is the value
+	// oauthclient.MaxTokenResponseBytes carries, and that constant's own comment names this
+	// call as where it came from: three requests to /auth/token must not read three
+	// different numbers of bytes. Declared here rather than imported, so apiclient does not
+	// take an edge on oauthclient for one integer.
+	maxSessionTokenResponseBytes = 1 << 20
 )
 
 // SessionTokenSource obtains and caches the bearer token the admin console presents to the
@@ -126,7 +133,11 @@ func (s *SessionTokenSource) fetch(ctx context.Context) (string, time.Time, erro
 	}
 	defer func() { _ = response.Body.Close() }()
 
-	body, err := io.ReadAll(io.LimitReader(response.Body, 1<<20))
+	// Bounded, and an overrun is refused rather than cut. A truncated token response that
+	// happened to be balanced would decode with the access token missing, which arrives at
+	// the caller as the empty-token refusal below rather than as the oversized answer it was
+	// (#386 decision 4).
+	body, err := boundedread.Read(response.Body, maxSessionTokenResponseBytes)
 	if err != nil {
 		return "", time.Time{}, errs.Wrap(err, "unable to read the session token response")
 	}

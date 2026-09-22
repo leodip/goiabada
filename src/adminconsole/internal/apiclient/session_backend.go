@@ -5,11 +5,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"io"
 	"net/http"
 	"strings"
 	"time"
 
+	"github.com/leodip/goiabada/adminconsole/internal/boundedread"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/sessionstore"
@@ -222,7 +222,10 @@ func (b *httpBackend) attempt(ctx context.Context, operation string, encoded []b
 	// for, an idle keep-alive connection closed by the far end, which is a Do failure with
 	// no response at all and therefore nothing the server has acted on (final review,
 	// round 2, finding 2).
-	body, err := io.ReadAll(io.LimitReader(response.Body, maxSessionResponseBytes))
+	// Bounded, and an overrun is refused rather than cut: a truncated envelope would reach
+	// the decoder below as a parse failure indistinguishable from a malformed one, and one
+	// that happened to be balanced would decode with the blob missing (#386 decision 4).
+	body, err := boundedread.Read(response.Body, maxSessionResponseBytes)
 	if err != nil {
 		return 0, nil, errs.Wrap(err, "unable to read the browser session response")
 	}

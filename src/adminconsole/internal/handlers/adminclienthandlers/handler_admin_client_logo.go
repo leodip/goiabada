@@ -48,7 +48,7 @@ func HandleAdminClientLogoGet(
 			return
 		}
 
-		clientResp, err := apiClient.GetClientById(jwtInfo.TokenResponse.AccessToken, id)
+		clientResp, err := apiClient.GetClientById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -59,7 +59,7 @@ func HandleAdminClientLogoGet(
 		}
 
 		var logoUrl string
-		logoInfo, err := apiClient.GetClientLogo(jwtInfo.TokenResponse.AccessToken, id)
+		logoInfo, err := apiClient.GetClientLogo(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			slog.WarnContext(r.Context(), "unable to fetch the client logo info", "error", err, "client_id", id)
 		} else if logoInfo != nil && logoInfo.HasLogo {
@@ -115,7 +115,7 @@ func HandleAdminClientLogoPost(
 			return
 		}
 
-		response, err := apiClient.UploadClientLogo(jwtInfo.TokenResponse.AccessToken, clientId, logoData, header.Filename)
+		response, err := apiClient.UploadClientLogo(r.Context(), jwtInfo.TokenResponse.AccessToken, clientId, logoData, header.Filename)
 		if err != nil {
 			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
@@ -147,7 +147,7 @@ func HandleAdminClientLogoDelete(
 			return
 		}
 
-		err = apiClient.DeleteClientLogo(jwtInfo.TokenResponse.AccessToken, clientId)
+		err = apiClient.DeleteClientLogo(r.Context(), jwtInfo.TokenResponse.AccessToken, clientId)
 		if err != nil {
 			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return

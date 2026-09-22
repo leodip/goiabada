@@ -4,13 +4,13 @@ import (
 	"context"
 	"crypto/rsa"
 	"encoding/json"
-	"io"
 	"log/slog"
 	"net/http"
 	"net/url"
 	"sort"
 	"strings"
 
+	"github.com/leodip/goiabada/adminconsole/internal/boundedread"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	coreconstants "github.com/leodip/goiabada/core/constants"
@@ -239,11 +239,16 @@ func (m *MiddlewareJwt) refreshToken(
 	defer func() { _ = resp.Body.Close() }()
 
 	// Read the response, bounded: a peer answering with an endless body would otherwise be
-	// read into memory until the process dies. Cut rather than refused, so an oversized
-	// answer fails to parse below and the caller clears the session and carries on.
-	body, err := io.ReadAll(io.LimitReader(resp.Body, oauthclient.MaxTokenResponseBytes))
+	// read into memory until the process dies. An answer over the ceiling is refused rather
+	// than cut, so it is reported as boundedread.ErrResponseTooLarge rather than as a parse
+	// failure indistinguishable from a malformed body; either way the caller clears the
+	// session and carries on, and nothing below this line runs (#386 decision 4).
+	body, err := boundedread.Read(resp.Body, oauthclient.MaxTokenResponseBytes)
 	if err != nil {
-		return false, errs.Errorf("error reading refresh token response: %v", err)
+		// %w rather than %v, which is what the line said before: the message is byte for
+		// byte the same and the sentinel stays reachable through errors.Is, which is the
+		// whole point of classifying the overrun.
+		return false, errs.Errorf("error reading refresh token response: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {

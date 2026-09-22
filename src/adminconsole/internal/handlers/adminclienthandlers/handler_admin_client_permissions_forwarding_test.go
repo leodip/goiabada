@@ -1,6 +1,7 @@
 package adminclienthandlers
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -32,7 +33,7 @@ type permissionsApiClient struct {
 	err error
 }
 
-func (c *permissionsApiClient) UpdateClientPermissions(accessToken string, clientId int64, request *api.UpdateClientPermissionsRequest) error {
+func (c *permissionsApiClient) UpdateClientPermissions(_ context.Context, accessToken string, clientId int64, request *api.UpdateClientPermissionsRequest) error {
 	return c.err
 }
 

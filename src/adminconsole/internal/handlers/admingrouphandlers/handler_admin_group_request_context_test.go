@@ -47,6 +47,12 @@ func (s *groupCtxRecordingApiClient) record(ctx context.Context) error {
 	return errs.New("the auth server refused")
 }
 
+// GetAllResources is the permissions page's first call and is #386 stage 12's. It is here rather
+// than in the resource package because this is the handler that makes it.
+func (s *groupCtxRecordingApiClient) GetAllResources(ctx context.Context, _ string) ([]api.ResourceResponse, error) {
+	return nil, s.record(ctx)
+}
+
 func (s *groupCtxRecordingApiClient) GetAllGroups(ctx context.Context, _ string) ([]api.GroupResponse, error) {
 	return nil, s.record(ctx)
 }
@@ -134,6 +140,14 @@ func TestAdminGroupHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsConte
 			request: handlertest.Request(http.MethodPost, "/admin/groups/new",
 				handlertest.WithAccessToken(),
 				handlertest.WithForm(url.Values{"groupIdentifier": {"support"}})),
+		},
+		{
+			name: "HandleAdminGroupPermissionsGet",
+			build: func(h *mocks_handlerhelpers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+				return HandleAdminGroupPermissionsGet(h, nil, c)
+			},
+			request: handlertest.Request(http.MethodGet, "/admin/groups/5/permissions",
+				handlertest.WithAccessToken(), handlertest.WithRouteParam("groupId", "5")),
 		},
 		{
 			name: "HandleAdminGroupSettingsGet",

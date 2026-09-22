@@ -73,7 +73,7 @@ func HandleAdminClientNewPost(
 		clientCredentialsEnabled := r.FormValue("clientCredentialsEnabled") == "on"
 
 		// Call AuthServer API to create client
-		_, err := apiClient.CreateClient(jwtInfo.TokenResponse.AccessToken, &api.CreateClientRequest{
+		_, err := apiClient.CreateClient(r.Context(), jwtInfo.TokenResponse.AccessToken, &api.CreateClientRequest{
 			ClientIdentifier:         strings.TrimSpace(clientIdentifier),
 			DisplayName:              strings.TrimSpace(displayName),
 			AuthorizationCodeEnabled: authorizationCodeEnabled,

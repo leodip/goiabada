@@ -24,7 +24,7 @@ func HandleAdminResourcesGet(
 			return
 		}
 
-		resources, err := apiClient.GetAllResources(jwtInfo.TokenResponse.AccessToken)
+		resources, err := apiClient.GetAllResources(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return

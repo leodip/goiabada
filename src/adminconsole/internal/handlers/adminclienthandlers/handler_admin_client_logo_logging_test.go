@@ -28,11 +28,11 @@ type logoApiClient struct {
 	logoErr error
 }
 
-func (c *logoApiClient) GetClientById(accessToken string, clientId int64) (*api.ClientResponse, error) {
+func (c *logoApiClient) GetClientById(_ context.Context, accessToken string, clientId int64) (*api.ClientResponse, error) {
 	return &api.ClientResponse{Id: clientId, ClientIdentifier: "an-client"}, nil
 }
 
-func (c *logoApiClient) GetClientLogo(accessToken string, clientId int64) (*apiclient.ClientLogoInfo, error) {
+func (c *logoApiClient) GetClientLogo(_ context.Context, accessToken string, clientId int64) (*apiclient.ClientLogoInfo, error) {
 	return nil, c.logoErr
 }
 

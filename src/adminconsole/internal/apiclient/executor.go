@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/leodip/goiabada/adminconsole/internal/boundedread"
 	"github.com/leodip/goiabada/core/errs"
 )
 
@@ -35,20 +36,11 @@ const generalAPITimeout = 10 * time.Second
 // Revisit when an install's unpaginated lists approach those counts: exceeding this is a hard
 // failure and reaches the administrator as a 500 on an admin page, and the same event is the one
 // that should make those endpoints paginate.
+//
+// Exceeding it is refused rather than cut, by boundedread.Read; the console's error classifier
+// falls through to InternalServerError for boundedread.ErrResponseTooLarge, which is the right
+// answer for a peer that replied with something absurd.
 const maxAPIResponseBytes = 1 << 20
-
-// ErrResponseTooLarge is returned when the auth server's answer exceeds maxAPIResponseBytes.
-//
-// The answer is refused rather than cut: the body is read to one byte past the ceiling and the
-// overrun is detected by length, so no prefix ever reaches a decoder. Cutting instead would make
-// an oversized answer arrive as a parse failure, indistinguishable from a malformed one, and a
-// truncated prefix that happened to be balanced would decode with keys missing and nothing would
-// say so (#386 decision 4).
-//
-// It needs no handling of its own in the console's error classifier: HandleAPIError and its two
-// siblings route on *APIError through errors.As and fall through to InternalServerError, which is
-// the right answer for a peer that replied with something absurd.
-var ErrResponseTooLarge = errors.New("the auth server's response exceeded the maximum size")
 
 // contentTypeJSON is the request content type all but three of the client's methods carry.
 const contentTypeJSON = "application/json"
@@ -138,8 +130,8 @@ func (c *AuthServerClient) do(ctx context.Context, accessToken string, r apiRequ
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	body, readErr := readBounded(resp.Body)
-	if readErr != nil && !errors.Is(readErr, ErrResponseTooLarge) && r.readErrorIsNotAnError {
+	body, readErr := boundedread.Read(resp.Body, maxAPIResponseBytes)
+	if readErr != nil && !errors.Is(readErr, boundedread.ErrResponseTooLarge) && r.readErrorIsNotAnError {
 		// The read failed partway through and this method does not own that failure. Carry on
 		// with what arrived, which is what its `body, _ := io.ReadAll(...)` does today.
 		readErr = nil
@@ -181,22 +173,4 @@ func (r apiRequest) accepts(status int) bool {
 		return status >= 200 && status < 300
 	}
 	return status == r.successStatus
-}
-
-// readBounded reads body under maxAPIResponseBytes, refusing an overrun rather than cutting it.
-// One byte past the ceiling is read: if that byte arrived, the answer is oversized and no prefix
-// reaches a decoder (#386 decision 4).
-//
-// Whatever did arrive is returned alongside the error, because readErrorIsNotAnError needs the
-// partial body a failed read produced. Nothing is returned on an overrun, so a prefix cannot
-// reach a decoder by that route either.
-func readBounded(body io.Reader) ([]byte, error) {
-	read, err := io.ReadAll(io.LimitReader(body, maxAPIResponseBytes+1))
-	if len(read) > maxAPIResponseBytes {
-		return nil, errs.Wrapf(ErrResponseTooLarge, "the auth server answered with more than %d bytes", maxAPIResponseBytes)
-	}
-	if err != nil {
-		return read, errs.Errorf("failed to read response body: %w", err)
-	}
-	return read, nil
 }

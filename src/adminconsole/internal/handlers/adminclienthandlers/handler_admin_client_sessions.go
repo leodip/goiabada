@@ -41,7 +41,7 @@ func HandleAdminClientUserSessionsGet(
 		}
 
 		// Load client via API
-		clientResp, err := apiClient.GetClientById(jwtInfo.TokenResponse.AccessToken, id)
+		clientResp, err := apiClient.GetClientById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -132,7 +132,7 @@ func HandleAdminClientUserSessionsPost(
 			httpHelper.JsonError(w, r, errs.New("no JWT info found in context"))
 			return
 		}
-		clientResp, err := apiClient.GetClientById(jwtInfo.TokenResponse.AccessToken, id)
+		clientResp, err := apiClient.GetClientById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return

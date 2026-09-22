@@ -1,6 +1,7 @@
 package adminresourcehandlers
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -31,13 +32,13 @@ type systemLevelApiClient struct {
 	resource api.ResourceResponse
 }
 
-func (c *systemLevelApiClient) GetResourceById(accessToken string, resourceId int64) (*api.ResourceResponse, error) {
+func (c *systemLevelApiClient) GetResourceById(_ context.Context, accessToken string, resourceId int64) (*api.ResourceResponse, error) {
 	resource := c.resource
 	resource.Id = resourceId
 	return &resource, nil
 }
 
-func (c *systemLevelApiClient) GetPermissionsByResource(accessToken string, resourceId int64) ([]api.PermissionResponse, error) {
+func (c *systemLevelApiClient) GetPermissionsByResource(_ context.Context, accessToken string, resourceId int64) ([]api.PermissionResponse, error) {
 	return nil, nil
 }
 

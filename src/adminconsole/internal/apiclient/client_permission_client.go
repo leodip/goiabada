@@ -1,79 +1,35 @@
 package apiclient
 
 import (
-	"bytes"
-	"encoding/json"
-	"io"
+	"context"
 	"net/http"
 	"strconv"
 
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/errs"
 )
 
-// GetClientPermissions retrieves client and its permissions
-func (c *AuthServerClient) GetClientPermissions(accessToken string, clientId int64) (*api.ClientResponse, []api.PermissionResponse, error) {
-	fullURL := c.baseURL + "/api/v1/admin/clients/" + strconv.FormatInt(clientId, 10) + "/permissions"
-
-	req, err := http.NewRequest("GET", fullURL, nil)
+// GetClientPermissions retrieves client and its permissions, two values out of one envelope.
+func (c *AuthServerClient) GetClientPermissions(ctx context.Context, accessToken string, clientId int64) (*api.ClientResponse, []api.PermissionResponse, error) {
+	// No Content-Type: this request carries no body and has never set the header.
+	response, err := execute[api.GetClientPermissionsResponse](ctx, c, accessToken, apiRequest{
+		method:        "GET",
+		url:           c.baseURL + "/api/v1/admin/clients/" + strconv.FormatInt(clientId, 10) + "/permissions",
+		successStatus: http.StatusOK,
+	})
 	if err != nil {
-		return nil, nil, errs.Errorf("failed to create request: %w", err)
+		return nil, nil, err
 	}
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, nil, errs.Errorf("failed to make request: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, nil, errs.Errorf("failed to read response body: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, nil, parseAPIError(resp, body)
-	}
-
-	var apiResp api.GetClientPermissionsResponse
-	if err := json.Unmarshal(body, &apiResp); err != nil {
-		return nil, nil, errs.Errorf("failed to unmarshal response: %w", err)
-	}
-
-	return &apiResp.Client, apiResp.Permissions, nil
+	return &response.Client, response.Permissions, nil
 }
 
 // UpdateClientPermissions replaces the set of permissions assigned to a client.
-func (c *AuthServerClient) UpdateClientPermissions(accessToken string, clientId int64, request *api.UpdateClientPermissionsRequest) error {
-	fullURL := c.baseURL + "/api/v1/admin/clients/" + strconv.FormatInt(clientId, 10) + "/permissions"
-
-	bodyBytes, err := json.Marshal(request)
-	if err != nil {
-		return errs.Errorf("failed to marshal request: %w", err)
-	}
-
-	req, err := http.NewRequest("PUT", fullURL, bytes.NewBuffer(bodyBytes))
-	if err != nil {
-		return errs.Errorf("failed to create request: %w", err)
-	}
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return errs.Errorf("failed to make request: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return errs.Errorf("failed to read response body: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return parseAPIError(resp, respBody)
-	}
-
-	return nil
+func (c *AuthServerClient) UpdateClientPermissions(ctx context.Context, accessToken string, clientId int64, request *api.UpdateClientPermissionsRequest) error {
+	_, err := c.do(ctx, accessToken, apiRequest{
+		method:        "PUT",
+		url:           c.baseURL + "/api/v1/admin/clients/" + strconv.FormatInt(clientId, 10) + "/permissions",
+		jsonBody:      request,
+		contentType:   contentTypeJSON,
+		successStatus: http.StatusOK,
+	})
+	return err
 }

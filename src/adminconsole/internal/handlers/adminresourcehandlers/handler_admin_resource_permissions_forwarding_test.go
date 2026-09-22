@@ -2,6 +2,7 @@ package adminresourcehandlers
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -39,11 +40,11 @@ type savePermissionsApiClient struct {
 	updateErr error
 }
 
-func (c *savePermissionsApiClient) GetResourceById(accessToken string, resourceId int64) (*api.ResourceResponse, error) {
+func (c *savePermissionsApiClient) GetResourceById(_ context.Context, accessToken string, resourceId int64) (*api.ResourceResponse, error) {
 	return c.resource, nil
 }
 
-func (c *savePermissionsApiClient) UpdateResourcePermissions(accessToken string, resourceId int64,
+func (c *savePermissionsApiClient) UpdateResourcePermissions(_ context.Context, accessToken string, resourceId int64,
 	req *api.UpdateResourcePermissionsRequest) error {
 	return c.updateErr
 }
