@@ -12,6 +12,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/revocation"
 	"github.com/leodip/goiabada/core/api"
 )
 
@@ -19,10 +20,10 @@ import (
 // sessions.
 //
 // It embeds the row builder's port because the listing is built by buildSessionDetails, and the
-// revocation port because terminating a session goes through handlers.TerminateUserSessionTx.
+// revocation port because terminating a session goes through revocation.TerminateUserSessionTx.
 type usersSessionsDatabase interface {
 	sessionDetailsDatabase
-	handlers.RevocationDatabase
+	revocation.Database
 
 	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*models.User, error)
 	GetUserSessionById(ctx context.Context, tx *sql.Tx, userSessionId int64) (*models.UserSession, error)
@@ -138,7 +139,7 @@ func HandleAPIUserSessionDelete(
 		// session revoked and sweeps the refresh tokens those grants produced, all in one
 		// transaction (#129 decision 5). The 404 above answers first, so a missing session never
 		// opens one.
-		result, err := handlers.TerminateUserSessionTx(r.Context(), database, userSession)
+		result, err := revocation.TerminateUserSessionTx(r.Context(), database, userSession)
 		if err != nil {
 			writeInternalServerError(w, r, err)
 			return
@@ -152,7 +153,7 @@ func HandleAPIUserSessionDelete(
 			"userSessionId": sessionId,
 			"loggedInUser":  loggedInUser,
 		})
-		handlers.LogTerminatedUserSession(r.Context(), auditLogger, userSession, loggedInUser, result)
+		revocation.LogTerminatedUserSession(r.Context(), auditLogger, userSession, loggedInUser, result)
 
 		// Return success response
 		response := api.SuccessResponse{

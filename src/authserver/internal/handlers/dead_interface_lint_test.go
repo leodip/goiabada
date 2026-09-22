@@ -20,6 +20,11 @@ import (
 //
 // The scope is this module, not the source root: an interface under internal/ is unreferenceable
 // from outside the module that declares it.
+//
+// The walk is recursive, so apihandlers and accounthandlers have always been covered by the first
+// entry. A new top-level package is not, which is why #387 names each capability package it lifts
+// out of here as it lands: the interfaces leaving this directory would otherwise stop being
+// guarded by the move itself, which is the silent-unguarding shape #333 exists to refuse.
 func TestHandlers_NoDeadInterfaces(t *testing.T) {
-	testutil.AssertNoDeadInterfaces(t, "authserver/internal/handlers")
+	testutil.AssertNoDeadInterfaces(t, "authserver/internal/handlers", "authserver/internal/revocation")
 }

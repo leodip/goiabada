@@ -786,7 +786,7 @@ func redirectToHintlessLogout(w http.ResponseWriter, r *http.Request, httpHelper
 // immediately, since RequireValidSession resolves it; offline grants survive, which is OIDC Core
 // section 11's reading and the one #129 adopted for the hinted path. The child rows in
 // user_session_clients go with the parent on every engine, on the fk_user_sessions_clients cascade
-// that TerminateUserSessionTx already relies on.
+// that revocation.TerminateUserSessionTx already relies on.
 //
 // A lookup or delete failure is returned so the caller can surface a 500; a row that is simply not
 // there is not an error, it is nothing to tear down. Those two used to be one branch returning a

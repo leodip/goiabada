@@ -19,6 +19,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/revocation"
 	"github.com/leodip/goiabada/authserver/internal/urlutil"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
@@ -33,7 +34,7 @@ import (
 // It embeds the revocation port because making a confidential client public revokes the grants it
 // held while it still had to authenticate.
 type clientsDatabase interface {
-	handlers.RevocationDatabase
+	revocation.Database
 
 	AcquireClientRow(ctx context.Context, tx *sql.Tx, clientId int64) error
 	ClientLoadRedirectURIs(ctx context.Context, tx *sql.Tx, client *models.Client) error
@@ -697,7 +698,7 @@ func HandleAPIClientAuthenticationPut(
 		// review finding 1, decision 17).
 		if req.IsPublic {
 			var becamePublic bool
-			result, err := handlers.RevokeClientGrantsTx(r.Context(), database, client.Id, func(tx *sql.Tx) (bool, error) {
+			result, err := revocation.RevokeClientGrantsTx(r.Context(), database, client.Id, func(tx *sql.Tx) (bool, error) {
 				var err error
 				becamePublic, err = database.SetClientPublic(r.Context(), tx, client.Id)
 				if err != nil {
@@ -715,8 +716,8 @@ func HandleAPIClientAuthenticationPut(
 			// Only a write that really performed the transition gets the event. A save of an
 			// already-public client revoked nothing and must not claim to.
 			if becamePublic {
-				handlers.LogRevokedClientGrants(r.Context(), auditLogger, client.Id,
-					handlers.RevocationReasonClientBecamePublic, callerSubject(r), result)
+				revocation.LogRevokedClientGrants(r.Context(), auditLogger, client.Id,
+					revocation.RevocationReasonClientBecamePublic, callerSubject(r), result)
 			}
 		} else if err := database.UpdateClient(r.Context(), nil, client); err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error updating client authentication"), "client_id", client.Id)

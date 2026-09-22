@@ -34,7 +34,7 @@ func accountSessionDeleteRequest(sessionId string, subject string) *http.Request
 
 // TestHandleAPIAccountSessionDelete_TerminatesAndAuditsBothEvents is the wiring test for the
 // self-service half of decision 5. The payload is asserted here too rather than left to the admin
-// site: LogTerminatedUserSession is shared, but which session row each handler hands it is not, and
+// site: revocation.LogTerminatedUserSession is shared, but which session row each handler hands it is not, and
 // this is the site that resolves the row through an ownership check first.
 func TestHandleAPIAccountSessionDelete_TerminatesAndAuditsBothEvents(t *testing.T) {
 	database := mocks_data.NewDatabase(t)

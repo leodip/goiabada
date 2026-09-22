@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/data"
-	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/revocation"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -112,7 +112,7 @@ func awaitWorker[T any](t *testing.T, what string, ch <-chan T) T {
 
 // pausedBeforeSessionDelete parks the credential sweep after it has taken the users row (the
 // password write and the generation increment both precede DeleteUserSession) and before it takes
-// the first session row. RevokeUserAuthState calls DeleteUserSession on the db it was handed, so
+// the first session row. revocation.RevokeUserAuthState calls DeleteUserSession on the db it was handed, so
 // this decorator, passed as that db, catches it.
 type pausedBeforeSessionDelete struct {
 	data.Database
@@ -126,8 +126,8 @@ func (d pausedBeforeSessionDelete) DeleteUserSession(ctx context.Context, tx *sq
 
 // pausedBeforeTokenUpdate parks the termination after it has taken the session row and the codes
 // rows (DeleteUserSession and RevokeCodesBySessionIdentifier both precede the token sweep) and
-// before it takes the first token row. TerminateUserSessionTx reaches its token updates through
-// revokeRefreshTokens, which calls UpdateRefreshToken on the db it was handed.
+// before it takes the first token row. revocation.TerminateUserSessionTx reaches its token updates through
+// revocation.RevokeRefreshTokens, which calls UpdateRefreshToken on the db it was handed.
 type pausedBeforeTokenUpdate struct {
 	data.Database
 	b *barrier
@@ -173,7 +173,7 @@ func TestDeadlockRetry_CredentialSweepAgainstIssuance(t *testing.T) {
 
 	sweepDone := make(chan error, 1)
 	go func() {
-		_, err := handlers.RevokeUserAuthStateTx(context.Background(), pDB, user.Id, "", func(tx *sql.Tx) error {
+		_, err := revocation.RevokeUserAuthStateTx(context.Background(), pDB, user.Id, "", func(tx *sql.Tx) error {
 			return pDB.SetUserPasswordHash(context.Background(), tx, user.Id, newHash)
 		})
 		sweepDone <- err
@@ -253,7 +253,7 @@ func TestDeadlockRetry_CredentialSweepAgainstIssuance(t *testing.T) {
 		assert.False(t, minted.Used, "the code was minted, not redeemed")
 
 		// The code outlives the session it was issued through, and what stops it being spent is
-		// the generation the sweep advanced rather than any write to this row: RevokeUserAuthState
+		// the generation the sweep advanced rather than any write to this row: revocation.RevokeUserAuthState
 		// increments the user's auth_state_generation, deletes the session rows and sweeps the
 		// refresh tokens, and touches no code (#106). Pinning that here is what says the winner's
 		// code is refused at redemption for the reason the design claims, not by luck.
@@ -289,12 +289,12 @@ func TestDeadlockRetry_DeleteUserAgainstCredentialSweep(t *testing.T) {
 	pDB := pausedBeforeSessionDelete{Database: database, b: b}
 
 	type sweepResult struct {
-		result handlers.RevocationResult
+		result revocation.RevocationResult
 		err    error
 	}
 	sweepDone := make(chan sweepResult, 1)
 	go func() {
-		result, err := handlers.RevokeUserAuthStateTx(context.Background(), pDB, user.Id, "", func(tx *sql.Tx) error {
+		result, err := revocation.RevokeUserAuthStateTx(context.Background(), pDB, user.Id, "", func(tx *sql.Tx) error {
 			return pDB.SetUserPasswordHash(context.Background(), tx, user.Id, newHash)
 		})
 		sweepDone <- sweepResult{result: result, err: err}
@@ -361,7 +361,7 @@ func TestDeadlockRetry_DeleteClientAgainstTermination(t *testing.T) {
 
 	terminationDone := make(chan error, 1)
 	go func() {
-		_, err := handlers.TerminateUserSessionTx(context.Background(), pDB, session)
+		_, err := revocation.TerminateUserSessionTx(context.Background(), pDB, session)
 		terminationDone <- err
 	}()
 

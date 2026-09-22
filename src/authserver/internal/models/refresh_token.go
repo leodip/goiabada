@@ -11,7 +11,7 @@ type RefreshToken struct {
 	// is what makes the family chain a chain at all. The tag is not hygiene. SQL Server
 	// re-checks a foreign key whenever its column appears in an UPDATE's SET list, even
 	// with an unchanged value, taking a shared lock on the parent row. UpdateRefreshToken
-	// is a full-row update and revokeRefreshTokens is what every session-side transaction
+	// is a full-row update and revocation.RevokeRefreshTokens is what every session-side transaction
 	// ends with, so without these tags a password change, a reset, a termination and the
 	// auth-code replay response each took a shared clients lock at their grant sweep,
 	// AFTER they already held the session and its association rows. Against DeleteClient,

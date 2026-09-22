@@ -1134,7 +1134,7 @@ func TestHandleResetPasswordPost_ClaimFails(t *testing.T) {
 // returning an error may mean the server committed and the client never found out, and the
 // rollback this test stubs as succeeding cannot undo that. The mock models
 // "Commit fails, Rollback succeeds" because that is the shape the code takes, not because the
-// pair implies the write was undone. See the contract note on RevokeUserAuthStateTx.
+// pair implies the write was undone. See the contract note on revocation.RevokeUserAuthStateTx.
 func TestHandleResetPasswordPost_TransactionFailureHandling(t *testing.T) {
 	const codeHash = "the-code-hash"
 	const newPassword = "Str0ngP4ss!"

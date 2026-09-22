@@ -27,12 +27,12 @@ import (
 // had no unit coverage at all, which is why the plan says it "must be created".
 
 // apiRevokeTx is an opaque non-nil transaction, the counterpart of the handlers package's
-// revokeTx. RevokeUserAuthState rejects a nil one, so a test that let BeginTransaction return
+// revokeTx. revocation.RevokeUserAuthState rejects a nil one, so a test that let BeginTransaction return
 // nil would exercise a shape production never runs.
 var apiRevokeTx = &sql.Tx{}
 
 // stubSweep registers the sweep calls for a user with no sessions and no refresh tokens. Thin on
-// purpose: the sweep table is owned exhaustively by revocation_test.go in the handlers package,
+// purpose: the sweep table is owned exhaustively by revocation_test.go in internal/revocation,
 // and restating it here would mean two places to update.
 func stubSweep(database *mocks_data.Database, userId int64, newGeneration int64) {
 	expectRunInTransaction(database, apiRevokeTx)

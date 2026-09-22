@@ -7,9 +7,9 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/data"
-	"github.com/leodip/goiabada/authserver/internal/handlers"
 	"github.com/leodip/goiabada/authserver/internal/issuance"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/revocation"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -45,7 +45,7 @@ func mintCode(db data.Database, tx *sql.Tx, client *models.Client, user *models.
 // decides whether to commit.
 //
 // The handler itself cannot be driven from this tier: it owns its transaction and answers over
-// HTTP. The pairing is the one #139 uses throughout: the unit tests in the handlers package pin
+// HTTP. The pairing is the one #139 uses throughout: the unit tests beside the production code pin
 // that production issues exactly this sequence in exactly this order, and this tier answers what
 // a mock cannot, what two real transactions of these shapes do to each other on a real catalog.
 func issuanceStatements(db data.Database, tx *sql.Tx, client *models.Client, user *models.User, sessionIdentifier string) issuanceOutcome {
@@ -118,12 +118,12 @@ func runIssuanceOrderingAgainstTermination(t *testing.T, db data.Database, other
 		// The real termination, on the other handle, arriving while the ceremony holds the row.
 		// Its first statement is the delete, which is what makes it wait.
 		type terminationOutcome struct {
-			result handlers.TerminationResult
+			result revocation.TerminationResult
 			err    error
 		}
 		termination := goBlocked(t, "the termination", tx, func(reached func()) terminationOutcome {
 			reached()
-			result, err := handlers.TerminateUserSessionTx(context.Background(), other, session)
+			result, err := revocation.TerminateUserSessionTx(context.Background(), other, session)
 			return terminationOutcome{result: result, err: err}
 		})
 
@@ -155,7 +155,7 @@ func runIssuanceOrderingAgainstTermination(t *testing.T, db data.Database, other
 		user := createTestUserOn(t, db)
 		session := createTestUserSessionOn(t, db, user.Id)
 
-		// TerminateUserSessionTx owns and commits its own transaction, so an ordering that needs
+		// revocation.TerminateUserSessionTx owns and commits its own transaction, so an ordering that needs
 		// the termination HELD OPEN across the ceremony's arrival replays its statements by hand;
 		// the other subtest drives the real function.
 		tx, err := db.BeginTransaction(context.Background())
@@ -208,7 +208,7 @@ func runIssuanceOrderingAgainstTermination(t *testing.T, db data.Database, other
 	})
 }
 
-// terminationStatements issues, on the caller's transaction, what TerminateUserSessionTx issues
+// terminationStatements issues, on the caller's transaction, what revocation.TerminateUserSessionTx issues
 // in the order it issues them. The real function owns and commits its own transaction, so an
 // ordering that needs the termination HELD OPEN across the other party's arrival cannot call it;
 // the ordering that does not is driven through the real function.

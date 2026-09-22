@@ -1,4 +1,4 @@
-package handlers
+package revocation
 
 import (
 	"context"
@@ -11,12 +11,13 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 )
 
-// RevocationDatabase is what the revocation service needs: the generation counters it advances,
+// Database is what the revocation service needs: the generation counters it advances,
 // and the sessions, codes and refresh tokens the advance invalidates.
 //
-// Exported, unlike most ports here, because four of its functions are called from apihandlers,
-// whose own ports have to name this capability to hand it on (#386 decision 8).
-type RevocationDatabase interface {
+// Exported, unlike the per-file ports #386 left in the handler packages, because it is this
+// package's own port and eight consumer ports across handlers and apihandlers embed it to hand
+// the capability on (#387).
+type Database interface {
 	DeleteUserSession(ctx context.Context, tx *sql.Tx, userSessionId int64) error
 	GetRefreshTokensByClientId(ctx context.Context, tx *sql.Tx, clientId int64) ([]*models.RefreshToken, error)
 	GetRefreshTokensBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) ([]*models.RefreshToken, error)
@@ -31,16 +32,19 @@ type RevocationDatabase interface {
 	UpdateRefreshToken(ctx context.Context, tx *sql.Tx, refreshToken *models.RefreshToken) error
 }
 
-// revokeRefreshTokens marks the given refresh tokens revoked and returns the JTIs this call
+// RevokeRefreshTokens marks the given refresh tokens revoked and returns the JTIs this call
 // transitioned from live to revoked. Already-revoked tokens are skipped and NOT reported:
 // callers rely on "we actually revoked something" to distinguish a real revocation from a
 // no-op, which is what makes concurrent auth-code redemption safe (#77, see
 // revokeOnAuthCodeReuse). That invariant used to exist only as an unremarked `continue`
 // inside a loop; extracting it is how it gets a name (#106 decision 8).
 //
+// Exported, where it was package-private inside handlers, because the token endpoint's reuse arm
+// calls it directly and now sits one package away (#387).
+//
 // The caller owns the transaction. Passing a nil tx is permitted and means no transaction,
 // following the data layer's convention, but every caller here supplies one.
-func revokeRefreshTokens(ctx context.Context, db RevocationDatabase, tx *sql.Tx, tokens []*models.RefreshToken) ([]string, error) {
+func RevokeRefreshTokens(ctx context.Context, db Database, tx *sql.Tx, tokens []*models.RefreshToken) ([]string, error) {
 	revokedJtis := make([]string, 0, len(tokens))
 	for _, rt := range tokens {
 		if rt.Revoked {
@@ -64,7 +68,7 @@ type RevocationResult struct {
 	// TerminatedSessionIdentifiers lists the sessions deleted, excluding any preserved one.
 	TerminatedSessionIdentifiers []string
 	// RevokedRefreshTokenJtis lists only the tokens this call transitioned, per
-	// revokeRefreshTokens. A token already revoked before the call is absent.
+	// RevokeRefreshTokens. A token already revoked before the call is absent.
 	RevokedRefreshTokenJtis []string
 	// PreservedSessionIdentifier is the session identifier the preservation exception was
 	// applied to, or "" when the sweep was unconditional. It identifies the GRANT ORIGIN that
@@ -95,7 +99,7 @@ type RevocationResult struct {
 // (decision 4). The caller owns the transaction, which is REQUIRED here rather than
 // optional, because IncrementUserAuthStateGeneration cannot read back its own increment
 // safely without one.
-func RevokeUserAuthState(ctx context.Context, db RevocationDatabase, tx *sql.Tx, userId int64, exceptSid string) (RevocationResult, error) {
+func RevokeUserAuthState(ctx context.Context, db Database, tx *sql.Tx, userId int64, exceptSid string) (RevocationResult, error) {
 	result := RevocationResult{
 		TerminatedSessionIdentifiers: []string{},
 		RevokedRefreshTokenJtis:      []string{},
@@ -222,7 +226,7 @@ func RevokeUserAuthState(ctx context.Context, db RevocationDatabase, tx *sql.Tx,
 		toRevoke = append(toRevoke, rt)
 	}
 
-	revokedJtis, err := revokeRefreshTokens(ctx, db, tx, toRevoke)
+	revokedJtis, err := RevokeRefreshTokens(ctx, db, tx, toRevoke)
 	if err != nil {
 		return result, err
 	}
@@ -300,7 +304,7 @@ const (
 // side and a gap on the forensic side. Closing that gap needs a transactional outbox or a
 // distinct "commit outcome unknown" event, not a rollback, and neither is in scope for #106
 // (decision 5, finding 36).
-func RevokeUserAuthStateTx(ctx context.Context, db RevocationDatabase, userId int64, exceptSid string,
+func RevokeUserAuthStateTx(ctx context.Context, db Database, userId int64, exceptSid string,
 	write func(tx *sql.Tx) error) (RevocationResult, error) {
 
 	// The write and the sweep in one transaction opened through RunInTransaction, so a deadlock
@@ -335,7 +339,7 @@ type TerminationResult struct {
 	// revoked anything.
 	RevokedCodeCount int64
 	// RevokedRefreshTokenJtis lists only the tokens this call transitioned, per
-	// revokeRefreshTokens. A token already revoked before the call is absent. Non-nil on the
+	// RevokeRefreshTokens. A token already revoked before the call is absent. Non-nil on the
 	// success path, so a JSON audit payload carries [] rather than null.
 	RevokedRefreshTokenJtis []string
 }
@@ -397,7 +401,7 @@ type TerminationResult struct {
 // caller here must not be read as "nothing happened"; the durable outcome of a reported commit
 // failure is indeterminate, and the bounded consequence is a termination with no audit record of
 // it, which is fail-closed on the security side and a gap on the forensic side.
-func TerminateUserSessionTx(ctx context.Context, db RevocationDatabase, userSession *models.UserSession) (TerminationResult, error) {
+func TerminateUserSessionTx(ctx context.Context, db Database, userSession *models.UserSession) (TerminationResult, error) {
 	// Both sweeps key on the session identifier and the delete keys on the id, so this takes the
 	// loaded row rather than two loose values: from one row they cannot describe two different
 	// sessions, and both call sites already load it for their own not-found and ownership checks.
@@ -434,7 +438,7 @@ func TerminateUserSessionTx(ctx context.Context, db RevocationDatabase, userSess
 			return err
 		}
 
-		revokedJtis, err := revokeRefreshTokens(ctx, db, tx, tokens)
+		revokedJtis, err := RevokeRefreshTokens(ctx, db, tx, tokens)
 		if err != nil {
 			return err
 		}
@@ -465,7 +469,7 @@ type ClientGrantRevocationResult struct {
 	// anything.
 	RevokedCodeCount int64
 	// RevokedRefreshTokenJtis lists only the tokens this call transitioned, per
-	// revokeRefreshTokens. A token already revoked before the call is absent. Non-nil on the
+	// RevokeRefreshTokens. A token already revoked before the call is absent. Non-nil on the
 	// success path, so a JSON audit payload carries [] rather than null.
 	RevokedRefreshTokenJtis []string
 }
@@ -509,7 +513,7 @@ type ClientGrantRevocationResult struct {
 // RevokeUserAuthState states about its own: the contract is atomicity across a marker and a
 // multi-row sweep, so the transaction is a precondition of the whole operation rather than an
 // argument one nested call happens to care about.
-func RevokeClientGrants(ctx context.Context, db RevocationDatabase, tx *sql.Tx, clientId int64) (ClientGrantRevocationResult, error) {
+func RevokeClientGrants(ctx context.Context, db Database, tx *sql.Tx, clientId int64) (ClientGrantRevocationResult, error) {
 	result := ClientGrantRevocationResult{RevokedRefreshTokenJtis: []string{}}
 
 	if tx == nil {
@@ -526,7 +530,7 @@ func RevokeClientGrants(ctx context.Context, db RevocationDatabase, tx *sql.Tx, 
 		return ClientGrantRevocationResult{}, err
 	}
 
-	revokedJtis, err := revokeRefreshTokens(ctx, db, tx, tokens)
+	revokedJtis, err := RevokeRefreshTokens(ctx, db, tx, tokens)
 	if err != nil {
 		return ClientGrantRevocationResult{}, err
 	}
@@ -577,7 +581,7 @@ const RevocationReasonClientBecamePublic = "client_became_public"
 // caller here must not be read as "nothing happened"; the durable outcome of a reported commit
 // failure is indeterminate, and the bounded consequence is a client left flipped and revoked with
 // no audit record of it, which is fail-closed on the security side and a gap on the forensic side.
-func RevokeClientGrantsTx(ctx context.Context, db RevocationDatabase, clientId int64,
+func RevokeClientGrantsTx(ctx context.Context, db Database, clientId int64,
 	write func(tx *sql.Tx) (bool, error)) (ClientGrantRevocationResult, error) {
 
 	// The write and the conditional sweep in one transaction opened through RunInTransaction, so
@@ -604,6 +608,18 @@ func RevokeClientGrantsTx(ctx context.Context, db RevocationDatabase, clientId i
 		return ClientGrantRevocationResult{}, err
 	}
 	return result, nil
+}
+
+// AuditLogger records one security event. This package declares only the shape its three Log*
+// helpers need rather than depending on the audit implementation that satisfies it, and rather
+// than importing a handler package to borrow the declaration: the context is first because every
+// audit event raised while serving a request is correlated to that request, so the console record
+// joins the request's own log line and the persisted row carries the same id, which is why
+// testutil.AssertAuditLogContext refuses a context.Background() here (#328). The shape is kept
+// identical to handlers.AuditLogger, which the same concrete *audit.AuditLogger satisfies, exactly
+// as middleware's own copy already does (#387).
+type AuditLogger interface {
+	Log(ctx context.Context, auditEvent string, details map[string]interface{})
 }
 
 // LogRevokedClientGrants emits AuditRevokedClientGrants. One function rather than a literal at the

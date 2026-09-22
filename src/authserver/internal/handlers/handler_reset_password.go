@@ -18,6 +18,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
+	"github.com/leodip/goiabada/authserver/internal/revocation"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/i18n"
 )
@@ -71,7 +72,7 @@ const (
 // building the form themselves.
 const continuationIdField = "continuationId"
 
-// errResetPasswordClaimLost is returned out of the RevokeUserAuthStateTx callback when the
+// errResetPasswordClaimLost is returned out of the revocation.RevokeUserAuthStateTx callback when the
 // conditional password write claims no row. It is not a server fault: it rolls the whole
 // transaction back, including the revocation sweep, and the handler then takes the ordinary
 // indistinguishable rejection path rather than a 500.
@@ -210,7 +211,7 @@ func rejectResetPassword(httpHelper HttpHelper, auditLogger AuditLogger, w http.
 // It embeds the revocation port because a completed reset revokes the credentials issued under
 // the old password.
 type resetPasswordDatabase interface {
-	RevocationDatabase
+	revocation.Database
 
 	GetUserByForgotPasswordCodeHash(ctx context.Context, tx *sql.Tx, codeHash string) (*models.User, error)
 	TryConsumeForgotPasswordCode(ctx context.Context, tx *sql.Tx, userId int64, codeHash string, passwordHash string) (bool, error)
@@ -483,7 +484,7 @@ func HandleResetPasswordPost(
 		// Reset revokes everything, with no exceptSid: whoever is resetting a forgotten
 		// password is not necessarily the person holding the live sessions, which is the
 		// stolen-laptop case this issue exists for.
-		result, err := RevokeUserAuthStateTx(r.Context(), database, user.Id, "", func(tx *sql.Tx) error {
+		result, err := revocation.RevokeUserAuthStateTx(r.Context(), database, user.Id, "", func(tx *sql.Tx) error {
 			claimed, err := database.TryConsumeForgotPasswordCode(r.Context(), tx, user.Id, marker.CodeHash, passwordHash)
 			if err != nil {
 				return err
@@ -507,7 +508,7 @@ func HandleResetPasswordPost(
 
 		// After commit, per decision 5. This is also the first audit event this handler emits
 		// on SUCCESS: until now it logged only failures (auditFailedResetPasswordCode).
-		LogRevokedUserAuthState(r.Context(), auditLogger, user.Id, RevocationReasonPasswordReset, "", result)
+		revocation.LogRevokedUserAuthState(r.Context(), auditLogger, user.Id, revocation.RevocationReasonPasswordReset, "", result)
 
 		// Hygiene, and not the thing that makes the marker single-use: the claim above is.
 		// A failure here is logged rather than answered with a 500, because the password has

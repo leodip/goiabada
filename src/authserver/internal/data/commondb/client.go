@@ -142,7 +142,7 @@ func (d *CommonDatabase) AcquireClientRow(ctx context.Context, tx *sql.Tx, clien
 // in-flight writer and takes the row, and the conditional UPDATE after it evaluates against this
 // transaction's own version, which was derived from the committed one.
 //
-// The transaction is required rather than optional, for the reason RevokeClientGrants states
+// The transaction is required rather than optional, for the reason revocation.RevokeClientGrants states
 // about its own: without one, each statement autocommits and the acquisition drops its lock
 // before the classification runs, which is the whole mechanism.
 func (d *CommonDatabase) SetClientPublic(ctx context.Context, tx *sql.Tx, clientId int64) (bool, error) {

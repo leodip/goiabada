@@ -29,7 +29,7 @@ import (
 // BeginTransaction return nil would exercise a shape production never runs.
 var apiTerminateTx = &sql.Tx{}
 
-// stubTermination registers the calls TerminateUserSessionTx makes for one session. Thin on
+// stubTermination registers the calls revocation.TerminateUserSessionTx makes for one session. Thin on
 // purpose, following stubSweep: revocation_test.go owns the exhaustive termination table over the
 // happy path, both entry guards and all six failure points, and restating it here would mean two
 // places to update.

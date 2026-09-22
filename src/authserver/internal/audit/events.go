@@ -243,7 +243,7 @@ const (
 	//
 	// It answers WHY, beside the deleted_user_session and terminated_user_session pair for the
 	// session that was ended and what its grants authorized, and started_new_user_session for what
-	// replaced it. Emitted only after TerminateUserSessionTx commits, so it never attests to a
+	// replaced it. Emitted only after revocation.TerminateUserSessionTx commits, so it never attests to a
 	// termination that rolled back.
 	//
 	// It attests the handover and the ending, and deliberately NOT that a replacement exists: it is
