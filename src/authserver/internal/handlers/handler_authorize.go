@@ -129,8 +129,9 @@ func HandleAuthorizeGet(
 		// RP's stated preference survives every subsequent step of the
 		// multi-step auth flow (/auth/pwd → /auth/otp → /auth/consent →
 		// /auth/issue). Sanitize first — BCP 47 shape filter, capped at
-		// 10 tags / 256 bytes — so we don't bloat the session cookie or
-		// accept attacker-controlled junk. r.FormValue covers both query
+		// 10 tags / 256 bytes — so we don't bloat the server-side session
+		// store this context lives in, which #266 moved out of the cookie,
+		// or accept attacker-controlled junk. r.FormValue covers both query
 		// (GET) and form body (POST).
 		if uiLocales := i18n.SanitizeUILocales(r.FormValue("ui_locales")); len(uiLocales) > 0 {
 			authContext.UILocales = uiLocales
