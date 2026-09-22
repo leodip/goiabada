@@ -3,11 +3,18 @@ package accountvalidation
 import (
 	"context"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/i18n"
 )
+
+// maxPasswordBytes is the longest password any form or API accepts. It counts bytes, the unit
+// bcrypt counts, and must stay at or below passwordhash.MaxPasswordBytes, where bcrypt refuses to
+// hash at all: a raise past it turns a validation message into a failed hash on every path that
+// sets a password (#409). The test file holds it there.
+const maxPasswordBytes = 64
 
 type PasswordValidator struct {
 }
@@ -20,7 +27,6 @@ func (val *PasswordValidator) ValidatePassword(ctx context.Context, password str
 	settings := ctx.Value(constants.ContextKeySettings).(*models.Settings)
 
 	minLength := 1
-	maxLength := 64
 	mustIncludeLowerCase := false
 	mustIncludeUpperCase := false
 	mustIncludeANumber := false
@@ -44,12 +50,16 @@ func (val *PasswordValidator) ValidatePassword(ctx context.Context, password str
 
 	// i18n surface: A | C — registration, reset-password, account API,
 	// admin user CRUD.
-	if len(password) < minLength {
+	//
+	// The minimum counts characters, which is what its message says and what a user counts; the
+	// maximum counts bytes, because it guards bcrypt's bound, and its message says bytes. Counting
+	// the minimum in bytes let three accented characters pass a six-character policy (#409).
+	if utf8.RuneCountInString(password) < minLength {
 		return i18n.NewLocalizedError(i18n.ErrCodePasswordTooShort, map[string]any{"min": minLength})
 	}
 
-	if len(password) > maxLength {
-		return i18n.NewLocalizedError(i18n.ErrCodePasswordTooLong, map[string]any{"max": maxLength})
+	if len(password) > maxPasswordBytes {
+		return i18n.NewLocalizedError(i18n.ErrCodePasswordTooLong, map[string]any{"max": maxPasswordBytes})
 	}
 
 	if mustIncludeLowerCase && !val.containsLowerCase(password) {

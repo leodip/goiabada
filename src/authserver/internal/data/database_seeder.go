@@ -94,10 +94,51 @@ GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY=%s
 	)
 }
 
+// checkAdminPasswordLength refuses an admin password bcrypt cannot hash, naming the variable it
+// came from and the bound, in bytes because bcrypt counts bytes. The seeder is the one path that
+// hashes a password no validator has seen, so without this the refusal surfaced as a hashing
+// failure, and before #409 not at all: the error was discarded and the admin was stored with an
+// empty password hash, an account nobody could sign in to.
+func checkAdminPasswordLength(password string) error {
+	if len(password) > passwordhash.MaxPasswordBytes {
+		return errs.Errorf("the admin password in GOIABADA_ADMIN_PASSWORD is %d bytes long, and bcrypt accepts "+
+			"at most %d bytes: shorten it, counting two to four bytes for each non-ASCII character",
+			len(password), passwordhash.MaxPasswordBytes)
+	}
+	return nil
+}
+
 func (ds *DatabaseSeeder) Seed(ctx context.Context) error {
 
 	// The data-encryption key comes from the environment (GOIABADA_AES_ENCRYPTION_KEY,
 	// issue #83) via the process cipher; the seeder no longer generates or stores it.
+
+	adminEmail := ds.adminEmail
+	if len(adminEmail) == 0 {
+		const defaultAdminEmail = "admin@example.com"
+		slog.WarnContext(ctx, "admin email is not set, defaulting it", "email", defaultAdminEmail)
+		adminEmail = defaultAdminEmail
+	}
+
+	adminPassword := ds.adminPassword
+	if len(adminPassword) == 0 {
+		const defaultAdminPassword = "changeme"
+		// The default is a published constant rather than a secret, and an operator who did not
+		// set one has to be told what they got: the alternative is an admin account nobody can
+		// sign in to. A configured password is never written here.
+		slog.WarnContext(ctx, "admin password is not set, defaulting it", "password", defaultAdminPassword)
+		adminPassword = defaultAdminPassword
+	}
+
+	// Checked and hashed before anything is generated or written, so a password bcrypt refuses
+	// leaves the database empty and the next start, with the variable fixed, seeds it (#409).
+	if err := checkAdminPasswordLength(adminPassword); err != nil {
+		return err
+	}
+	passwordHash, err := passwordhash.Hash(adminPassword)
+	if err != nil {
+		return errs.Wrap(err, "unable to hash the admin password")
+	}
 
 	// Generate session keys for both auth server and admin console
 	// These are only used if bootstrapEnvOutFile is set (legacy two-step bootstrap)
@@ -208,25 +249,6 @@ func (ds *DatabaseSeeder) Seed(ctx context.Context) error {
 		return err
 	}
 	slog.InfoContext(ctx, "redirect uri created", "uri", redirectURI.URI)
-
-	adminEmail := ds.adminEmail
-	if len(adminEmail) == 0 {
-		const defaultAdminEmail = "admin@example.com"
-		slog.WarnContext(ctx, "admin email is not set, defaulting it", "email", defaultAdminEmail)
-		adminEmail = defaultAdminEmail
-	}
-
-	adminPassword := ds.adminPassword
-	if len(adminPassword) == 0 {
-		const defaultAdminPassword = "changeme"
-		// The default is a published constant rather than a secret, and an operator who did not
-		// set one has to be told what they got: the alternative is an admin account nobody can
-		// sign in to. A configured password is never written here.
-		slog.WarnContext(ctx, "admin password is not set, defaulting it", "password", defaultAdminPassword)
-		adminPassword = defaultAdminPassword
-	}
-
-	passwordHash, _ := passwordhash.Hash(adminPassword)
 
 	user := &models.User{
 		Subject: uuidutil.New(),

@@ -1451,7 +1451,7 @@
 "handler.admin_resource_permissions.description_too_long" = "A descrição não pode ter mais que {{.max}} caracteres."
 
 "validator.password.too_short" = "O comprimento mínimo para a senha é {{.min}} caracteres"
-"validator.password.too_long" = "O comprimento máximo para a senha é {{.max}} caracteres"
+"validator.password.too_long" = "A senha pode ter no máximo {{.max}} bytes. Caracteres acentuados e de outros alfabetos contam como dois ou mais bytes cada."
 "validator.password.lowercase_required" = "Conforme nossa política, é obrigatório um caractere minúsculo na senha."
 "validator.password.uppercase_required" = "Conforme nossa política, é obrigatório um caractere maiúsculo na senha."
 "validator.password.number_required" = "Conforme nossa política, sua senha precisa conter um dígito numérico."
