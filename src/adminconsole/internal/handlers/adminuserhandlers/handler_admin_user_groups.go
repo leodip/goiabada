@@ -1,13 +1,13 @@
 package adminuserhandlers
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/core/api"
@@ -17,10 +17,18 @@ import (
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
+// userGroupsAPI is what the user groups page needs: the groups to choose from, and the user's own
+// set.
+type userGroupsAPI interface {
+	GetAllGroups(ctx context.Context, accessToken string) ([]api.GroupResponse, error)
+	GetUserGroups(ctx context.Context, accessToken string, userId int64) (*api.UserResponse, []api.GroupResponse, error)
+	UpdateUserGroups(ctx context.Context, accessToken string, userId int64, request *api.UpdateUserGroupsRequest) (*api.UserResponse, []api.GroupResponse, error)
+}
+
 func HandleAdminUserGroupsGet(
 	httpHelper handlers.HttpHelper,
 	httpSession sessionstore.Store,
-	apiClient apiclient.ApiClient,
+	apiClient userGroupsAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -99,7 +107,7 @@ func HandleAdminUserGroupsGet(
 func HandleAdminUserGroupsPost(
 	httpHelper handlers.HttpHelper,
 	httpSession sessionstore.Store,
-	apiClient apiclient.ApiClient,
+	apiClient userGroupsAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {

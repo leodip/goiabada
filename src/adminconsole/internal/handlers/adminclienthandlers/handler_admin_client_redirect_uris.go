@@ -1,6 +1,7 @@
 package adminclienthandlers
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -8,7 +9,6 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/core/api"
@@ -18,10 +18,18 @@ import (
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
+// clientRedirectURIsAPI is what the redirect URIs page needs: the client, the global switches it
+// reads against, and the write.
+type clientRedirectURIsAPI interface {
+	GetClientById(ctx context.Context, accessToken string, clientId int64) (*api.ClientResponse, error)
+	GetSettingsGeneral(ctx context.Context, accessToken string) (*api.SettingsGeneralResponse, error)
+	UpdateClientRedirectURIs(ctx context.Context, accessToken string, clientId int64, request *api.UpdateClientRedirectURIsRequest) (*api.ClientResponse, error)
+}
+
 func HandleAdminClientRedirectURIsGet(
 	httpHelper handlers.HttpHelper,
 	httpSession sessionstore.Store,
-	apiClient apiclient.ApiClient,
+	apiClient clientRedirectURIsAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -124,7 +132,7 @@ func HandleAdminClientRedirectURIsGet(
 func HandleAdminClientRedirectURIsPost(
 	httpHelper handlers.HttpHelper,
 	httpSession sessionstore.Store,
-	apiClient apiclient.ApiClient,
+	apiClient clientRedirectURIsAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {

@@ -1,11 +1,11 @@
 package adminresourcehandlers
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strings"
 
-	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
@@ -29,9 +29,14 @@ func HandleAdminResourceNewGet(
 	}
 }
 
+// resourceNewAPI is what the new resource page needs: the one write it makes.
+type resourceNewAPI interface {
+	CreateResource(ctx context.Context, accessToken string, request *api.CreateResourceRequest) (*api.ResourceResponse, error)
+}
+
 func HandleAdminResourceNewPost(
 	httpHelper handlers.HttpHelper,
-	apiClient apiclient.ApiClient,
+	apiClient resourceNewAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {

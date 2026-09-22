@@ -1,6 +1,7 @@
 package adminuserhandlers
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -19,10 +20,16 @@ import (
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
+// userEmailAPI is what the user email page needs: the user, and the email write.
+type userEmailAPI interface {
+	GetUserById(ctx context.Context, accessToken string, userId int64) (*api.UserResponse, error)
+	UpdateUserEmail(ctx context.Context, accessToken string, userId int64, request *api.UpdateUserEmailRequest) (*api.UserResponse, error)
+}
+
 func HandleAdminUserEmailGet(
 	httpHelper handlers.HttpHelper,
 	httpSession sessionstore.Store,
-	apiClient apiclient.ApiClient,
+	apiClient userEmailAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -91,7 +98,7 @@ func HandleAdminUserEmailGet(
 func HandleAdminUserEmailPost(
 	httpHelper handlers.HttpHelper,
 	httpSession sessionstore.Store,
-	apiClient apiclient.ApiClient,
+	apiClient userEmailAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {

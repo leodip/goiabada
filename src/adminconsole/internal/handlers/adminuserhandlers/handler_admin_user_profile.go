@@ -1,6 +1,7 @@
 package adminuserhandlers
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -8,7 +9,6 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
@@ -22,10 +22,16 @@ import (
 	"github.com/leodip/goiabada/core/timezones"
 )
 
+// userProfileAPI is what the user profile page needs: the user, and the profile write.
+type userProfileAPI interface {
+	GetUserById(ctx context.Context, accessToken string, userId int64) (*api.UserResponse, error)
+	UpdateUserProfile(ctx context.Context, accessToken string, userId int64, request *api.UpdateUserProfileRequest) (*api.UserResponse, error)
+}
+
 func HandleAdminUserProfileGet(
 	httpHelper handlers.HttpHelper,
 	httpSession sessionstore.Store,
-	apiClient apiclient.ApiClient,
+	apiClient userProfileAPI,
 ) http.HandlerFunc {
 
 	timezones := timezones.Get()
@@ -96,7 +102,7 @@ func HandleAdminUserProfileGet(
 func HandleAdminUserProfilePost(
 	httpHelper handlers.HttpHelper,
 	httpSession sessionstore.Store,
-	apiClient apiclient.ApiClient,
+	apiClient userProfileAPI,
 ) http.HandlerFunc {
 
 	timezones := timezones.Get()

@@ -1,9 +1,9 @@
 package accounthandlers
 
 import (
+	"context"
 	"net/http"
 
-	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
@@ -14,10 +14,16 @@ import (
 	"github.com/leodip/goiabada/core/stringutil"
 )
 
+// accountLogoutAPI is what the account logout page needs: the logout request the auth server
+// answers with a URL.
+type accountLogoutAPI interface {
+	CreateAccountLogoutRequest(ctx context.Context, accessToken string, request *api.AccountLogoutRequest) (*api.AccountLogoutFormPostResponse, *api.AccountLogoutRedirectResponse, error)
+}
+
 func HandleAccountLogoutGet(
 	httpHelper handlers.HttpHelper,
 	httpSession sessionstore.Store,
-	apiClient apiclient.ApiClient,
+	apiClient accountLogoutAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {

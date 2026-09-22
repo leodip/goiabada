@@ -1,10 +1,10 @@
 package accounthandlers
 
 import (
+	"context"
 	"net/http"
 	"strings"
 
-	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
@@ -15,10 +15,15 @@ import (
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
+// accountPasswordAPI is what the account password page needs: the one write it makes.
+type accountPasswordAPI interface {
+	UpdateAccountPassword(ctx context.Context, accessToken string, request *api.UpdateAccountPasswordRequest) (*api.UserResponse, error)
+}
+
 func HandleAccountChangePasswordGet(
 	httpHelper handlers.HttpHelper,
 	httpSession sessionstore.Store,
-	_ apiclient.ApiClient,
+	_ accountPasswordAPI,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Access token presence ensured by middleware; just handle flash UX
@@ -50,7 +55,7 @@ func HandleAccountChangePasswordGet(
 func HandleAccountChangePasswordPost(
 	httpHelper handlers.HttpHelper,
 	httpSession sessionstore.Store,
-	apiClient apiclient.ApiClient,
+	apiClient accountPasswordAPI,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Get access token

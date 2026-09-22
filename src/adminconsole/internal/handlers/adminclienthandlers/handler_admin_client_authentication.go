@@ -1,12 +1,12 @@
 package adminclienthandlers
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
@@ -18,10 +18,17 @@ import (
 	"github.com/leodip/goiabada/core/stringutil"
 )
 
+// clientAuthenticationAPI is what the client authentication page needs: the client, and its
+// authentication write.
+type clientAuthenticationAPI interface {
+	GetClientById(ctx context.Context, accessToken string, clientId int64) (*api.ClientResponse, error)
+	UpdateClientAuthentication(ctx context.Context, accessToken string, clientId int64, request *api.UpdateClientAuthenticationRequest) (*api.ClientResponse, error)
+}
+
 func HandleAdminClientAuthenticationGet(
 	httpHelper handlers.HttpHelper,
 	httpSession sessionstore.Store,
-	apiClient apiclient.ApiClient,
+	apiClient clientAuthenticationAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -98,7 +105,7 @@ func HandleAdminClientAuthenticationGet(
 func HandleAdminClientAuthenticationPost(
 	httpHelper handlers.HttpHelper,
 	httpSession sessionstore.Store,
-	apiClient apiclient.ApiClient,
+	apiClient clientAuthenticationAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {

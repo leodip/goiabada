@@ -1,6 +1,7 @@
 package accounthandlers
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"time"
@@ -12,9 +13,14 @@ import (
 	"github.com/leodip/goiabada/core/oauth"
 )
 
+// accountPictureAPI is what the account picture endpoint needs: the one read it serves.
+type accountPictureAPI interface {
+	GetAccountProfilePicture(ctx context.Context, accessToken string) (*apiclient.ProfilePictureInfo, error)
+}
+
 func HandleAccountPictureGet(
 	httpHelper handlers.HttpHelper,
-	apiClient apiclient.ApiClient,
+	apiClient accountPictureAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {

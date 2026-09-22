@@ -1,20 +1,27 @@
 package accounthandlers
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"sort"
 
-	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
+	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
 )
 
+// accountSessionsAPI is what the account sessions page needs: the list, and the revoke of one.
+type accountSessionsAPI interface {
+	DeleteAccountSession(ctx context.Context, accessToken string, sessionId int64) error
+	GetAccountSessions(ctx context.Context, accessToken string) ([]api.UserSessionDetailResponse, error)
+}
+
 func HandleAccountSessionsGet(
 	httpHelper handlers.HttpHelper,
-	apiClient apiclient.ApiClient,
+	apiClient accountSessionsAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -68,7 +75,7 @@ func HandleAccountSessionsGet(
 
 func HandleAccountSessionsEndSesssionPost(
 	httpHelper handlers.HttpHelper,
-	apiClient apiclient.ApiClient,
+	apiClient accountSessionsAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {

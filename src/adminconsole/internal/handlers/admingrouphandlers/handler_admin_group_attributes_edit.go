@@ -1,12 +1,12 @@
 package admingrouphandlers
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/core/api"
@@ -14,9 +14,17 @@ import (
 	"github.com/leodip/goiabada/core/oauth"
 )
 
+// groupAttributesEditAPI is what the edit group attribute page needs: the group, the attribute,
+// and the write.
+type groupAttributesEditAPI interface {
+	GetGroupAttributeById(ctx context.Context, accessToken string, attributeId int64) (*api.GroupAttributeResponse, error)
+	GetGroupById(ctx context.Context, accessToken string, groupId int64) (*api.GroupResponse, error)
+	UpdateGroupAttribute(ctx context.Context, accessToken string, attributeId int64, request *api.UpdateGroupAttributeRequest) (*api.GroupAttributeResponse, error)
+}
+
 func HandleAdminGroupAttributesEditGet(
 	httpHelper handlers.HttpHelper,
-	apiClient apiclient.ApiClient,
+	apiClient groupAttributesEditAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -89,7 +97,7 @@ func HandleAdminGroupAttributesEditGet(
 
 func HandleAdminGroupAttributesEditPost(
 	httpHelper handlers.HttpHelper,
-	apiClient apiclient.ApiClient,
+	apiClient groupAttributesEditAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {

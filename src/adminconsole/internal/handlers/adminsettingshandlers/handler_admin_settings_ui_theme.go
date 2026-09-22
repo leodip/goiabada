@@ -1,6 +1,7 @@
 package adminsettingshandlers
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strings"
@@ -8,7 +9,6 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/sessionstore"
 
-	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/cache"
 	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
@@ -18,10 +18,16 @@ import (
 	"github.com/leodip/goiabada/core/oauth"
 )
 
+// settingsUIThemeAPI is what the UI theme page needs: the theme, and the write.
+type settingsUIThemeAPI interface {
+	GetSettingsUITheme(ctx context.Context, accessToken string) (*api.SettingsUIThemeResponse, error)
+	UpdateSettingsUITheme(ctx context.Context, accessToken string, request *api.UpdateSettingsUIThemeRequest) (*api.SettingsUIThemeResponse, error)
+}
+
 func HandleAdminSettingsUIThemeGet(
 	httpHelper handlers.HttpHelper,
 	httpSession sessionstore.Store,
-	apiClient apiclient.ApiClient,
+	apiClient settingsUIThemeAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -76,7 +82,7 @@ func HandleAdminSettingsUIThemeGet(
 func HandleAdminSettingsUIThemePost(
 	httpHelper handlers.HttpHelper,
 	httpSession sessionstore.Store,
-	apiClient apiclient.ApiClient,
+	apiClient settingsUIThemeAPI,
 	settingsCache *cache.SettingsCache,
 ) http.HandlerFunc {
 

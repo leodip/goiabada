@@ -1,22 +1,31 @@
 package adminresourcehandlers
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
+	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
 )
 
+// resourceDeleteAPI is what the resource delete page needs: the resource, the permissions it
+// warns about, and the delete.
+type resourceDeleteAPI interface {
+	DeleteResource(ctx context.Context, accessToken string, resourceId int64) error
+	GetPermissionsByResource(ctx context.Context, accessToken string, resourceId int64) ([]api.PermissionResponse, error)
+	GetResourceById(ctx context.Context, accessToken string, resourceId int64) (*api.ResourceResponse, error)
+}
+
 func HandleAdminResourceDeleteGet(
 	httpHelper handlers.HttpHelper,
-	apiClient apiclient.ApiClient,
+	apiClient resourceDeleteAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -66,7 +75,7 @@ func HandleAdminResourceDeleteGet(
 
 func HandleAdminResourceDeletePost(
 	httpHelper handlers.HttpHelper,
-	apiClient apiclient.ApiClient,
+	apiClient resourceDeleteAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {

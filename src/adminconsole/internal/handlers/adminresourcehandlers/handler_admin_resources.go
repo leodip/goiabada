@@ -1,18 +1,24 @@
 package adminresourcehandlers
 
 import (
+	"context"
 	"net/http"
 
-	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
+	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
 )
 
+// resourcesAPI is what the resources list needs: the one read it renders.
+type resourcesAPI interface {
+	GetAllResources(ctx context.Context, accessToken string) ([]api.ResourceResponse, error)
+}
+
 func HandleAdminResourcesGet(
 	httpHelper handlers.HttpHelper,
-	apiClient apiclient.ApiClient,
+	apiClient resourcesAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {

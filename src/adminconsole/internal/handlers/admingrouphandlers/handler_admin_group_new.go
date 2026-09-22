@@ -1,11 +1,11 @@
 package admingrouphandlers
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strings"
 
-	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
@@ -30,9 +30,14 @@ func HandleAdminGroupNewGet(
 	}
 }
 
+// groupNewAPI is what the new group page needs: the one write it makes.
+type groupNewAPI interface {
+	CreateGroup(ctx context.Context, accessToken string, request *api.CreateGroupRequest) (*api.GroupResponse, error)
+}
+
 func HandleAdminGroupNewPost(
 	httpHelper handlers.HttpHelper,
-	apiClient apiclient.ApiClient,
+	apiClient groupNewAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {

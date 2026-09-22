@@ -1,13 +1,13 @@
 package adminresourcehandlers
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
@@ -18,10 +18,16 @@ import (
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
+// resourceSettingsAPI is what the resource settings page needs: the resource, and the write.
+type resourceSettingsAPI interface {
+	GetResourceById(ctx context.Context, accessToken string, resourceId int64) (*api.ResourceResponse, error)
+	UpdateResource(ctx context.Context, accessToken string, resourceId int64, request *api.UpdateResourceRequest) (*api.ResourceResponse, error)
+}
+
 func HandleAdminResourceSettingsGet(
 	httpHelper handlers.HttpHelper,
 	httpSession sessionstore.Store,
-	apiClient apiclient.ApiClient,
+	apiClient resourceSettingsAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -84,7 +90,7 @@ func HandleAdminResourceSettingsGet(
 func HandleAdminResourceSettingsPost(
 	httpHelper handlers.HttpHelper,
 	httpSession sessionstore.Store,
-	apiClient apiclient.ApiClient,
+	apiClient resourceSettingsAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {

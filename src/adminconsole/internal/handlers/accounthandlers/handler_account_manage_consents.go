@@ -1,19 +1,26 @@
 package accounthandlers
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 
-	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
+	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
 )
 
+// accountConsentsAPI is what the manage-consents page needs: the list, and the revoke.
+type accountConsentsAPI interface {
+	GetAccountConsents(ctx context.Context, accessToken string) ([]api.UserConsentResponse, error)
+	RevokeAccountConsent(ctx context.Context, accessToken string, consentId int64) error
+}
+
 func HandleAccountManageConsentsGet(
 	httpHelper handlers.HttpHelper,
-	apiClient apiclient.ApiClient,
+	apiClient accountConsentsAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -62,7 +69,7 @@ func HandleAccountManageConsentsGet(
 
 func HandleAccountManageConsentsRevokePost(
 	httpHelper handlers.HttpHelper,
-	apiClient apiclient.ApiClient,
+	apiClient accountConsentsAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {

@@ -1,6 +1,7 @@
 package admingrouphandlers
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -19,10 +20,16 @@ import (
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
+// groupSettingsAPI is what the group settings page needs: the group, and the write.
+type groupSettingsAPI interface {
+	GetGroupById(ctx context.Context, accessToken string, groupId int64) (*api.GroupResponse, error)
+	UpdateGroup(ctx context.Context, accessToken string, groupId int64, request *api.UpdateGroupRequest) (*api.GroupResponse, error)
+}
+
 func HandleAdminGroupSettingsGet(
 	httpHelper handlers.HttpHelper,
 	httpSession sessionstore.Store,
-	apiClient apiclient.ApiClient,
+	apiClient groupSettingsAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -92,7 +99,7 @@ func HandleAdminGroupSettingsGet(
 func HandleAdminGroupSettingsPost(
 	httpHelper handlers.HttpHelper,
 	httpSession sessionstore.Store,
-	apiClient apiclient.ApiClient,
+	apiClient groupSettingsAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {

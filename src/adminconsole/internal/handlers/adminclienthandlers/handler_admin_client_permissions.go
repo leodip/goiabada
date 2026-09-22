@@ -1,6 +1,7 @@
 package adminclienthandlers
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -8,7 +9,6 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/core/api"
@@ -18,10 +18,18 @@ import (
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
+// clientPermissionsAPI is what the client permissions page needs: the resources to choose from,
+// and the client's own set.
+type clientPermissionsAPI interface {
+	GetAllResources(ctx context.Context, accessToken string) ([]api.ResourceResponse, error)
+	GetClientPermissions(ctx context.Context, accessToken string, clientId int64) (*api.ClientResponse, []api.PermissionResponse, error)
+	UpdateClientPermissions(ctx context.Context, accessToken string, clientId int64, request *api.UpdateClientPermissionsRequest) error
+}
+
 func HandleAdminClientPermissionsGet(
 	httpHelper handlers.HttpHelper,
 	httpSession sessionstore.Store,
-	apiClient apiclient.ApiClient,
+	apiClient clientPermissionsAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -113,7 +121,7 @@ func HandleAdminClientPermissionsGet(
 func HandleAdminClientPermissionsPost(
 	httpHelper handlers.HttpHelper,
 	httpSession sessionstore.Store,
-	apiClient apiclient.ApiClient,
+	apiClient clientPermissionsAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {

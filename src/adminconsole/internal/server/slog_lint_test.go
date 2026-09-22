@@ -25,3 +25,11 @@ func TestSlogConvention(t *testing.T) {
 func TestAuditLogContext(t *testing.T) {
 	testutil.AssertAuditLogContext(t)
 }
+
+// TestRequestPathContext fails the tier when a request-path package constructs a context carrying
+// nothing. The compiler forces every migrated Database and API client call site to pass a context;
+// this is what forces it to be the request's, so a cancelled request stops the work it started and
+// the records it wrote can be joined to it (#386).
+func TestRequestPathContext(t *testing.T) {
+	testutil.AssertRequestPathContext(t)
+}

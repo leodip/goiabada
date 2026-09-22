@@ -1,20 +1,29 @@
 package adminuserhandlers
 
 import (
+	"context"
 	"net/http"
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
+	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
 )
 
+// userAttributesAPI is what the user attributes page needs: the user, its attributes, and the
+// delete of one.
+type userAttributesAPI interface {
+	DeleteUserAttribute(ctx context.Context, accessToken string, attributeId int64) error
+	GetUserAttributesByUserId(ctx context.Context, accessToken string, userId int64) ([]api.UserAttributeResponse, error)
+	GetUserById(ctx context.Context, accessToken string, userId int64) (*api.UserResponse, error)
+}
+
 func HandleAdminUserAttributesGet(
 	httpHelper handlers.HttpHelper,
-	apiClient apiclient.ApiClient,
+	apiClient userAttributesAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -71,7 +80,7 @@ func HandleAdminUserAttributesGet(
 
 func HandleAdminUserAttributesRemovePost(
 	httpHelper handlers.HttpHelper,
-	apiClient apiclient.ApiClient,
+	apiClient userAttributesAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {

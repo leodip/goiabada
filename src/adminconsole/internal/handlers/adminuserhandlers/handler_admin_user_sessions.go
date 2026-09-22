@@ -1,22 +1,31 @@
 package adminuserhandlers
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"sort"
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
+	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
 )
 
+// userSessionsAPI is what the user sessions page needs: the user, its sessions, and the revoke of
+// one.
+type userSessionsAPI interface {
+	DeleteUserSessionById(ctx context.Context, accessToken string, sessionId int64) error
+	GetUserById(ctx context.Context, accessToken string, userId int64) (*api.UserResponse, error)
+	GetUserSessionsByUserId(ctx context.Context, accessToken string, userId int64) ([]api.UserSessionDetailResponse, error)
+}
+
 func HandleAdminUserSessionsGet(
 	httpHelper handlers.HttpHelper,
-	apiClient apiclient.ApiClient,
+	apiClient userSessionsAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -98,7 +107,7 @@ func HandleAdminUserSessionsGet(
 
 func HandleAdminUserSessionsPost(
 	httpHelper handlers.HttpHelper,
-	apiClient apiclient.ApiClient,
+	apiClient userSessionsAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {

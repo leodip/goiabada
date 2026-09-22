@@ -1,6 +1,7 @@
 package admingrouphandlers
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -8,7 +9,6 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/core/api"
@@ -18,10 +18,18 @@ import (
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
+// groupPermissionsAPI is what the group permissions page needs: the resources to choose from, and
+// the group's own set.
+type groupPermissionsAPI interface {
+	GetAllResources(ctx context.Context, accessToken string) ([]api.ResourceResponse, error)
+	GetGroupPermissions(ctx context.Context, accessToken string, groupId int64) (*api.GroupResponse, []api.PermissionResponse, error)
+	UpdateGroupPermissions(ctx context.Context, accessToken string, groupId int64, request *api.UpdateGroupPermissionsRequest) error
+}
+
 func HandleAdminGroupPermissionsGet(
 	httpHelper handlers.HttpHelper,
 	httpSession sessionstore.Store,
-	apiClient apiclient.ApiClient,
+	apiClient groupPermissionsAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -113,7 +121,7 @@ func HandleAdminGroupPermissionsGet(
 func HandleAdminGroupPermissionsPost(
 	httpHelper handlers.HttpHelper,
 	httpSession sessionstore.Store,
-	apiClient apiclient.ApiClient,
+	apiClient groupPermissionsAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {

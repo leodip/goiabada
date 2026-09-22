@@ -1,10 +1,10 @@
 package accounthandlers
 
 import (
+	"context"
 	"net/http"
 	"strings"
 
-	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
@@ -15,10 +15,17 @@ import (
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
+// accountEmailAPI is what the account email page needs: the profile it renders from, and the
+// email write.
+type accountEmailAPI interface {
+	GetAccountProfile(ctx context.Context, accessToken string) (*api.UserResponse, error)
+	UpdateAccountEmail(ctx context.Context, accessToken string, request *api.UpdateAccountEmailRequest) (*api.UserResponse, error)
+}
+
 func HandleAccountEmailGet(
 	httpHelper handlers.HttpHelper,
 	httpSession sessionstore.Store,
-	apiClient apiclient.ApiClient,
+	apiClient accountEmailAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -72,7 +79,7 @@ func HandleAccountEmailGet(
 func HandleAccountEmailPost(
 	httpHelper handlers.HttpHelper,
 	httpSession sessionstore.Store,
-	apiClient apiclient.ApiClient,
+	apiClient accountEmailAPI,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 

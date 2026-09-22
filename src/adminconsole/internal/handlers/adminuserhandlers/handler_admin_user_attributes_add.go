@@ -1,13 +1,13 @@
 package adminuserhandlers
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
@@ -16,9 +16,16 @@ import (
 	"github.com/leodip/goiabada/core/oauth"
 )
 
+// userAttributesAddAPI is what the add user attribute page needs: the user it belongs to, and the
+// create.
+type userAttributesAddAPI interface {
+	CreateUserAttribute(ctx context.Context, accessToken string, request *api.CreateUserAttributeRequest) (*api.UserAttributeResponse, error)
+	GetUserById(ctx context.Context, accessToken string, userId int64) (*api.UserResponse, error)
+}
+
 func HandleAdminUserAttributesAddGet(
 	httpHelper handlers.HttpHelper,
-	apiClient apiclient.ApiClient,
+	apiClient userAttributesAddAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -70,7 +77,7 @@ func HandleAdminUserAttributesAddGet(
 
 func HandleAdminUserAttributesAddPost(
 	httpHelper handlers.HttpHelper,
-	apiClient apiclient.ApiClient,
+	apiClient userAttributesAddAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {

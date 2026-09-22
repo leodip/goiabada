@@ -1,12 +1,12 @@
 package adminuserhandlers
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
@@ -15,9 +15,17 @@ import (
 	"github.com/leodip/goiabada/core/oauth"
 )
 
+// userAttributesEditAPI is what the edit user attribute page needs: the user, the attribute, and
+// the write.
+type userAttributesEditAPI interface {
+	GetUserAttributeById(ctx context.Context, accessToken string, attributeId int64) (*api.UserAttributeResponse, error)
+	GetUserById(ctx context.Context, accessToken string, userId int64) (*api.UserResponse, error)
+	UpdateUserAttribute(ctx context.Context, accessToken string, attributeId int64, request *api.UpdateUserAttributeRequest) (*api.UserAttributeResponse, error)
+}
+
 func HandleAdminUserAttributesEditGet(
 	httpHelper handlers.HttpHelper,
-	apiClient apiclient.ApiClient,
+	apiClient userAttributesEditAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -90,7 +98,7 @@ func HandleAdminUserAttributesEditGet(
 
 func HandleAdminUserAttributesEditPost(
 	httpHelper handlers.HttpHelper,
-	apiClient apiclient.ApiClient,
+	apiClient userAttributesEditAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {

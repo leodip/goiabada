@@ -1,6 +1,7 @@
 package accounthandlers
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strings"
@@ -16,10 +17,18 @@ import (
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
+// accountEmailVerificationAPI is what email verification needs: the profile, the send, and the
+// verify.
+type accountEmailVerificationAPI interface {
+	GetAccountProfile(ctx context.Context, accessToken string) (*api.UserResponse, error)
+	SendAccountEmailVerification(ctx context.Context, accessToken string) (*api.AccountEmailVerificationSendResponse, error)
+	VerifyAccountEmail(ctx context.Context, accessToken string, request *api.VerifyAccountEmailRequest) (*api.UserResponse, error)
+}
+
 func HandleAccountEmailVerificationGet(
 	httpHelper handlers.HttpHelper,
 	httpSession sessionstore.Store,
-	apiClient apiclient.ApiClient,
+	apiClient accountEmailVerificationAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -74,7 +83,7 @@ func HandleAccountEmailVerificationGet(
 
 func HandleAccountEmailSendVerificationPost(
 	httpHelper handlers.HttpHelper,
-	apiClient apiclient.ApiClient,
+	apiClient accountEmailVerificationAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -106,7 +115,7 @@ func HandleAccountEmailSendVerificationPost(
 func HandleAccountEmailVerificationPost(
 	httpHelper handlers.HttpHelper,
 	httpSession sessionstore.Store,
-	apiClient apiclient.ApiClient,
+	apiClient accountEmailVerificationAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {

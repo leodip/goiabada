@@ -1,6 +1,7 @@
 package adminsettingshandlers
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -8,7 +9,6 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/sessionstore"
 
-	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
@@ -17,10 +17,16 @@ import (
 	"github.com/leodip/goiabada/core/oauth"
 )
 
+// settingsTokensAPI is what the token settings page needs: the settings, and the write.
+type settingsTokensAPI interface {
+	GetSettingsTokens(ctx context.Context, accessToken string) (*api.SettingsTokensResponse, error)
+	UpdateSettingsTokens(ctx context.Context, accessToken string, request *api.UpdateSettingsTokensRequest) (*api.SettingsTokensResponse, error)
+}
+
 func HandleAdminSettingsTokensGet(
 	httpHelper handlers.HttpHelper,
 	httpSession sessionstore.Store,
-	apiClient apiclient.ApiClient,
+	apiClient settingsTokensAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -78,7 +84,7 @@ func HandleAdminSettingsTokensGet(
 func HandleAdminSettingsTokensPost(
 	httpHelper handlers.HttpHelper,
 	httpSession sessionstore.Store,
-	apiClient apiclient.ApiClient,
+	apiClient settingsTokensAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {

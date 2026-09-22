@@ -1,13 +1,13 @@
 package adminclienthandlers
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
@@ -18,10 +18,16 @@ import (
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
+// clientTokensAPI is what the client tokens page needs: the client, and the token settings write.
+type clientTokensAPI interface {
+	GetClientById(ctx context.Context, accessToken string, clientId int64) (*api.ClientResponse, error)
+	UpdateClientTokens(ctx context.Context, accessToken string, clientId int64, request *api.UpdateClientTokensRequest) (*api.ClientResponse, error)
+}
+
 func HandleAdminClientTokensGet(
 	httpHelper handlers.HttpHelper,
 	httpSession sessionstore.Store,
-	apiClient apiclient.ApiClient,
+	apiClient clientTokensAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -101,7 +107,7 @@ func HandleAdminClientTokensGet(
 func HandleAdminClientTokensPost(
 	httpHelper handlers.HttpHelper,
 	httpSession sessionstore.Store,
-	apiClient apiclient.ApiClient,
+	apiClient clientTokensAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {

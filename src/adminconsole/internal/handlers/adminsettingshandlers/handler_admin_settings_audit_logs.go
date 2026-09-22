@@ -1,12 +1,12 @@
 package adminsettingshandlers
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/url"
 	"strconv"
 
-	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
@@ -18,10 +18,19 @@ import (
 	"github.com/leodip/goiabada/core/sessionstore"
 )
 
+// settingsAuditLogsAPI is what the audit logs page needs: the retention settings, the event types
+// it filters by, and the page of records.
+type settingsAuditLogsAPI interface {
+	GetAuditEventTypes(ctx context.Context, accessToken string) (*api.GetAuditEventTypesResponse, error)
+	GetAuditLogsPaginated(ctx context.Context, accessToken string, page, pageSize int, auditEvent string, requestId string) (*api.GetAuditLogsResponse, error)
+	GetSettingsAuditLogs(ctx context.Context, accessToken string) (*api.SettingsAuditLogsResponse, error)
+	UpdateSettingsAuditLogs(ctx context.Context, accessToken string, request *api.UpdateSettingsAuditLogsRequest) (*api.SettingsAuditLogsResponse, error)
+}
+
 func HandleAdminSettingsAuditLogsGet(
 	httpHelper handlers.HttpHelper,
 	httpSession sessionstore.Store,
-	apiClient apiclient.ApiClient,
+	apiClient settingsAuditLogsAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -77,7 +86,7 @@ func HandleAdminSettingsAuditLogsGet(
 func HandleAdminSettingsAuditLogsPost(
 	httpHelper handlers.HttpHelper,
 	httpSession sessionstore.Store,
-	apiClient apiclient.ApiClient,
+	apiClient settingsAuditLogsAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -149,7 +158,7 @@ func HandleAdminSettingsAuditLogsPost(
 
 func HandleAdminSettingsAuditLogViewerGet(
 	httpHelper handlers.HttpHelper,
-	apiClient apiclient.ApiClient,
+	apiClient settingsAuditLogsAPI,
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
