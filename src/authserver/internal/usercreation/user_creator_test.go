@@ -22,6 +22,16 @@ import (
 // opens. What reaches the tables on a real engine is the registration and admin-create
 // integration paths' to show.
 
+// txSentinel is the transaction the shared stub hands the body. It is non-nil and the mock
+// database never dereferences it, which is the whole of what it has to be: an expectation
+// written against txSentinel matches a call the body made and no call made before or after the
+// transaction, where the creator passes nil. A nil here -- which is what the BeginTransaction stubs
+// it replaced handed over, and what this package's own copy of the stub handed over until #198
+// -- makes those two indistinguishable, so a sweep moved back outside the transaction would
+// pass on call count alone. mocks_data.ExpectRunInTransaction now refuses a nil outright, so
+// what was this package's convention is the shared stub's rule (#422).
+var txSentinel = &sql.Tx{}
+
 const accountPermissionId = int64(31)
 
 // expectAccountPermissionLookup registers the two reads that precede the transaction: the
@@ -44,7 +54,7 @@ func TestUserCreator_CreateUser_WritesTheUserAndItsAccountPermissionInOneTransac
 	expectAccountPermissionLookup(db, accountPermissions())
 
 	var calls []string
-	stub := expectRunInTransaction(db)
+	stub := mocks_data.ExpectRunInTransaction(db, txSentinel)
 	db.On("CreateUser", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		created := args.Get(2).(*models.User)
 		created.Id = 77 // stand in for the generated primary key
@@ -66,7 +76,7 @@ func TestUserCreator_CreateUser_WritesTheUserAndItsAccountPermissionInOneTransac
 
 	assert.Equal(t, []string{"user row", "permission row"}, calls,
 		"the permission insert follows the user insert, inside the same transaction, and names the id it assigned")
-	assert.NoError(t, stub.bodyErr, "the body asked the helper to commit")
+	assert.NoError(t, stub.BodyErr, "the body asked the helper to commit")
 	assert.Equal(t, int64(77), user.Id)
 	assert.True(t, user.Enabled)
 	assert.Equal(t, "ada@example.com", user.Email)
@@ -84,14 +94,14 @@ func TestUserCreator_CreateUser_AFailedUserInsertReachesTheHelperAndWritesNoPerm
 	expectAccountPermissionLookup(db, accountPermissions())
 
 	boom := errors.New("the engine refused the insert")
-	stub := expectRunInTransaction(db)
+	stub := mocks_data.ExpectRunInTransaction(db, txSentinel)
 	db.On("CreateUser", mock.Anything, mock.Anything, mock.Anything).Return(boom).Once()
 
 	user, err := NewUserCreator(db).CreateUser(context.Background(), &CreateUserInput{Email: "ada@example.com"})
 
 	require.ErrorIs(t, err, boom)
 	assert.Nil(t, user, "no user is returned alongside an error")
-	assert.ErrorIs(t, stub.bodyErr, boom, "the body handed the failure to the helper, which rolls back")
+	assert.ErrorIs(t, stub.BodyErr, boom, "the body handed the failure to the helper, which rolls back")
 	db.AssertNotCalled(t, "CreateUserPermission", mock.Anything, mock.Anything, mock.Anything)
 }
 
@@ -100,7 +110,7 @@ func TestUserCreator_CreateUser_ATransactionThatCannotOpenIsReported(t *testing.
 	expectAccountPermissionLookup(db, accountPermissions())
 
 	boom := errors.New("cannot begin")
-	expectRunInTransactionRefused(db, boom)
+	mocks_data.ExpectRunInTransactionRefused(db, boom)
 
 	user, err := NewUserCreator(db).CreateUser(context.Background(), &CreateUserInput{Email: "ada@example.com"})
 
@@ -131,11 +141,13 @@ func TestUserCreator_CreateUser_TheBodyIsSafeToRerun(t *testing.T) {
 	expectAccountPermissionLookup(db, accountPermissions())
 
 	// A stub that runs the body twice, as the helper does after a deadlock on the first attempt.
+	// The shared stub in mocks_data runs the body once, so this one stays local; it hands over
+	// txSentinel for the same reason the shared one refuses a nil.
 	db.EXPECT().RunInTransaction(mock.Anything, mock.Anything).RunAndReturn(func(_ context.Context, fn func(tx *sql.Tx) error) error {
-		if err := fn(nil); err != nil {
+		if err := fn(txSentinel); err != nil {
 			return err
 		}
-		return fn(nil)
+		return fn(txSentinel)
 	}).Once()
 
 	ids := []int64{77, 78}

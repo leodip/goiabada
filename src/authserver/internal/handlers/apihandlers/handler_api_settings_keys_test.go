@@ -49,8 +49,8 @@ func signingKey(id int64, state models.KeyState) models.KeyPair {
 // classify read inside it. The commit and the rollback are the helper's and never reach the mock;
 // the returned stub records what the body handed the helper, which is how the refusal cases below
 // assert that nothing was committed.
-func stubRotateRead(database *mocks_data.Database, keys []models.KeyPair) *runInTransactionStub {
-	stub := expectRunInTransaction(database, rotateTx)
+func stubRotateRead(database *mocks_data.Database, keys []models.KeyPair) *mocks_data.RunInTransactionStub {
+	stub := mocks_data.ExpectRunInTransaction(database, rotateTx)
 	database.On("GetAllSigningKeys", mock.Anything, rotateTx).Return(keys, nil).Once()
 	return stub
 }
@@ -103,7 +103,7 @@ func TestHandleAPISettingsKeysRotatePost_Success(t *testing.T) {
 	assert.JSONEq(t, `{"success":true}`, rr.Body.String())
 	require.NotNil(t, payload)
 	assert.Equal(t, adminSubject, payload["loggedInUser"])
-	assert.NoError(t, stub.bodyErr, "the body asked the helper to commit")
+	assert.NoError(t, stub.BodyErr, "the body asked the helper to commit")
 	database.AssertExpectations(t)
 	auditLogger.AssertExpectations(t)
 }
@@ -134,7 +134,7 @@ func TestHandleAPISettingsKeysRotatePost_RotationInProgress(t *testing.T) {
 	// refusal, and the body handed the refusal to the helper, which is what rolls it back rather
 	// than committing. auditLogger has no expectation at all, which NewAuditLogger's cleanup turns
 	// into a failure on any Log call.
-	assert.Error(t, stub.bodyErr)
+	assert.Error(t, stub.BodyErr)
 	database.AssertExpectations(t)
 	auditLogger.AssertExpectations(t)
 }
@@ -175,7 +175,7 @@ func TestHandleAPISettingsKeysRotatePost_KeySetIncomplete(t *testing.T) {
 	assert.Contains(t, body.ErrorDescription, rotateKeysRequestId,
 		"the id on the wire and the id in the log have to be the same string")
 
-	assert.Error(t, stub.bodyErr, "the refusal reached the helper, which rolls back")
+	assert.Error(t, stub.BodyErr, "the refusal reached the helper, which rolls back")
 	database.AssertExpectations(t)
 	auditLogger.AssertExpectations(t)
 }
@@ -187,7 +187,7 @@ func TestHandleAPISettingsKeysRotatePost_InternalError(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_audit.NewAuditLogger(t)
 
-	expectRunInTransaction(database, rotateTx)
+	mocks_data.ExpectRunInTransaction(database, rotateTx)
 	database.On("GetAllSigningKeys", mock.Anything, rotateTx).
 		Return([]models.KeyPair(nil), assert.AnError).Once()
 

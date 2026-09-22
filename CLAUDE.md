@@ -355,6 +355,17 @@ Three test types:
 over `crypto/rand` that replaced a third-party faker in #272. Reach for it rather than adding a
 dependency the next time a test needs a random string.
 
+**Transaction stub**: a unit test that needs the mock database to answer `RunInTransaction`
+uses `mocks_data.ExpectRunInTransaction`, hand-written beside the generated mock in
+`authserver/internal/data/mocks` and reachable from every caller without a new import, with
+`ExpectRunInTransactionThenFail` for a commit the engine refuses and `ExpectRunInTransactionRefused`
+for a transaction that never opens. It hands the body the transaction the caller names and refuses a
+nil one: every `Database` method takes the transaction it runs under and a call made outside any
+transaction passes nil, so a stub handing over nil makes a write inside the transaction
+indistinguishable from one moved back outside it, and the test passes either way. That was seven
+divergent copies of the same 58 lines, two of them handing over nil, until they were merged into one
+here, folded into #387 (PR #422).
+
 **Race detector**: `./run-tests.sh --type modules --race` runs the three module tiers under
 `go test -race`, and CI's `Unit / race` job does the same beside the plain unit jobs. The
 detector needs cgo, so the dev container ships gcc and pins `CGO_ENABLED=0` for everything

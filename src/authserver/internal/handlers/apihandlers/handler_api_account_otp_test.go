@@ -252,7 +252,7 @@ func TestHandleAPIAccountOTPPut_Enable_CommitsBothWritesAtomically(t *testing.T)
 		Return(true, nil).Once()
 
 	var calls []string
-	expectRunInTransaction(database, otpDisableTx, func(edge string) { calls = append(calls, edge) })
+	mocks_data.ExpectRunInTransaction(database, otpDisableTx, func(edge string) { calls = append(calls, edge) })
 	database.On("UpdateUser", mock.Anything, otpDisableTx, user).Return(nil).
 		Run(func(mock.Arguments) { calls = append(calls, "update") }).Once()
 	database.On("IncrementUserOtpConfigGeneration", mock.Anything, otpDisableTx, user.Id).Return(int64(1), nil).
@@ -299,7 +299,7 @@ func TestHandleAPIAccountOTPPut_Enable_CounterFailureRollsBack(t *testing.T) {
 	database.On("TryConsumeUserOTPStep", mock.Anything, (*sql.Tx)(nil), user.Id, mock.Anything, false).
 		Return(true, nil).Once()
 
-	stub := expectRunInTransaction(database, otpDisableTx)
+	stub := mocks_data.ExpectRunInTransaction(database, otpDisableTx)
 	database.On("UpdateUser", mock.Anything, otpDisableTx, user).Return(nil).Once()
 	database.On("IncrementUserOtpConfigGeneration", mock.Anything, otpDisableTx, user.Id).
 		Return(int64(0), errors.New("the database is unwell")).Once()
@@ -312,7 +312,7 @@ func TestHandleAPIAccountOTPPut_Enable_CounterFailureRollsBack(t *testing.T) {
 	assert.Equal(t, "INTERNAL_SERVER_ERROR", errorCodeOf(t, rr))
 	// The body handed its error to the helper, which is when the helper rolls back, and an
 	// enable that did not happen is not audited as one.
-	assert.EqualError(t, stub.bodyErr, "the database is unwell")
+	assert.EqualError(t, stub.BodyErr, "the database is unwell")
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 }
 
@@ -361,7 +361,7 @@ func TestHandleAPIAccountOTPPut_Disable_CommitsBothWritesAtomically(t *testing.T
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), subject).Return(user, nil).Once()
 
 	var calls []string
-	expectRunInTransaction(database, otpDisableTx, func(edge string) { calls = append(calls, edge) })
+	mocks_data.ExpectRunInTransaction(database, otpDisableTx, func(edge string) { calls = append(calls, edge) })
 	database.On("UpdateUser", mock.Anything, otpDisableTx, user).Return(nil).
 		Run(func(mock.Arguments) { calls = append(calls, "update") }).Once()
 	database.On("ResetUserOTPStep", mock.Anything, otpDisableTx, user.Id).Return(nil).
@@ -402,7 +402,7 @@ func TestHandleAPIAccountOTPPut_Disable_ResetFailureRollsBack(t *testing.T) {
 	user.OTPEnabled = true
 
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), subject).Return(user, nil).Once()
-	stub := expectRunInTransaction(database, otpDisableTx)
+	stub := mocks_data.ExpectRunInTransaction(database, otpDisableTx)
 	database.On("UpdateUser", mock.Anything, otpDisableTx, user).Return(nil).Once()
 	database.On("ResetUserOTPStep", mock.Anything, otpDisableTx, user.Id).
 		Return(errors.New("the database is unwell")).Once()
@@ -415,7 +415,7 @@ func TestHandleAPIAccountOTPPut_Disable_ResetFailureRollsBack(t *testing.T) {
 	assert.Equal(t, "INTERNAL_SERVER_ERROR", errorCodeOf(t, rr))
 	// The body handed its error to the helper, which is when the helper rolls back, and a
 	// disable that did not happen is not audited as one.
-	assert.EqualError(t, stub.bodyErr, "the database is unwell")
+	assert.EqualError(t, stub.BodyErr, "the database is unwell")
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 }
 
@@ -829,7 +829,7 @@ func TestHandleAPIAccountOTPPut_Enable_StoresTheIssuedSeed(t *testing.T) {
 		Return(true, nil).Once()
 
 	tx := &sql.Tx{}
-	expectRunInTransaction(database, tx)
+	mocks_data.ExpectRunInTransaction(database, tx)
 	database.On("UpdateUser", mock.Anything, tx, user).Return(nil).Once()
 	database.On("IncrementUserOtpConfigGeneration", mock.Anything, tx, user.Id).Return(int64(4), nil).Once()
 	// The clear rides in the enable's own transaction, so no committed state has OTP on with a

@@ -68,7 +68,7 @@ func TestUpdateClientNotOwningAuthenticationMode_TakesTheModeFromTheRowNotTheCal
 	database := mocks_data.NewDatabase(t)
 
 	secret := []byte("the-secret-another-request-just-set")
-	expectRunInTransaction(database, clientUpdateTx)
+	mocks_data.ExpectRunInTransaction(database, clientUpdateTx)
 	database.On("AcquireClientRow", mock.Anything, clientUpdateTx, int64(7)).Return(nil).Once()
 	database.On("GetClientById", mock.Anything, clientUpdateTx, int64(7)).
 		Return(&models.Client{Id: 7, IsPublic: false, ClientSecretEncrypted: secret}, nil).Once()
@@ -112,7 +112,7 @@ func TestUpdateClientNotOwningAuthenticationMode_TakesTheModeFromTheRowNotTheCal
 func TestUpdateClientNotOwningAuthenticationMode_ReappliesThePublicInvariantsAgainstTheRefreshedMode(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 
-	expectRunInTransaction(database, clientUpdateTx)
+	mocks_data.ExpectRunInTransaction(database, clientUpdateTx)
 	database.On("AcquireClientRow", mock.Anything, clientUpdateTx, int64(7)).Return(nil).Once()
 	// The row is public; the caller below thinks it is confidential.
 	database.On("GetClientById", mock.Anything, clientUpdateTx, int64(7)).
@@ -150,7 +150,7 @@ func TestUpdateClientNotOwningAuthenticationMode_ReappliesThePublicInvariantsAga
 func TestUpdateClientNotOwningAuthenticationMode_LeavesAConfidentialClientsFlowsAlone(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 
-	expectRunInTransaction(database, clientUpdateTx)
+	mocks_data.ExpectRunInTransaction(database, clientUpdateTx)
 	database.On("AcquireClientRow", mock.Anything, clientUpdateTx, int64(7)).Return(nil).Once()
 	database.On("GetClientById", mock.Anything, clientUpdateTx, int64(7)).
 		Return(&models.Client{Id: 7, IsPublic: false}, nil).Once()
@@ -180,13 +180,13 @@ func TestUpdateClientNotOwningAuthenticationMode_LeavesAConfidentialClientsFlows
 func TestUpdateClientNotOwningAuthenticationMode_ADisappearedClientIsAnErrorNotAnInsert(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 
-	stub := expectRunInTransaction(database, clientUpdateTx)
+	stub := mocks_data.ExpectRunInTransaction(database, clientUpdateTx)
 	database.On("AcquireClientRow", mock.Anything, clientUpdateTx, int64(7)).Return(nil).Once()
 	database.On("GetClientById", mock.Anything, clientUpdateTx, int64(7)).Return(nil, nil).Once()
 
 	err := updateClientNotOwningAuthenticationMode(context.Background(), database, &models.Client{Id: 7})
 	require.Error(t, err)
-	assert.Equal(t, err, stub.bodyErr, "the body hands its error to the helper, which rolls back")
+	assert.Equal(t, err, stub.BodyErr, "the body hands its error to the helper, which rolls back")
 	assertNotAttemptedOnClientDatabase(t, database, "UpdateClient")
 }
 
@@ -198,13 +198,13 @@ func TestUpdateClientNotOwningAuthenticationMode_ADisappearedClientIsAnErrorNotA
 func TestUpdateClientNotOwningAuthenticationMode_AFailedAcquisitionDoesNotWrite(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 
-	stub := expectRunInTransaction(database, clientUpdateTx)
+	stub := mocks_data.ExpectRunInTransaction(database, clientUpdateTx)
 	database.On("AcquireClientRow", mock.Anything, clientUpdateTx, int64(7)).
 		Return(errors.New("deadlock found when trying to get lock")).Once()
 
 	err := updateClientNotOwningAuthenticationMode(context.Background(), database, &models.Client{Id: 7, IsPublic: true})
 	require.Error(t, err)
-	assert.Equal(t, err, stub.bodyErr, "the body hands its error to the helper unchanged, which is what lets a real deadlock be rerun")
+	assert.Equal(t, err, stub.BodyErr, "the body hands its error to the helper unchanged, which is what lets a real deadlock be rerun")
 	assertNotAttemptedOnClientDatabase(t, database, "GetClientById", "UpdateClient")
 }
 
@@ -231,7 +231,7 @@ func TestHandleAPIClientAuthenticationPut_ClassifiesTheFlipAgainstTheRow(t *test
 	// What the write reports when it runs: it really did make the client public, because another
 	// request got there first with confidential mode and the grants it issued are the ones at
 	// stake. The handler must believe this over its own snapshot.
-	expectRunInTransaction(database, clientUpdateTx)
+	mocks_data.ExpectRunInTransaction(database, clientUpdateTx)
 	database.On("SetClientPublic", mock.Anything, clientUpdateTx, int64(7)).Return(true, nil).Once()
 	database.On("UpdateClient", mock.Anything, clientUpdateTx, mock.Anything).Return(nil).Once()
 	database.On("RevokeCodesByClientId", mock.Anything, clientUpdateTx, int64(7)).Return(int64(2), nil).Once()
@@ -275,7 +275,7 @@ func TestHandleAPIClientAuthenticationPut_AFailedClassificationRevokesNothingAnd
 
 	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).
 		Return(&models.Client{Id: 7, IsPublic: false, ClientSecretEncrypted: []byte("secret")}, nil).Once()
-	stub := expectRunInTransaction(database, clientUpdateTx)
+	stub := mocks_data.ExpectRunInTransaction(database, clientUpdateTx)
 	database.On("SetClientPublic", mock.Anything, clientUpdateTx, int64(7)).
 		Return(false, errors.New("no client with that id")).Once()
 
@@ -285,8 +285,8 @@ func TestHandleAPIClientAuthenticationPut_AFailedClassificationRevokesNothingAnd
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
 	// The client write is not registered on the strict mock, so reaching it fails on its own.
-	// Naming it says which property broke; bodyErr says the helper was asked to roll back.
-	assert.EqualError(t, stub.bodyErr, "no client with that id")
+	// Naming it says which property broke; BodyErr says the helper was asked to roll back.
+	assert.EqualError(t, stub.BodyErr, "no client with that id")
 	assertNotAttemptedOnClientDatabase(t, database, "UpdateClient",
 		"RevokeCodesByClientId", "GetRefreshTokensByClientId")
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, audit.AuditRevokedClientGrants, mock.Anything)
@@ -304,7 +304,7 @@ func TestHandleAPIClientAuthenticationPut_ASaveOfAnAlreadyPublicClientRevokesNot
 
 	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).
 		Return(&models.Client{Id: 7, IsPublic: true}, nil).Once()
-	expectRunInTransaction(database, clientUpdateTx)
+	mocks_data.ExpectRunInTransaction(database, clientUpdateTx)
 	database.On("SetClientPublic", mock.Anything, clientUpdateTx, int64(7)).Return(false, nil).Once()
 	database.On("UpdateClient", mock.Anything, clientUpdateTx, mock.Anything).Return(nil).Once()
 	stubClientResponseLoads(database)
@@ -385,7 +385,7 @@ func TestHandleAPIClientWebOriginsPut_SavesInOneTransactionUnderTheRowAcquisitio
 	client := &models.Client{Id: 7, AuthorizationCodeEnabled: false}
 	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(client, nil).Once()
 
-	expectRunInTransaction(database, clientUpdateTx)
+	mocks_data.ExpectRunInTransaction(database, clientUpdateTx)
 	database.On("AcquireClientRow", mock.Anything, clientUpdateTx, int64(7)).Return(nil).Once()
 	database.On("ClientLoadWebOrigins", mock.Anything, clientUpdateTx, mock.Anything).
 		Run(func(args mock.Arguments) {
@@ -432,7 +432,7 @@ func TestHandleAPIClientWebOriginsPut_AFailedWriteCommitsNothing(t *testing.T) {
 	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).
 		Return(&models.Client{Id: 7, AuthorizationCodeEnabled: true}, nil).Once()
 	diskFull := errors.New("the disk is full")
-	stub := expectRunInTransaction(database, clientUpdateTx)
+	stub := mocks_data.ExpectRunInTransaction(database, clientUpdateTx)
 	database.On("AcquireClientRow", mock.Anything, clientUpdateTx, int64(7)).Return(nil).Once()
 	database.On("ClientLoadWebOrigins", mock.Anything, clientUpdateTx, mock.Anything).Return(nil).Once()
 	database.On("CreateWebOrigin", mock.Anything, clientUpdateTx, mock.Anything).Return(diskFull).Once()
@@ -449,9 +449,9 @@ func TestHandleAPIClientWebOriginsPut_AFailedWriteCommitsNothing(t *testing.T) {
 	// stopped being a wire distinction when every 500 here moved onto one code and one sentence
 	// (#279 decision 7); it is still a distinction an operator can act on, so it is asserted
 	// where it now lives.
-	assert.ErrorIs(t, stub.bodyErr, diskFull)
+	assert.ErrorIs(t, stub.BodyErr, diskFull)
 	var failure *webOriginsWriteFailure
-	require.ErrorAs(t, stub.bodyErr, &failure)
+	require.ErrorAs(t, stub.BodyErr, &failure)
 	assert.Equal(t, "https://a.example.com", failure.origin)
 	// Nothing was audited either: an audit entry for a save that did not happen is a false
 	// record of an administrator's action.
@@ -468,7 +468,7 @@ func TestHandleAPIClientWebOriginsPut_AFailedLoadIsAnsweredAsALoadFailure(t *tes
 	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).
 		Return(&models.Client{Id: 7, AuthorizationCodeEnabled: true}, nil).Once()
 	loadErr := errors.New("the read failed")
-	stub := expectRunInTransaction(database, clientUpdateTx)
+	stub := mocks_data.ExpectRunInTransaction(database, clientUpdateTx)
 	database.On("AcquireClientRow", mock.Anything, clientUpdateTx, int64(7)).Return(nil).Once()
 	database.On("ClientLoadWebOrigins", mock.Anything, clientUpdateTx, mock.Anything).Return(loadErr).Once()
 
@@ -480,8 +480,8 @@ func TestHandleAPIClientWebOriginsPut_AFailedLoadIsAnsweredAsALoadFailure(t *tes
 	assert.Contains(t, rr.Body.String(), "INTERNAL_SERVER_ERROR")
 	// The step is still named, on the error rather than on the wire: it is carried out of the
 	// transaction body so nothing is written from an attempt that might be rerun.
-	assert.ErrorIs(t, stub.bodyErr, loadErr)
-	assert.Contains(t, stub.bodyErr.Error(), "Database error loading client web origins before update")
+	assert.ErrorIs(t, stub.BodyErr, loadErr)
+	assert.Contains(t, stub.BodyErr.Error(), "Database error loading client web origins before update")
 	database.AssertExpectations(t)
 	assertNotAttemptedOnClientDatabase(t, database, "CreateWebOrigin", "DeleteWebOrigin")
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, audit.AuditUpdatedWebOrigins, mock.Anything)
@@ -549,7 +549,7 @@ func TestHandleAPIClientWebOriginsPut_AnExhaustedRetryIsOneFiveHundred(t *testin
 	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).
 		Return(&models.Client{Id: 7, AuthorizationCodeEnabled: true}, nil).Once()
 	exhausted := errors.New("transaction aborted as a deadlock victim on all 3 attempts")
-	expectRunInTransactionRefused(database, exhausted)
+	mocks_data.ExpectRunInTransactionRefused(database, exhausted)
 
 	rr := httptest.NewRecorder()
 	handler := HandleAPIClientWebOriginsPut(database, auditLogger)

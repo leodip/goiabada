@@ -139,7 +139,7 @@ func TestHandleIssueGet_IssuesUnderTheRequestsContext(t *testing.T) {
 	// The session read, the acquisition and the insert, each matched on THIS request's context.
 	database.On("GetUserSessionBySessionIdentifier", theRequestsContext(), (*sql.Tx)(nil), liveSessionIdentifier).
 		Return(&models.UserSession{Id: 55, SessionIdentifier: liveSessionIdentifier, UserId: 123}, nil)
-	expectRunInTransaction(database, issuanceTx)
+	mocks_data.ExpectRunInTransaction(database, issuanceTx)
 	database.On("AcquireUserSessionRow", theRequestsContext(), issuanceTx, liveSessionIdentifier).Return(true, nil).Once()
 	codeIssuer.On("CreateAuthCode", theRequestsContext(), issuanceTx, mock.Anything).
 		Return(&models.Code{Id: 1, Code: "test-code", ClientId: 1, RedirectURI: "https://example.com/callback"}, nil)

@@ -36,7 +36,7 @@ var apiTerminateTx = &sql.Tx{}
 func stubTermination(database *mocks_data.Database, userSession *models.UserSession,
 	revokedCodeCount int64, tokens []*models.RefreshToken) {
 
-	expectRunInTransaction(database, apiTerminateTx)
+	mocks_data.ExpectRunInTransaction(database, apiTerminateTx)
 	database.On("RevokeCodesBySessionIdentifier", mock.Anything, apiTerminateTx, userSession.SessionIdentifier).
 		Return(revokedCodeCount, nil).Once()
 	database.On("GetRefreshTokensBySessionIdentifier", mock.Anything, apiTerminateTx, userSession.SessionIdentifier).
@@ -177,7 +177,7 @@ func TestHandleAPIUserSessionDelete_TerminationFailureIsA500(t *testing.T) {
 
 	database.On("GetUserSessionById", mock.Anything, (*sql.Tx)(nil), int64(100)).Return(userSession, nil).Once()
 	// The deletion, which since #139 is the first write inside the termination transaction.
-	stub := expectRunInTransaction(database, apiTerminateTx)
+	stub := mocks_data.ExpectRunInTransaction(database, apiTerminateTx)
 	database.On("DeleteUserSession", mock.Anything, apiTerminateTx, userSession.Id).
 		Return(errors.New("the session delete failed")).Once()
 
@@ -187,7 +187,7 @@ func TestHandleAPIUserSessionDelete_TerminationFailureIsA500(t *testing.T) {
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
 	database.AssertExpectations(t)
-	assert.EqualError(t, stub.bodyErr, "the session delete failed", "the body hands its error to the helper, which rolls back")
+	assert.EqualError(t, stub.BodyErr, "the session delete failed", "the body hands its error to the helper, which rolls back")
 	// NEITHER event. deleted_user_session would otherwise claim a deletion that rolled back, and
 	// the two emitters are adjacent in the handler, so it is easy to leave the first one outside the
 	// error check.

@@ -125,7 +125,7 @@ func TestHandleAPIAccountSessionDelete_TerminationFailureIsA500(t *testing.T) {
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), subject).
 		Return(&models.User{Id: 42, Enabled: true}, nil).Once()
 	// The deletion, which since #139 is the first write inside the termination transaction.
-	stub := expectRunInTransaction(database, apiTerminateTx)
+	stub := mocks_data.ExpectRunInTransaction(database, apiTerminateTx)
 	database.On("DeleteUserSession", mock.Anything, apiTerminateTx, int64(100)).
 		Return(errors.New("the session delete failed")).Once()
 
@@ -135,6 +135,6 @@ func TestHandleAPIAccountSessionDelete_TerminationFailureIsA500(t *testing.T) {
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
 	database.AssertExpectations(t)
-	assert.EqualError(t, stub.bodyErr, "the session delete failed", "the body hands its error to the helper, which rolls back")
+	assert.EqualError(t, stub.BodyErr, "the session delete failed", "the body hands its error to the helper, which rolls back")
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 }

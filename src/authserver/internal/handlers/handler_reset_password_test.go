@@ -1105,7 +1105,7 @@ func TestHandleResetPasswordPost_ClaimLost(t *testing.T) {
 	passwordValidator.On("ValidatePassword", mock.Anything, newPassword).Return(nil).Once()
 	database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).
 		Return(&models.User{Id: 1}, nil).Once()
-	stub := expectRunInTransaction(database, revokeTx)
+	stub := mocks_data.ExpectRunInTransaction(database, revokeTx)
 	database.On("TryConsumeForgotPasswordCode", mock.Anything, revokeTx, int64(1), codeHash, mock.Anything).
 		Return(false, nil).Once()
 
@@ -1125,7 +1125,7 @@ func TestHandleResetPasswordPost_ClaimLost(t *testing.T) {
 	// Nothing committed, and no sweep started: a reset that wrote no password must not
 	// terminate the user's sessions either. The body leaves the helper on the lost-claim
 	// sentinel, which is how it asks for a rollback rather than a commit.
-	assert.ErrorIs(t, stub.bodyErr, errResetPasswordClaimLost)
+	assert.ErrorIs(t, stub.BodyErr, errResetPasswordClaimLost)
 	database.AssertNotCalled(t, "IncrementUserAuthStateGeneration", mock.Anything, mock.Anything, mock.Anything)
 	// And it is not a 500: a lost claim is an ordinary outcome, not a fault.
 	httpHelper.AssertNotCalled(t, "InternalServerError", mock.Anything, mock.Anything, mock.Anything)
@@ -1146,7 +1146,7 @@ func TestHandleResetPasswordPost_ClaimFails(t *testing.T) {
 	passwordValidator.On("ValidatePassword", mock.Anything, "Str0ngP4ss!").Return(nil).Once()
 	database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).
 		Return(&models.User{Id: 1}, nil).Once()
-	stub := expectRunInTransaction(database, revokeTx)
+	stub := mocks_data.ExpectRunInTransaction(database, revokeTx)
 	database.On("TryConsumeForgotPasswordCode", mock.Anything, revokeTx, int64(1), codeHash, mock.Anything).
 		Return(false, errors.New("update failed")).Once()
 	httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).Return().Once()
@@ -1163,7 +1163,7 @@ func TestHandleResetPasswordPost_ClaimFails(t *testing.T) {
 	// restate the two that matter most explicitly, because a passing test here with a silently
 	// committed transaction would be the worst outcome: a changed password with the old
 	// sessions intact.
-	assert.EqualError(t, stub.bodyErr, "update failed", "the body hands its error to the helper, which rolls back")
+	assert.EqualError(t, stub.BodyErr, "update failed", "the body hands its error to the helper, which rolls back")
 	database.AssertNotCalled(t, "IncrementUserAuthStateGeneration", mock.Anything, mock.Anything, mock.Anything)
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 }
@@ -1262,9 +1262,9 @@ func TestHandleResetPasswordPost_TransactionFailureHandling(t *testing.T) {
 			database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).
 				Return(&models.User{Id: 1}, nil).Once()
 			if tc.commitFails {
-				expectRunInTransactionThenFail(database, revokeTx, errors.New("commit failed"))
+				mocks_data.ExpectRunInTransactionThenFail(database, revokeTx, errors.New("commit failed"))
 			} else {
-				expectRunInTransaction(database, revokeTx)
+				mocks_data.ExpectRunInTransaction(database, revokeTx)
 			}
 			database.On("TryConsumeForgotPasswordCode", mock.Anything, revokeTx, int64(1), codeHash, mock.Anything).
 				Return(true, nil).Once()
@@ -1505,7 +1505,7 @@ func TestResetPassword_LinkFailuresAreIndistinguishable(t *testing.T) {
 				passwordValidator.On("ValidatePassword", mock.Anything, newPassword).Return(nil).Once()
 				database.On("GetUserByForgotPasswordCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).
 					Return(&models.User{Id: 1}, nil).Once()
-				expectRunInTransaction(database, revokeTx)
+				mocks_data.ExpectRunInTransaction(database, revokeTx)
 				database.On("TryConsumeForgotPasswordCode", mock.Anything, revokeTx, int64(1), codeHash, mock.Anything).
 					Return(false, nil).Once()
 				expectAuditFailedCode(auditLogger, auditReasonClaimLost, 1)

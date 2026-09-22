@@ -98,7 +98,7 @@ func TestHandleAPIUserEnabledPut_RevocationConditionality(t *testing.T) {
 				Return(&models.User{Id: userId}, nil).Once()
 
 			// Set on the disabling rows, which are the ones that open a transaction.
-			var stub *runInTransactionStub
+			var stub *mocks_data.RunInTransactionStub
 			if tc.requestedEnabled {
 				// Enabling: the compare-and-set runs outside a transaction, since there is no
 				// sweep to be atomic with. Both directions go through it, so neither stays on
@@ -106,7 +106,7 @@ func TestHandleAPIUserEnabledPut_RevocationConditionality(t *testing.T) {
 				database.On("TrySetUserEnabled", mock.Anything, (*sql.Tx)(nil), userId, false, true).
 					Return(tc.transitioned, nil).Once()
 			} else {
-				stub = expectRunInTransaction(database, apiRevokeTx)
+				stub = mocks_data.ExpectRunInTransaction(database, apiRevokeTx)
 				database.On("TrySetUserEnabled", mock.Anything, apiRevokeTx, userId, true, false).
 					Return(tc.transitioned, nil).Once()
 				if tc.transitioned {
@@ -143,10 +143,10 @@ func TestHandleAPIUserEnabledPut_RevocationConditionality(t *testing.T) {
 			if stub != nil && !tc.transitioned {
 				// Already disabled: the body leaves the helper on the sentinel, so the empty
 				// transaction rolls back rather than commits, and the caller still answers 200.
-				assert.ErrorIs(t, stub.bodyErr, errUserAlreadyDisabled)
+				assert.ErrorIs(t, stub.BodyErr, errUserAlreadyDisabled)
 			}
 			if stub != nil && tc.transitioned {
-				assert.NoError(t, stub.bodyErr)
+				assert.NoError(t, stub.BodyErr)
 			}
 			database.AssertExpectations(t)
 			auditLogger.AssertExpectations(t)
@@ -183,7 +183,7 @@ func TestHandleAPIUserEnabledPut_SweepFailureRollsBack(t *testing.T) {
 	auditLogger := mocks_audit.NewAuditLogger(t)
 
 	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), userId).Return(&models.User{Id: userId}, nil).Once()
-	stub := expectRunInTransaction(database, apiRevokeTx)
+	stub := mocks_data.ExpectRunInTransaction(database, apiRevokeTx)
 	database.On("TrySetUserEnabled", mock.Anything, apiRevokeTx, userId, true, false).Return(true, nil).Once()
 	database.On("IncrementUserAuthStateGeneration", mock.Anything, apiRevokeTx, userId).
 		Return(int64(0), assert.AnError).Once()
@@ -194,7 +194,7 @@ func TestHandleAPIUserEnabledPut_SweepFailureRollsBack(t *testing.T) {
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
 	database.AssertExpectations(t)
-	assert.ErrorIs(t, stub.bodyErr, assert.AnError, "the body hands its error to the helper, which rolls back")
+	assert.ErrorIs(t, stub.BodyErr, assert.AnError, "the body hands its error to the helper, which rolls back")
 	// Not even the pre-existing event: the disable did not happen, so recording it as a user
 	// detail update would be false.
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
@@ -278,7 +278,7 @@ func TestHandleAPIUserOTPPut_DisableCommitsBothWritesAtomically(t *testing.T) {
 	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), userId).Return(user, nil).Once()
 
 	var calls []string
-	expectRunInTransaction(database, otpDisableTx, func(edge string) { calls = append(calls, edge) })
+	mocks_data.ExpectRunInTransaction(database, otpDisableTx, func(edge string) { calls = append(calls, edge) })
 	database.On("UpdateUser", mock.Anything, otpDisableTx, user).Return(nil).
 		Run(func(mock.Arguments) { calls = append(calls, "update") }).Once()
 	database.On("ResetUserOTPStep", mock.Anything, otpDisableTx, userId).Return(nil).
