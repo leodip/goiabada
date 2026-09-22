@@ -2,15 +2,10 @@ package signingkeys
 
 import (
 	"context"
-	"crypto/x509"
 	"database/sql"
-	"encoding/pem"
 	"errors"
 
-	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
-	"github.com/leodip/goiabada/authserver/internal/rsautil"
-	"github.com/leodip/goiabada/authserver/internal/uuidutil"
 	"github.com/leodip/goiabada/core/errs"
 )
 
@@ -88,7 +83,7 @@ func NewSigningKeyRotator(database RotationDatabase) *SigningKeyRotator {
 // across it is what made the window wide enough to hit.
 func (r *SigningKeyRotator) Rotate(ctx context.Context) error {
 
-	newNextKey, err := r.generateNextKey()
+	newNextKey, err := NewKeyPair(models.KeyStateNext, r.keySizeBits)
 	if err != nil {
 		return err
 	}
@@ -159,43 +154,4 @@ func (r *SigningKeyRotator) Rotate(ctx context.Context) error {
 
 		return r.database.CreateKeyPair(ctx, tx, newNextKey)
 	})
-}
-
-// generateNextKey builds the replacement key, already in the next state. It writes nothing.
-func (r *SigningKeyRotator) generateNextKey() (*models.KeyPair, error) {
-
-	privateKey, err := rsautil.GeneratePrivateKey(r.keySizeBits)
-	if err != nil {
-		return nil, errs.Wrap(err, "unable to generate a private key")
-	}
-	privateKeyPEM := rsautil.EncodePrivateKeyToPEM(privateKey)
-
-	// Encrypt the private key at rest (issue #83) before storing it.
-	privateKeyPEMEncrypted, err := encryption.EncryptData(string(privateKeyPEM))
-	if err != nil {
-		return nil, errs.Wrap(err, "unable to encrypt the private key")
-	}
-
-	publicKeyASN1DER, err := x509.MarshalPKIXPublicKey(&privateKey.PublicKey)
-	if err != nil {
-		return nil, errs.Wrap(err, "unable to marshal public key to PKIX")
-	}
-	publicKeyPEM := pem.EncodeToMemory(&pem.Block{Type: "RSA PUBLIC KEY", Bytes: publicKeyASN1DER})
-
-	kid := uuidutil.New()
-	publicKeyJWK, err := rsautil.MarshalRSAPublicKeyToJWK(&privateKey.PublicKey, kid)
-	if err != nil {
-		return nil, errs.Wrap(err, "unable to marshal JWK")
-	}
-
-	return &models.KeyPair{
-		State:             models.KeyStateNext.String(),
-		KeyIdentifier:     kid,
-		Type:              "RSA",
-		Algorithm:         "RS256",
-		PrivateKeyPEM:     privateKeyPEMEncrypted,
-		PublicKeyPEM:      publicKeyPEM,
-		PublicKeyASN1_DER: publicKeyASN1DER,
-		PublicKeyJWK:      publicKeyJWK,
-	}, nil
 }

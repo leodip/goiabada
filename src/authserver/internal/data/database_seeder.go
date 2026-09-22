@@ -2,9 +2,7 @@ package data
 
 import (
 	"context"
-	"crypto/x509"
 	"encoding/hex"
-	"encoding/pem"
 	"fmt"
 	"log/slog"
 	"os"
@@ -14,7 +12,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
-	"github.com/leodip/goiabada/authserver/internal/rsautil"
+	"github.com/leodip/goiabada/authserver/internal/signingkeys"
 	"github.com/leodip/goiabada/authserver/internal/uuidutil"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/errs"
@@ -382,43 +380,9 @@ func (ds *DatabaseSeeder) Seed(ctx context.Context) error {
 
 	// key pair (current)
 
-	privateKey, err := rsautil.GeneratePrivateKey(4096)
-	if err != nil {
-		return errs.Wrap(err, "unable to generate a private key")
-	}
-	privateKeyPEM := rsautil.EncodePrivateKeyToPEM(privateKey)
-
-	publicKeyASN1_DER, err := x509.MarshalPKIXPublicKey(&privateKey.PublicKey)
-	if err != nil {
-		return errs.Wrap(err, "unable to marshal public key to PKIX")
-	}
-
-	publicKeyPEM := pem.EncodeToMemory(
-		&pem.Block{
-			Type:  "RSA PUBLIC KEY",
-			Bytes: publicKeyASN1_DER,
-		},
-	)
-
-	kid := uuidutil.New()
-	publicKeyJWK, err := rsautil.MarshalRSAPublicKeyToJWK(&privateKey.PublicKey, kid)
+	keyPair, err := signingkeys.NewKeyPair(models.KeyStateCurrent, 4096)
 	if err != nil {
 		return err
-	}
-
-	currentPrivateKeyEncrypted, err := encryption.EncryptData(string(privateKeyPEM))
-	if err != nil {
-		return errs.Wrap(err, "unable to encrypt current signing key")
-	}
-	keyPair := &models.KeyPair{
-		State:             models.KeyStateCurrent.String(),
-		KeyIdentifier:     kid,
-		Type:              "RSA",
-		Algorithm:         "RS256",
-		PrivateKeyPEM:     currentPrivateKeyEncrypted,
-		PublicKeyPEM:      publicKeyPEM,
-		PublicKeyASN1_DER: publicKeyASN1_DER,
-		PublicKeyJWK:      publicKeyJWK,
 	}
 	err = ds.DB.CreateKeyPair(ctx, nil, keyPair)
 	if err != nil {
@@ -427,43 +391,9 @@ func (ds *DatabaseSeeder) Seed(ctx context.Context) error {
 	slog.InfoContext(ctx, "key pair created", "key_identifier", keyPair.KeyIdentifier, "state", "current")
 
 	// key pair (next)
-	privateKey, err = rsautil.GeneratePrivateKey(4096)
-	if err != nil {
-		return errs.Wrap(err, "unable to generate a private key")
-	}
-	privateKeyPEM = rsautil.EncodePrivateKeyToPEM(privateKey)
-
-	publicKeyASN1_DER, err = x509.MarshalPKIXPublicKey(&privateKey.PublicKey)
-	if err != nil {
-		return errs.Wrap(err, "unable to marshal public key to PKIX")
-	}
-
-	publicKeyPEM = pem.EncodeToMemory(
-		&pem.Block{
-			Type:  "RSA PUBLIC KEY",
-			Bytes: publicKeyASN1_DER,
-		},
-	)
-
-	kid = uuidutil.New()
-	publicKeyJWK, err = rsautil.MarshalRSAPublicKeyToJWK(&privateKey.PublicKey, kid)
+	keyPair, err = signingkeys.NewKeyPair(models.KeyStateNext, 4096)
 	if err != nil {
 		return err
-	}
-
-	nextPrivateKeyEncrypted, err := encryption.EncryptData(string(privateKeyPEM))
-	if err != nil {
-		return errs.Wrap(err, "unable to encrypt next signing key")
-	}
-	keyPair = &models.KeyPair{
-		State:             models.KeyStateNext.String(),
-		KeyIdentifier:     kid,
-		Type:              "RSA",
-		Algorithm:         "RS256",
-		PrivateKeyPEM:     nextPrivateKeyEncrypted,
-		PublicKeyPEM:      publicKeyPEM,
-		PublicKeyASN1_DER: publicKeyASN1_DER,
-		PublicKeyJWK:      publicKeyJWK,
 	}
 	err = ds.DB.CreateKeyPair(ctx, nil, keyPair)
 	if err != nil {

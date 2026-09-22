@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"strings"
 	"testing"
 
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
@@ -111,7 +112,9 @@ func TestSigningKeyRotator_Rotate_Success(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, created.KeyIdentifier, parsedKid)
 	assert.NotEmpty(t, created.PrivateKeyPEM)
-	assert.NotEmpty(t, created.PublicKeyPEM)
+	// The replacement key comes from NewKeyPair, so it carries RFC 7468's label (#424).
+	assert.True(t, strings.HasPrefix(string(created.PublicKeyPEM), "-----BEGIN PUBLIC KEY-----\n"),
+		"the replacement key's public PEM is not labelled PUBLIC KEY")
 	assert.NotEmpty(t, created.PublicKeyASN1_DER)
 	assert.NotEmpty(t, created.PublicKeyJWK)
 	// The private key is stored encrypted (#83), so the PEM header must not survive.
