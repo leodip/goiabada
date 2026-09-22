@@ -654,15 +654,18 @@ func (t *TokenIssuer) GenerateTokenResponseForRefreshROPC(ctx context.Context, i
 	return &tokenResponse, nil
 }
 
-// claimMapper builds the user-claims mapper for one token type. The three fields after the port
-// are issuance's side of the three divergences userclaims keeps as inputs rather than merging:
-// the base URL is the one injected into this issuer, updated_at rides with any scope but a lone
-// openid, and the include flag is the token type's own (#387 decision 5).
+// claimMapper builds the user-claims mapper for one token type. The two fields after the port are
+// issuance's side of the two divergences userclaims keeps as inputs rather than merging: the base
+// URL is the one injected into this issuer, and the include flag is the token type's own (#387
+// decision 5). updated_at was a third until it turned out to be a defect: issuance wrote it for
+// any scope but a lone openid, and in an access token for a lone openid too, because the audience
+// loop below appends authserver:userinfo to the scope slice before the claim block reads it. It
+// now rides with the profile scope, as it does at /userinfo and as this repository's own
+// documentation has always said.
 func (t *TokenIssuer) claimMapper(inclusion userclaims.Inclusion) userclaims.Mapper {
 	return userclaims.Mapper{
 		Database:  t.database,
 		BaseURL:   t.baseURL,
-		UpdatedAt: userclaims.UpdatedAtBeyondOpenidScope,
 		Inclusion: inclusion,
 	}
 }
