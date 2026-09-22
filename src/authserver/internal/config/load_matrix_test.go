@@ -5,9 +5,11 @@ import (
 	"flag"
 	"io"
 	"log/slog"
+	"maps"
 	"os"
 	"reflect"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -276,8 +278,8 @@ func loadMatrix(t *testing.T, env map[string]string, args []string) *flag.FlagSe
 		t.Setenv(key, value)
 	}
 
-	saved := cfg
-	t.Cleanup(func() { cfg = saved })
+	saved, savedArgs := cfg, positionalArgs
+	t.Cleanup(func() { cfg, positionalArgs = saved, savedArgs })
 
 	fs := flag.NewFlagSet(t.Name(), flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
@@ -484,6 +486,137 @@ func TestFlagLists_AgreeWithTheTable(t *testing.T) {
 	// flag nobody decided about.
 	if got := len(authServerFlags) + len(refusedFlags); got != 45 {
 		t.Errorf("the two lists cover %d flags, want the 45 both binaries registered before the split", got)
+	}
+}
+
+// TestLoadFrom_ArgsAreWhatTheParseLeft is the half of #424's dispatch that config owns: Args
+// answers the positional arguments in order, and the server's parse stops at the first one, so a
+// flag written after `migrate` is left for the subcommand's own parse rather than landing here.
+func TestLoadFrom_ArgsAreWhatTheParseLeft(t *testing.T) {
+	cases := []struct {
+		name     string
+		args     []string
+		wantArgs []string
+		wantType string
+	}{
+		{"no arguments", nil, nil, "sqlite"},
+		{"a flag and nothing else", []string{"-db-type=mysql"}, nil, "mysql"},
+		{"flags before migrate", []string{"-db-type=mysql", "migrate", "to", "44"}, []string{"migrate", "to", "44"}, "mysql"},
+		{"a separate value, two dashes", []string{"--db-type", "mysql", "migrate", "version"}, []string{"migrate", "version"}, "mysql"},
+		{"a flag after migrate stays migrate's", []string{"migrate", "to", "44", "-db-type=mysql"}, []string{"migrate", "to", "44", "-db-type=mysql"}, "sqlite"},
+		{"a double dash ends the flags", []string{"-db-type=mysql", "--", "migrate", "version"}, []string{"migrate", "version"}, "mysql"},
+		{"a typo is left for dispatch to refuse", []string{"migrat", "to", "44"}, []string{"migrat", "to", "44"}, "sqlite"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			loadMatrix(t, nil, tc.args)
+
+			if got := Args(); !slices.Equal(got, tc.wantArgs) {
+				t.Errorf("Args() = %#v, want %#v", got, tc.wantArgs)
+			}
+			if got := GetDatabase().Type; got != tc.wantType {
+				t.Errorf("db-type landed as %q, want %q", got, tc.wantType)
+			}
+		})
+	}
+
+	t.Run("the slice returned is a copy", func(t *testing.T) {
+		loadMatrix(t, nil, []string{"migrate", "version"})
+
+		Args()[0] = "changed"
+		if got := Args()[0]; got != "migrate" {
+			t.Errorf("writing to the returned slice changed what Args answers next: %q", got)
+		}
+	})
+}
+
+// TestRegisterDatabaseFlags_RegistersTheDatabaseFlagsOnTheConfigGiven holds the one registration
+// both parses share: exactly the db- names of authServerFlags, defaulting to and writing into the
+// struct it was handed rather than the package's configuration.
+func TestRegisterDatabaseFlags_RegistersTheDatabaseFlagsOnTheConfigGiven(t *testing.T) {
+	saved := cfg
+	t.Cleanup(func() { cfg = saved })
+	cfg.Database.Port = 3306
+
+	local := DatabaseConfig{
+		Type:     "postgres",
+		Username: "u1",
+		Password: "p1",
+		Host:     "h1",
+		Port:     15432,
+		Name:     "n1",
+		DSN:      "d1",
+		Create:   false,
+	}
+	fs := flag.NewFlagSet(t.Name(), flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	RegisterDatabaseFlags(fs, &local)
+
+	want := map[string]bool{}
+	for _, name := range authServerFlags {
+		if strings.HasPrefix(name, "db-") {
+			want[name] = true
+		}
+	}
+	if len(want) != 8 {
+		t.Fatalf("authServerFlags names %d db- flags, want 8, so this case would check the wrong set", len(want))
+	}
+
+	registered := map[string]string{}
+	fs.VisitAll(func(f *flag.Flag) { registered[f.Name] = f.DefValue })
+	for name := range want {
+		if _, ok := registered[name]; !ok {
+			t.Errorf("RegisterDatabaseFlags does not register %q", name)
+		}
+	}
+	for _, name := range slices.Sorted(maps.Keys(registered)) {
+		if !want[name] {
+			t.Errorf("RegisterDatabaseFlags registers %q, which is not a database flag", name)
+		}
+	}
+
+	wantDefaults := map[string]string{
+		"db-type":     "postgres",
+		"db-username": "u1",
+		"db-password": "p1",
+		"db-host":     "h1",
+		"db-port":     "15432",
+		"db-name":     "n1",
+		"db-dsn":      "d1",
+		"db-create":   "false",
+	}
+	for name, def := range wantDefaults {
+		if got := registered[name]; got != def {
+			t.Errorf("%s defaults to %q, want the struct's own %q", name, got, def)
+		}
+	}
+
+	if err := fs.Set("db-port", "1433"); err != nil {
+		t.Fatalf("setting db-port: %v", err)
+	}
+	if local.Port != 1433 {
+		t.Errorf("db-port set to 1433 left the struct at %d", local.Port)
+	}
+	if cfg.Database.Port != 3306 {
+		t.Errorf("db-port set on a local struct reached the package configuration: %d", cfg.Database.Port)
+	}
+}
+
+// TestRegisterDatabaseFlags_DbTypeHelpNamesEveryEngine: the help text named two of the four
+// engines this binary supports.
+func TestRegisterDatabaseFlags_DbTypeHelpNamesEveryEngine(t *testing.T) {
+	var local DatabaseConfig
+	fs := flag.NewFlagSet(t.Name(), flag.ContinueOnError)
+	RegisterDatabaseFlags(fs, &local)
+
+	f := fs.Lookup("db-type")
+	if f == nil {
+		t.Fatal("db-type is not registered")
+	}
+	for _, engine := range []string{"sqlite", "mysql", "postgres", "mssql"} {
+		if !strings.Contains(f.Usage, engine) {
+			t.Errorf("db-type's help %q does not name %s", f.Usage, engine)
+		}
 	}
 }
 
