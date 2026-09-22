@@ -58,7 +58,8 @@ repository root. It is enforced rather than descriptive: see **Architecture guar
 - `internal/emaillinks/` - The emailed-link round trip for password reset and activation: build the link, mark it followed, redeem it once. Beside `emaildelivery`, which sends it (#387)
 - `internal/{encryption,passwordhash,oidc,rsakey,urlutil,uuidutil}/` - The authserver-only utilities #360 moved out of `core`: AES and bcrypt, discovery metadata, RSA key generation, redirect-URI and origin predicates, UUIDs (#360)
 - `internal/models/` - All domain models (Client, User, Permission, Group, etc.). Persistence records only: no cryptography, no claim construction, and nothing imported but the standard library, `core/constants` and `core/errs` (#359, #387)
-- `internal/data/` - The composition-only `Database` interface, the seeder, `commondb/`, the four engine adapters, and the generated `Database` mock that every narrow port is tested through (#354, #359, #386)
+- `internal/data/` - The composition-only `Database` interface, `commondb/`, the four engine adapters, and the generated `Database` mock that every narrow port is tested through (#354, #359, #386)
+- `internal/bootstrap/` - The first run: which of the three bootstrap modes applies, and the seed, whose 19 writes commit in one transaction with the bootstrap file published only after it (#424)
 - `internal/datafactory/` - Database composition: engine selection, config mapping, the email-case pre-flight, the startup data tasks (#353)
 - `internal/server/routes.go` - All route definitions
 - `web/template/` - HTML templates

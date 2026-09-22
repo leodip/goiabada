@@ -188,8 +188,9 @@ Notes on rows that are not self-evident:
 - These five were `moving | #359` until #359 carried the seeder that named them out of core. The
   note here then predicted that nothing would reference them afterwards; it was wrong.
   `AdminConsoleClientIdentifier` is `both-apps`, named by the admin console at four production
-  sites and by the moved seeder. The four permission identifiers are `contract`, their only
-  referrers being `authserver/internal/server/routes.go` and that seeder. The word is earned and
+  sites and by the seeder, now `authserver/internal/bootstrap` (#424). The four permission
+  identifiers are `contract`, their only referrers being `authserver/internal/server/routes.go`
+  and that seeder. The word is earned and
   not conceded to the guard: they are the scope strings a client asks for and a token carries, and
   the admin console compiles all four through `BuiltInAuthServerPermissionIdentifiers`, which is
   `both-apps` on its own account and cannot leave core — moving them out beside it would spell

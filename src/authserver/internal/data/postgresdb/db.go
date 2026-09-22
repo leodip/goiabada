@@ -110,6 +110,7 @@ func NewPostgresDatabase(dbConfig *DatabaseConfig, logSQL bool) (*PostgresDataba
 	commonDb.IsDeadlock = isDeadlock
 	commonDb.IsUniqueViolation = isUniqueViolation
 	commonDb.InsertReturningIdSQL = insertReturningIdSQL
+	commonDb.ExplicitIdInsertSQL = explicitIdInsertSQL
 
 	postgresDb := PostgresDatabase{
 		CommonDatabase: commonDb,

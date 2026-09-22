@@ -24,9 +24,10 @@ import (
 // The walk is recursive, so apihandlers and accounthandlers have always been covered by the first
 // entry. A new top-level package is not, which is why #387 names each capability package it lifts
 // out of here as it lands: the interfaces leaving this directory would otherwise stop being
-// guarded by the move itself, which is the silent-unguarding shape #333 exists to refuse.
+// guarded by the move itself, which is the silent-unguarding shape #333 exists to refuse. bootstrap
+// is named for the same reason: it declares the seed's ports, and #424 created it.
 func TestHandlers_NoDeadInterfaces(t *testing.T) {
 	testutil.AssertNoDeadInterfaces(t, "authserver/internal/handlers", "authserver/internal/revocation",
 		"authserver/internal/emaillinks", "authserver/internal/otpcredential",
-		"authserver/internal/userclaims")
+		"authserver/internal/userclaims", "authserver/internal/bootstrap")
 }
