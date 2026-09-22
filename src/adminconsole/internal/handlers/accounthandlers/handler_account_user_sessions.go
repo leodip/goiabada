@@ -27,7 +27,7 @@ func HandleAccountSessionsGet(
 		}
 
 		// Fetch sessions via API
-		sessions, err := apiClient.GetAccountSessions(jwtInfo.TokenResponse.AccessToken)
+		sessions, err := apiClient.GetAccountSessions(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -97,7 +97,7 @@ func HandleAccountSessionsEndSesssionPost(
 		// server computes isCurrent from the sid claim of the very token this request forwards,
 		// so this is the same comparison the console used to make for itself, now made once and
 		// in one place (#373).
-		sessions, err := apiClient.GetAccountSessions(jwtInfo.TokenResponse.AccessToken)
+		sessions, err := apiClient.GetAccountSessions(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
 			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
@@ -124,7 +124,7 @@ func HandleAccountSessionsEndSesssionPost(
 		}
 
 		// Delete session via API (server validates ownership and audits)
-		if err = apiClient.DeleteAccountSession(jwtInfo.TokenResponse.AccessToken, int64(userSessionId)); err != nil {
+		if err = apiClient.DeleteAccountSession(r.Context(), jwtInfo.TokenResponse.AccessToken, int64(userSessionId)); err != nil {
 			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}

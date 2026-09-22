@@ -1,6 +1,7 @@
 package adminuserhandlers
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -39,15 +40,15 @@ type attributesApiClient struct {
 	attributes []api.UserAttributeResponse
 }
 
-func (c *attributesApiClient) GetUserById(accessToken string, userId int64) (*api.UserResponse, error) {
+func (c *attributesApiClient) GetUserById(_ context.Context, accessToken string, userId int64) (*api.UserResponse, error) {
 	return c.user, c.userErr
 }
 
-func (c *attributesApiClient) GetUserAttributesByUserId(accessToken string, userId int64) ([]api.UserAttributeResponse, error) {
+func (c *attributesApiClient) GetUserAttributesByUserId(_ context.Context, accessToken string, userId int64) ([]api.UserAttributeResponse, error) {
 	return c.attributes, nil
 }
 
-func (c *attributesApiClient) DeleteUserAttribute(accessToken string, attributeId int64) error {
+func (c *attributesApiClient) DeleteUserAttribute(_ context.Context, accessToken string, attributeId int64) error {
 	return nil
 }
 

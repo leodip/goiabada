@@ -39,7 +39,7 @@ func HandleAdminGroupMembersAddGet(
 			return
 		}
 
-		group, err := apiClient.GetGroupById(jwtInfo.TokenResponse.AccessToken, id)
+		group, err := apiClient.GetGroupById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -90,7 +90,7 @@ func HandleAdminGroupMembersSearchGet(
 			return
 		}
 
-		group, err := apiClient.GetGroupById(jwtInfo.TokenResponse.AccessToken, id)
+		group, err := apiClient.GetGroupById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
@@ -106,7 +106,7 @@ func HandleAdminGroupMembersSearchGet(
 			return
 		}
 
-		users, _, err := apiClient.SearchUsersWithGroupAnnotation(jwtInfo.TokenResponse.AccessToken, query, group.Id, 1, 15)
+		users, _, err := apiClient.SearchUsersWithGroupAnnotation(r.Context(), jwtInfo.TokenResponse.AccessToken, query, group.Id, 1, 15)
 		if err != nil {
 			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
@@ -169,7 +169,7 @@ func HandleAdminGroupMembersAddPost(
 			return
 		}
 
-		err = apiClient.AddUserToGroup(jwtInfo.TokenResponse.AccessToken, id, userId)
+		err = apiClient.AddUserToGroup(r.Context(), jwtInfo.TokenResponse.AccessToken, id, userId)
 		if err != nil {
 			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return

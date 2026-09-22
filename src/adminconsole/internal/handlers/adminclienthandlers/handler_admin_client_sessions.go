@@ -52,7 +52,7 @@ func HandleAdminClientUserSessionsGet(
 		}
 
 		// Get the first 50 sessions (server filters invalid)
-		clientSessions, err := apiClient.GetClientSessionsByClientId(jwtInfo.TokenResponse.AccessToken, clientResp.Id, 1, 50)
+		clientSessions, err := apiClient.GetClientSessionsByClientId(r.Context(), jwtInfo.TokenResponse.AccessToken, clientResp.Id, 1, 50)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -161,7 +161,7 @@ func HandleAdminClientUserSessionsPost(
 		// in one place (#373).
 		//
 		// The page this request comes from is the first 50 rows, so the same page is read back.
-		clientSessions, err := apiClient.GetClientSessionsByClientId(jwtInfo.TokenResponse.AccessToken, clientResp.Id, 1, 50)
+		clientSessions, err := apiClient.GetClientSessionsByClientId(r.Context(), jwtInfo.TokenResponse.AccessToken, clientResp.Id, 1, 50)
 		if err != nil {
 			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
@@ -191,7 +191,7 @@ func HandleAdminClientUserSessionsPost(
 		}
 
 		// Delete the session via API (authserver performs audit)
-		err = apiClient.DeleteUserSessionById(jwtInfo.TokenResponse.AccessToken, int64(userSessionId))
+		err = apiClient.DeleteUserSessionById(r.Context(), jwtInfo.TokenResponse.AccessToken, int64(userSessionId))
 		if err != nil {
 			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return

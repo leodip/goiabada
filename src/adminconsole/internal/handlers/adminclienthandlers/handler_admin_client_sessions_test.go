@@ -1,6 +1,7 @@
 package adminclienthandlers
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -40,7 +41,7 @@ func (c *clientSessionsApiClient) GetClientById(accessToken string, clientId int
 	return c.client, nil
 }
 
-func (c *clientSessionsApiClient) GetClientSessionsByClientId(accessToken string, clientId int64,
+func (c *clientSessionsApiClient) GetClientSessionsByClientId(_ context.Context, accessToken string, clientId int64,
 	page, size int) (*api.GetClientSessionsResponse, error) {
 	if c.sessionsErr != nil {
 		return nil, c.sessionsErr
@@ -48,12 +49,12 @@ func (c *clientSessionsApiClient) GetClientSessionsByClientId(accessToken string
 	return &api.GetClientSessionsResponse{Sessions: c.sessions, Users: c.users}, nil
 }
 
-func (c *clientSessionsApiClient) DeleteUserSessionById(accessToken string, sessionId int64) error {
+func (c *clientSessionsApiClient) DeleteUserSessionById(_ context.Context, accessToken string, sessionId int64) error {
 	c.deleted = append(c.deleted, sessionId)
 	return nil
 }
 
-func (c *clientSessionsApiClient) GetUserById(accessToken string, userId int64) (*api.UserResponse, error) {
+func (c *clientSessionsApiClient) GetUserById(_ context.Context, accessToken string, userId int64) (*api.UserResponse, error) {
 	c.userReads++
 	return nil, nil
 }

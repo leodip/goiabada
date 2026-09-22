@@ -46,7 +46,7 @@ func HandleAdminGroupPermissionsGet(
 		}
 
 		// Get group and permissions via API
-		group, groupPermissions, err := apiClient.GetGroupPermissions(jwtInfo.TokenResponse.AccessToken, id)
+		group, groupPermissions, err := apiClient.GetGroupPermissions(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -143,7 +143,7 @@ func HandleAdminGroupPermissionsPost(
 			PermissionIds: data.AssignedPermissionsIds,
 		}
 
-		err = apiClient.UpdateGroupPermissions(jwtInfo.TokenResponse.AccessToken, data.GroupId, updateReq)
+		err = apiClient.UpdateGroupPermissions(r.Context(), jwtInfo.TokenResponse.AccessToken, data.GroupId, updateReq)
 		if err != nil {
 			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return

@@ -39,7 +39,7 @@ func HandleAdminUserDeleteGet(
 			return
 		}
 
-		user, err := apiClient.GetUserById(jwtInfo.TokenResponse.AccessToken, id)
+		user, err := apiClient.GetUserById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -53,7 +53,7 @@ func HandleAdminUserDeleteGet(
 		// /api/v1/admin/users/{id} serves none: the page listed "none" for every user,
 		// whatever their real membership, and this is a confirmation screen for a
 		// destructive action, so under-reporting what it discards is the whole defect (#350).
-		_, groups, err := apiClient.GetUserGroups(jwtInfo.TokenResponse.AccessToken, id)
+		_, groups, err := apiClient.GetUserGroups(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -100,7 +100,7 @@ func HandleAdminUserDeletePost(
 			return
 		}
 
-		err = apiClient.DeleteUser(jwtInfo.TokenResponse.AccessToken, id)
+		err = apiClient.DeleteUser(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return

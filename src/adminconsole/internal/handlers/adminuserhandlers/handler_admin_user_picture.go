@@ -40,7 +40,7 @@ func HandleAdminUserPictureGet(
 			return
 		}
 
-		user, err := apiClient.GetUserById(jwtInfo.TokenResponse.AccessToken, id)
+		user, err := apiClient.GetUserById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -52,7 +52,7 @@ func HandleAdminUserPictureGet(
 
 		// Get profile picture info
 		var profilePictureUrl string
-		pictureInfo, err := apiClient.GetUserProfilePicture(jwtInfo.TokenResponse.AccessToken, id)
+		pictureInfo, err := apiClient.GetUserProfilePicture(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err == nil && pictureInfo != nil && pictureInfo.HasPicture {
 			// Add cache-busting parameter to prevent browser caching
 			profilePictureUrl = fmt.Sprintf("%s?t=%d", pictureInfo.PictureUrl, time.Now().UnixNano())

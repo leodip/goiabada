@@ -1,6 +1,7 @@
 package adminuserhandlers
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -38,7 +39,7 @@ type usersPagingApiClient struct {
 	asked []int
 }
 
-func (c *usersPagingApiClient) SearchUsersPaginated(accessToken, query string,
+func (c *usersPagingApiClient) SearchUsersPaginated(_ context.Context, accessToken, query string,
 	page, pageSize int) ([]api.UserResponse, int, error) {
 
 	c.asked = append(c.asked, page)
@@ -248,7 +249,7 @@ type queryRecordingApiClient struct {
 	tokens  []string
 }
 
-func (c *queryRecordingApiClient) SearchUsersPaginated(accessToken, query string,
+func (c *queryRecordingApiClient) SearchUsersPaginated(_ context.Context, accessToken, query string,
 	page, pageSize int) ([]api.UserResponse, int, error) {
 
 	c.queries = append(c.queries, query)

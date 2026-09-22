@@ -1,6 +1,7 @@
 package apiclient
 
 import (
+	"context"
 	"net/http"
 	"testing"
 	"time"
@@ -30,7 +31,7 @@ func TestAuthServerClient_GetGroupAttributesByGroupIdDecodesTheAttributeShape(t 
 	client, recorded := serves(t, `{"attributes":[{`+groupAttributeBodyFields+`},`+
 		`{"id":8,"key":"region","value":"br","groupId":4}]}`)
 
-	attributes, err := client.GetGroupAttributesByGroupId("an-access-token", 4)
+	attributes, err := client.GetGroupAttributesByGroupId(context.Background(), "an-access-token", 4)
 	require.NoError(t, err)
 
 	gotPath, gotAuthorization := recorded()
@@ -56,7 +57,7 @@ func TestAuthServerClient_GetGroupAttributesByGroupIdDecodesTheAttributeShape(t 
 func TestAuthServerClient_GetGroupAttributeByIdDecodesTheSingleAttribute(t *testing.T) {
 	client, recorded := serves(t, `{"attribute":{`+groupAttributeBodyFields+`}}`)
 
-	attribute, err := client.GetGroupAttributeById("an-access-token", 7)
+	attribute, err := client.GetGroupAttributeById(context.Background(), "an-access-token", 7)
 	require.NoError(t, err)
 	require.NotNil(t, attribute)
 
@@ -76,7 +77,7 @@ func TestAuthServerClient_CreateAndUpdateGroupAttributeReturnTheSavedAttribute(t
 	t.Run("create", func(t *testing.T) {
 		client, recorded := servesStatus(t, http.StatusCreated, `{"attribute":{`+groupAttributeBodyFields+`}}`)
 
-		attribute, err := client.CreateGroupAttribute("an-access-token", nil)
+		attribute, err := client.CreateGroupAttribute(context.Background(), "an-access-token", nil)
 		require.NoError(t, err)
 		require.NotNil(t, attribute)
 
@@ -89,7 +90,7 @@ func TestAuthServerClient_CreateAndUpdateGroupAttributeReturnTheSavedAttribute(t
 	t.Run("update", func(t *testing.T) {
 		client, recorded := serves(t, `{"attribute":{`+groupAttributeBodyFields+`}}`)
 
-		attribute, err := client.UpdateGroupAttribute("an-access-token", 7, nil)
+		attribute, err := client.UpdateGroupAttribute(context.Background(), "an-access-token", 7, nil)
 		require.NoError(t, err)
 		require.NotNil(t, attribute)
 

@@ -45,7 +45,7 @@ func HandleAdminUserGroupsGet(
 		}
 
 		// Get user and their groups
-		user, userGroups, err := apiClient.GetUserGroups(jwtInfo.TokenResponse.AccessToken, id)
+		user, userGroups, err := apiClient.GetUserGroups(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -58,7 +58,7 @@ func HandleAdminUserGroupsGet(
 		}
 
 		// Get all available groups
-		allGroups, err := apiClient.GetAllGroups(jwtInfo.TokenResponse.AccessToken)
+		allGroups, err := apiClient.GetAllGroups(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -142,7 +142,7 @@ func HandleAdminUserGroupsPost(
 		}
 
 		// Call API to update user groups (this handles all the business logic including audit logging)
-		_, _, err = apiClient.UpdateUserGroups(jwtInfo.TokenResponse.AccessToken, id, request)
+		_, _, err = apiClient.UpdateUserGroups(r.Context(), jwtInfo.TokenResponse.AccessToken, id, request)
 		if err != nil {
 			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return

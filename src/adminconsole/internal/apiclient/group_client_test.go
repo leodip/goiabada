@@ -1,6 +1,7 @@
 package apiclient
 
 import (
+	"context"
 	"net/http"
 	"testing"
 	"time"
@@ -35,7 +36,7 @@ const groupBodyFields = `
 func TestAuthServerClient_GetGroupByIdDecodesEveryFieldTheGroupPagesBind(t *testing.T) {
 	client, recorded := serves(t, `{"group":{`+groupBodyFields+`}}`)
 
-	group, err := client.GetGroupById("an-access-token", 4)
+	group, err := client.GetGroupById(context.Background(), "an-access-token", 4)
 	require.NoError(t, err)
 	require.NotNil(t, group)
 
@@ -61,7 +62,7 @@ func TestAuthServerClient_GetAllGroupsDecodesEachRowsMemberCount(t *testing.T) {
 	client, recorded := serves(t, `{"groups":[{`+groupBodyFields+`},`+
 		`{"id":5,"groupIdentifier":"site-viewers","description":"Viewers","memberCount":3}]}`)
 
-	groups, err := client.GetAllGroups("an-access-token")
+	groups, err := client.GetAllGroups(context.Background(), "an-access-token")
 	require.NoError(t, err)
 
 	gotPath, _ := recorded()
@@ -81,7 +82,7 @@ func TestAuthServerClient_GetAllGroupsDecodesEachRowsMemberCount(t *testing.T) {
 func TestAuthServerClient_GetUserGroupsReturnsTheUserAndTheMemberships(t *testing.T) {
 	client, recorded := serves(t, `{"user":{"id":42,"email":"jane@example.com"},"groups":[{`+groupBodyFields+`}]}`)
 
-	user, groups, err := client.GetUserGroups("an-access-token", 42)
+	user, groups, err := client.GetUserGroups(context.Background(), "an-access-token", 42)
 	require.NoError(t, err)
 
 	gotPath, _ := recorded()
@@ -99,7 +100,7 @@ func TestAuthServerClient_GetUserGroupsReturnsTheUserAndTheMemberships(t *testin
 func TestAuthServerClient_UpdateUserGroupsReturnsTheMembershipsItSaved(t *testing.T) {
 	client, recorded := serves(t, `{"user":{"id":42,"email":"jane@example.com"},"groups":[{`+groupBodyFields+`}]}`)
 
-	user, groups, err := client.UpdateUserGroups("an-access-token", 42, nil)
+	user, groups, err := client.UpdateUserGroups(context.Background(), "an-access-token", 42, nil)
 	require.NoError(t, err)
 
 	gotPath, _ := recorded()
@@ -118,7 +119,7 @@ func TestAuthServerClient_CreateAndUpdateGroupReturnTheSavedGroup(t *testing.T) 
 	t.Run("create", func(t *testing.T) {
 		client, recorded := servesStatus(t, http.StatusCreated, `{"group":{`+groupBodyFields+`}}`)
 
-		group, err := client.CreateGroup("an-access-token", nil)
+		group, err := client.CreateGroup(context.Background(), "an-access-token", nil)
 		require.NoError(t, err)
 		require.NotNil(t, group)
 
@@ -131,7 +132,7 @@ func TestAuthServerClient_CreateAndUpdateGroupReturnTheSavedGroup(t *testing.T) 
 	t.Run("update", func(t *testing.T) {
 		client, recorded := serves(t, `{"group":{`+groupBodyFields+`}}`)
 
-		group, err := client.UpdateGroup("an-access-token", 4, nil)
+		group, err := client.UpdateGroup(context.Background(), "an-access-token", 4, nil)
 		require.NoError(t, err)
 		require.NotNil(t, group)
 
@@ -150,7 +151,7 @@ func TestAuthServerClient_GetGroupPermissionsReturnsTheGroupBesideThePermissions
 		`"permissionIdentifier":"read","description":"Read","resourceId":2,`+
 		`"resource":{"id":2,"resourceIdentifier":"api","description":"The API"}}]}`)
 
-	group, permissions, err := client.GetGroupPermissions("an-access-token", 4)
+	group, permissions, err := client.GetGroupPermissions(context.Background(), "an-access-token", 4)
 	require.NoError(t, err)
 	require.NotNil(t, group)
 

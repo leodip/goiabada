@@ -46,7 +46,7 @@ func HandleAdminGroupSettingsGet(
 			return
 		}
 
-		group, err := apiClient.GetGroupById(jwtInfo.TokenResponse.AccessToken, id)
+		group, err := apiClient.GetGroupById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			var apiErr *apiclient.APIError
 			if errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusNotFound {
@@ -147,7 +147,7 @@ func HandleAdminGroupSettingsPost(
 		}
 
 		// Call API to update group
-		_, err = apiClient.UpdateGroup(jwtInfo.TokenResponse.AccessToken, id, updateReq)
+		_, err = apiClient.UpdateGroup(r.Context(), jwtInfo.TokenResponse.AccessToken, id, updateReq)
 		if err != nil {
 			handlers.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
 			return

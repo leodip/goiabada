@@ -41,7 +41,7 @@ func HandleAdminGroupMembersGet(
 		}
 
 		// Get group details
-		group, err := apiClient.GetGroupById(jwtInfo.TokenResponse.AccessToken, id)
+		group, err := apiClient.GetGroupById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -54,7 +54,7 @@ func HandleAdminGroupMembersGet(
 		pageInt := pagination.ParsePage(r.URL.Query().Get("page"))
 
 		const pageSize = 10
-		users, total, err := apiClient.GetGroupMembers(jwtInfo.TokenResponse.AccessToken, group.Id, pageInt, pageSize)
+		users, total, err := apiClient.GetGroupMembers(r.Context(), jwtInfo.TokenResponse.AccessToken, group.Id, pageInt, pageSize)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -65,7 +65,7 @@ func HandleAdminGroupMembersGet(
 		// that highlights a full one (#305).
 		if clamped := pagination.ClampPage(total, pageSize, pageInt); clamped != pageInt {
 			pageInt = clamped
-			users, total, err = apiClient.GetGroupMembers(jwtInfo.TokenResponse.AccessToken, group.Id, pageInt, pageSize)
+			users, total, err = apiClient.GetGroupMembers(r.Context(), jwtInfo.TokenResponse.AccessToken, group.Id, pageInt, pageSize)
 			if err != nil {
 				handlers.HandleAPIError(httpHelper, w, r, err)
 				return
