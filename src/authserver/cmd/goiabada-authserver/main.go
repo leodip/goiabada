@@ -1,7 +1,17 @@
+// Command goiabada-authserver is the Goiabada auth server, and the tool that steps its schema.
+//
+//	goiabada-authserver [flags]                                     serve
+//	goiabada-authserver [flags] migrate [--db-* flags] version      report the schema version
+//	goiabada-authserver [flags] migrate [--db-* flags] to <version> step the schema to <version>
+//
+// Flags before `migrate` are the server's, and only the --db-* ones among them reach `migrate`;
+// after it, only the --db-* flags are accepted, and one given there overrides the same flag given
+// before. Any other first argument is refused.
 package main
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -20,6 +30,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/server"
 	"github.com/leodip/goiabada/authserver/internal/sessionbackend"
 	coreconstants "github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/logging"
 	"github.com/leodip/goiabada/core/sessionstore"
@@ -39,6 +50,17 @@ func main() {
 		os.Exit(1)
 	}
 
+	// The command is chosen from what the flag parse left, not from os.Args: the parse stops at
+	// the first argument that is not a flag, so reading os.Args[1] took `-db-type=mysql migrate
+	// to 44` for a server start and migrated a database up that the operator asked to step down
+	// (#424). A refusal is the operator's typo rather than a server event, so it goes to stderr
+	// as one line and nothing is opened.
+	migrateArgs, isMigrate, err := dispatch(config.Args())
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "%v\n", err)
+		os.Exit(migrateExitUsage)
+	}
+
 	slog.Info("auth server started")
 	slog.Info("build information",
 		"version", coreconstants.Version,
@@ -46,12 +68,15 @@ func main() {
 		"git_commit", coreconstants.GitCommit)
 	slog.Info("config loaded")
 
-	// The `migrate` subcommand is dispatched here: after the configuration is loaded, because it
-	// needs GOIABADA_DB_*, and before the data-encryption key is validated, because a schema
-	// migration touches no encrypted value and the key would otherwise be a precondition for
-	// repairing a database on a deployment that has not set one (#268).
-	if len(os.Args) > 1 && os.Args[1] == "migrate" {
-		os.Exit(migrateCommand(os.Args[2:]))
+	// The `migrate` subcommand runs here: after the configuration is loaded, because it needs
+	// GOIABADA_DB_* and the --db-* flags given before it, and before the data-encryption key is
+	// validated, because a schema migration touches no encrypted value and the key would
+	// otherwise be a precondition for repairing a database on a deployment that has not set one
+	// (#268). Its arguments are the ones dispatch left after the word `migrate`, and the database
+	// configuration is handed over by value, so the --db-* flags it parses among them override a
+	// copy and the loaded configuration stays what the process was started with (#424).
+	if isMigrate {
+		os.Exit(migrateCommand(migrateArgs, *config.GetDatabase(), os.Stdout, os.Stderr))
 	}
 
 	// Validate the data-encryption key EARLY and initialize the process cipher
@@ -271,6 +296,23 @@ func main() {
 	s.Start(ctx)
 
 	slog.Info("auth server stopped")
+}
+
+// dispatch chooses the command from the positional arguments the flag parse left: none serves,
+// a first `migrate` hands the rest to the subcommand, and anything else is refused, before a
+// database is opened. A typo such as `migrat to 44` used to start the server and migrate the
+// database up, the opposite of what was asked (#424).
+func dispatch(args []string) (migrateArgs []string, isMigrate bool, err error) {
+	if len(args) == 0 {
+		return nil, false, nil
+	}
+	if args[0] == "migrate" {
+		return args[1:], true, nil
+	}
+	return nil, false, errs.Errorf("unknown command %q: run goiabada-authserver [flags] with no "+
+		"command to start the server, or goiabada-authserver [flags] migrate version, or "+
+		"goiabada-authserver [flags] migrate to <version>, to manage the schema; the server's "+
+		"flags go before the command", args[0])
 }
 
 // bootstrapCredentialVars are the five values a deployment has to carry over from

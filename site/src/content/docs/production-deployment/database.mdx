@@ -66,7 +66,9 @@ changed. The admin console holds no database
 connection of its own and reaches the auth server through its API, so restarting it migrates
 nothing.
 
-The commands below run against the database in `GOIABADA_DB_*` and do not start the server.
+The commands below run against the database in `GOIABADA_DB_*` and do not start the server. The
+`--db-*` flags override those variables, given before or after `migrate`; any other flag goes before
+it. A mistyped command, such as `migrat`, is refused rather than starting the server.
 
 | Command | What it does |
 |---|---|

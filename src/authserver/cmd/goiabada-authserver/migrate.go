@@ -2,9 +2,9 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"io"
-	"os"
 	"strconv"
 	"strings"
 
@@ -36,48 +36,144 @@ const migrateUsage = `usage:
   goiabada-authserver migrate version      show the schema version this binary expects and the one the database records
   goiabada-authserver migrate to <version> step the schema to <version>, up or down (for example: to 44, or to 000044)
 
-Connection details come from the usual GOIABADA_DB_* environment variables.`
+Connection details come from the GOIABADA_DB_* environment variables or the --db-* flags
+(--db-type, --db-username, --db-password, --db-host, --db-port, --db-name, --db-dsn, --db-create),
+given before or after migrate. A flag after migrate overrides the same flag before it. Every other
+flag goes before migrate.`
 
 // Exit codes. They are kept apart so a deployment script can tell a mistake in the invocation from
 // a refusal by the database, which need different responses: one is fixed by retyping the command,
-// the other by looking at the schema.
+// the other by looking at the schema. migrateExitUsage also answers a malformed command line before
+// any subcommand is chosen, from dispatch in main.go, for the same reason (#424).
 const (
 	migrateExitOK    = 0
 	migrateExitError = 1
 	migrateExitUsage = 2
 )
 
-// migrateCommand opens the configured database WITHOUT migrating it and hands its migrator to
-// runMigrate. It is the only caller of datafactory.OpenDatabase: datafactory.NewDatabase brings the schema to
+// migrateCommand parses the arguments after `migrate`, opens the database they and base describe
+// WITHOUT migrating it, and hands its migrator to runMigrate. base is the loaded database
+// configuration: the environment, then the --db-* flags given before `migrate`.
+//
+// It is the only caller of datafactory.OpenDatabase: datafactory.NewDatabase brings the schema to
 // head on the way out, which would make a step down impossible and a `migrate version` on a
 // database behind this binary a lie, since the read would happen after the migration it was meant
 // to report on.
-func migrateCommand(args []string) int {
+func migrateCommand(args []string, base config.DatabaseConfig, stdout, stderr io.Writer) int {
+	inv, err := parseMigrateArgs(args, base)
+	if err != nil {
+		outf(stderr, "%v\n\n%s\n", err, migrateUsage)
+		return migrateExitUsage
+	}
+	if inv.help {
+		outf(stdout, "%s\n", migrateUsage)
+		return migrateExitOK
+	}
+
 	// The subcommand owns this root: it is a one-shot process with no request above it, and
 	// nothing else is waiting on the migration it runs. It exists so that every driver call
 	// below takes a context rather than opening one where it lands (#386).
 	ctx := context.Background()
 
-	database, err := datafactory.OpenDatabase(config.GetDatabase(), false)
+	database, err := datafactory.OpenDatabase(&inv.database, false)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "unable to open the database: %+v\n", err)
+		outf(stderr, "unable to open the database: %+v\n", err)
 		return migrateExitError
 	}
 
 	provider, ok := database.(datafactory.MigratorProvider)
 	if !ok {
 		// Every engine type implements NewMigrator, so this is a new engine that forgot to.
-		fmt.Fprintf(os.Stderr, "this database engine cannot be migrated by hand: %T has no NewMigrator\n", database)
+		outf(stderr, "this database engine cannot be migrated by hand: %T has no NewMigrator\n", database)
 		return migrateExitError
 	}
 
 	m, err := provider.NewMigrator(ctx)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "unable to prepare the migration runner: %+v\n", err)
+		outf(stderr, "unable to prepare the migration runner: %+v\n", err)
 		return migrateExitError
 	}
 
-	return runMigrate(ctx, args, database, m, rollbackFloor, os.Stdout)
+	return runMigrate(ctx, inv.positional, database, m, rollbackFloor, stdout)
+}
+
+// migrateInvocation is what parseMigrateArgs made of the arguments after `migrate`.
+type migrateInvocation struct {
+	positional []string              // the subcommand and its operand, for runMigrate
+	database   config.DatabaseConfig // base, with every --db-* flag given after `migrate` applied
+	help       bool                  // -h or --help was given
+}
+
+// parseMigrateArgs reads the arguments after `migrate`: the --db-* flags anywhere among them, and
+// the positional arguments runMigrate takes, in order. A flag overrides the same flag in db, which
+// is a copy, so the loaded configuration is untouched; given twice, the last one wins.
+//
+// The scan is written here rather than left to FlagSet.Parse, and only the value parse is the flag
+// package's. Parse stops at the first positional argument, so it cannot take flags interleaved
+// with `to <n>`, and its errors are unexported text: telling an undefined flag from a malformed
+// value, which need different advice, would mean matching that text. Walking the tokens with the
+// flag package's own grammar and resolving each name through Lookup classifies every refusal
+// before any error exists (#424). The grammar followed is flag's: one or two dashes, `name=value`,
+// a non-boolean flag taking the next argument whatever it is, a boolean one never, `--` ending the
+// flags, and a lone `-` positional.
+func parseMigrateArgs(args []string, db config.DatabaseConfig) (migrateInvocation, error) {
+	fs := flag.NewFlagSet("migrate", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	config.RegisterDatabaseFlags(fs, &db)
+
+	var inv migrateInvocation
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		if arg == "--" {
+			inv.positional = append(inv.positional, args[i+1:]...)
+			break
+		}
+		if len(arg) < 2 || arg[0] != '-' {
+			inv.positional = append(inv.positional, arg)
+			continue
+		}
+
+		name := strings.TrimPrefix(arg[1:], "-")
+		value, hasValue := "", false
+		if eq := strings.IndexByte(name, '='); eq >= 0 {
+			name, value, hasValue = name[:eq], name[eq+1:], true
+		}
+
+		if !hasValue && (name == "h" || name == "help") {
+			inv.help = true
+			continue
+		}
+
+		f := fs.Lookup(name)
+		if name == "" || f == nil {
+			typed := arg
+			if name != "" {
+				typed = arg[:strings.IndexByte(arg+"=", '=')]
+			}
+			return migrateInvocation{}, errs.Errorf("%s is not a flag migrate accepts: only the "+
+				"--db-* flags can follow migrate, so give any other flag before it", typed)
+		}
+
+		if b, ok := f.Value.(interface{ IsBoolFlag() bool }); ok && b.IsBoolFlag() {
+			if !hasValue {
+				value = "true"
+			}
+		} else if !hasValue {
+			if i+1 == len(args) {
+				return migrateInvocation{}, errs.Errorf("--%s needs a value: give it as --%s=<value>",
+					name, name)
+			}
+			i++
+			value = args[i]
+		}
+
+		if err := fs.Set(name, value); err != nil {
+			return migrateInvocation{}, errs.Wrapf(err, "invalid value %q for --%s", value, name)
+		}
+	}
+
+	inv.database = db
+	return inv, nil
 }
 
 // runMigrate is the whole of the `migrate` subcommand: the arguments that followed the word
@@ -254,16 +350,15 @@ func migrateTo(ctx context.Context, database data.Database, m *migrator.Migrator
 
 // outf writes one line of the command's own output, discarding the error the write returns.
 //
-// The discard is the point of the function. The destination is the process's stdout, and a
-// command that cannot describe what it did has no second channel to say so on: reporting a
+// The discard is the point of the function. The destination is the process's stdout or stderr,
+// and a command that cannot describe what it did has no second channel to say so on: reporting a
 // failed write means writing again, to the thing that just failed. What the command actually
 // did is decided by the migrator and reported by the exit code, neither of which depends on
 // the description reaching anyone.
 //
-// It exists rather than a `_, _ =` on each of the twenty-two call sites above, which is the
-// same discard spelled once per line. errcheck flags an unchecked write to an io.Writer and
-// does not flag one to os.Stderr, which is why the three failures in migrateCommand still
-// call fmt.Fprintf directly: they go somewhere else, for a different reason.
+// It exists rather than a `_, _ =` on each call site above, which is the same discard spelled
+// once per line: errcheck flags an unchecked write to an io.Writer. migrateCommand's failures
+// reach it too, since #424 gave the command its writers as parameters so a test can read them.
 func outf(out io.Writer, format string, a ...any) {
 	_, _ = fmt.Fprintf(out, format, a...)
 }

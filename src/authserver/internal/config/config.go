@@ -120,6 +120,9 @@ type Config struct {
 var (
 	cfg  Config
 	once sync.Once
+
+	// positionalArgs is what the flag parse in loadFrom left, read through Args.
+	positionalArgs []string
 )
 
 // Init initializes the configuration
@@ -218,14 +221,7 @@ func loadFrom(fs *flag.FlagSet, args []string) {
 	fs.StringVar(&cfg.AdminConsole.OAuthClientSecret, "adminconsole-oauth-client-secret", cfg.AdminConsole.OAuthClientSecret, "OAuth client_secret used by admin console (confidential client)")
 
 	// Database
-	fs.StringVar(&cfg.Database.Type, "db-type", cfg.Database.Type, "Database type. Options: mysql, sqlite")
-	fs.StringVar(&cfg.Database.Username, "db-username", cfg.Database.Username, "Database username")
-	fs.StringVar(&cfg.Database.Password, "db-password", cfg.Database.Password, "Database password")
-	fs.StringVar(&cfg.Database.Host, "db-host", cfg.Database.Host, "Database host")
-	fs.IntVar(&cfg.Database.Port, "db-port", cfg.Database.Port, "Database port")
-	fs.StringVar(&cfg.Database.Name, "db-name", cfg.Database.Name, "Database name")
-	fs.StringVar(&cfg.Database.DSN, "db-dsn", cfg.Database.DSN, "Database DSN (only for sqlite)")
-	fs.BoolVar(&cfg.Database.Create, "db-create", cfg.Database.Create, "Create the database if it does not exist (only for mysql, postgres, mssql)")
+	RegisterDatabaseFlags(fs, &cfg.Database)
 
 	// Initial setup
 	fs.StringVar(&cfg.AdminEmail, "admin-email", cfg.AdminEmail, "Default admin email")
@@ -236,6 +232,7 @@ func loadFrom(fs *flag.FlagSet, args []string) {
 	// ExitOnError, so a server given a bad flag has already exited by here, and a
 	// test supplying its own set asserts on the config rather than on the parse.
 	_ = fs.Parse(args)
+	positionalArgs = fs.Args()
 
 	// Re-derive slice-valued config after flag parsing so a command-line flag
 	// (comma-separated) overrides the environment value.
@@ -257,6 +254,31 @@ func loadFrom(fs *flag.FlagSet, args []string) {
 		slog.Warn("a removed setting is present in the environment and is ignored, because the secure cookie flag is now derived from an https base url",
 			"setting", k)
 	}
+}
+
+// RegisterDatabaseFlags registers the eight --db-* flags on fs, each writing into c and
+// defaulting to the value c already holds.
+//
+// It is the one registration of those names. The server's parse registers them over the loaded
+// configuration, and the `migrate` subcommand registers them again on a set of its own over a copy
+// of it, so that the same flags given after `migrate` override the ones given before; a second
+// hand-written list would let the two command lines drift apart (#424).
+func RegisterDatabaseFlags(fs *flag.FlagSet, c *DatabaseConfig) {
+	fs.StringVar(&c.Type, "db-type", c.Type, "Database type. Options: sqlite, mysql, postgres, mssql")
+	fs.StringVar(&c.Username, "db-username", c.Username, "Database username")
+	fs.StringVar(&c.Password, "db-password", c.Password, "Database password")
+	fs.StringVar(&c.Host, "db-host", c.Host, "Database host")
+	fs.IntVar(&c.Port, "db-port", c.Port, "Database port")
+	fs.StringVar(&c.Name, "db-name", c.Name, "Database name")
+	fs.StringVar(&c.DSN, "db-dsn", c.DSN, "Database DSN (only for sqlite)")
+	fs.BoolVar(&c.Create, "db-create", c.Create, "Create the database if it does not exist (only for mysql, postgres, mssql)")
+}
+
+// Args returns the positional arguments the command-line parse left, in order. The flag parse
+// stops at the first argument that is not a flag, so the first of these selects the command and
+// the rest belong to it; none means the server runs (#424).
+func Args() []string {
+	return append([]string(nil), positionalArgs...)
 }
 
 func GetAuthServer() *AuthServerConfig {
