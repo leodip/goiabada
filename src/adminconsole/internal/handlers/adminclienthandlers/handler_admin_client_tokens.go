@@ -45,7 +45,7 @@ func HandleAdminClientTokensGet(
 			return
 		}
 
-		client, err := apiClient.GetClientById(jwtInfo.TokenResponse.AccessToken, id)
+		client, err := apiClient.GetClientById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -125,7 +125,7 @@ func HandleAdminClientTokensPost(
 			return
 		}
 
-		client, err := apiClient.GetClientById(jwtInfo.TokenResponse.AccessToken, id)
+		client, err := apiClient.GetClientById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -192,7 +192,7 @@ func HandleAdminClientTokensPost(
 			IncludeOpenIDConnectClaimsInIdToken:     settingsInfo.IncludeOpenIDConnectClaimsInIdToken,
 		}
 
-		_, err = apiClient.UpdateClientTokens(jwtInfo.TokenResponse.AccessToken, id, updateReq)
+		_, err = apiClient.UpdateClientTokens(r.Context(), jwtInfo.TokenResponse.AccessToken, id, updateReq)
 		if err != nil {
 			handlers.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
 			return

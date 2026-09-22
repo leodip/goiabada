@@ -1,153 +1,64 @@
 package apiclient
 
 import (
-	"bytes"
-	"encoding/json"
+	"context"
 	"fmt"
-	"io"
 	"net/http"
 
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/errs"
 )
 
 // CreateResource creates a new resource via the auth server admin API
-func (c *AuthServerClient) CreateResource(accessToken string, request *api.CreateResourceRequest) (*api.ResourceResponse, error) {
-	url := fmt.Sprintf("%s/api/v1/admin/resources", c.baseURL)
-
-	body, err := json.Marshal(request)
+func (c *AuthServerClient) CreateResource(ctx context.Context, accessToken string, request *api.CreateResourceRequest) (*api.ResourceResponse, error) {
+	response, err := execute[api.CreateResourceResponse](ctx, c, accessToken, apiRequest{
+		method:        "POST",
+		url:           fmt.Sprintf("%s/api/v1/admin/resources", c.baseURL),
+		jsonBody:      request,
+		contentType:   contentTypeJSON,
+		successStatus: http.StatusCreated,
+	})
 	if err != nil {
-		return nil, errs.Errorf("failed to marshal request: %w", err)
+		return nil, err
 	}
-
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(body))
-	if err != nil {
-		return nil, errs.Errorf("failed to create request: %w", err)
-	}
-
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, errs.Errorf("request failed: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, errs.Errorf("failed to read response body: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusCreated {
-		return nil, parseAPIError(resp, respBody)
-	}
-
-	var apiResp api.CreateResourceResponse
-	if err := json.Unmarshal(respBody, &apiResp); err != nil {
-		return nil, errs.Errorf("failed to parse response: %w", err)
-	}
-
-	return &apiResp.Resource, nil
+	return &response.Resource, nil
 }
 
 // GetResourceById retrieves a single resource by ID via the auth server admin API
-func (c *AuthServerClient) GetResourceById(accessToken string, resourceId int64) (*api.ResourceResponse, error) {
-	url := fmt.Sprintf("%s/api/v1/admin/resources/%d", c.baseURL, resourceId)
-
-	req, err := http.NewRequest("GET", url, nil)
+func (c *AuthServerClient) GetResourceById(ctx context.Context, accessToken string, resourceId int64) (*api.ResourceResponse, error) {
+	response, err := execute[api.GetResourceResponse](ctx, c, accessToken, apiRequest{
+		method:        "GET",
+		url:           fmt.Sprintf("%s/api/v1/admin/resources/%d", c.baseURL, resourceId),
+		contentType:   contentTypeJSON,
+		successStatus: http.StatusOK,
+	})
 	if err != nil {
-		return nil, errs.Errorf("failed to create request: %w", err)
+		return nil, err
 	}
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, errs.Errorf("request failed: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, errs.Errorf("failed to read response body: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, parseAPIError(resp, body)
-	}
-
-	var apiResp api.GetResourceResponse
-	if err := json.Unmarshal(body, &apiResp); err != nil {
-		return nil, errs.Errorf("failed to parse response: %w", err)
-	}
-
-	return &apiResp.Resource, nil
+	return &response.Resource, nil
 }
 
 // UpdateResource updates an existing resource via the auth server admin API
-func (c *AuthServerClient) UpdateResource(accessToken string, resourceId int64, request *api.UpdateResourceRequest) (*api.ResourceResponse, error) {
-	url := fmt.Sprintf("%s/api/v1/admin/resources/%d", c.baseURL, resourceId)
-
-	body, err := json.Marshal(request)
+func (c *AuthServerClient) UpdateResource(ctx context.Context, accessToken string, resourceId int64, request *api.UpdateResourceRequest) (*api.ResourceResponse, error) {
+	response, err := execute[api.UpdateResourceResponse](ctx, c, accessToken, apiRequest{
+		method:        "PUT",
+		url:           fmt.Sprintf("%s/api/v1/admin/resources/%d", c.baseURL, resourceId),
+		jsonBody:      request,
+		contentType:   contentTypeJSON,
+		successStatus: http.StatusOK,
+	})
 	if err != nil {
-		return nil, errs.Errorf("failed to marshal request: %w", err)
+		return nil, err
 	}
-
-	req, err := http.NewRequest("PUT", url, bytes.NewBuffer(body))
-	if err != nil {
-		return nil, errs.Errorf("failed to create request: %w", err)
-	}
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, errs.Errorf("request failed: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, errs.Errorf("failed to read response body: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, parseAPIError(resp, respBody)
-	}
-
-	var apiResp api.UpdateResourceResponse
-	if err := json.Unmarshal(respBody, &apiResp); err != nil {
-		return nil, errs.Errorf("failed to parse response: %w", err)
-	}
-
-	return &apiResp.Resource, nil
+	return &response.Resource, nil
 }
 
 // DeleteResource deletes a resource via the auth server admin API
-func (c *AuthServerClient) DeleteResource(accessToken string, resourceId int64) error {
-	url := fmt.Sprintf("%s/api/v1/admin/resources/%d", c.baseURL, resourceId)
-
-	req, err := http.NewRequest("DELETE", url, nil)
-	if err != nil {
-		return errs.Errorf("failed to create request: %w", err)
-	}
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return errs.Errorf("request failed: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return errs.Errorf("failed to read response body: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return parseAPIError(resp, respBody)
-	}
-	return nil
+func (c *AuthServerClient) DeleteResource(ctx context.Context, accessToken string, resourceId int64) error {
+	_, err := c.do(ctx, accessToken, apiRequest{
+		method:        "DELETE",
+		url:           fmt.Sprintf("%s/api/v1/admin/resources/%d", c.baseURL, resourceId),
+		contentType:   contentTypeJSON,
+		successStatus: http.StatusOK,
+	})
+	return err
 }

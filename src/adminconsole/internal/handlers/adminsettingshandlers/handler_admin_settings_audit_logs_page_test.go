@@ -1,6 +1,7 @@
 package adminsettingshandlers
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -43,7 +44,7 @@ type auditPagingApiClient struct {
 	eventTypesErr error
 }
 
-func (c *auditPagingApiClient) GetAuditLogsPaginated(accessToken string, page, pageSize int,
+func (c *auditPagingApiClient) GetAuditLogsPaginated(_ context.Context, accessToken string, page, pageSize int,
 	auditEvent string, requestId string) (*api.GetAuditLogsResponse, error) {
 
 	c.asked = append(c.asked, page)
@@ -58,7 +59,7 @@ func (c *auditPagingApiClient) GetAuditLogsPaginated(accessToken string, page, p
 	}, nil
 }
 
-func (c *auditPagingApiClient) GetAuditEventTypes(accessToken string) (*api.GetAuditEventTypesResponse, error) {
+func (c *auditPagingApiClient) GetAuditEventTypes(_ context.Context, accessToken string) (*api.GetAuditEventTypesResponse, error) {
 	if c.eventTypesErr != nil {
 		return nil, c.eventTypesErr
 	}

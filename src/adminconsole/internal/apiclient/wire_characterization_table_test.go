@@ -274,7 +274,7 @@ func wireCharacterization() []wireCase {
 		{
 			name: "GetSettingsAuditLogs",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				got, err := c.GetSettingsAuditLogs(charAccessToken)
+				got, err := c.GetSettingsAuditLogs(ctx, charAccessToken)
 				if err != nil {
 					return nil, err
 				}
@@ -286,7 +286,7 @@ func wireCharacterization() []wireCase {
 		{
 			name: "UpdateSettingsAuditLogs",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				got, err := c.UpdateSettingsAuditLogs(charAccessToken, charUpdateAuditSettings)
+				got, err := c.UpdateSettingsAuditLogs(ctx, charAccessToken, charUpdateAuditSettings)
 				if err != nil {
 					return nil, err
 				}
@@ -299,7 +299,7 @@ func wireCharacterization() []wireCase {
 		{
 			name: "GetAuditLogsPaginated",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				got, err := c.GetAuditLogsPaginated(charAccessToken, 2, 25, "AuditUserLogin", "a request id")
+				got, err := c.GetAuditLogsPaginated(ctx, charAccessToken, 2, 25, "AuditUserLogin", "a request id")
 				if err != nil {
 					return nil, err
 				}
@@ -313,7 +313,7 @@ func wireCharacterization() []wireCase {
 		{
 			name: "GetAuditEventTypes",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				got, err := c.GetAuditEventTypes(charAccessToken)
+				got, err := c.GetAuditEventTypes(ctx, charAccessToken)
 				if err != nil {
 					return nil, err
 				}
@@ -327,7 +327,7 @@ func wireCharacterization() []wireCase {
 		{
 			name: "GetAllClients",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				got, err := c.GetAllClients(charAccessToken)
+				got, err := c.GetAllClients(ctx, charAccessToken)
 				if err != nil {
 					return nil, err
 				}
@@ -339,7 +339,7 @@ func wireCharacterization() []wireCase {
 		{
 			name: "GetClientById",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				got, err := c.GetClientById(charAccessToken, 3)
+				got, err := c.GetClientById(ctx, charAccessToken, 3)
 				if err != nil {
 					return nil, err
 				}
@@ -351,7 +351,7 @@ func wireCharacterization() []wireCase {
 		{
 			name: "CreateClient",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				got, err := c.CreateClient(charAccessToken, charCreateClient)
+				got, err := c.CreateClient(ctx, charAccessToken, charCreateClient)
 				if err != nil {
 					return nil, err
 				}
@@ -364,7 +364,7 @@ func wireCharacterization() []wireCase {
 		{
 			name: "UpdateClient",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				got, err := c.UpdateClient(charAccessToken, 3, charUpdateClient)
+				got, err := c.UpdateClient(ctx, charAccessToken, 3, charUpdateClient)
 				if err != nil {
 					return nil, err
 				}
@@ -377,7 +377,7 @@ func wireCharacterization() []wireCase {
 		{
 			name: "UpdateClientAuthentication",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				got, err := c.UpdateClientAuthentication(charAccessToken, 3, charUpdateClientAuth)
+				got, err := c.UpdateClientAuthentication(ctx, charAccessToken, 3, charUpdateClientAuth)
 				if err != nil {
 					return nil, err
 				}
@@ -390,7 +390,7 @@ func wireCharacterization() []wireCase {
 		{
 			name: "UpdateClientOAuth2Flows",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				got, err := c.UpdateClientOAuth2Flows(charAccessToken, 3, charUpdateClientFlows)
+				got, err := c.UpdateClientOAuth2Flows(ctx, charAccessToken, 3, charUpdateClientFlows)
 				if err != nil {
 					return nil, err
 				}
@@ -403,7 +403,7 @@ func wireCharacterization() []wireCase {
 		{
 			name: "DeleteClient",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				return nil, c.DeleteClient(charAccessToken, 3)
+				return nil, c.DeleteClient(ctx, charAccessToken, 3)
 			},
 			verb: "DELETE", path: "/api/v1/admin/clients/3", contentType: charJSON, anySuccess2xx: true,
 			reply: `{}`,
@@ -411,7 +411,7 @@ func wireCharacterization() []wireCase {
 		{
 			name: "UpdateClientRedirectURIs",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				got, err := c.UpdateClientRedirectURIs(charAccessToken, 3, charUpdateClientRedir)
+				got, err := c.UpdateClientRedirectURIs(ctx, charAccessToken, 3, charUpdateClientRedir)
 				if err != nil {
 					return nil, err
 				}
@@ -424,7 +424,7 @@ func wireCharacterization() []wireCase {
 		{
 			name: "UpdateClientWebOrigins",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				got, err := c.UpdateClientWebOrigins(charAccessToken, 3, charUpdateClientOrig)
+				got, err := c.UpdateClientWebOrigins(ctx, charAccessToken, 3, charUpdateClientOrig)
 				if err != nil {
 					return nil, err
 				}
@@ -437,7 +437,7 @@ func wireCharacterization() []wireCase {
 		{
 			name: "UpdateClientTokens",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				got, err := c.UpdateClientTokens(charAccessToken, 3, charUpdateClientToken)
+				got, err := c.UpdateClientTokens(ctx, charAccessToken, 3, charUpdateClientToken)
 				if err != nil {
 					return nil, err
 				}
@@ -450,7 +450,7 @@ func wireCharacterization() []wireCase {
 		{
 			name: "GetClientLogo",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				got, err := c.GetClientLogo(charAccessToken, 3)
+				got, err := c.GetClientLogo(ctx, charAccessToken, 3)
 				if err != nil {
 					return nil, err
 				}
@@ -463,7 +463,7 @@ func wireCharacterization() []wireCase {
 		{
 			name: "UploadClientLogo",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				got, err := c.UploadClientLogo(charAccessToken, 3, charPictureBytes, "logo.png")
+				got, err := c.UploadClientLogo(ctx, charAccessToken, 3, charPictureBytes, "logo.png")
 				if err != nil {
 					return nil, err
 				}
@@ -477,7 +477,7 @@ func wireCharacterization() []wireCase {
 		{
 			name: "DeleteClientLogo",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				return nil, c.DeleteClientLogo(charAccessToken, 3)
+				return nil, c.DeleteClientLogo(ctx, charAccessToken, 3)
 			},
 			verb: "DELETE", path: "/api/v1/admin/clients/3/logo",
 			successStatus: 200, reply: `{}`,
@@ -487,7 +487,7 @@ func wireCharacterization() []wireCase {
 		{
 			name: "GetClientPermissions",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				client, permissions, err := c.GetClientPermissions(charAccessToken, 3)
+				client, permissions, err := c.GetClientPermissions(ctx, charAccessToken, 3)
 				if err != nil {
 					return nil, err
 				}
@@ -500,7 +500,7 @@ func wireCharacterization() []wireCase {
 		{
 			name: "UpdateClientPermissions",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				return nil, c.UpdateClientPermissions(charAccessToken, 3, charUpdateClientPerms)
+				return nil, c.UpdateClientPermissions(ctx, charAccessToken, 3, charUpdateClientPerms)
 			},
 			verb: "PUT", path: "/api/v1/admin/clients/3/permissions", contentType: charJSON,
 			bodyOf:        charUpdateClientPerms,
@@ -740,7 +740,7 @@ func wireCharacterization() []wireCase {
 		{
 			name: "GetUserPermissions",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				user, permissions, err := c.GetUserPermissions(charAccessToken, 42)
+				user, permissions, err := c.GetUserPermissions(ctx, charAccessToken, 42)
 				if err != nil {
 					return nil, err
 				}
@@ -753,7 +753,7 @@ func wireCharacterization() []wireCase {
 		{
 			name: "UpdateUserPermissions",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				return nil, c.UpdateUserPermissions(charAccessToken, 42, charUpdateUserPerm)
+				return nil, c.UpdateUserPermissions(ctx, charAccessToken, 42, charUpdateUserPerm)
 			},
 			verb: "PUT", path: "/api/v1/admin/users/42/permissions", contentType: charJSON,
 			bodyOf:        charUpdateUserPerm,
@@ -762,7 +762,7 @@ func wireCharacterization() []wireCase {
 		{
 			name: "GetAllResources",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				got, err := c.GetAllResources(charAccessToken)
+				got, err := c.GetAllResources(ctx, charAccessToken)
 				if err != nil {
 					return nil, err
 				}
@@ -774,7 +774,7 @@ func wireCharacterization() []wireCase {
 		{
 			name: "GetPermissionsByResource",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				got, err := c.GetPermissionsByResource(charAccessToken, 2)
+				got, err := c.GetPermissionsByResource(ctx, charAccessToken, 2)
 				if err != nil {
 					return nil, err
 				}
@@ -786,7 +786,7 @@ func wireCharacterization() []wireCase {
 		{
 			name: "UpdateResourcePermissions",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				return nil, c.UpdateResourcePermissions(charAccessToken, 2, charUpdateResPerms)
+				return nil, c.UpdateResourcePermissions(ctx, charAccessToken, 2, charUpdateResPerms)
 			},
 			verb: "PUT", path: "/api/v1/admin/resources/2/permissions", contentType: charJSON,
 			bodyOf:        charUpdateResPerms,
@@ -795,7 +795,7 @@ func wireCharacterization() []wireCase {
 		{
 			name: "GetUsersByPermission",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				users, total, err := c.GetUsersByPermission(charAccessToken, 8, 1, 10)
+				users, total, err := c.GetUsersByPermission(ctx, charAccessToken, 8, 1, 10)
 				if err != nil {
 					return nil, err
 				}
@@ -809,7 +809,7 @@ func wireCharacterization() []wireCase {
 		{
 			name: "SearchUsersWithPermissionAnnotation",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				users, total, err := c.SearchUsersWithPermissionAnnotation(charAccessToken, 8, "jane doe", 1, 10)
+				users, total, err := c.SearchUsersWithPermissionAnnotation(ctx, charAccessToken, 8, "jane doe", 1, 10)
 				if err != nil {
 					return nil, err
 				}
@@ -852,7 +852,7 @@ func wireCharacterization() []wireCase {
 		{
 			name: "CreateResource",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				got, err := c.CreateResource(charAccessToken, charCreateResource)
+				got, err := c.CreateResource(ctx, charAccessToken, charCreateResource)
 				if err != nil {
 					return nil, err
 				}
@@ -865,7 +865,7 @@ func wireCharacterization() []wireCase {
 		{
 			name: "GetResourceById",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				got, err := c.GetResourceById(charAccessToken, 2)
+				got, err := c.GetResourceById(ctx, charAccessToken, 2)
 				if err != nil {
 					return nil, err
 				}
@@ -877,7 +877,7 @@ func wireCharacterization() []wireCase {
 		{
 			name: "UpdateResource",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				got, err := c.UpdateResource(charAccessToken, 2, charUpdateResource)
+				got, err := c.UpdateResource(ctx, charAccessToken, 2, charUpdateResource)
 				if err != nil {
 					return nil, err
 				}
@@ -890,7 +890,7 @@ func wireCharacterization() []wireCase {
 		{
 			name: "DeleteResource",
 			call: func(ctx context.Context, c *AuthServerClient) (any, error) {
-				return nil, c.DeleteResource(charAccessToken, 2)
+				return nil, c.DeleteResource(ctx, charAccessToken, 2)
 			},
 			verb: "DELETE", path: "/api/v1/admin/resources/2", contentType: charJSON,
 			successStatus: 200, reply: `{}`,

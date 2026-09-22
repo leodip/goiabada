@@ -15,6 +15,7 @@ import (
 	"time"
 
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
+	"github.com/leodip/goiabada/adminconsole/internal/boundedread"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	coreconstants "github.com/leodip/goiabada/core/constants"
@@ -817,8 +818,8 @@ func TestBuildScopeString_SpecialCharacters(t *testing.T) {
 
 // countingRefreshBody serves a fixed body and records how much was read. Finite
 // and larger than the cap: an unbounded read consumes all of it and parses
-// cleanly, a bounded one stops at the cap and hands json.Unmarshal a truncated
-// object, so both the count and the outcome flip when the cap goes.
+// cleanly, while the bound stops one byte past the cap and refuses the answer
+// outright, so both the count and the outcome flip when the cap goes.
 type countingRefreshBody struct {
 	remaining []byte
 	read      int64
@@ -843,7 +844,7 @@ func oversizedRefreshResponse() *countingRefreshBody {
 	return &countingRefreshBody{remaining: []byte(prefix + strings.Repeat("x", padding) + suffix)}
 }
 
-func TestRefreshToken_ReadsAtMostTheCap(t *testing.T) {
+func TestRefreshToken_RefusesAnAnswerOverTheCap(t *testing.T) {
 	const testSessionName = "test-session"
 	mockTokenParser := new(mock_middleware.TokenParser)
 	mockAuthHelper := new(mock_middleware.AuthHelper)
@@ -870,13 +871,13 @@ func TestRefreshToken_ReadsAtMostTheCap(t *testing.T) {
 
 	assert.False(t, refreshed)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "error parsing refresh token response",
-		"the answer reaches json.Unmarshal truncated rather than being refused outright")
-	assert.Equal(t, int64(oauthclient.MaxTokenResponseBytes), body.read,
-		"exactly the cap is read from a peer answering with more than it")
+	assert.True(t, errors.Is(err, boundedread.ErrResponseTooLarge),
+		"the answer is refused as oversized rather than reaching json.Unmarshal truncated: %v", err)
+	assert.Equal(t, int64(oauthclient.MaxTokenResponseBytes)+1, body.read,
+		"one byte past the cap is read, which is what makes the overrun detectable, and no more")
 
-	// The session is reached only after the parse succeeds, so an oversized
-	// answer never becomes the administrator's session.
+	// The session is reached only after the read and the parse succeed, so an
+	// oversized answer never becomes the administrator's session.
 	mockSessionStore.AssertNotCalled(t, "Save", mock.Anything, mock.Anything, mock.Anything)
 	mockHTTPClient.AssertExpectations(t)
 }

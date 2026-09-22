@@ -44,7 +44,7 @@ func HandleAdminClientRedirectURIsGet(
 			return
 		}
 
-		clientResp, err := apiClient.GetClientById(jwtInfo.TokenResponse.AccessToken, id)
+		clientResp, err := apiClient.GetClientById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -153,7 +153,7 @@ func HandleAdminClientRedirectURIsPost(
 		req := &api.UpdateClientRedirectURIsRequest{
 			RedirectURIs: data.RedirectURIs,
 		}
-		_, err = apiClient.UpdateClientRedirectURIs(jwtInfo.TokenResponse.AccessToken, data.ClientId, req)
+		_, err = apiClient.UpdateClientRedirectURIs(r.Context(), jwtInfo.TokenResponse.AccessToken, data.ClientId, req)
 		if err != nil {
 			// Not JsonError directly: the API refuses a redirect URI with a 400 whose
 			// description names the offending value, and that sentence is the only thing

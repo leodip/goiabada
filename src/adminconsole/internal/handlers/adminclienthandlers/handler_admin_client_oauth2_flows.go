@@ -42,7 +42,7 @@ func HandleAdminClientOAuth2Get(
 			httpHelper.InternalServerError(w, r, errs.New("no JWT info found in context"))
 			return
 		}
-		client, err := apiClient.GetClientById(jwtInfo.TokenResponse.AccessToken, id)
+		client, err := apiClient.GetClientById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -141,7 +141,7 @@ func HandleAdminClientOAuth2Post(
 			httpHelper.InternalServerError(w, r, errs.New("no JWT info found in context"))
 			return
 		}
-		client, err := apiClient.GetClientById(jwtInfo.TokenResponse.AccessToken, id)
+		client, err := apiClient.GetClientById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -215,7 +215,7 @@ func HandleAdminClientOAuth2Post(
 			ImplicitGrantEnabled:                    implicitGrantEnabled,
 			ResourceOwnerPasswordCredentialsEnabled: ropcEnabled,
 		}
-		_, err = apiClient.UpdateClientOAuth2Flows(jwtInfo.TokenResponse.AccessToken, client.Id, req)
+		_, err = apiClient.UpdateClientOAuth2Flows(r.Context(), jwtInfo.TokenResponse.AccessToken, client.Id, req)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return

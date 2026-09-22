@@ -44,7 +44,7 @@ func HandleAdminClientPermissionsGet(
 			return
 		}
 
-		clientResp, perms, err := apiClient.GetClientPermissions(jwtInfo.TokenResponse.AccessToken, id)
+		clientResp, perms, err := apiClient.GetClientPermissions(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -71,7 +71,7 @@ func HandleAdminClientPermissionsGet(
 			adminClientPermissions.Permissions[permission.Id] = permission.Resource.ResourceIdentifier + ":" + permission.PermissionIdentifier
 		}
 
-		resources, err := apiClient.GetAllResources(jwtInfo.TokenResponse.AccessToken)
+		resources, err := apiClient.GetAllResources(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -140,7 +140,7 @@ func HandleAdminClientPermissionsPost(
 
 		// Call Auth Server API to update client permissions
 		req := &api.UpdateClientPermissionsRequest{PermissionIds: data.AssignedPermissionsIds}
-		if err := apiClient.UpdateClientPermissions(jwtInfo.TokenResponse.AccessToken, data.ClientId, req); err != nil {
+		if err := apiClient.UpdateClientPermissions(r.Context(), jwtInfo.TokenResponse.AccessToken, data.ClientId, req); err != nil {
 			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}

@@ -24,7 +24,7 @@ func HandleAdminClientsGet(
 			return
 		}
 
-		clients, err := apiClient.GetAllClients(jwtInfo.TokenResponse.AccessToken)
+		clients, err := apiClient.GetAllClients(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return

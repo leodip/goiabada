@@ -1,15 +1,11 @@
 package apiclient
 
 import (
-	"bytes"
-	"encoding/json"
-	"io"
-	"mime/multipart"
+	"context"
 	"net/http"
 	"strconv"
 
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/errs"
 )
 
 // ClientLogoInfo contains client logo metadata
@@ -24,563 +20,183 @@ type ClientLogoUploadResponse struct {
 	PictureUrl string `json:"pictureUrl"`
 }
 
-func (c *AuthServerClient) GetAllClients(accessToken string) ([]api.ClientResponse, error) {
-	// Build URL
-	fullURL := c.baseURL + "/api/v1/admin/clients"
+// The ten methods below accept the whole 2xx range rather than one status, which is how they were
+// written and what their characterization rows record. The rest of the client names the single
+// status it expects; these keep the range because narrowing one would refuse an answer the auth
+// server is free to give today.
 
-	// Create request
-	req, err := http.NewRequest("GET", fullURL, nil)
+func (c *AuthServerClient) GetAllClients(ctx context.Context, accessToken string) ([]api.ClientResponse, error) {
+	response, err := execute[api.GetClientsResponse](ctx, c, accessToken, apiRequest{
+		method:        "GET",
+		url:           c.baseURL + "/api/v1/admin/clients",
+		contentType:   contentTypeJSON,
+		anySuccess2xx: true,
+	})
 	if err != nil {
-		return nil, errs.Errorf("failed to create request: %w", err)
+		return nil, err
 	}
-
-	// Set headers
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-	req.Header.Set("Content-Type", "application/json")
-
-	// Make request
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, errs.Errorf("failed to make request: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	// Read response body
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, errs.Errorf("failed to read response body: %w", err)
-	}
-
-	// Handle non-2xx responses
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, parseAPIError(resp, body)
-	}
-
-	// Parse response
-	var response api.GetClientsResponse
-	if err := json.Unmarshal(body, &response); err != nil {
-		return nil, errs.Errorf("failed to unmarshal response: %w", err)
-	}
-
 	return response.Clients, nil
 }
 
-func (c *AuthServerClient) GetClientById(accessToken string, clientId int64) (*api.ClientResponse, error) {
-	// Build URL
-	fullURL := c.baseURL + "/api/v1/admin/clients/" + strconv.FormatInt(clientId, 10)
-
-	// Create request
-	req, err := http.NewRequest("GET", fullURL, nil)
+func (c *AuthServerClient) GetClientById(ctx context.Context, accessToken string, clientId int64) (*api.ClientResponse, error) {
+	response, err := execute[api.GetClientResponse](ctx, c, accessToken, apiRequest{
+		method:        "GET",
+		url:           c.baseURL + "/api/v1/admin/clients/" + strconv.FormatInt(clientId, 10),
+		contentType:   contentTypeJSON,
+		anySuccess2xx: true,
+	})
 	if err != nil {
-		return nil, errs.Errorf("failed to create request: %w", err)
+		return nil, err
 	}
-
-	// Set headers
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-	req.Header.Set("Content-Type", "application/json")
-
-	// Make request
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, errs.Errorf("failed to make request: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	// Read response body
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, errs.Errorf("failed to read response body: %w", err)
-	}
-
-	// Handle non-2xx responses
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, parseAPIError(resp, body)
-	}
-
-	// Parse response
-	var response api.GetClientResponse
-	if err := json.Unmarshal(body, &response); err != nil {
-		return nil, errs.Errorf("failed to unmarshal response: %w", err)
-	}
-
 	return &response.Client, nil
 }
 
-func (c *AuthServerClient) CreateClient(accessToken string, request *api.CreateClientRequest) (*api.ClientResponse, error) {
-	// Build URL
-	fullURL := c.baseURL + "/api/v1/admin/clients"
-
-	// Marshal request body
-	bodyBytes, err := json.Marshal(request)
+func (c *AuthServerClient) CreateClient(ctx context.Context, accessToken string, request *api.CreateClientRequest) (*api.ClientResponse, error) {
+	response, err := execute[api.CreateClientResponse](ctx, c, accessToken, apiRequest{
+		method:        "POST",
+		url:           c.baseURL + "/api/v1/admin/clients",
+		jsonBody:      request,
+		contentType:   contentTypeJSON,
+		anySuccess2xx: true,
+	})
 	if err != nil {
-		return nil, errs.Errorf("failed to marshal request: %w", err)
+		return nil, err
 	}
-
-	// Create request
-	req, err := http.NewRequest("POST", fullURL, bytes.NewBuffer(bodyBytes))
-	if err != nil {
-		return nil, errs.Errorf("failed to create request: %w", err)
-	}
-
-	// Set headers
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-	req.Header.Set("Content-Type", "application/json")
-
-	// Make request
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, errs.Errorf("failed to make request: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	// Read response body
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, errs.Errorf("failed to read response body: %w", err)
-	}
-
-	// Handle non-2xx responses
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, parseAPIError(resp, body)
-	}
-
-	// Parse response
-	var response api.CreateClientResponse
-	if err := json.Unmarshal(body, &response); err != nil {
-		return nil, errs.Errorf("failed to unmarshal response: %w", err)
-	}
-
 	return &response.Client, nil
 }
 
-func (c *AuthServerClient) UpdateClient(accessToken string, clientId int64, request *api.UpdateClientSettingsRequest) (*api.ClientResponse, error) {
-	// Build URL
-	fullURL := c.baseURL + "/api/v1/admin/clients/" + strconv.FormatInt(clientId, 10)
-
-	// Marshal request body
-	bodyBytes, err := json.Marshal(request)
+func (c *AuthServerClient) UpdateClient(ctx context.Context, accessToken string, clientId int64, request *api.UpdateClientSettingsRequest) (*api.ClientResponse, error) {
+	response, err := execute[api.UpdateClientResponse](ctx, c, accessToken, apiRequest{
+		method:        "PUT",
+		url:           c.baseURL + "/api/v1/admin/clients/" + strconv.FormatInt(clientId, 10),
+		jsonBody:      request,
+		contentType:   contentTypeJSON,
+		anySuccess2xx: true,
+	})
 	if err != nil {
-		return nil, errs.Errorf("failed to marshal request: %w", err)
+		return nil, err
 	}
-
-	// Create request
-	req, err := http.NewRequest("PUT", fullURL, bytes.NewBuffer(bodyBytes))
-	if err != nil {
-		return nil, errs.Errorf("failed to create request: %w", err)
-	}
-
-	// Set headers
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-	req.Header.Set("Content-Type", "application/json")
-
-	// Make request
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, errs.Errorf("failed to make request: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	// Read response body
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, errs.Errorf("failed to read response body: %w", err)
-	}
-
-	// Handle non-2xx responses
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, parseAPIError(resp, body)
-	}
-
-	// Parse response
-	var response api.UpdateClientResponse
-	if err := json.Unmarshal(body, &response); err != nil {
-		return nil, errs.Errorf("failed to unmarshal response: %w", err)
-	}
-
 	return &response.Client, nil
 }
 
-func (c *AuthServerClient) UpdateClientAuthentication(accessToken string, clientId int64, request *api.UpdateClientAuthenticationRequest) (*api.ClientResponse, error) {
-	// Build URL
-	fullURL := c.baseURL + "/api/v1/admin/clients/" + strconv.FormatInt(clientId, 10) + "/authentication"
-
-	// Marshal request body
-	bodyBytes, err := json.Marshal(request)
+func (c *AuthServerClient) UpdateClientAuthentication(ctx context.Context, accessToken string, clientId int64, request *api.UpdateClientAuthenticationRequest) (*api.ClientResponse, error) {
+	response, err := execute[api.UpdateClientResponse](ctx, c, accessToken, apiRequest{
+		method:        "PUT",
+		url:           c.baseURL + "/api/v1/admin/clients/" + strconv.FormatInt(clientId, 10) + "/authentication",
+		jsonBody:      request,
+		contentType:   contentTypeJSON,
+		anySuccess2xx: true,
+	})
 	if err != nil {
-		return nil, errs.Errorf("failed to marshal request: %w", err)
+		return nil, err
 	}
-
-	// Create request
-	req, err := http.NewRequest("PUT", fullURL, bytes.NewBuffer(bodyBytes))
-	if err != nil {
-		return nil, errs.Errorf("failed to create request: %w", err)
-	}
-
-	// Set headers
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-	req.Header.Set("Content-Type", "application/json")
-
-	// Make request
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, errs.Errorf("failed to make request: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	// Read response body
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, errs.Errorf("failed to read response body: %w", err)
-	}
-
-	// Handle non-2xx responses
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, parseAPIError(resp, body)
-	}
-
-	// Parse response
-	var response api.UpdateClientResponse
-	if err := json.Unmarshal(body, &response); err != nil {
-		return nil, errs.Errorf("failed to unmarshal response: %w", err)
-	}
-
 	return &response.Client, nil
 }
 
-func (c *AuthServerClient) UpdateClientOAuth2Flows(accessToken string, clientId int64, request *api.UpdateClientOAuth2FlowsRequest) (*api.ClientResponse, error) {
-	// Build URL
-	fullURL := c.baseURL + "/api/v1/admin/clients/" + strconv.FormatInt(clientId, 10) + "/oauth2-flows"
-
-	// Marshal request body
-	bodyBytes, err := json.Marshal(request)
+func (c *AuthServerClient) UpdateClientOAuth2Flows(ctx context.Context, accessToken string, clientId int64, request *api.UpdateClientOAuth2FlowsRequest) (*api.ClientResponse, error) {
+	response, err := execute[api.UpdateClientResponse](ctx, c, accessToken, apiRequest{
+		method:        "PUT",
+		url:           c.baseURL + "/api/v1/admin/clients/" + strconv.FormatInt(clientId, 10) + "/oauth2-flows",
+		jsonBody:      request,
+		contentType:   contentTypeJSON,
+		anySuccess2xx: true,
+	})
 	if err != nil {
-		return nil, errs.Errorf("failed to marshal request: %w", err)
+		return nil, err
 	}
-
-	// Create request
-	req, err := http.NewRequest("PUT", fullURL, bytes.NewBuffer(bodyBytes))
-	if err != nil {
-		return nil, errs.Errorf("failed to create request: %w", err)
-	}
-
-	// Set headers
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-	req.Header.Set("Content-Type", "application/json")
-
-	// Make request
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, errs.Errorf("failed to make request: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	// Read response body
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, errs.Errorf("failed to read response body: %w", err)
-	}
-
-	// Handle non-2xx responses
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, parseAPIError(resp, body)
-	}
-
-	// Parse response
-	var response api.UpdateClientResponse
-	if err := json.Unmarshal(body, &response); err != nil {
-		return nil, errs.Errorf("failed to unmarshal response: %w", err)
-	}
-
 	return &response.Client, nil
-}
-
-func (c *AuthServerClient) DeleteClient(accessToken string, clientId int64) error {
-	// Build URL
-	fullURL := c.baseURL + "/api/v1/admin/clients/" + strconv.FormatInt(clientId, 10)
-
-	// Create request
-	req, err := http.NewRequest("DELETE", fullURL, nil)
-	if err != nil {
-		return errs.Errorf("failed to create request: %w", err)
-	}
-
-	// Set headers
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-	req.Header.Set("Content-Type", "application/json")
-
-	// Make request
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return errs.Errorf("failed to make request: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	// Read response body
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return errs.Errorf("failed to read response body: %w", err)
-	}
-
-	// Handle non-2xx responses
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return parseAPIError(resp, body)
-	}
-
-	return nil
 }
 
 // UpdateClientRedirectURIs updates the full set of redirect URIs for a client.
-func (c *AuthServerClient) UpdateClientRedirectURIs(accessToken string, clientId int64, request *api.UpdateClientRedirectURIsRequest) (*api.ClientResponse, error) {
-	// Build URL
-	fullURL := c.baseURL + "/api/v1/admin/clients/" + strconv.FormatInt(clientId, 10) + "/redirect-uris"
-
-	// Marshal request body
-	bodyBytes, err := json.Marshal(request)
+func (c *AuthServerClient) UpdateClientRedirectURIs(ctx context.Context, accessToken string, clientId int64, request *api.UpdateClientRedirectURIsRequest) (*api.ClientResponse, error) {
+	response, err := execute[api.UpdateClientResponse](ctx, c, accessToken, apiRequest{
+		method:        "PUT",
+		url:           c.baseURL + "/api/v1/admin/clients/" + strconv.FormatInt(clientId, 10) + "/redirect-uris",
+		jsonBody:      request,
+		contentType:   contentTypeJSON,
+		anySuccess2xx: true,
+	})
 	if err != nil {
-		return nil, errs.Errorf("failed to marshal request: %w", err)
+		return nil, err
 	}
-
-	// Create request
-	req, err := http.NewRequest("PUT", fullURL, bytes.NewBuffer(bodyBytes))
-	if err != nil {
-		return nil, errs.Errorf("failed to create request: %w", err)
-	}
-
-	// Set headers
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-	req.Header.Set("Content-Type", "application/json")
-
-	// Make request
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, errs.Errorf("failed to make request: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	// Read response body
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, errs.Errorf("failed to read response body: %w", err)
-	}
-
-	// Handle non-2xx responses
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, parseAPIError(resp, body)
-	}
-
-	// Parse response
-	var response api.UpdateClientResponse
-	if err := json.Unmarshal(body, &response); err != nil {
-		return nil, errs.Errorf("failed to unmarshal response: %w", err)
-	}
-
 	return &response.Client, nil
 }
 
 // UpdateClientWebOrigins updates the full set of web origins for a client.
-func (c *AuthServerClient) UpdateClientWebOrigins(accessToken string, clientId int64, request *api.UpdateClientWebOriginsRequest) (*api.ClientResponse, error) {
-	// Build URL
-	fullURL := c.baseURL + "/api/v1/admin/clients/" + strconv.FormatInt(clientId, 10) + "/web-origins"
-
-	// Marshal request body
-	bodyBytes, err := json.Marshal(request)
+func (c *AuthServerClient) UpdateClientWebOrigins(ctx context.Context, accessToken string, clientId int64, request *api.UpdateClientWebOriginsRequest) (*api.ClientResponse, error) {
+	response, err := execute[api.UpdateClientResponse](ctx, c, accessToken, apiRequest{
+		method:        "PUT",
+		url:           c.baseURL + "/api/v1/admin/clients/" + strconv.FormatInt(clientId, 10) + "/web-origins",
+		jsonBody:      request,
+		contentType:   contentTypeJSON,
+		anySuccess2xx: true,
+	})
 	if err != nil {
-		return nil, errs.Errorf("failed to marshal request: %w", err)
+		return nil, err
 	}
-
-	// Create request
-	req, err := http.NewRequest("PUT", fullURL, bytes.NewBuffer(bodyBytes))
-	if err != nil {
-		return nil, errs.Errorf("failed to create request: %w", err)
-	}
-
-	// Set headers
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-	req.Header.Set("Content-Type", "application/json")
-
-	// Make request
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, errs.Errorf("failed to make request: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	// Read response body
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, errs.Errorf("failed to read response body: %w", err)
-	}
-
-	// Handle non-2xx responses
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, parseAPIError(resp, body)
-	}
-
-	// Parse response
-	var response api.UpdateClientResponse
-	if err := json.Unmarshal(body, &response); err != nil {
-		return nil, errs.Errorf("failed to unmarshal response: %w", err)
-	}
-
 	return &response.Client, nil
 }
 
 // UpdateClientTokens updates token-related settings for a client.
-func (c *AuthServerClient) UpdateClientTokens(accessToken string, clientId int64, request *api.UpdateClientTokensRequest) (*api.ClientResponse, error) {
-	// Build URL
-	fullURL := c.baseURL + "/api/v1/admin/clients/" + strconv.FormatInt(clientId, 10) + "/tokens"
-
-	// Marshal request body
-	bodyBytes, err := json.Marshal(request)
+func (c *AuthServerClient) UpdateClientTokens(ctx context.Context, accessToken string, clientId int64, request *api.UpdateClientTokensRequest) (*api.ClientResponse, error) {
+	response, err := execute[api.UpdateClientResponse](ctx, c, accessToken, apiRequest{
+		method:        "PUT",
+		url:           c.baseURL + "/api/v1/admin/clients/" + strconv.FormatInt(clientId, 10) + "/tokens",
+		jsonBody:      request,
+		contentType:   contentTypeJSON,
+		anySuccess2xx: true,
+	})
 	if err != nil {
-		return nil, errs.Errorf("failed to marshal request: %w", err)
+		return nil, err
 	}
-
-	// Create request
-	req, err := http.NewRequest("PUT", fullURL, bytes.NewBuffer(bodyBytes))
-	if err != nil {
-		return nil, errs.Errorf("failed to create request: %w", err)
-	}
-
-	// Set headers
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-	req.Header.Set("Content-Type", "application/json")
-
-	// Make request
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, errs.Errorf("failed to make request: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	// Read response body
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, errs.Errorf("failed to read response body: %w", err)
-	}
-
-	// Handle non-2xx responses
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, parseAPIError(resp, body)
-	}
-
-	// Parse response
-	var response api.UpdateClientResponse
-	if err := json.Unmarshal(body, &response); err != nil {
-		return nil, errs.Errorf("failed to unmarshal response: %w", err)
-	}
-
 	return &response.Client, nil
 }
 
-func (c *AuthServerClient) GetClientLogo(accessToken string, clientId int64) (*ClientLogoInfo, error) {
-	fullURL := c.baseURL + "/api/v1/admin/clients/" + strconv.FormatInt(clientId, 10) + "/logo"
-
-	req, err := http.NewRequest("GET", fullURL, nil)
-	if err != nil {
-		return nil, errs.Errorf("failed to create request: %w", err)
-	}
-
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, errs.Errorf("failed to make request: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, errs.Errorf("failed to read response body: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, parseAPIError(resp, respBody)
-	}
-
-	var logoInfo ClientLogoInfo
-	if err := json.Unmarshal(respBody, &logoInfo); err != nil {
-		return nil, errs.Errorf("failed to decode response: %w", err)
-	}
-
-	return &logoInfo, nil
+func (c *AuthServerClient) DeleteClient(ctx context.Context, accessToken string, clientId int64) error {
+	_, err := c.do(ctx, accessToken, apiRequest{
+		method:        "DELETE",
+		url:           c.baseURL + "/api/v1/admin/clients/" + strconv.FormatInt(clientId, 10),
+		contentType:   contentTypeJSON,
+		anySuccess2xx: true,
+	})
+	return err
 }
 
-func (c *AuthServerClient) UploadClientLogo(accessToken string, clientId int64, logoData []byte, filename string) (*ClientLogoUploadResponse, error) {
-	fullURL := c.baseURL + "/api/v1/admin/clients/" + strconv.FormatInt(clientId, 10) + "/logo"
+// The three logo methods are the exception in this file: each accepts 200 alone, as it was
+// written.
 
-	var buf bytes.Buffer
-	writer := multipart.NewWriter(&buf)
-
-	part, err := writer.CreateFormFile("picture", filename)
-	if err != nil {
-		return nil, errs.Errorf("failed to create form file: %w", err)
-	}
-
-	if _, err := part.Write(logoData); err != nil {
-		return nil, errs.Errorf("failed to write logo data: %w", err)
-	}
-
-	if err := writer.Close(); err != nil {
-		return nil, errs.Errorf("failed to close multipart writer: %w", err)
-	}
-
-	req, err := http.NewRequest("POST", fullURL, &buf)
-	if err != nil {
-		return nil, errs.Errorf("failed to create request: %w", err)
-	}
-
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-	req.Header.Set("Content-Type", writer.FormDataContentType())
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, errs.Errorf("failed to make request: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, errs.Errorf("failed to read response body: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, parseAPIError(resp, body)
-	}
-
-	var uploadResp ClientLogoUploadResponse
-	if err := json.Unmarshal(body, &uploadResp); err != nil {
-		return nil, errs.Errorf("failed to decode response: %w", err)
-	}
-
-	return &uploadResp, nil
+func (c *AuthServerClient) GetClientLogo(ctx context.Context, accessToken string, clientId int64) (*ClientLogoInfo, error) {
+	// Decoded straight into ClientLogoInfo: this endpoint answers the object itself rather than
+	// wrapping it in an envelope.
+	return execute[ClientLogoInfo](ctx, c, accessToken, apiRequest{
+		method:        "GET",
+		url:           c.baseURL + "/api/v1/admin/clients/" + strconv.FormatInt(clientId, 10) + "/logo",
+		contentType:   contentTypeJSON,
+		successStatus: http.StatusOK,
+	})
 }
 
-func (c *AuthServerClient) DeleteClientLogo(accessToken string, clientId int64) error {
-	fullURL := c.baseURL + "/api/v1/admin/clients/" + strconv.FormatInt(clientId, 10) + "/logo"
-
-	req, err := http.NewRequest("DELETE", fullURL, nil)
+func (c *AuthServerClient) UploadClientLogo(ctx context.Context, accessToken string, clientId int64, logoData []byte, filename string) (*ClientLogoUploadResponse, error) {
+	body, contentType, err := multipartPicture(filename, logoData)
 	if err != nil {
-		return errs.Errorf("failed to create request: %w", err)
+		return nil, err
 	}
 
-	req.Header.Set("Authorization", "Bearer "+accessToken)
+	return execute[ClientLogoUploadResponse](ctx, c, accessToken, apiRequest{
+		method:        "POST",
+		url:           c.baseURL + "/api/v1/admin/clients/" + strconv.FormatInt(clientId, 10) + "/logo",
+		rawBody:       body,
+		contentType:   contentType,
+		successStatus: http.StatusOK,
+	})
+}
 
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return errs.Errorf("failed to make request: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return errs.Errorf("failed to read response body: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return parseAPIError(resp, body)
-	}
-
-	return nil
+func (c *AuthServerClient) DeleteClientLogo(ctx context.Context, accessToken string, clientId int64) error {
+	// No Content-Type: this request carries no body and has never set the header.
+	_, err := c.do(ctx, accessToken, apiRequest{
+		method:        "DELETE",
+		url:           c.baseURL + "/api/v1/admin/clients/" + strconv.FormatInt(clientId, 10) + "/logo",
+		successStatus: http.StatusOK,
+	})
+	return err
 }

@@ -1,8 +1,10 @@
 package apiclient
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -10,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"errors"
+	"github.com/leodip/goiabada/adminconsole/internal/boundedread"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/stretchr/testify/assert"
@@ -519,4 +521,57 @@ func TestHTTPBackend_AMaximalSessionCrossesTheWireInBothDirections(t *testing.T)
 	require.NoError(t, err)
 	assert.LessOrEqual(t, len(encoded), sessionstore.MaxSessionWireBytes,
 		"a maximal blob must survive the endpoint's request cap, envelope included")
+}
+
+// The pair the response cap never had. The case above shows a maximal session fitting
+// through it; these two show where the cap actually falls and what crossing it does.
+//
+// An answer over the cap is refused rather than cut, so it never reaches json.Unmarshal as a
+// prefix. That matters more here than at a list endpoint: a session envelope cut short would
+// decode with Data truncated, and a truncated ciphertext is a session that fails to open
+// rather than one that is reported missing (#386 decision 4).
+func TestHTTPBackend_RefusesAResponseOverTheCap(t *testing.T) {
+	stub := newStubEndpoint(t, func(w http.ResponseWriter, _ int) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(bytes.Repeat([]byte("x"), sessionstore.MaxSessionWireBytes+1))
+	})
+	backend := NewSessionBackend(stub.server.URL, newStubTokens())
+
+	_, err := backend.Load(context.Background(), httpTestSessionId)
+
+	require.Error(t, err)
+	assert.True(t, errors.Is(err, boundedread.ErrResponseTooLarge),
+		"the answer is refused as oversized rather than decoded from a prefix: %v", err)
+	assert.Len(t, stub.recorded(), 1, "an oversized answer is not a transport failure, so it is not retried")
+}
+
+// And the boundary itself: an answer of exactly the cap is accepted. Without this the case
+// above reads as "large answers are refused" rather than "answers over the cap are".
+func TestHTTPBackend_AcceptsAResponseOfExactlyTheCap(t *testing.T) {
+	stub := newStubEndpoint(t, func(w http.ResponseWriter, _ int) {
+		encoded, err := json.Marshal(api.SessionLoadResponse{
+			Data:         "",
+			LastAccessed: time.Now().UTC(),
+			ExpiresAt:    time.Now().UTC().Add(time.Hour),
+		})
+		require.NoError(t, err)
+
+		// Pad the one field of unbounded length until the envelope is the cap to the byte.
+		padded, err := json.Marshal(api.SessionLoadResponse{
+			Data:         strings.Repeat("x", sessionstore.MaxSessionWireBytes-len(encoded)),
+			LastAccessed: time.Now().UTC(),
+			ExpiresAt:    time.Now().UTC().Add(time.Hour),
+		})
+		require.NoError(t, err)
+		require.Len(t, padded, sessionstore.MaxSessionWireBytes)
+
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(padded)
+	})
+	backend := NewSessionBackend(stub.server.URL, newStubTokens())
+
+	record, err := backend.Load(context.Background(), httpTestSessionId)
+
+	require.NoError(t, err, "the cap is the largest accepted answer, not the first refused one")
+	assert.NotEmpty(t, record.Data)
 }

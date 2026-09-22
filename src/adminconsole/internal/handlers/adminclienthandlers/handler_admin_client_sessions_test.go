@@ -37,7 +37,7 @@ type clientSessionsApiClient struct {
 	deleted []int64
 }
 
-func (c *clientSessionsApiClient) GetClientById(accessToken string, clientId int64) (*api.ClientResponse, error) {
+func (c *clientSessionsApiClient) GetClientById(_ context.Context, accessToken string, clientId int64) (*api.ClientResponse, error) {
 	return c.client, nil
 }
 

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/leodip/goiabada/adminconsole/internal/boundedread"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
 )
@@ -42,7 +43,7 @@ func NewSettingsClient(authServerBaseURL string) *SettingsClient {
 // section 3 requires, so carrying it here discloses nothing new (#285).
 //
 // This is the admin console's second caller of the auth server, so it is bounded and carries a
-// context on the same terms as the general client (#386). Both arms read through readBounded
+// context on the same terms as the general client (#386). Both arms read through boundedread.Read
 // before anything looks at them: the success arm used to decode straight off the wire through a
 // json.Decoder, which stops at the first complete value and would therefore accept a truncated
 // prefix with keys missing and say nothing, and the failure arm discarded its read error. The 10
@@ -61,7 +62,7 @@ func (c *SettingsClient) GetPublicSettings(ctx context.Context) (*api.PublicSett
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	body, err := readBounded(resp.Body)
+	body, err := boundedread.Read(resp.Body, maxAPIResponseBytes)
 	if err != nil {
 		return nil, err
 	}

@@ -1,6 +1,7 @@
 package adminresourcehandlers
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -33,7 +34,7 @@ type notFoundResourceApiClient struct {
 	err    error
 }
 
-func (c *notFoundResourceApiClient) GetResourceById(accessToken string, id int64) (*api.ResourceResponse, error) {
+func (c *notFoundResourceApiClient) GetResourceById(_ context.Context, accessToken string, id int64) (*api.ResourceResponse, error) {
 	return c.entity, c.err
 }
 

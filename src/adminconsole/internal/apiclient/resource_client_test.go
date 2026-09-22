@@ -1,6 +1,7 @@
 package apiclient
 
 import (
+	"context"
 	"net/http"
 	"testing"
 
@@ -29,7 +30,7 @@ const permissionBodyFields = `"id":9,"permissionIdentifier":"read","description"
 func TestAuthServerClient_GetResourceByIdDecodesEveryFieldTheConsoleBinds(t *testing.T) {
 	client, recorded := serves(t, `{"resource":{`+resourceBodyFields+`}}`)
 
-	resource, err := client.GetResourceById("an-access-token", 2)
+	resource, err := client.GetResourceById(context.Background(), "an-access-token", 2)
 	require.NoError(t, err)
 	require.NotNil(t, resource)
 
@@ -53,7 +54,7 @@ func TestAuthServerClient_GetAllResourcesDecodesTheList(t *testing.T) {
 	client, recorded := serves(t, `{"resources":[{`+resourceBodyFields+`},`+
 		`{"id":3,"resourceIdentifier":"billing","description":"Billing","isSystemLevelResource":false}]}`)
 
-	resources, err := client.GetAllResources("an-access-token")
+	resources, err := client.GetAllResources(context.Background(), "an-access-token")
 	require.NoError(t, err)
 
 	gotPath, _ := recorded()
@@ -70,7 +71,7 @@ func TestAuthServerClient_GetAllResourcesDecodesTheList(t *testing.T) {
 func TestAuthServerClient_CreateResourceDecodesTheCreatedRow(t *testing.T) {
 	client, recorded := servesStatus(t, http.StatusCreated, `{"resource":{`+resourceBodyFields+`}}`)
 
-	resource, err := client.CreateResource("an-access-token", nil)
+	resource, err := client.CreateResource(context.Background(), "an-access-token", nil)
 	require.NoError(t, err)
 	require.NotNil(t, resource)
 
@@ -83,7 +84,7 @@ func TestAuthServerClient_CreateResourceDecodesTheCreatedRow(t *testing.T) {
 func TestAuthServerClient_UpdateResourceDecodesTheUpdatedRow(t *testing.T) {
 	client, recorded := serves(t, `{"resource":{`+resourceBodyFields+`}}`)
 
-	resource, err := client.UpdateResource("an-access-token", 2, nil)
+	resource, err := client.UpdateResource(context.Background(), "an-access-token", 2, nil)
 	require.NoError(t, err)
 	require.NotNil(t, resource)
 
@@ -99,7 +100,7 @@ func TestAuthServerClient_UpdateResourceDecodesTheUpdatedRow(t *testing.T) {
 func TestAuthServerClient_GetPermissionsByResourceDecodesTheNestedResource(t *testing.T) {
 	client, recorded := serves(t, `{"permissions":[{`+permissionBodyFields+`}]}`)
 
-	permissions, err := client.GetPermissionsByResource("an-access-token", 2)
+	permissions, err := client.GetPermissionsByResource(context.Background(), "an-access-token", 2)
 	require.NoError(t, err)
 
 	gotPath, _ := recorded()
@@ -119,7 +120,7 @@ func TestAuthServerClient_GetUserPermissionsReturnsTheUserBesideThePermissions(t
 	client, recorded := serves(t, `{"user":{"id":42,"username":"jdoe"},`+
 		`"permissions":[{`+permissionBodyFields+`}]}`)
 
-	user, permissions, err := client.GetUserPermissions("an-access-token", 42)
+	user, permissions, err := client.GetUserPermissions(context.Background(), "an-access-token", 42)
 	require.NoError(t, err)
 	require.NotNil(t, user)
 
@@ -136,7 +137,7 @@ func TestAuthServerClient_GetClientPermissionsReturnsTheClientBesideThePermissio
 	client, recorded := serves(t, `{"client":{"id":7,"clientIdentifier":"portal"},`+
 		`"permissions":[{`+permissionBodyFields+`}]}`)
 
-	clientResp, permissions, err := client.GetClientPermissions("an-access-token", 7)
+	clientResp, permissions, err := client.GetClientPermissions(context.Background(), "an-access-token", 7)
 	require.NoError(t, err)
 	require.NotNil(t, clientResp)
 

@@ -45,7 +45,7 @@ func HandleAdminClientSettingsGet(
 			return
 		}
 
-		clientResp, err := apiClient.GetClientById(jwtInfo.TokenResponse.AccessToken, id)
+		clientResp, err := apiClient.GetClientById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -148,7 +148,7 @@ func HandleAdminClientSettingsPost(
 			return
 		}
 
-		clientResp, err := apiClient.GetClientById(jwtInfo.TokenResponse.AccessToken, id)
+		clientResp, err := apiClient.GetClientById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -221,7 +221,7 @@ func HandleAdminClientSettingsPost(
 			updateReq.DefaultAcrLevel = r.FormValue("defaultAcrLevel")
 		}
 
-		_, err = apiClient.UpdateClient(jwtInfo.TokenResponse.AccessToken, id, updateReq)
+		_, err = apiClient.UpdateClient(r.Context(), jwtInfo.TokenResponse.AccessToken, id, updateReq)
 		if err != nil {
 			handlers.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
 			return

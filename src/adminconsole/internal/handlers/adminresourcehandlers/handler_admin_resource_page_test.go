@@ -50,11 +50,11 @@ type resourcePagingApiClient struct {
 	asked       []int
 }
 
-func (c *resourcePagingApiClient) GetResourceById(accessToken string, resourceId int64) (*api.ResourceResponse, error) {
+func (c *resourcePagingApiClient) GetResourceById(_ context.Context, accessToken string, resourceId int64) (*api.ResourceResponse, error) {
 	return &api.ResourceResponse{Id: resourceId, ResourceIdentifier: "some-resource"}, nil
 }
 
-func (c *resourcePagingApiClient) GetPermissionsByResource(accessToken string, resourceId int64) ([]api.PermissionResponse, error) {
+func (c *resourcePagingApiClient) GetPermissionsByResource(_ context.Context, accessToken string, resourceId int64) ([]api.PermissionResponse, error) {
 	return c.permissions, nil
 }
 
@@ -85,7 +85,7 @@ func (c *resourcePagingApiClient) SearchGroupsWithPermissionAnnotation(_ context
 	return groups, c.total, nil
 }
 
-func (c *resourcePagingApiClient) GetUsersByPermission(accessToken string,
+func (c *resourcePagingApiClient) GetUsersByPermission(_ context.Context, accessToken string,
 	permissionId int64, page, size int) ([]api.UserResponse, int, error) {
 
 	c.asked = append(c.asked, page)

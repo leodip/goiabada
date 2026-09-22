@@ -17,13 +17,12 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 )
 
-// Seam 4 for the one resource page that reaches a group method (#386 stage 11). See
-// admingrouphandlers' file of the same name for what this owns and why the context is the
-// assertion.
+// Seam 4 for the resource pages (#386 stages 11 and 12). See admingrouphandlers' file of the same
+// name for what this owns and why the context is the assertion.
 //
-// The resource reads this page makes first -- GetResourceById and GetPermissionsByResource -- are
-// stage 12's and still carry no context, so they only have to succeed for the group call below
-// them to happen at all.
+// GetResourceById and GetPermissionsByResource record and then succeed rather than refusing,
+// because most of this package's pages read one or both of them first and everything below would
+// otherwise be unreachable.
 
 type resourceCtxMarkerKey struct{}
 
@@ -41,12 +40,42 @@ func (s *resourceCtxRecordingApiClient) record(ctx context.Context) error {
 	return errs.New("the auth server refused")
 }
 
-func (s *resourceCtxRecordingApiClient) GetResourceById(_ string, resourceId int64) (*api.ResourceResponse, error) {
+func (s *resourceCtxRecordingApiClient) GetResourceById(ctx context.Context, _ string, resourceId int64) (*api.ResourceResponse, error) {
+	s.seen = append(s.seen, ctx)
 	return &api.ResourceResponse{Id: resourceId, ResourceIdentifier: "some-resource"}, nil
 }
 
-func (s *resourceCtxRecordingApiClient) GetPermissionsByResource(_ string, _ int64) ([]api.PermissionResponse, error) {
+func (s *resourceCtxRecordingApiClient) GetPermissionsByResource(ctx context.Context, _ string, _ int64) ([]api.PermissionResponse, error) {
+	s.seen = append(s.seen, ctx)
 	return s.permissions, nil
+}
+
+func (s *resourceCtxRecordingApiClient) GetAllResources(ctx context.Context, _ string) ([]api.ResourceResponse, error) {
+	return nil, s.record(ctx)
+}
+
+func (s *resourceCtxRecordingApiClient) UpdateResource(ctx context.Context, _ string, _ int64, _ *api.UpdateResourceRequest) (*api.ResourceResponse, error) {
+	return nil, s.record(ctx)
+}
+
+func (s *resourceCtxRecordingApiClient) DeleteResource(ctx context.Context, _ string, _ int64) error {
+	return s.record(ctx)
+}
+
+func (s *resourceCtxRecordingApiClient) UpdateResourcePermissions(ctx context.Context, _ string, _ int64, _ *api.UpdateResourcePermissionsRequest) error {
+	return s.record(ctx)
+}
+
+func (s *resourceCtxRecordingApiClient) GetUsersByPermission(ctx context.Context, _ string, _ int64, _, _ int) ([]api.UserResponse, int, error) {
+	return nil, 0, s.record(ctx)
+}
+
+func (s *resourceCtxRecordingApiClient) SearchUsersWithPermissionAnnotation(ctx context.Context, _ string, _ int64, _ string, _, _ int) ([]api.UserWithPermissionResponse, int, error) {
+	return nil, 0, s.record(ctx)
+}
+
+func (s *resourceCtxRecordingApiClient) GetUserPermissions(ctx context.Context, _ string, _ int64) (*api.UserResponse, []api.PermissionResponse, error) {
+	return nil, nil, s.record(ctx)
 }
 
 func (s *resourceCtxRecordingApiClient) GetAllGroups(ctx context.Context, _ string) ([]api.GroupResponse, error) {
@@ -61,13 +90,53 @@ func (s *resourceCtxRecordingApiClient) GetGroupPermissions(ctx context.Context,
 	return nil, nil, s.record(ctx)
 }
 
-func TestAdminResourceHandlers_TheGroupCallsCarryTheRequestsContext(t *testing.T) {
+func TestAdminResourceHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T) {
 	testCases := []struct {
 		name        string
 		permissions []api.PermissionResponse
 		build       func(httpHelper *mocks_handlerhelpers.HttpHelper, apiClient apiclient.ApiClient) http.HandlerFunc
 		request     *http.Request
 	}{
+		{
+			name: "HandleAdminResourcesGet",
+			build: func(h *mocks_handlerhelpers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+				return HandleAdminResourcesGet(h, c)
+			},
+			request: handlertest.Request(http.MethodGet, "/admin/resources", handlertest.WithAccessToken()),
+		},
+		{
+			name: "HandleAdminResourceSettingsGet",
+			build: func(h *mocks_handlerhelpers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+				return HandleAdminResourceSettingsGet(h, testStore(), c)
+			},
+			request: handlertest.Request(http.MethodGet, "/admin/resources/3/settings",
+				handlertest.WithAccessToken(), handlertest.WithRouteParam("resourceId", "3")),
+		},
+		{
+			name: "HandleAdminResourceDeleteGet",
+			build: func(h *mocks_handlerhelpers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+				return HandleAdminResourceDeleteGet(h, c)
+			},
+			request: handlertest.Request(http.MethodGet, "/admin/resources/3/delete",
+				handlertest.WithAccessToken(), handlertest.WithRouteParam("resourceId", "3")),
+		},
+		{
+			name: "HandleAdminResourcePermissionsGet",
+			build: func(h *mocks_handlerhelpers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+				return HandleAdminResourcePermissionsGet(h, testStore(), c)
+			},
+			request: handlertest.Request(http.MethodGet, "/admin/resources/3/permissions",
+				handlertest.WithAccessToken(), handlertest.WithRouteParam("resourceId", "3")),
+		},
+		{
+			name:        "HandleAdminResourceUsersWithPermissionGet",
+			permissions: []api.PermissionResponse{{Id: 8, PermissionIdentifier: "read"}},
+			build: func(h *mocks_handlerhelpers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+				return HandleAdminResourceUsersWithPermissionGet(h, testStore(), c)
+			},
+			request: handlertest.Request(http.MethodGet, "/admin/resources/3/users-with-permission",
+				handlertest.WithAccessToken(), handlertest.WithRouteParam("resourceId", "3")),
+		},
 		{
 			name: "HandleAdminResourceGroupsWithPermissionGet, no permission to annotate",
 			build: func(h *mocks_handlerhelpers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {

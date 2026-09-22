@@ -41,7 +41,7 @@ func HandleAdminClientDeleteGet(
 			return
 		}
 
-		client, perms, err := apiClient.GetClientPermissions(jwtInfo.TokenResponse.AccessToken, id)
+		client, perms, err := apiClient.GetClientPermissions(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -114,7 +114,7 @@ func HandleAdminClientDeletePost(
 			return
 		}
 
-		client, _, err := apiClient.GetClientPermissions(jwtInfo.TokenResponse.AccessToken, id)
+		client, _, err := apiClient.GetClientPermissions(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -152,7 +152,7 @@ func HandleAdminClientDeletePost(
 			return
 		}
 
-		err = apiClient.DeleteClient(jwtInfo.TokenResponse.AccessToken, client.Id)
+		err = apiClient.DeleteClient(r.Context(), jwtInfo.TokenResponse.AccessToken, client.Id)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return

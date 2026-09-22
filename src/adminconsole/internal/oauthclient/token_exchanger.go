@@ -3,11 +3,11 @@ package oauthclient
 import (
 	"context"
 	"encoding/json"
-	"io"
 	"net/http"
 	"net/url"
 	"strings"
 
+	"github.com/leodip/goiabada/adminconsole/internal/boundedread"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
 )
@@ -53,11 +53,14 @@ func (te *TokenExchanger) ExchangeCodeForTokens(
 	defer func() { _ = resp.Body.Close() }()
 
 	// Bounded: the peer is the auth server, but a peer that answers with an endless body
-	// would otherwise be read into memory until the process dies. Cut rather than refused,
-	// which makes an oversized answer a parse failure here and a 500 to the administrator.
-	body, err := io.ReadAll(io.LimitReader(resp.Body, MaxTokenResponseBytes))
+	// would otherwise be read into memory until the process dies. An answer over the ceiling
+	// is refused rather than cut, so it reaches the caller as boundedread.ErrResponseTooLarge
+	// rather than as a parse failure indistinguishable from a malformed body (#386 decision 4).
+	body, err := boundedread.Read(resp.Body, MaxTokenResponseBytes)
 	if err != nil {
-		return nil, errs.Errorf("error reading response: %v", err)
+		// %w rather than %v, which is what the line said before: the message is byte for
+		// byte the same and the sentinel stays reachable through errors.Is.
+		return nil, errs.Errorf("error reading response: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {

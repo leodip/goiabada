@@ -21,8 +21,8 @@ import (
 // Seam 4 for the client pages whose calls have moved (#386). See accounthandlers' file of the same
 // name for what this owns and why the context is the assertion.
 //
-// Two settings reads from stage 10 and the two session pages from stage 11. The rest of this
-// package's API calls are stage 12's and are characterized there.
+// GetClientById records and then succeeds rather than refusing, because nearly every page here
+// reads it first and everything below it would otherwise be unreachable.
 
 type clientCtxMarkerKey struct{}
 
@@ -31,10 +31,32 @@ type ctxRecordingApiClient struct {
 	seen []context.Context
 }
 
-// GetClientById is reached first and is stage 12's, so it still has no context and only has to
-// succeed for the calls below it to happen at all.
-func (s *ctxRecordingApiClient) GetClientById(_ string, clientId int64) (*api.ClientResponse, error) {
+func (s *ctxRecordingApiClient) record(ctx context.Context) error {
+	s.seen = append(s.seen, ctx)
+	return errs.New("the auth server refused")
+}
+
+// GetClientById records and then succeeds rather than refusing, because nearly every page here
+// reads it first and everything below it would otherwise be unreachable.
+func (s *ctxRecordingApiClient) GetClientById(ctx context.Context, _ string, clientId int64) (*api.ClientResponse, error) {
+	s.seen = append(s.seen, ctx)
 	return &api.ClientResponse{Id: clientId, ClientIdentifier: "a-client"}, nil
+}
+
+func (s *ctxRecordingApiClient) GetAllClients(ctx context.Context, _ string) ([]api.ClientResponse, error) {
+	return nil, s.record(ctx)
+}
+
+func (s *ctxRecordingApiClient) GetClientPermissions(ctx context.Context, _ string, _ int64) (*api.ClientResponse, []api.PermissionResponse, error) {
+	return nil, nil, s.record(ctx)
+}
+
+func (s *ctxRecordingApiClient) GetClientLogo(ctx context.Context, _ string, _ int64) (*apiclient.ClientLogoInfo, error) {
+	return nil, s.record(ctx)
+}
+
+func (s *ctxRecordingApiClient) DeleteClient(ctx context.Context, _ string, _ int64) error {
+	return s.record(ctx)
 }
 
 func (s *ctxRecordingApiClient) GetSettingsGeneral(ctx context.Context, _ string) (*api.SettingsGeneralResponse, error) {
@@ -62,6 +84,53 @@ func TestAdminClientHandlers_TheMovedCallsCarryTheRequestsContext(t *testing.T) 
 		build   func(httpHelper *mocks_handlerhelpers.HttpHelper, apiClient apiclient.ApiClient) http.HandlerFunc
 		request *http.Request
 	}{
+		{
+			name: "HandleAdminClientsGet",
+			build: func(h *mocks_handlerhelpers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+				return HandleAdminClientsGet(h, c)
+			},
+			request: handlertest.Request(http.MethodGet, "/admin/clients", handlertest.WithAccessToken()),
+		},
+		{
+			name: "HandleAdminClientPermissionsGet",
+			build: func(h *mocks_handlerhelpers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+				return HandleAdminClientPermissionsGet(h, newTestSessionStore(), c)
+			},
+			request: handlertest.Request(http.MethodGet, "/admin/clients/3/permissions",
+				handlertest.WithAccessToken(), handlertest.WithRouteParam("clientId", "3")),
+		},
+		{
+			name: "HandleAdminClientLogoGet",
+			build: func(h *mocks_handlerhelpers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+				return HandleAdminClientLogoGet(h, c)
+			},
+			request: handlertest.Request(http.MethodGet, "/admin/clients/3/logo",
+				handlertest.WithAccessToken(), handlertest.WithRouteParam("clientId", "3")),
+		},
+		{
+			name: "HandleAdminClientDeleteGet",
+			build: func(h *mocks_handlerhelpers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+				return HandleAdminClientDeleteGet(h, c)
+			},
+			request: handlertest.Request(http.MethodGet, "/admin/clients/3/delete",
+				handlertest.WithAccessToken(), handlertest.WithRouteParam("clientId", "3")),
+		},
+		{
+			name: "HandleAdminClientTokensGet",
+			build: func(h *mocks_handlerhelpers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+				return HandleAdminClientTokensGet(h, newTestSessionStore(), c)
+			},
+			request: handlertest.Request(http.MethodGet, "/admin/clients/3/tokens",
+				handlertest.WithAccessToken(), handlertest.WithRouteParam("clientId", "3")),
+		},
+		{
+			name: "HandleAdminClientSettingsGet",
+			build: func(h *mocks_handlerhelpers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+				return HandleAdminClientSettingsGet(h, newTestSessionStore(), c)
+			},
+			request: handlertest.Request(http.MethodGet, "/admin/clients/3/settings",
+				handlertest.WithAccessToken(), handlertest.WithRouteParam("clientId", "3")),
+		},
 		{
 			name: "HandleAdminClientOAuth2Get",
 			build: func(h *mocks_handlerhelpers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {

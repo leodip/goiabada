@@ -43,7 +43,7 @@ func HandleAdminResourceUsersWithPermissionGet(
 		}
 		accessToken := jwtInfo.TokenResponse.AccessToken
 
-		resource, err := apiClient.GetResourceById(accessToken, id)
+		resource, err := apiClient.GetResourceById(r.Context(), accessToken, id)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -53,7 +53,7 @@ func HandleAdminResourceUsersWithPermissionGet(
 			return
 		}
 
-		permissions, err := apiClient.GetPermissionsByResource(accessToken, resource.Id)
+		permissions, err := apiClient.GetPermissionsByResource(r.Context(), accessToken, resource.Id)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -102,7 +102,7 @@ func HandleAdminResourceUsersWithPermissionGet(
 		var usersWithPermission []api.UserResponse
 		var total int
 		if selectedPermission > 0 {
-			usersWithPermission, total, err = apiClient.GetUsersByPermission(accessToken, selectedPermission, pageInt, pageSize)
+			usersWithPermission, total, err = apiClient.GetUsersByPermission(r.Context(), accessToken, selectedPermission, pageInt, pageSize)
 			if err != nil {
 				handlers.HandleAPIError(httpHelper, w, r, err)
 				return
@@ -113,7 +113,7 @@ func HandleAdminResourceUsersWithPermissionGet(
 			// under a bar that highlights a full one (#305).
 			if clamped := pagination.ClampPage(total, pageSize, pageInt); clamped != pageInt {
 				pageInt = clamped
-				usersWithPermission, total, err = apiClient.GetUsersByPermission(accessToken, selectedPermission, pageInt, pageSize)
+				usersWithPermission, total, err = apiClient.GetUsersByPermission(r.Context(), accessToken, selectedPermission, pageInt, pageSize)
 				if err != nil {
 					handlers.HandleAPIError(httpHelper, w, r, err)
 					return
@@ -192,7 +192,7 @@ func HandleAdminResourceUsersWithPermissionRemovePermissionPost(
 		}
 		accessToken := jwtInfo.TokenResponse.AccessToken
 
-		resource, err := apiClient.GetResourceById(accessToken, id)
+		resource, err := apiClient.GetResourceById(r.Context(), accessToken, id)
 		if err != nil {
 			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
@@ -213,7 +213,7 @@ func HandleAdminResourceUsersWithPermissionRemovePermissionPost(
 			return
 		}
 
-		user, currentPerms, err := apiClient.GetUserPermissions(accessToken, userId)
+		user, currentPerms, err := apiClient.GetUserPermissions(r.Context(), accessToken, userId)
 		if err != nil {
 			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
@@ -234,7 +234,7 @@ func HandleAdminResourceUsersWithPermissionRemovePermissionPost(
 			return
 		}
 
-		permissions, err := apiClient.GetPermissionsByResource(accessToken, resource.Id)
+		permissions, err := apiClient.GetPermissionsByResource(r.Context(), accessToken, resource.Id)
 		if err != nil {
 			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
@@ -278,7 +278,7 @@ func HandleAdminResourceUsersWithPermissionRemovePermissionPost(
 			}
 		}
 		apiReq := &api.UpdateUserPermissionsRequest{PermissionIds: newIds}
-		if err := apiClient.UpdateUserPermissions(accessToken, user.Id, apiReq); err != nil {
+		if err := apiClient.UpdateUserPermissions(r.Context(), accessToken, user.Id, apiReq); err != nil {
 			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
@@ -311,7 +311,7 @@ func HandleAdminResourceUsersWithPermissionAddGet(
 		}
 		accessToken := jwtInfo.TokenResponse.AccessToken
 
-		resource, err := apiClient.GetResourceById(accessToken, id)
+		resource, err := apiClient.GetResourceById(r.Context(), accessToken, id)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -321,7 +321,7 @@ func HandleAdminResourceUsersWithPermissionAddGet(
 			return
 		}
 
-		permissions, err := apiClient.GetPermissionsByResource(accessToken, resource.Id)
+		permissions, err := apiClient.GetPermissionsByResource(r.Context(), accessToken, resource.Id)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -411,7 +411,7 @@ func HandleAdminResourceUsersWithPermissionSearchGet(
 		}
 		accessToken := jwtInfo.TokenResponse.AccessToken
 
-		resource, err := apiClient.GetResourceById(accessToken, id)
+		resource, err := apiClient.GetResourceById(r.Context(), accessToken, id)
 		if err != nil {
 			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
@@ -421,7 +421,7 @@ func HandleAdminResourceUsersWithPermissionSearchGet(
 			return
 		}
 
-		permissions, err := apiClient.GetPermissionsByResource(accessToken, resource.Id)
+		permissions, err := apiClient.GetPermissionsByResource(r.Context(), accessToken, resource.Id)
 		if err != nil {
 			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
@@ -465,7 +465,7 @@ func HandleAdminResourceUsersWithPermissionSearchGet(
 			return
 		}
 
-		annotatedUsers, _, err := apiClient.SearchUsersWithPermissionAnnotation(accessToken, selectedPermission, query, 1, 15)
+		annotatedUsers, _, err := apiClient.SearchUsersWithPermissionAnnotation(r.Context(), accessToken, selectedPermission, query, 1, 15)
 		if err != nil {
 			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
@@ -511,7 +511,7 @@ func HandleAdminResourceUsersWithPermissionAddPermissionPost(
 		}
 		accessToken := jwtInfo.TokenResponse.AccessToken
 
-		resource, err := apiClient.GetResourceById(accessToken, id)
+		resource, err := apiClient.GetResourceById(r.Context(), accessToken, id)
 		if err != nil {
 			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
@@ -532,7 +532,7 @@ func HandleAdminResourceUsersWithPermissionAddPermissionPost(
 			return
 		}
 
-		user, currentPerms, err := apiClient.GetUserPermissions(accessToken, userId)
+		user, currentPerms, err := apiClient.GetUserPermissions(r.Context(), accessToken, userId)
 		if err != nil {
 			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
@@ -553,7 +553,7 @@ func HandleAdminResourceUsersWithPermissionAddPermissionPost(
 			return
 		}
 
-		permissions, err := apiClient.GetPermissionsByResource(accessToken, resource.Id)
+		permissions, err := apiClient.GetPermissionsByResource(r.Context(), accessToken, resource.Id)
 		if err != nil {
 			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
@@ -599,7 +599,7 @@ func HandleAdminResourceUsersWithPermissionAddPermissionPost(
 		}
 		newIds = append(newIds, permissionId)
 		apiReq := &api.UpdateUserPermissionsRequest{PermissionIds: newIds}
-		if err := apiClient.UpdateUserPermissions(accessToken, user.Id, apiReq); err != nil {
+		if err := apiClient.UpdateUserPermissions(r.Context(), accessToken, user.Id, apiReq); err != nil {
 			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}

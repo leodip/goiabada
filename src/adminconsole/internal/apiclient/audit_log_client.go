@@ -1,87 +1,34 @@
 package apiclient
 
 import (
-	"bytes"
-	"encoding/json"
+	"context"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/errs"
 )
 
-func (c *AuthServerClient) GetSettingsAuditLogs(accessToken string) (*api.SettingsAuditLogsResponse, error) {
-	fullURL := c.baseURL + "/api/v1/admin/settings/audit-logs"
-
-	req, err := http.NewRequest("GET", fullURL, nil)
-	if err != nil {
-		return nil, errs.Errorf("failed to create request: %w", err)
-	}
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, errs.Errorf("failed to make request: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, errs.Errorf("failed to read response body: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, parseAPIError(resp, body)
-	}
-
-	var response api.SettingsAuditLogsResponse
-	if err := json.Unmarshal(body, &response); err != nil {
-		return nil, errs.Errorf("failed to decode response: %w", err)
-	}
-	return &response, nil
+func (c *AuthServerClient) GetSettingsAuditLogs(ctx context.Context, accessToken string) (*api.SettingsAuditLogsResponse, error) {
+	return execute[api.SettingsAuditLogsResponse](ctx, c, accessToken, apiRequest{
+		method:        "GET",
+		url:           c.baseURL + "/api/v1/admin/settings/audit-logs",
+		contentType:   contentTypeJSON,
+		successStatus: http.StatusOK,
+	})
 }
 
-func (c *AuthServerClient) UpdateSettingsAuditLogs(accessToken string, request *api.UpdateSettingsAuditLogsRequest) (*api.SettingsAuditLogsResponse, error) {
-	fullURL := c.baseURL + "/api/v1/admin/settings/audit-logs"
-
-	jsonData, err := json.Marshal(request)
-	if err != nil {
-		return nil, errs.Errorf("failed to marshal request: %w", err)
-	}
-
-	req, err := http.NewRequest("PUT", fullURL, bytes.NewBuffer(jsonData))
-	if err != nil {
-		return nil, errs.Errorf("failed to create request: %w", err)
-	}
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, errs.Errorf("failed to make request: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, errs.Errorf("failed to read response body: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, parseAPIError(resp, body)
-	}
-
-	var response api.SettingsAuditLogsResponse
-	if err := json.Unmarshal(body, &response); err != nil {
-		return nil, errs.Errorf("failed to decode response: %w", err)
-	}
-	return &response, nil
+func (c *AuthServerClient) UpdateSettingsAuditLogs(ctx context.Context, accessToken string, request *api.UpdateSettingsAuditLogsRequest) (*api.SettingsAuditLogsResponse, error) {
+	return execute[api.SettingsAuditLogsResponse](ctx, c, accessToken, apiRequest{
+		method:        "PUT",
+		url:           c.baseURL + "/api/v1/admin/settings/audit-logs",
+		jsonBody:      request,
+		contentType:   contentTypeJSON,
+		successStatus: http.StatusOK,
+	})
 }
 
-func (c *AuthServerClient) GetAuditLogsPaginated(accessToken string, page, pageSize int, auditEvent string,
+func (c *AuthServerClient) GetAuditLogsPaginated(ctx context.Context, accessToken string, page, pageSize int, auditEvent string,
 	requestId string) (*api.GetAuditLogsResponse, error) {
 	fullURL := fmt.Sprintf("%s/api/v1/admin/audit-logs?page=%d&size=%d", c.baseURL, page, pageSize)
 	// Both filters are escaped. The request id is whatever the client put in X-Request-Id, so it
@@ -95,67 +42,23 @@ func (c *AuthServerClient) GetAuditLogsPaginated(accessToken string, page, pageS
 		fullURL += fmt.Sprintf("&requestId=%s", url.QueryEscape(requestId))
 	}
 
-	req, err := http.NewRequest("GET", fullURL, nil)
-	if err != nil {
-		return nil, errs.Errorf("failed to create request: %w", err)
-	}
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, errs.Errorf("failed to make request: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, errs.Errorf("failed to read response body: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, parseAPIError(resp, body)
-	}
-
-	var response api.GetAuditLogsResponse
-	if err := json.Unmarshal(body, &response); err != nil {
-		return nil, errs.Errorf("failed to decode response: %w", err)
-	}
-	return &response, nil
+	return execute[api.GetAuditLogsResponse](ctx, c, accessToken, apiRequest{
+		method:        "GET",
+		url:           fullURL,
+		contentType:   contentTypeJSON,
+		successStatus: http.StatusOK,
+	})
 }
 
 // GetAuditEventTypes fetches the catalog of audit event names the auth server can write, which
 // is what the viewer's filter dropdown offers. The admin console holds no audit event name of
 // its own: a name compiled in here would be one the two binaries could disagree about after a
 // partial upgrade, offering a filter value the server never writes (#351).
-func (c *AuthServerClient) GetAuditEventTypes(accessToken string) (*api.GetAuditEventTypesResponse, error) {
-	fullURL := c.baseURL + "/api/v1/admin/audit-logs/event-types"
-
-	req, err := http.NewRequest("GET", fullURL, nil)
-	if err != nil {
-		return nil, errs.Errorf("failed to create request: %w", err)
-	}
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, errs.Errorf("failed to make request: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, errs.Errorf("failed to read response body: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, parseAPIError(resp, body)
-	}
-
-	var response api.GetAuditEventTypesResponse
-	if err := json.Unmarshal(body, &response); err != nil {
-		return nil, errs.Errorf("failed to decode response: %w", err)
-	}
-	return &response, nil
+func (c *AuthServerClient) GetAuditEventTypes(ctx context.Context, accessToken string) (*api.GetAuditEventTypesResponse, error) {
+	return execute[api.GetAuditEventTypesResponse](ctx, c, accessToken, apiRequest{
+		method:        "GET",
+		url:           c.baseURL + "/api/v1/admin/audit-logs/event-types",
+		contentType:   contentTypeJSON,
+		successStatus: http.StatusOK,
+	})
 }

@@ -47,7 +47,7 @@ func HandleAdminResourcePermissionsGet(
 			return
 		}
 
-		resource, err := apiClient.GetResourceById(jwtInfo.TokenResponse.AccessToken, id)
+		resource, err := apiClient.GetResourceById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -72,7 +72,7 @@ func HandleAdminResourcePermissionsGet(
 			}
 		}
 
-		permissions, err := apiClient.GetPermissionsByResource(jwtInfo.TokenResponse.AccessToken, resource.Id)
+		permissions, err := apiClient.GetPermissionsByResource(r.Context(), jwtInfo.TokenResponse.AccessToken, resource.Id)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -131,7 +131,7 @@ func HandleAdminResourcePermissionsPost(
 			httpHelper.JsonError(w, r, errs.New("no JWT info found in context"))
 			return
 		}
-		resource, err := apiClient.GetResourceById(jwtInfo.TokenResponse.AccessToken, id)
+		resource, err := apiClient.GetResourceById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
@@ -163,7 +163,7 @@ func HandleAdminResourcePermissionsPost(
 			})
 		}
 		updateReq := &api.UpdateResourcePermissionsRequest{Permissions: upserts}
-		if err := apiClient.UpdateResourcePermissions(jwtInfo.TokenResponse.AccessToken, resource.Id, updateReq); err != nil {
+		if err := apiClient.UpdateResourcePermissions(r.Context(), jwtInfo.TokenResponse.AccessToken, resource.Id, updateReq); err != nil {
 			// Forward the API's status rather than dressing a 400 as a 200 carrying result.Error.
 			// The administrator still reads the API's sentence either way: sendAjaxRequest draws
 			// error_description from any non-2xx into this same modal, and escapes it on the way

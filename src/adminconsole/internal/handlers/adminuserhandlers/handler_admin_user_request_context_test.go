@@ -41,6 +41,14 @@ func (s *ctxRecordingApiClient) record(ctx context.Context) error {
 	return errs.New("the auth server refused")
 }
 
+func (s *ctxRecordingApiClient) GetUserPermissions(ctx context.Context, _ string, _ int64) (*api.UserResponse, []api.PermissionResponse, error) {
+	return nil, nil, s.record(ctx)
+}
+
+func (s *ctxRecordingApiClient) UpdateUserPermissions(ctx context.Context, _ string, _ int64, _ *api.UpdateUserPermissionsRequest) error {
+	return s.record(ctx)
+}
+
 func (s *ctxRecordingApiClient) UpdateUserPhone(ctx context.Context, _ string, _ int64, _ *api.UpdateUserPhoneRequest) (*api.UserResponse, error) {
 	return nil, s.record(ctx)
 }
@@ -125,6 +133,14 @@ func TestAdminUserHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContex
 				handlertest.WithAccessToken(),
 				handlertest.WithSettings(&api.PublicSettingsResponse{}),
 				handlertest.WithForm(url.Values{"email": {"jane@example.com"}, "password": {"N3w!word"}})),
+		},
+		{
+			name: "HandleAdminUserPermissionsGet",
+			build: func(h *mocks_handlerhelpers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+				return HandleAdminUserPermissionsGet(h, nil, c)
+			},
+			request: handlertest.Request(http.MethodGet, "/admin/users/42/permissions",
+				handlertest.WithAccessToken(), handlertest.WithRouteParam("userId", userId)),
 		},
 		{
 			name: "HandleAdminUserDetailsGet",

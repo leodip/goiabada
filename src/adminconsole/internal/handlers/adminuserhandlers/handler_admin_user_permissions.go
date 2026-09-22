@@ -45,7 +45,7 @@ func HandleAdminUserPermissionsGet(
 		}
 
 		// Get user permissions via API
-		user, userPermissions, err := apiClient.GetUserPermissions(accessToken, id)
+		user, userPermissions, err := apiClient.GetUserPermissions(r.Context(), accessToken, id)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -62,7 +62,7 @@ func HandleAdminUserPermissionsGet(
 		}
 
 		// Get all resources via API
-		resources, err := apiClient.GetAllResources(accessToken)
+		resources, err := apiClient.GetAllResources(r.Context(), accessToken)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -148,7 +148,7 @@ func HandleAdminUserPermissionsPost(
 		}
 
 		// Update user permissions via API (includes validation and audit logging)
-		err = apiClient.UpdateUserPermissions(accessToken, id, request)
+		err = apiClient.UpdateUserPermissions(r.Context(), accessToken, id, request)
 		if err != nil {
 			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return

@@ -37,7 +37,7 @@ func HandleAdminGetPermissionsGet(
 		}
 
 		// Get permissions via API client
-		permissions, err := apiClient.GetPermissionsByResource(accessToken, resourceId)
+		permissions, err := apiClient.GetPermissionsByResource(r.Context(), accessToken, resourceId)
 		if err != nil {
 			// The resource id goes into the message rather than into a record of its own. This
 			// was the console's one caller-side error log, and it ran before the classifier: an

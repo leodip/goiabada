@@ -7,6 +7,7 @@ import (
 	"crypto/rsa"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"io"
 	"math/big"
 	"net/http"
@@ -18,6 +19,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/leodip/goiabada/adminconsole/internal/boundedread"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -740,6 +742,13 @@ func TestGetPublicKeyFromCache(t *testing.T) {
 // modulus. Valid matters for the same reason as oversizedTokenResponse: without
 // the cap it decodes cleanly, so the case fails on both the count and the
 // outcome when the cap goes.
+//
+// A balanced prefix is what made cutting unsound here rather than merely
+// indistinguishable. json.Decoder stops at the first complete value, so a
+// document cut at the cap whose first key happened to close would have decoded
+// with the rest of the keys missing and nothing would have said so -- and this
+// parser would then have cached a JWKS short of the key the next token needed.
+// The overrun is refused instead (#386 decision 4).
 func oversizedJwks(t *testing.T) *countingBody {
 	t.Helper()
 	prefix := `{"keys":[{"kty":"RSA","kid":"key-1","alg":"RS256","use":"sig","e":"AQAB","n":"`
@@ -748,7 +757,7 @@ func oversizedJwks(t *testing.T) *countingBody {
 	return &countingBody{remaining: []byte(prefix + strings.Repeat("x", padding) + suffix)}
 }
 
-func TestRefreshJwks_ReadsAtMostTheCap(t *testing.T) {
+func TestRefreshJwks_RefusesADocumentOverTheCap(t *testing.T) {
 	body := oversizedJwks(t)
 
 	tp := NewJWKSTokenParser("https://auth.example.com",
@@ -756,10 +765,38 @@ func TestRefreshJwks_ReadsAtMostTheCap(t *testing.T) {
 
 	err := tp.refreshJwks(context.Background())
 
-	require.Error(t, err, "the document reaches the decoder truncated and fails to parse")
-	assert.Equal(t, int64(MaxTokenResponseBytes), body.read.Load(),
-		"exactly the cap is read from a peer answering with more than it")
-	assert.Empty(t, tp.cachedJwks.Keys, "nothing is cached from a document that did not decode")
+	require.Error(t, err)
+	assert.True(t, errors.Is(err, boundedread.ErrResponseTooLarge),
+		"the document is refused as oversized rather than reaching the decoder truncated: %v", err)
+	assert.Equal(t, int64(MaxTokenResponseBytes)+1, body.read.Load(),
+		"one byte past the cap is read, which is what makes the overrun detectable, and no more")
+	assert.Empty(t, tp.cachedJwks.Keys, "nothing is cached from a document that was refused")
+}
+
+// The document exactly at the cap is accepted, so the case above is the overrun
+// and not the size. It is the one boundary a reader would otherwise have to take
+// on trust, since the two padded documents above and below it are a megabyte
+// apart.
+func TestRefreshJwks_AcceptsADocumentOfExactlyTheCap(t *testing.T) {
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+
+	jwk := jwkFromPublicKey("key-1", &key.PublicKey)
+	encoded, err := json.Marshal(oauth.Jwks{Keys: []oauth.Jwk{jwk}})
+	require.NoError(t, err)
+
+	// Pad the one field of unbounded length until the encoding is the cap to the byte.
+	jwk.Kid = "key-1" + strings.Repeat("x", MaxTokenResponseBytes-len(encoded))
+	encoded, err = json.Marshal(oauth.Jwks{Keys: []oauth.Jwk{jwk}})
+	require.NoError(t, err)
+	require.Len(t, encoded, MaxTokenResponseBytes)
+
+	tp := NewJWKSTokenParser("https://auth.example.com",
+		clientReturning(http.StatusOK, io.NopCloser(bytes.NewReader(encoded))))
+
+	require.NoError(t, tp.refreshJwks(context.Background()))
+	require.Len(t, tp.cachedJwks.Keys, 1)
+	assert.Equal(t, jwk.Kid, tp.cachedJwks.Keys[0].Kid)
 }
 
 // The benign member of the class: a document under the cap still decodes, so the

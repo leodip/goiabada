@@ -5,7 +5,6 @@ import (
 	"crypto/rsa"
 	"encoding/base64"
 	"encoding/json"
-	"io"
 	"log/slog"
 	"math/big"
 	"net/http"
@@ -13,6 +12,7 @@ import (
 	"sync"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/leodip/goiabada/adminconsole/internal/boundedread"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
 )
@@ -141,12 +141,22 @@ func (tp *JWKSTokenParser) refreshJwks(ctx context.Context) error {
 		slog.ErrorContext(ctx, "unable to fetch the jwks document", "status", resp.StatusCode)
 		return errs.New("failed to fetch JWKS")
 	}
-	// Bounded like the other two reads the admin console makes of the auth server. The
-	// request keeps its own context rather than a detached one: fetching /certs is an
-	// idempotent read of a document the server holds no state for, so abandoning it when
-	// the browser goes away loses nothing (#338).
+	// Bounded like every other read the admin console makes of the auth server. The request
+	// keeps its own context rather than a detached one: fetching /certs is an idempotent read
+	// of a document the server holds no state for, so abandoning it when the browser goes
+	// away loses nothing (#338).
+	//
+	// Read whole and then unmarshalled, rather than decoded off the wire through a
+	// LimitReader. json.Decoder stops at the first complete value, so a document cut at the
+	// ceiling that happened to be balanced would decode with keys missing and this would
+	// cache a JWKS short of the key the next token needs, with nothing saying so. An overrun
+	// is refused instead, and the cache below is left as it was (#386 decision 4).
+	body, err := boundedread.Read(resp.Body, MaxTokenResponseBytes)
+	if err != nil {
+		return err
+	}
 	var jwks oauth.Jwks
-	if err := json.NewDecoder(io.LimitReader(resp.Body, MaxTokenResponseBytes)).Decode(&jwks); err != nil {
+	if err := json.Unmarshal(body, &jwks); err != nil {
 		return err
 	}
 	tp.mu.Lock()

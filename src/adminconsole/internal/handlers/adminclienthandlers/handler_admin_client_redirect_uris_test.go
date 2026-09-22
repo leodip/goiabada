@@ -31,12 +31,12 @@ type stubApiClient struct {
 	settings  *api.SettingsGeneralResponse
 }
 
-func (s *stubApiClient) UpdateClientRedirectURIs(accessToken string, clientId int64,
+func (s *stubApiClient) UpdateClientRedirectURIs(_ context.Context, accessToken string, clientId int64,
 	request *api.UpdateClientRedirectURIsRequest) (*api.ClientResponse, error) {
 	return nil, s.updateErr
 }
 
-func (s *stubApiClient) GetClientById(accessToken string, clientId int64) (*api.ClientResponse, error) {
+func (s *stubApiClient) GetClientById(_ context.Context, accessToken string, clientId int64) (*api.ClientResponse, error) {
 	return s.client, nil
 }
 

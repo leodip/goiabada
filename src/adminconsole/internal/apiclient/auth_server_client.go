@@ -44,40 +44,40 @@ type ApiClient interface {
 	AddUserToGroup(ctx context.Context, accessToken string, groupId int64, userId int64) error
 	RemoveUserFromGroup(ctx context.Context, accessToken string, groupId int64, userId int64) error
 	SearchUsersWithGroupAnnotation(ctx context.Context, accessToken, query string, groupId int64, page, size int) ([]api.UserWithGroupMembershipResponse, int, error)
-	GetUserPermissions(accessToken string, userId int64) (*api.UserResponse, []api.PermissionResponse, error)
-	UpdateUserPermissions(accessToken string, userId int64, request *api.UpdateUserPermissionsRequest) error
+	GetUserPermissions(ctx context.Context, accessToken string, userId int64) (*api.UserResponse, []api.PermissionResponse, error)
+	UpdateUserPermissions(ctx context.Context, accessToken string, userId int64, request *api.UpdateUserPermissionsRequest) error
 	GetGroupPermissions(ctx context.Context, accessToken string, groupId int64) (*api.GroupResponse, []api.PermissionResponse, error)
 	UpdateGroupPermissions(ctx context.Context, accessToken string, groupId int64, request *api.UpdateGroupPermissionsRequest) error
-	GetAllResources(accessToken string) ([]api.ResourceResponse, error)
-	GetResourceById(accessToken string, resourceId int64) (*api.ResourceResponse, error)
-	UpdateResource(accessToken string, resourceId int64, request *api.UpdateResourceRequest) (*api.ResourceResponse, error)
-	DeleteResource(accessToken string, resourceId int64) error
-	GetPermissionsByResource(accessToken string, resourceId int64) ([]api.PermissionResponse, error)
-	UpdateResourcePermissions(accessToken string, resourceId int64, request *api.UpdateResourcePermissionsRequest) error
-	CreateResource(accessToken string, request *api.CreateResourceRequest) (*api.ResourceResponse, error)
+	GetAllResources(ctx context.Context, accessToken string) ([]api.ResourceResponse, error)
+	GetResourceById(ctx context.Context, accessToken string, resourceId int64) (*api.ResourceResponse, error)
+	UpdateResource(ctx context.Context, accessToken string, resourceId int64, request *api.UpdateResourceRequest) (*api.ResourceResponse, error)
+	DeleteResource(ctx context.Context, accessToken string, resourceId int64) error
+	GetPermissionsByResource(ctx context.Context, accessToken string, resourceId int64) ([]api.PermissionResponse, error)
+	UpdateResourcePermissions(ctx context.Context, accessToken string, resourceId int64, request *api.UpdateResourcePermissionsRequest) error
+	CreateResource(ctx context.Context, accessToken string, request *api.CreateResourceRequest) (*api.ResourceResponse, error)
 	GetPhoneCountries(ctx context.Context, accessToken string) ([]api.PhoneCountryResponse, error)
 	GetGroupAttributesByGroupId(ctx context.Context, accessToken string, groupId int64) ([]api.GroupAttributeResponse, error)
 	GetGroupAttributeById(ctx context.Context, accessToken string, attributeId int64) (*api.GroupAttributeResponse, error)
 	CreateGroupAttribute(ctx context.Context, accessToken string, request *api.CreateGroupAttributeRequest) (*api.GroupAttributeResponse, error)
 	UpdateGroupAttribute(ctx context.Context, accessToken string, attributeId int64, request *api.UpdateGroupAttributeRequest) (*api.GroupAttributeResponse, error)
 	DeleteGroupAttribute(ctx context.Context, accessToken string, attributeId int64) error
-	GetAllClients(accessToken string) ([]api.ClientResponse, error)
-	GetClientById(accessToken string, clientId int64) (*api.ClientResponse, error)
-	CreateClient(accessToken string, request *api.CreateClientRequest) (*api.ClientResponse, error)
-	UpdateClient(accessToken string, clientId int64, request *api.UpdateClientSettingsRequest) (*api.ClientResponse, error)
-	UpdateClientAuthentication(accessToken string, clientId int64, request *api.UpdateClientAuthenticationRequest) (*api.ClientResponse, error)
-	UpdateClientOAuth2Flows(accessToken string, clientId int64, request *api.UpdateClientOAuth2FlowsRequest) (*api.ClientResponse, error)
-	DeleteClient(accessToken string, clientId int64) error
-	UpdateClientRedirectURIs(accessToken string, clientId int64, request *api.UpdateClientRedirectURIsRequest) (*api.ClientResponse, error)
-	UpdateClientWebOrigins(accessToken string, clientId int64, request *api.UpdateClientWebOriginsRequest) (*api.ClientResponse, error)
-	GetClientPermissions(accessToken string, clientId int64) (*api.ClientResponse, []api.PermissionResponse, error)
-	UpdateClientPermissions(accessToken string, clientId int64, request *api.UpdateClientPermissionsRequest) error
-	UpdateClientTokens(accessToken string, clientId int64, request *api.UpdateClientTokensRequest) (*api.ClientResponse, error)
+	GetAllClients(ctx context.Context, accessToken string) ([]api.ClientResponse, error)
+	GetClientById(ctx context.Context, accessToken string, clientId int64) (*api.ClientResponse, error)
+	CreateClient(ctx context.Context, accessToken string, request *api.CreateClientRequest) (*api.ClientResponse, error)
+	UpdateClient(ctx context.Context, accessToken string, clientId int64, request *api.UpdateClientSettingsRequest) (*api.ClientResponse, error)
+	UpdateClientAuthentication(ctx context.Context, accessToken string, clientId int64, request *api.UpdateClientAuthenticationRequest) (*api.ClientResponse, error)
+	UpdateClientOAuth2Flows(ctx context.Context, accessToken string, clientId int64, request *api.UpdateClientOAuth2FlowsRequest) (*api.ClientResponse, error)
+	DeleteClient(ctx context.Context, accessToken string, clientId int64) error
+	UpdateClientRedirectURIs(ctx context.Context, accessToken string, clientId int64, request *api.UpdateClientRedirectURIsRequest) (*api.ClientResponse, error)
+	UpdateClientWebOrigins(ctx context.Context, accessToken string, clientId int64, request *api.UpdateClientWebOriginsRequest) (*api.ClientResponse, error)
+	GetClientPermissions(ctx context.Context, accessToken string, clientId int64) (*api.ClientResponse, []api.PermissionResponse, error)
+	UpdateClientPermissions(ctx context.Context, accessToken string, clientId int64, request *api.UpdateClientPermissionsRequest) error
+	UpdateClientTokens(ctx context.Context, accessToken string, clientId int64, request *api.UpdateClientTokensRequest) (*api.ClientResponse, error)
 	SearchGroupsWithPermissionAnnotation(ctx context.Context, accessToken string, permissionId int64, page, size int) ([]api.GroupWithPermissionResponse, int, error)
 	// Users with permission
-	GetUsersByPermission(accessToken string, permissionId int64, page, size int) ([]api.UserResponse, int, error)
+	GetUsersByPermission(ctx context.Context, accessToken string, permissionId int64, page, size int) ([]api.UserResponse, int, error)
 	// Users search annotated with permission flag
-	SearchUsersWithPermissionAnnotation(accessToken string, permissionId int64, query string, page, size int) ([]api.UserWithPermissionResponse, int, error)
+	SearchUsersWithPermissionAnnotation(ctx context.Context, accessToken string, permissionId int64, query string, page, size int) ([]api.UserWithPermissionResponse, int, error)
 	// Settings - General
 	GetSettingsGeneral(ctx context.Context, accessToken string) (*api.SettingsGeneralResponse, error)
 	UpdateSettingsGeneral(ctx context.Context, accessToken string, request *api.UpdateSettingsGeneralRequest) (*api.SettingsGeneralResponse, error)
@@ -99,10 +99,10 @@ type ApiClient interface {
 	RotateSettingsKeys(ctx context.Context, accessToken string) error
 	DeleteSettingsKey(ctx context.Context, accessToken string, id int64) error
 	// Settings - Audit Logs
-	GetSettingsAuditLogs(accessToken string) (*api.SettingsAuditLogsResponse, error)
-	UpdateSettingsAuditLogs(accessToken string, request *api.UpdateSettingsAuditLogsRequest) (*api.SettingsAuditLogsResponse, error)
-	GetAuditLogsPaginated(accessToken string, page, pageSize int, auditEvent string, requestId string) (*api.GetAuditLogsResponse, error)
-	GetAuditEventTypes(accessToken string) (*api.GetAuditEventTypesResponse, error)
+	GetSettingsAuditLogs(ctx context.Context, accessToken string) (*api.SettingsAuditLogsResponse, error)
+	UpdateSettingsAuditLogs(ctx context.Context, accessToken string, request *api.UpdateSettingsAuditLogsRequest) (*api.SettingsAuditLogsResponse, error)
+	GetAuditLogsPaginated(ctx context.Context, accessToken string, page, pageSize int, auditEvent string, requestId string) (*api.GetAuditLogsResponse, error)
+	GetAuditEventTypes(ctx context.Context, accessToken string) (*api.GetAuditEventTypesResponse, error)
 	// Account (self-service)
 	GetAccountProfile(ctx context.Context, accessToken string) (*api.UserResponse, error)
 	UpdateAccountProfile(ctx context.Context, accessToken string, request *api.UpdateUserProfileRequest) (*api.UserResponse, error)
@@ -127,9 +127,9 @@ type ApiClient interface {
 	UploadUserProfilePicture(ctx context.Context, accessToken string, userId int64, pictureData []byte, filename string) (*ProfilePictureUploadResponse, error)
 	DeleteUserProfilePicture(ctx context.Context, accessToken string, userId int64) error
 	// Admin - Client Logo
-	GetClientLogo(accessToken string, clientId int64) (*ClientLogoInfo, error)
-	UploadClientLogo(accessToken string, clientId int64, logoData []byte, filename string) (*ClientLogoUploadResponse, error)
-	DeleteClientLogo(accessToken string, clientId int64) error
+	GetClientLogo(ctx context.Context, accessToken string, clientId int64) (*ClientLogoInfo, error)
+	UploadClientLogo(ctx context.Context, accessToken string, clientId int64, logoData []byte, filename string) (*ClientLogoUploadResponse, error)
+	DeleteClientLogo(ctx context.Context, accessToken string, clientId int64) error
 }
 
 type AuthServerClient struct {

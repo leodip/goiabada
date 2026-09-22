@@ -43,7 +43,7 @@ func HandleAdminClientAuthenticationGet(
 			httpHelper.InternalServerError(w, r, errs.New("no JWT info found in context"))
 			return
 		}
-		client, err := apiClient.GetClientById(jwtInfo.TokenResponse.AccessToken, id)
+		client, err := apiClient.GetClientById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -121,7 +121,7 @@ func HandleAdminClientAuthenticationPost(
 			httpHelper.InternalServerError(w, r, errs.New("no JWT info found in context"))
 			return
 		}
-		client, err := apiClient.GetClientById(jwtInfo.TokenResponse.AccessToken, id)
+		client, err := apiClient.GetClientById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -184,7 +184,7 @@ func HandleAdminClientAuthenticationPost(
 			ClientSecret: adminClientAuthentication.ClientSecret,
 		}
 
-		_, err = apiClient.UpdateClientAuthentication(jwtInfo.TokenResponse.AccessToken, client.Id, req)
+		_, err = apiClient.UpdateClientAuthentication(r.Context(), jwtInfo.TokenResponse.AccessToken, client.Id, req)
 		if err != nil {
 			handlers.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
 			return

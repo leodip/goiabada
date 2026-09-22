@@ -34,7 +34,7 @@ func HandleAdminSettingsAuditLogsGet(
 		}
 
 		// Fetch settings
-		settingsResp, err := apiClient.GetSettingsAuditLogs(jwtInfo.TokenResponse.AccessToken)
+		settingsResp, err := apiClient.GetSettingsAuditLogs(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -124,7 +124,7 @@ func HandleAdminSettingsAuditLogsPost(
 			AuditLogRetentionDays:      retentionInt,
 		}
 
-		_, err := apiClient.UpdateSettingsAuditLogs(jwtInfo.TokenResponse.AccessToken, updateReq)
+		_, err := apiClient.UpdateSettingsAuditLogs(r.Context(), jwtInfo.TokenResponse.AccessToken, updateReq)
 		if err != nil {
 			handlers.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
 			return
@@ -171,7 +171,7 @@ func HandleAdminSettingsAuditLogViewerGet(
 		const pageSize = 20
 
 		// Fetch audit logs
-		auditLogsResp, err := apiClient.GetAuditLogsPaginated(jwtInfo.TokenResponse.AccessToken, pageInt, pageSize, auditEvent, requestId)
+		auditLogsResp, err := apiClient.GetAuditLogsPaginated(r.Context(), jwtInfo.TokenResponse.AccessToken, pageInt, pageSize, auditEvent, requestId)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -182,7 +182,7 @@ func HandleAdminSettingsAuditLogViewerGet(
 		// that highlights a full one (#305).
 		if clamped := pagination.ClampPage(auditLogsResp.Total, pageSize, pageInt); clamped != pageInt {
 			pageInt = clamped
-			auditLogsResp, err = apiClient.GetAuditLogsPaginated(jwtInfo.TokenResponse.AccessToken, pageInt, pageSize, auditEvent, requestId)
+			auditLogsResp, err = apiClient.GetAuditLogsPaginated(r.Context(), jwtInfo.TokenResponse.AccessToken, pageInt, pageSize, auditEvent, requestId)
 			if err != nil {
 				handlers.HandleAPIError(httpHelper, w, r, err)
 				return
@@ -193,7 +193,7 @@ func HandleAdminSettingsAuditLogViewerGet(
 		// and is the only process that writes them. Compiling the list in here would let the
 		// two binaries disagree after a partial upgrade, offering a filter value the server
 		// never writes or omitting one it does (#351).
-		eventTypesResp, err := apiClient.GetAuditEventTypes(jwtInfo.TokenResponse.AccessToken)
+		eventTypesResp, err := apiClient.GetAuditEventTypes(r.Context(), jwtInfo.TokenResponse.AccessToken)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return

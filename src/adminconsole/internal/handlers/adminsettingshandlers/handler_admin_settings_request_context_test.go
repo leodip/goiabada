@@ -42,6 +42,22 @@ func (s *ctxRecordingApiClient) record(ctx context.Context) error {
 	return errs.New("the auth server refused")
 }
 
+func (s *ctxRecordingApiClient) GetSettingsAuditLogs(ctx context.Context, _ string) (*api.SettingsAuditLogsResponse, error) {
+	return nil, s.record(ctx)
+}
+
+func (s *ctxRecordingApiClient) UpdateSettingsAuditLogs(ctx context.Context, _ string, _ *api.UpdateSettingsAuditLogsRequest) (*api.SettingsAuditLogsResponse, error) {
+	return nil, s.record(ctx)
+}
+
+func (s *ctxRecordingApiClient) GetAuditLogsPaginated(ctx context.Context, _ string, _, _ int, _, _ string) (*api.GetAuditLogsResponse, error) {
+	return nil, s.record(ctx)
+}
+
+func (s *ctxRecordingApiClient) GetAuditEventTypes(ctx context.Context, _ string) (*api.GetAuditEventTypesResponse, error) {
+	return nil, s.record(ctx)
+}
+
 func (s *ctxRecordingApiClient) GetSettingsEmail(ctx context.Context, _ string) (*api.SettingsEmailResponse, error) {
 	return nil, s.record(ctx)
 }
@@ -128,6 +144,20 @@ func TestAdminSettingsHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsCo
 		build   func(httpHelper *mocks_handlerhelpers.HttpHelper, apiClient apiclient.ApiClient) http.HandlerFunc
 		request *http.Request
 	}{
+		{
+			name: "HandleAdminSettingsAuditLogsGet",
+			build: func(h *mocks_handlerhelpers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+				return HandleAdminSettingsAuditLogsGet(h, newSettingsTestStore(), c)
+			},
+			request: handlertest.Request(http.MethodGet, "/admin/settings/audit-logs", handlertest.WithAccessToken()),
+		},
+		{
+			name: "HandleAdminSettingsAuditLogViewerGet",
+			build: func(h *mocks_handlerhelpers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+				return HandleAdminSettingsAuditLogViewerGet(h, c)
+			},
+			request: handlertest.Request(http.MethodGet, "/admin/settings/audit-logs/viewer", handlertest.WithAccessToken()),
+		},
 		{
 			name: "HandleAdminSettingsEmailGet",
 			build: func(h *mocks_handlerhelpers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {

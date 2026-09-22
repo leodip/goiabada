@@ -66,7 +66,7 @@ func HandleAdminResourceNewPost(
 			Description:        description,
 		}
 
-		_, err := apiClient.CreateResource(jwtInfo.TokenResponse.AccessToken, req)
+		_, err := apiClient.CreateResource(r.Context(), jwtInfo.TokenResponse.AccessToken, req)
 		if err != nil {
 			handlers.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
 			return

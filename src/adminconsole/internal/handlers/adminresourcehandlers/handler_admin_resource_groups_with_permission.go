@@ -44,7 +44,7 @@ func HandleAdminResourceGroupsWithPermissionGet(
 		}
 		accessToken := jwtInfo.TokenResponse.AccessToken
 
-		resource, err := apiClient.GetResourceById(accessToken, id)
+		resource, err := apiClient.GetResourceById(r.Context(), accessToken, id)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -54,7 +54,7 @@ func HandleAdminResourceGroupsWithPermissionGet(
 			return
 		}
 
-		permissions, err := apiClient.GetPermissionsByResource(accessToken, resource.Id)
+		permissions, err := apiClient.GetPermissionsByResource(r.Context(), accessToken, resource.Id)
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
@@ -240,7 +240,7 @@ func HandleAdminResourceGroupsWithPermissionAddPermissionPost(
 		}
 		accessToken := jwtInfo.TokenResponse.AccessToken
 
-		resource, err := apiClient.GetResourceById(accessToken, id)
+		resource, err := apiClient.GetResourceById(r.Context(), accessToken, id)
 		if err != nil {
 			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
@@ -284,7 +284,7 @@ func HandleAdminResourceGroupsWithPermissionAddPermissionPost(
 			return
 		}
 
-		permissions, err := apiClient.GetPermissionsByResource(accessToken, resource.Id)
+		permissions, err := apiClient.GetPermissionsByResource(r.Context(), accessToken, resource.Id)
 		if err != nil {
 			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
@@ -370,7 +370,7 @@ func HandleAdminResourceGroupsWithPermissionRemovePermissionPost(
 		}
 		accessToken := jwtInfo.TokenResponse.AccessToken
 
-		resource, err := apiClient.GetResourceById(accessToken, id)
+		resource, err := apiClient.GetResourceById(r.Context(), accessToken, id)
 		if err != nil {
 			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
@@ -414,7 +414,7 @@ func HandleAdminResourceGroupsWithPermissionRemovePermissionPost(
 			return
 		}
 
-		permissions, err := apiClient.GetPermissionsByResource(accessToken, resource.Id)
+		permissions, err := apiClient.GetPermissionsByResource(r.Context(), accessToken, resource.Id)
 		if err != nil {
 			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return

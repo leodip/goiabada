@@ -2,6 +2,7 @@ package adminclienthandlers
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -27,11 +28,11 @@ type stubAllClientsApiClient struct {
 	allClients []api.ClientResponse
 }
 
-func (s *stubAllClientsApiClient) GetAllClients(accessToken string) ([]api.ClientResponse, error) {
+func (s *stubAllClientsApiClient) GetAllClients(_ context.Context, accessToken string) ([]api.ClientResponse, error) {
 	return s.allClients, nil
 }
 
-func (s *stubAllClientsApiClient) UpdateClientWebOrigins(accessToken string, clientId int64,
+func (s *stubAllClientsApiClient) UpdateClientWebOrigins(_ context.Context, accessToken string, clientId int64,
 	request *api.UpdateClientWebOriginsRequest) (*api.ClientResponse, error) {
 	return nil, s.updateErr
 }
