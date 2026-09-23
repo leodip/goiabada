@@ -1,9 +1,9 @@
 package mssqldb
 
 import (
-	"net"
 	"net/url"
-	"strconv"
+
+	"github.com/leodip/goiabada/core/hostport"
 )
 
 // maintenanceDatabase is where a SQL Server database is created and dropped from.
@@ -11,9 +11,10 @@ const maintenanceDatabase = "master"
 
 // DSN is the connection URL for the application database cfg names.
 //
-// The host goes through net.JoinHostPort, because a Sprintf'd `host:port` gave an IPv6 literal
-// no brackets and the driver read it as a host with no port (#424). The credentials and the
-// database were already escaped by url.URL.
+// The host goes through hostport.Join, because a Sprintf'd `host:port` gave an IPv6 literal no
+// brackets and the driver read it as a host with no port (#424). hostport.Join also reads `[::1]`
+// as `::1`, the one IPv6 spelling the Sprintf'd form accepted. The credentials and the database
+// were already escaped by url.URL.
 func DSN(cfg *DatabaseConfig) string {
 	return connectionURL(cfg, cfg.Name)
 }
@@ -31,7 +32,7 @@ func connectionURL(cfg *DatabaseConfig, database string) string {
 	u := url.URL{
 		Scheme:   "sqlserver",
 		User:     url.UserPassword(cfg.Username, cfg.Password),
-		Host:     net.JoinHostPort(cfg.Host, strconv.Itoa(cfg.Port)),
+		Host:     hostport.Join(cfg.Host, cfg.Port),
 		RawQuery: q.Encode(),
 	}
 	return u.String()

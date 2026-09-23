@@ -66,6 +66,21 @@ func TestDSN_RoundTripsThroughTheDriver(t *testing.T) {
 	}
 }
 
+// TestDSN_BracketedIPv6HostIsTheSameHost pins that `[::1]`, the one IPv6 spelling of
+// GOIABADA_DB_HOST a Sprintf'd DSN accepted, still names the host `::1` does. A plain
+// net.JoinHostPort would have written `[[::1]]:3306`, which no dial can use (#424).
+func TestDSN_BracketedIPv6HostIsTheSameHost(t *testing.T) {
+	bare := &DatabaseConfig{Username: "goiabada", Password: "pw", Host: "::1", Port: 3306, Name: "goiabada"}
+	bracketed := &DatabaseConfig{Username: "goiabada", Password: "pw", Host: "[::1]", Port: 3306, Name: "goiabada"}
+
+	assert.Equal(t, DSN(bare), DSN(bracketed))
+	assert.Equal(t, MaintenanceDSN(bare), MaintenanceDSN(bracketed))
+
+	parsed, err := mysqldriver.ParseDSN(DSN(bracketed))
+	require.NoError(t, err)
+	assert.Equal(t, "[::1]:3306", parsed.Addr)
+}
+
 // TestDSN_ColonInUsernameIsTheKnownCeiling pins the limit mysqldb.DSN's ceiling comment names:
 // the driver's grammar splits user from password at the first `:`, with no escape, so a username
 // carrying one comes back as a different user. The day this fails the driver has grown an escape

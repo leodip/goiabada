@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
@@ -19,6 +18,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/hostport"
 	"github.com/leodip/goiabada/core/i18n"
 )
 
@@ -106,8 +106,15 @@ func HandleAPISettingsEmailPut(
 			return
 		}
 
+		// The host is normalised once, and the required check, the bound, the dial and the stored
+		// value all take the result: surrounding space trimmed, and `[::1]` read as `::1`, which
+		// RFC 4038 section 5.1 asks of anything parsing a literal address. The sender uses the
+		// stored host on its own as the TLS server name, where brackets name nothing, so it is
+		// stored bare (#424).
+		smtpHost := hostport.Unbracket(strings.TrimSpace(req.SMTPHost))
+
 		// Validation when enabled
-		if strings.TrimSpace(req.SMTPHost) == "" {
+		if smtpHost == "" {
 			writeJSONError(w, "SMTP host is required.", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
@@ -120,7 +127,7 @@ func HandleAPISettingsEmailPut(
 			return
 		}
 
-		if len(req.SMTPHost) > 120 {
+		if len(smtpHost) > 120 {
 			writeJSONError(w, fmt.Sprintf("SMTP host must be less than %v characters.", 120), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
@@ -169,7 +176,7 @@ func HandleAPISettingsEmailPut(
 
 		// TCP connectivity test with 3s timeout. Every check that needs no network runs
 		// above, so a bad field is answered without waiting on the dial.
-		conn, err := net.DialTimeout("tcp", net.JoinHostPort(req.SMTPHost, strconv.Itoa(req.SMTPPort)), 3*time.Second)
+		conn, err := net.DialTimeout("tcp", hostport.Join(smtpHost, req.SMTPPort), 3*time.Second)
 		if err != nil {
 			writeJSONError(w, "Unable to connect to the SMTP server: "+err.Error(), "VALIDATION_ERROR", http.StatusBadRequest)
 			return
@@ -180,7 +187,7 @@ func HandleAPISettingsEmailPut(
 
 		// Apply updates
 		currentSettings.SMTPEnabled = true
-		currentSettings.SMTPHost = strings.TrimSpace(req.SMTPHost)
+		currentSettings.SMTPHost = smtpHost
 		currentSettings.SMTPPort = req.SMTPPort
 		currentSettings.SMTPEncryption = smtpEncryption.String()
 		currentSettings.SMTPUsername = strings.TrimSpace(req.SMTPUsername)

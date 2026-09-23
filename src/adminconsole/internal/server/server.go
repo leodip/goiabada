@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/hostport"
 	"github.com/leodip/goiabada/core/sessionstore"
 
 	"log/slog"
@@ -117,10 +118,7 @@ func (s *Server) Start() {
 	// Start HTTPS server if enabled
 	if httpsEnabled {
 		go func() {
-			httpsServer := &http.Server{
-				Addr:    fmt.Sprintf("%s:%d", httpsHost, httpsPort),
-				Handler: s.router,
-			}
+			httpsServer := newHTTPServer(httpsHost, httpsPort, s.router)
 			slog.Info("starting the https listener", "host", httpsHost, "port", httpsPort)
 			if err := httpsServer.ListenAndServeTLS(certFile, keyFile); err != nil {
 				errChan <- errs.Errorf("HTTPS server error: %v", err)
@@ -131,10 +129,7 @@ func (s *Server) Start() {
 	// Start HTTP server if enabled
 	if httpEnabled {
 		go func() {
-			httpServer := &http.Server{
-				Addr:    fmt.Sprintf("%s:%d", httpHost, httpPort),
-				Handler: s.router,
-			}
+			httpServer := newHTTPServer(httpHost, httpPort, s.router)
 			slog.Info("starting the http listener", "host", httpHost, "port", httpPort)
 			if err := httpServer.ListenAndServe(); err != nil {
 				errChan <- errs.Errorf("HTTP server error: %v", err)
@@ -156,6 +151,17 @@ func (s *Server) Start() {
 			slog.Error("a listener failed", "error", err)
 			os.Exit(1)
 		}
+	}
+}
+
+// newHTTPServer builds one of Start's listeners, unstarted. The address comes from hostport.Join,
+// so an IPv6 host such as `::1` listens, where a Sprintf'd `host:port` stopped the console at
+// start with "too many colons in address" (#424). `0.0.0.0`, the default, needs no IPv6 spelling
+// to reach IPv6 clients: with network "tcp" Go listens on both families from it.
+func newHTTPServer(host string, port int, handler http.Handler) *http.Server {
+	return &http.Server{
+		Addr:    hostport.Join(host, port),
+		Handler: handler,
 	}
 }
 

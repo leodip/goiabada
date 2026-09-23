@@ -74,7 +74,7 @@ Used only on first startup:
     <tr>
       <td style="white-space: nowrap;"><code>GOIABADA_DB_HOST</code><br/><code>--db-host</code></td>
       <td><code>localhost</code></td>
-      <td>Database hostname</td>
+      <td>Database hostname or address. An IPv6 address may be written with or without brackets (<code>::1</code> or <code>[::1]</code>)</td>
     </tr>
     <tr>
       <td style="white-space: nowrap;"><code>GOIABADA_DB_PORT</code><br/><code>--db-port</code></td>
@@ -134,7 +134,7 @@ These variables are read by **both applications**: the auth server uses them for
     <tr>
       <td style="white-space: nowrap;"><code>GOIABADA_AUTHSERVER_LISTEN_HOST_HTTP</code><br/><code>--authserver-listen-host-http</code></td>
       <td><code>0.0.0.0</code></td>
-      <td>HTTP bind address (<code>0.0.0.0</code> = all interfaces, <code>127.0.0.1</code> = localhost only)</td>
+      <td>HTTP bind address. <code>0.0.0.0</code> = all interfaces, IPv4 and IPv6 alike; <code>127.0.0.1</code> or <code>::1</code> = loopback only, for that one address family. An IPv6 address may be written with or without brackets (<code>::1</code> or <code>[::1]</code>). See <a href="#listen-addresses-and-ipv6">Listen addresses and IPv6</a></td>
     </tr>
     <tr>
       <td style="white-space: nowrap;"><code>GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP</code><br/><code>--authserver-listen-port-http</code></td>
@@ -144,7 +144,7 @@ These variables are read by **both applications**: the auth server uses them for
     <tr>
       <td style="white-space: nowrap;"><code>GOIABADA_AUTHSERVER_LISTEN_HOST_HTTPS</code><br/><code>--authserver-listen-host-https</code></td>
       <td><code>0.0.0.0</code></td>
-      <td>HTTPS bind address (<code>0.0.0.0</code> = all interfaces, <code>127.0.0.1</code> = localhost only)</td>
+      <td>HTTPS bind address. <code>0.0.0.0</code> = all interfaces, IPv4 and IPv6 alike; <code>127.0.0.1</code> or <code>::1</code> = loopback only, for that one address family. An IPv6 address may be written with or without brackets (<code>::1</code> or <code>[::1]</code>). See <a href="#listen-addresses-and-ipv6">Listen addresses and IPv6</a></td>
     </tr>
     <tr>
       <td style="white-space: nowrap;"><code>GOIABADA_AUTHSERVER_LISTEN_PORT_HTTPS</code><br/><code>--authserver-listen-port-https</code></td>
@@ -153,6 +153,14 @@ These variables are read by **both applications**: the auth server uses them for
     </tr>
   </tbody>
 </table>
+
+### Listen addresses and IPv6
+
+A listen host is an address on this machine, not the public URL: browsers and clients reach the server through `GOIABADA_AUTHSERVER_BASEURL` and `GOIABADA_ADMINCONSOLE_BASEURL`, and the listen hosts only decide which of this machine's addresses accept connections.
+
+- **`0.0.0.0`, the default, already serves IPv6.** Goiabada opens one socket from it that accepts both IPv4 and IPv6 connections, and `::` means the same thing. On a host with IPv6 switched off it quietly serves IPv4 alone.
+- **A specific address serves only its own family.** `127.0.0.1` accepts no IPv6 connection and `::1` no IPv4 one. A hostname such as `localhost` binds only the first address it resolves to, so prefer a literal address.
+- **Write an IPv6 address bare, as `::1` or `2001:db8::10`.** Brackets are accepted too (`[::1]`) and mean the same address. A link-local address takes its zone: `fe80::1%eth0`.
 
 ### Security settings
 
@@ -387,7 +395,7 @@ This variable serves different purposes depending on which application reads it:
     <tr>
       <td style="white-space: nowrap;"><code>GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTP</code><br/><code>--adminconsole-listen-host-http</code></td>
       <td><code>0.0.0.0</code></td>
-      <td>HTTP bind address (<code>0.0.0.0</code> = all interfaces, <code>127.0.0.1</code> = localhost only)</td>
+      <td>HTTP bind address. <code>0.0.0.0</code> = all interfaces, IPv4 and IPv6 alike; <code>127.0.0.1</code> or <code>::1</code> = loopback only, for that one address family. An IPv6 address may be written with or without brackets (<code>::1</code> or <code>[::1]</code>). See <a href="#listen-addresses-and-ipv6">Listen addresses and IPv6</a></td>
     </tr>
     <tr>
       <td style="white-space: nowrap;"><code>GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTP</code><br/><code>--adminconsole-listen-port-http</code></td>
@@ -397,7 +405,7 @@ This variable serves different purposes depending on which application reads it:
     <tr>
       <td style="white-space: nowrap;"><code>GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTPS</code><br/><code>--adminconsole-listen-host-https</code></td>
       <td><code>0.0.0.0</code></td>
-      <td>HTTPS bind address (<code>0.0.0.0</code> = all interfaces, <code>127.0.0.1</code> = localhost only)</td>
+      <td>HTTPS bind address. <code>0.0.0.0</code> = all interfaces, IPv4 and IPv6 alike; <code>127.0.0.1</code> or <code>::1</code> = loopback only, for that one address family. An IPv6 address may be written with or without brackets (<code>::1</code> or <code>[::1]</code>). See <a href="#listen-addresses-and-ipv6">Listen addresses and IPv6</a></td>
     </tr>
     <tr>
       <td style="white-space: nowrap;"><code>GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTPS</code><br/><code>--adminconsole-listen-port-https</code></td>

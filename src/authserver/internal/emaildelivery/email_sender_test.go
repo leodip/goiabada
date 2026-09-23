@@ -176,6 +176,59 @@ func TestSendEmail_EncryptionModes(t *testing.T) {
 	}
 }
 
+// TestSendEmail_IPv6Host sends to the fake at its IPv6 loopback address, bare and bracketed. The
+// bracketed rows need the host unbracketed before it is used on its own as well as in the address:
+// the ssltls row verifies the certificate against the TLS server name, which `[::1]` is not, and
+// the none row sends credentials in cleartext, which isLocalHost permits for `::1` and would refuse
+// for `[::1]` (#424).
+func TestSendEmail_IPv6Host(t *testing.T) {
+	testutil.SkipWithoutIPv6Loopback(t)
+
+	cert := newFakeCert(t)
+
+	tests := []struct {
+		name         string
+		host         string
+		encryption   string
+		ext          []string
+		tlsExt       []string
+		tlsFromStart bool
+	}{
+		{name: "bare, ssltls", host: "::1", encryption: "ssltls", tlsExt: []string{"AUTH PLAIN", "8BITMIME"}, tlsFromStart: true},
+		{name: "bracketed, ssltls", host: "[::1]", encryption: "ssltls", tlsExt: []string{"AUTH PLAIN", "8BITMIME"}, tlsFromStart: true},
+		{name: "bare, none", host: "::1", encryption: "none", ext: []string{"AUTH PLAIN", "8BITMIME"}},
+		{name: "bracketed, none", host: "[::1]", encryption: "none", ext: []string{"AUTH PLAIN", "8BITMIME"}},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			f := &fakeSMTP{
+				ext:            test.ext,
+				tlsExt:         test.tlsExt,
+				tlsFromStart:   test.tlsFromStart,
+				expectPassword: fixturePassword,
+				cert:           cert,
+			}
+			port := f.start(t)
+
+			ctx := fakeSettings(t, test.host, port, test.encryption, fixtureUser, fixturePassword, "Goiabada")
+			sender := &EmailSender{rootCAs: cert.pool}
+
+			err := sender.SendEmail(ctx, &SendEmailInput{
+				To:       fixtureRecipient,
+				Subject:  "Test email",
+				HtmlBody: "<p>hello</p>",
+			})
+			require.NoError(t, err)
+
+			user, password := f.credentials()
+			assert.Equal(t, fixtureUser, user)
+			assert.Equal(t, fixturePassword, password)
+			assert.True(t, f.hasLinePrefix("DATA"), "the message must have been sent")
+		})
+	}
+}
+
 // TestSendEmail_MechanismChoice pins decision 3: PLAIN, then LOGIN, then CRAM-MD5, in the client's
 // order and not the server's. Every row runs over `none` to 127.0.0.1, which decision 1 permits,
 // so the mechanism is the only thing under test.

@@ -99,6 +99,7 @@ A row whose owner is not `kernel` names the issue that moves it. A `kernel` row 
 | `core/errs` | kernel | — |
 | `core/gender` | kernel | — |
 | `core/hashutil` | kernel | — |
+| `core/hostport` | kernel | — |
 | `core/i18n` | kernel | — |
 | `core/locales` | kernel | — |
 | `core/logging` | kernel | — |
