@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -28,9 +29,24 @@ import (
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/i18n"
 
+	"github.com/leodip/goiabada/core/testutil"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
+
+// assertSelfRegistrationDisabledLogged holds a refusal while self-registration is off to its one
+// record: a refused request is Warn, not the error-level record the 500 page used to write
+// (#425 decision 5).
+func assertSelfRegistrationDisabledLogged(t *testing.T, logs *testutil.SlogCapture) {
+	t.Helper()
+
+	records := logs.Records()
+	require.Len(t, records, 1, "a refusal writes exactly one record: %s", logs.Text())
+	assert.Equal(t, slog.LevelWarn, records[0].Level)
+	assert.Equal(t, "self-registration request refused because self-registration is disabled", records[0].Message)
+}
 
 func TestHandleAccountRegisterGet(t *testing.T) {
 	t.Run("Self registration enabled", func(t *testing.T) {
@@ -69,10 +85,12 @@ func TestHandleAccountRegisterGet(t *testing.T) {
 		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
 		req = req.WithContext(ctx)
 
-		httpHelper.On("InternalServerError", rr, req, mock.Anything).Return()
+		httpHelper.On("NotFound", rr, req).Return().Once()
+		logs := testutil.CaptureSlog(t)
 
 		handler.ServeHTTP(rr, req)
 
+		assertSelfRegistrationDisabledLogged(t, logs)
 		httpHelper.AssertExpectations(t)
 	})
 }
@@ -502,16 +520,17 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
 		req = req.WithContext(ctx)
 
-		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
-			return strings.Contains(err.Error(), "trying to access self registration page but self registration is not enabled in settings")
-		})).Run(func(args mock.Arguments) {
+		// The not-found page, RFC 9110 section 15.5.5, rather than the 500 page it used to be.
+		httpHelper.On("NotFound", rr, req).Run(func(args mock.Arguments) {
 			w := args.Get(0).(http.ResponseWriter)
-			w.WriteHeader(http.StatusInternalServerError)
-		}).Return()
+			w.WriteHeader(http.StatusNotFound)
+		}).Return().Once()
+		logs := testutil.CaptureSlog(t)
 
 		handler.ServeHTTP(rr, req)
 
-		assert.Equal(t, http.StatusInternalServerError, rr.Code)
+		assert.Equal(t, http.StatusNotFound, rr.Code)
+		assertSelfRegistrationDisabledLogged(t, logs)
 		httpHelper.AssertExpectations(t)
 
 		// Ensure that no other mock methods were called

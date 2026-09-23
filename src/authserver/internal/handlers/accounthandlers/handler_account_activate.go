@@ -12,6 +12,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/config"
+	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/emaillinks"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
@@ -28,15 +29,46 @@ import (
 // same rule the reset flow states in isForgotPasswordCodeExpired (#112 decision 7).
 const verificationCodeLifetime = 5 * time.Minute
 
-// renderActivationLinkExpired renders the "this link is no longer usable, register again"
-// state of the activation result page.
+// The reasons an activation link is refused, as recorded on the Warn record. They are the reset
+// flow's names for the same states, so one log query reads both emailed-link flows. The marker's
+// own rejections (marker_missing, marker_wrong_flow, marker_expired, continuation_in_flight) pass
+// through as emaillinks decided them, as they do on the reset side (#425).
+const (
+	// activationReasonUnknownCode is a code that resolves to no pre-registration, or to one whose
+	// stored code it does not reproduce. The first hop only, where the credential arrives.
+	activationReasonUnknownCode = "unknown_code"
+	// activationReasonCodeExpired is the code's own lifetime having passed.
+	activationReasonCodeExpired = "code_expired"
+	// activationReasonCodeNoLongerOutstanding is a marker whose code hash no longer resolves: the
+	// activation completed, the code expired and was deleted, or the row is otherwise gone.
+	activationReasonCodeNoLongerOutstanding = "code_no_longer_outstanding"
+)
+
+// refuseActivationLink is every activation refusal: one Warn record naming the reason, then the
+// one rendering, at 200.
 //
-// Every marker-attributable refusal on the clean hop comes here: no marker, a marker left by
-// the reset flow, an expired marker, and a marker whose code hash no longer resolves to a
-// pre-registration. That last one is what refuses a marker whose code has since been
-// consumed, which clearing the session does not answer even now that clearing it reaches
-// every copy (#266). The first hop uses it for an expired code, and for a link followed
-// while another continuation is still live.
+// 200 and not a 4xx, for the reason renderResetPasswordCodeInvalid gives on the reset side:
+// activation links are fetched by mail scanners and link previewers that treat a 4xx as a broken
+// link, and the page itself was served. The response is the same for every reason, so the record
+// is the only place the cause is visible. An unknown code used to answer the 500 page with an
+// error-level stack, which paged an operator for a user clicking an old link (#425 decision 5).
+//
+// Genuine server faults must NOT come here: a stored code that will not decrypt, a database
+// failure and a session store that cannot be read stay InternalServerError.
+func refuseActivationLink(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request, reason string) {
+	slog.WarnContext(r.Context(), "account activation link refused", "reason", reason)
+	renderActivationLinkExpired(httpHelper, w, r)
+}
+
+// renderActivationLinkExpired renders the "this link is no longer usable, register again"
+// state of the activation result page. Reached only through refuseActivationLink.
+//
+// Every refusal attributable to the link comes here. On the clean hop: no marker, a marker left
+// by the reset flow, an expired marker, and a marker whose code hash no longer resolves to a
+// pre-registration. That last one is what refuses a marker whose code has since been consumed,
+// which clearing the session does not answer even now that clearing it reaches every copy
+// (#266). On the first hop: an unknown code, a code its row's stored code does not match, an
+// expired code, and a link followed while another continuation is still live.
 //
 // It is an existing rendering rather than a new state on purpose: the page already tells the
 // reader to register again, which is the right instruction for every one of them (#112).
@@ -75,6 +107,10 @@ type accountActivateDatabase interface {
 // previewer that fetches the URL therefore completes the registration. After this change it
 // consumes the redirect and the account is created on the clean GET instead, which is the same
 // outcome by one more hop.
+//
+// Both hops refuse while self-registration is off, the way the register pages do: a link mailed
+// while registration was on must not create an account after an administrator has turned it off
+// (#425 decision 6).
 func HandleAccountActivateGet(
 	httpHelper HttpHelper,
 	httpSession sessionstore.Store,
@@ -84,6 +120,12 @@ func HandleAccountActivateGet(
 ) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
+
+		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
+		if !settings.SelfRegistrationEnabled {
+			refuseSelfRegistrationDisabled(httpHelper, w, r)
+			return
+		}
 
 		if code := r.URL.Query().Get("code"); len(code) > 0 {
 			handleActivationLinkFollowed(httpHelper, httpSession, database, w, r, code)
@@ -114,22 +156,24 @@ func handleActivationLinkFollowed(httpHelper HttpHelper, httpSession sessionstor
 		return
 	}
 
+	// An unknown code is also a consumed one: the activation deletes the row, so a link clicked
+	// twice lands here.
 	if preRegistration == nil {
-		httpHelper.InternalServerError(w, r, errs.New("could not find pre registration"))
+		refuseActivationLink(httpHelper, w, r, activationReasonUnknownCode)
 		return
 	}
 
 	verificationCode, err := encryption.DecryptData(preRegistration.VerificationCodeEncrypted)
 	if err != nil {
-		httpHelper.InternalServerError(w, r, errs.New("unable to decrypt verification code"))
+		httpHelper.InternalServerError(w, r, errs.Wrap(err, "unable to decrypt verification code"))
 		return
 	}
 
 	// The index found a candidate; this decides. Reachable only through a SHA-256 collision now
 	// that the row is located by hash, and kept so the comparison stays load-bearing rather than
-	// decorative. The address comes from the resolved row, since the request no longer has one.
+	// decorative. Answered as an unknown code, as the reset twin answers its own mismatch.
 	if verificationCode != code {
-		httpHelper.InternalServerError(w, r, errs.Errorf("email %v is trying to activate the account with the wrong code", preRegistration.Email))
+		refuseActivationLink(httpHelper, w, r, activationReasonUnknownCode)
 		return
 	}
 
@@ -140,7 +184,7 @@ func handleActivationLinkFollowed(httpHelper HttpHelper, httpSession sessionstor
 			return
 		}
 
-		renderActivationLinkExpired(httpHelper, w, r)
+		refuseActivationLink(httpHelper, w, r, activationReasonCodeExpired)
 		return
 	}
 
@@ -157,15 +201,15 @@ func handleActivationLinkFollowed(httpHelper HttpHelper, httpSession sessionstor
 	// A second, different link followed while one is still live, of either flow. The first
 	// continuation keeps the session and this one is refused: the clean hop reads the
 	// marker alone, so replacing here would make the redirect already in flight activate
-	// this registration instead of the one that authorized it. Nothing is audited, because
-	// this handler has no failed-activation event to record it under; the reset side, which
-	// has one, audits the same refusal as continuation_in_flight.
+	// this registration instead of the one that authorized it. Logged rather than audited,
+	// because this handler has no failed-activation event to record it under; the reset side,
+	// which has one, audits the same refusal as continuation_in_flight.
 	//
 	// Activation carries no continuation id, unlike the reset form: its continuation is the
 	// browser following a 303 with no page in between, so there is nothing on screen to be
 	// retargeted later and nowhere to put an id that would not go back into the URL.
 	if rejection != "" {
-		renderActivationLinkExpired(httpHelper, w, r)
+		refuseActivationLink(httpHelper, w, r, string(rejection))
 		return
 	}
 
@@ -199,7 +243,7 @@ func handleActivationCleanHop(httpHelper HttpHelper, httpSession sessionstore.St
 		return
 	}
 	if rejection != "" {
-		renderActivationLinkExpired(httpHelper, w, r)
+		refuseActivationLink(httpHelper, w, r, string(rejection))
 		return
 	}
 
@@ -212,7 +256,7 @@ func handleActivationCleanHop(httpHelper HttpHelper, httpSession sessionstore.St
 		return
 	}
 	if preRegistration == nil {
-		renderActivationLinkExpired(httpHelper, w, r)
+		refuseActivationLink(httpHelper, w, r, activationReasonCodeNoLongerOutstanding)
 		return
 	}
 

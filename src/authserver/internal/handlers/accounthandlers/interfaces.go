@@ -16,7 +16,7 @@ import (
 // handler_account_activate.go and handler_account_register.go named handlers.HttpHelper,
 // handlers.AuditLogger and four more, which is the only reason this package imported a transport
 // package sitting above it. A port belongs to the side that calls it (#386), so each of these
-// names only what these two files call: HttpHelper is three methods here against the parent's
+// names only what these two files call: HttpHelper is four methods here against the parent's
 // eight. The concrete types the composition root builds satisfy them structurally, so routes.go is
 // unchanged, and so do the generated mocks (#387).
 //
@@ -34,10 +34,12 @@ type AuditLogger interface {
 }
 
 // HttpHelper renders this package's pages and its one email body. These two handlers answer HTML,
-// so unlike apihandlers they do name the page writer; NotFound, the JSON writers and the two
-// merged-form accessors the parent's declaration carries have no caller here and are not named.
+// so unlike apihandlers they do name the page writers. NotFound answers every self-registration
+// page while the feature is off (#425); the JSON writers and the two merged-form accessors the
+// parent's declaration carries have no caller here and are not named.
 type HttpHelper interface {
 	InternalServerError(w http.ResponseWriter, r *http.Request, err error)
+	NotFound(w http.ResponseWriter, r *http.Request)
 	RenderTemplate(w http.ResponseWriter, r *http.Request, layoutName string, templateName string,
 		data map[string]interface{}) error
 	RenderTemplateToBuffer(r *http.Request, layoutName string, templateName string,
