@@ -733,6 +733,43 @@ func TestResolveScope_Outcomes(t *testing.T) {
 	}
 }
 
+// IsResourceScope is the shape alone, exactly one ':', and it is the rule ResolveScope refuses by:
+// every row the predicate rejects is also resolved against a strict mock with no stubs, and must
+// come back ScopeMalformed without a read. The accepted shapes reaching the lookups are
+// TestResolveScope_Outcomes' rows. The refresh arm relies on the two agreeing: a value this
+// rejects is answered there as a scope this server does not issue, and one it accepts goes on to
+// the permission check (#425).
+func TestIsResourceScope(t *testing.T) {
+	testCases := []struct {
+		name  string
+		scope string
+		want  bool
+	}{
+		{name: "resource and permission", scope: "backend-svc:read", want: true},
+		{name: "the built-in userinfo scope", scope: "authserver:userinfo", want: true},
+		{name: "a resource scope containing the offline text", scope: "res:offline_access_read", want: true},
+		{name: "separator only, two empty halves", scope: ":", want: true},
+		{name: "uppercase offline access", scope: "OFFLINE_ACCESS", want: false},
+		{name: "offline_access itself", scope: "offline_access", want: false},
+		{name: "a claim scope", scope: "openid", want: false},
+		{name: "two separators", scope: "backend-svc:read:extra", want: false},
+		{name: "empty", scope: "", want: false},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, IsResourceScope(tc.scope))
+
+			if tc.want {
+				return
+			}
+			resolution, err := ResolveScope(context.Background(), mocks_data.NewDatabase(t), tc.scope)
+			assert.NoError(t, err)
+			assert.Equal(t, ScopeMalformed, resolution.Outcome)
+		})
+	}
+}
+
 // A database failure is an error and never an outcome: a caller reading only the
 // outcome would otherwise deny a legitimate scope for the length of a fault.
 func TestResolveScope_DatabaseErrorsPropagate(t *testing.T) {

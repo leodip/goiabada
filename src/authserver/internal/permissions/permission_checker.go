@@ -49,6 +49,15 @@ type ScopeResolverDatabase interface {
 	GetPermissionsByResourceId(ctx context.Context, tx *sql.Tx, resourceId int64) ([]models.Permission, error)
 }
 
+// IsResourceScope reports whether a scope has the resource:permission shape, which is exactly one
+// ':'. It says nothing about whether the resource or the permission exists; ResolveScope answers
+// that. It is the one statement of the shape: ResolveScope answers anything else as ScopeMalformed,
+// and the refresh arm uses it to tell a stored value this server does not issue from a resource
+// scope it must re-check (#425).
+func IsResourceScope(scope string) bool {
+	return strings.Count(scope, ":") == 1
+}
+
 // ResolveScope resolves one resource:permission scope against the database: split on ':', look the
 // resource up, look the permission up on that resource. It is the one copy of that sequence: the
 // three protocol validators each carried their own until #124, and this package carried a fourth
@@ -64,10 +73,10 @@ type ScopeResolverDatabase interface {
 // rule, and protocolvalidation already depends on this package's checker; moving it the other way
 // would put a domain rule under a protocol validator (#425 decision 9).
 func ResolveScope(ctx context.Context, db ScopeResolverDatabase, scopeStr string) (ScopeResolution, error) {
-	parts := strings.Split(scopeStr, ":")
-	if len(parts) != 2 {
+	if !IsResourceScope(scopeStr) {
 		return ScopeResolution{Outcome: ScopeMalformed}, nil
 	}
+	parts := strings.Split(scopeStr, ":")
 
 	resolution := ScopeResolution{
 		ResourceIdentifier:   parts[0],

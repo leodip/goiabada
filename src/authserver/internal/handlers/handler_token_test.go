@@ -1520,23 +1520,36 @@ func TestHandleTokenPost_ScopeDenialAudit(t *testing.T) {
 
 	// Rows 1 and 2 differ ONLY in grant type. Row 2 fails if a GrantType check is ever added to the
 	// predicate, which would leave ROPC scope probing unlogged despite being the identical signal.
+	// Row 3 is the refresh arm's request for a scope beyond its grant, which answered invalid_grant
+	// and went unaudited until #425 gave it invalid_scope; the audited scope is the request's, not
+	// the grant's.
 	for _, tc := range []struct {
-		name      string
-		grantType string
-		form      string
-		wantScope string
+		name        string
+		grantType   string
+		form        string
+		description string
+		wantScope   string
 	}{
 		{
-			name:      "client credentials scope denial is audited",
-			grantType: "client_credentials",
-			form:      "grant_type=client_credentials&client_id=test_client&client_secret=s&scope=reports-api:read",
-			wantScope: "reports-api:read",
+			name:        "client credentials scope denial is audited",
+			grantType:   "client_credentials",
+			form:        "grant_type=client_credentials&client_id=test_client&client_secret=s&scope=reports-api:read",
+			description: "Permission to access scope 'reports-api:read' is not granted to the client.",
+			wantScope:   "reports-api:read",
 		},
 		{
-			name:      "ROPC scope denial is audited too",
-			grantType: "password",
-			form:      "grant_type=password&client_id=test_client&username=u&password=p&scope=reports-api:read",
-			wantScope: "reports-api:read",
+			name:        "ROPC scope denial is audited too",
+			grantType:   "password",
+			form:        "grant_type=password&client_id=test_client&username=u&password=p&scope=reports-api:read",
+			description: "Permission to access scope 'reports-api:read' is not granted to the client.",
+			wantScope:   "reports-api:read",
+		},
+		{
+			name:        "a refresh asking beyond its grant is audited",
+			grantType:   "refresh_token",
+			form:        "grant_type=refresh_token&client_id=test_client&client_secret=s&refresh_token=rt&scope=openid+reports-api:read",
+			description: "Scope 'reports-api:read' is not recognized. The original access token does not grant the 'reports-api:read' permission.",
+			wantScope:   "openid reports-api:read",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -1546,8 +1559,7 @@ func TestHandleTokenPost_ScopeDenialAudit(t *testing.T) {
 			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 			rr := httptest.NewRecorder()
 
-			denial := customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope",
-				"Permission to access scope 'reports-api:read' is not granted to the client.",
+			denial := customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope", tc.description,
 				http.StatusBadRequest)
 			tokenValidator.On("ValidateTokenRequest", req.Context(),
 				mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).Return(nil, denial)

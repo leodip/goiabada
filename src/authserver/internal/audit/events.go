@@ -46,10 +46,10 @@ const (
 	// whichever principal that grant authenticates.
 	//
 	// Not every row is an authorization denial. The predicate covers every authenticated
-	// invalid_scope failure, of which only "not granted to the client" and "the user does not
-	// have permission" are authorization decisions; malformed format and unknown resource or
-	// permission usually mean a misconfigured client. See the call site for the full accounting,
-	// including the one genuine authorization denial this event misses.
+	// invalid_scope failure, of which only "not granted to the client", "the user does not have
+	// permission" and a refresh asking for a scope its grant does not hold are authorization
+	// decisions; malformed format and unknown resource or permission usually mean a misconfigured
+	// client. See the call site for the full accounting, including the two branches outside it.
 	//
 	// The name is deliberately grant-agnostic and sorts immediately after the five
 	// token_issued_* events, so a token_* filter groups token issuance with scope denials. That
@@ -63,7 +63,9 @@ const (
 	// ROPC authenticates the USER, and the client only when it is confidential, so for a public
 	// ROPC client the identifier is caller-supplied request context rather than proof that the
 	// named client made the request. The row is still worth having, because the user behind it
-	// did authenticate.
+	// did authenticate. A refresh authenticates a confidential client, and for a public one the
+	// row follows the presentation of a refresh token issued to the named client, because the
+	// refresh arm checks the token's owner before it compares scopes.
 	AuditTokenScopeDenied = "token_scope_denied"
 	// AuditROPCAuthFailed is logged when ROPC authentication fails.
 	// This includes invalid credentials, disabled users, and 2FA-blocked users.

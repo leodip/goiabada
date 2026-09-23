@@ -413,8 +413,9 @@ func TestToken_Refresh_WithAdditionalScope(t *testing.T) {
 
 	data = postToTokenEndpoint(t, httpClient, destUrl, formData)
 
-	// Check that the request was denied due to the additional scope
-	assert.Equal(t, "invalid_grant", data["error"])
+	// Check that the request was denied due to the additional scope. invalid_scope since #425:
+	// the request exceeds the grant, which RFC 6749 section 5.2 names invalid_scope for.
+	assert.Equal(t, "invalid_scope", data["error"])
 	assert.Contains(t, data["error_description"], fmt.Sprintf("Scope '%s' is not recognized. The original access token does not grant the '%s' permission.", newScope, newScope))
 
 	// Now, try again with only the original scopes
@@ -681,7 +682,8 @@ func TestToken_Refresh_ConsentDoesNotIncludeScope(t *testing.T) {
 
 	refreshResp := postToTokenEndpoint(t, httpClient, tokenUrl, formData)
 
-	assert.Equal(t, "invalid_grant", refreshResp["error"])
+	// invalid_scope since #425, for the reason TestToken_Refresh_WithAdditionalScope gives.
+	assert.Equal(t, "invalid_scope", refreshResp["error"])
 	expectedErrorDescription := fmt.Sprintf("Scope '%s' is not recognized. The original access token does not grant the '%s' permission.",
 		additionalScope, additionalScope)
 	assert.Equal(t, expectedErrorDescription, refreshResp["error_description"])

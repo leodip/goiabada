@@ -220,25 +220,29 @@ func HandleTokenPost(
 
 			// Record scope validation failures, on any grant type. Nothing recorded them before.
 			//
-			// **What this is and is not.** It is every authenticated invalid_scope failure from the
-			// two scope validators, which is a POSITIONAL boundary, not a semantic one. Only two of
-			// the eight branches it covers are authorization denials in any strict sense: "not
-			// granted to the client" and "the user does not have permission". The rest are malformed
-			// format and unknown resource or permission, which usually mean a misconfigured client
-			// rather than a caller probing for access it was not granted. So read a row as "a
-			// request that got past authentication and then asked for a scope the server would not
-			// give", and check the message before treating it as an authorization probe.
+			// **What this is and is not.** It is every authenticated invalid_scope failure: the two
+			// scope validators', and the refresh arm's request for a scope its grant does not hold.
+			// That is a POSITIONAL boundary, not a semantic one. Only three of the nine branches it
+			// covers are authorization denials in any strict sense: "not granted to the client",
+			// "the user does not have permission" and the refresh request beyond its grant. The rest
+			// are malformed format and unknown resource or permission, which usually mean a
+			// misconfigured client rather than a caller probing for access it was not granted. So
+			// read a row as "a request that got past authentication and then asked for a scope the
+			// server would not give", and check the message before treating it as an authorization
+			// probe.
 			//
 			// Keyed on the error code rather than the grant type, deliberately: within the validator
-			// invalid_scope is returned only by the two scope validators, so the predicate cannot
-			// pick up unrelated failures and stays correct if either gains another branch. It covers
-			// eight of the eleven scope denial branches. Three are outside it: the client credentials
-			// OIDC-scope rejection returns invalid_request, the refresh down-scope denial returns
-			// invalid_grant (a code used for 22 unrelated failures, so it cannot be isolated), and
-			// the provided-but-empty rejection above fires before authentication. Note the refresh
-			// down-scope denial IS a genuine authorization denial and is missed: the error taxonomy
-			// cannot isolate it, so this event's coverage does not line up with the semantic
-			// category in either direction.
+			// invalid_scope is returned only by the two scope validators and the refresh arm's
+			// beyond-the-grant check, so the predicate cannot pick up unrelated failures and stays
+			// correct if any of them gains another branch. It covers nine of the eleven scope denial
+			// branches. Two are outside it: the client credentials OIDC-scope rejection returns
+			// invalid_request, and the provided-but-empty rejection above fires before
+			// authentication. The refresh request beyond its grant was a third, and the one genuine
+			// authorization denial this missed, until #425 answered it with the invalid_scope RFC
+			// 6749 section 5.2 names for it rather than invalid_grant, a code 22 unrelated failures
+			// share. The refresh arm's refusals of the grant itself (consent withdrawn, a permission
+			// since revoked, a stored value this server does not issue) stay invalid_grant, and are
+			// not scope denials of the request.
 			//
 			// THIS IS THE ONLY CALL SITE, and adding a second at the provided-but-empty rejection is
 			// the obvious-looking completeness fix and is wrong: that branch runs before the client
