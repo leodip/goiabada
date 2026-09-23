@@ -152,7 +152,7 @@ func HandleAccountProfilePost(
 				user.Locale = request.Locale
 
 				if len(request.Gender) > 0 {
-					if i, err := strconv.Atoi(request.Gender); err == nil {
+					if i, parseErr := strconv.Atoi(request.Gender); parseErr == nil {
 						user.Gender = gender.Gender(i).String()
 					}
 				} else {
@@ -161,7 +161,7 @@ func HandleAccountProfilePost(
 
 				if len(request.DateOfBirth) > 0 {
 					layout := "2006-01-02"
-					if parsed, err := time.Parse(layout, request.DateOfBirth); err == nil {
+					if parsed, parseErr := time.Parse(layout, request.DateOfBirth); parseErr == nil {
 						user.BirthDate = &parsed
 					}
 				} else {
@@ -175,8 +175,8 @@ func HandleAccountProfilePost(
 					"error":     errorMessage,
 				}
 
-				if err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/account_profile.html", bind); err != nil {
-					httpHelper.InternalServerError(w, r, err)
+				if renderErr := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/account_profile.html", bind); renderErr != nil {
+					httpHelper.InternalServerError(w, r, renderErr)
 					return
 				}
 			})

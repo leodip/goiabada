@@ -142,10 +142,10 @@ func HandleAccountEmailVerificationPost(
 		verificationCode := strings.TrimSpace(r.PostFormValue("verificationCode"))
 		req := &api.VerifyAccountEmailRequest{VerificationCode: verificationCode}
 
-		if _, err := apiClient.VerifyAccountEmail(r.Context(), jwtInfo.TokenResponse.AccessToken, req); err != nil {
+		if _, verifyErr := apiClient.VerifyAccountEmail(r.Context(), jwtInfo.TokenResponse.AccessToken, req); verifyErr != nil {
 			// Handle invalid/expired code gracefully as validation error
 			var apiErr *apiclient.APIError
-			if errors.As(err, &apiErr) && apiErr.Code == "INVALID_OR_EXPIRED_VERIFICATION_CODE" {
+			if errors.As(verifyErr, &apiErr) && apiErr.Code == "INVALID_OR_EXPIRED_VERIFICATION_CODE" {
 				settings := r.Context().Value(constants.ContextKeySettings).(*api.PublicSettingsResponse)
 				bind := map[string]interface{}{
 					"savedSuccessfully": false,
@@ -155,14 +155,14 @@ func HandleAccountEmailVerificationPost(
 					"error":             apiErr.Message,
 					"verificationCode":  verificationCode,
 				}
-				if err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/account_email_verification.html", bind); err != nil {
-					httpHelper.InternalServerError(w, r, err)
+				if renderErr := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/account_email_verification.html", bind); renderErr != nil {
+					httpHelper.InternalServerError(w, r, renderErr)
 				}
 				return
 			}
 
 			// Delegate other errors to generic handler
-			handlers.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(errorMessage string) {
+			handlers.HandleAPIErrorWithCallback(httpHelper, w, r, verifyErr, func(errorMessage string) {
 				settings := r.Context().Value(constants.ContextKeySettings).(*api.PublicSettingsResponse)
 				bind := map[string]interface{}{
 					"savedSuccessfully": false,
@@ -172,8 +172,8 @@ func HandleAccountEmailVerificationPost(
 					"error":             errorMessage,
 					"verificationCode":  verificationCode,
 				}
-				if err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/account_email_verification.html", bind); err != nil {
-					httpHelper.InternalServerError(w, r, err)
+				if renderErr := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/account_email_verification.html", bind); renderErr != nil {
+					httpHelper.InternalServerError(w, r, renderErr)
 				}
 			})
 			return

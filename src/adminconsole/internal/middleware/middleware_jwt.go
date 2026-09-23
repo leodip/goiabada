@@ -124,13 +124,13 @@ func (m *MiddlewareJwt) JwtSessionHandler() func(http.Handler) http.Handler {
 				// Check if token needs refresh
 				_, err := m.tokenParser.DecodeAndValidateTokenString(r.Context(), tokenResponse.AccessToken, nil, true)
 				if err != nil {
-					refreshed, err := m.refreshToken(w, r, &tokenResponse)
-					if err != nil || !refreshed {
+					refreshed, refreshErr := m.refreshToken(w, r, &tokenResponse)
+					if refreshErr != nil || !refreshed {
 						// If refresh failed, clear the session and continue
 						delete(sess.Values, constants.SessionKeyJwt)
-						err := m.sessionStore.Save(r, w, sess)
-						if err != nil {
-							m.errorRenderer.InternalServerError(w, r, errs.Wrap(err, "unable to save the session"))
+						saveErr := m.sessionStore.Save(r, w, sess)
+						if saveErr != nil {
+							m.errorRenderer.InternalServerError(w, r, errs.Wrap(saveErr, "unable to save the session"))
 							return
 						}
 						next.ServeHTTP(w, r)

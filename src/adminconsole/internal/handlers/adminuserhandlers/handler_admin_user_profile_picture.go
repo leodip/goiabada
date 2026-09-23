@@ -49,7 +49,7 @@ func HandleAdminUserProfilePicturePost(
 		}
 
 		// Parse multipart form (max 10MB)
-		if err := r.ParseMultipartForm(10 << 20); err != nil {
+		if parseFormErr := r.ParseMultipartForm(10 << 20); parseFormErr != nil {
 			handlers.JsonBadRequestBody(httpHelper, w, r)
 			return
 		}

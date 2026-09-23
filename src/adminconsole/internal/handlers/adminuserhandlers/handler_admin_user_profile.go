@@ -164,47 +164,47 @@ func HandleAdminUserProfilePost(
 		if err != nil {
 			// Handle validation errors by showing them in the form
 			handlers.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(errorMessage string) {
-				// Get user data for form display
-				user, userErr := apiClient.GetUserById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
+				// Get formUser data for form display
+				formUser, userErr := apiClient.GetUserById(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 				if userErr != nil {
 					handlers.HandleAPIError(httpHelper, w, r, userErr)
 					return
 				}
 
 				// Update user fields with form values for display
-				user.Username = request.Username
-				user.GivenName = request.GivenName
-				user.MiddleName = request.MiddleName
-				user.FamilyName = request.FamilyName
-				user.Nickname = request.Nickname
-				user.Website = request.Website
-				user.ZoneInfoCountryName = request.ZoneInfoCountryName
-				user.ZoneInfo = request.ZoneInfo
-				user.Locale = request.Locale
+				formUser.Username = request.Username
+				formUser.GivenName = request.GivenName
+				formUser.MiddleName = request.MiddleName
+				formUser.FamilyName = request.FamilyName
+				formUser.Nickname = request.Nickname
+				formUser.Website = request.Website
+				formUser.ZoneInfoCountryName = request.ZoneInfoCountryName
+				formUser.ZoneInfo = request.ZoneInfo
+				formUser.Locale = request.Locale
 
 				// Handle gender display
 				if len(request.Gender) > 0 {
-					i, err := strconv.Atoi(request.Gender)
-					if err == nil {
-						user.Gender = gender.Gender(i).String()
+					i, parseErr := strconv.Atoi(request.Gender)
+					if parseErr == nil {
+						formUser.Gender = gender.Gender(i).String()
 					}
 				} else {
-					user.Gender = ""
+					formUser.Gender = ""
 				}
 
 				// Handle date of birth display
 				if len(request.DateOfBirth) > 0 {
 					layout := "2006-01-02"
-					parsedTime, err := time.Parse(layout, request.DateOfBirth)
-					if err == nil {
-						user.BirthDate = &parsedTime
+					parsedTime, parseErr := time.Parse(layout, request.DateOfBirth)
+					if parseErr == nil {
+						formUser.BirthDate = &parsedTime
 					}
 				} else {
-					user.BirthDate = nil
+					formUser.BirthDate = nil
 				}
 
 				bind := map[string]interface{}{
-					"user":      user,
+					"user":      formUser,
 					"timezones": timezones,
 					"locales":   locales,
 					"page":      r.URL.Query().Get("page"),

@@ -141,9 +141,9 @@ func HandleAdminUserAuthenticationPost(
 				"error":      message,
 			}
 
-			err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_users_authentication.html", bind)
-			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
+			renderErr := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_users_authentication.html", bind)
+			if renderErr != nil {
+				httpHelper.InternalServerError(w, r, renderErr)
 			}
 		}
 
@@ -160,9 +160,9 @@ func HandleAdminUserAuthenticationPost(
 			passwordReq := &api.UpdateUserPasswordRequest{
 				NewPassword: newPassword,
 			}
-			_, err := apiClient.UpdateUserPassword(r.Context(), accessToken, id, passwordReq)
-			if err != nil {
-				handlers.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
+			_, updateUserPasswordErr := apiClient.UpdateUserPassword(r.Context(), accessToken, id, passwordReq)
+			if updateUserPasswordErr != nil {
+				handlers.HandleAPIErrorWithCallback(httpHelper, w, r, updateUserPasswordErr, renderError)
 				return
 			}
 		}
@@ -174,9 +174,9 @@ func HandleAdminUserAuthenticationPost(
 				otpReq := &api.UpdateUserOTPRequest{
 					Enabled: false,
 				}
-				_, err := apiClient.UpdateUserOTP(r.Context(), accessToken, id, otpReq)
-				if err != nil {
-					handlers.HandleAPIError(httpHelper, w, r, err)
+				_, updateUserOTPErr := apiClient.UpdateUserOTP(r.Context(), accessToken, id, otpReq)
+				if updateUserOTPErr != nil {
+					handlers.HandleAPIError(httpHelper, w, r, updateUserOTPErr)
 					return
 				}
 			}

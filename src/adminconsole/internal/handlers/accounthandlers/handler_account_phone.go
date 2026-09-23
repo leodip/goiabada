@@ -111,8 +111,8 @@ func HandleAccountPhonePost(
 				"phoneCountries":               phoneCountries,
 				"error":                        errorMessage,
 			}
-			if err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/account_phone.html", bind); err != nil {
-				httpHelper.InternalServerError(w, r, err)
+			if renderErr := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/account_phone.html", bind); renderErr != nil {
+				httpHelper.InternalServerError(w, r, renderErr)
 			}
 		}
 
