@@ -911,7 +911,7 @@ func createAuthCodeEnsuringUserScope(t *testing.T, clientSecret string, scope st
 
 	scopes := strings.Split(scope, " ")
 	for _, s := range scopes {
-		if s == "" || oidc.IsIdTokenScope(s) || oidc.IsOfflineAccessScope(s) {
+		if s == "" || oidc.IsClaimScope(s) || oidc.IsOfflineAccessScope(s) {
 			continue
 		}
 		parts := strings.Split(s, ":")

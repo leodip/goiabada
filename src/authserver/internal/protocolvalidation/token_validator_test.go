@@ -2088,11 +2088,11 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 			wantCode:    "invalid_request",
 			wantDesc:    "are not supported in the client credentials flow",
 		},
-		// The next two look inconsistent and are correct. IsIdTokenScope is an exact
-		// slices.Contains, so "OPENID" is not recognized as an OIDC scope and falls
-		// through to the format check; IsOfflineAccessScope uses strings.EqualFold, so
-		// "OFFLINE_ACCESS" is recognized. Keep both: they document a real asymmetry
-		// between two adjacent helpers that otherwise reads as a typo.
+		// Scope values are case-sensitive (RFC 6749 section 3.3), so neither uppercase
+		// spelling is an OIDC scope: both fall through to the format check. OFFLINE_ACCESS
+		// used to be case-folded into offline_access here while every other site matched it
+		// exactly; the two rows now agree, and the second is the one that fails if the
+		// lenient match comes back (#425).
 		{
 			name:        "uppercase OPENID falls through to the format check",
 			clientPerms: []models.Permission{billingRead},
@@ -2101,11 +2101,11 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 			wantDesc:    "Invalid scope format",
 		},
 		{
-			name:        "uppercase OFFLINE_ACCESS is recognized and rejected",
+			name:        "uppercase OFFLINE_ACCESS falls through to the format check",
 			clientPerms: []models.Permission{billingRead},
 			scope:       "OFFLINE_ACCESS",
-			wantCode:    "invalid_request",
-			wantDesc:    "are not supported in the client credentials flow",
+			wantCode:    "invalid_scope",
+			wantDesc:    "Invalid scope format",
 		},
 	}
 
@@ -6971,7 +6971,7 @@ func TestValidateTokenRequest_RefreshToken_SubjectResolvesToNoUser(t *testing.T)
 		storedScope string
 	}{
 		{
-			// Never reaches the dereference: IsIdTokenScope skips the permission re-check
+			// Never reaches the dereference: IsClaimScope skips the permission re-check
 			// entirely. Today this arm would succeed, so it is the row that fails if the refusal
 			// is written at the panic site instead of above the loop.
 			name:        "an OIDC-only scope never reaches the dereference and is still refused",

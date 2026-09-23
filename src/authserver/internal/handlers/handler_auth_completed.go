@@ -460,7 +460,7 @@ func HandleAuthCompletedGet(
 		}
 
 		// we must redirect to consent if the client requires it or if there's an offline_access scope
-		if client.ConsentRequired || authContext.HasScope(oidc.OfflineAccessScope) {
+		if client.ConsentRequired || oidc.HasOfflineAccessScope(authContext.Scope) {
 			authContext.AuthState = ceremony.AuthStateRequiresConsent
 
 			err = authHelper.SaveAuthContext(w, r, authContext)

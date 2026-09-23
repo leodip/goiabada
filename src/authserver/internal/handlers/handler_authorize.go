@@ -744,7 +744,7 @@ func handlePromptNone(w http.ResponseWriter, r *http.Request, httpHelper HttpHel
 	}
 
 	// 8. Check consent requirements
-	if client.ConsentRequired || strings.Contains(effectiveScope, oidc.OfflineAccessScope) {
+	if client.ConsentRequired || oidc.HasOfflineAccessScope(effectiveScope) {
 		consent, err := database.GetConsentByUserIdAndClientId(r.Context(), nil, user.Id, client.Id)
 		if err != nil {
 			httpHelper.InternalServerError(w, r, err)

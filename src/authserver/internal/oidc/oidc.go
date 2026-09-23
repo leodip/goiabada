@@ -19,27 +19,46 @@ import (
 
 const OfflineAccessScope = "offline_access"
 
-func IsIdTokenScope(scope string) bool {
-	oidcScopes := []string{"openid", "profile", "email", "address", "phone", "groups", "attributes"}
-	return slices.Contains(oidcScopes, scope)
+// claimScopes is openid and the claim scopes: the set that is answered from the user's own
+// profile rather than a resource permission, and that puts the userinfo audience in an access
+// token. It is the one definition the predicate, the consent descriptions and the discovery
+// document's scopes_supported all read, where each used to carry its own copy (#425).
+var claimScopes = []string{"openid", "profile", "email", "address", "phone", "groups", "attributes"}
+
+func IsClaimScope(scope string) bool {
+	return slices.Contains(claimScopes, scope)
 }
 
+// IsOfflineAccessScope matches offline_access exactly. RFC 6749 section 3.3 makes scope values
+// case-sensitive strings, so OFFLINE_ACCESS is not this scope, and every site now agrees on that:
+// the validators used to accept it case-folded and trimmed while consent and issuance matched it
+// exactly, and the prompt=none path matched it as a substring (#425).
 func IsOfflineAccessScope(scope string) bool {
-	return strings.EqualFold(strings.TrimSpace(scope), "offline_access")
+	return scope == OfflineAccessScope
 }
 
-// GetIdTokenScopeDescriptionKey returns the i18n catalog key for a built-in
-// OIDC / offline_access scope's description (consent.scope.<scope>.description).
-// Returns "" for unknown scopes (the caller handles resource-permission scopes).
+// HasOfflineAccessScope reports whether a whole scope string, space-delimited per RFC 6749
+// section 3.3, carries offline_access as one of its values. A resource scope that merely contains
+// the text, such as res:offline_access_read, is not offline access.
+func HasOfflineAccessScope(scope string) bool {
+	return slices.ContainsFunc(strings.Split(scope, " "), IsOfflineAccessScope)
+}
+
+// SupportedScopes is the scopes_supported the discovery document publishes: the claim scopes and
+// offline_access. It returns a fresh slice, so a caller appending to it cannot reach the roster.
+func SupportedScopes() []string {
+	return append(slices.Clone(claimScopes), OfflineAccessScope)
+}
+
+// ScopeDescriptionKey returns the i18n catalog key for a built-in scope's description
+// (consent.scope.<scope>.description): a claim scope or offline_access. It returns "" for any
+// other scope; the caller describes resource-permission scopes itself.
 //
-// This returns a key rather than the localized string so oidc stays free of an
-// i18n dependency (i18n → oauth → oidc would otherwise cycle); the caller, which
-// has a request context, renders it via i18n.T.
-func GetIdTokenScopeDescriptionKey(scope string) string {
-	switch scope {
-	case "openid", "profile", "email", "address", "phone", "groups", "attributes", "offline_access":
+// It returns a key rather than the localized string because the locale is the request's, and
+// the caller holds the request context that i18n.T reads it from.
+func ScopeDescriptionKey(scope string) string {
+	if IsClaimScope(scope) || IsOfflineAccessScope(scope) {
 		return "consent.scope." + scope + ".description"
-	default:
-		return ""
 	}
+	return ""
 }

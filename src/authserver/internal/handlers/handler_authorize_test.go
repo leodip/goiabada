@@ -3100,6 +3100,122 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		auditLogger.AssertExpectations(t)
 	})
 
+	// The silent path decides whether consent is owed from the effective scope. It used to ask
+	// strings.Contains(effectiveScope, "offline_access"), so a resource scope that merely contains
+	// the text sent a silent request to the consent lookup and on to consent_required, though no
+	// offline access was asked for and this client requires no consent. offline_access is one
+	// space-delimited value (RFC 6749 section 3.3), matched whole (#425).
+	//
+	// Keep this case: once the predicate is right nothing else reaches this input, so it is the
+	// only thing that fails if the substring match comes back.
+	t.Run("prompt=none with a resource scope containing offline_access text - issues without consent", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
+		userSessionManager := mocks_handlers.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		authorizeValidator := mocks_protocolvalidation.NewAuthorizeValidator(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+		permissionChecker := mocks_handlers.NewPermissionChecker(t)
+		tokenParser := mocks_handlers.NewTokenParser(t)
+
+		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser)
+
+		const requestedScope = "openid res:offline_access_read"
+		userSubject := fake.UUID()
+		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid%20res:offline_access_read&prompt=none&id_token_hint=valid-jwt-token", nil)
+		assert.NoError(t, err)
+
+		settings := &models.Settings{
+			PKCERequired: true,
+			Issuer:       "https://test-issuer.com",
+		}
+		ctx := req.Context()
+		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		ctx = context.WithValue(ctx, constants.ContextKeySessionIdentifier, "session-789")
+		req = req.WithContext(ctx)
+
+		rr := httptest.NewRecorder()
+
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+			return ac.AuthState == ceremony.AuthStateInitial && ac.ClientId == "test-client"
+		})).Return(nil)
+
+		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateClientAndRedirectURIInput")).Return(nil)
+		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
+
+		client := &models.Client{
+			Id:               1,
+			ClientIdentifier: "test-client",
+			DefaultAcrLevel:  models.AcrLevel1,
+			ConsentRequired:  false,
+		}
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
+
+		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*protocolvalidation.ValidateRequestInput")).Return(nil)
+		authorizeValidator.On("ValidateScopes", mock.Anything, requestedScope).Return(nil)
+		authorizeValidator.On("ValidatePrompt", "none").Return("none", nil)
+
+		validToken := &oauth.JwtToken{
+			TokenBase64: "valid-jwt-token",
+			Claims: jwt.MapClaims{
+				"iss": "https://test-issuer.com",
+				"sub": userSubject,
+			},
+		}
+		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "valid-jwt-token", false).Return(validToken, nil)
+
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+			return ac.IdTokenHintSub == userSubject && ac.Prompt == "none"
+		})).Return(nil)
+
+		userSession := &models.UserSession{
+			Id:                  1,
+			UserId:              789,
+			AcrLevel:            models.AcrLevel1.String(),
+			AuthMethods:         "pwd",
+			AuthStateGeneration: 7,
+			User: models.User{
+				Id:                  789,
+				Enabled:             true,
+				Subject:             userSubject,
+				AuthStateGeneration: 7,
+			},
+		}
+		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "session-789").Return(userSession, nil)
+		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, userSession).Return(nil)
+
+		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
+
+		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, requestedScope, mock.MatchedBy(func(u *models.User) bool {
+			return u.Id == 789
+		})).Return(requestedScope, nil)
+
+		userSessionManager.On("BumpUserSession", req, "session-789", int64(1), "pwd", models.AcrLevel1.String()).Return(userSession, nil)
+
+		auditLogger.On("Log", mock.Anything, audit.AuditBumpedUserSession, mock.MatchedBy(func(details map[string]interface{}) bool {
+			return details["userId"] == int64(789) && details["clientId"] == int64(1)
+		})).Return()
+
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+			return ac.AuthState == ceremony.AuthStateReadyToIssueCode && ac.Scope == requestedScope
+		})).Return(nil)
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusFound, rr.Code)
+		assert.Contains(t, rr.Header().Get("Location"), config.GetAuthServer().BaseURL+"/auth/issue")
+		database.AssertNotCalled(t, "GetConsentByUserIdAndClientId", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+		database.AssertExpectations(t)
+		authorizeValidator.AssertExpectations(t)
+		tokenParser.AssertExpectations(t)
+		userSessionManager.AssertExpectations(t)
+		permissionChecker.AssertExpectations(t)
+		auditLogger.AssertExpectations(t)
+	})
+
 	t.Run("prompt=none with valid id_token_hint different user - login_required", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)

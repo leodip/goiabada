@@ -1,3 +1,7 @@
+// Package usercreation creates a user account: the user row and the account-management permission
+// every user is given, written together in one transaction. Registration, activation and the admin
+// API's create go through UserCreator rather than writing the two rows themselves; the first-run
+// seed writes its administrator inside its own transaction, in internal/bootstrap.
 package usercreation
 
 import (
@@ -55,6 +59,11 @@ func (uc *UserCreator) CreateUser(ctx context.Context, input *CreateUserInput) (
 	authServerResource, err := uc.database.GetResourceByResourceIdentifier(ctx, nil, constants.AuthServerResourceIdentifier)
 	if err != nil {
 		return nil, err
+	}
+	// The seed creates this resource and nothing deletes it through the product, but a lookup
+	// answers (nil, nil) for a row that is not there, and the id below dereferenced it (#425).
+	if authServerResource == nil {
+		return nil, errs.Errorf("unable to find the %v resource", constants.AuthServerResourceIdentifier)
 	}
 
 	permissions, err := uc.database.GetPermissionsByResourceId(ctx, nil, authServerResource.Id)
