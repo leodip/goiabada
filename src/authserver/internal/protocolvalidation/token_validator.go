@@ -2,7 +2,6 @@ package protocolvalidation
 
 import (
 	"context"
-	"crypto/rsa"
 	"crypto/subtle"
 	"database/sql"
 	"fmt"
@@ -31,7 +30,7 @@ type PermissionChecker interface {
 }
 
 type TokenParser interface {
-	DecodeAndValidateTokenString(ctx context.Context, token string, pubKey *rsa.PublicKey, withExpirationCheck bool) (*oauth.JwtToken, error)
+	DecodeAndValidateTokenString(ctx context.Context, token string, withExpirationCheck bool) (*oauth.JwtToken, error)
 }
 
 // tokenValidatorDatabase is what the token request validator needs: the client, the grant being
@@ -580,7 +579,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 				"Missing required refresh_token parameter.", http.StatusBadRequest)
 		}
 
-		refreshTokenInfo, err := val.tokenParser.DecodeAndValidateTokenString(ctx, input.RefreshToken, nil, true)
+		refreshTokenInfo, err := val.tokenParser.DecodeAndValidateTokenString(ctx, input.RefreshToken, true)
 		if err != nil {
 			return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
 				"The refresh token is invalid ("+err.Error()+").",

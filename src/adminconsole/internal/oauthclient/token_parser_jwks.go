@@ -39,8 +39,8 @@ func NewJWKSTokenParser(baseURL string, httpClient *http.Client) *JWKSTokenParse
 	}
 }
 
-func (tp *JWKSTokenParser) DecodeAndValidateTokenResponse(ctx context.Context, tokenResponse *oauth.TokenResponse) (*oauth.JwtInfo, error) {
-	result := &oauth.JwtInfo{TokenResponse: *tokenResponse}
+func (tp *JWKSTokenParser) DecodeAndValidateTokenResponse(ctx context.Context, tokenResponse *oauth.TokenResponse) (*JwtInfo, error) {
+	result := &JwtInfo{TokenResponse: *tokenResponse}
 
 	var err error
 	if len(tokenResponse.AccessToken) > 0 {

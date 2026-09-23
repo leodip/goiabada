@@ -15,8 +15,8 @@ import (
 
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	mocks_handlerhelpers "github.com/leodip/goiabada/adminconsole/internal/handlerhelpers/mocks"
+	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/core/errs"
-	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/testutil"
 )
 
@@ -38,8 +38,8 @@ func TestRequest_AnOptionNotGivenLeavesTheValueOff(t *testing.T) {
 func TestRequest_WithAccessTokenCarriesTheBearerTheHandlersRead(t *testing.T) {
 	req := Request(http.MethodGet, "/admin/users", WithAccessToken())
 
-	jwtInfo, ok := req.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
-	require.True(t, ok, "the context carries no oauth.JwtInfo")
+	jwtInfo, ok := req.Context().Value(constants.ContextKeyJwtInfo).(oauthclient.JwtInfo)
+	require.True(t, ok, "the context carries no oauthclient.JwtInfo")
 	assert.Equal(t, AccessToken, jwtInfo.TokenResponse.AccessToken)
 }
 

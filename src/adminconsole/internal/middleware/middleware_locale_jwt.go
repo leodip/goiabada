@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
+	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/core/i18n"
-	"github.com/leodip/goiabada/core/oauth"
 )
 
 // MiddlewareLocaleFromJWT reads the locale claim from the JWT info already on
@@ -40,7 +40,7 @@ func localeClaimFromJwt(ctx context.Context) string {
 	if v == nil {
 		return ""
 	}
-	jwtInfo, ok := v.(oauth.JwtInfo)
+	jwtInfo, ok := v.(oauthclient.JwtInfo)
 	if !ok || jwtInfo.IdToken == nil {
 		return ""
 	}

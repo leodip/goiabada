@@ -4,8 +4,10 @@ import "github.com/leodip/goiabada/core/errs"
 
 // ThreeStateSetting is a per-client override of a global setting: on, off, or defer to the global
 // value. It is carried as its String value on the client columns that can be overridden. It is
-// here rather than in core because no admin console file names one in production, and rather than
-// in issuance, which reads it, because database_seeder.go writes it (#385).
+// here rather than in core because no admin console file names one in production (#385), and
+// rather than in any one consumer because it is the vocabulary of two Client columns that four
+// packages name: the client API handlers and the DCR handler write it, bootstrap seeds it, and
+// issuance reads it (#424).
 type ThreeStateSetting int
 
 const (

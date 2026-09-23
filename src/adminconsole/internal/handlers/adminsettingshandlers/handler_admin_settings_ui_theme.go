@@ -13,9 +13,9 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
+	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/core/api"
 	coreconstants "github.com/leodip/goiabada/core/constants"
-	"github.com/leodip/goiabada/core/oauth"
 )
 
 // settingsUIThemeAPI is what the UI theme page needs: the theme, and the write.
@@ -33,7 +33,7 @@ func HandleAdminSettingsUIThemeGet(
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		// Get access token
-		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauthclient.JwtInfo)
 		if !ok {
 			httpHelper.InternalServerError(w, r, errs.New("no JWT info found in context"))
 			return
@@ -95,7 +95,7 @@ func HandleAdminSettingsUIThemePost(
 		renderError := func(message string) {
 			// Try to get themes from API to populate the dropdown on error
 			uiThemes := []string{}
-			if jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo); ok {
+			if jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauthclient.JwtInfo); ok {
 				if apiResp, err := apiClient.GetSettingsUITheme(r.Context(), jwtInfo.TokenResponse.AccessToken); err == nil {
 					uiThemes = apiResp.AvailableThemes
 				}
@@ -115,7 +115,7 @@ func HandleAdminSettingsUIThemePost(
 		// No client-side validation; rely on API validation
 
 		// Get access token
-		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauthclient.JwtInfo)
 		if !ok {
 			httpHelper.InternalServerError(w, r, errs.New("no JWT info found in context"))
 			return

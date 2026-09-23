@@ -9,6 +9,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/core/errs"
 	oauth "github.com/leodip/goiabada/core/oauth"
 )
 
@@ -24,45 +25,11 @@ type TokenParser struct {
 	database tokenParserDatabase
 }
 
+// NewTokenParser returns a parser reading its keys from database.
 func NewTokenParser(database tokenParserDatabase) *TokenParser {
 	return &TokenParser{
 		database: database,
 	}
-}
-
-func (tp *TokenParser) DecodeAndValidateTokenResponse(ctx context.Context, tokenResponse *oauth.TokenResponse) (*oauth.JwtInfo, error) {
-
-	pubKey, err := tp.getPublicKey(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	result := &oauth.JwtInfo{
-		TokenResponse: *tokenResponse,
-	}
-
-	if len(tokenResponse.AccessToken) > 0 {
-		result.AccessToken, err = tp.DecodeAndValidateTokenString(ctx, tokenResponse.AccessToken, pubKey, true)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	if len(tokenResponse.IdToken) > 0 {
-		result.IdToken, err = tp.DecodeAndValidateTokenString(ctx, tokenResponse.IdToken, pubKey, true)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	if len(tokenResponse.RefreshToken) > 0 {
-		result.RefreshToken, err = tp.DecodeAndValidateTokenString(ctx, tokenResponse.RefreshToken, pubKey, false)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return result, nil
 }
 
 func (tp *TokenParser) getPublicKey(ctx context.Context) (*rsa.PublicKey, error) {
@@ -79,8 +46,16 @@ func (tp *TokenParser) getPublicKey(ctx context.Context) (*rsa.PublicKey, error)
 	return pubKey, nil
 }
 
+// DecodeAndValidateTokenString verifies an RS256 token against the current signing key, then, when
+// the signature is what failed, against every other stored key, so a token signed before a rotation
+// still verifies. withExpirationCheck requires an unexpired exp claim; without it no claim is
+// validated, which is how an id_token_hint is read. An empty token returns an empty result and reads
+// no key.
+//
+// The key always comes from the database. It used to be a parameter every caller passed as nil, so
+// the one branch that used it was never reached in production (#424).
 func (tp *TokenParser) DecodeAndValidateTokenString(ctx context.Context, token string,
-	pubKey *rsa.PublicKey, withExpirationCheck bool) (*oauth.JwtToken, error) {
+	withExpirationCheck bool) (*oauth.JwtToken, error) {
 
 	result := &oauth.JwtToken{
 		TokenBase64: token,
@@ -96,7 +71,7 @@ func (tp *TokenParser) DecodeAndValidateTokenString(ctx context.Context, token s
 			opts = append(opts, jwt.WithoutClaimsValidation())
 		}
 
-		// Try with provided/current key first
+		// Tried with the current key first, then with each fallback key
 		tryParse := func(pk *rsa.PublicKey) error {
 			_, err := jwt.ParseWithClaims(token, claims, func(token *jwt.Token) (interface{}, error) {
 				return pk, nil
@@ -104,16 +79,12 @@ func (tp *TokenParser) DecodeAndValidateTokenString(ctx context.Context, token s
 			return err
 		}
 
-		// Ensure we have at least the current key
-		if pubKey == nil {
-			var err error
-			pubKey, err = tp.getPublicKey(ctx)
-			if err != nil {
-				return nil, err
-			}
+		pubKey, err := tp.getPublicKey(ctx)
+		if err != nil {
+			return nil, err
 		}
 
-		if err := tryParse(pubKey); err != nil {
+		if err = tryParse(pubKey); err != nil {
 			slog.DebugContext(ctx, "unable to parse the token with the current key", "error", err)
 
 			// Check if this is a claims validation error (not a signature error)
@@ -137,10 +108,13 @@ func (tp *TokenParser) DecodeAndValidateTokenString(ctx context.Context, token s
 			// Only try fallback keys for signature-related errors
 			// This handles tokens signed with rotated/old keys
 
-			// Fallback: try all signing keys (e.g., previous) to allow tokens signed by old key
+			// Fallback: try all signing keys (e.g., previous) to allow tokens signed by old key.
+			// A failed lookup returns both errors: the parse error says why the token was
+			// refused, the lookup error that no other key could be tried, which returning the
+			// first alone hid (#424).
 			allKeys, derr := tp.database.GetAllSigningKeys(ctx, nil)
 			if derr != nil {
-				return nil, err
+				return nil, errs.Join(err, errs.Wrap(derr, "unable to read the signing keys to try"))
 			}
 			slog.DebugContext(ctx, "trying the fallback keys", "count", len(allKeys))
 

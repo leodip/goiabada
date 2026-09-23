@@ -6,9 +6,9 @@ import (
 	"strconv"
 
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
+	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
-	"github.com/leodip/goiabada/core/oauth"
 )
 
 // permissionsAPI is what the permissions lookup needs: the one read it answers with.
@@ -23,7 +23,7 @@ func HandleAdminGetPermissionsGet(
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauthclient.JwtInfo)
 		if !ok {
 			httpHelper.JsonError(w, r, errs.New("no JWT info found in context"))
 			return

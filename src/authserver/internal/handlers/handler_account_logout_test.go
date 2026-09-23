@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"context"
-	"crypto/rsa"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -429,7 +428,7 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 
 		httpHelper.On("LookupFromUrlQueryOrFormPost", mock.Anything, "id_token_hint").Return(hintedToken, true)
 		httpHelper.On("LookupFromUrlQueryOrFormPost", mock.Anything, "client_id").Return("another_client", true)
-		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, hintedToken, (*rsa.PublicKey)(nil), false).
+		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, hintedToken, false).
 			Return(&oauth.JwtToken{TokenBase64: hintedToken, Claims: hintedClaims()}, nil)
 
 		httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, "post_logout_redirect_uri").Return(hintedRegisteredURI)
@@ -802,7 +801,7 @@ func stubConfirmedHint(
 
 	httpHelper.On("LookupFromUrlQueryOrFormPost", mock.Anything, "id_token_hint").Return(hintedToken, true)
 	httpHelper.On("LookupFromUrlQueryOrFormPost", mock.Anything, "client_id").Return("", false)
-	tokenParser.On("DecodeAndValidateTokenString", mock.Anything, hintedToken, (*rsa.PublicKey)(nil), false).
+	tokenParser.On("DecodeAndValidateTokenString", mock.Anything, hintedToken, false).
 		Return(&oauth.JwtToken{TokenBase64: hintedToken, Claims: claims}, nil)
 	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, hintedClientId).Return(client, nil)
 	database.On("GetUserBySubject", mock.Anything, mock.Anything, hintedSubject).
@@ -1564,7 +1563,7 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 		// different client from the aud the hint is signed over.
 		httpHelper.On("LookupFromUrlQueryOrFormPost", mock.Anything, "id_token_hint").Return(hintedToken, true)
 		httpHelper.On("LookupFromUrlQueryOrFormPost", mock.Anything, "client_id").Return("another_client", true)
-		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, hintedToken, (*rsa.PublicKey)(nil), false).
+		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, hintedToken, false).
 			Return(&oauth.JwtToken{TokenBase64: hintedToken, Claims: hintedClaims()}, nil)
 
 		httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, "post_logout_redirect_uri").Return(hintedRegisteredURI)
@@ -1623,7 +1622,7 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 
 				httpHelper.On("LookupFromUrlQueryOrFormPost", mock.Anything, "id_token_hint").Return(hintedToken, true)
 				httpHelper.On("LookupFromUrlQueryOrFormPost", mock.Anything, "client_id").Return("another_client", true)
-				tokenParser.On("DecodeAndValidateTokenString", mock.Anything, hintedToken, (*rsa.PublicKey)(nil), false).
+				tokenParser.On("DecodeAndValidateTokenString", mock.Anything, hintedToken, false).
 					Return(&oauth.JwtToken{TokenBase64: hintedToken, Claims: hintedClaims()}, nil)
 
 				httpHelper.On("GetFromUrlQueryOrFormPost", mock.Anything, "post_logout_redirect_uri").Return("")
@@ -2476,7 +2475,7 @@ func TestClassifyIdTokenHint(t *testing.T) {
 			if tc.innerToken != nil {
 				parsed = *tc.innerToken
 			}
-			parserCall := tokenParser.On("DecodeAndValidateTokenString", mock.Anything, parsed, (*rsa.PublicKey)(nil), false)
+			parserCall := tokenParser.On("DecodeAndValidateTokenString", mock.Anything, parsed, false)
 			if tc.parserErr != nil {
 				parserCall.Return(nil, tc.parserErr).Maybe()
 			} else {

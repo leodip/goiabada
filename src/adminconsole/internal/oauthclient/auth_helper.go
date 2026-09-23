@@ -78,7 +78,7 @@ func (s *AuthHelper) RedirToAuthorize(
 	return nil
 }
 
-func (s *AuthHelper) IsAuthorizedToAccessResource(jwtInfo oauth.JwtInfo, scopesAnyOf []string) bool {
+func (s *AuthHelper) IsAuthorizedToAccessResource(jwtInfo JwtInfo, scopesAnyOf []string) bool {
 	if jwtInfo.AccessToken != nil {
 		for _, scope := range scopesAnyOf {
 			if jwtInfo.AccessToken.HasScope(scope) {
@@ -89,6 +89,6 @@ func (s *AuthHelper) IsAuthorizedToAccessResource(jwtInfo oauth.JwtInfo, scopesA
 	return false
 }
 
-func (s *AuthHelper) IsAuthenticated(jwtInfo oauth.JwtInfo) bool {
+func (s *AuthHelper) IsAuthenticated(jwtInfo JwtInfo) bool {
 	return jwtInfo.IdToken != nil
 }

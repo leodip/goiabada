@@ -6,6 +6,7 @@ import (
 	"crypto/rsa"
 	"net/http"
 
+	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/core/oauth"
 )
 
@@ -21,7 +22,7 @@ type HttpHelper interface {
 }
 
 type AuthHelper interface {
-	IsAuthenticated(jwtInfo oauth.JwtInfo) bool
+	IsAuthenticated(jwtInfo oauthclient.JwtInfo) bool
 }
 
 type IdentifierValidator interface {
@@ -30,7 +31,7 @@ type IdentifierValidator interface {
 
 type TokenParser interface {
 	DecodeAndValidateTokenString(ctx context.Context, token string, pubKey *rsa.PublicKey, withExpirationCheck bool) (*oauth.JwtToken, error)
-	DecodeAndValidateTokenResponse(ctx context.Context, tokenResponse *oauth.TokenResponse) (*oauth.JwtInfo, error)
+	DecodeAndValidateTokenResponse(ctx context.Context, tokenResponse *oauth.TokenResponse) (*oauthclient.JwtInfo, error)
 }
 
 type TokenExchanger interface {

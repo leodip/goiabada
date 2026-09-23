@@ -44,7 +44,7 @@ func validateIdTokenHint(ctx context.Context, idTokenHint string, tokenParser To
 	}
 
 	// Parse JWT: verify signature, skip expiration (spec: SHOULD accept expired)
-	jwtToken, err := tokenParser.DecodeAndValidateTokenString(ctx, idTokenHint, nil, false)
+	jwtToken, err := tokenParser.DecodeAndValidateTokenString(ctx, idTokenHint, false)
 	if err != nil {
 		return "", customerrors.NewErrorDetailWithHttpStatusCode(
 			"invalid_request",

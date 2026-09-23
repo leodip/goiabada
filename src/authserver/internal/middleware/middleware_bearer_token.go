@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"context"
-	"crypto/rsa"
 	"net/http"
 	"strings"
 
@@ -15,7 +14,7 @@ import (
 // it. Declared as the shape used rather than the whole parser, which is what the
 // neighbouring ports in this package already do (#385).
 type tokenParser interface {
-	DecodeAndValidateTokenString(ctx context.Context, token string, pubKey *rsa.PublicKey, withExpirationCheck bool) (*oauth.JwtToken, error)
+	DecodeAndValidateTokenString(ctx context.Context, token string, withExpirationCheck bool) (*oauth.JwtToken, error)
 }
 
 type MiddlewareBearerToken struct {
@@ -58,7 +57,7 @@ func (m *MiddlewareBearerToken) JwtAuthorizationHeaderToContext() func(http.Hand
 
 			// Validate and store the token if found
 			if tokenStr != "" {
-				token, err := m.tokenParser.DecodeAndValidateTokenString(r.Context(), tokenStr, nil, true)
+				token, err := m.tokenParser.DecodeAndValidateTokenString(r.Context(), tokenStr, true)
 				if err == nil {
 					ctx = context.WithValue(ctx, constants.ContextKeyBearerToken, *token)
 				}

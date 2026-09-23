@@ -21,6 +21,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
+	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/core/oauth"
 )
 
@@ -39,7 +40,7 @@ type requestSpec struct {
 	contentType string
 	routeParams [][2]string
 	accessToken *string
-	jwtInfo     *oauth.JwtInfo
+	jwtInfo     *oauthclient.JwtInfo
 	settings    any
 	hasSettings bool
 }
@@ -68,7 +69,7 @@ func Request(method, target string, opts ...Option) *http.Request {
 		ctx = context.WithValue(ctx, constants.ContextKeyJwtInfo, *spec.jwtInfo)
 	} else if spec.accessToken != nil {
 		ctx = context.WithValue(ctx, constants.ContextKeyJwtInfo,
-			oauth.JwtInfo{TokenResponse: oauth.TokenResponse{AccessToken: *spec.accessToken}})
+			oauthclient.JwtInfo{TokenResponse: oauth.TokenResponse{AccessToken: *spec.accessToken}})
 	}
 	if spec.hasSettings {
 		ctx = context.WithValue(ctx, constants.ContextKeySettings, spec.settings)
@@ -86,13 +87,13 @@ func WithAccessToken() Option {
 	}
 }
 
-// WithJwtInfo puts a whole oauth.JwtInfo on the context, for the handlers that read the parsed
+// WithJwtInfo puts a whole oauthclient.JwtInfo on the context, for the handlers that read the parsed
 // token pointers rather than the raw bearer. WithAccessToken fills TokenResponse.AccessToken and
 // leaves IdToken and AccessToken nil, which is indistinguishable from a visitor who never
 // authenticated: the logout page, which reads both pointers, takes its unauthenticated arm.
 //
 // It replaces whatever WithAccessToken set, so the two are not combined.
-func WithJwtInfo(jwtInfo oauth.JwtInfo) Option {
+func WithJwtInfo(jwtInfo oauthclient.JwtInfo) Option {
 	return func(spec *requestSpec) {
 		spec.jwtInfo = &jwtInfo
 	}

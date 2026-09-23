@@ -18,6 +18,7 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	mocks_handlerhelpers "github.com/leodip/goiabada/adminconsole/internal/handlerhelpers/mocks"
+	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
@@ -46,7 +47,7 @@ func (p unusedTokenParser) DecodeAndValidateTokenString(_ context.Context, token
 	return nil, nil
 }
 
-func (p unusedTokenParser) DecodeAndValidateTokenResponse(_ context.Context, tokenResponse *oauth.TokenResponse) (*oauth.JwtInfo, error) {
+func (p unusedTokenParser) DecodeAndValidateTokenResponse(_ context.Context, tokenResponse *oauth.TokenResponse) (*oauthclient.JwtInfo, error) {
 	p.t.Fatal("the token parser must not be reached: the exchange fails before it")
 	return nil, nil
 }

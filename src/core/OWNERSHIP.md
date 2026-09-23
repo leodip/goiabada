@@ -373,7 +373,6 @@ command itself and fails on a tree it changed.
 | `core/oauth` | `GeneratePKCECodeChallenge` | both-apps | — |
 | `core/oauth` | `Jwk` | both-apps | — |
 | `core/oauth` | `Jwks` | both-apps | — |
-| `core/oauth` | `JwtInfo` | both-apps | — |
 | `core/oauth` | `JwtToken` | both-apps | — |
 | `core/oauth` | `TokenResponse` | both-apps | — |
 | `core/sessionstore` | `Backend` | both-apps | — |

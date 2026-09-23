@@ -115,7 +115,7 @@ func TestNewKeyPair_TheTokenParserReadsBothLabels(t *testing.T) {
 			database := mocks_data.NewDatabase(t)
 			database.On("GetCurrentSigningKey", mock.Anything, mock.Anything).Return(row, nil).Once()
 
-			result, err := NewTokenParser(database).DecodeAndValidateTokenString(context.Background(), token, nil, true)
+			result, err := NewTokenParser(database).DecodeAndValidateTokenString(context.Background(), token, true)
 
 			require.NoError(t, err)
 			require.NotNil(t, result)

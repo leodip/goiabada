@@ -33,8 +33,9 @@
 // /userinfo's decision to answer at all -- together with iss, aud, exp, nonce and everything else
 // a token carries that is not read off the user row.
 //
-// Staying on models.User: GetFullName and GetDateOfBirthFormatted, which format stored fields for
-// callers that are not building claims at all.
+// Staying on models.User: GetFullName, which also names the user in the emails the auth server
+// sends. The birthdate claim's YYYY-MM-DD format has no reader but the claim, so it is written
+// here, as the claim construction it is (#424).
 //
 // Nothing here takes an http.ResponseWriter, a *http.Request, template data or a status code, and
 // nothing here imports a handler package.

@@ -9,9 +9,11 @@ import (
 	"testing"
 
 	"errors"
+
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
+	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/mocks"
@@ -250,7 +252,7 @@ func TestRenderTemplateToBuffer(t *testing.T) {
 		ctx := req.Context()
 
 		// Mock JwtInfo with ID Token
-		jwtInfo := oauth.JwtInfo{
+		jwtInfo := oauthclient.JwtInfo{
 			IdToken: &oauth.JwtToken{
 				Claims: map[string]interface{}{
 					"sub":  "user123",
@@ -278,7 +280,7 @@ func TestRenderTemplateToBuffer(t *testing.T) {
 	t.Run("isAdmin follows the access token's scope", func(t *testing.T) {
 		withAccessToken := func(scope string) *http.Request {
 			req := httptest.NewRequest("GET", "/", nil)
-			jwtInfo := oauth.JwtInfo{
+			jwtInfo := oauthclient.JwtInfo{
 				AccessToken: &oauth.JwtToken{Claims: map[string]interface{}{"scope": scope}},
 			}
 			return req.WithContext(context.WithValue(req.Context(), constants.ContextKeyJwtInfo, jwtInfo))
