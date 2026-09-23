@@ -837,8 +837,13 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 					}
 				}
 
+				// invalid_scope, not invalid_grant: the grant is intact and the request asks for
+				// more than it holds, which is what RFC 6749 section 5.2 names invalid_scope for
+				// ("exceeds the scope granted by the resource owner") and what the endpoints
+				// reference has always documented. It answered invalid_grant until #425. The
+				// token is not spent, so the client can ask again within its grant.
 				if !scopeExists {
-					return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
+					return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope",
 						fmt.Sprintf("Scope '%v' is not recognized. The original access token does not grant the '%v' permission.", inputScopeStr, inputScopeStr),
 						http.StatusBadRequest)
 				}
@@ -924,6 +929,34 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 		}
 
 		for _, inputScopeStr := range inputScopes {
+			// A value that is none of the scopes this server issues: not a claim scope, not
+			// offline_access, and not resource:permission shaped. Refused first, so it gets one
+			// answer whatever the client's consent setting.
+			//
+			// Every issuing path validates the scope before storing it, so only a grant stored
+			// before a rule change can carry one. The case that exists is OFFLINE_ACCESS: until
+			// #425 the validators case-folded offline_access, so a client that sent the uppercase
+			// spelling had it stored, and #425 made the match exact, per RFC 6749 section 3.3.
+			// Such a value used to fall through to the permission check below as if it were a
+			// resource scope, which refused it as a caller's bug and answered 500.
+			//
+			// invalid_grant rather than 500, by the rule the unresolvable-subject check above
+			// states: a 500 is for a state no supported operation can produce, and a previous
+			// release produced this one (#123). invalid_grant rather than skipping the value,
+			// because RFC 6749 section 6 keeps a rotated refresh token's scope identical to the
+			// presented one: the value would have to be skipped on every refresh for the life of
+			// the grant, and issuance, which reads the stored scope when the request omits one,
+			// would need the same leniency. So the grant is refused, as one whose resource scope
+			// names a deleted resource already is. The refusal comes before
+			// MarkRefreshTokenAsRevoked, so the token is not spent, and a client that narrows
+			// `scope` to leave the value out still refreshes.
+			if !oidc.IsClaimScope(inputScopeStr) && !oidc.IsOfflineAccessScope(inputScopeStr) &&
+				!permissions.IsResourceScope(inputScopeStr) {
+				return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
+					fmt.Sprintf("Scope '%v' is not recognized. It is not a scope this server issues.", inputScopeStr),
+					http.StatusBadRequest)
+			}
+
 			// check if user still consents to this scope
 			if consentCheckRequired {
 				consentScopeExists := false

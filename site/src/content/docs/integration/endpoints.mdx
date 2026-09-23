@@ -193,7 +193,7 @@ Per [RFC 6749](https://datatracker.ietf.org/doc/html/rfc6749#section-2.3), clien
     </tr>
     <tr>
       <td style="white-space: nowrap;"><code>scope</code></td>
-      <td>For <code>client_credentials</code>: required, one or more <code>resource:permission</code> scopes. For <code>refresh_token</code>: optional, to restrict the original scope.</td>
+      <td>For <code>client_credentials</code>: required, one or more <code>resource:permission</code> scopes. For <code>refresh_token</code>: optional, to restrict the original scope. A value the original grant does not hold is refused with <code>invalid_scope</code>.</td>
     </tr>
     <tr>
       <td style="white-space: nowrap;"><code>refresh_token</code></td>

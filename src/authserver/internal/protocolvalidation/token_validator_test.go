@@ -3034,12 +3034,15 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		result, err := validator.ValidateTokenRequest(ctx, input)
 
+		// invalid_scope since #425: the grant is intact and the request exceeds it, which RFC 6749
+		// section 5.2 names invalid_scope for. It answered invalid_grant before.
 		assert.Nil(t, result)
 		assert.Error(t, err)
 		customErr, ok := err.(*customerrors.ErrorDetail)
 		assert.True(t, ok)
-		assert.Equal(t, "invalid_grant", customErr.GetCode())
-		assert.Contains(t, customErr.GetDescription(), "Scope 'address' is not recognized")
+		assert.Equal(t, "invalid_scope", customErr.GetCode())
+		assert.Equal(t, "Scope 'address' is not recognized. The original access token does not grant the 'address' permission.",
+			customErr.GetDescription())
 		assert.Equal(t, http.StatusBadRequest, customErr.GetHttpStatusCode())
 	})
 
@@ -5394,6 +5397,288 @@ func TestValidateTokenRequest_RefreshToken_ROPC_InjectedUserInfoScope(t *testing
 			assert.Equal(t, "invalid_grant", customErr.GetCode())
 			assert.Contains(t, customErr.GetDescription(),
 				fmt.Sprintf("The user does not have the '%v' permission", userInfoScope))
+		})
+	}
+}
+
+// storedGrant describes a hand-built refresh token for the stored-scope cases below.
+type storedGrant struct {
+	// ropc makes it an ROPC token, which has no code and carries its scope on the token row,
+	// rather than an authorization code one, whose scope the arm reads from the code.
+	ropc  bool
+	scope string
+	// consentScope, when set, makes the client require consent and is the consent row's scope.
+	// Authorization code grants only: the arm skips consent for ROPC.
+	consentScope string
+}
+
+// newStoredGrantRefresh wires a validator over strict mocks for one refresh of g, and hands back the
+// permission checker so a case registers only the checks it expects to reach. Every read the arm
+// makes before it compares the requested scope with the grant is stubbed. The subject lookup and
+// the consent row come after that comparison, so they are stubbed only when reachesUser is set, and
+// a case that stops at the comparison fails if it reads either.
+func newStoredGrantRefresh(t *testing.T, g storedGrant, requestedScope string, reachesUser bool) (
+	*TokenValidator, *mocks_handlers.PermissionChecker, context.Context, *ValidateTokenRequestInput) {
+	t.Helper()
+
+	mockDB := mocks_data.NewDatabase(t)
+	mockTokenParser := mocks_handlers.NewTokenParser(t)
+	mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
+	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
+
+	settings := &models.Settings{
+		UserSessionIdleTimeoutInSeconds: 3600,
+		UserSessionMaxLifetimeInSeconds: 86400,
+	}
+	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+
+	input := &ValidateTokenRequestInput{
+		GrantType:    "refresh_token",
+		ClientId:     "client1",
+		RefreshToken: "stored_grant_refresh_token",
+		Scope:        requestedScope,
+	}
+	user := models.User{Id: 1, Subject: "user123", Enabled: true}
+
+	var client *models.Client
+	var refreshTokenJwt *oauth.JwtToken
+	var refreshToken *models.RefreshToken
+	if g.ropc {
+		// Always Offline, because ROPC creates no browser session, and presented by a public
+		// client, so no secret.
+		client = &models.Client{Id: 1, ClientIdentifier: "client1", Enabled: true, IsPublic: true}
+		refreshTokenJwt = &oauth.JwtToken{Claims: jwt.MapClaims{
+			"jti":                         "stored_grant_jti",
+			"typ":                         "Offline",
+			"sub":                         "user123",
+			"offline_access_max_lifetime": float64(time.Now().UTC().Add(24 * time.Hour).Unix()),
+		}}
+		refreshToken = &models.RefreshToken{
+			RefreshTokenJti: "stored_grant_jti",
+			CodeId:          sql.NullInt64{Valid: false},
+			UserId:          sql.NullInt64{Int64: 1, Valid: true},
+			ClientId:        sql.NullInt64{Int64: 1, Valid: true},
+			Scope:           g.scope,
+			User:            user,
+			Client:          *client,
+		}
+		mockDB.On("RefreshTokenLoadUser", mock.Anything, mock.Anything, refreshToken).Return(nil).Once()
+		mockDB.On("RefreshTokenLoadClient", mock.Anything, mock.Anything, refreshToken).Return(nil).Once()
+	} else {
+		// Session-bound, which is what a release before #425 issued for OFFLINE_ACCESS: issuance
+		// matched offline_access exactly, so the uppercase spelling never made a grant offline.
+		clientSecretEncrypted, err := encryption.EncryptData("client_secret")
+		require.NoError(t, err)
+		client = &models.Client{
+			Id:                       1,
+			ClientIdentifier:         "client1",
+			Enabled:                  true,
+			AuthorizationCodeEnabled: true,
+			ClientSecretEncrypted:    clientSecretEncrypted,
+			ConsentRequired:          g.consentScope != "",
+		}
+		input.ClientSecret = "client_secret"
+		refreshTokenJwt = &oauth.JwtToken{Claims: jwt.MapClaims{
+			"jti": "stored_grant_jti",
+			"typ": "Refresh",
+			"sub": "user123",
+		}}
+		refreshToken = &models.RefreshToken{
+			RefreshTokenJti:   "stored_grant_jti",
+			SessionIdentifier: "test_session",
+			CodeId:            sql.NullInt64{Int64: 1, Valid: true},
+			Code:              models.Code{ClientId: 1, UserId: 1, Scope: g.scope, User: user},
+		}
+		userSession := &models.UserSession{
+			SessionIdentifier: "test_session",
+			UserId:            1,
+			Started:           time.Now().UTC().Add(-30 * time.Minute),
+			LastAccessed:      time.Now().UTC().Add(-5 * time.Minute),
+		}
+		mockDB.On("RefreshTokenLoadCode", mock.Anything, mock.Anything, refreshToken).Return(nil).Once()
+		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, &refreshToken.Code).Return(nil).Once()
+		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test_session").
+			Return(userSession, nil).Once()
+	}
+
+	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "client1").Return(client, nil).Once()
+	mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "stored_grant_refresh_token", true).
+		Return(refreshTokenJwt, nil).Once()
+	mockDB.On("GetRefreshTokenByJti", mock.Anything, mock.Anything, "stored_grant_jti").Return(refreshToken, nil).Once()
+
+	if reachesUser {
+		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "user123").Return(&user, nil).Once()
+		if g.consentScope != "" {
+			mockDB.On("GetConsentByUserIdAndClientId", mock.Anything, mock.Anything, int64(1), int64(1)).
+				Return(&models.UserConsent{UserId: 1, ClientId: 1, Scope: g.consentScope}, nil).Once()
+		}
+	}
+
+	return validator, mockPermissionChecker, ctx, input
+}
+
+// TestValidateTokenRequest_RefreshToken_StoredScopeThisServerDoesNotIssue pins the refresh arm's
+// answer to a grant carrying a value that is none of the scopes this server issues: 400
+// invalid_grant, with the permission checker never asked. The value that exists in production is
+// OFFLINE_ACCESS, stored for a client that sent the uppercase spelling while the validators still
+// case-folded offline_access, before #425 made the match exact. It used to fall through to
+// UserHasScopePermission as if it were a resource scope, which refused it as a caller's bug and
+// answered 500.
+//
+// The grant is hand-built because no current issuing path can store such a value. The integration
+// tier builds the same state by rewriting a real grant's rows.
+//
+// No refused row registers a permission checker expectation: the strict mock fails the test if the
+// value reaches the check at all, and AssertNotCalled says so explicitly.
+func TestValidateTokenRequest_RefreshToken_StoredScopeThisServerDoesNotIssue(t *testing.T) {
+	const notIssued = "Scope '%v' is not recognized. It is not a scope this server issues."
+
+	testCases := []struct {
+		name           string
+		grant          storedGrant
+		requestedScope string // empty means omitted, so the arm checks the whole stored grant
+		// permissionScope, when set, is the one resource scope the checker is asked about, and
+		// it answers held.
+		permissionScope string
+		wantDesc        string // empty means accepted
+	}{
+		{
+			name:     "authorization code grant, scope omitted",
+			grant:    storedGrant{scope: "openid profile email OFFLINE_ACCESS"},
+			wantDesc: fmt.Sprintf(notIssued, "OFFLINE_ACCESS"),
+		},
+		{
+			// The population that lasts: an ROPC refresh token is always offline, so it lives up
+			// to the offline maximum lifetime.
+			name:     "ROPC grant, scope omitted",
+			grant:    storedGrant{ropc: true, scope: "openid OFFLINE_ACCESS"},
+			wantDesc: fmt.Sprintf(notIssued, "OFFLINE_ACCESS"),
+		},
+		{
+			// The comparison with the grant passes, since the value is in it, and the refusal
+			// still comes: asking for it explicitly is no different from inheriting it.
+			name:           "the value requested explicitly",
+			grant:          storedGrant{scope: "openid profile email OFFLINE_ACCESS"},
+			requestedScope: "openid OFFLINE_ACCESS",
+			wantDesc:       fmt.Sprintf(notIssued, "OFFLINE_ACCESS"),
+		},
+		{
+			// The way out a client already has, and the reason the refusal must not spend the
+			// token: narrowing the request to leave the value out.
+			name:           "authorization code grant, a request that leaves the value out",
+			grant:          storedGrant{scope: "openid profile email OFFLINE_ACCESS"},
+			requestedScope: "openid profile",
+		},
+		{
+			name:           "ROPC grant, a request that leaves the value out",
+			grant:          storedGrant{ropc: true, scope: "openid OFFLINE_ACCESS"},
+			requestedScope: "openid",
+		},
+		{
+			name:     "a mixed-case spelling",
+			grant:    storedGrant{scope: "openid Offline_Access"},
+			wantDesc: fmt.Sprintf(notIssued, "Offline_Access"),
+		},
+		{
+			name:     "a value with two separators",
+			grant:    storedGrant{scope: "openid backend-svc:read:extra"},
+			wantDesc: fmt.Sprintf(notIssued, "backend-svc:read:extra"),
+		},
+		{
+			// Refused before the consent comparison, so the answer does not depend on the client's
+			// consent setting. Checked the other way round, this consent row, which lacks the
+			// value, would refuse it as unconsented instead.
+			name:     "a client requiring consent gets the same answer",
+			grant:    storedGrant{scope: "openid profile OFFLINE_ACCESS", consentScope: "openid profile"},
+			wantDesc: fmt.Sprintf(notIssued, "OFFLINE_ACCESS"),
+		},
+		{
+			// The negative control: a resource-shaped value still goes to the permission check, so
+			// the refusal does not swallow resource scopes.
+			name:            "a resource scope still reaches the permission check",
+			grant:           storedGrant{scope: "openid backend-svc:read"},
+			permissionScope: "backend-svc:read",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			validator, mockPermissionChecker, ctx, input := newStoredGrantRefresh(t, tc.grant, tc.requestedScope, true)
+			if tc.permissionScope != "" {
+				mockPermissionChecker.On("UserHasScopePermission", mock.Anything, int64(1), tc.permissionScope).
+					Return(true, nil).Once()
+			}
+
+			result, err := validator.ValidateTokenRequest(ctx, input)
+
+			if tc.wantDesc == "" {
+				require.NoError(t, err)
+				assert.NotNil(t, result)
+				return
+			}
+
+			assert.Nil(t, result)
+			var customErr *customerrors.ErrorDetail
+			require.ErrorAs(t, err, &customErr)
+			assert.Equal(t, "invalid_grant", customErr.GetCode())
+			assert.Equal(t, tc.wantDesc, customErr.GetDescription())
+			assert.Equal(t, http.StatusBadRequest, customErr.GetHttpStatusCode())
+			mockPermissionChecker.AssertNotCalled(t, "UserHasScopePermission", mock.Anything, mock.Anything, mock.Anything)
+		})
+	}
+}
+
+// TestValidateTokenRequest_RefreshToken_RequestedScopeBeyondTheGrant pins invalid_scope for a
+// refresh that asks for a value its grant does not hold, on both kinds of grant: RFC 6749 section
+// 5.2 names invalid_scope for a requested scope that "exceeds the scope granted by the resource
+// owner". It answered invalid_grant until #425. The comparison comes before the subject lookup,
+// so newStoredGrantRefresh stubs neither the user nor the consent row, and the permission checker
+// is never asked.
+func TestValidateTokenRequest_RefreshToken_RequestedScopeBeyondTheGrant(t *testing.T) {
+	testCases := []struct {
+		name           string
+		grant          storedGrant
+		requestedScope string
+		beyond         string // the value the request asks for beyond the grant
+	}{
+		{
+			name:           "authorization code grant asked for a resource scope it does not hold",
+			grant:          storedGrant{scope: "openid profile"},
+			requestedScope: "openid backend-svc:read",
+			beyond:         "backend-svc:read",
+		},
+		{
+			name:           "ROPC grant asked for a resource scope it does not hold",
+			grant:          storedGrant{ropc: true, scope: "openid"},
+			requestedScope: "openid backend-svc:read",
+			beyond:         "backend-svc:read",
+		},
+		{
+			// Scope values are case-sensitive, RFC 6749 section 3.3: a grant that stored the
+			// uppercase spelling does not hold offline_access, so asking for it asks beyond the grant.
+			name:           "offline_access against a grant that stored the uppercase spelling",
+			grant:          storedGrant{scope: "openid OFFLINE_ACCESS"},
+			requestedScope: "openid offline_access",
+			beyond:         "offline_access",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			validator, mockPermissionChecker, ctx, input := newStoredGrantRefresh(t, tc.grant, tc.requestedScope, false)
+
+			result, err := validator.ValidateTokenRequest(ctx, input)
+
+			assert.Nil(t, result)
+			var customErr *customerrors.ErrorDetail
+			require.ErrorAs(t, err, &customErr)
+			assert.Equal(t, "invalid_scope", customErr.GetCode())
+			assert.Equal(t,
+				fmt.Sprintf("Scope '%v' is not recognized. The original access token does not grant the '%v' permission.",
+					tc.beyond, tc.beyond),
+				customErr.GetDescription())
+			assert.Equal(t, http.StatusBadRequest, customErr.GetHttpStatusCode())
+			mockPermissionChecker.AssertNotCalled(t, "UserHasScopePermission", mock.Anything, mock.Anything, mock.Anything)
 		})
 	}
 }
