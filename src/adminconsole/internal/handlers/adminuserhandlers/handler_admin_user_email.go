@@ -2,14 +2,12 @@ package adminuserhandlers
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
@@ -142,27 +140,25 @@ func HandleAdminUserEmailPost(
 		// Update user email via API
 		updatedUser, err := apiClient.UpdateUserEmail(r.Context(), jwtInfo.TokenResponse.AccessToken, id, updateReq)
 		if err != nil {
-			// Handle API validation errors by displaying them in template
-			var apiErr *apiclient.APIError
-			if errors.As(err, &apiErr) && apiErr.StatusCode == 400 {
+			// The classifier decides which failures the form can show: a 400 the API's validation
+			// refused, and a 409 for an address another account took after that validation passed
+			// (#425).
+			handlers.HandleAPIErrorWithCallback(httpHelper, w, r, err, func(errorMessage string) {
 				bind := map[string]interface{}{
 					"user":          user,
 					"email":         updateReq.Email,
 					"emailVerified": updateReq.EmailVerified,
 					"page":          r.URL.Query().Get("page"),
 					"query":         r.URL.Query().Get("query"),
-					"error":         apiErr.Message,
+					"error":         errorMessage,
 				}
 
-				err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_users_email.html", bind)
-				if err != nil {
-					httpHelper.InternalServerError(w, r, err)
+				renderErr := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_users_email.html", bind)
+				if renderErr != nil {
+					httpHelper.InternalServerError(w, r, renderErr)
 				}
-				return
-			} else {
-				handlers.HandleAPIError(httpHelper, w, r, err)
-				return
-			}
+			})
+			return
 		}
 
 		sess, err := httpSession.Get(r, coreconstants.AdminConsoleSessionName)

@@ -179,6 +179,10 @@ func TestHandleAPIError_RoutesOnStatus(t *testing.T) {
 			err:  &apiclient.APIError{Code: "VALIDATION_ERROR", Message: "Invalid client identifier", StatusCode: http.StatusBadRequest},
 		},
 		{
+			name: "a 409 from the API stays a 500 on this helper, for the same reason",
+			err:  &apiclient.APIError{Code: "EMAIL_ALREADY_EXISTS", Message: "This email address is already registered", StatusCode: http.StatusConflict},
+		},
+		{
 			name: "a transport error stays a 500",
 			err:  errs.New("connection refused"),
 		},
@@ -220,9 +224,26 @@ func TestHandleAPIErrorWithCallback_RoutesOnStatus(t *testing.T) {
 			err:          &apiclient.APIError{Code: "VALIDATION_ERROR", Message: "Invalid client identifier", StatusCode: http.StatusBadRequest},
 			wantRendered: "Invalid client identifier",
 		},
+		// A conflict is the administrator's to resolve and resubmit, RFC 9110 section 15.5.10: an
+		// email address another account took between the form's check and its write. It answered
+		// the 500 page before #425, discarding the form.
+		{
+			name:         "a 409 re-renders the form with the API's sentence",
+			err:          &apiclient.APIError{Code: "EMAIL_ALREADY_EXISTS", Message: "This email address is already registered", StatusCode: http.StatusConflict},
+			wantRendered: "This email address is already registered",
+		},
+		{
+			name:         "a wrapped 409 still re-renders the form",
+			err:          errs.Wrap(&apiclient.APIError{Code: "EMAIL_ALREADY_EXISTS", Message: "This email address is already registered", StatusCode: http.StatusConflict}, "unable to update the email"),
+			wantRendered: "This email address is already registered",
+		},
 		{
 			name: "a 500 from the API stays a 500",
 			err:  &apiclient.APIError{Code: "INTERNAL_SERVER_ERROR", Message: "the database is on fire", StatusCode: http.StatusInternalServerError},
+		},
+		{
+			name: "a 403 from the API stays a 500",
+			err:  &apiclient.APIError{Code: "FORBIDDEN", Message: "insufficient permissions", StatusCode: http.StatusForbidden},
 		},
 		{
 			name: "a transport error stays a 500",

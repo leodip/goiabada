@@ -34,8 +34,14 @@ func HandleAccountPictureGet(
 
 		// Get profile picture info
 		var profilePictureUrl string
+		// A user with no picture is a 200 from the API with HasPicture false, so an error here is a
+		// real failure and is answered as one rather than drawn as an empty picture (#425).
 		pictureInfo, err := apiClient.GetAccountProfilePicture(r.Context(), jwtInfo.TokenResponse.AccessToken)
-		if err == nil && pictureInfo != nil && pictureInfo.HasPicture {
+		if err != nil {
+			handlers.HandleAPIError(httpHelper, w, r, err)
+			return
+		}
+		if pictureInfo != nil && pictureInfo.HasPicture {
 			// Add cache-busting parameter to prevent browser caching
 			profilePictureUrl = fmt.Sprintf("%s?t=%d", pictureInfo.PictureUrl, time.Now().UnixNano())
 		}

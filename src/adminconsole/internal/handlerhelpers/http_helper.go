@@ -20,6 +20,7 @@ import (
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
+	"github.com/leodip/goiabada/core/logging"
 )
 
 // This renderer is one of two. The auth server has its own copy in
@@ -83,7 +84,14 @@ func (h *HttpHelper) InternalServerError(w http.ResponseWriter, r *http.Request,
 		"_httpStatus": http.StatusInternalServerError,
 	})
 	if err != nil {
-		http.Error(w, fmt.Sprintf("unable to render the error page: %v", err.Error()), http.StatusInternalServerError)
+		// The last resort writes fixed catalog text and never the render error, which named
+		// template files and internal state to whoever hit the page. The request id is the one
+		// variable, and it is client-chosen: chi's RequestID adopts an inbound X-Request-Id
+		// verbatim, so it is escaped and clipped before it is echoed (#159, #414, #425).
+		slog.ErrorContext(r.Context(), "unable to render the error page", "error", err)
+		http.Error(w, i18n.T(r.Context(), "adminconsole.error.body")+" "+
+			i18n.T(r.Context(), "adminconsole.error.request_id_label")+" "+logging.FieldForLog(requestId),
+			http.StatusInternalServerError)
 	}
 }
 
