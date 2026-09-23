@@ -79,6 +79,18 @@ func main() {
 		os.Exit(migrateCommand(migrateArgs, *config.GetDatabase(), os.Stdout, os.Stderr))
 	}
 
+	// A trusted-proxy entry that is neither an IP nor a CIDR stops the server whatever
+	// TRUST_PROXY_HEADERS says. Skipping it would leave a list of typos empty, which the real-IP
+	// middleware reads as trusting any single hop, and a typo in a list trust is off for today
+	// would otherwise surface only on the day trust is switched on (#425). It is checked after
+	// `migrate` for the reason the encryption key is: that command serves no request, and a
+	// setting only the server reads is no precondition for repairing a schema.
+	trustedProxies, proxyErr := config.GetAuthServer().TrustedProxyRanges()
+	if proxyErr != nil {
+		slog.Error("the trusted proxy list is malformed, so the auth server cannot start", "error", proxyErr)
+		os.Exit(1)
+	}
+
 	// Validate the data-encryption key EARLY and initialize the process cipher
 	// before the database is opened: NewDatabase runs the at-rest re-encryption
 	// migration, which needs the key. The key is supplied from the environment
@@ -236,7 +248,7 @@ func main() {
 	slog.Info("initialized server-side session store")
 
 	r := chi.NewRouter()
-	s := server.NewServer(r, database, sessionStore)
+	s := server.NewServer(r, database, sessionStore, trustedProxies)
 
 	// The process owns the signals; the server just gets told when to stop. On
 	// SIGTERM (what a container runtime sends) or SIGINT, ctx is cancelled and

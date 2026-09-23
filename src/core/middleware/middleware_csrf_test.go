@@ -3,6 +3,7 @@ package middleware
 import (
 	"context"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -11,6 +12,10 @@ import (
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/core/i18n"
+	"github.com/leodip/goiabada/core/logging"
+	"github.com/leodip/goiabada/core/testutil"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // The fixture policy every matching test below drives, and it is deliberately not either
@@ -471,6 +476,66 @@ func TestMiddlewareCsrf_OriginDecisions(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestMiddlewareCsrf_TheRefusalRecordIsBounded: every value the refusal record takes from the
+// request is the client's to choose and arrives before anything has authenticated it. Each is
+// megabytes long here and made of bytes a log line must not carry, and the record stays small and
+// printable (#425, the bound #159 put on the request logger).
+func TestMiddlewareCsrf_TheRefusalRecordIsBounded(t *testing.T) {
+	const size = 1 << 20
+	capture := testutil.CaptureSlog(t)
+
+	handler := MiddlewareCsrf()(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		t.Error("request reached the handler, want it refused")
+	}))
+
+	req := httptest.NewRequest(http.MethodPost, "/auth/pwd", nil)
+	req.Method = strings.Repeat("P", size)
+	req.URL.Path = "/" + strings.Repeat("\n", size)
+	req.Host = strings.Repeat("h", size)
+	req.Header.Set("Origin", "https://"+strings.Repeat("\x00", size))
+	// Not one of the four values W3C Fetch Metadata defines, so Check refuses it whatever the
+	// Origin holds.
+	req.Header.Set("Sec-Fetch-Site", strings.Repeat("\x7f", size))
+
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+	require.Equal(t, http.StatusForbidden, rr.Code)
+
+	records := capture.Records()
+	require.Len(t, records, 1)
+	record := records[0]
+	assert.Equal(t, slog.LevelWarn, record.Level)
+	assert.Equal(t, "cross-origin request refused", record.Message)
+
+	printable := func(t *testing.T, key, value string) {
+		t.Helper()
+		for i := 0; i < len(value); i++ {
+			if value[i] < 0x20 || value[i] > 0x7e {
+				t.Errorf("%s carries byte 0x%02x at offset %d", key, value[i], i)
+				return
+			}
+		}
+	}
+
+	for _, key := range []string{"method", "request_host", "origin_header", "sec_fetch_site"} {
+		value, ok := record.Attrs[key].(string)
+		require.True(t, ok, "%s is a string attribute", key)
+		assert.LessOrEqual(t, len(value), 256, "%s is bounded", key)
+		printable(t, key, value)
+	}
+
+	target, ok := record.Attrs["target"].(string)
+	require.True(t, ok, "target is a string attribute")
+	assert.LessOrEqual(t, len(target), maxLoggedTarget+len(logging.TruncationMarker(maxLoggedTarget, 1<<30)))
+	printable(t, "target", target)
+
+	// The request logger's key for the same value; the old "path" carried it raw.
+	assert.NotContains(t, record.Attrs, "path")
+
+	// More than 4 MB went in.
+	assert.Less(t, len(capture.Text()), 16<<10)
 }
 
 // TestExplainCsrfFailure covers the diagnostic the 403 carries into the log, which is the only place

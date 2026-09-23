@@ -370,19 +370,29 @@ func withContext(ctx context.Context, id string) {
 	slog.WarnContext(ctx, "client not found", "client_identifier", id)
 }
 `)
+	// parseCIDRs was admitted until #425 withdrew it, so its plain record is a finding now: the
+	// admission was removed, not moved elsewhere in the package.
 	tree.write("core/middleware/middleware_realip.go", `package middleware
 
 import "log/slog"
 
 func parseCIDRs(entries []string) { slog.Warn("ignoring invalid trusted proxy entry", "entry", entries[0]) }
 `)
-	tree.write("core/middleware/namesake.go", `package middleware
+	tree.write("adminconsole/internal/handlerhelpers/template_funcs.go", `package handlerhelpers
 
 import "log/slog"
 
-func parseCIDRs2() { slog.Warn("not the admitted function") }
+func addUrlParam(u string) string { slog.Warn("unable to parse url", "url", u); return u }
 
-func (m *limiter) parseCIDRs() { slog.Warn("a method by the admitted name, in another file") }
+func convertToString(v any) string { slog.Warn("unable to convert value", "value", v); return "" }
+`)
+	tree.write("adminconsole/internal/handlerhelpers/namesake.go", `package handlerhelpers
+
+import "log/slog"
+
+func addUrlParam2() { slog.Warn("not the admitted function") }
+
+func (m *limiter) addUrlParam() { slog.Warn("a method by the admitted name, in another file") }
 `)
 	// The audit path, listed by #328 now that AuditLogger.Log takes a context. Two files of the one
 	// package are planted because the rule decides per file: a walk that reached the directory and
@@ -442,7 +452,7 @@ func tagged() { slog.SetDefault(slog.Default()); slog.Info("failed to x") }
 
 	violations, files, err := findSlogViolations(tree.root, tree.golangci, nil)
 	require.NoError(t, err)
-	assert.Equal(t, 28, files, "every non-exempt fixture is walked")
+	assert.Equal(t, 29, files, "every non-exempt fixture is walked")
 
 	got := make([]string, 0, len(violations))
 	for _, v := range violations {
@@ -484,8 +494,9 @@ func tagged() { slog.SetDefault(slog.Default()); slog.Info("failed to x") }
 		"authserver/internal/handlers/plain.go:9 a plain slog.Info in a request-path package",
 		"authserver/internal/handlers/plain.go:13 a plain slog.Warn in a request-path package",
 		"authserver/internal/handlers/plain.go:14 a plain slog.Debug in a request-path package",
-		"core/middleware/namesake.go:5 a plain slog.Warn in a request-path package",
-		"core/middleware/namesake.go:7 a plain slog.Warn in a request-path package",
+		"core/middleware/middleware_realip.go:5 a plain slog.Warn in a request-path package",
+		"adminconsole/internal/handlerhelpers/namesake.go:5 a plain slog.Warn in a request-path package",
+		"adminconsole/internal/handlerhelpers/namesake.go:7 a plain slog.Warn in a request-path package",
 	}
 	sort.Strings(want)
 	sort.Strings(got)

@@ -33,6 +33,16 @@ func main() {
 		os.Exit(1)
 	}
 
+	// A trusted-proxy entry that is neither an IP nor a CIDR stops the server whatever
+	// TRUST_PROXY_HEADERS says. Skipping it would leave a list of typos empty, which the real-IP
+	// middleware reads as trusting any single hop, and a typo in a list trust is off for today
+	// would otherwise surface only on the day trust is switched on (#425).
+	trustedProxies, proxyErr := config.GetAdminConsole().TrustedProxyRanges()
+	if proxyErr != nil {
+		slog.Error("the trusted proxy list is malformed, so the admin console cannot start", "error", proxyErr)
+		os.Exit(1)
+	}
+
 	slog.Info("admin console started")
 	slog.Info("build information",
 		"version", coreconstants.Version,
@@ -186,7 +196,7 @@ func main() {
 	slog.Info("initialized settings cache with 30s TTL")
 
 	r := chi.NewRouter()
-	s := server.NewServer(r, sessionStore, settingsCache)
+	s := server.NewServer(r, sessionStore, settingsCache, trustedProxies)
 
 	s.Start()
 }

@@ -10,12 +10,14 @@ import (
 	"encoding/hex"
 	"flag"
 	"log/slog"
+	"net"
 	"os"
 	"strconv"
 	"strings"
 	"sync"
 
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/middleware"
 )
 
 type AuthServerConfig struct {
@@ -63,6 +65,19 @@ func (c *AuthServerConfig) GetEffectiveBaseURL() string {
 // setting; the base URL scheme is the single source of truth.
 func (c *AuthServerConfig) IsCookieSecure() bool {
 	return isHTTPSURL(c.BaseURL)
+}
+
+// TrustedProxyRanges parses TrustedProxies into the ranges the real-IP
+// middleware walks. main refuses to start on the error, whatever
+// TrustProxyHeaders says, because an entry that is neither an IP nor a CIDR is
+// a restriction the operator asked for and cannot get (#425). The value can come
+// from the variable or the flag, so the error names both.
+func (c *AuthServerConfig) TrustedProxyRanges() ([]*net.IPNet, error) {
+	ranges, err := middleware.ParseTrustedProxies(c.TrustedProxies)
+	if err != nil {
+		return nil, errs.Wrap(err, "GOIABADA_AUTHSERVER_TRUSTED_PROXIES (--authserver-trusted-proxies)")
+	}
+	return ranges, nil
 }
 
 // isHTTPSURL reports whether a URL uses the https scheme (case-insensitive).
