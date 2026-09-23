@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/leodip/goiabada/authserver/internal/apiresponse"
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/i18n"
@@ -51,6 +52,26 @@ func writeInternalServerErrorWithCode(w http.ResponseWriter, r *http.Request, er
 	requestId := apiresponse.LogInternalServerError(r, err)
 	writeJSONError(w, fmt.Sprintf("%s. Request Id: %v", message, requestId), code,
 		http.StatusInternalServerError)
+}
+
+// writeEmailTakenOrInternalServerError answers a failed user write: 409 EMAIL_ALREADY_EXISTS when
+// the engine refused it on a unique key, which on the users table means the email, and the one 500
+// otherwise. RFC 9110 section 15.5.10: a conflict "with the current state of the target
+// resource" the user "might be able to resolve" and resubmit.
+//
+// Each caller checks the address before it writes, and that check answers the ordinary duplicate.
+// This is the race the check cannot close, where a concurrent request takes the address between
+// the read and the write; the data layer tags the refusal on every engine, so matching the
+// sentinel is enough. Subject is the table's only other unique key, and no caller here writes one
+// another row could hold: a create mints a fresh UUID and an email change keeps the row's own.
+// Serves user creation and both email PUTs, the last two of which answered this race 500 until
+// #425 (#414 item 1).
+func writeEmailTakenOrInternalServerError(w http.ResponseWriter, r *http.Request, err error) {
+	if errors.Is(err, data.ErrUniqueViolation) {
+		writeJSONError(w, "This email address is already registered", "EMAIL_ALREADY_EXISTS", http.StatusConflict)
+		return
+	}
+	writeInternalServerError(w, r, err)
 }
 
 // writeValidationError emits a 400 Bad Request envelope from a validation

@@ -86,7 +86,7 @@ func HandleAPIUserEmailPut(
 		// Update user in database
 		err = database.UpdateUser(r.Context(), nil, user)
 		if err != nil {
-			writeInternalServerError(w, r, err)
+			writeEmailTakenOrInternalServerError(w, r, err)
 			return
 		}
 

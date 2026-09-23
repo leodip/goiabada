@@ -583,6 +583,13 @@ func statusesWrittenIn(t *testing.T, path string, fset *token.FileSet, fn *ast.F
 				if f.Name == "readSessionRequest" {
 					out[400] = true
 				}
+				// writeEmailTakenOrInternalServerError answers a failed user write 409 when the
+				// engine refused the email as taken and 500 otherwise, so the two email PUTs that
+				// call it name neither constant for failures they can produce (#425).
+				if f.Name == "writeEmailTakenOrInternalServerError" {
+					out[409] = true
+					out[500] = true
+				}
 			case *ast.SelectorExpr:
 				switch f.Sel.Name {
 				case "InternalServerError", "JsonError":

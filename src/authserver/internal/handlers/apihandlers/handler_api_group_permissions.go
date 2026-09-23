@@ -72,14 +72,14 @@ func HandleAPIGroupPermissionsGet(
 			}
 		}
 
-		// Get member count for the group response
-		memberCount, err := database.CountGroupMembers(r.Context(), nil, group.Id)
+		memberCounts, err := countGroupMembers(r.Context(), database, []models.Group{*group})
 		if err != nil {
-			memberCount = 0 // Continue with 0 count on error
+			writeInternalServerError(w, r, err)
+			return
 		}
 
 		response := api.GetGroupPermissionsResponse{
-			Group:       *apimapping.ToGroupResponse(group, memberCount),
+			Group:       *apimapping.ToGroupResponse(group, memberCounts[group.Id]),
 			Permissions: apimapping.ToPermissionResponses(group.Permissions),
 		}
 
@@ -167,6 +167,12 @@ func HandleAPIGroupPermissionsPut(
 					writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error retrieving permission for group assignment"), "permission_id", permissionId, "group_id", group.Id)
 					return
 				}
+				// Deleted since the validation above read it: the answer that read would give
+				// now, rather than a dereference of nil (#425).
+				if permission == nil {
+					writeJSONError(w, "Permission not found", "NOT_FOUND", http.StatusNotFound)
+					return
+				}
 
 				err = database.CreateGroupPermission(r.Context(), nil, &models.GroupPermission{
 					GroupId:      group.Id,
@@ -206,6 +212,11 @@ func HandleAPIGroupPermissionsPut(
 			if err != nil {
 				writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting group permission for deletion"), "group_id", group.Id, "permission_id", permissionId)
 				return
+			}
+			// Removed by a concurrent request since the load above: the grant is gone, which is
+			// what this request asked for, and this request removed nothing to audit (#425).
+			if groupPermission == nil {
+				continue
 			}
 
 			err = database.DeleteGroupPermission(r.Context(), nil, groupPermission.Id)

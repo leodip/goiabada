@@ -43,15 +43,10 @@ func HandleAPIGroupsGet(
 			return
 		}
 
-		// Get member counts for all groups
-		memberCounts := make(map[int64]int)
-		for _, group := range groups {
-			count, err := database.CountGroupMembers(r.Context(), nil, group.Id)
-			if err != nil {
-				// Log error but continue with 0 count
-				count = 0
-			}
-			memberCounts[group.Id] = count
+		memberCounts, err := countGroupMembers(r.Context(), database, groups)
+		if err != nil {
+			writeInternalServerError(w, r, err)
+			return
 		}
 
 		groupResponses := apimapping.ToGroupResponses(groups, memberCounts)
@@ -178,15 +173,14 @@ func HandleAPIGroupGet(
 			return
 		}
 
-		// Get member count
-		memberCount, err := database.CountGroupMembers(r.Context(), nil, group.Id)
+		memberCounts, err := countGroupMembers(r.Context(), database, []models.Group{*group})
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error counting group members"), "group_id", group.Id)
+			writeInternalServerError(w, r, err)
 			return
 		}
 
 		response := api.GetGroupResponse{
-			Group: *apimapping.ToGroupResponse(group, memberCount),
+			Group: *apimapping.ToGroupResponse(group, memberCounts[group.Id]),
 		}
 
 		writeJSON(w, r, http.StatusOK, response)
@@ -285,16 +279,15 @@ func HandleAPIGroupUpdatePut(
 			"loggedInUser":    callerSubject(r),
 		})
 
-		// Get member count for response
-		memberCount, err := database.CountGroupMembers(r.Context(), nil, group.Id)
+		memberCounts, err := countGroupMembers(r.Context(), database, []models.Group{*group})
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error counting group members for update response"), "group_id", group.Id)
+			writeInternalServerError(w, r, err)
 			return
 		}
 
 		// Return updated group
 		response := api.UpdateGroupResponse{
-			Group: *apimapping.ToGroupResponse(group, memberCount),
+			Group: *apimapping.ToGroupResponse(group, memberCounts[group.Id]),
 		}
 
 		writeJSON(w, r, http.StatusOK, response)

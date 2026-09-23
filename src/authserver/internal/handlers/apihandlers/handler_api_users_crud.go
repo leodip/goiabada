@@ -15,7 +15,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/constants"
-	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	"github.com/leodip/goiabada/authserver/internal/emaillinks"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
@@ -45,7 +44,6 @@ type usersCrudDatabase interface {
 	DeleteUser(ctx context.Context, tx *sql.Tx, userId int64) error
 	GetUserByEmail(ctx context.Context, tx *sql.Tx, email string) (*models.User, error)
 	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*models.User, error)
-	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 	SetUserPasswordHash(ctx context.Context, tx *sql.Tx, userId int64, passwordHash string) error
 	TrySetUserEnabled(ctx context.Context, tx *sql.Tx, userId int64, expected bool, desired bool) (bool, error)
 	UpdateUser(ctx context.Context, tx *sql.Tx, user *models.User) error
@@ -434,11 +432,7 @@ func HandleAPIUserCreatePost(
 			// This replaces a test for the words "email" and "already" in the driver's sentence,
 			// which matched none of the four engines' actual duplicate-key messages and so had
 			// never fired: every lost race answered 500 (#279).
-			if errors.Is(err, data.ErrUniqueViolation) {
-				writeJSONError(w, "This email address is already registered", "EMAIL_ALREADY_EXISTS", http.StatusConflict)
-			} else {
-				writeInternalServerError(w, r, errs.Wrap(err, "failed to create user"))
-			}
+			writeEmailTakenOrInternalServerError(w, r, errs.Wrap(err, "failed to create user"))
 			return
 		}
 
@@ -527,10 +521,11 @@ func HandleAPIUserCreatePost(
 	}
 }
 
-// errUserAlreadyDisabled is what HandleAPIUserEnabledPut's disabling transaction returns when
-// the compare-and-set found the account already disabled. It exists so the body can leave
-// RunInTransaction without committing: a nil return would commit an empty transaction, and
-// any other error would be reported as a fault, when the honest answer is "nothing to do".
+// errUserAlreadyDisabled is what HandleAPIUserEnabledPut's write callback returns to
+// revocation.RevokeUserAuthStateTx when the compare-and-set found the account already disabled.
+// It exists so the transaction ends before the sweep and without committing: a nil return would
+// sweep a user a previous disable already dealt with, and any other error would be reported as a
+// fault, when the honest answer is "nothing to do".
 var errUserAlreadyDisabled = errors.New("the user is already disabled")
 
 // HandleAPIUserEnabledPut - PUT /api/v1/admin/users/{id}/enabled
@@ -589,37 +584,32 @@ func HandleAPIUserEnabledPut(
 		// TrySetUserEnabled reports whether it actually flipped the row, and that report is
 		// the condition. Both directions use it, so neither stays on the full-row UpdateUser
 		// that decision 14 rules out.
-		// The transaction is opened here rather than through RevokeUserAuthStateTx, because
-		// this is the one site whose sweep is conditional on its own write, and the helper's
-		// contract is "write then always sweep". Threading a skip through it would put a
-		// behaviour switch in a primitive three other sites share, which is what decision 8
-		// rejected.
 		//
-		// Opened through RunInTransaction, so a deadlock reruns the compare-and-set and the
-		// sweep together (#301). Safe to rerun: the compare-and-set asks the row again on every
-		// attempt, and the sweep reads the sessions and tokens afresh.
+		// The sweep is conditional on the write, and RevokeUserAuthStateTx carries that without a
+		// switch: the write callback returns errUserAlreadyDisabled when nothing flipped, which
+		// ends the transaction before the sweep, exactly as the password reset's
+		// errResetPasswordClaimLost does when its conditional write claims no row (#425). The
+		// helper opens it through RunInTransaction, so a deadlock reruns the compare-and-set and
+		// the sweep together (#301); the compare-and-set asks the row again on every attempt.
 		disableWithRevocation := func() (revocation.RevocationResult, bool, error) {
-			var result revocation.RevocationResult
-			err := database.RunInTransaction(r.Context(), func(tx *sql.Tx) error {
-				transitioned, err := database.TrySetUserEnabled(r.Context(), tx, userId, true, false)
-				if err != nil {
-					return err
+			result, txErr := revocation.RevokeUserAuthStateTx(r.Context(), database, userId, "", func(tx *sql.Tx) error {
+				flipped, setErr := database.TrySetUserEnabled(r.Context(), tx, userId, true, false)
+				if setErr != nil {
+					return setErr
 				}
-				if !transitioned {
+				if !flipped {
 					// Already disabled. Nothing was written, so there is nothing to commit and
-					// nothing to sweep. The sentinel is not a deadlock, so the helper rolls the
-					// empty transaction back once and hands it straight back.
+					// nothing to sweep. The sentinel is not a deadlock, so the transaction rolls
+					// the empty attempt back once and hands it straight back.
 					return errUserAlreadyDisabled
 				}
-
-				result, err = revocation.RevokeUserAuthState(r.Context(), database, tx, userId, "")
-				return err
+				return nil
 			})
-			if errors.Is(err, errUserAlreadyDisabled) {
+			if errors.Is(txErr, errUserAlreadyDisabled) {
 				return revocation.RevocationResult{}, false, nil
 			}
-			if err != nil {
-				return revocation.RevocationResult{}, false, err
+			if txErr != nil {
+				return revocation.RevocationResult{}, false, txErr
 			}
 			return result, true, nil
 		}

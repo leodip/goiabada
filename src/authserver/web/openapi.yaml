@@ -315,6 +315,16 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          description: |
+            The email address was registered to another user between the
+            duplicate check and the write. error_code is EMAIL_ALREADY_EXISTS.
+            An address already taken when the request arrives is a 400 with
+            error_code validator.email.already_registered.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '500':
           $ref: '#/components/responses/InternalServerError'
 
@@ -2814,6 +2824,16 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          description: |
+            The email address was registered to another user between the
+            duplicate check and the write. error_code is EMAIL_ALREADY_EXISTS.
+            An address already taken when the request arrives is a 400 with
+            error_code validator.email.already_registered.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '500':
           $ref: '#/components/responses/InternalServerError'
 
