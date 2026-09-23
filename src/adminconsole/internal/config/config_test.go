@@ -606,6 +606,76 @@ func unsetEnv(t *testing.T, key string) {
 	_ = os.Unsetenv(key)
 }
 
+// TestLoadFrom_TrustedProxies is the consumer half of the trusted-proxy parse:
+// the table of what an entry means is ParseTrustedProxies' own, in core. Here it
+// is only that the list loadFrom reads reaches it, and that a refusal names the
+// setting an operator has to fix (#425).
+func TestLoadFrom_TrustedProxies(t *testing.T) {
+	const key = "GOIABADA_ADMINCONSOLE_TRUSTED_PROXIES"
+	tests := []struct {
+		name       string
+		value      *string
+		wantRanges []string
+		wantErr    []string
+	}{
+		{name: "unset: no ranges and no error", value: nil},
+		{name: "a valid list", value: ptr(" 10.0.0.0/8 , 192.168.1.5 "), wantRanges: []string{"10.0.0.0/8", "192.168.1.5/32"}},
+		{
+			name:    "every entry malformed",
+			value:   ptr("not-an-ip,10.0.0.0/33"),
+			wantErr: []string{key, "--adminconsole-trusted-proxies", `"not-an-ip"`, `"10.0.0.0/33"`},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			unsetEnv(t, key)
+			if tt.value != nil {
+				t.Setenv(key, *tt.value)
+			}
+			saved := cfg
+			t.Cleanup(func() { cfg = saved })
+
+			fs := flag.NewFlagSet(t.Name(), flag.ContinueOnError)
+			fs.SetOutput(io.Discard)
+			loadFrom(fs, nil)
+
+			ranges, err := cfg.AdminConsole.TrustedProxyRanges()
+			if tt.wantErr != nil {
+				if err == nil {
+					t.Fatalf("TrustedProxyRanges() = %v, want an error", ranges)
+				}
+				if ranges != nil {
+					t.Errorf("TrustedProxyRanges() ranges = %v, want nil beside the error", ranges)
+				}
+				for _, want := range tt.wantErr {
+					if !strings.Contains(err.Error(), want) {
+						t.Errorf("error %q does not name %s", err.Error(), want)
+					}
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("TrustedProxyRanges() error = %v", err)
+			}
+			got := make([]string, 0, len(ranges))
+			for _, r := range ranges {
+				got = append(got, r.String())
+			}
+			if len(tt.wantRanges) == 0 {
+				if ranges != nil {
+					t.Errorf("TrustedProxyRanges() = %v, want nil", got)
+				}
+				return
+			}
+			if !reflect.DeepEqual(got, tt.wantRanges) {
+				t.Errorf("TrustedProxyRanges() = %v, want %v", got, tt.wantRanges)
+			}
+		})
+	}
+}
+
+func ptr(s string) *string { return &s }
+
 // loadLogSettings drives loadFrom with its own flag set, which is the whole
 // reason that seam exists: the flags are registered on the set handed in, so
 // each case gets a fresh registration instead of panicking on the second.

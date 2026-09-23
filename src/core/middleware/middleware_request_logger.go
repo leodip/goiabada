@@ -199,12 +199,6 @@ func clip(s string, limit int) string {
 	return s
 }
 
-// truncate returns s unchanged when it fits, and otherwise the retained prefix
-// followed by a marker giving the limit and the true byte count.
-func truncate(s string, limit int) string {
-	return logging.TruncateCounted(s, limit, len(s))
-}
-
 // queryComponentForLog renders one parameter name or one retained value: escaped
 // with url.QueryEscape, then clipped at maxLoggedQueryComponent.
 //

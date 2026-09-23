@@ -332,15 +332,14 @@ type slogPlainSite struct {
 	name  string
 }
 
-// slogPlainSites is rule 5's table. Three functions, each with the reason no context reaches it:
-// parseCIDRs runs once, when the real-IP middleware is constructed at startup, and its record is
-// about the configuration rather than a request; addUrlParam and convertToString are the admin
-// console's template function and the helper it calls, and html/template invokes a template
-// function with no context, so a record either writes has nothing to carry request_id on.
-// convertToString was core/stringutil.ConvertToString and stood outside these directories
-// altogether until #385 moved it in with its one caller.
+// slogPlainSites is rule 5's table. Two functions, with the reason no context reaches them:
+// addUrlParam and convertToString are the admin console's template function and the helper it
+// calls, and html/template invokes a template function with no context, so a record either writes
+// has nothing to carry request_id on. convertToString was core/stringutil.ConvertToString and
+// stood outside these directories altogether until #385 moved it in with its one caller.
+// core/middleware's parseCIDRs was a third until #425 made a malformed trusted-proxy entry refuse
+// startup: its replacement returns the error to main and logs nothing.
 var slogPlainSites = []slogPlainSite{
-	{scope: "core/middleware/middleware_realip.go", name: "parseCIDRs"},
 	{scope: "adminconsole/internal/handlerhelpers/template_funcs.go", name: "addUrlParam"},
 	{scope: "adminconsole/internal/handlerhelpers/template_funcs.go", name: "convertToString"},
 }

@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/core/i18n"
+	"github.com/leodip/goiabada/core/logging"
 )
 
 // csrfSkipContextKey marks a request that the application's CsrfPolicy has already cleared, so
@@ -210,9 +211,13 @@ func MiddlewareCsrf() func(next http.Handler) http.Handler {
 			// misconfigured base URL and a response header interfering with the browser. This
 			// explains which of those it was and what to do about it.
 			//
-			// Nothing sensitive is logged: no cookies, no request body. Header values are
-			// attacker-controlled, so they go in structured fields where the handler quotes them,
-			// never interpolated into the message.
+			// Nothing sensitive is logged: no cookies, no request body. The method, the target,
+			// Host, Origin and Sec-Fetch-Site are the client's to choose and reach this record
+			// before anything has authenticated it, so each is escaped and bounded the way the
+			// request logger bounds the same values: FieldForLog for the scalars and
+			// RequestTargetForLog for the target, under the key that logger uses for it. Without
+			// that one unauthenticated request with a 1 MB Origin wrote a 1 MB log line (#159,
+			// #425).
 			explanation, remedy := explainCsrfFailure(r)
 
 			// The message is a literal and the sentence explainCsrfFailure built is an attribute:
@@ -222,11 +227,11 @@ func MiddlewareCsrf() func(next http.Handler) http.Handler {
 				"explanation", explanation,
 				"remedy", remedy,
 				"error", err,
-				"method", r.Method,
-				"path", r.URL.Path,
-				"request_host", r.Host,
-				"origin_header", headerOrPlaceholder(r, "Origin"),
-				"sec_fetch_site", headerOrPlaceholder(r, "Sec-Fetch-Site"),
+				"method", logging.FieldForLog(r.Method),
+				"target", RequestTargetForLog(r.URL),
+				"request_host", logging.FieldForLog(r.Host),
+				"origin_header", logging.FieldForLog(headerOrPlaceholder(r, "Origin")),
+				"sec_fetch_site", logging.FieldForLog(headerOrPlaceholder(r, "Sec-Fetch-Site")),
 			)
 
 			// The reason stays in the log. It describes the deployment's origin handling,

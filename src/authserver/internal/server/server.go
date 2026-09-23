@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"net"
 	"net/http"
 	"os"
 	"strings"
@@ -37,6 +38,10 @@ type Server struct {
 	sessionStore sessionstore.Store
 	worker       *workers.Worker
 
+	// Parsed by main, which refuses to start on a malformed entry (#425), so the real-IP
+	// middleware takes ranges and has no error path of its own.
+	trustedProxies []*net.IPNet
+
 	staticFS   fs.FS
 	templateFS fs.FS
 
@@ -45,13 +50,15 @@ type Server struct {
 	setCookieSecure bool
 }
 
-func NewServer(router *chi.Mux, database data.Database, sessionStore sessionstore.Store) *Server {
+func NewServer(router *chi.Mux, database data.Database, sessionStore sessionstore.Store, trustedProxies []*net.IPNet) *Server {
 
 	s := Server{
 		router:       router,
 		database:     database,
 		sessionStore: sessionStore,
 		worker:       workers.NewWorker(database),
+
+		trustedProxies: trustedProxies,
 
 		// Config fields
 		baseURL:         config.GetAuthServer().BaseURL,
@@ -261,7 +268,7 @@ func (s *Server) initMiddleware() chi.Router {
 	// limiter, session/audit IP, request logger) share one trustworthy value.
 	s.router.Use(custom_middleware.MiddlewareRealIP(
 		config.GetAuthServer().TrustProxyHeaders,
-		config.GetAuthServer().TrustedProxies,
+		s.trustedProxies,
 	))
 
 	// HTTP request logging, mounted ABOVE Recoverer. Replaces chi's middleware.Logger, which

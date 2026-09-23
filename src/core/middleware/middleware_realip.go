@@ -1,10 +1,12 @@
 package middleware
 
 import (
-	"log/slog"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
+
+	"github.com/leodip/goiabada/core/errs"
 )
 
 // MiddlewareRealIP resolves the real client IP for each request and writes it
@@ -23,12 +25,10 @@ import (
 //   - true, trustedProxies empty: a single proxy hop is trusted (the rightmost
 //     X-Forwarded-For entry, or X-Real-IP). Sound only when that single proxy
 //     overwrites the forwarded headers.
-//   - true, trustedProxies set (CIDRs/IPs): the forwarded chain is walked from
-//     the right, crossing only trusted hops, which is spoof-resistant across
-//     multiple proxies / a CDN.
-func MiddlewareRealIP(trustProxyHeaders bool, trustedProxies []string) func(next http.Handler) http.Handler {
-	trusted := parseCIDRs(trustedProxies)
-
+//   - true, trustedProxies set (the ranges ParseTrustedProxies returns): the
+//     forwarded chain is walked from the right, crossing only trusted hops,
+//     which is spoof-resistant across multiple proxies / a CDN.
+func MiddlewareRealIP(trustProxyHeaders bool, trustedProxies []*net.IPNet) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			r.RemoteAddr = resolveClientIP(
@@ -36,7 +36,7 @@ func MiddlewareRealIP(trustProxyHeaders bool, trustedProxies []string) func(next
 				r.Header.Get("X-Forwarded-For"),
 				r.Header.Get("X-Real-IP"),
 				trustProxyHeaders,
-				trusted,
+				trustedProxies,
 			)
 			next.ServeHTTP(w, r)
 		})
@@ -89,33 +89,55 @@ func resolveClientIP(remoteAddr, xff, xRealIP string, trustProxyHeaders bool, tr
 	return client
 }
 
-// parseCIDRs converts a list of CIDR strings or bare IPs into IP ranges. A bare
-// IP becomes a single-host range (/32 for IPv4, /128 for IPv6). Malformed
-// entries are logged and skipped.
-func parseCIDRs(entries []string) []*net.IPNet {
+// ParseTrustedProxies converts the configured trusted-proxy entries, each a
+// CIDR range or a bare IP, into the ranges MiddlewareRealIP walks. Each entry is
+// trimmed and an empty one is skipped. A bare address Go reads as IPv4 becomes
+// that host's /32, and so does its IPv4-mapped IPv6 spelling (::ffff:10.0.0.1):
+// the peer Go reports for that proxy is the IPv4 address, and appending /32 to
+// the IPv6 text instead yields ::/32, a range that trusts ::1 and not the proxy
+// (#425). Any other bare address becomes its /128, and net.ParseCIDR decides
+// everything else, a CIDR with host bits set standing for its network.
+//
+// Every refused entry is named in the one error returned, and a list with any
+// refused entry yields no ranges at all. The caller refuses to start on that
+// error rather than skipping the entry: an operator who listed a proxy asked
+// for a restriction, and a list whose only entries are typos would otherwise
+// leave it empty, which MiddlewareRealIP reads as trusting any single hop
+// (#425).
+func ParseTrustedProxies(entries []string) ([]*net.IPNet, error) {
 	var out []*net.IPNet
+	var refused []string
 	for _, e := range entries {
 		e = strings.TrimSpace(e)
 		if e == "" {
 			continue
 		}
+		cidr := e
 		if !strings.Contains(e, "/") {
 			if ip := net.ParseIP(e); ip != nil {
-				if ip.To4() != nil {
-					e += "/32"
+				if ip4 := ip.To4(); ip4 != nil {
+					cidr = ip4.String() + "/32"
 				} else {
-					e += "/128"
+					cidr = e + "/128"
 				}
 			}
 		}
-		_, ipNet, err := net.ParseCIDR(e)
+		_, ipNet, err := net.ParseCIDR(cidr)
 		if err != nil {
-			slog.Warn("ignoring invalid trusted proxy entry", "entry", e, "error", err)
+			refused = append(refused, e)
 			continue
 		}
 		out = append(out, ipNet)
 	}
-	return out
+	if len(refused) > 0 {
+		quoted := make([]string, len(refused))
+		for i, e := range refused {
+			quoted[i] = strconv.Quote(e)
+		}
+		return nil, errs.Errorf("the trusted proxy list has entries that are neither an IP address nor a CIDR range: %s",
+			strings.Join(quoted, ", "))
+	}
+	return out, nil
 }
 
 // splitXFF splits an X-Forwarded-For header into normalized, non-empty IPs.

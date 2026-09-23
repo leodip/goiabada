@@ -155,3 +155,24 @@ func TestMain_RefusesAServerFlagAfterMigrateBeforeOpeningAnything(t *testing.T) 
 	assert.NoFileExists(t, flagged)
 	assert.NoFileExists(t, decoy)
 }
+
+// TestMain_RefusesAMalformedTrustedProxyListBeforeOpeningAnything: an entry that is neither an IP
+// nor a CIDR used to be logged and skipped, and a list of nothing but typos then meant trusting any
+// single hop. Now the server refuses to start (#425).
+//
+// The exit code alone proves nothing here: without the check the child still exits 1, later, at
+// the data-encryption key this harness never sets. The variable's name in stderr does, because
+// only this refusal writes it.
+func TestMain_RefusesAMalformedTrustedProxyListBeforeOpeningAnything(t *testing.T) {
+	decoy := filepath.Join(t.TempDir(), "d.db")
+
+	code, stderr := runMainProcess(t, decoy, "--authserver-trusted-proxies=not-an-ip,10.0.0.0/33")
+
+	require.Equal(t, 1, code)
+	assert.Contains(t, stderr, "the trusted proxy list is malformed, so the auth server cannot start")
+	assert.Contains(t, stderr, "GOIABADA_AUTHSERVER_TRUSTED_PROXIES")
+	// Unquoted: the text handler escapes the quotes the error puts around each entry.
+	assert.Contains(t, stderr, "not-an-ip")
+	assert.Contains(t, stderr, "10.0.0.0/33")
+	assert.NoFileExists(t, decoy)
+}

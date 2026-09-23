@@ -29,11 +29,6 @@ const (
 // conditions fail in opposite directions, which is why both are worth a line: untrusted
 // headers behind a proxy fail closed and throttle everybody at once, while single-hop trust
 // with no allowlist fails open and hands the bucket choice to the caller.
-//
-// One case it deliberately does not reach: a trusted-proxy list whose entries are all
-// malformed leaves MiddlewareRealIP in single-hop mode with this function seeing a
-// non-empty list. That is not silent, since parseCIDRs warns once per rejected entry and
-// names it, which is the more actionable message of the two.
 func rateLimiterConfigWarnings(enabled, trustProxyHeaders bool, trustedProxies []string) []string {
 	if !enabled {
 		return nil

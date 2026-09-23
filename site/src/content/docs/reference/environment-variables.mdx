@@ -191,7 +191,7 @@ A listen host is an address on this machine, not the public URL: browsers and cl
     <tr>
       <td style="white-space: nowrap;"><code>GOIABADA_AUTHSERVER_TRUSTED_PROXIES</code><br/><code>--authserver-trusted-proxies</code></td>
       <td><em>(empty)</em></td>
-      <td>Comma-separated reverse-proxy IPs/CIDRs, e.g. <code>10.0.0.0/8,192.168.1.5</code>. When set (with <code>TRUST_PROXY_HEADERS=true</code>), the real client IP is resolved by walking <code>X-Forwarded-For</code> from the right across these trusted hops, which prevents IP spoofing behind multiple proxies or a CDN. When empty, a single proxy hop is trusted.</td>
+      <td>Comma-separated reverse-proxy IPs/CIDRs, e.g. <code>10.0.0.0/8,192.168.1.5</code>. When set (with <code>TRUST_PROXY_HEADERS=true</code>), the real client IP is resolved by walking <code>X-Forwarded-For</code> from the right across these trusted hops, which prevents IP spoofing behind multiple proxies or a CDN. When empty, a single proxy hop is trusted. An entry that is neither an IP address nor a CIDR range stops the server at startup, whatever <code>TRUST_PROXY_HEADERS</code> says.</td>
     </tr>
     <tr>
       <td style="white-space: nowrap;"><code>GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY</code></td>
@@ -491,7 +491,7 @@ The admin console needs to know where the auth server is located. See [Network c
     <tr>
       <td style="white-space: nowrap;"><code>GOIABADA_ADMINCONSOLE_TRUSTED_PROXIES</code><br/><code>--adminconsole-trusted-proxies</code></td>
       <td><em>(empty)</em></td>
-      <td>Comma-separated reverse-proxy IPs/CIDRs, e.g. <code>10.0.0.0/8,192.168.1.5</code>. When set (with <code>TRUST_PROXY_HEADERS=true</code>), the real client IP is resolved by walking <code>X-Forwarded-For</code> from the right across these trusted hops, which prevents IP spoofing behind multiple proxies or a CDN. When empty, a single proxy hop is trusted.</td>
+      <td>Comma-separated reverse-proxy IPs/CIDRs, e.g. <code>10.0.0.0/8,192.168.1.5</code>. When set (with <code>TRUST_PROXY_HEADERS=true</code>), the real client IP is resolved by walking <code>X-Forwarded-For</code> from the right across these trusted hops, which prevents IP spoofing behind multiple proxies or a CDN. When empty, a single proxy hop is trusted. An entry that is neither an IP address nor a CIDR range stops the server at startup, whatever <code>TRUST_PROXY_HEADERS</code> says.</td>
     </tr>
     <tr>
       <td style="white-space: nowrap;"><code>GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY</code></td>

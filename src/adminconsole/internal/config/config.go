@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"flag"
 	"log/slog"
+	"net"
 	"os"
 	"strconv"
 	"strings"
@@ -16,6 +17,7 @@ import (
 
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/middleware"
 )
 
 type AdminConsoleConfig struct {
@@ -49,6 +51,19 @@ type AdminConsoleConfig struct {
 // setting; the base URL scheme is the single source of truth.
 func (c *AdminConsoleConfig) IsCookieSecure() bool {
 	return isHTTPSURL(c.BaseURL)
+}
+
+// TrustedProxyRanges parses TrustedProxies into the ranges the real-IP
+// middleware walks. main refuses to start on the error, whatever
+// TrustProxyHeaders says, because an entry that is neither an IP nor a CIDR is
+// a restriction the operator asked for and cannot get (#425). The value can come
+// from the variable or the flag, so the error names both.
+func (c *AdminConsoleConfig) TrustedProxyRanges() ([]*net.IPNet, error) {
+	ranges, err := middleware.ParseTrustedProxies(c.TrustedProxies)
+	if err != nil {
+		return nil, errs.Wrap(err, "GOIABADA_ADMINCONSOLE_TRUSTED_PROXIES (--adminconsole-trusted-proxies)")
+	}
+	return ranges, nil
 }
 
 // isHTTPSURL reports whether a URL uses the https scheme (case-insensitive).

@@ -73,7 +73,9 @@ func TestSlogConvention_CsrfRefusalIsWarnWithALiteralMessage(t *testing.T) {
 		"the sentence that used to be the message is now an attribute")
 	assert.NotEmpty(t, record.Attrs["remedy"])
 	assert.Equal(t, http.MethodPost, record.Attrs["method"])
-	assert.Equal(t, "/auth/pwd", record.Attrs["path"])
+	// Under the request logger's key for the same value since #425, which bounded it.
+	assert.Equal(t, "/auth/pwd", record.Attrs["target"])
+	assert.NotContains(t, record.Attrs, "path")
 	assert.Equal(t, "auth.example.com", record.Attrs["request_host"])
 	assert.Equal(t, "https://evil.example.com", record.Attrs["origin_header"])
 	assert.Equal(t, "cross-site", record.Attrs["sec_fetch_site"])

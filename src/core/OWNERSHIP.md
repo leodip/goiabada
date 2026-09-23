@@ -368,6 +368,7 @@ command itself and fails on a tree it changed.
 | `core/middleware` | `MiddlewareRequestLogger` | both-apps | — |
 | `core/middleware` | `MiddlewareSecurityHeaders` | both-apps | — |
 | `core/middleware` | `MiddlewareSkipCsrf` | both-apps | — |
+| `core/middleware` | `ParseTrustedProxies` | both-apps | — |
 | `core/middleware` | `RequestTargetForLog` | own-package | — |
 | `core/mocks` | `TestFS` | test-support | Test support: a hand-written `fs.FS` fake for the template loaders, named only from tests. |
 | `core/mocks` | `TestFile` | test-support | Test support: a hand-written `fs.FS` fake for the template loaders, named only from tests. |

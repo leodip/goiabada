@@ -4,12 +4,20 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func mustCIDRs(t *testing.T, entries ...string) []*net.IPNet {
 	t.Helper()
-	return parseCIDRs(entries)
+	ranges, err := ParseTrustedProxies(entries)
+	if err != nil {
+		t.Fatalf("ParseTrustedProxies(%q): %v", entries, err)
+	}
+	return ranges
 }
 
 func TestResolveClientIP(t *testing.T) {
@@ -190,29 +198,110 @@ func TestResolveClientIP(t *testing.T) {
 	}
 }
 
-func TestParseCIDRs(t *testing.T) {
-	// Bare IPv4 -> /32, bare IPv6 -> /128, CIDR passthrough, invalid skipped.
-	got := parseCIDRs([]string{"10.0.0.5", "2001:db8::1", "192.168.0.0/16", "not-an-ip", ""})
-	if len(got) != 3 {
-		t.Fatalf("parseCIDRs kept %d ranges, want 3 (invalid/empty skipped)", len(got))
-	}
-	if !ipInAny("10.0.0.5", got) {
-		t.Error("expected bare IPv4 10.0.0.5 to match its /32")
-	}
-	if ipInAny("10.0.0.6", got) {
-		t.Error("did not expect 10.0.0.6 to match a /32 of 10.0.0.5")
-	}
-	if !ipInAny("192.168.42.1", got) {
-		t.Error("expected 192.168.42.1 to match 192.168.0.0/16")
-	}
-	if !ipInAny("2001:db8::1", got) {
-		t.Error("expected bare IPv6 to match its /128")
-	}
+// The ten entries net.ParseCIDR refuses, whatever ParseTrustedProxies did to them first. Each
+// was executed against the rule before being written here.
+var refusedTrustedProxyEntries = []string{
+	"10.0.0.0/33",
+	"not-an-ip",
+	"1.2.3",
+	"10.0.0.256",
+	"fe80::1%eth0",
+	"*",
+	"10.0.0.0/",
+	"/8",
+	"10.0.0.0/8/8",
+	"10.0.0.0 /8",
+}
+
+func TestParseTrustedProxies(t *testing.T) {
+	t.Run("accepted entries", func(t *testing.T) {
+		tests := []struct {
+			entry     string
+			wantRange string
+			inside    []string
+			outside   []string
+		}{
+			{entry: "10.0.0.5", wantRange: "10.0.0.5/32", inside: []string{"10.0.0.5"}, outside: []string{"10.0.0.6"}},
+			{entry: "2001:db8::1", wantRange: "2001:db8::1/128", inside: []string{"2001:db8::1"}, outside: []string{"2001:db8::2"}},
+			{entry: "192.168.0.0/16", wantRange: "192.168.0.0/16", inside: []string{"192.168.42.1"}, outside: []string{"192.169.0.1"}},
+			// Host bits are dropped: the entry stands for its network.
+			{entry: "10.0.0.1/8", wantRange: "10.0.0.0/8", inside: []string{"10.9.9.9"}, outside: []string{"11.0.0.1"}},
+			{entry: " 10.0.0.0/8 ", wantRange: "10.0.0.0/8", inside: []string{"10.9.9.9"}, outside: []string{"11.0.0.1"}},
+			// The mapped spelling of an IPv4 proxy is that proxy's /32. Appending /32 to the IPv6
+			// text, the rule this replaced, produced ::/32, which trusted IPv6 loopback and not
+			// the proxy (#425).
+			{entry: "::ffff:10.0.0.1", wantRange: "10.0.0.1/32", inside: []string{"10.0.0.1", "::ffff:10.0.0.1"}, outside: []string{"::1", "::2"}},
+			{entry: "::ffff:a00:1", wantRange: "10.0.0.1/32", inside: []string{"10.0.0.1", "::ffff:10.0.0.1"}, outside: []string{"::1"}},
+			// A mapped CIDR range is net.ParseCIDR's to decide, and it already means the IPv4 range.
+			{entry: "::ffff:10.0.0.0/104", wantRange: "10.0.0.0/8", inside: []string{"10.9.9.9"}, outside: []string{"11.0.0.1"}},
+			{entry: "0.0.0.0/0", wantRange: "0.0.0.0/0", inside: []string{"203.0.113.9"}, outside: []string{"2001:db8::1"}},
+			{entry: "::/0", wantRange: "::/0", inside: []string{"2001:db8::1", "::1"}},
+		}
+		for _, tt := range tests {
+			t.Run(tt.entry, func(t *testing.T) {
+				got, err := ParseTrustedProxies([]string{tt.entry})
+				require.NoError(t, err)
+				require.Len(t, got, 1)
+				assert.Equal(t, tt.wantRange, got[0].String())
+				for _, ip := range tt.inside {
+					assert.True(t, ipInAny(ip, got), "%s should be inside %s", ip, got[0])
+				}
+				for _, ip := range tt.outside {
+					assert.False(t, ipInAny(ip, got), "%s should be outside %s", ip, got[0])
+				}
+			})
+		}
+	})
+
+	t.Run("refused entries", func(t *testing.T) {
+		// Each alone in its list, so that it is the only possible reason for the refusal.
+		for _, entry := range refusedTrustedProxyEntries {
+			t.Run(entry, func(t *testing.T) {
+				got, err := ParseTrustedProxies([]string{entry})
+				assert.Nil(t, got)
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), strconv.Quote(entry))
+			})
+		}
+	})
+
+	t.Run("skipped entries", func(t *testing.T) {
+		for name, entries := range map[string][]string{
+			"empty":      {""},
+			"blank":      {"   "},
+			"nil list":   nil,
+			"empty list": {},
+		} {
+			t.Run(name, func(t *testing.T) {
+				got, err := ParseTrustedProxies(entries)
+				assert.NoError(t, err)
+				assert.Nil(t, got)
+			})
+		}
+	})
+
+	t.Run("every entry malformed: the error names each of them", func(t *testing.T) {
+		got, err := ParseTrustedProxies(refusedTrustedProxyEntries)
+		assert.Nil(t, got)
+		require.Error(t, err)
+		for _, entry := range refusedTrustedProxyEntries {
+			assert.Contains(t, err.Error(), strconv.Quote(entry))
+		}
+	})
+
+	t.Run("one bad entry among good ones: no ranges at all", func(t *testing.T) {
+		got, err := ParseTrustedProxies([]string{"10.0.0.0/8", "not-an-ip", "192.168.0.0/16"})
+		assert.Nil(t, got)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), `"not-an-ip"`)
+		assert.NotContains(t, err.Error(), "10.0.0.0/8")
+		assert.NotContains(t, err.Error(), "192.168.0.0/16")
+	})
 }
 
 func TestMiddlewareRealIP_RewritesRemoteAddr(t *testing.T) {
 	var seen string
-	handler := MiddlewareRealIP(true, []string{"10.0.0.0/8"})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := MiddlewareRealIP(true, mustCIDRs(t, "10.0.0.0/8"))(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		seen = r.RemoteAddr
 		w.WriteHeader(http.StatusOK)
 	}))

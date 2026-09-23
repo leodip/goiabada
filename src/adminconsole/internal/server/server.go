@@ -3,6 +3,7 @@ package server
 import (
 	"fmt"
 	"io/fs"
+	"net"
 	"net/http"
 	"os"
 	"strings"
@@ -30,16 +31,22 @@ type Server struct {
 	sessionStore  sessionstore.Store
 	settingsCache *cache.SettingsCache
 
+	// Parsed by main, which refuses to start on a malformed entry (#425), so the real-IP
+	// middleware takes ranges and has no error path of its own.
+	trustedProxies []*net.IPNet
+
 	staticFS   fs.FS
 	templateFS fs.FS
 }
 
-func NewServer(router *chi.Mux, sessionStore sessionstore.Store, settingsCache *cache.SettingsCache) *Server {
+func NewServer(router *chi.Mux, sessionStore sessionstore.Store, settingsCache *cache.SettingsCache, trustedProxies []*net.IPNet) *Server {
 
 	s := Server{
 		router:        router,
 		sessionStore:  sessionStore,
 		settingsCache: settingsCache,
+
+		trustedProxies: trustedProxies,
 	}
 
 	if envVar := config.GetAdminConsole().StaticDir; len(envVar) == 0 {
@@ -206,7 +213,7 @@ func (s *Server) initMiddleware() chi.Router {
 	// audit IP, request logger) share one trustworthy value.
 	s.router.Use(custom_middleware.MiddlewareRealIP(
 		config.GetAdminConsole().TrustProxyHeaders,
-		config.GetAdminConsole().TrustedProxies,
+		s.trustedProxies,
 	))
 
 	// HTTP request logging, mounted ABOVE Recoverer. Replaces chi's middleware.Logger, which
