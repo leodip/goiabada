@@ -660,8 +660,8 @@ func TestPromptNone_OtpConfigChanged_RefusalWritesNothing(t *testing.T) {
 	}
 	user.OTPEnabled = true
 	user.OTPSecretEncrypted = encryptOTPSecretForTest(t, key.Secret())
-	if err := database.UpdateUser(context.Background(), nil, user); err != nil {
-		t.Fatal(err)
+	if updateUserErr := database.UpdateUser(context.Background(), nil, user); updateUserErr != nil {
+		t.Fatal(updateUserErr)
 	}
 
 	advanceOtpConfigGeneration(t, user.Id)
@@ -685,9 +685,9 @@ func TestPromptNone_OtpConfigChanged_RefusalWritesNothing(t *testing.T) {
 			"&prompt=none" +
 			"&acr_values=" + models.AcrLevel2Optional.String()
 
-		resp, err := httpClient.Get(destUrl)
-		if err != nil {
-			t.Fatal(err)
+		resp, getErr := httpClient.Get(destUrl)
+		if getErr != nil {
+			t.Fatal(getErr)
 		}
 		defer func() { _ = resp.Body.Close() }()
 

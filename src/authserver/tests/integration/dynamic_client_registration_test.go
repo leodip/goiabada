@@ -543,15 +543,15 @@ func TestDCR_WellKnown_Metadata(t *testing.T) {
 		httpClient := createHttpClient(t)
 		wellKnownURL := config.GetAuthServer().BaseURL + "/.well-known/openid-configuration"
 
-		resp, err := httpClient.Get(wellKnownURL)
-		assert.NoError(t, err)
+		resp, fetchErr := httpClient.Get(wellKnownURL)
+		assert.NoError(t, fetchErr)
 		defer func() { _ = resp.Body.Close() }()
 
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 		var metadata map[string]interface{}
-		err = json.NewDecoder(resp.Body).Decode(&metadata)
-		assert.NoError(t, err)
+		fetchErr = json.NewDecoder(resp.Body).Decode(&metadata)
+		assert.NoError(t, fetchErr)
 
 		registrationEndpoint, ok := metadata["registration_endpoint"].(string)
 		assert.True(t, ok, "registration_endpoint should be present")

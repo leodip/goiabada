@@ -76,18 +76,18 @@ func HandleForgotPasswordPost(
 		if user != nil {
 
 			verificationCode := stringutil.GenerateSecurityRandomString(32)
-			verificationCodeEncrypted, err := encryption.EncryptData(verificationCode)
-			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
+			verificationCodeEncrypted, resetEmailErr := encryption.EncryptData(verificationCode)
+			if resetEmailErr != nil {
+				httpHelper.InternalServerError(w, r, resetEmailErr)
 				return
 			}
 
 			// The hash is how the reset link finds this row again, since the link carries
 			// the code and no email address (#112). The encryption above stays: it is what
 			// proves a submitted code matches, where the hash only locates the row.
-			verificationCodeHash, err := hashutil.HashString(verificationCode)
-			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
+			verificationCodeHash, resetEmailErr := hashutil.HashString(verificationCode)
+			if resetEmailErr != nil {
+				httpHelper.InternalServerError(w, r, resetEmailErr)
 				return
 			}
 
@@ -95,9 +95,9 @@ func HandleForgotPasswordPost(
 			user.ForgotPasswordCodeHash = verificationCodeHash
 			utcNow := time.Now().UTC()
 			user.ForgotPasswordCodeIssuedAt = sql.NullTime{Time: utcNow, Valid: true}
-			err = database.UpdateUser(r.Context(), nil, user)
-			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
+			resetEmailErr = database.UpdateUser(r.Context(), nil, user)
+			if resetEmailErr != nil {
+				httpHelper.InternalServerError(w, r, resetEmailErr)
 				return
 			}
 
@@ -106,9 +106,9 @@ func HandleForgotPasswordPost(
 				"link": emaillinks.ResetPasswordLink(verificationCode),
 			}
 			emailReq := r.WithContext(i18n.WithLocale(r.Context(), true, user.Locale, "en"))
-			buf, err := httpHelper.RenderTemplateToBuffer(emailReq, "/layouts/email_layout.html", "/emails/email_forgot_password.html", bind)
-			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
+			buf, resetEmailErr := httpHelper.RenderTemplateToBuffer(emailReq, "/layouts/email_layout.html", "/emails/email_forgot_password.html", bind)
+			if resetEmailErr != nil {
+				httpHelper.InternalServerError(w, r, resetEmailErr)
 				return
 			}
 
@@ -117,9 +117,9 @@ func HandleForgotPasswordPost(
 				Subject:  i18n.T(emailReq.Context(), "email.forgot_password.subject"),
 				HtmlBody: buf.String(),
 			}
-			err = emailSender.SendEmail(r.Context(), input)
-			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
+			resetEmailErr = emailSender.SendEmail(r.Context(), input)
+			if resetEmailErr != nil {
+				httpHelper.InternalServerError(w, r, resetEmailErr)
 				return
 			}
 		}

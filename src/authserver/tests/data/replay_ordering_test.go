@@ -37,8 +37,8 @@ func replayResponse(db data.Database, tx *sql.Tx, sessionIdentifier string) (boo
 			continue
 		}
 		rt.Revoked = true
-		if err := db.UpdateRefreshToken(context.Background(), tx, rt); err != nil {
-			return live, err
+		if updateRefreshTokenErr := db.UpdateRefreshToken(context.Background(), tx, rt); updateRefreshTokenErr != nil {
+			return live, updateRefreshTokenErr
 		}
 		revoked++
 	}

@@ -489,9 +489,9 @@ func HandleResetPasswordPost(
 		// password is not necessarily the person holding the live sessions, which is the
 		// stolen-laptop case this issue exists for.
 		result, err := revocation.RevokeUserAuthStateTx(r.Context(), database, user.Id, "", func(tx *sql.Tx) error {
-			claimed, err := database.TryConsumeForgotPasswordCode(r.Context(), tx, user.Id, marker.CodeHash, passwordHash)
-			if err != nil {
-				return err
+			claimed, consumeErr := database.TryConsumeForgotPasswordCode(r.Context(), tx, user.Id, marker.CodeHash, passwordHash)
+			if consumeErr != nil {
+				return consumeErr
 			}
 			if !claimed {
 				// Rolls the revocation sweep back with it: a reset that did not write a
@@ -518,9 +518,9 @@ func HandleResetPasswordPost(
 		// A failure here is logged rather than answered with a 500, because the password has
 		// already changed and telling the caller the reset failed would be false. The stale
 		// marker it leaves behind resolves to nothing on its next use.
-		if err := emaillinks.ClearLinkMarker(httpSession, w, r); err != nil {
+		if clearLinkMarkerErr := emaillinks.ClearLinkMarker(httpSession, w, r); clearLinkMarkerErr != nil {
 			slog.ErrorContext(r.Context(), "unable to clear the reset password link marker after a completed reset",
-				"user_id", user.Id, "error", err)
+				"user_id", user.Id, "error", clearLinkMarkerErr)
 		}
 
 		bind := map[string]interface{}{

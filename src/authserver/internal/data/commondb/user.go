@@ -590,13 +590,13 @@ func (d *CommonDatabase) DeleteUser(ctx context.Context, tx *sql.Tx, userId int6
 		sort.Slice(sessions, func(i, j int) bool { return sessions[i].Id < sessions[j].Id })
 
 		for i := range sessions {
-			if err := d.DeleteUserSession(ctx, tx, sessions[i].Id); err != nil {
-				return err
+			if deleteUserSessionErr := d.DeleteUserSession(ctx, tx, sessions[i].Id); deleteUserSessionErr != nil {
+				return deleteUserSessionErr
 			}
 		}
 
-		if err := d.deleteRefreshTokensByColumn(ctx, tx, "user_id", userId); err != nil {
-			return err
+		if deleteRefreshTokensErr := d.deleteRefreshTokensByColumn(ctx, tx, "user_id", userId); deleteRefreshTokensErr != nil {
+			return deleteRefreshTokensErr
 		}
 
 		userStruct := sqlbuilder.NewStruct(new(models.UserSession)).

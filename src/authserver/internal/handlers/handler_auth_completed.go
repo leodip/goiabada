@@ -138,8 +138,8 @@ func HandleAuthCompletedGet(
 			// OWASP's "regenerate on any privilege level change", and this server's ACR
 			// levels are privilege levels by construction (#266 decision 6).
 			if usersession.WillRaisePrivilege(userSession, authContext.AuthMethods, targetAcrLevel.String()) {
-				if err := authHelper.RegenerateSession(w, r); err != nil {
-					httpHelper.InternalServerError(w, r, err)
+				if regenerateSessionErr := authHelper.RegenerateSession(w, r); regenerateSessionErr != nil {
+					httpHelper.InternalServerError(w, r, regenerateSessionErr)
 					return
 				}
 			}
@@ -148,10 +148,10 @@ func HandleAuthCompletedGet(
 			// This handles step-up authentication: if the user had a level1 session but just
 			// completed OTP for a level2 client, the session's AuthMethods and AcrLevel
 			// will be upgraded to reflect the stronger authentication that was performed.
-			bumpedSession, err := userSessionManager.BumpUserSession(r, sessionIdentifier, client.Id,
+			bumpedSession, sessionErr := userSessionManager.BumpUserSession(r, sessionIdentifier, client.Id,
 				authContext.AuthMethods, targetAcrLevel.String())
-			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
+			if sessionErr != nil {
+				httpHelper.InternalServerError(w, r, sessionErr)
 				return
 			}
 
@@ -171,9 +171,9 @@ func HandleAuthCompletedGet(
 				// (#252 decision 8). userReallyAuthenticated is exactly the guard that makes
 				// the dereference safe: non-nil and non-zero.
 				bumpedSession.AuthTime = authContext.AuthenticatedAt.UTC()
-				err = database.UpdateUserSession(r.Context(), nil, bumpedSession)
-				if err != nil {
-					httpHelper.InternalServerError(w, r, err)
+				sessionErr = database.UpdateUserSession(r.Context(), nil, bumpedSession)
+				if sessionErr != nil {
+					httpHelper.InternalServerError(w, r, sessionErr)
 					return
 				}
 			}
@@ -203,10 +203,10 @@ func HandleAuthCompletedGet(
 			// predicate /auth/level1completed uses to decide the step-up, so the two agree by
 			// construction (#242 decision 3).
 			if authContext.OtpConfigGeneration != nil && targetAcrLevel.IsHigherThan(models.AcrLevel1) {
-				err = database.PromoteUserSessionOtpConfigGeneration(r.Context(), nil, bumpedSession.Id,
+				sessionErr = database.PromoteUserSessionOtpConfigGeneration(r.Context(), nil, bumpedSession.Id,
 					*authContext.OtpConfigGeneration)
-				if err != nil {
-					httpHelper.InternalServerError(w, r, err)
+				if sessionErr != nil {
+					httpHelper.InternalServerError(w, r, sessionErr)
 					return
 				}
 				bumpedSession.OtpConfigGeneration = *authContext.OtpConfigGeneration
@@ -269,9 +269,9 @@ func HandleAuthCompletedGet(
 			// arrived here. A failure returns 500 with the browser still cookied to the old
 			// session and no new session and no code minted, which is the fail-closed direction.
 			if userSession != nil && !sessionBelongsToCeremony {
-				terminationResult, err := revocation.TerminateUserSessionTx(r.Context(), database, userSession)
-				if err != nil {
-					httpHelper.InternalServerError(w, r, err)
+				terminationResult, terminateErr := revocation.TerminateUserSessionTx(r.Context(), database, userSession)
+				if terminateErr != nil {
+					httpHelper.InternalServerError(w, r, terminateErr)
 					return
 				}
 
@@ -320,12 +320,12 @@ func HandleAuthCompletedGet(
 			// beside it. StartNewUserSession refuses a nil or zero instant rather than
 			// inventing one, so if that invariant ever breaks this arm answers 500 instead of
 			// minting a session that claims a sign-in happened just now.
-			newSession, err := userSessionManager.StartNewUserSession(
+			newSession, startNewUserSessionErr := userSessionManager.StartNewUserSession(
 				w, r, authContext.UserId, client.Id, authContext.AuthMethods, targetAcrLevel.String(),
 				authContext.AuthStateGeneration, authContext.OtpConfigGeneration,
 				authContext.AuthenticatedAt)
-			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
+			if startNewUserSessionErr != nil {
+				httpHelper.InternalServerError(w, r, startNewUserSessionErr)
 				return
 			}
 
@@ -378,27 +378,27 @@ func HandleAuthCompletedGet(
 			// on w, and redirToClientWithError commits the response in every response mode, so
 			// clearing afterwards leaves the header on a response already written and the
 			// browser keeps an auth context it can replay (#141).
-			err := authHelper.ClearAuthContext(w, r)
-			if err != nil {
+			refusalErr := authHelper.ClearAuthContext(w, r)
+			if refusalErr != nil {
 				// The clear failed, so Save wrote no cookie and the browser still holds the
 				// auth context. The client is owed an error response regardless: its redirect
 				// URI was validated upstream, so OIDC Core 1.0 3.1.2.2 with 3.1.2.6 applies,
 				// and RFC 6749 4.1.2.1 mints server_error for exactly this condition (#141).
 				slog.ErrorContext(r.Context(), "unable to clear the auth context, answering the client with server_error",
-					"error", err)
-				err = redirToClientWithError(w, r, database, httpHelper, templateFS,
+					"error", refusalErr)
+				refusalErr = redirToClientWithError(w, r, database, httpHelper, templateFS,
 					redirectErrorFromAuthContext(authContext, client, "server_error", "Internal server error"))
-				if err != nil {
+				if refusalErr != nil {
 					// Nowhere left to send the client, so the 500 is the last resort here.
-					httpHelper.InternalServerError(w, r, err)
+					httpHelper.InternalServerError(w, r, refusalErr)
 				}
 				return
 			}
 
-			err = redirToClientWithError(w, r, database, httpHelper, templateFS,
+			refusalErr = redirToClientWithError(w, r, database, httpHelper, templateFS,
 				redirectErrorFromAuthContext(authContext, client, "access_denied", "The user account is disabled."))
-			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
+			if refusalErr != nil {
+				httpHelper.InternalServerError(w, r, refusalErr)
 				return
 			}
 			return

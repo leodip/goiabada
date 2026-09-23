@@ -123,8 +123,8 @@ func runIssuanceOrderingAgainstTermination(t *testing.T, db data.Database, other
 		}
 		termination := goBlocked(t, "the termination", tx, func(reached func()) terminationOutcome {
 			reached()
-			result, err := revocation.TerminateUserSessionTx(context.Background(), other, session)
-			return terminationOutcome{result: result, err: err}
+			result, terminateErr := revocation.TerminateUserSessionTx(context.Background(), other, session)
+			return terminationOutcome{result: result, err: terminateErr}
 		})
 
 		// THE INSERT COMES AFTER THE TERMINATION HAS ARRIVED. This is the window the issue is
@@ -166,10 +166,10 @@ func runIssuanceOrderingAgainstTermination(t *testing.T, db data.Database, other
 			"the termination's statements on a session nothing else has touched yet")
 
 		ceremony := goBlocked(t, "the ceremony", tx, func(reached func()) issuanceOutcome {
-			otherTx, err := other.BeginTransaction(context.Background())
-			if err != nil {
+			otherTx, beginErr := other.BeginTransaction(context.Background())
+			if beginErr != nil {
 				reached()
-				return issuanceOutcome{err: err}
+				return issuanceOutcome{err: beginErr}
 			}
 			defer func() { _ = other.RollbackTransaction(context.Background(), otherTx) }()
 

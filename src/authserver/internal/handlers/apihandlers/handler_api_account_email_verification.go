@@ -93,8 +93,8 @@ func HandleAPIAccountEmailVerificationSendPost(
 		}
 		user.EmailVerificationCodeEncrypted = encrypted
 		user.EmailVerificationCodeIssuedAt = sql.NullTime{Time: time.Now().UTC(), Valid: true}
-		if err := database.UpdateUser(r.Context(), nil, user); err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "Failed to update user with verification code"), "user_id", user.Id)
+		if updateUserErr := database.UpdateUser(r.Context(), nil, user); updateUserErr != nil {
+			writeInternalServerError(w, r, errs.Wrap(updateUserErr, "Failed to update user with verification code"), "user_id", user.Id)
 			return
 		}
 

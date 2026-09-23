@@ -69,12 +69,12 @@ func HandleAPIClientSessionsGet(
 		page := 1
 		size := 50
 		if v := r.URL.Query().Get("page"); v != "" {
-			if p, err := strconv.Atoi(v); err == nil && p > 0 {
+			if p, parseErr := strconv.Atoi(v); parseErr == nil && p > 0 {
 				page = p
 			}
 		}
 		if v := r.URL.Query().Get("size"); v != "" {
-			if s, err := strconv.Atoi(v); err == nil && s > 0 {
+			if s, parseErr := strconv.Atoi(v); parseErr == nil && s > 0 {
 				if s > 100 {
 					s = 100
 				}
@@ -90,8 +90,8 @@ func HandleAPIClientSessionsGet(
 		}
 
 		// Load the clients each session authorized; buildSessionDetails hydrates them.
-		if err := database.UserSessionsLoadClients(r.Context(), nil, userSessions); err != nil {
-			writeInternalServerError(w, r, err)
+		if userSessionsLoadClientsErr := database.UserSessionsLoadClients(r.Context(), nil, userSessions); userSessionsLoadClientsErr != nil {
+			writeInternalServerError(w, r, userSessionsLoadClientsErr)
 			return
 		}
 

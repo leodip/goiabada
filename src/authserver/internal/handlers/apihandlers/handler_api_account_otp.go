@@ -148,15 +148,15 @@ func HandleAPIAccountOTPEnrollmentGet(
 				return
 			}
 
-			secretEncrypted, err := encryption.EncryptData(keyURL)
-			if err != nil {
-				writeInternalServerError(w, r, err)
+			secretEncrypted, enrollErr := encryption.EncryptData(keyURL)
+			if enrollErr != nil {
+				writeInternalServerError(w, r, enrollErr)
 				return
 			}
 
-			installed, err := database.TryInstallPendingOTPEnrollment(r.Context(), nil, user.Id, secretEncrypted, now, staleBefore)
-			if err != nil {
-				writeInternalServerError(w, r, err)
+			installed, enrollErr := database.TryInstallPendingOTPEnrollment(r.Context(), nil, user.Id, secretEncrypted, now, staleBefore)
+			if enrollErr != nil {
+				writeInternalServerError(w, r, enrollErr)
 				return
 			}
 			if !installed {
@@ -167,9 +167,9 @@ func HandleAPIAccountOTPEnrollmentGet(
 				// the row is read back and the winner's value answered instead. Two
 				// concurrent calls then agree on one enrollment, which is the reason the
 				// install is conditional at all.
-				user, err = database.GetUserById(r.Context(), nil, user.Id)
-				if err != nil {
-					writeInternalServerError(w, r, err)
+				user, enrollErr = database.GetUserById(r.Context(), nil, user.Id)
+				if enrollErr != nil {
+					writeInternalServerError(w, r, enrollErr)
 					return
 				}
 				if user == nil {
@@ -181,9 +181,9 @@ func HandleAPIAccountOTPEnrollmentGet(
 					return
 				}
 
-				keyURL, err = livePendingEnrollmentKeyURL(user, staleBefore)
-				if err != nil {
-					writeInternalServerError(w, r, err)
+				keyURL, enrollErr = livePendingEnrollmentKeyURL(user, staleBefore)
+				if enrollErr != nil {
+					writeInternalServerError(w, r, enrollErr)
 					return
 				}
 				if keyURL == "" {
@@ -244,7 +244,7 @@ func HandleAPIAccountOTPPut(
 		}
 
 		var rawFields map[string]json.RawMessage
-		if err := json.Unmarshal(body, &rawFields); err != nil {
+		if unmarshalErr := json.Unmarshal(body, &rawFields); unmarshalErr != nil {
 			writeJSONError(w, "Invalid request body", "INVALID_REQUEST_BODY", http.StatusBadRequest)
 			return
 		}
@@ -273,7 +273,7 @@ func HandleAPIAccountOTPPut(
 		}
 
 		var req api.UpdateAccountOTPRequest
-		if err := json.Unmarshal(body, &req); err != nil {
+		if unmarshalErr := json.Unmarshal(body, &req); unmarshalErr != nil {
 			writeJSONError(w, "Invalid request body", "INVALID_REQUEST_BODY", http.StatusBadRequest)
 			return
 		}
@@ -348,9 +348,9 @@ func HandleAPIAccountOTPPut(
 			// enrolling stops working, which is the safe direction, instead of accepting a
 			// secret from the wire again.
 			now := time.Now().UTC()
-			keyURL, err := livePendingEnrollmentKeyURL(user, now.Add(-otpEnrollmentLifetime))
-			if err != nil {
-				writeInternalServerError(w, r, err)
+			keyURL, verifyErr := livePendingEnrollmentKeyURL(user, now.Add(-otpEnrollmentLifetime))
+			if verifyErr != nil {
+				writeInternalServerError(w, r, verifyErr)
 				return
 			}
 			if keyURL == "" {
@@ -360,9 +360,9 @@ func HandleAPIAccountOTPPut(
 				return
 			}
 
-			pendingSecret, err := otp.SecretFromKeyURL(keyURL)
-			if err != nil {
-				writeInternalServerError(w, r, err)
+			pendingSecret, verifyErr := otp.SecretFromKeyURL(keyURL)
+			if verifyErr != nil {
+				writeInternalServerError(w, r, verifyErr)
 				return
 			}
 
@@ -375,10 +375,10 @@ func HandleAPIAccountOTPPut(
 			// authenticator: requireOTPEnabled is false inside it, and it can only be off
 			// here, since the OTP_ALREADY_ENABLED check above refuses an enable when it is
 			// on (#111 decision 10).
-			verified, err := otpcredential.VerifySupplied(r.Context(), database, user, pendingSecret,
+			verified, verifyErr := otpcredential.VerifySupplied(r.Context(), database, user, pendingSecret,
 				req.OtpCode, now)
-			if err != nil {
-				writeInternalServerError(w, r, err)
+			if verifyErr != nil {
+				writeInternalServerError(w, r, verifyErr)
 				return
 			}
 			switch verified.Outcome {
@@ -404,8 +404,8 @@ func HandleAPIAccountOTPPut(
 			// authenticator is on and no session knows (#242 decision 2). The returned
 			// generation is discarded here: only the browser ceremony, which captured the
 			// pre-enrollment value earlier in the same ceremony, has a use for it.
-			if _, err := otpcredential.Establish(r.Context(), database, user, pendingSecret); err != nil {
-				writeInternalServerError(w, r, err)
+			if _, establishErr := otpcredential.Establish(r.Context(), database, user, pendingSecret); establishErr != nil {
+				writeInternalServerError(w, r, establishErr)
 				return
 			}
 
@@ -419,8 +419,8 @@ func HandleAPIAccountOTPPut(
 				return
 			}
 
-			if err := otpcredential.Remove(r.Context(), database, user); err != nil {
-				writeInternalServerError(w, r, err)
+			if removeErr := otpcredential.Remove(r.Context(), database, user); removeErr != nil {
+				writeInternalServerError(w, r, removeErr)
 				return
 			}
 

@@ -347,8 +347,8 @@ func (d *MsSQLDatabase) ensureSchemaMigrationsTable(ctx context.Context) (err er
 
 	// The lock waits indefinitely, which is what the library did too: the holder is another
 	// process's pre-create or migration, and both are short.
-	if err := eng.Lock(ctx, conn); err != nil {
-		return errs.Wrap(err, "unable to take the migration lock")
+	if lockErr := eng.Lock(ctx, conn); lockErr != nil {
+		return errs.Wrap(lockErr, "unable to take the migration lock")
 	}
 	defer func() {
 		// The same two obligations Migrator.run carries, for the same reasons, because this is

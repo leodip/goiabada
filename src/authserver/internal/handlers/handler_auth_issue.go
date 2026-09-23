@@ -194,28 +194,28 @@ func HandleIssueGet(
 				// the one refusal that leaves the context in ready_to_issue_code, the state that
 				// mints codes, so a browser keeping it can replay this endpoint with only the
 				// comparison above standing between the replay and a code (#141).
-				err := authHelper.ClearAuthContext(w, r)
-				if err != nil {
+				refusalErr := authHelper.ClearAuthContext(w, r)
+				if refusalErr != nil {
 					// The clear failed, so Save wrote no cookie and the browser still holds the
 					// auth context. The client is owed an error response regardless: its redirect
 					// URI was validated upstream, so OIDC Core 1.0 3.1.2.2 with 3.1.2.6 applies,
 					// and RFC 6749 4.1.2.1 mints server_error for exactly this condition (#141).
 					slog.ErrorContext(r.Context(), "unable to clear the auth context, answering the client with server_error",
-						"error", err)
-					err = redirToClientWithError(w, r, database, httpHelper, templateFS,
+						"error", refusalErr)
+					refusalErr = redirToClientWithError(w, r, database, httpHelper, templateFS,
 						redirectErrorFromAuthContext(authContext, issuingClient, "server_error", "Internal server error"))
-					if err != nil {
+					if refusalErr != nil {
 						// Nowhere left to send the client, so the 500 is the last resort here.
-						httpHelper.InternalServerError(w, r, err)
+						httpHelper.InternalServerError(w, r, refusalErr)
 					}
 					return
 				}
 
-				err = redirToClientWithError(w, r, database, httpHelper, templateFS,
+				refusalErr = redirToClientWithError(w, r, database, httpHelper, templateFS,
 					redirectErrorFromAuthContext(authContext, issuingClient, constants.ErrorLoginRequired,
 						"The authenticated user does not match the id_token_hint"))
-				if err != nil {
-					httpHelper.InternalServerError(w, r, err)
+				if refusalErr != nil {
+					httpHelper.InternalServerError(w, r, refusalErr)
 					return
 				}
 				return
@@ -475,9 +475,9 @@ func HandleIssueGet(
 			// ago and are not re-asked here: the only thing this narrower question misses is an idle
 			// timeout elapsing in the microseconds between the two, and buying that would cost a
 			// SELECT on every authorization code issued (#139 decision 7).
-			live, err := database.AcquireUserSessionRow(r.Context(), tx, sessionIdentifier)
-			if err != nil {
-				return err
+			live, issueErr := database.AcquireUserSessionRow(r.Context(), tx, sessionIdentifier)
+			if issueErr != nil {
+				return issueErr
 			}
 
 			if !live {
@@ -491,8 +491,8 @@ func HandleIssueGet(
 				return errIssuanceRefused
 			}
 
-			code, err = codeIssuer.CreateAuthCode(r.Context(), tx, createCodeInput)
-			if err != nil {
+			code, issueErr = codeIssuer.CreateAuthCode(r.Context(), tx, createCodeInput)
+			if issueErr != nil {
 				// The client's registration went away under this ceremony, between the liveness
 				// read above the dispatch and the insert. Answered as the session-gone shape rather
 				// than as a 500: nothing is wrong with this server, the application the browser was
@@ -501,13 +501,13 @@ func HandleIssueGet(
 				// re-reads the registration on its way out and withholds the redirect, so a deleted
 				// client is told on an interstitial rather than by a redirect to an address nobody
 				// owns any more (#248 part 5).
-				if errors.Is(err, issuance.ErrIssuingClientGone) {
+				if errors.Is(issueErr, issuance.ErrIssuingClientGone) {
 					slog.WarnContext(r.Context(), "the client this ceremony is issuing for no longer exists, refusing to issue a code",
 						"client_identifier", authContext.ClientId,
 						"session_identifier", sessionIdentifier)
 					return errIssuanceRefused
 				}
-				return err
+				return issueErr
 			}
 			return nil
 		})

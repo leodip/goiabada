@@ -57,14 +57,14 @@ func HandleAPIGroupMembersGet(
 		// Parse pagination parameters
 		page := 1
 		if pageStr := r.URL.Query().Get("page"); pageStr != "" {
-			if p, err := strconv.Atoi(pageStr); err == nil && p > 0 {
+			if p, parseErr := strconv.Atoi(pageStr); parseErr == nil && p > 0 {
 				page = p
 			}
 		}
 
 		size := 10 // Default page size matching current implementation
 		if sizeStr := r.URL.Query().Get("size"); sizeStr != "" {
-			if s, err := strconv.Atoi(sizeStr); err == nil && s > 0 && s <= 200 {
+			if s, parseErr := strconv.Atoi(sizeStr); parseErr == nil && s > 0 && s <= 200 {
 				size = s
 			}
 		}

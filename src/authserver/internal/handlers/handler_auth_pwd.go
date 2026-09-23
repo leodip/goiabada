@@ -66,9 +66,9 @@ func HandleAuthPwdGet(
 		// try to get email from session
 		email := ""
 		if len(sessionIdentifier) > 0 {
-			userSession, err := database.GetUserSessionBySessionIdentifier(r.Context(), nil, sessionIdentifier)
-			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
+			userSession, getUserSessionErr := database.GetUserSessionBySessionIdentifier(r.Context(), nil, sessionIdentifier)
+			if getUserSessionErr != nil {
+				httpHelper.InternalServerError(w, r, getUserSessionErr)
 				return
 			}
 			if userSession != nil {
@@ -336,8 +336,8 @@ func HandleAuthPwdPost(
 		// planted identifier naming a row that IS password-completed, which is exactly the
 		// state the attacker needs. Same ordering, and the same reason, as the step-up arm
 		// in handler_auth_completed.
-		if err := authHelper.RegenerateSession(w, r); err != nil {
-			httpHelper.InternalServerError(w, r, err)
+		if regenerateSessionErr := authHelper.RegenerateSession(w, r); regenerateSessionErr != nil {
+			httpHelper.InternalServerError(w, r, regenerateSessionErr)
 			return
 		}
 

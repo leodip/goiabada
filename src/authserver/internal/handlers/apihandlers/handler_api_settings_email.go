@@ -158,8 +158,8 @@ func HandleAPISettingsEmailPut(
 			return
 		}
 
-		if err := accountvalidation.ValidateNoAngleBrackets(req.SMTPFromName, i18n.ErrCodeSettingsSmtpFromNameAngleBrackets); err != nil {
-			writeValidationError(w, r, err)
+		if validateNoAngleBracketsErr := accountvalidation.ValidateNoAngleBrackets(req.SMTPFromName, i18n.ErrCodeSettingsSmtpFromNameAngleBrackets); validateNoAngleBracketsErr != nil {
+			writeValidationError(w, r, validateNoAngleBracketsErr)
 			return
 		}
 		if len(req.SMTPFromEmail) > 60 {
@@ -167,8 +167,8 @@ func HandleAPISettingsEmailPut(
 			return
 		}
 
-		if err := emailValidator.ValidateEmailAddress(req.SMTPFromEmail); err != nil {
-			writeValidationError(w, r, err)
+		if validateEmailAddressErr := emailValidator.ValidateEmailAddress(req.SMTPFromEmail); validateEmailAddressErr != nil {
+			writeValidationError(w, r, validateEmailAddressErr)
 			return
 		}
 

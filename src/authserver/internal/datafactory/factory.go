@@ -168,8 +168,8 @@ func NewDatabase(ctx context.Context, dbConfig *config.DatabaseConfig, aesKey []
 		return nil, err
 	}
 
-	if err := preflightEmailCase(ctx, database); err != nil {
-		return nil, err
+	if preflightEmailCaseErr := preflightEmailCase(ctx, database); preflightEmailCaseErr != nil {
+		return nil, preflightEmailCaseErr
 	}
 
 	err = database.Migrate(ctx)

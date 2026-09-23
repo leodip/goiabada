@@ -1034,7 +1034,7 @@ func HandleAPIClientWebOriginsPut(
 		// page next door reintroduces this bug (#250).
 
 		var req api.UpdateClientWebOriginsRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		if decodeErr := json.NewDecoder(r.Body).Decode(&req); decodeErr != nil {
 			writeJSONError(w, "Invalid request body", "INVALID_REQUEST_BODY", http.StatusBadRequest)
 			return
 		}
@@ -1091,17 +1091,17 @@ func HandleAPIClientWebOriginsPut(
 		// classifier still sees a deadlock, and nothing is logged or written to the response until
 		// the helper has returned: an attempt that is about to be rerun must not answer.
 		err = database.RunInTransaction(r.Context(), func(tx *sql.Tx) error {
-			if err := database.AcquireClientRow(r.Context(), tx, client.Id); err != nil {
+			if acquireClientRowErr := database.AcquireClientRow(r.Context(), tx, client.Id); acquireClientRowErr != nil {
 				return &webOriginsWriteFailure{
 					logMessage: "database error acquiring client row for web origins update",
-					err:        err}
+					err:        acquireClientRowErr}
 			}
 
 			// Load existing web origins
-			if err := database.ClientLoadWebOrigins(r.Context(), tx, client); err != nil {
+			if clientLoadWebOriginsErr := database.ClientLoadWebOrigins(r.Context(), tx, client); clientLoadWebOriginsErr != nil {
 				return &webOriginsWriteFailure{
 					logMessage: "database error loading client web origins before update",
-					err:        err}
+					err:        clientLoadWebOriginsErr}
 			}
 
 			// The stored value is already canonical, migration 000034 having repaired the rows
@@ -1117,10 +1117,10 @@ func HandleAPIClientWebOriginsPut(
 			// Add new origins
 			for _, origin := range normalized {
 				if _, ok := existingSet[origin]; !ok {
-					if err := database.CreateWebOrigin(r.Context(), tx, &models.WebOrigin{ClientId: client.Id, Origin: origin}); err != nil {
+					if createWebOriginErr := database.CreateWebOrigin(r.Context(), tx, &models.WebOrigin{ClientId: client.Id, Origin: origin}); createWebOriginErr != nil {
 						return &webOriginsWriteFailure{
 							logMessage: "database error creating web origin",
-							origin:     origin, err: err}
+							origin:     origin, err: createWebOriginErr}
 					}
 				}
 			}
@@ -1128,10 +1128,10 @@ func HandleAPIClientWebOriginsPut(
 			// Delete removed origins
 			for origin, wid := range existingSet {
 				if _, ok := desiredSet[origin]; !ok {
-					if err := database.DeleteWebOrigin(r.Context(), tx, wid); err != nil {
+					if deleteWebOriginErr := database.DeleteWebOrigin(r.Context(), tx, wid); deleteWebOriginErr != nil {
 						return &webOriginsWriteFailure{
 							logMessage: "database error deleting web origin",
-							origin:     origin, err: err}
+							origin:     origin, err: deleteWebOriginErr}
 					}
 				}
 			}
@@ -1225,7 +1225,7 @@ func HandleAPIClientTokensPut(
 		}
 
 		var req api.UpdateClientTokensRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		if decodeErr := json.NewDecoder(r.Body).Decode(&req); decodeErr != nil {
 			writeJSONError(w, "Invalid request body", "INVALID_REQUEST_BODY", http.StatusBadRequest)
 			return
 		}

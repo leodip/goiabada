@@ -160,14 +160,14 @@ func RevokeUserAuthState(ctx context.Context, db Database, tx *sql.Tx, userId in
 	for i := range sessions {
 		session := sessions[i]
 		if exceptSid != "" && session.SessionIdentifier == exceptSid {
-			if err := db.PromoteUserSessionGeneration(ctx, tx, session.Id, newGeneration); err != nil {
-				return result, err
+			if promoteErr := db.PromoteUserSessionGeneration(ctx, tx, session.Id, newGeneration); promoteErr != nil {
+				return result, promoteErr
 			}
 			preservedSessionFound = true
 			continue
 		}
-		if err := db.DeleteUserSession(ctx, tx, session.Id); err != nil {
-			return result, err
+		if deleteUserSessionErr := db.DeleteUserSession(ctx, tx, session.Id); deleteUserSessionErr != nil {
+			return result, deleteUserSessionErr
 		}
 		result.TerminatedSessionIdentifiers = append(result.TerminatedSessionIdentifiers,
 			session.SessionIdentifier)
@@ -205,9 +205,9 @@ func RevokeUserAuthState(ctx context.Context, db Database, tx *sql.Tx, userId in
 	promoteIds := []int64{}
 	if exceptSid != "" {
 		result.PreservedSessionIdentifier = exceptSid
-		preservedTokens, err := db.GetRefreshTokensBySessionIdentifier(ctx, tx, exceptSid)
-		if err != nil {
-			return result, err
+		preservedTokens, getRefreshTokensErr := db.GetRefreshTokensBySessionIdentifier(ctx, tx, exceptSid)
+		if getRefreshTokensErr != nil {
+			return result, getRefreshTokensErr
 		}
 		for _, rt := range preservedTokens {
 			preservedIds[rt.Id] = true

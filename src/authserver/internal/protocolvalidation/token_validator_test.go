@@ -1440,7 +1440,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{}
-		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+		subtestCtx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "client_credentials",
@@ -1470,7 +1470,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "resource").Return(&models.Resource{Id: 1, ResourceIdentifier: "resource"}, nil)
 		mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(1)).Return([]models.Permission{{Id: 10, PermissionIdentifier: "permission", ResourceId: 1}}, nil)
 
-		result, err := validator.ValidateTokenRequest(ctx, input)
+		result, err := validator.ValidateTokenRequest(subtestCtx, input)
 
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
@@ -1486,7 +1486,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{}
-		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+		subtestCtx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "client_credentials",
@@ -1507,7 +1507,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "valid_client").Return(client, nil)
 
-		result, err := validator.ValidateTokenRequest(ctx, input)
+		result, err := validator.ValidateTokenRequest(subtestCtx, input)
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
@@ -1525,7 +1525,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{}
-		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+		subtestCtx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "client_credentials",
@@ -1558,7 +1558,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(1)).Return([]models.Permission{{Id: 10, PermissionIdentifier: "read", ResourceId: 1}}, nil)
 		mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(2)).Return([]models.Permission{{Id: 20, PermissionIdentifier: "write", ResourceId: 2}}, nil)
 
-		result, err := validator.ValidateTokenRequest(ctx, input)
+		result, err := validator.ValidateTokenRequest(subtestCtx, input)
 
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
@@ -1573,7 +1573,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{}
-		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+		subtestCtx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "client_credentials",
@@ -1597,7 +1597,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		mockDB.On("ClientLoadPermissions", mock.Anything, mock.Anything, client).Return(nil)
 		mockDB.On("PermissionsLoadResources", mock.Anything, mock.Anything, mock.AnythingOfType("[]models.Permission")).Return(nil)
 
-		result, err := validator.ValidateTokenRequest(ctx, input)
+		result, err := validator.ValidateTokenRequest(subtestCtx, input)
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
@@ -1615,7 +1615,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{}
-		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+		subtestCtx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "client_credentials",
@@ -1642,7 +1642,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "resource").Return(&models.Resource{Id: 1, ResourceIdentifier: "resource"}, nil)
 		mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(1)).Return([]models.Permission{{PermissionIdentifier: "read"}}, nil)
 
-		result, err := validator.ValidateTokenRequest(ctx, input)
+		result, err := validator.ValidateTokenRequest(subtestCtx, input)
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
@@ -1660,7 +1660,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{}
-		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+		subtestCtx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "client_credentials",
@@ -1684,7 +1684,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		mockDB.On("ClientLoadPermissions", mock.Anything, mock.Anything, client).Return(nil)
 		mockDB.On("PermissionsLoadResources", mock.Anything, mock.Anything, mock.AnythingOfType("[]models.Permission")).Return(nil)
 
-		result, err := validator.ValidateTokenRequest(ctx, input)
+		result, err := validator.ValidateTokenRequest(subtestCtx, input)
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
@@ -1702,7 +1702,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{}
-		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+		subtestCtx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "client_credentials",
@@ -1727,7 +1727,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		mockDB.On("PermissionsLoadResources", mock.Anything, mock.Anything, mock.AnythingOfType("[]models.Permission")).Return(nil)
 		mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "non_existent_resource").Return(nil, nil)
 
-		result, err := validator.ValidateTokenRequest(ctx, input)
+		result, err := validator.ValidateTokenRequest(subtestCtx, input)
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
@@ -1745,7 +1745,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{}
-		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+		subtestCtx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "client_credentials",
@@ -1771,7 +1771,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "resource").Return(&models.Resource{Id: 1, ResourceIdentifier: "resource"}, nil)
 		mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(1)).Return([]models.Permission{}, nil)
 
-		result, err := validator.ValidateTokenRequest(ctx, input)
+		result, err := validator.ValidateTokenRequest(subtestCtx, input)
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
@@ -1789,7 +1789,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{}
-		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+		subtestCtx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "client_credentials",
@@ -1825,7 +1825,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(2)).Return([]models.Permission{{Id: 20, PermissionIdentifier: "write", ResourceId: 2}}, nil)
 		mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(3)).Return([]models.Permission{{Id: 30, PermissionIdentifier: "delete", ResourceId: 3}}, nil)
 
-		result, err := validator.ValidateTokenRequest(ctx, input)
+		result, err := validator.ValidateTokenRequest(subtestCtx, input)
 
 		assert.NoError(t, err)
 		assert.NotNil(t, result)

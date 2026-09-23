@@ -880,8 +880,8 @@ func TestUpdateUserSession_DoesNotClobberAuthStateGeneration(t *testing.T) {
 	// session of the user a re-prompt it does not owe, or discharge one it does (#242).
 	created.OtpConfigGeneration = 0
 	created.DeviceName = "the rest of the update still applies"
-	if err := database.UpdateUserSession(context.Background(), nil, created); err != nil {
-		t.Fatalf("Failed to update user session: %v", err)
+	if updateUserSessionErr := database.UpdateUserSession(context.Background(), nil, created); updateUserSessionErr != nil {
+		t.Fatalf("Failed to update user session: %v", updateUserSessionErr)
 	}
 
 	after, err := database.GetUserSessionById(context.Background(), nil, userSession.Id)
@@ -964,8 +964,8 @@ func TestAcquireUserSessionRow(t *testing.T) {
 	if !live {
 		t.Fatal("expected a live session to report true")
 	}
-	if err := database.CommitTransaction(context.Background(), tx); err != nil {
-		t.Fatalf("CommitTransaction: %v", err)
+	if commitErr := database.CommitTransaction(context.Background(), tx); commitErr != nil {
+		t.Fatalf("CommitTransaction: %v", commitErr)
 	}
 
 	// Only updated_at moves. Session validity is measured from started and last_accessed,
@@ -987,8 +987,8 @@ func TestAcquireUserSessionRow(t *testing.T) {
 
 	// The row is gone. This is the answer the ceremony refuses on, and it is a report
 	// rather than an error: nothing went wrong, the session simply ended first.
-	if err := database.DeleteUserSession(context.Background(), nil, session.Id); err != nil {
-		t.Fatalf("DeleteUserSession: %v", err)
+	if deleteUserSessionErr := database.DeleteUserSession(context.Background(), nil, session.Id); deleteUserSessionErr != nil {
+		t.Fatalf("DeleteUserSession: %v", deleteUserSessionErr)
 	}
 	gone := beginTx(t)
 	live, err = database.AcquireUserSessionRow(context.Background(), gone, session.SessionIdentifier)
@@ -1059,8 +1059,8 @@ func TestAcquireUserSessionRow_TransactionAndFailurePath(t *testing.T) {
 	if !live {
 		t.Fatal("expected a live session to report true inside the transaction")
 	}
-	if err := database.RollbackTransaction(context.Background(), tx); err != nil {
-		t.Fatalf("RollbackTransaction: %v", err)
+	if rollbackErr := database.RollbackTransaction(context.Background(), tx); rollbackErr != nil {
+		t.Fatalf("RollbackTransaction: %v", rollbackErr)
 	}
 
 	// Had the statement gone through the pool it would have survived the rollback.

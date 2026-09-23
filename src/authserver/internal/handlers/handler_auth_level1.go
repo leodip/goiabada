@@ -162,9 +162,9 @@ func HandleAuthLevel1CompletedGet(
 
 		if hasValidUserSession {
 			// Parse the session's ACR level
-			acrLevelFromSession, err := models.AcrLevelFromString(userSession.AcrLevel)
-			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
+			acrLevelFromSession, acrLevelErr := models.AcrLevelFromString(userSession.AcrLevel)
+			if acrLevelErr != nil {
+				httpHelper.InternalServerError(w, r, acrLevelErr)
 				return
 			}
 

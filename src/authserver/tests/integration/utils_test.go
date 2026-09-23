@@ -786,9 +786,9 @@ func createAuthCode(t *testing.T, clientSecret string, scope string, opts ...aut
 	user := opt.user
 	if user == nil {
 		password = fake.Password(8)
-		passwordHashed, err := passwordhash.Hash(password)
-		if err != nil {
-			t.Fatal(err)
+		passwordHashed, createErr := passwordhash.Hash(password)
+		if createErr != nil {
+			t.Fatal(createErr)
 		}
 
 		user = &models.User{
@@ -798,9 +798,9 @@ func createAuthCode(t *testing.T, clientSecret string, scope string, opts ...aut
 			PasswordHash: passwordHashed,
 		}
 
-		err = database.CreateUser(context.Background(), nil, user)
-		if err != nil {
-			t.Fatal(err)
+		createErr = database.CreateUser(context.Background(), nil, user)
+		if createErr != nil {
+			t.Fatal(createErr)
 		}
 	}
 
@@ -921,17 +921,17 @@ func createAuthCodeEnsuringUserScope(t *testing.T, clientSecret string, scope st
 		resourceIdentifier := parts[0]
 		permissionIdentifier := parts[1]
 
-		resource, err := database.GetResourceByResourceIdentifier(context.Background(), nil, resourceIdentifier)
-		if err != nil {
-			t.Fatal(err)
+		resource, grantErr := database.GetResourceByResourceIdentifier(context.Background(), nil, resourceIdentifier)
+		if grantErr != nil {
+			t.Fatal(grantErr)
 		}
 		if resource == nil {
 			t.Fatalf("resource not found: %s", resourceIdentifier)
 		}
 
-		perms, err := database.GetPermissionsByResourceId(context.Background(), nil, resource.Id)
-		if err != nil {
-			t.Fatal(err)
+		perms, grantErr := database.GetPermissionsByResourceId(context.Background(), nil, resource.Id)
+		if grantErr != nil {
+			t.Fatal(grantErr)
 		}
 		var sel *models.Permission
 		for i := range perms {
@@ -943,9 +943,9 @@ func createAuthCodeEnsuringUserScope(t *testing.T, clientSecret string, scope st
 		if sel == nil {
 			t.Fatalf("permission not found: %s:%s", resourceIdentifier, permissionIdentifier)
 		}
-		err = database.CreateUserPermission(context.Background(), nil, &models.UserPermission{UserId: user.Id, PermissionId: sel.Id})
-		if err != nil {
-			t.Fatal(err)
+		grantErr = database.CreateUserPermission(context.Background(), nil, &models.UserPermission{UserId: user.Id, PermissionId: sel.Id})
+		if grantErr != nil {
+			t.Fatal(grantErr)
 		}
 	}
 

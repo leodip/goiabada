@@ -122,9 +122,9 @@ func TestGetAllSigningKeys(t *testing.T) {
 	}
 
 	for _, kp := range keyPairs {
-		err := database.DeleteKeyPair(context.Background(), nil, kp.Id)
-		if err != nil {
-			t.Fatalf("Failed to delete key pair: %v", err)
+		deleteKeyPairErr := database.DeleteKeyPair(context.Background(), nil, kp.Id)
+		if deleteKeyPairErr != nil {
+			t.Fatalf("Failed to delete key pair: %v", deleteKeyPairErr)
 		}
 	}
 
@@ -169,9 +169,9 @@ func TestGetCurrentSigningKey(t *testing.T) {
 	}
 
 	for _, kp := range keyPairs {
-		err := database.DeleteKeyPair(context.Background(), nil, kp.Id)
-		if err != nil {
-			t.Fatalf("Failed to delete key pair: %v", err)
+		deleteKeyPairErr := database.DeleteKeyPair(context.Background(), nil, kp.Id)
+		if deleteKeyPairErr != nil {
+			t.Fatalf("Failed to delete key pair: %v", deleteKeyPairErr)
 		}
 	}
 
@@ -180,7 +180,7 @@ func TestGetCurrentSigningKey(t *testing.T) {
 	// returns an error rather than (nil, nil) because every caller dereferences the
 	// result, so a missing current key is a panic at eight sites instead of a
 	// diagnosable failure (#251). Reverse that and this assertion fails.
-	if _, err := database.GetCurrentSigningKey(context.Background(), nil); err == nil {
+	if _, getCurrentSigningKeyErr := database.GetCurrentSigningKey(context.Background(), nil); getCurrentSigningKeyErr == nil {
 		t.Fatal("Expected an error when no key pair is in the current state, got nil")
 	}
 
@@ -427,8 +427,8 @@ func TestUpdateKeyPairState_EnlistsInCallersTransaction(t *testing.T) {
 		t.Fatal("Expected the transition to be made by this call")
 	}
 
-	if err := database.RollbackTransaction(context.Background(), tx); err != nil {
-		t.Fatalf("Failed to roll back transaction: %v", err)
+	if rollbackErr := database.RollbackTransaction(context.Background(), tx); rollbackErr != nil {
+		t.Fatalf("Failed to roll back transaction: %v", rollbackErr)
 	}
 
 	// A statement that ignored the caller's tx and used the pool instead would have
@@ -468,8 +468,8 @@ func TestUpdateKeyPairState_StorageFailureIsAnError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to begin transaction: %v", err)
 	}
-	if err := database.RollbackTransaction(context.Background(), tx); err != nil {
-		t.Fatalf("Failed to roll back transaction: %v", err)
+	if rollbackErr := database.RollbackTransaction(context.Background(), tx); rollbackErr != nil {
+		t.Fatalf("Failed to roll back transaction: %v", rollbackErr)
 	}
 
 	moved, err := database.UpdateKeyPairState(context.Background(), tx, keyPair.Id, current, previous)

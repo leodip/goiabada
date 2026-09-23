@@ -453,9 +453,9 @@ func TestClientLoadRedirectURIs(t *testing.T) {
 	}
 
 	for _, uri := range redirectURIs {
-		err := database.CreateRedirectURI(context.Background(), nil, &uri)
-		if err != nil {
-			t.Fatalf("Failed to create redirect URI: %v", err)
+		createRedirectURIErr := database.CreateRedirectURI(context.Background(), nil, &uri)
+		if createRedirectURIErr != nil {
+			t.Fatalf("Failed to create redirect URI: %v", createRedirectURIErr)
 		}
 	}
 
@@ -538,9 +538,9 @@ func TestClientLoadWebOrigins(t *testing.T) {
 	}
 
 	for _, origin := range webOrigins {
-		err := database.CreateWebOrigin(context.Background(), nil, &origin)
-		if err != nil {
-			t.Fatalf("Failed to create web origin: %v", err)
+		createWebOriginErr := database.CreateWebOrigin(context.Background(), nil, &origin)
+		if createWebOriginErr != nil {
+			t.Fatalf("Failed to create web origin: %v", createWebOriginErr)
 		}
 	}
 
@@ -893,9 +893,9 @@ func TestClientLoadPermissions(t *testing.T) {
 	}
 
 	for i := range permissions {
-		err := database.CreatePermission(context.Background(), nil, &permissions[i])
-		if err != nil {
-			t.Fatalf("Failed to create permission: %v", err)
+		createPermissionErr := database.CreatePermission(context.Background(), nil, &permissions[i])
+		if createPermissionErr != nil {
+			t.Fatalf("Failed to create permission: %v", createPermissionErr)
 		}
 	}
 
@@ -905,9 +905,9 @@ func TestClientLoadPermissions(t *testing.T) {
 			ClientId:     client.Id,
 			PermissionId: perm.Id,
 		}
-		err := database.CreateClientPermission(context.Background(), nil, clientPermission)
-		if err != nil {
-			t.Fatalf("Failed to create client permission: %v", err)
+		createClientPermissionErr := database.CreateClientPermission(context.Background(), nil, clientPermission)
+		if createClientPermissionErr != nil {
+			t.Fatalf("Failed to create client permission: %v", createClientPermissionErr)
 		}
 	}
 
@@ -997,9 +997,9 @@ func TestGetAllClients(t *testing.T) {
 			DefaultAcrLevel:                         models.AcrLevel1,
 		}
 
-		err := database.CreateClient(context.Background(), nil, client)
-		if err != nil {
-			t.Fatalf("Failed to create test client %d: %v", i, err)
+		createClientErr := database.CreateClient(context.Background(), nil, client)
+		if createClientErr != nil {
+			t.Fatalf("Failed to create test client %d: %v", i, createClientErr)
 		}
 
 		createdClients[i] = client
@@ -1454,8 +1454,8 @@ func TestSetClientPublic(t *testing.T) {
 	if !becamePublic {
 		t.Errorf("making a confidential client public must report the transition")
 	}
-	if err := database.CommitTransaction(context.Background(), tx); err != nil {
-		t.Fatalf("CommitTransaction: %v", err)
+	if commitErr := database.CommitTransaction(context.Background(), tx); commitErr != nil {
+		t.Fatalf("CommitTransaction: %v", commitErr)
 	}
 
 	// The column really moved. Reporting the transition without performing it would leave the

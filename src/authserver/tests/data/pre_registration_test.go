@@ -272,8 +272,8 @@ func TestGetPreRegistrationByVerificationCodeHash_Transaction(t *testing.T) {
 		t.Errorf("found pre-registration id %d through the transaction, want %d", inTx.Id, preReg.Id)
 	}
 
-	if err := database.RollbackTransaction(context.Background(), tx); err != nil {
-		t.Fatalf("RollbackTransaction failed: %v", err)
+	if rollbackErr := database.RollbackTransaction(context.Background(), tx); rollbackErr != nil {
+		t.Fatalf("RollbackTransaction failed: %v", rollbackErr)
 	}
 
 	// 12a. Rolled back, so nothing carries the hash any more.

@@ -124,16 +124,16 @@ func main() {
 func run() error {
 	dumps := map[schemadump.Dialect][]byte{}
 	for _, t := range targets() {
-		t, err := t.withOverrides()
+		resolved, err := t.withOverrides()
 		if err != nil {
 			return err
 		}
-		fmt.Printf("dumping %s...\n", t.dialect)
-		encoded, err := dumpOne(t)
+		fmt.Printf("dumping %s...\n", resolved.dialect)
+		encoded, err := dumpOne(resolved)
 		if err != nil {
-			return errs.Errorf("%s: %w", t.dialect, err)
+			return errs.Errorf("%s: %w", resolved.dialect, err)
 		}
-		dumps[t.dialect] = encoded
+		dumps[resolved.dialect] = encoded
 	}
 
 	// Written only now, once every engine has answered. A run that fails part way through
@@ -169,8 +169,8 @@ func dumpOne(t target) ([]byte, error) {
 	}
 	defer cleanup()
 
-	if err := db.Migrate(ctx); err != nil {
-		return nil, errs.Errorf("migrate the scratch database to head: %w", err)
+	if migrateErr := db.Migrate(ctx); migrateErr != nil {
+		return nil, errs.Errorf("migrate the scratch database to head: %w", migrateErr)
 	}
 	// Read off the database that was just migrated rather than counted from the files on
 	// disk, so the header records what the chain actually reached. The two agree unless a

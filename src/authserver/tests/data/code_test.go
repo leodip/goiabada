@@ -241,7 +241,7 @@ func TestMarkCodeAsUsed(t *testing.T) {
 	}
 
 	// Guard: id 0 is rejected outright.
-	if _, err := database.MarkCodeAsUsed(context.Background(), nil, 0); err == nil {
+	if _, markCodeAsUsedErr := database.MarkCodeAsUsed(context.Background(), nil, 0); markCodeAsUsedErr == nil {
 		t.Errorf("MarkCodeAsUsed with id 0 must return an error")
 	}
 
@@ -251,8 +251,8 @@ func TestMarkCodeAsUsed(t *testing.T) {
 	// Keep BOTH this case and the already-used one above: either alone still passes
 	// with the other term deleted from the predicate.
 	revoked := createTestCode(t, client.Id, user.Id)
-	if _, err := database.RevokeCodesBySessionIdentifier(context.Background(), nil, revoked.SessionIdentifier); err != nil {
-		t.Fatalf("failed to revoke the code's session: %v", err)
+	if _, revokeCodesErr := database.RevokeCodesBySessionIdentifier(context.Background(), nil, revoked.SessionIdentifier); revokeCodesErr != nil {
+		t.Fatalf("failed to revoke the code's session: %v", revokeCodesErr)
 	}
 	claimed, err = database.MarkCodeAsUsed(context.Background(), nil, revoked.Id)
 	if err != nil {
@@ -712,8 +712,8 @@ func TestDeleteUsedCodesWithoutRefreshTokens_AgeCutoff(t *testing.T) {
 
 	// The same code once it is genuinely past the cutoff: no longer redeemable, so it can
 	// never gain a refresh token, and the sweep must reap it.
-	if err := database.DeleteUsedCodesWithoutRefreshTokens(context.Background(), nil, time.Now().UTC().Add(time.Hour)); err != nil {
-		t.Fatalf("Failed to run the sweep with a future cutoff: %v", err)
+	if deleteCodesErr := database.DeleteUsedCodesWithoutRefreshTokens(context.Background(), nil, time.Now().UTC().Add(time.Hour)); deleteCodesErr != nil {
+		t.Fatalf("Failed to run the sweep with a future cutoff: %v", deleteCodesErr)
 	}
 	reaped, err := database.GetCodeById(context.Background(), nil, code.Id)
 	if err != nil {
@@ -923,8 +923,8 @@ func TestUpdateCode_DoesNotClobberAuthStateGeneration(t *testing.T) {
 
 	created.AuthStateGeneration = 0
 	created.Used = true
-	if err := database.UpdateCode(context.Background(), nil, created); err != nil {
-		t.Fatalf("Failed to update code: %v", err)
+	if updateCodeErr := database.UpdateCode(context.Background(), nil, created); updateCodeErr != nil {
+		t.Fatalf("Failed to update code: %v", updateCodeErr)
 	}
 
 	after, err := database.GetCodeById(context.Background(), nil, code.Id)
@@ -1068,8 +1068,8 @@ func TestRevokeCodesBySessionIdentifier_TransactionAndFailurePath(t *testing.T) 
 		t.Fatalf("expected 1 code revoked inside the transaction, got %d", count)
 	}
 
-	if err := database.RollbackTransaction(context.Background(), tx); err != nil {
-		t.Fatalf("RollbackTransaction: %v", err)
+	if rollbackErr := database.RollbackTransaction(context.Background(), tx); rollbackErr != nil {
+		t.Fatalf("RollbackTransaction: %v", rollbackErr)
 	}
 
 	// Had the statement gone through the pool instead of the transaction it would have
@@ -1174,8 +1174,8 @@ func TestRevokeCodesByClientId_TransactionAndFailurePath(t *testing.T) {
 		t.Fatalf("expected 1 code revoked inside the transaction, got %d", count)
 	}
 
-	if err := database.RollbackTransaction(context.Background(), tx); err != nil {
-		t.Fatalf("RollbackTransaction: %v", err)
+	if rollbackErr := database.RollbackTransaction(context.Background(), tx); rollbackErr != nil {
+		t.Fatalf("RollbackTransaction: %v", rollbackErr)
 	}
 
 	// Had the statement gone through the pool instead of the transaction it would have

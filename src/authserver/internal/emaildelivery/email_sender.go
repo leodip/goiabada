@@ -122,9 +122,9 @@ func (e *EmailSender) SendEmail(ctx context.Context, input *SendEmailInput) erro
 		return errs.Wrap(err, "unable to connect to SMTP server")
 	}
 
-	if err := conn.SetDeadline(time.Now().Add(convTimeout)); err != nil {
+	if setDeadlineErr := conn.SetDeadline(time.Now().Add(convTimeout)); setDeadlineErr != nil {
 		_ = conn.Close()
-		return errs.Wrap(err, "unable to connect to SMTP server")
+		return errs.Wrap(setDeadlineErr, "unable to connect to SMTP server")
 	}
 
 	client, err := smtp.NewClient(conn, host)
@@ -145,22 +145,22 @@ func (e *EmailSender) SendEmail(ctx context.Context, input *SendEmailInput) erro
 		}
 		// StartTLS re-issues EHLO, per RFC 3207 section 4.2: everything learned before the
 		// handshake has to be discarded.
-		if err := client.StartTLS(tlsConfig); err != nil {
-			return errs.Wrap(err, "unable to send SMTP message")
+		if startTLSErr := client.StartTLS(tlsConfig); startTLSErr != nil {
+			return errs.Wrap(startTLSErr, "unable to send SMTP message")
 		}
 	}
 
 	if len(settings.SMTPUsername) > 0 {
-		if err := authenticate(client, host, smtpEnc, settings.SMTPUsername, password); err != nil {
-			return errs.Wrap(err, "unable to send SMTP message")
+		if authenticateErr := authenticate(client, host, smtpEnc, settings.SMTPUsername, password); authenticateErr != nil {
+			return errs.Wrap(authenticateErr, "unable to send SMTP message")
 		}
 	}
 
-	if err := client.Mail(from.Address); err != nil {
-		return errs.Wrap(err, "unable to send SMTP message")
+	if mailErr := client.Mail(from.Address); mailErr != nil {
+		return errs.Wrap(mailErr, "unable to send SMTP message")
 	}
-	if err := client.Rcpt(to.Address); err != nil {
-		return errs.Wrap(err, "unable to send SMTP message")
+	if rcptErr := client.Rcpt(to.Address); rcptErr != nil {
+		return errs.Wrap(rcptErr, "unable to send SMTP message")
 	}
 	w, err := client.Data()
 	if err != nil {

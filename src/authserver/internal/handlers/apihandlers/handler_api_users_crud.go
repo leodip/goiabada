@@ -115,7 +115,7 @@ func HandleAPIUserPasswordPut(
 
 		// Decode the request body
 		var req api.UpdateUserPasswordRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		if decodeErr := json.NewDecoder(r.Body).Decode(&req); decodeErr != nil {
 			writeJSONError(w, "Invalid request body", "INVALID_REQUEST_BODY", http.StatusBadRequest)
 			return
 		}
@@ -221,7 +221,7 @@ func HandleAPIUserOTPPut(
 
 		// Decode the request body
 		var req api.UpdateUserOTPRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		if decodeErr := json.NewDecoder(r.Body).Decode(&req); decodeErr != nil {
 			writeJSONError(w, "Invalid request body", "INVALID_REQUEST_BODY", http.StatusBadRequest)
 			return
 		}
@@ -551,7 +551,7 @@ func HandleAPIUserEnabledPut(
 
 		// Decode the request body
 		var req api.UpdateUserEnabledRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		if decodeErr := json.NewDecoder(r.Body).Decode(&req); decodeErr != nil {
 			writeJSONError(w, "Invalid request body", "INVALID_REQUEST_BODY", http.StatusBadRequest)
 			return
 		}

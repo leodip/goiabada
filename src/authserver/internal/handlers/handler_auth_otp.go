@@ -374,9 +374,9 @@ func HandleAuthOtpPost(
 			// is enrolling to TOTP now. The seed is encrypted at rest, the user written and the
 			// OTP configuration generation's advance committed together, so there is no state in
 			// which the authenticator is on and no session knows (#242 decision 2).
-			enrolledGeneration, err := otpcredential.Establish(r.Context(), database, user, secretKey)
-			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
+			enrolledGeneration, establishErr := otpcredential.Establish(r.Context(), database, user, secretKey)
+			if establishErr != nil {
+				httpHelper.InternalServerError(w, r, establishErr)
 				return
 			}
 
@@ -435,8 +435,8 @@ func HandleAuthOtpPost(
 		// rotation persists the contents as they are now, so a failure between the two
 		// leaves a fresh identifier on a session that has not been marked
 		// authentication_completed (#266).
-		if err := authHelper.RegenerateSession(w, r); err != nil {
-			httpHelper.InternalServerError(w, r, err)
+		if regenerateSessionErr := authHelper.RegenerateSession(w, r); regenerateSessionErr != nil {
+			httpHelper.InternalServerError(w, r, regenerateSessionErr)
 			return
 		}
 

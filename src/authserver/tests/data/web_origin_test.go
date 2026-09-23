@@ -104,9 +104,9 @@ func TestGetAllWebOrigins(t *testing.T) {
 		t.Fatalf("Failed to get existing web origins: %v", err)
 	}
 	for _, webOrigin := range existingWebOrigins {
-		err := database.DeleteWebOrigin(context.Background(), nil, webOrigin.Id)
-		if err != nil {
-			t.Fatalf("Failed to delete existing web origin: %v", err)
+		deleteWebOriginErr := database.DeleteWebOrigin(context.Background(), nil, webOrigin.Id)
+		if deleteWebOriginErr != nil {
+			t.Fatalf("Failed to delete existing web origin: %v", deleteWebOriginErr)
 		}
 	}
 
@@ -231,8 +231,8 @@ func TestWebOriginExists_Transaction(t *testing.T) {
 		t.Error("a write made through the transaction must be visible to a read through the same transaction")
 	}
 
-	if err := database.RollbackTransaction(context.Background(), tx); err != nil {
-		t.Fatalf("RollbackTransaction: %v", err)
+	if rollbackErr := database.RollbackTransaction(context.Background(), tx); rollbackErr != nil {
+		t.Fatalf("RollbackTransaction: %v", rollbackErr)
 	}
 
 	exists, err = database.WebOriginExists(context.Background(), nil, origin)

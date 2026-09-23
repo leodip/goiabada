@@ -158,9 +158,9 @@ func TestGetAllResources(t *testing.T) {
 		t.Fatalf("Failed to get existing resources: %v", err)
 	}
 	for _, resource := range existingResources {
-		err := database.DeleteResource(context.Background(), nil, resource.Id)
-		if err != nil {
-			t.Fatalf("Failed to delete existing resource: %v", err)
+		deleteResourceErr := database.DeleteResource(context.Background(), nil, resource.Id)
+		if deleteResourceErr != nil {
+			t.Fatalf("Failed to delete existing resource: %v", deleteResourceErr)
 		}
 	}
 

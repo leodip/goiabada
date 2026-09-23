@@ -62,9 +62,9 @@ func HandleAPIGroupPermissionsGet(
 
 		// Load resource information for each permission
 		for i := range group.Permissions {
-			resource, err := database.GetResourceById(r.Context(), nil, group.Permissions[i].ResourceId)
-			if err != nil {
-				writeInternalServerError(w, r, errs.Wrap(err, "database error getting resource by ID for permission"), "resource_id", group.Permissions[i].ResourceId, "group_id", group.Id)
+			resource, getResourceErr := database.GetResourceById(r.Context(), nil, group.Permissions[i].ResourceId)
+			if getResourceErr != nil {
+				writeInternalServerError(w, r, errs.Wrap(getResourceErr, "database error getting resource by ID for permission"), "resource_id", group.Permissions[i].ResourceId, "group_id", group.Id)
 				return
 			}
 			if resource != nil {
@@ -115,7 +115,7 @@ func HandleAPIGroupPermissionsPut(
 		}
 
 		var request api.UpdateGroupPermissionsRequest
-		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		if decodeErr := json.NewDecoder(r.Body).Decode(&request); decodeErr != nil {
 			writeJSONError(w, "Invalid request body", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}

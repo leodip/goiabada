@@ -95,18 +95,18 @@ func main() {
 	// before the database is opened: NewDatabase runs the at-rest re-encryption
 	// migration, which needs the key. The key is supplied from the environment
 	// and never co-located with the ciphertext (issue #83).
-	if err := config.ValidateAESEncryptionKey(); err != nil {
+	if aesKeyErr := config.ValidateAESEncryptionKey(); aesKeyErr != nil {
 		// One record where three used to be, for the same reason decision 6 collapses the
 		// banners: the two lines after the failure were prose an operator had to read as a
 		// unit, and a JSON deployment received them as three unrelated records with the
 		// remedy in a message field nothing could query (#320).
 		slog.Error("the data encryption key is missing or malformed, so the auth server cannot start: set GOIABADA_AES_ENCRYPTION_KEY, and back it up separately from the database because every encrypted secret and signing key is unrecoverable without it",
-			"error", err,
+			"error", aesKeyErr,
 			"generate_with", "openssl rand -hex 32")
 		os.Exit(1)
 	}
-	if err := encryption.InitDataCipher(config.GetAESEncryptionKey()); err != nil {
-		slog.Error("unable to initialize the data cipher", "error", err)
+	if initDataCipherErr := encryption.InitDataCipher(config.GetAESEncryptionKey()); initDataCipherErr != nil {
+		slog.Error("unable to initialize the data cipher", "error", initDataCipherErr)
 		os.Exit(1)
 	}
 	slog.Info("data encryption key validated")
@@ -130,8 +130,8 @@ func main() {
 
 	// Load i18n message catalogs (and merge GOIABADA_I18N_OVERRIDES_DIR if set).
 	// Fail-fast: a malformed catalog or missing override dir is a config bug.
-	if _, err := i18n.LoadBundle(); err != nil {
-		slog.Error("unable to load the i18n message catalogs", "error", err)
+	if _, loadBundleErr := i18n.LoadBundle(); loadBundleErr != nil {
+		slog.Error("unable to load the i18n message catalogs", "error", loadBundleErr)
 		os.Exit(1)
 	}
 	slog.Info("i18n catalogs loaded")
@@ -181,8 +181,8 @@ func main() {
 	}
 
 	// Validate session keys for normal operation (after bootstrap check)
-	if err := config.ValidateAuthServerSessionKeys(); err != nil {
-		bootstrap.LogCredentialsNotConfigured(startupCtx, err, config.GetAuthServer().BootstrapEnvOutFile)
+	if sessionKeysErr := config.ValidateAuthServerSessionKeys(); sessionKeysErr != nil {
+		bootstrap.LogCredentialsNotConfigured(startupCtx, sessionKeysErr, config.GetAuthServer().BootstrapEnvOutFile)
 		os.Exit(1)
 	}
 	slog.Info("session keys validated")

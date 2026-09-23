@@ -129,8 +129,8 @@ func buildRCSIFixture() (*rcsiFixture, error) {
 
 	deferPackageTeardown(func() { dropRCSIDatabase(cfg, name) })
 
-	if err := created.DB.Close(); err != nil {
-		return nil, fmt.Errorf("releasing the pool that created %s: %w", name, err)
+	if closeErr := created.DB.Close(); closeErr != nil {
+		return nil, fmt.Errorf("releasing the pool that created %s: %w", name, closeErr)
 	}
 
 	// 2. Turn RCSI on from master, with a deadline, so a fixture that cannot get exclusive access
@@ -146,8 +146,8 @@ func buildRCSIFixture() (*rcsiFixture, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), rcsiStatementTimeout)
 	defer cancel()
 	alter := fmt.Sprintf("ALTER DATABASE [%s] SET READ_COMMITTED_SNAPSHOT ON WITH ROLLBACK IMMEDIATE", name)
-	if _, err := master.ExecContext(ctx, alter); err != nil {
-		return nil, fmt.Errorf("turning READ_COMMITTED_SNAPSHOT on for %s: %w", name, err)
+	if _, execErr := master.ExecContext(ctx, alter); execErr != nil {
+		return nil, fmt.Errorf("turning READ_COMMITTED_SNAPSHOT on for %s: %w", name, execErr)
 	}
 
 	// 3. READ IT BACK, and this step is not ceremony. A fixture that quietly failed to apply the
@@ -181,8 +181,8 @@ func buildRCSIFixture() (*rcsiFixture, error) {
 	if err != nil {
 		return nil, fmt.Errorf("opening the handle that migrates %s: %w", name, err)
 	}
-	if err := migrateRCSIDatabase(migrating); err != nil {
-		return nil, err
+	if rcsiErr := migrateRCSIDatabase(migrating); rcsiErr != nil {
+		return nil, rcsiErr
 	}
 	if open := migrating.DB.Stats().OpenConnections; open != 0 {
 		return nil, fmt.Errorf("the migrating handle for %s still holds %d connection(s) after it was closed, so the runner did not give its connection back", name, open)

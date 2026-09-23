@@ -49,7 +49,7 @@ func HandleAPIUserProfilePut(
 
 		// Parse request body
 		var req api.UpdateUserProfileRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		if decodeErr := json.NewDecoder(r.Body).Decode(&req); decodeErr != nil {
 			writeJSONError(w, "Invalid request body", "INVALID_REQUEST_BODY", http.StatusBadRequest)
 			return
 		}
@@ -102,8 +102,8 @@ func HandleAPIUserProfilePut(
 
 		// Handle gender
 		if len(input.Gender) > 0 {
-			i, err := strconv.Atoi(input.Gender)
-			if err == nil {
+			i, parseErr := strconv.Atoi(input.Gender)
+			if parseErr == nil {
 				user.Gender = gender.Gender(i).String()
 			}
 		} else {
@@ -113,8 +113,8 @@ func HandleAPIUserProfilePut(
 		// Handle date of birth
 		if len(input.DateOfBirth) > 0 {
 			layout := "2006-01-02"
-			parsedTime, err := time.Parse(layout, input.DateOfBirth)
-			if err == nil {
+			parsedTime, parseErr := time.Parse(layout, input.DateOfBirth)
+			if parseErr == nil {
 				user.BirthDate = sql.NullTime{Time: parsedTime, Valid: true}
 			}
 		} else {
@@ -179,7 +179,7 @@ func HandleAPIUserAddressPut(
 
 		// Parse request body
 		var req api.UpdateUserAddressRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		if decodeErr := json.NewDecoder(r.Body).Decode(&req); decodeErr != nil {
 			writeJSONError(w, "Invalid request body", "INVALID_REQUEST_BODY", http.StatusBadRequest)
 			return
 		}

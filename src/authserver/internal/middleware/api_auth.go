@@ -270,10 +270,10 @@ func RequireValidSession(database apiAuthDatabase) func(http.Handler) http.Handl
 			sid := jwtToken.GetStringClaim("sid")
 			if sid == "" {
 				// Offline grant or ROPC: no session to defer to, so the token's own
-				// generation claim decides. A malformed claim is rejected on !ok, before
+				// generation claim decides. A malformed claim is rejected on !wellFormed, before
 				// the comparison, so it can never collide with a stored generation.
-				generation, ok := tokenGeneration(jwtToken)
-				if !ok || generation != user.AuthStateGeneration {
+				generation, wellFormed := tokenGeneration(jwtToken)
+				if !wellFormed || generation != user.AuthStateGeneration {
 					slog.WarnContext(r.Context(), "rejecting bearer token: superseded authentication generation",
 						"user_id", user.Id)
 					rejectInvalidToken(w, "Session has been terminated")

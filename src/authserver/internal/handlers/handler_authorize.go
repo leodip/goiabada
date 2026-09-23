@@ -161,9 +161,9 @@ func HandleAuthorizeGet(
 				"_httpStatus": httpStatus,
 			}
 
-			err := httpHelper.RenderTemplate(w, r, "/layouts/no_menu_layout.html", "/auth_error.html", bind)
-			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
+			renderTemplateErr := httpHelper.RenderTemplate(w, r, "/layouts/no_menu_layout.html", "/auth_error.html", bind)
+			if renderTemplateErr != nil {
+				httpHelper.InternalServerError(w, r, renderTemplateErr)
 			}
 		}
 
@@ -405,9 +405,9 @@ func HandleAuthorizeGet(
 				customerrors.ConformErrorDescription(validationError.GetDescription())
 			authContext.AuthState = ceremony.AuthStateRequiresLevel1
 
-			err := authHelper.SaveAuthContext(w, r, &authContext)
-			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
+			saveAuthContextErr := authHelper.SaveAuthContext(w, r, &authContext)
+			if saveAuthContextErr != nil {
+				httpHelper.InternalServerError(w, r, saveAuthContextErr)
 				return
 			}
 			http.Redirect(w, r, config.GetAuthServer().BaseURL+"/auth/level1", http.StatusFound)
@@ -745,9 +745,9 @@ func handlePromptNone(w http.ResponseWriter, r *http.Request, httpHelper HttpHel
 
 	// 8. Check consent requirements
 	if client.ConsentRequired || oidc.HasOfflineAccessScope(effectiveScope) {
-		consent, err := database.GetConsentByUserIdAndClientId(r.Context(), nil, user.Id, client.Id)
-		if err != nil {
-			httpHelper.InternalServerError(w, r, err)
+		consent, getConsentErr := database.GetConsentByUserIdAndClientId(r.Context(), nil, user.Id, client.Id)
+		if getConsentErr != nil {
+			httpHelper.InternalServerError(w, r, getConsentErr)
 			return
 		}
 

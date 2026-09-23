@@ -91,8 +91,8 @@ func HandleAPIAccountPasswordPut(
 		}
 
 		// Validate new password against policy
-		if err := passwordValidator.ValidatePassword(r.Context(), req.NewPassword); err != nil {
-			writeValidationError(w, r, err)
+		if validatePasswordErr := passwordValidator.ValidatePassword(r.Context(), req.NewPassword); validatePasswordErr != nil {
+			writeValidationError(w, r, validatePasswordErr)
 			return
 		}
 
