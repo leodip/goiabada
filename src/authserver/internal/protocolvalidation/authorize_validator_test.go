@@ -43,6 +43,14 @@ func TestValidateScopes(t *testing.T) {
 			expectedError: "",
 		},
 		{
+			// Scope values are case-sensitive (RFC 6749 section 3.3). This spelling used to be
+			// case-folded into offline_access and skipped; it is now some other scope, and not
+			// one in resource:permission form (#425).
+			name:          "Uppercase OFFLINE_ACCESS is not offline_access",
+			scope:         "OFFLINE_ACCESS",
+			expectedError: "Invalid scope format: 'OFFLINE_ACCESS'. Scopes must adhere to the resource-identifier:permission-identifier format. For instance: backend-service:create-product.",
+		},
+		{
 			name:  "Invalid userinfo scope",
 			scope: constants.AuthServerResourceIdentifier + ":" + constants.UserinfoPermissionIdentifier,
 			expectedError: "The 'authserver:userinfo' scope is automatically included in the access token when an OpenID Connect scope is present. " +

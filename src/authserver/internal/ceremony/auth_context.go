@@ -196,13 +196,6 @@ func (ac *AuthContext) SetScope(scope string) {
 	ac.Scope = strings.TrimSpace(strings.Join(scopeArr, " "))
 }
 
-func (ac *AuthContext) HasScope(scope string) bool {
-	if len(ac.Scope) == 0 {
-		return false
-	}
-	return slices.Contains(strings.Split(ac.Scope, " "), scope)
-}
-
 func (ac *AuthContext) AddAuthMethod(method string) {
 	method = strings.ToLower(strings.TrimSpace(method))
 

@@ -223,7 +223,7 @@ func (t *TokenIssuer) generateAccessToken(ctx context.Context, settings *models.
 // AUTHORIZED scope rather than whatever a later request asked for. Mirrors the branch
 // generateRefreshToken uses to choose the token type, so the two cannot disagree.
 func grantIsOffline(authorizedScope string, sessionIdentifier string) bool {
-	return slices.Contains(strings.Split(authorizedScope, " "), oidc.OfflineAccessScope) ||
+	return oidc.HasOfflineAccessScope(authorizedScope) ||
 		sessionIdentifier == ""
 }
 
@@ -428,7 +428,7 @@ func (t *TokenIssuer) GenerateTokenResponseForClientCred(ctx context.Context, cl
 
 	audCollection := []string{}
 	for _, scope := range scopes {
-		if oidc.IsIdTokenScope(scope) || oidc.IsOfflineAccessScope(scope) {
+		if oidc.IsClaimScope(scope) || oidc.IsOfflineAccessScope(scope) {
 			continue
 		}
 		parts := strings.Split(scope, ":")
@@ -707,7 +707,7 @@ func (t *TokenIssuer) generateAccessTokenCore(ctx context.Context, settings *mod
 	// Build audience collection from scopes
 	audCollection := []string{}
 	for _, s := range scopes {
-		if oidc.IsIdTokenScope(s) {
+		if oidc.IsClaimScope(s) {
 			// if an OIDC scope is present, give access to the userinfo endpoint
 			if !slices.Contains(audCollection, coreconstants.AuthServerResourceIdentifier) {
 				audCollection = append(audCollection, coreconstants.AuthServerResourceIdentifier)

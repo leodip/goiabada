@@ -133,6 +133,23 @@ func TestUserCreator_CreateUser_RefusesWithoutTheAccountPermissionBeforeAnyTrans
 	db.AssertNotCalled(t, "RunInTransaction", mock.Anything, mock.Anything)
 }
 
+// A lookup answers (nil, nil) for a row that is not there. The creator used to read the id off
+// that nil and panic; it refuses instead, naming the resource, before any other read and before
+// any transaction opens (#425).
+func TestUserCreator_CreateUser_RefusesWhenTheAuthServerResourceIsMissing(t *testing.T) {
+	db := mocks_data.NewDatabase(t)
+	db.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, constants.AuthServerResourceIdentifier).
+		Return(nil, nil).Once()
+
+	user, err := NewUserCreator(db).CreateUser(context.Background(), &CreateUserInput{Email: "ada@example.com"})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unable to find the "+constants.AuthServerResourceIdentifier+" resource")
+	assert.Nil(t, user)
+	db.AssertNotCalled(t, "GetPermissionsByResourceId", mock.Anything, mock.Anything, mock.Anything)
+	db.AssertNotCalled(t, "RunInTransaction", mock.Anything, mock.Anything)
+}
+
 // TestUserCreator_CreateUser_TheBodyIsSafeToRerun is the property RunInTransaction relies on: a
 // second run of the body, as after a deadlock, inserts the user again and names the id THAT
 // insert assigned, not the one the rolled-back attempt left on the model.

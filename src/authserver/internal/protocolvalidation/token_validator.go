@@ -18,6 +18,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
+	"github.com/leodip/goiabada/authserver/internal/permissions"
 	"github.com/leodip/goiabada/authserver/internal/urlutil"
 	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
@@ -36,7 +37,7 @@ type TokenParser interface {
 // tokenValidatorDatabase is what the token request validator needs: the client, the grant being
 // presented, and the consent and permissions that decide the scope.
 type tokenValidatorDatabase interface {
-	scopeResolverDatabase
+	permissions.ScopeResolverDatabase
 
 	ClientLoadPermissions(ctx context.Context, tx *sql.Tx, client *models.Client) error
 	ClientLoadRedirectURIs(ctx context.Context, tx *sql.Tx, client *models.Client) error
@@ -874,7 +875,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 			coreconstants.UserinfoPermissionIdentifier)
 		storedScopeHasOidcScope := false
 		for _, storedScopeStr := range strings.Split(tokenScope, " ") {
-			if oidc.IsIdTokenScope(storedScopeStr) {
+			if oidc.IsClaimScope(storedScopeStr) {
 				storedScopeHasOidcScope = true
 				break
 			}
@@ -962,7 +963,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 			// token skips the check, which costs nothing, since it carries an OIDC scope and would
 			// therefore receive authserver:userinfo regardless of what the user holds.
 			isInjectedUserInfoScope := storedScopeHasOidcScope && inputScopeStr == userInfoScope
-			if !oidc.IsIdTokenScope(inputScopeStr) && !oidc.IsOfflineAccessScope(inputScopeStr) &&
+			if !oidc.IsClaimScope(inputScopeStr) && !oidc.IsOfflineAccessScope(inputScopeStr) &&
 				!isInjectedUserInfoScope {
 				userHasPermission, err := val.permissionChecker.UserHasScopePermission(ctx, user.Id, inputScopeStr)
 				if err != nil {
@@ -1113,95 +1114,6 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 	}
 }
 
-// scopeOutcome is what resolving a single resource:permission scope against the database can
-// conclude. Every value other than scopeOK is a rejection the caller words itself: the three call
-// sites answer the same conclusion with deliberately different text, so returning an error here
-// would either flatten that wording or force the resolver to know which site called it (#124).
-type scopeOutcome int
-
-const (
-	scopeOK scopeOutcome = iota
-	scopeMalformed
-	scopeResourceUnknown
-	scopePermissionUnknown
-)
-
-// scopeResolution carries the split parts back to the caller as well as the outcome, because every
-// rejection message quotes the resource identifier, the permission identifier, or both, and
-// re-splitting the scope at the call site is how the two copies drift apart.
-type scopeResolution struct {
-	Outcome              scopeOutcome
-	ResourceIdentifier   string             // parts[0], empty when Outcome is scopeMalformed
-	PermissionIdentifier string             // parts[1], empty when Outcome is scopeMalformed
-	Permission           *models.Permission // the resolved row, set only when Outcome is scopeOK
-}
-
-// resolveScope resolves one resource:permission scope against the database: split on ':', look the
-// resource up, look the permission up on that resource. It is the sequence ValidateScopes,
-// validateClientCredentialsScopes and validateROPCScopes each carried a copy of, and the copies had
-// already diverged - only one of them kept the resolved row, which is what the #104 fix needs to
-// compare permission ids rather than bare identifiers. Keep it that way: a caller that re-resolves
-// the permission itself is free to compare the identifier again and re-open #104.
-//
-// A returned error is a genuine database failure and nothing else; it is propagated unwrapped, since
-// all three callers hand it to a 500. A rejection is an Outcome, never an error.
-//
-// Package-level rather than a method because the two callers are different types, AuthorizeValidator
-// and TokenValidator, which hold ports of their own and share only what this function needs.
-
-// scopeResolverDatabase is what resolving one `resource:permission` scope needs: the resource, and
-// the permissions declared on it.
-//
-// Its own port rather than the token validator's, even though it is declared here, because the
-// authorize validator calls resolveScope too and holds two operations of its own. Handing it the
-// token validator's nineteen to reach these two is the shape decision 3 rejected when it chose a
-// port per file over a port per package (#386).
-type scopeResolverDatabase interface {
-	GetResourceByResourceIdentifier(ctx context.Context, tx *sql.Tx, resourceIdentifier string) (*models.Resource, error)
-	GetPermissionsByResourceId(ctx context.Context, tx *sql.Tx, resourceId int64) ([]models.Permission, error)
-}
-
-func resolveScope(ctx context.Context, db scopeResolverDatabase, scopeStr string) (scopeResolution, error) {
-	parts := strings.Split(scopeStr, ":")
-	if len(parts) != 2 {
-		return scopeResolution{Outcome: scopeMalformed}, nil
-	}
-
-	resolution := scopeResolution{
-		ResourceIdentifier:   parts[0],
-		PermissionIdentifier: parts[1],
-	}
-
-	res, err := db.GetResourceByResourceIdentifier(ctx, nil, resolution.ResourceIdentifier)
-	if err != nil {
-		return scopeResolution{}, err
-	}
-	if res == nil {
-		resolution.Outcome = scopeResourceUnknown
-		return resolution, nil
-	}
-
-	permissions, err := db.GetPermissionsByResourceId(ctx, nil, res.Id)
-	if err != nil {
-		return scopeResolution{}, err
-	}
-
-	// Resolve the requested permission ON THIS RESOURCE. permissions is already narrowed to
-	// resolution.ResourceIdentifier by the query above, and (permission_identifier, resource_id) is
-	// unique on every supported engine via idx_permission_identifier_resource, so at most one row
-	// here can match.
-	for i := range permissions {
-		if permissions[i].PermissionIdentifier == resolution.PermissionIdentifier {
-			resolution.Outcome = scopeOK
-			resolution.Permission = &permissions[i]
-			return resolution, nil
-		}
-	}
-
-	resolution.Outcome = scopePermissionUnknown
-	return resolution, nil
-}
-
 func (val *TokenValidator) validateClientCredentialsScopes(ctx context.Context, scope string, client *models.Client) error {
 
 	if len(scope) == 0 {
@@ -1215,35 +1127,35 @@ func (val *TokenValidator) validateClientCredentialsScopes(ctx context.Context, 
 
 	for _, scopeStr := range scopes {
 
-		if oidc.IsIdTokenScope(scopeStr) || oidc.IsOfflineAccessScope(scopeStr) {
+		if oidc.IsClaimScope(scopeStr) || oidc.IsOfflineAccessScope(scopeStr) {
 			return customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
 				fmt.Sprintf("Id token scopes (such as '%v') are not supported in the client credentials flow. Please use scopes in the format 'resource:permission' (e.g., 'backendA:read'). Multiple scopes can be specified, separated by spaces.", scopeStr),
 				http.StatusBadRequest)
 		}
 
-		resolution, err := resolveScope(ctx, val.database, scopeStr)
+		resolution, err := permissions.ResolveScope(ctx, val.database, scopeStr)
 		if err != nil {
 			return err
 		}
 
 		switch resolution.Outcome {
-		case scopeMalformed:
+		case permissions.ScopeMalformed:
 			return customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope",
 				fmt.Sprintf("Invalid scope format: '%v'. Scopes must adhere to the resource-identifier:permission-identifier format. For instance: backend-service:create-product.", scopeStr),
 				http.StatusBadRequest)
-		case scopeResourceUnknown:
+		case permissions.ScopeResourceUnknown:
 			return customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope",
 				fmt.Sprintf("Invalid scope: '%v'. Could not find a resource with identifier '%v'.", scopeStr, resolution.ResourceIdentifier),
 				http.StatusBadRequest)
-		case scopePermissionUnknown:
+		case permissions.ScopePermissionUnknown:
 			return customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope",
 				fmt.Sprintf("Scope '%v' is not recognized. The resource identified by '%v' doesn't grant the '%v' permission.", scopeStr, resolution.ResourceIdentifier, resolution.PermissionIdentifier),
 				http.StatusBadRequest)
 		}
 
-		// Ownership is decided here and not by the resolver: resolveScope answers whether the
-		// permission exists on the requested resource, "is it this client's?" is this grant's
-		// own rule and ROPC answers the same question against the user instead.
+		// Ownership is decided here and not by the resolver: permissions.ResolveScope answers
+		// whether the permission exists on the requested resource, "is it this client's?" is this
+		// grant's own rule and ROPC answers the same question against the user instead.
 		//
 		// Compare the resource-scoped permission id, never the bare identifier.
 		// client.Permissions is loaded by ClientLoadPermissions across EVERY resource, so a
@@ -1292,7 +1204,7 @@ func (val *TokenValidator) validateROPCScopes(ctx context.Context, scope string,
 		}
 
 		// Allow OIDC scopes and offline_access
-		if oidc.IsIdTokenScope(scopeStr) || oidc.IsOfflineAccessScope(scopeStr) {
+		if oidc.IsClaimScope(scopeStr) || oidc.IsOfflineAccessScope(scopeStr) {
 			validatedScopes = append(validatedScopes, scopeStr)
 			continue
 		}
@@ -1300,21 +1212,21 @@ func (val *TokenValidator) validateROPCScopes(ctx context.Context, scope string,
 		// Resolve resource:permission against the database. The malformed-pair wording here is
 		// this grant's own - it names the OIDC scopes, which the other two sites do not - so the
 		// resolver answers with an outcome and each site writes its own message (#124).
-		resolution, err := resolveScope(ctx, val.database, scopeStr)
+		resolution, err := permissions.ResolveScope(ctx, val.database, scopeStr)
 		if err != nil {
 			return "", err
 		}
 
 		switch resolution.Outcome {
-		case scopeMalformed:
+		case permissions.ScopeMalformed:
 			return "", customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope",
 				fmt.Sprintf("Invalid scope format: '%v'. Scopes must be either OIDC scopes (openid, profile, email, address, phone, groups, attributes) or resource-identifier:permission-identifier format.", scopeStr),
 				http.StatusBadRequest)
-		case scopeResourceUnknown:
+		case permissions.ScopeResourceUnknown:
 			return "", customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope",
 				fmt.Sprintf("Invalid scope: '%v'. Could not find a resource with identifier '%v'.", scopeStr, resolution.ResourceIdentifier),
 				http.StatusBadRequest)
-		case scopePermissionUnknown:
+		case permissions.ScopePermissionUnknown:
 			return "", customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope",
 				fmt.Sprintf("Scope '%v' is not recognized. The resource identified by '%v' doesn't grant the '%v' permission.", scopeStr, resolution.ResourceIdentifier, resolution.PermissionIdentifier),
 				http.StatusBadRequest)

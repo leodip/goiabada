@@ -12,6 +12,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
+	"github.com/leodip/goiabada/authserver/internal/permissions"
 	"github.com/leodip/goiabada/authserver/internal/urlutil"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
@@ -21,9 +22,9 @@ import (
 // authorizeValidatorDatabase is what the authorize request validator needs: the client and its
 // registered redirect URIs.
 //
-// It embeds the scope resolver's port because a requested scope is resolved by resolveScope.
+// It embeds the scope resolver's port because a requested scope is resolved by permissions.ResolveScope.
 type authorizeValidatorDatabase interface {
-	scopeResolverDatabase
+	permissions.ScopeResolverDatabase
 
 	ClientLoadRedirectURIs(ctx context.Context, tx *sql.Tx, client *models.Client) error
 	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*models.Client, error)
@@ -82,7 +83,7 @@ func (val *AuthorizeValidator) ValidateScopes(ctx context.Context, scope string)
 	for _, scopeStr := range scopes {
 
 		// these scopes don't need further validation
-		if oidc.IsIdTokenScope(scopeStr) || oidc.IsOfflineAccessScope(scopeStr) {
+		if oidc.IsClaimScope(scopeStr) || oidc.IsOfflineAccessScope(scopeStr) {
 			continue
 		}
 
@@ -96,21 +97,21 @@ func (val *AuthorizeValidator) ValidateScopes(ctx context.Context, scope string)
 		// The rejection wording below is this endpoint's own and differs from the token
 		// endpoint's for the same outcome; both are asserted verbatim by the integration suite,
 		// so the shared resolver hands back an outcome and never a message (#124).
-		resolution, err := resolveScope(ctx, val.database, scopeStr)
+		resolution, err := permissions.ResolveScope(ctx, val.database, scopeStr)
 		if err != nil {
 			return err
 		}
 
 		switch resolution.Outcome {
-		case scopeMalformed:
+		case permissions.ScopeMalformed:
 			return customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope",
 				fmt.Sprintf("Invalid scope format: '%v'. Scopes must adhere to the resource-identifier:permission-identifier format. For instance: backend-service:create-product.", scopeStr),
 				http.StatusBadRequest)
-		case scopeResourceUnknown:
+		case permissions.ScopeResourceUnknown:
 			return customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope",
 				fmt.Sprintf("Invalid scope: '%v'. Could not find a resource with identifier '%v'.", scopeStr, resolution.ResourceIdentifier),
 				http.StatusBadRequest)
-		case scopePermissionUnknown:
+		case permissions.ScopePermissionUnknown:
 			return customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope",
 				fmt.Sprintf("Scope '%v' is invalid. The resource identified by '%v' does not have a permission with identifier '%v'.", scopeStr, resolution.ResourceIdentifier, resolution.PermissionIdentifier),
 				http.StatusBadRequest)

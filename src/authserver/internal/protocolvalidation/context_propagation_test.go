@@ -20,8 +20,8 @@ import (
 // a validator that resolved a scope under context.Background() matches nothing and the strict mock
 // reports an unexpected call.
 //
-// The shape is worth a case of its own because resolveScope is where the context has furthest to
-// travel inside this package: ValidateScopes takes it, hands it to a package-level function shared
+// The shape is worth a case of its own because permissions.ResolveScope is where the context has
+// furthest to travel from this package: ValidateScopes takes it, hands it to the resolver it shares
 // with the token endpoint, and that function makes two reads.
 
 const propagatedRequestId = "goiabada/req-validation-propagation-1"
@@ -36,8 +36,8 @@ func theCallersContext() interface{} {
 	})
 }
 
-// The accept arm: both of resolveScope's reads -- the resource and the permissions on it -- are
-// issued on behalf of the caller that asked for the validation.
+// The accept arm: both of permissions.ResolveScope's reads -- the resource and the permissions on
+// it -- are issued on behalf of the caller that asked for the validation.
 func TestValidateScopes_ResolvesUnderTheCallersContext(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 
@@ -53,8 +53,8 @@ func TestValidateScopes_ResolvesUnderTheCallersContext(t *testing.T) {
 }
 
 // The reject arm: a scope that is not in resource:permission form is refused by the shape check
-// inside resolveScope, before either read, so no database port is reached at all and there is no
-// context to get wrong.
+// inside permissions.ResolveScope, before either read, so no database port is reached at all and
+// there is no context to get wrong.
 func TestValidateScopes_AMalformedScopeReachesNoDatabasePort(t *testing.T) {
 	mockDB := mocks_data.NewDatabase(t)
 

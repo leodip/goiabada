@@ -36,10 +36,10 @@ func buildScopeInfoArray(ctx context.Context, scope string, consent *models.User
 
 	scopes := strings.Split(scope, " ")
 	for _, scope := range scopes {
-		if oidc.IsIdTokenScope(scope) || oidc.IsOfflineAccessScope(scope) {
+		if oidc.IsClaimScope(scope) || oidc.IsOfflineAccessScope(scope) {
 			scopeInfoArr = append(scopeInfoArr, ScopeInfo{
 				Scope:            scope,
-				Description:      i18n.T(ctx, oidc.GetIdTokenScopeDescriptionKey(scope)),
+				Description:      i18n.T(ctx, oidc.ScopeDescriptionKey(scope)),
 				AlreadyConsented: consent != nil && consent.HasScope(scope),
 			})
 		} else {
@@ -133,7 +133,7 @@ func HandleConsentGet(
 		// - Not all scopes are fully consented, OR
 		// - offline_access is requested (always re-confirm refresh token grant), OR
 		// - prompt=consent was explicitly requested (force consent UI)
-		if !scopesFullyConsented || authContext.HasScope(oidc.OfflineAccessScope) || authContext.HasPromptValue("consent") {
+		if !scopesFullyConsented || oidc.HasOfflineAccessScope(authContext.Scope) || authContext.HasPromptValue("consent") {
 			displayInfo := getClientDisplayInfo(r.Context(), database, client)
 
 			// The consent screen names the client through its own rule rather than through

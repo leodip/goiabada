@@ -743,33 +743,3 @@ func TestSetScope_NormalizesWhitespaceAndDuplicates(t *testing.T) {
 		})
 	}
 }
-
-func TestAuthContext_HasScope(t *testing.T) {
-	testCases := []struct {
-		name  string
-		scope string
-		query string
-		want  bool
-	}{
-		{"present among several", "openid profile email", "profile", true},
-		{"first element", "openid profile", "openid", true},
-		{"last element", "openid profile", "profile", true},
-		{"only element", "openid", "openid", true},
-		{"absent", "openid profile", "email", false},
-		{"empty scope", "", "openid", false},
-		{"empty query against empty scope", "", "", false},
-		{"prefix must not match", "openid profile", "open", false},
-		{"suffix must not match", "openid profile", "id", false},
-		{"resource scope present", "openid backend-svc:read", "backend-svc:read", true},
-		{"resource scope absent", "openid backend-svc:read", "backend-svc:write", false},
-		{"case sensitive", "openid", "OPENID", false},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			ac := &AuthContext{Scope: tc.scope}
-
-			assert.Equal(t, tc.want, ac.HasScope(tc.query))
-		})
-	}
-}

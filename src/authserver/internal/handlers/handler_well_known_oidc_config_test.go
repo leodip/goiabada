@@ -47,7 +47,8 @@ func TestHandleWellKnownOIDCConfigGet(t *testing.T) {
 			assert.ElementsMatch(t, []string{"urn:goiabada:level1", "urn:goiabada:level2_optional", "urn:goiabada:level2_mandatory"}, wellKnownConfig.ACRValuesSupported)
 			assert.ElementsMatch(t, []string{"public"}, wellKnownConfig.SubjectTypesSupported)
 			assert.ElementsMatch(t, []string{"RS256"}, wellKnownConfig.IdTokenSigningAlgValuesSupported)
-			assert.ElementsMatch(t, []string{"openid", "profile", "email", "address", "phone", "groups", "attributes", "offline_access"}, wellKnownConfig.ScopesSupported)
+			// The roster is pinned literally in oidc_test.go; this asserts discovery publishes that one list.
+			assert.Equal(t, oidc.SupportedScopes(), wellKnownConfig.ScopesSupported)
 			assert.ElementsMatch(t, []string{
 				"iss", "iat", "nbf", "auth_time", "jti", "acr", "amr", "sid", "aud", "typ", "exp", "nonce",
 				"sub", "name", "given_name", "middle_name", "family_name", "nickname", "preferred_username",

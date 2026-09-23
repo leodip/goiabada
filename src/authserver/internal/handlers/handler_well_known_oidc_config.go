@@ -47,8 +47,7 @@ func HandleWellKnownOIDCConfigGet(
 			ACRValuesSupported:               []string{"urn:goiabada:level1", "urn:goiabada:level2_optional", "urn:goiabada:level2_mandatory"},
 			SubjectTypesSupported:            []string{"public"},
 			IdTokenSigningAlgValuesSupported: []string{"RS256"},
-			ScopesSupported: []string{
-				"openid", "profile", "email", "address", "phone", "groups", "attributes", oidc.OfflineAccessScope},
+			ScopesSupported:                  oidc.SupportedScopes(),
 			ClaimsSupported: []string{
 				"iss", "iat", "nbf", "auth_time", "jti", "acr", "amr", "sid", "aud", "typ", "exp", "nonce",
 				"sub",                                                                                                                                                                            // openid
