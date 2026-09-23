@@ -217,8 +217,8 @@ func createDatabaseUnderAdvisoryLock(maintenanceDB *sql.DB, name string) error {
 	defer func() { _ = conn.Close() }()
 
 	key := AdvisoryLockKey(name)
-	if _, err := conn.ExecContext(ctx, "SELECT pg_advisory_lock($1)", key); err != nil {
-		return errs.Wrap(err, "unable to take the database creation lock")
+	if _, execErr := conn.ExecContext(ctx, "SELECT pg_advisory_lock($1)", key); execErr != nil {
+		return errs.Wrap(execErr, "unable to take the database creation lock")
 	}
 	defer func() {
 		_, _ = conn.ExecContext(ctx, "SELECT pg_advisory_unlock($1)", key)

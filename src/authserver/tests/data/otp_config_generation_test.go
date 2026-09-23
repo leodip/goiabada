@@ -52,11 +52,11 @@ func TestIncrementUserOtpConfigGeneration(t *testing.T) {
 
 	// Twice more, so "by one" is a property rather than a coincidence of starting at 0.
 	for want := int64(2); want <= 3; want++ {
-		tx, err := database.BeginTransaction(context.Background())
-		require.NoError(t, err, "BeginTransaction")
-		got, err := database.IncrementUserOtpConfigGeneration(context.Background(), tx, moved.Id)
-		require.NoError(t, err, "IncrementUserOtpConfigGeneration")
-		require.NoError(t, database.CommitTransaction(context.Background(), tx), "CommitTransaction")
+		loopTx, loopErr := database.BeginTransaction(context.Background())
+		require.NoError(t, loopErr, "BeginTransaction")
+		got, loopErr := database.IncrementUserOtpConfigGeneration(context.Background(), loopTx, moved.Id)
+		require.NoError(t, loopErr, "IncrementUserOtpConfigGeneration")
+		require.NoError(t, database.CommitTransaction(context.Background(), loopTx), "CommitTransaction")
 		assert.EqualValues(t, want, got)
 	}
 	assert.EqualValues(t, 3, reload(moved.Id))

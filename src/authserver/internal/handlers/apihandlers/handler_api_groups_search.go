@@ -54,12 +54,12 @@ func HandleAPIGroupsSearchGet(
 		page := 1
 		size := 10
 		if v := r.URL.Query().Get("page"); v != "" {
-			if p, err := strconv.Atoi(v); err == nil && p > 0 {
+			if p, parseErr := strconv.Atoi(v); parseErr == nil && p > 0 {
 				page = p
 			}
 		}
 		if v := r.URL.Query().Get("size"); v != "" {
-			if s, err := strconv.Atoi(v); err == nil && s > 0 && s <= 200 {
+			if s, parseErr := strconv.Atoi(v); parseErr == nil && s > 0 && s <= 200 {
 				size = s
 			}
 		}

@@ -190,7 +190,7 @@ func HandleAPIResourceUpdatePut(
 		}
 
 		var updateReq api.UpdateResourceRequest
-		if err := json.NewDecoder(r.Body).Decode(&updateReq); err != nil {
+		if decodeErr := json.NewDecoder(r.Body).Decode(&updateReq); decodeErr != nil {
 			writeJSONError(w, "Invalid request body", "INVALID_REQUEST_BODY", http.StatusBadRequest)
 			return
 		}
@@ -208,14 +208,14 @@ func HandleAPIResourceUpdatePut(
 			return
 		}
 
-		if err := accountvalidation.ValidateNoAngleBrackets(updateReq.Description, i18n.ErrCodeDescriptionAngleBrackets); err != nil {
-			writeValidationError(w, r, err)
+		if validateNoAngleBracketsErr := accountvalidation.ValidateNoAngleBrackets(updateReq.Description, i18n.ErrCodeDescriptionAngleBrackets); validateNoAngleBracketsErr != nil {
+			writeValidationError(w, r, validateNoAngleBracketsErr)
 			return
 		}
 
 		// Validate identifier format
-		if err := identifierValidator.ValidateIdentifier(updateReq.ResourceIdentifier, true); err != nil {
-			writeValidationError(w, r, err)
+		if validateIdentifierErr := identifierValidator.ValidateIdentifier(updateReq.ResourceIdentifier, true); validateIdentifierErr != nil {
+			writeValidationError(w, r, validateIdentifierErr)
 			return
 		}
 

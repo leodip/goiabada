@@ -77,7 +77,7 @@ func HandleAPIUserPhonePut(
 
 		// Parse request body
 		var req api.UpdateUserPhoneRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		if decodeErr := json.NewDecoder(r.Body).Decode(&req); decodeErr != nil {
 			writeJSONError(w, "Invalid request body", "INVALID_REQUEST_BODY", http.StatusBadRequest)
 			return
 		}

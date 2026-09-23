@@ -93,17 +93,17 @@ func parkOnConsentScreen(t *testing.T, requestScope string, clientSecret string,
 	for _, scope := range grantScopes {
 		parts := strings.Split(scope, ":")
 		assert.Len(t, parts, 2, "a grantable scope is resource:permission")
-		resource, err := database.GetResourceByResourceIdentifier(context.Background(), nil, parts[0])
-		assert.NoError(t, err)
+		resource, grantErr := database.GetResourceByResourceIdentifier(context.Background(), nil, parts[0])
+		assert.NoError(t, grantErr)
 		assert.NotNil(t, resource)
-		permissions, err := database.GetPermissionsByResourceId(context.Background(), nil, resource.Id)
-		assert.NoError(t, err)
+		permissions, grantErr := database.GetPermissionsByResourceId(context.Background(), nil, resource.Id)
+		assert.NoError(t, grantErr)
 		granted := false
 		for i := range permissions {
 			if permissions[i].PermissionIdentifier == parts[1] {
-				err = database.CreateUserPermission(context.Background(), nil,
+				grantErr = database.CreateUserPermission(context.Background(), nil,
 					&models.UserPermission{UserId: user.Id, PermissionId: permissions[i].Id})
-				assert.NoError(t, err)
+				assert.NoError(t, grantErr)
 				granted = true
 				break
 			}

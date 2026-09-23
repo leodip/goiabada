@@ -249,11 +249,11 @@ func TestRenderTemplateToBuffer(t *testing.T) {
 	})
 
 	t.Run("Layout settings reach the template", func(t *testing.T) {
-		templateFS := &mocks.TestFS{FileContents: map[string]string{
+		layoutFS := &mocks.TestFS{FileContents: map[string]string{
 			"layouts/layout.html": "<html>{{template \"content\" .}}</html>",
 			"page.html":           "{{define \"content\"}}{{.appName}}|{{.uiTheme}}|{{.smtpEnabled}}{{end}}",
 		}}
-		httpHelper := NewHttpHelper(templateFS, stubSettingsReader{settings: LayoutSettings{
+		httpHelper := NewHttpHelper(layoutFS, stubSettingsReader{settings: LayoutSettings{
 			AppName:     "sentinel app",
 			UITheme:     "sentinel theme",
 			SMTPEnabled: true,

@@ -344,13 +344,13 @@ func TestAPIClientSessionsGet_PaginationDefaultAndCap(t *testing.T) {
 			DeviceOS:          "linux",
 			UserId:            testUser.Id,
 		}
-		err := database.CreateUserSession(context.Background(), nil, s)
-		assert.NoError(t, err)
+		sessionErr := database.CreateUserSession(context.Background(), nil, s)
+		assert.NoError(t, sessionErr)
 		sessions = append(sessions, s)
 		// Link to client
 		usc := &models.UserSessionClient{UserSessionId: s.Id, ClientId: testClient.Id, Started: now.Add(-time.Hour), LastAccessed: now.Add(-time.Minute * 5)}
-		err = database.CreateUserSessionClient(context.Background(), nil, usc)
-		assert.NoError(t, err)
+		sessionErr = database.CreateUserSessionClient(context.Background(), nil, usc)
+		assert.NoError(t, sessionErr)
 	}
 	defer func() {
 		for _, s := range sessions {

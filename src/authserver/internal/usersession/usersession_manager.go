@@ -165,20 +165,20 @@ func (u *UserSessionManager) StartNewUserSession(w http.ResponseWriter, r *http.
 	// browser did have (#198). Only the browser-store write below is left after the commit, and it
 	// is compensated rather than prevented: see abandonUserSession.
 	err = u.database.RunInTransaction(r.Context(), func(tx *sql.Tx) error {
-		if err := u.database.CreateUserSession(r.Context(), tx, userSession); err != nil {
-			return err
+		if createUserSessionErr := u.database.CreateUserSession(r.Context(), tx, userSession); createUserSessionErr != nil {
+			return createUserSessionErr
 		}
 
 		for _, client := range userSession.Clients {
 			client.UserSessionId = userSession.Id
-			if err := u.database.CreateUserSessionClient(r.Context(), tx, &client); err != nil {
-				return err
+			if createUserSessionClientErr := u.database.CreateUserSessionClient(r.Context(), tx, &client); createUserSessionClientErr != nil {
+				return createUserSessionClientErr
 			}
 		}
 
-		allUserSessions, err := u.database.GetUserSessionsByUserId(r.Context(), tx, userId)
-		if err != nil {
-			return err
+		allUserSessions, getUserSessionsErr := u.database.GetUserSessionsByUserId(r.Context(), tx, userId)
+		if getUserSessionsErr != nil {
+			return getUserSessionsErr
 		}
 
 		// Delete this user's other sessions from the same device: same raw User-Agent header,
@@ -198,8 +198,8 @@ func (u *UserSessionManager) StartNewUserSession(w http.ResponseWriter, r *http.
 			if us.SessionIdentifier != userSession.SessionIdentifier &&
 				us.UserAgent == userSession.UserAgent &&
 				us.IpAddress == ipWithoutPort {
-				if err := u.database.DeleteUserSession(r.Context(), tx, us.Id); err != nil {
-					return err
+				if deleteUserSessionErr := u.database.DeleteUserSession(r.Context(), tx, us.Id); deleteUserSessionErr != nil {
+					return deleteUserSessionErr
 				}
 			}
 		}
@@ -241,8 +241,8 @@ func (u *UserSessionManager) StartNewUserSession(w http.ResponseWriter, r *http.
 	// Regenerate runs, and the row it deletes never held the identifier, so the ordering
 	// changes no outcome an attacker could use.
 	if regenerator, ok := u.sessionStore.(sessionstore.Regenerator); ok {
-		if err := regenerator.Regenerate(w, r, sess); err != nil {
-			return nil, u.abandonUserSession(r.Context(), userSession, errs.Wrap(err, "unable to rotate the browser session identifier"))
+		if regenerateErr := regenerator.Regenerate(w, r, sess); regenerateErr != nil {
+			return nil, u.abandonUserSession(r.Context(), userSession, errs.Wrap(regenerateErr, "unable to rotate the browser session identifier"))
 		}
 		return userSession, nil
 	}
@@ -381,21 +381,21 @@ func (u *UserSessionManager) BumpUserSession(r *http.Request, sessionIdentifier 
 		// from client.Id on a copy, so an attempt that inserted leaves the slice as it found it
 		// and the rerun decides the same way.
 		err = u.database.RunInTransaction(r.Context(), func(tx *sql.Tx) error {
-			if err := u.database.UpdateUserSession(r.Context(), tx, userSession); err != nil {
-				return err
+			if updateUserSessionErr := u.database.UpdateUserSession(r.Context(), tx, userSession); updateUserSessionErr != nil {
+				return updateUserSessionErr
 			}
 
 			for _, client := range userSession.Clients {
 				if client.Id > 0 {
 					// update
-					if err := u.database.UpdateUserSessionClient(r.Context(), tx, &client); err != nil {
-						return err
+					if updateUserSessionClientErr := u.database.UpdateUserSessionClient(r.Context(), tx, &client); updateUserSessionClientErr != nil {
+						return updateUserSessionClientErr
 					}
 				} else {
 					// insert new
 					client.UserSessionId = userSession.Id
-					if err := u.database.CreateUserSessionClient(r.Context(), tx, &client); err != nil {
-						return err
+					if createUserSessionClientErr := u.database.CreateUserSessionClient(r.Context(), tx, &client); createUserSessionClientErr != nil {
+						return createUserSessionClientErr
 					}
 				}
 			}

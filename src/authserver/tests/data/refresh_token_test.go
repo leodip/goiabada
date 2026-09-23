@@ -653,8 +653,8 @@ func TestUpdateRefreshToken_DoesNotClobberAuthStateGeneration(t *testing.T) {
 
 	created.AuthStateGeneration = 0
 	created.Revoked = true
-	if err := database.UpdateRefreshToken(context.Background(), nil, created); err != nil {
-		t.Fatalf("Failed to update refresh token: %v", err)
+	if updateRefreshTokenErr := database.UpdateRefreshToken(context.Background(), nil, created); updateRefreshTokenErr != nil {
+		t.Fatalf("Failed to update refresh token: %v", updateRefreshTokenErr)
 	}
 
 	after, err := database.GetRefreshTokenById(context.Background(), nil, refreshToken.Id)
@@ -1034,8 +1034,8 @@ func TestGetRefreshTokensByClientId_TransactionAndFailurePath(t *testing.T) {
 		t.Fatalf("expected the transaction's own uncommitted token, got %d rows", len(got))
 	}
 
-	if err := database.RollbackTransaction(context.Background(), tx); err != nil {
-		t.Fatalf("RollbackTransaction: %v", err)
+	if rollbackErr := database.RollbackTransaction(context.Background(), tx); rollbackErr != nil {
+		t.Fatalf("RollbackTransaction: %v", rollbackErr)
 	}
 
 	// The failure path, forced by the same finished transaction.
@@ -1139,8 +1139,8 @@ func TestMarkRefreshTokenAsRevoked(t *testing.T) {
 	// revocation or a family cascade produces.
 	other := createTestRefreshToken(t)
 	other.Revoked = true
-	if err := database.UpdateRefreshToken(context.Background(), nil, other); err != nil {
-		t.Fatalf("failed to revoke a token by another path: %v", err)
+	if updateRefreshTokenErr := database.UpdateRefreshToken(context.Background(), nil, other); updateRefreshTokenErr != nil {
+		t.Fatalf("failed to revoke a token by another path: %v", updateRefreshTokenErr)
 	}
 	claimed, err = database.MarkRefreshTokenAsRevoked(context.Background(), nil, other.Id)
 	if err != nil {

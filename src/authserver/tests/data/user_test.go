@@ -627,8 +627,8 @@ func TestUpdateUser_DoesNotClobberAuthStateGeneration(t *testing.T) {
 	// A stale model, carrying the pre-increment value, must not pull it back down.
 	created.AuthStateGeneration = 0
 	created.GivenName = "Changed"
-	if err := database.UpdateUser(context.Background(), nil, created); err != nil {
-		t.Fatalf("Failed to update user: %v", err)
+	if updateUserErr := database.UpdateUser(context.Background(), nil, created); updateUserErr != nil {
+		t.Fatalf("Failed to update user: %v", updateUserErr)
 	}
 
 	after, err := database.GetUserById(context.Background(), nil, user.Id)
@@ -672,8 +672,8 @@ func TestIncrementUserAuthStateGeneration(t *testing.T) {
 		t.Errorf("second increment returned %d, want 2 (is the counter monotonic?)", second)
 	}
 
-	if err := database.CommitTransaction(context.Background(), tx); err != nil {
-		t.Fatalf("CommitTransaction failed: %v", err)
+	if commitErr := database.CommitTransaction(context.Background(), tx); commitErr != nil {
+		t.Fatalf("CommitTransaction failed: %v", commitErr)
 	}
 
 	reloaded, err := database.GetUserById(context.Background(), nil, user.Id)
@@ -716,8 +716,8 @@ func TestSetUserPasswordHash(t *testing.T) {
 		t.Fatalf("Failed to reload user: %v", err)
 	}
 
-	if err := database.SetUserPasswordHash(context.Background(), nil, user.Id, "newhash"); err != nil {
-		t.Fatalf("SetUserPasswordHash failed: %v", err)
+	if setUserPasswordHashErr := database.SetUserPasswordHash(context.Background(), nil, user.Id, "newhash"); setUserPasswordHashErr != nil {
+		t.Fatalf("SetUserPasswordHash failed: %v", setUserPasswordHashErr)
 	}
 
 	after, err := database.GetUserById(context.Background(), nil, user.Id)
@@ -927,8 +927,8 @@ func TestResetUserOTPStep(t *testing.T) {
 		t.Fatalf("seeding a consumed step failed: claimed=%v err=%v", claimed, err)
 	}
 
-	if err := database.ResetUserOTPStep(context.Background(), nil, user.Id); err != nil {
-		t.Fatalf("ResetUserOTPStep failed: %v", err)
+	if resetUserOTPStepErr := database.ResetUserOTPStep(context.Background(), nil, user.Id); resetUserOTPStepErr != nil {
+		t.Fatalf("ResetUserOTPStep failed: %v", resetUserOTPStepErr)
 	}
 
 	reloaded, err := database.GetUserById(context.Background(), nil, user.Id)
@@ -989,8 +989,8 @@ func TestTryConsumeUserOTPStep_RequireOTPEnabled(t *testing.T) {
 	// disable handlers do; it cannot touch last_otp_step, since the column is
 	// dont-update.
 	user.OTPEnabled = false
-	if err := database.UpdateUser(context.Background(), nil, user); err != nil {
-		t.Fatalf("Failed to disable OTP: %v", err)
+	if updateUserErr := database.UpdateUser(context.Background(), nil, user); updateUserErr != nil {
+		t.Fatalf("Failed to disable OTP: %v", updateUserErr)
 	}
 
 	// A verification claim is now refused, with no error: the step is newer than the
@@ -1034,11 +1034,11 @@ func TestResetUserOTPStep_DoesNotReopenConsumedStepToVerification(t *testing.T) 
 	// Reversed, there is a window where the marker reads 0 while the authenticator
 	// still reads enabled, and this test's claim would succeed.
 	user.OTPEnabled = false
-	if err := database.UpdateUser(context.Background(), nil, user); err != nil {
-		t.Fatalf("Failed to disable OTP: %v", err)
+	if updateUserErr := database.UpdateUser(context.Background(), nil, user); updateUserErr != nil {
+		t.Fatalf("Failed to disable OTP: %v", updateUserErr)
 	}
-	if err := database.ResetUserOTPStep(context.Background(), nil, user.Id); err != nil {
-		t.Fatalf("ResetUserOTPStep failed: %v", err)
+	if resetUserOTPStepErr := database.ResetUserOTPStep(context.Background(), nil, user.Id); resetUserOTPStepErr != nil {
+		t.Fatalf("ResetUserOTPStep failed: %v", resetUserOTPStepErr)
 	}
 
 	replayed, err := database.TryConsumeUserOTPStep(context.Background(), nil, user.Id, step, true)
@@ -1088,8 +1088,8 @@ func TestTryConsumeUserOTPStep_EnlistsInTransactionAndFailsClosed(t *testing.T) 
 		t.Fatal("claim inside a transaction should report the transition")
 	}
 
-	if err := database.RollbackTransaction(context.Background(), tx); err != nil {
-		t.Fatalf("RollbackTransaction failed: %v", err)
+	if rollbackErr := database.RollbackTransaction(context.Background(), tx); rollbackErr != nil {
+		t.Fatalf("RollbackTransaction failed: %v", rollbackErr)
 	}
 
 	reloaded, err := database.GetUserById(context.Background(), nil, user.Id)
@@ -1242,8 +1242,8 @@ func TestUpdateUser_DoesNotClobberLastOTPStep(t *testing.T) {
 	}
 
 	stale.GivenName = "Changed"
-	if err := database.UpdateUser(context.Background(), nil, stale); err != nil {
-		t.Fatalf("Failed to update user: %v", err)
+	if updateUserErr := database.UpdateUser(context.Background(), nil, stale); updateUserErr != nil {
+		t.Fatalf("Failed to update user: %v", updateUserErr)
 	}
 
 	after, err := database.GetUserById(context.Background(), nil, user.Id)
@@ -1389,8 +1389,8 @@ func TestSetUserPasswordHash_ClearsCodeHash(t *testing.T) {
 		t.Fatalf("the seeded hash must be findable before the password write: user=%v err=%v", before, err)
 	}
 
-	if err := database.SetUserPasswordHash(context.Background(), nil, user.Id, "newhash"); err != nil {
-		t.Fatalf("SetUserPasswordHash failed: %v", err)
+	if setUserPasswordHashErr := database.SetUserPasswordHash(context.Background(), nil, user.Id, "newhash"); setUserPasswordHashErr != nil {
+		t.Fatalf("SetUserPasswordHash failed: %v", setUserPasswordHashErr)
 	}
 
 	after, err := database.GetUserByForgotPasswordCodeHash(context.Background(), nil, hash)
@@ -1451,8 +1451,8 @@ func TestGetUserByForgotPasswordCodeHash_Transaction(t *testing.T) {
 		t.Errorf("found user id %d through the transaction, want %d", inTx.Id, user.Id)
 	}
 
-	if err := database.RollbackTransaction(context.Background(), tx); err != nil {
-		t.Fatalf("RollbackTransaction failed: %v", err)
+	if rollbackErr := database.RollbackTransaction(context.Background(), tx); rollbackErr != nil {
+		t.Fatalf("RollbackTransaction failed: %v", rollbackErr)
 	}
 
 	// 7a. Rolled back, so nothing carries the hash any more.
@@ -1556,10 +1556,10 @@ func TestTryConsumeForgotPasswordCode(t *testing.T) {
 	// '' is the dormant value on every user with no code outstanding, so an empty
 	// predicate would claim one of them and set a password on an account nobody asked to
 	// reset.
-	if _, err := database.TryConsumeForgotPasswordCode(context.Background(), nil, other.Id, "", "guardedpassword"); err == nil {
+	if _, consumeErr := database.TryConsumeForgotPasswordCode(context.Background(), nil, other.Id, "", "guardedpassword"); consumeErr == nil {
 		t.Error("an empty code hash must return an error")
 	}
-	if _, err := database.TryConsumeForgotPasswordCode(context.Background(), nil, 0, otherHash, "guardedpassword"); err == nil {
+	if _, consumeErr := database.TryConsumeForgotPasswordCode(context.Background(), nil, 0, otherHash, "guardedpassword"); consumeErr == nil {
 		t.Error("a zero user id must return an error")
 	}
 	guarded, err := database.GetUserById(context.Background(), nil, other.Id)
@@ -1591,8 +1591,8 @@ func TestTryConsumeForgotPasswordCode_EnlistsInTransactionAndFailsClosed(t *test
 		t.Fatal("claim inside a transaction should report the transition")
 	}
 
-	if err := database.RollbackTransaction(context.Background(), tx); err != nil {
-		t.Fatalf("RollbackTransaction failed: %v", err)
+	if rollbackErr := database.RollbackTransaction(context.Background(), tx); rollbackErr != nil {
+		t.Fatalf("RollbackTransaction failed: %v", rollbackErr)
 	}
 
 	reloaded, err := database.GetUserById(context.Background(), nil, user.Id)

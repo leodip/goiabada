@@ -105,9 +105,9 @@ func (r *SigningKeyRotator) Rotate(ctx context.Context) error {
 		var previousKey *models.KeyPair
 		for i := range allSigningKeys {
 			kp := &allSigningKeys[i]
-			keyState, err := models.KeyStateFromString(kp.State)
-			if err != nil {
-				return err
+			keyState, keyStateErr := models.KeyStateFromString(kp.State)
+			if keyStateErr != nil {
+				return keyStateErr
 			}
 			switch keyState {
 			case models.KeyStateCurrent:
@@ -129,8 +129,8 @@ func (r *SigningKeyRotator) Rotate(ctx context.Context) error {
 		// still there would put two rows in the previous state within one statement, which
 		// the unique index on key_pairs (state) refuses on every engine.
 		if previousKey != nil {
-			if err := r.database.DeleteKeyPair(ctx, tx, previousKey.Id); err != nil {
-				return err
+			if deleteKeyPairErr := r.database.DeleteKeyPair(ctx, tx, previousKey.Id); deleteKeyPairErr != nil {
+				return deleteKeyPairErr
 			}
 		}
 

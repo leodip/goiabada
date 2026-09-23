@@ -127,8 +127,8 @@ func DumpTable(ctx context.Context, db *sql.DB, d Dialect, table string) (TableS
 	// construct. Guarding first means one sentence a migration author can act on. It runs
 	// after the columns, so a table that does not exist is still answered by the
 	// read-no-columns error above rather than by a guard query returning zero of everything.
-	if err := guardTable(ctx, db, d, table); err != nil {
-		return TableShape{}, err
+	if guardTableErr := guardTable(ctx, db, d, table); guardTableErr != nil {
+		return TableShape{}, guardTableErr
 	}
 
 	indexes, err := dumpIndexes(ctx, db, d, table)

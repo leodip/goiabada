@@ -196,9 +196,9 @@ func TestAuthorize_ConsentFormFromAReplacedCeremonyIsRefused(t *testing.T) {
 
 	// Nothing was issued and nothing was persisted, for either client.
 	for _, c := range []*models.Client{clientA, clientB} {
-		consent, err := database.GetConsentByUserIdAndClientId(context.Background(), nil, user.Id, c.Id)
-		if err != nil {
-			t.Fatal(err)
+		consent, getConsentErr := database.GetConsentByUserIdAndClientId(context.Background(), nil, user.Id, c.Id)
+		if getConsentErr != nil {
+			t.Fatal(getConsentErr)
 		}
 		assert.Nil(t, consent, "the refused submission must persist no consent for %s", c.ClientIdentifier)
 	}

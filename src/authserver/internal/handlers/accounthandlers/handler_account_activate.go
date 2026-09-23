@@ -179,8 +179,8 @@ func handleActivationLinkFollowed(httpHelper HttpHelper, httpSession sessionstor
 
 	if isVerificationCodeExpired(preRegistration) {
 		// The code has expired: delete the pre-registration and ask the user to register again.
-		if err := database.DeletePreRegistration(r.Context(), nil, preRegistration.Id); err != nil {
-			httpHelper.InternalServerError(w, r, err)
+		if deletePreRegistrationErr := database.DeletePreRegistration(r.Context(), nil, preRegistration.Id); deletePreRegistrationErr != nil {
+			httpHelper.InternalServerError(w, r, deletePreRegistrationErr)
 			return
 		}
 
@@ -291,9 +291,9 @@ func handleActivationCleanHop(httpHelper HttpHelper, httpSession sessionstore.St
 	// Hygiene, and not the thing that makes the marker single-use: the deletion above is. A
 	// failure here is logged rather than answered with a 500, because the account has already
 	// been created and telling the caller the activation failed would be false.
-	if err := emaillinks.ClearLinkMarker(httpSession, w, r); err != nil {
+	if clearLinkMarkerErr := emaillinks.ClearLinkMarker(httpSession, w, r); clearLinkMarkerErr != nil {
 		slog.ErrorContext(r.Context(), "unable to clear the account activation link marker after a completed activation",
-			"email", createdUser.Email, "error", err)
+			"email", createdUser.Email, "error", clearLinkMarkerErr)
 	}
 
 	bind := map[string]interface{}{

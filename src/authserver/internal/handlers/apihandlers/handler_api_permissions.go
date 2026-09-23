@@ -115,7 +115,7 @@ func HandleAPIResourcePermissionsPut(
 		}
 
 		var req api.UpdateResourcePermissionsRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		if decodeErr := json.NewDecoder(r.Body).Decode(&req); decodeErr != nil {
 			writeJSONError(w, "Invalid request body", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
@@ -138,9 +138,9 @@ func HandleAPIResourcePermissionsPut(
 			rawDescription := strings.TrimSpace(req.Permissions[i].Description)
 
 			// Explicitly forbid HTML angle brackets in description
-			if err := accountvalidation.ValidateNoAngleBrackets(rawDescription,
-				i18n.ErrCodeAdminResourcePermissionsDescriptionHtmlNotAllowed); err != nil {
-				writeValidationError(w, r, err)
+			if validateNoAngleBracketsErr := accountvalidation.ValidateNoAngleBrackets(rawDescription,
+				i18n.ErrCodeAdminResourcePermissionsDescriptionHtmlNotAllowed); validateNoAngleBracketsErr != nil {
+				writeValidationError(w, r, validateNoAngleBracketsErr)
 				return
 			}
 
@@ -153,8 +153,8 @@ func HandleAPIResourcePermissionsPut(
 				return
 			}
 
-			if err := identifierValidator.ValidateIdentifier(rawIdentifier, true); err != nil {
-				writeValidationError(w, r, err)
+			if validateIdentifierErr := identifierValidator.ValidateIdentifier(rawIdentifier, true); validateIdentifierErr != nil {
+				writeValidationError(w, r, validateIdentifierErr)
 				return
 			}
 
@@ -242,8 +242,8 @@ func HandleAPIResourcePermissionsPut(
 
 				cur.PermissionIdentifier = p.PermissionIdentifier
 				cur.Description = p.Description
-				if err := database.UpdatePermission(r.Context(), nil, &cur); err != nil {
-					writeInternalServerError(w, r, errs.Wrap(err, "database error updating permission"), "permission_id", cur.Id)
+				if updatePermissionErr := database.UpdatePermission(r.Context(), nil, &cur); updatePermissionErr != nil {
+					writeInternalServerError(w, r, errs.Wrap(updatePermissionErr, "database error updating permission"), "permission_id", cur.Id)
 					return
 				}
 				// reflect change in maps
@@ -264,8 +264,8 @@ func HandleAPIResourcePermissionsPut(
 					PermissionIdentifier: p.PermissionIdentifier,
 					Description:          p.Description,
 				}
-				if err := database.CreatePermission(r.Context(), nil, perm); err != nil {
-					writeInternalServerError(w, r, errs.Wrap(err, "database error creating permission"), "resource_id", resource.Id)
+				if createPermissionErr := database.CreatePermission(r.Context(), nil, perm); createPermissionErr != nil {
+					writeInternalServerError(w, r, errs.Wrap(createPermissionErr, "database error creating permission"), "resource_id", resource.Id)
 					return
 				}
 				existingByIdentifier[perm.PermissionIdentifier] = *perm

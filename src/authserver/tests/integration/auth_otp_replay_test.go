@@ -82,12 +82,12 @@ func createLevel2MandatoryUser(t *testing.T, otpEnabled bool) (*models.Client, *
 
 	otpSecret := ""
 	if otpEnabled {
-		key, err := totp.Generate(totp.GenerateOpts{
+		key, generateErr := totp.Generate(totp.GenerateOpts{
 			Issuer:      "Goiabada",
 			AccountName: user.Email,
 		})
-		if err != nil {
-			t.Fatal(err)
+		if generateErr != nil {
+			t.Fatal(generateErr)
 		}
 		otpSecret = key.Secret()
 		user.OTPSecretEncrypted = encryptOTPSecretForTest(t, otpSecret)

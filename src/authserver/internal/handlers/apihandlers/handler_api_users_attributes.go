@@ -165,8 +165,8 @@ func HandleAPIUserAttributeCreatePost(
 			return
 		}
 
-		if err := accountvalidation.ValidateNoAngleBrackets(req.Value, i18n.ErrCodeAttributeValueAngleBrackets); err != nil {
-			writeValidationError(w, r, err)
+		if validateNoAngleBracketsErr := accountvalidation.ValidateNoAngleBrackets(req.Value, i18n.ErrCodeAttributeValueAngleBrackets); validateNoAngleBracketsErr != nil {
+			writeValidationError(w, r, validateNoAngleBracketsErr)
 			return
 		}
 
@@ -233,7 +233,7 @@ func HandleAPIUserAttributeUpdatePut(
 
 		// Decode the request body
 		var req api.UpdateUserAttributeRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		if decodeErr := json.NewDecoder(r.Body).Decode(&req); decodeErr != nil {
 			writeJSONError(w, "Invalid request body", "INVALID_REQUEST_BODY", http.StatusBadRequest)
 			return
 		}
@@ -269,8 +269,8 @@ func HandleAPIUserAttributeUpdatePut(
 			return
 		}
 
-		if err := accountvalidation.ValidateNoAngleBrackets(req.Value, i18n.ErrCodeAttributeValueAngleBrackets); err != nil {
-			writeValidationError(w, r, err)
+		if validateNoAngleBracketsErr := accountvalidation.ValidateNoAngleBrackets(req.Value, i18n.ErrCodeAttributeValueAngleBrackets); validateNoAngleBracketsErr != nil {
+			writeValidationError(w, r, validateNoAngleBracketsErr)
 			return
 		}
 

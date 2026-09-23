@@ -309,8 +309,8 @@ func TestGoldenPath(t *testing.T) {
 	require.NoError(t, err, "the test's own working directory is inside the repository")
 
 	for _, d := range []Dialect{SQLite, MySQL, Postgres, MSSQL} {
-		path, err := GoldenPath(d)
-		require.NoErrorf(t, err, "GoldenPath(%s)", d)
+		path, goldenPathErr := GoldenPath(d)
+		require.NoErrorf(t, goldenPathErr, "GoldenPath(%s)", d)
 		assert.Equalf(t, filepath.Join(root, "authserver", "internal", "data", string(d)+"db", "schema.golden"), path,
 			"the %s golden file sits beside that engine's migrations", d)
 		_, statErr := os.Stat(filepath.Dir(path))

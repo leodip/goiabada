@@ -160,8 +160,8 @@ func HandleAPIGroupAttributeCreatePost(
 			return
 		}
 
-		if err := accountvalidation.ValidateNoAngleBrackets(createReq.Value, i18n.ErrCodeAttributeValueAngleBrackets); err != nil {
-			writeValidationError(w, r, err)
+		if validateNoAngleBracketsErr := accountvalidation.ValidateNoAngleBrackets(createReq.Value, i18n.ErrCodeAttributeValueAngleBrackets); validateNoAngleBracketsErr != nil {
+			writeValidationError(w, r, validateNoAngleBracketsErr)
 			return
 		}
 
@@ -271,8 +271,8 @@ func HandleAPIGroupAttributeUpdatePut(
 			return
 		}
 
-		if err := accountvalidation.ValidateNoAngleBrackets(updateReq.Value, i18n.ErrCodeAttributeValueAngleBrackets); err != nil {
-			writeValidationError(w, r, err)
+		if validateNoAngleBracketsErr := accountvalidation.ValidateNoAngleBrackets(updateReq.Value, i18n.ErrCodeAttributeValueAngleBrackets); validateNoAngleBracketsErr != nil {
+			writeValidationError(w, r, validateNoAngleBracketsErr)
 			return
 		}
 

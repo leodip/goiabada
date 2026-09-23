@@ -174,9 +174,9 @@ func (t *TokenIssuer) GenerateTokenResponseForAuthCode(ctx context.Context,
 
 	scopes := strings.Split(code.Scope, " ")
 	if slices.Contains(scopes, "openid") {
-		idTokenStr, err := t.generateIdToken(ctx, settings, code, code.Scope, now, privKey, keyPair.KeyIdentifier)
-		if err != nil {
-			return nil, err
+		idTokenStr, idTokenErr := t.generateIdToken(ctx, settings, code, code.Scope, now, privKey, keyPair.KeyIdentifier)
+		if idTokenErr != nil {
+			return nil, idTokenErr
 		}
 		tokenResponse.IdToken = idTokenStr
 	}
@@ -531,9 +531,9 @@ func (t *TokenIssuer) GenerateTokenResponseForRefresh(ctx context.Context, input
 
 	scopes := strings.Split(scopeToUse, " ")
 	if slices.Contains(scopes, "openid") {
-		idTokenStr, err := t.generateIdToken(ctx, settings, input.Code, scopeToUse, now, privKey, keyPair.KeyIdentifier)
-		if err != nil {
-			return nil, err
+		idTokenStr, idTokenErr := t.generateIdToken(ctx, settings, input.Code, scopeToUse, now, privKey, keyPair.KeyIdentifier)
+		if idTokenErr != nil {
+			return nil, idTokenErr
 		}
 		tokenResponse.IdToken = idTokenStr
 	}
@@ -633,9 +633,9 @@ func (t *TokenIssuer) GenerateTokenResponseForRefreshROPC(ctx context.Context, i
 
 	scopes := strings.Split(scopeToUse, " ")
 	if slices.Contains(scopes, "openid") {
-		idTokenStr, err := t.generateROPCIdToken(ctx, settings, ropcInput, scopeToUse, now, privKey, keyPair.KeyIdentifier)
-		if err != nil {
-			return nil, err
+		idTokenStr, idTokenErr := t.generateROPCIdToken(ctx, settings, ropcInput, scopeToUse, now, privKey, keyPair.KeyIdentifier)
+		if idTokenErr != nil {
+			return nil, idTokenErr
 		}
 		tokenResponse.IdToken = idTokenStr
 	}
@@ -1131,9 +1131,9 @@ func (t *TokenIssuer) GenerateTokenResponseForROPC(ctx context.Context,
 	// Generate id_token if openid scope is present
 	scopes := strings.Split(input.Scope, " ")
 	if slices.Contains(scopes, "openid") {
-		idTokenStr, err := t.generateROPCIdToken(ctx, settings, input, input.Scope, now, privKey, keyPair.KeyIdentifier)
-		if err != nil {
-			return nil, err
+		idTokenStr, idTokenErr := t.generateROPCIdToken(ctx, settings, input, input.Scope, now, privKey, keyPair.KeyIdentifier)
+		if idTokenErr != nil {
+			return nil, idTokenErr
 		}
 		response.IdToken = idTokenStr
 	}

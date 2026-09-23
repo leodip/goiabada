@@ -76,7 +76,7 @@ func TestIntegration_UserFixturesDrawUniqueEmails(t *testing.T) {
 				if !ok {
 					continue
 				}
-				if name, ok := kv.Key.(*ast.Ident); !ok || name.Name != "Email" {
+				if name, isIdent := kv.Key.(*ast.Ident); !isIdent || name.Name != "Email" {
 					continue
 				}
 				value, ok := kv.Value.(*ast.BasicLit)

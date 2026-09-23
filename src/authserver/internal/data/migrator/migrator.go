@@ -59,9 +59,9 @@ func (m *Migrator) Engine() string { return m.eng.name }
 // "at version 0" tests for.
 func (m *Migrator) Version(ctx context.Context) (version int, dirty bool, err error) {
 	err = m.withConn(ctx, func(ctx context.Context, conn *sql.Conn) error {
-		v, d, err := m.readVersion(ctx, conn)
-		if err != nil {
-			return err
+		v, d, readVersionErr := m.readVersion(ctx, conn)
+		if readVersionErr != nil {
+			return readVersionErr
 		}
 		if v == NilVersion && !d {
 			return ErrNilVersion
@@ -105,8 +105,8 @@ func (m *Migrator) Migrate(ctx context.Context, target int) error {
 		if err != nil {
 			return err
 		}
-		if err := m.checkCarried(target); err != nil {
-			return err
+		if checkCarriedErr := m.checkCarried(target); checkCarriedErr != nil {
+			return checkCarriedErr
 		}
 		steps, err := m.stepsFrom(current, target)
 		if err != nil {
@@ -136,8 +136,8 @@ func (m *Migrator) Plan(ctx context.Context, target int) ([]int, error) {
 		if err != nil {
 			return err
 		}
-		if err := m.checkCarried(target); err != nil {
-			return err
+		if checkCarriedErr := m.checkCarried(target); checkCarriedErr != nil {
+			return checkCarriedErr
 		}
 		steps, err := m.stepsFrom(current, target)
 		if err != nil {

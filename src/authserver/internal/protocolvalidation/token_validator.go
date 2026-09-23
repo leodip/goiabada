@@ -256,9 +256,9 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 					clientSecretRequiredErrorMsg, http.StatusUnauthorized)
 			}
 
-			clientSecretDecrypted, err := encryption.DecryptData(client.ClientSecretEncrypted)
-			if err != nil {
-				return nil, err
+			clientSecretDecrypted, decryptDataErr := encryption.DecryptData(client.ClientSecretEncrypted)
+			if decryptDataErr != nil {
+				return nil, decryptDataErr
 			}
 			if subtle.ConstantTimeCompare([]byte(clientSecretDecrypted), []byte(input.ClientSecret)) != 1 {
 				// RFC 6749 Section 5.2: invalid_client for failed authentication
@@ -378,9 +378,9 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 		// Both columns compared are NOT NULL, so the zero-equals-zero vacuity that an
 		// incomplete test fixture can produce cannot arise against a real database.
 		if codeEntity.SessionIdentifier != "" {
-			codeSession, err := val.database.GetUserSessionBySessionIdentifier(ctx, nil, codeEntity.SessionIdentifier)
-			if err != nil {
-				return nil, err
+			codeSession, getUserSessionErr := val.database.GetUserSessionBySessionIdentifier(ctx, nil, codeEntity.SessionIdentifier)
+			if getUserSessionErr != nil {
+				return nil, getUserSessionErr
 			}
 			if codeSession != nil && codeSession.UserId != codeEntity.UserId {
 				return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
@@ -737,9 +737,9 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 			// this is a normal refresh token
 			// check the associated user session to see if it's still valid
 
-			userSession, err := val.database.GetUserSessionBySessionIdentifier(ctx, nil, refreshToken.SessionIdentifier)
-			if err != nil {
-				return nil, err
+			userSession, getUserSessionErr := val.database.GetUserSessionBySessionIdentifier(ctx, nil, refreshToken.SessionIdentifier)
+			if getUserSessionErr != nil {
+				return nil, getUserSessionErr
 			}
 			if userSession == nil {
 				return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant", invalidTokenMessage,
@@ -806,9 +806,9 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 			// above: code_id is NULL, refreshToken.Code is the zero value, and there was never
 			// a session to own the grant.
 			if !isROPCToken && refreshToken.Code.SessionIdentifier != "" {
-				codeSession, err := val.database.GetUserSessionBySessionIdentifier(ctx, nil, refreshToken.Code.SessionIdentifier)
-				if err != nil {
-					return nil, err
+				codeSession, getUserSessionErr := val.database.GetUserSessionBySessionIdentifier(ctx, nil, refreshToken.Code.SessionIdentifier)
+				if getUserSessionErr != nil {
+					return nil, getUserSessionErr
 				}
 				if codeSession != nil && codeSession.UserId != tokenUserId {
 					return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",

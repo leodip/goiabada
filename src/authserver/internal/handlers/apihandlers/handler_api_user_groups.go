@@ -144,9 +144,9 @@ func HandleAPIUserGroupsPut(
 
 		// Validate all requested groups exist
 		if len(request.GroupIds) > 0 {
-			groups, err := database.GetGroupsByIds(r.Context(), nil, request.GroupIds)
-			if err != nil {
-				writeInternalServerError(w, r, errs.Wrap(err, "database error getting groups by IDs for validation"), "group_ids", request.GroupIds, "user_id", user.Id)
+			groups, getGroupsErr := database.GetGroupsByIds(r.Context(), nil, request.GroupIds)
+			if getGroupsErr != nil {
+				writeInternalServerError(w, r, errs.Wrap(getGroupsErr, "database error getting groups by IDs for validation"), "group_ids", request.GroupIds, "user_id", user.Id)
 				return
 			}
 			if len(groups) != len(request.GroupIds) {
@@ -200,15 +200,15 @@ func HandleAPIUserGroupsPut(
 		// Remove groups that are in current but not in requested
 		for _, grp := range user.Groups {
 			if !requestedGroupIds[grp.Id] {
-				userGroup, err := database.GetUserGroupByUserIdAndGroupId(r.Context(), nil, user.Id, grp.Id)
-				if err != nil {
-					writeInternalServerError(w, r, errs.Wrap(err, "database error getting user group relationship for removal"), "user_id", user.Id, "group_id", grp.Id)
+				userGroup, removeErr := database.GetUserGroupByUserIdAndGroupId(r.Context(), nil, user.Id, grp.Id)
+				if removeErr != nil {
+					writeInternalServerError(w, r, errs.Wrap(removeErr, "database error getting user group relationship for removal"), "user_id", user.Id, "group_id", grp.Id)
 					return
 				}
 				if userGroup != nil {
-					err = database.DeleteUserGroup(r.Context(), nil, userGroup.Id)
-					if err != nil {
-						writeInternalServerError(w, r, errs.Wrap(err, "database error deleting user group membership"), "user_group_id", userGroup.Id, "user_id", user.Id, "group_id", grp.Id)
+					removeErr = database.DeleteUserGroup(r.Context(), nil, userGroup.Id)
+					if removeErr != nil {
+						writeInternalServerError(w, r, errs.Wrap(removeErr, "database error deleting user group membership"), "user_group_id", userGroup.Id, "user_id", user.Id, "group_id", grp.Id)
 						return
 					}
 

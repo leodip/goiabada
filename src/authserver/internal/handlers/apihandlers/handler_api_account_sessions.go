@@ -68,8 +68,8 @@ func HandleAPIAccountSessionsGet(
 		}
 
 		// Load the clients each session authorized; buildSessionDetails hydrates them.
-		if err := database.UserSessionsLoadClients(r.Context(), nil, userSessions); err != nil {
-			writeInternalServerError(w, r, err)
+		if userSessionsLoadClientsErr := database.UserSessionsLoadClients(r.Context(), nil, userSessions); userSessionsLoadClientsErr != nil {
+			writeInternalServerError(w, r, userSessionsLoadClientsErr)
 			return
 		}
 

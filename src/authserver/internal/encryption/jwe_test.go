@@ -165,9 +165,9 @@ func TestEncryptIDTokenHintJWE_Shape(t *testing.T) {
 	}
 
 	for i, want := range map[int]int{2: 12, 4: 16} {
-		raw, err := base64.RawURLEncoding.DecodeString(parts[i])
-		if err != nil {
-			t.Fatalf("segment %d is not raw base64url: %v", i, err)
+		raw, decodeStringErr := base64.RawURLEncoding.DecodeString(parts[i])
+		if decodeStringErr != nil {
+			t.Fatalf("segment %d is not raw base64url: %v", i, decodeStringErr)
 		}
 		if len(raw) != want {
 			t.Errorf("segment %d is %d bytes, want %d", i, len(raw), want)

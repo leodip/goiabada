@@ -209,9 +209,9 @@ func TestGetAllGroupsPaginated(t *testing.T) {
 		{"last page holds the remainder", lastPage, expectedOnLastPage},
 		{"page past the end is empty", lastPage + 1, 0},
 	} {
-		groups, total, err := database.GetAllGroupsPaginated(context.Background(), nil, tc.page, pageSize)
-		if err != nil {
-			t.Fatalf("%s: failed to get page %d: %v", tc.name, tc.page, err)
+		groups, total, getGroupsErr := database.GetAllGroupsPaginated(context.Background(), nil, tc.page, pageSize)
+		if getGroupsErr != nil {
+			t.Fatalf("%s: failed to get page %d: %v", tc.name, tc.page, getGroupsErr)
 		}
 		if len(groups) != tc.expected {
 			t.Errorf("%s: expected %d groups on page %d, got %d", tc.name, tc.expected, tc.page, len(groups))
