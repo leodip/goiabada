@@ -90,7 +90,7 @@ func bodyString(t *testing.T, resp *http.Response) string {
 }
 
 // Scenario 1: GET /account/register
-// 1a. With self-registration disabled the page should not render.
+// 1a. With self-registration disabled the page answers the not-found page (#425).
 func TestSelfRegister_GetPage_Disabled(t *testing.T) {
 	defer saveAndRestoreRegSettings(t)()
 	setRegSettings(t, false, false, true)
@@ -99,7 +99,7 @@ func TestSelfRegister_GetPage_Disabled(t *testing.T) {
 	resp := loadPage(t, httpClient, config.GetAuthServer().BaseURL+"/account/register")
 	defer func() { _ = resp.Body.Close() }()
 
-	assert.Equal(t, http.StatusInternalServerError, resp.StatusCode)
+	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
 // 1b. With self-registration enabled the page renders.
@@ -403,8 +403,8 @@ func TestSelfRegister_ASecondLinkDoesNotRetargetTheRedirectInFlight(t *testing.T
 	assert.NotNil(t, stillPending, "the second registration must still be pending, so its own link still works")
 }
 
-// Scenario 5a: POST while self-registration is disabled returns the error
-// page. We load the form while it is enabled, then disable.
+// Scenario 5a: POST while self-registration is disabled returns the not-found
+// page (#425). We load the form while it is enabled, then disable.
 func TestSelfRegister_Post_Disabled_ReturnsError(t *testing.T) {
 	defer saveAndRestoreRegSettings(t)()
 	setRegSettings(t, true, false, false)
@@ -417,7 +417,7 @@ func TestSelfRegister_Post_Disabled_ReturnsError(t *testing.T) {
 	resp := postRegister(t, httpClient, fake.Email(), "Password123!", "Password123!")
 	defer func() { _ = resp.Body.Close() }()
 
-	assert.Equal(t, http.StatusInternalServerError, resp.StatusCode)
+	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
 // Scenario 5b: duplicate user email is rejected with a friendly message.

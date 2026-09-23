@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -18,11 +19,22 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/usercreation"
 	"github.com/leodip/goiabada/core/customerrors"
-	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/stringutil"
 )
+
+// refuseSelfRegistrationDisabled answers a self-registration page, or an activation link, while
+// the setting is off: one Warn record and the not-found page.
+//
+// 404 is RFC 9110 section 15.5.5's status for a resource the server "is not willing to disclose
+// that one exists", which is what a feature switched off is. It used to be the 500 page with an
+// error-level stack, which alerted an operator for every visitor following an old link to a page
+// the operator had turned off on purpose (#425 decision 5).
+func refuseSelfRegistrationDisabled(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request) {
+	slog.WarnContext(r.Context(), "self-registration request refused because self-registration is disabled")
+	httpHelper.NotFound(w, r)
+}
 
 func HandleAccountRegisterGet(
 	httpHelper HttpHelper,
@@ -32,7 +44,7 @@ func HandleAccountRegisterGet(
 
 		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
 		if !settings.SelfRegistrationEnabled {
-			httpHelper.InternalServerError(w, r, errs.New("trying to access self registration page but self registration is not enabled in settings"))
+			refuseSelfRegistrationDisabled(httpHelper, w, r)
 			return
 		}
 
@@ -68,7 +80,7 @@ func HandleAccountRegisterPost(
 
 		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
 		if !settings.SelfRegistrationEnabled {
-			httpHelper.InternalServerError(w, r, errs.New("trying to access self registration page but self registration is not enabled in settings"))
+			refuseSelfRegistrationDisabled(httpHelper, w, r)
 			return
 		}
 
