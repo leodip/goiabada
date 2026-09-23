@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
@@ -21,10 +20,16 @@ type accountEmailDatabase interface {
 	UpdateUser(ctx context.Context, tx *sql.Tx, user *models.User) error
 }
 
+// accountEmailValidator is the self-service change check: the address rules, and that no other
+// account holds the address.
+type accountEmailValidator interface {
+	ValidateEmailChange(ctx context.Context, email string, subject string) error
+}
+
 // HandleAPIAccountEmailPut - PUT /api/v1/account/email
 func HandleAPIAccountEmailPut(
 	database accountEmailDatabase,
-	emailValidator *accountvalidation.EmailValidator,
+	emailValidator accountEmailValidator,
 	auditLogger AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

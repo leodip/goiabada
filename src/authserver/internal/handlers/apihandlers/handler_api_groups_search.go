@@ -42,7 +42,7 @@ func HandleAPIGroupsSearchGet(
 		// Ensure permission exists
 		perm, err := database.GetPermissionById(r.Context(), nil, permId)
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting permission by ID for annotation"), "permission_id", permId)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error getting permission by ID for annotation"), "permission_id", permId)
 			return
 		}
 		if perm == nil {
@@ -67,7 +67,7 @@ func HandleAPIGroupsSearchGet(
 		// Fetch groups with server-side pagination
 		groups, total, err := database.GetAllGroupsPaginated(r.Context(), nil, page, size)
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting groups paginated"), "page", page, "size", size)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error getting groups paginated"), "page", page, "size", size)
 			return
 		}
 
@@ -83,7 +83,7 @@ func HandleAPIGroupsSearchGet(
 			// Load permissions for all groups in batch
 			gp, err := database.GetGroupPermissionsByGroupIds(r.Context(), nil, groupIds)
 			if err != nil {
-				writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting group permissions by group IDs"), "group_count", len(groupIds))
+				writeInternalServerError(w, r, errs.Wrap(err, "database error getting group permissions by group IDs"), "group_count", len(groupIds))
 				return
 			}
 

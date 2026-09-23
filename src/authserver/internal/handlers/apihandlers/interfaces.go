@@ -22,7 +22,7 @@ import (
 // implementations (#387).
 //
 // Per-file database ports stay per-file, beside the function taking them: the database is the
-// dependency that genuinely varies from handler to handler, and these seven do not.
+// dependency that genuinely varies from handler to handler, and these eight do not.
 
 // AuditLogger records one security event. The context is first because every audit event raised
 // while serving a request is correlated to that request: the installed slog handler reads chi's
@@ -49,12 +49,20 @@ type EmailSender interface {
 	SendEmail(ctx context.Context, input *emaildelivery.SendEmailInput) error
 }
 
-// EmailValidator is the address check alone. The two richer validations this package performs,
-// ValidateEmailChange and ValidateEmailUpdate, are called on the concrete
-// *accountvalidation.EmailValidator in handler_api_account_email.go and handler_api_users_email.go
-// and have never gone through a port, so naming them here would widen the port past its callers.
+// EmailValidator is the address check alone, which the settings email endpoints and user creation
+// call. The two richer validations this package performs each have one caller, so each is a
+// per-file port beside it: accountEmailValidator (ValidateEmailChange) in
+// handler_api_account_email.go and usersEmailValidator (ValidateEmailUpdate) in
+// handler_api_users_email.go. Naming them here would widen this port past its callers.
 type EmailValidator interface {
 	ValidateEmailAddress(emailAddress string) error
+}
+
+// PasswordValidator checks a new password against the password policy in the request's
+// settings. Three handlers call it: user creation, an administrator setting a user's password, and
+// the account's own password change.
+type PasswordValidator interface {
+	ValidatePassword(ctx context.Context, password string) error
 }
 
 // UserCreator creates the user row and its default permissions in one transaction.

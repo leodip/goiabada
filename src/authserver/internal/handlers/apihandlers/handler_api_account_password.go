@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
@@ -32,7 +31,7 @@ type accountPasswordDatabase interface {
 // HandleAPIAccountPasswordPut - PUT /api/v1/account/password
 func HandleAPIAccountPasswordPut(
 	database accountPasswordDatabase,
-	passwordValidator *accountvalidation.PasswordValidator,
+	passwordValidator PasswordValidator,
 	auditLogger AuditLogger,
 	credentialFailures CredentialFailureRecorder,
 ) http.HandlerFunc {

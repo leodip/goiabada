@@ -23,9 +23,7 @@ import (
 )
 
 // HandleAPISettingsEmailGet - GET /api/v1/admin/settings/email
-func HandleAPISettingsEmailGet(
-	httpHelper HttpHelper,
-) http.HandlerFunc {
+func HandleAPISettingsEmailGet() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
 		if settings == nil {

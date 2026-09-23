@@ -39,7 +39,7 @@ func HandleAPIGroupsGet(
 
 		groups, err := database.GetAllGroups(r.Context(), nil)
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting all groups"))
+			writeInternalServerError(w, r, errs.Wrap(err, "database error getting all groups"))
 			return
 		}
 
@@ -107,7 +107,7 @@ func HandleAPIGroupCreatePost(
 		// Check if group identifier already exists
 		existingGroup, err := database.GetGroupByGroupIdentifier(r.Context(), nil, createReq.GroupIdentifier)
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error checking group existence by identifier"), "group_identifier", createReq.GroupIdentifier)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error checking group existence by identifier"), "group_identifier", createReq.GroupIdentifier)
 			return
 		}
 		if existingGroup != nil {
@@ -125,7 +125,7 @@ func HandleAPIGroupCreatePost(
 
 		err = database.CreateGroup(r.Context(), nil, group)
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error creating group"), "group_identifier", group.GroupIdentifier)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error creating group"), "group_identifier", group.GroupIdentifier)
 			return
 		}
 
@@ -165,7 +165,7 @@ func HandleAPIGroupGet(
 
 		group, err := database.GetGroupById(r.Context(), nil, id)
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting group by ID"), "group_id", id)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error getting group by ID"), "group_id", id)
 			return
 		}
 		if group == nil {
@@ -209,7 +209,7 @@ func HandleAPIGroupUpdatePut(
 
 		group, err := database.GetGroupById(r.Context(), nil, id)
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting group by ID for update"), "group_id", id)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error getting group by ID for update"), "group_id", id)
 			return
 		}
 		if group == nil {
@@ -252,7 +252,7 @@ func HandleAPIGroupUpdatePut(
 		// Check if group identifier already exists (but not for this group)
 		existingGroup, err := database.GetGroupByGroupIdentifier(r.Context(), nil, updateReq.GroupIdentifier)
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error checking group existence by identifier for update"), "group_identifier", updateReq.GroupIdentifier, "group_id", group.Id)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error checking group existence by identifier for update"), "group_identifier", updateReq.GroupIdentifier, "group_id", group.Id)
 			return
 		}
 		if existingGroup != nil && existingGroup.Id != group.Id {
@@ -268,7 +268,7 @@ func HandleAPIGroupUpdatePut(
 
 		err = database.UpdateGroup(r.Context(), nil, group)
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error updating group"), "group_id", group.Id, "group_identifier", group.GroupIdentifier)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error updating group"), "group_id", group.Id, "group_identifier", group.GroupIdentifier)
 			return
 		}
 
@@ -316,7 +316,7 @@ func HandleAPIGroupDelete(
 		// Check if group exists
 		group, err := database.GetGroupById(r.Context(), nil, id)
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting group by ID for deletion"), "group_id", id)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error getting group by ID for deletion"), "group_id", id)
 			return
 		}
 		if group == nil {
@@ -327,7 +327,7 @@ func HandleAPIGroupDelete(
 		// Delete the group
 		err = database.DeleteGroup(r.Context(), nil, group.Id)
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error deleting group"), "group_id", group.Id, "group_identifier", group.GroupIdentifier)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error deleting group"), "group_id", group.Id, "group_identifier", group.GroupIdentifier)
 			return
 		}
 

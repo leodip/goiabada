@@ -43,7 +43,7 @@ func HandleAPIPermissionUsersGet(
 		// Validate permission exists and enforce special rules
 		perm, err := database.GetPermissionById(r.Context(), nil, permissionId)
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: error getting permission by ID for users listing"), "permission_id", permissionId)
+			writeInternalServerError(w, r, errs.Wrap(err, "error getting permission by ID for users listing"), "permission_id", permissionId)
 			return
 		}
 		if perm == nil {
@@ -54,7 +54,7 @@ func HandleAPIPermissionUsersGet(
 		// Load its resource to check for authserver:userinfo special case
 		resource, err := database.GetResourceById(r.Context(), nil, perm.ResourceId)
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: error getting resource for permission users listing"), "permission_id", permissionId)
+			writeInternalServerError(w, r, errs.Wrap(err, "error getting resource for permission users listing"), "permission_id", permissionId)
 			return
 		}
 		if resource != nil && resource.ResourceIdentifier == constants.AuthServerResourceIdentifier && perm.PermissionIdentifier == constants.UserinfoPermissionIdentifier {
@@ -78,7 +78,7 @@ func HandleAPIPermissionUsersGet(
 
 		users, total, err := database.GetUsersByPermissionIdPaginated(r.Context(), nil, permissionId, page, size)
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: error getting users by permission paginated"), "permission_id", permissionId, "page", page, "size", size)
+			writeInternalServerError(w, r, errs.Wrap(err, "error getting users by permission paginated"), "permission_id", permissionId, "page", page, "size", size)
 			return
 		}
 

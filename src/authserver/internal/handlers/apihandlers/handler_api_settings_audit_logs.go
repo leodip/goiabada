@@ -14,9 +14,7 @@ import (
 )
 
 // HandleAPISettingsAuditLogsGet - GET /api/v1/admin/settings/audit-logs
-func HandleAPISettingsAuditLogsGet(
-	httpHelper HttpHelper,
-) http.HandlerFunc {
+func HandleAPISettingsAuditLogsGet() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
 		if settings == nil {

@@ -94,7 +94,7 @@ func HandleAPIUserGet(
 // HandleAPIUserPasswordPut - PUT /api/v1/admin/users/{id}/password
 func HandleAPIUserPasswordPut(
 	database usersCrudDatabase,
-	passwordValidator *accountvalidation.PasswordValidator,
+	passwordValidator PasswordValidator,
 	auditLogger AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -285,9 +285,9 @@ func HandleAPIUserCreatePost(
 	httpHelper HttpHelper,
 	database usersCrudDatabase,
 	userCreator UserCreator,
-	emailValidator *accountvalidation.EmailValidator,
+	emailValidator EmailValidator,
 	profileValidator *accountvalidation.ProfileValidator,
-	passwordValidator *accountvalidation.PasswordValidator,
+	passwordValidator PasswordValidator,
 	auditLogger AuditLogger,
 	emailSender EmailSender,
 ) http.HandlerFunc {

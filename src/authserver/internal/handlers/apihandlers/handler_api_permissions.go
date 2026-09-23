@@ -51,7 +51,7 @@ func HandleAPIPermissionsByResourceGet(
 
 		permissions, err := database.GetPermissionsByResourceId(r.Context(), nil, resourceId)
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting permissions"), "resource_id", resourceId)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error getting permissions"), "resource_id", resourceId)
 			return
 		}
 
@@ -106,7 +106,7 @@ func HandleAPIResourcePermissionsPut(
 
 		resource, err := database.GetResourceById(r.Context(), nil, resourceId)
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting resource by ID for permissions update"), "resource_id", resourceId)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error getting resource by ID for permissions update"), "resource_id", resourceId)
 			return
 		}
 		if resource == nil {
@@ -178,7 +178,7 @@ func HandleAPIResourcePermissionsPut(
 		// Load existing permissions once
 		existing, err := database.GetPermissionsByResourceId(r.Context(), nil, resource.Id)
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting existing permissions"), "resource_id", resource.Id)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error getting existing permissions"), "resource_id", resource.Id)
 			return
 		}
 
@@ -197,7 +197,7 @@ func HandleAPIResourcePermissionsPut(
 				existingPerm, found := existingByIdentifier[builtInIdentifier]
 				if !found {
 					writeInternalServerError(w, r,
-						errs.Errorf("AuthServer API: built-in permission %q is missing from the system resource; the database may be corrupted or mis-seeded", builtInIdentifier),
+						errs.Errorf("built-in permission %q is missing from the system resource; the database may be corrupted or mis-seeded", builtInIdentifier),
 						"built_in_identifier", builtInIdentifier, "resource_id", resource.Id)
 					return
 				}
@@ -243,7 +243,7 @@ func HandleAPIResourcePermissionsPut(
 				cur.PermissionIdentifier = p.PermissionIdentifier
 				cur.Description = p.Description
 				if err := database.UpdatePermission(r.Context(), nil, &cur); err != nil {
-					writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error updating permission"), "permission_id", cur.Id)
+					writeInternalServerError(w, r, errs.Wrap(err, "database error updating permission"), "permission_id", cur.Id)
 					return
 				}
 				// reflect change in maps
@@ -265,7 +265,7 @@ func HandleAPIResourcePermissionsPut(
 					Description:          p.Description,
 				}
 				if err := database.CreatePermission(r.Context(), nil, perm); err != nil {
-					writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error creating permission"), "resource_id", resource.Id)
+					writeInternalServerError(w, r, errs.Wrap(err, "database error creating permission"), "resource_id", resource.Id)
 					return
 				}
 				existingByIdentifier[perm.PermissionIdentifier] = *perm
@@ -277,7 +277,7 @@ func HandleAPIResourcePermissionsPut(
 		// Reload current permissions to be safe
 		current, err := database.GetPermissionsByResourceId(r.Context(), nil, resource.Id)
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting current permissions for deletion"), "resource_id", resource.Id)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error getting current permissions for deletion"), "resource_id", resource.Id)
 			return
 		}
 		desiredIdentifiers := map[string]bool{}
@@ -287,7 +287,7 @@ func HandleAPIResourcePermissionsPut(
 		for _, existingPerm := range current {
 			if !desiredIdentifiers[existingPerm.PermissionIdentifier] {
 				if err := database.DeletePermission(r.Context(), nil, existingPerm.Id); err != nil {
-					writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error deleting permission"), "permission_id", existingPerm.Id)
+					writeInternalServerError(w, r, errs.Wrap(err, "database error deleting permission"), "permission_id", existingPerm.Id)
 					return
 				}
 			}

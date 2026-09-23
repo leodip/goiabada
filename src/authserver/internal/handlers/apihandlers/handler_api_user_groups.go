@@ -70,7 +70,7 @@ func HandleAPIUserGroupsGet(
 
 		user, err := database.GetUserById(r.Context(), nil, id)
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting user by ID for groups"), "user_id", id)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error getting user by ID for groups"), "user_id", id)
 			return
 		}
 		if user == nil {
@@ -80,7 +80,7 @@ func HandleAPIUserGroupsGet(
 
 		err = database.UserLoadGroups(r.Context(), nil, user)
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error loading user groups"), "user_id", user.Id)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error loading user groups"), "user_id", user.Id)
 			return
 		}
 
@@ -134,7 +134,7 @@ func HandleAPIUserGroupsPut(
 
 		user, err := database.GetUserById(r.Context(), nil, id)
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting user by ID for groups"), "user_id", id)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error getting user by ID for groups"), "user_id", id)
 			return
 		}
 		if user == nil {
@@ -146,7 +146,7 @@ func HandleAPIUserGroupsPut(
 		if len(request.GroupIds) > 0 {
 			groups, err := database.GetGroupsByIds(r.Context(), nil, request.GroupIds)
 			if err != nil {
-				writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting groups by IDs for validation"), "group_ids", request.GroupIds, "user_id", user.Id)
+				writeInternalServerError(w, r, errs.Wrap(err, "database error getting groups by IDs for validation"), "group_ids", request.GroupIds, "user_id", user.Id)
 				return
 			}
 			if len(groups) != len(request.GroupIds) {
@@ -159,7 +159,7 @@ func HandleAPIUserGroupsPut(
 		// Load current user groups
 		err = database.UserLoadGroups(r.Context(), nil, user)
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error loading current user groups for update"), "user_id", user.Id)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error loading current user groups for update"), "user_id", user.Id)
 			return
 		}
 
@@ -185,7 +185,7 @@ func HandleAPIUserGroupsPut(
 					GroupId: groupId,
 				})
 				if err != nil {
-					writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error creating user group membership"), "user_id", user.Id, "group_id", groupId)
+					writeInternalServerError(w, r, errs.Wrap(err, "database error creating user group membership"), "user_id", user.Id, "group_id", groupId)
 					return
 				}
 
@@ -202,13 +202,13 @@ func HandleAPIUserGroupsPut(
 			if !requestedGroupIds[grp.Id] {
 				userGroup, err := database.GetUserGroupByUserIdAndGroupId(r.Context(), nil, user.Id, grp.Id)
 				if err != nil {
-					writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error getting user group relationship for removal"), "user_id", user.Id, "group_id", grp.Id)
+					writeInternalServerError(w, r, errs.Wrap(err, "database error getting user group relationship for removal"), "user_id", user.Id, "group_id", grp.Id)
 					return
 				}
 				if userGroup != nil {
 					err = database.DeleteUserGroup(r.Context(), nil, userGroup.Id)
 					if err != nil {
-						writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error deleting user group membership"), "user_group_id", userGroup.Id, "user_id", user.Id, "group_id", grp.Id)
+						writeInternalServerError(w, r, errs.Wrap(err, "database error deleting user group membership"), "user_group_id", userGroup.Id, "user_id", user.Id, "group_id", grp.Id)
 						return
 					}
 
@@ -224,7 +224,7 @@ func HandleAPIUserGroupsPut(
 		// Reload user groups to get updated state
 		err = database.UserLoadGroups(r.Context(), nil, user)
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: Database error reloading user groups after update"), "user_id", user.Id)
+			writeInternalServerError(w, r, errs.Wrap(err, "database error reloading user groups after update"), "user_id", user.Id)
 			return
 		}
 

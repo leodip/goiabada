@@ -64,7 +64,7 @@ func HandleAPIUsersSearchGet(
 			// raw, a multi-kilobyte search term lands whole on the record with whatever control
 			// characters or line separators it carries, which is the log injection this tree
 			// closed for every other client-chosen scalar (#159).
-			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: failed to search users"), "query", logging.FieldForLog(query), "page", page)
+			writeInternalServerError(w, r, errs.Wrap(err, "failed to search users"), "query", logging.FieldForLog(query), "page", page)
 			return
 		}
 
@@ -85,7 +85,7 @@ func HandleAPIUsersSearchGet(
 			// Verify group exists
 			group, err := database.GetGroupById(r.Context(), nil, annotateGroupId)
 			if err != nil {
-				writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: failed to get group by ID"), "group_id", annotateGroupId, "query", logging.FieldForLog(query), "page", page)
+				writeInternalServerError(w, r, errs.Wrap(err, "failed to get group by ID"), "group_id", annotateGroupId, "query", logging.FieldForLog(query), "page", page)
 				return
 			}
 			if group == nil {
@@ -96,7 +96,7 @@ func HandleAPIUsersSearchGet(
 			// Load groups for all users to check membership
 			err = database.UsersLoadGroups(r.Context(), nil, users)
 			if err != nil {
-				writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: failed to load user groups"), "user_count", len(users), "query", logging.FieldForLog(query), "page", page)
+				writeInternalServerError(w, r, errs.Wrap(err, "failed to load user groups"), "user_count", len(users), "query", logging.FieldForLog(query), "page", page)
 				return
 			}
 
@@ -139,7 +139,7 @@ func HandleAPIUsersSearchGet(
 			// Verify permission exists and enforce userinfo special case
 			perm, err := database.GetPermissionById(r.Context(), nil, permId)
 			if err != nil {
-				writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: failed to get permission by ID"), "permission_id", permId)
+				writeInternalServerError(w, r, errs.Wrap(err, "failed to get permission by ID"), "permission_id", permId)
 				return
 			}
 			if perm == nil {
@@ -148,7 +148,7 @@ func HandleAPIUsersSearchGet(
 			}
 			resource, err := database.GetResourceById(r.Context(), nil, perm.ResourceId)
 			if err != nil {
-				writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: failed to get resource for permission annotation"), "permission_id", permId)
+				writeInternalServerError(w, r, errs.Wrap(err, "failed to get resource for permission annotation"), "permission_id", permId)
 				return
 			}
 			if resource != nil && resource.ResourceIdentifier == constants.AuthServerResourceIdentifier && perm.PermissionIdentifier == constants.UserinfoPermissionIdentifier {
@@ -158,7 +158,7 @@ func HandleAPIUsersSearchGet(
 
 			// Load permissions for all users to check if they have permId
 			if err := database.UsersLoadPermissions(r.Context(), nil, users); err != nil {
-				writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: failed to load user permissions"), "user_count", len(users))
+				writeInternalServerError(w, r, errs.Wrap(err, "failed to load user permissions"), "user_count", len(users))
 				return
 			}
 
