@@ -37,10 +37,15 @@ func HandleAPIError(httpHelper HttpHelper, w http.ResponseWriter, r *http.Reques
 // thing the form edits no longer exists, so there is no form to re-render and the 404 page is the
 // answer (#279); anything else escalates to InternalServerError. The English description
 // from the API response is surfaced verbatim.
+//
+// 409 Conflict joins 400, as it does in HandleAPIErrorJson. RFC 9110 section 15.5.10 uses it where
+// "the user might be able to resolve the conflict and resubmit the request": an email address
+// another account took between the form's check and its write is exactly that, and the 500 page
+// this answered before threw the form away and blamed the server (#425).
 func HandleAPIErrorWithCallback(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request, err error, renderErrorFunc func(string)) {
 	var apiErr *apiclient.APIError
 	if errors.As(err, &apiErr) {
-		if apiErr.StatusCode == http.StatusBadRequest {
+		if apiErr.StatusCode == http.StatusBadRequest || apiErr.StatusCode == http.StatusConflict {
 			renderErrorFunc(apiErr.Message)
 			return
 		}
