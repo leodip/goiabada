@@ -20,9 +20,7 @@ import (
 )
 
 // HandleAPISettingsGeneralGet - GET /api/v1/admin/settings/general
-func HandleAPISettingsGeneralGet(
-	httpHelper HttpHelper,
-) http.HandlerFunc {
+func HandleAPISettingsGeneralGet() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
 		if settings == nil {

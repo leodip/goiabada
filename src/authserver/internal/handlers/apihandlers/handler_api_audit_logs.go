@@ -59,7 +59,7 @@ func HandleAPIAuditLogsGet(
 			// log injection this tree closed for every other client-chosen scalar (#159).
 			// filter_request_id and not request_id because that name is the handler's own,
 			// injected from the context; this is what the caller asked to filter by (#328).
-			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: failed to get audit logs"),
+			writeInternalServerError(w, r, errs.Wrap(err, "failed to get audit logs"),
 				"page", page, "size", size,
 				"audit_event", logging.FieldForLog(auditEvent),
 				"filter_request_id", logging.FieldForLog(requestId))

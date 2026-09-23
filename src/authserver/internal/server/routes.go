@@ -275,24 +275,24 @@ func (s *Server) initRoutes(root chi.Router) {
 		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesClients)).Delete("/clients/{id}/logo", apihandlers.HandleAPIClientLogoDelete(s.database, auditLogger))
 
 		// Settings - General
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/settings/general", apihandlers.HandleAPISettingsGeneralGet(httpHelper))
+		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/settings/general", apihandlers.HandleAPISettingsGeneralGet())
 		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesSettings)).Put("/settings/general", apihandlers.HandleAPISettingsGeneralPut(s.database, auditLogger))
 
 		// Settings - Email
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/settings/email", apihandlers.HandleAPISettingsEmailGet(httpHelper))
+		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/settings/email", apihandlers.HandleAPISettingsEmailGet())
 		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesSettings)).Put("/settings/email", apihandlers.HandleAPISettingsEmailPut(s.database, emailValidator, auditLogger))
 		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesSettings)).Post("/settings/email/send-test", apihandlers.HandleAPISettingsEmailSendTestPost(emailValidator, emailSender, auditLogger))
 
 		// Settings - Sessions
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/settings/sessions", apihandlers.HandleAPISettingsSessionsGet(httpHelper))
+		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/settings/sessions", apihandlers.HandleAPISettingsSessionsGet())
 		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesSettings)).Put("/settings/sessions", apihandlers.HandleAPISettingsSessionsPut(s.database, auditLogger))
 
 		// Settings - UI Theme
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/settings/ui-theme", apihandlers.HandleAPISettingsUIThemeGet(httpHelper))
+		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/settings/ui-theme", apihandlers.HandleAPISettingsUIThemeGet())
 		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesSettings)).Put("/settings/ui-theme", apihandlers.HandleAPISettingsUIThemePut(s.database, auditLogger))
 
 		// Settings - Tokens
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/settings/tokens", apihandlers.HandleAPISettingsTokensGet(httpHelper))
+		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/settings/tokens", apihandlers.HandleAPISettingsTokensGet())
 		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesSettings)).Put("/settings/tokens", apihandlers.HandleAPISettingsTokensPut(s.database, auditLogger))
 
 		// Settings - Keys
@@ -301,7 +301,7 @@ func (s *Server) initRoutes(root chi.Router) {
 		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesSettings)).Delete("/settings/keys/{id}", apihandlers.HandleAPISettingsKeyDelete(s.database, auditLogger))
 
 		// Settings - Audit Logs
-		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/settings/audit-logs", apihandlers.HandleAPISettingsAuditLogsGet(httpHelper))
+		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesSettingsRead)).Get("/settings/audit-logs", apihandlers.HandleAPISettingsAuditLogsGet())
 		r.With(middleware.RequireBearerTokenScopeAnyOf(scopesSettings)).Put("/settings/audit-logs", apihandlers.HandleAPISettingsAuditLogsPut(s.database, auditLogger))
 
 		// Audit Logs Viewer

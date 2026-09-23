@@ -23,10 +23,16 @@ type usersEmailDatabase interface {
 	UpdateUser(ctx context.Context, tx *sql.Tx, user *models.User) error
 }
 
+// usersEmailValidator is the administrator's update check: the address rules, the confirmation,
+// and that no other account holds the address.
+type usersEmailValidator interface {
+	ValidateEmailUpdate(ctx context.Context, input *accountvalidation.ValidateEmailInput) error
+}
+
 // HandleAPIUserEmailPut - PUT /api/v1/admin/users/{id}/email
 func HandleAPIUserEmailPut(
 	database usersEmailDatabase,
-	emailValidator *accountvalidation.EmailValidator,
+	emailValidator usersEmailValidator,
 	auditLogger AuditLogger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

@@ -15,9 +15,7 @@ import (
 )
 
 // HandleAPISettingsTokensGet - GET /api/v1/admin/settings/tokens
-func HandleAPISettingsTokensGet(
-	httpHelper HttpHelper,
-) http.HandlerFunc {
+func HandleAPISettingsTokensGet() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
 		if settings == nil {

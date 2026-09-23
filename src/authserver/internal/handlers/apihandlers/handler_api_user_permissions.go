@@ -45,7 +45,7 @@ func HandleAPIUserPermissionsGet(
 
 		user, err := database.GetUserById(r.Context(), nil, id)
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: failed to get user by ID"), "user_id", id)
+			writeInternalServerError(w, r, errs.Wrap(err, "failed to get user by ID"), "user_id", id)
 			return
 		}
 		if user == nil {
@@ -55,7 +55,7 @@ func HandleAPIUserPermissionsGet(
 
 		err = database.UserLoadPermissions(r.Context(), nil, user)
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: failed to load user permissions"), "user_id", user.Id)
+			writeInternalServerError(w, r, errs.Wrap(err, "failed to load user permissions"), "user_id", user.Id)
 			return
 		}
 
@@ -63,7 +63,7 @@ func HandleAPIUserPermissionsGet(
 		for i := range user.Permissions {
 			resource, err := database.GetResourceById(r.Context(), nil, user.Permissions[i].ResourceId)
 			if err != nil {
-				writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: failed to load resource information"), "user_id", user.Id, "resource_id", user.Permissions[i].ResourceId)
+				writeInternalServerError(w, r, errs.Wrap(err, "failed to load resource information"), "user_id", user.Id, "resource_id", user.Permissions[i].ResourceId)
 				return
 			}
 			if resource != nil {
@@ -99,7 +99,7 @@ func HandleAPIUserPermissionsPut(
 
 		user, err := database.GetUserById(r.Context(), nil, id)
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: failed to get user by ID"), "user_id", id)
+			writeInternalServerError(w, r, errs.Wrap(err, "failed to get user by ID"), "user_id", id)
 			return
 		}
 		if user == nil {
@@ -116,7 +116,7 @@ func HandleAPIUserPermissionsPut(
 		// Load current user permissions
 		err = database.UserLoadPermissions(r.Context(), nil, user)
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: failed to load current user permissions"), "user_id", user.Id)
+			writeInternalServerError(w, r, errs.Wrap(err, "failed to load current user permissions"), "user_id", user.Id)
 			return
 		}
 
@@ -124,7 +124,7 @@ func HandleAPIUserPermissionsPut(
 		for _, permissionId := range request.PermissionIds {
 			permission, err := database.GetPermissionById(r.Context(), nil, permissionId)
 			if err != nil {
-				writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: failed to get permission by ID during validation"), "user_id", user.Id, "permission_id", permissionId)
+				writeInternalServerError(w, r, errs.Wrap(err, "failed to get permission by ID during validation"), "user_id", user.Id, "permission_id", permissionId)
 				return
 			}
 			if permission == nil {
@@ -146,7 +146,7 @@ func HandleAPIUserPermissionsPut(
 			if !found {
 				permission, err := database.GetPermissionById(r.Context(), nil, permissionId)
 				if err != nil {
-					writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: failed to retrieve permission for user permission creation"), "user_id", user.Id, "permission_id", permissionId)
+					writeInternalServerError(w, r, errs.Wrap(err, "failed to retrieve permission for user permission creation"), "user_id", user.Id, "permission_id", permissionId)
 					return
 				}
 
@@ -155,7 +155,7 @@ func HandleAPIUserPermissionsPut(
 					PermissionId: permission.Id,
 				})
 				if err != nil {
-					writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: failed to create user permission"), "user_id", user.Id, "permission_id", permission.Id)
+					writeInternalServerError(w, r, errs.Wrap(err, "failed to create user permission"), "user_id", user.Id, "permission_id", permission.Id)
 					return
 				}
 
@@ -186,13 +186,13 @@ func HandleAPIUserPermissionsPut(
 		for _, permissionId := range toDelete {
 			userPermission, err := database.GetUserPermissionByUserIdAndPermissionId(r.Context(), nil, user.Id, permissionId)
 			if err != nil {
-				writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: failed to find user permission for deletion"), "user_id", user.Id, "permission_id", permissionId)
+				writeInternalServerError(w, r, errs.Wrap(err, "failed to find user permission for deletion"), "user_id", user.Id, "permission_id", permissionId)
 				return
 			}
 
 			err = database.DeleteUserPermission(r.Context(), nil, userPermission.Id)
 			if err != nil {
-				writeInternalServerError(w, r, errs.Wrap(err, "AuthServer API: failed to delete user permission"), "user_id", user.Id, "permission_id", permissionId)
+				writeInternalServerError(w, r, errs.Wrap(err, "failed to delete user permission"), "user_id", user.Id, "permission_id", permissionId)
 				return
 			}
 

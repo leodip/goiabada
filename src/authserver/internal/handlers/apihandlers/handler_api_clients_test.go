@@ -481,7 +481,7 @@ func TestHandleAPIClientWebOriginsPut_AFailedLoadIsAnsweredAsALoadFailure(t *tes
 	// The step is still named, on the error rather than on the wire: it is carried out of the
 	// transaction body so nothing is written from an attempt that might be rerun.
 	assert.ErrorIs(t, stub.BodyErr, loadErr)
-	assert.Contains(t, stub.BodyErr.Error(), "Database error loading client web origins before update")
+	assert.Contains(t, stub.BodyErr.Error(), "database error loading client web origins before update")
 	database.AssertExpectations(t)
 	assertNotAttemptedOnClientDatabase(t, database, "CreateWebOrigin", "DeleteWebOrigin")
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, audit.AuditUpdatedWebOrigins, mock.Anything)
