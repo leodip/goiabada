@@ -48,6 +48,31 @@ func TestCreateUser_DuplicateEmailIsErrUniqueViolation(t *testing.T) {
 	}
 }
 
+// TestUpdateUser_DuplicateEmailIsErrUniqueViolation is the UPDATE beside the INSERT above, and it
+// is what both email PUTs stand on: each answers a lost race 409 only if the engine's refusal of an
+// UPDATE arrives tagged the same way (#414 item 1, #425).
+//
+// It is not the insert path again. UpdateUser writes through ExecSql on all four engines, where
+// PostgreSQL and SQL Server insert through QuerySql, so on those two this is the first case that
+// takes a real unique violation through the other writer.
+func TestUpdateUser_DuplicateEmailIsErrUniqueViolation(t *testing.T) {
+	first := createTestUser(t)
+	defer func() { _ = database.DeleteUser(context.Background(), nil, first.Id) }()
+	second := createTestUser(t)
+	defer func() { _ = database.DeleteUser(context.Background(), nil, second.Id) }()
+
+	second.Email = first.Email
+
+	err := database.UpdateUser(context.Background(), nil, second)
+	if err == nil {
+		t.Fatal("a user was moved onto a taken email; users.email is supposed to be unique")
+	}
+	if !errors.Is(err, data.ErrUniqueViolation) {
+		t.Errorf("errors.Is(err, data.ErrUniqueViolation) = false for an UPDATE on this engine, "+
+			"so the email PUTs cannot answer 409 here; err = %v", err)
+	}
+}
+
 // TestInsert_AnUnrelatedConstraintIsNotErrUniqueViolation is the negative half, and it is the one
 // that would be worst to get wrong: tagging every write failure would have the API answer 409 to
 // callers whose request can never succeed, and the positive case above cannot detect that.

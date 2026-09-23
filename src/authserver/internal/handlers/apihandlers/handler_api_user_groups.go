@@ -84,15 +84,10 @@ func HandleAPIUserGroupsGet(
 			return
 		}
 
-		// Get member counts for user's groups
-		memberCounts := make(map[int64]int)
-		for _, group := range user.Groups {
-			count, err := database.CountGroupMembers(r.Context(), nil, group.Id)
-			if err != nil {
-				// Log error but continue with 0 count
-				count = 0
-			}
-			memberCounts[group.Id] = count
+		memberCounts, err := countGroupMembers(r.Context(), database, user.Groups)
+		if err != nil {
+			writeInternalServerError(w, r, err, "user_id", user.Id)
+			return
 		}
 
 		response := api.GetUserGroupsResponse{
@@ -233,15 +228,12 @@ func HandleAPIUserGroupsPut(
 			return
 		}
 
-		// Get member counts for user's groups
-		memberCounts := make(map[int64]int)
-		for _, group := range user.Groups {
-			count, err := database.CountGroupMembers(r.Context(), nil, group.Id)
-			if err != nil {
-				// Log error but continue with 0 count
-				count = 0
-			}
-			memberCounts[group.Id] = count
+		// The membership change above is already written and audited, so a failure here answers
+		// 500 for a request whose effect stands; a retry of the same set writes nothing new.
+		memberCounts, err := countGroupMembers(r.Context(), database, user.Groups)
+		if err != nil {
+			writeInternalServerError(w, r, err, "user_id", user.Id)
+			return
 		}
 
 		response := api.GetUserGroupsResponse{

@@ -17,6 +17,8 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/signingkeys"
 	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/logging"
 )
 
 // accountLogoutDatabase is what the account logout endpoint needs: the session being ended, the
@@ -64,23 +66,34 @@ func HandleAPIAccountLogoutRequestPost(
 		var client *models.Client
 		var err error
 		if req.ClientIdentifier != "" {
+			// A failed lookup is the server's fault and a missing row the caller's, so the two
+			// answer apart: 500 and 400. Folding them answered a database outage as a bad client
+			// identifier, which a caller would fix by changing a value that was right (#425).
 			client, err = database.GetClientByClientIdentifier(r.Context(), nil, req.ClientIdentifier)
-			if err != nil || client == nil {
+			if err != nil {
+				writeInternalServerError(w, r, errs.Wrap(err, "unable to load the client by its identifier"),
+					"client_identifier", logging.FieldForLog(req.ClientIdentifier))
+				return
+			}
+			if client == nil {
 				writeJSONError(w, "Invalid client identifier", "VALIDATION_ERROR", http.StatusBadRequest)
 				return
 			}
 		} else {
 			// Automatic resolution by post_logout_redirect_uri
-			clients, err := database.GetAllClients(r.Context(), nil)
-			if err != nil {
-				writeInternalServerError(w, r, err)
+			clients, clientsErr := database.GetAllClients(r.Context(), nil)
+			if clientsErr != nil {
+				writeInternalServerError(w, r, clientsErr)
 				return
 			}
 			var matches []*models.Client
 			for i := range clients {
 				c := &clients[i]
+				// derr, not err: err is the function's, and nil here. Passing it logged a 500
+				// with no error on the record (#414 item 2).
 				if derr := database.ClientLoadRedirectURIs(r.Context(), nil, c); derr != nil {
-					writeInternalServerError(w, r, err)
+					writeInternalServerError(w, r, errs.Wrap(derr, "unable to load a client's redirect URIs"),
+						"client_id", c.Id)
 					return
 				}
 				for _, uri := range c.RedirectURIs {
@@ -121,7 +134,13 @@ func HandleAPIAccountLogoutRequestPost(
 			return
 		}
 		userSession, err := database.GetUserSessionBySessionIdentifier(r.Context(), nil, sid)
-		if err != nil || userSession == nil {
+		if err != nil {
+			// A failed lookup is not a missing session: 401 would tell the caller to
+			// re-authenticate over what is a server fault (#425).
+			writeInternalServerError(w, r, errs.Wrap(err, "unable to load the user session"))
+			return
+		}
+		if userSession == nil {
 			writeJSONError(w, "Session not found", "INVALID_SESSION", http.StatusUnauthorized)
 			return
 		}

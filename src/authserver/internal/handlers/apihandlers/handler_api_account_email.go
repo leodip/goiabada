@@ -73,7 +73,7 @@ func HandleAPIAccountEmailPut(
 		user.EmailVerificationCodeIssuedAt = sql.NullTime{Valid: false}
 
 		if err := database.UpdateUser(r.Context(), nil, user); err != nil {
-			writeInternalServerError(w, r, err)
+			writeEmailTakenOrInternalServerError(w, r, err)
 			return
 		}
 
