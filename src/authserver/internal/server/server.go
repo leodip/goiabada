@@ -24,6 +24,7 @@ import (
 	authserver_middleware "github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/workers"
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/hostport"
 	"github.com/leodip/goiabada/core/i18n"
 	custom_middleware "github.com/leodip/goiabada/core/middleware"
 )
@@ -133,10 +134,7 @@ func (s *Server) Start(ctx context.Context) {
 
 	// Start HTTPS server if enabled
 	if httpsEnabled {
-		httpsServer := &http.Server{
-			Addr:    fmt.Sprintf("%s:%d", httpsHost, httpsPort),
-			Handler: s.router,
-		}
+		httpsServer := newHTTPServer(httpsHost, httpsPort, s.router)
 		httpServers = append(httpServers, httpsServer)
 		go func() {
 			slog.InfoContext(ctx, "starting the https listener", "host", httpsHost, "port", httpsPort)
@@ -149,10 +147,7 @@ func (s *Server) Start(ctx context.Context) {
 
 	// Start HTTP server if enabled
 	if httpEnabled {
-		httpServer := &http.Server{
-			Addr:    fmt.Sprintf("%s:%d", httpHost, httpPort),
-			Handler: s.router,
-		}
+		httpServer := newHTTPServer(httpHost, httpPort, s.router)
 		httpServers = append(httpServers, httpServer)
 		go func() {
 			slog.InfoContext(ctx, "starting the http listener", "host", httpHost, "port", httpPort)
@@ -181,6 +176,17 @@ func (s *Server) Start(ctx context.Context) {
 	case <-ctx.Done():
 		slog.InfoContext(ctx, "shutdown signal received")
 		s.shutdown(httpServers)
+	}
+}
+
+// newHTTPServer builds one of Start's listeners, unstarted. The address comes from hostport.Join,
+// so an IPv6 host such as `::1` listens, where a Sprintf'd `host:port` stopped the server at start
+// with "too many colons in address" (#424). `0.0.0.0`, the default, needs no IPv6 spelling to
+// reach IPv6 clients: with network "tcp" Go listens on both families from it.
+func newHTTPServer(host string, port int, handler http.Handler) *http.Server {
+	return &http.Server{
+		Addr:    hostport.Join(host, port),
+		Handler: handler,
 	}
 }
 

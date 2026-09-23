@@ -22,6 +22,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/hostport"
 )
 
 const (
@@ -89,8 +90,12 @@ func (e *EmailSender) SendEmail(ctx context.Context, input *SendEmailInput) erro
 		return err
 	}
 
-	host := settings.SMTPHost
-	addr := net.JoinHostPort(host, strconv.Itoa(settings.SMTPPort))
+	// The settings handler stores the host bare, but a row written some other way may carry
+	// `[::1]`. Every use below takes the host on its own as well as in the address -- the TLS
+	// server name, the SMTP client's host, the local-host check -- and brackets name nothing in
+	// any of them (#424).
+	host := hostport.Unbracket(settings.SMTPHost)
+	addr := hostport.Join(host, settings.SMTPPort)
 
 	dialTimeout := e.dialTimeout
 	if dialTimeout == 0 {

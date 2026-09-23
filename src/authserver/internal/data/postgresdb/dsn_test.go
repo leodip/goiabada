@@ -55,3 +55,20 @@ func TestDSN_RoundTripsThroughTheDriver(t *testing.T) {
 		})
 	}
 }
+
+// TestDSN_BracketedIPv6HostIsTheSameHost pins that `[::1]`, the one IPv6 spelling of
+// GOIABADA_DB_HOST a Sprintf'd URL accepted, still names the host `::1` does. A plain
+// net.JoinHostPort would have written `[[::1]]:5432`, which pgx refuses as an invalid IP literal
+// (#424).
+func TestDSN_BracketedIPv6HostIsTheSameHost(t *testing.T) {
+	bare := &DatabaseConfig{Username: "goiabada", Password: "pw", Host: "::1", Port: 5432, Name: "goiabada"}
+	bracketed := &DatabaseConfig{Username: "goiabada", Password: "pw", Host: "[::1]", Port: 5432, Name: "goiabada"}
+
+	assert.Equal(t, DSN(bare), DSN(bracketed))
+	assert.Equal(t, MaintenanceDSN(bare), MaintenanceDSN(bracketed))
+
+	parsed, err := pgx.ParseConfig(DSN(bracketed))
+	require.NoError(t, err)
+	assert.Equal(t, "::1", parsed.Host)
+	assert.Equal(t, uint16(5432), parsed.Port)
+}

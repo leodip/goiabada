@@ -1,11 +1,10 @@
 package mysqldb
 
 import (
-	"net"
-	"strconv"
 	"time"
 
 	mysqldriver "github.com/go-sql-driver/mysql"
+	"github.com/leodip/goiabada/core/hostport"
 )
 
 // DSN is the connection string for the application database cfg names, with multiStatements on,
@@ -13,8 +12,8 @@ import (
 //
 // Built through the driver's own FormatDSN rather than written by hand, so a database name
 // carrying `/`, `?` or `#` and an IPv6 host survive the driver's parse; a Sprintf'd string
-// broke on both (#424). The host goes through net.JoinHostPort for the brackets an IPv6 literal
-// needs.
+// broke on both (#424). The host goes through hostport.Join for the brackets an IPv6 literal
+// needs, which also reads `[::1]` as `::1`: the one IPv6 spelling the Sprintf'd string accepted.
 //
 // ceiling: a username containing `:` cannot be expressed. The driver's DSN grammar splits the
 // user from the password at the first `:` and has no escape for one, so FormatDSN writes it and
@@ -41,7 +40,7 @@ func driverConfig(cfg *DatabaseConfig) *mysqldriver.Config {
 	c.User = cfg.Username
 	c.Passwd = cfg.Password
 	c.Net = "tcp"
-	c.Addr = net.JoinHostPort(cfg.Host, strconv.Itoa(cfg.Port))
+	c.Addr = hostport.Join(cfg.Host, cfg.Port)
 	c.ParseTime = true
 	c.Loc = time.UTC
 	// Charset's option only sets a field and returns no error; Apply is the driver's one way in.

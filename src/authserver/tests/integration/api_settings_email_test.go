@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"net"
 	"net/http"
 	"strings"
 	"testing"
@@ -11,7 +12,9 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/core/testutil"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // GET /api/v1/admin/settings/email
@@ -280,6 +283,76 @@ func TestAPISettingsEmailPut_TCPConnectionFailure(t *testing.T) {
 	var errBody api.ErrorResponse
 	_ = json.NewDecoder(resp.Body).Decode(&errBody)
 	assert.True(t, strings.HasPrefix(errBody.ErrorDescription, "Unable to connect to the SMTP server:"))
+}
+
+// PUT: the host is dialled, bounded and stored in one normalised form: surrounding space trimmed,
+// and one pair of brackets taken off an IPv6 literal. The sender uses the stored host on its own as
+// the TLS server name, where `[::1]` names nothing, and before #424 the bracketed form never got that
+// far: the dial refused it with "missing port in address".
+func TestAPISettingsEmailPut_HostIsStoredBare(t *testing.T) {
+	accessToken, _ := createAdminClientWithToken(t)
+	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/email"
+
+	// The last row leaves a closed IPv6 port behind, and the tests after this one send mail
+	// through whatever the settings row says.
+	before, err := database.GetSettingsById(context.Background(), nil, 1)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, database.UpdateSettings(context.Background(), nil, before))
+	})
+
+	tests := []struct {
+		name string
+		host string
+		want string
+		ipv6 bool
+	}{
+		{name: "surrounding space", host: " mailpit ", want: "mailpit"},
+		{name: "IPv6 loopback", host: "::1", want: "::1", ipv6: true},
+		{name: "IPv6 loopback, bracketed", host: "[::1]", want: "::1", ipv6: true},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			port := 1025
+			if test.ipv6 {
+				testutil.SkipWithoutIPv6Loopback(t)
+				// The handler dials the host before it saves anything, and the server under test
+				// runs on this machine, so a listener here is what that dial reaches.
+				ln, err := net.Listen("tcp", "[::1]:0")
+				require.NoError(t, err)
+				t.Cleanup(func() { _ = ln.Close() })
+				go func() {
+					for {
+						conn, err := ln.Accept()
+						if err != nil {
+							return
+						}
+						_ = conn.Close()
+					}
+				}()
+				port = ln.Addr().(*net.TCPAddr).Port
+			}
+
+			resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsEmailRequest{
+				SMTPEnabled:    true,
+				SMTPHost:       test.host,
+				SMTPPort:       port,
+				SMTPFromEmail:  "noreply@goiabada.dev",
+				SMTPEncryption: "none",
+			})
+			defer func() { _ = resp.Body.Close() }()
+			require.Equal(t, http.StatusOK, resp.StatusCode)
+
+			var body api.SettingsEmailResponse
+			require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
+			assert.Equal(t, test.want, body.SMTPHost)
+
+			settings, err := database.GetSettingsById(context.Background(), nil, 1)
+			require.NoError(t, err)
+			assert.Equal(t, test.want, settings.SMTPHost)
+		})
+	}
 }
 
 // PUT: password set and clear lifecycle

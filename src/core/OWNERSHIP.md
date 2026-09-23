@@ -260,6 +260,8 @@ command itself and fails on a tree it changed.
 | `core/gender` | `IsGenderValid` | contract | The `Gender` type's own bound, and the only statement of which of its values are legal, which is why a caller holding an int asks here rather than comparing against `GenderOther` itself. The admin console names only `Gender`, so the tree justifies the type and not this (#385 decision 17). |
 | `core/hashutil` | `HashString` | both-apps | — |
 | `core/hashutil` | `VerifyStringHash` | kernel | — |
+| `core/hostport` | `Join` | both-apps | — |
+| `core/hostport` | `Unbracket` | own-package | — |
 | `core/i18n` | `Bundle` | own-package | — |
 | `core/i18n` | `ErrCodeAddressAngleBrackets` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
 | `core/i18n` | `ErrCodeAddressCountryInvalid` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
@@ -425,6 +427,7 @@ command itself and fails on a tree it changed.
 | `core/testutil` | `RenderSymbolOwnership` | kernel | — |
 | `core/testutil` | `Reporter` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
 | `core/testutil` | `RunGuard` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
+| `core/testutil` | `SkipWithoutIPv6Loopback` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
 | `core/testutil` | `SlogCapture` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
 | `core/testutil` | `SourceRoot` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
 | `core/testutil` | `WalkHTMLTemplates` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
