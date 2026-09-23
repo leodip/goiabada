@@ -77,8 +77,11 @@ func newRunner(db runDatabase, cfg Config) *runner {
 }
 
 // Run seeds an empty database in the mode the configuration selects and answers what the process
-// does next. A database already seeded is left alone. An error means the process exits 1: nothing
-// the seed wrote was committed, so the next start, with the cause fixed, seeds from the beginning.
+// does next. A database already seeded is left alone. An error means the process exits 1. Every
+// error but one means nothing the seed wrote was committed, so the next start, with the cause
+// fixed, seeds from the beginning. The exception is a bootstrap file that could not be moved into
+// place after the commit: the database is seeded, a restart regenerates nothing, and the error
+// names the staged file holding the only copy of the credentials, which the operator moves.
 func Run(ctx context.Context, db runDatabase, cfg Config) (Outcome, error) {
 	return newRunner(db, cfg).run(ctx)
 }

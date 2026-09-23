@@ -50,14 +50,16 @@ type seedValues struct {
 //
 // WHY IT IS ORDERED THIS WAY. Every step that can fail without the database's help runs first --
 // the password check, the random keys, the encryption, both RSA keys, the hash and the bootstrap
-// file's staging -- and then all 19 writes run in one transaction, so a failure anywhere leaves an
-// empty database that the next start seeds from the beginning. They used to run one statement at a
-// time with no transaction, the file written after the first of them: a failure part-way left a
-// database IsEmpty still called empty, whose next seed then failed on the client it had already
-// written, and no restart recovered it (#424). The file appears under its name only after the
-// commit, by a rename in its own directory, so an operator never copies credentials the database
-// does not hold. bootstrapFile is empty in single-step mode, which writes no file even when one is
-// configured beside the secret.
+// file's staging -- and then all 19 writes run in one transaction, so a failure anywhere up to the
+// commit leaves an empty database that the next start seeds from the beginning. The one step after
+// it, publishing the file, cannot be undone that way, and its failure keeps the staged file and
+// names it instead (below). They used to run one statement at a time with no transaction, the
+// file written after the first of them: a failure part-way left a database IsEmpty still called
+// empty, whose next seed then failed on the client it had already written, and no restart
+// recovered it (#424). The file appears under its name only after the commit, by a rename in its
+// own directory, so an operator never copies credentials the database does not hold.
+// bootstrapFile is empty in single-step mode, which writes no file even when one is configured
+// beside the secret.
 func (r *runner) seed(ctx context.Context, bootstrapFile string) error {
 
 	// The data-encryption key comes from the environment (GOIABADA_AES_ENCRYPTION_KEY,
