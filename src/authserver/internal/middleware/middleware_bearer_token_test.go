@@ -24,7 +24,7 @@ func TestJwtAuthorizationHeaderToContext_ValidBearerToken(t *testing.T) {
 			"sub": "user",
 		},
 	}
-	mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "validtoken", mock.Anything, true).
+	mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "validtoken", true).
 		Return(expectedToken, nil)
 
 	req := httptest.NewRequest("GET", "/", nil)
@@ -50,7 +50,7 @@ func TestJwtAuthorizationHeaderToContext_InvalidBearerToken(t *testing.T) {
 	mockTokenParser := new(mock_middleware.TokenParser)
 	middleware := NewMiddlewareBearerToken(mockTokenParser)
 
-	mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "invalidtoken", mock.Anything, true).
+	mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "invalidtoken", true).
 		Return(nil, assert.AnError)
 
 	req := httptest.NewRequest("GET", "/", nil)
@@ -116,7 +116,7 @@ func TestJwtAuthorizationHeaderToContext_ValidPostBodyToken(t *testing.T) {
 			"sub": "user",
 		},
 	}
-	mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "validposttoken", mock.Anything, true).
+	mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "validposttoken", true).
 		Return(expectedToken, nil)
 
 	req := httptest.NewRequest("POST", "/userinfo", strings.NewReader("access_token=validposttoken"))
@@ -142,7 +142,7 @@ func TestJwtAuthorizationHeaderToContext_InvalidPostBodyToken(t *testing.T) {
 	mockTokenParser := new(mock_middleware.TokenParser)
 	middleware := NewMiddlewareBearerToken(mockTokenParser)
 
-	mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "invalidposttoken", mock.Anything, true).
+	mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "invalidposttoken", true).
 		Return(nil, assert.AnError)
 
 	req := httptest.NewRequest("POST", "/userinfo", strings.NewReader("access_token=invalidposttoken"))
@@ -172,7 +172,7 @@ func TestJwtAuthorizationHeaderToContext_HeaderTakesPrecedenceOverPostBody(t *te
 		},
 	}
 	// Only the header token should be validated, not the body token
-	mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "headertoken", mock.Anything, true).
+	mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "headertoken", true).
 		Return(expectedToken, nil)
 
 	req := httptest.NewRequest("POST", "/userinfo", strings.NewReader("access_token=bodytoken"))
@@ -215,7 +215,7 @@ func TestJwtAuthorizationHeaderToContext_PostBodyIgnoredForGetRequest(t *testing
 
 	// Token parser should NOT be called for GET request with body token
 	mockTokenParser.AssertNotCalled(t, "DecodeAndValidateTokenString",
-		mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+		mock.Anything, mock.Anything, mock.Anything)
 }
 
 // A POST that carries the token only in its query is the one request where the two accessors
@@ -247,7 +247,7 @@ func TestJwtAuthorizationHeaderToContext_PostQueryTokenIgnored(t *testing.T) {
 
 	// Token parser should NOT be called for a token that arrived in the request target
 	mockTokenParser.AssertNotCalled(t, "DecodeAndValidateTokenString",
-		mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+		mock.Anything, mock.Anything, mock.Anything)
 }
 
 func TestJwtAuthorizationHeaderToContext_PostBodyIgnoredForWrongContentType(t *testing.T) {
@@ -269,7 +269,7 @@ func TestJwtAuthorizationHeaderToContext_PostBodyIgnoredForWrongContentType(t *t
 
 	// Token parser should NOT be called for wrong content type
 	mockTokenParser.AssertNotCalled(t, "DecodeAndValidateTokenString",
-		mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+		mock.Anything, mock.Anything, mock.Anything)
 }
 
 func TestJwtAuthorizationHeaderToContext_PostBodyEmptyAccessToken(t *testing.T) {
@@ -291,7 +291,7 @@ func TestJwtAuthorizationHeaderToContext_PostBodyEmptyAccessToken(t *testing.T) 
 
 	// Token parser should NOT be called for empty token
 	mockTokenParser.AssertNotCalled(t, "DecodeAndValidateTokenString",
-		mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+		mock.Anything, mock.Anything, mock.Anything)
 }
 
 func TestJwtAuthorizationHeaderToContext_PostBodyNoAccessTokenParameter(t *testing.T) {
@@ -313,7 +313,7 @@ func TestJwtAuthorizationHeaderToContext_PostBodyNoAccessTokenParameter(t *testi
 
 	// Token parser should NOT be called when access_token is missing
 	mockTokenParser.AssertNotCalled(t, "DecodeAndValidateTokenString",
-		mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+		mock.Anything, mock.Anything, mock.Anything)
 }
 
 func TestJwtAuthorizationHeaderToContext_PostBodyContentTypeWithCharset(t *testing.T) {
@@ -326,7 +326,7 @@ func TestJwtAuthorizationHeaderToContext_PostBodyContentTypeWithCharset(t *testi
 			"sub": "user",
 		},
 	}
-	mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "charsettoken", mock.Anything, true).
+	mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "charsettoken", true).
 		Return(expectedToken, nil)
 
 	req := httptest.NewRequest("POST", "/userinfo", strings.NewReader("access_token=charsettoken"))
@@ -356,7 +356,7 @@ func TestJwtAuthorizationHeaderToContext_PostBodyWithOtherParameters(t *testing.
 			"sub": "user",
 		},
 	}
-	mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "tokenwithotherparams", mock.Anything, true).
+	mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "tokenwithotherparams", true).
 		Return(expectedToken, nil)
 
 	req := httptest.NewRequest("POST", "/userinfo", strings.NewReader("param1=value1&access_token=tokenwithotherparams&param2=value2"))
@@ -386,7 +386,7 @@ func TestJwtAuthorizationHeaderToContext_EmptyBearerTokenInHeader(t *testing.T) 
 			"sub": "user",
 		},
 	}
-	mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "fallbacktoken", mock.Anything, true).
+	mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "fallbacktoken", true).
 		Return(expectedToken, nil)
 
 	// Empty Bearer token in header should fall back to POST body
@@ -428,5 +428,5 @@ func TestJwtAuthorizationHeaderToContext_PutRequestIgnoresPostBody(t *testing.T)
 
 	// Token parser should NOT be called for PUT request
 	mockTokenParser.AssertNotCalled(t, "DecodeAndValidateTokenString",
-		mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+		mock.Anything, mock.Anything, mock.Anything)
 }

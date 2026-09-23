@@ -8,13 +8,14 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
+	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 )
 
-func newJwtInfoWithLocale(locale string) oauth.JwtInfo {
-	return oauth.JwtInfo{
+func newJwtInfoWithLocale(locale string) oauthclient.JwtInfo {
+	return oauthclient.JwtInfo{
 		IdToken: &oauth.JwtToken{
 			Claims: jwt.MapClaims{"locale": locale},
 		},
@@ -66,7 +67,7 @@ func TestMiddlewareLocaleFromJWT_FallsThroughWhenClaimMissing(t *testing.T) {
 	// must survive.
 	req := httptest.NewRequest("GET", "/admin/users", nil)
 	req.Header.Set("Accept-Language", "pt-BR")
-	req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeyJwtInfo, oauth.JwtInfo{
+	req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeyJwtInfo, oauthclient.JwtInfo{
 		IdToken: &oauth.JwtToken{Claims: jwt.MapClaims{}},
 	}))
 

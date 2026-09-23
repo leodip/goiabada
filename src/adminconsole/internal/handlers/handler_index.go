@@ -5,7 +5,7 @@ import (
 
 	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
-	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 )
 
 func HandleIndexGet(
@@ -21,10 +21,10 @@ func HandleIndexGet(
 		loggedInUser := ""
 		logoutLink := ""
 
-		var jwtInfo oauth.JwtInfo
+		var jwtInfo oauthclient.JwtInfo
 		var ok bool
 		if r.Context().Value(constants.ContextKeyJwtInfo) != nil {
-			jwtInfo, ok = r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+			jwtInfo, ok = r.Context().Value(constants.ContextKeyJwtInfo).(oauthclient.JwtInfo)
 			if ok {
 				isAuthenticated = authHelper.IsAuthenticated(jwtInfo)
 				if isAuthenticated {

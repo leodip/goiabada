@@ -69,7 +69,7 @@ func TestJwtSessionHandler_ValidSession(t *testing.T) {
 	}
 	mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "validtoken", mock.Anything, true).Return(expectedToken, nil)
 
-	expectedJwtInfo := &oauth.JwtInfo{
+	expectedJwtInfo := &oauthclient.JwtInfo{
 		TokenResponse: oauth.TokenResponse{AccessToken: "validtoken"},
 		AccessToken:   expectedToken,
 	}
@@ -77,7 +77,7 @@ func TestJwtSessionHandler_ValidSession(t *testing.T) {
 
 	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Validate that JwtInfo is set in the context
-		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauthclient.JwtInfo)
 		assert.True(t, ok, "JwtInfo should be set in the context")
 		assert.NotNil(t, jwtInfo, "JwtInfo should not be nil")
 
@@ -193,23 +193,23 @@ func TestJwtSessionHandler_InvalidTokenInSession(t *testing.T) {
 func TestJwtSessionHandler_InvalidIssuer(t *testing.T) {
 	tests := []struct {
 		name     string
-		setToken func(*oauth.JwtInfo, *oauth.JwtToken)
+		setToken func(*oauthclient.JwtInfo, *oauth.JwtToken)
 	}{
 		{
 			name: "id token",
-			setToken: func(jwtInfo *oauth.JwtInfo, token *oauth.JwtToken) {
+			setToken: func(jwtInfo *oauthclient.JwtInfo, token *oauth.JwtToken) {
 				jwtInfo.IdToken = token
 			},
 		},
 		{
 			name: "access token",
-			setToken: func(jwtInfo *oauth.JwtInfo, token *oauth.JwtToken) {
+			setToken: func(jwtInfo *oauthclient.JwtInfo, token *oauth.JwtToken) {
 				jwtInfo.AccessToken = token
 			},
 		},
 		{
 			name: "refresh token",
-			setToken: func(jwtInfo *oauth.JwtInfo, token *oauth.JwtToken) {
+			setToken: func(jwtInfo *oauthclient.JwtInfo, token *oauth.JwtToken) {
 				jwtInfo.RefreshToken = token
 			},
 		},
@@ -245,7 +245,7 @@ func TestJwtSessionHandler_InvalidIssuer(t *testing.T) {
 			}
 			mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "validtoken", mock.Anything, true).Return(expectedToken, nil)
 
-			jwtInfo := &oauth.JwtInfo{
+			jwtInfo := &oauthclient.JwtInfo{
 				TokenResponse: oauth.TokenResponse{AccessToken: "validtoken"},
 			}
 			tt.setToken(jwtInfo, expectedToken)
@@ -323,7 +323,7 @@ func TestJwtSessionHandler_ValidRefreshToken(t *testing.T) {
 			tr.RefreshToken == "newrefreshtoken" &&
 			tr.TokenType == "Bearer" &&
 			tr.ExpiresIn == 3600
-	})).Return(&oauth.JwtInfo{
+	})).Return(&oauthclient.JwtInfo{
 		TokenResponse: oauth.TokenResponse{AccessToken: "newvalidtoken"},
 		AccessToken: &oauth.JwtToken{
 			TokenBase64: "newvalidtoken",
@@ -346,7 +346,7 @@ func TestJwtSessionHandler_ValidRefreshToken(t *testing.T) {
 
 	// Create next handler
 	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauthclient.JwtInfo)
 		assert.True(t, ok, "JwtInfo should be set in the context")
 		assert.NotNil(t, jwtInfo, "JwtInfo should not be nil")
 		assert.Equal(t, "newvalidtoken", jwtInfo.TokenResponse.AccessToken)
@@ -518,7 +518,7 @@ func TestRequiresScope_Authorized(t *testing.T) {
 	req := httptest.NewRequest("GET", "/", nil)
 	rr := httptest.NewRecorder()
 
-	jwtInfo := oauth.JwtInfo{
+	jwtInfo := oauthclient.JwtInfo{
 		TokenResponse: oauth.TokenResponse{AccessToken: "validtoken"},
 	}
 	ctx := req.Context()
@@ -551,7 +551,7 @@ func TestRequiresScope_Unauthorized(t *testing.T) {
 	req := httptest.NewRequest("GET", "/", nil)
 	rr := httptest.NewRecorder()
 
-	jwtInfo := oauth.JwtInfo{
+	jwtInfo := oauthclient.JwtInfo{
 		TokenResponse: oauth.TokenResponse{AccessToken: "validtoken"},
 	}
 	ctx := req.Context()
@@ -589,7 +589,7 @@ func TestRequiresScope_Unauthenticated(t *testing.T) {
 	req := httptest.NewRequest("GET", "/", nil)
 	rr := httptest.NewRecorder()
 
-	jwtInfo := oauth.JwtInfo{}
+	jwtInfo := oauthclient.JwtInfo{}
 	ctx := req.Context()
 	ctx = context.WithValue(ctx, constants.ContextKeyJwtInfo, jwtInfo)
 	req = req.WithContext(ctx)
@@ -619,8 +619,8 @@ func TestRequiresScope_NoJwtInfo(t *testing.T) {
 	req := httptest.NewRequest("GET", "/", nil)
 	rr := httptest.NewRecorder()
 
-	mockAuthHelper.On("IsAuthorizedToAccessResource", oauth.JwtInfo{}, []string{"required:scope"}).Return(false)
-	mockAuthHelper.On("IsAuthenticated", oauth.JwtInfo{}).Return(false)
+	mockAuthHelper.On("IsAuthorizedToAccessResource", oauthclient.JwtInfo{}, []string{"required:scope"}).Return(false)
+	mockAuthHelper.On("IsAuthenticated", oauthclient.JwtInfo{}).Return(false)
 	mockAuthHelper.On("RedirToAuthorize", mock.Anything, mock.Anything, coreconstants.AdminConsoleClientIdentifier, mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return(nil)
 
 	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -644,7 +644,7 @@ func TestRequiresScope_RedirectError(t *testing.T) {
 	req := httptest.NewRequest("GET", "/", nil)
 	rr := httptest.NewRecorder()
 
-	jwtInfo := oauth.JwtInfo{}
+	jwtInfo := oauthclient.JwtInfo{}
 	ctx := req.Context()
 	ctx = context.WithValue(ctx, constants.ContextKeyJwtInfo, jwtInfo)
 	req = req.WithContext(ctx)
@@ -984,7 +984,7 @@ func TestJwtSessionHandler_RefreshesOnACancelledRequestContext(t *testing.T) {
 	mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "oldaccesstoken",
 		mock.Anything, true).Return(nil, errors.New("token is expired"))
 	mockTokenParser.On("DecodeAndValidateTokenResponse", mock.Anything, mock.Anything).
-		Return(&oauth.JwtInfo{}, nil)
+		Return(&oauthclient.JwtInfo{}, nil)
 
 	// The browser has gone: the inbound request's context is already done before
 	// the handler runs. It carries a request id, which is the value the detachment is

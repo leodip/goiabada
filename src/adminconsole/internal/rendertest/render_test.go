@@ -25,6 +25,7 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/handlers/adminsettingshandlers"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers/adminuserhandlers"
 	adminmiddleware "github.com/leodip/goiabada/adminconsole/internal/middleware"
+	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/adminconsole/internal/pagination"
 	web "github.com/leodip/goiabada/adminconsole/web"
 	"github.com/leodip/goiabada/core/api"
@@ -62,7 +63,7 @@ func renderWithLayout(t *testing.T, layout, page string, bind map[string]interfa
 }
 
 // renderWithLayoutAs is renderWithLayout with an ID token on the context, which is how every
-// authenticated page reaches the renderer in production: JwtSessionHandler puts an oauth.JwtInfo
+// authenticated page reaches the renderer in production: JwtSessionHandler puts an oauthclient.JwtInfo
 // there and HttpHelper.RenderTemplateToBuffer turns its claims into the `loggedInUser` bind that
 // menu_layout.html reads for the dropdown label. Passing nil claims is the anonymous request, which
 // is what every other case in this file renders and why the label is blank in all of them.
@@ -74,7 +75,7 @@ func renderWithLayoutAs(t *testing.T, layout, page string, bind map[string]inter
 	settings := &api.PublicSettingsResponse{AppName: "Test", UITheme: "dark", SMTPEnabled: true}
 	req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings, settings))
 	if idTokenClaims != nil {
-		jwtInfo := oauth.JwtInfo{IdToken: &oauth.JwtToken{Claims: idTokenClaims}}
+		jwtInfo := oauthclient.JwtInfo{IdToken: &oauth.JwtToken{Claims: idTokenClaims}}
 		req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeyJwtInfo, jwtInfo))
 	}
 	req = req.WithContext(i18n.WithLocale(req.Context(), true, "pt-BR"))

@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
+	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/oauth"
@@ -132,7 +133,7 @@ func TestMiddlewareJwt_ServerErrorsRenderThePageAndKeepTheCauseOutOfTheResponse(
 				parser := new(mock_middleware.TokenParser)
 				parser.On("DecodeAndValidateTokenString", mock.Anything, "valid", mock.Anything, true).Return(token, nil)
 				parser.On("DecodeAndValidateTokenResponse", mock.Anything, mock.AnythingOfType("*oauth.TokenResponse")).
-					Return(&oauth.JwtInfo{
+					Return(&oauthclient.JwtInfo{
 						TokenResponse: oauth.TokenResponse{AccessToken: "valid"},
 						AccessToken:   token,
 					}, nil)
@@ -165,7 +166,7 @@ func TestMiddlewareJwt_ServerErrorsRenderThePageAndKeepTheCauseOutOfTheResponse(
 			name:      "the redirect to the authorize endpoint fails",
 			wantCause: "unable to redirect to authorize",
 			build: func(t *testing.T, rec *recordingErrorRenderer) (http.Handler, *http.Request) {
-				jwtInfo := oauth.JwtInfo{}
+				jwtInfo := oauthclient.JwtInfo{}
 
 				helper := new(mock_middleware.AuthHelper)
 				helper.On("IsAuthorizedToAccessResource", jwtInfo, []string{"required:scope"}).Return(false)

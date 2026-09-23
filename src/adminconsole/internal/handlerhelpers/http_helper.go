@@ -15,11 +15,11 @@ import (
 
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
+	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
-	"github.com/leodip/goiabada/core/oauth"
 )
 
 // This renderer is one of two. The auth server has its own copy in
@@ -164,10 +164,10 @@ func (h *HttpHelper) RenderTemplateToBuffer(r *http.Request, layoutName string, 
 	// own, and the two are deliberately separate (#385).
 	data["ctx"] = r.Context()
 
-	var jwtInfo oauth.JwtInfo
+	var jwtInfo oauthclient.JwtInfo
 	if r.Context().Value(constants.ContextKeyJwtInfo) != nil {
 		var ok bool
-		jwtInfo, ok = r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		jwtInfo, ok = r.Context().Value(constants.ContextKeyJwtInfo).(oauthclient.JwtInfo)
 		if !ok {
 			return nil, errs.New("unable to cast jwtInfo to dtos.JwtInfo")
 		}

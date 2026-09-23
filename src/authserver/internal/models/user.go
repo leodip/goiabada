@@ -111,14 +111,6 @@ type User struct {
 	Attributes  []UserAttribute `db:"-"`
 }
 
-func (u *User) GetDateOfBirthFormatted() string {
-	dateOfBirthFormatted := ""
-	if u != nil && u.BirthDate.Valid {
-		dateOfBirthFormatted = u.BirthDate.Time.Format("2006-01-02")
-	}
-	return dateOfBirthFormatted
-}
-
 func (u *User) GetFullName() string {
 	fullName := ""
 

@@ -20,7 +20,7 @@ import (
 )
 
 type tokenParser interface {
-	DecodeAndValidateTokenResponse(ctx context.Context, tokenResponse *oauth.TokenResponse) (*oauth.JwtInfo, error)
+	DecodeAndValidateTokenResponse(ctx context.Context, tokenResponse *oauth.TokenResponse) (*oauthclient.JwtInfo, error)
 	DecodeAndValidateTokenString(ctx context.Context, token string, pubKey *rsa.PublicKey, withExpirationCheck bool) (*oauth.JwtToken, error)
 }
 
@@ -30,8 +30,8 @@ type issuerReader interface {
 
 type AuthHelper interface {
 	RedirToAuthorize(w http.ResponseWriter, r *http.Request, clientIdentifier string, scope string, redirectBack string) error
-	IsAuthorizedToAccessResource(jwtInfo oauth.JwtInfo, scopesAnyOf []string) bool
-	IsAuthenticated(jwtInfo oauth.JwtInfo) bool
+	IsAuthorizedToAccessResource(jwtInfo oauthclient.JwtInfo, scopesAnyOf []string) bool
+	IsAuthenticated(jwtInfo oauthclient.JwtInfo) bool
 }
 
 type HTTPClient interface {
@@ -298,10 +298,10 @@ func (m *MiddlewareJwt) RequiresScope(
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
 
-			var jwtInfo oauth.JwtInfo
+			var jwtInfo oauthclient.JwtInfo
 			var ok bool
 			if r.Context().Value(constants.ContextKeyJwtInfo) != nil {
-				jwtInfo, ok = r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+				jwtInfo, ok = r.Context().Value(constants.ContextKeyJwtInfo).(oauthclient.JwtInfo)
 				if !ok {
 					m.errorRenderer.InternalServerError(w, r,
 						errs.New("unable to cast the context value to JwtInfo in RequiresScope middleware"))

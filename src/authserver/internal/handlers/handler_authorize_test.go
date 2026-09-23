@@ -2552,7 +2552,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
 		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
 
-		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "bad-jwt-token", mock.Anything, false).Return(nil, errors.New("signature verification failed"))
+		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "bad-jwt-token", false).Return(nil, errors.New("signature verification failed"))
 
 		authHelper.On("ClearAuthContext", rr, req).Return(nil)
 
@@ -2622,7 +2622,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 				"sub": "user-123",
 			},
 		}
-		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "valid-jwt-wrong-issuer", mock.Anything, false).Return(wrongIssuerToken, nil)
+		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "valid-jwt-wrong-issuer", false).Return(wrongIssuerToken, nil)
 
 		authHelper.On("ClearAuthContext", rr, req).Return(nil)
 
@@ -2691,7 +2691,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 				"iss": "https://test-issuer.com",
 			},
 		}
-		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "valid-jwt-no-sub", mock.Anything, false).Return(noSubToken, nil)
+		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "valid-jwt-no-sub", false).Return(noSubToken, nil)
 
 		authHelper.On("ClearAuthContext", rr, req).Return(nil)
 
@@ -2762,7 +2762,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 				"sub": userSubject,
 			},
 		}
-		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "expired-jwt-token", mock.Anything, false).Return(expiredToken, nil)
+		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "expired-jwt-token", false).Return(expiredToken, nil)
 
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.IdTokenHintSub == userSubject
@@ -2854,7 +2854,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 				"sub": userSubject,
 			},
 		}
-		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "valid-jwt-token", mock.Anything, false).Return(validToken, nil)
+		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "valid-jwt-token", false).Return(validToken, nil)
 
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.IdTokenHintSub == userSubject
@@ -2948,7 +2948,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 				"sub": hintSubject,
 			},
 		}
-		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "different-user-jwt", mock.Anything, false).Return(differentUserToken, nil)
+		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "different-user-jwt", false).Return(differentUserToken, nil)
 
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.IdTokenHintSub == hintSubject
@@ -3039,7 +3039,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 				"sub": userSubject,
 			},
 		}
-		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "valid-jwt-token", mock.Anything, false).Return(validToken, nil)
+		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "valid-jwt-token", false).Return(validToken, nil)
 
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.IdTokenHintSub == userSubject && ac.Prompt == "none"
@@ -3155,7 +3155,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 				"sub": hintSubject,
 			},
 		}
-		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "different-user-jwt", mock.Anything, false).Return(differentUserToken, nil)
+		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "different-user-jwt", false).Return(differentUserToken, nil)
 
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.IdTokenHintSub == hintSubject && ac.Prompt == "none"
@@ -3255,7 +3255,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 				"sub": hintSubject,
 			},
 		}
-		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "different-user-jwt", mock.Anything, false).Return(differentUserToken, nil)
+		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "different-user-jwt", false).Return(differentUserToken, nil)
 
 		userSession := &models.UserSession{
 			Id:          1,
@@ -3357,7 +3357,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 				"sub": hintSubject,
 			},
 		}
-		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "different-user-jwt", mock.Anything, false).Return(differentUserToken, nil)
+		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "different-user-jwt", false).Return(differentUserToken, nil)
 
 		userSession := &models.UserSession{
 			Id:          1,
@@ -3451,7 +3451,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 				"sub": hintSubject,
 			},
 		}
-		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "different-user-jwt", mock.Anything, false).Return(differentUserToken, nil)
+		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "different-user-jwt", false).Return(differentUserToken, nil)
 
 		userSession := &models.UserSession{
 			Id:          1,

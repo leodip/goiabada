@@ -121,64 +121,6 @@ func TestAcrLevel_IsHigherThan_UnknownACR(t *testing.T) {
 }
 
 // =============================================================================
-// Tests for AcrLevel.IsHigherOrEqualTo() - Exhaustive 3x3 matrix
-// =============================================================================
-
-func TestAcrLevel_IsHigherOrEqualTo_ExhaustiveMatrix(t *testing.T) {
-	allLevels := []AcrLevel{AcrLevel1, AcrLevel2Optional, AcrLevel2Mandatory}
-
-	// Expected results for IsHigherOrEqualTo(row, col)
-	//
-	//                    col: level1  level2_opt  level2_mand
-	// row: level1               true      false        false
-	// row: level2_optional      true       true        false
-	// row: level2_mandatory     true       true         true
-	expectedMatrix := [][]bool{
-		{true, false, false}, // level1 is >= only itself
-		{true, true, false},  // level2_optional is >= level1 and itself
-		{true, true, true},   // level2_mandatory is >= all
-	}
-
-	for i, rowLevel := range allLevels {
-		for j, colLevel := range allLevels {
-			expected := expectedMatrix[i][j]
-			t.Run(rowLevel.String()+"_vs_"+colLevel.String(), func(t *testing.T) {
-				result := rowLevel.IsHigherOrEqualTo(colLevel)
-				assert.Equal(t, expected, result,
-					"%s.IsHigherOrEqualTo(%s) should be %v", rowLevel, colLevel, expected)
-			})
-		}
-	}
-}
-
-func TestAcrLevel_IsHigherOrEqualTo_UnknownACR(t *testing.T) {
-	unknown := AcrLevel("unknown")
-	empty := AcrLevel("")
-
-	t.Run("unknown ACR vs all known ACRs", func(t *testing.T) {
-		// Unknown (priority 0) is never >= known levels (priority >= 1)
-		assert.False(t, unknown.IsHigherOrEqualTo(AcrLevel1))
-		assert.False(t, unknown.IsHigherOrEqualTo(AcrLevel2Optional))
-		assert.False(t, unknown.IsHigherOrEqualTo(AcrLevel2Mandatory))
-	})
-
-	t.Run("all known ACRs vs unknown ACR", func(t *testing.T) {
-		// Known levels (priority >= 1) are always >= unknown (priority 0)
-		assert.True(t, AcrLevel1.IsHigherOrEqualTo(unknown))
-		assert.True(t, AcrLevel2Optional.IsHigherOrEqualTo(unknown))
-		assert.True(t, AcrLevel2Mandatory.IsHigherOrEqualTo(unknown))
-	})
-
-	t.Run("unknown vs unknown (equal priorities)", func(t *testing.T) {
-		// Both have priority 0, so they are "equal" (0 >= 0)
-		assert.True(t, unknown.IsHigherOrEqualTo(unknown))
-		assert.True(t, empty.IsHigherOrEqualTo(empty))
-		assert.True(t, unknown.IsHigherOrEqualTo(empty))
-		assert.True(t, empty.IsHigherOrEqualTo(unknown))
-	})
-}
-
-// =============================================================================
 // Tests for AcrMax() - Exhaustive 3x3 matrix
 // =============================================================================
 

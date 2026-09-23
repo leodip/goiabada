@@ -8,8 +8,8 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
+	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/core/errs"
-	"github.com/leodip/goiabada/core/oauth"
 )
 
 // groupMembersRemoveAPI is what the remove member endpoint needs: the one write it makes.
@@ -49,7 +49,7 @@ func HandleAdminGroupMembersRemoveUserPost(
 		}
 
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauthclient.JwtInfo)
 		if !ok {
 			httpHelper.JsonError(w, r, errs.New("no JWT info found in context"))
 			return

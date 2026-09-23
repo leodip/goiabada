@@ -13,6 +13,7 @@ import (
 	"context"
 	"crypto/rsa"
 
+	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/core/oauth"
 	mock "github.com/stretchr/testify/mock"
 )
@@ -54,23 +55,23 @@ func (_m *TokenParser) EXPECT() *TokenParser_Expecter {
 }
 
 // DecodeAndValidateTokenResponse provides a mock function for the type TokenParser
-func (_mock *TokenParser) DecodeAndValidateTokenResponse(ctx context.Context, tokenResponse *oauth.TokenResponse) (*oauth.JwtInfo, error) {
+func (_mock *TokenParser) DecodeAndValidateTokenResponse(ctx context.Context, tokenResponse *oauth.TokenResponse) (*oauthclient.JwtInfo, error) {
 	ret := _mock.Called(ctx, tokenResponse)
 
 	if len(ret) == 0 {
 		panic("no return value specified for DecodeAndValidateTokenResponse")
 	}
 
-	var r0 *oauth.JwtInfo
+	var r0 *oauthclient.JwtInfo
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *oauth.TokenResponse) (*oauth.JwtInfo, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *oauth.TokenResponse) (*oauthclient.JwtInfo, error)); ok {
 		return returnFunc(ctx, tokenResponse)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *oauth.TokenResponse) *oauth.JwtInfo); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *oauth.TokenResponse) *oauthclient.JwtInfo); ok {
 		r0 = returnFunc(ctx, tokenResponse)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*oauth.JwtInfo)
+			r0 = ret.Get(0).(*oauthclient.JwtInfo)
 		}
 	}
 	if returnFunc, ok := ret.Get(1).(func(context.Context, *oauth.TokenResponse) error); ok {
@@ -111,12 +112,12 @@ func (_c *TokenParser_DecodeAndValidateTokenResponse_Call) Run(run func(ctx cont
 	return _c
 }
 
-func (_c *TokenParser_DecodeAndValidateTokenResponse_Call) Return(jwtInfo *oauth.JwtInfo, err error) *TokenParser_DecodeAndValidateTokenResponse_Call {
+func (_c *TokenParser_DecodeAndValidateTokenResponse_Call) Return(jwtInfo *oauthclient.JwtInfo, err error) *TokenParser_DecodeAndValidateTokenResponse_Call {
 	_c.Call.Return(jwtInfo, err)
 	return _c
 }
 
-func (_c *TokenParser_DecodeAndValidateTokenResponse_Call) RunAndReturn(run func(ctx context.Context, tokenResponse *oauth.TokenResponse) (*oauth.JwtInfo, error)) *TokenParser_DecodeAndValidateTokenResponse_Call {
+func (_c *TokenParser_DecodeAndValidateTokenResponse_Call) RunAndReturn(run func(ctx context.Context, tokenResponse *oauth.TokenResponse) (*oauthclient.JwtInfo, error)) *TokenParser_DecodeAndValidateTokenResponse_Call {
 	_c.Call.Return(run)
 	return _c
 }

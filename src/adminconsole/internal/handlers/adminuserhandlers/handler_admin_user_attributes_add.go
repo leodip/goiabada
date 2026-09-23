@@ -11,9 +11,9 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
+	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
-	"github.com/leodip/goiabada/core/oauth"
 )
 
 // userAttributesAddAPI is what the add user attribute page needs: the user it belongs to, and the
@@ -43,7 +43,7 @@ func HandleAdminUserAttributesAddGet(
 		}
 
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauthclient.JwtInfo)
 		if !ok {
 			httpHelper.InternalServerError(w, r, errs.New("no JWT info found in context"))
 			return
@@ -95,7 +95,7 @@ func HandleAdminUserAttributesAddPost(
 		}
 
 		// Get JWT info from context to extract access token
-		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauthclient.JwtInfo)
 		if !ok {
 			httpHelper.InternalServerError(w, r, errs.New("no JWT info found in context"))
 			return

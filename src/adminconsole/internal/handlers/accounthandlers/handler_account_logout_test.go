@@ -12,6 +12,7 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	mocks_handlerhelpers "github.com/leodip/goiabada/adminconsole/internal/handlerhelpers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
+	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/oauth"
 )
@@ -44,7 +45,7 @@ func (c *logoutApiClient) CreateAccountLogoutRequest(_ context.Context, accessTo
 // IdToken and AccessToken nil, which is the handler's unauthenticated arm.
 func logoutRequest() *http.Request {
 	return handlertest.Request(http.MethodGet, "/account/logout",
-		handlertest.WithJwtInfo(oauth.JwtInfo{
+		handlertest.WithJwtInfo(oauthclient.JwtInfo{
 			IdToken:     &oauth.JwtToken{TokenBase64: "the.id.token"},
 			AccessToken: &oauth.JwtToken{TokenBase64: handlertest.AccessToken},
 		}))

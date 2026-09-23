@@ -7,9 +7,9 @@ import (
 
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
+	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
-	"github.com/leodip/goiabada/core/oauth"
 )
 
 // accountConsentsAPI is what the manage-consents page needs: the list, and the revoke.
@@ -26,7 +26,7 @@ func HandleAccountManageConsentsGet(
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		// Get JWT info to extract access token
-		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauthclient.JwtInfo)
 		if !ok {
 			httpHelper.InternalServerError(w, r, errs.New("no JWT info found in context"))
 			return
@@ -75,7 +75,7 @@ func HandleAccountManageConsentsRevokePost(
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		// Get JWT info to extract access token
-		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauth.JwtInfo)
+		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauthclient.JwtInfo)
 		if !ok {
 			httpHelper.JsonError(w, r, errs.New("no JWT info found in context"))
 			return

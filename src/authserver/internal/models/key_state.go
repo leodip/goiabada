@@ -4,8 +4,8 @@ import "github.com/leodip/goiabada/core/errs"
 
 // KeyState is where a signing key sits in the rotation, carried on key_pairs.state as its String
 // value. It is here rather than in signingkeys, which performs the rotation, because
-// data/commondb/key_pair.go builds a SQL WHERE from KeyStateCurrent and database_seeder.go writes
-// rows with it, and data imports nothing above models (#385).
+// data/commondb/key_pair.go builds a SQL WHERE from KeyStateCurrent, and data imports nothing
+// above models (#385).
 type KeyState int
 
 const (

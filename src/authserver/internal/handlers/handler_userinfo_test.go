@@ -246,7 +246,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 			assert.Equal(t, user.Nickname, claims["nickname"])
 			assert.Equal(t, user.Website, claims["website"])
 			assert.Equal(t, user.Gender, claims["gender"])
-			assert.Equal(t, user.GetDateOfBirthFormatted(), claims["birthdate"])
+			assert.Equal(t, "1990-01-01", claims["birthdate"])
 			assert.Equal(t, user.ZoneInfo, claims["zoneinfo"])
 			assert.Equal(t, user.Locale, claims["locale"])
 			assert.Equal(t, user.PhoneNumber, claims["phone_number"])

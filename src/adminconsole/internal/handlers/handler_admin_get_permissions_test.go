@@ -17,6 +17,7 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
 	adminmiddleware "github.com/leodip/goiabada/adminconsole/internal/middleware"
+	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/mocks"
 	"github.com/leodip/goiabada/core/oauth"
@@ -60,7 +61,7 @@ func permissionRecords(t *testing.T, client apiclient.ApiClient, query string) (
 	router.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ctx := context.WithValue(r.Context(), constants.ContextKeyJwtInfo,
-				oauth.JwtInfo{TokenResponse: oauth.TokenResponse{AccessToken: "an-access-token"}})
+				oauthclient.JwtInfo{TokenResponse: oauth.TokenResponse{AccessToken: "an-access-token"}})
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	})

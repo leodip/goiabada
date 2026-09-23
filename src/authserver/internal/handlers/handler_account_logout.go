@@ -315,7 +315,7 @@ func classifyIdTokenHint(
 		hint = decrypted
 	}
 
-	idToken, err := tokenParser.DecodeAndValidateTokenString(r.Context(), hint, nil, false)
+	idToken, err := tokenParser.DecodeAndValidateTokenString(r.Context(), hint, false)
 	if err != nil || idToken == nil {
 		return rejectIdTokenHint(r.Context(), "parse and signature", "error", err)
 	}

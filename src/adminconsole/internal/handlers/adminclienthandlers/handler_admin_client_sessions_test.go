@@ -16,6 +16,7 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	mocks_handlerhelpers "github.com/leodip/goiabada/adminconsole/internal/handlerhelpers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
+	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/oauth"
 )
@@ -341,7 +342,7 @@ func TestHandleAdminClientUserSessionsPost_TheAnswerFollowsIsCurrentOnTheRow(t *
 			if testCase.sid == "" {
 				opts = append(opts, handlertest.WithAccessToken())
 			} else {
-				opts = append(opts, handlertest.WithJwtInfo(oauth.JwtInfo{
+				opts = append(opts, handlertest.WithJwtInfo(oauthclient.JwtInfo{
 					TokenResponse: oauth.TokenResponse{AccessToken: handlertest.AccessToken},
 					AccessToken:   &oauth.JwtToken{Claims: jwt.MapClaims{"sid": testCase.sid}},
 				}))

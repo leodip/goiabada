@@ -15,6 +15,7 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	mocks_handlerhelpers "github.com/leodip/goiabada/adminconsole/internal/handlerhelpers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
+	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
@@ -208,7 +209,7 @@ func TestAccountHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContext(
 			// The logout page reads the parsed token pointers rather than the raw bearer, and
 			// takes its unauthenticated arm without both of them.
 			request: handlertest.Request(http.MethodGet, "/account/logout",
-				handlertest.WithJwtInfo(oauth.JwtInfo{
+				handlertest.WithJwtInfo(oauthclient.JwtInfo{
 					IdToken:     &oauth.JwtToken{TokenBase64: "the.id.token"},
 					AccessToken: &oauth.JwtToken{TokenBase64: handlertest.AccessToken},
 				})),

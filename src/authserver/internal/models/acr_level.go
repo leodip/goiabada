@@ -7,8 +7,8 @@ import "github.com/leodip/goiabada/core/errs"
 //
 // It is here rather than in core because only the auth server authenticates: the admin console
 // names no ACR value in production. It is in models rather than in ceremony, where the rest of the
-// ceremony vocabulary lives, because internal/data names it -- database_seeder.go writes a client
-// with AcrLevel2Optional -- and data imports nothing above models (#385).
+// ceremony vocabulary lives, because Client.DefaultAcrLevel is typed with it and models imports
+// nothing above itself (#385).
 type AcrLevel string
 
 const (
@@ -61,12 +61,6 @@ func (acr AcrLevel) Priority() int {
 // authentication than the other ACR level.
 func (acr AcrLevel) IsHigherThan(other AcrLevel) bool {
 	return acr.Priority() > other.Priority()
-}
-
-// IsHigherOrEqualTo returns true if this ACR level represents
-// authentication that is at least as strong as the other ACR level.
-func (acr AcrLevel) IsHigherOrEqualTo(other AcrLevel) bool {
-	return acr.Priority() >= other.Priority()
 }
 
 // Max returns the ACR level with higher security strength.
