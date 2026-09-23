@@ -143,7 +143,7 @@ func HandleAdminUserSessionsPost(
 
 		var data map[string]interface{}
 		decoder := json.NewDecoder(r.Body)
-		if err := decoder.Decode(&data); err != nil {
+		if decodeErr := decoder.Decode(&data); decodeErr != nil {
 			handlers.JsonBadRequestBody(httpHelper, w, r)
 			return
 		}

@@ -54,8 +54,8 @@ func main() {
 	tzdataURL := fmt.Sprintf("%stzdata%s.tar.gz", ianaDataBaseURL, version)
 	fmt.Printf("Downloading %s...\n", tzdataURL)
 
-	if err := downloadAndExtract(tzdataURL, tmpDir); err != nil {
-		fmt.Fprintf(os.Stderr, "Error downloading/extracting tzdata: %v\n", err)
+	if downloadErr := downloadAndExtract(tzdataURL, tmpDir); downloadErr != nil {
+		fmt.Fprintf(os.Stderr, "Error downloading/extracting tzdata: %v\n", downloadErr)
 		os.Exit(1)
 	}
 

@@ -117,14 +117,14 @@ func run(doer httpDoer) error {
 	}
 	fmt.Fprintf(os.Stderr, "Parsed %d upstream rows\n", len(list))
 
-	if err := validateUpstream(list); err != nil {
-		return errs.Errorf("validate upstream: %w", err)
+	if validateUpstreamErr := validateUpstream(list); validateUpstreamErr != nil {
+		return errs.Errorf("validate upstream: %w", validateUpstreamErr)
 	}
 
 	list = applySupplements(list)
 
-	if err := validate(list); err != nil {
-		return errs.Errorf("validate: %w", err)
+	if validateErr := validate(list); validateErr != nil {
+		return errs.Errorf("validate: %w", validateErr)
 	}
 
 	sort.Slice(list, func(i, j int) bool { return list[i].Alpha2 < list[j].Alpha2 })

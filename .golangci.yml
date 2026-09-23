@@ -7,10 +7,11 @@
 # commit instead.
 #
 # The first five below are exactly golangci-lint 2.12.2's `standard` set, pinned
-# as of the CI/CD v2 stage 0 cleanup. sloglint was added by #320 and is the one
-# deliberate widening: it holds the logging convention CLAUDE.md pattern 8
+# as of the CI/CD v2 stage 0 cleanup. Two deliberate widenings follow. sloglint
+# was added by #320: it holds the logging convention CLAUDE.md pattern 8
 # states, type-checked, and its settings below are that convention spelled in
-# its vocabulary. The binary itself is pinned in src/authserver/versions.yaml
+# its vocabulary. govet's shadow analyzer was added by #425, under govet's
+# settings below. The binary itself is pinned in src/authserver/versions.yaml
 # (tools.golangci-lint).
 #
 # Note that golangci-lint's bundled staticcheck includes the QF (quickfix)
@@ -28,6 +29,16 @@ linters:
     - unused
     - sloglint
   settings:
+    govet:
+      enable:
+        # A := in an inner scope that redeclares an outer variable. The logout
+        # endpoint wrote such an inner err's outer twin, which is nil there,
+        # instead of the error it had just caught (#414, fixed in #425). Default
+        # (non-strict) mode, and no exclusion for tests: a shadowed err in a test
+        # can make an assertion pass whatever the code did. A finding is
+        # resolved by renaming the inner variable for what it holds, never by
+        # turning := into = and never by //nolint (#425 decisions 12 and 13).
+        - shadow
     unused:
       # A field the constructor writes and nothing ever reads is dead, and the
       # default (field-writes-are-uses: true) calls the write a use, so the

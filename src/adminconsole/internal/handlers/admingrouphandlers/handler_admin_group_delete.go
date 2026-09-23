@@ -116,9 +116,9 @@ func HandleAdminGroupDeletePost(
 				"error":        message,
 			}
 
-			err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_groups_delete.html", bind)
-			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
+			renderErr := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_groups_delete.html", bind)
+			if renderErr != nil {
+				httpHelper.InternalServerError(w, r, renderErr)
 			}
 		}
 

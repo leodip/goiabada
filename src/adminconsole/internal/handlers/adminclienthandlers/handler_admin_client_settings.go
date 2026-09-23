@@ -203,9 +203,9 @@ func HandleAdminClientSettingsPost(
 				"error":  message,
 			}
 
-			err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_clients_settings.html", bind)
-			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
+			renderErr := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_clients_settings.html", bind)
+			if renderErr != nil {
+				httpHelper.InternalServerError(w, r, renderErr)
 			}
 		}
 

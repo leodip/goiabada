@@ -171,14 +171,14 @@ func HandleAdminResourcePermissionsPost(
 			})
 		}
 		updateReq := &api.UpdateResourcePermissionsRequest{Permissions: upserts}
-		if err := apiClient.UpdateResourcePermissions(r.Context(), jwtInfo.TokenResponse.AccessToken, resource.Id, updateReq); err != nil {
+		if updateResourcePermissionsErr := apiClient.UpdateResourcePermissions(r.Context(), jwtInfo.TokenResponse.AccessToken, resource.Id, updateReq); updateResourcePermissionsErr != nil {
 			// Forward the API's status rather than dressing a 400 as a 200 carrying result.Error.
 			// The administrator still reads the API's sentence either way: sendAjaxRequest draws
 			// error_description from any non-2xx into this same modal, and escapes it on the way
 			// in, where the 200 path passed the value straight to showModalDialog, which assigns
 			// innerHTML. Answering 200 also reported a save that had not happened to anything
 			// reading the status rather than the body (#279 decision 13).
-			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
+			handlers.HandleAPIErrorJson(httpHelper, w, r, updateResourcePermissionsErr)
 			return
 		}
 

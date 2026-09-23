@@ -126,9 +126,9 @@ func HandleAdminSettingsGeneralPost(
 				"error":    message,
 			}
 
-			err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_settings_general.html", bind)
-			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
+			renderErr := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_settings_general.html", bind)
+			if renderErr != nil {
+				httpHelper.InternalServerError(w, r, renderErr)
 			}
 		}
 
@@ -157,18 +157,18 @@ func HandleAdminSettingsGeneralPost(
 		// Check if issuer was changed
 		if originalIssuer != updatedResp.Issuer {
 			// Clear the session
-			sess, err := httpSession.Get(r, coreconstants.AdminConsoleSessionName)
-			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
+			sess, sessionErr := httpSession.Get(r, coreconstants.AdminConsoleSessionName)
+			if sessionErr != nil {
+				httpHelper.InternalServerError(w, r, sessionErr)
 				return
 			}
 
 			// Delete the JWT from session
 			delete(sess.Values, constants.SessionKeyJwt)
 
-			err = httpSession.Save(r, w, sess)
-			if err != nil {
-				httpHelper.InternalServerError(w, r, err)
+			sessionErr = httpSession.Save(r, w, sess)
+			if sessionErr != nil {
+				httpHelper.InternalServerError(w, r, sessionErr)
 				return
 			}
 

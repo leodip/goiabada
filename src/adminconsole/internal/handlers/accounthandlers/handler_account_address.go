@@ -156,8 +156,8 @@ func HandleAccountAddressPost(
 					"countries": countries,
 					"error":     errorMessage,
 				}
-				if err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/account_address.html", bind); err != nil {
-					httpHelper.InternalServerError(w, r, err)
+				if renderErr := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/account_address.html", bind); renderErr != nil {
+					httpHelper.InternalServerError(w, r, renderErr)
 				}
 			})
 			return

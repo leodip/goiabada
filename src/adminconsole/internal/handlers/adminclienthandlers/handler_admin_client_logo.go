@@ -108,7 +108,7 @@ func HandleAdminClientLogoPost(
 			return
 		}
 
-		if err := r.ParseMultipartForm(10 << 20); err != nil {
+		if parseFormErr := r.ParseMultipartForm(10 << 20); parseFormErr != nil {
 			handlers.JsonBadRequestBody(httpHelper, w, r)
 			return
 		}

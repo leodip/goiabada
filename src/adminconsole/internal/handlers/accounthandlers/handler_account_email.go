@@ -108,8 +108,8 @@ func HandleAccountEmailPost(
 				"emailConfirmation": emailConfirmation,
 				"error":             "The email and email confirmation entries must be identical.",
 			}
-			if err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/account_email.html", bind); err != nil {
-				httpHelper.InternalServerError(w, r, err)
+			if renderErr := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/account_email.html", bind); renderErr != nil {
+				httpHelper.InternalServerError(w, r, renderErr)
 			}
 			return
 		}
@@ -125,8 +125,8 @@ func HandleAccountEmailPost(
 					"emailConfirmation": emailConfirmation,
 					"error":             errorMessage,
 				}
-				if err := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/account_email.html", bind); err != nil {
-					httpHelper.InternalServerError(w, r, err)
+				if renderErr := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/account_email.html", bind); renderErr != nil {
+					httpHelper.InternalServerError(w, r, renderErr)
 				}
 			})
 			return

@@ -528,14 +528,14 @@ func (s *ServerSideStore) Save(r *http.Request, w http.ResponseWriter, session *
 	authenticated := s.isAuthenticated(session)
 
 	if session.ID == "" {
-		id, err := newSessionId()
-		if err != nil {
-			return err
+		id, createErr := newSessionId()
+		if createErr != nil {
+			return createErr
 		}
 
-		expiresAt, err := s.Backend.Create(ctx, id, []byte(encoded), authenticated)
-		if err != nil {
-			return errs.Wrap(err, "unable to create the browser session")
+		expiresAt, createErr := s.Backend.Create(ctx, id, []byte(encoded), authenticated)
+		if createErr != nil {
+			return errs.Wrap(createErr, "unable to create the browser session")
 		}
 
 		session.ID = id

@@ -49,9 +49,9 @@ func HandleAccountOtpGet(
 
 		if !user.OTPEnabled {
 			// request enrollment secret and QR from API
-			enrollment, err := apiClient.GetAccountOTPEnrollment(r.Context(), jwtInfo.TokenResponse.AccessToken)
-			if err != nil {
-				handlers.HandleAPIError(httpHelper, w, r, err)
+			enrollment, enrollmentErr := apiClient.GetAccountOTPEnrollment(r.Context(), jwtInfo.TokenResponse.AccessToken)
+			if enrollmentErr != nil {
+				handlers.HandleAPIError(httpHelper, w, r, enrollmentErr)
 				return
 			}
 

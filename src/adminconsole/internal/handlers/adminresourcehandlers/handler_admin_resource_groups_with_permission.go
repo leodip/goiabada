@@ -121,9 +121,9 @@ func HandleAdminResourceGroupsWithPermissionGet(
 		)
 		if selectedPermission == 0 {
 			// No permissions in resource; paginate groups client-side and mark all as false
-			allGroups, err := apiClient.GetAllGroups(r.Context(), accessToken)
-			if err != nil {
-				handlers.HandleAPIError(httpHelper, w, r, err)
+			allGroups, getGroupsErr := apiClient.GetAllGroups(r.Context(), accessToken)
+			if getGroupsErr != nil {
+				handlers.HandleAPIError(httpHelper, w, r, getGroupsErr)
 				return
 			}
 			total = len(allGroups)
@@ -156,9 +156,9 @@ func HandleAdminResourceGroupsWithPermissionGet(
 				groupInfoArr[i] = GroupInfo{Id: g.Id, GroupIdentifier: g.GroupIdentifier, Description: g.Description, HasPermission: false}
 			}
 		} else {
-			annotatedGroups, total2, err := apiClient.SearchGroupsWithPermissionAnnotation(r.Context(), accessToken, selectedPermission, pageInt, pageSize)
-			if err != nil {
-				handlers.HandleAPIError(httpHelper, w, r, err)
+			annotatedGroups, total2, searchErr := apiClient.SearchGroupsWithPermissionAnnotation(r.Context(), accessToken, selectedPermission, pageInt, pageSize)
+			if searchErr != nil {
+				handlers.HandleAPIError(httpHelper, w, r, searchErr)
 				return
 			}
 			total = total2
@@ -168,9 +168,9 @@ func HandleAdminResourceGroupsWithPermissionGet(
 			// under a bar that highlights a full one (#305).
 			if clamped := pagination.ClampPage(total, pageSize, pageInt); clamped != pageInt {
 				pageInt = clamped
-				annotatedGroups, total2, err = apiClient.SearchGroupsWithPermissionAnnotation(r.Context(), accessToken, selectedPermission, pageInt, pageSize)
-				if err != nil {
-					handlers.HandleAPIError(httpHelper, w, r, err)
+				annotatedGroups, total2, searchErr = apiClient.SearchGroupsWithPermissionAnnotation(r.Context(), accessToken, selectedPermission, pageInt, pageSize)
+				if searchErr != nil {
+					handlers.HandleAPIError(httpHelper, w, r, searchErr)
 					return
 				}
 				total = total2
