@@ -143,6 +143,15 @@ func TestValidateProfilePicture_FileTooLarge_DefaultMaxSize(t *testing.T) {
 	assert.Contains(t, result.Error, "file size exceeds maximum allowed size")
 }
 
+// TestMaxFileSize: the configured size stands when it is positive, and anything else is the
+// default, including a negative value an operator could set.
+func TestMaxFileSize(t *testing.T) {
+	assert.Equal(t, int64(DefaultMaxFileSize), MaxFileSize(0))
+	assert.Equal(t, int64(DefaultMaxFileSize), MaxFileSize(-1))
+	assert.Equal(t, int64(1), MaxFileSize(1))
+	assert.Equal(t, int64(5<<20), MaxFileSize(5<<20))
+}
+
 func TestValidateProfilePicture_InvalidType_Text(t *testing.T) {
 	data := []byte("This is just plain text, not an image")
 

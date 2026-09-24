@@ -42,6 +42,9 @@ func TestInitMiddleware_TheWholeChainInOrder(t *testing.T) {
 		"github.com/leodip/goiabada/core/middleware.MiddlewareRequestLogger.func1",
 		"github.com/go-chi/chi/v5/middleware.Recoverer",
 		"github.com/go-chi/chi/v5/middleware.StripSlashes",
+		// After StripSlashes, whose path it routes by, and before the /auth/logout exemption
+		// predicate, which parses the form body (#426).
+		"github.com/leodip/goiabada/core/middleware.MiddlewareBodyLimit.func1",
 		"github.com/leodip/goiabada/core/middleware.MiddlewareSkipCsrf.func1",
 		"github.com/leodip/goiabada/core/middleware.MiddlewareCsrf.func1",
 	}
