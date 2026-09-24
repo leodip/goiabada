@@ -92,6 +92,7 @@ func MatchStep(passcode string, secret string, now time.Time) (int64, bool) {
 	}
 
 	produces := func(step int64) (bool, error) {
+		//nolint:gosec // G115: steps count 30-second periods since 1970 from the current time, never negative
 		return hotp.ValidateCustom(passcode, uint64(step), secret, hotp.ValidateOpts{
 			Digits:    pquernaotp.DigitsSix,
 			Algorithm: pquernaotp.AlgorithmSHA1,

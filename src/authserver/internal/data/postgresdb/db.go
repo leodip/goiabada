@@ -144,6 +144,7 @@ func AdvisoryLockKey(name string) int64 {
 	h := fnv.New64a()
 	// hash.Hash documents that Write never returns an error.
 	_, _ = h.Write([]byte(advisoryLockNamespace + name))
+	//nolint:gosec // G115: the sum is reinterpreted as a lock key on purpose; any bit pattern is a valid key
 	return int64(h.Sum64())
 }
 

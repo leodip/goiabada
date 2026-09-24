@@ -53,6 +53,7 @@ func HandleAccountProfilePicturePost(
 		// The body is bounded before it gets here, by uploadBodyLimit in the server's
 		// request-body table (#426). The argument is not a limit: it is how much of the form is
 		// held in memory before the rest spills to temporary files.
+		//nolint:gosec // G120: bounded by uploadBodyLimit, as above; G120 flags every multipart parse
 		if err := r.ParseMultipartForm(10 << 20); err != nil {
 			handlers.JsonBadRequestBody(httpHelper, w, r)
 			return

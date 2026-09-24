@@ -50,6 +50,7 @@ var templateFuncMap = template.FuncMap{
 		return els
 	},
 	"versionComment": func() template.HTML {
+		//nolint:gosec // G203: build-time constants stamped by the linker, never request input
 		return template.HTML("<!-- version: " + constants.Version + "; build date: " + constants.BuildDate + "; git commit: " + constants.GitCommit + "-->")
 	},
 }

@@ -79,6 +79,7 @@ func HandleClientLogoGet(
 		w.Header().Set("Cache-Control", "public, max-age=300, must-revalidate")
 		w.Header().Set("Content-Length", strconv.Itoa(len(clientLogo.Logo)))
 		w.WriteHeader(http.StatusOK)
+		//nolint:gosec // G705: image bytes under the image content type the upload validated, and nosniff is set at the root
 		_, _ = w.Write(clientLogo.Logo)
 	}
 }

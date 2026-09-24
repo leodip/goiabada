@@ -17,7 +17,7 @@ package i18n
 const (
 	// Login flow — used by /auth/pwd POST.
 	ErrCodeLoginEmailRequired    = "validator.login.email_required"
-	ErrCodeLoginPasswordRequired = "validator.login.password_required"
+	ErrCodeLoginPasswordRequired = "validator.login.password_required" //nolint:gosec // G101: a catalog key naming a message, not a credential
 	ErrCodeLoginAuthFailed       = "handler.login.auth_failed"
 	ErrCodeLoginAccountDisabled  = "handler.login.account_disabled"
 

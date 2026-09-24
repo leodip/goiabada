@@ -220,6 +220,7 @@ var templateFuncMap = template.FuncMap{
 		}
 		// enc.Encode appends a trailing newline; trim it.
 		out := strings.TrimSpace(buf.String())
+		//nolint:gosec // G203: JSON encoded with HTML escaping, so no value can close the script
 		return template.HTML("<script>window.i18n=" + out + ";</script>")
 	},
 
@@ -246,9 +247,11 @@ var templateFuncMap = template.FuncMap{
 	"addUrlParam": addUrlParam,
 	"marshal": func(v interface{}) template.JS {
 		a, _ := json.Marshal(v)
+		//nolint:gosec // G203: json.Marshal escapes <, > and &, so the value is a JS literal that cannot close its script
 		return template.JS(a)
 	},
 	"versionComment": func() template.HTML {
+		//nolint:gosec // G203: build-time constants stamped by the linker, never request input
 		return template.HTML("<!-- version: " + constants.Version + "; build date: " + constants.BuildDate + "; git commit: " + constants.GitCommit + "-->")
 	},
 	"isAdminClientPage": func(urlPath string) bool {

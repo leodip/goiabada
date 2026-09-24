@@ -28,6 +28,7 @@ import (
 // zone ID, and optional English comment (see RefCountry/RefPhoneCountry/RefTimezone).
 func loadOverrideCatalogs(dir string) ([]catalogFile, error) {
 	catalogsDir := filepath.Join(dir, "catalogs")
+	//nolint:gosec // G703: dir is GOIABADA_I18N_OVERRIDES_DIR, the operator's own directory, read once at startup
 	info, err := os.Stat(catalogsDir)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -50,6 +51,7 @@ func loadOverrideCatalogs(dir string) ([]catalogFile, error) {
 			continue
 		}
 		path := filepath.Join(catalogsDir, e.Name())
+		//nolint:gosec // G304: a file listed in the operator's own override directory, read once at startup
 		data, err := os.ReadFile(path)
 		if err != nil {
 			return nil, errs.Errorf("i18n: read override catalog %s: %w", path, err)
