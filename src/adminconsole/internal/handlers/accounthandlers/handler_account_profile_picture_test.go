@@ -154,6 +154,59 @@ func TestAccountProfilePicturePost_AnswersThroughTheSharedJsonWriters(t *testing
 	}
 }
 
+// uploadRecorder is an API client that keeps the picture it was handed.
+type uploadRecorder struct {
+	apiclient.ApiClient
+	picture []byte
+}
+
+func (c *uploadRecorder) UploadAccountProfilePicture(_ context.Context, _ string, pictureData []byte, _ string) (*apiclient.ProfilePictureUploadResponse, error) {
+	c.picture = pictureData
+	return &apiclient.ProfilePictureUploadResponse{Success: true, PictureUrl: "https://auth.example.com/userinfo/picture/a-subject"}, nil
+}
+
+// A multipart body the request-body limit cut short answers the JSON 400 an unparseable form
+// already answers, the page's own modal reading it, and nothing is forwarded to the API (#426
+// decision 6). The same body under a limit equal to its length is read whole and forwarded.
+func TestAccountProfilePicturePost_ABodyTheLimitCut(t *testing.T) {
+	form, contentType := multipartPicture(t, "picture")
+	body := form.Bytes()
+
+	serve := func(t *testing.T, limit int, httpHelper *mocks_handlerhelpers.HttpHelper, apiClient *uploadRecorder) *httptest.ResponseRecorder {
+		rr := httptest.NewRecorder()
+		req := handlertest.Request(http.MethodPost, "/account/picture",
+			handlertest.WithContentType(contentType), handlertest.WithAccessToken())
+		req.Body = http.MaxBytesReader(rr, io.NopCloser(bytes.NewReader(body)), int64(limit))
+
+		HandleAccountProfilePicturePost(httpHelper, apiClient).ServeHTTP(rr, req)
+		return rr
+	}
+
+	t.Run("at exactly the limit the picture is forwarded", func(t *testing.T) {
+		apiClient := &uploadRecorder{}
+
+		rr := serve(t, len(body), mocks_handlerhelpers.NewHttpHelper(t), apiClient)
+
+		assert.Equal(t, http.StatusOK, rr.Code)
+		assert.Equal(t, []byte("not really a jpeg, but bytes are bytes here"), apiClient.picture)
+	})
+
+	t.Run("one byte short it is the JSON 400 and nothing is forwarded", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper.On("JsonError", mock.Anything, mock.Anything, mock.MatchedBy(func(err error) bool {
+			var detail *customerrors.ErrorDetail
+			return errors.As(err, &detail) && detail.GetCode() == "invalid_request_body" &&
+				detail.GetHttpStatusCode() == http.StatusBadRequest
+		})).Return().Once()
+		apiClient := &uploadRecorder{}
+
+		serve(t, len(body)-1, httpHelper, apiClient)
+
+		httpHelper.AssertExpectations(t)
+		assert.Nil(t, apiClient.picture)
+	})
+}
+
 // TestAccountProfilePictureDelete_AnswersThroughTheSharedJsonWriters covers the handler that did
 // not take an httpHelper at all before #279, which is why its errors were hand-rolled: there was
 // nothing else to answer with.

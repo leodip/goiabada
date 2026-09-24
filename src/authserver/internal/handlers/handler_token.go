@@ -104,9 +104,14 @@ func HandleTokenPost(
 	credentialFailures CredentialFailureRecorder,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		err := r.ParseForm()
-		if err != nil {
-			jsonErrorConformed(httpHelper, w, r, err)
+		// A body that cannot be parsed is the client's malformed request, RFC 6749 section
+		// 5.2's invalid_request, and not a server fault: a url-encoding broken by the client,
+		// or a body cut at the request-body limit (#426). Answered as a 500 it wrote an Error
+		// record for every one. With the ROPC limiter on, its own ParseForm meets the failure
+		// first and this one succeeds on an empty form, which is refused below for what it lacks.
+		if err := r.ParseForm(); err != nil {
+			jsonErrorConformed(httpHelper, w, r, customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
+				"The request body could not be parsed.", http.StatusBadRequest))
 			return
 		}
 

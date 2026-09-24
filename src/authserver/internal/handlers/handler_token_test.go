@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -38,33 +39,106 @@ import (
 )
 
 func TestHandleTokenPost(t *testing.T) {
+	// A form that cannot be parsed is the client's malformed request, answered 400 invalid_request
+	// per RFC 6749 section 5.2, and never the 500 it once was: whatever broke the parse, the
+	// server is not at fault (#426). The body cut at the request-body limit is the case the
+	// limit introduced; the other two answered 500 before it.
 	t.Run("ParseForm gives error", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-		userSessionManager := mocks_handlers.NewUserSessionManager(t)
-		database := mocks_data.NewDatabase(t)
-		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
-		tokenValidator := mocks_protocolvalidation.NewTokenValidator(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		const form = "grant_type=client_credentials&client_id=a-client&client_secret=a-secret"
 
-		handler := HandleTokenPost(httpHelper, userSessionManager, database, tokenIssuer, tokenValidator, auditLogger, noCredentialFailures{})
+		tests := []struct {
+			name string
+			body func(w http.ResponseWriter) io.Reader
+		}{
+			{"no body at all", func(http.ResponseWriter) io.Reader { return nil }},
+			{"a broken percent-encoding", func(http.ResponseWriter) io.Reader { return strings.NewReader("grant_type=%zz") }},
+			{"a body cut one byte short by the request-body limit", func(w http.ResponseWriter) io.Reader {
+				return http.MaxBytesReader(w, io.NopCloser(strings.NewReader(form)), int64(len(form)-1))
+			}},
+		}
+		for _, test := range tests {
+			t.Run(test.name, func(t *testing.T) {
+				httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+				database := mocks_data.NewDatabase(t)
+				handler := HandleTokenPost(httpHelper, mocks_handlers.NewUserSessionManager(t), database,
+					mocks_handlers.NewTokenIssuer(t), mocks_protocolvalidation.NewTokenValidator(t),
+					mocks_audit.NewAuditLogger(t), noCredentialFailures{})
 
-		req, _ := http.NewRequest("POST", "/token", nil)
-		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-		rr := httptest.NewRecorder()
+				rr := httptest.NewRecorder()
+				req, _ := http.NewRequest("POST", "/token", test.body(rr))
+				req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-		// The ParseForm error is not an *ErrorDetail, and it used to be handed to the writer
-		// exactly as it arrived. It is rebuilt at the boundary instead, because the description
-		// the writer would then build interpolates a request id the caller chooses (#213).
-		httpHelper.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
-			detail, ok := err.(*customerrors.ErrorDetail)
-			return ok && detail.GetCode() == "server_error" &&
-				detail.GetHttpStatusCode() == http.StatusInternalServerError &&
-				detail.GetDescription() == customerrors.ConformErrorDescription(detail.GetDescription())
-		})).Return()
+				httpHelper.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
+					detail, ok := err.(*customerrors.ErrorDetail)
+					return ok && detail.GetCode() == "invalid_request" &&
+						detail.GetHttpStatusCode() == http.StatusBadRequest &&
+						detail.GetDescription() == "The request body could not be parsed."
+				})).Return().Once()
 
-		handler.ServeHTTP(rr, req)
+				handler.ServeHTTP(rr, req)
 
-		httpHelper.AssertExpectations(t)
+				httpHelper.AssertExpectations(t)
+				database.AssertNotCalled(t, "GetClientByClientIdentifier", mock.Anything, mock.Anything, mock.Anything)
+			})
+		}
+
+		// The accept side of the limit: the same form under a limit equal to its length is read
+		// whole, and every field of it reaches the validator.
+		t.Run("the same body at exactly the limit", func(t *testing.T) {
+			refused := customerrors.NewErrorDetailWithHttpStatusCode("invalid_client", "Client authentication failed.", http.StatusUnauthorized)
+			tokenValidator := mocks_protocolvalidation.NewTokenValidator(t)
+			tokenValidator.On("ValidateTokenRequest", mock.Anything, mock.MatchedBy(func(input *protocolvalidation.ValidateTokenRequestInput) bool {
+				return input.GrantType == "client_credentials" && input.ClientId == "a-client" && input.ClientSecret == "a-secret"
+			})).Return(nil, refused).Once()
+			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+
+			handler := HandleTokenPost(httpHelper, mocks_handlers.NewUserSessionManager(t), mocks_data.NewDatabase(t),
+				mocks_handlers.NewTokenIssuer(t), tokenValidator, mocks_audit.NewAuditLogger(t), noCredentialFailures{})
+
+			rr := httptest.NewRecorder()
+			req, _ := http.NewRequest("POST", "/token",
+				http.MaxBytesReader(rr, io.NopCloser(strings.NewReader(form)), int64(len(form))))
+			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+			httpHelper.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
+				detail, ok := err.(*customerrors.ErrorDetail)
+				return ok && detail.GetCode() == "invalid_client"
+			})).Return().Once()
+
+			handler.ServeHTTP(rr, req)
+
+			httpHelper.AssertExpectations(t)
+			tokenValidator.AssertExpectations(t)
+		})
+
+		// With the ROPC limiter on, its own ParseForm meets the cut body first and passes the
+		// request through, and net/http leaves an empty form behind for the handler's. The real
+		// validator answers that empty form, which names no client.
+		t.Run("a body cut before the handler, as the ROPC limiter leaves it", func(t *testing.T) {
+			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+			database := mocks_data.NewDatabase(t)
+			handler := HandleTokenPost(httpHelper, mocks_handlers.NewUserSessionManager(t), database,
+				mocks_handlers.NewTokenIssuer(t), protocolvalidation.NewTokenValidator(database, nil, nil),
+				mocks_audit.NewAuditLogger(t), noCredentialFailures{})
+
+			rr := httptest.NewRecorder()
+			req, _ := http.NewRequest("POST", "/token",
+				http.MaxBytesReader(rr, io.NopCloser(strings.NewReader(form)), int64(len(form)-1)))
+			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings, &models.Settings{Id: 1}))
+			require.Error(t, req.ParseForm(), "the limiter's parse fails")
+
+			httpHelper.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
+				detail, ok := err.(*customerrors.ErrorDetail)
+				return ok && detail.GetCode() == "invalid_request" &&
+					detail.GetHttpStatusCode() == http.StatusBadRequest &&
+					detail.GetDescription() == "Missing required client_id parameter."
+			})).Return().Once()
+
+			handler.ServeHTTP(rr, req)
+
+			httpHelper.AssertExpectations(t)
+		})
 	})
 
 	t.Run("ValidateTokenRequest gives error", func(t *testing.T) {

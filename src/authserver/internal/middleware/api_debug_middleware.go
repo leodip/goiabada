@@ -149,20 +149,48 @@ func redact(v any, depth int) (any, error) {
 	return v, nil
 }
 
+// capturedBody is what the middleware kept of one body for the log: at most
+// maxLoggedBody+1 bytes of it, which is enough to know a body is too large to log
+// without holding the rest in memory, and what is known of the whole (#426).
+type capturedBody struct {
+	head []byte
+	// size is the whole body's length in bytes, or -1 when it is not known: a request
+	// body larger than head that declared no Content-Length.
+	size int64
+	// err is the read error that ended the capture before the body did, if one did.
+	err error
+}
+
+// wholeBody is a body captured in full.
+func wholeBody(body []byte) capturedBody {
+	return capturedBody{head: body, size: int64(len(body))}
+}
+
 // bodyForLog returns the text to log for one request or response body: the body
 // pretty-printed with every credential replaced, or a one-line placeholder giving the
 // byte count and the reason. No part of a body that could not be parsed, that is too
-// large, or that is nested too deeply is ever returned.
-func bodyForLog(body []byte) string {
-	notLogged := func(reason any) string {
-		return fmt.Sprintf("%d bytes, not logged (%v)", len(body), reason)
+// large, that is nested too deeply, or whose read failed is ever returned.
+func bodyForLog(body capturedBody) string {
+	// A read that failed leaves a prefix, and a prefix can be valid JSON on its own:
+	// {"a":1} followed by padding a limit cut off parses, and logging it would present
+	// a cut body as the whole one (#426).
+	if body.err != nil {
+		return fmt.Sprintf("%d bytes read, not logged (unable to read the whole body: %v)", len(body.head), body.err)
 	}
 
-	if len(body) > maxLoggedBody {
+	size := fmt.Sprintf("%d bytes", body.size)
+	if body.size < 0 {
+		size = fmt.Sprintf("more than %d bytes", maxLoggedBody)
+	}
+	notLogged := func(reason any) string {
+		return fmt.Sprintf("%s, not logged (%v)", size, reason)
+	}
+
+	if len(body.head) > maxLoggedBody {
 		return notLogged(fmt.Sprintf("larger than %d bytes", maxLoggedBody))
 	}
 
-	decoder := json.NewDecoder(bytes.NewReader(body))
+	decoder := json.NewDecoder(bytes.NewReader(body.head))
 	// UseNumber keeps integers exact. Without it an int64 such as 9223372036854775807
 	// round-trips through float64 and is logged as 9223372036854776000, which reads
 	// like a real value and is not one (#145).
@@ -204,7 +232,11 @@ func bodyForLog(body []byte) string {
 type responseWriter struct {
 	http.ResponseWriter
 	statusCode int
-	body       *bytes.Buffer
+	// body keeps at most maxLoggedBody+1 bytes of the response, and size counts all of
+	// them. Nothing above that is ever logged, so a copy of a whole large response
+	// would only hold memory for the length of the request (#426).
+	body *bytes.Buffer
+	size int64
 }
 
 func (rw *responseWriter) WriteHeader(code int) {
@@ -213,8 +245,70 @@ func (rw *responseWriter) WriteHeader(code int) {
 }
 
 func (rw *responseWriter) Write(b []byte) (int, error) {
-	rw.body.Write(b)
-	return rw.ResponseWriter.Write(b)
+	n, err := rw.ResponseWriter.Write(b)
+	if room := maxLoggedBody + 1 - rw.body.Len(); room > 0 {
+		rw.body.Write(b[:min(n, room)])
+	}
+	rw.size += int64(n)
+	return n, err
+}
+
+// captured is the response as the log sees it.
+func (rw *responseWriter) captured() capturedBody {
+	return capturedBody{head: rw.body.Bytes(), size: rw.size}
+}
+
+// replayedBody is the request body handed on to the handler: the prefix the middleware
+// read, then whatever of the original it did not.
+type replayedBody struct {
+	io.Reader
+	original io.Closer
+}
+
+func (b replayedBody) Close() error {
+	return b.original.Close()
+}
+
+// errorReader answers every read with the error that ended the middleware's own read.
+type errorReader struct {
+	err error
+}
+
+func (r errorReader) Read([]byte) (int, error) {
+	return 0, r.err
+}
+
+// captureRequestBody reads at most maxLoggedBody+1 bytes of r's body, enough to know
+// whether it can be logged, and puts back a body that reads that prefix followed by the
+// unread remainder (#426).
+//
+// A read error is handed on rather than dropped: the replacement returns it where the
+// prefix ends, so a body cut short by the request-body limit, or by a client that went
+// away, reaches the handler as the failed read it is. Discarding it, as this function's
+// io.ReadAll once did, handed the handler a truncated body as though it were whole.
+func captureRequestBody(r *http.Request) capturedBody {
+	if r.Body == nil {
+		return capturedBody{}
+	}
+
+	head, err := io.ReadAll(io.LimitReader(r.Body, maxLoggedBody+1))
+
+	var rest io.Reader = r.Body
+	if err != nil {
+		rest = errorReader{err: err}
+	}
+	r.Body = replayedBody{Reader: io.MultiReader(bytes.NewReader(head), rest), original: r.Body}
+
+	size := int64(len(head))
+	if len(head) > maxLoggedBody {
+		// Only the declared length says how large the rest is. A chunked body declares
+		// none, and bodyForLog then says it was larger than the cap and no more.
+		size = -1
+		if r.ContentLength > maxLoggedBody {
+			size = r.ContentLength
+		}
+	}
+	return capturedBody{head: head, size: size, err: err}
 }
 
 // APIDebugMiddleware logs detailed information about API requests and responses when debug is enabled
@@ -228,12 +322,7 @@ func APIDebugMiddleware() func(http.Handler) http.Handler {
 
 			start := time.Now()
 
-			// Read and store the request body
-			var reqBody []byte
-			if r.Body != nil {
-				reqBody, _ = io.ReadAll(r.Body)
-				r.Body = io.NopCloser(bytes.NewBuffer(reqBody))
-			}
+			reqBody := captureRequestBody(r)
 
 			// Wrap the response writer to capture response
 			rw := &responseWriter{
@@ -251,12 +340,12 @@ func APIDebugMiddleware() func(http.Handler) http.Handler {
 			// redaction the HTTP request log uses: r.URL.String() carries the query
 			// string verbatim, which is the same defect under a second flag, and
 			// these routes carry a user search string in `query` (#159).
-			debugLog(r.Method, custom_middleware.RequestTargetForLog(r.URL), reqBody, rw.statusCode, rw.body.Bytes(), duration, r)
+			debugLog(r.Method, custom_middleware.RequestTargetForLog(r.URL), reqBody, rw.statusCode, rw.captured(), duration, r)
 		})
 	}
 }
 
-func debugLog(method, url string, reqBody []byte, statusCode int, respBody []byte, duration time.Duration, r *http.Request) {
+func debugLog(method, url string, reqBody capturedBody, statusCode int, respBody capturedBody, duration time.Duration, r *http.Request) {
 	// Sanitize auth header for logging. "None" stays as it is, so a request that
 	// carried no credential is still distinguishable from one whose credential
 	// was removed here.
@@ -300,8 +389,8 @@ func debugLog(method, url string, reqBody []byte, statusCode int, respBody []byt
 // returns "0 bytes, not logged (EOF)", which reads like a body that was there and
 // could not be shown. The attribute is always written, so this is what keeps a
 // bodyless request distinguishable from a refused body (#320).
-func bodyAttrForLog(body []byte) string {
-	if len(body) == 0 {
+func bodyAttrForLog(body capturedBody) string {
+	if len(body.head) == 0 && body.err == nil {
 		return ""
 	}
 	return bodyForLog(body)

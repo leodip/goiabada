@@ -108,6 +108,9 @@ func HandleAdminClientLogoPost(
 			return
 		}
 
+		// The body is bounded before it gets here, by uploadBodyLimit in the server's
+		// request-body table (#426). The argument is not a limit: it is how much of the form is
+		// held in memory before the rest spills to temporary files.
 		if parseFormErr := r.ParseMultipartForm(10 << 20); parseFormErr != nil {
 			handlers.JsonBadRequestBody(httpHelper, w, r)
 			return
