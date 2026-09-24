@@ -256,7 +256,14 @@ func main() {
 	ctx, stopListeningForSignals := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stopListeningForSignals()
 
-	s.Start(ctx)
+	// Start has already drained whatever it started by the time it returns an error, and logs
+	// none of them: this is the one record, and the one exit, for all of them (#426). The deferred
+	// stop does not run under os.Exit, hence the explicit call.
+	if err := s.Start(ctx); err != nil {
+		slog.Error("the auth server stopped on an error", "error", err)
+		stopListeningForSignals()
+		os.Exit(1)
+	}
 
 	slog.Info("auth server stopped")
 }

@@ -1,12 +1,15 @@
 package server
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"io/fs"
 	"net"
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/leodip/goiabada/core/errs"
@@ -68,15 +71,45 @@ func NewServer(router *chi.Mux, sessionStore sessionstore.Store, settingsCache *
 	return &s
 }
 
-func (s *Server) Start() {
-	// Validate required confidential client configuration. The client id is not part of it:
-	// the admin console always authenticates as the client the seeder provisions, so the
-	// secret is the only half of the credential a deployment supplies (#285).
-	if strings.TrimSpace(config.GetAdminConsole().OAuthClientSecret) == "" {
-		slog.Error("the oauth client secret is not configured, so the admin console cannot start: on a first deployment the auth server logs the generated credentials",
-			"required", "GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET")
-		os.Exit(1)
+// Start brings up the listeners and blocks until ctx is cancelled or a listener fails, and on both
+// drains in-flight requests before returning. It returns nil after a cancellation, and otherwise
+// the error, unlogged: main writes the one record for it and owns the exit. The client secret is
+// main's to check, before anything is built (#426, #390).
+func (s *Server) Start(ctx context.Context) error {
+	httpsHost := config.GetAdminConsole().ListenHostHttps
+	httpsPort := config.GetAdminConsole().ListenPortHttps
+	certFile := config.GetAdminConsole().CertFile
+	keyFile := config.GetAdminConsole().KeyFile
+	httpsEnabled := httpsHost != "" && httpsPort > 0 && certFile != "" && keyFile != ""
+
+	// One record per listener where five and three lines used to be. A reader
+	// checking why HTTPS is off had to join "https enabled: false" to four
+	// separate lines to see which of the four settings was the empty one (#320).
+	slog.InfoContext(ctx, "https listener configuration",
+		"enabled", httpsEnabled,
+		"host", httpsHost,
+		"port", httpsPort,
+		"cert_file", certFile,
+		"key_file", keyFile)
+
+	httpHost := config.GetAdminConsole().ListenHostHttp
+	httpPort := config.GetAdminConsole().ListenPortHttp
+	httpEnabled := httpHost != "" && httpPort > 0
+
+	slog.InfoContext(ctx, "http listener configuration",
+		"enabled", httpEnabled,
+		"host", httpHost,
+		"port", httpPort)
+
+	if httpEnabled && !httpsEnabled {
+		logHttpWithoutTlsWarning()
 	}
+
+	// Refused before anything is built, so a process about to exit builds no routes first.
+	if !httpsEnabled && !httpEnabled {
+		return errs.New("no listener is enabled, so the admin console cannot start: configure at least one of the http and https listeners")
+	}
+
 	// The static branch and the application branch, in that order. Both are registered
 	// on s.router; only the second carries the middleware initMiddleware returns, which
 	// is what keeps a stylesheet from costing a session load, and here that load is an
@@ -91,75 +124,98 @@ func (s *Server) Start() {
 
 	s.initRoutes(app)
 
-	httpsHost := config.GetAdminConsole().ListenHostHttps
-	httpsPort := config.GetAdminConsole().ListenPortHttps
-	certFile := config.GetAdminConsole().CertFile
-	keyFile := config.GetAdminConsole().KeyFile
-	httpsEnabled := httpsHost != "" && httpsPort > 0 && certFile != "" && keyFile != ""
+	// The servers are kept rather than left local to the goroutine serving each, which is what lets
+	// a cancellation drain them. Before #426 nothing could, and SIGTERM cut off every request in
+	// flight.
+	var listeners []listener
 
-	// One record per listener where five and three lines used to be. A reader
-	// checking why HTTPS is off had to join "https enabled: false" to four
-	// separate lines to see which of the four settings was the empty one (#320).
-	slog.Info("https listener configuration",
-		"enabled", httpsEnabled,
-		"host", httpsHost,
-		"port", httpsPort,
-		"cert_file", certFile,
-		"key_file", keyFile)
-
-	httpHost := config.GetAdminConsole().ListenHostHttp
-	httpPort := config.GetAdminConsole().ListenPortHttp
-	httpEnabled := httpHost != "" && httpPort > 0
-
-	slog.Info("http listener configuration",
-		"enabled", httpEnabled,
-		"host", httpHost,
-		"port", httpPort)
-
-	if httpEnabled && !httpsEnabled {
-		logHttpWithoutTlsWarning()
-	}
-
-	errChan := make(chan error, 2) // Buffer for both HTTP and HTTPS errors
-
-	// Start HTTPS server if enabled
 	if httpsEnabled {
-		go func() {
-			httpsServer := newHTTPServer(httpsHost, httpsPort, s.router)
-			slog.Info("starting the https listener", "host", httpsHost, "port", httpsPort)
-			if err := httpsServer.ListenAndServeTLS(certFile, keyFile); err != nil {
-				errChan <- errs.Errorf("HTTPS server error: %v", err)
-			}
-		}()
+		httpsServer := newHTTPServer(httpsHost, httpsPort, s.router)
+		listeners = append(listeners, listener{
+			server: httpsServer,
+			serve:  func() error { return httpsServer.ListenAndServeTLS(certFile, keyFile) },
+		})
+		slog.InfoContext(ctx, "starting the https listener", "host", httpsHost, "port", httpsPort)
 	}
 
-	// Start HTTP server if enabled
 	if httpEnabled {
+		httpServer := newHTTPServer(httpHost, httpPort, s.router)
+		listeners = append(listeners, listener{
+			server: httpServer,
+			serve:  httpServer.ListenAndServe,
+		})
+		slog.InfoContext(ctx, "starting the http listener", "host", httpHost, "port", httpPort)
+	}
+
+	return serveAndDrain(ctx, listeners)
+}
+
+// listener is one of Start's servers and the call that serves it, which is ListenAndServe or
+// ListenAndServeTLS in Start and Serve on an ephemeral listener in a test.
+type listener struct {
+	server *http.Server
+	serve  func() error
+}
+
+// serveAndDrain is the auth server's, copied rather than shared because each binary owns its
+// listener, and without the afterDrain hook, since the console has no worker to stop. It serves every listener
+// until ctx ends or one of them fails, and on both paths drains them all before it returns: a
+// listener failing is no reason to cut off the requests the other one is answering.
+//
+// It returns nil after a cancellation with no failure, and otherwise every failure, joined, each
+// naming its address. http.ErrServerClosed is what a drained listener's serve call returns, so it is
+// never a failure; the console's loop used to report it as one. It writes no record of the failure:
+// main writes the one record for whatever Start returns (#426).
+func serveAndDrain(ctx context.Context, listeners []listener) error {
+	// Buffered for every listener, so a serve goroutine never blocks on a send nobody receives.
+	failures := make(chan error, len(listeners))
+	var serving sync.WaitGroup
+
+	for _, l := range listeners {
+		serving.Add(1)
 		go func() {
-			httpServer := newHTTPServer(httpHost, httpPort, s.router)
-			slog.Info("starting the http listener", "host", httpHost, "port", httpPort)
-			if err := httpServer.ListenAndServe(); err != nil {
-				errChan <- errs.Errorf("HTTP server error: %v", err)
+			defer serving.Done()
+			if err := l.serve(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+				failures <- errs.Wrapf(err, "the listener on %s", l.server.Addr)
 			}
 		}()
 	}
 
-	// Exit if neither server is enabled
-	if !httpsEnabled && !httpEnabled {
-		slog.Error("no listener is enabled, so the admin console cannot start: configure at least one of the http and https listeners")
-		os.Exit(1)
+	var failed []error
+	select {
+	case err := <-failures:
+		failed = append(failed, err)
+	case <-ctx.Done():
+		slog.InfoContext(ctx, "shutdown signal received")
 	}
 
-	// Wait for any server errors and exit on first error
-	for i := 0; i < cap(errChan); i++ {
-		if err := <-errChan; err != nil {
-			// The error as a value, not as the message: it arrives from errs.Errorf, so
-			// %+v prints the frames the message text threw away (#320).
-			slog.Error("a listener failed", "error", err)
-			os.Exit(1)
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), httpShutdownTimeout)
+	defer cancel()
+
+	for _, l := range listeners {
+		if err := l.server.Shutdown(shutdownCtx); err != nil {
+			slog.ErrorContext(ctx, "unable to shut down a listener", "address", l.server.Addr, "error", err)
 		}
 	}
+	slog.InfoContext(ctx, "listeners drained")
+
+	// Every serve call has returned once its server is shut down, so this is short. It is what lets
+	// a second listener's failure, arriving while the first was being handled, join the result.
+	serving.Wait()
+	close(failures)
+	for err := range failures {
+		failed = append(failed, err)
+	}
+
+	slog.InfoContext(ctx, "shutdown complete")
+
+	return errs.Join(failed...)
 }
+
+// httpShutdownTimeout bounds how long in-flight requests get to finish. The auth server's value: a
+// console request in flight is waiting on auth server calls deadlined at 10s each (apiclient's
+// generalAPITimeout), and 15s lets the one under way finish.
+const httpShutdownTimeout = 15 * time.Second
 
 // newHTTPServer builds one of Start's listeners, unstarted. The address comes from hostport.Join,
 // so an IPv6 host such as `::1` listens, where a Sprintf'd `host:port` stopped the console at

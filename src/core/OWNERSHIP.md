@@ -248,7 +248,7 @@ command itself and fails on a tree it changed.
 | `core/customerrors` | `NewErrorDetail` | contract | One of the two neutral `ErrorDetail` constructors. `NewErrorDetailWithHttpStatusCode` beside it is `both-apps`, and the pair is one API that both processes compile. |
 | `core/customerrors` | `NewErrorDetailWithHttpStatusCode` | both-apps | — |
 | `core/errs` | `Errorf` | kernel | — |
-| `core/errs` | `Join` | contract | One function of the error kernel both processes compile. CLAUDE.md pattern 7 names it as the only legal `errors.Join` in this tree, so it is part of the convention rather than of one caller. |
+| `core/errs` | `Join` | both-apps | — |
 | `core/errs` | `New` | kernel | — |
 | `core/errs` | `WithStack` | kernel | — |
 | `core/errs` | `Wrap` | kernel | — |

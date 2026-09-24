@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/leodip/goiabada/authserver/web"
@@ -84,26 +85,11 @@ func NewServer(router *chi.Mux, database data.Database, sessionStore sessionstor
 	return &s
 }
 
-// Start brings up the listeners and blocks until ctx is cancelled or a listener
-// fails. On cancellation it drains in-flight requests and stops the worker before
-// returning, so the process can exit cleanly.
-func (s *Server) Start(ctx context.Context) {
-	s.worker.Start()
-
-	// The static branch and the application branch, in that order. Both are registered
-	// on s.router; only the second carries the middleware initMiddleware returns, which
-	// is what keeps a stylesheet from costing a settings read and a session load
-	// (see initMiddleware).
-	app := s.initMiddleware()
-
-	s.serveStaticFiles("/static", http.FS(s.staticFS))
-
-	// Browsers auto-probe /favicon.ico at the site root regardless of the
-	// <link rel="icon"> tags; point it at the real asset under /static.
-	s.router.Get("/favicon.ico", http.RedirectHandler("/static/favicon/favicon.ico", http.StatusMovedPermanently).ServeHTTP)
-
-	s.initRoutes(app)
-
+// Start brings up the listeners and blocks until ctx is cancelled or a listener fails. On both it
+// drains in-flight requests and then stops the worker before returning. It returns nil after a
+// cancellation, and otherwise the error, unlogged: main writes the one record for it and owns the
+// exit, so nothing below main decides to end the process (#426, #390).
+func (s *Server) Start(ctx context.Context) error {
 	httpsHost := config.GetAuthServer().ListenHostHttps
 	httpsPort := config.GetAuthServer().ListenPortHttps
 	certFile := config.GetAuthServer().CertFile
@@ -133,57 +119,115 @@ func (s *Server) Start(ctx context.Context) {
 		logHttpWithoutTlsWarning()
 	}
 
-	errChan := make(chan error, 2) // Buffer for both HTTP and HTTPS errors
+	// Refused before anything starts: the worker would otherwise be left running, and the routes
+	// half built, behind a process that is about to exit.
+	if !httpsEnabled && !httpEnabled {
+		return errs.New("no listener is enabled, so the auth server cannot start: configure at least one of the http and https listeners")
+	}
 
-	// The listeners are kept so shutdown can drain them. http.ErrServerClosed is
-	// the normal result of Shutdown, so it must not be reported as a failure.
-	var httpServers []*http.Server
+	// The static branch and the application branch, in that order. Both are registered
+	// on s.router; only the second carries the middleware initMiddleware returns, which
+	// is what keeps a stylesheet from costing a settings read and a session load
+	// (see initMiddleware).
+	app := s.initMiddleware()
 
-	// Start HTTPS server if enabled
+	s.serveStaticFiles("/static", http.FS(s.staticFS))
+
+	// Browsers auto-probe /favicon.ico at the site root regardless of the
+	// <link rel="icon"> tags; point it at the real asset under /static.
+	s.router.Get("/favicon.ico", http.RedirectHandler("/static/favicon/favicon.ico", http.StatusMovedPermanently).ServeHTTP)
+
+	s.initRoutes(app)
+
+	var listeners []listener
+
 	if httpsEnabled {
 		httpsServer := newHTTPServer(httpsHost, httpsPort, s.router)
-		httpServers = append(httpServers, httpsServer)
-		go func() {
-			slog.InfoContext(ctx, "starting the https listener", "host", httpsHost, "port", httpsPort)
-			if err := httpsServer.ListenAndServeTLS(certFile, keyFile); err != nil &&
-				!errors.Is(err, http.ErrServerClosed) {
-				errChan <- errs.Errorf("HTTPS server error: %v", err)
-			}
-		}()
+		listeners = append(listeners, listener{
+			server: httpsServer,
+			serve:  func() error { return httpsServer.ListenAndServeTLS(certFile, keyFile) },
+		})
+		slog.InfoContext(ctx, "starting the https listener", "host", httpsHost, "port", httpsPort)
 	}
 
-	// Start HTTP server if enabled
 	if httpEnabled {
 		httpServer := newHTTPServer(httpHost, httpPort, s.router)
-		httpServers = append(httpServers, httpServer)
+		listeners = append(listeners, listener{
+			server: httpServer,
+			serve:  httpServer.ListenAndServe,
+		})
+		slog.InfoContext(ctx, "starting the http listener", "host", httpHost, "port", httpPort)
+	}
+
+	s.worker.Start()
+
+	return serveAndDrain(ctx, listeners, func() { s.worker.Stop(workerStopTimeout) })
+}
+
+// listener is one of Start's servers and the call that serves it, which is ListenAndServe or
+// ListenAndServeTLS in Start and Serve on an ephemeral listener in a test.
+type listener struct {
+	server *http.Server
+	serve  func() error
+}
+
+// serveAndDrain serves every listener until ctx ends or one of them fails, and on both paths drains
+// them all before it returns: a listener failing is no reason to cut off the requests the other one
+// is answering. afterDrain runs once every listener has stopped, which is where the auth server stops
+// its worker.
+//
+// The order matters: draining the listeners first means no new request can start work that the
+// worker's cleanup might be deleting underneath it.
+//
+// It returns nil after a cancellation with no failure, and otherwise every failure, joined, each
+// naming its address. http.ErrServerClosed is what a drained listener's serve call returns, so it is
+// never a failure. It writes no record of the failure: main writes the one record for whatever
+// Start returns (#426).
+func serveAndDrain(ctx context.Context, listeners []listener, afterDrain func()) error {
+	// Buffered for every listener, so a serve goroutine never blocks on a send nobody receives.
+	failures := make(chan error, len(listeners))
+	var serving sync.WaitGroup
+
+	for _, l := range listeners {
+		serving.Add(1)
 		go func() {
-			slog.InfoContext(ctx, "starting the http listener", "host", httpHost, "port", httpPort)
-			if err := httpServer.ListenAndServe(); err != nil &&
-				!errors.Is(err, http.ErrServerClosed) {
-				errChan <- errs.Errorf("HTTP server error: %v", err)
+			defer serving.Done()
+			if err := l.serve(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+				failures <- errs.Wrapf(err, "the listener on %s", l.server.Addr)
 			}
 		}()
 	}
 
-	// Exit if neither server is enabled
-	if len(httpServers) == 0 {
-		slog.ErrorContext(ctx, "no listener is enabled, so the auth server cannot start: configure at least one of the http and https listeners")
-		os.Exit(1)
-	}
-
+	var failed []error
 	select {
-	case err := <-errChan:
-		// A listener failed. Still shut down cleanly so the worker is not left
-		// holding a half-finished delete, then exit non-zero.
-		// The error as a value, not as the message: it arrives from errs.Errorf, so
-		// %+v prints the frames the message text threw away (#320).
-		slog.ErrorContext(ctx, "a listener failed", "error", err)
-		s.shutdown(httpServers)
-		os.Exit(1)
+	case err := <-failures:
+		failed = append(failed, err)
 	case <-ctx.Done():
 		slog.InfoContext(ctx, "shutdown signal received")
-		s.shutdown(httpServers)
 	}
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), httpShutdownTimeout)
+	defer cancel()
+
+	for _, l := range listeners {
+		if err := l.server.Shutdown(shutdownCtx); err != nil {
+			slog.ErrorContext(ctx, "unable to shut down a listener", "address", l.server.Addr, "error", err)
+		}
+	}
+	slog.InfoContext(ctx, "listeners drained")
+
+	// Every serve call has returned once its server is shut down, so this is short. It is what lets
+	// a second listener's failure, arriving while the first was being handled, join the result.
+	serving.Wait()
+	close(failures)
+	for err := range failures {
+		failed = append(failed, err)
+	}
+
+	afterDrain()
+	slog.InfoContext(ctx, "shutdown complete")
+
+	return errs.Join(failed...)
 }
 
 // newHTTPServer builds one of Start's listeners, unstarted. The address comes from hostport.Join,
@@ -244,25 +288,6 @@ const (
 	// the case where the driver does something else with the cancellation than stop.
 	workerStopTimeout = 20 * time.Second
 )
-
-// shutdown stops accepting requests first, then the background worker.
-//
-// The order matters: draining the listeners first means no new request can start
-// work that the worker's cleanup might be deleting underneath it.
-func (s *Server) shutdown(httpServers []*http.Server) {
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), httpShutdownTimeout)
-	defer cancel()
-
-	for _, httpServer := range httpServers {
-		if err := httpServer.Shutdown(shutdownCtx); err != nil {
-			slog.Error("unable to shut down a listener", "address", httpServer.Addr, "error", err)
-		}
-	}
-	slog.Info("listeners drained")
-
-	s.worker.Stop(workerStopTimeout)
-	slog.Info("shutdown complete")
-}
 
 // initMiddleware mounts the chain and returns the router the application's own routes
 // belong on.
