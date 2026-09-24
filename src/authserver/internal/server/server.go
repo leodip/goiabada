@@ -189,13 +189,50 @@ func (s *Server) Start(ctx context.Context) {
 // newHTTPServer builds one of Start's listeners, unstarted. The address comes from hostport.Join,
 // so an IPv6 host such as `::1` listens, where a Sprintf'd `host:port` stopped the server at start
 // with "too many colons in address" (#424). `0.0.0.0`, the default, needs no IPv6 spelling to
-// reach IPv6 clients: with network "tcp" Go listens on both families from it.
+// reach IPv6 clients: with network "tcp" Go listens on both families from it. It is the only
+// place this binary builds an http.Server, so every listener gets the bounds below (#426).
 func newHTTPServer(host string, port int, handler http.Handler) *http.Server {
 	return &http.Server{
-		Addr:    hostport.Join(host, port),
-		Handler: handler,
+		Addr:              hostport.Join(host, port),
+		Handler:           handler,
+		ReadHeaderTimeout: readHeaderTimeout,
+		ReadTimeout:       readTimeout,
+		WriteTimeout:      writeTimeout,
+		IdleTimeout:       idleTimeout,
+		MaxHeaderBytes:    maxHeaderBytes,
 	}
 }
+
+// The listener's bounds. net/http's zero for each is no bound at all (1 MB for the header block),
+// so a client that opens a connection and stops sending held it for ever (#426). Each value is a
+// constant rather than a setting: every one has wide headroom over what a legitimate request needs.
+const (
+	// readHeaderTimeout closes a connection that never finishes its header block. Being the smallest
+	// non-zero timeout, it is also the TLS handshake's deadline, so a client that never says hello
+	// is dropped at the same point.
+	readHeaderTimeout = 10 * time.Second
+
+	// readTimeout bounds the whole request, header and body, from its first byte. 60s carries a
+	// 3 MiB profile picture or logo upload at about 53 KB/s.
+	readTimeout = 60 * time.Second
+
+	// writeTimeout must outlast the body read plus the slowest handler, because a handler that runs
+	// past it leaves the client with no response at all, not an error. net/http starts it when the
+	// header block has been read, so the body's arrival counts against it. The slowest handlers send
+	// mail synchronously, up to 40s of SMTP dial and conversation (emaildelivery), behind a form body
+	// under a kilobyte. It is never shorter than readTimeout, or a body the read deadline admits
+	// would lose its response.
+	writeTimeout = 60 * time.Second
+
+	// idleTimeout closes a kept-alive connection that sends no next request.
+	idleTimeout = 120 * time.Second
+
+	// maxHeaderBytes bounds the request line and header fields. The largest legitimate request is an
+	// authorize or logout URL carrying an id_token_hint and a client-chosen state, about 10 KB, plus
+	// cookies, and this server's own session cookie is an identifier (#266). net/http adds 4096
+	// bytes of slack and answers 431 itself above that, before any handler runs.
+	maxHeaderBytes = 64 << 10
+)
 
 const (
 	// httpShutdownTimeout bounds how long in-flight requests get to finish.
