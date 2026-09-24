@@ -30,7 +30,7 @@ func (s *Server) initRoutes(root chi.Router) {
 
 	authServerClient := newAuthServerHTTPClient()
 
-	tokenParser := oauthclient.NewJWKSTokenParser(authBase, authServerClient)
+	tokenParser := oauthclient.NewJWKSTokenParser(authBase, authServerClient, constants.AdminConsoleClientIdentifier, middleware.SettingsReader{})
 	tokenExchanger := oauthclient.NewTokenExchanger(authServerClient)
 
 	identifierValidator := validators.NewIdentifierValidator()
