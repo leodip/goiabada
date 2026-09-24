@@ -1,9 +1,13 @@
 package main
 
 import (
+	"context"
 	"encoding/gob"
 	"log/slog"
 	"os"
+	"os/signal"
+	"strings"
+	"syscall"
 	"time"
 	_ "time/tzdata"
 
@@ -70,8 +74,10 @@ func main() {
 	// Validate OAuth credentials EARLY - fail fast if missing
 	adminConsoleConfig := config.GetAdminConsole()
 	// One block, keyed on the secret: the client id is no longer configuration, so the only
-	// half of the credential a deployment supplies is the secret (#285).
-	if adminConsoleConfig.OAuthClientSecret == "" {
+	// half of the credential a deployment supplies is the secret (#285). The only check, too:
+	// Start used to repeat it with TrimSpace, so a secret of blanks passed here and stopped the
+	// console there (#426).
+	if strings.TrimSpace(adminConsoleConfig.OAuthClientSecret) == "" {
 		logBootstrapCredentialsNotConfigured()
 		os.Exit(1)
 	}
@@ -198,15 +204,24 @@ func main() {
 	r := chi.NewRouter()
 	s := server.NewServer(r, sessionStore, settingsCache, trustedProxies)
 
-	s.Start()
+	// The process owns the signals, as the auth server's does; the console just gets told when to
+	// stop. On SIGTERM (what a container runtime sends) or SIGINT, ctx is cancelled and Start
+	// drains the listeners before returning. Before #426 nothing listened, and SIGTERM cut off
+	// every request in flight.
+	ctx, stopListeningForSignals := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stopListeningForSignals()
+
+	// Start logs none of its errors: this is the one record, and the one exit, for all of them. The
+	// deferred stop does not run under os.Exit, hence the explicit call.
+	if err := s.Start(ctx); err != nil {
+		slog.Error("the admin console stopped on an error", "error", err)
+		stopListeningForSignals()
+		os.Exit(1)
+	}
+
+	slog.Info("admin console stopped")
 }
 
-// logBootstrapCredentialsNotConfigured reports a deployment with no OAuth client
-// secret, which is the credential the admin console authenticates to the auth
-// server with and the one half of it a deployment supplies (#285).
-//
-// One record where a 13-line banner used to be. The names are listed rather than
-// described, because the operator's next action is to set them (#320 decision 6).
 // logSessionKeysNotConfigured reports session keys the console cannot use, which
 // it needs before it can seal a cookie and therefore before it can serve anything.
 //
@@ -226,6 +241,12 @@ func logSessionKeysNotConfigured(err error) {
 		"generate_with", "openssl rand -hex 64 (authentication key), openssl rand -hex 32 (encryption key)")
 }
 
+// logBootstrapCredentialsNotConfigured reports a deployment with no OAuth client
+// secret, which is the credential the admin console authenticates to the auth
+// server with and the one half of it a deployment supplies (#285).
+//
+// One record where a 13-line banner used to be. The names are listed rather than
+// described, because the operator's next action is to set them (#320 decision 6).
 func logBootstrapCredentialsNotConfigured() {
 	slog.Error("bootstrap credentials are not configured, so the admin console cannot start: on a first deployment start the auth server first, which writes the bootstrap file and exits, then copy every credential into the two services' configuration and restart them",
 		"required", []string{
