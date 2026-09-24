@@ -153,6 +153,193 @@ func TestAPIDebugMiddleware_EnabledWithNoRequestBody(t *testing.T) {
 }
 
 // -----------------------------------------------------------------------------
+// Bodies larger than the log will ever show (#426)
+//
+// Nothing above maxLoggedBody is logged, so the middleware reads and keeps no more
+// than maxLoggedBody+1 bytes of either body: one byte past the cap is what tells it a
+// body is too large. The handler and the client still see every byte.
+// -----------------------------------------------------------------------------
+
+// countingBody counts what is read from it and whether it was closed.
+type countingBody struct {
+	io.Reader
+	read   int
+	closed bool
+}
+
+func (b *countingBody) Read(p []byte) (int, error) {
+	n, err := b.Reader.Read(p)
+	b.read += n
+	return n, err
+}
+
+func (b *countingBody) Close() error {
+	b.closed = true
+	return nil
+}
+
+// oversizedBody is three times the cap, ending in a sentinel, so a handler that
+// receives only a prefix is visibly missing its end.
+func oversizedBody() string {
+	return strings.Repeat("x", 3*maxLoggedBody) + "TAIL-SENTINEL"
+}
+
+// debugRecord runs one request through the middleware and returns the one record it
+// wrote, with what the handler read and the error its read ended in.
+func debugRecord(t *testing.T, req *http.Request, respond func(w http.ResponseWriter)) (testutil.CapturedRecord, string, error) {
+	t.Helper()
+	withDebugAPIRequests(t, true)
+	logged := testutil.CaptureSlog(t)
+
+	var read []byte
+	var readErr error
+	handler := APIDebugMiddleware()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		read, readErr = io.ReadAll(r.Body)
+		if respond != nil {
+			respond(w)
+		}
+	}))
+	handler.ServeHTTP(httptest.NewRecorder(), req)
+
+	records := logged.Records()
+	require.Len(t, records, 1)
+	return records[0], string(read), readErr
+}
+
+func TestAPIDebugMiddleware_AnOversizedRequestBodyReachesTheHandlerWhole(t *testing.T) {
+	body := oversizedBody()
+	req := httptest.NewRequest(http.MethodPut, "/api/v1/admin/users/1/profile", strings.NewReader(body))
+
+	record, read, err := debugRecord(t, req, nil)
+
+	require.NoError(t, err)
+	assert.Equal(t, body, read, "the prefix the middleware read and the rest it did not, in order")
+	assert.Equal(t, fmt.Sprintf("%d bytes, not logged (larger than %d bytes)", len(body), maxLoggedBody),
+		record.Attrs["request_body"], "a declared length is the whole body's size")
+	assert.NotContains(t, fmt.Sprint(record.Attrs), "TAIL-SENTINEL")
+}
+
+func TestAPIDebugMiddleware_AnOversizedChunkedRequestBodyIsSaidToBeLargerThanTheCap(t *testing.T) {
+	body := oversizedBody()
+	req := httptest.NewRequest(http.MethodPut, "/api/v1/admin/users/1/profile", strings.NewReader(body))
+	// What a chunked request looks like to a handler: no declared length.
+	req.ContentLength = -1
+
+	record, read, err := debugRecord(t, req, nil)
+
+	require.NoError(t, err)
+	assert.Equal(t, body, read)
+	assert.Equal(t, fmt.Sprintf("more than %d bytes, not logged (larger than %d bytes)", maxLoggedBody, maxLoggedBody),
+		record.Attrs["request_body"], "with no declared length the middleware knows only that it passed the cap")
+}
+
+// The middleware must not buffer a body it will not log: before the handler reads
+// anything, exactly one byte past the cap has left the connection.
+func TestAPIDebugMiddleware_ReadsNoMoreThanOneBytePastTheCapBeforeTheHandler(t *testing.T) {
+	withDebugAPIRequests(t, true)
+
+	source := &countingBody{Reader: strings.NewReader(oversizedBody())}
+	req := httptest.NewRequest(http.MethodPut, "/api/v1/admin/users/1/profile", nil)
+	req.Body = source
+
+	readBeforeHandler := -1
+	handler := APIDebugMiddleware()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		readBeforeHandler = source.read
+		require.NoError(t, r.Body.Close())
+	}))
+	handler.ServeHTTP(httptest.NewRecorder(), req)
+
+	assert.Equal(t, maxLoggedBody+1, readBeforeHandler)
+	assert.True(t, source.closed, "closing the body the handler holds closes the original")
+}
+
+// A limit outside the middleware makes the read fail. The handler must see that failure
+// where the body ends, and not a prefix handed over as though it were the whole body,
+// whether the limit falls inside the prefix the middleware reads or after it.
+func TestAPIDebugMiddleware_AReadErrorReachesTheHandler(t *testing.T) {
+	for _, limit := range []int64{1000, maxLoggedBody + 1000} {
+		t.Run(fmt.Sprintf("limit %d", limit), func(t *testing.T) {
+			body := oversizedBody()
+			recorder := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodPut, "/api/v1/admin/users/1/profile", nil)
+			req.Body = http.MaxBytesReader(recorder, io.NopCloser(strings.NewReader(body)), limit)
+
+			record, read, err := debugRecord(t, req, nil)
+
+			var tooLarge *http.MaxBytesError
+			require.ErrorAs(t, err, &tooLarge, "the limit's own error, not a clean end of body")
+			assert.Equal(t, body[:limit], read, "every byte the limit allowed, then the error")
+			if limit <= maxLoggedBody {
+				assert.Equal(t, fmt.Sprintf("%d bytes read, not logged (unable to read the whole body: %v)", limit, tooLarge),
+					record.Attrs["request_body"], "a cut body is never logged as though it were whole")
+			}
+		})
+	}
+}
+
+// A body the limit cut short can still be valid JSON on its own. It is not logged,
+// because what was read is not what was sent.
+func TestAPIDebugMiddleware_DoesNotLogACutBodyThatParses(t *testing.T) {
+	body := `{"givenName":"CUT-SENTINEL"}` + strings.Repeat(" ", 100)
+	recorder := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPut, "/api/v1/admin/users/1/profile", nil)
+	req.Body = http.MaxBytesReader(recorder, io.NopCloser(strings.NewReader(body)), 50)
+
+	record, _, err := debugRecord(t, req, nil)
+
+	require.Error(t, err)
+	assert.NotContains(t, record.Attrs["request_body"], "CUT-SENTINEL")
+	assert.Contains(t, record.Attrs["request_body"], "50 bytes read, not logged")
+}
+
+func TestAPIDebugMiddleware_AnOversizedResponseReachesTheClientWhole(t *testing.T) {
+	withDebugAPIRequests(t, true)
+	logged := testutil.CaptureSlog(t)
+
+	chunk := strings.Repeat("y", 100_000)
+	const writes = 6
+
+	var capture *responseWriter
+	handler := APIDebugMiddleware()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		capture = w.(*responseWriter)
+		for range writes {
+			_, _ = w.Write([]byte(chunk))
+		}
+	}))
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/api/v1/admin/audit-logs", nil))
+
+	assert.Equal(t, strings.Repeat(chunk, writes), recorder.Body.String(), "the client receives every byte")
+	assert.Equal(t, maxLoggedBody+1, capture.body.Len(), "the log keeps one byte past what it can show")
+
+	records := logged.Records()
+	require.Len(t, records, 1)
+	assert.Equal(t, fmt.Sprintf("%d bytes, not logged (larger than %d bytes)", writes*len(chunk), maxLoggedBody),
+		records[0].Attrs["response_body"], "the count is every byte written, not what was kept")
+}
+
+// The capture stops at one byte past the cap whichever write crosses it, and counts
+// what the real writer took.
+func TestDebugResponseWriter_CapturesAtMostOneBytePastTheCap(t *testing.T) {
+	recorder := httptest.NewRecorder()
+	rw := &responseWriter{ResponseWriter: recorder, statusCode: http.StatusOK, body: &bytes.Buffer{}}
+
+	first := strings.Repeat("a", maxLoggedBody-10)
+	second := strings.Repeat("b", 20)
+	third := "c"
+
+	for _, write := range []string{first, second, third} {
+		n, err := rw.Write([]byte(write))
+		require.NoError(t, err)
+		require.Equal(t, len(write), n)
+	}
+
+	assert.Equal(t, first+second[:11], rw.body.String(), "the write that crosses the cap is cut at one byte past it")
+	assert.Equal(t, int64(len(first)+len(second)+len(third)), rw.size)
+	assert.Equal(t, first+second+third, recorder.Body.String())
+}
+
+// -----------------------------------------------------------------------------
 // debugLog
 //
 // This is the function that writes bodies to the log, so the case that matters is
@@ -194,8 +381,8 @@ func TestDebugLog_DoesNotLogTheAuthorizationHeaderVerbatim(t *testing.T) {
 			req := httptest.NewRequest("POST", "/api/v1/admin/users", nil)
 			req.Header.Set("Authorization", tc.authHeader)
 
-			debugLog("POST", "/api/v1/admin/users", []byte(`{"a":1}`),
-				http.StatusOK, []byte(`{"b":2}`), 5*time.Millisecond, req)
+			debugLog("POST", "/api/v1/admin/users", wholeBody([]byte(`{"a":1}`)),
+				http.StatusOK, wholeBody([]byte(`{"b":2}`)), 5*time.Millisecond, req)
 
 			assert.NotContains(t, logged.Text(), tc.secret,
 				"the credential must never be written to the log")
@@ -210,7 +397,7 @@ func TestDebugLog_ReportsAnAbsentAuthorizationHeader(t *testing.T) {
 	logged := testutil.CaptureSlog(t)
 
 	req := httptest.NewRequest("GET", "/api/v1/admin/users", nil)
-	debugLog("GET", "/api/v1/admin/users", nil, http.StatusOK, nil, time.Millisecond, req)
+	debugLog("GET", "/api/v1/admin/users", capturedBody{}, http.StatusOK, capturedBody{}, time.Millisecond, req)
 
 	records := logged.Records()
 	require.Len(t, records, 1)
@@ -232,8 +419,8 @@ func TestDebugLog_WritesOneRecordCarryingTheWholeExchange(t *testing.T) {
 
 	req := httptest.NewRequest("POST", "/api/v1/admin/users", nil)
 	req.Header.Set("Authorization", "Bearer a-token")
-	debugLog("POST", "/api/v1/admin/users?page=2", []byte(`{"a":1}`),
-		http.StatusCreated, []byte(`{"b":2}`), 7*time.Millisecond, req)
+	debugLog("POST", "/api/v1/admin/users?page=2", wholeBody([]byte(`{"a":1}`)),
+		http.StatusCreated, wholeBody([]byte(`{"b":2}`)), 7*time.Millisecond, req)
 
 	records := logged.Records()
 	require.Len(t, records, 1, "one exchange, one record")
@@ -259,7 +446,7 @@ func TestDebugLog_BoundsAnOversizedMethod(t *testing.T) {
 
 	method := strings.Repeat("M", 900000)
 	req := httptest.NewRequest("GET", "/api/v1/admin/users", nil)
-	debugLog(method, "/api/v1/admin/users", nil, http.StatusOK, nil, time.Millisecond, req)
+	debugLog(method, "/api/v1/admin/users", capturedBody{}, http.StatusOK, capturedBody{}, time.Millisecond, req)
 
 	records := logged.Records()
 	require.Len(t, records, 1)
@@ -280,7 +467,7 @@ func TestDebugLog_CarriesTheRequestIdFromTheContext(t *testing.T) {
 
 	req := httptest.NewRequest("GET", "/api/v1/admin/users", nil)
 	req = req.WithContext(context.WithValue(req.Context(), chimiddleware.RequestIDKey, "req-abc"))
-	debugLog("GET", "/api/v1/admin/users", nil, http.StatusOK, nil, time.Millisecond, req)
+	debugLog("GET", "/api/v1/admin/users", capturedBody{}, http.StatusOK, capturedBody{}, time.Millisecond, req)
 
 	records := logged.Records()
 	require.Len(t, records, 1)
@@ -295,8 +482,8 @@ func TestDebugLog_LogsRequestAndResponseBodies(t *testing.T) {
 	logged := testutil.CaptureSlog(t)
 
 	req := httptest.NewRequest("POST", "/api/v1/admin/users", nil)
-	debugLog("POST", "/api/v1/admin/users", []byte(`{"givenName":"Jane"}`),
-		http.StatusCreated, []byte(`{"id":42}`), time.Millisecond, req)
+	debugLog("POST", "/api/v1/admin/users", wholeBody([]byte(`{"givenName":"Jane"}`)),
+		http.StatusCreated, wholeBody([]byte(`{"id":42}`)), time.Millisecond, req)
 
 	output := logged.Text()
 	assert.Contains(t, output, "givenName")
@@ -325,8 +512,8 @@ func TestDebugLog_HandlesEveryBodyShape(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			assert.NotPanics(t, func() {
-				debugLog("POST", "/api/v1/admin/users", tc.reqBody,
-					http.StatusOK, tc.respBody, time.Millisecond, req)
+				debugLog("POST", "/api/v1/admin/users", wholeBody(tc.reqBody),
+					http.StatusOK, wholeBody(tc.respBody), time.Millisecond, req)
 			})
 		})
 	}
@@ -338,7 +525,7 @@ func TestDebugLog_HandlesUnknownStatusCode(t *testing.T) {
 	// http.StatusText returns "" for an unrecognized code, which must not break
 	// the log line.
 	assert.NotPanics(t, func() {
-		debugLog("GET", "/api/v1/admin/users", nil, 799, nil, time.Millisecond, req)
+		debugLog("GET", "/api/v1/admin/users", capturedBody{}, 799, capturedBody{}, time.Millisecond, req)
 	})
 }
 
@@ -357,8 +544,8 @@ func logRequestBody(t *testing.T, body string) string {
 	t.Helper()
 	logged := testutil.CaptureSlog(t)
 	req := httptest.NewRequest("POST", "/api/v1/admin/users", nil)
-	debugLog("POST", "/api/v1/admin/users", []byte(body),
-		http.StatusOK, nil, time.Millisecond, req)
+	debugLog("POST", "/api/v1/admin/users", wholeBody([]byte(body)),
+		http.StatusOK, capturedBody{}, time.Millisecond, req)
 	return logged.Text()
 }
 
@@ -644,7 +831,7 @@ func TestDebugLog_LogsBodiesOnTheAcceptedSideOfEveryBound(t *testing.T) {
 	t.Run("empty body writes an empty attribute rather than a refusal", func(t *testing.T) {
 		logged := testutil.CaptureSlog(t)
 		req := httptest.NewRequest("POST", "/api/v1/admin/users", nil)
-		debugLog("POST", "/api/v1/admin/users", nil, http.StatusOK, nil, time.Millisecond, req)
+		debugLog("POST", "/api/v1/admin/users", capturedBody{}, http.StatusOK, capturedBody{}, time.Millisecond, req)
 
 		records := logged.Records()
 		require.Len(t, records, 1)

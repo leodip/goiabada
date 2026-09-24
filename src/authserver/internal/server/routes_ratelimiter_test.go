@@ -194,13 +194,17 @@ func browserForm(method string, target string, body string) *http.Request {
 func apiRequest(method string, target string, body string) *http.Request {
 	r := httptest.NewRequest(method, target, strings.NewReader(body))
 	r.Header.Set("Content-Type", "application/json")
-	token := oauth.JwtToken{Claims: jwt.MapClaims{
+	r = r.WithContext(context.WithValue(r.Context(), constants.ContextKeyBearerToken, accountAPIToken()))
+	return withRoutesTestSettings(r)
+}
+
+// accountAPIToken is the decoded bearer token apiRequest carries.
+func accountAPIToken() oauth.JwtToken {
+	return oauth.JwtToken{Claims: jwt.MapClaims{
 		"sub":       routesTestSubject,
 		"scope":     coreconstants.AuthServerResourceIdentifier + ":" + coreconstants.ManageAccountPermissionIdentifier,
 		"auth_time": float64(time.Now().Add(-time.Minute).Unix()),
 	}}
-	r = r.WithContext(context.WithValue(r.Context(), constants.ContextKeyBearerToken, token))
-	return withRoutesTestSettings(r)
 }
 
 // otpCeremonyCookie mints the session cookie a user part way through the OTP step carries:

@@ -107,7 +107,7 @@ func HandleAPIClientPermissionsPut(
 
 		var request api.UpdateClientPermissionsRequest
 		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-			writeJSONError(w, "Invalid request body", "VALIDATION_ERROR", http.StatusBadRequest)
+			writeJSONError(w, "Invalid request body", "INVALID_REQUEST_BODY", http.StatusBadRequest)
 			return
 		}
 

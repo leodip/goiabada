@@ -66,52 +66,49 @@ func TestToken_InvalidGrantType(t *testing.T) {
 	assert.Equal(t, "Unsupported grant_type.", data["error_description"])
 }
 
-// TestToken_MalformedForm_RequestIdIsConformed proves the token endpoint's conformance boundary
-// also covers the error responses that never reach a validator.
+// TestToken_UnparseableForm_IsInvalidRequest: a token request whose body will not parse is the
+// client's malformed request, RFC 6749 section 5.2's invalid_request, through the real server.
 //
-// A body of "%" is not a valid application/x-www-form-urlencoded document, so r.ParseForm() fails
-// before any client is identified and the endpoint answers with the generic server error. That
-// description interpolates chi's request id, and chi adopts an inbound X-Request-Id verbatim, so
-// without the filter an unauthenticated caller writes their own bytes into a parameter RFC 6749
-// Appendix A.8 confines to %x20-21 / %x23-5B / %x5D-7E. Every byte sent below survives Go's header
-// parsing on both sides, which is what makes this reachable rather than theoretical (#213).
-//
-// Driven through the real server so the real middleware chain supplies the request id. The
-// character set itself belongs to TestConformErrorDescription in src/core/customerrors; what this
-// tier proves is that the boundary is on the path even when the error is not an *ErrorDetail.
-func TestToken_MalformedForm_RequestIdIsConformed(t *testing.T) {
+// A body of "%" is not a valid application/x-www-form-urlencoded document, and a form larger than
+// the endpoint's 64 KiB row in the request-body table is cut by the limit, so r.ParseForm() fails
+// before any client is identified in both. Both answered the generic 500 until #426, and the first
+// was how #213 reached that arm from outside, with a hostile X-Request-Id the description
+// interpolated. The header is still sent: the answer is now a fixed sentence that carries no
+// request id at all. The generic arm's own conformance is pinned by
+// TestJsonErrorConformed_GenericErrorCarriesNoForbiddenByte, since no request from outside reaches
+// it through this path any more.
+func TestToken_UnparseableForm_IsInvalidRequest(t *testing.T) {
 	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
 
 	httpClient := createHttpClient(t)
 
-	request, err := http.NewRequest("POST", destUrl, strings.NewReader("%"))
-	assert.NoError(t, err)
-	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	request.Header.Set("X-Request-Id", "caller\U0001F4A3id\"x\\y")
-
-	resp, err := httpClient.Do(request)
-	assert.NoError(t, err)
-	defer func() { _ = resp.Body.Close() }()
-
-	body, err := io.ReadAll(resp.Body)
-	assert.NoError(t, err)
-
-	var data map[string]interface{}
-	assert.NoError(t, json.Unmarshal(body, &data))
-
-	assert.Equal(t, "server_error", data["error"])
-
-	description, ok := data["error_description"].(string)
-	assert.True(t, ok, "error_description must be a string, got %v", data["error_description"])
-
-	for i := 0; i < len(description); i++ {
-		b := description[i]
-		conforming := (b >= 0x20 && b <= 0x21) || (b >= 0x23 && b <= 0x5B) || (b >= 0x5D && b <= 0x7E)
-		assert.True(t, conforming,
-			"byte %d of %q is 0x%02x, which RFC 6749 Appendix A.8 excludes from error-description",
-			i, description, b)
+	tests := []struct {
+		name string
+		body string
+	}{
+		{"a broken percent-encoding", "%"},
+		{"a form over the request-body limit", "grant_type=client_credentials&client_id=a-client&pad=" + strings.Repeat("x", 64<<10)},
 	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			request, err := http.NewRequest("POST", destUrl, strings.NewReader(test.body))
+			assert.NoError(t, err)
+			request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			request.Header.Set("X-Request-Id", "caller\U0001F4A3id\"x\\y")
 
-	// The request id still correlates the response with the server log, one '?' per offending rune.
-	assert.Contains(t, description, "Request Id: caller?id?x?y")
+			resp, err := httpClient.Do(request)
+			assert.NoError(t, err)
+			defer func() { _ = resp.Body.Close() }()
+
+			body, err := io.ReadAll(resp.Body)
+			assert.NoError(t, err)
+
+			var data map[string]interface{}
+			assert.NoError(t, json.Unmarshal(body, &data))
+
+			assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+			assert.Equal(t, "invalid_request", data["error"])
+			assert.Equal(t, "The request body could not be parsed.", data["error_description"])
+		})
+	}
 }
