@@ -20,11 +20,11 @@ const (
 	redactedValue = "[redacted]"
 
 	// maxLoggedTarget bounds the whole rendered request target. A real authorize
-	// request renders to a couple of hundred bytes, while a client can put about a
-	// megabyte in the request line (Go's default 1 MB MaxHeaderBytes, which this
-	// repo never overrides), and redaction barely shortens that because the
-	// parameter names survive. Without this bound an unauthenticated caller writes
-	// a megabyte to the log per request (#159).
+	// request renders to a couple of hundred bytes, while a client can put about
+	// 64 KiB in the request line (both servers bound the header block at 64 KiB,
+	// #426, still sixteen times this bound), and redaction barely shortens that
+	// because the parameter names survive. Without this bound an unauthenticated
+	// caller writes all of that to the log per request (#159).
 	maxLoggedTarget = 4096
 
 	// maxLoggedQueryComponent bounds each rendered parameter name and each retained
