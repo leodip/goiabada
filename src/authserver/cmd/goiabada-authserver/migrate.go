@@ -164,6 +164,7 @@ func parseMigrateArgs(args []string, db config.DatabaseConfig) (migrateInvocatio
 					name, name)
 			}
 			i++
+			//nolint:gosec // G602: i+1 == len(args) returned above, so i is in range here
 			value = args[i]
 		}
 

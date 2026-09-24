@@ -479,7 +479,9 @@ have generators of their own, out of it (#338).
 four modules with the commands CI's Lint job uses, then regenerates the Tailwind CSS and the mocks
 and fails if either differs from what is committed; `all` includes it. It fails rather than skips
 when a binary is missing, and refuses `--race`. It is where `sloglint` holds most of the logging
-convention (pattern 8), which is why it is a tier of the script and not CI-only (#320). The two
+convention (pattern 8), which is why it is a tier of the script and not CI-only (#320), and where
+`gosec` holds shipping code to every rule, each false positive suppressed inline with its reason,
+which `nolintlint` requires (#426). The two
 regeneration checks are here because each was CI-only and nothing local could see it: a template
 class that never reached `main.css` (#328) and sixteen mocks stale against their own pin (#338).
 `unparam` joined them for the same reason: #385 moved an exported parse into the module whose two

@@ -202,6 +202,7 @@ func createDatabaseUnderAppLock(masterDB *sql.DB, name string) error {
 	// is why every string column a future migration adds must spell its own COLLATE clause
 	// explicitly, naming the collation below, rather than relying on this line, and why a data
 	// test migrates the whole chain into a hostile database and asserts all 92 columns.
+	//nolint:gosec // G201: the name passes through quoteLiteral and quoteIdentifier; CREATE DATABASE takes no parameter
 	createDatabaseCommand := fmt.Sprintf(`
         IF NOT EXISTS (SELECT * FROM sys.databases WHERE name = N%s)
         BEGIN

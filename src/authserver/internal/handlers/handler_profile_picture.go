@@ -55,6 +55,7 @@ func HandleProfilePictureGet(
 		w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate")
 		w.Header().Set("Content-Length", strconv.Itoa(len(profilePicture.Picture)))
 		w.WriteHeader(http.StatusOK)
+		//nolint:gosec // G705: image bytes under the image content type the upload validated, and nosniff is set at the root
 		_, _ = w.Write(profilePicture.Picture)
 	}
 }

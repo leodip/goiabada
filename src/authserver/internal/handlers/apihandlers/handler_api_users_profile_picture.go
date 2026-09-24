@@ -64,6 +64,7 @@ func HandleAPIUserProfilePicturePost(
 		r.Body = http.MaxBytesReader(w, r.Body, maxFileSize+1024) // extra for multipart overhead
 
 		// Parse multipart form
+		//nolint:gosec // G120: bounded by the MaxBytesReader above and the server's request-body table; G120 flags every multipart parse
 		err = r.ParseMultipartForm(maxFileSize)
 		if err != nil {
 			writeJSONError(w, "File too large or invalid form data", "FILE_TOO_LARGE", http.StatusBadRequest)

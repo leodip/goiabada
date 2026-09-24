@@ -21,9 +21,9 @@ package audit
 // the operator's filter dropdown, with nothing going red.
 
 const (
-	AuditAuthFailedPwd                        = "auth_failed_pwd"
+	AuditAuthFailedPwd                        = "auth_failed_pwd" //nolint:gosec // G101: an audit event name, not a credential
 	AuditAuthFailedOtp                        = "auth_failed_otp"
-	AuditAuthSuccessPwd                       = "auth_success_pwd"
+	AuditAuthSuccessPwd                       = "auth_success_pwd" //nolint:gosec // G101: an audit event name, not a credential
 	AuditAuthSuccessOtp                       = "auth_success_otp"
 	AuditUserDisabled                         = "user_disabled"
 	AuditStartedNewUserSesson                 = "started_new_user_session"
@@ -32,14 +32,14 @@ const (
 	AuditSavedConsent                         = "saved_consent"
 	AuditTokenIssuedAuthorizationCodeResponse = "token_issued_authorization_code_response"
 	AuditTokenIssuedClientCredentialsResponse = "token_issued_client_credentials_response"
-	AuditTokenIssuedRefreshTokenResponse      = "token_issued_refresh_token_response"
+	AuditTokenIssuedRefreshTokenResponse      = "token_issued_refresh_token_response" //nolint:gosec // G101: an audit event name, not a credential
 	// AuditTokenIssuedImplicitResponse is logged when tokens are issued via implicit flow.
 	// SECURITY NOTE: Implicit flow is deprecated in OAuth 2.1.
 	AuditTokenIssuedImplicitResponse = "token_issued_implicit_response"
 	// AuditTokenIssuedROPCResponse is logged when tokens are issued via ROPC flow.
 	// RFC 6749 Section 4.3
 	// SECURITY NOTE: ROPC is deprecated in OAuth 2.1 due to credential exposure risks.
-	AuditTokenIssuedROPCResponse = "token_issued_ropc_response"
+	AuditTokenIssuedROPCResponse = "token_issued_ropc_response" //nolint:gosec // G101: an audit event name, not a credential
 	// AuditTokenScopeDenied is logged when a token request fails scope validation, on any grant
 	// type. Emitted from a single call site in HandleTokenPost, after ValidateTokenRequest has
 	// failed with an invalid_scope error, so every row follows a successful authentication of

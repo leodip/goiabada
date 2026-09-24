@@ -37,6 +37,8 @@ import (
 
 // idTokenHintJWEHeader is the protected header EncryptIDTokenHintJWE writes, byte
 // for byte. It is the header of the scheme integration/endpoints.mdx documents.
+//
+//nolint:gosec // G101: a JWE protected header naming algorithms, not a credential
 const idTokenHintJWEHeader = `{"alg":"dir","enc":"A256GCM","cty":"JWT"}`
 
 const (

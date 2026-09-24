@@ -7,11 +7,16 @@
 # commit instead.
 #
 # The first five below are exactly golangci-lint 2.12.2's `standard` set, pinned
-# as of the CI/CD v2 stage 0 cleanup. Two deliberate widenings follow. sloglint
+# as of the CI/CD v2 stage 0 cleanup. Four deliberate widenings follow. sloglint
 # was added by #320: it holds the logging convention CLAUDE.md pattern 8
 # states, type-checked, and its settings below are that convention spelled in
 # its vocabulary. govet's shadow analyzer was added by #425, under govet's
-# settings below. The binary itself is pinned in src/authserver/versions.yaml
+# settings below. gosec was added by #426 with every rule on: a server with no
+# timeouts and a setup wizard writing its secrets world-readable were both
+# gosec findings nobody had run gosec to see. nolintlint was added beside it,
+# because gosec's false positives are suppressed inline, and it holds every
+# suppression to naming its linter and its reason and to still being needed.
+# The binary itself is pinned in src/authserver/versions.yaml
 # (tools.golangci-lint).
 #
 # Note that golangci-lint's bundled staticcheck includes the QF (quickfix)
@@ -28,7 +33,16 @@ linters:
     - staticcheck
     - unused
     - sloglint
+    - gosec
+    - nolintlint
   settings:
+    nolintlint:
+      # Every //nolint names the linter it silences and says why, and one that
+      # silences nothing is itself a finding, so a suppression cannot outlive
+      # the code it was written for (#426 decision 10).
+      require-explanation: true
+      require-specific: true
+      allow-unused: false
     govet:
       enable:
         # A := in an inner scope that redeclares an outer variable. The logout
@@ -121,3 +135,25 @@ linters:
       - path: core/logging/
         linters: [sloglint]
         text: request_id
+      # gosec holds the code a server binary ships. A test reads fixtures by
+      # path, dials httptest servers and writes temporary files as it likes,
+      # and 174 findings there would bury the one that matters (#426
+      # decision 10).
+      - path: _test\.go
+        linters: [gosec]
+      # The tree-wide guards read the source tree by path and call the test
+      # mail server; no binary imports them.
+      - path: core/testutil/
+        linters: [gosec]
+      # The generators and dump tools run by hand in the dev container, read
+      # only the tree or a download named in their source, and write
+      # repository files, which are 0644 on purpose. No server binary contains
+      # them. The timezones generator is rebuilt by #432.
+      - path: core/timezones/generate/
+        linters: [gosec]
+      - path: core/countries/generate/
+        linters: [gosec]
+      - path: core/cmd/
+        linters: [gosec]
+      - path: authserver/cmd/schemadump/
+        linters: [gosec]

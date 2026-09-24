@@ -975,6 +975,7 @@ func finishLogout(
 	}
 
 	if len(location) > 0 {
+		//nolint:gosec // G710: a redirect URI registered on the client and matched exactly
 		http.Redirect(w, r, location, http.StatusFound)
 		return
 	}

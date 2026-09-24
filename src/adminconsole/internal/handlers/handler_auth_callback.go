@@ -172,6 +172,7 @@ func HandleAuthCallbackPost(
 		}
 
 		// redirect
+		//nolint:gosec // G710: the base URL plus path the console itself stored in its server-side session
 		http.Redirect(w, r, redirectBack, http.StatusFound)
 	}
 }

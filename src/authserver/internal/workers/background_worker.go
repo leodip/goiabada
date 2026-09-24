@@ -206,6 +206,7 @@ func jitter(max time.Duration) time.Duration {
 	if max <= 0 {
 		return 0
 	}
+	//nolint:gosec // G404: scheduling jitter, not a secret
 	return time.Duration(rand.Int64N(int64(max)))
 }
 

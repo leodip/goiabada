@@ -838,6 +838,7 @@ func issueImplicitTokens(
 	//
 	// Field order is now declaration order rather than Encode's alphabetical sort. Nothing depends
 	// on it: RFC 6749 4.2.2 defines a set of parameters and not a sequence.
+	//nolint:gosec // G710: a redirect URI registered on the client and matched exactly, checked again at gate 4 above
 	http.Redirect(w, r, redirectURI+"#"+encodeResponseParams(params), http.StatusFound)
 	return nil
 }

@@ -325,6 +325,7 @@ func (m *Migrator) setVersion(ctx context.Context, conn *sql.Conn, version int, 
 	}
 
 	if version >= 0 || (version == NilVersion && dirty) {
+		//nolint:gosec // G201: migrationsTable is a constant and the placeholders are the engine's own; the values are bound
 		insert := fmt.Sprintf("INSERT INTO %s (version, dirty) VALUES (%s, %s)",
 			migrationsTable, m.eng.placeholder(1), m.eng.placeholder(2))
 		if _, err := tx.ExecContext(ctx, insert, version, dirty); err != nil {

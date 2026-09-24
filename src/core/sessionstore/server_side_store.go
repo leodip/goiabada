@@ -611,6 +611,7 @@ func (s *ServerSideStore) setCookie(w http.ResponseWriter, session *Session, id 
 // things: CookieName for this store's own cookie, and StaleCookieNames for what the
 // chunked cookie store left behind.
 func (s *ServerSideStore) DeletionCookie(name string) *http.Cookie {
+	//nolint:gosec // G124: Secure, HttpOnly and SameSite come from the store's options, set per deployment
 	return &http.Cookie{
 		Name:  name,
 		Value: "",
@@ -626,6 +627,7 @@ func (s *ServerSideStore) DeletionCookie(name string) *http.Cookie {
 }
 
 func (s *ServerSideStore) buildCookie(logicalName, value string, options *Options) *http.Cookie {
+	//nolint:gosec // G124: Secure, HttpOnly and SameSite come from the store's options, set per deployment
 	cookie := &http.Cookie{
 		Name:     s.CookieName(logicalName),
 		Value:    value,
