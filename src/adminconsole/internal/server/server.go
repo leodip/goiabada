@@ -341,6 +341,11 @@ func (s *Server) initMiddleware() chi.Router {
 	// Strip slashes
 	s.router.Use(middleware.StripSlashes)
 
+	// Request-body limits, one per route from bodyLimitPolicy (#426). After StripSlashes, because
+	// the lookup resolves the route by the path StripSlashes normalized, and before anything else
+	// at the root, so no body is read without a bound.
+	s.router.Use(custom_middleware.MiddlewareBodyLimit(s.router, bodyLimitPolicy()))
+
 	// CSRF
 	// Note: CSRF runs before the locale middleware below, so there is no localizer on the
 	// context when a request is rejected. MiddlewareCsrf resolves a tentative one of its own
@@ -430,6 +435,46 @@ func csrfPolicy() custom_middleware.CsrfPolicy {
 		// No conditional entries. This server has no endpoint whose exemption depends on the
 		// request rather than only on its path; the auth server's /auth/logout predicate is the
 		// only one in the tree.
+	}
+}
+
+const (
+	// defaultBodyLimit bounds every request body the table below does not name: /auth/callback,
+	// the one form a caller reaches without a console session, and anything no route matches. The
+	// callback's form_post carries a code and a state, a few hundred bytes (#426).
+	defaultBodyLimit = 64 << 10
+
+	// pageBodyLimit bounds the signed-in pages under /admin and /account: their forms, and the
+	// JSON lists some of them send, which the console forwards to an auth server API that is
+	// itself bounded at 1 MiB (#426).
+	pageBodyLimit = 1 << 20
+
+	// uploadBodyLimit bounds the three image uploads. The console's upload page refuses a source
+	// file over 3 MB and sends a 512x512 crop of it (maxSize in web/static/image-upload.js), and
+	// 64 KiB above that covers the multipart framing. It is not the auth server's
+	// GOIABADA_PROFILE_PICTURE_MAX_SIZE_BYTES, which this binary does not read: a deployment that
+	// raises that setting still uploads through this page, which stops at 3 MB (#426).
+	uploadBodyLimit = 3<<20 + 64<<10
+)
+
+// bodyLimitPolicy is the admin console's request-body table (#426): how many bytes each route may
+// read, looked up by MiddlewareBodyLimit at the root. A route missing from it gets
+// defaultBodyLimit, the smallest limit here, so an omission is a refused request rather than an
+// unbounded read.
+func bodyLimitPolicy() custom_middleware.BodyLimitPolicy {
+	return custom_middleware.BodyLimitPolicy{
+		Default: defaultBodyLimit,
+
+		Prefixes: map[string]int64{
+			"/admin/":   pageBodyLimit,
+			"/account/": pageBodyLimit,
+		},
+
+		Routes: map[string]int64{
+			"POST /account/picture":               uploadBodyLimit,
+			"POST /admin/clients/{clientId}/logo": uploadBodyLimit,
+			"POST /admin/users/{userId}/picture":  uploadBodyLimit,
+		},
 	}
 }
 

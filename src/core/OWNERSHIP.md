@@ -361,7 +361,9 @@ command itself and fails on a tree it changed.
 | `core/logging` | `TruncateCounted` | kernel | — |
 | `core/logging` | `TruncationMarker` | kernel | — |
 | `core/logging` | `WrapRequestID` | kernel | — |
+| `core/middleware` | `BodyLimitPolicy` | both-apps | — |
 | `core/middleware` | `CsrfPolicy` | both-apps | — |
+| `core/middleware` | `MiddlewareBodyLimit` | both-apps | — |
 | `core/middleware` | `MiddlewareCookieReset` | both-apps | — |
 | `core/middleware` | `MiddlewareCsrf` | both-apps | — |
 | `core/middleware` | `MiddlewareRealIP` | both-apps | — |

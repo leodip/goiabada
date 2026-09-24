@@ -33,12 +33,22 @@ type ValidationResult struct {
 	Height      int
 }
 
-// ValidateProfilePicture validates an image for use as a profile picture.
-// maxFileSize is the maximum allowed file size in bytes. If 0, DefaultMaxFileSize is used.
-func ValidateProfilePicture(data []byte, maxFileSize int64) ValidationResult {
-	if maxFileSize <= 0 {
-		maxFileSize = DefaultMaxFileSize
+// MaxFileSize is the largest image the configured size admits: the configured value, or
+// DefaultMaxFileSize when it is zero or less. It is the one place that fallback is written, because
+// the upload handlers and the auth server's request-body table must agree on it: the table's upload
+// rows are this plus the multipart allowance, and a handler reading a different number would meet
+// the table's bound before its own (#426).
+func MaxFileSize(configured int64) int64 {
+	if configured <= 0 {
+		return DefaultMaxFileSize
 	}
+	return configured
+}
+
+// ValidateProfilePicture validates an image for use as a profile picture.
+// maxFileSize is the maximum allowed file size in bytes, resolved through MaxFileSize.
+func ValidateProfilePicture(data []byte, maxFileSize int64) ValidationResult {
+	maxFileSize = MaxFileSize(maxFileSize)
 
 	// Check file size
 	if int64(len(data)) > maxFileSize {

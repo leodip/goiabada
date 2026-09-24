@@ -23,6 +23,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/data"
 	authhandlerhelpers "github.com/leodip/goiabada/authserver/internal/handlerhelpers"
+	"github.com/leodip/goiabada/authserver/internal/imaging"
 	authserver_middleware "github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/workers"
 	"github.com/leodip/goiabada/core/errs"
@@ -362,13 +363,19 @@ func (s *Server) initMiddleware() chi.Router {
 	// Strip slashes
 	s.router.Use(middleware.StripSlashes)
 
+	// Request-body limits, one per route from bodyLimitPolicy (#426). After StripSlashes, because
+	// the lookup resolves the route by the path StripSlashes normalized; before MiddlewareSkipCsrf,
+	// because the /auth/logout exemption predicate parses the form body right there at the root,
+	// and a body read before this mount would be read without a bound.
+	s.router.Use(custom_middleware.MiddlewareBodyLimit(s.router,
+		bodyLimitPolicy(config.GetAuthServer().ProfilePictureMaxSizeBytes)))
+
 	// CSRF
-	// Note: CSRF runs before the locale middleware below, so no localizer exists yet when a
-	// request is rejected. CSRF rejection responses therefore render in English regardless of
-	// the user's preferred locale. This is acceptable for an infrequent, transient failure mode
-	// (typically a form left open across a deployment change, fixed by a page reload) and avoids
-	// the locale lookup cost on every rejected request. Localizing it would mean resolving a
-	// locale this early for the sake of a response nobody normally sees.
+	// Note: CSRF runs before the locale middleware below, so there is no localizer on the context
+	// when a request is rejected. MiddlewareCsrf resolves a tentative one of its own through
+	// i18n.ResolveRequestLocale, so the rejection is localized without moving the origin check
+	// down onto the application branch, where a route registered outside that branch would
+	// escape it.
 	//
 	// MiddlewareSkipCsrf marks the endpoints that are cross-origin by protocol, and MiddlewareCsrf
 	// refuses every other state-changing cross-origin request outright, trusting no origin but this
@@ -471,6 +478,62 @@ func csrfPolicy() custom_middleware.CsrfPolicy {
 			// middleware.LogoutIdTokenHintPresent for why presence is the test and why it is read
 			// through the same function the logout handler classifies the parameter with (#109).
 			"/auth/logout": authserver_middleware.LogoutIdTokenHintPresent,
+		},
+	}
+}
+
+const (
+	// defaultBodyLimit bounds every request body the table below does not name: every browser
+	// form, every /auth endpoint, /connect/register, /userinfo and anything no route matches, all
+	// reachable by anyone. The largest of those a legitimate caller sends is a registration
+	// request, whose metadata RFC 7591 section 2 says to ignore rather than refuse when this
+	// server does not understand it, so it is 64 KiB rather than a form's few hundred bytes: room
+	// for an inline jwks or a software_statement this server never reads (#426).
+	defaultBodyLimit = 64 << 10
+
+	// apiBodyLimit bounds the admin and account APIs. The caller is signed in, but /api/v1/account
+	// is open to any user holding manage-account, so signed in is not trusted; the largest
+	// legitimate body is a permission, group or redirect-URI list of tens of KB (#426).
+	apiBodyLimit = 1 << 20
+
+	// uploadMultipartAllowance is what an upload row allows above the image itself, for the
+	// multipart boundaries and part headers around it. The upload handlers bound their own bodies
+	// at the image size plus 1 KiB and answer FILE_TOO_LARGE past it; this is wider, so the
+	// handler's bound is always the one that answers (#426).
+	uploadMultipartAllowance = 64 << 10
+)
+
+// bodyLimitPolicy is the auth server's request-body table (#426): how many bytes each route may
+// read, looked up by MiddlewareBodyLimit at the root. A route missing from it gets
+// defaultBodyLimit, the smallest limit here, so an omission is a refused request rather than an
+// unbounded read.
+//
+// Every limit is at least the bound of the handler inside it, so a handler that bounds its own
+// body keeps answering for it: the uploads, the session endpoints and the account OTP PUT.
+//
+// profilePictureMaxSizeBytes is GOIABADA_PROFILE_PICTURE_MAX_SIZE_BYTES, read once at startup, so
+// raising it raises the upload rows with it.
+func bodyLimitPolicy(profilePictureMaxSizeBytes int64) custom_middleware.BodyLimitPolicy {
+	uploadLimit := imaging.MaxFileSize(profilePictureMaxSizeBytes) + uploadMultipartAllowance
+
+	return custom_middleware.BodyLimitPolicy{
+		Default: defaultBodyLimit,
+
+		Prefixes: map[string]int64{
+			"/api/v1/admin/":   apiBodyLimit,
+			"/api/v1/account/": apiBodyLimit,
+
+			// The admin console's session transport. Its handlers bound their bodies at the
+			// store's own wire ceiling, deliberately, so a session the store accepts is a request
+			// they read; the row names the same constant, so the two cannot drift apart and the
+			// handler's bound stays the one that answers.
+			"/api/v1/sessions/": sessionstore.MaxSessionWireBytes,
+		},
+
+		Routes: map[string]int64{
+			"POST /api/v1/admin/users/{id}/profile-picture": uploadLimit,
+			"POST /api/v1/admin/clients/{id}/logo":          uploadLimit,
+			"POST /api/v1/account/profile-picture":          uploadLimit,
 		},
 	}
 }

@@ -57,10 +57,7 @@ func HandleAPIAccountProfilePicturePost(
 		}
 
 		// Get max file size from config
-		maxFileSize := config.GetAuthServer().ProfilePictureMaxSizeBytes
-		if maxFileSize <= 0 {
-			maxFileSize = imaging.DefaultMaxFileSize
-		}
+		maxFileSize := imaging.MaxFileSize(config.GetAuthServer().ProfilePictureMaxSizeBytes)
 
 		// Limit request body size
 		r.Body = http.MaxBytesReader(w, r.Body, maxFileSize+1024) // extra for multipart overhead
