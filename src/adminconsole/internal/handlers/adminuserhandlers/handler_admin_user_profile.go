@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
@@ -236,7 +235,6 @@ func HandleAdminUserProfilePost(
 		}
 
 		// Redirect to the profile page
-		http.Redirect(w, r, fmt.Sprintf("%v/admin/users/%v/profile?page=%v&query=%v", config.GetAdminConsole().BaseURL, user.Id,
-			r.URL.Query().Get("page"), r.URL.Query().Get("query")), http.StatusFound)
+		http.Redirect(w, r, withListPosition(fmt.Sprintf("/admin/users/%v/profile", user.Id), r), http.StatusFound)
 	}
 }

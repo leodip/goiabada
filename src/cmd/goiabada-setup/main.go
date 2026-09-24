@@ -675,59 +675,44 @@ func main() {
 	}
 	fmt.Println("----------------------------------")
 
+	filename, content := generatedConfiguration(deploymentType, config)
+	if flags.Output != "" && !isDirectory(flags.Output) {
+		filename = filepath.Base(flags.Output)
+	}
+	outputPath := filepath.Join(outputDir, filename)
+	if err := writePrivateFile(outputPath, content); err != nil {
+		printError("Error writing %s: %v", filename, err)
+		os.Exit(1)
+	}
+	printSuccess("Created: %s", outputPath)
+
+	printCompletionMessage(config, outputPath)
+}
+
+// generatedConfiguration returns the file a deployment type is configured by, under its default
+// name: Kubernetes manifests for type 3, an environment file for native binaries (type 4), and a
+// docker-compose file for the two Docker types.
+func generatedConfiguration(deploymentType string, config *Config) (filename, content string) {
 	switch deploymentType {
 	case "3":
-		// Generate Kubernetes manifests
-		k8sManifest := generateKubernetesManifests(config)
-		filename := "goiabada-k8s.yaml"
-		if flags.Output != "" && !isDirectory(flags.Output) {
-			filename = filepath.Base(flags.Output)
-		}
-		k8sPath := filepath.Join(outputDir, filename)
-		err := os.WriteFile(k8sPath, []byte(k8sManifest), 0644)
-		if err != nil {
-			printError("Error writing %s: %v", filename, err)
-			os.Exit(1)
-		}
-		printSuccess("Created: %s", k8sPath)
-
-		// Done message for Kubernetes
-		printCompletionMessage(config, k8sPath)
+		return "goiabada-k8s.yaml", generateKubernetesManifests(config)
 	case "4":
-		// Generate environment file for native binaries
-		envFile := generateEnvFile(config)
-		filename := "goiabada.env"
-		if flags.Output != "" && !isDirectory(flags.Output) {
-			filename = filepath.Base(flags.Output)
-		}
-		envPath := filepath.Join(outputDir, filename)
-		err := os.WriteFile(envPath, []byte(envFile), 0644)
-		if err != nil {
-			printError("Error writing %s: %v", filename, err)
-			os.Exit(1)
-		}
-		printSuccess("Created: %s", envPath)
-
-		// Done message for native binaries
-		printCompletionMessage(config, envPath)
+		return "goiabada.env", generateEnvFile(config)
 	default:
-		// Generate docker-compose.yml
-		dockerCompose := generateDockerCompose(config)
-		filename := "docker-compose.yml"
-		if flags.Output != "" && !isDirectory(flags.Output) {
-			filename = filepath.Base(flags.Output)
-		}
-		dockerComposePath := filepath.Join(outputDir, filename)
-		err := os.WriteFile(dockerComposePath, []byte(dockerCompose), 0644)
-		if err != nil {
-			printError("Error writing %s: %v", filename, err)
-			os.Exit(1)
-		}
-		printSuccess("Created: %s", dockerComposePath)
-
-		// Done message for Docker
-		printCompletionMessage(config, dockerComposePath)
+		return "docker-compose.yml", generateDockerCompose(config)
 	}
+}
+
+// writePrivateFile writes a generated file readable by its owner alone. Every file this wizard
+// generates carries the admin password, the session keys and the AES key, and each was written
+// 0644, readable by every account on the host (#426). The explicit chmod is what makes a re-run
+// safe: os.WriteFile applies its mode only when it creates the file, so overwriting one an earlier
+// run left 0644 would keep it world-readable.
+func writePrivateFile(path, content string) error {
+	if err := os.WriteFile(path, []byte(content), 0600); err != nil {
+		return err
+	}
+	return os.Chmod(path, 0600)
 }
 
 // Config holds all configuration values

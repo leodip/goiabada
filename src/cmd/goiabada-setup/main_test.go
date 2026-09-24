@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -135,6 +136,87 @@ func TestCommittedOutputsOmitTheRemovedAdminConsoleVars(t *testing.T) {
 			if !strings.Contains(string(contents), testCase.stillPresent) {
 				t.Errorf("%s does not contain %q, so the absence checks above proved nothing",
 					testCase.name, testCase.stillPresent)
+			}
+		})
+	}
+}
+
+// Every file the wizard writes carries the admin password, the session keys and the AES key, and
+// each was written 0644 (#426). The existing-file case is the one os.WriteFile alone gets wrong: it
+// applies its mode only when it creates the file, so a re-run over an earlier 0644 output would
+// leave the new secrets world-readable.
+func TestWritePrivateFile_LeavesTheFileReadableByItsOwnerAlone(t *testing.T) {
+	testCases := []struct {
+		name         string
+		existingMode os.FileMode
+	}{
+		{name: "a new file"},
+		{name: "an existing 0644 file", existingMode: 0644},
+		{name: "an existing 0666 file", existingMode: 0666},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "goiabada.env")
+			if testCase.existingMode != 0 {
+				if err := os.WriteFile(path, []byte("yesterday's secrets, and more of them"), 0600); err != nil {
+					t.Fatal(err)
+				}
+				// Set apart from the write, so the umask cannot narrow the mode being overwritten.
+				if err := os.Chmod(path, testCase.existingMode); err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			if err := writePrivateFile(path, "today's secrets"); err != nil {
+				t.Fatalf("writePrivateFile: %v", err)
+			}
+
+			info, err := os.Stat(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := info.Mode().Perm(); got != 0600 {
+				t.Errorf("mode is %v, want -rw-------", got)
+			}
+			contents, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if string(contents) != "today's secrets" {
+				t.Errorf("contents are %q, want the new content alone", contents)
+			}
+		})
+	}
+}
+
+// main has one write, of whatever this returns, so each deployment type reaching writePrivateFile
+// comes down to each type's file coming from here.
+func TestGeneratedConfiguration_NamesEachDeploymentTypesFile(t *testing.T) {
+	config := testConfig()
+
+	testCases := []struct {
+		deploymentType string
+		wantFilename   string
+		wantContent    string
+	}{
+		{deploymentType: "1", wantFilename: "docker-compose.yml", wantContent: generateDockerCompose(config)},
+		{deploymentType: "2", wantFilename: "docker-compose.yml", wantContent: generateDockerCompose(config)},
+		{deploymentType: "3", wantFilename: "goiabada-k8s.yaml", wantContent: generateKubernetesManifests(config)},
+		{deploymentType: "4", wantFilename: "goiabada.env", wantContent: generateEnvFile(config)},
+	}
+
+	for _, testCase := range testCases {
+		t.Run("type "+testCase.deploymentType, func(t *testing.T) {
+			filename, content := generatedConfiguration(testCase.deploymentType, config)
+			if filename != testCase.wantFilename {
+				t.Errorf("file name is %q, want %q", filename, testCase.wantFilename)
+			}
+			if content != testCase.wantContent {
+				t.Errorf("content is not %s's generator output", testCase.wantFilename)
+			}
+			if !strings.Contains(content, "admin-password") {
+				t.Errorf("content carries no admin password, so it is not the file whose mode matters")
 			}
 		})
 	}

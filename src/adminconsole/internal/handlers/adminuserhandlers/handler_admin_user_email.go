@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
@@ -174,7 +173,6 @@ func HandleAdminUserEmailPost(
 			return
 		}
 
-		http.Redirect(w, r, fmt.Sprintf("%v/admin/users/%v/email?page=%v&query=%v", config.GetAdminConsole().BaseURL, updatedUser.Id,
-			r.URL.Query().Get("page"), r.URL.Query().Get("query")), http.StatusFound)
+		http.Redirect(w, r, withListPosition(fmt.Sprintf("/admin/users/%v/email", updatedUser.Id), r), http.StatusFound)
 	}
 }

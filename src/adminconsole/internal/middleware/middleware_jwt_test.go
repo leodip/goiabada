@@ -664,6 +664,44 @@ func TestRequiresScope_RedirectError(t *testing.T) {
 	mockAuthHelper.AssertExpectations(t)
 }
 
+// Where the console returns after sign-in is its own base URL and the request's path and query.
+// It was the base URL and the request line as sent, and an absolute-form request line put a whole
+// second URL after the base (#426).
+func TestRequiresScope_ReturnsToTheBaseURLPlusPathAndQuery(t *testing.T) {
+	testCases := []struct {
+		name        string
+		requestLine string
+	}{
+		{name: "origin form", requestLine: "/admin/users?page=2&query=a%26b"},
+		{name: "absolute form naming another host", requestLine: "http://elsewhere.example/admin/users?page=2&query=a%26b"},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			mockAuthHelper := new(mock_middleware.AuthHelper)
+			middleware := NewMiddlewareJwt(new(mock_sessionstore.Store), "test-session", new(mock_middleware.TokenParser),
+				stubIssuerReader{issuer: "https://example.com"}, mockAuthHelper, stubErrorRenderer{}, nil,
+				"http://localhost:9090", "http://localhost:9091", coreconstants.AdminConsoleClientIdentifier, "")
+
+			req := httptest.NewRequest("GET", testCase.requestLine, nil)
+			require.Equal(t, testCase.requestLine, req.RequestURI, "the request line did not reach the request as sent")
+
+			mockAuthHelper.On("IsAuthorizedToAccessResource", oauthclient.JwtInfo{}, []string{"required:scope"}).Return(false)
+			mockAuthHelper.On("IsAuthenticated", oauthclient.JwtInfo{}).Return(false)
+			mockAuthHelper.On("RedirToAuthorize", mock.Anything, mock.Anything, coreconstants.AdminConsoleClientIdentifier,
+				mock.AnythingOfType("string"), "http://localhost:9091/admin/users?page=2&query=a%26b").Return(nil)
+
+			next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				t.Error("Next handler should not have been called")
+			})
+
+			middleware.RequiresScope([]string{"required:scope"})(next).ServeHTTP(httptest.NewRecorder(), req)
+
+			mockAuthHelper.AssertExpectations(t)
+		})
+	}
+}
+
 func TestBuildScopeString(t *testing.T) {
 	middleware := &MiddlewareJwt{}
 
