@@ -2,12 +2,10 @@ package adminuserhandlers
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/handlers"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
@@ -115,7 +113,6 @@ func HandleAdminUserDeletePost(
 			return
 		}
 
-		http.Redirect(w, r, fmt.Sprintf("%v/admin/users/?page=%v&query=%v", config.GetAdminConsole().BaseURL,
-			r.URL.Query().Get("page"), r.URL.Query().Get("query")), http.StatusFound)
+		http.Redirect(w, r, withListPosition("/admin/users/", r), http.StatusFound)
 	}
 }

@@ -322,9 +322,14 @@ func (m *MiddlewareJwt) RequiresScope(
 					// module's identity. initRoutes passes the constant the admin
 					// console is seeded as, so a default here could only ever hide a
 					// caller that forgot (#285).
+					//
+					// The return URL is the path and query alone. r.RequestURI is the
+					// request line as sent, and an absolute-form line
+					// (GET http://elsewhere/x HTTP/1.1) put a whole second URL after the
+					// base URL (#426).
 					err := m.authHelper.RedirToAuthorize(w, r, m.clientID,
 						m.buildScopeString(scopesAnyOf),
-						m.baseURL+r.RequestURI)
+						m.baseURL+r.URL.RequestURI())
 					if err != nil {
 						m.errorRenderer.InternalServerError(w, r,
 							errs.Wrap(err, "unable to redirect to authorize in RequiresScope middleware"))
