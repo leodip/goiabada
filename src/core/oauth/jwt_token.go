@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/leodip/goiabada/core/hashutil"
 )
 
 type JwtToken struct {
@@ -19,25 +18,6 @@ type JwtToken struct {
 // 2^53 cannot be distinguished from one that was larger. Anything above this is therefore
 // treated as malformed rather than silently accepted as a different number than was sent.
 const maxSafeFloat64Int = float64(1<<53 - 1)
-
-func (jwt JwtToken) GetAudience() []string {
-	if jwt.Claims["aud"] != nil {
-		audArr, ok := jwt.Claims["aud"].([]interface{})
-		if ok {
-			result := make([]string, len(audArr))
-			for i, v := range audArr {
-				result[i] = v.(string)
-			}
-			return result
-		}
-
-		aud, ok := jwt.Claims["aud"].(string)
-		if ok {
-			return []string{aud}
-		}
-	}
-	return []string{}
-}
 
 func (jwt JwtToken) GetStringClaim(claimName string) string {
 	if jwt.Claims[claimName] != nil {
@@ -132,17 +112,4 @@ func (jwt JwtToken) HasScope(scope string) bool {
 		}
 	}
 	return false
-}
-
-func (jwt JwtToken) IsNonceValid(nonce string) bool {
-	nonceHashFromToken := jwt.GetStringClaim("nonce")
-	if len(nonce) > 0 {
-		return hashutil.VerifyStringHash(nonceHashFromToken, nonce)
-	}
-	return false
-}
-
-func (jwt JwtToken) IsIssuerValid(issuer string) bool {
-	iss := jwt.GetStringClaim("iss")
-	return iss == issuer
 }
