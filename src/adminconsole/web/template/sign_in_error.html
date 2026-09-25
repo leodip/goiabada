@@ -1,0 +1,32 @@
+{{define "title"}}{{ .appName }} - {{ T $.ctx "adminconsole.sign_in_error.page_title" }}{{end}}
+{{define "head"}}{{end}}
+
+{{define "body"}}
+<main>
+
+<div class="flex items-center justify-center h-screen p-8">
+    <div class="hero h-4/5">
+        <div class="text-center hero-content">
+            <div class="max-w-md">
+
+                <h1 class="mt-5 text-[36px] font-bold lg:text-[50px]">{{ T $.ctx .titleKey }}</h1>
+
+                <p class="mt-4 text-xl">{{ T $.ctx .messageKey "description" .description "code" .code }}</p>
+
+                {{if .serverFault}}
+                <p class="mt-4 text-lg">{{ T $.ctx "adminconsole.sign_in_error.log_line" }}</p>
+                <pre>{{.requestId}}</pre>
+                {{else}}
+                <div class="justify-center mt-4 card-actions">
+                    <a href="/" class="btn btn-primary">{{ T $.ctx "adminconsole.sign_in_error.start_again" }}</a>
+                </div>
+                {{end}}
+
+            </div>
+        </div>
+    </div>
+</div>
+
+</main>
+
+{{end}}

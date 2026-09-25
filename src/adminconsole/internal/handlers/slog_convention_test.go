@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"context"
-	"crypto/rsa"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -18,6 +17,7 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	mocks_handlerhelpers "github.com/leodip/goiabada/adminconsole/internal/handlerhelpers/mocks"
+	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/errs"
@@ -38,18 +38,27 @@ func (failingExchanger) ExchangeCodeForTokens(_ context.Context, code, redirectU
 }
 
 // unusedTokenParser satisfies the handler's dependency. The exchange fails above it, so a call to
-// either method is a test that stopped measuring what it says it measures.
+// it is a test that stopped measuring what it says it measures.
 type unusedTokenParser struct{ t *testing.T }
 
-func (p unusedTokenParser) DecodeAndValidateTokenString(_ context.Context, token string, pubKey *rsa.PublicKey,
-	withExpirationCheck bool) (*oauth.JwtToken, error) {
+func (p unusedTokenParser) DecodeAndValidateSignInResponse(_ context.Context, _ *oauth.TokenResponse,
+	_ string) (*oauthclient.JwtInfo, error) {
 	p.t.Fatal("the token parser must not be reached: the exchange fails before it")
 	return nil, nil
 }
 
-func (p unusedTokenParser) DecodeAndValidateTokenResponse(_ context.Context, tokenResponse *oauth.TokenResponse) (*oauthclient.JwtInfo, error) {
-	p.t.Fatal("the token parser must not be reached: the exchange fails before it")
-	return nil, nil
+// handshakeSession is a session holding all six values RedirToAuthorize parks, with the state
+// "the-state", so a callback posting that state reaches the exchange. The handler reads all six
+// before it exchanges, so a case missing one stops short of what it is about.
+func handshakeSession() *sessionstore.Session {
+	return &sessionstore.Session{Values: map[string]any{
+		constants.SessionKeyState:          "the-state",
+		constants.SessionKeyCodeVerifier:   "the-code-verifier",
+		constants.SessionKeyRedirectURI:    "https://adminconsole.example/auth/callback",
+		constants.SessionKeyNonce:          "the-nonce",
+		constants.SessionKeyRedirectBack:   "https://adminconsole.example/admin/clients",
+		constants.SessionKeyRequestedScope: "openid authserver:manage",
+	}}
 }
 
 // The code exchange record, moved from Info to Debug and from a concatenated message to an
@@ -76,15 +85,11 @@ func TestSlogConvention_TheCodeExchangeIsDebugAndCarriesTheBaseUrlAndTheRequestI
 	logs := testutil.CaptureSlog(t)
 
 	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-	httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).Return()
+	handlertest.RefuseInternalServerError(t, httpHelper)
+	handlertest.ExpectRender(httpHelper, "/layouts/no_menu_layout.html", "/sign_in_error.html").Once()
 
-	session := &sessionstore.Session{Values: map[string]any{
-		constants.SessionKeyState:        "the-state",
-		constants.SessionKeyCodeVerifier: "the-code-verifier",
-		constants.SessionKeyRedirectURI:  "https://adminconsole.example/auth/callback",
-	}}
 	httpSession := mocks_sessionstore.NewStore(t)
-	httpSession.On("Get", mock.Anything, coreconstants.AdminConsoleSessionName).Return(session, nil)
+	httpSession.On("Get", mock.Anything, coreconstants.AdminConsoleSessionName).Return(handshakeSession(), nil)
 
 	form := url.Values{"state": {"the-state"}, "code": {"the-code"}}
 	req := httptest.NewRequest(http.MethodPost, "/auth/callback", strings.NewReader(form.Encode()))
@@ -97,7 +102,9 @@ func TestSlogConvention_TheCodeExchangeIsDebugAndCarriesTheBaseUrlAndTheRequestI
 	chimiddleware.RequestID(handler).ServeHTTP(httptest.NewRecorder(), req)
 
 	records := logs.Records()
-	require.Len(t, records, 1, "one record, which is the one under test")
+	// The second is the failed exchange's own refusal, at Error; the first is the one under test.
+	require.Len(t, records, 2, "the exchange record, then the refusal of the exchange that failed")
+	assert.Equal(t, slog.LevelError, records[1].Level)
 	assert.Equal(t, slog.LevelDebug, records[0].Level,
 		"per-request tracing is Debug: an operator reading the log does not need a line per sign-in")
 	assert.Equal(t, "exchanging the code for tokens", records[0].Message,
