@@ -448,3 +448,28 @@ func TestHandleAPIErrorJson_NoOtherStatusCarriesTheSessionEndedCode(t *testing.T
 		})
 	}
 }
+
+// IsSessionEnded is what the pages reading something optional ask before carrying on without it,
+// so it is held on its own as well as through the three helpers: the admin API's 401, found
+// through any wrapping, and nothing else (#427 decision 17, final review round 2).
+func TestIsSessionEnded(t *testing.T) {
+	testCases := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{"the admin API's 401", &apiclient.APIError{Code: "invalid_token", StatusCode: http.StatusUnauthorized}, true},
+		{"the same 401 wrapped", errs.Wrap(&apiclient.APIError{Code: "invalid_token", StatusCode: http.StatusUnauthorized}, "unable to read the logo"), true},
+		{"a 403", &apiclient.APIError{Code: "FORBIDDEN", StatusCode: http.StatusForbidden}, false},
+		{"a 400", &apiclient.APIError{Code: "VALIDATION_ERROR", StatusCode: http.StatusBadRequest}, false},
+		{"a 500", &apiclient.APIError{Code: "INTERNAL_ERROR", StatusCode: http.StatusInternalServerError}, false},
+		{"an error that is not the API's", errs.New("the auth server is unreachable"), false},
+		{"no error", nil, false},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, IsSessionEnded(tc.err))
+		})
+	}
+}

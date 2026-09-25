@@ -72,6 +72,12 @@ func HandleAdminClientLogoGet(
 		var logoUrl string
 		logoInfo, err := apiClient.GetClientLogo(r.Context(), jwtInfo.TokenResponse.AccessToken, id)
 		if err != nil {
+			// The page renders without the logo, but not past a 401: the administrator's session
+			// has ended, and nothing on the page would work (#427 decision 17).
+			if handlers.IsSessionEnded(err) {
+				handlers.HandleAPIError(httpHelper, w, r, err)
+				return
+			}
 			slog.WarnContext(r.Context(), "unable to fetch the client logo info", "error", err, "client_id", id)
 		} else if logoInfo != nil && logoInfo.HasLogo {
 			logoUrl = fmt.Sprintf("%s?t=%d", logoInfo.LogoUrl, time.Now().UnixNano())

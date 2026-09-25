@@ -44,6 +44,11 @@ import (
 // is what lets the rule be decided from syntax alone; an error stored, passed to another function
 // and guarded there would not be seen. And the receiver is matched by the name apiClient, which is
 // what every call site spells and what the handler signature binds.
+//
+// The first boundary is enforced rather than assumed: an apiClient call no guard of that shape
+// follows is itself a problem, because it is a call whose error this rule cannot see go anywhere.
+// The theme list redrawn beside a refused UI theme form was one, written as `if ...; err == nil`,
+// and it dropped the admin API's 401 with every other failure (#427, final review round 2).
 func TestHandlers_ApiClientErrorsReachTheClassifier(t *testing.T) {
 	// go test runs with the package directory as the working directory, so ".." is
 	// src/adminconsole/internal.
@@ -64,38 +69,9 @@ func TestHandlers_ApiClientErrorsReachTheClassifier(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		rel := filepath.ToSlash(path)
-		ast.Inspect(file, func(n ast.Node) bool {
-			block, ok := n.(*ast.BlockStmt)
-			if !ok {
-				return true
-			}
-			for i := range block.List {
-				guard, name := apiClientErrorGuard(block.List, i)
-				if guard == nil {
-					continue
-				}
-				if !guardAnswersTheRequest(guard.Body) {
-					continue
-				}
-				guards++
-				if blind := blindAPIErrorCatch(guard.Body); blind != nil {
-					problems = append(problems, rel+":"+
-						strconv.Itoa(fset.Position(blind.Pos()).Line)+": the error from "+name+
-						" is caught here for every status, so 404 and 500 are answered as a "+
-						"rejected value")
-					continue
-				}
-				if guardReachesClassifier(guard.Body) {
-					continue
-				}
-				problems = append(problems, rel+":"+
-					strconv.Itoa(fset.Position(guard.Pos()).Line)+": the error from "+name+
-					" is answered here without reaching HandleAPIError, "+
-					"HandleAPIErrorWithCallback or HandleAPIErrorJson")
-			}
-			return true
-		})
+		fileProblems, fileGuards := apiClientGuardProblems(fset, file, filepath.ToSlash(path))
+		problems = append(problems, fileProblems...)
+		guards += fileGuards
 		return nil
 	})
 	if err != nil {
@@ -110,61 +86,155 @@ func TestHandlers_ApiClientErrorsReachTheClassifier(t *testing.T) {
 
 	sort.Strings(problems)
 	if len(problems) > 0 {
-		t.Errorf("%d apiClient error guard(s) of %d answer the failure themselves:\n\t%s\n\n"+
+		t.Errorf("%d problem(s) across %d apiClient error guard(s):\n\t%s\n\n"+
 			"Call handlers.HandleAPIError for a page, HandleAPIErrorWithCallback for a page with a "+
-			"form to redraw, or HandleAPIErrorJson for JSON. Each routes 404 to the console's own "+
-			"not-found answer, 400 (and 409, on the JSON one) to the caller, and everything else to "+
-			"the 500 writer, which is where the stack and the request id belong (#279).",
+			"form to redraw, or HandleAPIErrorJson for JSON. Each routes 401 to the session-ended "+
+			"route, 404 to the console's own not-found answer, 400 (and 409) to the caller, and "+
+			"everything else to the 500 writer, which is where the stack and the request id belong "+
+			"(#279, #427). A read the page can do without keeps its fallback for everything but "+
+			"handlers.IsSessionEnded.",
 			len(problems), guards, strings.Join(problems, "\n\t"))
 	}
 }
 
-// apiClientErrorGuard reports the if statement guarding the error of an apiClient call at
-// list[i], and the method it called. Two shapes carry every call site in this tree: the call in an
-// assignment with the guard as the next statement, and the call in the guard's own init.
-func apiClientErrorGuard(list []ast.Stmt, i int) (*ast.IfStmt, string) {
-	switch stmt := list[i].(type) {
-	case *ast.IfStmt:
-		if stmt.Init == nil {
-			return nil, ""
-		}
-		assign, ok := stmt.Init.(*ast.AssignStmt)
-		if !ok {
-			return nil, ""
-		}
-		name, ok := apiClientCallName(assign)
-		if !ok || !condIsErrNotNil(stmt.Cond, errVarOf(assign)) {
-			return nil, ""
-		}
-		return stmt, name
-	case *ast.AssignStmt:
-		name, ok := apiClientCallName(stmt)
-		if !ok || i+1 >= len(list) {
-			return nil, ""
-		}
-		next, ok := list[i+1].(*ast.IfStmt)
-		if !ok || next.Init != nil || !condIsErrNotNil(next.Cond, errVarOf(stmt)) {
-			return nil, ""
-		}
-		return next, name
+// apiClientGuardProblems is the rule over one file: every apiClient call guarded in a shape this
+// rule reads, every guard that answers the request reaching a classifier without a blind catch in
+// front of it, and every guard that does not answer handing the error back to its caller. It
+// reports the problems and how many guards it matched, so the walk can refuse matching none.
+func apiClientGuardProblems(fset *token.FileSet, file *ast.File, rel string) ([]string, int) {
+	var problems []string
+	guards := 0
+	at := func(n ast.Node) string {
+		return rel + ":" + strconv.Itoa(fset.Position(n.Pos()).Line) + ": "
 	}
-	return nil, ""
+
+	guarded := map[*ast.CallExpr]bool{}
+	ast.Inspect(file, func(n ast.Node) bool {
+		// Statement lists are where a call and its guard sit side by side: a block, and the body
+		// of a switch or select case, which is a list of its own rather than a block.
+		var list []ast.Stmt
+		switch stmts := n.(type) {
+		case *ast.BlockStmt:
+			list = stmts.List
+		case *ast.CaseClause:
+			list = stmts.Body
+		case *ast.CommClause:
+			list = stmts.Body
+		default:
+			return true
+		}
+		for i := range list {
+			guard, ok := apiClientErrorGuard(list, i)
+			if !ok {
+				continue
+			}
+			guarded[guard.call] = true
+			guards++
+			body := guard.stmt.Body
+			if !guardAnswersTheRequest(body) {
+				if !guardReturnsTheError(body, guard.errVar) {
+					problems = append(problems, at(guard.stmt)+"the error from "+guard.method+
+						" is dropped here: a guard that writes no response hands the error back "+
+						"to its caller, or an admin API 401 never signs the administrator out")
+				}
+				continue
+			}
+			if blind := blindAPIErrorCatch(body); blind != nil {
+				problems = append(problems, at(blind)+"the error from "+guard.method+
+					" is caught here for every status, so 404 and 500 are answered as a "+
+					"rejected value")
+				continue
+			}
+			if guardReachesClassifier(body) {
+				continue
+			}
+			problems = append(problems, at(guard.stmt)+"the error from "+guard.method+
+				" is answered here without reaching HandleAPIError, "+
+				"HandleAPIErrorWithCallback or HandleAPIErrorJson")
+		}
+		return true
+	})
+
+	ast.Inspect(file, func(n ast.Node) bool {
+		call, ok := n.(*ast.CallExpr)
+		if !ok || guarded[call] {
+			return true
+		}
+		if name, ok := apiClientMethod(call); ok {
+			problems = append(problems, at(call)+"the error from "+name+
+				" is not guarded by an `if err != nil` beside the call, so this rule cannot see "+
+				"where it goes")
+		}
+		return true
+	})
+
+	return problems, guards
 }
 
-// apiClientCallName reports the apiClient method an assignment's right-hand side calls.
-func apiClientCallName(assign *ast.AssignStmt) (string, bool) {
+// apiClientGuard is an apiClient call and the if statement guarding its error.
+type apiClientGuard struct {
+	stmt   *ast.IfStmt
+	call   *ast.CallExpr
+	method string
+	errVar string
+}
+
+// apiClientErrorGuard reports the guard on the error of an apiClient call at list[i]. Two shapes
+// carry every call site in this tree: the call in an assignment with the guard as the next
+// statement, and the call in the guard's own init.
+func apiClientErrorGuard(list []ast.Stmt, i int) (apiClientGuard, bool) {
+	var assign *ast.AssignStmt
+	var stmt *ast.IfStmt
+	switch s := list[i].(type) {
+	case *ast.IfStmt:
+		init, ok := s.Init.(*ast.AssignStmt)
+		if !ok {
+			return apiClientGuard{}, false
+		}
+		assign, stmt = init, s
+	case *ast.AssignStmt:
+		if i+1 >= len(list) {
+			return apiClientGuard{}, false
+		}
+		next, ok := list[i+1].(*ast.IfStmt)
+		if !ok || next.Init != nil {
+			return apiClientGuard{}, false
+		}
+		assign, stmt = s, next
+	default:
+		return apiClientGuard{}, false
+	}
+	call, method, ok := apiClientCallName(assign)
+	errVar := errVarOf(assign)
+	if !ok || !condIsErrNotNil(stmt.Cond, errVar) {
+		return apiClientGuard{}, false
+	}
+	return apiClientGuard{stmt: stmt, call: call, method: method, errVar: errVar}, true
+}
+
+// apiClientCallName reports the apiClient call an assignment's right-hand side makes, and the
+// method it names.
+func apiClientCallName(assign *ast.AssignStmt) (*ast.CallExpr, string, bool) {
 	if len(assign.Rhs) != 1 {
-		return "", false
+		return nil, "", false
 	}
-	call, ok := assign.Rhs[0].(*ast.CallExpr)
+	call, ok := ast.Unparen(assign.Rhs[0]).(*ast.CallExpr)
+	if !ok {
+		return nil, "", false
+	}
+	name, ok := apiClientMethod(call)
+	return call, name, ok
+}
+
+// apiClientMethod reports the method a call names on apiClient. Parentheses are stripped on the
+// callee and the receiver, so a bracketed call is the call it brackets: the two passes above must
+// agree on what an apiClient call is, or a bracket would drop a call out of both at once.
+func apiClientMethod(call *ast.CallExpr) (string, bool) {
+	sel, ok := ast.Unparen(call.Fun).(*ast.SelectorExpr)
 	if !ok {
 		return "", false
 	}
-	sel, ok := call.Fun.(*ast.SelectorExpr)
-	if !ok {
-		return "", false
-	}
-	receiver, ok := sel.X.(*ast.Ident)
+	receiver, ok := ast.Unparen(sel.X).(*ast.Ident)
 	if !ok || receiver.Name != "apiClient" {
 		return "", false
 	}
@@ -255,12 +325,16 @@ func inspectsAPIErrorStatus(body *ast.BlockStmt) bool {
 	return found
 }
 
-// guardAnswersTheRequest reports whether a guard body decides what the caller sees. A guard that
-// writes no response is not choosing a meaning for the failure and is out of this rule: the phone
-// countries cache returns the error to its caller, which guards it again, and the client logo page
-// logs a warning and renders without a logo, because the logo is optional and its absence is not a
-// failure of the page. Inspecting the error's API status counts as answering even when the writing
-// happens inside a closure, which is the broad errors.As catch this rule exists to refuse.
+// guardAnswersTheRequest reports whether a guard body decides what the caller sees. Inspecting the
+// error's API status counts as answering even when the writing happens inside a closure, which is
+// the broad errors.As catch this rule exists to refuse.
+//
+// A guard that writes no response is held to guardReturnsTheError instead. It used to be out of
+// this rule altogether, on the reading that it chooses no meaning for the failure, and that stopped
+// being true with #427 decision 17: a 401 means the administrator's session has ended however
+// optional the read was. The client logo page logged it as a warning and rendered, until final
+// review round 2 of #427; it now answers a 401 through HandleAPIError and keeps its warning for
+// everything else, which makes it a guard that answers.
 func guardAnswersTheRequest(body *ast.BlockStmt) bool {
 	answers := false
 	ast.Inspect(body, func(n ast.Node) bool {
@@ -284,6 +358,34 @@ func guardAnswersTheRequest(body *ast.BlockStmt) bool {
 		return !answers
 	})
 	return answers
+}
+
+// guardReturnsTheError reports whether a guard that writes no response hands the error it caught
+// back to its caller, wrapped or not, which is what the phone countries cache does: its two
+// callers guard the error again and answer it through HandleAPIError. A return inside a closure
+// in the guard is the closure's, not the guard's, and does not count.
+func guardReturnsTheError(body *ast.BlockStmt, errVar string) bool {
+	found := false
+	ast.Inspect(body, func(n ast.Node) bool {
+		switch node := n.(type) {
+		case *ast.FuncLit:
+			return false
+		case *ast.ReturnStmt:
+			for _, result := range node.Results {
+				ast.Inspect(result, func(m ast.Node) bool {
+					switch leaf := m.(type) {
+					case *ast.FuncLit:
+						return false
+					case *ast.Ident:
+						found = found || leaf.Name == errVar
+					}
+					return !found
+				})
+			}
+		}
+		return !found
+	})
+	return found
 }
 
 // guardReachesClassifier reports whether the guard's body calls one of the three helpers anywhere
@@ -387,6 +489,176 @@ func TestHandlers_BlindCatchRuleTable(t *testing.T) {
 			blind := blindAPIErrorCatch(fn.Body) != nil
 			if blind != testCase.blind {
 				t.Errorf("blindAPIErrorCatch = %v, want %v, for:\n\t%s", blind, testCase.blind, testCase.body)
+			}
+		})
+	}
+}
+
+// TestHandlers_ApiClientGuardRuleTable holds apiClientGuardProblems to its rules over source text.
+// Its first two rows are the two shapes #427's final review round 2 found dropping the admin API's
+// 401, each as it was before the fix, and the two rows after them are the same reads as they are
+// now. The walk above cannot show either rule failing, because nothing in the tree breaks them.
+func TestHandlers_ApiClientGuardRuleTable(t *testing.T) {
+	testCases := []struct {
+		name     string
+		body     string
+		guards   int
+		problems []string // one substring per problem, in the order the finder reports them
+	}{
+		{
+			name: "an optional read that logs and carries on drops the 401 with the rest",
+			body: `logoInfo, err := apiClient.GetClientLogo(ctx, token, id)
+				if err != nil {
+					slog.WarnContext(ctx, "unable to fetch the client logo info", "error", err)
+				}`,
+			guards:   1,
+			problems: []string{"GetClientLogo is dropped here"},
+		},
+		{
+			name: "a read guarded on err == nil is a call this rule cannot see the error of",
+			body: `if apiResp, err := apiClient.GetSettingsUITheme(ctx, token); err == nil {
+					uiThemes = apiResp.AvailableThemes
+				}`,
+			problems: []string{"GetSettingsUITheme is not guarded"},
+		},
+		{
+			name: "the optional read that answers a 401 and warns on the rest",
+			body: `logoInfo, err := apiClient.GetClientLogo(ctx, token, id)
+				if err != nil {
+					if handlers.IsSessionEnded(err) {
+						handlers.HandleAPIError(httpHelper, w, r, err)
+						return
+					}
+					slog.WarnContext(ctx, "unable to fetch the client logo info", "error", err)
+				}`,
+			guards: 1,
+		},
+		{
+			name: "the redraw that answers a 401 and carries on without the list otherwise",
+			body: `apiResp, err := apiClient.GetSettingsUITheme(ctx, token)
+				if err != nil {
+					if handlers.IsSessionEnded(err) {
+						handlers.HandleAPIError(httpHelper, w, r, err)
+						return
+					}
+				} else {
+					uiThemes = apiResp.AvailableThemes
+				}`,
+			guards: 1,
+		},
+		{
+			name: "a guard that hands the error back is its caller's to answer",
+			body: `data, err := apiClient.GetPhoneCountries(ctx, token)
+				if err != nil {
+					return nil, err
+				}`,
+			guards: 1,
+		},
+		{
+			name: "wrapped on the way back is still handed back",
+			body: `data, err := apiClient.GetPhoneCountries(ctx, token)
+				if err != nil {
+					return nil, errs.Wrap(err, "reading the phone countries")
+				}`,
+			guards: 1,
+		},
+		{
+			name: "a return of something else is not the error handed back",
+			body: `data, err := apiClient.GetPhoneCountries(ctx, token)
+				if err != nil {
+					return nil, nil
+				}`,
+			guards:   1,
+			problems: []string{"GetPhoneCountries is dropped here"},
+		},
+		{
+			name: "a closure returning the error is the closure's return, not the guard's",
+			body: `data, err := apiClient.GetPhoneCountries(ctx, token)
+				if err != nil {
+					later = func() error { return err }
+				}`,
+			guards:   1,
+			problems: []string{"GetPhoneCountries is dropped here"},
+		},
+		{
+			name:     "a call whose error is discarded outright",
+			body:     `_, _ = apiClient.GetPhoneCountries(ctx, token)`,
+			problems: []string{"GetPhoneCountries is not guarded"},
+		},
+		{
+			name:     "a call inside another expression",
+			body:     `use(apiClient.GetPhoneCountries(ctx, token))`,
+			problems: []string{"GetPhoneCountries is not guarded"},
+		},
+		{
+			name: "brackets around the receiver and the callee hide neither the call nor the drop",
+			body: `logoInfo, err := ((apiClient).GetClientLogo)(ctx, token, id)
+				if err != nil {
+					slog.WarnContext(ctx, "unable to fetch the client logo info", "error", err)
+				}`,
+			guards:   1,
+			problems: []string{"GetClientLogo is dropped here"},
+		},
+		{
+			name: "a guard in a switch case is read like one in a block",
+			body: `switch mode {
+				case "logo":
+					logoInfo, err := apiClient.GetClientLogo(ctx, token, id)
+					if err != nil {
+						httpHelper.InternalServerError(w, r, err)
+						return
+					}
+				}`,
+			guards:   1,
+			problems: []string{"GetClientLogo is answered here without reaching"},
+		},
+		{
+			name: "a guard that answers without a classifier is still refused",
+			body: `client, err := apiClient.GetClientById(ctx, token, id)
+				if err != nil {
+					httpHelper.InternalServerError(w, r, err)
+					return
+				}`,
+			guards:   1,
+			problems: []string{"GetClientById is answered here without reaching"},
+		},
+		{
+			name: "a blind catch in front of the classifier is still refused",
+			body: `client, err := apiClient.GetClientById(ctx, token, id)
+				if err != nil {
+					if errors.As(err, &apiErr) {
+						renderError(apiErr.Message)
+						return
+					}
+					handlers.HandleAPIError(httpHelper, w, r, err)
+					return
+				}`,
+			guards:   1,
+			problems: []string{"GetClientById is caught here for every status"},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			src := "package p\nfunc f() {\n" + testCase.body + "\n}\n"
+			fset := token.NewFileSet()
+			file, err := parser.ParseFile(fset, "fixture.go", src, 0)
+			if err != nil {
+				t.Fatalf("parsing the fixture: %v", err)
+			}
+
+			problems, guards := apiClientGuardProblems(fset, file, "fixture.go")
+
+			if guards != testCase.guards {
+				t.Errorf("guards = %d, want %d", guards, testCase.guards)
+			}
+			if len(problems) != len(testCase.problems) {
+				t.Fatalf("problems = %q, want %d of them, matching %q", problems, len(testCase.problems), testCase.problems)
+			}
+			for i, want := range testCase.problems {
+				if !strings.Contains(problems[i], want) {
+					t.Errorf("problem %d = %q, want it to say %q", i, problems[i], want)
+				}
 			}
 		})
 	}
