@@ -274,14 +274,17 @@ func TestRenderTemplateToBuffer(t *testing.T) {
 	})
 
 	// The isAdmin bind is the other half of the enrichment #385 moved here out of core, and
-	// the console's layouts gate the admin menu on it. It is true only for a token carrying the
+	// the console's layouts gate the admin menu on it. It is true only for a grant carrying the
 	// auth server's manage scope, which is why both arms are here: the scope string is assembled
-	// from two core constants and a token holding a different scope must not light the menu.
-	t.Run("isAdmin follows the access token's scope", func(t *testing.T) {
+	// from two core constants and a grant holding a different scope must not light the menu. The
+	// grant is the token response's scope, not anything inside the access token, which the console
+	// carries without decoding (#427).
+	t.Run("isAdmin follows the granted scope", func(t *testing.T) {
 		withAccessToken := func(scope string) *http.Request {
 			req := httptest.NewRequest("GET", "/", nil)
 			jwtInfo := oauthclient.JwtInfo{
-				AccessToken: &oauth.JwtToken{Claims: map[string]interface{}{"scope": scope}},
+				TokenResponse: oauth.TokenResponse{AccessToken: "opaque", Scope: "openid " + scope},
+				IdToken:       &oauth.JwtToken{TokenBase64: "i"},
 			}
 			return req.WithContext(context.WithValue(req.Context(), constants.ContextKeyJwtInfo, jwtInfo))
 		}

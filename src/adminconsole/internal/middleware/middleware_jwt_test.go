@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"sort"
@@ -21,7 +20,6 @@ import (
 	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
-	"github.com/leodip/goiabada/core/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -40,70 +38,13 @@ func (m *mockHTTPClient) Do(req *http.Request) (*http.Response, error) {
 	return args.Get(0).(*http.Response), args.Error(1)
 }
 
-func TestJwtSessionHandler_ValidSession(t *testing.T) {
-	const testSessionName = "test-session"
-	mockTokenParser := new(mock_middleware.TokenParser)
-	mockAuthHelper := new(mock_middleware.AuthHelper)
-	mockSessionStore := new(mock_sessionstore.Store)
-
-	middleware := NewMiddlewareJwt(mockSessionStore, testSessionName, mockTokenParser, stubIssuerReader{issuer: "https://example.com"}, mockAuthHelper, stubErrorRenderer{}, nil, "http://localhost:9090", "http://localhost:9091", "", "")
-
-	req := httptest.NewRequest("GET", "/", nil)
-	rr := httptest.NewRecorder()
-
-	session := &sessionstore.Session{
-		Values: map[string]any{
-			constants.SessionKeyJwt: oauth.TokenResponse{
-				AccessToken: "validtoken",
-			},
-		},
-	}
-
-	mockSessionStore.On("Get", mock.Anything, testSessionName).Return(session, nil)
-
-	expectedToken := &oauth.JwtToken{
-		TokenBase64: "validtoken",
-		Claims: map[string]interface{}{
-			"iss": "https://example.com",
-		},
-	}
-	mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "validtoken", mock.Anything, true).Return(expectedToken, nil)
-
-	expectedJwtInfo := &oauthclient.JwtInfo{
-		TokenResponse: oauth.TokenResponse{AccessToken: "validtoken"},
-		AccessToken:   expectedToken,
-	}
-	mockTokenParser.On("DecodeAndValidateTokenResponse", mock.Anything, mock.AnythingOfType("*oauth.TokenResponse")).Return(expectedJwtInfo, nil)
-
-	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Validate that JwtInfo is set in the context
-		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauthclient.JwtInfo)
-		assert.True(t, ok, "JwtInfo should be set in the context")
-		assert.NotNil(t, jwtInfo, "JwtInfo should not be nil")
-
-		// Validate the contents of JwtInfo
-		assert.Equal(t, "validtoken", jwtInfo.TokenResponse.AccessToken)
-		assert.Equal(t, "validtoken", jwtInfo.AccessToken.TokenBase64)
-		assert.Equal(t, "https://example.com", jwtInfo.AccessToken.GetStringClaim("iss"))
-
-		// Compare the struct values, not the pointers
-		assert.Equal(t, *expectedJwtInfo, jwtInfo, "JwtInfo in context should match expected JwtInfo")
-	})
-
-	handler := middleware.JwtSessionHandler()(nextHandler)
-	handler.ServeHTTP(rr, req)
-
-	mockSessionStore.AssertExpectations(t)
-	mockTokenParser.AssertExpectations(t)
-}
-
 func TestJwtSessionHandler_InvalidSession(t *testing.T) {
 	const testSessionName = "test-session"
 	mockTokenParser := new(mock_middleware.TokenParser)
 	mockAuthHelper := new(mock_middleware.AuthHelper)
 	mockSessionStore := new(mock_sessionstore.Store)
 
-	middleware := NewMiddlewareJwt(mockSessionStore, testSessionName, mockTokenParser, stubIssuerReader{issuer: "https://example.com"}, mockAuthHelper, stubErrorRenderer{}, nil, "http://localhost:9090", "http://localhost:9091", "", "")
+	middleware := NewMiddlewareJwt(mockSessionStore, testSessionName, mockTokenParser, mockAuthHelper, stubErrorRenderer{}, nil, "http://localhost:9090", "http://localhost:9091", "", "")
 
 	req := httptest.NewRequest("GET", "/", nil)
 	rr := httptest.NewRecorder()
@@ -121,302 +62,6 @@ func TestJwtSessionHandler_InvalidSession(t *testing.T) {
 	mockSessionStore.AssertExpectations(t)
 }
 
-func TestJwtSessionHandler_NoJwtInSession(t *testing.T) {
-	const testSessionName = "test-session"
-	mockTokenParser := new(mock_middleware.TokenParser)
-	mockAuthHelper := new(mock_middleware.AuthHelper)
-	mockSessionStore := new(mock_sessionstore.Store)
-
-	middleware := NewMiddlewareJwt(mockSessionStore, testSessionName, mockTokenParser, stubIssuerReader{issuer: "https://example.com"}, mockAuthHelper, stubErrorRenderer{}, nil, "http://localhost:9090", "http://localhost:9091", "", "")
-
-	req := httptest.NewRequest("GET", "/", nil)
-	rr := httptest.NewRecorder()
-
-	session := &sessionstore.Session{
-		Values: map[string]any{},
-	}
-
-	mockSessionStore.On("Get", mock.Anything, testSessionName).Return(session, nil)
-
-	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		jwtInfo := r.Context().Value(constants.ContextKeyJwtInfo)
-		assert.Nil(t, jwtInfo, "JwtInfo should not be set in the context")
-	})
-
-	handler := middleware.JwtSessionHandler()(nextHandler)
-	handler.ServeHTTP(rr, req)
-
-	mockSessionStore.AssertExpectations(t)
-}
-
-func TestJwtSessionHandler_InvalidTokenInSession(t *testing.T) {
-	const testSessionName = "test-session"
-	mockTokenParser := new(mock_middleware.TokenParser)
-	mockAuthHelper := new(mock_middleware.AuthHelper)
-	mockSessionStore := new(mock_sessionstore.Store)
-
-	middleware := NewMiddlewareJwt(mockSessionStore, testSessionName, mockTokenParser, stubIssuerReader{issuer: "https://example.com"}, mockAuthHelper, stubErrorRenderer{}, nil, "http://localhost:9090", "http://localhost:9091", "", "")
-
-	req := httptest.NewRequest("GET", "/", nil)
-	rr := httptest.NewRecorder()
-
-	session := &sessionstore.Session{
-		Values: map[string]any{
-			constants.SessionKeyJwt: oauth.TokenResponse{
-				AccessToken: "invalidtoken",
-			},
-		},
-	}
-
-	mockSessionStore.On("Get", mock.Anything, testSessionName).Return(session, nil)
-	mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "invalidtoken", mock.Anything, true).Return(nil, assert.AnError)
-
-	// Mock session save after failed refresh attempt
-	mockSessionStore.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-
-	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		jwtInfo := r.Context().Value(constants.ContextKeyJwtInfo)
-		assert.Nil(t, jwtInfo, "JwtInfo should not be set in the context")
-	})
-
-	handler := middleware.JwtSessionHandler()(nextHandler)
-	handler.ServeHTTP(rr, req)
-
-	mockSessionStore.AssertExpectations(t)
-	mockTokenParser.AssertExpectations(t)
-	// no database expectations
-
-	// Check that the JWT was removed from the session
-	assert.Nil(t, session.Values[constants.SessionKeyJwt], "JWT should be removed from session")
-}
-
-func TestJwtSessionHandler_InvalidIssuer(t *testing.T) {
-	tests := []struct {
-		name     string
-		setToken func(*oauthclient.JwtInfo, *oauth.JwtToken)
-	}{
-		{
-			name: "id token",
-			setToken: func(jwtInfo *oauthclient.JwtInfo, token *oauth.JwtToken) {
-				jwtInfo.IdToken = token
-			},
-		},
-		{
-			name: "access token",
-			setToken: func(jwtInfo *oauthclient.JwtInfo, token *oauth.JwtToken) {
-				jwtInfo.AccessToken = token
-			},
-		},
-		{
-			name: "refresh token",
-			setToken: func(jwtInfo *oauthclient.JwtInfo, token *oauth.JwtToken) {
-				jwtInfo.RefreshToken = token
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			const testSessionName = "test-session"
-			mockTokenParser := new(mock_middleware.TokenParser)
-			mockAuthHelper := new(mock_middleware.AuthHelper)
-			mockSessionStore := new(mock_sessionstore.Store)
-
-			middleware := NewMiddlewareJwt(mockSessionStore, testSessionName, mockTokenParser, stubIssuerReader{issuer: "https://example.com"}, mockAuthHelper, stubErrorRenderer{}, nil, "http://localhost:9090", "http://localhost:9091", "", "")
-
-			req := httptest.NewRequest("GET", "/", nil)
-			rr := httptest.NewRecorder()
-
-			session := &sessionstore.Session{
-				Values: map[string]any{
-					constants.SessionKeyJwt: oauth.TokenResponse{
-						AccessToken: "validtoken",
-					},
-				},
-			}
-
-			mockSessionStore.On("Get", mock.Anything, testSessionName).Return(session, nil)
-
-			expectedToken := &oauth.JwtToken{
-				TokenBase64: "validtoken",
-				Claims: map[string]interface{}{
-					"iss": "https://invalid-issuer.com",
-				},
-			}
-			mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "validtoken", mock.Anything, true).Return(expectedToken, nil)
-
-			jwtInfo := &oauthclient.JwtInfo{
-				TokenResponse: oauth.TokenResponse{AccessToken: "validtoken"},
-			}
-			tt.setToken(jwtInfo, expectedToken)
-			mockTokenParser.On("DecodeAndValidateTokenResponse", mock.Anything, mock.AnythingOfType("*oauth.TokenResponse")).Return(jwtInfo, nil)
-
-			mockSessionStore.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-
-			nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				t.Error("Next handler should not be called")
-			})
-
-			logged := testutil.CaptureSlog(t)
-
-			handler := middleware.JwtSessionHandler()(nextHandler)
-			handler.ServeHTTP(rr, req)
-
-			assert.Equal(t, http.StatusFound, rr.Code)
-			assert.Equal(t, "/", rr.Header().Get("Location"))
-
-			// Warn, not Error. This was Error, and it is the one level #320's sweep moved in core: a
-			// token from another issuer is a condition this middleware exists to meet, and it meets it
-			// by clearing the session and redirecting. Pinned so nobody restores it on the reasoning
-			// that an invalid issuer sounds severe; decision 5 answers that an error log full of
-			// handled conditions is not an error log.
-			records := logged.Records()
-			require.Len(t, records, 1)
-			assert.Equal(t, slog.LevelWarn, records[0].Level)
-			assert.Equal(t, "jwt token has an invalid issuer, clearing the session and redirecting to root",
-				records[0].Message)
-
-			_, exists := session.Values[constants.SessionKeyJwt]
-			assert.False(t, exists, "JWT should be removed from session")
-
-			mockSessionStore.AssertExpectations(t)
-			mockTokenParser.AssertExpectations(t)
-		})
-	}
-}
-
-func TestJwtSessionHandler_ValidRefreshToken(t *testing.T) {
-	const testSessionName = "test-session"
-	mockTokenParser := new(mock_middleware.TokenParser)
-	mockAuthHelper := new(mock_middleware.AuthHelper)
-	mockSessionStore := new(mock_sessionstore.Store)
-	mockHTTPClient := &mockHTTPClient{}
-
-	// Create middleware with mocked dependencies and client credentials
-	middleware := NewMiddlewareJwt(mockSessionStore, testSessionName, mockTokenParser, stubIssuerReader{issuer: "https://example.com"}, mockAuthHelper, stubErrorRenderer{}, mockHTTPClient, "http://localhost:9090", "http://localhost:9091", "admin-console-client", "secret123")
-
-	// Create test request
-	req := httptest.NewRequest("GET", "/", nil)
-	rr := httptest.NewRecorder()
-
-	// Setup initial session
-	initialSession := &sessionstore.Session{
-		Values: map[string]any{
-			constants.SessionKeyJwt: oauth.TokenResponse{
-				AccessToken:  "invalidtoken",
-				RefreshToken: "validrefreshtoken",
-			},
-		},
-	}
-
-	// Mock session store
-	mockSessionStore.On("Get", mock.Anything, testSessionName).Return(initialSession, nil)
-	mockSessionStore.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-
-	// Mock token parser
-	mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "invalidtoken", mock.Anything, true).Return(nil, errors.New("invalid token")).Once()
-
-	mockTokenParser.On("DecodeAndValidateTokenResponse", mock.Anything, mock.MatchedBy(func(tr *oauth.TokenResponse) bool {
-		// Validate the TokenResponse
-		return tr != nil &&
-			tr.AccessToken == "newvalidtoken" &&
-			tr.RefreshToken == "newrefreshtoken" &&
-			tr.TokenType == "Bearer" &&
-			tr.ExpiresIn == 3600
-	})).Return(&oauthclient.JwtInfo{
-		TokenResponse: oauth.TokenResponse{AccessToken: "newvalidtoken"},
-		AccessToken: &oauth.JwtToken{
-			TokenBase64: "newvalidtoken",
-			Claims: map[string]interface{}{
-				"iss": "https://example.com",
-			},
-		},
-	}, nil).Once()
-
-	// Mock HTTP client for token refresh
-	mockHTTPClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
-		StatusCode: http.StatusOK,
-		Body: io.NopCloser(strings.NewReader(`{
-			"access_token": "newvalidtoken",
-			"token_type": "Bearer",
-			"expires_in": 3600,
-			"refresh_token": "newrefreshtoken"
-		}`)),
-	}, nil)
-
-	// Create next handler
-	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		jwtInfo, ok := r.Context().Value(constants.ContextKeyJwtInfo).(oauthclient.JwtInfo)
-		assert.True(t, ok, "JwtInfo should be set in the context")
-		assert.NotNil(t, jwtInfo, "JwtInfo should not be nil")
-		assert.Equal(t, "newvalidtoken", jwtInfo.TokenResponse.AccessToken)
-	})
-
-	// Run the middleware
-	handler := middleware.JwtSessionHandler()(nextHandler)
-	handler.ServeHTTP(rr, req)
-
-	// Assert expectations
-	mockSessionStore.AssertExpectations(t)
-	mockTokenParser.AssertExpectations(t)
-	// no database expectations
-	mockHTTPClient.AssertExpectations(t)
-
-	// Additional assertions
-	assert.Equal(t, http.StatusOK, rr.Code, "Handler returned wrong status code")
-}
-
-func TestRefreshToken_Success(t *testing.T) {
-	const testSessionName = "test-session"
-	mockTokenParser := new(mock_middleware.TokenParser)
-	mockAuthHelper := new(mock_middleware.AuthHelper)
-	mockSessionStore := new(mock_sessionstore.Store)
-	mockHTTPClient := &mockHTTPClient{}
-
-	middleware := NewMiddlewareJwt(mockSessionStore, testSessionName, mockTokenParser, stubIssuerReader{issuer: "https://example.com"}, mockAuthHelper, stubErrorRenderer{}, mockHTTPClient, "http://localhost:9090", "http://localhost:9091", "admin-console-client", "secret123")
-
-	req := httptest.NewRequest("GET", "/", nil)
-	rr := httptest.NewRecorder()
-
-	initialTokenResponse := &oauth.TokenResponse{
-		AccessToken:  "oldaccesstoken",
-		RefreshToken: "oldrefreshtoken",
-	}
-
-	session := &sessionstore.Session{
-		Values: map[string]any{
-			constants.SessionKeyJwt: *initialTokenResponse,
-		},
-	}
-
-	mockSessionStore.On("Get", mock.Anything, testSessionName).Return(session, nil)
-	mockSessionStore.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-
-	mockHTTPClient.On("Do", mock.AnythingOfType("*http.Request")).Return(&http.Response{
-		StatusCode: http.StatusOK,
-		Body: io.NopCloser(strings.NewReader(`{
-			"access_token": "newaccesstoken",
-			"token_type": "Bearer",
-			"expires_in": 3600,
-			"refresh_token": "newrefreshtoken"
-		}`)),
-	}, nil)
-
-	refreshed, err := middleware.refreshToken(rr, req, initialTokenResponse)
-
-	assert.True(t, refreshed)
-	assert.NoError(t, err)
-
-	newTokenResponse, ok := session.Values[constants.SessionKeyJwt].(oauth.TokenResponse)
-	assert.True(t, ok)
-	assert.Equal(t, "newaccesstoken", newTokenResponse.AccessToken)
-	assert.Equal(t, "newrefreshtoken", newTokenResponse.RefreshToken)
-
-	mockSessionStore.AssertExpectations(t)
-	// no database expectations
-	mockHTTPClient.AssertExpectations(t)
-}
-
 func TestRefreshToken_NoRefreshToken(t *testing.T) {
 	const testSessionName = "test-session"
 	mockTokenParser := new(mock_middleware.TokenParser)
@@ -424,7 +69,7 @@ func TestRefreshToken_NoRefreshToken(t *testing.T) {
 	mockSessionStore := new(mock_sessionstore.Store)
 	mockHTTPClient := &mockHTTPClient{}
 
-	middleware := NewMiddlewareJwt(mockSessionStore, testSessionName, mockTokenParser, stubIssuerReader{issuer: "https://example.com"}, mockAuthHelper, stubErrorRenderer{}, mockHTTPClient, "http://localhost:9090", "http://localhost:9091", "admin-console-client", "secret123")
+	middleware := NewMiddlewareJwt(mockSessionStore, testSessionName, mockTokenParser, mockAuthHelper, stubErrorRenderer{}, mockHTTPClient, "http://localhost:9090", "http://localhost:9091", "admin-console-client", "secret123")
 
 	req := httptest.NewRequest("GET", "/", nil)
 	rr := httptest.NewRecorder()
@@ -434,9 +79,10 @@ func TestRefreshToken_NoRefreshToken(t *testing.T) {
 		// No refresh token
 	}
 
-	refreshed, err := middleware.refreshToken(rr, req, tokenResponse)
+	refreshed, refused, err := middleware.refreshToken(rr, req, *tokenResponse, verifiedStored)
 
-	assert.False(t, refreshed)
+	assert.Nil(t, refreshed)
+	assert.NoError(t, refused, "no answer reached the parser")
 	assert.NoError(t, err)
 }
 
@@ -457,7 +103,7 @@ func TestRefreshToken_NilHTTPClientFailsClosed(t *testing.T) {
 
 	// nil as the interface itself, not a typed nil behind it: a (*mockHTTPClient)(nil) would
 	// pass the == nil guard and reach Do, which is a different thing to test.
-	middleware := NewMiddlewareJwt(mockSessionStore, testSessionName, mockTokenParser, stubIssuerReader{issuer: "https://example.com"}, mockAuthHelper, stubErrorRenderer{}, nil, "http://localhost:9090", "http://localhost:9091", "admin-console-client", "secret123")
+	middleware := NewMiddlewareJwt(mockSessionStore, testSessionName, mockTokenParser, mockAuthHelper, stubErrorRenderer{}, nil, "http://localhost:9090", "http://localhost:9091", "admin-console-client", "secret123")
 
 	req := httptest.NewRequest("GET", "/", nil)
 	rr := httptest.NewRecorder()
@@ -467,9 +113,10 @@ func TestRefreshToken_NilHTTPClientFailsClosed(t *testing.T) {
 		RefreshToken: "oldrefreshtoken",
 	}
 
-	refreshed, err := middleware.refreshToken(rr, req, tokenResponse)
+	refreshed, refused, err := middleware.refreshToken(rr, req, *tokenResponse, verifiedStored)
 
-	assert.False(t, refreshed)
+	assert.Nil(t, refreshed)
+	assert.NoError(t, refused, "no answer reached the parser")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "no http client is configured")
 }
@@ -481,7 +128,7 @@ func TestRefreshToken_InvalidResponse(t *testing.T) {
 	mockSessionStore := new(mock_sessionstore.Store)
 	mockHTTPClient := &mockHTTPClient{}
 
-	middleware := NewMiddlewareJwt(mockSessionStore, testSessionName, mockTokenParser, stubIssuerReader{issuer: "https://example.com"}, mockAuthHelper, stubErrorRenderer{}, mockHTTPClient, "http://localhost:9090", "http://localhost:9091", "admin-console-client", "secret123")
+	middleware := NewMiddlewareJwt(mockSessionStore, testSessionName, mockTokenParser, mockAuthHelper, stubErrorRenderer{}, mockHTTPClient, "http://localhost:9090", "http://localhost:9091", "admin-console-client", "secret123")
 
 	req := httptest.NewRequest("GET", "/", nil)
 	rr := httptest.NewRecorder()
@@ -496,9 +143,10 @@ func TestRefreshToken_InvalidResponse(t *testing.T) {
 		Body:       io.NopCloser(strings.NewReader(`{"error": "invalid_grant"}`)),
 	}, nil)
 
-	refreshed, err := middleware.refreshToken(rr, req, tokenResponse)
+	refreshed, refused, err := middleware.refreshToken(rr, req, *tokenResponse, verifiedStored)
 
-	assert.False(t, refreshed)
+	assert.Nil(t, refreshed)
+	assert.NoError(t, refused, "no answer reached the parser")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "error response from server")
 
@@ -513,7 +161,7 @@ func TestRequiresScope_Authorized(t *testing.T) {
 	mockAuthHelper := new(mock_middleware.AuthHelper)
 	mockSessionStore := new(mock_sessionstore.Store)
 
-	middleware := NewMiddlewareJwt(mockSessionStore, testSessionName, mockTokenParser, stubIssuerReader{issuer: "https://example.com"}, mockAuthHelper, stubErrorRenderer{}, nil, "http://localhost:9090", "http://localhost:9091", "", "")
+	middleware := NewMiddlewareJwt(mockSessionStore, testSessionName, mockTokenParser, mockAuthHelper, stubErrorRenderer{}, nil, "http://localhost:9090", "http://localhost:9091", "", "")
 
 	req := httptest.NewRequest("GET", "/", nil)
 	rr := httptest.NewRecorder()
@@ -546,7 +194,7 @@ func TestRequiresScope_Unauthorized(t *testing.T) {
 	mockAuthHelper := new(mock_middleware.AuthHelper)
 	mockSessionStore := new(mock_sessionstore.Store)
 
-	middleware := NewMiddlewareJwt(mockSessionStore, testSessionName, mockTokenParser, stubIssuerReader{issuer: "https://example.com"}, mockAuthHelper, stubErrorRenderer{}, nil, "http://localhost:9090", "http://localhost:9091", "", "")
+	middleware := NewMiddlewareJwt(mockSessionStore, testSessionName, mockTokenParser, mockAuthHelper, stubErrorRenderer{}, nil, "http://localhost:9090", "http://localhost:9091", "", "")
 
 	req := httptest.NewRequest("GET", "/", nil)
 	rr := httptest.NewRecorder()
@@ -584,7 +232,7 @@ func TestRequiresScope_Unauthenticated(t *testing.T) {
 	mockAuthHelper := new(mock_middleware.AuthHelper)
 	mockSessionStore := new(mock_sessionstore.Store)
 
-	middleware := NewMiddlewareJwt(mockSessionStore, testSessionName, mockTokenParser, stubIssuerReader{issuer: "https://example.com"}, mockAuthHelper, stubErrorRenderer{}, nil, "http://localhost:9090", "http://localhost:9091", coreconstants.AdminConsoleClientIdentifier, "")
+	middleware := NewMiddlewareJwt(mockSessionStore, testSessionName, mockTokenParser, mockAuthHelper, stubErrorRenderer{}, nil, "http://localhost:9090", "http://localhost:9091", coreconstants.AdminConsoleClientIdentifier, "")
 
 	req := httptest.NewRequest("GET", "/", nil)
 	rr := httptest.NewRecorder()
@@ -614,7 +262,7 @@ func TestRequiresScope_NoJwtInfo(t *testing.T) {
 	mockAuthHelper := new(mock_middleware.AuthHelper)
 	mockSessionStore := new(mock_sessionstore.Store)
 
-	middleware := NewMiddlewareJwt(mockSessionStore, testSessionName, mockTokenParser, stubIssuerReader{issuer: "https://example.com"}, mockAuthHelper, stubErrorRenderer{}, nil, "http://localhost:9090", "http://localhost:9091", coreconstants.AdminConsoleClientIdentifier, "")
+	middleware := NewMiddlewareJwt(mockSessionStore, testSessionName, mockTokenParser, mockAuthHelper, stubErrorRenderer{}, nil, "http://localhost:9090", "http://localhost:9091", coreconstants.AdminConsoleClientIdentifier, "")
 
 	req := httptest.NewRequest("GET", "/", nil)
 	rr := httptest.NewRecorder()
@@ -639,7 +287,7 @@ func TestRequiresScope_RedirectError(t *testing.T) {
 	mockAuthHelper := new(mock_middleware.AuthHelper)
 	mockSessionStore := new(mock_sessionstore.Store)
 
-	middleware := NewMiddlewareJwt(mockSessionStore, testSessionName, mockTokenParser, stubIssuerReader{issuer: "https://example.com"}, mockAuthHelper, stubErrorRenderer{}, nil, "http://localhost:9090", "http://localhost:9091", coreconstants.AdminConsoleClientIdentifier, "")
+	middleware := NewMiddlewareJwt(mockSessionStore, testSessionName, mockTokenParser, mockAuthHelper, stubErrorRenderer{}, nil, "http://localhost:9090", "http://localhost:9091", coreconstants.AdminConsoleClientIdentifier, "")
 
 	req := httptest.NewRequest("GET", "/", nil)
 	rr := httptest.NewRecorder()
@@ -680,7 +328,7 @@ func TestRequiresScope_ReturnsToTheBaseURLPlusPathAndQuery(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			mockAuthHelper := new(mock_middleware.AuthHelper)
 			middleware := NewMiddlewareJwt(new(mock_sessionstore.Store), "test-session", new(mock_middleware.TokenParser),
-				stubIssuerReader{issuer: "https://example.com"}, mockAuthHelper, stubErrorRenderer{}, nil,
+				mockAuthHelper, stubErrorRenderer{}, nil,
 				"http://localhost:9090", "http://localhost:9091", coreconstants.AdminConsoleClientIdentifier, "")
 
 			req := httptest.NewRequest("GET", testCase.requestLine, nil)
@@ -890,7 +538,7 @@ func TestRefreshToken_RefusesAnAnswerOverTheCap(t *testing.T) {
 	mockHTTPClient := &mockHTTPClient{}
 
 	middleware := NewMiddlewareJwt(mockSessionStore, testSessionName, mockTokenParser,
-		stubIssuerReader{issuer: "https://example.com"}, mockAuthHelper, stubErrorRenderer{},
+		mockAuthHelper, stubErrorRenderer{},
 		mockHTTPClient, "http://localhost:9090", "http://localhost:9091", "admin-console-client", "secret123")
 
 	req := httptest.NewRequest("GET", "/", nil)
@@ -902,12 +550,13 @@ func TestRefreshToken_RefusesAnAnswerOverTheCap(t *testing.T) {
 		Body:       body,
 	}, nil)
 
-	refreshed, err := middleware.refreshToken(rr, req, &oauth.TokenResponse{
+	refreshed, refused, err := middleware.refreshToken(rr, req, oauth.TokenResponse{
 		AccessToken:  "oldaccesstoken",
 		RefreshToken: "oldrefreshtoken",
-	})
+	}, verifiedStored)
 
-	assert.False(t, refreshed)
+	assert.Nil(t, refreshed)
+	assert.NoError(t, refused, "no answer reached the parser")
 	require.Error(t, err)
 	assert.True(t, errors.Is(err, boundedread.ErrResponseTooLarge),
 		"the answer is refused as oversized rather than reaching json.Unmarshal truncated: %v", err)
@@ -980,7 +629,7 @@ func TestJwtSessionHandler_RefreshesOnACancelledRequestContext(t *testing.T) {
 	mockSessionStore := new(mock_sessionstore.Store)
 
 	middleware := NewMiddlewareJwt(mockSessionStore, testSessionName, mockTokenParser,
-		stubIssuerReader{issuer: "https://example.com"}, mockAuthHelper, stubErrorRenderer{},
+		mockAuthHelper, stubErrorRenderer{},
 		&http.Client{Transport: transport}, authServer.URL, "http://localhost:9091",
 		"admin-console-client", "secret123")
 
@@ -988,8 +637,11 @@ func TestJwtSessionHandler_RefreshesOnACancelledRequestContext(t *testing.T) {
 		Values: map[string]any{
 			constants.SessionKeyJwt: oauth.TokenResponse{
 				AccessToken:  "oldaccesstoken",
+				IdToken:      storedIDTokenRaw,
 				RefreshToken: "oldrefreshtoken",
 			},
+			// Due: this is what sends the middleware down the refresh path.
+			constants.SessionKeyJwtExpiresAt: time.Now().Add(10 * time.Second).Unix(),
 		},
 	}
 	// The context each store call was handed, captured at the call: the handler cancels
@@ -1018,11 +670,24 @@ func TestJwtSessionHandler_RefreshesOnACancelledRequestContext(t *testing.T) {
 			}
 		})
 
-	// The expired access token is what sends the middleware down the refresh path.
-	mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "oldaccesstoken",
-		mock.Anything, true).Return(nil, errors.New("token is expired"))
-	mockTokenParser.On("DecodeAndValidateTokenResponse", mock.Anything, mock.Anything).
-		Return(&oauthclient.JwtInfo{}, nil)
+	mockTokenParser.On("DecodeAndValidateStoredIDToken", mock.Anything, storedIDTokenRaw).
+		Return(verifiedStored, nil)
+	// The answer's validation is part of the refresh too: the old refresh token is spent by the
+	// time it runs, and the parser may have to fetch the JWKS, so it runs on the detached context
+	// under the same deadline as the call and the write (#427).
+	var parseCtxErr error
+	var parseDeadline time.Time
+	var parseHadDeadline bool
+	mockTokenParser.On("DecodeAndValidateRefreshResponse", mock.Anything, mock.Anything, verifiedStored).
+		Run(func(args mock.Arguments) {
+			if ctx, ok := args.Get(0).(context.Context); ok {
+				parseCtxErr = ctx.Err()
+				parseDeadline, parseHadDeadline = ctx.Deadline()
+			}
+		}).
+		Return(func(_ context.Context, tr *oauth.TokenResponse, previous *oauth.JwtToken) (*oauthclient.JwtInfo, error) {
+			return &oauthclient.JwtInfo{TokenResponse: *tr, IdToken: previous}, nil
+		})
 
 	// The browser has gone: the inbound request's context is already done before
 	// the handler runs. It carries a request id, which is the value the detachment is
@@ -1085,6 +750,10 @@ func TestJwtSessionHandler_RefreshesOnACancelledRequestContext(t *testing.T) {
 		"the session read runs on the deadline the token call was given, not a fresh one")
 	assert.True(t, transport.deadline.Equal(saveDeadline),
 		"and so does the save: one deadline covers the call and the write together")
+	assert.NoError(t, parseCtxErr, "the answer is validated on the detached context")
+	require.True(t, parseHadDeadline, "which is bounded")
+	assert.True(t, transport.deadline.Equal(parseDeadline),
+		"by the same deadline as the call and the write it sits between")
 
 	// The request id is the value WithoutCancel exists to keep. Every record these three
 	// write is correlated by it, so context.Background() here would silence the refresh in

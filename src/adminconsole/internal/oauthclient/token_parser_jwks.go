@@ -276,56 +276,6 @@ func sameAudience(previous, refreshed *oauth.JwtToken) bool {
 	return len(previousSet) == len(refreshedSet)
 }
 
-func (tp *JWKSTokenParser) DecodeAndValidateTokenResponse(ctx context.Context, tokenResponse *oauth.TokenResponse) (*JwtInfo, error) {
-	result := &JwtInfo{TokenResponse: *tokenResponse}
-
-	var err error
-	if len(tokenResponse.AccessToken) > 0 {
-		result.AccessToken, err = tp.DecodeAndValidateTokenString(ctx, tokenResponse.AccessToken, nil, true)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	if len(tokenResponse.IdToken) > 0 {
-		result.IdToken, err = tp.DecodeAndValidateTokenString(ctx, tokenResponse.IdToken, nil, true)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	if len(tokenResponse.RefreshToken) > 0 {
-		result.RefreshToken, err = tp.DecodeAndValidateTokenString(ctx, tokenResponse.RefreshToken, nil, false)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return result, nil
-}
-
-func (tp *JWKSTokenParser) DecodeAndValidateTokenString(ctx context.Context, token string, _ *rsa.PublicKey, withExpirationCheck bool) (*oauth.JwtToken, error) {
-	result := &oauth.JwtToken{TokenBase64: token}
-	if len(token) == 0 {
-		return result, nil
-	}
-
-	claims := jwt.MapClaims{}
-
-	opts := []jwt.ParserOption{jwt.WithValidMethods([]string{jwt.SigningMethodRS256.Alg()})}
-	if withExpirationCheck {
-		opts = append(opts, jwt.WithExpirationRequired())
-	} else {
-		opts = append(opts, jwt.WithoutClaimsValidation())
-	}
-
-	if _, err := jwt.ParseWithClaims(token, claims, tp.keyFunc(ctx), opts...); err != nil {
-		return nil, err
-	}
-	result.Claims = claims
-	return result, nil
-}
-
 // keyFunc finds the published key a token's kid names, refreshing the cached JWKS once when
 // the cache does not hold it.
 func (tp *JWKSTokenParser) keyFunc(ctx context.Context) jwt.Keyfunc {

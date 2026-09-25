@@ -410,8 +410,8 @@ func TestDecodeAndValidateSignInResponse(t *testing.T) {
 		require.NotNil(t, result.IdToken)
 		assert.Equal(t, idToken, result.IdToken.TokenBase64)
 		assert.Equal(t, "1234567890", result.IdToken.GetStringClaim("sub"))
-		assert.Nil(t, result.AccessToken, "the access token is carried, never decoded")
-		assert.Nil(t, result.RefreshToken, "the refresh token is carried, never decoded")
+		// The access and refresh tokens are carried, never decoded: JwtInfo has no field to
+		// decode them into since #427, so the equality with the response above is the whole of it.
 	})
 }
 

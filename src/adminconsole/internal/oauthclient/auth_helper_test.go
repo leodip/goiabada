@@ -179,3 +179,46 @@ func TestIsAuthenticated(t *testing.T) {
 		})
 	}
 }
+
+// Authorized means the grant the token response records names one of the scopes asked for, matched
+// exactly. It is read from the response's scope, which the console sets to the effective grant on
+// arrival, never from inside the access token: the rows whose access token string would decode to
+// a matching scope, were anything to decode it, must still be refused (#427).
+func TestIsAuthorizedToAccessResource(t *testing.T) {
+	const manage = "authserver:manage"
+	const manageAccount = "authserver:manage-account"
+	withGrant := func(scope string) oauthclient.JwtInfo {
+		return oauthclient.JwtInfo{
+			TokenResponse: oauth.TokenResponse{AccessToken: "opaque", Scope: scope},
+			IdToken:       &oauth.JwtToken{TokenBase64: "i"},
+		}
+	}
+
+	testCases := []struct {
+		name        string
+		jwtInfo     oauthclient.JwtInfo
+		scopesAnyOf []string
+		want        bool
+	}{
+		{"nothing", oauthclient.JwtInfo{}, []string{manage}, false},
+		{"the one scope asked for", withGrant("openid " + manage), []string{manage}, true},
+		{"the second of two asked for", withGrant("openid " + manageAccount), []string{manage, manageAccount}, true},
+		{"none of those asked for", withGrant("openid profile"), []string{manage, manageAccount}, false},
+		{"nothing asked for", withGrant("openid " + manage), nil, false},
+		{"a prefix of the scope", withGrant("openid authserver:manag"), []string{manage}, false},
+		{"the scope as a prefix of a granted one", withGrant("openid " + manageAccount), []string{manage}, false},
+		{"a case variant", withGrant("openid AUTHSERVER:MANAGE"), []string{manage}, false},
+		{"an empty grant", withGrant(""), []string{manage}, false},
+		{"an empty scope asked for against a doubled space", withGrant("openid  " + manage), []string{""}, false},
+		{"the scope only inside the access token string",
+			oauthclient.JwtInfo{TokenResponse: oauth.TokenResponse{AccessToken: manage, Scope: "openid"}},
+			[]string{manage}, false},
+	}
+
+	helper := oauthclient.NewAuthHelper(nil, helperSessionName, helperConsoleBase, helperAuthBase)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, helper.IsAuthorizedToAccessResource(tc.jwtInfo, tc.scopesAnyOf))
+		})
+	}
+}

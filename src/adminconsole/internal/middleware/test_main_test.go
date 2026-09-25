@@ -1,7 +1,6 @@
 package middleware
 
 import (
-	"context"
 	"net/http"
 	"os"
 	"testing"
@@ -17,16 +16,6 @@ func TestMain(m *testing.M) {
 		panic(err)
 	}
 	os.Exit(m.Run())
-}
-
-// stubIssuerReader stands in for middleware.SettingsReader, which reads the issuer off a
-// settings value this package's tests have no business putting on the context.
-type stubIssuerReader struct {
-	issuer string
-}
-
-func (s stubIssuerReader) Issuer(context.Context) string {
-	return s.issuer
 }
 
 // stubErrorRenderer stands in for *handlerhelpers.HttpHelper, whose real

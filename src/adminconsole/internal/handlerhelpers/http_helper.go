@@ -234,8 +234,9 @@ func (h *HttpHelper) RenderTemplateToBuffer(r *http.Request, layoutName string, 
 
 			data["loggedInUser"] = loggedInUser
 		}
-		if jwtInfo.AccessToken != nil &&
-			jwtInfo.AccessToken.HasScope(coreconstants.AuthServerResourceIdentifier+":"+coreconstants.ManagePermissionIdentifier) {
+		// The grant the token response records, not the access token, which the console carries
+		// without decoding (#427).
+		if jwtInfo.HasScope(coreconstants.AuthServerResourceIdentifier + ":" + coreconstants.ManagePermissionIdentifier) {
 			data["isAdmin"] = true
 		}
 	}

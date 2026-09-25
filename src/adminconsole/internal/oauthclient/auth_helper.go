@@ -87,12 +87,14 @@ func nonceHash(nonce string) (string, error) {
 	return hashutil.HashString(nonce)
 }
 
+// IsAuthorizedToAccessResource reports whether the grant the token response records includes any
+// of scopesAnyOf. It reads the response's scope through JwtInfo.HasScope, never the access token,
+// which the console carries without decoding (#427). A visitor with no token response has an empty
+// grant and is authorized for nothing.
 func (s *AuthHelper) IsAuthorizedToAccessResource(jwtInfo JwtInfo, scopesAnyOf []string) bool {
-	if jwtInfo.AccessToken != nil {
-		for _, scope := range scopesAnyOf {
-			if jwtInfo.AccessToken.HasScope(scope) {
-				return true
-			}
+	for _, scope := range scopesAnyOf {
+		if jwtInfo.HasScope(scope) {
+			return true
 		}
 	}
 	return false

@@ -6,9 +6,12 @@ import (
 	"github.com/leodip/goiabada/core/oauth"
 )
 
-// JwtInfo is a token response with each of its tokens validated and decoded, as the JWKS parser
-// produces it and the JWT session middleware puts it on the request context. A token the response
-// does not carry stays nil.
+// JwtInfo is a token response with its ID token verified and decoded, as the JWKS parser produces
+// it and the JWT session middleware puts it on the request context. The ID token is the one token
+// addressed to the console (OIDC Core 3.1.3.7); the access and refresh tokens stay the strings in
+// TokenResponse, carried and never decoded, as RFC 6749 sections 1.4 and 1.5 describe a client
+// treating them. What the access token grants is read from the response's scope (HasScope), and
+// when it lapses from expires_in (ExpiresAt), not from inside it (#427).
 //
 // It is here rather than in core/oauth because the admin console is the only process that names it:
 // the auth server's parser method producing one had no caller and went in #424, and a type one
@@ -16,10 +19,7 @@ import (
 // which stores the TokenResponse alone, so the move renamed nothing persisted.
 type JwtInfo struct {
 	TokenResponse oauth.TokenResponse
-
-	AccessToken  *oauth.JwtToken
-	IdToken      *oauth.JwtToken
-	RefreshToken *oauth.JwtToken
+	IdToken       *oauth.JwtToken
 }
 
 // HasScope reports whether the grant the token response records includes scope, matched

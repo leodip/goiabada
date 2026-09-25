@@ -10,6 +10,7 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	coreconstants "github.com/leodip/goiabada/core/constants"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
@@ -66,7 +67,7 @@ func TestMiddlewareJwt_ServerErrorsRenderThePageAndKeepTheCauseOutOfTheResponse(
 				store.On("Get", mock.Anything, sessionName).Return(nil, assert.AnError)
 
 				m := NewMiddlewareJwt(store, sessionName, new(mock_middleware.TokenParser),
-					stubIssuerReader{issuer: "https://this-deployment.example"}, new(mock_middleware.AuthHelper), rec, nil,
+					new(mock_middleware.AuthHelper), rec, nil,
 					"http://localhost:9090", "http://localhost:9091", "", "")
 
 				return m.JwtSessionHandler()(mustNotRun(t)), httptest.NewRequest(http.MethodGet, "/", nil)
@@ -82,64 +83,52 @@ func TestMiddlewareJwt_ServerErrorsRenderThePageAndKeepTheCauseOutOfTheResponse(
 				}, nil)
 
 				m := NewMiddlewareJwt(store, sessionName, new(mock_middleware.TokenParser),
-					stubIssuerReader{issuer: "https://this-deployment.example"}, new(mock_middleware.AuthHelper), rec, nil,
+					new(mock_middleware.AuthHelper), rec, nil,
 					"http://localhost:9090", "http://localhost:9091", "", "")
 
 				return m.JwtSessionHandler()(mustNotRun(t)), httptest.NewRequest(http.MethodGet, "/", nil)
 			},
 		},
 		{
-			name:      "clearing an unrefreshable session cannot be saved",
+			name:      "signing out a session with no recorded expiry cannot be saved",
 			wantCause: "unable to save the session",
 			build: func(t *testing.T, rec *recordingErrorRenderer) (http.Handler, *http.Request) {
 				store := new(mock_sessionstore.Store)
-				// No refresh token, so refreshToken reports "not refreshed" without a
-				// network call and the middleware falls through to clearing the session.
+				// No recorded expiry, as a session signed in before #427, so the middleware
+				// signs it out without consulting the parser.
 				store.On("Get", mock.Anything, sessionName).Return(&sessionstore.Session{
 					Values: map[string]any{
-						constants.SessionKeyJwt: oauth.TokenResponse{AccessToken: "expired"},
+						constants.SessionKeyJwt: oauth.TokenResponse{AccessToken: "a", IdToken: "i"},
 					},
 				}, nil)
 				store.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(assert.AnError)
 
-				parser := new(mock_middleware.TokenParser)
-				parser.On("DecodeAndValidateTokenString", mock.Anything, "expired", mock.Anything, true).
-					Return(nil, assert.AnError)
-
-				m := NewMiddlewareJwt(store, sessionName, parser,
-					stubIssuerReader{issuer: "https://this-deployment.example"}, new(mock_middleware.AuthHelper), rec, nil,
+				m := NewMiddlewareJwt(store, sessionName, mock_middleware.NewTokenParser(t),
+					new(mock_middleware.AuthHelper), rec, nil,
 					"http://localhost:9090", "http://localhost:9091", "", "")
 
 				return m.JwtSessionHandler()(mustNotRun(t)), httptest.NewRequest(http.MethodGet, "/", nil)
 			},
 		},
 		{
-			name:      "clearing a session whose tokens carry a foreign issuer cannot be saved",
+			name:      "clearing a session whose ID token is foreign cannot be saved",
 			wantCause: "unable to save the session",
 			build: func(t *testing.T, rec *recordingErrorRenderer) (http.Handler, *http.Request) {
-				token := &oauth.JwtToken{
-					TokenBase64: "valid",
-					Claims:      map[string]interface{}{"iss": "https://someone-else.example"},
-				}
-
 				store := new(mock_sessionstore.Store)
 				store.On("Get", mock.Anything, sessionName).Return(&sessionstore.Session{
 					Values: map[string]any{
-						constants.SessionKeyJwt: oauth.TokenResponse{AccessToken: "valid"},
+						constants.SessionKeyJwt:          oauth.TokenResponse{AccessToken: "a", IdToken: "foreign"},
+						constants.SessionKeyJwtExpiresAt: int64(0),
 					},
 				}, nil)
 				store.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(assert.AnError)
 
-				parser := new(mock_middleware.TokenParser)
-				parser.On("DecodeAndValidateTokenString", mock.Anything, "valid", mock.Anything, true).Return(token, nil)
-				parser.On("DecodeAndValidateTokenResponse", mock.Anything, mock.AnythingOfType("*oauth.TokenResponse")).
-					Return(&oauthclient.JwtInfo{
-						TokenResponse: oauth.TokenResponse{AccessToken: "valid"},
-						AccessToken:   token,
-					}, nil)
+				parser := mock_middleware.NewTokenParser(t)
+				parser.On("DecodeAndValidateStoredIDToken", mock.Anything, "foreign").
+					Return(nil, errs.Wrap(oauthclient.ErrForeignToken, "the id token's iss is another"))
 
 				m := NewMiddlewareJwt(store, sessionName, parser,
-					stubIssuerReader{issuer: "https://this-deployment.example"}, new(mock_middleware.AuthHelper), rec, nil,
+					new(mock_middleware.AuthHelper), rec, nil,
 					"http://localhost:9090", "http://localhost:9091", "", "")
 
 				req := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -152,7 +141,7 @@ func TestMiddlewareJwt_ServerErrorsRenderThePageAndKeepTheCauseOutOfTheResponse(
 			wantCause: "unable to cast the context value to JwtInfo",
 			build: func(t *testing.T, rec *recordingErrorRenderer) (http.Handler, *http.Request) {
 				m := NewMiddlewareJwt(new(mock_sessionstore.Store), sessionName,
-					new(mock_middleware.TokenParser), stubIssuerReader{issuer: "https://this-deployment.example"}, new(mock_middleware.AuthHelper), rec, nil,
+					new(mock_middleware.TokenParser), new(mock_middleware.AuthHelper), rec, nil,
 					"http://localhost:9090", "http://localhost:9091", "", "")
 
 				req := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -176,7 +165,7 @@ func TestMiddlewareJwt_ServerErrorsRenderThePageAndKeepTheCauseOutOfTheResponse(
 					mock.AnythingOfType("string")).Return(assert.AnError)
 
 				m := NewMiddlewareJwt(new(mock_sessionstore.Store), sessionName,
-					new(mock_middleware.TokenParser), stubIssuerReader{issuer: "https://this-deployment.example"}, helper, rec, nil,
+					new(mock_middleware.TokenParser), helper, rec, nil,
 					"http://localhost:9090", "http://localhost:9091",
 					coreconstants.AdminConsoleClientIdentifier, "")
 
