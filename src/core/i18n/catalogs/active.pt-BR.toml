@@ -292,12 +292,14 @@
 "adminconsole.sign_in_error.start_again" = "Começar de novo"
 "adminconsole.sign_in_error.log_line" = "O log do servidor registra a causa sob este ID de requisição:"
 
+"adminconsole.session_ended.message" = "Seu acesso terminou. Entre novamente."
+
 "adminconsole.not_found.page_title" = "Não encontrado"
 "adminconsole.not_found.title" = "Não encontrado (404)"
 "adminconsole.not_found.body" = "Desculpe, não foi possível encontrar a página solicitada. Verifique a URL e tente novamente."
 
 "adminconsole.unauthorized.page_title" = "Não autorizado"
-"adminconsole.unauthorized.title" = "Não autorizado (401)"
+"adminconsole.unauthorized.title" = "Não autorizado (403)"
 "adminconsole.unauthorized.body" = "Pedimos desculpas, mas você não tem os privilégios necessários para acessar esta página."
 
 "adminconsole.welcome.page_title" = "Bem-vindo(a)"

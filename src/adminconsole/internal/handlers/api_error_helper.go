@@ -7,7 +7,29 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/i18n"
 )
+
+// sessionEndedPath is the console route an admin API 401 sends the browser to, which clears the
+// stored tokens and leaves a notice on the home page (#427 decision 17).
+const sessionEndedPath = "/auth/session-ended"
+
+// sessionEndedCode is the error code HandleAPIErrorJson answers an admin API 401 with. The three
+// fetch sites in web/static/utils.js and web/static/image-upload.js key on this literal, not on the
+// 403 status, to navigate to sessionEndedPath; every other 403 keeps its modal and signs nobody out.
+const sessionEndedCode = "session_ended"
+
+// isSessionEnded reports whether the admin API refused the console's access token.
+//
+// RFC 6750 section 3.1: invalid_token is answered 401 when the token "is expired, revoked,
+// malformed, or invalid for other reasons". The admin API's RequireValidSession answers it for an
+// unexpired token whenever the account is disabled or its session has ended, idled out, outlived
+// its maximum lifetime or been superseded, and the console's refresh token is bound to the same
+// session, so a refresh and a retry would meet the same refusal. The administrator is signed out
+// and told why instead of being shown the 500 page every 401 answered before (#427 decision 17).
+func isSessionEnded(apiErr *apiclient.APIError) bool {
+	return apiErr.StatusCode == http.StatusUnauthorized
+}
 
 // HandleAPIError - for simple operations without forms (delete, etc.)
 //
@@ -17,9 +39,15 @@ import (
 // callers' own `== nil` guards were written for. Until this arm existed, following a stale link or
 // a bookmark to a deleted user told the administrator the server had broken, and spent a stack, a
 // log record and a request id saying so (#279).
+//
+// A 401 sends the browser to sessionEndedPath (see isSessionEnded).
 func HandleAPIError(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request, err error) {
 	var apiErr *apiclient.APIError
 	if errors.As(err, &apiErr) {
+		if isSessionEnded(apiErr) {
+			http.Redirect(w, r, sessionEndedPath, http.StatusFound)
+			return
+		}
 		if apiErr.StatusCode == http.StatusNotFound {
 			httpHelper.NotFound(w, r)
 			return
@@ -42,9 +70,16 @@ func HandleAPIError(httpHelper HttpHelper, w http.ResponseWriter, r *http.Reques
 // "the user might be able to resolve the conflict and resubmit the request": an email address
 // another account took between the form's check and its write is exactly that, and the 500 page
 // this answered before threw the form away and blamed the server (#425).
+//
+// A 401 sends the browser to sessionEndedPath, as HandleAPIError does: no resubmission of the form
+// can succeed with a token the admin API has refused.
 func HandleAPIErrorWithCallback(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request, err error, renderErrorFunc func(string)) {
 	var apiErr *apiclient.APIError
 	if errors.As(err, &apiErr) {
+		if isSessionEnded(apiErr) {
+			http.Redirect(w, r, sessionEndedPath, http.StatusFound)
+			return
+		}
 		if apiErr.StatusCode == http.StatusBadRequest || apiErr.StatusCode == http.StatusConflict {
 			renderErrorFunc(apiErr.Message)
 			return
@@ -84,9 +119,20 @@ func HandleAPIErrorWithCallback(httpHelper HttpHelper, w http.ResponseWriter, r 
 // apiclient method funnels a non-2xx through parseAPIError, so "the row is gone" reaches this
 // function as an *apiclient.APIError and nothing else. It answers the console's own 404 sentence
 // rather than forwarding the API's, matching what the page beside it shows (#279 decision 11).
+//
+// A 401 is answered 403 with sessionEndedCode and the console's own "sign-in has ended" sentence,
+// which the browser follows to sessionEndedPath (see isSessionEnded). Not 401: RFC 9110 section
+// 15.5.2 says a 401 "MUST send a WWW-Authenticate header field", and the console signs in with a
+// cookie and has no challenge to send; with 403 the client "MAY repeat the request with new or
+// different credentials", section 15.5.4, which is what signing in again is (#427 decision 18).
 func HandleAPIErrorJson(httpHelper HttpHelper, w http.ResponseWriter, r *http.Request, err error) {
 	var apiErr *apiclient.APIError
 	if errors.As(err, &apiErr) {
+		if isSessionEnded(apiErr) {
+			httpHelper.JsonError(w, r, customerrors.NewErrorDetailWithHttpStatusCode(sessionEndedCode,
+				i18n.T(r.Context(), "adminconsole.session_ended.message"), http.StatusForbidden))
+			return
+		}
 		if apiErr.StatusCode == http.StatusNotFound {
 			JsonNotFound(httpHelper, w, r)
 			return

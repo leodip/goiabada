@@ -83,7 +83,7 @@ func (s *Server) initRoutes(root chi.Router) {
 
 	// Base routes
 	root.NotFound(handlers.HandleNotFoundGet(httpHelper))
-	root.With(baseAuth...).Get("/", handlers.HandleIndexGet(authHelper, httpHelper))
+	root.With(baseAuth...).Get("/", handlers.HandleIndexGet(authHelper, httpHelper, s.sessionStore))
 	// /unauthorized is reached by authenticated-but-forbidden users via the
 	// redirect in middleware_jwt's RequiresScope path. Wrapping it through
 	// baseAuth lets the user-locale refinement fire so the page renders
@@ -97,6 +97,7 @@ func (s *Server) initRoutes(root chi.Router) {
 	root.With(baseAuth...).Route("/auth", func(r chi.Router) {
 		r.Post("/callback", handlers.HandleAuthCallbackPost(httpHelper, s.sessionStore, tokenParser, tokenExchanger))
 		r.Get("/logout", accounthandlers.HandleAccountLogoutGet(httpHelper, s.sessionStore, apiClient))
+		r.Get("/session-ended", handlers.HandleSessionEndedGet(httpHelper, s.sessionStore))
 	})
 
 	// Account routes

@@ -306,12 +306,16 @@
 "adminconsole.sign_in_error.start_again" = "Start again"
 "adminconsole.sign_in_error.log_line" = "The server log records the cause under this request id:"
 
+# The admin API refused the console's access token (#427 decision 17): the home page's one-time
+# notice, and the description an AJAX request is answered with.
+"adminconsole.session_ended.message" = "Your sign-in has ended. Sign in again."
+
 "adminconsole.not_found.page_title" = "Not found"
 "adminconsole.not_found.title" = "Not found (404)"
 "adminconsole.not_found.body" = "Sorry, the page you are looking for could not be found. Please check the URL and try again."
 
 "adminconsole.unauthorized.page_title" = "Unauthorized"
-"adminconsole.unauthorized.title" = "Unauthorized (401)"
+"adminconsole.unauthorized.title" = "Unauthorized (403)"
 "adminconsole.unauthorized.body" = "Apologies, but you don't have the required privileges to enter this page."
 
 "adminconsole.welcome.page_title" = "Welcome"

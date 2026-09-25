@@ -282,6 +282,13 @@
         .then(response => {
             if (!response.ok) {
                 return response.json().then(data => {
+                    // The admin API refused the access token. There is no dialog here to
+                    // acknowledge, so sign out at once: the home page shows the same sentence.
+                    // The promise never settles, so no error line flashes while the page leaves.
+                    if (isSessionEnded(data)) {
+                        goToSessionEnded();
+                        return new Promise(() => {});
+                    }
                     // error_description first: these endpoints now answer through the console's
                     // shared JSON writers, whose body is RFC 6749 5.2's {error, error_description}
                     // -- error is the code ("not_found"), the sentence is in error_description.
@@ -347,6 +354,11 @@
         .then(response => {
             if (!response.ok) {
                 return response.json().then(data => {
+                    // See the upload path above, for this branch and the sentence.
+                    if (isSessionEnded(data)) {
+                        goToSessionEnded();
+                        return new Promise(() => {});
+                    }
                     // See the upload path above: error_description carries the sentence.
                     throw new Error(data.error_description || data.error || t('js.image_upload.delete_failed'));
                 });
