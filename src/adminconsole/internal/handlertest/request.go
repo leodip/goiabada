@@ -87,10 +87,10 @@ func WithAccessToken() Option {
 	}
 }
 
-// WithJwtInfo puts a whole oauthclient.JwtInfo on the context, for the handlers that read the parsed
-// token pointers rather than the raw bearer. WithAccessToken fills TokenResponse.AccessToken and
-// leaves IdToken and AccessToken nil, which is indistinguishable from a visitor who never
-// authenticated: the logout page, which reads both pointers, takes its unauthenticated arm.
+// WithJwtInfo puts a whole oauthclient.JwtInfo on the context, for the handlers that read the
+// verified ID token rather than the raw bearer alone. WithAccessToken fills
+// TokenResponse.AccessToken and leaves IdToken nil, which is indistinguishable from a visitor who
+// never authenticated: the logout page, which requires both, takes its unauthenticated arm.
 //
 // It replaces whatever WithAccessToken set, so the two are not combined.
 func WithJwtInfo(jwtInfo oauthclient.JwtInfo) Option {

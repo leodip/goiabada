@@ -40,11 +40,13 @@ func MiddlewareSettingsCache(settingsCache *cache.SettingsCache) func(http.Handl
 			}
 
 			// The issuer has one writer, the auth server that stamps it into the iss
-			// claim, so refuse to serve a request rather than guess it. oauth.IsIssuerValid
-			// is plain string equality, so an expected issuer of "" rejects every token
-			// the auth server can mint and locks the administrator out of the console
-			// silently, which is the thing this check exists to end (#285). The only live
-			// route here is an auth server too old to serve the field: an absent settings
+			// claim, so refuse to serve a request rather than guess it. The JWKS token parser
+			// in oauthclient compares an ID token's iss with this value exactly and refuses an
+			// empty one outright, so an expected issuer of "" would refuse every sign-in and
+			// sign every administrator out, locking them out of the console with nothing but
+			// a log line to say why, which is the thing this check exists to end (#285,
+			// #427). The only live route here is an auth server too old to serve the
+			// field: an absent settings
 			// row already answers 500 on its side, and the settings API refuses to store
 			// an issuer shorter than three characters.
 			//

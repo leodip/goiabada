@@ -395,7 +395,7 @@ command itself and fails on a tree it changed.
 | `core/sessionstore` | `Record` | kernel | — |
 | `core/sessionstore` | `Regenerator` | both-apps | — |
 | `core/sessionstore` | `ServerSideStore` | own-package | — |
-| `core/sessionstore` | `Session` | own-package | — |
+| `core/sessionstore` | `Session` | both-apps | — |
 | `core/sessionstore` | `SessionIdBytes` | own-package | — |
 | `core/sessionstore` | `Store` | kernel | — |
 | `core/sessionstore` | `TouchThreshold` | own-package | — |

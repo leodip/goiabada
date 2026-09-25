@@ -206,12 +206,12 @@ func TestAccountHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContext(
 				// session before it asks the auth server to end the upstream one.
 				return HandleAccountLogoutGet(h, newFlashTestStore(), c)
 			},
-			// The logout page reads the parsed token pointers rather than the raw bearer, and
-			// takes its unauthenticated arm without both of them.
+			// The logout page reads the verified ID token beside the bearer string, and takes its
+			// unauthenticated arm without both of them.
 			request: handlertest.Request(http.MethodGet, "/account/logout",
 				handlertest.WithJwtInfo(oauthclient.JwtInfo{
-					IdToken:     &oauth.JwtToken{TokenBase64: "the.id.token"},
-					AccessToken: &oauth.JwtToken{TokenBase64: handlertest.AccessToken},
+					TokenResponse: oauth.TokenResponse{AccessToken: handlertest.AccessToken},
+					IdToken:       &oauth.JwtToken{TokenBase64: "the.id.token"},
 				})),
 		},
 		{

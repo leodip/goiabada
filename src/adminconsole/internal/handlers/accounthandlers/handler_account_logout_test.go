@@ -33,21 +33,25 @@ type logoutApiClient struct {
 	redirect *api.AccountLogoutRedirectResponse
 
 	got *api.AccountLogoutRequest
+	// gotBearer is the access token the call was made with.
+	gotBearer string
 }
 
 func (c *logoutApiClient) CreateAccountLogoutRequest(_ context.Context, accessToken string, request *api.AccountLogoutRequest) (
 	*api.AccountLogoutFormPostResponse, *api.AccountLogoutRedirectResponse, error) {
 	c.got = request
+	c.gotBearer = accessToken
 	return c.form, c.redirect, nil
 }
 
-// logoutRequest is a visitor holding the parsed tokens this page reads. WithAccessToken alone leaves
-// IdToken and AccessToken nil, which is the handler's unauthenticated arm.
+// logoutRequest is a visitor holding what this page reads: a verified ID token and the access
+// token string. WithAccessToken alone leaves IdToken nil, which is the handler's unauthenticated
+// arm.
 func logoutRequest() *http.Request {
 	return handlertest.Request(http.MethodGet, "/account/logout",
 		handlertest.WithJwtInfo(oauthclient.JwtInfo{
-			IdToken:     &oauth.JwtToken{TokenBase64: "the.id.token"},
-			AccessToken: &oauth.JwtToken{TokenBase64: handlertest.AccessToken},
+			TokenResponse: oauth.TokenResponse{AccessToken: handlertest.AccessToken},
+			IdToken:       &oauth.JwtToken{TokenBase64: "the.id.token"},
 		}))
 }
 
@@ -73,6 +77,8 @@ func TestHandleAccountLogoutGet_AsksForTheFormPostModeAndRendersTheForm(t *testi
 	require.NotNil(t, apiClient.got, "the handler must reach the API")
 	assert.Equal(t, api.AccountLogoutResponseModeFormPost, apiClient.got.ResponseMode,
 		"asking for the redirect mode is what puts the id_token_hint in a top-level URL")
+	assert.Equal(t, handlertest.AccessToken, apiClient.gotBearer,
+		"the bearer is the access token string the response carried, never a decoded token (#427)")
 	assert.NotEmpty(t, apiClient.got.State, "the console still sends a state")
 
 	// The session cookie is cleared whichever arm is taken, so a 302 here would be a redirect the
@@ -106,18 +112,33 @@ func TestHandleAccountLogoutGet_StillFollowsARedirectResponse(t *testing.T) {
 		rec.Header().Get("Location"))
 }
 
-// A visitor with no parsed tokens never reaches the API at all: the embedded interface would panic
-// on the call, so this case would fail loudly rather than quietly.
+// A visitor missing either the verified ID token or the access token string never reaches the API
+// at all: the embedded interface would panic on the call, so these cases would fail loudly rather
+// than quietly.
 func TestHandleAccountLogoutGet_WithoutTokensGoesHomeWithoutCallingTheAPI(t *testing.T) {
-	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-	handlertest.RefuseInternalServerError(t, httpHelper)
+	testCases := []struct {
+		name string
+		req  *http.Request
+	}{
+		{"an access token and no ID token",
+			handlertest.Request(http.MethodGet, "/account/logout", handlertest.WithAccessToken())},
+		{"an ID token and no access token",
+			handlertest.Request(http.MethodGet, "/account/logout",
+				handlertest.WithJwtInfo(oauthclient.JwtInfo{IdToken: &oauth.JwtToken{TokenBase64: "the.id.token"}}))},
+	}
 
-	apiClient := &logoutApiClient{}
-	rec := httptest.NewRecorder()
-	req := handlertest.Request(http.MethodGet, "/account/logout", handlertest.WithAccessToken())
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+			handlertest.RefuseInternalServerError(t, httpHelper)
 
-	HandleAccountLogoutGet(httpHelper, newFlashTestStore(), apiClient).ServeHTTP(rec, req)
+			apiClient := &logoutApiClient{}
+			rec := httptest.NewRecorder()
 
-	assert.Equal(t, http.StatusFound, rec.Code)
-	assert.Nil(t, apiClient.got, "there is no logout to prepare without an ID token")
+			HandleAccountLogoutGet(httpHelper, newFlashTestStore(), apiClient).ServeHTTP(rec, tc.req)
+
+			assert.Equal(t, http.StatusFound, rec.Code)
+			assert.Nil(t, apiClient.got, "there is no logout to prepare without both tokens")
+		})
+	}
 }

@@ -46,7 +46,7 @@ func HandleAccountLogoutGet(
 		}
 
 		// If we don't have a valid ID token, just go back to the console home
-		if jwtInfo.IdToken == nil || jwtInfo.AccessToken == nil {
+		if jwtInfo.IdToken == nil || jwtInfo.TokenResponse.AccessToken == "" {
 			http.Redirect(w, r, config.GetAdminConsole().BaseURL, http.StatusFound)
 			return
 		}
@@ -56,7 +56,7 @@ func HandleAccountLogoutGet(
 		// every proxy between here and the auth server; a self-submitting form carries it in a
 		// request body instead. The console is the one relying party shipped beside this server
 		// and has to follow the advice the integration docs give everyone else (#350 decision 2).
-		accessToken := jwtInfo.AccessToken.TokenBase64
+		accessToken := jwtInfo.TokenResponse.AccessToken
 		req := &api.AccountLogoutRequest{
 			PostLogoutRedirectUri: config.GetAdminConsole().BaseURL,
 			State:                 stringutil.GenerateSecurityRandomString(32),

@@ -279,7 +279,8 @@ func TestHandleAdminClientUserSessionsPost_TheAnswerFollowsIsCurrentOnTheRow(t *
 
 	testCases := []struct {
 		name string
-		// sid, when set, is the claim on the console's own parsed access token. Without it the
+		// sid, when set, is the claim on the console's own verified ID token, the one token it decodes
+		// now (#427), and the one a handler reading a claim would have left. Without it the
 		// request carries the bearer alone and no parsed token at all.
 		sid         string
 		sessions    []api.UserSessionDetailResponse
@@ -344,7 +345,7 @@ func TestHandleAdminClientUserSessionsPost_TheAnswerFollowsIsCurrentOnTheRow(t *
 			} else {
 				opts = append(opts, handlertest.WithJwtInfo(oauthclient.JwtInfo{
 					TokenResponse: oauth.TokenResponse{AccessToken: handlertest.AccessToken},
-					AccessToken:   &oauth.JwtToken{Claims: jwt.MapClaims{"sid": testCase.sid}},
+					IdToken:       &oauth.JwtToken{Claims: jwt.MapClaims{"sid": testCase.sid}},
 				}))
 			}
 
