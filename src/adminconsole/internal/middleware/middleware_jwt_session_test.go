@@ -329,9 +329,10 @@ func TestJwtSessionHandler_AStoredIDTokenThatNoLongerVerifiesIsSignedOutWithoutA
 
 // Decision 19 on real tokens. The mock above cannot prove this: which failures are foreign is the
 // parser's decision, so a mock answering a plain error proves only what the middleware does with
-// one. Here the stored ID token is signed by a key the JWKS no longer publishes and its access
-// token is due, so a middleware that fell through from step 3 to the refresh would send one.
-func TestJwtSessionHandler_AStoredIDTokenUnderARetiredKeyIsSignedOutWithoutARefresh(t *testing.T) {
+// one. Here the stored ID token is signed by a key the JWKS no longer publishes when the console
+// first fetches it, a console started after the key was removed, and its access token is due, so
+// a middleware that fell through from step 3 to the refresh would send one.
+func TestJwtSessionHandler_AStoredIDTokenUnderAKeyUnpublishedAtTheFirstFetchIsSignedOutWithoutARefresh(t *testing.T) {
 	h := newSessionHarness(t)
 
 	signing, retired := oauthclienttest.Keys(t)
@@ -355,6 +356,72 @@ func TestJwtSessionHandler_AStoredIDTokenUnderARetiredKeyIsSignedOutWithoutARefr
 	h.assertSignedOut(cookies)
 	h.assertOneRecord(slog.LevelWarn, "the stored id token no longer verifies, signing the session out",
 		"public key not found for token kid")
+}
+
+// Decision 20, the same on a warm cache: the console fetched the key while it was published and
+// the auth server removed it afterwards, which OIDC Core 10.1.1's refetch on an unfamiliar kid
+// never notices. Within the parser's ten-minute JWKS age the stored ID token still verifies; from
+// the age on, the next request refetches /certs, finds the key gone, and signs the session out
+// with no refresh sent although the access token is due.
+func TestJwtSessionHandler_AKeyRemovedAfterTheConsoleFetchedIt(t *testing.T) {
+	signing, _ := oauthclienttest.Keys(t)
+	stored := oauthclienttest.SignRS256(t, signing, "removed", oauthclienttest.ValidClaims())
+
+	// warm returns a parser that verified stored while its key was published, over a JWKS that
+	// has since removed it, and the clock the parser measures its cache's age by.
+	warm := func(t *testing.T) (*oauthclient.JWKSTokenParser, *oauthclienttest.JwksServer, *oauthclienttest.Clock) {
+		t.Helper()
+		jwks := oauthclienttest.NewMutableJwksServer(t, oauthclienttest.JwkFromPublicKey("removed", &signing.PublicKey))
+		clock := oauthclienttest.NewClock()
+		parser := oauthclient.NewJWKSTokenParser(jwks.URL, jwks.Client(), oauthclienttest.ClientID,
+			oauthclienttest.StaticIssuer(oauthclienttest.Issuer), oauthclient.WithClock(clock.Now))
+		_, err := parser.DecodeAndValidateStoredIDToken(context.Background(), stored)
+		require.NoError(t, err)
+		jwks.Publish()
+		return parser, jwks, clock
+	}
+	session := func(expiresAt int64) map[string]any {
+		response := storedResponse()
+		response.IdToken = stored
+		return map[string]any{
+			constants.SessionKeyJwt:          response,
+			constants.SessionKeyJwtExpiresAt: expiresAt,
+			"unrelated":                      "kept",
+		}
+	}
+
+	t.Run("within the age the stored ID token still verifies", func(t *testing.T) {
+		h := newSessionHarness(t)
+		parser, jwks, clock := warm(t)
+		cookies := h.seed(session(notDue()))
+		clock.Advance(10*time.Minute - time.Second)
+
+		out := h.serve(parser, cookies)
+
+		assert.True(t, out.reached)
+		require.NotNil(t, out.jwtInfo, "the administrator is still signed in")
+		require.NotNil(t, out.jwtInfo.IdToken)
+		assert.Equal(t, stored, out.jwtInfo.IdToken.TokenBase64)
+		assert.Equal(t, int32(1), jwks.Hits.Load(), "the cache answered")
+		h.assertNoRefreshSent()
+		assert.Empty(t, h.logs.Records())
+	})
+
+	t.Run("from the age the session is signed out without a refresh", func(t *testing.T) {
+		h := newSessionHarness(t)
+		parser, jwks, clock := warm(t)
+		cookies := h.seed(session(due()))
+		clock.Advance(10 * time.Minute)
+
+		out := h.serve(parser, cookies)
+
+		h.assertContinuedUnauthenticated(out)
+		h.assertNoRefreshSent()
+		h.assertSignedOut(cookies)
+		h.assertOneRecord(slog.LevelWarn, "the stored id token no longer verifies, signing the session out",
+			"public key not found for token kid")
+		assert.Equal(t, int32(2), jwks.Hits.Load(), "the age sent the parser back to /certs")
+	})
 }
 
 // Step 4: nothing is refreshed until the recorded expiry is within the margin, and an unknown
