@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/leodip/goiabada/adminconsole/internal/boundedread"
@@ -33,6 +34,16 @@ type issuerReader interface {
 	Issuer(ctx context.Context) string
 }
 
+// jwksMaxAge is how long a fetched JWKS answers for the keys it holds. OIDC Core 10.1.1 asks a
+// verifier only to "go back to the jwks_uri location to re-retrieve the keys when it sees an
+// unfamiliar kid value", and the auth server publishes its next key before signing with it, so
+// that rule alone never shows a running console that a key it cached has been removed: it kept
+// verifying the stored ID tokens a removed key had signed until a restart, or the second
+// rotation after its last fetch. Bounding the age means a removed key stops verifying within
+// this long, and the session whose ID token it signed is signed out on its next request. The
+// section neither requires nor forbids a bound; ten minutes is panva/jose's default (#427).
+const jwksMaxAge = 10 * time.Minute
+
 // JWKSTokenParser validates tokens using the auth server JWKS endpoint.
 // It does not rely on any database and is suitable for the admin console.
 type JWKSTokenParser struct {
@@ -40,25 +51,48 @@ type JWKSTokenParser struct {
 	httpClient *http.Client
 	clientID   string
 	issuer     issuerReader
+	now        func() time.Time
+
+	// fetchMu is held across a fetch of /certs, so the requests that find the cache wanting at
+	// the same moment make one fetch between them rather than one each.
+	fetchMu sync.Mutex
 
 	mu         sync.RWMutex
 	cachedJwks oauth.Jwks
+	fetchedAt  time.Time
+	// generation counts the fetches that replaced cachedJwks; it is how a request that waited
+	// on fetchMu tells that the fetch it was waiting for has already happened.
+	generation uint64
+}
+
+// ParserOption configures a JWKSTokenParser beyond what NewJWKSTokenParser requires.
+type ParserOption func(*JWKSTokenParser)
+
+// WithClock replaces the clock the parser measures its cached JWKS's age by, so a test can move
+// past the age without waiting for it.
+func WithClock(now func() time.Time) ParserOption {
+	return func(tp *JWKSTokenParser) { tp.now = now }
 }
 
 // NewJWKSTokenParser creates a JWKS-based token parser. The baseURL should be the
 // reachable base URL for the auth server (InternalBaseURL if set, otherwise BaseURL).
 // clientID is the console's client identifier, the one audience an ID token may name, and
 // issuer answers the issuer an ID token must name.
-func NewJWKSTokenParser(baseURL string, httpClient *http.Client, clientID string, issuer issuerReader) *JWKSTokenParser {
+func NewJWKSTokenParser(baseURL string, httpClient *http.Client, clientID string, issuer issuerReader, opts ...ParserOption) *JWKSTokenParser {
 	if httpClient == nil {
 		httpClient = &http.Client{Timeout: TokenExchangeTimeout}
 	}
-	return &JWKSTokenParser{
+	tp := &JWKSTokenParser{
 		jwksURL:    strings.TrimRight(baseURL, "/") + "/certs",
 		httpClient: httpClient,
 		clientID:   clientID,
 		issuer:     issuer,
+		now:        time.Now,
 	}
+	for _, opt := range opts {
+		opt(tp)
+	}
+	return tp
 }
 
 // DecodeAndValidateSignInResponse accepts the token response that completes a sign-in. It
@@ -276,17 +310,27 @@ func sameAudience(previous, refreshed *oauth.JwtToken) bool {
 	return len(previousSet) == len(refreshedSet)
 }
 
-// keyFunc finds the published key a token's kid names, refreshing the cached JWKS once when
-// the cache does not hold it.
+// keyFunc finds the published key a token's kid names. The cached JWKS answers while it is
+// younger than jwksMaxAge and holds the kid; otherwise /certs is fetched and the cache asked
+// again, so an unfamiliar kid (OIDC Core 10.1.1) and a cache past its age both reach the auth
+// server. A fetch that fails refuses the token rather than falling back to the cache it was
+// meant to replace, since a cache past its age is exactly the one that may still hold a removed
+// key; panva/jose fails a check whose reload failed the same way (#427).
+//
+// ceiling: a failed signature does not refetch, so were the auth server to publish new key
+// material under a kid already cached, tokens under the new material would be refused and
+// tokens under the old accepted until the cache's age lapsed. Revisit when a kid can be reused:
+// signingkeys.NewKeyPair gives every key pair a fresh UUID today.
 func (tp *JWKSTokenParser) keyFunc(ctx context.Context) jwt.Keyfunc {
 	return func(t *jwt.Token) (interface{}, error) {
 		kid, _ := t.Header["kid"].(string)
-		// Try cached first
-		if pub := tp.getPublicKeyFromCache(kid); pub != nil {
-			return pub, nil
+		generation, fresh := tp.cacheState()
+		if fresh {
+			if pub := tp.getPublicKeyFromCache(kid); pub != nil {
+				return pub, nil
+			}
 		}
-		// Refresh JWKS and try again
-		if err := tp.refreshJwks(ctx); err != nil {
+		if err := tp.refreshJwksSince(ctx, generation); err != nil {
 			return nil, err
 		}
 		if pub := tp.getPublicKeyFromCache(kid); pub != nil {
@@ -294,6 +338,30 @@ func (tp *JWKSTokenParser) keyFunc(ctx context.Context) jwt.Keyfunc {
 		}
 		return nil, errs.New("public key not found for token kid")
 	}
+}
+
+// cacheState answers the generation of the cached JWKS and whether it is younger than
+// jwksMaxAge. A parser that has never fetched has a zero fetchedAt, which is never fresh.
+func (tp *JWKSTokenParser) cacheState() (generation uint64, fresh bool) {
+	tp.mu.RLock()
+	defer tp.mu.RUnlock()
+	return tp.generation, tp.now().Sub(tp.fetchedAt) < jwksMaxAge
+}
+
+// refreshJwksSince fetches /certs unless the cache has been replaced since the caller found it
+// wanting at generation seen: a request that waited on fetchMu behind another request's fetch
+// uses that fetch rather than making its own.
+func (tp *JWKSTokenParser) refreshJwksSince(ctx context.Context, seen uint64) error {
+	tp.fetchMu.Lock()
+	defer tp.fetchMu.Unlock()
+
+	tp.mu.RLock()
+	replaced := tp.generation != seen
+	tp.mu.RUnlock()
+	if replaced {
+		return nil
+	}
+	return tp.refreshJwks(ctx)
 }
 
 func (tp *JWKSTokenParser) getPublicKeyFromCache(kid string) *rsa.PublicKey {
@@ -352,6 +420,8 @@ func (tp *JWKSTokenParser) refreshJwks(ctx context.Context) error {
 	}
 	tp.mu.Lock()
 	tp.cachedJwks = jwks
+	tp.fetchedAt = tp.now()
+	tp.generation++
 	tp.mu.Unlock()
 	return nil
 }

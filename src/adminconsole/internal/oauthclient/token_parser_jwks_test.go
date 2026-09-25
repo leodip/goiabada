@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -152,6 +153,227 @@ func TestJWKSTokenParser_SelectsCorrectKeyWhenSeveralArePublished(t *testing.T) 
 
 	assert.NoError(t, err)
 	assert.Equal(t, "1234567890", result.Claims["sub"])
+}
+
+// -----------------------------------------------------------------------------
+// The cache's age
+//
+// OIDC Core 10.1.1's rule, refetch on an unfamiliar kid, never shows a warm cache
+// that a key it holds has left /certs, because the auth server publishes its next
+// key before signing with it. So the cache answers for at most jwksMaxAge after
+// its fetch, and a removed key stops verifying from then on (#427).
+// -----------------------------------------------------------------------------
+
+// newWarmParser returns a parser over server, reading clock, that has verified
+// token once and so cached server's keys.
+func newWarmParser(t *testing.T, server *oauthclienttest.JwksServer, token string) (*JWKSTokenParser, *oauthclienttest.Clock) {
+	t.Helper()
+	clock := oauthclienttest.NewClock()
+	tp := NewJWKSTokenParser(server.URL, server.Client(), oauthclienttest.ClientID,
+		oauthclienttest.StaticIssuer(oauthclienttest.Issuer), WithClock(clock.Now))
+	_, err := tp.DecodeAndValidateStoredIDToken(context.Background(), token)
+	require.NoError(t, err, "the token verifies while its key is published")
+	require.Equal(t, int32(1), server.Hits.Load())
+	return tp, clock
+}
+
+// A key removed from /certs after the cache fetched it keeps verifying until the
+// cache's age, and not from the age on, in each shape a key leaves this auth
+// server's key set: the only key removed; its rotation, which deletes the old
+// current key and promotes a next key the cache already holds, so no unfamiliar
+// kid ever arrives; and a token with no kid against a single key that was swapped.
+func TestJWKSTokenParser_ARemovedKeyVerifiesUntilTheCacheIsPastItsAge(t *testing.T) {
+	removed, other := oauthclienttest.Keys(t)
+
+	testCases := []struct {
+		name      string
+		before    []oauth.Jwk
+		after     []oauth.Jwk
+		token     string
+		promoted  string // a token under the key the change promoted, verified from the cache
+		wantError error
+		wantText  string
+	}{
+		{
+			name:     "the only key removed",
+			before:   []oauth.Jwk{oauthclienttest.JwkFromPublicKey("removed", &removed.PublicKey)},
+			after:    nil,
+			token:    oauthclienttest.SignRS256(t, removed, "removed", oauthclienttest.ValidClaims()),
+			wantText: "public key not found for token kid",
+		},
+		{
+			name: "a rotation: next promoted, current deleted",
+			before: []oauth.Jwk{
+				oauthclienttest.JwkFromPublicKey("next", &other.PublicKey),
+				oauthclienttest.JwkFromPublicKey("removed", &removed.PublicKey),
+			},
+			after:    []oauth.Jwk{oauthclienttest.JwkFromPublicKey("next", &other.PublicKey)},
+			token:    oauthclienttest.SignRS256(t, removed, "removed", oauthclienttest.ValidClaims()),
+			promoted: oauthclienttest.SignRS256(t, other, "next", oauthclienttest.ValidClaims()),
+			wantText: "public key not found for token kid",
+		},
+		{
+			name:      "no kid, and the one key swapped",
+			before:    []oauth.Jwk{oauthclienttest.JwkFromPublicKey("removed", &removed.PublicKey)},
+			after:     []oauth.Jwk{oauthclienttest.JwkFromPublicKey("new", &other.PublicKey)},
+			token:     oauthclienttest.SignRS256(t, removed, "", oauthclienttest.ValidClaims()),
+			wantError: jwt.ErrTokenSignatureInvalid,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			server := oauthclienttest.NewMutableJwksServer(t, tc.before...)
+			tp, clock := newWarmParser(t, server, tc.token)
+			server.Publish(tc.after...)
+
+			clock.Advance(jwksMaxAge - time.Second)
+			result, err := tp.DecodeAndValidateStoredIDToken(context.Background(), tc.token)
+			require.NoError(t, err, "within the age the cache still answers for the removed key")
+			assert.Equal(t, tc.token, result.TokenBase64)
+			if tc.promoted != "" {
+				_, err = tp.DecodeAndValidateStoredIDToken(context.Background(), tc.promoted)
+				require.NoError(t, err, "the promoted key was already cached")
+			}
+			assert.Equal(t, int32(1), server.Hits.Load(), "nothing sent the cache back to /certs")
+
+			clock.Advance(time.Second)
+			result, err = tp.DecodeAndValidateStoredIDToken(context.Background(), tc.token)
+			require.Error(t, err, "at the age the keys are refetched and the removed one is gone")
+			assert.Nil(t, result)
+			if tc.wantError != nil {
+				assert.ErrorIs(t, err, tc.wantError)
+			}
+			if tc.wantText != "" {
+				assert.Contains(t, err.Error(), tc.wantText)
+			}
+			assert.Equal(t, int32(2), server.Hits.Load(), "one refetch")
+		})
+	}
+}
+
+// A refetch restarts the age: the keys it brought answer for another jwksMaxAge,
+// not only until the first fetch's age.
+func TestJWKSTokenParser_ARefetchRestartsTheCachesAge(t *testing.T) {
+	key, _ := oauthclienttest.Keys(t)
+	server := oauthclienttest.NewMutableJwksServer(t, oauthclienttest.JwkFromPublicKey("key-1", &key.PublicKey))
+	token := oauthclienttest.SignRS256(t, key, "key-1", oauthclienttest.ValidClaims())
+	tp, clock := newWarmParser(t, server, token)
+
+	verify := func() {
+		t.Helper()
+		_, err := tp.DecodeAndValidateStoredIDToken(context.Background(), token)
+		require.NoError(t, err)
+	}
+
+	clock.Advance(jwksMaxAge)
+	verify()
+	assert.Equal(t, int32(2), server.Hits.Load(), "the age lapsed, so the keys were refetched")
+
+	clock.Advance(jwksMaxAge - time.Second)
+	verify()
+	assert.Equal(t, int32(2), server.Hits.Load(), "the refetched keys answer for a whole age")
+
+	clock.Advance(time.Second)
+	verify()
+	assert.Equal(t, int32(3), server.Hits.Load(), "and not past it")
+}
+
+// A cache past its age is not trusted for want of a newer one: when /certs cannot
+// be fetched, the token is refused rather than verified against the keys the fetch
+// was meant to replace. Within the age an unreachable /certs changes nothing,
+// because nothing asks it, and a fetch that failed is retried by the next check
+// rather than remembered.
+func TestJWKSTokenParser_RefusesATokenWhenTheKeysCannotBeRefetchedPastTheAge(t *testing.T) {
+	key, _ := oauthclienttest.Keys(t)
+	server := oauthclienttest.NewMutableJwksServer(t, oauthclienttest.JwkFromPublicKey("key-1", &key.PublicKey))
+	token := oauthclienttest.SignRS256(t, key, "key-1", oauthclienttest.ValidClaims())
+	tp, clock := newWarmParser(t, server, token)
+	server.GoDown()
+
+	clock.Advance(jwksMaxAge - time.Second)
+	_, err := tp.DecodeAndValidateStoredIDToken(context.Background(), token)
+	require.NoError(t, err, "within the age the cache answers without asking /certs")
+	assert.Equal(t, int32(1), server.Hits.Load())
+
+	clock.Advance(time.Second)
+	for attempt := int32(2); attempt <= 3; attempt++ {
+		result, err := tp.DecodeAndValidateStoredIDToken(context.Background(), token)
+		require.Error(t, err, "past the age a failed refetch refuses the token")
+		assert.Nil(t, result)
+		assert.Contains(t, err.Error(), "failed to fetch JWKS")
+		assert.Equal(t, attempt, server.Hits.Load(), "each check tries /certs again")
+	}
+}
+
+// OIDC Core 10.1.1's half, on a warm cache and inside the age: an unfamiliar kid
+// sends the parser back to /certs, and what it fetches replaces the cache whole,
+// so a key the auth server has removed meanwhile is refused from then on.
+func TestJWKSTokenParser_AnUnfamiliarKidRefetchesWithinTheAge(t *testing.T) {
+	removed, promoted := oauthclienttest.Keys(t)
+	server := oauthclienttest.NewMutableJwksServer(t, oauthclienttest.JwkFromPublicKey("removed", &removed.PublicKey))
+	underRemoved := oauthclienttest.SignRS256(t, removed, "removed", oauthclienttest.ValidClaims())
+	tp, _ := newWarmParser(t, server, underRemoved)
+	server.Publish(oauthclienttest.JwkFromPublicKey("promoted", &promoted.PublicKey))
+
+	_, err := tp.DecodeAndValidateStoredIDToken(context.Background(),
+		oauthclienttest.SignRS256(t, promoted, "promoted", oauthclienttest.ValidClaims()))
+	require.NoError(t, err)
+	assert.Equal(t, int32(2), server.Hits.Load(), "the unfamiliar kid was refetched")
+
+	_, err = tp.DecodeAndValidateStoredIDToken(context.Background(), underRemoved)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "public key not found for token kid")
+}
+
+// Requests that find the cache wanting together make one fetch between them: one
+// that waited on the fetch lock behind another's fetch finds the generation it saw
+// replaced and uses that fetch. A caller whose generation is current fetches.
+func TestRefreshJwksSince_UsesAFetchThatLandedWhileItWaited(t *testing.T) {
+	key, _ := oauthclienttest.Keys(t)
+	server := oauthclienttest.NewMutableJwksServer(t, oauthclienttest.JwkFromPublicKey("key-1", &key.PublicKey))
+	tp := NewJWKSTokenParser(server.URL, server.Client(), oauthclienttest.ClientID, oauthclienttest.StaticIssuer(oauthclienttest.Issuer))
+
+	require.NoError(t, tp.refreshJwksSince(context.Background(), 0))
+	assert.Equal(t, int32(1), server.Hits.Load(), "the caller's generation was current, so it fetched")
+
+	require.NoError(t, tp.refreshJwksSince(context.Background(), 0))
+	assert.Equal(t, int32(1), server.Hits.Load(), "generation 0 was replaced while it waited, so no second fetch")
+
+	require.NoError(t, tp.refreshJwksSince(context.Background(), 1))
+	assert.Equal(t, int32(2), server.Hits.Load())
+}
+
+// The same promise through the public method: however many checks find the cache
+// past its age at once, /certs is fetched once. That holds in every interleaving,
+// since a check that looks before the refetch lands waits on it and finds its
+// generation replaced, and one that looks after finds the cache fresh. The race
+// tier runs this over the parser's two locks.
+func TestJWKSTokenParser_ChecksThatFindTheCachePastItsAgeTogetherFetchOnce(t *testing.T) {
+	key, _ := oauthclienttest.Keys(t)
+	server := oauthclienttest.NewMutableJwksServer(t, oauthclienttest.JwkFromPublicKey("key-1", &key.PublicKey))
+	token := oauthclienttest.SignRS256(t, key, "key-1", oauthclienttest.ValidClaims())
+	tp, clock := newWarmParser(t, server, token)
+	clock.Advance(jwksMaxAge)
+
+	const checks = 8
+	results := make(chan error, checks)
+	var wg sync.WaitGroup
+	for range checks {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, err := tp.DecodeAndValidateStoredIDToken(context.Background(), token)
+			results <- err
+		}()
+	}
+	wg.Wait()
+	close(results)
+
+	for err := range results {
+		assert.NoError(t, err)
+	}
+	assert.Equal(t, int32(2), server.Hits.Load(), "the warm-up's fetch and one refetch between all of them")
 }
 
 // -----------------------------------------------------------------------------

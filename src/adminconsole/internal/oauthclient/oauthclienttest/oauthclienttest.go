@@ -81,18 +81,86 @@ func JwkFromPublicKey(kid string, pub *rsa.PublicKey) oauth.Jwk {
 // can assert the parser caches rather than refetching per token.
 func NewJwksServer(t testing.TB, keys ...oauth.Jwk) (*httptest.Server, *atomic.Int32) {
 	t.Helper()
-	var hits atomic.Int32
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := NewMutableJwksServer(t, keys...)
+	return server.Server, &server.Hits
+}
+
+// JwksServer serves at /certs the keys it was last told to publish and counts the fetches, so a
+// test can change the auth server's key set under a parser that has already cached it.
+type JwksServer struct {
+	*httptest.Server
+	// Hits counts the requests for /certs, answered or refused.
+	Hits atomic.Int32
+
+	mu   sync.Mutex
+	keys []oauth.Jwk
+	down bool
+}
+
+// NewMutableJwksServer starts a JwksServer publishing keys.
+func NewMutableJwksServer(t testing.TB, keys ...oauth.Jwk) *JwksServer {
+	t.Helper()
+	s := &JwksServer{keys: keys}
+	s.Server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/certs" {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
-		hits.Add(1)
+		s.Hits.Add(1)
+		s.mu.Lock()
+		keys, down := s.keys, s.down
+		s.mu.Unlock()
+		if down {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(oauth.Jwks{Keys: keys})
 	}))
-	t.Cleanup(server.Close)
-	return server, &hits
+	t.Cleanup(s.Close)
+	return s
+}
+
+// Publish replaces the keys /certs publishes, as a rotation or a key deletion on the auth
+// server does.
+func (s *JwksServer) Publish(keys ...oauth.Jwk) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.keys = keys
+}
+
+// GoDown makes /certs answer 503 from now on, an auth server that cannot give out its keys.
+func (s *JwksServer) GoDown() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.down = true
+}
+
+// Clock is a clock a test moves by hand, for the parser's JWKS age, which is all the parser
+// reads it for: a token's exp and nbf are still checked against the real time. It starts at the
+// real time.
+type Clock struct {
+	mu  sync.Mutex
+	now time.Time
+}
+
+// NewClock returns a Clock reading the real time until it is moved.
+func NewClock() *Clock {
+	return &Clock{now: time.Now()}
+}
+
+// Now reads the clock.
+func (c *Clock) Now() time.Time {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.now
+}
+
+// Advance moves the clock forward by d.
+func (c *Clock) Advance(d time.Duration) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.now = c.now.Add(d)
 }
 
 // SignRS256 signs claims with key, naming kid in the header unless it is empty.
