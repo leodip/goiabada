@@ -39,4 +39,6 @@ func TestConstants_SessionKeysAreStoredData(t *testing.T) {
 	assert.Equal(t, "RedirectURI", SessionKeyRedirectURI)
 	assert.Equal(t, "CodeVerifier", SessionKeyCodeVerifier)
 	assert.Equal(t, "RedirectBack", SessionKeyRedirectBack)
+	assert.Equal(t, "JwtExpiresAt", SessionKeyJwtExpiresAt)
+	assert.Equal(t, "RequestedScope", SessionKeyRequestedScope)
 }

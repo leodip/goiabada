@@ -3,7 +3,6 @@ package handlers
 import (
 	"bytes"
 	"context"
-	"crypto/rsa"
 	"net/http"
 
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
@@ -29,9 +28,10 @@ type IdentifierValidator interface {
 	ValidateIdentifier(identifier string, enforceMinLength bool) error
 }
 
+// TokenParser is the sign-in's one question to the parser: is this token response, answering a
+// sign-in that sent this nonce, one the console may accept.
 type TokenParser interface {
-	DecodeAndValidateTokenString(ctx context.Context, token string, pubKey *rsa.PublicKey, withExpirationCheck bool) (*oauth.JwtToken, error)
-	DecodeAndValidateTokenResponse(ctx context.Context, tokenResponse *oauth.TokenResponse) (*oauthclient.JwtInfo, error)
+	DecodeAndValidateSignInResponse(ctx context.Context, tokenResponse *oauth.TokenResponse, nonce string) (*oauthclient.JwtInfo, error)
 }
 
 type TokenExchanger interface {

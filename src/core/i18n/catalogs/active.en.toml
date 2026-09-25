@@ -291,6 +291,21 @@
 "adminconsole.error.settings_unavailable" = "Unable to load the configuration from the auth server. You can find further information in the server logs."
 "adminconsole.error.issuer_missing" = "The auth server did not report an issuer. It may be running a version older than this admin console."
 
+# The sign-in refusal page (#427). 400s say what the browser can do about it; 500s
+# say what an operator should check, and share one message per kind on purpose.
+"adminconsole.sign_in_error.page_title" = "Sign-in"
+"adminconsole.sign_in_error.session.title" = "This sign-in can't be finished"
+"adminconsole.sign_in_error.session.body" = "It may have expired, been started in another tab or window, or been interrupted."
+"adminconsole.sign_in_error.no_session.body" = "Your browser didn't bring this sign-in's session back. This happens when the sign-in took too long, when cookies are blocked, or when the admin console and the auth server are on different sites."
+"adminconsole.sign_in_error.refused.title" = "The auth server refused the sign-in"
+"adminconsole.sign_in_error.refused.body_description" = "It said: {{.description}}"
+"adminconsole.sign_in_error.refused.body_code" = "It answered with the error code {{.code}} and no description."
+"adminconsole.sign_in_error.failed.title" = "Sign-in failed"
+"adminconsole.sign_in_error.exchange.body" = "The admin console could not complete the sign-in with the auth server. This usually means the console's client secret or the auth server's address is wrong."
+"adminconsole.sign_in_error.unverified.body" = "The auth server's answer could not be verified. This usually means the admin console and the auth server disagree about the issuer or the client."
+"adminconsole.sign_in_error.start_again" = "Start again"
+"adminconsole.sign_in_error.log_line" = "The server log records the cause under this request id:"
+
 "adminconsole.not_found.page_title" = "Not found"
 "adminconsole.not_found.title" = "Not found (404)"
 "adminconsole.not_found.body" = "Sorry, the page you are looking for could not be found. Please check the URL and try again."

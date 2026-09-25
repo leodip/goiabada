@@ -10,12 +10,11 @@ import (
 	"time"
 
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
-	"github.com/leodip/goiabada/adminconsole/internal/constants"
+	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
-	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -69,15 +68,11 @@ func (e *contextRecordingExchanger) ExchangeCodeForTokens(ctx context.Context, c
 // its save (#338).
 func TestHandleAuthCallbackPost_DetachesTheExchangeFromTheBrowsersContext(t *testing.T) {
 	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-	httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).Return()
+	handlertest.RefuseInternalServerError(t, httpHelper)
+	handlertest.ExpectRender(httpHelper, "/layouts/no_menu_layout.html", "/sign_in_error.html").Once()
 
-	session := &sessionstore.Session{Values: map[string]any{
-		constants.SessionKeyState:        "the-state",
-		constants.SessionKeyCodeVerifier: "the-code-verifier",
-		constants.SessionKeyRedirectURI:  "https://adminconsole.example/auth/callback",
-	}}
 	httpSession := mocks_sessionstore.NewStore(t)
-	httpSession.On("Get", mock.Anything, coreconstants.AdminConsoleSessionName).Return(session, nil)
+	httpSession.On("Get", mock.Anything, coreconstants.AdminConsoleSessionName).Return(handshakeSession(), nil)
 
 	form := url.Values{"state": {"the-state"}, "code": {"the-code"}}
 	req := httptest.NewRequest(http.MethodPost, "/auth/callback", strings.NewReader(form.Encode()))

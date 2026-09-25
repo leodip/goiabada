@@ -20,18 +20,19 @@ import (
 // Rotating the handle at the moment the session becomes authenticated is what puts the
 // immunity back (#266).
 //
-// Why a source lint rather than a test that drives the handler. The missing call was
+// Why a source lint as well as a test that drives the handler. The missing call was
 // invisible to every other instrument: nothing failed, nothing was red, and the module's
 // sign-in worked perfectly, because a rotation that never happens is inert rather than
-// broken. That is the same reason csrf_lint_test.go in this package exists. This module
-// has no handler test harness at all (#237) and building one is a different change, so
-// there is no mock store to observe the call on either.
+// broken. That is the same reason csrf_lint_test.go in this package exists. The sign-in's
+// rotation is now observed as behaviour too, by
+// TestHandleAuthCallbackPost_SignsInAndRotatesTheIdentifier over a real store (#427); this
+// lint stays as the floor for every writer, including any a later change adds.
 //
 // What it proves and what it does not. It proves that the file which writes the token set
 // at the privilege transition also reaches the store's rotation, which is what a copy-paste,
 // a revert or a rewritten handler would drop. It does not prove the two are on the same path,
-// and nothing lexical could. The store's own half, that rotation issues a different identifier
-// and removes the old row, is real behaviour and is covered at
+// and nothing lexical could; the callback's test above is what does. The store's own half,
+// that rotation issues a different identifier and removes the old row, is covered at
 // core/sessionstore.TestServerSideStore_RegenerateRotatesAnAdminConsoleSession; the auth
 // server's equivalent site is observed end to end, through a real cookie jar, at
 // TestBrowserSession_IdentifierRotatesAtSignIn.

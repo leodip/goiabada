@@ -128,6 +128,7 @@ func (m *MiddlewareJwt) JwtSessionHandler() func(http.Handler) http.Handler {
 					if refreshErr != nil || !refreshed {
 						// If refresh failed, clear the session and continue
 						delete(sess.Values, constants.SessionKeyJwt)
+						delete(sess.Values, constants.SessionKeyJwtExpiresAt)
 						saveErr := m.sessionStore.Save(r, w, sess)
 						if saveErr != nil {
 							m.errorRenderer.InternalServerError(w, r, errs.Wrap(saveErr, "unable to save the session"))
@@ -161,6 +162,7 @@ func (m *MiddlewareJwt) JwtSessionHandler() func(http.Handler) http.Handler {
 
 						// Clear the session
 						delete(sess.Values, constants.SessionKeyJwt)
+						delete(sess.Values, constants.SessionKeyJwtExpiresAt)
 						err := m.sessionStore.Save(r, w, sess)
 						if err != nil {
 							m.errorRenderer.InternalServerError(w, r, errs.Wrap(err, "unable to save the session"))
