@@ -10,6 +10,12 @@
             <h1 class="font-bold text-7xl">{{ .appName }}</h1>
             <h3>{{ T $.ctx "adminconsole.welcome.subtitle" }}</h3>
 
+            {{if .SessionEnded}}
+            <div class="w-full mt-6 text-center">
+                <p class="text-warning">{{ T $.ctx "adminconsole.session_ended.message" }}</p>
+            </div>
+            {{end}}
+
             {{if .IsAuthenticated}}
             <div class="w-full mt-6 mb-4 text-center">
                 <span class="px-4 py-2 rounded-full bg-neutral text-neutral-content">

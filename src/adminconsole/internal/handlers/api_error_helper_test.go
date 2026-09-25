@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -9,6 +10,7 @@ import (
 	mocks_handlerhelpers "github.com/leodip/goiabada/adminconsole/internal/handlerhelpers/mocks"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/i18n"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -152,10 +154,23 @@ func TestHandleAPIErrorWithCallback_RendersAWrappedBadRequest(t *testing.T) {
 // path's 400 rather than displace it, and everything else has to stay a 500 (#279 decision 11).
 func TestHandleAPIError_RoutesOnStatus(t *testing.T) {
 	testCases := []struct {
-		name         string
-		err          error
-		wantNotFound bool
+		name             string
+		err              error
+		wantNotFound     bool
+		wantSessionEnded bool
 	}{
+		// #427 decision 17: the admin API refused the console's access token, so the administrator
+		// is signed out and told why, rather than shown the 500 page.
+		{
+			name:             "a 401 sends the browser to the session-ended route",
+			err:              &apiclient.APIError{Code: "invalid_token", Message: "Session has been terminated", StatusCode: http.StatusUnauthorized},
+			wantSessionEnded: true,
+		},
+		{
+			name:             "a wrapped 401 still sends the browser to the session-ended route",
+			err:              errs.Wrap(&apiclient.APIError{Code: "invalid_token", Message: "Session has expired", StatusCode: http.StatusUnauthorized}, "unable to load the client"),
+			wantSessionEnded: true,
+		},
 		{
 			name:         "a 404 is answered with the 404 page",
 			err:          &apiclient.APIError{Code: "NOT_FOUND", Message: "Client not found", StatusCode: http.StatusNotFound},
@@ -191,29 +206,60 @@ func TestHandleAPIError_RoutesOnStatus(t *testing.T) {
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-			if testCase.wantNotFound {
+			switch {
+			case testCase.wantSessionEnded:
+				// No expectation: the mock fails on any page writer.
+			case testCase.wantNotFound:
 				httpHelper.On("NotFound", mock.Anything, mock.Anything).Return().Once()
-			} else {
+			default:
 				httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).Return().Once()
 			}
 
-			HandleAPIError(httpHelper, httptest.NewRecorder(),
+			w := httptest.NewRecorder()
+			HandleAPIError(httpHelper, w,
 				httptest.NewRequest(http.MethodGet, "/admin/clients/42/settings", nil), testCase.err)
 
 			httpHelper.AssertExpectations(t)
+			assertSessionEndedRedirect(t, w, testCase.wantSessionEnded)
 		})
 	}
+}
+
+// assertSessionEndedRedirect asserts that w is the redirect to the session-ended route exactly when
+// want says it should be.
+func assertSessionEndedRedirect(t *testing.T, w *httptest.ResponseRecorder, want bool) {
+	t.Helper()
+	if want {
+		assert.Equal(t, http.StatusFound, w.Code)
+		assert.Equal(t, "/auth/session-ended", w.Header().Get("Location"))
+		return
+	}
+	assert.NotEqual(t, "/auth/session-ended", w.Header().Get("Location"),
+		"only a 401 signs the administrator out")
 }
 
 // The form path's own table. A 400 still re-renders the form with the API's sentence, which is what
 // #122 established; a 404 means the thing the form edits is gone, so there is no form to re-render.
 func TestHandleAPIErrorWithCallback_RoutesOnStatus(t *testing.T) {
 	testCases := []struct {
-		name         string
-		err          error
-		wantNotFound bool
-		wantRendered string
+		name             string
+		err              error
+		wantNotFound     bool
+		wantSessionEnded bool
+		wantRendered     string
 	}{
+		// No resubmission can succeed with a token the admin API refused, so a 401 never reaches
+		// the form (#427 decision 17).
+		{
+			name:             "a 401 sends the browser to the session-ended route and never reaches the form",
+			err:              &apiclient.APIError{Code: "invalid_token", Message: "Session has been terminated", StatusCode: http.StatusUnauthorized},
+			wantSessionEnded: true,
+		},
+		{
+			name:             "a wrapped 401 still sends the browser to the session-ended route",
+			err:              errs.Wrap(&apiclient.APIError{Code: "invalid_token", Message: "Session has expired", StatusCode: http.StatusUnauthorized}, "unable to save the client"),
+			wantSessionEnded: true,
+		},
 		{
 			name:         "a 404 is answered with the 404 page and never reaches the form",
 			err:          &apiclient.APIError{Code: "NOT_FOUND", Message: "Client not found", StatusCode: http.StatusNotFound},
@@ -255,6 +301,8 @@ func TestHandleAPIErrorWithCallback_RoutesOnStatus(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 			switch {
+			case testCase.wantSessionEnded:
+				// No expectation: the mock fails on any page writer.
 			case testCase.wantNotFound:
 				httpHelper.On("NotFound", mock.Anything, mock.Anything).Return().Once()
 			case testCase.wantRendered == "":
@@ -262,12 +310,14 @@ func TestHandleAPIErrorWithCallback_RoutesOnStatus(t *testing.T) {
 			}
 
 			rendered := ""
-			HandleAPIErrorWithCallback(httpHelper, httptest.NewRecorder(),
+			w := httptest.NewRecorder()
+			HandleAPIErrorWithCallback(httpHelper, w,
 				httptest.NewRequest(http.MethodPost, "/admin/clients/42/settings", nil), testCase.err,
 				func(message string) { rendered = message })
 
 			assert.Equal(t, testCase.wantRendered, rendered)
 			httpHelper.AssertExpectations(t)
+			assertSessionEndedRedirect(t, w, testCase.wantSessionEnded)
 		})
 	}
 }
@@ -331,4 +381,70 @@ func TestHandleAPIErrorJson_AnswersNotFound(t *testing.T) {
 	assert.Equal(t, "not_found", detail.GetCode())
 	assert.NotContains(t, detail.GetDescription(), "User not found",
 		"the API's own sentence is not forwarded; the console shows the sentence its 404 page shows")
+}
+
+// #427 decisions 17 and 18, the AJAX half. An admin API 401 is answered 403, since the console has
+// no WWW-Authenticate challenge a 401 would owe, with the code the browser's three fetch sites
+// follow to the session-ended route and the console's own sentence in the request's locale. The
+// API's sentence is not forwarded: it names which of the auth server's checks refused the token.
+func TestHandleAPIErrorJson_AnswersA401AsTheSessionEnded(t *testing.T) {
+	testCases := []struct {
+		name     string
+		err      error
+		locale   string
+		wantText string
+	}{
+		{
+			name:     "a 401, in English",
+			err:      &apiclient.APIError{Code: "invalid_token", Message: "Session has been terminated", StatusCode: http.StatusUnauthorized},
+			locale:   "en",
+			wantText: "Your sign-in has ended. Sign in again.",
+		},
+		{
+			name:     "a wrapped 401, in the request's locale",
+			err:      errs.Wrap(&apiclient.APIError{Code: "invalid_token", Message: "Session has expired", StatusCode: http.StatusUnauthorized}, "unable to upload the picture"),
+			locale:   "pt-BR",
+			wantText: "Seu acesso terminou. Entre novamente.",
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+			captured := captureJsonError(httpHelper)
+
+			req := httptest.NewRequest(http.MethodPost, "/account/picture", nil)
+			req = req.WithContext(i18n.WithLocale(req.Context(), true, testCase.locale))
+			HandleAPIErrorJson(httpHelper, httptest.NewRecorder(), req, testCase.err)
+
+			detail, ok := (*captured).(*customerrors.ErrorDetail)
+			require.True(t, ok, "expected an *customerrors.ErrorDetail, got %T", *captured)
+			assert.Equal(t, http.StatusForbidden, detail.GetHttpStatusCode())
+			assert.Equal(t, "session_ended", detail.GetCode())
+			assert.Equal(t, testCase.wantText, detail.GetDescription())
+		})
+	}
+}
+
+// The browser signs the administrator out on the code alone, so no other status may carry it: a 403
+// from the API is a missing permission, and signing out over it would lose the page for nothing.
+func TestHandleAPIErrorJson_NoOtherStatusCarriesTheSessionEndedCode(t *testing.T) {
+	for _, status := range []int{
+		http.StatusBadRequest, http.StatusForbidden, http.StatusNotFound, http.StatusConflict,
+		http.StatusInternalServerError, http.StatusBadGateway,
+	} {
+		t.Run(http.StatusText(status), func(t *testing.T) {
+			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+			captured := captureJsonError(httpHelper)
+
+			HandleAPIErrorJson(httpHelper, httptest.NewRecorder(),
+				httptest.NewRequest(http.MethodPost, "/account/picture", nil),
+				&apiclient.APIError{Code: "SOME_CODE", Message: "a sentence", StatusCode: status})
+
+			var detail *customerrors.ErrorDetail
+			if errors.As(*captured, &detail) {
+				assert.NotEqual(t, "session_ended", detail.GetCode())
+			}
+		})
+	}
 }

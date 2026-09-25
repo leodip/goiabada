@@ -35,6 +35,22 @@ function escapeHtml(str) {
     .split("'").join("&#39;");
 }
 
+// The error code the console answers an AJAX request with when the admin API refused its access
+// token, and the route that then signs the administrator out and says why on the home page. The
+// code is HandleAPIErrorJson's sessionEndedCode and the path its sessionEndedPath; a drift test in
+// internal/handlers holds the three to each other. Every fetch site here and in image-upload.js
+// keys on the code rather than on the 403 it arrives with, so no other 403 signs anybody out (#427).
+const SESSION_ENDED_CODE = "session_ended";
+const SESSION_ENDED_PATH = "/auth/session-ended";
+
+function isSessionEnded(err) {
+  return err !== null && typeof err === "object" && err.error === SESSION_ENDED_CODE;
+}
+
+function goToSessionEnded() {
+  window.location.assign(SESSION_ENDED_PATH);
+}
+
 function showModalDialog(id, title, message, btn1callback, btn2callback) {
   document.getElementById(id + "_modalDialogTitle").innerText = title;
   document.getElementById(id + "_modalDialogMessage").innerHTML = message;
@@ -149,6 +165,16 @@ function sendAjaxRequest(props) {
           response.text().then((text) => {
             try {
               const err = JSON.parse(text);
+              // The admin API refused the access token: say so, and sign out once the dialog
+              // closes, by its button or by Escape alike.
+              if (isSessionEnded(err)) {
+                setLoading(false);
+                showModalDialog(props.modalId, t("js.error.session_expired_title"),
+                  escapeHtml(err.error_description));
+                document.getElementById(props.modalId + "_modalDialog")
+                  .addEventListener("close", goToSessionEnded, { once: true });
+                return;
+              }
               // The title says whose mistake it was. A 5xx is the server's, so it is
               // "Server error"; a 400, 404 or 409 is a rejected value, a stale record or
               // a conflict, and the sentence below already explains it, so the title is
