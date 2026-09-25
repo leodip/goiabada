@@ -27,24 +27,3 @@ func TestHashString(t *testing.T) {
 		})
 	}
 }
-
-func TestVerifyStringHash(t *testing.T) {
-	tests := []struct {
-		name         string
-		hashedString string
-		input        string
-		wantVerified bool
-	}{
-		{"Correct hash", "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9", "hello world", true},
-		{"Incorrect hash", "incorrecthash", "hello world", false},
-		{"Empty string", "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "", true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := VerifyStringHash(tt.hashedString, tt.input); got != tt.wantVerified {
-				t.Errorf("VerifyStringHash() = %v, want %v", got, tt.wantVerified)
-			}
-		})
-	}
-}

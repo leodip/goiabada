@@ -1,7 +1,7 @@
-// Package hashutil hashes a string with SHA-256 and checks one against its hash. It stays in core
-// while the rest of what this package held moved to authserver/internal/passwordhash, because both
-// processes reach it independently: the auth server hashes authorization, verification and reset
-// codes to locate rows, and the admin console hashes the nonce it sends and re-checks it (#360).
+// Package hashutil hashes a string with SHA-256. It stays in core while the rest of what this
+// package held moved to authserver/internal/passwordhash, because both processes reach it
+// independently: the auth server hashes authorization, verification and reset codes to locate rows,
+// and the admin console hashes the nonce it sends, and again to check the ID token's (#360, #427).
 package hashutil
 
 import (
@@ -21,12 +21,4 @@ func HashString(s string) (string, error) {
 	bs := h.Sum(nil)
 	hex := fmt.Sprintf("%x", bs)
 	return hex, nil
-}
-
-func VerifyStringHash(hashedString string, s string) bool {
-	hash, err := HashString(s)
-	if err != nil {
-		return false
-	}
-	return hash == hashedString
 }

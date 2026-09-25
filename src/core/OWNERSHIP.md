@@ -259,7 +259,6 @@ command itself and fails on a tree it changed.
 | `core/gender` | `GenderOther` | own-package | — |
 | `core/gender` | `IsGenderValid` | contract | The `Gender` type's own bound, and the only statement of which of its values are legal, which is why a caller holding an int asks here rather than comparing against `GenderOther` itself. The admin console names only `Gender`, so the tree justifies the type and not this (#385 decision 17). |
 | `core/hashutil` | `HashString` | both-apps | — |
-| `core/hashutil` | `VerifyStringHash` | kernel | — |
 | `core/hostport` | `Join` | both-apps | — |
 | `core/hostport` | `Unbracket` | own-package | — |
 | `core/i18n` | `Bundle` | own-package | — |
