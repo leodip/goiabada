@@ -3,11 +3,13 @@ package datatests
 import (
 	"context"
 	"database/sql"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
+	"github.com/stretchr/testify/require"
 )
 
 func TestCreateWebOrigin(t *testing.T) {
@@ -40,6 +42,29 @@ func TestCreateWebOrigin(t *testing.T) {
 	if retrievedWebOrigin.ClientId != webOrigin.ClientId {
 		t.Errorf("Expected ClientId %d, got %d", webOrigin.ClientId, retrievedWebOrigin.ClientId)
 	}
+}
+
+// TestCreateWebOrigin_TheLongestStandardOriginRoundTrips stores the longest standards-valid origin:
+// "https://" plus a 253-character host of three 63-character labels and one of 61, plus ":65535",
+// which is models.WebOriginMaxBytes. The admin API admits it, so every engine has to store it, under
+// the unique index on (origin, client_id) that covers the widened column (#428).
+func TestCreateWebOrigin_TheLongestStandardOriginRoundTrips(t *testing.T) {
+	label := func(n int) string { return strings.Repeat("a", n) }
+	host := strings.Join([]string{label(63), label(63), label(63), label(61)}, ".")
+	require.Len(t, host, 253, "the host is off the longest DNS name, so the case no longer observes the column's edge")
+	origin := "https://" + host + ":65535"
+	require.Len(t, origin, models.WebOriginMaxBytes)
+
+	client := createTestClient(t)
+	webOrigin := &models.WebOrigin{Origin: origin, ClientId: client.Id}
+
+	err := database.CreateWebOrigin(context.Background(), nil, webOrigin)
+	require.NoError(t, err, "a web origin of %d bytes was refused by the column", models.WebOriginMaxBytes)
+
+	stored, err := database.GetWebOriginById(context.Background(), nil, webOrigin.Id)
+	require.NoError(t, err)
+	require.NotNil(t, stored)
+	require.Equal(t, origin, stored.Origin, "the web origin did not round-trip unchanged")
 }
 
 func TestGetWebOriginById(t *testing.T) {

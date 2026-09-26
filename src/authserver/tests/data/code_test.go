@@ -9,6 +9,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
+	"github.com/stretchr/testify/require"
 )
 
 func TestCreateCode(t *testing.T) {
@@ -126,6 +127,42 @@ func TestCreateCode(t *testing.T) {
 	err = database.CreateCode(context.Background(), nil, invalidCode)
 	if err == nil {
 		t.Errorf("Expected error when creating code with invalid user ID, got nil")
+	}
+}
+
+// TestCreateCode_ARedirectURIAtTheBoundRoundTrips covers the second column a registered redirect URI
+// is written to. Issuance copies the URI into codes.redirect_uri unchanged, and RFC 6749 section
+// 4.1.3 requires the token request's redirect_uri to be identical to the one the code was issued
+// for, so the copy can be neither truncated nor hashed away: a URI the handlers admit must fit here
+// as well as in redirect_uris.uri, or it registers and then fails to issue a code (#428).
+func TestCreateCode_ARedirectURIAtTheBoundRoundTrips(t *testing.T) {
+	for _, tc := range redirectURIsAtTheBound(t) {
+		t.Run(tc.name, func(t *testing.T) {
+			client := createTestClient(t)
+			user := createTestUser(t)
+			random := fake.LetterN(6)
+			code := &models.Code{
+				ClientId:          client.Id,
+				UserId:            user.Id,
+				Code:              "testcode_" + random,
+				CodeHash:          "testhash_" + random,
+				RedirectURI:       tc.value,
+				Scope:             "openid",
+				ResponseMode:      "query",
+				AuthenticatedAt:   time.Now().UTC().Truncate(time.Microsecond),
+				SessionIdentifier: "testsession_" + random,
+				AcrLevel:          "1",
+				AuthMethods:       "password",
+			}
+
+			err := database.CreateCode(context.Background(), nil, code)
+			require.NoError(t, err, "a code carrying a %d-byte redirect URI was refused by the column", models.RedirectURIMaxBytes)
+
+			stored, err := database.GetCodeById(context.Background(), nil, code.Id)
+			require.NoError(t, err)
+			require.NotNil(t, stored)
+			require.Equal(t, tc.value, stored.RedirectURI, "the code's redirect URI did not round-trip unchanged")
+		})
 	}
 }
 

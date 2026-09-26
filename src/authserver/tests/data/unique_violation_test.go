@@ -73,6 +73,51 @@ func TestUpdateUser_DuplicateEmailIsErrUniqueViolation(t *testing.T) {
 	}
 }
 
+// TestCreateWebOrigin_ADuplicateOriginIsErrUniqueViolation is what the web-origin save's 409 rests
+// on. web_origins carries a unique index on (origin, client_id), so two saves of one client adding
+// the same origin at the same moment end with the engine refusing the second insert, and the save
+// answers that 409 CONCURRENT_UPDATE only if the refusal arrives tagged as a unique violation on
+// every engine (#428).
+func TestCreateWebOrigin_ADuplicateOriginIsErrUniqueViolation(t *testing.T) {
+	client := createTestClient(t)
+	first := createTestWebOrigin(t, client.Id)
+
+	second := &models.WebOrigin{Origin: first.Origin, ClientId: client.Id}
+	err := database.CreateWebOrigin(context.Background(), nil, second)
+	if err == nil {
+		_ = database.DeleteWebOrigin(context.Background(), nil, second.Id)
+		t.Fatal("a second web origin on the same (origin, client_id) was accepted; the pair is supposed to be unique")
+	}
+	if !errors.Is(err, data.ErrUniqueViolation) {
+		t.Errorf("errors.Is(err, data.ErrUniqueViolation) = false for a duplicate web origin on this "+
+			"engine, so the web-origin save cannot answer 409 here; err = %v", err)
+	}
+}
+
+// TestCreatePermission_ADuplicateIdentifierIsErrUniqueViolation is the same for the resource
+// permission save: permissions carries a unique index on (permission_identifier, resource_id), and
+// two saves adding the same identifier to one resource at the same moment are answered 409 only if
+// the engine's refusal arrives tagged (#428).
+func TestCreatePermission_ADuplicateIdentifierIsErrUniqueViolation(t *testing.T) {
+	resource := createTestResource(t)
+	first := createTestPermission(t, resource)
+
+	second := &models.Permission{
+		PermissionIdentifier: first.PermissionIdentifier,
+		Description:          "duplicate",
+		ResourceId:           resource.Id,
+	}
+	err := database.CreatePermission(context.Background(), nil, second)
+	if err == nil {
+		_ = database.DeletePermission(context.Background(), nil, second.Id)
+		t.Fatal("a second permission on the same (permission_identifier, resource_id) was accepted; the pair is supposed to be unique")
+	}
+	if !errors.Is(err, data.ErrUniqueViolation) {
+		t.Errorf("errors.Is(err, data.ErrUniqueViolation) = false for a duplicate permission on this "+
+			"engine, so the resource permission save cannot answer 409 here; err = %v", err)
+	}
+}
+
 // TestInsert_AnUnrelatedConstraintIsNotErrUniqueViolation is the negative half, and it is the one
 // that would be worst to get wrong: tagging every write failure would have the API answer 409 to
 // callers whose request can never succeed, and the positive case above cannot detect that.

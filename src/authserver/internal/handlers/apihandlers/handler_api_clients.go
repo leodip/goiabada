@@ -75,8 +75,8 @@ type clientsDatabase interface {
 // window is that writer's whole transaction rather than the gap between two statements; SQL
 // Server's shared locks narrow it and do not close it. AcquireClientRow takes the row first, so
 // the re-read happens under this transaction's own lock and nothing can get between it and the
-// write. Measured on all four engines in the agreement's probe/shared_writer_restores_public.out
-// (#245, final review round 3, decision 18).
+// write. Measured on all four engines during #245's final review: a writer that re-read without
+// first acquiring the row restored public mode over a concurrent confidential flip (#245).
 //
 // REFRESHING THE MODE IS NOT ENOUGH ON ITS OWN, because two other columns are derived from it.
 // A public client must carry pkce_required true and client_credentials_enabled false, and every
@@ -85,9 +85,9 @@ type clientsDatabase interface {
 // the refreshed public mode and restore both forbidden values underneath it. The server would
 // still refuse client credentials and still require PKCE at runtime, because both rules are read
 // at the point of use, but the stored row, the admin API's response and the console would all
-// report the opposite of what the server does, which is the display lie decision 2 exists to
-// prevent. applyPublicClientInvariants therefore runs on every caller's behalf, after the
-// refresh and before the write (#245, final review round 2 finding 2).
+// report the opposite of what the server does, which is the display lie #245 closed.
+// Client.ApplyPublicClientInvariants therefore runs on every caller's behalf, after the refresh
+// and before the write (#245).
 //
 // It does not close the lost update on the columns each endpoint DOES own: two concurrent saves
 // of the same section still last-write-wins, which is how every entity in this codebase behaves
@@ -95,7 +95,7 @@ type clientsDatabase interface {
 func updateClientNotOwningAuthenticationMode(ctx context.Context, database clientsDatabase, client *models.Client) error {
 	// Opened through RunInTransaction, so a deadlock reruns the acquisition, the re-read and the
 	// write together (#301). Safe to rerun: the two columns are copied from the row re-read under
-	// this attempt's own lock, and applyPublicClientInvariants is idempotent on the result.
+	// this attempt's own lock, and ApplyPublicClientInvariants is idempotent on the result.
 	return database.RunInTransaction(ctx, func(tx *sql.Tx) error {
 		if err := database.AcquireClientRow(ctx, tx, client.Id); err != nil {
 			return err
@@ -111,35 +111,10 @@ func updateClientNotOwningAuthenticationMode(ctx context.Context, database clien
 		client.IsPublic = current.IsPublic
 		client.ClientSecretEncrypted = current.ClientSecretEncrypted
 
-		applyPublicClientInvariants(client)
+		client.ApplyPublicClientInvariants()
 
 		return database.UpdateClient(ctx, tx, client)
 	})
-}
-
-// applyPublicClientInvariants forces the two columns a public client is not allowed to
-// contradict. One definition, called by every writer that can persist them, because the defect
-// this closes was the same rule living at one write site and not the others.
-//
-// Both are storage-side corrections rather than enforcement: the server already refuses client
-// credentials for a public client and already requires its PKCE whatever these columns hold. What
-// they buy is that the row, the API response built from it and the admin console's rendering of
-// it all say what the server will actually do. A stale false or a nil pkce_required is handed
-// straight back to a reader, and under a global-off deployment nil renders as "inherit from the
-// global setting (currently: optional)", which is the display lie decision 2 exists to prevent
-// (#245).
-func applyPublicClientInvariants(client *models.Client) {
-	if !client.IsPublic {
-		return
-	}
-	// Public clients cannot use the client credentials flow.
-	client.ClientCredentialsEnabled = false
-	// A public client always requires PKCE, so a caller's own value is not read for one:
-	// normalized rather than refused with a 400, so the two public-client rules behave the same
-	// way. It is not silent, because these endpoints answer with the updated client and a caller
-	// who sent false reads back true.
-	pkceRequired := true
-	client.PKCERequired = &pkceRequired
 }
 
 // HandleAPIClientsGet - GET /api/v1/admin/clients
@@ -658,7 +633,7 @@ func HandleAPIClientAuthenticationPut(
 			client.ClientSecretEncrypted = nil
 			// Client credentials off and PKCE required, from the one definition every writer
 			// that can persist those two columns shares (#245).
-			applyPublicClientInvariants(client)
+			client.ApplyPublicClientInvariants()
 		} else {
 			// Confidential: require strong secret
 			if err := validateClientSecret(req.ClientSecret); err != nil {
@@ -985,14 +960,6 @@ func HandleAPIClientRedirectURIsPut(
 	}
 }
 
-// maxWebOriginLength is the width of the web_origins.origin column on MySQL, PostgreSQL and SQL
-// Server; sqlite stores TEXT. A standards-valid origin can be 267 characters ("https://" plus a
-// 253-character host plus ":65535"), so a longer value is refused here rather than becoming a 500
-// on three engines out of four, which is what it is today and what no sqlite tier can see. The cap
-// lives at the endpoint and not in urlutil.CanonicalOrigin because it is a fact about storage
-// rather than about what an origin is (#250).
-const maxWebOriginLength = 256
-
 // HandleAPIClientWebOriginsPut - PUT /api/v1/admin/clients/{id}/web-origins
 // Replaces the full set of web origins for the client, in one transaction. Each value is
 // canonicalized to the exact string a browser sends in an Origin header, or refused, so a stored
@@ -1063,8 +1030,10 @@ func HandleAPIClientWebOriginsPut(
 				writeJSONError(w, fmt.Sprintf("Invalid web origin: %s. A web origin is a scheme, a host and an optional port, with nothing after the host: for example https://www.example.com or https://myapp:8080. The scheme must be http or https; the host must be ASCII, must carry no user information, and must not be an IPv6 literal or an abbreviated IPv4 address; and a port, if present, must be plain decimal below 65536 with no leading zero.", val), "VALIDATION_ERROR", http.StatusBadRequest)
 				return
 			}
-			if len(origin) > maxWebOriginLength {
-				writeJSONError(w, fmt.Sprintf("Web origin is too long (%d characters, the maximum is %d): %s", len(origin), maxWebOriginLength, origin), "VALIDATION_ERROR", http.StatusBadRequest)
+			// The column's width, models.WebOriginMaxBytes; its comment says why the bound is
+			// here rather than in CanonicalOrigin.
+			if len(origin) > models.WebOriginMaxBytes {
+				writeJSONError(w, fmt.Sprintf("Web origin is too long (%d characters, the maximum is %d): %s", len(origin), models.WebOriginMaxBytes, origin), "VALIDATION_ERROR", http.StatusBadRequest)
 				return
 			}
 			if _, exists := seen[origin]; exists {

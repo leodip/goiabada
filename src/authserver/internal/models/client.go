@@ -93,6 +93,31 @@ func (c *Client) IsPKCERequired(globalPKCERequired bool) bool {
 	return globalPKCERequired
 }
 
+// ApplyPublicClientInvariants forces the two columns a public client is not allowed to contradict:
+// client credentials off, and PKCE an explicit true. It leaves a confidential client untouched. One
+// definition, called by every writer that can persist those columns, because the defect it closes
+// was the same rule living at one write site and not the others (#245, #428).
+//
+// Both are storage-side corrections rather than enforcement: the token endpoint already refuses
+// client credentials for a public client, and IsPKCERequired already requires its PKCE, whatever
+// these columns hold. What they buy is that the row, the API response built from it and the admin
+// console's rendering of it all say what the server will actually do. A stale true or a nil
+// pkce_required is handed straight back to a reader, and under a deployment whose global PKCE
+// setting is off, nil renders as "inherit from the global setting (currently: optional)", which is
+// the display lie #245 closed.
+//
+// A caller's own PKCE value is not read for a public client: it is normalized rather than refused,
+// so the two public-client rules behave the same way. It is not silent, because every writer
+// answers with the stored client and a caller who sent false reads back true.
+func (c *Client) ApplyPublicClientInvariants() {
+	if !c.IsPublic {
+		return
+	}
+	c.ClientCredentialsEnabled = false
+	pkceRequired := true
+	c.PKCERequired = &pkceRequired
+}
+
 // IsImplicitGrantEnabled returns whether implicit grant is enabled for this client,
 // taking into account both the client-level override and global settings.
 // If the client has an explicit setting, it takes precedence over the global setting.

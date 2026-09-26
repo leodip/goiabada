@@ -15,6 +15,7 @@ import (
 	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/urlutil"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -322,6 +323,44 @@ func TestHandleAPIClientAuthenticationPut_ASaveOfAnAlreadyPublicClientRevokesNot
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, audit.AuditRevokedClientGrants, mock.Anything)
 }
 
+// TestHandleAPIClientAuthenticationPut_AClientMadePublicIsWrittenWithThePublicInvariants pins the
+// endpoint's own call to Client.ApplyPublicClientInvariants. The client arrives confidential with
+// client credentials on and PKCE explicitly optional, and is made public: the row written must
+// already carry client credentials off and PKCE an explicit true, since the endpoint answers with
+// that row and the console renders it (#245, #428).
+func TestHandleAPIClientAuthenticationPut_AClientMadePublicIsWrittenWithThePublicInvariants(t *testing.T) {
+	database := mocks_data.NewDatabase(t)
+	auditLogger := mocks_audit.NewAuditLogger(t)
+
+	pkceOptional := false
+	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(&models.Client{
+		Id: 7, IsPublic: false, ClientSecretEncrypted: []byte("secret"),
+		ClientCredentialsEnabled: true, PKCERequired: &pkceOptional,
+	}, nil).Once()
+	mocks_data.ExpectRunInTransaction(database, clientUpdateTx)
+	database.On("SetClientPublic", mock.Anything, clientUpdateTx, int64(7)).Return(true, nil).Once()
+	var written models.Client
+	database.On("UpdateClient", mock.Anything, clientUpdateTx, mock.Anything).
+		Run(func(args mock.Arguments) { written = *args.Get(2).(*models.Client) }).Return(nil).Once()
+	database.On("RevokeCodesByClientId", mock.Anything, clientUpdateTx, int64(7)).Return(int64(0), nil).Once()
+	database.On("GetRefreshTokensByClientId", mock.Anything, clientUpdateTx, int64(7)).
+		Return([]*models.RefreshToken{}, nil).Once()
+	stubClientResponseLoads(database)
+	auditLogger.On("Log", mock.Anything, audit.AuditRevokedClientGrants, mock.Anything).Return().Once()
+	auditLogger.On("Log", mock.Anything, audit.AuditUpdatedClientAuthentication, mock.Anything).Return().Once()
+
+	rr := httptest.NewRecorder()
+	handler := HandleAPIClientAuthenticationPut(database, auditLogger)
+	handler.ServeHTTP(rr, authenticationPutRequest(t, "7", api.UpdateClientAuthenticationRequest{IsPublic: true}))
+
+	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+	assert.True(t, written.IsPublic)
+	assert.Nil(t, written.ClientSecretEncrypted, "a public client keeps no secret")
+	assert.False(t, written.ClientCredentialsEnabled, "a public client was written with client credentials enabled")
+	require.NotNil(t, written.PKCERequired, "a public client was written with PKCE inherited rather than required")
+	assert.True(t, *written.PKCERequired, "a public client was written with PKCE optional")
+}
+
 // assertNotAttemptedOnClientDatabase fails naming the method, where the strict mock alone would
 // fail naming an unexpected call.
 //
@@ -561,11 +600,34 @@ func TestHandleAPIClientWebOriginsPut_AnExhaustedRetryIsOneFiveHundred(t *testin
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 }
 
-// A canonical origin longer than the column is refused rather than stored. web_origins.origin is
-// 256 characters on MySQL, PostgreSQL and SQL Server, so today this is a 500 on three engines out
-// of four and a silent success on sqlite, which is the only engine the local integration tier runs
-// (#250 decision 14b). The value here canonicalizes cleanly and is refused purely on length, which
-// is what separates this from the invalid-origin path.
+// canonicalOriginOfLength is a canonical origin of exactly n bytes: "https://" plus a host of
+// 63-character labels and one shorter label, plus ":65535". urlutil.CanonicalOrigin bounds no
+// host's length, so every n from 30 up canonicalizes, which is what lets the two boundary cases
+// below sit either side of models.WebOriginMaxBytes on length alone.
+func canonicalOriginOfLength(t *testing.T, n int) string {
+	t.Helper()
+	const prefix, port = "https://", ":65535"
+	hostLen := n - len(prefix) - len(port)
+	var labels []string
+	for hostLen > 63 {
+		labels = append(labels, strings.Repeat("a", 63))
+		hostLen -= 64 // the label and the dot after it
+	}
+	labels = append(labels, strings.Repeat("b", hostLen))
+	origin := prefix + strings.Join(labels, ".") + port
+	require.Len(t, origin, n)
+	canonical, ok := urlutil.CanonicalOrigin(origin)
+	require.True(t, ok, "the fixture must canonicalize, or the case is testing the wrong refusal")
+	require.Equal(t, origin, canonical, "the fixture must already be canonical")
+	return origin
+}
+
+// A canonical origin one byte longer than the column is refused rather than stored.
+// web_origins.origin is 267 wide (models.WebOriginMaxBytes) on MySQL, PostgreSQL and SQL Server,
+// so an unbounded save would be a 500 on three engines out of four and a silent success on sqlite,
+// which is the only engine the local integration tier runs (#250, #428). The value canonicalizes
+// cleanly and is refused purely on length, which is what separates this from the invalid-origin
+// path.
 //
 // The strict mock carries GetClientById and nothing else: reaching RunInTransaction fails the test,
 // so the refusal is proved to happen before any write is attempted.
@@ -576,11 +638,9 @@ func TestHandleAPIClientWebOriginsPut_AnOverlongOriginIsRefusedNotStored(t *test
 	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).
 		Return(&models.Client{Id: 7, AuthorizationCodeEnabled: true}, nil).Once()
 
-	// "https://" plus a host of repeated 63-character labels, canonical and over the cap.
-	label := strings.Repeat("a", 63)
-	host := label + "." + label + "." + label + "." + label
-	origin := "https://" + host
-	require.Greater(t, len(origin), maxWebOriginLength)
+	// A literal rather than models.WebOriginMaxBytes+1, so the case pins the number itself: a bound
+	// raised past the column moves with a derived value and is caught only by a literal one.
+	origin := canonicalOriginOfLength(t, 268)
 
 	rr := httptest.NewRecorder()
 	handler := HandleAPIClientWebOriginsPut(database, auditLogger)
@@ -590,4 +650,33 @@ func TestHandleAPIClientWebOriginsPut_AnOverlongOriginIsRefusedNotStored(t *test
 	assert.Contains(t, rr.Body.String(), "too long")
 	database.AssertExpectations(t)
 	database.AssertNotCalled(t, "RunInTransaction", mock.Anything, mock.Anything)
+}
+
+// The other side of the bound: a canonical origin of exactly 267 bytes, models.WebOriginMaxBytes and
+// the longest standards-valid origin, is written. It reaches CreateWebOrigin on the save's
+// transaction, which is what separates an admitted value from one refused before the write (#428).
+func TestHandleAPIClientWebOriginsPut_AnOriginAtTheBoundIsStored(t *testing.T) {
+	database := mocks_data.NewDatabase(t)
+	auditLogger := mocks_audit.NewAuditLogger(t)
+
+	origin := canonicalOriginOfLength(t, 267)
+
+	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).
+		Return(&models.Client{Id: 7, AuthorizationCodeEnabled: true}, nil).Once()
+	mocks_data.ExpectRunInTransaction(database, clientUpdateTx)
+	database.On("AcquireClientRow", mock.Anything, clientUpdateTx, int64(7)).Return(nil).Once()
+	database.On("ClientLoadWebOrigins", mock.Anything, clientUpdateTx, mock.Anything).Return(nil).Once()
+	var created string
+	database.On("CreateWebOrigin", mock.Anything, clientUpdateTx, mock.Anything).
+		Run(func(args mock.Arguments) { created = args.Get(2).(*models.WebOrigin).Origin }).Return(nil).Once()
+	stubClientResponseLoads(database)
+	auditLogger.On("Log", mock.Anything, audit.AuditUpdatedWebOrigins, mock.Anything).Return().Once()
+
+	rr := httptest.NewRecorder()
+	handler := HandleAPIClientWebOriginsPut(database, auditLogger)
+	handler.ServeHTTP(rr, webOriginsPutRequest(t, "7", []string{origin}))
+
+	assert.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+	assert.Equal(t, origin, created)
+	database.AssertExpectations(t)
 }
