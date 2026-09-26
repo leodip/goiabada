@@ -813,6 +813,14 @@ func (m *RateLimiterMiddleware) LimitForgotPwd(next http.Handler) http.Handler {
 }
 
 // LimitDCR rate limits Dynamic Client Registration requests (RFC 7591 §3)
+//
+// It follows the global switch like every other limit here, and that switch is off by default:
+// #219 left it so because many deployments already limit at Cloudflare, a WAF or a reverse proxy,
+// which does it better, and recorded that so it is not re-litigated. A limit of its own that ran
+// whenever registration is on would, behind a proxy without trusted forwarding headers, be ten
+// registrations a minute for the whole deployment, and would need a setting of its own to turn off.
+// Each registration is bounded whatever the switch says, by the redirect URI count and length and
+// by the request body limit (#219, #426, #428).
 func (m *RateLimiterMiddleware) LimitDCR(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Skip rate limiting if disabled

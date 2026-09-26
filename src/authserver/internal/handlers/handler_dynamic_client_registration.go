@@ -17,22 +17,18 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/urlutil"
 	"github.com/leodip/goiabada/authserver/internal/uuidutil"
+	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/stringutil"
 	"github.com/leodip/goiabada/core/validators"
 )
 
 // dynamicClientRegistrationDatabase is what RFC 7591 registration needs: the client and redirect
-// URIs it creates, and the delete that undoes a half-built one.
-// dcrRollbackTimeout bounds the compensating delete once it has been detached from the caller's
-// cancellation. Ten seconds, matching every other bounded wait on a dependency in this
-// repository's request path rather than introducing a value nobody chose against the others.
-const dcrRollbackTimeout = 10 * time.Second
-
+// URIs it creates, and the transaction that makes them one write.
 type dynamicClientRegistrationDatabase interface {
 	CreateClient(ctx context.Context, tx *sql.Tx, client *models.Client) error
 	CreateRedirectURI(ctx context.Context, tx *sql.Tx, redirectURI *models.RedirectURI) error
-	DeleteClient(ctx context.Context, tx *sql.Tx, clientId int64) error
+	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 }
 
 // HandleDynamicClientRegistrationPost implements RFC 7591 §3 Client Registration Endpoint
@@ -79,19 +75,6 @@ func HandleDynamicClientRegistrationPost(
 		// 7. Determine if public or confidential client
 		isPublic := req.TokenEndpointAuthMethod == "none"
 
-		// A public client always requires PKCE, and the server enforces that whatever this
-		// column holds. It is written explicitly all the same, and only on the public path: a
-		// nil column is handed raw to the admin API's client response and to the admin console's
-		// template, where it renders as "inherit from the global setting" and so reports the
-		// opposite of what the server does whenever that global is off. A confidential client
-		// keeps writing nothing, because inheriting the global is what the setting is for
-		// (#245).
-		var pkceRequired *bool
-		if isPublic {
-			required := true
-			pkceRequired = &required
-		}
-
 		// 8. Generate client secret for confidential clients (RFC 7591 §3.2.1)
 		var clientSecretEncrypted []byte
 		var clientSecret string
@@ -113,7 +96,6 @@ func HandleDynamicClientRegistrationPost(
 			ClientSecretEncrypted: clientSecretEncrypted,
 			Description:           req.ClientName,
 			IsPublic:              isPublic,
-			PKCERequired:          pkceRequired,
 			Enabled:               true,
 			// A self-registered client is one nobody here has vetted, and RFC 7591 section 5
 			// requires all of its metadata be treated as self-asserted. Consent is the only
@@ -138,39 +120,43 @@ func HandleDynamicClientRegistrationPost(
 			RefreshTokenOfflineMaxLifetimeInSeconds: settings.RefreshTokenOfflineMaxLifetimeInSeconds,
 		}
 
-		// 10. Save client to database
-		if err := database.CreateClient(r.Context(), nil, client); err != nil {
-			apiresponse.LogInternalServerError(r, errs.Wrap(err, "DCR: database error creating client"))
+		// A public client always requires PKCE and never holds client credentials, and the
+		// server enforces both whatever the columns hold. They are written all the same, through
+		// the one rule every writer of a public client applies, so the row, the admin API's
+		// response and the admin console's page say what the server does (#245). validateDCRRequest
+		// has already refused a public client asking for client_credentials, so here it only sets
+		// PKCE (#428).
+		client.ApplyPublicClientInvariants()
+
+		// 10. Save the client and its redirect URIs as one write (#428). Everything the request
+		// can be refused for was decided above, so a failure here is the server's, and the
+		// transaction is what leaves no half-registered client behind: a client row whose redirect
+		// URIs were not all written, holding a secret its requester never received. The body is
+		// safe to rerun after a deadlock: CreateClient reassigns the id and timestamps on each
+		// attempt, each redirect URI row is built inside it, and it writes nothing to the response.
+		err := database.RunInTransaction(r.Context(), func(tx *sql.Tx) error {
+			if err := database.CreateClient(r.Context(), tx, client); err != nil {
+				return errs.Wrap(err, "DCR: unable to create the client")
+			}
+			for _, uri := range req.RedirectURIs {
+				redirectURI := &models.RedirectURI{
+					ClientId: client.Id,
+					URI:      uri,
+				}
+				if err := database.CreateRedirectURI(r.Context(), tx, redirectURI); err != nil {
+					return errs.Wrap(err, "DCR: unable to create a redirect URI")
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			apiresponse.LogInternalServerError(r, err)
+			// One answer whichever write failed, since the whole registration was undone.
 			writeDCRError(w, "server_error", "Failed to register client", http.StatusInternalServerError)
 			return
 		}
 
-		// 11. Save redirect URIs
-		for _, uri := range req.RedirectURIs {
-			redirectURI := &models.RedirectURI{
-				ClientId: client.Id,
-				URI:      uri,
-			}
-			if err := database.CreateRedirectURI(r.Context(), nil, redirectURI); err != nil {
-				apiresponse.LogInternalServerError(r, errs.Wrap(err, "DCR: failed to create redirect URI"), "uri", uri)
-				// Rollback client creation, on a context of its own rather than the request's.
-				// The client row above is already committed and there is no transaction across
-				// the two writes, so this is the only thing that withdraws it -- and a cancelled
-				// request is one of the reasons the write above fails, which would leave the
-				// compensation unable to run in precisely the case it exists for. WithoutCancel
-				// keeps the request id on the record, and the bound is what the cancellation used
-				// to supply (#386 decision 6, and final review round 1 finding 9; the same rule
-				// as audit.Log and usersession.abandonUserSession).
-				rollbackCtx, cancelRollback := context.WithTimeout(
-					context.WithoutCancel(r.Context()), dcrRollbackTimeout)
-				_ = database.DeleteClient(rollbackCtx, nil, client.Id)
-				cancelRollback()
-				writeDCRError(w, "server_error", "Failed to register redirect URIs", http.StatusInternalServerError)
-				return
-			}
-		}
-
-		// 12. Audit log
+		// 11. Audit log, after the commit, so an event never records a client that does not exist
 		auditLogger.Log(r.Context(), audit.AuditDynamicClientRegistration, map[string]interface{}{
 			"clientId":         client.Id,
 			"clientIdentifier": client.ClientIdentifier,
@@ -179,7 +165,7 @@ func HandleDynamicClientRegistrationPost(
 			"sourceIP":         getClientIP(r),
 		})
 
-		// 13. Build response (RFC 7591 §3.2.1)
+		// 12. Build response (RFC 7591 §3.2.1)
 		response := oidc.DynamicClientRegistrationResponse{
 			ClientID:                clientIdentifier,
 			ClientIDIssuedAt:        time.Now().Unix(),
@@ -195,7 +181,7 @@ func HandleDynamicClientRegistrationPost(
 			response.ClientSecret = clientSecret
 		}
 
-		// 14. Send response
+		// 13. Send response
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("Pragma", "no-cache")
@@ -241,6 +227,17 @@ func validateDCRRequest(req *oidc.DynamicClientRegistrationRequest) error {
 		}
 	}
 
+	// RFC 6749 section 4.4: the client credentials grant MUST only be used by confidential
+	// clients, and RFC 7591 section 2.1 names refusing such an inconsistent registration with
+	// invalid_client_metadata as the way to honour its SHOULD. Refused rather than substituted:
+	// dropping the grant would answer a client_credentials-only request with a 201 for a client
+	// holding no usable grant, a silent success hiding the registrant's bug. The token endpoint
+	// refuses the grant for a public client anyway; this keeps the row from saying otherwise
+	// (#428).
+	if req.TokenEndpointAuthMethod == "none" && containsGrantType(req.GrantTypes, "client_credentials") {
+		return errs.Errorf("a public client (token_endpoint_auth_method none) cannot use the client_credentials grant")
+	}
+
 	// Validate client_name length if provided (matches database column size)
 	if len(req.ClientName) > 128 {
 		return errs.Errorf("client_name cannot exceed 128 characters")
@@ -268,10 +265,30 @@ func validateDCRRedirectURIs(req *oidc.DynamicClientRegistrationRequest) error {
 		return errs.Errorf("redirect_uris required for authorization_code grant type")
 	}
 
+	// The bounds are the admin API's too, since they are facts about storage rather than about
+	// the door, and every refusal here is invalid_redirect_uri, so an integrator learns the one
+	// thing to change is redirect_uris (#428). RFC 7591 sets no bound of its own.
+	if len(req.RedirectURIs) > models.RedirectURIsMaxPerClient {
+		return errs.Errorf("redirect_uris cannot hold more than %d entries", models.RedirectURIsMaxPerClient)
+	}
+
 	// Validate each redirect URI
 	isPublic := req.TokenEndpointAuthMethod == "none"
 
+	seen := make(map[string]bool, len(req.RedirectURIs))
 	for _, uri := range req.RedirectURIs {
+		// Bytes, before parsing, so an overlong value is never parsed, and not echoed: the
+		// refusal names the bound instead of repeating a value that broke it.
+		if len(uri) > models.RedirectURIMaxBytes {
+			return errs.Errorf("a redirect_uri cannot exceed %d bytes", models.RedirectURIMaxBytes)
+		}
+		// A repeat would be stored as a second row, and a save removing the URI would then
+		// leave the other copy live at sign-in. Matching at the authorization endpoint is
+		// exact, so the comparison here is too.
+		if seen[uri] {
+			return errs.Errorf("redirect_uri is listed more than once: %s", uri)
+		}
+		seen[uri] = true
 		if err := validateRedirectURI(uri, isPublic); err != nil {
 			return err
 		}
@@ -420,7 +437,12 @@ func getClientIP(r *http.Request) string {
 	return r.RemoteAddr
 }
 
-// writeDCRError writes RFC 7591 §3.2.2 error response
+// writeDCRError writes RFC 7591 §3.2.2 error response.
+//
+// The description goes through the conformer the authorization and token endpoints use. RFC 7591
+// section 3.2.2 makes error_description "human-readable ASCII text", and descriptions here
+// interpolate request text -- a grant type, a redirect URI -- so without it a registrant's quote,
+// backslash or non-ASCII character comes back raw, at whatever length it was sent (#428).
 func writeDCRError(w http.ResponseWriter, errorCode, description string, statusCode int) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-store")
@@ -429,7 +451,7 @@ func writeDCRError(w http.ResponseWriter, errorCode, description string, statusC
 
 	errorResp := oidc.DynamicClientRegistrationError{
 		Error:            errorCode,
-		ErrorDescription: description,
+		ErrorDescription: customerrors.ConformErrorDescription(description),
 	}
 	_ = json.NewEncoder(w).Encode(errorResp)
 }

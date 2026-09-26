@@ -3,7 +3,6 @@ package handlers
 import (
 	"bytes"
 	"context"
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -26,7 +25,7 @@ import (
 )
 
 // Dynamic client registration is the one 500 surface #279 decision 7 does not take over. Its body
-// is fixed by RFC 7591 section 3.2.2, which section 2 of the agreement leaves alone, so it takes the
+// is fixed by RFC 7591 section 3.2.2, which #279 left alone, so it takes the
 // primitive's logging half and keeps its own envelope. This case holds both halves at once: the
 // record exists, structured and with the request id, and nothing on the wire moved.
 func TestDCR_AStorageFailureLogsOnceAndKeepsTheRFC7591Envelope(t *testing.T) {
@@ -36,7 +35,8 @@ func TestDCR_AStorageFailureLogsOnceAndKeepsTheRFC7591Envelope(t *testing.T) {
 	auditLogger := mocks_audit.NewAuditLogger(t)
 	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
 
-	database.On("CreateClient", mock.Anything, (*sql.Tx)(nil), mock.Anything).
+	mocks_data.ExpectRunInTransaction(database, dcrTx)
+	database.On("CreateClient", mock.Anything, dcrTx, mock.Anything).
 		Return(errors.New("the disk is full")).Once()
 
 	body, err := json.Marshal(oidc.DynamicClientRegistrationRequest{
