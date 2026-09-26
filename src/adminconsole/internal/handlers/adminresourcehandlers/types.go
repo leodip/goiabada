@@ -60,3 +60,16 @@ type UserResult struct {
 type SearchResult struct {
 	Users []UserResult
 }
+
+// permissionIdsOf is the ids of the grants a handler read, sent as the save's loaded set when it
+// grants or revokes one permission from that read: the auth server refuses the save with 409 when
+// the stored grants changed in between, rather than let the whole set it writes undo that change.
+// Never nil, so a user or group read with no grants sends [] and not the null the save refuses
+// (#428).
+func permissionIdsOf(permissions []api.PermissionResponse) []int64 {
+	ids := make([]int64, 0, len(permissions))
+	for _, p := range permissions {
+		ids = append(ids, p.Id)
+	}
+	return ids
+}

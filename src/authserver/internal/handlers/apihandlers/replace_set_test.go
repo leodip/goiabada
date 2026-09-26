@@ -139,3 +139,47 @@ func TestSameSet(t *testing.T) {
 		})
 	}
 }
+
+// revokedKeys is what a save that audits per item reports as removed after its commit: each stored
+// key not wanted, once, in stored order. An extra copy of a wanted key is deleted by replaceSet but
+// is not a revocation, since the key stays granted, and is left out (#428).
+func TestRevokedKeys(t *testing.T) {
+	tests := []struct {
+		name   string
+		stored []storedRow
+		wanted []string
+		want   []string
+	}{
+		{name: "nothing stored", stored: nil, wanted: []string{"a"}, want: nil},
+		{name: "nothing revoked", stored: []storedRow{{1, "a"}, {2, "b"}}, wanted: []string{"b", "a"}, want: nil},
+		{name: "every key revoked, in stored order", stored: []storedRow{{1, "b"}, {2, "a"}}, wanted: []string{}, want: []string{"b", "a"}},
+		{name: "a revoked key stored twice is named once", stored: []storedRow{{1, "a"}, {2, "b"}, {3, "a"}}, wanted: []string{"b"}, want: []string{"a"}},
+		{name: "an extra copy of a kept key is not a revocation", stored: []storedRow{{1, "a"}, {2, "a"}}, wanted: []string{"a"}, want: nil},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			assert.Equal(t, test.want, revokedKeys(test.stored, storedRowKey, test.wanted))
+		})
+	}
+}
+
+// firstOccurrences is how a save deduplicates its request before validating: first occurrence kept,
+// order kept, and an empty request an empty list rather than nil (#406, #428).
+func TestFirstOccurrences(t *testing.T) {
+	tests := []struct {
+		name string
+		keys []string
+		want []string
+	}{
+		{name: "nil is an empty list", keys: nil, want: []string{}},
+		{name: "no repeats", keys: []string{"b", "a"}, want: []string{"b", "a"}},
+		{name: "a repeat keeps its first place", keys: []string{"b", "a", "b", "c", "a"}, want: []string{"b", "a", "c"}},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			assert.Equal(t, test.want, firstOccurrences(test.keys))
+		})
+	}
+}

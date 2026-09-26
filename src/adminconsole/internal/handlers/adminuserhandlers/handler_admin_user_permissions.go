@@ -152,7 +152,8 @@ func HandleAdminUserPermissionsPost(
 
 		// Convert to API request format
 		request := &api.UpdateUserPermissionsRequest{
-			PermissionIds: data.AssignedPermissionsIds,
+			PermissionIds:         data.AssignedPermissionsIds,
+			ExpectedPermissionIds: data.ExpectedPermissionIds,
 		}
 
 		// Update user permissions via API (includes validation and audit logging)

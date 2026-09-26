@@ -713,6 +713,14 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          description: |
+            Another save changed the user's permissions after expectedPermissionIds was read.
+            error_code is CONCURRENT_UPDATE; nothing was saved. Read them again and retry.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '500':
           $ref: '#/components/responses/InternalServerError'
 
@@ -1340,6 +1348,14 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          description: |
+            Another save changed the group's permissions after expectedPermissionIds was read.
+            error_code is CONCURRENT_UPDATE; nothing was saved. Read them again and retry.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '500':
           $ref: '#/components/responses/InternalServerError'
 
@@ -4105,9 +4121,16 @@ components:
 
     UpdateUserPermissionsRequest:
       type: object
+      required: [expectedPermissionIds]
       properties:
         permissionIds:
           type: array
+          items:
+            type: integer
+            format: int64
+        expectedPermissionIds:
+          type: array
+          description: The user's permission ids as last read; [] if there were none.
           items:
             type: integer
             format: int64
@@ -4582,9 +4605,16 @@ components:
 
     UpdateGroupPermissionsRequest:
       type: object
+      required: [expectedPermissionIds]
       properties:
         permissionIds:
           type: array
+          items:
+            type: integer
+            format: int64
+        expectedPermissionIds:
+          type: array
+          description: The group's permission ids as last read; [] if there were none.
           items:
             type: integer
             format: int64

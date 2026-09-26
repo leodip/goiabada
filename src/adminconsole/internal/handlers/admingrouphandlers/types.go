@@ -27,4 +27,7 @@ type PageResult struct {
 type PermissionsPostInput struct {
 	GroupId                int64   `json:"groupId"`
 	AssignedPermissionsIds []int64 `json:"assignedPermissionsIds"`
+	// ExpectedPermissionIds is the set as the page loaded it, passed through unchanged so the auth
+	// server can refuse a save from an outdated page (#428).
+	ExpectedPermissionIds []int64 `json:"expectedPermissionIds"`
 }

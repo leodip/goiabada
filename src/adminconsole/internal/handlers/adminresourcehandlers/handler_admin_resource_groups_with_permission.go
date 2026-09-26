@@ -340,7 +340,7 @@ func HandleAdminResourceGroupsWithPermissionAddPermissionPost(
 		}
 		newIds = append(newIds, permissionId)
 
-		req := &api.UpdateGroupPermissionsRequest{PermissionIds: newIds}
+		req := &api.UpdateGroupPermissionsRequest{PermissionIds: newIds, ExpectedPermissionIds: permissionIdsOf(currentPerms)}
 		if err := apiClient.UpdateGroupPermissions(r.Context(), accessToken, group.Id, req); err != nil {
 			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
@@ -476,7 +476,7 @@ func HandleAdminResourceGroupsWithPermissionRemovePermissionPost(
 				newIds = append(newIds, p.Id)
 			}
 		}
-		req := &api.UpdateGroupPermissionsRequest{PermissionIds: newIds}
+		req := &api.UpdateGroupPermissionsRequest{PermissionIds: newIds, ExpectedPermissionIds: permissionIdsOf(currentPerms)}
 		if err := apiClient.UpdateGroupPermissions(r.Context(), accessToken, group.Id, req); err != nil {
 			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
