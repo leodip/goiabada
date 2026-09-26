@@ -59,8 +59,8 @@ func TestAPIAccountProfileGet_UnauthorizedAndScope(t *testing.T) {
 	body2, _ := io.ReadAll(resp2.Body)
 	assert.Contains(t, string(body2), "Access token required.")
 
-	// Insufficient scope (use userinfo scope via client-credentials)
-	tok := createClientCredentialsTokenWithScope(t, constants.AuthServerResourceIdentifier, constants.UserinfoPermissionIdentifier)
+	// Insufficient scope (a client-credentials token whose scope no route grants)
+	tok := createClientCredentialsTokenWithoutRouteScope(t)
 	resp3 := makeAPIRequest(t, "GET", url, tok, nil)
 	defer func() { _ = resp3.Body.Close() }()
 	assert.Equal(t, http.StatusForbidden, resp3.StatusCode)
@@ -158,8 +158,8 @@ func TestAPIAccountProfilePut_UnauthorizedAndScope(t *testing.T) {
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 
-	// Insufficient scope (authserver:userinfo)
-	tok := createClientCredentialsTokenWithScope(t, constants.AuthServerResourceIdentifier, constants.UserinfoPermissionIdentifier)
+	// Insufficient scope (a scope no route grants)
+	tok := createClientCredentialsTokenWithoutRouteScope(t)
 	resp2 := makeAPIRequest(t, "PUT", url, tok, api.UpdateUserProfileRequest{GivenName: "A", FamilyName: "B"})
 	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusForbidden, resp2.StatusCode)

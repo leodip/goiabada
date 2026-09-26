@@ -228,7 +228,7 @@ func TestAPIAccountAddressPut_UnauthorizedAndScope(t *testing.T) {
 	assert.Contains(t, string(bodyInvalid), "Access token required.")
 
 	// Insufficient scope
-	tok := createClientCredentialsTokenWithScope(t, constants.AuthServerResourceIdentifier, constants.UserinfoPermissionIdentifier)
+	tok := createClientCredentialsTokenWithoutRouteScope(t)
 	resp2 := makeAPIRequest(t, "PUT", url, tok, api.UpdateUserAddressRequest{AddressLine1: "X"})
 	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusForbidden, resp2.StatusCode)

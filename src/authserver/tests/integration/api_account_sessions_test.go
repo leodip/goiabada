@@ -13,7 +13,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/constants"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -268,7 +267,7 @@ func TestAPIAccountSessions_UnauthorizedAndScope(t *testing.T) {
 	assert.Contains(t, string(body2), "Access token required.")
 
 	// Insufficient scope
-	tok := createClientCredentialsTokenWithScope(t, constants.AuthServerResourceIdentifier, constants.UserinfoPermissionIdentifier)
+	tok := createClientCredentialsTokenWithoutRouteScope(t)
 	resp3 := makeAPIRequest(t, "GET", url, tok, nil)
 	defer func() { _ = resp3.Body.Close() }()
 	assert.Equal(t, http.StatusForbidden, resp3.StatusCode)

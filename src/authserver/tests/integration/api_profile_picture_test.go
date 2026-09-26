@@ -18,7 +18,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
-	"github.com/leodip/goiabada/core/constants"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -115,8 +114,8 @@ func TestAPIAccountProfilePictureGet_Unauthorized(t *testing.T) {
 func TestAPIAccountProfilePictureGet_InsufficientScope(t *testing.T) {
 	url := config.GetAuthServer().BaseURL + "/api/v1/account/profile-picture"
 
-	// Token with different scope (userinfo instead of manage-account)
-	tok := createClientCredentialsTokenWithScope(t, constants.AuthServerResourceIdentifier, constants.UserinfoPermissionIdentifier)
+	// Token with a scope no route grants instead of manage-account
+	tok := createClientCredentialsTokenWithoutRouteScope(t)
 	resp := makeAPIRequest(t, "GET", url, tok, nil)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusForbidden, resp.StatusCode)

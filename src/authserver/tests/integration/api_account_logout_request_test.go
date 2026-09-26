@@ -408,7 +408,7 @@ func TestAPIAccountLogoutRequest_ValidationErrors_And_Scope(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, resp3.StatusCode)
 
 	// Insufficient scope
-	tok := createClientCredentialsTokenWithScope(t, constants.AuthServerResourceIdentifier, constants.UserinfoPermissionIdentifier)
+	tok := createClientCredentialsTokenWithoutRouteScope(t)
 	resp4 := makeAPIRequest(t, "POST", urlLogoutReq, tok, api.AccountLogoutRequest{PostLogoutRedirectUri: "https://example.com/"})
 	defer func() { _ = resp4.Body.Close() }()
 	assert.Equal(t, http.StatusForbidden, resp4.StatusCode)
