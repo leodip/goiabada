@@ -10,7 +10,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/uithemes"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/constants"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -145,7 +144,7 @@ func TestAPISettingsUITheme_UnauthorizedAndScope(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, resp2.StatusCode)
 
 	// Insufficient scope
-	tok := createClientCredentialsTokenWithScope(t, constants.AuthServerResourceIdentifier, constants.UserinfoPermissionIdentifier)
+	tok := createClientCredentialsTokenWithoutRouteScope(t)
 	resp3 := makeAPIRequest(t, "GET", url, tok, nil)
 	defer func() { _ = resp3.Body.Close() }()
 	assert.Equal(t, http.StatusForbidden, resp3.StatusCode)

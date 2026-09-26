@@ -82,8 +82,8 @@ func TestAPIResourceGet_UnauthorizedAndScope(t *testing.T) {
 	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, resp2.StatusCode)
 
-	// Insufficient scope (userinfo)
-	token := createClientCredentialsTokenWithScope(t, constants.AuthServerResourceIdentifier, constants.UserinfoPermissionIdentifier)
+	// Insufficient scope (a scope no route grants)
+	token := createClientCredentialsTokenWithoutRouteScope(t)
 	resp3 := makeAPIRequest(t, "GET", url, token, nil)
 	defer func() { _ = resp3.Body.Close() }()
 	assert.Equal(t, http.StatusForbidden, resp3.StatusCode)
@@ -275,7 +275,7 @@ func TestAPIResourceUpdatePut_UnauthorizedAndScope(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, resp2.StatusCode)
 
 	// Insufficient scope
-	token := createClientCredentialsTokenWithScope(t, constants.AuthServerResourceIdentifier, constants.UserinfoPermissionIdentifier)
+	token := createClientCredentialsTokenWithoutRouteScope(t)
 	resp3 := makeAPIRequest(t, "PUT", url, token, api.UpdateResourceRequest{ResourceIdentifier: res.ResourceIdentifier, Description: res.Description})
 	defer func() { _ = resp3.Body.Close() }()
 	assert.Equal(t, http.StatusForbidden, resp3.StatusCode)

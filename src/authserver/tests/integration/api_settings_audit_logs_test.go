@@ -298,8 +298,7 @@ func TestAPISettingsAuditLogs_UnauthorizedAndScope(t *testing.T) {
 		})
 
 		t.Run(method+" with insufficient scope", func(t *testing.T) {
-			tok := createClientCredentialsTokenWithScope(t,
-				constants.AuthServerResourceIdentifier, constants.UserinfoPermissionIdentifier)
+			tok := createClientCredentialsTokenWithoutRouteScope(t)
 			resp := makeAPIRequest(t, method, url, tok, nil)
 			defer func() { _ = resp.Body.Close() }()
 

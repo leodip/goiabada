@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/config"
@@ -15,6 +16,7 @@ import (
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestAPIResourcesGet tests the GET /api/v1/admin/resources endpoint
@@ -137,8 +139,8 @@ func TestAPIResourcesGet_InvalidToken(t *testing.T) {
 
 // Test insufficient scope returns 403 with proper error text
 func TestAPIResourcesGet_InsufficientScope(t *testing.T) {
-	// Create a non-admin client with a different scope (e.g., authserver:userinfo)
-	token := createClientCredentialsTokenWithScope(t, constants.AuthServerResourceIdentifier, constants.UserinfoPermissionIdentifier)
+	// A non-admin client whose only scope is one no route grants
+	token := createClientCredentialsTokenWithoutRouteScope(t)
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources"
 	resp := makeAPIRequest(t, "GET", url, token, nil)
@@ -169,6 +171,9 @@ func createClientCredentialsTokenWithScope(t *testing.T, resourceIdentifier, per
 	}
 	err = database.CreateClient(context.Background(), nil, client)
 	assert.NoError(t, err)
+	t.Cleanup(func() {
+		assert.NoError(t, database.DeleteClient(context.Background(), nil, client.Id))
+	})
 
 	// Find the requested permission
 	resource, err := database.GetResourceByResourceIdentifier(context.Background(), nil, resourceIdentifier)
@@ -204,7 +209,28 @@ func createClientCredentialsTokenWithScope(t *testing.T, resourceIdentifier, per
 	accessToken, ok := data["access_token"].(string)
 	assert.True(t, ok)
 	assert.NotEmpty(t, accessToken)
+	assert.Equal(t, resourceIdentifier+":"+permissionIdentifier, data["scope"], "the reported scope is the grant")
 	return accessToken
+}
+
+// createClientCredentialsTokenWithoutRouteScope returns a valid client-credentials token whose only
+// scope is a throwaway permission no route requires, for the tests showing a route answers 403 to a
+// token lacking its scope. The permission sits on the authserver resource so the token's aud names
+// authserver, as does every token those routes serve (#401); and it is deleted when the test
+// ends, because later tests read, count and save the authserver resource's permission list (#449).
+func createClientCredentialsTokenWithoutRouteScope(t *testing.T) string {
+	t.Helper()
+	resource, err := database.GetResourceByResourceIdentifier(context.Background(), nil, constants.AuthServerResourceIdentifier)
+	require.NoError(t, err)
+	require.NotNil(t, resource)
+
+	permission := createTestPermission(t, resource.Id, "no-route-scope-"+strings.ToLower(fake.LetterN(8)), "Grants no route")
+	require.NotZero(t, permission.Id)
+	t.Cleanup(func() {
+		assert.NoError(t, database.DeletePermission(context.Background(), nil, permission.Id))
+	})
+
+	return createClientCredentialsTokenWithScope(t, constants.AuthServerResourceIdentifier, permission.PermissionIdentifier)
 }
 
 // Helper function to create multiple test resources for more comprehensive testing

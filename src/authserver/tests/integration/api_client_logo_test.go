@@ -15,7 +15,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
-	"github.com/leodip/goiabada/core/constants"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -90,7 +89,7 @@ func TestAPIClientLogoGet_InsufficientScope(t *testing.T) {
 	client := createTestClientForLogo(t)
 
 	url := fmt.Sprintf("%s/api/v1/admin/clients/%d/logo", config.GetAuthServer().BaseURL, client.Id)
-	tok := createClientCredentialsTokenWithScope(t, constants.AuthServerResourceIdentifier, constants.UserinfoPermissionIdentifier)
+	tok := createClientCredentialsTokenWithoutRouteScope(t)
 	resp := makeAPIRequest(t, "GET", url, tok, nil)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusForbidden, resp.StatusCode)

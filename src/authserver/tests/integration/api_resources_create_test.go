@@ -11,7 +11,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/constants"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -154,8 +153,8 @@ func TestAPIResourcesCreate_UnauthorizedAndScope(t *testing.T) {
 	assert.Equal(t, "application/json", resp2.Header.Get("Content-Type"))
 	assert.Contains(t, string(body2), "Access token required.")
 
-	// Insufficient scope (e.g., userinfo only)
-	token := createClientCredentialsTokenWithScope(t, constants.AuthServerResourceIdentifier, constants.UserinfoPermissionIdentifier)
+	// Insufficient scope (a scope no route grants)
+	token := createClientCredentialsTokenWithoutRouteScope(t)
 	resp3 := makeAPIRequest(t, "POST", url, token, api.CreateResourceRequest{ResourceIdentifier: "valid-" + fake.LetterN(6), Description: "x"})
 	defer func() { _ = resp3.Body.Close() }()
 	assert.Equal(t, http.StatusForbidden, resp3.StatusCode)

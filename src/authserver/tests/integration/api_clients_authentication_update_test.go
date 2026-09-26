@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"net/url"
 	"strconv"
 	"strings"
 	"testing"
@@ -190,51 +189,8 @@ func TestAPIClientAuthenticationPut_SystemLevelClientAllowed(t *testing.T) {
 }
 
 func TestAPIClientAuthenticationPut_InsufficientScope(t *testing.T) {
-	// Create a token with only auth-server:userinfo scope
-	clientSecret := stringutil.GenerateSecurityRandomString(60)
-	enc, err := encryption.EncryptData(clientSecret)
-	assert.NoError(t, err)
-
-	client := &models.Client{
-		ClientIdentifier:         "inscope-auth-" + strings.ToLower(fake.LetterN(8)),
-		Enabled:                  true,
-		ClientCredentialsEnabled: true,
-		IsPublic:                 false,
-		ClientSecretEncrypted:    enc,
-	}
-	err = database.CreateClient(context.Background(), nil, client)
-	assert.NoError(t, err)
-	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
-
-	// Grant auth-server:userinfo permission
-	authRes, err := database.GetResourceByResourceIdentifier(context.Background(), nil, constants.AuthServerResourceIdentifier)
-	assert.NoError(t, err)
-	perms, err := database.GetPermissionsByResourceId(context.Background(), nil, authRes.Id)
-	assert.NoError(t, err)
-	var userinfoPerm *models.Permission
-	for i := range perms {
-		if perms[i].PermissionIdentifier == constants.UserinfoPermissionIdentifier {
-			userinfoPerm = &perms[i]
-			break
-		}
-	}
-	assert.NotNil(t, userinfoPerm)
-	err = database.CreateClientPermission(context.Background(), nil, &models.ClientPermission{ClientId: client.Id, PermissionId: userinfoPerm.Id})
-	assert.NoError(t, err)
-
-	// Get token with only auth-server:userinfo scope
-	httpClient := createHttpClient(t)
-	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
-	formData := url.Values{
-		"grant_type":    {"client_credentials"},
-		"client_id":     {client.ClientIdentifier},
-		"client_secret": {clientSecret},
-		"scope":         {constants.AuthServerResourceIdentifier + ":" + constants.UserinfoPermissionIdentifier},
-	}
-	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
-	accessToken, ok := data["access_token"].(string)
-	assert.True(t, ok)
-	assert.NotEmpty(t, accessToken)
+	// A valid token whose only scope is one no route grants, so the route answers 403
+	accessToken := createClientCredentialsTokenWithoutRouteScope(t)
 
 	// Create a target client to attempt updating
 	target := createPublicClient(t)

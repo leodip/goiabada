@@ -120,8 +120,8 @@ func TestAPIAccountEmailPut_UnauthorizedAndScope(t *testing.T) {
 	assert.Equal(t, "application/json", resp.Header.Get("Content-Type"))
 	assert.Contains(t, string(body1), "Access token required.")
 
-	// Insufficient scope (authserver:userinfo via client credentials)
-	tok := createClientCredentialsTokenWithScope(t, constants.AuthServerResourceIdentifier, constants.UserinfoPermissionIdentifier)
+	// Insufficient scope (a client-credentials token whose scope no route grants)
+	tok := createClientCredentialsTokenWithoutRouteScope(t)
 	resp2 := makeAPIRequest(t, "PUT", url, tok, api.UpdateAccountEmailRequest{Email: "a@example.com"})
 	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusForbidden, resp2.StatusCode)

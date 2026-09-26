@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	neturl "net/url"
 	"strconv"
 	"strings"
 	"testing"
@@ -348,50 +347,12 @@ func TestAPIClientPermissions_Put_PermissionNotFound(t *testing.T) {
 
 // Test PUT insufficient scope (expect 403)
 func TestAPIClientPermissions_Put_InsufficientScope(t *testing.T) {
-	// Create a client with only authserver:userinfo scope
-	httpClient := createHttpClient(t)
-
-	// Create confidential client and grant userinfo
-	secret := fake.Password(32)
-	enc, err := encryption.EncryptData(secret)
-	assert.NoError(t, err)
-
-	client := &models.Client{ClientIdentifier: "api-perm-put-scope-" + strings.ToLower(fake.LetterN(6)), Enabled: true, ClientCredentialsEnabled: true, IsPublic: false, ClientSecretEncrypted: enc}
-	err = database.CreateClient(context.Background(), nil, client)
-	assert.NoError(t, err)
-	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
-
-	authRes, err := database.GetResourceByResourceIdentifier(context.Background(), nil, constants.AuthServerResourceIdentifier)
-	assert.NoError(t, err)
-	perms, err := database.GetPermissionsByResourceId(context.Background(), nil, authRes.Id)
-	assert.NoError(t, err)
-	var userinfoPerm *models.Permission
-	for i := range perms {
-		if perms[i].PermissionIdentifier == constants.UserinfoPermissionIdentifier {
-			userinfoPerm = &perms[i]
-			break
-		}
-	}
-	assert.NotNil(t, userinfoPerm)
-	err = database.CreateClientPermission(context.Background(), nil, &models.ClientPermission{ClientId: client.Id, PermissionId: userinfoPerm.Id})
-	assert.NoError(t, err)
-
-	// Get token with only userinfo scope
-	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
-	formData := neturl.Values{
-		"grant_type":    {"client_credentials"},
-		"client_id":     {client.ClientIdentifier},
-		"client_secret": {secret},
-		"scope":         {constants.AuthServerResourceIdentifier + ":" + constants.UserinfoPermissionIdentifier},
-	}
-	data := postToTokenEndpoint(t, httpClient, destUrl, formData)
-	tok, ok := data["access_token"].(string)
-	assert.True(t, ok)
-	assert.NotEmpty(t, tok)
+	// A valid token whose only scope is one no route grants, so the route answers 403
+	tok := createClientCredentialsTokenWithoutRouteScope(t)
 
 	// Create target client to update
 	target := &models.Client{ClientIdentifier: "api-perm-put-target-" + fake.LetterN(6), Enabled: true, ClientCredentialsEnabled: true, IsPublic: true}
-	err = database.CreateClient(context.Background(), nil, target)
+	err := database.CreateClient(context.Background(), nil, target)
 	assert.NoError(t, err)
 	defer func() { _ = database.DeleteClient(context.Background(), nil, target.Id) }()
 

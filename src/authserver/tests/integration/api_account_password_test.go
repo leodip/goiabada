@@ -11,7 +11,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/constants"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -136,8 +135,8 @@ func TestAPIAccountPasswordPut_UnauthorizedAndScope(t *testing.T) {
 	body2, _ := io.ReadAll(resp2.Body)
 	assert.Contains(t, string(body2), "Access token required.")
 
-	// Insufficient scope: use client-credentials with userinfo scope
-	tok := createClientCredentialsTokenWithScope(t, constants.AuthServerResourceIdentifier, constants.UserinfoPermissionIdentifier)
+	// Insufficient scope: a client-credentials token whose scope no route grants
+	tok := createClientCredentialsTokenWithoutRouteScope(t)
 	resp3 := makeAPIRequest(t, "PUT", url, tok, api.UpdateAccountPasswordRequest{CurrentPassword: "a", NewPassword: "b"})
 	defer func() { _ = resp3.Body.Close() }()
 	assert.Equal(t, http.StatusForbidden, resp3.StatusCode)
