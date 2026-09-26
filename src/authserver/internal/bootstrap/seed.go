@@ -20,7 +20,7 @@ import (
 	"github.com/leodip/goiabada/core/stringutil"
 )
 
-// seedDatabase is the seed's port: the transaction and the nine creates its 19 writes call.
+// seedDatabase is the seed's port: the transaction and the nine creates its 18 writes call.
 type seedDatabase interface {
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 	CreateClient(ctx context.Context, tx *sql.Tx, client *models.Client) error
@@ -50,7 +50,7 @@ type seedValues struct {
 //
 // WHY IT IS ORDERED THIS WAY. Every step that can fail without the database's help runs first --
 // the password check, the random keys, the encryption, both RSA keys, the hash and the bootstrap
-// file's staging -- and then all 19 writes run in one transaction, so a failure anywhere up to the
+// file's staging -- and then all 18 writes run in one transaction, so a failure anywhere up to the
 // commit leaves an empty database that the next start seeds from the beginning. The one step after
 // it, publishing the file, cannot be undone that way, and its failure keeps the staged file and
 // names it instead (below). They used to run one statement at a time with no transaction, the
@@ -267,7 +267,6 @@ func (r *runner) writeSeedRows(ctx context.Context, tx *sql.Tx, values seedValue
 
 	permissions := make(map[string]*models.Permission)
 	for _, p := range []struct{ identifier, description string }{
-		{constants.UserinfoPermissionIdentifier, "Access to the OpenID Connect user info endpoint"},
 		{constants.ManageAccountPermissionIdentifier, "View and update user account data for the current user"},
 		{constants.ManagePermissionIdentifier, "Manage the authorization server via the admin console"},
 		// Granular admin API scopes

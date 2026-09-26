@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"slices"
 	"strconv"
 	"strings"
 
@@ -67,13 +66,6 @@ func HandleAPIPermissionsByResourceGet(
 			if err != nil {
 				writeInternalServerError(w, r, err)
 				return
-			}
-
-			// Filter out the userinfo permission if the resource is authserver
-			if permissions[0].Resource.ResourceIdentifier == constants.AuthServerResourceIdentifier {
-				permissions = slices.DeleteFunc(permissions, func(p models.Permission) bool {
-					return p.PermissionIdentifier == constants.UserinfoPermissionIdentifier
-				})
 			}
 		}
 

@@ -230,6 +230,12 @@ func TestToken_ClientCred_InvalidScope(t *testing.T) {
 			errorDescription: "Invalid scope: 'invalid:perm'. Could not find a resource with identifier 'invalid'.",
 		},
 		{
+			// The authserver resource has no userinfo permission since #449.
+			scope:            "authserver:userinfo",
+			errorCode:        "invalid_scope",
+			errorDescription: "Scope 'authserver:userinfo' is not recognized. The resource identified by 'authserver' doesn't grant the 'userinfo' permission.",
+		},
+		{
 			scope:            resourceIdentifier + ":perm",
 			errorCode:        "invalid_scope",
 			errorDescription: fmt.Sprintf("Scope '%s:perm' is not recognized. The resource identified by '%s' doesn't grant the 'perm' permission.", resourceIdentifier, resourceIdentifier),

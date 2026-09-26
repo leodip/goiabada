@@ -15,6 +15,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
+	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
@@ -2023,6 +2024,15 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 			scope:       "billing-api:delete",
 			wantCode:    "invalid_scope",
 			wantDesc:    "doesn't grant the 'delete' permission",
+		},
+		{
+			// The authserver resource has no userinfo permission since #449, so an explicit
+			// request for it is refused as any unknown permission is.
+			name:        "authserver:userinfo, a permission the authserver resource no longer has",
+			clientPerms: []models.Permission{authserverManage},
+			scope:       "authserver:userinfo",
+			wantCode:    "invalid_scope",
+			wantDesc:    "Scope 'authserver:userinfo' is not recognized. The resource identified by 'authserver' doesn't grant the 'userinfo' permission.",
 		},
 		{
 			name:        "client holds no permissions at all",
@@ -5266,6 +5276,22 @@ func TestValidateTokenRequest_ROPC_ResourcePermission_ResolutionFailures(t *test
 					Return([]models.Permission{{Id: 1, PermissionIdentifier: "read", ResourceId: 1}}, nil).Once()
 			},
 			wantDesc: "Scope 'api:delete' is not recognized. The resource identified by 'api' doesn't grant the 'delete' permission.",
+		},
+		{
+			// The authserver resource has no userinfo permission since #449, so an explicit
+			// request for it is refused as any unknown permission is.
+			name:  "authserver:userinfo, a permission the authserver resource no longer has",
+			scope: "openid authserver:userinfo",
+			setup: func(mockDB *mocks_data.Database) {
+				builtIns := make([]models.Permission, 0, len(coreconstants.BuiltInAuthServerPermissionIdentifiers))
+				for i, identifier := range coreconstants.BuiltInAuthServerPermissionIdentifiers {
+					builtIns = append(builtIns, models.Permission{Id: int64(40 + i), PermissionIdentifier: identifier, ResourceId: 4})
+				}
+				mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, coreconstants.AuthServerResourceIdentifier).
+					Return(&models.Resource{Id: 4, ResourceIdentifier: coreconstants.AuthServerResourceIdentifier}, nil).Once()
+				mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(4)).Return(builtIns, nil).Once()
+			},
+			wantDesc: "Scope 'authserver:userinfo' is not recognized. The resource identified by 'authserver' doesn't grant the 'userinfo' permission.",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

@@ -177,7 +177,6 @@ silence is not. Four rows carry it, the permission identifiers #359 left behind.
 | `ManagePermissionIdentifier` | both-apps | — |
 | `ManageSettingsPermissionIdentifier` | contract | — |
 | `ManageUsersPermissionIdentifier` | contract | — |
-| `UserinfoPermissionIdentifier` | both-apps | — |
 | `Version` | both-apps | — |
 
 Notes on rows that are not self-evident:

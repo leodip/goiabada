@@ -3,7 +3,6 @@ package adminresourcehandlers
 import (
 	"context"
 	"net/http"
-	"slices"
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
@@ -69,13 +68,6 @@ func HandleAdminResourceGroupsWithPermissionGet(
 		if err != nil {
 			handlers.HandleAPIError(httpHelper, w, r, err)
 			return
-		}
-
-		// filter out the userinfo permission if the resource is authserver
-		if resource.ResourceIdentifier == coreconstants.AuthServerResourceIdentifier {
-			permissions = slices.DeleteFunc(permissions, func(p api.PermissionResponse) bool {
-				return p.PermissionIdentifier == coreconstants.UserinfoPermissionIdentifier
-			})
 		}
 
 		selectedPermissionStr := r.URL.Query().Get("permission")
@@ -301,13 +293,6 @@ func HandleAdminResourceGroupsWithPermissionAddPermissionPost(
 			return
 		}
 
-		// filter out the userinfo permission if the resource is authserver
-		if resource.ResourceIdentifier == coreconstants.AuthServerResourceIdentifier {
-			permissions = slices.DeleteFunc(permissions, func(p api.PermissionResponse) bool {
-				return p.PermissionIdentifier == coreconstants.UserinfoPermissionIdentifier
-			})
-		}
-
 		found := false
 		for _, permission := range permissions {
 			if permission.Id == permissionId {
@@ -430,19 +415,6 @@ func HandleAdminResourceGroupsWithPermissionRemovePermissionPost(
 			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
 		}
-
-		// filter out the userinfo permission if the resource is authserver
-		filteredPermissions := []api.PermissionResponse{}
-		for idx, permission := range permissions {
-			if permission.Resource.ResourceIdentifier == coreconstants.AuthServerResourceIdentifier {
-				if permission.PermissionIdentifier != coreconstants.UserinfoPermissionIdentifier {
-					filteredPermissions = append(filteredPermissions, permissions[idx])
-				}
-			} else {
-				filteredPermissions = append(filteredPermissions, permissions[idx])
-			}
-		}
-		permissions = filteredPermissions
 
 		found := false
 		for _, permission := range permissions {

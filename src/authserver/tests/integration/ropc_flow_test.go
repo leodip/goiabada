@@ -650,6 +650,38 @@ func TestROPC_WithResourcePermissions(t *testing.T) {
 	assert.Contains(t, scope, resource.ResourceIdentifier+":"+permission.PermissionIdentifier)
 }
 
+// TestROPC_ExplicitUserinfoScopeIsRefused pins that an explicit authserver:userinfo is refused as
+// any unknown permission is: the authserver resource has no userinfo permission since #449, so no
+// user can hold it and there is no special answer for it any more.
+func TestROPC_ExplicitUserinfoScopeIsRefused(t *testing.T) {
+	settings, err := database.GetSettingsById(context.Background(), nil, 1)
+	assert.Nil(t, err)
+	originalROPCSetting := settings.ResourceOwnerPasswordCredentialsEnabled
+	settings.ResourceOwnerPasswordCredentialsEnabled = true
+	err = database.UpdateSettings(context.Background(), nil, settings)
+	assert.Nil(t, err)
+	defer func() {
+		settings.ResourceOwnerPasswordCredentialsEnabled = originalROPCSetting
+		_ = database.UpdateSettings(context.Background(), nil, settings)
+	}()
+
+	password := fake.Password(12)
+	client := createROPCClient(t, "", true)
+	user := createROPCUser(t, password)
+
+	data := postToTokenEndpoint(t, createHttpClient(t), config.GetAuthServer().BaseURL+"/auth/token/", url.Values{
+		"grant_type": {"password"},
+		"client_id":  {client.ClientIdentifier},
+		"username":   {user.Email},
+		"password":   {password},
+		"scope":      {"openid authserver:userinfo"},
+	})
+
+	assert.Equal(t, "invalid_scope", data["error"])
+	assert.Equal(t, "Scope 'authserver:userinfo' is not recognized. The resource identified by 'authserver' doesn't grant the 'userinfo' permission.", data["error_description"])
+	assert.Nil(t, data["access_token"], "a refused request issues no token")
+}
+
 // TestROPC_RefreshToken_OpenIdOnly pins that an ROPC grant of `openid` and nothing else refreshes,
 // and that the reissued token still reaches /userinfo. It was broken outright once: the refresh
 // token recorded a scope issuance had appended, and the refresh re-checked it against the user's

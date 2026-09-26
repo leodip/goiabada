@@ -74,11 +74,37 @@ func TestSeederLowercasesAdminEmail(t *testing.T) {
 		givenEmail, givenEmail)
 }
 
+// TestSeed_TheAuthServerPermissionsAreTheBuiltIns holds a fresh deployment's authserver resource
+// to exactly the built-in permissions, on every engine. The list and the seed have to agree: the
+// resource's permissions save demands every built-in by its row, so a built-in the seed does not
+// write answers every save of that resource with a 500. userinfo is in neither since #449.
+func TestSeed_TheAuthServerPermissionsAreTheBuiltIns(t *testing.T) {
+	h := migratedIsolatedDB(t)
+	ctx := context.Background()
+
+	outcome, err := bootstrap.Run(ctx, h.DB, seedConfig("admin@example.com"))
+	require.NoError(t, err)
+	require.Equal(t, bootstrap.Continue, outcome)
+
+	resource, err := h.DB.GetResourceByResourceIdentifier(ctx, nil, constants.AuthServerResourceIdentifier)
+	require.NoError(t, err)
+	require.NotNil(t, resource)
+	permissions, err := h.DB.GetPermissionsByResourceId(ctx, nil, resource.Id)
+	require.NoError(t, err)
+	identifiers := make([]string, 0, len(permissions))
+	for _, p := range permissions {
+		identifiers = append(identifiers, p.PermissionIdentifier)
+	}
+	assert.ElementsMatchf(t, constants.BuiltInAuthServerPermissionIdentifiers, identifiers,
+		"the seed must write the built-in permissions and no other on %s", dbType())
+	assert.Len(t, identifiers, 7)
+}
+
 var errSeedFault = errors.New("injected seed failure")
 
 // seedFaultDB fails the seed on a real engine at the two points that matter to #424 decision 14:
 // after the settings insert has executed, which draws the settings row's id from the engine's
-// counter, and at the commit, after all nineteen writes have run. The commit is failed by
+// counter, and at the commit, after all eighteen writes have run. The commit is failed by
 // cancelling the transaction's context once the body has returned, which database/sql answers by
 // rolling back.
 type seedFaultDB struct {

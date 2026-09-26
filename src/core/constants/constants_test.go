@@ -22,20 +22,15 @@ func TestGranularScopeConstants(t *testing.T) {
 	assert.Equal(t, "authserver", AuthServerResourceIdentifier)
 }
 
-// TestScopeConstantsAreUnique verifies that all permission identifiers are unique
+// TestScopeConstantsAreUnique verifies that the built-in permission identifiers are unique, and
+// that they are the seven runtime scope checks name. userinfo left the list in #449: /userinfo
+// gates on the openid scope, so nothing checks for that permission.
 func TestScopeConstantsAreUnique(t *testing.T) {
-	permissions := []string{
-		UserinfoPermissionIdentifier,
-		ManageAccountPermissionIdentifier,
-		ManagePermissionIdentifier,
-		AdminReadPermissionIdentifier,
-		ManageUsersPermissionIdentifier,
-		ManageClientsPermissionIdentifier,
-		ManageSettingsPermissionIdentifier,
-	}
+	assert.Len(t, BuiltInAuthServerPermissionIdentifiers, 7)
+	assert.NotContains(t, BuiltInAuthServerPermissionIdentifiers, "userinfo")
 
 	seen := make(map[string]bool)
-	for _, perm := range permissions {
+	for _, perm := range BuiltInAuthServerPermissionIdentifiers {
 		assert.False(t, seen[perm], "Duplicate permission identifier found: %s", perm)
 		seen[perm] = true
 	}

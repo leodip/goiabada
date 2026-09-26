@@ -14,7 +14,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/permissions"
 	"github.com/leodip/goiabada/authserver/internal/urlutil"
-	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/i18n"
 )
@@ -85,13 +84,6 @@ func (val *AuthorizeValidator) ValidateScopes(ctx context.Context, scope string)
 		// these scopes don't need further validation
 		if oidc.IsClaimScope(scopeStr) || oidc.IsOfflineAccessScope(scopeStr) {
 			continue
-		}
-
-		userInfoScope := fmt.Sprintf("%v:%v", constants.AuthServerResourceIdentifier, constants.UserinfoPermissionIdentifier)
-		if scopeStr == userInfoScope {
-			return customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope",
-				fmt.Sprintf("The '%v' scope is automatically included in the access token when an OpenID Connect scope is present. There's no need to request it explicitly. Please remove it from your request.", userInfoScope),
-				http.StatusBadRequest)
 		}
 
 		// The rejection wording below is this endpoint's own and differs from the token

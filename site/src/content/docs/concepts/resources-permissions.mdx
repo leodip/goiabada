@@ -52,13 +52,13 @@ The built-in permissions under the `authserver` resource are:
 
 | Permission identifier | Purpose |
 |----------------------|---------|
-| `userinfo` | Access to the `/userinfo` endpoint |
 | `manage-account` | Self-service account management (Account API) |
 | `manage` | Full admin access to all Admin API endpoints |
 | `admin-read` | Read-only access to all Admin API endpoints |
 | `manage-users` | Full access to user, group, and permission endpoints |
 | `manage-clients` | Full access to client endpoints |
 | `manage-settings` | Full access to settings and key endpoints |
+| `browser-sessions` | The admin console's access to its own browser sessions |
 
 You can create additional custom permissions on the `authserver` resource if needed, but the built-in ones listed above are protected.
 

@@ -135,8 +135,7 @@ paths:
           description: |
             Permission id to annotate each returned user against. Selects the
             SearchUsersWithPermissionAnnotationResponse shape. A permission id that matches
-            nothing is answered 404, and the authserver `userinfo` permission is refused with
-            400.
+            nothing is answered 404.
           schema:
             type: integer
             format: int64
