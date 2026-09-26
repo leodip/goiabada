@@ -146,7 +146,8 @@ func HandleAdminUserGroupsPost(
 
 		// Create API request for updating user groups
 		request := &api.UpdateUserGroupsRequest{
-			GroupIds: data.AssignedGroupsIds,
+			GroupIds:         data.AssignedGroupsIds,
+			ExpectedGroupIds: data.ExpectedGroupIds,
 		}
 
 		// Call API to update user groups (this handles all the business logic including audit logging)

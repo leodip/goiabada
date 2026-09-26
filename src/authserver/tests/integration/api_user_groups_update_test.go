@@ -12,6 +12,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestAPIUserGroupsPut tests the PUT /api/v1/admin/users/{id}/groups endpoint
@@ -62,7 +63,8 @@ func TestAPIUserGroupsPut_Success(t *testing.T) {
 
 	// Test: Update user groups - remove group 0, keep group 1, add group 2
 	updateReq := api.UpdateUserGroupsRequest{
-		GroupIds: []int64{groups[1].Id, groups[2].Id},
+		GroupIds:         []int64{groups[1].Id, groups[2].Id},
+		ExpectedGroupIds: getUserGroupIds(t, accessToken, testUser.Id),
 	}
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/groups"
@@ -147,7 +149,8 @@ func TestAPIUserGroupsPut_EmptyGroups(t *testing.T) {
 
 	// Test: Remove all groups (empty array)
 	updateReq := api.UpdateUserGroupsRequest{
-		GroupIds: []int64{}, // Empty array
+		GroupIds:         []int64{}, // Empty array
+		ExpectedGroupIds: getUserGroupIds(t, accessToken, testUser.Id),
 	}
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/groups"
@@ -194,7 +197,8 @@ func TestAPIUserGroupsPut_NonExistentGroup(t *testing.T) {
 
 	// Test: Try to assign user to non-existent group
 	updateReq := api.UpdateUserGroupsRequest{
-		GroupIds: []int64{99999}, // Non-existent group ID
+		GroupIds:         []int64{99999}, // Non-existent group ID
+		ExpectedGroupIds: getUserGroupIds(t, accessToken, testUser.Id),
 	}
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/groups"
@@ -211,7 +215,8 @@ func TestAPIUserGroupsPut_UserNotFound(t *testing.T) {
 
 	// Test: Update groups for non-existent user
 	updateReq := api.UpdateUserGroupsRequest{
-		GroupIds: []int64{}, // Empty groups
+		GroupIds:         []int64{}, // Empty groups
+		ExpectedGroupIds: []int64{},
 	}
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/99999/groups"
@@ -237,7 +242,8 @@ func TestAPIUserGroupsPut_InvalidId(t *testing.T) {
 	}
 
 	updateReq := api.UpdateUserGroupsRequest{
-		GroupIds: []int64{},
+		GroupIds:         []int64{},
+		ExpectedGroupIds: []int64{},
 	}
 
 	for _, tc := range testCases {
@@ -374,7 +380,7 @@ func TestAPIUserGroupsPut_TheGroupIdArrayIsBounded(t *testing.T) {
 			url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" +
 				strconv.FormatInt(testUser.Id, 10) + "/groups"
 			resp := makeAPIRequest(t, "PUT", url, accessToken,
-				api.UpdateUserGroupsRequest{GroupIds: groupIds})
+				api.UpdateUserGroupsRequest{GroupIds: groupIds, ExpectedGroupIds: []int64{}})
 			defer func() { _ = resp.Body.Close() }()
 
 			assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
@@ -390,4 +396,124 @@ func TestAPIUserGroupsPut_TheGroupIdArrayIsBounded(t *testing.T) {
 			assert.Empty(t, testUser.Groups)
 		})
 	}
+}
+
+// getUserGroupIds reads the user's groups through the API, as a caller does before a save, and
+// returns their ids: the loaded set a save carries (#428).
+func getUserGroupIds(t *testing.T, accessToken string, userId int64) []int64 {
+	t.Helper()
+	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(userId, 10) + "/groups"
+	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
+	defer func() { _ = resp.Body.Close() }()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	var body api.GetUserGroupsResponse
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
+	ids := []int64{}
+	for _, g := range body.Groups {
+		ids = append(ids, g.Id)
+	}
+	return ids
+}
+
+// createUserForGroupsSave creates an enabled user for one save case and removes it afterwards.
+func createUserForGroupsSave(t *testing.T) *models.User {
+	t.Helper()
+	user := &models.User{
+		Subject:    fake.UUID(),
+		Enabled:    true,
+		Email:      uniqueEmail("testuser@groups-expected.test"),
+		GivenName:  "Test",
+		FamilyName: "User",
+	}
+	require.NoError(t, database.CreateUser(context.Background(), nil, user))
+	t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, user.Id) })
+	return user
+}
+
+// The loaded set is required: absent or null answers 400 naming the field, and no membership is
+// added (#428).
+func TestAPIUserGroupsPut_TheLoadedListIsRequired(t *testing.T) {
+	accessToken, _ := createAdminClientWithToken(t)
+	user := createUserForGroupsSave(t)
+	group := createTestGroup(t)
+	t.Cleanup(func() { _ = database.DeleteGroup(context.Background(), nil, group.Id) })
+	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(user.Id, 10) + "/groups"
+
+	bodies := map[string]interface{}{
+		"absent": map[string]interface{}{"groupIds": []int64{group.Id}},
+		"null":   map[string]interface{}{"groupIds": []int64{group.Id}, "expectedGroupIds": nil},
+	}
+	for name, body := range bodies {
+		t.Run(name, func(t *testing.T) {
+			resp := makeAPIRequest(t, "PUT", url, accessToken, body)
+			defer func() { _ = resp.Body.Close() }()
+			assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+			var got map[string]interface{}
+			require.NoError(t, json.NewDecoder(resp.Body).Decode(&got))
+			assert.Equal(t, "VALIDATION_ERROR", got["error_code"])
+			assert.Contains(t, got["error_description"], "expectedGroupIds is required")
+			assert.Empty(t, getUserGroupIds(t, accessToken, user.Id))
+		})
+	}
+}
+
+// Two administrators load the same memberships; the first removes the user from one group, and
+// the second, still holding the set as it was, saves. The second is refused 409 CONCURRENT_UPDATE
+// and writes nothing, rather than putting the user back into the group the first had just removed
+// them from (#428).
+func TestAPIUserGroupsPut_AnOutdatedLoadedListIsRefused(t *testing.T) {
+	accessToken, _ := createAdminClientWithToken(t)
+	user := createUserForGroupsSave(t)
+	groupA := createTestGroup(t)
+	t.Cleanup(func() { _ = database.DeleteGroup(context.Background(), nil, groupA.Id) })
+	groupB := createTestGroup(t)
+	t.Cleanup(func() { _ = database.DeleteGroup(context.Background(), nil, groupB.Id) })
+	groupC := createTestGroup(t)
+	t.Cleanup(func() { _ = database.DeleteGroup(context.Background(), nil, groupC.Id) })
+	for _, g := range []*models.Group{groupA, groupB} {
+		require.NoError(t, database.CreateUserGroup(context.Background(), nil, &models.UserGroup{UserId: user.Id, GroupId: g.Id}))
+	}
+	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(user.Id, 10) + "/groups"
+
+	loadedByBoth := getUserGroupIds(t, accessToken, user.Id)
+
+	first := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateUserGroupsRequest{
+		GroupIds: []int64{groupB.Id}, ExpectedGroupIds: loadedByBoth})
+	defer func() { _ = first.Body.Close() }()
+	require.Equal(t, http.StatusOK, first.StatusCode)
+
+	second := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateUserGroupsRequest{
+		GroupIds: []int64{groupA.Id, groupB.Id, groupC.Id}, ExpectedGroupIds: loadedByBoth})
+	defer func() { _ = second.Body.Close() }()
+	assert.Equal(t, http.StatusConflict, second.StatusCode)
+	var body map[string]interface{}
+	require.NoError(t, json.NewDecoder(second.Body).Decode(&body))
+	assert.Equal(t, "CONCURRENT_UPDATE", body["error_code"])
+
+	assert.Equal(t, []int64{groupB.Id}, getUserGroupIds(t, accessToken, user.Id), "the first save's result stands")
+}
+
+// A group id named twice is one membership, where it used to be refused as a group that does not
+// exist, and a following save without it removes the membership (#428).
+func TestAPIUserGroupsPut_ARepeatedGroupIdIsOneMembership(t *testing.T) {
+	accessToken, _ := createAdminClientWithToken(t)
+	user := createUserForGroupsSave(t)
+	group := createTestGroup(t)
+	t.Cleanup(func() { _ = database.DeleteGroup(context.Background(), nil, group.Id) })
+	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(user.Id, 10) + "/groups"
+
+	resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateUserGroupsRequest{
+		GroupIds: []int64{group.Id, group.Id}, ExpectedGroupIds: []int64{}})
+	defer func() { _ = resp.Body.Close() }()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	stored, err := database.GetUserGroupsByUserId(context.Background(), nil, user.Id)
+	require.NoError(t, err)
+	require.Len(t, stored, 1, "one row for the repeated id")
+
+	again := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateUserGroupsRequest{
+		GroupIds: []int64{}, ExpectedGroupIds: getUserGroupIds(t, accessToken, user.Id)})
+	defer func() { _ = again.Body.Close() }()
+	require.Equal(t, http.StatusOK, again.StatusCode)
+	assert.Empty(t, getUserGroupIds(t, accessToken, user.Id))
 }

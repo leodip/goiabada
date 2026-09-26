@@ -468,6 +468,56 @@ func TestRender_AdminGroupsPermissions_SendsTheLoadedList(t *testing.T) {
 	assertSendsTheLoadedPermissionIds(t, out)
 }
 
+// The client permissions page does the same (#428).
+func TestRender_AdminClientsPermissions_SendsTheLoadedList(t *testing.T) {
+	out := render(t, "/admin_clients_permissions.html", map[string]interface{}{
+		"client": struct {
+			ClientId                 int64
+			ClientIdentifier         string
+			ClientCredentialsEnabled bool
+			Permissions              map[int64]string
+			IsSystemLevelClient      bool
+		}{
+			ClientId:                 7,
+			ClientIdentifier:         "a-service",
+			ClientCredentialsEnabled: true,
+			Permissions:              map[int64]string{3: "some-resource:read", 4: "some-resource:write"},
+		},
+		"resources":         []api.ResourceResponse{},
+		"savedSuccessfully": false,
+	})
+	assertSendsTheLoadedPermissionIds(t, out)
+}
+
+// The user groups page keeps the ids of the memberships it loaded and sends them with every save,
+// so the auth server can refuse a save from an outdated page rather than undo another
+// administrator's change. The copy is taken after every loaded membership is pushed and never
+// edited, or the page would send its edited set as the loaded one and every save would pass (#428).
+func TestRender_AdminUsersGroups_SendsTheLoadedList(t *testing.T) {
+	out := render(t, "/admin_users_groups.html", map[string]interface{}{
+		"user":              &api.UserResponse{Id: 5, Email: "someone@example.com"},
+		"userGroups":        map[int64]string{3: "admins", 4: "auditors"},
+		"allGroups":         []api.GroupResponse{},
+		"page":              "",
+		"query":             "",
+		"savedSuccessfully": false,
+	})
+
+	const copyTaken = "const loadedGroupIds = assignedGroups.map(function(assignedGroup) { return parseInt(assignedGroup.id, 10); });"
+	// The template ranges over the map in key order, so auditors (4) is the last loaded push.
+	lastLoaded := strings.Index(out, `"groupIdentifier": "auditors"`)
+	require.NotEqual(t, -1, lastLoaded, "the loaded memberships are pushed into the editable list")
+	require.Less(t, strings.Index(out, `"groupIdentifier": "admins"`), lastLoaded)
+	copyAt := strings.Index(out, copyTaken)
+	require.NotEqual(t, -1, copyAt, "the page keeps the ids of the loaded memberships")
+	assert.Greater(t, copyAt, lastLoaded, "the copy is taken after every loaded membership is in the list")
+	assert.Less(t, copyAt, strings.Index(out, "function btnSaveClick"), "the copy is taken at load, before anything can edit the list")
+
+	assert.Contains(t, out, `"expectedGroupIds": loadedGroupIds`)
+	assert.NotRegexp(t, `loadedGroupIds\.(push|splice|pop|shift|unshift)\(`, out)
+	assert.NotRegexp(t, `loadedGroupIds\s*=[^=]`, strings.Replace(out, copyTaken, "", 1))
+}
+
 // TestRender_AdminUsersPaginator is the template hop of the paginator swap (#271): the partial is
 // unchanged and now reads a *pagination.Paginator instead of the unmaintained library's value, so
 // what needs proving is that a Go template resolves the replacement's exported fields the way it

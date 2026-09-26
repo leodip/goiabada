@@ -147,7 +147,10 @@ func HandleAdminClientPermissionsPost(
 		}
 
 		// Call Auth Server API to update client permissions
-		req := &api.UpdateClientPermissionsRequest{PermissionIds: data.AssignedPermissionsIds}
+		req := &api.UpdateClientPermissionsRequest{
+			PermissionIds:         data.AssignedPermissionsIds,
+			ExpectedPermissionIds: data.ExpectedPermissionIds,
+		}
 		if updateClientPermissionsErr := apiClient.UpdateClientPermissions(r.Context(), jwtInfo.TokenResponse.AccessToken, data.ClientId, req); updateClientPermissionsErr != nil {
 			handlers.HandleAPIErrorJson(httpHelper, w, r, updateClientPermissionsErr)
 			return

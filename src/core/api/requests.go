@@ -146,8 +146,12 @@ type VerifyAccountEmailRequest struct {
 	VerificationCode string `json:"verificationCode"`
 }
 
+// UpdateUserGroupsRequest replaces the whole set of groups a user belongs to.
+// ExpectedGroupIds is the set as the caller last read it, as ExpectedPermissionIds is on
+// UpdateUserPermissionsRequest (#428).
 type UpdateUserGroupsRequest struct {
-	GroupIds []int64 `json:"groupIds"`
+	GroupIds         []int64 `json:"groupIds"`
+	ExpectedGroupIds []int64 `json:"expectedGroupIds"`
 }
 
 // UpdateUserPermissionsRequest replaces the whole set of permissions granted to a user.
@@ -205,9 +209,10 @@ type ResourcePermissionUpsert struct {
 // UpdateClientPermissionsRequest is used to replace the full set of
 // permissions assigned to a client. The auth server validates existence
 // of permissions, enforces client constraints, applies add/remove ops,
-// and performs auditing.
+// and performs auditing. ExpectedPermissionIds is as on UpdateUserPermissionsRequest (#428).
 type UpdateClientPermissionsRequest struct {
-	PermissionIds []int64 `json:"permissionIds"`
+	PermissionIds         []int64 `json:"permissionIds"`
+	ExpectedPermissionIds []int64 `json:"expectedPermissionIds"`
 }
 
 type UpdateUserPhoneRequest struct {

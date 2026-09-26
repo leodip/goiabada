@@ -22,9 +22,10 @@ type clientPermissionsDatabase interface {
 	CreateClientPermission(ctx context.Context, tx *sql.Tx, clientPermission *models.ClientPermission) error
 	DeleteClientPermission(ctx context.Context, tx *sql.Tx, clientPermissionId int64) error
 	GetClientById(ctx context.Context, tx *sql.Tx, clientId int64) (*models.Client, error)
-	GetClientPermissionByClientIdAndPermissionId(ctx context.Context, tx *sql.Tx, clientId, permissionId int64) (*models.ClientPermission, error)
+	GetClientPermissionsByClientId(ctx context.Context, tx *sql.Tx, clientId int64) ([]models.ClientPermission, error)
 	GetPermissionById(ctx context.Context, tx *sql.Tx, permissionId int64) (*models.Permission, error)
 	PermissionsLoadResources(ctx context.Context, tx *sql.Tx, permissions []models.Permission) error
+	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 }
 
 // HandleAPIClientPermissionsGet - GET /api/v1/admin/clients/{id}/permissions
@@ -106,21 +107,19 @@ func HandleAPIClientPermissionsPut(
 		}
 
 		var request api.UpdateClientPermissionsRequest
-		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		if decodeErr := json.NewDecoder(r.Body).Decode(&request); decodeErr != nil {
 			writeJSONError(w, "Invalid request body", "INVALID_REQUEST_BODY", http.StatusBadRequest)
 			return
 		}
 
-		// Deduplicate permission IDs
-		uniquePermissionIds := make([]int64, 0)
-		seen := make(map[int64]bool)
-		for _, pid := range request.PermissionIds {
-			if !seen[pid] {
-				uniquePermissionIds = append(uniquePermissionIds, pid)
-				seen[pid] = true
-			}
+		// The set as the caller loaded it, required as it is on every list save: absent or null
+		// decodes to nil and is refused, [] means the caller read no grants (#428).
+		if request.ExpectedPermissionIds == nil {
+			writeJSONError(w, "expectedPermissionIds is required: send the permission ids as you last read them, or [] if there were none.", "VALIDATION_ERROR", http.StatusBadRequest)
+			return
 		}
-		request.PermissionIds = uniquePermissionIds
+
+		wanted := firstOccurrences(request.PermissionIds)
 
 		// Enforce that client credentials flow must be enabled
 		if !client.ClientCredentialsEnabled {
@@ -128,17 +127,11 @@ func HandleAPIClientPermissionsPut(
 			return
 		}
 
-		// Load current permissions
-		if err := database.ClientLoadPermissions(r.Context(), nil, client); err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "database error loading current client permissions"), "client_id", client.Id)
-			return
-		}
-
 		// Validate that all requested permissions exist
-		for _, permissionId := range request.PermissionIds {
-			permission, err := database.GetPermissionById(r.Context(), nil, permissionId)
-			if err != nil {
-				writeInternalServerError(w, r, errs.Wrap(err, "database error getting permission by ID for validation"), "permission_id", permissionId, "client_id", client.Id)
+		for _, permissionId := range wanted {
+			permission, getErr := database.GetPermissionById(r.Context(), nil, permissionId)
+			if getErr != nil {
+				writeInternalServerError(w, r, errs.Wrap(getErr, "database error getting permission by ID for validation"), "permission_id", permissionId, "client_id", client.Id)
 				return
 			}
 			if permission == nil {
@@ -147,65 +140,53 @@ func HandleAPIClientPermissionsPut(
 			}
 		}
 
-		// Add new permissions
-		for _, permissionId := range request.PermissionIds {
-			found := false
-			for _, permission := range client.Permissions {
-				if permission.Id == permissionId {
-					found = true
-					break
+		grantKey := func(cp models.ClientPermission) int64 { return cp.PermissionId }
+		grantId := func(cp models.ClientPermission) int64 { return cp.Id }
+
+		// One transaction, so a failure part way through commits nothing and the 500 is true, where
+		// the autocommitted writes this replaced could leave a grant made or a revocation done under
+		// a 500 (#406). No row lock, as for every list save: two overlapping saves of one client's
+		// grants merge item by item, and client_permissions has no unique key, so a grant the two
+		// both add is stored twice, which is harmless and collapsed by the next save's replaceSet.
+		// Opened through RunInTransaction, so a deadlock victim is rerun whole (#301). The body is
+		// safe to rerun: the plan is recomputed from the rows read on the transaction on every
+		// attempt, and nothing is written to the response inside it (#428).
+		//
+		// A permission deleted after the validation above read it fails the insert's foreign key,
+		// which undoes the whole save as one 500; the second lookup the add loop made went with the
+		// loop, and so did the "get one, then delete it" lookup, whose nil answer this save
+		// reported as a 404 after the grants before it were already written (#406).
+		err = database.RunInTransaction(r.Context(), func(tx *sql.Tx) error {
+			stored, loadErr := database.GetClientPermissionsByClientId(r.Context(), tx, client.Id)
+			if loadErr != nil {
+				return errs.Wrap(loadErr, "database error loading client permissions before update")
+			}
+			if !sameSet(stored, grantKey, request.ExpectedPermissionIds) {
+				return errListChanged
+			}
+
+			insert, remove := replaceSet(stored, grantKey, grantId, wanted)
+			for _, rowId := range remove {
+				if deleteErr := database.DeleteClientPermission(r.Context(), tx, rowId); deleteErr != nil {
+					return errs.Wrapf(deleteErr, "database error deleting client permission %d", rowId)
 				}
 			}
-			if !found {
-				permission, err := database.GetPermissionById(r.Context(), nil, permissionId)
-				if err != nil {
-					writeInternalServerError(w, r, errs.Wrap(err, "database error retrieving permission for client assignment"), "permission_id", permissionId, "client_id", client.Id)
-					return
-				}
-
-				if err := database.CreateClientPermission(r.Context(), nil, &models.ClientPermission{
+			for _, permissionId := range insert {
+				if createErr := database.CreateClientPermission(r.Context(), tx, &models.ClientPermission{
 					ClientId:     client.Id,
-					PermissionId: permission.Id,
-				}); err != nil {
-					writeInternalServerError(w, r, errs.Wrap(err, "database error creating client permission"), "client_id", client.Id, "permission_id", permission.Id)
-					return
+					PermissionId: permissionId,
+				}); createErr != nil {
+					return errs.Wrapf(createErr, "database error granting permission %d", permissionId)
 				}
 			}
+			return nil
+		})
+		if err != nil {
+			writeListSaveFailure(w, r, err, "client_id", client.Id)
+			return
 		}
 
-		// Remove permissions not in request
-		toDelete := []int64{}
-		for _, permission := range client.Permissions {
-			keep := false
-			for _, pid := range request.PermissionIds {
-				if permission.Id == pid {
-					keep = true
-					break
-				}
-			}
-			if !keep {
-				toDelete = append(toDelete, permission.Id)
-			}
-		}
-
-		for _, permissionId := range toDelete {
-			clientPermission, err := database.GetClientPermissionByClientIdAndPermissionId(r.Context(), nil, client.Id, permissionId)
-			if err != nil {
-				writeInternalServerError(w, r, errs.Wrap(err, "database error getting client permission for deletion"), "client_id", client.Id, "permission_id", permissionId)
-				return
-			}
-			if clientPermission == nil {
-				writeJSONError(w, "Client permission not found", "NOT_FOUND", http.StatusNotFound)
-				return
-			}
-
-			if err := database.DeleteClientPermission(r.Context(), nil, clientPermission.Id); err != nil {
-				writeInternalServerError(w, r, errs.Wrap(err, "database error deleting client permission"), "client_permission_id", clientPermission.Id, "client_id", client.Id, "permission_id", permissionId)
-				return
-			}
-		}
-
-		// Audit consolidated update
+		// Audit consolidated update, once the save has committed (#428).
 		auditLogger.Log(r.Context(), audit.AuditUpdatedClientPermissions, map[string]interface{}{
 			"clientId":     client.Id,
 			"loggedInUser": callerSubject(r),
