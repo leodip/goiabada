@@ -2,6 +2,7 @@ package integrationtests
 
 import (
 	"context"
+	"net/http"
 	"net/url"
 	"testing"
 
@@ -11,8 +12,8 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
-	"github.com/leodip/goiabada/core/constants"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // Helper function to create a client with ROPC enabled
@@ -649,18 +650,15 @@ func TestROPC_WithResourcePermissions(t *testing.T) {
 	assert.Contains(t, scope, resource.ResourceIdentifier+":"+permission.PermissionIdentifier)
 }
 
-// TestROPC_RefreshToken_OpenIdOnly covers the case that was broken outright: an ROPC token
-// requesting `openid` and nothing else could not be refreshed.
+// TestROPC_RefreshToken_OpenIdOnly pins that an ROPC grant of `openid` and nothing else refreshes,
+// and that the reissued token still reaches /userinfo. It was broken outright once: the refresh
+// token recorded a scope issuance had appended, and the refresh re-checked it against the user's
+// permissions. Nothing is appended since #449, so the reported scope is the grant, and /userinfo
+// admits the token on its openid.
 //
-// generateAccessTokenCore appends authserver:userinfo to any token carrying an OIDC scope so the
-// token can reach /userinfo. The ROPC refresh token used to record that appended scope as though
-// it were the grant, and on refresh the validator re-checked every non-OIDC scope in it against
-// the user's permissions, so the server rejected a scope it had injected itself.
-//
-// The four ROPC tests above assert only that a refresh token comes back and never redeem one,
-// which is why this shipped. `openid` alone is deliberate: it is the normal ROPC request, needs no
-// permission grants, and is exactly the case that failed. A test that also requested a resource
-// scope could pass for the wrong reason if the user happened to hold it.
+// `openid` alone is deliberate: it is the normal ROPC request, needs no permission grants, and is
+// exactly the case that failed. A test that also requested a resource scope could pass for the
+// wrong reason if the user happened to hold it.
 func TestROPC_RefreshToken_OpenIdOnly(t *testing.T) {
 	settings, err := database.GetSettingsById(context.Background(), nil, 1)
 	assert.Nil(t, err)
@@ -681,8 +679,6 @@ func TestROPC_RefreshToken_OpenIdOnly(t *testing.T) {
 	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
 	httpClient := createHttpClient(t)
 
-	userInfoScope := constants.AuthServerResourceIdentifier + ":" + constants.UserinfoPermissionIdentifier
-
 	data := postToTokenEndpoint(t, httpClient, destUrl, url.Values{
 		"grant_type":    {"password"},
 		"client_id":     {client.ClientIdentifier},
@@ -694,33 +690,10 @@ func TestROPC_RefreshToken_OpenIdOnly(t *testing.T) {
 
 	refreshToken, ok := data["refresh_token"].(string)
 	assert.True(t, ok, "ROPC should return a refresh token: %v", data)
+	assert.Equal(t, "openid", data["scope"], "the reported scope is the grant")
 
-	// The ACCESS token carries the injected scope: that is the feature, and it must survive.
-	accessScope, ok := data["scope"].(string)
-	assert.True(t, ok)
-	assert.Contains(t, accessScope, userInfoScope,
-		"the issued access token should still carry the injected userinfo scope")
-
-	// The REFRESH token must record the grant instead, so it carries no injected scope. Assert on
-	// both the claim and the persisted row, because the row is what the validator consults.
-	refreshClaims := decodeJWTPayload(t, refreshToken)
-	refreshScopeClaim, ok := refreshClaims["scope"].(string)
-	assert.True(t, ok, "refresh token should carry a scope claim")
-	assert.Equal(t, "openid", refreshScopeClaim,
-		"the refresh token should record the granted scope, not the decorated one")
-
-	jti, ok := refreshClaims["jti"].(string)
-	assert.True(t, ok)
-	persisted, err := database.GetRefreshTokenByJti(context.Background(), nil, jti)
-	assert.NoError(t, err)
-	if assert.NotNil(t, persisted, "the refresh token should be persisted") {
-		assert.Equal(t, "openid", persisted.Scope,
-			"the persisted refresh token row should record the granted scope")
-		assert.NotContains(t, persisted.Scope, userInfoScope)
-	}
-
-	// Redeeming it is the point. The user holds no permissions at all, which before the fix was
-	// enough to make this fail with invalid_grant.
+	// The user holds no permissions at all, which was once enough to make this fail with
+	// invalid_grant.
 	refreshed := postToTokenEndpoint(t, httpClient, destUrl, url.Values{
 		"grant_type":    {"refresh_token"},
 		"client_id":     {client.ClientIdentifier},
@@ -729,18 +702,16 @@ func TestROPC_RefreshToken_OpenIdOnly(t *testing.T) {
 	})
 
 	assert.Nil(t, refreshed["error"], "refresh should succeed: %v", refreshed)
+	assert.Equal(t, "openid", refreshed["scope"])
 	newAccessToken, ok := refreshed["access_token"].(string)
-	assert.True(t, ok, "refresh should return a new access token: %v", refreshed)
-	assert.NotEmpty(t, newAccessToken)
+	require.True(t, ok, "refresh should return a new access token: %v", refreshed)
 
-	// The reissued access token is re-decorated, so /userinfo access is unchanged by the fix.
-	// This pair is the whole point: the scope left the refresh token record without leaving the
-	// issued token.
 	newAccessClaims := decodeJWTPayload(t, newAccessToken)
-	newAccessScope, ok := newAccessClaims["scope"].(string)
-	assert.True(t, ok)
-	assert.Contains(t, newAccessScope, userInfoScope,
-		"the reissued access token should still carry the injected userinfo scope")
+	assert.Equal(t, "openid", newAccessClaims["scope"])
+
+	resp := makeAPIRequest(t, "GET", config.GetAuthServer().BaseURL+"/userinfo", newAccessToken, nil)
+	defer func() { _ = resp.Body.Close() }()
+	assert.Equal(t, http.StatusOK, resp.StatusCode, "the reissued token reaches /userinfo")
 }
 
 // TestROPC_RefreshToken_StopsWhenROPCDisabled is the breaking half of this change, end to end:

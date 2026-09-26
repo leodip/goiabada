@@ -76,11 +76,14 @@ func (s *Server) initRoutes(root chi.Router) {
 	root.With(rateLimiter.LimitResetPwd).Post("/reset-password", handlers.HandleResetPasswordPost(httpHelper, s.sessionStore, s.database, passwordValidator, auditLogger))
 	root.Get("/.well-known/openid-configuration", handlers.HandleWellKnownOIDCConfigGet(httpHelper))
 	root.Get("/certs", handlers.HandleCertsGet(httpHelper, s.database))
-	// RequireUserBoundToken comes AFTER the scope check so an insufficient-scope caller still
-	// receives the 403 it receives today. GET and POST are separate registrations: a guard added
-	// to only one of them leaves the other reachable.
-	root.With(authHeaderToContext, middleware.RequireBearerTokenScope(coreconstants.AuthServerResourceIdentifier+":"+coreconstants.UserinfoPermissionIdentifier), middleware.RequireUserBoundToken(), middleware.RequireValidSession(s.database)).Get("/userinfo", handlers.HandleUserInfoGetPost(httpHelper, s.database, auditLogger))
-	root.With(authHeaderToContext, middleware.RequireBearerTokenScope(coreconstants.AuthServerResourceIdentifier+":"+coreconstants.UserinfoPermissionIdentifier), middleware.RequireUserBoundToken(), middleware.RequireValidSession(s.database)).Post("/userinfo", handlers.HandleUserInfoGetPost(httpHelper, s.database, auditLogger))
+	// /userinfo takes a user's access token whose scope carries openid, which is what OIDC Core 1.0
+	// section 5.3 says the endpoint exists for (#449). The scope check comes first, as on every
+	// user-token route (#104): a client credentials token can never carry openid, since that grant
+	// refuses every OpenID Connect scope, so it stops there with 403 INSUFFICIENT_SCOPE, and
+	// RequireUserBoundToken behind it stops any other token that is not a user's. GET and POST are
+	// separate registrations: a guard added to only one of them leaves the other reachable.
+	root.With(authHeaderToContext, middleware.RequireBearerTokenScope("openid"), middleware.RequireUserBoundToken(), middleware.RequireValidSession(s.database)).Get("/userinfo", handlers.HandleUserInfoGetPost(httpHelper, s.database, auditLogger))
+	root.With(authHeaderToContext, middleware.RequireBearerTokenScope("openid"), middleware.RequireUserBoundToken(), middleware.RequireValidSession(s.database)).Post("/userinfo", handlers.HandleUserInfoGetPost(httpHelper, s.database, auditLogger))
 	root.Get("/health", handlers.HandleHealthCheckGet(httpHelper))
 	root.Get("/openapi.yaml", handlers.HandleOpenAPIGet())
 	root.Get("/userinfo/picture/{subject}", handlers.HandleProfilePictureGet(httpHelper, s.database))

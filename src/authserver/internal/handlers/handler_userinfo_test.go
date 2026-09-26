@@ -21,7 +21,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
-	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
@@ -82,7 +81,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/userinfo", nil)
 		jwtToken := oauth.JwtToken{
 			Claims: map[string]interface{}{
-				"scope": coreconstants.AuthServerResourceIdentifier + ":" + coreconstants.UserinfoPermissionIdentifier,
+				"scope": "openid",
 			},
 		}
 		ctx := context.WithValue(req.Context(), constants.ContextKeyValidatedToken, jwtToken)
@@ -113,7 +112,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		jwtToken := oauth.JwtToken{
 			Claims: map[string]interface{}{
 				"sub":   "user123",
-				"scope": coreconstants.AuthServerResourceIdentifier + ":" + coreconstants.UserinfoPermissionIdentifier,
+				"scope": "openid",
 			},
 		}
 		ctx := context.WithValue(req.Context(), constants.ContextKeyValidatedToken, jwtToken)
@@ -145,7 +144,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		jwtToken := oauth.JwtToken{
 			Claims: map[string]interface{}{
 				"sub":   sub,
-				"scope": coreconstants.AuthServerResourceIdentifier + ":" + coreconstants.UserinfoPermissionIdentifier,
+				"scope": "openid",
 			},
 		}
 		ctx := context.WithValue(req.Context(), constants.ContextKeyValidatedToken, jwtToken)
@@ -182,7 +181,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 		jwtToken := oauth.JwtToken{
 			Claims: map[string]interface{}{
 				"sub":   sub,
-				"scope": coreconstants.AuthServerResourceIdentifier + ":" + coreconstants.UserinfoPermissionIdentifier + " profile email address phone groups attributes",
+				"scope": "openid profile email address phone groups attributes",
 			},
 		}
 		ctx := context.WithValue(req.Context(), constants.ContextKeyValidatedToken, jwtToken)
@@ -505,12 +504,12 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 }
 
 // userInfoRequestForScopes builds the /userinfo request the cases above drive, carrying a
-// validated token for sub whose scope is the endpoint's own permission plus the OIDC scopes
-// named. The permission is always there because the middleware would refuse the request
-// without it; what each case varies is what follows.
+// validated token for sub whose scope is openid plus the OIDC scopes named. openid is always
+// there because the middleware would refuse the request without it; what each case varies is
+// what follows.
 func userInfoRequestForScopes(t *testing.T, sub string, oidcScopes string) *http.Request {
 	t.Helper()
-	scope := coreconstants.AuthServerResourceIdentifier + ":" + coreconstants.UserinfoPermissionIdentifier
+	scope := "openid"
 	if len(oidcScopes) > 0 {
 		scope += " " + oidcScopes
 	}
@@ -579,7 +578,7 @@ func TestHandleUserInfoGetPost_RefusalsAreInvalidTokenOnTheWire(t *testing.T) {
 			jwtToken := oauth.JwtToken{
 				Claims: map[string]interface{}{
 					"sub":   "user123",
-					"scope": coreconstants.AuthServerResourceIdentifier + ":" + coreconstants.UserinfoPermissionIdentifier,
+					"scope": "openid",
 				},
 			}
 			req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeyValidatedToken, jwtToken))
