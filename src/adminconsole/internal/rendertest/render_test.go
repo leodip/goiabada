@@ -385,6 +385,40 @@ func TestRender_AdminClientWebOrigins(t *testing.T) {
 	assert.Contains(t, out, "sem nada depois do host")
 }
 
+// The web origins page keeps the list as it loaded it and sends that copy with every save, as the
+// redirect URIs page does, so the auth server can refuse a save from an outdated page rather than
+// undo another administrator's change (#428). The copy is taken after the loaded values are pushed
+// and never edited, or the page would send its edited list as the loaded one and every save would
+// pass.
+func TestRender_AdminClientWebOrigins_SendsTheLoadedList(t *testing.T) {
+
+	out := render(t, "/admin_clients_web_origins.html", map[string]interface{}{
+		"client": struct {
+			ClientId            int64
+			ClientIdentifier    string
+			WebOrigins          map[int64]string
+			EffectiveWebOrigins []struct{ Origin, ClientIdentifier string }
+			IsSystemLevelClient bool
+		}{
+			ClientId:         7,
+			ClientIdentifier: "a-javascript-app",
+			WebOrigins:       map[int64]string{1: "https://a.example.com", 2: "https://b.example.com"},
+		},
+		"savedSuccessfully": false,
+	})
+
+	const copyTaken = "const loadedWebOrigins = webOrigins.slice();"
+	lastPush := strings.LastIndex(out, `webOrigins.push("https:\/\/b.example.com");`)
+	require.NotEqual(t, -1, lastPush, "the loaded values are pushed into the editable list")
+	copyAt := strings.Index(out, copyTaken)
+	require.NotEqual(t, -1, copyAt, "the page keeps a copy of the loaded list")
+	assert.Greater(t, copyAt, lastPush, "the copy is taken after every loaded value is in the list")
+
+	assert.Contains(t, out, `"expectedWebOrigins": loadedWebOrigins,`)
+	assert.NotRegexp(t, `loadedWebOrigins\.(push|splice|pop|shift|unshift)\(`, out)
+	assert.NotRegexp(t, `loadedWebOrigins\s*=[^=]`, strings.Replace(out, copyTaken, "", 1))
+}
+
 // TestRender_AdminUsersPaginator is the template hop of the paginator swap (#271): the partial is
 // unchanged and now reads a *pagination.Paginator instead of the unmaintained library's value, so
 // what needs proving is that a Go template resolves the replacement's exported fields the way it

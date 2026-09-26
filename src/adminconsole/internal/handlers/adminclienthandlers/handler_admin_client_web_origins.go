@@ -186,7 +186,8 @@ func HandleAdminClientWebOriginsPost(
 
 		// Build API request and call auth server
 		req := &api.UpdateClientWebOriginsRequest{
-			WebOrigins: data.WebOrigins,
+			WebOrigins:         data.WebOrigins,
+			ExpectedWebOrigins: data.ExpectedWebOrigins,
 		}
 		_, err = apiClient.UpdateClientWebOrigins(r.Context(), jwtInfo.TokenResponse.AccessToken, data.ClientId, req)
 		if err != nil {

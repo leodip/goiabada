@@ -19,7 +19,10 @@ type RedirectURIsPostInput struct {
 type WebOriginsPostInput struct {
 	ClientId   int64    `json:"clientId"`
 	WebOrigins []string `json:"webOrigins"`
-	Ids        []int64  `json:"ids"`
+	// ExpectedWebOrigins is the list as the page loaded it, passed through unchanged so the auth
+	// server can refuse a save from an outdated page (#428).
+	ExpectedWebOrigins []string `json:"expectedWebOrigins"`
+	Ids                []int64  `json:"ids"`
 }
 
 type SessionInfo struct {

@@ -326,8 +326,12 @@ type UpdateClientRedirectURIsRequest struct {
 // UpdateClientWebOriginsRequest is used to replace the full set of
 // web origins for a client. The auth server validates and applies
 // add/remove operations accordingly.
+//
+// ExpectedWebOrigins is the list as the caller last read it, required as ExpectedRedirectURIs is
+// and compared the same way, each value in its canonical form (#428).
 type UpdateClientWebOriginsRequest struct {
-	WebOrigins []string `json:"webOrigins"`
+	WebOrigins         []string `json:"webOrigins"`
+	ExpectedWebOrigins []string `json:"expectedWebOrigins"`
 }
 
 // UpdateClientTokensRequest is used to change token-related settings for a client.
