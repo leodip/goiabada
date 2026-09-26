@@ -18,6 +18,9 @@
        {{- $idx = add $idx 1}}
       {{- end}}
    };
+   // The set as loaded, never edited: the save sends it so the server can refuse a save from an
+   // outdated page rather than undo another administrator's change (#428).
+   const loadedPermissionIds = Object.keys(assignedPermissions).map(function(key) { return parseInt(key, 10); });
 
    document.addEventListener("DOMContentLoaded", function() {
       refreshPermissionsTable();
@@ -48,7 +51,8 @@
             "url": "/admin/users/{{.user.Id}}/permissions",
             "method": "POST",
             "bodyData": JSON.stringify({
-                "assignedPermissionsIds": assignedPermissionsIds
+                "assignedPermissionsIds": assignedPermissionsIds,
+                "expectedPermissionIds": loadedPermissionIds
             }),
             "loadingElement": loadingIcon,
             "loadingClasses": ["loading", "loading-xs"],

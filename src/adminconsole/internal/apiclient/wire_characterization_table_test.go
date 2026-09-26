@@ -41,8 +41,8 @@ var (
 	charCreateGroup     = &api.CreateGroupRequest{GroupIdentifier: "a-new-group"}
 	charUpdateGroup     = &api.UpdateGroupRequest{GroupIdentifier: "a-group"}
 	charUpdateUserGrps  = &api.UpdateUserGroupsRequest{GroupIds: []int64{5}}
-	charUpdateGroupPerm = &api.UpdateGroupPermissionsRequest{PermissionIds: []int64{8}}
-	charUpdateUserPerm  = &api.UpdateUserPermissionsRequest{PermissionIds: []int64{8}}
+	charUpdateGroupPerm = &api.UpdateGroupPermissionsRequest{PermissionIds: []int64{8}, ExpectedPermissionIds: []int64{3}}
+	charUpdateUserPerm  = &api.UpdateUserPermissionsRequest{PermissionIds: []int64{8}, ExpectedPermissionIds: []int64{3}}
 	charUpdateResPerms  = &api.UpdateResourcePermissionsRequest{Permissions: []api.ResourcePermissionUpsert{}}
 
 	charUpdateUserPhone = &api.UpdateUserPhoneRequest{PhoneNumber: "5555678"}

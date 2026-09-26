@@ -419,6 +419,55 @@ func TestRender_AdminClientWebOrigins_SendsTheLoadedList(t *testing.T) {
 	assert.NotRegexp(t, `loadedWebOrigins\s*=[^=]`, strings.Replace(out, copyTaken, "", 1))
 }
 
+// assertSendsTheLoadedPermissionIds is the check both permission pages owe: the page takes the ids
+// of the grants it rendered once, after they are in assignedPermissions, sends that copy with every
+// save as expectedPermissionIds, and never edits it. A copy taken later, or edited, would send the
+// administrator's edited set as the loaded one and every save would pass the check (#428).
+func assertSendsTheLoadedPermissionIds(t *testing.T, out string) {
+	t.Helper()
+	const copyTaken = "const loadedPermissionIds = Object.keys(assignedPermissions).map(function(key) { return parseInt(key, 10); });"
+	loaded := regexp.MustCompile(`var assignedPermissions = \{\s*3\s*: \{\s*"Scope": "some-resource:read"\s*\},\s*4\s*: \{\s*"Scope": "some-resource:write"\s*\}\s*\};`).FindStringIndex(out)
+	require.NotNil(t, loaded, "the page renders the loaded grants into assignedPermissions")
+	copyAt := strings.Index(out, copyTaken)
+	require.NotEqual(t, -1, copyAt, "the page keeps the ids of the loaded grants")
+	assert.Greater(t, copyAt, loaded[1]-1, "the copy is taken after the loaded grants are in the object")
+
+	assert.Contains(t, out, `"expectedPermissionIds": loadedPermissionIds`)
+	assert.NotRegexp(t, `loadedPermissionIds\.(push|splice|pop|shift|unshift)\(`, out)
+	assert.NotRegexp(t, `loadedPermissionIds\s*=[^=]`, strings.Replace(out, copyTaken, "", 1))
+}
+
+// The user permissions page keeps the set of grants it loaded and sends it with every save (#428).
+func TestRender_AdminUsersPermissions_SendsTheLoadedList(t *testing.T) {
+	out := render(t, "/admin_users_permissions.html", map[string]interface{}{
+		"user":              &api.UserResponse{Id: 5, Email: "someone@example.com"},
+		"userPermissions":   map[int64]string{3: "some-resource:read", 4: "some-resource:write"},
+		"resources":         []api.ResourceResponse{},
+		"page":              "",
+		"query":             "",
+		"savedSuccessfully": false,
+	})
+	assertSendsTheLoadedPermissionIds(t, out)
+}
+
+// The group permissions page does the same (#428).
+func TestRender_AdminGroupsPermissions_SendsTheLoadedList(t *testing.T) {
+	out := render(t, "/admin_groups_permissions.html", map[string]interface{}{
+		"group": struct {
+			GroupId         int64
+			GroupIdentifier string
+			Permissions     map[int64]string
+		}{
+			GroupId:         5,
+			GroupIdentifier: "admins",
+			Permissions:     map[int64]string{3: "some-resource:read", 4: "some-resource:write"},
+		},
+		"resources":         []api.ResourceResponse{},
+		"savedSuccessfully": false,
+	})
+	assertSendsTheLoadedPermissionIds(t, out)
+}
+
 // TestRender_AdminUsersPaginator is the template hop of the paginator swap (#271): the partial is
 // unchanged and now reads a *pagination.Paginator instead of the unmaintained library's value, so
 // what needs proving is that a Go template resolves the replacement's exported fields the way it

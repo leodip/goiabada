@@ -40,6 +40,48 @@ func replaceSet[R any, K comparable](stored []R, key func(R) K, id func(R) int64
 	return insert, remove
 }
 
+// revokedKeys is the keys replaceSet's plan takes away outright: every stored key that is not
+// wanted, once however many rows carry it, in stored order. A save that audits per item emits one
+// removal event per key here after its commit. The extra copies of a wanted key that replaceSet also
+// deletes are not in it: that key is still granted, so deleting its copies is a repair and not a
+// revocation, and an event for it would tell an auditor a grant was withdrawn that was not (#428).
+func revokedKeys[R any, K comparable](stored []R, key func(R) K, wanted []K) []K {
+	wantedSet := make(map[K]struct{}, len(wanted))
+	for _, k := range wanted {
+		wantedSet[k] = struct{}{}
+	}
+	var revoked []K
+	seen := make(map[K]struct{}, len(stored))
+	for _, row := range stored {
+		k := key(row)
+		if _, isWanted := wantedSet[k]; isWanted {
+			continue
+		}
+		if _, already := seen[k]; already {
+			continue
+		}
+		seen[k] = struct{}{}
+		revoked = append(revoked, k)
+	}
+	return revoked
+}
+
+// firstOccurrences is keys with each repeat dropped, first occurrence kept, in order. A save
+// deduplicates its request with it before validating, so each value is checked once and the per-item
+// audit events name each value once. Never nil, so an empty request stays an empty list (#406, #428).
+func firstOccurrences[K comparable](keys []K) []K {
+	out := make([]K, 0, len(keys))
+	seen := make(map[K]struct{}, len(keys))
+	for _, k := range keys {
+		if _, already := seen[k]; already {
+			continue
+		}
+		seen[k] = struct{}{}
+		out = append(out, k)
+	}
+	return out
+}
+
 // sameSet reports whether the stored rows carry exactly the keys the caller loaded, order and
 // repeats ignored. A save that replaces a list calls it on the rows it read inside its transaction,
 // before planning, and refuses with errListChanged when it is false: the caller's page or script

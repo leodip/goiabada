@@ -148,7 +148,8 @@ func HandleAdminGroupPermissionsPost(
 
 		// Update group permissions via API (includes validation, security, and audit logging)
 		updateReq := &api.UpdateGroupPermissionsRequest{
-			PermissionIds: data.AssignedPermissionsIds,
+			PermissionIds:         data.AssignedPermissionsIds,
+			ExpectedPermissionIds: data.ExpectedPermissionIds,
 		}
 
 		err = apiClient.UpdateGroupPermissions(r.Context(), jwtInfo.TokenResponse.AccessToken, data.GroupId, updateReq)

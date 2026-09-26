@@ -22,10 +22,11 @@ type groupPermissionsDatabase interface {
 	CreateGroupPermission(ctx context.Context, tx *sql.Tx, groupPermission *models.GroupPermission) error
 	DeleteGroupPermission(ctx context.Context, tx *sql.Tx, groupPermissionId int64) error
 	GetGroupById(ctx context.Context, tx *sql.Tx, groupId int64) (*models.Group, error)
-	GetGroupPermissionByGroupIdAndPermissionId(ctx context.Context, tx *sql.Tx, groupId, permissionId int64) (*models.GroupPermission, error)
+	GetGroupPermissionsByGroupId(ctx context.Context, tx *sql.Tx, groupId int64) ([]models.GroupPermission, error)
 	GetPermissionById(ctx context.Context, tx *sql.Tx, permissionId int64) (*models.Permission, error)
 	GetResourceById(ctx context.Context, tx *sql.Tx, resourceId int64) (*models.Resource, error)
 	GroupLoadPermissions(ctx context.Context, tx *sql.Tx, group *models.Group) error
+	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 }
 
 func HandleAPIGroupPermissionsGet(
@@ -120,29 +121,21 @@ func HandleAPIGroupPermissionsPut(
 			return
 		}
 
-		// Deduplicate permission IDs to avoid creating duplicate records
-		uniquePermissionIds := make([]int64, 0)
-		seenIds := make(map[int64]bool)
-		for _, permissionId := range request.PermissionIds {
-			if !seenIds[permissionId] {
-				uniquePermissionIds = append(uniquePermissionIds, permissionId)
-				seenIds[permissionId] = true
-			}
-		}
-		request.PermissionIds = uniquePermissionIds
-
-		// Load current group permissions
-		err = database.GroupLoadPermissions(r.Context(), nil, group)
-		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "database error loading current group permissions for update"), "group_id", group.Id)
+		// The set as the caller loaded it, required as it is on every list save: absent or null
+		// decodes to nil and is refused, [] means the caller read no grants (#428).
+		if request.ExpectedPermissionIds == nil {
+			writeJSONError(w, "expectedPermissionIds is required: send the permission ids as you last read them, or [] if there were none.", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 
+		// Deduplicate permission IDs, so each is validated once and audited once.
+		wanted := firstOccurrences(request.PermissionIds)
+
 		// Validate that all requested permissions exist
-		for _, permissionId := range request.PermissionIds {
-			permission, err := database.GetPermissionById(r.Context(), nil, permissionId)
-			if err != nil {
-				writeInternalServerError(w, r, errs.Wrap(err, "database error getting permission by ID for validation"), "permission_id", permissionId, "group_id", group.Id)
+		for _, permissionId := range wanted {
+			permission, getErr := database.GetPermissionById(r.Context(), nil, permissionId)
+			if getErr != nil {
+				writeInternalServerError(w, r, errs.Wrap(getErr, "database error getting permission by ID for validation"), "permission_id", permissionId, "group_id", group.Id)
 				return
 			}
 			if permission == nil {
@@ -151,80 +144,62 @@ func HandleAPIGroupPermissionsPut(
 			}
 		}
 
-		// Add new permissions that don't already exist
-		for _, permissionId := range request.PermissionIds {
-			found := false
-			for _, permission := range group.Permissions {
-				if permission.Id == permissionId {
-					found = true
-					break
-				}
+		grantKey := func(gp models.GroupPermission) int64 { return gp.PermissionId }
+		grantId := func(gp models.GroupPermission) int64 { return gp.Id }
+
+		// One transaction, as the user permission save: a failure part way through commits
+		// nothing, overlapping saves merge item by item with no row lock (group_permissions has no
+		// unique key, so a grant both add is stored twice and collapsed by the next save), and a
+		// deadlock victim is rerun whole with the plan recomputed from the rows read on the
+		// transaction (#301, #406, #428).
+		//
+		// The rows are read once, on the transaction, and deleted by the ids that read returned,
+		// so neither of the two nil results #425 guarded is left to arrive: the second "get one"
+		// lookup a revocation made, and the second GetPermissionById a grant made, are both gone.
+		// A permission deleted after the validation above read it fails the insert's foreign key,
+		// which undoes the whole save as one 500 (#406).
+		var granted, revoked []int64
+		err = database.RunInTransaction(r.Context(), func(tx *sql.Tx) error {
+			stored, loadErr := database.GetGroupPermissionsByGroupId(r.Context(), tx, group.Id)
+			if loadErr != nil {
+				return errs.Wrap(loadErr, "database error loading group permissions before update")
+			}
+			if !sameSet(stored, grantKey, request.ExpectedPermissionIds) {
+				return errListChanged
 			}
 
-			if !found {
-				permission, err := database.GetPermissionById(r.Context(), nil, permissionId)
-				if err != nil {
-					writeInternalServerError(w, r, errs.Wrap(err, "database error retrieving permission for group assignment"), "permission_id", permissionId, "group_id", group.Id)
-					return
+			insert, remove := replaceSet(stored, grantKey, grantId, wanted)
+			for _, rowId := range remove {
+				if deleteErr := database.DeleteGroupPermission(r.Context(), tx, rowId); deleteErr != nil {
+					return errs.Wrapf(deleteErr, "database error deleting group permission %d", rowId)
 				}
-				// Deleted since the validation above read it: the answer that read would give
-				// now, rather than a dereference of nil (#425).
-				if permission == nil {
-					writeJSONError(w, "Permission not found", "NOT_FOUND", http.StatusNotFound)
-					return
-				}
-
-				err = database.CreateGroupPermission(r.Context(), nil, &models.GroupPermission{
+			}
+			for _, permissionId := range insert {
+				if createErr := database.CreateGroupPermission(r.Context(), tx, &models.GroupPermission{
 					GroupId:      group.Id,
-					PermissionId: permission.Id,
-				})
-				if err != nil {
-					writeInternalServerError(w, r, errs.Wrap(err, "database error creating group permission"), "group_id", group.Id, "permission_id", permission.Id)
-					return
-				}
-
-				auditLogger.Log(r.Context(), audit.AuditAddedGroupPermission, map[string]interface{}{
-					"groupId":      group.Id,
-					"permissionId": permission.Id,
-					"loggedInUser": callerSubject(r),
-				})
-			}
-		}
-
-		// Remove permissions that are not in the request
-		toDelete := []int64{}
-		for _, permission := range group.Permissions {
-			found := false
-			for _, permissionId := range request.PermissionIds {
-				if permission.Id == permissionId {
-					found = true
-					break
+					PermissionId: permissionId,
+				}); createErr != nil {
+					return errs.Wrapf(createErr, "database error granting permission %d", permissionId)
 				}
 			}
-
-			if !found {
-				toDelete = append(toDelete, permission.Id)
-			}
+			granted, revoked = insert, revokedKeys(stored, grantKey, wanted)
+			return nil
+		})
+		if err != nil {
+			writeListSaveFailure(w, r, err, "group_id", group.Id)
+			return
 		}
 
-		for _, permissionId := range toDelete {
-			groupPermission, err := database.GetGroupPermissionByGroupIdAndPermissionId(r.Context(), nil, group.Id, permissionId)
-			if err != nil {
-				writeInternalServerError(w, r, errs.Wrap(err, "database error getting group permission for deletion"), "group_id", group.Id, "permission_id", permissionId)
-				return
-			}
-			// Removed by a concurrent request since the load above: the grant is gone, which is
-			// what this request asked for, and this request removed nothing to audit (#425).
-			if groupPermission == nil {
-				continue
-			}
-
-			err = database.DeleteGroupPermission(r.Context(), nil, groupPermission.Id)
-			if err != nil {
-				writeInternalServerError(w, r, errs.Wrap(err, "database error deleting group permission"), "group_permission_id", groupPermission.Id, "group_id", group.Id, "permission_id", permissionId)
-				return
-			}
-
+		// Audit, once the save has committed: one event per grant made and per grant withdrawn,
+		// from the plan of the attempt that committed (#428).
+		for _, permissionId := range granted {
+			auditLogger.Log(r.Context(), audit.AuditAddedGroupPermission, map[string]interface{}{
+				"groupId":      group.Id,
+				"permissionId": permissionId,
+				"loggedInUser": callerSubject(r),
+			})
+		}
+		for _, permissionId := range revoked {
 			auditLogger.Log(r.Context(), audit.AuditDeletedGroupPermission, map[string]interface{}{
 				"groupId":      group.Id,
 				"permissionId": permissionId,

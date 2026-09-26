@@ -150,12 +150,21 @@ type UpdateUserGroupsRequest struct {
 	GroupIds []int64 `json:"groupIds"`
 }
 
+// UpdateUserPermissionsRequest replaces the whole set of permissions granted to a user.
+//
+// ExpectedPermissionIds is the set as the caller last read it, required and compared as
+// ExpectedRedirectURIs is: absent or null is refused, [] means the caller read no grants, and a
+// stored set that differs answers 409 CONCURRENT_UPDATE (#428).
 type UpdateUserPermissionsRequest struct {
-	PermissionIds []int64 `json:"permissionIds"`
+	PermissionIds         []int64 `json:"permissionIds"`
+	ExpectedPermissionIds []int64 `json:"expectedPermissionIds"`
 }
 
+// UpdateGroupPermissionsRequest replaces the whole set of permissions granted to a group.
+// ExpectedPermissionIds is as on UpdateUserPermissionsRequest (#428).
 type UpdateGroupPermissionsRequest struct {
-	PermissionIds []int64 `json:"permissionIds"`
+	PermissionIds         []int64 `json:"permissionIds"`
+	ExpectedPermissionIds []int64 `json:"expectedPermissionIds"`
 }
 
 // AccountLogoutRequest is used by clients to request a prepared logout operation.

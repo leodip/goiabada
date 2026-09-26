@@ -288,7 +288,7 @@ func HandleAdminResourceUsersWithPermissionRemovePermissionPost(
 				newIds = append(newIds, p.Id)
 			}
 		}
-		apiReq := &api.UpdateUserPermissionsRequest{PermissionIds: newIds}
+		apiReq := &api.UpdateUserPermissionsRequest{PermissionIds: newIds, ExpectedPermissionIds: permissionIdsOf(currentPerms)}
 		if err := apiClient.UpdateUserPermissions(r.Context(), accessToken, user.Id, apiReq); err != nil {
 			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
@@ -609,7 +609,7 @@ func HandleAdminResourceUsersWithPermissionAddPermissionPost(
 			newIds = append(newIds, p.Id)
 		}
 		newIds = append(newIds, permissionId)
-		apiReq := &api.UpdateUserPermissionsRequest{PermissionIds: newIds}
+		apiReq := &api.UpdateUserPermissionsRequest{PermissionIds: newIds, ExpectedPermissionIds: permissionIdsOf(currentPerms)}
 		if err := apiClient.UpdateUserPermissions(r.Context(), accessToken, user.Id, apiReq); err != nil {
 			handlers.HandleAPIErrorJson(httpHelper, w, r, err)
 			return
