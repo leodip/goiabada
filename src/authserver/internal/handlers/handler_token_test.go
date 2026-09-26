@@ -1348,39 +1348,6 @@ func TestHandleTokenPost_Refresh_Replay_ContainmentErrorReturns500(t *testing.T)
 	httpHelper.AssertNotCalled(t, "JsonError", mock.Anything, mock.Anything, mock.Anything)
 }
 
-// TestNormalizeScope is the exhaustive table for the helper, which is a pure string function, so
-// every other layer's scope tests can stay thin.
-//
-// The last three rows are what step 3's wiring tests build on: normalizeScope cannot distinguish a
-// whitespace-only scope from an omitted one, and does not try to. Both yield "", and the CALLER
-// separates them by also looking at the raw value.
-func TestNormalizeScope(t *testing.T) {
-	testCases := []struct {
-		name  string
-		input string
-		want  string
-	}{
-		{"collapses a double space", "billing-api:read  billing-api:write", "billing-api:read billing-api:write"},
-		{"collapses a tab", "billing-api:read\tbilling-api:write", "billing-api:read billing-api:write"},
-		{"collapses a newline", "billing-api:read\nbilling-api:write", "billing-api:read billing-api:write"},
-		{"trims leading", " billing-api:read", "billing-api:read"},
-		{"trims trailing", "billing-api:read ", "billing-api:read"},
-		{"trims both", "  billing-api:read  ", "billing-api:read"},
-		{"trims and collapses mixed whitespace", " billing-api:read \t  billing-api:write\t", "billing-api:read billing-api:write"},
-		{"drops an exact duplicate", "billing-api:read billing-api:read", "billing-api:read"},
-		{"drops a later duplicate, preserving first-occurrence order", "billing-api:read billing-api:write billing-api:read", "billing-api:read billing-api:write"},
-		{"spaces only becomes empty", "   ", ""},
-		{"tab only becomes empty", "\t", ""},
-		{"empty stays empty", "", ""},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			assert.Equal(t, tc.want, normalizeScope(tc.input))
-		})
-	}
-}
-
 // TestGrantTypeConsumesScope pins which grant types the provided-but-empty rejection applies to.
 // The authorization_code row is the one that matters: it never reads the scope parameter, so
 // rejecting on it would break a valid token exchange.
@@ -1404,9 +1371,9 @@ func TestGrantTypeConsumesScope(t *testing.T) {
 	}
 }
 
-// TestHandleTokenPost_ScopeNormalizationWiring is step 3 of the normalization work: it proves the
-// handler actually calls normalizeScope and passes its OUTPUT to the validator, which the pure
-// unit table above cannot show.
+// TestHandleTokenPost_ScopeNormalizationWiring proves the handler normalizes the scope with
+// oidc.NormalizeScope and passes its OUTPUT to the validator, which oidc's own whitespace table
+// cannot show. That table is where the rule is pinned; the rows here are the consumer's (#116).
 //
 // The validator is mocked with mock.MatchedBy so the scope it receives is captured rather than
 // merely type-checked. Every accepting row returns a validation error afterwards, because what is
@@ -1442,6 +1409,16 @@ func TestHandleTokenPost_ScopeNormalizationWiring(t *testing.T) {
 			grantType:           "client_credentials",
 			rawScope:            "billing-api:read billing-api:read",
 			wantScope:           "billing-api:read",
+			wantValidatorCalled: true,
+		},
+		{
+			// The widening #116's one splitter brought to this endpoint: a U+00A0 beside a
+			// separator is trimmed off its element, where the endpoint used to hand the validator
+			// " billing-api:write" and have it refused as an unknown scope.
+			name:                "a U+00A0 after a separator is trimmed",
+			grantType:           "refresh_token",
+			rawScope:            "billing-api:read  billing-api:write",
+			wantScope:           "billing-api:read billing-api:write",
 			wantValidatorCalled: true,
 		},
 		{

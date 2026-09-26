@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/oidc"
 )
 
 var (
@@ -180,20 +181,7 @@ type AuthContext struct {
 }
 
 func (ac *AuthContext) SetScope(scope string) {
-	scopeArr := []string{}
-
-	// remove duplicated spaces
-	space := regexp.MustCompile(`\s+`)
-	scopeSanitized := space.ReplaceAllString(scope, " ")
-
-	// remove duplicated scopes
-	scopeElements := strings.Split(scopeSanitized, " ")
-	for _, s := range scopeElements {
-		if !slices.Contains(scopeArr, strings.TrimSpace(s)) {
-			scopeArr = append(scopeArr, strings.TrimSpace(s))
-		}
-	}
-	ac.Scope = strings.TrimSpace(strings.Join(scopeArr, " "))
+	ac.Scope = oidc.NormalizeScope(scope)
 }
 
 func (ac *AuthContext) AddAuthMethod(method string) {

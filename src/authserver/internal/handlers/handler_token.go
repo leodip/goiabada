@@ -8,8 +8,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"regexp"
-	"slices"
 	"strings"
 
 	"github.com/go-chi/chi/v5/middleware"
@@ -17,6 +15,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/issuance"
 	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 	"github.com/leodip/goiabada/authserver/internal/revocation"
 	"github.com/leodip/goiabada/core/customerrors"
@@ -140,7 +139,7 @@ func HandleTokenPost(
 		// So the normalization and the rejection belong together, upstream of the validator.
 		// Moving either into the validator reopens one of the two holes.
 		rawScope := r.PostForm.Get("scope")
-		normalizedScope := normalizeScope(rawScope)
+		normalizedScope := oidc.NormalizeScope(rawScope)
 
 		// A scope that was provided but contains nothing is rejected rather than treated as
 		// omitted, for the grant types that read it. Note `rawScope != ""`: PostForm.Get cannot
@@ -819,51 +818,6 @@ func parseBasicAuth(authHeader string) (clientId, clientSecret string, ok bool) 
 	}
 
 	return credentials[:colonIdx], credentials[colonIdx+1:], true
-}
-
-// scopeWhitespaceRegex matches any run of whitespace, so runs collapse to a single space.
-// Package-level so it compiles once rather than per request.
-var scopeWhitespaceRegex = regexp.MustCompile(`\s+`)
-
-// normalizeScope canonicalizes a raw `scope` form value: trim, collapse internal whitespace runs
-// to single spaces, and drop duplicates preserving first-occurrence order.
-//
-// This is the same operation AuthContext.SetScope (authserver/internal/ceremony/auth_context.go) already applies on
-// the authorize path, so with this in place all four of the codebase's scope-handling sites agree.
-//
-// What motivates it: the token endpoint used to collapse whitespace onto a LOCAL copy and never
-// assign it back, so the caller's raw string was carried onward. A client separating scopes with a
-// tab therefore passed scope validation, which collapses whitespace before checking, and then hit a
-// **500**: the issuer re-parses the scope, splits it on spaces alone, and the whole tab-joined
-// string arrives as one element whose colon-split yields three parts rather than two
-// (token_issuer.go). Refresh had the same shape and the same outcome. Verified by reverting this
-// normalization and re-running the end-to-end tests, which fail with server_error.
-//
-// So the defect cost functionality rather than security. Note it did NOT produce a token whose
-// scopes silently match nothing: the issuer rejected first. Do not restate that older claim, which
-// this project's spec made twice before it was measured.
-//
-// Deduplication is a consistency fix rather than a correctness one, since HasScope matches the
-// first occurrence and a repeated scope is inert.
-//
-// Callers must handle the "provided but normalizes to empty" case themselves; see the call site in
-// HandleTokenPost. Returning "" for whitespace-only input is deliberate, so that case is
-// distinguishable.
-func normalizeScope(scope string) string {
-	collapsed := scopeWhitespaceRegex.ReplaceAllString(strings.TrimSpace(scope), " ")
-	if collapsed == "" {
-		return ""
-	}
-
-	unique := make([]string, 0, strings.Count(collapsed, " ")+1)
-	for _, scopeStr := range strings.Split(collapsed, " ") {
-		if scopeStr == "" || slices.Contains(unique, scopeStr) {
-			continue
-		}
-		unique = append(unique, scopeStr)
-	}
-
-	return strings.Join(unique, " ")
 }
 
 // grantTypeConsumesScope reports whether a grant type reads the `scope` request parameter.

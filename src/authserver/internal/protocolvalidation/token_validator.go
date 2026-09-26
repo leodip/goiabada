@@ -6,7 +6,7 @@ import (
 	"database/sql"
 	"fmt"
 	"net/http"
-	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -820,28 +820,16 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 
 		if len(input.Scope) > 0 {
 			// must be equal to, or a subset of the original scopes requested
-			space := regexp.MustCompile(`\s+`)
-			inputScopeSanitized := space.ReplaceAllString(input.Scope, " ")
-			inputScopes := strings.Split(inputScopeSanitized, " ")
+			scopesFromOriginal := oidc.SplitScope(tokenScope)
 
-			for _, inputScopeStr := range inputScopes {
-
-				scopesFromOriginal := strings.Split(tokenScope, " ")
-
-				scopeExists := false
-				for _, scopeFromOriginal := range scopesFromOriginal {
-					if scopeFromOriginal == inputScopeStr {
-						scopeExists = true
-						break
-					}
-				}
+			for _, inputScopeStr := range oidc.SplitScope(input.Scope) {
 
 				// invalid_scope, not invalid_grant: the grant is intact and the request asks for
 				// more than it holds, which is what RFC 6749 section 5.2 names invalid_scope for
 				// ("exceeds the scope granted by the resource owner") and what the endpoints
 				// reference has always documented. It answered invalid_grant until #425. The
 				// token is not spent, so the client can ask again within its grant.
-				if !scopeExists {
+				if !slices.Contains(scopesFromOriginal, inputScopeStr) {
 					return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope",
 						fmt.Sprintf("Scope '%v' is not recognized. The original access token does not grant the '%v' permission.", inputScopeStr, inputScopeStr),
 						http.StatusBadRequest)
@@ -853,7 +841,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, input *Vali
 		if len(input.Scope) > 0 {
 			scopes = input.Scope
 		}
-		inputScopes := strings.Split(scopes, " ")
+		inputScopes := oidc.SplitScope(scopes)
 
 		sub := refreshTokenInfo.GetStringClaim("sub")
 		user, err := val.database.GetUserBySubject(ctx, nil, sub)
@@ -1102,12 +1090,7 @@ func (val *TokenValidator) validateClientCredentialsScopes(ctx context.Context, 
 		return nil
 	}
 
-	space := regexp.MustCompile(`\s+`)
-	scope = space.ReplaceAllString(scope, " ")
-
-	scopes := strings.Split(scope, " ")
-
-	for _, scopeStr := range scopes {
+	for _, scopeStr := range oidc.SplitScope(scope) {
 
 		if oidc.IsClaimScope(scopeStr) || oidc.IsOfflineAccessScope(scopeStr) {
 			return customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
@@ -1173,18 +1156,9 @@ func (val *TokenValidator) validateROPCScopes(ctx context.Context, scope string,
 		return "openid", nil
 	}
 
-	space := regexp.MustCompile(`\s+`)
-	scope = space.ReplaceAllString(scope, " ")
-	scopes := strings.Split(scope, " ")
-
 	validatedScopes := []string{}
 
-	for _, scopeStr := range scopes {
-		scopeStr = strings.TrimSpace(scopeStr)
-		if len(scopeStr) == 0 {
-			continue
-		}
-
+	for _, scopeStr := range oidc.SplitScope(scope) {
 		// Allow OIDC scopes and offline_access
 		if oidc.IsClaimScope(scopeStr) || oidc.IsOfflineAccessScope(scopeStr) {
 			validatedScopes = append(validatedScopes, scopeStr)
