@@ -154,7 +154,7 @@ func TestGenerateTokenResponseForAuthCode_FullOpenIDConnect(t *testing.T) {
 	assert.NotEmpty(t, response.AccessToken)
 	assert.NotEmpty(t, response.IdToken)
 	assert.NotEmpty(t, response.RefreshToken)
-	assert.Equal(t, "openid profile email address phone groups attributes offline_access authserver:userinfo", response.Scope)
+	assert.Equal(t, "openid profile email address phone groups attributes offline_access", response.Scope)
 	assert.Equal(t, int64(3600), response.RefreshExpiresIn)
 
 	// validate Id token --------------------------------------------
@@ -279,7 +279,7 @@ func TestGenerateTokenResponseForAuthCode_FullOpenIDConnect(t *testing.T) {
 	assert.Equal(t, "value3", attributes["attr3"])
 	assert.Equal(t, "value4", attributes["attr4"])
 	assert.Equal(t, 3, len(attributes))
-	assert.Equal(t, "openid profile email address phone groups attributes offline_access authserver:userinfo", accessClaims["scope"])
+	assert.Equal(t, "openid profile email address phone groups attributes offline_access", accessClaims["scope"])
 
 	// validate Refresh token --------------------------------------------
 
@@ -288,7 +288,7 @@ func TestGenerateTokenResponseForAuthCode_FullOpenIDConnect(t *testing.T) {
 	assert.Equal(t, "https://test-issuer.com", refreshClaims["aud"])
 	assert.Equal(t, "https://test-issuer.com", refreshClaims["iss"])
 	assert.Equal(t, "Offline", refreshClaims["typ"])
-	assert.Equal(t, "openid profile email address phone groups attributes offline_access authserver:userinfo", refreshClaims["scope"])
+	assert.Equal(t, "openid profile email address phone groups attributes offline_access", refreshClaims["scope"])
 
 	assertTimeClaimWithinRange(t, refreshClaims, "exp", 3600*time.Second, "exp should be 3600 seconds from now")
 	assertTimeClaimWithinRange(t, refreshClaims, "iat", 0*time.Second, "iat should be now")
@@ -374,7 +374,7 @@ func TestGenerateTokenResponseForAuthCode_MinimalScope(t *testing.T) {
 	assert.NotEmpty(t, response.AccessToken)
 	assert.NotEmpty(t, response.IdToken)
 	assert.NotEmpty(t, response.RefreshToken)
-	assert.Equal(t, "openid authserver:userinfo", response.Scope)
+	assert.Equal(t, "openid", response.Scope)
 	assert.InDelta(t, int64(600), response.RefreshExpiresIn, 1)
 
 	// validate Id token --------------------------------------------
@@ -406,7 +406,7 @@ func TestGenerateTokenResponseForAuthCode_MinimalScope(t *testing.T) {
 	assert.ElementsMatch(t, strings.Fields(code.AuthMethods), accessClaims["amr"])
 	assert.Equal(t, sessionIdentifier, accessClaims["sid"])
 	assert.Equal(t, "Bearer", accessClaims["typ"])
-	assert.Equal(t, "openid authserver:userinfo", accessClaims["scope"])
+	assert.Equal(t, "openid", accessClaims["scope"])
 
 	assertTimeClaimWithinRange(t, accessClaims, "auth_time", -120*time.Second, "auth_time should be 2 minutes ago")
 	assertTimeClaimWithinRange(t, accessClaims, "exp", 600*time.Second, "exp should be 10 minutes in the future")
@@ -423,7 +423,7 @@ func TestGenerateTokenResponseForAuthCode_MinimalScope(t *testing.T) {
 	assert.Equal(t, "https://test-issuer.com", refreshClaims["aud"])
 	assert.Equal(t, "Refresh", refreshClaims["typ"])
 	assert.Equal(t, sessionIdentifier, refreshClaims["sid"])
-	assert.Equal(t, "openid authserver:userinfo", refreshClaims["scope"])
+	assert.Equal(t, "openid", refreshClaims["scope"])
 
 	assertTimeClaimWithinRange(t, refreshClaims, "exp", 600*time.Second, "exp should be 10 minutes in the future")
 	assertTimeClaimWithinRange(t, refreshClaims, "iat", 0, "iat should be now")
@@ -462,7 +462,7 @@ func TestGenerateTokenResponseForAuthCode_ClientOverrideAndMixedScopes(t *testin
 		Id:                3,
 		ClientId:          3,
 		UserId:            3,
-		Scope:             "openid profile email authserver:userinfo resource1:read resource2:write",
+		Scope:             "openid profile email resource1:read resource2:write",
 		Nonce:             "mixed-nonce",
 		AuthenticatedAt:   now.Add(-60 * time.Second),
 		SessionIdentifier: sessionIdentifier,
@@ -526,7 +526,7 @@ func TestGenerateTokenResponseForAuthCode_ClientOverrideAndMixedScopes(t *testin
 	assert.NotEmpty(t, response.AccessToken)
 	assert.NotEmpty(t, response.IdToken)
 	assert.NotEmpty(t, response.RefreshToken)
-	assert.Equal(t, "openid profile email authserver:userinfo resource1:read resource2:write", response.Scope)
+	assert.Equal(t, "openid profile email resource1:read resource2:write", response.Scope)
 	assert.InDelta(t, int64(600), response.RefreshExpiresIn, 1)
 
 	// validate Id token --------------------------------------------
@@ -591,7 +591,7 @@ func TestGenerateTokenResponseForAuthCode_ClientOverrideAndMixedScopes(t *testin
 
 	assert.NotContains(t, accessClaims, "groups")
 	assert.NotContains(t, accessClaims, "attributes")
-	assert.Equal(t, "openid profile email authserver:userinfo resource1:read resource2:write", accessClaims["scope"])
+	assert.Equal(t, "openid profile email resource1:read resource2:write", accessClaims["scope"])
 
 	// validate Refresh token --------------------------------------------
 
@@ -601,7 +601,7 @@ func TestGenerateTokenResponseForAuthCode_ClientOverrideAndMixedScopes(t *testin
 	assert.Equal(t, settings.Issuer, refreshClaims["iss"])
 	assert.Equal(t, "Refresh", refreshClaims["typ"])
 	assert.Equal(t, sessionIdentifier, refreshClaims["sid"])
-	assert.Equal(t, "openid profile email authserver:userinfo resource1:read resource2:write", refreshClaims["scope"])
+	assert.Equal(t, "openid profile email resource1:read resource2:write", refreshClaims["scope"])
 
 	assertTimeClaimWithinRange(t, refreshClaims, "iat", 0*time.Second, "iat should be now")
 	assertTimeClaimWithinRange(t, refreshClaims, "nbf", 0*time.Second, "nbf should be now")
@@ -898,10 +898,9 @@ func TestGenerateAccessToken(t *testing.T) {
 
 	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, user.Id).Return(false, nil)
 
-	accessToken, scope, err := tokenIssuer.generateAccessToken(context.Background(), settings, code, code.Scope, now, privKey, "test-key-id", nil)
+	accessToken, err := tokenIssuer.generateAccessToken(context.Background(), settings, code, code.Scope, now, privKey, "test-key-id", nil)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, accessToken)
-	assert.Equal(t, "openid profile email authserver:userinfo", scope)
 
 	claims := verifyAndDecodeToken(t, accessToken, publicKeyBytes)
 
@@ -929,7 +928,7 @@ func TestGenerateAccessToken(t *testing.T) {
 	assert.Equal(t, "http://localhost:8081/account/profile", claims["profile"])
 	assert.Equal(t, user.Email, claims["email"])
 	assert.Equal(t, user.EmailVerified, claims["email_verified"])
-	assert.Equal(t, "openid profile email authserver:userinfo", claims["scope"])
+	assert.Equal(t, "openid profile email", claims["scope"])
 
 	assertTimeClaimWithinRange(t, claims, "updated_at", -1*time.Hour, "updated_at should be 1 hour ago")
 }
@@ -977,10 +976,9 @@ func TestGenerateAccessToken_CustomScope(t *testing.T) {
 	code.Client = *client
 	code.User = *user
 
-	accessToken, scope, err := tokenIssuer.generateAccessToken(context.Background(), settings, code, code.Scope, now, privKey, "test-key-id", nil)
+	accessToken, err := tokenIssuer.generateAccessToken(context.Background(), settings, code, code.Scope, now, privKey, "test-key-id", nil)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, accessToken)
-	assert.Equal(t, "resource1:read resource2:write", scope)
 
 	claims := verifyAndDecodeToken(t, accessToken, publicKeyBytes)
 
@@ -1072,10 +1070,9 @@ func TestGenerateAccessToken_WithGroupsAndAttributes(t *testing.T) {
 
 	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, user.Id).Return(false, nil)
 
-	accessToken, scope, err := tokenIssuer.generateAccessToken(context.Background(), settings, code, code.Scope, now, privKey, "test-key-id", nil)
+	accessToken, err := tokenIssuer.generateAccessToken(context.Background(), settings, code, code.Scope, now, privKey, "test-key-id", nil)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, accessToken)
-	assert.Equal(t, "openid profile email groups attributes authserver:userinfo", scope)
 
 	claims := verifyAndDecodeToken(t, accessToken, publicKeyBytes)
 
@@ -1104,7 +1101,7 @@ func TestGenerateAccessToken_WithGroupsAndAttributes(t *testing.T) {
 	assert.Equal(t, user.Email, claims["email"])
 	assert.Equal(t, user.EmailVerified, claims["email_verified"])
 
-	assert.Equal(t, "openid profile email groups attributes authserver:userinfo", claims["scope"])
+	assert.Equal(t, "openid profile email groups attributes", claims["scope"])
 
 	assertTimeClaimWithinRange(t, claims, "updated_at", -2*time.Hour, "updated_at should be 2 hours ago")
 
@@ -1163,7 +1160,7 @@ func TestGenerateAccessToken_InvalidScope(t *testing.T) {
 	code.Client = *client
 	code.User = *user
 
-	_, _, err = tokenIssuer.generateAccessToken(context.Background(), settings, code, code.Scope, now, privKey, "test-key-id", nil)
+	_, err = tokenIssuer.generateAccessToken(context.Background(), settings, code, code.Scope, now, privKey, "test-key-id", nil)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid scope")
 }
@@ -2158,7 +2155,7 @@ func TestGenerateTokenResponseForRefresh(t *testing.T) {
 	assert.NotEmpty(t, response.AccessToken)
 	assert.NotEmpty(t, response.IdToken)
 	assert.NotEmpty(t, response.RefreshToken)
-	assert.Equal(t, "openid profile resource1:read authserver:userinfo", response.Scope)
+	assert.Equal(t, "openid profile resource1:read", response.Scope)
 	assert.InDelta(t, int64(600), response.RefreshExpiresIn, 1) // remaining time based on session max lifetime
 
 	// validate Id token --------------------------------------------
@@ -2200,7 +2197,7 @@ func TestGenerateTokenResponseForRefresh(t *testing.T) {
 	assert.Equal(t, user.GetFullName(), accessClaims["name"])
 	assert.Equal(t, user.Username, accessClaims["preferred_username"])
 	assert.Equal(t, fmt.Sprintf("%v/account/profile", "http://localhost:8081"), accessClaims["profile"])
-	assert.Equal(t, "openid profile resource1:read authserver:userinfo", accessClaims["scope"])
+	assert.Equal(t, "openid profile resource1:read", accessClaims["scope"])
 	_, err = uuidutil.Parse(accessClaims["jti"].(string))
 	assert.NoError(t, err)
 	assertTimeClaimWithinRange(t, accessClaims, "updated_at", -1*time.Hour, "updated_at should be 1 hour ago")
@@ -4456,7 +4453,7 @@ func TestGenerateAccessTokenCore_InvalidScope(t *testing.T) {
 			AuthenticatedAt: now,
 		}
 
-		_, _, err := tokenIssuer.generateAccessTokenCore(context.Background(), settings, input, now, privKey, "key-id")
+		_, err := tokenIssuer.generateAccessTokenCore(context.Background(), settings, input, now, privKey, "key-id")
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid scope")
 	})
@@ -4478,10 +4475,11 @@ func TestGenerateAccessTokenCore_InvalidScope(t *testing.T) {
 			AuthenticatedAt: now,
 		}
 
-		token, scope, err := tokenIssuer.generateAccessTokenCore(context.Background(), settings, input, now, privKey, "key-id")
+		token, err := tokenIssuer.generateAccessTokenCore(context.Background(), settings, input, now, privKey, "key-id")
 		assert.NoError(t, err)
 		assert.NotEmpty(t, token)
-		assert.Contains(t, scope, "authserver:userinfo")
+		claims := verifyAndDecodeToken(t, token, getTestPublicKey(t))
+		assert.Equal(t, "openid", claims["scope"])
 	})
 }
 
@@ -4516,7 +4514,7 @@ func TestGenerateAccessTokenCore_MultipleAudiences(t *testing.T) {
 		AuthenticatedAt: now,
 	}
 
-	token, _, err := tokenIssuer.generateAccessTokenCore(context.Background(), settings, input, now, privKey, "key-id")
+	token, err := tokenIssuer.generateAccessTokenCore(context.Background(), settings, input, now, privKey, "key-id")
 	assert.NoError(t, err)
 
 	claims := verifyAndDecodeToken(t, token, publicKeyBytes)
@@ -4561,7 +4559,7 @@ func TestGenerateAccessTokenCore_OptionalClaims(t *testing.T) {
 			SessionIdentifier: "test-session",
 		}
 
-		token, _, err := tokenIssuer.generateAccessTokenCore(context.Background(), settings, input, now, privKey, "key-id")
+		token, err := tokenIssuer.generateAccessTokenCore(context.Background(), settings, input, now, privKey, "key-id")
 		assert.NoError(t, err)
 
 		claims := verifyAndDecodeToken(t, token, publicKeyBytes)
@@ -4584,7 +4582,7 @@ func TestGenerateAccessTokenCore_OptionalClaims(t *testing.T) {
 			Nonce:           "",
 		}
 
-		token, _, err := tokenIssuer.generateAccessTokenCore(context.Background(), settings, input, now, privKey, "key-id")
+		token, err := tokenIssuer.generateAccessTokenCore(context.Background(), settings, input, now, privKey, "key-id")
 		assert.NoError(t, err)
 
 		claims := verifyAndDecodeToken(t, token, publicKeyBytes)
@@ -4992,7 +4990,7 @@ func TestGenerateAccessTokenCore_ClientOverrideExpiration(t *testing.T) {
 			AuthenticatedAt: now,
 		}
 
-		token, _, err := tokenIssuer.generateAccessTokenCore(context.Background(), settings, input, now, privKey, "key-id")
+		token, err := tokenIssuer.generateAccessTokenCore(context.Background(), settings, input, now, privKey, "key-id")
 		assert.NoError(t, err)
 
 		claims := verifyAndDecodeToken(t, token, publicKeyBytes)
@@ -5016,7 +5014,7 @@ func TestGenerateAccessTokenCore_ClientOverrideExpiration(t *testing.T) {
 			AuthenticatedAt: now,
 		}
 
-		token, _, err := tokenIssuer.generateAccessTokenCore(context.Background(), settings, input, now, privKey, "key-id")
+		token, err := tokenIssuer.generateAccessTokenCore(context.Background(), settings, input, now, privKey, "key-id")
 		assert.NoError(t, err)
 
 		claims := verifyAndDecodeToken(t, token, publicKeyBytes)
@@ -5063,7 +5061,7 @@ func TestGenerateAccessTokenCore_OIDCClaimsInAccessToken(t *testing.T) {
 			AuthenticatedAt: now,
 		}
 
-		token, _, err := tokenIssuer.generateAccessTokenCore(context.Background(), settings, input, now, privKey, "key-id")
+		token, err := tokenIssuer.generateAccessTokenCore(context.Background(), settings, input, now, privKey, "key-id")
 		assert.NoError(t, err)
 
 		claims := verifyAndDecodeToken(t, token, publicKeyBytes)
@@ -5092,7 +5090,7 @@ func TestGenerateAccessTokenCore_OIDCClaimsInAccessToken(t *testing.T) {
 			AuthenticatedAt: now,
 		}
 
-		token, _, err := tokenIssuer.generateAccessTokenCore(context.Background(), settings, input, now, privKey, "key-id")
+		token, err := tokenIssuer.generateAccessTokenCore(context.Background(), settings, input, now, privKey, "key-id")
 		assert.NoError(t, err)
 
 		claims := verifyAndDecodeToken(t, token, publicKeyBytes)
@@ -5123,7 +5121,7 @@ func TestGenerateAccessTokenCore_OIDCClaimsInAccessToken(t *testing.T) {
 			AuthenticatedAt: now,
 		}
 
-		token, _, err := tokenIssuer.generateAccessTokenCore(context.Background(), settings, input, now, privKey, "key-id")
+		token, err := tokenIssuer.generateAccessTokenCore(context.Background(), settings, input, now, privKey, "key-id")
 		assert.NoError(t, err)
 
 		claims := verifyAndDecodeToken(t, token, publicKeyBytes)
@@ -5153,7 +5151,7 @@ func TestGenerateAccessTokenCore_OIDCClaimsInAccessToken(t *testing.T) {
 			AuthenticatedAt: now,
 		}
 
-		token, _, err := tokenIssuer.generateAccessTokenCore(context.Background(), settings, input, now, privKey, "key-id")
+		token, err := tokenIssuer.generateAccessTokenCore(context.Background(), settings, input, now, privKey, "key-id")
 		assert.NoError(t, err)
 
 		claims := verifyAndDecodeToken(t, token, publicKeyBytes)
@@ -5298,8 +5296,8 @@ func issueCharacterizationTokens(t *testing.T, scope string, baseURL string, use
 // as and what this repository's own documentation has always said it is. This test was written by
 // #387 stage 1 as a characterization: it recorded issuance's gate, "any scope beyond openid
 // alone", and the access token's extra row on top of it, where a lone openid still carried the
-// claim because generateAccessTokenCore appends authserver:userinfo to the scope slice for the
-// audience before the claim block reads it. Both were defects rather than choices, and the rows
+// claim because generateAccessTokenCore then appended authserver:userinfo to the scope slice for
+// the audience before the claim block read it. Both were defects rather than choices, and the rows
 // below are what each grant carries now that the gate is the profile scope at all three sites.
 //
 // The two rows that changed are the tripwire the characterization was for: "openid alone" stopped
@@ -5449,4 +5447,267 @@ func TestClaimCharacterization_ProfileAndPictureComeFromTheInjectedBaseURL(t *te
 		assert.Equal(t, "https://injected.example/account/profile", claims["profile"])
 		assert.Equal(t, "https://injected.example/userinfo/picture/"+sub, claims["picture"])
 	}
+}
+
+// scopeIsTheGrantIssue is what one flow of TestGenerateTokenResponse_ScopeIsTheGrant issued.
+type scopeIsTheGrantIssue struct {
+	reportedScope string
+	accessToken   string
+	idToken       string
+	refreshToken  string
+	storedRefresh *models.RefreshToken
+}
+
+// issueForScopeIsTheGrant runs one flow for one grant on a strict mock stubbed with the loads that
+// flow makes. storedRefreshScope is the scope already recorded on the parent refresh token, read only
+// by the two refresh flows; the code's scope and the ROPC grant are always the grant itself.
+func issueForScopeIsTheGrant(t *testing.T, flow string, grant string, storedRefreshScope string) scopeIsTheGrantIssue {
+	t.Helper()
+
+	mockDB := mocks_data.NewDatabase(t)
+	tokenIssuer := NewTokenIssuer(mockDB, "http://localhost:8081")
+
+	settings := &models.Settings{
+		Issuer:                                  "https://test-issuer.com",
+		TokenExpirationInSeconds:                600,
+		UserSessionIdleTimeoutInSeconds:         1200,
+		UserSessionMaxLifetimeInSeconds:         2400,
+		IncludeOpenIDConnectClaimsInIdToken:     true,
+		IncludeOpenIDConnectClaimsInAccessToken: true,
+		RefreshTokenOfflineIdleTimeoutInSeconds: 1800,
+		RefreshTokenOfflineMaxLifetimeInSeconds: 3600,
+	}
+	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+	now := time.Now().UTC()
+	sessionIdentifier := "scope-is-the-grant-session"
+
+	user := models.User{
+		Id:      1,
+		Subject: fake.UUID(),
+		Email:   "grant@example.com",
+		Groups:  []models.Group{{GroupIdentifier: "grant-group", IncludeInIdToken: true, IncludeInAccessToken: true}},
+	}
+	client := models.Client{Id: 1, ClientIdentifier: "grant-client"}
+
+	mockDB.On("GetCurrentSigningKey", mock.Anything, mock.Anything).Return(&models.KeyPair{
+		KeyIdentifier: "test-key-id",
+		PrivateKeyPEM: encryptPEM(t, getTestPrivateKey(t)),
+	}, nil)
+	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	mockDB.On("GroupsLoadAttributes", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	mockDB.On("UserLoadAttributes", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	// Only a grant with the profile scope asks for the picture, and only a session-bound refresh
+	// token asks for the session: both depend on the grant, not the flow.
+	mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, user.Id).Return(false, nil).Maybe()
+	mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, sessionIdentifier).Return(&models.UserSession{
+		Id:      1,
+		UserId:  user.Id,
+		Started: now.Add(-5 * time.Minute),
+	}, nil).Maybe()
+
+	var issued scopeIsTheGrantIssue
+	captureRefresh := func() {
+		mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*models.RefreshToken")).
+			Run(func(args mock.Arguments) {
+				issued.storedRefresh = args.Get(2).(*models.RefreshToken)
+			}).
+			Return(nil)
+	}
+
+	code := &models.Code{
+		Id:                1,
+		ClientId:          client.Id,
+		UserId:            user.Id,
+		Scope:             grant,
+		AuthenticatedAt:   now.Add(-time.Minute),
+		SessionIdentifier: sessionIdentifier,
+		AcrLevel:          "urn:goiabada:level1",
+		AuthMethods:       "pwd",
+		Client:            client,
+		User:              user,
+	}
+	parent := &models.RefreshToken{
+		Id:                   1,
+		RefreshTokenJti:      "parent-jti",
+		FirstRefreshTokenJti: "first-jti",
+		UserId:               sql.NullInt64{Int64: user.Id, Valid: true},
+		ClientId:             sql.NullInt64{Int64: client.Id, Valid: true},
+		Scope:                storedRefreshScope,
+		RefreshTokenType:     offlineRefreshTokenType,
+		MaxLifetime:          sql.NullTime{Time: now.Add(time.Hour), Valid: true},
+		User:                 user,
+		Client:               client,
+	}
+	implicit := &ImplicitGrantInput{
+		Client:            &client,
+		User:              &user,
+		Scope:             grant,
+		AcrLevel:          "urn:goiabada:level1",
+		AuthMethods:       "pwd",
+		SessionIdentifier: sessionIdentifier,
+		AuthenticatedAt:   now.Add(-time.Minute),
+	}
+
+	switch flow {
+	case "auth code exchange":
+		mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, code).Return(nil)
+		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, code).Return(nil)
+		captureRefresh()
+		response, err := tokenIssuer.GenerateTokenResponseForAuthCode(ctx, code)
+		require.NoError(t, err)
+		issued.reportedScope, issued.accessToken, issued.idToken, issued.refreshToken =
+			response.Scope, response.AccessToken, response.IdToken, response.RefreshToken
+	case "auth code refresh":
+		mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, code).Return(nil)
+		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, code).Return(nil)
+		captureRefresh()
+		response, err := tokenIssuer.GenerateTokenResponseForRefresh(ctx, &GenerateTokenForRefreshInput{
+			Code:         code,
+			RefreshToken: parent,
+		})
+		require.NoError(t, err)
+		issued.reportedScope, issued.accessToken, issued.idToken, issued.refreshToken =
+			response.Scope, response.AccessToken, response.IdToken, response.RefreshToken
+	case "implicit token", "implicit id_token token", "implicit id_token":
+		issueAccessToken := flow != "implicit id_token"
+		issueIdToken := flow != "implicit token"
+		response, err := tokenIssuer.GenerateTokenResponseForImplicit(ctx, implicit, issueAccessToken, issueIdToken)
+		require.NoError(t, err)
+		issued.reportedScope, issued.accessToken, issued.idToken = response.Scope, response.AccessToken, response.IdToken
+	case "ROPC":
+		captureRefresh()
+		response, err := tokenIssuer.GenerateTokenResponseForROPC(ctx, &ROPCGrantInput{Client: &client, User: &user, Scope: grant})
+		require.NoError(t, err)
+		issued.reportedScope, issued.accessToken, issued.idToken, issued.refreshToken =
+			response.Scope, response.AccessToken, response.IdToken, response.RefreshToken
+	case "ROPC refresh":
+		mockDB.On("RefreshTokenLoadUser", mock.Anything, mock.Anything, parent).Return(nil)
+		mockDB.On("RefreshTokenLoadClient", mock.Anything, mock.Anything, parent).Return(nil)
+		captureRefresh()
+		response, err := tokenIssuer.GenerateTokenResponseForRefreshROPC(ctx, &GenerateTokenForRefreshROPCInput{
+			RefreshToken: parent,
+		})
+		require.NoError(t, err)
+		issued.reportedScope, issued.accessToken, issued.idToken, issued.refreshToken =
+			response.Scope, response.AccessToken, response.IdToken, response.RefreshToken
+	default:
+		t.Fatalf("unknown flow %q", flow)
+	}
+	return issued
+}
+
+// audienceOf reads aud as a list whether the token wrote one value or several.
+func audienceOf(t *testing.T, claims jwt.MapClaims) []string {
+	t.Helper()
+	switch aud := claims["aud"].(type) {
+	case string:
+		return []string{aud}
+	case []interface{}:
+		values := make([]string, 0, len(aud))
+		for _, v := range aud {
+			values = append(values, v.(string))
+		}
+		return values
+	default:
+		t.Fatalf("aud is neither a string nor an array: %#v", claims["aud"])
+		return nil
+	}
+}
+
+// Every flow reports, and writes into the access token's scope claim, exactly the grant. Until #449
+// any claim scope appended authserver:userinfo to both, a scope the client never asked for, which a
+// refresh echoing the reported scope was then refused for (RFC 6749 section 6 lets a refresh request
+// any scope "originally granted"). /userinfo gates on openid now, so the append bought nothing. The
+// audience is unchanged: a claim scope still names authserver, whose /userinfo answers it, which a
+// groups-only grant needs since it may name no other audience.
+func TestGenerateTokenResponse_ScopeIsTheGrant(t *testing.T) {
+	grants := []string{
+		"openid",
+		"openid profile email resource1:read",
+		// A claim scope without openid, admitted as before (#449 decision 2).
+		"groups",
+		// No claim scope at all.
+		"resource1:read offline_access",
+	}
+	flows := []string{"auth code exchange", "auth code refresh", "implicit token", "ROPC", "ROPC refresh"}
+
+	publicKeyBytes := getTestPublicKey(t)
+
+	for _, grant := range grants {
+		grantScopes := strings.Split(grant, " ")
+		hasClaimScope := slices.ContainsFunc(grantScopes, func(s string) bool {
+			return slices.Contains([]string{"openid", "profile", "email", "address", "phone", "groups", "attributes"}, s)
+		})
+		for _, flow := range flows {
+			t.Run(flow+"/"+grant, func(t *testing.T) {
+				issued := issueForScopeIsTheGrant(t, flow, grant, grant)
+
+				assert.Equal(t, grant, issued.reportedScope, "reported scope")
+				accessClaims := verifyAndDecodeToken(t, issued.accessToken, publicKeyBytes)
+				assert.Equal(t, grant, accessClaims["scope"], "access token scope claim")
+
+				audience := audienceOf(t, accessClaims)
+				assert.Equal(t, hasClaimScope, slices.Contains(audience, coreconstants.AuthServerResourceIdentifier),
+					"aud names authserver exactly when the grant has a claim scope: %v", audience)
+				assert.Equal(t, slices.Contains(grantScopes, "resource1:read"), slices.Contains(audience, "resource1"),
+					"aud names resource1 exactly when the grant does: %v", audience)
+
+				if slices.Contains(grantScopes, "groups") {
+					assert.Equal(t, []interface{}{"grant-group"}, accessClaims["groups"])
+				}
+
+				if flow != "implicit token" {
+					assert.Equal(t, slices.Contains(grantScopes, "openid"), issued.idToken != "",
+						"an ID token is issued exactly when the grant carries openid")
+				}
+
+				if flow == "auth code exchange" {
+					refreshClaims := verifyAndDecodeToken(t, issued.refreshToken, publicKeyBytes)
+					assert.Equal(t, grant, refreshClaims["scope"], "refresh token scope claim")
+					require.NotNil(t, issued.storedRefresh)
+					assert.Equal(t, grant, issued.storedRefresh.Scope, "stored refresh token scope")
+				}
+			})
+		}
+	}
+
+	// The two implicit response types that issue an ID token are reachable only with openid, so
+	// they run on the openid grants alone. The id_token row issues no access token: it is here
+	// because the reported scope's two assignments are one now.
+	for _, grant := range []string{"openid", "openid profile email resource1:read"} {
+		for _, flow := range []string{"implicit id_token token", "implicit id_token"} {
+			t.Run(flow+"/"+grant, func(t *testing.T) {
+				issued := issueForScopeIsTheGrant(t, flow, grant, grant)
+
+				assert.Equal(t, grant, issued.reportedScope, "reported scope")
+				assert.NotEmpty(t, issued.idToken)
+				if flow == "implicit id_token" {
+					assert.Empty(t, issued.accessToken)
+					return
+				}
+				accessClaims := verifyAndDecodeToken(t, issued.accessToken, publicKeyBytes)
+				assert.Equal(t, grant, accessClaims["scope"], "access token scope claim")
+				assert.Contains(t, audienceOf(t, accessClaims), coreconstants.AuthServerResourceIdentifier)
+			})
+		}
+	}
+
+	// An auth-code refresh token issued before #449 recorded the decorated scope. The refresh reports
+	// and issues the code's grant, and copies the stored scope onto the new refresh token unchanged,
+	// because RFC 6749 section 6 requires the new refresh token's scope to be identical; nothing reads
+	// it for an auth-code grant, whose validator consults the code's scope.
+	t.Run("auth code refresh/legacy stored scope carrying authserver:userinfo", func(t *testing.T) {
+		legacyScope := "openid authserver:userinfo"
+		issued := issueForScopeIsTheGrant(t, "auth code refresh", "openid", legacyScope)
+
+		assert.Equal(t, "openid", issued.reportedScope)
+		accessClaims := verifyAndDecodeToken(t, issued.accessToken, publicKeyBytes)
+		assert.Equal(t, "openid", accessClaims["scope"])
+		assert.NotEmpty(t, issued.idToken)
+
+		refreshClaims := verifyAndDecodeToken(t, issued.refreshToken, publicKeyBytes)
+		assert.Equal(t, legacyScope, refreshClaims["scope"])
+		require.NotNil(t, issued.storedRefresh)
+		assert.Equal(t, legacyScope, issued.storedRefresh.Scope)
+	})
 }

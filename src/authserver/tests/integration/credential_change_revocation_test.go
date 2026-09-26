@@ -310,7 +310,7 @@ func (g *offlineGrant) exchange(t *testing.T, code string, codeVerifier string) 
 // createOfflineGrant runs a complete authorization code ceremony with offline_access, through the
 // real login and consent screens, and exchanges the code.
 //
-// It grants the user authserver:userinfo and authserver:manage-account so the resulting token can
+// It grants the user authserver:manage-account and requests openid, so the resulting token can
 // exercise both /userinfo and the account API, which is where the middleware's generation check
 // lives.
 func createOfflineGrant(t *testing.T) *offlineGrant {
@@ -352,10 +352,8 @@ func createOfflineGrant(t *testing.T) *offlineGrant {
 	}
 	require.NoError(t, database.CreateUser(context.Background(), nil, user))
 
-	// Only manage-account is granted. authserver:userinfo is deliberately NOT granted and NOT
-	// requested: the authorize validator rejects it explicitly, because an OpenID Connect scope
-	// causes the server to inject it into the access token itself. That injection is what lets
-	// the resulting token call /userinfo below.
+	// Only manage-account is granted. openid is what lets the resulting token call /userinfo
+	// below, and it is not a permission (#449).
 	authserverResource, err := database.GetResourceByResourceIdentifier(context.Background(), nil, constants.AuthServerResourceIdentifier)
 	require.NoError(t, err)
 	permissions, err := database.GetPermissionsByResourceId(context.Background(), nil, authserverResource.Id)

@@ -15,8 +15,8 @@ When configuring your OAuth2/OpenID Connect client to work with Goiabada, you'll
 2. **Issuer URL** (normally the auth server base URL) - e.g., `https://auth.example.com`
 3. **Authorization Endpoint** - `<auth-server-base-url>/auth/authorize`
 4. **Token Endpoint** - `<auth-server-base-url>/auth/token`
-5. **UserInfo Endpoint** - `<auth-server-base-url>/auth/userinfo`
-6. **JWKS URI** - `<auth-server-base-url>/.well-known/jwks.json`
+5. **UserInfo Endpoint** - `<auth-server-base-url>/userinfo`
+6. **JWKS URI** - `<auth-server-base-url>/certs`
 7. **End Session Endpoint** - `<auth-server-base-url>/auth/logout`
 
 Most libraries support automatic configuration via the **OpenID Connect Discovery** endpoint at `<auth-server-base-url>/.well-known/openid-configuration`.

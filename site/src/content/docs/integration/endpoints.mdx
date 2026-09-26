@@ -554,13 +554,7 @@ Send a valid access token using the `Authorization` header:
 Authorization: Bearer <access-token>
 ```
 
-The endpoint requires the `authserver:userinfo` scope to be present in the access token.
-
-<Aside>
-**Automatic scope addition:** When you request any OpenID Connect scope in your authorization request (`openid`, `profile`, `email`, `address`, `phone`, `groups`, or `attributes`), the auth server automatically adds the `authserver:userinfo` scope to the generated access token.
-
-You don't need to explicitly include `authserver:userinfo` in your authorization request's `scope` parameter.
-</Aside>
+The endpoint takes an access token issued for a user whose scope includes `openid`.
 
 ### Response
 
@@ -603,7 +597,7 @@ The response is a JSON object containing user claims. The `sub` (subject) claim 
 
 ### Example response
 
-Request with scopes `profile` and `email`:
+Request with scopes `openid`, `profile` and `email`:
 
 ```json
 {
@@ -624,7 +618,8 @@ Request with scopes `profile` and `email`:
 
 - **401 Unauthorized** - Missing or invalid access token
 - **401 Unauthorized** - `invalid_token`: the user account is disabled or no longer exists
-- **403 Forbidden** - Access token lacks `authserver:userinfo` scope
+- **401 Unauthorized** - `invalid_token`: the session the access token was issued in has ended
+- **403 Forbidden** - Access token lacks the `openid` scope (a client credentials token never has it)
 
 ## /client/logo/\{clientIdentifier\} (GET)
 

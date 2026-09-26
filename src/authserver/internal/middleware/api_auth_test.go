@@ -31,7 +31,7 @@ func TestRequireBearerTokenScope(t *testing.T) {
 
 		token := oauth.JwtToken{
 			Claims: map[string]interface{}{
-				"scope": "authserver:manage authserver:userinfo",
+				"scope": "authserver:manage openid",
 			},
 		}
 
@@ -81,7 +81,7 @@ func TestRequireBearerTokenScope(t *testing.T) {
 
 		token := oauth.JwtToken{
 			Claims: map[string]interface{}{
-				"scope": "authserver:userinfo",
+				"scope": "openid",
 			},
 		}
 
@@ -324,7 +324,7 @@ func TestRequireBearerTokenScopeAnyOf(t *testing.T) {
 
 		token := oauth.JwtToken{
 			Claims: map[string]interface{}{
-				"scope": "authserver:userinfo openid",
+				"scope": "openid profile",
 			},
 		}
 

@@ -1008,8 +1008,24 @@ func createAuthCodeEnsuringUserScope(t *testing.T, clientSecret string, scope st
 // createUserAccessTokenWithScope issues an access token for a user making sure requested
 // custom scopes are granted to that user before the flow. Returns (accessToken, *user).
 func createUserAccessTokenWithScope(t *testing.T, scope string) (string, *models.User) {
+	data, code, _, _ := userTokenResponseWithScope(t, scope, nil)
+	accessToken, ok := data["access_token"].(string)
+	assert.True(t, ok)
+	assert.NotEmpty(t, accessToken)
+	return accessToken, &code.User
+}
+
+// userTokenResponseWithScope is createUserAccessTokenWithScope for a caller that needs the whole
+// token response, the code it redeemed, and the client to refresh with. beforeExchange, when set,
+// runs on the user after the code is issued and before it is redeemed, which is where a fixture
+// changes what the token will carry: issuance reads the user's groups at the exchange.
+func userTokenResponseWithScope(t *testing.T, scope string, beforeExchange func(user *models.User)) (
+	map[string]interface{}, *models.Code, *http.Client, string) {
 	clientSecret := fake.LetterN(32)
 	httpClient, code := createAuthCodeEnsuringUserScope(t, clientSecret, scope)
+	if beforeExchange != nil {
+		beforeExchange(&code.User)
+	}
 
 	// Exchange code for tokens
 	tokenEndpoint := config.GetAuthServer().BaseURL + "/auth/token/"
@@ -1022,10 +1038,7 @@ func createUserAccessTokenWithScope(t *testing.T, scope string) (string, *models
 		"code_verifier": {"code-verifier"},
 	}
 	data := postToTokenEndpoint(t, httpClient, tokenEndpoint, form)
-	accessToken, ok := data["access_token"].(string)
-	assert.True(t, ok)
-	assert.NotEmpty(t, accessToken)
-	return accessToken, &code.User
+	return data, code, httpClient, clientSecret
 }
 
 func postToTokenEndpoint(t *testing.T, client *http.Client, url string, formData url.Values) map[string]interface{} {

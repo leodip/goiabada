@@ -152,11 +152,17 @@ func TestUserBoundToken_ClientCredentialsCannotActAsUser(t *testing.T) {
 	// need a third user for no added coverage.
 	//
 	// The matching user genuinely exists, which is what makes this the fixture the spec
-	// describes: with the guard removed, the handler resolves THIS user from the token's sub.
+	// describes: with the guards removed, the handler resolves THIS user from the token's sub.
+	//
+	// /userinfo gates on openid, which a client credentials token can never carry, since that
+	// grant refuses every OpenID Connect scope. So the token stops at the scope check, ahead of
+	// RequireUserBoundToken, and both subtests expect 403 INSUFFICIENT_SCOPE (#449 decision 3).
+	// The client holds manage-account for the same reason the first subtest's does: a real
+	// built-in, so the token is a valid one that is simply not a user's.
 	userinfoSubject := newUserSubjectValidAsClientIdentifier(t)
 	_, _ = createUserWithSubject(t, userinfoSubject)
 	userinfoToken := createImpersonatingClientCredentialsToken(t, userinfoSubject,
-		constants.UserinfoPermissionIdentifier)
+		constants.ManageAccountPermissionIdentifier)
 
 	t.Run("PUT account email is refused and the email is unchanged", func(t *testing.T) {
 		accessToken := createImpersonatingClientCredentialsToken(t, accountSubject,
@@ -188,11 +194,13 @@ func TestUserBoundToken_ClientCredentialsCannotActAsUser(t *testing.T) {
 		resp := makeAPIRequest(t, "GET", config.GetAuthServer().BaseURL+"/userinfo", userinfoToken, nil)
 		defer func() { _ = resp.Body.Close() }()
 
+		// Keep this: USER_CONTEXT_REQUIRED until #449, when the fixture client held the userinfo
+		// permission and so passed the scope check.
 		assert.Equal(t, http.StatusForbidden, resp.StatusCode)
 		var errResp api.ErrorResponse
 		body, _ := io.ReadAll(resp.Body)
 		_ = json.Unmarshal(body, &errResp)
-		assert.Equal(t, "USER_CONTEXT_REQUIRED", errResp.ErrorCode, "unexpected body: %s", string(body))
+		assert.Equal(t, "INSUFFICIENT_SCOPE", errResp.ErrorCode, "unexpected body: %s", string(body))
 	})
 
 	// GET and POST /userinfo are separate route registrations, so a guard added to only
@@ -209,11 +217,13 @@ func TestUserBoundToken_ClientCredentialsCannotActAsUser(t *testing.T) {
 		require.NoError(t, err)
 		defer func() { _ = resp.Body.Close() }()
 
+		// Keep this: USER_CONTEXT_REQUIRED until #449, when the fixture client held the userinfo
+		// permission and so passed the scope check.
 		assert.Equal(t, http.StatusForbidden, resp.StatusCode)
 		var errResp api.ErrorResponse
 		body, _ := io.ReadAll(resp.Body)
 		_ = json.Unmarshal(body, &errResp)
-		assert.Equal(t, "USER_CONTEXT_REQUIRED", errResp.ErrorCode, "unexpected body: %s", string(body))
+		assert.Equal(t, "INSUFFICIENT_SCOPE", errResp.ErrorCode, "unexpected body: %s", string(body))
 	})
 }
 
@@ -327,6 +337,42 @@ func userAccessTokenViaAuthCodeRefresh(t *testing.T) (string, *models.User) {
 func userAccessTokenViaROPC(t *testing.T) (string, *models.User, string) {
 	t.Helper()
 
+	// ROPC checks the USER holds each requested resource permission, so manage-account has to be
+	// granted, and nothing else is needed: the token reaches /userinfo because its scope carries
+	// openid, which is not a permission (#449).
+	grantManageAccount := func(user *models.User) {
+		authserverResource, err := database.GetResourceByResourceIdentifier(context.Background(), nil, constants.AuthServerResourceIdentifier)
+		require.NoError(t, err)
+		permissions, err := database.GetPermissionsByResourceId(context.Background(), nil, authserverResource.Id)
+		require.NoError(t, err)
+		for i := range permissions {
+			if permissions[i].PermissionIdentifier == constants.ManageAccountPermissionIdentifier {
+				assignPermissionToUser(t, user.Id, permissions[i].Id)
+				break
+			}
+		}
+	}
+
+	// ROPC bypasses consent entirely, but offline_access is still unnecessary: the grant
+	// returns a refresh token with plain openid (see TestROPC_Success).
+	scope := "openid " +
+		constants.AuthServerResourceIdentifier + ":" + constants.ManageAccountPermissionIdentifier
+	data, user := ropcTokenResponse(t, scope, grantManageAccount)
+
+	accessToken, ok := data["access_token"].(string)
+	require.True(t, ok, "ROPC should yield an access token: %v", data)
+	refreshToken, _ := data["refresh_token"].(string)
+
+	return accessToken, user, refreshToken
+}
+
+// ropcTokenResponse is userAccessTokenViaROPC for a caller that needs the whole token response
+// and chooses the scope. It turns ROPC on for the test, creates a confidential ROPC client and a
+// user, runs beforeGrant on the user when set, then makes the password grant. The refresh token's
+// client is recorded for refreshROPCToken and refreshROPCTokenResponse.
+func ropcTokenResponse(t *testing.T, scope string, beforeGrant func(user *models.User)) (map[string]interface{}, *models.User) {
+	t.Helper()
+
 	settings, err := database.GetSettingsById(context.Background(), nil, 1)
 	require.NoError(t, err)
 	original := settings.ResourceOwnerPasswordCredentialsEnabled
@@ -349,30 +395,10 @@ func userAccessTokenViaROPC(t *testing.T) (string, *models.User, string) {
 	err = database.UpdateUser(context.Background(), nil, user)
 	require.NoError(t, err)
 
-	// ROPC checks the USER holds each requested resource permission, so manage-account has to be
-	// granted. Nothing else: the user must NOT hold authserver:userinfo.
-	//
-	// That absence is load-bearing rather than incidental. This helper used to grant it too, to
-	// work around the refresh defect where the server re-validated the authserver:userinfo scope
-	// it injects itself against the user's permissions. With the defect fixed, the grant is gone,
-	// and its absence is what makes the "sessionless ROPC refresh token" case exercise the fix.
-	// Do not add it back to make a failure go away: a failure here means the injected-scope
-	// exception has regressed.
-	authserverResource, err := database.GetResourceByResourceIdentifier(context.Background(), nil, constants.AuthServerResourceIdentifier)
-	require.NoError(t, err)
-	permissions, err := database.GetPermissionsByResourceId(context.Background(), nil, authserverResource.Id)
-	require.NoError(t, err)
-	for i := range permissions {
-		if permissions[i].PermissionIdentifier == constants.ManageAccountPermissionIdentifier {
-			assignPermissionToUser(t, user.Id, permissions[i].Id)
-			break
-		}
+	if beforeGrant != nil {
+		beforeGrant(user)
 	}
 
-	// ROPC bypasses consent entirely, but offline_access is still unnecessary: the grant
-	// returns a refresh token with plain openid (see TestROPC_Success).
-	scope := "openid " +
-		constants.AuthServerResourceIdentifier + ":" + constants.ManageAccountPermissionIdentifier
 	data := postToTokenEndpoint(t, createHttpClient(t), config.GetAuthServer().BaseURL+"/auth/token/", url.Values{
 		"grant_type":    {"password"},
 		"client_id":     {client.ClientIdentifier},
@@ -382,17 +408,15 @@ func userAccessTokenViaROPC(t *testing.T) (string, *models.User, string) {
 		"scope":         {scope},
 	})
 
-	accessToken, ok := data["access_token"].(string)
-	require.True(t, ok, "ROPC should yield an access token: %v", data)
-	refreshToken, _ := data["refresh_token"].(string)
-
-	// Store the client secret so the refresh helper can reuse it.
-	ropcRefreshCredentials[refreshToken] = ropcClientCredentials{
-		clientIdentifier: client.ClientIdentifier,
-		clientSecret:     clientSecret,
+	if refreshToken, ok := data["refresh_token"].(string); ok {
+		// Store the client secret so the refresh helpers can reuse it.
+		ropcRefreshCredentials[refreshToken] = ropcClientCredentials{
+			clientIdentifier: client.ClientIdentifier,
+			clientSecret:     clientSecret,
+		}
 	}
 
-	return accessToken, user, refreshToken
+	return data, user
 }
 
 type ropcClientCredentials struct {
@@ -407,24 +431,42 @@ var ropcRefreshCredentials = map[string]ropcClientCredentials{}
 func refreshROPCToken(t *testing.T, refreshToken string) string {
 	t.Helper()
 
-	creds, ok := ropcRefreshCredentials[refreshToken]
-	require.True(t, ok, "refresh token should have recorded credentials")
-
-	data := postToTokenEndpoint(t, createHttpClient(t), config.GetAuthServer().BaseURL+"/auth/token/", url.Values{
-		"grant_type":    {"refresh_token"},
-		"client_id":     {creds.clientIdentifier},
-		"client_secret": {creds.clientSecret},
-		"refresh_token": {refreshToken},
-	})
-
+	status, data := refreshROPCTokenResponse(t, refreshToken, "")
+	require.Equal(t, http.StatusOK, status, "ROPC refresh should succeed: %v", data)
 	accessToken, ok := data["access_token"].(string)
 	require.True(t, ok, "ROPC refresh should yield an access token: %v", data)
 	return accessToken
 }
 
-// userAccessTokenViaImplicit drives the implicit flow to an access token carrying
-// authserver:userinfo.
+// refreshROPCTokenResponse is refreshROPCToken for a caller that needs the status and the whole
+// response, and may send a scope (empty means omitted).
+func refreshROPCTokenResponse(t *testing.T, refreshToken string, scope string) (int, map[string]interface{}) {
+	t.Helper()
+
+	creds, ok := ropcRefreshCredentials[refreshToken]
+	require.True(t, ok, "refresh token should have recorded credentials")
+
+	return refreshWithScope(t, createHttpClient(t), creds.clientIdentifier, creds.clientSecret, refreshToken, scope)
+}
+
+// userAccessTokenViaImplicit drives the implicit flow to an access token whose scope is openid.
 func userAccessTokenViaImplicit(t *testing.T) string {
+	t.Helper()
+
+	// Just "openid": it is what lets this token reach /userinfo, and it is not a permission, so
+	// the user needs no grant here (#449).
+	tokens, _ := implicitTokenResponse(t, "token", "openid")
+	accessToken := tokens["access_token"]
+	require.NotEmpty(t, accessToken, "implicit flow should yield an access token")
+
+	return accessToken
+}
+
+// implicitTokenResponse is userAccessTokenViaImplicit for a caller that needs the whole fragment
+// and chooses the response type and scope. It turns the implicit flow on for the test and runs the
+// ceremony for a fresh user, with a nonce, which OIDC Core 1.0 section 3.2.2.1 requires whenever
+// an ID token is asked for.
+func implicitTokenResponse(t *testing.T, responseType string, scope string) (map[string]string, *models.User) {
 	t.Helper()
 
 	settings, err := database.GetSettingsById(context.Background(), nil, 1)
@@ -441,17 +483,12 @@ func userAccessTokenViaImplicit(t *testing.T) string {
 	client, redirectUri := createImplicitFlowClient(t, nil)
 	user, password := createTestUserForImplicit(t)
 
-	// Just "openid". authserver:userinfo must NOT be requested explicitly: the authorize
-	// validator rejects it outright (authorize_validator.go ValidateScopes) because
-	// generateAccessTokenCore appends it to the issued token whenever an OIDC scope is
-	// present. That injection is what lets this token reach /userinfo, and it is also why
-	// the user needs no userinfo permission grant here.
-	requestScope := "openid"
 	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
-		"&response_type=token" +
-		"&scope=" + url.QueryEscape(requestScope) +
-		"&state=" + fake.LetterN(16)
+		"&response_type=" + url.QueryEscape(responseType) +
+		"&scope=" + url.QueryEscape(scope) +
+		"&state=" + fake.LetterN(16) +
+		"&nonce=" + fake.LetterN(16)
 
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Get(destUrl)
@@ -481,9 +518,5 @@ func userAccessTokenViaImplicit(t *testing.T) string {
 	resp = loadPage(t, httpClient, redirectLocation)
 	defer func() { _ = resp.Body.Close() }()
 
-	tokens := getTokensFromFragment(t, resp)
-	accessToken := tokens["access_token"]
-	require.NotEmpty(t, accessToken, "implicit flow should yield an access token")
-
-	return accessToken
+	return getTokensFromFragment(t, resp), user
 }
