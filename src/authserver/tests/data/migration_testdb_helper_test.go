@@ -401,8 +401,8 @@ func dropMsSQL(t *testing.T, cfg *config.DatabaseConfig, name string) {
 // connects as root/sa/postgres. A test that merely pre-created the database and set
 // Create: false would pass with the maintenance connection still opened and the create
 // statement still issued, because a superuser can do both. A restricted login is what observes
-// their absence from outside the constructor, which is why §5 of the agreement rejects counting
-// connections and decision 8 chose this instead.
+// their absence from outside the constructor, which is why counting connections was rejected
+// and decision 8 chose this instead (#293).
 //
 // MySQL is the one engine where that is not enough, and the shortfall is measured rather than
 // assumed: MySQL has no per-schema CONNECT privilege, so a login granted ALL PRIVILEGES ON
@@ -452,9 +452,9 @@ func postgresMaintenanceDSN(username, password string, cfg *config.DatabaseConfi
 }
 
 // newRestrictedLoginDB pre-creates an isolated database and a credential that cannot create
-// one, registering the drop of both on t. Built from probe/least_privilege_startup.go, which
-// measured what each engine actually allows. SQL Server and MySQL get the database at the
-// collation their constructor would have used, so nothing downstream reads a different one.
+// one, registering the drop of both on t. Built from measuring what each engine actually
+// allows (#293). SQL Server and MySQL get the database at the collation their constructor
+// would have used, so nothing downstream reads a different one.
 func newRestrictedLoginDB(t *testing.T) *restrictedLoginDB {
 	t.Helper()
 	cfg := config.GetDatabase()
@@ -525,8 +525,8 @@ func newRestrictedLoginDB(t *testing.T) *restrictedLoginDB {
 		// The restriction that makes this fixture observe anything on SQL Server. A login
 		// mapped into the application database can reach master through guest AND sees the
 		// database in sys.databases from there, so the constructor's IF NOT EXISTS would find
-		// it, create nothing and succeed: §1 of the agreement measured exactly that, and a
-		// constructor that ignored Create would go undetected here.
+		// it, create nothing and succeed: that was measured to be exactly the case (#293), and
+		// a constructor that ignored Create would go undetected here.
 		//
 		// DENY VIEW ANY DATABASE takes the catalog away instead, and then the whole creating
 		// path fails the way a least-privilege deployment fails: the check reads 0 rows, the
@@ -536,8 +536,7 @@ func newRestrictedLoginDB(t *testing.T) *restrictedLoginDB {
 		//
 		// Not DENY CONNECT in master, which looks like the more direct statement of "no access
 		// to master" and is not usable: it denies the login every database, the application's
-		// own included, with "Login failed for user". Measured in
-		// probe/mssql_deny_connect_master.go.
+		// own included, with "Login failed for user", measured directly (#293).
 		mustExec(t, admin, fmt.Sprintf("DENY VIEW ANY DATABASE TO [%s]", r.username))
 
 		t.Cleanup(func() {

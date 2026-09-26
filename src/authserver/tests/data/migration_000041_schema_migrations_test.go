@@ -155,9 +155,9 @@ func TestMigration000041_SchemaMigrationsShape(t *testing.T) {
 	// version is the surprise, pinned here so nobody later reads NOT NULL as a rejection
 	// and "tidies" the migration on that reading. SQLite REPLACES a NULL in an INTEGER
 	// PRIMARY KEY with a generated rowid whether or not NOT NULL is declared, so the
-	// column never rejects a NULL and never stores one. The agreement's decision 7 says
-	// it is refused; the probe behind that claim inserted (NULL, NULL) and read dirty's
-	// refusal as version's (probe/sqlite_version_table.out case 5, corrected here).
+	// column never rejects a NULL and never stores one. It was thought refused (#284): the
+	// insert behind that claim used (NULL, NULL) and read dirty's refusal as version's,
+	// corrected here.
 	_, err = h.SQL.Exec("INSERT INTO schema_migrations (version, dirty) VALUES (NULL, 0)")
 	require.NoError(t, err, "SQLite substitutes a rowid for a NULL INTEGER PRIMARY KEY rather than refusing it")
 	var nulls int

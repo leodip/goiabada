@@ -233,8 +233,8 @@ func TestSymbolOwnership_TheBaselineTreeResolves(t *testing.T) {
 
 // TestSymbolOwnership_AConstInheritsItsType pins the half of the reachable arm that reads the Go
 // spec rather than the syntax. ColourBlue spells no type at all, and reading each ValueSpec on its
-// own is what made probe/census2.out call the three Gender constants test-only while Gender itself
-// was both-apps.
+// own once misclassified the three Gender constants as test-only while Gender itself was
+// both-apps, caught during #385.
 func TestSymbolOwnership_AConstInheritsItsType(t *testing.T) {
 	computed := computedOver(t, symbolBaselineFiles())
 

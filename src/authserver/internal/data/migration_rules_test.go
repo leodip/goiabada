@@ -538,7 +538,7 @@ type migrationCutoffs struct {
 }
 
 // migrationCutoffsDefault is measured rather than chosen: the highest number each rule is
-// actually violated at today (probe/rule_facts.out, #288 decision 3).
+// actually violated at today (#288 decision 3).
 var migrationCutoffsDefault = migrationCutoffs{
 	MSSQLNVarchar:     14,
 	MSSQLNamedDefault: 18,

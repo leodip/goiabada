@@ -3,7 +3,8 @@ package emaildelivery
 // An in-process SMTP server for the EmailSender table. It exists because the dev container's
 // mailpit offers exactly one shape -- no encryption, no authentication -- so the three encryption
 // modes, the three authentication mechanisms, the fail-closed refusals and the bytes on the wire
-// are unreachable without it. Grown from docs/issue-274-retire-go-simple-mail/probe/wire_probe_test.go.
+// are unreachable without it. Grown from an early exploratory test written for #274, which
+// retired go-simple-mail in favor of net/smtp.
 
 import (
 	"bufio"
@@ -344,8 +345,8 @@ func extensionOffered(ext []string, name string) bool {
 }
 
 // start binds the fake to an ephemeral port on every interface, because the rows for decision 1
-// reach it through os.Hostname(), which inside a container is the non-loopback address
-// (probe/hostname.out). It serves exactly one connection.
+// reach it through os.Hostname(), which inside a container is the non-loopback address,
+// confirmed for #274. It serves exactly one connection.
 func (f *fakeSMTP) start(t *testing.T) int {
 	t.Helper()
 
@@ -445,7 +446,7 @@ func newFakeCert(t *testing.T) *fakeCert {
 
 // fakeHostname is this machine's name, which the decision 1 rows use as a host that is not
 // loopback. In the dev container and in CI's job containers it is the container id and resolves to
-// the container's own non-loopback address (probe/hostname.out).
+// the container's own non-loopback address, confirmed for #274.
 func fakeHostname(t *testing.T) string {
 	t.Helper()
 	name, err := os.Hostname()

@@ -111,9 +111,8 @@ func TestDCR_Refusal_AdministratorClientStillRedirects(t *testing.T) {
 		"and it goes to the client's own registered URI: %s", location)
 }
 
-// TestDCR_Refusal_InvalidScopeIsNotDeliveredByRedirect is RFC 9700 4.11.2 attack 1, and it is
-// probe/unauthenticated_error_redirect_test.go inverted. That probe sent one GET from a browser
-// holding no cookies, with an invalid scope, and watched the server answer
+// TestDCR_Refusal_InvalidScopeIsNotDeliveredByRedirect is RFC 9700 4.11.2 attack 1: before #108,
+// one GET from a browser holding no cookies, with an invalid scope, made the server answer
 // "302 Location: https://attacker.example.com/callback?error=invalid_scope" with nobody logged in
 // and nothing rendered.
 //

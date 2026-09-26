@@ -150,7 +150,7 @@ func TestNoBareBeginTransaction_TheCheckerTellsACallFromADeclaration(t *testing.
 		require.NoError(t, os.WriteFile(path, []byte(src), 0o644))
 	}
 
-	// Accepted: the interface declaration the agreement keeps, a mockery-shaped method
+	// Accepted: the interface declaration #301 exempted, a mockery-shaped method
 	// declaration, and the identifier inside a comment and inside a string.
 	write("authserver/internal/data/database.go", `package data
 

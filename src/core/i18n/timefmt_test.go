@@ -116,7 +116,7 @@ func TestFormatSince_UnitsAndPlurals(t *testing.T) {
 		{name: "two hours", elapsed: 2 * time.Hour, en: "2 hours ago", ptBR: "há 2 horas"},
 		{name: "just under a day", elapsed: 23*time.Hour + 59*time.Minute + 59*time.Second, en: "23 hours ago", ptBR: "há 23 horas"},
 
-		// Days, including the agreement's own worked example, 72h3m.
+		// Days, including the worked example #373 gave, 72h3m.
 		{name: "one day exactly", elapsed: 24 * time.Hour, en: "1 day ago", ptBR: "há 1 dia"},
 		{name: "three days", elapsed: 72*time.Hour + 3*time.Minute, en: "3 days ago", ptBR: "há 3 dias"},
 		// Past the largest unit: the documented ceiling, pinned so shortening

@@ -21,7 +21,7 @@ import (
 // What is asserted, and what deliberately is not:
 //
 //   - The default's EFFECT: insert a row naming every column except details, read details
-//     back, expect {}. §5 of the agreement rejects asserting the recorded text, because
+//     back, expect {}. Asserting the recorded text is deliberately out of scope, because
 //     MySQL can only carry this default as an expression and stamps it with the DDL
 //     connection's charset, so information_schema reports _utf8mb4'{}' where the other
 //     three report '{}'. An assertion on the text would encode a driver setting rather

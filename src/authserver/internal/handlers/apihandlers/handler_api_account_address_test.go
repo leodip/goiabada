@@ -24,7 +24,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// This handler is the agreement's representative site for the two defects stage 6 closes, so it is
+// This handler is #279's representative site for the two defects stage 6 closes, so it is
 // the one that gets a case for each. Before #279 decision 7, a database failure here answered
 // "Internal server error" and discarded err: no log line in the four lines above it and no request
 // id anywhere, which left an operator nothing to join a caller's report to. And the 200 was

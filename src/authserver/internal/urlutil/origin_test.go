@@ -6,12 +6,12 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// TestCanonicalOrigin_ProbeTable is the ten rows of the issue's own measurement,
-// probe/web_origin_normalization.out, run against the replacement rather than against the
-// validator that produced them. Six of the ten were accepted verbatim and could never match
-// the Origin header they were registered for; each of those six is here with the header the
-// probe recorded the browser sending, so the table asserts the defect is closed rather than
-// asserting whatever the new code happens to do (#250 W2).
+// TestCanonicalOrigin_ProbeTable is the ten rows #250 measured from real browsers' Origin
+// headers, run against the replacement rather than against the validator that produced them. Six
+// of the ten were accepted verbatim and could never match the Origin header they were registered
+// for; each of those six is here with the header measured from the browser that sent it, so the
+// table asserts the defect is closed rather than asserting whatever the new code happens to do
+// (#250 W2).
 func TestCanonicalOrigin_ProbeTable(t *testing.T) {
 	tests := []struct {
 		typed         string

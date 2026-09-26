@@ -16,8 +16,8 @@ import (
 // IP address (#281) -- but they are what a person reads when deciding which of their sessions
 // to end, so every row of both paths is pinned here rather than at a consumer.
 //
-// The rows are the ones docs/issue-281-replace-useragent/probe/labels.go executes, which is
-// where the derivation was settled before any of it was written into the tree.
+// The rows are the ones #281 worked out while settling the derivation, before any of it was
+// written into the tree.
 
 const (
 	chromeWindows = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +

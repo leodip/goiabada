@@ -17,10 +17,10 @@ import (
 // per-session snapshot (#242). It runs against an ISOLATED database of the configured dialect
 // (see migration_testdb_helper_test.go).
 //
-// §5 seam 4 of the agreement said this seed could not be covered by any tier, on the premise that
-// migrations run before any test row exists. That premise is false in this tree: migrations 000024
-// through 000030 each seed a pre-migration fixture through newIsolatedDB and then apply the
-// migration under test.
+// This seed was thought impossible for any tier to cover, on the premise that migrations run
+// before any test row exists. That premise is false in this tree: migrations 000024 through
+// 000030 each seed a pre-migration fixture through newIsolatedDB and then apply the migration
+// under test.
 //
 // The properties, in the order they appear below:
 //

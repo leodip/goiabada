@@ -21,7 +21,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// This file did not exist before #251 stage 3, and section 1 of the agreement recorded its absence:
+// This file did not exist before #251 stage 3, and #251 recorded its absence:
 // the rotate endpoint had no unit coverage at all, which is how five unsynchronised writes survived
 // since v0.7.
 //
@@ -31,7 +31,7 @@ import (
 // broken.
 //
 // Every case drives the REAL rotator over a mocked Database, because the handler constructs it and
-// the agreement kept the (authHelper, database, auditLogger) signature so routes.go stays untouched.
+// #251 kept the (authHelper, database, auditLogger) signature so routes.go stays untouched.
 // That costs one real 4096-bit key generation per case, about 300ms, since the rotator generates the
 // replacement before opening the transaction and so on every path including the refusals.
 
