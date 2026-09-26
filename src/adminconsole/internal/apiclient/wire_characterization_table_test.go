@@ -29,7 +29,8 @@ var (
 	charUpdateClient      = &api.UpdateClientSettingsRequest{ClientIdentifier: "a-client"}
 	charUpdateClientAuth  = &api.UpdateClientAuthenticationRequest{IsPublic: true}
 	charUpdateClientFlows = &api.UpdateClientOAuth2FlowsRequest{AuthorizationCodeEnabled: true}
-	charUpdateClientRedir = &api.UpdateClientRedirectURIsRequest{RedirectURIs: []string{"https://app.example.com/cb"}}
+	charUpdateClientRedir = &api.UpdateClientRedirectURIsRequest{RedirectURIs: []string{"https://app.example.com/cb"},
+		ExpectedRedirectURIs: []string{"https://old.example.com/cb"}}
 	charUpdateClientOrig  = &api.UpdateClientWebOriginsRequest{WebOrigins: []string{"https://app.example.com"}}
 	charUpdateClientToken = &api.UpdateClientTokensRequest{TokenExpirationInSeconds: 300}
 	charUpdateClientPerms = &api.UpdateClientPermissionsRequest{PermissionIds: []int64{8}}

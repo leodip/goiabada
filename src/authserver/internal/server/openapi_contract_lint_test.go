@@ -590,6 +590,14 @@ func statusesWrittenIn(t *testing.T, path string, fset *token.FileSet, fn *ast.F
 					out[409] = true
 					out[500] = true
 				}
+				// writeListSaveFailure answers a failed list save 409 CONCURRENT_UPDATE when the
+				// stored list changed after the caller loaded it or the engine refused a
+				// concurrent duplicate, and 500 otherwise, so the list saves that call it name
+				// neither constant for failures they can produce (#428).
+				if f.Name == "writeListSaveFailure" {
+					out[409] = true
+					out[500] = true
+				}
 			case *ast.SelectorExpr:
 				switch f.Sel.Name {
 				case "InternalServerError", "JsonError":

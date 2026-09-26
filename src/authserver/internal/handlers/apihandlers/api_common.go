@@ -74,6 +74,33 @@ func writeEmailTakenOrInternalServerError(w http.ResponseWriter, r *http.Request
 	writeInternalServerError(w, r, err)
 }
 
+// errListChanged is what a list save's transaction returns when the stored list is not the one the
+// caller says it loaded. writeListSaveFailure answers it 409 CONCURRENT_UPDATE, and nothing has
+// been written by then: the comparison runs on the rows read inside the transaction, before any
+// delete or insert (#428).
+var errListChanged = errors.New("the stored list differs from the list the caller loaded")
+
+// writeListSaveFailure answers a failed save of a whole list, one answer for every such save.
+//
+// 409 CONCURRENT_UPDATE for the two conflicts a caller resolves by reading the list again and
+// retrying, per RFC 9110 section 15.5.10: errListChanged, where the caller's list is outdated, and
+// data.ErrUniqueViolation, where the engine refused an insert because another save added the same
+// value at the same moment. List saves take no row lock, so two overlapping saves merge item by
+// item, and on a table with a unique key the second to add a value is refused and its whole save
+// rolled back. The same sentinel and status as the email race, writeEmailTakenOrInternalServerError.
+// Every other failure is the one 500, with the caller's attributes (#428).
+func writeListSaveFailure(w http.ResponseWriter, r *http.Request, err error, attrs ...any) {
+	if errors.Is(err, errListChanged) {
+		writeJSONError(w, "The list was changed by another save after it was loaded. Nothing was saved: reload it and make the change again.", "CONCURRENT_UPDATE", http.StatusConflict)
+		return
+	}
+	if errors.Is(err, data.ErrUniqueViolation) {
+		writeJSONError(w, "The list was changed by another save at the same moment. Nothing was saved: reload it and make the change again.", "CONCURRENT_UPDATE", http.StatusConflict)
+		return
+	}
+	writeInternalServerError(w, r, err, attrs...)
+}
+
 // writeValidationError emits a 400 Bad Request envelope from a validation
 // error. For *i18n.LocalizedError (the canonical UI/API path), error_code
 // is the catalog key and error_description is the message localized to

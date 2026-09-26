@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
+	"github.com/leodip/goiabada/authserver/internal/constants"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/urlutil"
@@ -678,5 +680,402 @@ func TestHandleAPIClientWebOriginsPut_AnOriginAtTheBoundIsStored(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
 	assert.Equal(t, origin, created)
+	database.AssertExpectations(t)
+}
+
+// =============================================================================
+// HandleAPIClientRedirectURIsPut
+// =============================================================================
+
+// redirectURIsBody is the save's JSON body. A nil expected list is sent as null, which the save
+// refuses; the absent-key case is written as a literal where it is tested.
+func redirectURIsBody(t *testing.T, wanted, expected []string) string {
+	t.Helper()
+	body, err := json.Marshal(api.UpdateClientRedirectURIsRequest{RedirectURIs: wanted, ExpectedRedirectURIs: expected})
+	require.NoError(t, err)
+	return string(body)
+}
+
+// redirectURIsPutRequest builds the PUT with its chi URL parameter, its body, and the settings the
+// flow gate reads from the context.
+func redirectURIsPutRequest(t *testing.T, id string, body string) *http.Request {
+	t.Helper()
+	r := httptest.NewRequest(http.MethodPut, "/api/v1/admin/clients/"+id+"/redirect-uris", strings.NewReader(body))
+	r = r.WithContext(context.WithValue(r.Context(), constants.ContextKeySettings, &models.Settings{}))
+	return setChiURLParam(r, "id", id)
+}
+
+// expectRedirectURIsClient registers the client read the save makes before it validates, for a
+// client whose authorization code flow is on, so the flow gate lets the request through.
+func expectRedirectURIsClient(database *mocks_data.Database) {
+	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).
+		Return(&models.Client{Id: 7, AuthorizationCodeEnabled: true}, nil).Once()
+}
+
+// expectStoredRedirectURIs registers the read of the stored list on the save's transaction,
+// answering the rows given.
+func expectStoredRedirectURIs(database *mocks_data.Database, rows ...models.RedirectURI) {
+	database.On("ClientLoadRedirectURIs", mock.Anything, clientUpdateTx, mock.Anything).
+		Run(func(args mock.Arguments) {
+			args.Get(2).(*models.Client).RedirectURIs = append([]models.RedirectURI(nil), rows...)
+		}).Return(nil).Once()
+}
+
+// uriOfBytes is an absolute https redirect URI of exactly n bytes whose path is made of unit, so a
+// multi-byte unit lands a URI on the same byte count in fewer characters.
+func uriOfBytes(t *testing.T, n int, unit string) string {
+	t.Helper()
+	const prefix = "https://example.com/"
+	body := n - len(prefix)
+	uri := prefix + strings.Repeat("x", body%len(unit)) + strings.Repeat(unit, body/len(unit))
+	require.Len(t, uri, n)
+	return uri
+}
+
+// The save is one transaction: the stored list is read on the transaction the writes use, compared
+// with the list the caller loaded, and replaced by exactly replaceSet's plan, deletes then inserts,
+// on that transaction. Autocommitted, as it was, a failure part way through left the earlier writes
+// committed under a 500 (#264). The stored list carries a URI twice, which dynamic registration
+// used to store: keeping it deletes the extra copy, where the save keyed by value left it alone and a
+// later removal of the URI deleted one copy and left the other live at sign-in (#428). The audit
+// event follows the commit.
+func TestHandleAPIClientRedirectURIsPut_SavesTheExactPlanInOneTransaction(t *testing.T) {
+	database := mocks_data.NewDatabase(t)
+	auditLogger := mocks_audit.NewAuditLogger(t)
+
+	expectRedirectURIsClient(database)
+	var order []string
+	note := func(edge string) { order = append(order, edge) }
+	stub := mocks_data.ExpectRunInTransaction(database, clientUpdateTx, note)
+	expectStoredRedirectURIs(database,
+		models.RedirectURI{Id: 11, ClientId: 7, URI: "https://old.example.com/cb"},
+		models.RedirectURI{Id: 12, ClientId: 7, URI: "https://keep.example.com/cb"},
+		models.RedirectURI{Id: 13, ClientId: 7, URI: "https://keep.example.com/cb"},
+	)
+	var deleted []int64
+	database.On("DeleteRedirectURI", mock.Anything, clientUpdateTx, mock.Anything).
+		Run(func(args mock.Arguments) {
+			deleted = append(deleted, args.Get(2).(int64))
+			order = append(order, "delete")
+		}).Return(nil).Twice()
+	var created []string
+	database.On("CreateRedirectURI", mock.Anything, clientUpdateTx, mock.Anything).
+		Run(func(args mock.Arguments) {
+			ru := args.Get(2).(*models.RedirectURI)
+			assert.Equal(t, int64(7), ru.ClientId)
+			created = append(created, ru.URI)
+			order = append(order, "insert")
+		}).Return(nil).Once()
+	stubClientResponseLoads(database)
+	auditLogger.On("Log", mock.Anything, audit.AuditUpdatedRedirectURIs, mock.Anything).
+		Run(func(mock.Arguments) { order = append(order, "audit") }).Return().Once()
+
+	rr := httptest.NewRecorder()
+	HandleAPIClientRedirectURIsPut(database, auditLogger).ServeHTTP(rr, redirectURIsPutRequest(t, "7",
+		redirectURIsBody(t,
+			[]string{"https://keep.example.com/cb", "  https://new.example.com/cb  "},
+			[]string{"https://old.example.com/cb", "https://keep.example.com/cb"})))
+
+	assert.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+	assert.NoError(t, stub.BodyErr)
+	assert.Equal(t, []int64{11, 13}, deleted, "every copy of a removed URI and every extra copy of a kept one")
+	assert.Equal(t, []string{"https://new.example.com/cb"}, created, "the new URI, trimmed, and nothing already stored")
+	assert.Equal(t, []string{"begin", "delete", "delete", "insert", "commit", "audit"}, order)
+	database.AssertExpectations(t)
+	auditLogger.AssertExpectations(t)
+}
+
+// A failed write hands its error to the helper, which is when the real one rolls back, so nothing
+// the save wrote before it commits; the answer is one 500 and nothing is audited, since an audit row
+// for a save that did not happen is a false record of an administrator's action (#264, #428).
+func TestHandleAPIClientRedirectURIsPut_AFailedWriteCommitsNothing(t *testing.T) {
+	database := mocks_data.NewDatabase(t)
+	auditLogger := mocks_audit.NewAuditLogger(t)
+
+	expectRedirectURIsClient(database)
+	stub := mocks_data.ExpectRunInTransaction(database, clientUpdateTx)
+	expectStoredRedirectURIs(database, models.RedirectURI{Id: 11, ClientId: 7, URI: "https://old.example.com/cb"})
+	database.On("DeleteRedirectURI", mock.Anything, clientUpdateTx, int64(11)).Return(nil).Once()
+	diskFull := errors.New("the disk is full")
+	database.On("CreateRedirectURI", mock.Anything, clientUpdateTx, mock.Anything).Return(diskFull).Once()
+
+	rr := httptest.NewRecorder()
+	HandleAPIClientRedirectURIsPut(database, auditLogger).ServeHTTP(rr, redirectURIsPutRequest(t, "7",
+		redirectURIsBody(t, []string{"https://new.example.com/cb"}, []string{"https://old.example.com/cb"})))
+
+	assert.Equal(t, http.StatusInternalServerError, rr.Code)
+	assert.Equal(t, 1, strings.Count(rr.Body.String(), "INTERNAL_SERVER_ERROR"), "exactly one error response")
+	assert.ErrorIs(t, stub.BodyErr, diskFull, "the body hands the driver's error to the helper, which rolls back")
+	database.AssertExpectations(t)
+	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
+}
+
+// The stored list failing to read inside the transaction is one 500 with no write and no audit, in
+// both of the shapes where ignoring the error would pass for something else: a loaded list naming a
+// stored row would then read as outdated and answer 409, and an empty loaded list with nothing wanted
+// would answer 200 over a read that never happened. Every list save carries this case (#428).
+func TestHandleAPIClientRedirectURIsPut_AFailedStoredReadIsOneFiveHundred(t *testing.T) {
+	tests := []struct {
+		name     string
+		wanted   []string
+		expected []string
+	}{
+		{name: "the loaded list names a stored row and nothing is wanted", wanted: []string{}, expected: []string{"https://a.example.com/cb"}},
+		{name: "the loaded list and the wanted list are both empty", wanted: []string{}, expected: []string{}},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			database := mocks_data.NewDatabase(t)
+			auditLogger := mocks_audit.NewAuditLogger(t)
+
+			expectRedirectURIsClient(database)
+			stub := mocks_data.ExpectRunInTransaction(database, clientUpdateTx)
+			readErr := errors.New("the read failed")
+			database.On("ClientLoadRedirectURIs", mock.Anything, clientUpdateTx, mock.Anything).Return(readErr).Once()
+
+			rr := httptest.NewRecorder()
+			HandleAPIClientRedirectURIsPut(database, auditLogger).ServeHTTP(rr, redirectURIsPutRequest(t, "7",
+				redirectURIsBody(t, test.wanted, test.expected)))
+
+			assert.Equal(t, http.StatusInternalServerError, rr.Code, rr.Body.String())
+			assert.Equal(t, 1, strings.Count(rr.Body.String(), "INTERNAL_SERVER_ERROR"), "exactly one error response")
+			assert.ErrorIs(t, stub.BodyErr, readErr)
+			database.AssertExpectations(t)
+			assertNotAttemptedOnClientDatabase(t, database, "CreateRedirectURI", "DeleteRedirectURI")
+			auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
+		})
+	}
+}
+
+// A body aborted as a deadlock victim and rerun by the helper answers once and audits once: each
+// attempt reads the stored list afresh and plans from it, and nothing is written to the response
+// from inside an attempt that might be thrown away (#301, #428).
+func TestHandleAPIClientRedirectURIsPut_ARerunAttemptAnswersOnce(t *testing.T) {
+	database := mocks_data.NewDatabase(t)
+	auditLogger := mocks_audit.NewAuditLogger(t)
+
+	expectRedirectURIsClient(database)
+	deadlock := errors.New("Error 1213: Deadlock found when trying to get lock")
+	attempts := 0
+	database.EXPECT().RunInTransaction(mock.Anything, mock.Anything).RunAndReturn(func(_ context.Context, fn func(tx *sql.Tx) error) error {
+		for {
+			attempts++
+			err := fn(clientUpdateTx)
+			if err == nil {
+				return nil
+			}
+			require.ErrorIs(t, err, deadlock,
+				"the body must hand the driver's error back in the chain, or the helper cannot tell a deadlock from a fault")
+			require.Less(t, attempts, 3, "the second attempt was scripted to succeed")
+		}
+	}).Once()
+	database.On("ClientLoadRedirectURIs", mock.Anything, clientUpdateTx, mock.Anything).Return(nil).Twice()
+	database.On("CreateRedirectURI", mock.Anything, clientUpdateTx, mock.Anything).Return(deadlock).Once()
+	database.On("CreateRedirectURI", mock.Anything, clientUpdateTx, mock.Anything).Return(nil).Once()
+	stubClientResponseLoads(database)
+	auditLogger.On("Log", mock.Anything, audit.AuditUpdatedRedirectURIs, mock.Anything).Return().Once()
+
+	rr := httptest.NewRecorder()
+	HandleAPIClientRedirectURIsPut(database, auditLogger).ServeHTTP(rr, redirectURIsPutRequest(t, "7",
+		redirectURIsBody(t, []string{"https://a.example.com/cb"}, []string{})))
+
+	assert.Equal(t, 2, attempts)
+	assert.Equal(t, http.StatusOK, rr.Code)
+	assert.NotContains(t, rr.Body.String(), "INTERNAL_SERVER_ERROR")
+	database.AssertExpectations(t)
+	auditLogger.AssertExpectations(t)
+}
+
+// A loaded list that differs from the stored rows read on the transaction is a save from an
+// outdated page: 409 CONCURRENT_UPDATE, nothing written and nothing audited, where applying the
+// whole list would silently undo the change the caller never saw (#428).
+func TestHandleAPIClientRedirectURIsPut_AnOutdatedLoadedListIsRefused(t *testing.T) {
+	database := mocks_data.NewDatabase(t)
+	auditLogger := mocks_audit.NewAuditLogger(t)
+
+	expectRedirectURIsClient(database)
+	stub := mocks_data.ExpectRunInTransaction(database, clientUpdateTx)
+	expectStoredRedirectURIs(database,
+		models.RedirectURI{Id: 11, ClientId: 7, URI: "https://a.example.com/cb"},
+		models.RedirectURI{Id: 12, ClientId: 7, URI: "https://added-meanwhile.example.com/cb"},
+	)
+
+	rr := httptest.NewRecorder()
+	HandleAPIClientRedirectURIsPut(database, auditLogger).ServeHTTP(rr, redirectURIsPutRequest(t, "7",
+		redirectURIsBody(t, []string{"https://a.example.com/cb", "https://b.example.com/cb"}, []string{"https://a.example.com/cb"})))
+
+	assert.Equal(t, http.StatusConflict, rr.Code)
+	code, _ := decodeErrorEnvelope(t, rr)
+	assert.Equal(t, "CONCURRENT_UPDATE", code)
+	assert.ErrorIs(t, stub.BodyErr, errListChanged, "the body refuses, so the helper rolls back")
+	database.AssertExpectations(t)
+	assertNotAttemptedOnClientDatabase(t, database, "CreateRedirectURI", "DeleteRedirectURI")
+	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
+}
+
+// A loaded list equal to the stored one as a set proceeds: in another order, with a repeat, with
+// surrounding spaces, and [] against an empty stored list, which is a page that loaded no URIs and
+// not a missing field (#428).
+func TestHandleAPIClientRedirectURIsPut_ALoadedListEqualAsASetProceeds(t *testing.T) {
+	tests := []struct {
+		name     string
+		stored   []models.RedirectURI
+		expected []string
+	}{
+		{
+			name: "another order, a repeat and surrounding spaces",
+			stored: []models.RedirectURI{
+				{Id: 11, ClientId: 7, URI: "https://a.example.com/cb"},
+				{Id: 12, ClientId: 7, URI: "https://b.example.com/cb"},
+			},
+			expected: []string{"https://b.example.com/cb", " https://a.example.com/cb ", "https://b.example.com/cb"},
+		},
+		{name: "an empty loaded list against an empty stored list", stored: nil, expected: []string{}},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			database := mocks_data.NewDatabase(t)
+			auditLogger := mocks_audit.NewAuditLogger(t)
+
+			expectRedirectURIsClient(database)
+			mocks_data.ExpectRunInTransaction(database, clientUpdateTx)
+			expectStoredRedirectURIs(database, test.stored...)
+			for _, row := range test.stored {
+				database.On("DeleteRedirectURI", mock.Anything, clientUpdateTx, row.Id).Return(nil).Once()
+			}
+			database.On("CreateRedirectURI", mock.Anything, clientUpdateTx, mock.Anything).Return(nil).Once()
+			stubClientResponseLoads(database)
+			auditLogger.On("Log", mock.Anything, audit.AuditUpdatedRedirectURIs, mock.Anything).Return().Once()
+
+			rr := httptest.NewRecorder()
+			HandleAPIClientRedirectURIsPut(database, auditLogger).ServeHTTP(rr, redirectURIsPutRequest(t, "7",
+				redirectURIsBody(t, []string{"https://c.example.com/cb"}, test.expected)))
+
+			assert.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+			database.AssertExpectations(t)
+		})
+	}
+}
+
+// Every refusal is decided before the transaction opens, so a refused save writes nothing: the
+// strict mock carries the client read and nothing else, and reaching RunInTransaction fails the
+// case. The bounds are the model's, the same at dynamic client registration (#428): at most 60
+// URIs, each at most 2048 bytes by Go len, which every engine's column holds, checked before the
+// parse. A stored value over a bound, one a client could hold from before the bound existed, is
+// refused like any other when the save carries it, which is #122's precedent for legacy rows.
+func TestHandleAPIClientRedirectURIsPut_ARefusedSaveNeverOpensTheTransaction(t *testing.T) {
+	sixtyOne := make([]string, 61)
+	for i := range sixtyOne {
+		sixtyOne[i] = fmt.Sprintf("https://app%d.example.com/cb", i)
+	}
+
+	tests := []struct {
+		name            string
+		body            string
+		wantDescription string
+	}{
+		{
+			name:            "the loaded list is absent",
+			body:            `{"redirectURIs":["https://a.example.com/cb"]}`,
+			wantDescription: "expectedRedirectURIs is required",
+		},
+		{
+			name:            "the loaded list is null",
+			body:            `{"redirectURIs":["https://a.example.com/cb"],"expectedRedirectURIs":null}`,
+			wantDescription: "expectedRedirectURIs is required",
+		},
+		{
+			name:            "61 redirect URIs",
+			body:            redirectURIsBody(t, sixtyOne, []string{}),
+			wantDescription: "at most 60 redirect URIs",
+		},
+		{
+			name:            "an ASCII URI of 2049 bytes",
+			body:            redirectURIsBody(t, []string{uriOfBytes(t, 2049, "a")}, []string{}),
+			wantDescription: "too long (2049 bytes, the maximum is 2048)",
+		},
+		{
+			name:            "a multi-byte URI of 2049 bytes",
+			body:            redirectURIsBody(t, []string{uriOfBytes(t, 2049, "é")}, []string{}),
+			wantDescription: "too long (2049 bytes, the maximum is 2048)",
+		},
+		{
+			name:            "a four-byte URI of 2049 bytes",
+			body:            redirectURIsBody(t, []string{uriOfBytes(t, 2049, "😀")}, []string{}),
+			wantDescription: "too long (2049 bytes, the maximum is 2048)",
+		},
+		{
+			// Length is checked before the parse, so an overlong value is never parsed.
+			name:            "an overlong URI that is also malformed",
+			body:            redirectURIsBody(t, []string{"not a url " + strings.Repeat("x", 2048)}, []string{}),
+			wantDescription: "too long",
+		},
+		{
+			name: "a stored URI over the bound, carried by the save",
+			body: redirectURIsBody(t,
+				[]string{uriOfBytes(t, 3000, "a"), "https://b.example.com/cb"},
+				[]string{uriOfBytes(t, 3000, "a")}),
+			wantDescription: "too long (3000 bytes, the maximum is 2048)",
+		},
+		{
+			name:            "a repeated URI",
+			body:            redirectURIsBody(t, []string{"https://a.example.com/cb", " https://a.example.com/cb"}, []string{}),
+			wantDescription: "Duplicate redirect URIs are not allowed",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			database := mocks_data.NewDatabase(t)
+			auditLogger := mocks_audit.NewAuditLogger(t)
+			expectRedirectURIsClient(database)
+
+			rr := httptest.NewRecorder()
+			HandleAPIClientRedirectURIsPut(database, auditLogger).ServeHTTP(rr, redirectURIsPutRequest(t, "7", test.body))
+
+			assert.Equal(t, http.StatusBadRequest, rr.Code)
+			code, description := decodeErrorEnvelope(t, rr)
+			assert.Equal(t, "VALIDATION_ERROR", code)
+			assert.Contains(t, description, test.wantDescription)
+			assert.Less(t, len(description), 400, "the refusal names an overlong value by its beginning, not whole")
+			database.AssertExpectations(t)
+			assertNotAttemptedOnClientDatabase(t, database, "RunInTransaction")
+		})
+	}
+}
+
+// The other side of every bound: 60 URIs of exactly 2048 bytes are stored, and a 2048-byte URI in
+// two-byte and in four-byte characters too, each reaching CreateRedirectURI on the save's
+// transaction. Literals rather than the model's constants, so a bound moved past its column is
+// caught (#428).
+func TestHandleAPIClientRedirectURIsPut_TheBoundsAreAdmitted(t *testing.T) {
+	sixty := make([]string, 60)
+	for i := range sixty {
+		sixty[i] = uriOfBytes(t, 2048, fmt.Sprintf("%02d", i%100))
+	}
+	sixty[0] = uriOfBytes(t, 2048, "é")
+	sixty[1] = uriOfBytes(t, 2048, "😀")
+	sixty[2] = uriOfBytes(t, 2048, "a")
+
+	database := mocks_data.NewDatabase(t)
+	auditLogger := mocks_audit.NewAuditLogger(t)
+	expectRedirectURIsClient(database)
+	mocks_data.ExpectRunInTransaction(database, clientUpdateTx)
+	expectStoredRedirectURIs(database)
+	var created []string
+	database.On("CreateRedirectURI", mock.Anything, clientUpdateTx, mock.Anything).
+		Run(func(args mock.Arguments) { created = append(created, args.Get(2).(*models.RedirectURI).URI) }).
+		Return(nil).Times(60)
+	stubClientResponseLoads(database)
+	auditLogger.On("Log", mock.Anything, audit.AuditUpdatedRedirectURIs, mock.Anything).Return().Once()
+
+	rr := httptest.NewRecorder()
+	HandleAPIClientRedirectURIsPut(database, auditLogger).ServeHTTP(rr, redirectURIsPutRequest(t, "7",
+		redirectURIsBody(t, sixty, []string{})))
+
+	assert.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+	assert.Equal(t, sixty, created)
 	database.AssertExpectations(t)
 }

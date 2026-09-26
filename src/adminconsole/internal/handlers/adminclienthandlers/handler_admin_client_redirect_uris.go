@@ -159,7 +159,8 @@ func HandleAdminClientRedirectURIsPost(
 
 		// Build API request and call auth server
 		req := &api.UpdateClientRedirectURIsRequest{
-			RedirectURIs: data.RedirectURIs,
+			RedirectURIs:         data.RedirectURIs,
+			ExpectedRedirectURIs: data.ExpectedRedirectURIs,
 		}
 		_, err = apiClient.UpdateClientRedirectURIs(r.Context(), jwtInfo.TokenResponse.AccessToken, data.ClientId, req)
 		if err != nil {

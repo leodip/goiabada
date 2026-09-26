@@ -811,8 +811,8 @@ func HandleAPIClientOAuth2FlowsPut(
 }
 
 // HandleAPIClientRedirectURIsPut - PUT /api/v1/admin/clients/{id}/redirect-uris
-// Replaces the full set of redirect URIs for the client. The server validates
-// inputs, enforces business rules, computes add/remove, and returns the updated client.
+// Replaces the full set of redirect URIs for the client, in one transaction, from a request
+// validated and bounded before anything is written, and returns the updated client.
 func HandleAPIClientRedirectURIsPut(
 	database clientsDatabase,
 	auditLogger AuditLogger,
@@ -864,6 +864,24 @@ func HandleAPIClientRedirectURIsPut(
 			return
 		}
 
+		// The list as the caller loaded it, required so that no save can silently undo another's
+		// change: absent or null decodes to nil and is refused, [] decodes to an empty non-nil
+		// slice and means the caller read an empty list (#428).
+		if req.ExpectedRedirectURIs == nil {
+			writeJSONError(w, "expectedRedirectURIs is required: send the redirect URIs as you last read them, or [] if there were none.", "VALIDATION_ERROR", http.StatusBadRequest)
+			return
+		}
+
+		// The bounds are the model's, the same at dynamic client registration: at most
+		// RedirectURIsMaxPerClient per client, each at most RedirectURIMaxBytes, which the columns
+		// hold on every engine. This PUT replaces the whole set, so a client already over either
+		// bound cannot be saved until the administrator trims it in the same save, which is #122's
+		// precedent for a legacy row below (#428).
+		if len(req.RedirectURIs) > models.RedirectURIsMaxPerClient {
+			writeJSONError(w, fmt.Sprintf("A client can have at most %d redirect URIs, and this list has %d.", models.RedirectURIsMaxPerClient, len(req.RedirectURIs)), "VALIDATION_ERROR", http.StatusBadRequest)
+			return
+		}
+
 		// Validate list and entries
 		seen := make(map[string]struct{})
 		normalized := make([]string, 0, len(req.RedirectURIs))
@@ -871,6 +889,12 @@ func HandleAPIClientRedirectURIsPut(
 			uri := strings.TrimSpace(raw)
 			if uri == "" {
 				writeJSONError(w, "Redirect URI cannot be empty", "VALIDATION_ERROR", http.StatusBadRequest)
+				return
+			}
+			// Before the parse, so an overlong value is never parsed. The message names the
+			// value by its beginning rather than echoing up to the whole body back.
+			if len(uri) > models.RedirectURIMaxBytes {
+				writeJSONError(w, fmt.Sprintf("Redirect URI is too long (%d bytes, the maximum is %d): %s...", len(uri), models.RedirectURIMaxBytes, strings.ToValidUTF8(uri[:80], "")), "VALIDATION_ERROR", http.StatusBadRequest)
 				return
 			}
 			if _, err := url.ParseRequestURI(uri); err != nil {
@@ -906,38 +930,55 @@ func HandleAPIClientRedirectURIsPut(
 			normalized = append(normalized, uri)
 		}
 
-		// Load existing redirect URIs
-		if err := database.ClientLoadRedirectURIs(r.Context(), nil, client); err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client redirect URIs before update"), "client_id", client.Id)
+		expected := make([]string, 0, len(req.ExpectedRedirectURIs))
+		for _, raw := range req.ExpectedRedirectURIs {
+			expected = append(expected, strings.TrimSpace(raw))
+		}
+		redirectURIKey := func(ru models.RedirectURI) string { return strings.TrimSpace(ru.URI) }
+		redirectURIId := func(ru models.RedirectURI) int64 { return ru.Id }
+
+		// One transaction, so a failure part way through commits nothing and the 500 is true: an
+		// administrator removing a compromised callback and adding its replacement ends with both
+		// changes or neither. Written autocommitted, as this was, a failed insert left the
+		// removals committed under the error (#264).
+		//
+		// No row lock: two overlapping saves of one list merge item by item, and a duplicate row
+		// the overlap leaves is removed with its original by the next save, since replaceSet
+		// deletes every copy of a key. Opened through RunInTransaction, so a deadlock victim is
+		// rerun whole (#301). The body is safe to rerun: it reads the stored rows on the
+		// transaction and plans from them on every attempt, and writes nothing to the response
+		// (#428).
+		err = database.RunInTransaction(r.Context(), func(tx *sql.Tx) error {
+			if loadErr := database.ClientLoadRedirectURIs(r.Context(), tx, client); loadErr != nil {
+				return errs.Wrap(loadErr, "database error loading client redirect URIs before update")
+			}
+			if !sameSet(client.RedirectURIs, redirectURIKey, expected) {
+				return errListChanged
+			}
+
+			insert, remove := replaceSet(client.RedirectURIs, redirectURIKey, redirectURIId, normalized)
+			for _, rid := range remove {
+				if deleteErr := database.DeleteRedirectURI(r.Context(), tx, rid); deleteErr != nil {
+					return errs.Wrapf(deleteErr, "database error deleting redirect URI %d", rid)
+				}
+			}
+			for _, uri := range insert {
+				if createErr := database.CreateRedirectURI(r.Context(), tx, &models.RedirectURI{ClientId: client.Id, URI: uri}); createErr != nil {
+					return errs.Wrap(createErr, "database error creating redirect URI")
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			writeListSaveFailure(w, r, err, "client_id", client.Id)
 			return
 		}
 
-		existingSet := make(map[string]int64)
-		for _, ru := range client.RedirectURIs {
-			existingSet[ru.URI] = ru.Id
-		}
-
-		desiredSet := seen
-
-		// Add new URIs
-		for _, uri := range normalized {
-			if _, ok := existingSet[uri]; !ok {
-				if err := database.CreateRedirectURI(r.Context(), nil, &models.RedirectURI{ClientId: client.Id, URI: uri}); err != nil {
-					writeInternalServerError(w, r, errs.Wrap(err, "database error creating redirect URI"), "client_id", client.Id, "uri", uri)
-					return
-				}
-			}
-		}
-
-		// Delete removed URIs
-		for uri, rid := range existingSet {
-			if _, ok := desiredSet[uri]; !ok {
-				if err := database.DeleteRedirectURI(r.Context(), nil, rid); err != nil {
-					writeInternalServerError(w, r, errs.Wrap(err, "database error deleting redirect URI"), "client_id", client.Id, "uri", uri)
-					return
-				}
-			}
-		}
+		// Audit, once the save has committed.
+		auditLogger.Log(r.Context(), audit.AuditUpdatedRedirectURIs, map[string]interface{}{
+			"clientId":     client.Id,
+			"loggedInUser": callerSubject(r),
+		})
 
 		// Reload related fields for response consistency
 		if err := database.ClientLoadRedirectURIs(r.Context(), nil, client); err != nil {
@@ -948,12 +989,6 @@ func HandleAPIClientRedirectURIsPut(
 			writeInternalServerError(w, r, errs.Wrap(err, "database error loading client web origins after redirect URIs update"), "client_id", client.Id)
 			return
 		}
-
-		// Audit
-		auditLogger.Log(r.Context(), audit.AuditUpdatedRedirectURIs, map[string]interface{}{
-			"clientId":     client.Id,
-			"loggedInUser": callerSubject(r),
-		})
 
 		resp := api.UpdateClientResponse{Client: *apimapping.ToClientResponse(client)}
 		writeJSON(w, r, http.StatusOK, resp)

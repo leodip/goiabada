@@ -29,10 +29,13 @@ type stubApiClient struct {
 	updateErr error
 	client    *api.ClientResponse
 	settings  *api.SettingsGeneralResponse
+	// sent is the request the handler handed the API, for the pass-through cases.
+	sent *api.UpdateClientRedirectURIsRequest
 }
 
 func (s *stubApiClient) UpdateClientRedirectURIs(_ context.Context, accessToken string, clientId int64,
 	request *api.UpdateClientRedirectURIsRequest) (*api.ClientResponse, error) {
+	s.sent = request
 	return nil, s.updateErr
 }
 
@@ -99,6 +102,15 @@ func TestHandleAdminClientRedirectURIsPost_APIErrorReachesTheBrowser(t *testing.
 			wantDescription: refusal,
 		},
 		{
+			// A save from an outdated page: the administrator is told to reload, not shown the
+			// generic error (#428).
+			name:            "a 409 is forwarded with its status and description",
+			apiErr:          &apiclient.APIError{Code: "CONCURRENT_UPDATE", Message: "The list was changed by another save after it was loaded.", StatusCode: http.StatusConflict},
+			wantStatus:      http.StatusConflict,
+			wantError:       "CONCURRENT_UPDATE",
+			wantDescription: "The list was changed by another save after it was loaded.",
+		},
+		{
 			name:            "a 500 from the API stays generic",
 			apiErr:          &apiclient.APIError{Code: "SERVER_ERROR", Message: "the database is on fire", StatusCode: http.StatusInternalServerError},
 			wantStatus:      http.StatusInternalServerError,
@@ -150,10 +162,75 @@ func TestHandleAdminClientRedirectURIsPost_APIErrorReachesTheBrowser(t *testing.
 			assert.Equal(t, tc.wantError, response["error"])
 			assert.Contains(t, response["error_description"], tc.wantDescription)
 
-			if tc.wantStatus != http.StatusBadRequest {
+			if tc.wantStatus != http.StatusBadRequest && tc.wantStatus != http.StatusConflict {
 				// The generic branch must not leak the API's message either: that is
 				// what sends it to the log rather than the screen.
 				assert.NotContains(t, response["error_description"], tc.apiErr.Error())
+			}
+		})
+	}
+}
+
+// The page posts the list as it loaded it beside the list it wants, and the handler hands both to
+// the API unchanged: the auth server compares the loaded list with what is stored and refuses a
+// save from an outdated page (#428). The empty and absent rows pin the distinction the API reads:
+// [] is a page that loaded an empty list and must reach the wire as [], and a body without the
+// field must reach it as null, which the API refuses, rather than be defaulted to a list that
+// would pass the check.
+func TestHandleAdminClientRedirectURIsPost_SendsTheLoadedList(t *testing.T) {
+
+	testCases := []struct {
+		name         string
+		body         string
+		wantWanted   []string
+		wantExpected []string
+	}{
+		{
+			name:         "the loaded list passes through beside the wanted one",
+			body:         `{"clientId":1,"redirectURIs":["https://a.example/cb","https://c.example/cb"],"expectedRedirectURIs":["https://a.example/cb","https://b.example/cb"]}`,
+			wantWanted:   []string{"https://a.example/cb", "https://c.example/cb"},
+			wantExpected: []string{"https://a.example/cb", "https://b.example/cb"},
+		},
+		{
+			name:         "an empty loaded list stays an empty list",
+			body:         `{"clientId":1,"redirectURIs":["https://a.example/cb"],"expectedRedirectURIs":[]}`,
+			wantWanted:   []string{"https://a.example/cb"},
+			wantExpected: []string{},
+		},
+		{
+			name:         "an absent loaded list stays absent",
+			body:         `{"clientId":1,"redirectURIs":["https://a.example/cb"]}`,
+			wantWanted:   []string{"https://a.example/cb"},
+			wantExpected: nil,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			httpHelper := handlerhelpers.NewHttpHelper(nil, adminmiddleware.SettingsReader{})
+			req := handlertest.Request(http.MethodPost, "/admin/clients/1/redirect-uris",
+				handlertest.WithAccessToken(),
+				handlertest.WithBody(bytes.NewBufferString(tc.body)),
+			)
+			rec := httptest.NewRecorder()
+
+			// The API refuses, so the handler returns before the nil session is touched; the
+			// request it sent is what is under test.
+			stub := &stubApiClient{updateErr: &apiclient.APIError{Code: "VALIDATION_ERROR", Message: "refused", StatusCode: http.StatusBadRequest}}
+			HandleAdminClientRedirectURIsPost(httpHelper, nil, stub).ServeHTTP(rec, req)
+
+			if !assert.NotNil(t, stub.sent) {
+				return
+			}
+			assert.Equal(t, tc.wantWanted, stub.sent.RedirectURIs)
+			assert.Equal(t, tc.wantExpected, stub.sent.ExpectedRedirectURIs)
+
+			wire, err := json.Marshal(stub.sent)
+			assert.NoError(t, err)
+			if tc.wantExpected == nil {
+				assert.Contains(t, string(wire), `"expectedRedirectURIs":null`)
+			} else if len(tc.wantExpected) == 0 {
+				assert.Contains(t, string(wire), `"expectedRedirectURIs":[]`)
 			}
 		})
 	}

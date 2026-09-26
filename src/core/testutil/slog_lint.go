@@ -193,9 +193,10 @@ var slogWatchedImports = watchedImports{
 // slogSpreadSites is rule 3's table. Every production function that spreads a run into a record
 // is here with its reason, and rule 3 refuses any other.
 //
-// The four forwarders take the caller's key/value run as a variadic ...any and put it in one
+// The five forwarders take the caller's key/value run as a variadic ...any and put it in one
 // record: the API's 500 writer, which 328 sites reach, its logging half, the apihandlers wrapper
-// over it, and the one answer for a refused id_token_hint. Their callers' keys are read by
+// over it, the list-save failure writer that hands its run to that wrapper (#428), and the one
+// answer for a refused id_token_hint. Their callers' keys are read by
 // sloglint at the call sites, which is what registering them under custom-funcs buys and what
 // rule 4 holds.
 //
@@ -212,6 +213,8 @@ var slogSpreadSites = []slogSpreadSite{
 		forwarder: apiresponseImportPath + ".LogInternalServerError"},
 	{scope: "authserver/internal/handlers/apihandlers", name: "writeInternalServerError",
 		forwarder: apihandlersImportPath + ".writeInternalServerError"},
+	{scope: "authserver/internal/handlers/apihandlers", name: "writeListSaveFailure",
+		forwarder: apihandlersImportPath + ".writeListSaveFailure"},
 	{scope: "authserver/internal/handlers", name: "rejectIdTokenHint",
 		forwarder: handlersImportPath + ".rejectIdTokenHint"},
 	{scope: "authserver/internal/middleware", name: "reportTrip"},
