@@ -387,7 +387,7 @@ func TestToken_AuthCode_CodeReuse_AccessTokenNoLongerWorks(t *testing.T) {
 // the handler to pass the raw scope, where this test fails with server_error. No token was reissued
 // carrying unmatchable scopes; the issuer rejected first.
 //
-// Deliberately thin, because normalizeScope's exhaustive table lives in the handlers package; this
+// Deliberately thin, because the whitespace rule's exhaustive table is oidc.NormalizeScope's; this
 // asserts only that refresh benefits from the shared helper.
 func TestToken_Refresh_TabSeparatedDownScopeIsNormalized(t *testing.T) {
 	clientSecret := fake.LetterN(32)

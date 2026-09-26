@@ -44,6 +44,51 @@ func HasOfflineAccessScope(scope string) bool {
 	return slices.ContainsFunc(strings.Split(scope, " "), IsOfflineAccessScope)
 }
 
+// isScopeSeparator is RE2's \s: space, tab, newline, form feed, carriage return. It is the set the
+// `\s+` regexes SplitScope replaced matched, kept so that no scope value accepted before #116's
+// consolidation changes meaning. It is deliberately not unicode.IsSpace, which strings.Fields
+// uses: that would also split on vertical tab, U+0085 and U+00A0, a widening away from the
+// space-only delimiter #244 part 4 proposes for every space-delimited parameter. When #244 part 4
+// lands, this is the one place the scope delimiter changes.
+func isScopeSeparator(r rune) bool {
+	return r == ' ' || r == '\t' || r == '\n' || r == '\f' || r == '\r'
+}
+
+// SplitScope splits a scope string, space-delimited per RFC 6749 section 3.3, into its values: on
+// runs of isScopeSeparator, each value trimmed with strings.TrimSpace, empty values dropped.
+// Duplicates are kept; NormalizeScope drops them. Every site that reads a scope's values goes
+// through here or through NormalizeScope, where each used to carry its own copy of the rule and
+// three of them disagreed on the edges (#116).
+func SplitScope(scope string) []string {
+	values := []string{}
+	for _, value := range strings.FieldsFunc(scope, isScopeSeparator) {
+		if value = strings.TrimSpace(value); value != "" {
+			values = append(values, value)
+		}
+	}
+	return values
+}
+
+// NormalizeScope is SplitScope with duplicates dropped, keeping each value's first occurrence,
+// joined with one space. It is what the token endpoint applies to its `scope` parameter before the
+// validator sees it and what AuthContext.SetScope stores, so the value validated is the value the
+// issuer later splits on spaces alone. Before 74d96cc4 the token endpoint validated a
+// whitespace-collapsed copy and carried the raw value onward, and a tab-separated scope passed
+// validation and then answered 500 from the issuer.
+//
+// A value holding nothing but whitespace normalizes to "", the same as an absent one. The token
+// endpoint tells the two apart by also reading the raw value, and must: an empty client
+// credentials scope grants everything the client holds.
+func NormalizeScope(scope string) string {
+	unique := []string{}
+	for _, value := range SplitScope(scope) {
+		if !slices.Contains(unique, value) {
+			unique = append(unique, value)
+		}
+	}
+	return strings.Join(unique, " ")
+}
+
 // SupportedScopes is the scopes_supported the discovery document publishes: the claim scopes and
 // offline_access. It returns a fresh slice, so a caller appending to it cannot reach the roster.
 func SupportedScopes() []string {
