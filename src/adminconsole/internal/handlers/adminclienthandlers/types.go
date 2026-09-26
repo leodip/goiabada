@@ -10,7 +10,10 @@ type PermissionsPostInput struct {
 type RedirectURIsPostInput struct {
 	ClientId     int64    `json:"clientId"`
 	RedirectURIs []string `json:"redirectURIs"`
-	Ids          []int64  `json:"ids"`
+	// ExpectedRedirectURIs is the list as the page loaded it, passed through unchanged so the auth
+	// server can refuse a save from an outdated page (#428).
+	ExpectedRedirectURIs []string `json:"expectedRedirectURIs"`
+	Ids                  []int64  `json:"ids"`
 }
 
 type WebOriginsPostInput struct {

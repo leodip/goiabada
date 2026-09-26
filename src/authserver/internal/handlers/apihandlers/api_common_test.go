@@ -6,9 +6,11 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
+	"github.com/leodip/goiabada/core/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -147,6 +149,66 @@ func TestWriteJSONError_GenericConditionEnvelopes(t *testing.T) {
 			assert.NotEqual(t, test.retired, code, "the retired spelling must not come back")
 			assert.Equal(t, test.description, description,
 				"flattening the code must not flatten the sentence a person reads")
+		})
+	}
+}
+
+// writeListSaveFailure is the one answer every list save gives a failed transaction. The two
+// conflicts a caller resolves by reading the list again, an outdated loaded list and a concurrent
+// duplicate the engine refused on a unique key, are 409 CONCURRENT_UPDATE and log nothing, since
+// nobody has to act on them; anything else is the one 500 with the caller's attributes on its record.
+// Each conflict is matched through a wrap, which is how it arrives: the transaction body wraps what
+// the data layer returns, and the helper hands the body's error back (#428).
+func TestWriteListSaveFailure(t *testing.T) {
+	tests := []struct {
+		name            string
+		err             error
+		wantStatus      int
+		wantCode        string
+		wantDescription string
+	}{
+		{
+			name:            "an outdated loaded list is 409 CONCURRENT_UPDATE",
+			err:             errs.Wrap(errListChanged, "inside the transaction"),
+			wantStatus:      http.StatusConflict,
+			wantCode:        "CONCURRENT_UPDATE",
+			wantDescription: "changed by another save after it was loaded",
+		},
+		{
+			name:            "a unique-key refusal is 409 CONCURRENT_UPDATE",
+			err:             errs.Wrap(data.ErrUniqueViolation, "database error creating web origin"),
+			wantStatus:      http.StatusConflict,
+			wantCode:        "CONCURRENT_UPDATE",
+			wantDescription: "changed by another save at the same moment",
+		},
+		{
+			name:            "anything else is the one 500",
+			err:             errs.New("the disk is full"),
+			wantStatus:      http.StatusInternalServerError,
+			wantCode:        "INTERNAL_SERVER_ERROR",
+			wantDescription: "Request Id",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			capture := testutil.CaptureSlog(t)
+			rr := httptest.NewRecorder()
+			r := httptest.NewRequest(http.MethodPut, "/api/v1/admin/clients/7/redirect-uris", nil)
+
+			writeListSaveFailure(rr, r, test.err, "client_id", int64(7))
+
+			assert.Equal(t, test.wantStatus, rr.Code)
+			code, description := decodeErrorEnvelope(t, rr)
+			assert.Equal(t, test.wantCode, code)
+			assert.Contains(t, description, test.wantDescription)
+
+			if test.wantStatus == http.StatusInternalServerError {
+				attrs := oneErrorRecord(t, capture)
+				assert.EqualValues(t, 7, attrs["client_id"], "the caller's attributes reach the record")
+			} else {
+				assert.Empty(t, capture.Records(), "a conflict the caller resolves is not logged")
+			}
 		})
 	}
 }

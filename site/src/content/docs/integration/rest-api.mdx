@@ -183,6 +183,8 @@ Common `error_code` categories:
 - `TOO_MANY_REQUESTS` - Rate limit reached; the response carries a `Retry-After` header
 - `INTERNAL_SERVER_ERROR` - Server-side error
 
+A save that replaces a whole list also sends the list as last read, in its `expected` field. If the stored list differs, the save answers `409` with error code `CONCURRENT_UPDATE` and changes nothing: read it again and retry.
+
 <Aside type="caution">
 This flat shape replaced the older nested `{ "error": { "code", "message" } }` envelope. Protocol endpoints (`/auth/token`, `/auth/authorize`, `/connect/register`, `/userinfo`) keep their RFC-defined error format and are unaffected.
 </Aside>
@@ -944,7 +946,8 @@ PUT /api/v1/admin/clients/{id}/redirect-uris
   "redirectURIs": [
     "https://myapp.com/callback",
     "https://myapp.com/silent-refresh"
-  ]
+  ],
+  "expectedRedirectURIs": ["https://myapp.com/callback"]
 }
 ```
 

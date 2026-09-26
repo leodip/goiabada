@@ -301,6 +301,40 @@ func TestRender_AdminClientRedirectURIs(t *testing.T) {
 	assert.Contains(t, blocked, "URIs de redirecionamento são usadas pelo fluxo authorization code com PKCE e pelo fluxo implicit.")
 }
 
+// The redirect URIs page keeps the list as it loaded it and sends that copy with every save, so the
+// auth server can refuse a save from a page another administrator's save has outdated rather than
+// undo their change (#428). The copy has to be taken after the loaded values are pushed and never
+// edited, or the page would send its edited list as the loaded one and every save would pass.
+func TestRender_AdminClientRedirectURIs_SendsTheLoadedList(t *testing.T) {
+
+	out := render(t, "/admin_clients_redirect_uris.html", map[string]interface{}{
+		"client": struct {
+			ClientId              int64
+			ClientIdentifier      string
+			CanManageRedirectURIs bool
+			RedirectURIs          map[int64]string
+			IsSystemLevelClient   bool
+		}{
+			ClientId:              7,
+			ClientIdentifier:      "an-app",
+			CanManageRedirectURIs: true,
+			RedirectURIs:          map[int64]string{1: "https://example.com/a", 2: "https://example.com/b"},
+		},
+		"savedSuccessfully": false,
+	})
+
+	const copyTaken = "const loadedRedirectURIs = redirectURIs.slice();"
+	lastPush := strings.LastIndex(out, `redirectURIs.push("https:\/\/example.com\/b");`)
+	require.NotEqual(t, -1, lastPush, "the loaded values are pushed into the editable list")
+	copyAt := strings.Index(out, copyTaken)
+	require.NotEqual(t, -1, copyAt, "the page keeps a copy of the loaded list")
+	assert.Greater(t, copyAt, lastPush, "the copy is taken after every loaded value is in the list")
+
+	assert.Contains(t, out, `"expectedRedirectURIs": loadedRedirectURIs,`)
+	assert.NotRegexp(t, `loadedRedirectURIs\.(push|splice|pop|shift|unshift)\(`, out)
+	assert.NotRegexp(t, `loadedRedirectURIs\s*=[^=]`, strings.Replace(out, copyTaken, "", 1))
+}
+
 // The Web Origins page has no gate left and shows two lists: this client's editable rows, and the
 // effective server-wide list every client's origins land in. This case proves the template can
 // display what it is handed; that the handler assembles the server-wide list at all is proved in

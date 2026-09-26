@@ -117,6 +117,9 @@ linters:
         - name: github.com/leodip/goiabada/authserver/internal/handlers/apihandlers.writeInternalServerError
           msg-pos: -1
           args-pos: 3
+        - name: github.com/leodip/goiabada/authserver/internal/handlers/apihandlers.writeListSaveFailure
+          msg-pos: -1
+          args-pos: 3
         - name: github.com/leodip/goiabada/authserver/internal/handlers.rejectIdTokenHint
           msg-pos: -1
           args-pos: 2

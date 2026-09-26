@@ -1950,6 +1950,14 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          description: |
+            The stored list differs from expectedRedirectURIs: another save changed it after it
+            was read. error_code is CONCURRENT_UPDATE; nothing was saved. Read it again and retry.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '500':
           $ref: '#/components/responses/InternalServerError'
 
@@ -5142,9 +5150,21 @@ components:
 
     UpdateClientRedirectURIsRequest:
       type: object
+      required: [expectedRedirectURIs]
       properties:
         redirectURIs:
           type: array
+          maxItems: 60
+          description: >-
+            The complete set of redirect URIs the client has after the call. More than 60, one
+            longer than 2048 bytes, or one listed twice is refused with VALIDATION_ERROR before
+            anything is written.
+          items:
+            type: string
+            maxLength: 2048
+        expectedRedirectURIs:
+          type: array
+          description: The redirect URIs as last read; [] if there were none.
           items:
             type: string
 

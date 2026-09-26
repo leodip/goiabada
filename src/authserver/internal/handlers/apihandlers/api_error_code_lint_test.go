@@ -85,6 +85,7 @@ var apiErrorCodes = map[string]string{
 	"VALUE_TOO_LONG":       "400: an attribute value exceeds the column.",
 	"FILE_TOO_LARGE":       "400 on an upload: the caller re-encodes smaller.",
 	"NO_FILE":              "400 on an upload: the multipart part is missing.",
+	"CONCURRENT_UPDATE":    "409 on a list save: the stored list changed after it was loaded, or another save added the same value at the same moment, so the caller reads the list again and retries.",
 
 	// Authentication and authorization. A caller distinguishes "send a token", "the token is
 	// malformed", "the token is not good enough" and "the session is gone", and retries differently

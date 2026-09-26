@@ -313,8 +313,14 @@ type UpdateClientOAuth2FlowsRequest struct {
 // UpdateClientRedirectURIsRequest is used to replace the full set of
 // redirect URIs for a client. The auth server validates and applies
 // add/remove operations accordingly.
+//
+// ExpectedRedirectURIs is the list as the caller last read it, and is required: absent or null
+// is refused, [] means the caller read an empty list. The save answers 409 CONCURRENT_UPDATE when
+// the stored list differs from it, so a save from an outdated page cannot undo another's change.
+// No omitempty, so an empty list still puts the key on the wire (#428).
 type UpdateClientRedirectURIsRequest struct {
-	RedirectURIs []string `json:"redirectURIs"`
+	RedirectURIs         []string `json:"redirectURIs"`
+	ExpectedRedirectURIs []string `json:"expectedRedirectURIs"`
 }
 
 // UpdateClientWebOriginsRequest is used to replace the full set of
