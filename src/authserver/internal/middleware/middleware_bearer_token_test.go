@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -8,8 +9,10 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/core/oauth"
+	"github.com/leodip/goiabada/core/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	mock_middleware "github.com/leodip/goiabada/authserver/internal/middleware/mocks"
 )
@@ -22,6 +25,8 @@ func TestJwtAuthorizationHeaderToContext_ValidBearerToken(t *testing.T) {
 		TokenBase64: "validtoken",
 		Claims: map[string]interface{}{
 			"sub": "user",
+			"typ": "Bearer",
+			"aud": "authserver",
 		},
 	}
 	mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "validtoken", true).
@@ -114,6 +119,8 @@ func TestJwtAuthorizationHeaderToContext_ValidPostBodyToken(t *testing.T) {
 		TokenBase64: "validposttoken",
 		Claims: map[string]interface{}{
 			"sub": "user",
+			"typ": "Bearer",
+			"aud": "authserver",
 		},
 	}
 	mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "validposttoken", true).
@@ -169,6 +176,8 @@ func TestJwtAuthorizationHeaderToContext_HeaderTakesPrecedenceOverPostBody(t *te
 		TokenBase64: "headertoken",
 		Claims: map[string]interface{}{
 			"sub": "headeruser",
+			"typ": "Bearer",
+			"aud": "authserver",
 		},
 	}
 	// Only the header token should be validated, not the body token
@@ -324,6 +333,8 @@ func TestJwtAuthorizationHeaderToContext_PostBodyContentTypeWithCharset(t *testi
 		TokenBase64: "charsettoken",
 		Claims: map[string]interface{}{
 			"sub": "user",
+			"typ": "Bearer",
+			"aud": "authserver",
 		},
 	}
 	mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "charsettoken", true).
@@ -354,6 +365,8 @@ func TestJwtAuthorizationHeaderToContext_PostBodyWithOtherParameters(t *testing.
 		TokenBase64: "tokenwithotherparams",
 		Claims: map[string]interface{}{
 			"sub": "user",
+			"typ": "Bearer",
+			"aud": "authserver",
 		},
 	}
 	mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "tokenwithotherparams", true).
@@ -384,6 +397,8 @@ func TestJwtAuthorizationHeaderToContext_EmptyBearerTokenInHeader(t *testing.T) 
 		TokenBase64: "fallbacktoken",
 		Claims: map[string]interface{}{
 			"sub": "user",
+			"typ": "Bearer",
+			"aud": "authserver",
 		},
 	}
 	mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "fallbacktoken", true).
@@ -429,4 +444,118 @@ func TestJwtAuthorizationHeaderToContext_PutRequestIgnoresPostBody(t *testing.T)
 	// Token parser should NOT be called for PUT request
 	mockTokenParser.AssertNotCalled(t, "DecodeAndValidateTokenString",
 		mock.Anything, mock.Anything, mock.Anything)
+}
+
+// TestJwtAuthorizationHeaderToContext_TokenKindAndAudience is the bearer table of #401: a validly
+// signed token reaches the context only when it is an access token (typ Bearer) whose aud names
+// authserver. Every refused row still calls the next handler, with nothing in the context, which is
+// how the route comes to answer as it does for a token that does not parse.
+//
+// The aud rows use the shapes the real parser hands over. It decodes into jwt.MapClaims, so the
+// []string issuance writes for two audiences arrives as []interface{}; []string is kept as a row
+// because it is the in-process shape.
+func TestJwtAuthorizationHeaderToContext_TokenKindAndAudience(t *testing.T) {
+	tests := []struct {
+		name      string
+		typ       interface{} // nil leaves the claim out
+		aud       interface{} // nil leaves the claim out
+		admitted  bool
+		wantInLog string
+	}{
+		{name: "access token, aud a string", typ: "Bearer", aud: "authserver", admitted: true},
+		{name: "access token, aud a parsed array", typ: "Bearer", aud: []interface{}{"authserver", "resource1"}, admitted: true},
+		{name: "access token, aud an in-process array", typ: "Bearer", aud: []string{"resource1", "authserver"}, admitted: true},
+
+		{name: "session refresh token", typ: "Refresh", aud: "authserver", wantInLog: "not an access token"},
+		{name: "offline refresh token", typ: "Offline", aud: "authserver", wantInLog: "not an access token"},
+		{name: "ID token, no typ", typ: nil, aud: "authserver", wantInLog: "not an access token"},
+		{name: "typ ID", typ: "ID", aud: "authserver", wantInLog: "not an access token"},
+		{name: "typ lowercase bearer", typ: "bearer", aud: "authserver", wantInLog: "not an access token"},
+		{name: "typ a number", typ: 1, aud: "authserver", wantInLog: "not an access token"},
+
+		{name: "aud absent", typ: "Bearer", aud: nil, wantInLog: "does not name this server's resource"},
+		{name: "aud another resource", typ: "Bearer", aud: "resource1", wantInLog: "does not name this server's resource"},
+		{name: "aud the issuer URL", typ: "Bearer", aud: "https://auth.example.com", wantInLog: "does not name this server's resource"},
+		{name: "aud an array without authserver", typ: "Bearer", aud: []interface{}{"resource1", "resource2"}, wantInLog: "does not name this server's resource"},
+		{name: "aud an empty array", typ: "Bearer", aud: []interface{}{}, wantInLog: "does not name this server's resource"},
+		{name: "aud an array with a non-string beside authserver", typ: "Bearer", aud: []interface{}{"authserver", 7}, wantInLog: "aud is malformed"},
+		// jwt/v5 reads an aud of any other type as no audience at all rather than an error.
+		{name: "aud a number", typ: "Bearer", aud: 7, wantInLog: "does not name this server's resource"},
+		{name: "aud a prefix of authserver", typ: "Bearer", aud: "authserve", wantInLog: "does not name this server's resource"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			logs := testutil.CaptureSlog(t)
+			mockTokenParser := new(mock_middleware.TokenParser)
+			middleware := NewMiddlewareBearerToken(mockTokenParser)
+
+			claims := map[string]interface{}{"sub": "user"}
+			if tc.typ != nil {
+				claims["typ"] = tc.typ
+			}
+			if tc.aud != nil {
+				claims["aud"] = tc.aud
+			}
+			mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "the-signed-token", true).
+				Return(&oauth.JwtToken{TokenBase64: "the-signed-token", Claims: claims}, nil)
+
+			req := httptest.NewRequest("GET", "/", nil)
+			req.Header.Set("Authorization", "Bearer the-signed-token")
+
+			nextCalled := false
+			var tokenInContext interface{}
+			nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				nextCalled = true
+				tokenInContext = r.Context().Value(constants.ContextKeyBearerToken)
+			})
+
+			middleware.JwtAuthorizationHeaderToContext()(nextHandler).ServeHTTP(httptest.NewRecorder(), req)
+
+			assert.True(t, nextCalled, "the next handler runs either way; the route decides the answer")
+			mockTokenParser.AssertExpectations(t)
+
+			if tc.admitted {
+				require.NotNil(t, tokenInContext)
+				assert.Equal(t, "the-signed-token", tokenInContext.(oauth.JwtToken).TokenBase64)
+				assert.Empty(t, logs.Records(), "an admitted token writes no record")
+				return
+			}
+
+			assert.Nil(t, tokenInContext, "a refused token must not reach the context")
+			records := logs.Records()
+			require.Len(t, records, 1, "one record per refusal")
+			assert.Equal(t, slog.LevelWarn, records[0].Level)
+			assert.Contains(t, records[0].Message, tc.wantInLog)
+			assert.NotContains(t, logs.Text(), "the-signed-token", "the record carries no token material")
+		})
+	}
+}
+
+// The form-body read of OIDC Core 1.0 section 5.3.1 reaches the same check: a refresh token sent
+// as access_token is refused like one sent in the header.
+func TestJwtAuthorizationHeaderToContext_PostBodyRefreshTokenRefused(t *testing.T) {
+	mockTokenParser := new(mock_middleware.TokenParser)
+	middleware := NewMiddlewareBearerToken(mockTokenParser)
+
+	mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "refreshtoken", true).
+		Return(&oauth.JwtToken{TokenBase64: "refreshtoken", Claims: map[string]interface{}{
+			"sub": "user",
+			"typ": "Refresh",
+			"aud": "https://auth.example.com",
+		}}, nil)
+
+	req := httptest.NewRequest("POST", "/userinfo", strings.NewReader("access_token=refreshtoken"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	nextCalled := false
+	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		nextCalled = true
+		assert.Nil(t, r.Context().Value(constants.ContextKeyBearerToken))
+	})
+
+	middleware.JwtAuthorizationHeaderToContext()(nextHandler).ServeHTTP(httptest.NewRecorder(), req)
+
+	assert.True(t, nextCalled)
+	mockTokenParser.AssertExpectations(t)
 }

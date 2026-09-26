@@ -45,7 +45,11 @@ func validateIdTokenHint(ctx context.Context, idTokenHint string, tokenParser To
 
 	// Parse JWT: verify signature, skip expiration (spec: SHOULD accept expired)
 	jwtToken, err := tokenParser.DecodeAndValidateTokenString(ctx, idTokenHint, false)
-	if err != nil {
+	// OIDC Core 1.0 section 3.1.2.1 defines the hint as an ID Token, and the signature does not
+	// say which kind of token this is: access and refresh tokens are signed with the same key and
+	// carry iss and sub too. The typ denylist is the one logout applies; a refused kind is
+	// answered as a hint that does not parse, so the answer says nothing about which it was (#401).
+	if err != nil || nonIdTokenTypValues[jwtToken.GetStringClaim("typ")] {
 		return "", customerrors.NewErrorDetailWithHttpStatusCode(
 			"invalid_request",
 			"The id_token_hint is invalid.",
