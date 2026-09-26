@@ -20,9 +20,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Seam 6 for the two saves that replace a set of permission grants and audit each grant and
-// revocation: PUT /users/{id}/permissions and PUT /groups/{id}/permissions. They are the same
-// three steps over two tables, so each case below runs once per save (#406, #428).
+// Seam 6 for the three saves that replace a set of permission grants: PUT /users/{id}/permissions,
+// PUT /groups/{id}/permissions and PUT /clients/{id}/permissions. They are the same three steps
+// over three tables, so each case below runs once per save. The user and group saves audit each
+// grant and revocation; the client save audits one consolidated event, which is the one way the
+// three differ to these cases (#406, #428).
 
 // grantsTx is the transaction the stub hands the save's body. Not nil: a write expected on it
 // cannot be matched by one made outside the transaction.
@@ -34,7 +36,7 @@ type grantRow struct {
 	permissionId int64
 }
 
-// grantSave describes one of the two saves to the shared cases.
+// grantSave describes one of the three saves to the shared cases.
 type grantSave struct {
 	name         string
 	path         string
@@ -48,9 +50,12 @@ type grantSave struct {
 	created      func(arg any) (ownerId int64, permissionId int64)
 	addedEvent   string
 	deletedEvent string
-	ownerKey     string
-	handler      func(database *mocks_data.Database, auditLogger *mocks_audit.AuditLogger) http.HandlerFunc
-	body         func(t *testing.T, wanted, expected []int64) string
+	// consolidatedEvent, when set, is the one event the save emits for the whole save in place of
+	// addedEvent and deletedEvent.
+	consolidatedEvent string
+	ownerKey          string
+	handler           func(database *mocks_data.Database, auditLogger *mocks_audit.AuditLogger) http.HandlerFunc
+	body              func(t *testing.T, wanted, expected []int64) string
 }
 
 const grantOwnerId = int64(5)
@@ -120,6 +125,39 @@ var grantSaves = []grantSave{
 			return string(body)
 		},
 	},
+	{
+		name:      "client permissions",
+		path:      "/api/v1/admin/clients/5/permissions",
+		ownerRead: "GetClientById",
+		// Client permissions are configurable only with the client credentials flow enabled;
+		// handler_api_client_permissions_test.go owns the refusal when it is not.
+		owner:      &models.Client{Id: grantOwnerId, ClientIdentifier: "a-service", ClientCredentialsEnabled: true},
+		readMethod: "GetClientPermissionsByClientId",
+		storedRows: func(rows []grantRow) any {
+			out := make([]models.ClientPermission, 0, len(rows))
+			for _, r := range rows {
+				out = append(out, models.ClientPermission{Id: r.id, ClientId: grantOwnerId, PermissionId: r.permissionId})
+			}
+			return out
+		},
+		createMethod: "CreateClientPermission",
+		deleteMethod: "DeleteClientPermission",
+		created: func(arg any) (int64, int64) {
+			cp := arg.(*models.ClientPermission)
+			return cp.ClientId, cp.PermissionId
+		},
+		consolidatedEvent: audit.AuditUpdatedClientPermissions,
+		ownerKey:          "clientId",
+		handler: func(database *mocks_data.Database, auditLogger *mocks_audit.AuditLogger) http.HandlerFunc {
+			return HandleAPIClientPermissionsPut(database, auditLogger)
+		},
+		body: func(t *testing.T, wanted, expected []int64) string {
+			t.Helper()
+			body, err := json.Marshal(map[string]any{"permissionIds": wanted, "expectedPermissionIds": expected})
+			require.NoError(t, err)
+			return string(body)
+		},
+	},
 }
 
 // serve runs the save on a PUT carrying body.
@@ -159,6 +197,22 @@ func audited(event string, permissionId int64) auditRecord {
 	return auditRecord(fmt.Sprintf("%s %d", event, permissionId))
 }
 
+// wantAudits is the events a committed save owes for the grants it made and withdrew: one per
+// grant and per revocation, or the save's one consolidated event whatever it changed.
+func (s grantSave) wantAudits(granted, revoked []int64) []auditRecord {
+	if s.consolidatedEvent != "" {
+		return []auditRecord{auditRecord(s.consolidatedEvent)}
+	}
+	var want []auditRecord
+	for _, id := range granted {
+		want = append(want, audited(s.addedEvent, id))
+	}
+	for _, id := range revoked {
+		want = append(want, audited(s.deletedEvent, id))
+	}
+	return want
+}
+
 // recordAudits accepts every Log call and collects them, checking each names the owner and the
 // caller, in order.
 func (s grantSave) recordAudits(t *testing.T, auditLogger *mocks_audit.AuditLogger, order *[]string) *[]auditRecord {
@@ -168,7 +222,12 @@ func (s grantSave) recordAudits(t *testing.T, auditLogger *mocks_audit.AuditLogg
 			details := args.Get(2).(map[string]interface{})
 			assert.Equal(t, grantOwnerId, details[s.ownerKey])
 			assert.Contains(t, details, "loggedInUser")
-			*records = append(*records, audited(args.String(1), details["permissionId"].(int64)))
+			if s.consolidatedEvent != "" {
+				assert.NotContains(t, details, "permissionId")
+				*records = append(*records, auditRecord(args.String(1)))
+			} else {
+				*records = append(*records, audited(args.String(1), details["permissionId"].(int64)))
+			}
 			if order != nil {
 				*order = append(*order, "audit")
 			}
@@ -213,8 +272,13 @@ func TestGrantListSaves_SaveTheExactPlanInOneTransaction(t *testing.T) {
 			assert.NoError(t, stub.BodyErr)
 			assert.Equal(t, []int64{21}, deleted, "the revoked grant's row, and nothing kept")
 			assert.Equal(t, []int64{6}, granted, "the new grant, and nothing already stored")
-			assert.Equal(t, []auditRecord{audited(save.addedEvent, 6), audited(save.deletedEvent, 3)}, *records)
-			assert.Equal(t, []string{"begin", "delete", "insert", "commit", "audit", "audit"}, order)
+			want := save.wantAudits([]int64{6}, []int64{3})
+			assert.Equal(t, want, *records)
+			wantOrder := []string{"begin", "delete", "insert", "commit"}
+			for range want {
+				wantOrder = append(wantOrder, "audit")
+			}
+			assert.Equal(t, wantOrder, order)
 			database.AssertExpectations(t)
 		})
 	}
@@ -248,7 +312,7 @@ func TestGrantListSaves_AStoredDuplicateIsRemovedWithItsOriginal(t *testing.T) {
 
 			assert.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
 			assert.Equal(t, []int64{21, 22, 24}, deleted, "both copies of the revoked grant, and the extra copy of the kept one")
-			assert.Equal(t, []auditRecord{audited(save.deletedEvent, 3)}, *records, "one revocation, and nothing for the repair")
+			assert.Equal(t, save.wantAudits(nil, []int64{3}), *records, "one revocation, and nothing for the repair")
 			database.AssertExpectations(t)
 			assertNotAttemptedOnClientDatabase(t, database, save.createMethod)
 		})
@@ -365,7 +429,7 @@ func TestGrantListSaves_ARerunAttemptAnswersAndAuditsOnce(t *testing.T) {
 			assert.Equal(t, 2, attempts)
 			assert.Equal(t, http.StatusOK, rr.Code)
 			assert.NotContains(t, rr.Body.String(), "INTERNAL_SERVER_ERROR")
-			assert.Equal(t, []auditRecord{audited(save.addedEvent, 6), audited(save.deletedEvent, 3)}, *records, "one event per change, not one per attempt")
+			assert.Equal(t, save.wantAudits([]int64{6}, []int64{3}), *records, "the events of one committed save, not one set per attempt")
 			database.AssertExpectations(t)
 		})
 	}
@@ -520,8 +584,8 @@ func TestGrantListSaves_ARefusedSaveNeverOpensTheTransaction(t *testing.T) {
 	}
 }
 
-// A repeated id in the request is validated once, granted once and audited once. The group save
-// always deduplicated; the user save did not, and stored the repeat as two grant rows, one of which
+// A repeated id in the request is validated once, granted once and audited once. The group and
+// client saves always deduplicated; the user save did not, and stored the repeat as two grant rows, one of which
 // a later revocation left in force (#406).
 func TestGrantListSaves_ARepeatedIdIsGrantedOnce(t *testing.T) {
 	for _, save := range grantSaves {
@@ -539,7 +603,7 @@ func TestGrantListSaves_ARepeatedIdIsGrantedOnce(t *testing.T) {
 			rr := save.serve(database, auditLogger, save.body(t, []int64{6, 6}, []int64{}))
 
 			assert.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
-			assert.Equal(t, []auditRecord{audited(save.addedEvent, 6)}, *records)
+			assert.Equal(t, save.wantAudits([]int64{6}, nil), *records)
 			database.AssertExpectations(t)
 		})
 	}

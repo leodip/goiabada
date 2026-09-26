@@ -28,6 +28,9 @@ type ConsentInfo struct {
 
 type GroupsPostInput struct {
 	AssignedGroupsIds []int64 `json:"assignedGroupsIds"`
+	// ExpectedGroupIds is the set as the page loaded it, passed through unchanged so the auth
+	// server can refuse a save from an outdated page (#428).
+	ExpectedGroupIds []int64 `json:"expectedGroupIds"`
 }
 
 type PermissionsPostInput struct {

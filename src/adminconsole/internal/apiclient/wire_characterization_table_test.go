@@ -34,13 +34,13 @@ var (
 	charUpdateClientOrig = &api.UpdateClientWebOriginsRequest{WebOrigins: []string{"https://app.example.com"},
 		ExpectedWebOrigins: []string{"https://old.example.com"}}
 	charUpdateClientToken = &api.UpdateClientTokensRequest{TokenExpirationInSeconds: 300}
-	charUpdateClientPerms = &api.UpdateClientPermissionsRequest{PermissionIds: []int64{8}}
+	charUpdateClientPerms = &api.UpdateClientPermissionsRequest{PermissionIds: []int64{8}, ExpectedPermissionIds: []int64{3}}
 
 	charCreateGroupAttr = &api.CreateGroupAttributeRequest{Key: "department", Value: "sales"}
 	charUpdateGroupAttr = &api.UpdateGroupAttributeRequest{Key: "department", Value: "support"}
 	charCreateGroup     = &api.CreateGroupRequest{GroupIdentifier: "a-new-group"}
 	charUpdateGroup     = &api.UpdateGroupRequest{GroupIdentifier: "a-group"}
-	charUpdateUserGrps  = &api.UpdateUserGroupsRequest{GroupIds: []int64{5}}
+	charUpdateUserGrps  = &api.UpdateUserGroupsRequest{GroupIds: []int64{5}, ExpectedGroupIds: []int64{3}}
 	charUpdateGroupPerm = &api.UpdateGroupPermissionsRequest{PermissionIds: []int64{8}, ExpectedPermissionIds: []int64{3}}
 	charUpdateUserPerm  = &api.UpdateUserPermissionsRequest{PermissionIds: []int64{8}, ExpectedPermissionIds: []int64{3}}
 	charUpdateResPerms  = &api.UpdateResourcePermissionsRequest{Permissions: []api.ResourcePermissionUpsert{}}

@@ -657,6 +657,14 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          description: |
+            Another save changed the user's groups after expectedGroupIds was read.
+            error_code is CONCURRENT_UPDATE; nothing was saved. Read them again and retry.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '500':
           $ref: '#/components/responses/InternalServerError'
 
@@ -2103,6 +2111,14 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          description: |
+            Another save changed the client's permissions after expectedPermissionIds was read.
+            error_code is CONCURRENT_UPDATE; nothing was saved. Read them again and retry.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '500':
           $ref: '#/components/responses/InternalServerError'
 
@@ -4106,6 +4122,7 @@ components:
 
     UpdateUserGroupsRequest:
       type: object
+      required: [expectedGroupIds]
       properties:
         groupIds:
           type: array
@@ -4115,6 +4132,12 @@ components:
             than 1000 groups is refused with VALIDATION_ERROR before any of them is read back,
             because every id is validated against the database and the list is read in
             statement-sized batches.
+          items:
+            type: integer
+            format: int64
+        expectedGroupIds:
+          type: array
+          description: The user's group ids as last read; [] if there were none.
           items:
             type: integer
             format: int64
@@ -5241,9 +5264,16 @@ components:
 
     UpdateClientPermissionsRequest:
       type: object
+      required: [expectedPermissionIds]
       properties:
         permissionIds:
           type: array
+          items:
+            type: integer
+            format: int64
+        expectedPermissionIds:
+          type: array
+          description: The client's permission ids as last read; [] if there were none.
           items:
             type: integer
             format: int64

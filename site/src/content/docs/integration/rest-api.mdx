@@ -680,7 +680,8 @@ PUT /api/v1/admin/users/{id}/groups
 
 ```json
 {
-  "groupIds": [1, 2, 3]
+  "groupIds": [1, 2, 3],
+  "expectedGroupIds": [1, 2]
 }
 ```
 
@@ -1002,7 +1003,8 @@ PUT /api/v1/admin/clients/{id}/permissions
 
 ```json
 {
-  "permissionIds": [1, 2, 3]
+  "permissionIds": [1, 2, 3],
+  "expectedPermissionIds": [1, 2]
 }
 ```
 

@@ -17,6 +17,7 @@ import (
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // Test GET /api/v1/admin/clients/{id}/permissions success
@@ -107,7 +108,7 @@ func TestAPIClientPermissions_Put_AddRemove(t *testing.T) {
 
 	// First assign p1 (with a duplicate in request to test de-dup)
 	putURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/permissions"
-	reqBody := api.UpdateClientPermissionsRequest{PermissionIds: []int64{p1.Id, p1.Id}}
+	reqBody := api.UpdateClientPermissionsRequest{PermissionIds: []int64{p1.Id, p1.Id}, ExpectedPermissionIds: getClientPermissionIds(t, accessToken, client.Id)}
 	resp := makeAPIRequest(t, "PUT", putURL, accessToken, &reqBody)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -123,7 +124,7 @@ func TestAPIClientPermissions_Put_AddRemove(t *testing.T) {
 	assert.Equal(t, p1.Id, cps[0].PermissionId)
 
 	// Now replace with p2 (should remove p1 and add p2)
-	reqBody = api.UpdateClientPermissionsRequest{PermissionIds: []int64{p2.Id}}
+	reqBody = api.UpdateClientPermissionsRequest{PermissionIds: []int64{p2.Id}, ExpectedPermissionIds: getClientPermissionIds(t, accessToken, client.Id)}
 	resp2 := makeAPIRequest(t, "PUT", putURL, accessToken, &reqBody)
 	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp2.StatusCode)
@@ -153,7 +154,7 @@ func TestAPIClientPermissions_Put_Idempotent(t *testing.T) {
 	p := createPermission(t, res.Id)
 
 	putURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/permissions"
-	reqBody := api.UpdateClientPermissionsRequest{PermissionIds: []int64{p.Id}}
+	reqBody := api.UpdateClientPermissionsRequest{PermissionIds: []int64{p.Id}, ExpectedPermissionIds: getClientPermissionIds(t, accessToken, client.Id)}
 	resp := makeAPIRequest(t, "PUT", putURL, accessToken, &reqBody)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -164,7 +165,8 @@ func TestAPIClientPermissions_Put_Idempotent(t *testing.T) {
 	assert.Equal(t, 1, len(cps))
 	assert.Equal(t, p.Id, cps[0].PermissionId)
 
-	// Call PUT again with the same set (no changes expected)
+	// Call PUT again with the same set (no changes expected), carrying the set as read again
+	reqBody.ExpectedPermissionIds = getClientPermissionIds(t, accessToken, client.Id)
 	resp2 := makeAPIRequest(t, "PUT", putURL, accessToken, &reqBody)
 	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp2.StatusCode)
@@ -198,7 +200,7 @@ func TestAPIClientPermissions_Unauthorized(t *testing.T) {
 
 	// PUT without token
 	putURL := getURL
-	reqBody := api.UpdateClientPermissionsRequest{PermissionIds: []int64{}}
+	reqBody := api.UpdateClientPermissionsRequest{PermissionIds: []int64{}, ExpectedPermissionIds: []int64{}}
 	bodyBytes, _ := json.Marshal(&reqBody)
 	req, _ = http.NewRequest("PUT", putURL, bytes.NewBuffer(bodyBytes))
 	resp2, err := httpClient.Do(req)
@@ -228,7 +230,7 @@ func TestAPIClientPermissions_Put_ClientCredentialsDisabled(t *testing.T) {
 	p := createPermission(t, res.Id)
 
 	putURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/permissions"
-	reqBody := api.UpdateClientPermissionsRequest{PermissionIds: []int64{p.Id}}
+	reqBody := api.UpdateClientPermissionsRequest{PermissionIds: []int64{p.Id}, ExpectedPermissionIds: getClientPermissionIds(t, accessToken, client.Id)}
 	resp := makeAPIRequest(t, "PUT", putURL, accessToken, &reqBody)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
@@ -277,8 +279,9 @@ func TestAPIClientPermissions_Put_SystemLevelAllowed(t *testing.T) {
 	err = json.NewDecoder(respGet.Body).Decode(&permsResp)
 	assert.NoError(t, err)
 
-	// Collect original permission IDs for restore
-	var originalPermIds []int64
+	// Collect original permission IDs for restore; never nil, since the loaded list is sent as it
+	// was read and [] is a real value there
+	originalPermIds := []int64{}
 	for _, p := range permsResp.Permissions {
 		originalPermIds = append(originalPermIds, p.Id)
 	}
@@ -292,7 +295,7 @@ func TestAPIClientPermissions_Put_SystemLevelAllowed(t *testing.T) {
 	modifiedPermIds = append(modifiedPermIds, testPerm.Id)
 
 	putURL := getURL
-	reqBody := api.UpdateClientPermissionsRequest{PermissionIds: modifiedPermIds}
+	reqBody := api.UpdateClientPermissionsRequest{PermissionIds: modifiedPermIds, ExpectedPermissionIds: originalPermIds}
 	respPut := makeAPIRequest(t, "PUT", putURL, accessToken, &reqBody)
 	defer func() { _ = respPut.Body.Close() }()
 
@@ -316,7 +319,7 @@ func TestAPIClientPermissions_Put_SystemLevelAllowed(t *testing.T) {
 	assert.True(t, foundTest, "test permission should be assigned to system-level client")
 
 	// Restore original permissions
-	restoreBody := api.UpdateClientPermissionsRequest{PermissionIds: originalPermIds}
+	restoreBody := api.UpdateClientPermissionsRequest{PermissionIds: originalPermIds, ExpectedPermissionIds: getClientPermissionIds(t, accessToken, sysClient.Id)}
 	respRestore := makeAPIRequest(t, "PUT", putURL, accessToken, &restoreBody)
 	defer func() { _ = respRestore.Body.Close() }()
 	assert.Equal(t, http.StatusOK, respRestore.StatusCode)
@@ -333,7 +336,7 @@ func TestAPIClientPermissions_Put_PermissionNotFound(t *testing.T) {
 	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
 	putURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/permissions"
-	reqBody := api.UpdateClientPermissionsRequest{PermissionIds: []int64{99999999}}
+	reqBody := api.UpdateClientPermissionsRequest{PermissionIds: []int64{99999999}, ExpectedPermissionIds: getClientPermissionIds(t, accessToken, client.Id)}
 	resp := makeAPIRequest(t, "PUT", putURL, accessToken, &reqBody)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
@@ -393,7 +396,7 @@ func TestAPIClientPermissions_Put_InsufficientScope(t *testing.T) {
 	defer func() { _ = database.DeleteClient(context.Background(), nil, target.Id) }()
 
 	putURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(target.Id, 10) + "/permissions"
-	reqBody := api.UpdateClientPermissionsRequest{PermissionIds: []int64{}}
+	reqBody := api.UpdateClientPermissionsRequest{PermissionIds: []int64{}, ExpectedPermissionIds: []int64{}}
 	// Intentionally use insufficient scope token
 	resp := makeAPIRequest(t, "PUT", putURL, tok, &reqBody)
 	defer func() { _ = resp.Body.Close() }()
@@ -402,4 +405,97 @@ func TestAPIClientPermissions_Put_InsufficientScope(t *testing.T) {
 	buf := new(bytes.Buffer)
 	_, _ = buf.ReadFrom(resp.Body)
 	assert.Contains(t, buf.String(), "Insufficient scope.")
+}
+
+// getClientPermissionIds reads the client's grants through the API, as a caller does before a
+// save, and returns their ids: the loaded set a save carries (#428).
+func getClientPermissionIds(t *testing.T, accessToken string, clientId int64) []int64 {
+	t.Helper()
+	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(clientId, 10) + "/permissions"
+	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
+	defer func() { _ = resp.Body.Close() }()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	var body api.GetClientPermissionsResponse
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
+	ids := []int64{}
+	for _, p := range body.Permissions {
+		ids = append(ids, p.Id)
+	}
+	return ids
+}
+
+// createClientForPermissionsSave creates a confidential client with the client credentials flow
+// enabled, which is what its permissions are configurable for, and removes it afterwards.
+func createClientForPermissionsSave(t *testing.T) *models.Client {
+	t.Helper()
+	enc, err := encryption.EncryptData(fake.Password(32))
+	require.NoError(t, err)
+	client := &models.Client{
+		ClientIdentifier:         "api-perm-expected-" + strings.ToLower(fake.LetterN(6)),
+		Enabled:                  true,
+		ClientCredentialsEnabled: true,
+		ClientSecretEncrypted:    enc,
+	}
+	require.NoError(t, database.CreateClient(context.Background(), nil, client))
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+	return client
+}
+
+// The loaded set is required: absent or null answers 400 naming the field, and nothing is granted
+// (#428).
+func TestAPIClientPermissions_Put_TheLoadedListIsRequired(t *testing.T) {
+	accessToken, _ := createAdminClientWithToken(t)
+	client := createClientForPermissionsSave(t)
+	perm := createPermission(t, createResource(t).Id)
+	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/permissions"
+
+	bodies := map[string]interface{}{
+		"absent": map[string]interface{}{"permissionIds": []int64{perm.Id}},
+		"null":   map[string]interface{}{"permissionIds": []int64{perm.Id}, "expectedPermissionIds": nil},
+	}
+	for name, body := range bodies {
+		t.Run(name, func(t *testing.T) {
+			resp := makeAPIRequest(t, "PUT", url, accessToken, body)
+			defer func() { _ = resp.Body.Close() }()
+			assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+			var got map[string]interface{}
+			require.NoError(t, json.NewDecoder(resp.Body).Decode(&got))
+			assert.Equal(t, "VALIDATION_ERROR", got["error_code"])
+			assert.Contains(t, got["error_description"], "expectedPermissionIds is required")
+			assert.Empty(t, getClientPermissionIds(t, accessToken, client.Id))
+		})
+	}
+}
+
+// Two administrators load the same grants; the first revokes one, and the second, still holding
+// the set as it was, saves. The second is refused 409 CONCURRENT_UPDATE and writes nothing, rather
+// than re-granting what the first had just revoked (#428).
+func TestAPIClientPermissions_Put_AnOutdatedLoadedListIsRefused(t *testing.T) {
+	accessToken, _ := createAdminClientWithToken(t)
+	client := createClientForPermissionsSave(t)
+	res := createResource(t)
+	permA := createPermission(t, res.Id)
+	permB := createPermission(t, res.Id)
+	permC := createPermission(t, res.Id)
+	for _, p := range []*models.Permission{permA, permB} {
+		require.NoError(t, database.CreateClientPermission(context.Background(), nil, &models.ClientPermission{ClientId: client.Id, PermissionId: p.Id}))
+	}
+	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/permissions"
+
+	loadedByBoth := getClientPermissionIds(t, accessToken, client.Id)
+
+	first := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateClientPermissionsRequest{
+		PermissionIds: []int64{permB.Id}, ExpectedPermissionIds: loadedByBoth})
+	defer func() { _ = first.Body.Close() }()
+	require.Equal(t, http.StatusOK, first.StatusCode)
+
+	second := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateClientPermissionsRequest{
+		PermissionIds: []int64{permA.Id, permB.Id, permC.Id}, ExpectedPermissionIds: loadedByBoth})
+	defer func() { _ = second.Body.Close() }()
+	assert.Equal(t, http.StatusConflict, second.StatusCode)
+	var body map[string]interface{}
+	require.NoError(t, json.NewDecoder(second.Body).Decode(&body))
+	assert.Equal(t, "CONCURRENT_UPDATE", body["error_code"])
+
+	assert.Equal(t, []int64{permB.Id}, getClientPermissionIds(t, accessToken, client.Id), "the first save's result stands")
 }
