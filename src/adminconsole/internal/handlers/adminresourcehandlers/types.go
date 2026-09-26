@@ -34,6 +34,9 @@ type Permission struct {
 type SavePermissionsInput struct {
 	Permissions []Permission `json:"permissions"`
 	ResourceId  int64        `json:"resourceId"`
+	// ExpectedPermissions is the list as the page loaded it, passed through unchanged so the auth
+	// server can refuse a save from an outdated page (#428).
+	ExpectedPermissions []Permission `json:"expectedPermissions"`
 }
 
 type SavePermissionsResult struct {

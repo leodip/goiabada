@@ -194,8 +194,14 @@ const AccountLogoutResponseModeFormPost = "form_post"
 // UpdateResourcePermissionsRequest replaces the set of permission definitions
 // for a resource. The auth server validates, sanitizes, applies create/update/delete,
 // and audits.
+//
+// ExpectedPermissions is the resource's permissions as the caller last read them, each entry's id,
+// identifier and description as stored, required and compared as ExpectedPermissionIds is on
+// UpdateUserPermissionsRequest: absent or null is refused, [] means the caller read none, and a
+// stored list that differs answers 409 CONCURRENT_UPDATE (#428).
 type UpdateResourcePermissionsRequest struct {
-	Permissions []ResourcePermissionUpsert `json:"permissions"`
+	Permissions         []ResourcePermissionUpsert `json:"permissions"`
+	ExpectedPermissions []ResourcePermissionUpsert `json:"expectedPermissions"`
 }
 
 // ResourcePermissionUpsert represents a permission to create or update.
