@@ -15,6 +15,9 @@
         webOrigins.push("{{ $value }}");
         ids.push({{$key}});
     {{end}}
+    // The list as loaded, never edited: the save sends it so the server can refuse a save from
+    // an outdated page rather than undo another administrator's change (#428).
+    const loadedWebOrigins = webOrigins.slice();
 
     document.addEventListener("DOMContentLoaded", function () {
 
@@ -34,6 +37,7 @@
                         "bodyData": JSON.stringify({
                             "clientId": {{.client.ClientId }},
                             "webOrigins": webOrigins,
+                            "expectedWebOrigins": loadedWebOrigins,
                             "ids": ids,
                         }),
                         "loadingElement": loadingIcon,

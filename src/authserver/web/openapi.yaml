@@ -1990,6 +1990,15 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          description: |
+            Another save changed the list after expectedWebOrigins was read, or added the same
+            origin at the same moment. error_code is CONCURRENT_UPDATE; nothing was saved. Read it
+            again and retry.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '500':
           $ref: '#/components/responses/InternalServerError'
 
@@ -5170,6 +5179,7 @@ components:
 
     UpdateClientWebOriginsRequest:
       type: object
+      required: [expectedWebOrigins]
       properties:
         webOrigins:
           type: array
@@ -5179,6 +5189,11 @@ components:
             description: >-
               A web origin, stored in its canonical form. One longer than 267 bytes, the longest
               standards-valid origin, is refused with VALIDATION_ERROR before anything is written.
+        expectedWebOrigins:
+          type: array
+          description: The web origins as last read; [] if there were none.
+          items:
+            type: string
 
     UpdateClientTokensRequest:
       type: object

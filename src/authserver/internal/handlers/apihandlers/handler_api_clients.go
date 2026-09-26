@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -1041,6 +1040,13 @@ func HandleAPIClientWebOriginsPut(
 			return
 		}
 
+		// The list as the caller loaded it, required as it is for redirect URIs: absent or null
+		// decodes to nil and is refused, [] means the caller read an empty list (#428).
+		if req.ExpectedWebOrigins == nil {
+			writeJSONError(w, "expectedWebOrigins is required: send the web origins as you last read them, or [] if there were none.", "VALIDATION_ERROR", http.StatusBadRequest)
+			return
+		}
+
 		// Validate list and entries: non-empty, canonical origin, within the column, no duplicates.
 		//
 		// urlutil.CanonicalOrigin is what makes a saved value one CORS can ever match.
@@ -1079,87 +1085,67 @@ func HandleAPIClientWebOriginsPut(
 			normalized = append(normalized, origin)
 		}
 
-		// The whole replacement is one transaction, on the sequence
-		// updateClientNotOwningAuthenticationMode uses a few hundred lines up. Two things go
-		// wrong without it. A failure part way through commits half a list under a 500, so an
-		// administrator removing a compromised origin and adding its replacement can end up with
-		// neither or with only the removal, and the response says the save failed either way.
-		// And two administrators saving different lists at once each read the same current list
-		// and each write their own diff of it, producing the union of the two rather than one of
-		// them. AcquireClientRow before the read is what serializes the second case (#250).
+		// The loaded list is compared in the form the rows are stored in, so each value is
+		// canonicalized as a wanted one is; one that does not canonicalize can match no stored
+		// row and is refused rather than read as an outdated list (#428).
+		expected := make([]string, 0, len(req.ExpectedWebOrigins))
+		for _, raw := range req.ExpectedWebOrigins {
+			origin, ok := urlutil.CanonicalOrigin(strings.TrimSpace(raw))
+			if !ok {
+				writeJSONError(w, fmt.Sprintf("Invalid web origin in expectedWebOrigins: %s. Send the web origins exactly as you last read them.", raw), "VALIDATION_ERROR", http.StatusBadRequest)
+				return
+			}
+			expected = append(expected, origin)
+		}
+		// The stored value is already canonical, migration 000034 having repaired the rows
+		// written before this endpoint canonicalized, so it is keyed as it stands (#250).
+		webOriginKey := func(wo models.WebOrigin) string { return wo.Origin }
+		webOriginId := func(wo models.WebOrigin) int64 { return wo.Id }
+
+		// One transaction, so a failure part way through commits nothing and the 500 is true: an
+		// administrator removing a compromised origin and adding its replacement ends with both
+		// changes or neither (#250).
 		//
-		// Opened through RunInTransaction, so a deadlock reruns the whole replacement (#301). The
-		// body is safe to rerun: the current list is loaded afresh inside the closure and the
-		// diff is computed from it on every attempt. Each failure is returned wrapped in a
-		// webOriginsWriteFailure that keeps the database's own error in the chain, so the helper's
-		// classifier still sees a deadlock, and nothing is logged or written to the response until
-		// the helper has returned: an attempt that is about to be rerun must not answer.
+		// No row lock, as for every list save: two overlapping saves of one list merge item by
+		// item. web_origins carries a unique key on (origin, client_id), so when both add the same
+		// origin the engine refuses the second insert, its whole save rolls back, and
+		// writeListSaveFailure answers it 409 CONCURRENT_UPDATE. This save took AcquireClientRow
+		// before its read until #428, which serialized the two instead; the twin redirect-URI save
+		// never did, and one pattern for both is the point. Opened through RunInTransaction, so a
+		// deadlock victim is rerun whole (#301). The body is safe to rerun: it reads the stored rows
+		// on the transaction and plans from them on every attempt, and writes nothing to the
+		// response (#428).
 		err = database.RunInTransaction(r.Context(), func(tx *sql.Tx) error {
-			if acquireClientRowErr := database.AcquireClientRow(r.Context(), tx, client.Id); acquireClientRowErr != nil {
-				return &webOriginsWriteFailure{
-					logMessage: "database error acquiring client row for web origins update",
-					err:        acquireClientRowErr}
+			if loadErr := database.ClientLoadWebOrigins(r.Context(), tx, client); loadErr != nil {
+				return errs.Wrap(loadErr, "database error loading client web origins before update")
+			}
+			if !sameSet(client.WebOrigins, webOriginKey, expected) {
+				return errListChanged
 			}
 
-			// Load existing web origins
-			if clientLoadWebOriginsErr := database.ClientLoadWebOrigins(r.Context(), tx, client); clientLoadWebOriginsErr != nil {
-				return &webOriginsWriteFailure{
-					logMessage: "database error loading client web origins before update",
-					err:        clientLoadWebOriginsErr}
-			}
-
-			// The stored value is already canonical, migration 000034 having repaired the rows
-			// written before this endpoint canonicalized, so it is keyed as it stands rather than
-			// lowercased again on the way past.
-			existingSet := make(map[string]int64)
-			for _, wo := range client.WebOrigins {
-				existingSet[wo.Origin] = wo.Id
-			}
-
-			desiredSet := seen
-
-			// Add new origins
-			for _, origin := range normalized {
-				if _, ok := existingSet[origin]; !ok {
-					if createWebOriginErr := database.CreateWebOrigin(r.Context(), tx, &models.WebOrigin{ClientId: client.Id, Origin: origin}); createWebOriginErr != nil {
-						return &webOriginsWriteFailure{
-							logMessage: "database error creating web origin",
-							origin:     origin, err: createWebOriginErr}
-					}
+			insert, remove := replaceSet(client.WebOrigins, webOriginKey, webOriginId, normalized)
+			for _, wid := range remove {
+				if deleteErr := database.DeleteWebOrigin(r.Context(), tx, wid); deleteErr != nil {
+					return errs.Wrapf(deleteErr, "database error deleting web origin %d", wid)
 				}
 			}
-
-			// Delete removed origins
-			for origin, wid := range existingSet {
-				if _, ok := desiredSet[origin]; !ok {
-					if deleteWebOriginErr := database.DeleteWebOrigin(r.Context(), tx, wid); deleteWebOriginErr != nil {
-						return &webOriginsWriteFailure{
-							logMessage: "database error deleting web origin",
-							origin:     origin, err: deleteWebOriginErr}
-					}
+			for _, origin := range insert {
+				if createErr := database.CreateWebOrigin(r.Context(), tx, &models.WebOrigin{ClientId: client.Id, Origin: origin}); createErr != nil {
+					return errs.Wrapf(createErr, "database error creating web origin %s", origin)
 				}
 			}
 			return nil
 		})
 		if err != nil {
-			// The helper's own failures, a transaction that could not open, a commit that failed
-			// or a deadlock on every attempt, carry no step of their own.
-			failure := &webOriginsWriteFailure{
-				logMessage: "database error in the web origins update transaction",
-				err:        err}
-			var stepFailure *webOriginsWriteFailure
-			if errors.As(err, &stepFailure) {
-				failure = stepFailure
-			}
-			// Two calls rather than one over a conditionally built run, so every key this site
-			// writes is a literal at the call sloglint reads (#320).
-			if failure.origin != "" {
-				writeInternalServerError(w, r, failure, "client_id", client.Id, "origin", failure.origin)
-			} else {
-				writeInternalServerError(w, r, failure, "client_id", client.Id)
-			}
+			writeListSaveFailure(w, r, err, "client_id", client.Id)
 			return
 		}
+
+		// Audit, once the save has committed.
+		auditLogger.Log(r.Context(), audit.AuditUpdatedWebOrigins, map[string]interface{}{
+			"clientId":     client.Id,
+			"loggedInUser": callerSubject(r),
+		})
 
 		// Reload related fields for response consistency
 		if err := database.ClientLoadRedirectURIs(r.Context(), nil, client); err != nil {
@@ -1171,33 +1157,10 @@ func HandleAPIClientWebOriginsPut(
 			return
 		}
 
-		// Audit
-		auditLogger.Log(r.Context(), audit.AuditUpdatedWebOrigins, map[string]interface{}{
-			"clientId":     client.Id,
-			"loggedInUser": callerSubject(r),
-		})
-
 		resp := api.UpdateClientResponse{Client: *apimapping.ToClientResponse(client)}
 		writeJSON(w, r, http.StatusOK, resp)
 	}
 }
-
-// webOriginsWriteFailure names which statement of the web-origins replacement failed, so the
-// handler can log and answer it once RunInTransaction has returned. It wraps the database's own
-// error unchanged, which is what lets the helper's classifier recognise a deadlock through it
-// and rerun the body: a sentinel that hid the driver error would exempt this one transaction
-// from the retry every other owner gets (#301).
-type webOriginsWriteFailure struct {
-	// logMessage is the slog line the handler emits, one per statement.
-	logMessage string
-	// origin is the web origin the failed statement was writing; empty for the two statements
-	// that do not name one.
-	origin string
-	err    error
-}
-
-func (f *webOriginsWriteFailure) Error() string { return f.logMessage + ": " + f.err.Error() }
-func (f *webOriginsWriteFailure) Unwrap() error { return f.err }
 
 // HandleAPIClientTokensPut - PUT /api/v1/admin/clients/{id}/tokens
 // Updates token-related settings for a client.

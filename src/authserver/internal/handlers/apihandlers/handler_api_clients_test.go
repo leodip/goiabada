@@ -15,10 +15,12 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
 	"github.com/leodip/goiabada/authserver/internal/constants"
+	"github.com/leodip/goiabada/authserver/internal/data"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/urlutil"
 	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -400,132 +402,159 @@ func callIndex(t *testing.T, database *mocks_data.Database, method string) int {
 // HandleAPIClientWebOriginsPut
 // =============================================================================
 
-// webOriginsPutRequest builds the PUT with its chi URL parameter and body.
-func webOriginsPutRequest(t *testing.T, id string, origins []string) *http.Request {
+// webOriginsBody is the save's JSON body. A nil expected list is sent as null, which the save
+// refuses; the absent-key case is written as a literal where it is tested.
+func webOriginsBody(t *testing.T, wanted, expected []string) string {
 	t.Helper()
-	body, err := json.Marshal(api.UpdateClientWebOriginsRequest{WebOrigins: origins})
+	body, err := json.Marshal(api.UpdateClientWebOriginsRequest{WebOrigins: wanted, ExpectedWebOrigins: expected})
 	require.NoError(t, err)
-	r := httptest.NewRequest(http.MethodPut, "/api/v1/admin/clients/"+id+"/web-origins", bytes.NewReader(body))
+	return string(body)
+}
+
+// webOriginsPutRequest builds the PUT with its chi URL parameter and body.
+func webOriginsPutRequest(t *testing.T, id string, body string) *http.Request {
+	t.Helper()
+	r := httptest.NewRequest(http.MethodPut, "/api/v1/admin/clients/"+id+"/web-origins", strings.NewReader(body))
 	return setChiURLParam(r, "id", id)
 }
 
-// The save is one transaction, and the current list is read inside it, under the row acquisition.
-//
-// Without that, two administrators saving different lists at once each read the same current list
-// and each write their own diff of it, so the row ends up holding the union of both rather than
-// either one. That is invisible to every other tier: nothing reachable over HTTP can produce the
-// gap on its own, because each request reloads. The seam where it is visible is the handler's own
-// conversation with the database, which is what a strict mock reproduces (#250 decision 15).
-//
-// The flow gate is gone as well, and this client says so: AuthorizationCodeEnabled is false, which
-// used to be refused with a 400 before the body was even read.
-func TestHandleAPIClientWebOriginsPut_SavesInOneTransactionUnderTheRowAcquisition(t *testing.T) {
+// expectWebOriginsClient registers the client read the save makes before it validates. The
+// client's authorization code flow is off: the save has no flow gate, since a browser client of any
+// flow needs a web origin, and a client with no redirect-based flow must still be saved (#250).
+func expectWebOriginsClient(database *mocks_data.Database) {
+	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).
+		Return(&models.Client{Id: 7, AuthorizationCodeEnabled: false}, nil).Once()
+}
+
+// expectStoredWebOrigins registers the read of the stored list on the save's transaction,
+// answering the rows given.
+func expectStoredWebOrigins(database *mocks_data.Database, rows ...models.WebOrigin) {
+	database.On("ClientLoadWebOrigins", mock.Anything, clientUpdateTx, mock.Anything).
+		Run(func(args mock.Arguments) {
+			args.Get(2).(*models.Client).WebOrigins = append([]models.WebOrigin(nil), rows...)
+		}).Return(nil).Once()
+}
+
+// The save is one transaction: the stored list is read on the transaction the writes use, compared
+// with the list the caller loaded, and replaced by exactly replaceSet's plan, deletes then inserts,
+// on that transaction, with no row acquisition before the read (#428). A wanted value is stored in
+// its canonical form, the exact string a browser sends in an Origin header (#250). The audit event
+// follows the commit.
+func TestHandleAPIClientWebOriginsPut_SavesTheExactPlanInOneTransaction(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_audit.NewAuditLogger(t)
 
-	client := &models.Client{Id: 7, AuthorizationCodeEnabled: false}
-	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(client, nil).Once()
-
-	mocks_data.ExpectRunInTransaction(database, clientUpdateTx)
-	database.On("AcquireClientRow", mock.Anything, clientUpdateTx, int64(7)).Return(nil).Once()
-	database.On("ClientLoadWebOrigins", mock.Anything, clientUpdateTx, mock.Anything).
+	expectWebOriginsClient(database)
+	var order []string
+	note := func(edge string) { order = append(order, edge) }
+	stub := mocks_data.ExpectRunInTransaction(database, clientUpdateTx, note)
+	expectStoredWebOrigins(database,
+		models.WebOrigin{Id: 11, ClientId: 7, Origin: "https://old.example.com"},
+		models.WebOrigin{Id: 12, ClientId: 7, Origin: "https://keep.example.com"},
+	)
+	var deleted []int64
+	database.On("DeleteWebOrigin", mock.Anything, clientUpdateTx, mock.Anything).
 		Run(func(args mock.Arguments) {
-			args.Get(2).(*models.Client).WebOrigins = []models.WebOrigin{
-				{Id: 11, ClientId: 7, Origin: "https://old.example.com"},
-			}
+			deleted = append(deleted, args.Get(2).(int64))
+			order = append(order, "delete")
 		}).Return(nil).Once()
-
-	var created string
+	var created []string
 	database.On("CreateWebOrigin", mock.Anything, clientUpdateTx, mock.Anything).
-		Run(func(args mock.Arguments) { created = args.Get(2).(*models.WebOrigin).Origin }).Return(nil).Once()
-	database.On("DeleteWebOrigin", mock.Anything, clientUpdateTx, int64(11)).Return(nil).Once()
+		Run(func(args mock.Arguments) {
+			wo := args.Get(2).(*models.WebOrigin)
+			assert.Equal(t, int64(7), wo.ClientId)
+			created = append(created, wo.Origin)
+			order = append(order, "insert")
+		}).Return(nil).Once()
 	stubClientResponseLoads(database)
-
-	auditLogger.On("Log", mock.Anything, audit.AuditUpdatedWebOrigins, mock.Anything).Return().Once()
+	auditLogger.On("Log", mock.Anything, audit.AuditUpdatedWebOrigins, mock.Anything).
+		Run(func(mock.Arguments) { order = append(order, "audit") }).Return().Once()
 
 	rr := httptest.NewRecorder()
-	handler := HandleAPIClientWebOriginsPut(database, auditLogger)
-	handler.ServeHTTP(rr, webOriginsPutRequest(t, "7", []string{"https://new.example.com"}))
+	HandleAPIClientWebOriginsPut(database, auditLogger).ServeHTTP(rr, webOriginsPutRequest(t, "7",
+		webOriginsBody(t,
+			[]string{"https://keep.example.com", "  HTTPS://New.Example.com/  "},
+			[]string{"https://old.example.com", "https://keep.example.com"})))
 
-	assert.Equal(t, http.StatusOK, rr.Code)
-	assert.Equal(t, "https://new.example.com", created)
+	assert.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+	assert.NoError(t, stub.BodyErr)
+	assert.Equal(t, []int64{11}, deleted, "the removed origin, and nothing kept")
+	assert.Equal(t, []string{"https://new.example.com"}, created, "the new origin, canonical, and nothing already stored")
+	assert.Equal(t, []string{"begin", "delete", "insert", "commit", "audit"}, order)
 	database.AssertExpectations(t)
-
-	// The read is inside the transaction that writes, and after the acquisition. Reading it on
-	// nil, or before AcquireClientRow, is what lets the concurrent save above interleave: the
-	// tx identity above already pins the first half, and the order pins the second.
-	assert.Less(t, callIndex(t, database, "AcquireClientRow"), callIndex(t, database, "ClientLoadWebOrigins"))
-	assert.Less(t, callIndex(t, database, "ClientLoadWebOrigins"), callIndex(t, database, "CreateWebOrigin"))
+	auditLogger.AssertExpectations(t)
+	assertNotAttemptedOnClientDatabase(t, database, "AcquireClientRow")
 }
 
-// A failure part way through commits nothing. The old code wrote each insert and delete on nil,
-// so a database error on the second of three writes left the first one committed, answered 500,
-// and the administrator's list was neither what they sent nor what it was before. Removing a
-// compromised origin and adding its replacement in one save is exactly when that matters.
-//
-// The body hands the failure to RunInTransaction, which is when the helper rolls back; the driver's
-// error stays in the chain it hands over, so a real deadlock would be recognised and rerun rather
-// than answered.
+// A failure part way through commits nothing. Written autocommitted, as this save once was, a
+// database error on the second of three writes left the first one committed, answered 500, and the
+// administrator's list was neither what they sent nor what it was before; removing a compromised
+// origin and adding its replacement in one save is exactly when that matters (#250). The body hands
+// the driver's error to the helper, which is when the real one rolls back, and it stays reachable
+// in the chain, so a real deadlock would be recognised and rerun rather than answered. The wrap
+// names the origin being written, for the operator reading the one log record (#428).
 func TestHandleAPIClientWebOriginsPut_AFailedWriteCommitsNothing(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_audit.NewAuditLogger(t)
 
-	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).
-		Return(&models.Client{Id: 7, AuthorizationCodeEnabled: true}, nil).Once()
-	diskFull := errors.New("the disk is full")
+	expectWebOriginsClient(database)
 	stub := mocks_data.ExpectRunInTransaction(database, clientUpdateTx)
-	database.On("AcquireClientRow", mock.Anything, clientUpdateTx, int64(7)).Return(nil).Once()
-	database.On("ClientLoadWebOrigins", mock.Anything, clientUpdateTx, mock.Anything).Return(nil).Once()
+	expectStoredWebOrigins(database, models.WebOrigin{Id: 11, ClientId: 7, Origin: "https://old.example.com"})
+	database.On("DeleteWebOrigin", mock.Anything, clientUpdateTx, int64(11)).Return(nil).Once()
+	diskFull := errors.New("the disk is full")
 	database.On("CreateWebOrigin", mock.Anything, clientUpdateTx, mock.Anything).Return(diskFull).Once()
 
 	rr := httptest.NewRecorder()
-	handler := HandleAPIClientWebOriginsPut(database, auditLogger)
-	handler.ServeHTTP(rr, webOriginsPutRequest(t, "7", []string{"https://a.example.com"}))
+	HandleAPIClientWebOriginsPut(database, auditLogger).ServeHTTP(rr, webOriginsPutRequest(t, "7",
+		webOriginsBody(t, []string{"https://a.example.com"}, []string{"https://old.example.com"})))
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
-	assert.Contains(t, rr.Body.String(), "INTERNAL_SERVER_ERROR")
+	assert.Equal(t, 1, strings.Count(rr.Body.String(), "INTERNAL_SERVER_ERROR"), "exactly one error response")
+	assert.ErrorIs(t, stub.BodyErr, diskFull, "the body hands the driver's error to the helper, which rolls back")
+	assert.Contains(t, stub.BodyErr.Error(), "https://a.example.com")
 	database.AssertExpectations(t)
-	// The driver's error is reachable through what the body returned, and the failure names the
-	// origin it was writing, which is what the handler's one log line carries. Which step failed
-	// stopped being a wire distinction when every 500 here moved onto one code and one sentence
-	// (#279 decision 7); it is still a distinction an operator can act on, so it is asserted
-	// where it now lives.
-	assert.ErrorIs(t, stub.BodyErr, diskFull)
-	var failure *webOriginsWriteFailure
-	require.ErrorAs(t, stub.BodyErr, &failure)
-	assert.Equal(t, "https://a.example.com", failure.origin)
-	// Nothing was audited either: an audit entry for a save that did not happen is a false
-	// record of an administrator's action.
-	auditLogger.AssertNotCalled(t, "Log", mock.Anything, audit.AuditUpdatedWebOrigins, mock.Anything)
+	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 }
 
-// The load failing inside the transaction is answered under its own message, as it was before
-// the response moved out of the transaction body; the step is carried on the error rather than
-// written from inside an attempt that might be rerun.
+// The stored list failing to read inside the transaction is one 500 under its own message, with no
+// write and no audit, in both of the shapes where ignoring the error would pass for something else:
+// a loaded list naming a stored row would then read as outdated and answer 409, and an empty loaded
+// list with nothing wanted would answer 200 over a read that never happened (#428).
 func TestHandleAPIClientWebOriginsPut_AFailedLoadIsAnsweredAsALoadFailure(t *testing.T) {
-	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	tests := []struct {
+		name     string
+		wanted   []string
+		expected []string
+	}{
+		{name: "the loaded list names a stored row and nothing is wanted", wanted: []string{}, expected: []string{"https://a.example.com"}},
+		{name: "the loaded list and the wanted list are both empty", wanted: []string{}, expected: []string{}},
+	}
 
-	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).
-		Return(&models.Client{Id: 7, AuthorizationCodeEnabled: true}, nil).Once()
-	loadErr := errors.New("the read failed")
-	stub := mocks_data.ExpectRunInTransaction(database, clientUpdateTx)
-	database.On("AcquireClientRow", mock.Anything, clientUpdateTx, int64(7)).Return(nil).Once()
-	database.On("ClientLoadWebOrigins", mock.Anything, clientUpdateTx, mock.Anything).Return(loadErr).Once()
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			database := mocks_data.NewDatabase(t)
+			auditLogger := mocks_audit.NewAuditLogger(t)
 
-	rr := httptest.NewRecorder()
-	handler := HandleAPIClientWebOriginsPut(database, auditLogger)
-	handler.ServeHTTP(rr, webOriginsPutRequest(t, "7", []string{"https://a.example.com"}))
+			expectWebOriginsClient(database)
+			stub := mocks_data.ExpectRunInTransaction(database, clientUpdateTx)
+			loadErr := errors.New("the read failed")
+			database.On("ClientLoadWebOrigins", mock.Anything, clientUpdateTx, mock.Anything).Return(loadErr).Once()
 
-	assert.Equal(t, http.StatusInternalServerError, rr.Code)
-	assert.Contains(t, rr.Body.String(), "INTERNAL_SERVER_ERROR")
-	// The step is still named, on the error rather than on the wire: it is carried out of the
-	// transaction body so nothing is written from an attempt that might be rerun.
-	assert.ErrorIs(t, stub.BodyErr, loadErr)
-	assert.Contains(t, stub.BodyErr.Error(), "database error loading client web origins before update")
-	database.AssertExpectations(t)
-	assertNotAttemptedOnClientDatabase(t, database, "CreateWebOrigin", "DeleteWebOrigin")
-	auditLogger.AssertNotCalled(t, "Log", mock.Anything, audit.AuditUpdatedWebOrigins, mock.Anything)
+			rr := httptest.NewRecorder()
+			HandleAPIClientWebOriginsPut(database, auditLogger).ServeHTTP(rr, webOriginsPutRequest(t, "7",
+				webOriginsBody(t, test.wanted, test.expected)))
+
+			assert.Equal(t, http.StatusInternalServerError, rr.Code, rr.Body.String())
+			assert.Equal(t, 1, strings.Count(rr.Body.String(), "INTERNAL_SERVER_ERROR"), "exactly one error response")
+			// The step is named on the error rather than on the wire: it is carried out of the
+			// transaction body so nothing is written from an attempt that might be rerun.
+			assert.ErrorIs(t, stub.BodyErr, loadErr)
+			assert.Contains(t, stub.BodyErr.Error(), "database error loading client web origins before update")
+			database.AssertExpectations(t)
+			assertNotAttemptedOnClientDatabase(t, database, "CreateWebOrigin", "DeleteWebOrigin")
+			auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
+		})
+	}
 }
 
 // A body aborted as a deadlock victim on its first attempt and rerun by the helper answers ONCE:
@@ -540,8 +569,7 @@ func TestHandleAPIClientWebOriginsPut_ARerunAttemptAnswersOnce(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_audit.NewAuditLogger(t)
 
-	client := &models.Client{Id: 7, AuthorizationCodeEnabled: true}
-	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(client, nil).Once()
+	expectWebOriginsClient(database)
 
 	deadlock := errors.New("Error 1213: Deadlock found when trying to get lock")
 	attempts := 0
@@ -558,8 +586,7 @@ func TestHandleAPIClientWebOriginsPut_ARerunAttemptAnswersOnce(t *testing.T) {
 		}
 	}).Once()
 
-	// Both attempts take the row and read the list afresh.
-	database.On("AcquireClientRow", mock.Anything, clientUpdateTx, int64(7)).Return(nil).Twice()
+	// Both attempts read the list afresh.
 	database.On("ClientLoadWebOrigins", mock.Anything, clientUpdateTx, mock.Anything).Return(nil).Twice()
 	// The first insert is the deadlock victim; the second lands.
 	database.On("CreateWebOrigin", mock.Anything, clientUpdateTx, mock.Anything).Return(deadlock).Once()
@@ -570,7 +597,7 @@ func TestHandleAPIClientWebOriginsPut_ARerunAttemptAnswersOnce(t *testing.T) {
 
 	rr := httptest.NewRecorder()
 	handler := HandleAPIClientWebOriginsPut(database, auditLogger)
-	handler.ServeHTTP(rr, webOriginsPutRequest(t, "7", []string{"https://a.example.com"}))
+	handler.ServeHTTP(rr, webOriginsPutRequest(t, "7", webOriginsBody(t, []string{"https://a.example.com"}, []string{})))
 
 	assert.Equal(t, 2, attempts)
 	assert.Equal(t, http.StatusOK, rr.Code)
@@ -587,14 +614,13 @@ func TestHandleAPIClientWebOriginsPut_AnExhaustedRetryIsOneFiveHundred(t *testin
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_audit.NewAuditLogger(t)
 
-	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).
-		Return(&models.Client{Id: 7, AuthorizationCodeEnabled: true}, nil).Once()
+	expectWebOriginsClient(database)
 	exhausted := errors.New("transaction aborted as a deadlock victim on all 3 attempts")
 	mocks_data.ExpectRunInTransactionRefused(database, exhausted)
 
 	rr := httptest.NewRecorder()
 	handler := HandleAPIClientWebOriginsPut(database, auditLogger)
-	handler.ServeHTTP(rr, webOriginsPutRequest(t, "7", []string{"https://a.example.com"}))
+	handler.ServeHTTP(rr, webOriginsPutRequest(t, "7", webOriginsBody(t, []string{"https://a.example.com"}, []string{})))
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
 	assert.Equal(t, 1, strings.Count(rr.Body.String(), "INTERNAL_SERVER_ERROR"), "exactly one error response")
@@ -637,8 +663,7 @@ func TestHandleAPIClientWebOriginsPut_AnOverlongOriginIsRefusedNotStored(t *test
 	database := mocks_data.NewDatabase(t)
 	auditLogger := mocks_audit.NewAuditLogger(t)
 
-	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).
-		Return(&models.Client{Id: 7, AuthorizationCodeEnabled: true}, nil).Once()
+	expectWebOriginsClient(database)
 
 	// A literal rather than models.WebOriginMaxBytes+1, so the case pins the number itself: a bound
 	// raised past the column moves with a derived value and is caught only by a literal one.
@@ -646,7 +671,7 @@ func TestHandleAPIClientWebOriginsPut_AnOverlongOriginIsRefusedNotStored(t *test
 
 	rr := httptest.NewRecorder()
 	handler := HandleAPIClientWebOriginsPut(database, auditLogger)
-	handler.ServeHTTP(rr, webOriginsPutRequest(t, "7", []string{origin}))
+	handler.ServeHTTP(rr, webOriginsPutRequest(t, "7", webOriginsBody(t, []string{origin}, []string{})))
 
 	assert.Equal(t, http.StatusBadRequest, rr.Code)
 	assert.Contains(t, rr.Body.String(), "too long")
@@ -663,11 +688,9 @@ func TestHandleAPIClientWebOriginsPut_AnOriginAtTheBoundIsStored(t *testing.T) {
 
 	origin := canonicalOriginOfLength(t, 267)
 
-	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).
-		Return(&models.Client{Id: 7, AuthorizationCodeEnabled: true}, nil).Once()
+	expectWebOriginsClient(database)
 	mocks_data.ExpectRunInTransaction(database, clientUpdateTx)
-	database.On("AcquireClientRow", mock.Anything, clientUpdateTx, int64(7)).Return(nil).Once()
-	database.On("ClientLoadWebOrigins", mock.Anything, clientUpdateTx, mock.Anything).Return(nil).Once()
+	expectStoredWebOrigins(database)
 	var created string
 	database.On("CreateWebOrigin", mock.Anything, clientUpdateTx, mock.Anything).
 		Run(func(args mock.Arguments) { created = args.Get(2).(*models.WebOrigin).Origin }).Return(nil).Once()
@@ -676,11 +699,172 @@ func TestHandleAPIClientWebOriginsPut_AnOriginAtTheBoundIsStored(t *testing.T) {
 
 	rr := httptest.NewRecorder()
 	handler := HandleAPIClientWebOriginsPut(database, auditLogger)
-	handler.ServeHTTP(rr, webOriginsPutRequest(t, "7", []string{origin}))
+	handler.ServeHTTP(rr, webOriginsPutRequest(t, "7", webOriginsBody(t, []string{origin}, []string{})))
 
 	assert.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
 	assert.Equal(t, origin, created)
 	database.AssertExpectations(t)
+}
+
+// Two saves of one client's list that both add the same origin at the same moment: no row lock
+// serializes them, so both pass their reads, and web_origins' unique key on (origin, client_id)
+// refuses the second insert. That whole save rolls back and answers 409 CONCURRENT_UPDATE, the
+// conflict an administrator resolves by reloading, rather than a 500 that says nothing; nothing is
+// audited (#428).
+func TestHandleAPIClientWebOriginsPut_AUniqueKeyRaceIsAConflict(t *testing.T) {
+	database := mocks_data.NewDatabase(t)
+	auditLogger := mocks_audit.NewAuditLogger(t)
+
+	expectWebOriginsClient(database)
+	stub := mocks_data.ExpectRunInTransaction(database, clientUpdateTx)
+	expectStoredWebOrigins(database)
+	refused := errs.Errorf("%w: %w", data.ErrUniqueViolation, errs.New("duplicate key value violates unique constraint \"idx_web_origins_origin_client\""))
+	database.On("CreateWebOrigin", mock.Anything, clientUpdateTx, mock.Anything).Return(refused).Once()
+
+	rr := httptest.NewRecorder()
+	HandleAPIClientWebOriginsPut(database, auditLogger).ServeHTTP(rr, webOriginsPutRequest(t, "7",
+		webOriginsBody(t, []string{"https://a.example.com"}, []string{})))
+
+	assert.Equal(t, http.StatusConflict, rr.Code, rr.Body.String())
+	code, _ := decodeErrorEnvelope(t, rr)
+	assert.Equal(t, "CONCURRENT_UPDATE", code)
+	assert.ErrorIs(t, stub.BodyErr, data.ErrUniqueViolation, "the body hands the refusal to the helper, which rolls back")
+	database.AssertExpectations(t)
+	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
+}
+
+// A loaded list that differs from the stored rows read on the transaction is a save from an
+// outdated page: 409 CONCURRENT_UPDATE, nothing written and nothing audited, where applying the
+// whole list would silently undo the change the caller never saw (#428).
+func TestHandleAPIClientWebOriginsPut_AnOutdatedLoadedListIsRefused(t *testing.T) {
+	database := mocks_data.NewDatabase(t)
+	auditLogger := mocks_audit.NewAuditLogger(t)
+
+	expectWebOriginsClient(database)
+	stub := mocks_data.ExpectRunInTransaction(database, clientUpdateTx)
+	expectStoredWebOrigins(database,
+		models.WebOrigin{Id: 11, ClientId: 7, Origin: "https://a.example.com"},
+		models.WebOrigin{Id: 12, ClientId: 7, Origin: "https://added-meanwhile.example.com"},
+	)
+
+	rr := httptest.NewRecorder()
+	HandleAPIClientWebOriginsPut(database, auditLogger).ServeHTTP(rr, webOriginsPutRequest(t, "7",
+		webOriginsBody(t, []string{"https://a.example.com", "https://b.example.com"}, []string{"https://a.example.com"})))
+
+	assert.Equal(t, http.StatusConflict, rr.Code)
+	code, _ := decodeErrorEnvelope(t, rr)
+	assert.Equal(t, "CONCURRENT_UPDATE", code)
+	assert.ErrorIs(t, stub.BodyErr, errListChanged, "the body refuses, so the helper rolls back")
+	database.AssertExpectations(t)
+	assertNotAttemptedOnClientDatabase(t, database, "CreateWebOrigin", "DeleteWebOrigin")
+	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
+}
+
+// A loaded list equal to the stored one as a set proceeds: in another order, with a repeat, and in
+// a form that canonicalizes to the stored value, since the comparison is on the canonical origin
+// the rows are stored in; and [] against an empty stored list, which is a page that loaded no
+// origins and not a missing field (#428).
+func TestHandleAPIClientWebOriginsPut_ALoadedListEqualAsASetProceeds(t *testing.T) {
+	tests := []struct {
+		name     string
+		stored   []models.WebOrigin
+		expected []string
+	}{
+		{
+			name: "another order, a repeat and a non-canonical spelling",
+			stored: []models.WebOrigin{
+				{Id: 11, ClientId: 7, Origin: "https://a.example.com"},
+				{Id: 12, ClientId: 7, Origin: "https://b.example.com"},
+			},
+			expected: []string{"https://b.example.com", " HTTPS://A.Example.com/ ", "https://b.example.com"},
+		},
+		{name: "an empty loaded list against an empty stored list", stored: nil, expected: []string{}},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			database := mocks_data.NewDatabase(t)
+			auditLogger := mocks_audit.NewAuditLogger(t)
+
+			expectWebOriginsClient(database)
+			mocks_data.ExpectRunInTransaction(database, clientUpdateTx)
+			expectStoredWebOrigins(database, test.stored...)
+			for _, row := range test.stored {
+				database.On("DeleteWebOrigin", mock.Anything, clientUpdateTx, row.Id).Return(nil).Once()
+			}
+			database.On("CreateWebOrigin", mock.Anything, clientUpdateTx, mock.Anything).Return(nil).Once()
+			stubClientResponseLoads(database)
+			auditLogger.On("Log", mock.Anything, audit.AuditUpdatedWebOrigins, mock.Anything).Return().Once()
+
+			rr := httptest.NewRecorder()
+			HandleAPIClientWebOriginsPut(database, auditLogger).ServeHTTP(rr, webOriginsPutRequest(t, "7",
+				webOriginsBody(t, []string{"https://c.example.com"}, test.expected)))
+
+			assert.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+			database.AssertExpectations(t)
+		})
+	}
+}
+
+// Every refusal is decided before the transaction opens, so a refused save writes nothing: the
+// strict mock carries the client read and nothing else, and reaching RunInTransaction fails the
+// case. The loaded list is required, and each of its values must canonicalize, since one that does
+// not can match no stored row (#428); the wanted list's rules are #250's.
+func TestHandleAPIClientWebOriginsPut_ARefusedSaveNeverOpensTheTransaction(t *testing.T) {
+	tests := []struct {
+		name            string
+		body            string
+		wantDescription string
+	}{
+		{
+			name:            "the loaded list is absent",
+			body:            `{"webOrigins":["https://a.example.com"]}`,
+			wantDescription: "expectedWebOrigins is required",
+		},
+		{
+			name:            "the loaded list is null",
+			body:            `{"webOrigins":["https://a.example.com"],"expectedWebOrigins":null}`,
+			wantDescription: "expectedWebOrigins is required",
+		},
+		{
+			name:            "the loaded list carries a value that is not an origin",
+			body:            webOriginsBody(t, []string{"https://a.example.com"}, []string{"ftp://a.example.com"}),
+			wantDescription: "Invalid web origin in expectedWebOrigins: ftp://a.example.com",
+		},
+		{
+			name:            "an empty origin",
+			body:            webOriginsBody(t, []string{"https://a.example.com", "  "}, []string{}),
+			wantDescription: "Web origin cannot be empty",
+		},
+		{
+			name:            "a value that is not an origin",
+			body:            webOriginsBody(t, []string{"ftp://a.example.com"}, []string{}),
+			wantDescription: "Invalid web origin: ftp://a.example.com",
+		},
+		{
+			name:            "an origin repeated in another spelling",
+			body:            webOriginsBody(t, []string{"https://a.example.com", "HTTPS://A.EXAMPLE.COM/"}, []string{}),
+			wantDescription: "Duplicate web origins are not allowed",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			database := mocks_data.NewDatabase(t)
+			auditLogger := mocks_audit.NewAuditLogger(t)
+			expectWebOriginsClient(database)
+
+			rr := httptest.NewRecorder()
+			HandleAPIClientWebOriginsPut(database, auditLogger).ServeHTTP(rr, webOriginsPutRequest(t, "7", test.body))
+
+			assert.Equal(t, http.StatusBadRequest, rr.Code)
+			code, description := decodeErrorEnvelope(t, rr)
+			assert.Equal(t, "VALIDATION_ERROR", code)
+			assert.Contains(t, description, test.wantDescription)
+			database.AssertExpectations(t)
+			assertNotAttemptedOnClientDatabase(t, database, "RunInTransaction")
+		})
+	}
 }
 
 // =============================================================================

@@ -370,8 +370,8 @@ func TestGetPermissionsByIds_RefusesAnAlreadyCancelledContext(t *testing.T) {
 }
 
 // AcquireClientRow is this batch's row acquisition, the client-side twin of
-// AcquireUserSessionRow: HandleAPIClientAuthenticationPut and HandleAPIClientWebOriginsPut take
-// the client row before reading what they are about to replace. It is an ExecSql rather than a
+// AcquireUserSessionRow: updateClientNotOwningAuthenticationMode takes the client row before
+// re-reading the authentication mode it is about to write back (#245). It is an ExecSql rather than a
 // QuerySql, which is the other of the two SQL chokepoints, so it is the case that would fail if
 // only the query half of this batch carried the context through.
 func TestAcquireClientRow_RefusesAnAlreadyCancelledContext(t *testing.T) {

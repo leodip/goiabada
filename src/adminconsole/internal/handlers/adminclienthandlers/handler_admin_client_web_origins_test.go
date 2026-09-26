@@ -26,6 +26,8 @@ import (
 type stubAllClientsApiClient struct {
 	stubApiClient
 	allClients []api.ClientResponse
+	// sentWebOrigins is the request the handler handed the API, for the pass-through cases.
+	sentWebOrigins *api.UpdateClientWebOriginsRequest
 }
 
 func (s *stubAllClientsApiClient) GetAllClients(_ context.Context, accessToken string) ([]api.ClientResponse, error) {
@@ -34,6 +36,7 @@ func (s *stubAllClientsApiClient) GetAllClients(_ context.Context, accessToken s
 
 func (s *stubAllClientsApiClient) UpdateClientWebOrigins(_ context.Context, accessToken string, clientId int64,
 	request *api.UpdateClientWebOriginsRequest) (*api.ClientResponse, error) {
+	s.sentWebOrigins = request
 	return nil, s.updateErr
 }
 
@@ -170,6 +173,15 @@ func TestHandleAdminClientWebOriginsPost_APIRefusalReachesTheBrowser(t *testing.
 			wantDescription: refusal,
 		},
 		{
+			// A save from an outdated page, or one that lost a race to add the same origin: the
+			// administrator is told to reload, not shown the generic error (#428).
+			name:            "a 409 is forwarded with its status and description",
+			apiErr:          &apiclient.APIError{Code: "CONCURRENT_UPDATE", Message: "The list was changed by another save after it was loaded.", StatusCode: http.StatusConflict},
+			wantStatus:      http.StatusConflict,
+			wantError:       "CONCURRENT_UPDATE",
+			wantDescription: "The list was changed by another save after it was loaded.",
+		},
+		{
 			name:            "a 500 from the API stays generic",
 			apiErr:          &apiclient.APIError{Code: "SERVER_ERROR", Message: "the database is on fire", StatusCode: http.StatusInternalServerError},
 			wantStatus:      http.StatusInternalServerError,
@@ -205,8 +217,74 @@ func TestHandleAdminClientWebOriginsPost_APIRefusalReachesTheBrowser(t *testing.
 			assert.Equal(t, tc.wantError, response["error"])
 			assert.Contains(t, response["error_description"], tc.wantDescription)
 
-			if tc.wantStatus != http.StatusBadRequest {
+			if tc.wantStatus != http.StatusBadRequest && tc.wantStatus != http.StatusConflict {
 				assert.NotContains(t, response["error_description"], "the database is on fire")
+			}
+		})
+	}
+}
+
+// The page posts the list as it loaded it beside the list it wants, and the handler hands both to
+// the API unchanged: the auth server compares the loaded list with what is stored and refuses a
+// save from an outdated page (#428). The empty and absent rows pin the distinction the API reads:
+// [] is a page that loaded an empty list and must reach the wire as [], and a body without the
+// field must reach it as null, which the API refuses, rather than be defaulted to a list that
+// would pass the check.
+func TestHandleAdminClientWebOriginsPost_SendsTheLoadedList(t *testing.T) {
+
+	testCases := []struct {
+		name         string
+		body         string
+		wantWanted   []string
+		wantExpected []string
+	}{
+		{
+			name:         "the loaded list passes through beside the wanted one",
+			body:         `{"clientId":1,"webOrigins":["https://a.example","https://c.example"],"expectedWebOrigins":["https://a.example","https://b.example"]}`,
+			wantWanted:   []string{"https://a.example", "https://c.example"},
+			wantExpected: []string{"https://a.example", "https://b.example"},
+		},
+		{
+			name:         "an empty loaded list stays an empty list",
+			body:         `{"clientId":1,"webOrigins":["https://a.example"],"expectedWebOrigins":[]}`,
+			wantWanted:   []string{"https://a.example"},
+			wantExpected: []string{},
+		},
+		{
+			name:         "an absent loaded list stays absent",
+			body:         `{"clientId":1,"webOrigins":["https://a.example"]}`,
+			wantWanted:   []string{"https://a.example"},
+			wantExpected: nil,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			httpHelper := handlerhelpers.NewHttpHelper(nil, adminmiddleware.SettingsReader{})
+			req := handlertest.Request(http.MethodPost, "/admin/clients/1/web-origins",
+				handlertest.WithAccessToken(),
+				handlertest.WithBody(bytes.NewBufferString(tc.body)),
+			)
+			rec := httptest.NewRecorder()
+
+			// The API refuses, so the handler returns before the nil session is touched; the
+			// request it sent is what is under test.
+			stub := &stubAllClientsApiClient{stubApiClient: stubApiClient{
+				updateErr: &apiclient.APIError{Code: "VALIDATION_ERROR", Message: "refused", StatusCode: http.StatusBadRequest}}}
+			HandleAdminClientWebOriginsPost(httpHelper, nil, stub).ServeHTTP(rec, req)
+
+			if !assert.NotNil(t, stub.sentWebOrigins) {
+				return
+			}
+			assert.Equal(t, tc.wantWanted, stub.sentWebOrigins.WebOrigins)
+			assert.Equal(t, tc.wantExpected, stub.sentWebOrigins.ExpectedWebOrigins)
+
+			wire, err := json.Marshal(stub.sentWebOrigins)
+			assert.NoError(t, err)
+			if tc.wantExpected == nil {
+				assert.Contains(t, string(wire), `"expectedWebOrigins":null`)
+			} else if len(tc.wantExpected) == 0 {
+				assert.Contains(t, string(wire), `"expectedWebOrigins":[]`)
 			}
 		})
 	}

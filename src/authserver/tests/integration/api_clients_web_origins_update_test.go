@@ -17,6 +17,7 @@ import (
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/stringutil"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // PUT /api/v1/admin/clients/{id}/web-origins
@@ -52,7 +53,8 @@ func TestAPIClientWebOriginsPut_Success_AddRemoveAndNormalize(t *testing.T) {
 	// Desired: keep A (with spaces and uppercase to test trimming+lowercasing), remove B, add C
 	originAMixed := "  HTTPS://A.EXAMPLE.COM  "
 	originC := "https://c.example.com"
-	reqBody := api.UpdateClientWebOriginsRequest{WebOrigins: []string{originAMixed, originC}}
+	reqBody := api.UpdateClientWebOriginsRequest{WebOrigins: []string{originAMixed, originC},
+		ExpectedWebOrigins: getClientWebOrigins(t, accessToken, client.Id)}
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/web-origins"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
@@ -113,7 +115,7 @@ func TestAPIClientWebOriginsPut_AuthCodeDisabledAccepted(t *testing.T) {
 	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
 	origin := "https://spa-" + strings.ToLower(fake.LetterN(8)) + ".example.com"
-	reqBody := api.UpdateClientWebOriginsRequest{WebOrigins: []string{origin}}
+	reqBody := api.UpdateClientWebOriginsRequest{WebOrigins: []string{origin}, ExpectedWebOrigins: getClientWebOrigins(t, accessToken, client.Id)}
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/web-origins"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
 	defer func() { _ = resp.Body.Close() }()
@@ -176,7 +178,7 @@ func TestAPIClientWebOriginsPut_StoresTheCanonicalOrigin(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			reqBody := api.UpdateClientWebOriginsRequest{WebOrigins: []string{tc.sent}}
+			reqBody := api.UpdateClientWebOriginsRequest{WebOrigins: []string{tc.sent}, ExpectedWebOrigins: getClientWebOrigins(t, accessToken, client.Id)}
 			resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
 			defer func() { _ = resp.Body.Close() }()
 			assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -214,7 +216,8 @@ func TestAPIClientWebOriginsPut_SystemLevelClientAllowed(t *testing.T) {
 
 	// Update web origins (should succeed)
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(sysId, 10) + "/web-origins"
-	reqBody := api.UpdateClientWebOriginsRequest{WebOrigins: []string{"https://example.com", "https://localhost:3000"}}
+	reqBody := api.UpdateClientWebOriginsRequest{WebOrigins: []string{"https://example.com", "https://localhost:3000"},
+		ExpectedWebOrigins: getClientWebOrigins(t, accessToken, sysId)}
 	resp2 := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
 	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp2.StatusCode)
@@ -237,10 +240,11 @@ func TestAPIClientWebOriginsPut_ValidationErrors(t *testing.T) {
 	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
 	baseURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/web-origins"
+	loaded := getClientWebOrigins(t, accessToken, client.Id)
 
 	// Sub-test: Empty web origin value
 	t.Run("EmptyOrigin", func(t *testing.T) {
-		reqBody := api.UpdateClientWebOriginsRequest{WebOrigins: []string{"https://example.com", "  "}}
+		reqBody := api.UpdateClientWebOriginsRequest{WebOrigins: []string{"https://example.com", "  "}, ExpectedWebOrigins: loaded}
 		resp := makeAPIRequest(t, "PUT", baseURL, accessToken, reqBody)
 		defer func() { _ = resp.Body.Close() }()
 		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
@@ -257,7 +261,7 @@ func TestAPIClientWebOriginsPut_ValidationErrors(t *testing.T) {
 	// both (#250).
 	for _, sent := range []string{"not-a-url", "ftp://example.com", "https://user@example.com", "https://[2001:db8::1]"} {
 		t.Run("Refused_"+sent, func(t *testing.T) {
-			reqBody := api.UpdateClientWebOriginsRequest{WebOrigins: []string{sent}}
+			reqBody := api.UpdateClientWebOriginsRequest{WebOrigins: []string{sent}, ExpectedWebOrigins: loaded}
 			resp := makeAPIRequest(t, "PUT", baseURL, accessToken, reqBody)
 			defer func() { _ = resp.Body.Close() }()
 			assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
@@ -275,7 +279,7 @@ func TestAPIClientWebOriginsPut_ValidationErrors(t *testing.T) {
 	// alone. "https://example.com/" and "https://example.com" are one origin to a browser, and
 	// storing both is storing one row that can never match.
 	t.Run("DuplicateOrigins", func(t *testing.T) {
-		reqBody := api.UpdateClientWebOriginsRequest{WebOrigins: []string{"https://example.com", "HTTPS://EXAMPLE.COM/"}}
+		reqBody := api.UpdateClientWebOriginsRequest{WebOrigins: []string{"https://example.com", "HTTPS://EXAMPLE.COM/"}, ExpectedWebOrigins: loaded}
 		resp := makeAPIRequest(t, "PUT", baseURL, accessToken, reqBody)
 		defer func() { _ = resp.Body.Close() }()
 		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
@@ -339,13 +343,15 @@ func TestAPIClientWebOriginsPut_TheBoundIsTheLongestStandardOrigin(t *testing.T)
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/web-origins"
 
 	atTheBound := webOriginOfLength(t, 267)
-	resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateClientWebOriginsRequest{WebOrigins: []string{atTheBound}})
+	resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateClientWebOriginsRequest{WebOrigins: []string{atTheBound},
+		ExpectedWebOrigins: getClientWebOrigins(t, accessToken, client.Id)})
 	_ = resp.Body.Close()
 	assert.Equal(t, http.StatusOK, resp.StatusCode, "a 267-byte origin is the longest standards-valid one and must be admitted")
 	assert.Equal(t, []string{atTheBound}, getClientWebOrigins(t, accessToken, client.Id))
 
 	overTheBound := webOriginOfLength(t, 268)
-	resp = makeAPIRequest(t, "PUT", url, accessToken, api.UpdateClientWebOriginsRequest{WebOrigins: []string{overTheBound}})
+	resp = makeAPIRequest(t, "PUT", url, accessToken, api.UpdateClientWebOriginsRequest{WebOrigins: []string{overTheBound},
+		ExpectedWebOrigins: getClientWebOrigins(t, accessToken, client.Id)})
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	var errResp api.ErrorResponse
@@ -356,12 +362,85 @@ func TestAPIClientWebOriginsPut_TheBoundIsTheLongestStandardOrigin(t *testing.T)
 		"a refused save must leave the stored list as it was")
 }
 
+// newWebOriginsClient creates a client for a web-origins save and removes it when the test ends.
+func newWebOriginsClient(t *testing.T, prefix string) *models.Client {
+	t.Helper()
+	client := &models.Client{
+		ClientIdentifier:         prefix + strings.ToLower(fake.LetterN(8)),
+		Enabled:                  true,
+		IsPublic:                 true,
+		AuthorizationCodeEnabled: true,
+	}
+	require.NoError(t, database.CreateClient(context.Background(), nil, client))
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+	return client
+}
+
+// The list as loaded is required: absent or null is refused before anything is written, naming the
+// field, so no caller can save a whole list without saying what it replaces (#428).
+func TestAPIClientWebOriginsPut_TheLoadedListIsRequired(t *testing.T) {
+	accessToken, _ := createAdminClientWithToken(t)
+	client := newWebOriginsClient(t, "weborig-expected-")
+	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/web-origins"
+
+	bodies := map[string]interface{}{
+		"absent": map[string]interface{}{"webOrigins": []string{"https://a.example.com"}},
+		"null":   map[string]interface{}{"webOrigins": []string{"https://a.example.com"}, "expectedWebOrigins": nil},
+	}
+	for name, body := range bodies {
+		t.Run(name, func(t *testing.T) {
+			resp := makeAPIRequest(t, "PUT", url, accessToken, body)
+			defer func() { _ = resp.Body.Close() }()
+			assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+			var got map[string]interface{}
+			require.NoError(t, json.NewDecoder(resp.Body).Decode(&got))
+			assert.Equal(t, "VALIDATION_ERROR", got["error_code"])
+			assert.Contains(t, got["error_description"], "expectedWebOrigins is required")
+			assert.Empty(t, getClientWebOrigins(t, accessToken, client.Id))
+		})
+	}
+}
+
+// A save from an outdated page: two saves both read the same list, the first commits, and the
+// second, still carrying the list as it was before the first, is refused 409 CONCURRENT_UPDATE with
+// nothing written, where it used to replace the first save's list with its own and undo a change its
+// author never saw (#428). The loaded list is compared in canonical form, so the first save's
+// copy, spelled as a browser bar would give it, still matches.
+func TestAPIClientWebOriginsPut_AnOutdatedLoadedListIsRefused(t *testing.T) {
+	accessToken, _ := createAdminClientWithToken(t)
+	client := newWebOriginsClient(t, "weborig-outdated-")
+	require.NoError(t, database.CreateWebOrigin(context.Background(), nil,
+		&models.WebOrigin{ClientId: client.Id, Origin: "https://a.example.com"}))
+	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/web-origins"
+
+	loadedByBoth := getClientWebOrigins(t, accessToken, client.Id)
+
+	first := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateClientWebOriginsRequest{
+		WebOrigins:         []string{"https://a.example.com", "https://b.example.com"},
+		ExpectedWebOrigins: []string{"HTTPS://A.Example.com/"}})
+	defer func() { _ = first.Body.Close() }()
+	require.Equal(t, http.StatusOK, first.StatusCode)
+
+	second := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateClientWebOriginsRequest{
+		WebOrigins:         []string{"https://c.example.com"},
+		ExpectedWebOrigins: loadedByBoth})
+	defer func() { _ = second.Body.Close() }()
+	assert.Equal(t, http.StatusConflict, second.StatusCode)
+	var body map[string]interface{}
+	require.NoError(t, json.NewDecoder(second.Body).Decode(&body))
+	assert.Equal(t, "CONCURRENT_UPDATE", body["error_code"])
+	assert.Contains(t, body["error_description"], "reload it")
+
+	assert.ElementsMatch(t, []string{"https://a.example.com", "https://b.example.com"},
+		getClientWebOrigins(t, accessToken, client.Id), "the refused save wrote nothing")
+}
+
 func TestAPIClientWebOriginsPut_NotFound_InvalidId_InvalidBody_Unauthorized(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Not found
 	urlNF := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/999999/web-origins"
-	resp := makeAPIRequest(t, "PUT", urlNF, accessToken, api.UpdateClientWebOriginsRequest{WebOrigins: []string{"https://example.com"}})
+	resp := makeAPIRequest(t, "PUT", urlNF, accessToken, api.UpdateClientWebOriginsRequest{WebOrigins: []string{"https://example.com"}, ExpectedWebOrigins: []string{}})
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 	var nf map[string]interface{}
@@ -373,7 +452,7 @@ func TestAPIClientWebOriginsPut_NotFound_InvalidId_InvalidBody_Unauthorized(t *t
 
 	// Invalid id (non-numeric)
 	urlBad := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/abc/web-origins"
-	resp2 := makeAPIRequest(t, "PUT", urlBad, accessToken, api.UpdateClientWebOriginsRequest{WebOrigins: []string{"https://example.com"}})
+	resp2 := makeAPIRequest(t, "PUT", urlBad, accessToken, api.UpdateClientWebOriginsRequest{WebOrigins: []string{"https://example.com"}, ExpectedWebOrigins: []string{}})
 	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp2.StatusCode)
 	var bad map[string]interface{}
@@ -482,7 +561,7 @@ func TestAPIClientWebOriginsPut_InsufficientScope(t *testing.T) {
 	defer func() { _ = database.DeleteClient(context.Background(), nil, target.Id) }()
 
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(target.Id, 10) + "/web-origins"
-	reqBody := api.UpdateClientWebOriginsRequest{WebOrigins: []string{"https://example.com"}}
+	reqBody := api.UpdateClientWebOriginsRequest{WebOrigins: []string{"https://example.com"}, ExpectedWebOrigins: []string{}}
 	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusForbidden, resp.StatusCode)
