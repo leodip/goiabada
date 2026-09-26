@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"testing"
@@ -13,7 +15,9 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
+	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -796,4 +800,222 @@ func TestDCR_PublicClient_PKCERequiredIsWrittenExplicitly(t *testing.T) {
 		assert.Nil(t, client.PKCERequired,
 			"a confidential client must keep inheriting the global setting")
 	})
+}
+
+// countClientsThroughTheAdminAPI is how many clients the admin API lists, which is how a refused
+// registration is shown to have created nothing without reading a row behind the endpoint's back.
+func countClientsThroughTheAdminAPI(t *testing.T, adminToken string) int {
+	t.Helper()
+	resp := makeAPIRequest(t, "GET", config.GetAuthServer().BaseURL+"/api/v1/admin/clients", adminToken, nil)
+	defer func() { _ = resp.Body.Close() }()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	var body api.GetClientsResponse
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
+	return len(body.Clients)
+}
+
+// httpsRedirectURIOfBytes is a confidential client's https redirect URI of exactly n bytes.
+func httpsRedirectURIOfBytes(t *testing.T, host string, n int) string {
+	t.Helper()
+	prefix := "https://" + host + "/callback/"
+	uri := prefix + strings.Repeat("a", n-len(prefix))
+	require.Len(t, uri, n)
+	return uri
+}
+
+// The registration refusals #428 adds, over HTTP: each answers its RFC 7591 section 3.2.2 code and
+// leaves the client list as it was.
+func TestDCR_RefusalsForBoundsAndInconsistentGrantsCreateNothing(t *testing.T) {
+	enableDCR(t)
+	defer disableDCR(t)
+
+	adminToken, _ := createAdminClientWithToken(t)
+
+	tooMany := make([]string, models.RedirectURIsMaxPerClient+1)
+	for i := range tooMany {
+		tooMany[i] = fmt.Sprintf("https://dcr-bounds.example.com/callback/%d", i)
+	}
+
+	testCases := []struct {
+		name    string
+		request oidc.DynamicClientRegistrationRequest
+		code    string
+	}{
+		{"a public client asking for client_credentials", oidc.DynamicClientRegistrationRequest{
+			RedirectURIs:            []string{"http://localhost:3000/callback"},
+			TokenEndpointAuthMethod: "none",
+			GrantTypes:              []string{"authorization_code", "client_credentials"},
+		}, oidc.DCRErrorInvalidClientMetadata},
+		{"61 redirect URIs", oidc.DynamicClientRegistrationRequest{
+			RedirectURIs: tooMany,
+		}, oidc.DCRErrorInvalidRedirectURI},
+		{"a redirect URI of 2049 bytes", oidc.DynamicClientRegistrationRequest{
+			RedirectURIs: []string{httpsRedirectURIOfBytes(t, "dcr-bounds.example.com", models.RedirectURIMaxBytes+1)},
+		}, oidc.DCRErrorInvalidRedirectURI},
+		{"a redirect URI listed twice", oidc.DynamicClientRegistrationRequest{
+			RedirectURIs: []string{"https://dcr-bounds.example.com/cb", "https://dcr-bounds.example.com/cb"},
+		}, oidc.DCRErrorInvalidRedirectURI},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			before := countClientsThroughTheAdminAPI(t, adminToken)
+
+			tc.request.ClientName = "Refused Registration"
+			resp := makeDCRRequest(t, tc.request)
+			defer func() { _ = resp.Body.Close() }()
+
+			assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+			var errorResp oidc.DynamicClientRegistrationError
+			require.NoError(t, json.NewDecoder(resp.Body).Decode(&errorResp))
+			assert.Equal(t, tc.code, errorResp.Error)
+
+			assert.Equal(t, before, countClientsThroughTheAdminAPI(t, adminToken), "a refused registration creates no client")
+		})
+	}
+}
+
+// Both bounds met at once: 60 redirect URIs, one of them exactly 2048 bytes, are registered and read
+// back whole through the admin API.
+func TestDCR_ARegistrationAtTheBoundsIsStoredWhole(t *testing.T) {
+	enableDCR(t)
+	defer disableDCR(t)
+
+	adminToken, _ := createAdminClientWithToken(t)
+
+	uris := make([]string, models.RedirectURIsMaxPerClient)
+	uris[0] = httpsRedirectURIOfBytes(t, "dcr-bounds.example.com", models.RedirectURIMaxBytes)
+	for i := 1; i < len(uris); i++ {
+		uris[i] = fmt.Sprintf("https://dcr-bounds.example.com/callback/%d", i)
+	}
+
+	resp := makeDCRRequest(t, oidc.DynamicClientRegistrationRequest{
+		ClientName:   "At The Bounds",
+		RedirectURIs: uris,
+	})
+	defer func() { _ = resp.Body.Close() }()
+	require.Equal(t, http.StatusCreated, resp.StatusCode)
+
+	var registered oidc.DynamicClientRegistrationResponse
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&registered))
+
+	client, err := database.GetClientByClientIdentifier(context.Background(), nil, registered.ClientID)
+	require.NoError(t, err)
+	require.NotNil(t, client)
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+
+	detail := makeAPIRequest(t, "GET", config.GetAuthServer().BaseURL+"/api/v1/admin/clients/"+
+		strconv.FormatInt(client.Id, 10), adminToken, nil)
+	defer func() { _ = detail.Body.Close() }()
+	require.Equal(t, http.StatusOK, detail.StatusCode)
+
+	var body api.GetClientResponse
+	require.NoError(t, json.NewDecoder(detail.Body).Decode(&body))
+	stored := make([]string, 0, len(body.Client.RedirectURIs))
+	for _, uri := range body.Client.RedirectURIs {
+		stored = append(stored, uri.URI)
+	}
+	assert.ElementsMatch(t, uris, stored)
+}
+
+// A redirect URI at the bound is usable, not merely storable: issuance copies it into
+// codes.redirect_uri verbatim and the token request must repeat it identically (RFC 6749 section
+// 4.1.3), so a client registered with a 2048-byte URI completes authorize, code issuance and
+// redemption. CI runs this against both widened columns on every engine (#428).
+func TestDCR_ARedirectURIOfTheMaximumLengthCompletesTheAuthorizationCodeFlow(t *testing.T) {
+	enableDCR(t)
+	defer disableDCR(t)
+
+	redirectURI := httpsRedirectURIOfBytes(t, "dcr-long.example.com", models.RedirectURIMaxBytes)
+
+	resp := makeDCRRequest(t, oidc.DynamicClientRegistrationRequest{
+		ClientName:              "Long Callback",
+		RedirectURIs:            []string{redirectURI},
+		TokenEndpointAuthMethod: "client_secret_post",
+		GrantTypes:              []string{"authorization_code"},
+	})
+	defer func() { _ = resp.Body.Close() }()
+	require.Equal(t, http.StatusCreated, resp.StatusCode)
+
+	var registered oidc.DynamicClientRegistrationResponse
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&registered))
+	require.NotEmpty(t, registered.ClientSecret)
+
+	client, err := database.GetClientByClientIdentifier(context.Background(), nil, registered.ClientID)
+	require.NoError(t, err)
+	require.NotNil(t, client)
+	t.Cleanup(func() { _ = database.DeleteClient(context.Background(), nil, client.Id) })
+
+	user, password := createCeremonyUser(t)
+	httpClient := createHttpClient(t)
+
+	codeVerifier := fake.LetterN(64)
+	state := fake.LetterN(8)
+	authorizeURL := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + registered.ClientID +
+		"&redirect_uri=" + url.QueryEscape(redirectURI) +
+		"&response_type=code" +
+		"&code_challenge_method=S256" +
+		"&code_challenge=" + oauth.GeneratePKCECodeChallenge(codeVerifier) +
+		"&scope=" + url.QueryEscape("openid profile") +
+		"&state=" + state +
+		"&nonce=" + fake.LetterN(8)
+
+	page, err := httpClient.Get(authorizeURL)
+	require.NoError(t, err)
+	defer func() { _ = page.Body.Close() }()
+
+	location := assertRedirect(t, page, "/auth/level1")
+	page = loadPage(t, httpClient, location)
+	defer func() { _ = page.Body.Close() }()
+
+	location = assertRedirect(t, page, "/auth/pwd")
+	page = loadPage(t, httpClient, location)
+	defer func() { _ = page.Body.Close() }()
+
+	page = authenticateWithPassword(t, httpClient, location, page, user.Email, password)
+	defer func() { _ = page.Body.Close() }()
+
+	location = assertRedirect(t, page, "/auth/level1completed")
+	page = loadPage(t, httpClient, location)
+	defer func() { _ = page.Body.Close() }()
+
+	// A self-registered client is registered at level2_optional and this user has no OTP, so
+	// level 2 falls straight through.
+	location = assertRedirect(t, page, "/auth/level2")
+	page = loadPage(t, httpClient, location)
+	defer func() { _ = page.Body.Close() }()
+
+	location = assertRedirect(t, page, "/auth/completed")
+	page = loadPage(t, httpClient, location)
+	defer func() { _ = page.Body.Close() }()
+
+	location = assertRedirect(t, page, "/auth/consent")
+	page = loadPage(t, httpClient, location)
+	defer func() { _ = page.Body.Close() }()
+
+	page = postConsent(t, httpClient, location, page, []int{0, 1})
+	defer func() { _ = page.Body.Close() }()
+
+	location = assertRedirect(t, page, "/auth/issue")
+	page = loadPage(t, httpClient, location)
+	defer func() { _ = page.Body.Close() }()
+
+	require.True(t, strings.HasPrefix(page.Header.Get("Location"), redirectURI+"?"),
+		"the code is delivered to the registered 2048-byte redirect URI")
+	codeVal, stateVal := getCodeAndStateFromUrl(t, page)
+	assert.Equal(t, state, stateVal)
+	assert.Equal(t, redirectURI, loadCodeFromDatabase(t, codeVal).RedirectURI,
+		"the code row holds the whole redirect URI")
+
+	tokens := postToTokenEndpoint(t, httpClient, config.GetAuthServer().BaseURL+"/auth/token/", url.Values{
+		"grant_type":    {"authorization_code"},
+		"client_id":     {registered.ClientID},
+		"client_secret": {registered.ClientSecret},
+		"code":          {codeVal},
+		"redirect_uri":  {redirectURI},
+		"code_verifier": {codeVerifier},
+	})
+	require.Nil(t, tokens["error"], "the redemption was refused: %v", tokens["error_description"])
+	assert.NotEmpty(t, tokens["access_token"])
 }

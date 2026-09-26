@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"database/sql"
 	"fmt"
 	"image"
 	"image/color"
@@ -172,11 +173,18 @@ func paddingTestSettings() *models.Settings {
 	return &models.Settings{Id: 1, AppName: "Goiabada", DynamicClientRegistrationEnabled: true}
 }
 
+// paddingDCRTx is the transaction the registration's writes are stubbed on.
+var paddingDCRTx = &sql.Tx{}
+
 func TestBodyLimitPadding_DynamicClientRegistration(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	database.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(paddingTestSettings(), nil)
-	database.On("CreateClient", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-	database.On("CreateRedirectURI", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	// One registration per request, and the helper sends two: with a Content-Length and chunked.
+	for range 2 {
+		mocks_data.ExpectRunInTransaction(database, paddingDCRTx)
+	}
+	database.On("CreateClient", mock.Anything, paddingDCRTx, mock.Anything).Return(nil)
+	database.On("CreateRedirectURI", mock.Anything, paddingDCRTx, mock.Anything).Return(nil)
 	server, counts := newPaddingTestServer(t, database)
 
 	assertReadNoFurtherThanTheValue(t, server, counts, paddedRequest{

@@ -57,8 +57,9 @@ func TestCutBody_DynamicClientRegistration(t *testing.T) {
 
 	t.Run("at exactly the limit the client is registered", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
-		database.On("CreateClient", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
-		database.On("CreateRedirectURI", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+		mocks_data.ExpectRunInTransaction(database, dcrTx)
+		database.On("CreateClient", mock.Anything, dcrTx, mock.Anything).Return(nil).Once()
+		database.On("CreateRedirectURI", mock.Anything, dcrTx, mock.Anything).Return(nil).Once()
 		auditLogger := mocks_audit.NewAuditLogger(t)
 		auditLogger.On("Log", mock.Anything, audit.AuditDynamicClientRegistration, mock.Anything).Return().Once()
 
@@ -81,6 +82,7 @@ func TestCutBody_DynamicClientRegistration(t *testing.T) {
 		var envelope oidc.DynamicClientRegistrationError
 		require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &envelope))
 		assert.Equal(t, oidc.DCRErrorInvalidClientMetadata, envelope.Error)
+		database.AssertNotCalled(t, "RunInTransaction", mock.Anything, mock.Anything)
 		database.AssertNotCalled(t, "CreateClient", mock.Anything, mock.Anything, mock.Anything)
 	})
 }

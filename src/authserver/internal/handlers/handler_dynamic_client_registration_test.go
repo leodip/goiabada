@@ -1,11 +1,27 @@
 package handlers
 
 import (
+	"bytes"
+	"context"
+	"database/sql"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/audit"
+	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
+	"github.com/leodip/goiabada/authserver/internal/constants"
+	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	mocks_handlerhelpers "github.com/leodip/goiabada/authserver/internal/handlerhelpers/mocks"
+	"github.com/leodip/goiabada/authserver/internal/models"
+	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/uuidutil"
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -201,4 +217,304 @@ func TestGenerateDCRClientIdentifier_IsThePrefixAndAUUID(t *testing.T) {
 	assert.Equal(t, rest, parsed, "the generator must emit the canonical lowercase form")
 
 	assert.NotEqual(t, first, generateDCRClientIdentifier(), "each call must draw a fresh value")
+}
+
+// RFC 6749 section 4.4 makes the client credentials grant confidential-only, and RFC 7591 section
+// 2.1 names invalid_client_metadata as the answer to a registration that asks for an inconsistent
+// state, so a public client asking for it is refused, alone or beside other grants, and the same
+// grant lists stay accepted for either confidential method (#428).
+func TestValidateDCRRequest_APublicClientCannotAskForClientCredentials(t *testing.T) {
+	tests := []struct {
+		authMethod string
+		grants     []string
+		accepted   bool
+	}{
+		{"none", []string{"client_credentials"}, false},
+		{"none", []string{"authorization_code", "client_credentials"}, false},
+		{"none", []string{"authorization_code", "refresh_token"}, true},
+		{"client_secret_basic", []string{"client_credentials"}, true},
+		{"client_secret_basic", []string{"authorization_code", "client_credentials"}, true},
+		{"client_secret_post", []string{"client_credentials"}, true},
+		{"client_secret_post", []string{"authorization_code", "client_credentials"}, true},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.authMethod+" "+strings.Join(tc.grants, ","), func(t *testing.T) {
+			err := validateDCRRequest(&oidc.DynamicClientRegistrationRequest{
+				TokenEndpointAuthMethod: tc.authMethod,
+				GrantTypes:              tc.grants,
+			})
+			if tc.accepted {
+				assert.NoError(t, err)
+				return
+			}
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "cannot use the client_credentials grant")
+		})
+	}
+}
+
+// sizedRedirectURI is a public client's custom-scheme redirect URI of exactly n bytes: fill repeated
+// as far as it fits, then ASCII to land on n. A multi-byte fill is what makes the byte bound differ
+// from a bound in runes, which would admit a 2049-byte value of emoji as about 520 characters.
+func sizedRedirectURI(t *testing.T, fill string, n int) string {
+	t.Helper()
+	uri := "myapp://cb/"
+	for len(uri)+len(fill) <= n {
+		uri += fill
+	}
+	uri += strings.Repeat("a", n-len(uri))
+	require.Len(t, uri, n, "the case must sit exactly on its byte count")
+	return uri
+}
+
+// The redirect URI bounds are storage's (models.RedirectURIsMaxPerClient, RedirectURIMaxBytes) and
+// every refusal is the "check redirect_uris" one, so each row is one list varied from an accepted
+// one by the thing under test (#428).
+func TestValidateDCRRedirectURIs_Bounds(t *testing.T) {
+	uris := func(n int) []string {
+		list := make([]string, n)
+		for i := range list {
+			list[i] = fmt.Sprintf("myapp://cb/%d", i)
+		}
+		return list
+	}
+
+	tests := []struct {
+		name     string
+		uris     []string
+		accepted bool
+		message  string
+	}{
+		{"60 URIs", uris(60), true, ""},
+		{"61 URIs", uris(61), false, "more than 60 entries"},
+		{"2048 bytes of ASCII", []string{sizedRedirectURI(t, "a", 2048)}, true, ""},
+		{"2049 bytes of ASCII", []string{sizedRedirectURI(t, "a", 2049)}, false, "exceed 2048 bytes"},
+		{"2048 bytes of two-byte characters", []string{sizedRedirectURI(t, "é", 2048)}, true, ""},
+		{"2049 bytes of two-byte characters", []string{sizedRedirectURI(t, "é", 2049)}, false, "exceed 2048 bytes"},
+		{"2048 bytes of four-byte characters", []string{sizedRedirectURI(t, "😀", 2048)}, true, ""},
+		{"2049 bytes of four-byte characters", []string{sizedRedirectURI(t, "😀", 2049)}, false, "exceed 2048 bytes"},
+		{"a URI listed twice", []string{"myapp://cb/a", "myapp://cb/b", "myapp://cb/a"}, false, "listed more than once"},
+		{"two URIs differing only in case", []string{"myapp://cb/A", "myapp://cb/a"}, true, ""},
+		// Also malformed, and answered with the length: the bound is checked before anything
+		// parses the value.
+		{"an overlong value that is also malformed", []string{"not a uri " + strings.Repeat("a", 2040)}, false, "exceed 2048 bytes"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			err := validateDCRRedirectURIs(&oidc.DynamicClientRegistrationRequest{
+				TokenEndpointAuthMethod: "none",
+				GrantTypes:              []string{"authorization_code"},
+				RedirectURIs:            tc.uris,
+			})
+			if tc.accepted {
+				assert.NoError(t, err)
+				return
+			}
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tc.message)
+		})
+	}
+}
+
+// dcrTx is the transaction the stub hands the registration's body, so a write asserted on it is
+// one made inside the transaction and not one moved back outside it.
+var dcrTx = &sql.Tx{}
+
+func serveDCR(t *testing.T, request oidc.DynamicClientRegistrationRequest, httpHelper *mocks_handlerhelpers.HttpHelper,
+	database *mocks_data.Database, auditLogger *mocks_audit.AuditLogger) *httptest.ResponseRecorder {
+
+	t.Helper()
+	body, err := json.Marshal(request)
+	require.NoError(t, err)
+
+	req := httptest.NewRequest(http.MethodPost, "/connect/register", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings,
+		&models.Settings{Id: 1, DynamicClientRegistrationEnabled: true}))
+
+	rr := httptest.NewRecorder()
+	HandleDynamicClientRegistrationPost(httpHelper, database, auditLogger).ServeHTTP(rr, req)
+	return rr
+}
+
+func decodeDCRError(t *testing.T, rr *httptest.ResponseRecorder) oidc.DynamicClientRegistrationError {
+	t.Helper()
+	var envelope oidc.DynamicClientRegistrationError
+	require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &envelope))
+	return envelope
+}
+
+var confidentialTwoURIRegistration = oidc.DynamicClientRegistrationRequest{
+	ClientName:   "A Test Client",
+	RedirectURIs: []string{"https://client.example.com/one", "https://client.example.com/two"},
+}
+
+// The client and every redirect URI are written on the one transaction, and the audit event
+// follows its commit, so an event never names a client that was rolled back (#428).
+func TestHandleDynamicClientRegistrationPost_WritesTheClientAndItsRedirectURIsInOneTransaction(t *testing.T) {
+	database := mocks_data.NewDatabase(t)
+	auditLogger := mocks_audit.NewAuditLogger(t)
+	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+
+	var events []string
+	note := func(event string) { events = append(events, event) }
+
+	mocks_data.ExpectRunInTransaction(database, dcrTx, note)
+	database.On("CreateClient", mock.Anything, dcrTx, mock.Anything).
+		Run(func(args mock.Arguments) {
+			args.Get(2).(*models.Client).Id = 42
+			note("client")
+		}).Return(nil).Once()
+	for _, uri := range confidentialTwoURIRegistration.RedirectURIs {
+		database.On("CreateRedirectURI", mock.Anything, dcrTx, mock.MatchedBy(func(r *models.RedirectURI) bool {
+			return r.ClientId == 42 && r.URI == uri
+		})).Run(func(mock.Arguments) { note("redirect uri") }).Return(nil).Once()
+	}
+	auditLogger.On("Log", mock.Anything, audit.AuditDynamicClientRegistration, mock.Anything).
+		Run(func(mock.Arguments) { note("audit") }).Return().Once()
+	httpHelper.On("EncodeJson", mock.Anything, mock.Anything, mock.Anything).Return().Once()
+
+	rr := serveDCR(t, confidentialTwoURIRegistration, httpHelper, database, auditLogger)
+
+	assert.Equal(t, http.StatusCreated, rr.Code)
+	assert.Equal(t, []string{"begin", "client", "redirect uri", "redirect uri", "commit", "audit"}, events)
+}
+
+// What the compensating delete used to stand for, now the transaction's: the second redirect URI
+// failing hands the helper an error, which is what rolls back the client and the first URI, and the
+// requester gets one server_error with nothing audited and no registration answered.
+func TestHandleDynamicClientRegistrationPost_AFailedSecondInsertCommitsNothing(t *testing.T) {
+	database := mocks_data.NewDatabase(t)
+	auditLogger := mocks_audit.NewAuditLogger(t)
+	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+
+	refused := errs.New("the engine refused the second redirect URI")
+	stub := mocks_data.ExpectRunInTransaction(database, dcrTx)
+	database.On("CreateClient", mock.Anything, dcrTx, mock.Anything).Return(nil).Once()
+	database.On("CreateRedirectURI", mock.Anything, dcrTx, mock.Anything).Return(nil).Once()
+	database.On("CreateRedirectURI", mock.Anything, dcrTx, mock.Anything).Return(refused).Once()
+
+	rr := serveDCR(t, confidentialTwoURIRegistration, httpHelper, database, auditLogger)
+
+	require.ErrorIs(t, stub.BodyErr, refused, "the body handed the helper the failure, so nothing was committed")
+	assert.Equal(t, http.StatusInternalServerError, rr.Code)
+	envelope := decodeDCRError(t, rr)
+	assert.Equal(t, "server_error", envelope.Error)
+	assert.Equal(t, "Failed to register client", envelope.ErrorDescription)
+	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
+	httpHelper.AssertNotCalled(t, "EncodeJson", mock.Anything, mock.Anything, mock.Anything)
+}
+
+func TestHandleDynamicClientRegistrationPost_AFailedClientInsertWritesNoRedirectURI(t *testing.T) {
+	database := mocks_data.NewDatabase(t)
+	auditLogger := mocks_audit.NewAuditLogger(t)
+	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+
+	refused := errs.New("the engine refused the client")
+	stub := mocks_data.ExpectRunInTransaction(database, dcrTx)
+	database.On("CreateClient", mock.Anything, dcrTx, mock.Anything).Return(refused).Once()
+
+	rr := serveDCR(t, confidentialTwoURIRegistration, httpHelper, database, auditLogger)
+
+	require.ErrorIs(t, stub.BodyErr, refused)
+	assert.Equal(t, http.StatusInternalServerError, rr.Code)
+	assert.Equal(t, "Failed to register client", decodeDCRError(t, rr).ErrorDescription)
+	database.AssertNotCalled(t, "CreateRedirectURI", mock.Anything, mock.Anything, mock.Anything)
+	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
+}
+
+// A public client is written through the one public-client rule: PKCE an explicit true, client
+// credentials off (#245, #428).
+func TestHandleDynamicClientRegistrationPost_APublicClientIsWrittenWithThePublicClientInvariants(t *testing.T) {
+	database := mocks_data.NewDatabase(t)
+	auditLogger := mocks_audit.NewAuditLogger(t)
+	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+
+	mocks_data.ExpectRunInTransaction(database, dcrTx)
+	database.On("CreateClient", mock.Anything, dcrTx, mock.MatchedBy(func(c *models.Client) bool {
+		return c.IsPublic && c.PKCERequired != nil && *c.PKCERequired && !c.ClientCredentialsEnabled
+	})).Return(nil).Once()
+	database.On("CreateRedirectURI", mock.Anything, dcrTx, mock.Anything).Return(nil).Once()
+	auditLogger.On("Log", mock.Anything, audit.AuditDynamicClientRegistration, mock.Anything).Return().Once()
+	httpHelper.On("EncodeJson", mock.Anything, mock.Anything, mock.Anything).Return().Once()
+
+	rr := serveDCR(t, oidc.DynamicClientRegistrationRequest{
+		ClientName:              "A Public Client",
+		RedirectURIs:            []string{"http://127.0.0.1:8765/callback"},
+		TokenEndpointAuthMethod: "none",
+		GrantTypes:              []string{"authorization_code", "refresh_token"},
+	}, httpHelper, database, auditLogger)
+
+	assert.Equal(t, http.StatusCreated, rr.Code)
+}
+
+// Every refusal is decided before the transaction opens, so none reaches RunInTransaction: the
+// strict mock has no expectation for it and would fail the case if it were called (#428).
+func TestHandleDynamicClientRegistrationPost_ARefusalNeverReachesTheTransaction(t *testing.T) {
+	manyURIs := make([]string, models.RedirectURIsMaxPerClient+1)
+	for i := range manyURIs {
+		manyURIs[i] = fmt.Sprintf("https://client.example.com/%d", i)
+	}
+
+	tests := []struct {
+		name    string
+		request oidc.DynamicClientRegistrationRequest
+		code    string
+	}{
+		{"a public client asking for client_credentials", oidc.DynamicClientRegistrationRequest{
+			RedirectURIs:            []string{"http://127.0.0.1:8765/callback"},
+			TokenEndpointAuthMethod: "none",
+			GrantTypes:              []string{"authorization_code", "client_credentials"},
+		}, oidc.DCRErrorInvalidClientMetadata},
+		{"one redirect URI past the count", oidc.DynamicClientRegistrationRequest{
+			RedirectURIs: manyURIs,
+		}, oidc.DCRErrorInvalidRedirectURI},
+		{"a redirect URI one byte past the length", oidc.DynamicClientRegistrationRequest{
+			RedirectURIs: []string{"https://client.example.com/" + strings.Repeat("a", models.RedirectURIMaxBytes+1-len("https://client.example.com/"))},
+		}, oidc.DCRErrorInvalidRedirectURI},
+		{"a redirect URI listed twice", oidc.DynamicClientRegistrationRequest{
+			RedirectURIs: []string{"https://client.example.com/cb", "https://client.example.com/cb"},
+		}, oidc.DCRErrorInvalidRedirectURI},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			database := mocks_data.NewDatabase(t)
+
+			rr := serveDCR(t, tc.request, mocks_handlerhelpers.NewHttpHelper(t), database, mocks_audit.NewAuditLogger(t))
+
+			assert.Equal(t, http.StatusBadRequest, rr.Code)
+			assert.Equal(t, tc.code, decodeDCRError(t, rr).Error)
+			database.AssertNotCalled(t, "RunInTransaction", mock.Anything, mock.Anything)
+		})
+	}
+}
+
+// A description interpolating request text is conformed like the authorization and token
+// endpoints': RFC 7591 section 3.2.2 makes it ASCII, and RFC 6749 Appendix A.8's NQSCHAR is what the
+// conformer admits, bounded to 512 bytes. The value is 3000 bytes carrying a double quote, a
+// backslash and a non-ASCII character, which before this came back as a 3029-byte description with
+// all three in it (#428).
+func TestHandleDynamicClientRegistrationPost_ADescriptionEchoingRequestTextIsConformed(t *testing.T) {
+	grantType := `x"y\z é ` + strings.Repeat("a", 3000-len(`x"y\z é `))
+	require.Len(t, grantType, 3000)
+
+	rr := serveDCR(t, oidc.DynamicClientRegistrationRequest{
+		RedirectURIs: []string{"https://client.example.com/cb"},
+		GrantTypes:   []string{grantType},
+	}, mocks_handlerhelpers.NewHttpHelper(t), mocks_data.NewDatabase(t), mocks_audit.NewAuditLogger(t))
+
+	assert.Equal(t, http.StatusBadRequest, rr.Code)
+	envelope := decodeDCRError(t, rr)
+	assert.Equal(t, oidc.DCRErrorInvalidClientMetadata, envelope.Error)
+	assert.True(t, strings.HasPrefix(envelope.ErrorDescription, "unsupported grant_type: x?y?z ? "),
+		"each forbidden character is replaced, not dropped: %q", envelope.ErrorDescription[:40])
+	assert.LessOrEqual(t, len(envelope.ErrorDescription), 512)
+	for i := 0; i < len(envelope.ErrorDescription); i++ {
+		b := envelope.ErrorDescription[i]
+		assert.True(t, b >= 0x20 && b <= 0x7E && b != '"' && b != '\\',
+			"byte %#x at %d is outside RFC 6749 Appendix A.8's NQSCHAR", b, i)
+	}
 }
