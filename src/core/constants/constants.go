@@ -5,7 +5,6 @@ const (
 
 	AuthServerResourceIdentifier = "authserver"
 
-	UserinfoPermissionIdentifier      = "userinfo"
 	ManageAccountPermissionIdentifier = "manage-account"
 	ManagePermissionIdentifier        = "manage"
 
@@ -27,7 +26,6 @@ const (
 // "authserver" resource that are required by Goiabada's runtime scope checks.
 // These cannot be renamed or deleted.
 var BuiltInAuthServerPermissionIdentifiers = []string{
-	UserinfoPermissionIdentifier,
 	ManageAccountPermissionIdentifier,
 	ManagePermissionIdentifier,
 	AdminReadPermissionIdentifier,

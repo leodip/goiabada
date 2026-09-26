@@ -25,6 +25,41 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// The system resource's permissions are answered as stored. The read used to drop the userinfo
+// row, which the save then demanded as a built-in, so a save built from the read was refused
+// (#449); nothing is special-cased now, a row that happens to be identified userinfo included.
+func TestHandleAPIPermissionsByResourceGet_TheSystemResourceIsAnsweredAsStored(t *testing.T) {
+	database := mocks_data.NewDatabase(t)
+
+	system := &models.Resource{Id: 1, ResourceIdentifier: constants.AuthServerResourceIdentifier}
+	stored := []models.Permission{
+		{Id: 10, PermissionIdentifier: "userinfo", ResourceId: 1, Description: "Created by an administrator"},
+		{Id: 11, PermissionIdentifier: constants.ManageAccountPermissionIdentifier, ResourceId: 1, Description: "Manage account"},
+		{Id: 12, PermissionIdentifier: constants.ManagePermissionIdentifier, ResourceId: 1, Description: "Manage"},
+	}
+	database.On("GetPermissionsByResourceId", mock.Anything, (*sql.Tx)(nil), int64(1)).Return(stored, nil).Once()
+	database.On("PermissionsLoadResources", mock.Anything, (*sql.Tx)(nil), mock.Anything).
+		Run(func(args mock.Arguments) {
+			for i := range args.Get(2).([]models.Permission) {
+				args.Get(2).([]models.Permission)[i].Resource = *system
+			}
+		}).Return(nil).Once()
+
+	req := setChiURLParam(httptest.NewRequest(http.MethodGet, "/api/v1/admin/resources/1/permissions", nil), "resourceId", "1")
+	rr := httptest.NewRecorder()
+	HandleAPIPermissionsByResourceGet(database).ServeHTTP(rr, req)
+
+	require.Equal(t, http.StatusOK, rr.Code)
+	var response api.GetPermissionsByResourceResponse
+	require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &response))
+	identifiers := make([]string, 0, len(response.Permissions))
+	for _, p := range response.Permissions {
+		identifiers = append(identifiers, p.PermissionIdentifier)
+	}
+	assert.Equal(t, []string{"userinfo", constants.ManageAccountPermissionIdentifier, constants.ManagePermissionIdentifier}, identifiers)
+	database.AssertExpectations(t)
+}
+
 // TestHandleAPIResourcePermissionsPut_BuiltInPermissionMissingFromDB verifies that when
 // a built-in permission is missing from the system resource's database rows, the handler
 // returns HTTP 500 with an appropriate integrity error message.
@@ -45,7 +80,6 @@ func TestHandleAPIResourcePermissionsPut_BuiltInPermissionMissingFromDB(t *testi
 
 	// Return existing permissions that are MISSING the "manage" built-in permission
 	existingPerms := []models.Permission{
-		{Id: 10, PermissionIdentifier: constants.UserinfoPermissionIdentifier, ResourceId: 1, Description: "Userinfo"},
 		{Id: 11, PermissionIdentifier: constants.ManageAccountPermissionIdentifier, ResourceId: 1, Description: "Manage account"},
 		// "manage" is intentionally missing
 		{Id: 13, PermissionIdentifier: constants.AdminReadPermissionIdentifier, ResourceId: 1, Description: "Admin read"},
@@ -488,7 +522,7 @@ func TestHandleAPIResourcePermissionsPut_ALoadedListEqualAsASetProceeds(t *testi
 // strict mock carries the reads each refusal needs and nothing else, and reaching RunInTransaction
 // fails the case. The loaded list is required (#428); the identifier rule is the one the update
 // and create loops applied, stated against the rows read here; and the system resource keeps its
-// built-in protection, userinfo included (decision 18 of #428 leaves that page's save as it is).
+// built-in protection, each of the seven refused on delete and on rename.
 func TestHandleAPIResourcePermissionsPut_ARefusedSaveNeverOpensTheTransaction(t *testing.T) {
 	stored := resourcePermsStored()
 	loaded := loadedEntries(stored)
@@ -502,14 +536,17 @@ func TestHandleAPIResourcePermissionsPut_ARefusedSaveNeverOpensTheTransaction(t 
 	for i, identifier := range constants.BuiltInAuthServerPermissionIdentifiers {
 		builtIns = append(builtIns, models.Permission{Id: int64(40 + i), ResourceId: resourcePermsId, PermissionIdentifier: identifier, Description: identifier})
 	}
-	withoutUserinfo := make([]api.ResourcePermissionUpsert, 0, len(builtIns))
-	for _, p := range loadedEntries(builtIns) {
-		if p.PermissionIdentifier != constants.UserinfoPermissionIdentifier {
-			withoutUserinfo = append(withoutUserinfo, p)
-		}
+	without := func(i int) []api.ResourcePermissionUpsert {
+		wanted := loadedEntries(builtIns)
+		return append(wanted[:i:i], wanted[i+1:]...)
+	}
+	renamed := func(i int) []api.ResourcePermissionUpsert {
+		wanted := loadedEntries(builtIns)
+		wanted[i].PermissionIdentifier += "-renamed"
+		return wanted
 	}
 
-	variants := []struct {
+	type refusedSave struct {
 		name               string
 		resourceIdentifier string
 		stored             []models.Permission
@@ -517,7 +554,8 @@ func TestHandleAPIResourcePermissionsPut_ARefusedSaveNeverOpensTheTransaction(t 
 		wantStatus         int
 		wantCode           string
 		wantDescription    string
-	}{
+	}
+	variants := []refusedSave{
 		{
 			name:            "the loaded list is absent",
 			body:            `{"permissions":[]}`,
@@ -567,15 +605,28 @@ func TestHandleAPIResourcePermissionsPut_ARefusedSaveNeverOpensTheTransaction(t 
 			wantCode:        "VALIDATION_ERROR",
 			wantDescription: "Permission identifier read is already in use.",
 		},
-		{
-			name:               "the system resource's list without userinfo",
-			resourceIdentifier: constants.AuthServerResourceIdentifier,
-			stored:             builtIns,
-			body:               resourcePermsBody(t, withoutUserinfo, loadedEntries(builtIns)),
-			wantStatus:         http.StatusBadRequest,
-			wantCode:           "VALIDATION_ERROR",
-			wantDescription:    "Built-in permission 'userinfo' cannot be deleted.",
-		},
+	}
+	for i, identifier := range constants.BuiltInAuthServerPermissionIdentifiers {
+		variants = append(variants,
+			refusedSave{
+				name:               "the system resource's list without " + identifier,
+				resourceIdentifier: constants.AuthServerResourceIdentifier,
+				stored:             builtIns,
+				body:               resourcePermsBody(t, without(i), loadedEntries(builtIns)),
+				wantStatus:         http.StatusBadRequest,
+				wantCode:           "VALIDATION_ERROR",
+				wantDescription:    "Built-in permission '" + identifier + "' cannot be deleted.",
+			},
+			refusedSave{
+				name:               "the system resource's list with " + identifier + " renamed",
+				resourceIdentifier: constants.AuthServerResourceIdentifier,
+				stored:             builtIns,
+				body:               resourcePermsBody(t, renamed(i), loadedEntries(builtIns)),
+				wantStatus:         http.StatusBadRequest,
+				wantCode:           "VALIDATION_ERROR",
+				wantDescription:    "Built-in permission '" + identifier + "' cannot be renamed.",
+			},
+		)
 	}
 
 	for _, variant := range variants {

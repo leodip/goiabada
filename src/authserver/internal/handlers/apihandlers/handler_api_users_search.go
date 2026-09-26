@@ -9,7 +9,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/logging"
 )
@@ -19,7 +18,6 @@ import (
 type usersSearchDatabase interface {
 	GetGroupById(ctx context.Context, tx *sql.Tx, groupId int64) (*models.Group, error)
 	GetPermissionById(ctx context.Context, tx *sql.Tx, permissionId int64) (*models.Permission, error)
-	GetResourceById(ctx context.Context, tx *sql.Tx, resourceId int64) (*models.Resource, error)
 	SearchUsersPaginated(ctx context.Context, tx *sql.Tx, query string, page int, pageSize int) ([]models.User, int, error)
 	UsersLoadGroups(ctx context.Context, tx *sql.Tx, users []models.User) error
 	UsersLoadPermissions(ctx context.Context, tx *sql.Tx, users []models.User) error
@@ -136,7 +134,7 @@ func HandleAPIUsersSearchGet(
 				return
 			}
 
-			// Verify permission exists and enforce userinfo special case
+			// Verify the permission exists
 			perm, err := database.GetPermissionById(r.Context(), nil, permId)
 			if err != nil {
 				writeInternalServerError(w, r, errs.Wrap(err, "failed to get permission by ID"), "permission_id", permId)
@@ -144,15 +142,6 @@ func HandleAPIUsersSearchGet(
 			}
 			if perm == nil {
 				writeJSONError(w, "Permission not found", "NOT_FOUND", http.StatusNotFound)
-				return
-			}
-			resource, err := database.GetResourceById(r.Context(), nil, perm.ResourceId)
-			if err != nil {
-				writeInternalServerError(w, r, errs.Wrap(err, "failed to get resource for permission annotation"), "permission_id", permId)
-				return
-			}
-			if resource != nil && resource.ResourceIdentifier == constants.AuthServerResourceIdentifier && perm.PermissionIdentifier == constants.UserinfoPermissionIdentifier {
-				writeJSONError(w, "Operation not allowed for userinfo permission", "VALIDATION_ERROR", http.StatusBadRequest)
 				return
 			}
 

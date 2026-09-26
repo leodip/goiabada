@@ -746,7 +746,10 @@ func TestIsResourceScope(t *testing.T) {
 		want  bool
 	}{
 		{name: "resource and permission", scope: "backend-svc:read", want: true},
-		{name: "the built-in userinfo scope", scope: "authserver:userinfo", want: true},
+		// A refresh token issued before #449 can still name this in its stored grant. It is
+		// resource-shaped, so the refresh arm takes it to the permission check, which refuses it
+		// now that the permission is gone, rather than answering it as a scope never issued.
+		{name: "the legacy authserver:userinfo grant", scope: "authserver:userinfo", want: true},
 		{name: "a resource scope containing the offline text", scope: "res:offline_access_read", want: true},
 		{name: "separator only, two empty halves", scope: ":", want: true},
 		{name: "uppercase offline access", scope: "OFFLINE_ACCESS", want: false},

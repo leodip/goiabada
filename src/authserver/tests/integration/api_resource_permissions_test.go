@@ -13,6 +13,7 @@ import (
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestAPIResourcePermissionsGet tests the GET /api/v1/admin/resources/{resourceId}/permissions endpoint
@@ -164,35 +165,45 @@ func TestAPIResourcePermissionsGet_InvalidResourceId(t *testing.T) {
 	}
 }
 
-func TestAPIResourcePermissionsGet_AuthServerResourceFiltersUserinfo(t *testing.T) {
-	// Setup: Create admin client and get access token
+// The authserver resource's GET answers every permission stored on it: the seven built-ins, and any
+// other, a permission identified userinfo included. It used to leave userinfo out, and the save
+// demanded it as a built-in, so a save built from what the GET answered was refused (#449).
+func TestAPIResourcePermissionsGet_TheAuthServerResourceAnswersEveryStoredPermission(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
-	// Setup: Get the AuthServer resource (should exist as a default system resource)
 	authServerResource, err := database.GetResourceByResourceIdentifier(context.Background(), nil, constants.AuthServerResourceIdentifier)
-	assert.NoError(t, err)
-	if authServerResource == nil {
-		t.Skip("AuthServer resource not found in database - skipping userinfo filter test")
-	}
+	require.NoError(t, err)
+	require.NotNil(t, authServerResource, "the seed creates the authserver resource")
 
-	// Test: Get permissions for AuthServer resource
+	userinfoNamed := createTestPermission(t, authServerResource.Id, "userinfo", "Created by an administrator")
+	t.Cleanup(func() { _ = database.DeletePermission(context.Background(), nil, userinfoNamed.Id) })
+
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(authServerResource.Id, 10) + "/permissions"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
 
-	// Assert: Response should be successful
-	assert.Equal(t, http.StatusOK, resp.StatusCode)
-
-	// Parse response
 	var getResponse api.GetPermissionsByResourceResponse
-	err = json.NewDecoder(resp.Body).Decode(&getResponse)
-	assert.NoError(t, err)
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&getResponse))
 
-	// Assert: Should not contain userinfo permission (it should be filtered out)
-	for _, perm := range getResponse.Permissions {
-		assert.NotEqual(t, constants.UserinfoPermissionIdentifier, perm.PermissionIdentifier,
-			"Userinfo permission should be filtered out for AuthServer resource")
+	stored, err := database.GetPermissionsByResourceId(context.Background(), nil, authServerResource.Id)
+	require.NoError(t, err)
+	storedIds := make(map[int64]string, len(stored))
+	for _, p := range stored {
+		storedIds[p.Id] = p.PermissionIdentifier
 	}
+	answeredIds := make(map[int64]string, len(getResponse.Permissions))
+	for _, p := range getResponse.Permissions {
+		answeredIds[p.Id] = p.PermissionIdentifier
+	}
+	assert.Equal(t, storedIds, answeredIds, "the GET answers exactly the stored permissions")
+
+	answered := make([]string, 0, len(getResponse.Permissions))
+	for _, p := range getResponse.Permissions {
+		answered = append(answered, p.PermissionIdentifier)
+	}
+	assert.Subset(t, answered, constants.BuiltInAuthServerPermissionIdentifiers, "every built-in is answered")
+	assert.Contains(t, answered, "userinfo", "a permission identified userinfo is answered as any other")
 }
 
 func TestAPIResourcePermissionsGet_AuthServerResourceIncludesOtherPermissions(t *testing.T) {
@@ -248,8 +259,8 @@ func TestAPIResourcePermissionsGet_NonAuthServerResourceIncludesAllPermissions(t
 		_ = database.DeleteResource(context.Background(), nil, resource.Id)
 	}()
 
-	// Setup: Create permission with userinfo identifier (should NOT be filtered for non-AuthServer resources)
-	userinfoLikePerm := createTestPermission(t, resource.Id, constants.UserinfoPermissionIdentifier, "Userinfo-like permission")
+	// Setup: a permission identified userinfo, which the authserver resource's GET used to leave out
+	userinfoLikePerm := createTestPermission(t, resource.Id, "userinfo", "Userinfo-like permission")
 	regularPerm := createTestPermission(t, resource.Id, "regular-perm", "Regular permission")
 	defer func() {
 		_ = database.DeletePermission(context.Background(), nil, userinfoLikePerm.Id)
@@ -278,8 +289,8 @@ func TestAPIResourcePermissionsGet_NonAuthServerResourceIncludesAllPermissions(t
 	}
 
 	// Both permissions should be present
-	userinfoResp, foundUserinfo := permMap[constants.UserinfoPermissionIdentifier]
-	assert.True(t, foundUserinfo, "Userinfo permission should NOT be filtered for non-AuthServer resource")
+	userinfoResp, foundUserinfo := permMap["userinfo"]
+	assert.True(t, foundUserinfo, "Userinfo permission should be present")
 	assert.Equal(t, userinfoLikePerm.Id, userinfoResp.Id)
 
 	regularResp, foundRegular := permMap["regular-perm"]

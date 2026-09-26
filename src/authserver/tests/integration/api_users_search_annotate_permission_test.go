@@ -14,6 +14,7 @@ import (
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestAPIUsersSearch_AnnotatePermission_Success(t *testing.T) {
@@ -126,36 +127,53 @@ func TestAPIUsersSearch_AnnotatePermission_ConflictWithGroupAnnotation(t *testin
 	assert.Equal(t, "annotateGroupMembership and annotatePermissionId cannot be used together", errResp.ErrorDescription)
 }
 
-func TestAPIUsersSearch_AnnotatePermission_UserinfoForbidden(t *testing.T) {
+// Annotating against a permission on the authserver resource is answered as against any other,
+// whether a built-in or one identified userinfo. The endpoint refused userinfo with 400 until #449,
+// when the row stopped meaning anything and was deleted; an administrator may create one of that
+// name, and it is an ordinary permission.
+func TestAPIUsersSearch_AnnotatePermission_AnAuthServerPermission(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
-	// Get existing AuthServer resource
 	authRes, err := database.GetResourceByResourceIdentifier(context.Background(), nil, constants.AuthServerResourceIdentifier)
-	assert.NoError(t, err)
-	if authRes == nil {
-		t.Skip("AuthServer resource not found in database - skipping userinfo annotation test")
-	}
-	// Locate userinfo permission
+	require.NoError(t, err)
+	require.NotNil(t, authRes, "the seed creates the authserver resource")
 	perms, err := database.GetPermissionsByResourceId(context.Background(), nil, authRes.Id)
-	assert.NoError(t, err)
-	err = database.PermissionsLoadResources(context.Background(), nil, perms)
-	assert.NoError(t, err)
-	var userinfoPermId int64
+	require.NoError(t, err)
+	var manageAccount *models.Permission
 	for i := range perms {
-		if perms[i].PermissionIdentifier == constants.UserinfoPermissionIdentifier {
-			userinfoPermId = perms[i].Id
-			break
+		if perms[i].PermissionIdentifier == constants.ManageAccountPermissionIdentifier {
+			manageAccount = &perms[i]
 		}
 	}
-	if userinfoPermId == 0 {
-		t.Skip("userinfo permission not found for authserver resource - skipping")
-	}
+	require.NotNil(t, manageAccount, "the seed writes the manage-account permission")
+	userinfoNamed := createTestPermission(t, authRes.Id, "userinfo", "Created by an administrator")
+	t.Cleanup(func() { _ = database.DeletePermission(context.Background(), nil, userinfoNamed.Id) })
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/search?annotatePermissionId=" + strconv.FormatInt(userinfoPermId, 10)
-	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-	defer func() { _ = resp.Body.Close() }()
-	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
-	var errResp api.ErrorResponse
-	_ = json.NewDecoder(resp.Body).Decode(&errResp)
-	assert.Equal(t, "Operation not allowed for userinfo permission", errResp.ErrorDescription)
+	for _, perm := range []*models.Permission{manageAccount, userinfoNamed} {
+		t.Run(perm.PermissionIdentifier, func(t *testing.T) {
+			randSuffix := fake.LetterN(8)
+			holder := &models.User{Subject: fake.UUID(), Enabled: true, Username: "annauth-" + randSuffix, Email: "annauth-" + randSuffix + "@test.com", GivenName: "A", FamilyName: "T"}
+			other := &models.User{Subject: fake.UUID(), Enabled: true, Username: "annauth-other-" + randSuffix, Email: "annauth-other-" + randSuffix + "@test.com", GivenName: "B", FamilyName: "T"}
+			require.NoError(t, database.CreateUser(context.Background(), nil, holder))
+			require.NoError(t, database.CreateUser(context.Background(), nil, other))
+			t.Cleanup(func() {
+				_ = database.DeleteUser(context.Background(), nil, holder.Id)
+				_ = database.DeleteUser(context.Background(), nil, other.Id)
+			})
+			assignPermissionToUser(t, holder.Id, perm.Id)
+
+			url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/search?query=" + randSuffix + "&annotatePermissionId=" + strconv.FormatInt(perm.Id, 10) + "&page=1&size=200"
+			resp := makeAPIRequest(t, "GET", url, accessToken, nil)
+			defer func() { _ = resp.Body.Close() }()
+			require.Equal(t, http.StatusOK, resp.StatusCode)
+
+			var apiResp api.SearchUsersWithPermissionAnnotationResponse
+			require.NoError(t, json.NewDecoder(resp.Body).Decode(&apiResp))
+			annotated := map[string]bool{}
+			for _, u := range apiResp.Users {
+				annotated[u.Email] = u.HasPermission
+			}
+			assert.Equal(t, map[string]bool{holder.Email: true, other.Email: false}, annotated)
+		})
+	}
 }

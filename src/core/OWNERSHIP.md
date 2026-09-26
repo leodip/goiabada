@@ -238,7 +238,6 @@ command itself and fails on a tree it changed.
 | `core/constants` | `ManagePermissionIdentifier` | both-apps | — |
 | `core/constants` | `ManageSettingsPermissionIdentifier` | own-package | — |
 | `core/constants` | `ManageUsersPermissionIdentifier` | own-package | — |
-| `core/constants` | `UserinfoPermissionIdentifier` | both-apps | — |
 | `core/constants` | `Version` | both-apps | — |
 | `core/countries` | `AllInfo` | both-apps | — |
 | `core/countries` | `ByAlpha2` | contract | The lookup half of the country table whose other half the admin console uses. Moving it would put one ISO 3166 dataset in two places. |

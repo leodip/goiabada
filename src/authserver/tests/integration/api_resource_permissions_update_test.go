@@ -630,8 +630,8 @@ func TestAPIResourcePermissionsPut_AnOutdatedLoadedListIsRefused(t *testing.T) {
 // What the console does: read the resource's permissions through the API's GET, edit them, and
 // send the entries as the GET answered them as the loaded list. That GET is the only list a caller
 // has, so its entries have to compare equal to the stored ones, id, identifier and description, or
-// every save from the page would be refused as outdated. A non-system resource: the system one's
-// GET leaves out userinfo, which its save requires, and that page's defect is a follow-up of #428.
+// every save from the page would be refused as outdated. The system resource's own read and save
+// are TestAPIResourcePermissionsPut_TheSystemResourceSavedWithTheListTheAPIRead.
 func TestAPIResourcePermissionsPut_SavedWithTheListTheAPIRead(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
@@ -667,4 +667,124 @@ func TestAPIResourcePermissionsPut_SavedWithTheListTheAPIRead(t *testing.T) {
 		descByIdent[p.PermissionIdentifier] = p.Description
 	}
 	assert.Equal(t, map[string]string{"read": "Reads every invoice", "export": "Exports the invoices"}, descByIdent)
+}
+
+// The system resource's page does what every resource's does: read the permissions through the
+// API's GET and send them back, unchanged or with a description edited, as both the list to save
+// and the loaded list. That save was refused on this resource alone until #449, because the GET
+// left out the userinfo permission and the save demanded it as a built-in, so nobody could edit a
+// built-in's description from the page.
+func TestAPIResourcePermissionsPut_TheSystemResourceSavedWithTheListTheAPIRead(t *testing.T) {
+	accessToken, _ := createAdminClientWithToken(t)
+
+	sysRes, err := database.GetResourceByResourceIdentifier(context.Background(), nil, constants.AuthServerResourceIdentifier)
+	require.NoError(t, err)
+	require.NotNil(t, sysRes, "the seed creates the authserver resource")
+
+	var manageId int64
+	var manageDescription string
+	for _, p := range storedPermissionEntries(t, sysRes.Id) {
+		if p.PermissionIdentifier == constants.ManagePermissionIdentifier {
+			manageId, manageDescription = p.Id, p.Description
+		}
+	}
+	require.NotZero(t, manageId, "the seed writes the manage permission")
+	t.Cleanup(func() {
+		perm, _ := database.GetPermissionById(context.Background(), nil, manageId)
+		if perm != nil {
+			perm.Description = manageDescription
+			_ = database.UpdatePermission(context.Background(), nil, perm)
+		}
+	})
+
+	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(sysRes.Id, 10) + "/permissions"
+	entriesAsRead := func() []api.ResourcePermissionUpsert {
+		read := readResourcePermissions(t, url, accessToken)
+		entries := make([]api.ResourcePermissionUpsert, 0, len(read))
+		for _, p := range read {
+			entries = append(entries, api.ResourcePermissionUpsert{Id: p.Id, PermissionIdentifier: p.PermissionIdentifier, Description: p.Description})
+		}
+		return entries
+	}
+
+	t.Run("unchanged", func(t *testing.T) {
+		loaded := entriesAsRead()
+		resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateResourcePermissionsRequest{Permissions: loaded, ExpectedPermissions: loaded})
+		defer func() { _ = resp.Body.Close() }()
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+		assert.ElementsMatch(t, loaded, storedPermissionEntries(t, sysRes.Id), "an unchanged save writes nothing")
+	})
+
+	t.Run("a built-in's description edited", func(t *testing.T) {
+		loaded := entriesAsRead()
+		edited := make([]api.ResourcePermissionUpsert, len(loaded))
+		copy(edited, loaded)
+		for i := range edited {
+			if edited[i].Id == manageId {
+				edited[i].Description = "Edited from the system resource's page"
+			}
+		}
+		resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateResourcePermissionsRequest{Permissions: edited, ExpectedPermissions: loaded})
+		defer func() { _ = resp.Body.Close() }()
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+		assert.ElementsMatch(t, edited, storedPermissionEntries(t, sysRes.Id), "the save wrote the edited description and nothing else")
+	})
+}
+
+// Every one of the seven built-ins is refused on delete and on rename, from a list the API read,
+// with nothing written. The two single cases above hold manage and manage-account; this holds the
+// list, which lost userinfo in #449, to protecting each entry it still names.
+func TestAPIResourcePermissionsPut_EveryBuiltInIsProtected(t *testing.T) {
+	accessToken, _ := createAdminClientWithToken(t)
+
+	sysRes, err := database.GetResourceByResourceIdentifier(context.Background(), nil, constants.AuthServerResourceIdentifier)
+	require.NoError(t, err)
+	require.NotNil(t, sysRes, "the seed creates the authserver resource")
+	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(sysRes.Id, 10) + "/permissions"
+	require.Len(t, constants.BuiltInAuthServerPermissionIdentifiers, 7)
+
+	for _, identifier := range constants.BuiltInAuthServerPermissionIdentifiers {
+		for _, change := range []struct {
+			name    string
+			apply   func([]api.ResourcePermissionUpsert) []api.ResourcePermissionUpsert
+			wantEnd string
+		}{
+			{"deleted", func(entries []api.ResourcePermissionUpsert) []api.ResourcePermissionUpsert {
+				kept := make([]api.ResourcePermissionUpsert, 0, len(entries))
+				for _, e := range entries {
+					if e.PermissionIdentifier != identifier {
+						kept = append(kept, e)
+					}
+				}
+				return kept
+			}, "cannot be deleted."},
+			{"renamed", func(entries []api.ResourcePermissionUpsert) []api.ResourcePermissionUpsert {
+				renamed := make([]api.ResourcePermissionUpsert, len(entries))
+				copy(renamed, entries)
+				for i := range renamed {
+					if renamed[i].PermissionIdentifier == identifier {
+						renamed[i].PermissionIdentifier = identifier + "-renamed"
+					}
+				}
+				return renamed
+			}, "cannot be renamed."},
+		} {
+			t.Run(identifier+" "+change.name, func(t *testing.T) {
+				read := readResourcePermissions(t, url, accessToken)
+				loaded := make([]api.ResourcePermissionUpsert, 0, len(read))
+				for _, p := range read {
+					loaded = append(loaded, api.ResourcePermissionUpsert{Id: p.Id, PermissionIdentifier: p.PermissionIdentifier, Description: p.Description})
+				}
+
+				resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateResourcePermissionsRequest{Permissions: change.apply(loaded), ExpectedPermissions: loaded})
+				defer func() { _ = resp.Body.Close() }()
+				assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+				var errResp api.ErrorResponse
+				require.NoError(t, json.NewDecoder(resp.Body).Decode(&errResp))
+				assert.Equal(t, "VALIDATION_ERROR", errResp.ErrorCode)
+				assert.Equal(t, "Built-in permission '"+identifier+"' "+change.wantEnd, errResp.ErrorDescription)
+				assert.ElementsMatch(t, loaded, storedPermissionEntries(t, sysRes.Id), "a refused save writes nothing")
+			})
+		}
+	}
 }

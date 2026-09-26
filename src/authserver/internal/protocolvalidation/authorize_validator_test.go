@@ -65,10 +65,20 @@ func TestValidateScopes(t *testing.T) {
 			expectedError: "Invalid scope format: 'OFFLINE_ACCESS'. Scopes must adhere to the resource-identifier:permission-identifier format. For instance: backend-service:create-product.",
 		},
 		{
-			name:  "Invalid userinfo scope",
-			scope: constants.AuthServerResourceIdentifier + ":" + constants.UserinfoPermissionIdentifier,
-			expectedError: "The 'authserver:userinfo' scope is automatically included in the access token when an OpenID Connect scope is present. " +
-				"There's no need to request it explicitly. Please remove it from your request.",
+			// The authserver resource has no userinfo permission since #449, so an explicit
+			// request for it gets the answer any unknown permission gets, not a refusal of its own.
+			name:  "authserver:userinfo, a permission the authserver resource no longer has",
+			scope: "openid authserver:userinfo",
+			mockSetup: func() {
+				builtIns := make([]models.Permission, 0, len(constants.BuiltInAuthServerPermissionIdentifiers))
+				for i, identifier := range constants.BuiltInAuthServerPermissionIdentifiers {
+					builtIns = append(builtIns, models.Permission{Id: int64(40 + i), PermissionIdentifier: identifier, ResourceId: 4})
+				}
+				mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, constants.AuthServerResourceIdentifier).
+					Return(&models.Resource{Id: 4, ResourceIdentifier: constants.AuthServerResourceIdentifier}, nil).Once()
+				mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(4)).Return(builtIns, nil).Once()
+			},
+			expectedError: "Scope 'authserver:userinfo' is invalid. The resource identified by 'authserver' does not have a permission with identifier 'userinfo'.",
 		},
 		{
 			name:          "Invalid scope format",

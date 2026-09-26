@@ -10,15 +10,13 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/errs"
 )
 
-// permissionUsersDatabase is what the permission holders endpoint needs: the permission, its
-// resource, and one page of the users holding it.
+// permissionUsersDatabase is what the permission holders endpoint needs: the permission, and one
+// page of the users holding it.
 type permissionUsersDatabase interface {
 	GetPermissionById(ctx context.Context, tx *sql.Tx, permissionId int64) (*models.Permission, error)
-	GetResourceById(ctx context.Context, tx *sql.Tx, resourceId int64) (*models.Resource, error)
 	GetUsersByPermissionIdPaginated(ctx context.Context, tx *sql.Tx, permissionId int64, page int, pageSize int) ([]models.User, int, error)
 }
 
@@ -40,7 +38,6 @@ func HandleAPIPermissionUsersGet(
 			return
 		}
 
-		// Validate permission exists and enforce special rules
 		perm, err := database.GetPermissionById(r.Context(), nil, permissionId)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "error getting permission by ID for users listing"), "permission_id", permissionId)
@@ -48,17 +45,6 @@ func HandleAPIPermissionUsersGet(
 		}
 		if perm == nil {
 			writeJSONError(w, "Permission not found", "NOT_FOUND", http.StatusNotFound)
-			return
-		}
-
-		// Load its resource to check for authserver:userinfo special case
-		resource, err := database.GetResourceById(r.Context(), nil, perm.ResourceId)
-		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "error getting resource for permission users listing"), "permission_id", permissionId)
-			return
-		}
-		if resource != nil && resource.ResourceIdentifier == constants.AuthServerResourceIdentifier && perm.PermissionIdentifier == constants.UserinfoPermissionIdentifier {
-			writeJSONError(w, "Operation not allowed for userinfo permission", "VALIDATION_ERROR", http.StatusBadRequest)
 			return
 		}
 

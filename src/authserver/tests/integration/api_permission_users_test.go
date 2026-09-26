@@ -13,6 +13,7 @@ import (
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // Test GET /api/v1/admin/permissions/{permissionId}/users success path
@@ -92,38 +93,56 @@ func TestAPIPermissionUsersGet_PermissionNotFound(t *testing.T) {
 	assert.Equal(t, "Permission not found", errResp.ErrorDescription)
 }
 
-func TestAPIPermissionUsersGet_UserinfoForbidden(t *testing.T) {
+// A permission on the authserver resource lists its holders as any other does, whether a built-in
+// or one identified userinfo. The endpoint refused userinfo with 400 until #449, when the row
+// stopped meaning anything and was deleted; an administrator may create one of that name, and it
+// is an ordinary permission.
+func TestAPIPermissionUsersGet_AnAuthServerPermission(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
-	// Get existing AuthServer resource
 	authRes, err := database.GetResourceByResourceIdentifier(context.Background(), nil, constants.AuthServerResourceIdentifier)
-	assert.NoError(t, err)
-	if authRes == nil {
-		t.Skip("AuthServer resource not found in database - skipping userinfo test")
-	}
-	// Find builtin userinfo permission
+	require.NoError(t, err)
+	require.NotNil(t, authRes, "the seed creates the authserver resource")
 	perms, err := database.GetPermissionsByResourceId(context.Background(), nil, authRes.Id)
-	assert.NoError(t, err)
-	err = database.PermissionsLoadResources(context.Background(), nil, perms)
-	assert.NoError(t, err)
-	var userinfoPermId int64
+	require.NoError(t, err)
+	var manageAccount *models.Permission
 	for i := range perms {
-		if perms[i].PermissionIdentifier == constants.UserinfoPermissionIdentifier {
-			userinfoPermId = perms[i].Id
-			break
+		if perms[i].PermissionIdentifier == constants.ManageAccountPermissionIdentifier {
+			manageAccount = &perms[i]
 		}
 	}
-	if userinfoPermId == 0 {
-		t.Skip("userinfo permission not found for authserver resource - skipping")
-	}
+	require.NotNil(t, manageAccount, "the seed writes the manage-account permission")
+	userinfoNamed := createTestPermission(t, authRes.Id, "userinfo", "Created by an administrator")
+	t.Cleanup(func() { _ = database.DeletePermission(context.Background(), nil, userinfoNamed.Id) })
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/permissions/" + strconv.FormatInt(userinfoPermId, 10) + "/users"
-	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
-	defer func() { _ = resp.Body.Close() }()
-	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
-	var errResp api.ErrorResponse
-	_ = json.NewDecoder(resp.Body).Decode(&errResp)
-	assert.Equal(t, "Operation not allowed for userinfo permission", errResp.ErrorDescription)
+	for _, perm := range []*models.Permission{manageAccount, userinfoNamed} {
+		t.Run(perm.PermissionIdentifier, func(t *testing.T) {
+			randSuffix := fake.LetterN(8)
+			holder := &models.User{Subject: fake.UUID(), Enabled: true, Username: "permauth-" + randSuffix, Email: "permauth-" + randSuffix + "@test.com", GivenName: "P", FamilyName: "T"}
+			require.NoError(t, database.CreateUser(context.Background(), nil, holder))
+			t.Cleanup(func() { _ = database.DeleteUser(context.Background(), nil, holder.Id) })
+			assignPermissionToUser(t, holder.Id, perm.Id)
+
+			// Every page, since a built-in can have more holders than one page carries by the time
+			// the suite reaches this test.
+			var emails []string
+			for page := 1; ; page++ {
+				url := config.GetAuthServer().BaseURL + "/api/v1/admin/permissions/" + strconv.FormatInt(perm.Id, 10) + "/users?page=" + strconv.Itoa(page) + "&size=200"
+				resp := makeAPIRequest(t, "GET", url, accessToken, nil)
+				require.Equal(t, http.StatusOK, resp.StatusCode)
+				var apiResp api.GetUsersByPermissionResponse
+				require.NoError(t, json.NewDecoder(resp.Body).Decode(&apiResp))
+				_ = resp.Body.Close()
+				for _, u := range apiResp.Users {
+					emails = append(emails, u.Email)
+				}
+				if len(apiResp.Users) == 0 || page*200 >= apiResp.Total {
+					break
+				}
+			}
+			assert.Contains(t, emails, holder.Email, "the holder is listed")
+		})
+	}
 }
 
 func TestAPIPermissionUsersGet_Unauthorized(t *testing.T) {

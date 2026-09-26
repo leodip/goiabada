@@ -11,7 +11,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
-	"github.com/leodip/goiabada/core/constants"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -701,7 +700,9 @@ func TestAuthorize_ValidateScopes_ScopeIsMissing(t *testing.T) {
 	assert.Contains(t, errorDescription, "The 'scope' parameter is missing")
 }
 
-func TestAuthorize_ValidateScopes_UserInfoShouldNotBeIncluded(t *testing.T) {
+// The authserver resource has no userinfo permission since #449, so an explicit request for it
+// is answered as any unknown permission is, where it used to have a refusal of its own.
+func TestAuthorize_ValidateScopes_UserinfoIsAnUnknownPermission(t *testing.T) {
 	client := &models.Client{
 		ClientIdentifier:         "test-client-" + fake.LetterN(8),
 		Enabled:                  true,
@@ -723,8 +724,6 @@ func TestAuthorize_ValidateScopes_UserInfoShouldNotBeIncluded(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	userInfoScope := fmt.Sprintf("%v:%v", constants.AuthServerResourceIdentifier, constants.UserinfoPermissionIdentifier)
-
 	baseUrl := config.GetAuthServer().BaseURL + "/auth/authorize/"
 	params := url.Values{}
 	params.Add("client_id", client.ClientIdentifier)
@@ -732,7 +731,7 @@ func TestAuthorize_ValidateScopes_UserInfoShouldNotBeIncluded(t *testing.T) {
 	params.Add("response_type", "code")
 	params.Add("code_challenge_method", "S256")
 	params.Add("code_challenge", fake.LetterN(43))
-	params.Add("scope", "openid profile "+userInfoScope)
+	params.Add("scope", "openid profile authserver:userinfo")
 
 	destUrl := baseUrl + "?" + params.Encode()
 
@@ -755,7 +754,7 @@ func TestAuthorize_ValidateScopes_UserInfoShouldNotBeIncluded(t *testing.T) {
 	errorDescription := redirectLocation.Query().Get("error_description")
 
 	assert.Equal(t, "invalid_scope", errorCode)
-	assert.Contains(t, errorDescription, "The 'authserver:userinfo' scope is automatically included in the access token")
+	assert.Equal(t, "Scope 'authserver:userinfo' is invalid. The resource identified by 'authserver' does not have a permission with identifier 'userinfo'.", errorDescription)
 }
 
 func TestAuthorize_ValidateScopes_InvalidScope(t *testing.T) {
