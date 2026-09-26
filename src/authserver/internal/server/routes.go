@@ -80,8 +80,10 @@ func (s *Server) initRoutes(root chi.Router) {
 	// section 5.3 says the endpoint exists for (#449). The scope check comes first, as on every
 	// user-token route (#104): a client credentials token can never carry openid, since that grant
 	// refuses every OpenID Connect scope, so it stops there with 403 INSUFFICIENT_SCOPE, and
-	// RequireUserBoundToken behind it stops any other token that is not a user's. GET and POST are
-	// separate registrations: a guard added to only one of them leaves the other reachable.
+	// RequireUserBoundToken behind it is what would stop a client's token that ever carried it.
+	// Refresh and ID tokens never get this far: authHeaderToContext admits only an access token
+	// for authserver (#401). GET and POST are separate registrations: a guard added to only one of
+	// them leaves the other reachable.
 	root.With(authHeaderToContext, middleware.RequireBearerTokenScope("openid"), middleware.RequireUserBoundToken(), middleware.RequireValidSession(s.database)).Get("/userinfo", handlers.HandleUserInfoGetPost(httpHelper, s.database, auditLogger))
 	root.With(authHeaderToContext, middleware.RequireBearerTokenScope("openid"), middleware.RequireUserBoundToken(), middleware.RequireValidSession(s.database)).Post("/userinfo", handlers.HandleUserInfoGetPost(httpHelper, s.database, auditLogger))
 	root.Get("/health", handlers.HandleHealthCheckGet(httpHelper))

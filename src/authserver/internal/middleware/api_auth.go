@@ -122,9 +122,14 @@ func RequireBearerTokenScopeAnyOf(requiredScopes []string) func(http.Handler) ht
 // (authorization code, authorization code refresh, implicit, ROPC, ROPC refresh), while
 // the client_credentials claim set is built separately and never contains it.
 //
-// Presence only, never the value. That is safe because JwtAuthorizationHeaderToContext
-// stores a token in this context key only after DecodeAndValidateTokenString succeeds, so
-// claims reaching here are server-issued and cannot be forged. It is also necessary: on
+// What reaches it is an access token issued for authserver, a user's or a client's:
+// JwtAuthorizationHeaderToContext stores a token in this context key only after
+// DecodeAndValidateTokenString succeeds and only when its typ is Bearer and its aud names
+// authserver, so refresh and ID tokens never get here (#401), and this guard's one question
+// is which of the two access-token kinds it holds.
+//
+// Presence only, never the value. That is safe because those claims are server-issued and
+// cannot be forged. It is also necessary: on
 // the ROPC refresh path the value is wrong (createTokenInputFromROPC passes `now`, so a
 // refreshed token reports the refresh moment as the authentication moment), a pre-existing
 // defect this guard neither depends on nor fixes.

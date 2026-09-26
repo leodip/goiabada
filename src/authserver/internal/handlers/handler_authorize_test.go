@@ -2506,6 +2506,51 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 	})
 }
 
+// TestValidateIdTokenHint_TypeOfToken: a validly signed token of this server that is not an ID
+// Token is refused as a hint, with the answer a hint that does not parse gets, so the reply does
+// not say which kind of token was sent (#401). ID Tokens carry no typ at all, so the absent row is
+// the one a real hint takes.
+func TestValidateIdTokenHint_TypeOfToken(t *testing.T) {
+	settings := &models.Settings{Issuer: "https://test-issuer.com"}
+
+	tests := []struct {
+		name     string
+		typ      interface{} // nil leaves the claim out
+		accepted bool
+	}{
+		{name: "ID Token, no typ", typ: nil, accepted: true},
+		{name: "access token", typ: "Bearer"},
+		{name: "session refresh token", typ: "Refresh"},
+		{name: "offline refresh token", typ: "Offline"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			claims := jwt.MapClaims{"iss": "https://test-issuer.com", "sub": "user-123"}
+			if tc.typ != nil {
+				claims["typ"] = tc.typ
+			}
+			tokenParser := mocks_handlers.NewTokenParser(t)
+			tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "the-hint", false).
+				Return(&oauth.JwtToken{TokenBase64: "the-hint", Claims: claims}, nil)
+
+			sub, err := validateIdTokenHint(context.Background(), "the-hint", tokenParser, settings)
+
+			if tc.accepted {
+				require.NoError(t, err)
+				assert.Equal(t, "user-123", sub)
+				return
+			}
+			assert.Empty(t, sub)
+			var detail *customerrors.ErrorDetail
+			require.ErrorAs(t, err, &detail)
+			assert.Equal(t, "invalid_request", detail.GetCode())
+			assert.Equal(t, "The id_token_hint is invalid.", detail.GetDescription())
+			assert.Equal(t, http.StatusBadRequest, detail.GetHttpStatusCode())
+		})
+	}
+}
+
 func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 	t.Run("Invalid id_token_hint bad signature - invalid_request", func(t *testing.T) {
 		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
@@ -2632,6 +2677,81 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		location := rr.Header().Get("Location")
 		assert.Contains(t, location, "https://example.com?error=invalid_request")
 		assert.Contains(t, location, "error_description=")
+
+		httpHelper.AssertExpectations(t)
+		authHelper.AssertExpectations(t)
+		database.AssertExpectations(t)
+		authorizeValidator.AssertExpectations(t)
+		tokenParser.AssertExpectations(t)
+	})
+
+	// An access token of this server, with the right issuer and a real sub, is not an ID Token:
+	// refused and answered as the unparseable hint above is (#401).
+	t.Run("id_token_hint that is an access token - invalid_request", func(t *testing.T) {
+		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		authHelper := mocks_handlers.NewAuthHelper(t)
+		userSessionManager := mocks_handlers.NewUserSessionManager(t)
+		database := mocks_data.NewDatabase(t)
+		stubRegisteredRedirectURI(database, "https://example.com")
+		authorizeValidator := mocks_protocolvalidation.NewAuthorizeValidator(t)
+		auditLogger := mocks_audit.NewAuditLogger(t)
+		permissionChecker := mocks_handlers.NewPermissionChecker(t)
+		tokenParser := mocks_handlers.NewTokenParser(t)
+
+		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, nil, authorizeValidator, auditLogger, permissionChecker, tokenParser)
+		stubAuthenticatedBrowser(database, userSessionManager)
+
+		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&id_token_hint=an-access-token", nil)
+		assert.NoError(t, err)
+
+		settings := &models.Settings{
+			PKCERequired: true,
+			Issuer:       "https://test-issuer.com",
+		}
+		ctx := req.Context()
+		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
+		req = req.WithContext(ctx)
+
+		rr := httptest.NewRecorder()
+
+		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
+			return ac.AuthState == ceremony.AuthStateInitial && ac.ClientId == "test-client"
+		})).Return(nil)
+
+		authorizeValidator.On("ValidateClientAndRedirectURI", mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateClientAndRedirectURIInput")).Return(nil)
+		authorizeValidator.On("ValidateUnsupportedRequestParameters", mock.AnythingOfType("*protocolvalidation.ValidateUnsupportedRequestParametersInput")).Return(nil)
+
+		client := &models.Client{
+			Id:               1,
+			ClientIdentifier: "test-client",
+			DefaultAcrLevel:  models.AcrLevel1,
+		}
+		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
+
+		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*protocolvalidation.ValidateRequestInput")).Return(nil)
+		authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
+		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
+
+		accessToken := &oauth.JwtToken{
+			TokenBase64: "an-access-token",
+			Claims: jwt.MapClaims{
+				"iss": "https://test-issuer.com",
+				"sub": "user-123",
+				"typ": "Bearer",
+				"aud": "authserver",
+			},
+		}
+		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "an-access-token", false).Return(accessToken, nil)
+
+		authHelper.On("ClearAuthContext", rr, req).Return(nil)
+
+		handler.ServeHTTP(rr, req)
+
+		assert.Equal(t, http.StatusFound, rr.Code)
+		location, err := url.Parse(rr.Header().Get("Location"))
+		require.NoError(t, err)
+		assert.Equal(t, "invalid_request", location.Query().Get("error"))
+		assert.Equal(t, "The id_token_hint is invalid.", location.Query().Get("error_description"))
 
 		httpHelper.AssertExpectations(t)
 		authHelper.AssertExpectations(t)
