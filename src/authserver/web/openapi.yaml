@@ -1707,6 +1707,15 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          description: |
+            Another save changed the resource's permissions after expectedPermissions was read,
+            or added the same identifier at the same moment. error_code is CONCURRENT_UPDATE;
+            nothing was saved. Read them again and retry.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '500':
           $ref: '#/components/responses/InternalServerError'
 
@@ -4858,9 +4867,15 @@ components:
 
     UpdateResourcePermissionsRequest:
       type: object
+      required: [expectedPermissions]
       properties:
         permissions:
           type: array
+          items:
+            $ref: '#/components/schemas/ResourcePermissionUpsert'
+        expectedPermissions:
+          type: array
+          description: The resource's permissions as last read, each with its id; [] if there were none.
           items:
             $ref: '#/components/schemas/ResourcePermissionUpsert'
 

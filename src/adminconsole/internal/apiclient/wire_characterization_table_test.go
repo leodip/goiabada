@@ -43,7 +43,8 @@ var (
 	charUpdateUserGrps  = &api.UpdateUserGroupsRequest{GroupIds: []int64{5}, ExpectedGroupIds: []int64{3}}
 	charUpdateGroupPerm = &api.UpdateGroupPermissionsRequest{PermissionIds: []int64{8}, ExpectedPermissionIds: []int64{3}}
 	charUpdateUserPerm  = &api.UpdateUserPermissionsRequest{PermissionIds: []int64{8}, ExpectedPermissionIds: []int64{3}}
-	charUpdateResPerms  = &api.UpdateResourcePermissionsRequest{Permissions: []api.ResourcePermissionUpsert{}}
+	charUpdateResPerms  = &api.UpdateResourcePermissionsRequest{Permissions: []api.ResourcePermissionUpsert{},
+		ExpectedPermissions: []api.ResourcePermissionUpsert{{Id: 3, PermissionIdentifier: "read", Description: "Read"}}}
 
 	charUpdateUserPhone = &api.UpdateUserPhoneRequest{PhoneNumber: "5555678"}
 	charCreateResource  = &api.CreateResourceRequest{ResourceIdentifier: "a-new-resource"}

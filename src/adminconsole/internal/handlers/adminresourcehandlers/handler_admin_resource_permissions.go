@@ -170,7 +170,21 @@ func HandleAdminResourcePermissionsPost(
 				Description:          strings.TrimSpace(p.Description),
 			})
 		}
-		updateReq := &api.UpdateResourcePermissionsRequest{Permissions: upserts}
+		// The loaded list goes as the page sent it, untrimmed, since the auth server compares it
+		// with the stored entries exactly; and an absent one stays nil, which the API refuses,
+		// rather than become a list that would pass (#428).
+		var expected []api.ResourcePermissionUpsert
+		if data.ExpectedPermissions != nil {
+			expected = make([]api.ResourcePermissionUpsert, 0, len(data.ExpectedPermissions))
+			for _, p := range data.ExpectedPermissions {
+				expected = append(expected, api.ResourcePermissionUpsert{
+					Id:                   p.Id,
+					PermissionIdentifier: p.Identifier,
+					Description:          p.Description,
+				})
+			}
+		}
+		updateReq := &api.UpdateResourcePermissionsRequest{Permissions: upserts, ExpectedPermissions: expected}
 		if updateResourcePermissionsErr := apiClient.UpdateResourcePermissions(r.Context(), jwtInfo.TokenResponse.AccessToken, resource.Id, updateReq); updateResourcePermissionsErr != nil {
 			// Forward the API's status rather than dressing a 400 as a 200 carrying result.Error.
 			// The administrator still reads the API's sentence either way: sendAjaxRequest draws

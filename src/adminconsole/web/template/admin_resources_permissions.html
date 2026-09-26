@@ -13,6 +13,9 @@
     {{- range $idx, $perm := .permissions}}
     availablePermissions.push({ "id": {{$perm.Id}}, "permissionIdentifier": "{{$perm.PermissionIdentifier}}", "description": "{{$perm.Description}}" });
     {{- end}}
+   // The list as loaded, copied entry by entry and never edited: the save sends it so the server
+   // can refuse a save from an outdated page rather than undo another administrator's change (#428).
+   const loadedPermissions = availablePermissions.map(function(p) { return { "id": p.id, "permissionIdentifier": p.permissionIdentifier, "description": p.description }; });
 
    // Built-in permissions that cannot be renamed or deleted (only for system-level resources)
    var builtInPermissionIdentifiers = [{{range $idx, $id := .builtInPermissionIdentifiers}}{{if $idx}},{{end}}"{{$id}}"{{end}}];
@@ -276,7 +279,8 @@
                 "method": "POST",
                 "bodyData": JSON.stringify({
                     "resourceId": {{.resourceId}},
-                    "permissions": availablePermissions
+                    "permissions": availablePermissions,
+                    "expectedPermissions": loadedPermissions
                 }),
                 "loadingElement": loadingIcon,
                 "loadingClasses": ["loading", "loading-xs"],

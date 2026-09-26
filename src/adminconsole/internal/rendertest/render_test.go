@@ -1308,6 +1308,39 @@ func TestRender_AdminResourcePermissions(t *testing.T) {
 	assert.Contains(t, out, `"id":  9 `)
 }
 
+// The resource permissions page keeps a copy of every entry it loaded and sends it with every
+// save, so the auth server can refuse a save from an outdated page rather than undo another
+// administrator's rename or new permission. The copy is taken entry by entry after every loaded
+// entry is pushed, since the editor changes the loaded objects in place, and it is never edited,
+// or the page would send its edited list as the loaded one and every save would pass (#428).
+func TestRender_AdminResourcePermissions_SendsTheLoadedList(t *testing.T) {
+	out := render(t, "/admin_resources_permissions.html", map[string]interface{}{
+		"resourceId":                   2,
+		"resourceIdentifier":           "faturamento",
+		"resourceDescription":          "Faturamento",
+		"isSystemLevelResource":        false,
+		"builtInPermissionIdentifiers": []string{},
+		"savedSuccessfully":            false,
+		"permissions": []api.PermissionResponse{
+			{Id: 9, PermissionIdentifier: "ler", Description: "Ler faturas", ResourceId: 2},
+			{Id: 10, PermissionIdentifier: "escrever", Description: "Escrever faturas", ResourceId: 2},
+		},
+	})
+
+	const copyTaken = `const loadedPermissions = availablePermissions.map(function(p) { return { "id": p.id, "permissionIdentifier": p.permissionIdentifier, "description": p.description }; });`
+	lastLoaded := strings.Index(out, `"permissionIdentifier": "escrever"`)
+	require.NotEqual(t, -1, lastLoaded, "the loaded entries are pushed into the editable list")
+	require.Less(t, strings.Index(out, `"permissionIdentifier": "ler"`), lastLoaded)
+	copyAt := strings.Index(out, copyTaken)
+	require.NotEqual(t, -1, copyAt, "the page keeps a copy of each loaded entry")
+	assert.Greater(t, copyAt, lastLoaded, "the copy is taken after every loaded entry is in the list")
+	assert.Less(t, copyAt, strings.Index(out, "function btnSaveClick"), "the copy is taken at load, before anything can edit the list")
+
+	assert.Contains(t, out, `"expectedPermissions": loadedPermissions`)
+	assert.NotRegexp(t, `loadedPermissions\.(push|splice|pop|shift|unshift)\(`, out)
+	assert.NotRegexp(t, `loadedPermissions\s*=[^=]`, strings.Replace(out, copyTaken, "", 1))
+}
+
 // Seam 4 for the logout form binding (#350 decision 2). The only seam that reads the real template
 // through the real layout, and so the only one that can see the page a browser would receive.
 //

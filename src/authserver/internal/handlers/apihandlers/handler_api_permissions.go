@@ -30,6 +30,7 @@ type permissionsDatabase interface {
 	GetPermissionsByResourceId(ctx context.Context, tx *sql.Tx, resourceId int64) ([]models.Permission, error)
 	GetResourceById(ctx context.Context, tx *sql.Tx, resourceId int64) (*models.Resource, error)
 	PermissionsLoadResources(ctx context.Context, tx *sql.Tx, permissions []models.Permission) error
+	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error
 	UpdatePermission(ctx context.Context, tx *sql.Tx, permission *models.Permission) error
 }
 
@@ -120,6 +121,13 @@ func HandleAPIResourcePermissionsPut(
 			return
 		}
 
+		// The list as the caller loaded it, required as it is on every list save: absent or null
+		// decodes to nil and is refused, [] means the caller read no permissions (#428).
+		if req.ExpectedPermissions == nil {
+			writeJSONError(w, "expectedPermissions is required: send the resource's permissions as you last read them, or [] if there were none.", "VALIDATION_ERROR", http.StatusBadRequest)
+			return
+		}
+
 		// Deduplicate identifiers and validate entries
 		seenIdentifiers := map[string]bool{}
 		seenIds := map[int64]bool{}
@@ -175,7 +183,8 @@ func HandleAPIResourcePermissionsPut(
 			req.Permissions[i].Description = rawDescription
 		}
 
-		// Load existing permissions once
+		// The stored rows the checks below refuse against, read before the transaction: every
+		// refusal is decided before it opens, and the transaction reads them again for its plan.
 		existing, err := database.GetPermissionsByResourceId(r.Context(), nil, resource.Id)
 		if err != nil {
 			writeInternalServerError(w, r, errs.Wrap(err, "database error getting existing permissions"), "resource_id", resource.Id)
@@ -226,74 +235,105 @@ func HandleAPIResourcePermissionsPut(
 			}
 		}
 
-		// First update existing permissions (Id > 0)
+		// An entry naming a stored row must name one of this resource's, and an identifier may not be
+		// one a different stored row holds, whether or not that row is renamed or dropped by the same
+		// save: a rename onto it, a swap of two identifiers, or a new permission reusing it is
+		// refused. That is the rule the update and create loops this replaced applied through a map
+		// they added to and never cleared, restated as what it was. It also keeps every write below
+		// clear of the unique index on (permission_identifier, resource_id) for the rows as read
+		// here, so the index is met only by another save racing this one, and answered 409 (#428).
 		for _, p := range req.Permissions {
 			if p.Id > 0 {
-				cur, ok := existingById[p.Id]
-				if !ok {
+				if _, ok := existingById[p.Id]; !ok {
 					writeJSONError(w, "Permission not found", "NOT_FOUND", http.StatusNotFound)
 					return
 				}
-				// If changing identifier, ensure no conflict with another permission
-				if other, exists := existingByIdentifier[p.PermissionIdentifier]; exists && other.Id != cur.Id {
-					writeJSONError(w, fmt.Sprintf("Permission identifier %s is already in use.", p.PermissionIdentifier), "VALIDATION_ERROR", http.StatusBadRequest)
-					return
-				}
-
-				cur.PermissionIdentifier = p.PermissionIdentifier
-				cur.Description = p.Description
-				if updatePermissionErr := database.UpdatePermission(r.Context(), nil, &cur); updatePermissionErr != nil {
-					writeInternalServerError(w, r, errs.Wrap(updatePermissionErr, "database error updating permission"), "permission_id", cur.Id)
-					return
-				}
-				// reflect change in maps
-				existingByIdentifier[p.PermissionIdentifier] = cur
-				existingById[p.Id] = cur
+			}
+			if other, exists := existingByIdentifier[p.PermissionIdentifier]; exists && other.Id != p.Id {
+				writeJSONError(w, fmt.Sprintf("Permission identifier %s is already in use.", p.PermissionIdentifier), "VALIDATION_ERROR", http.StatusBadRequest)
+				return
 			}
 		}
 
-		// Then create new permissions (Id <= 0)
-		for _, p := range req.Permissions {
-			if p.Id <= 0 {
-				if _, exists := existingByIdentifier[p.PermissionIdentifier]; exists {
-					writeJSONError(w, fmt.Sprintf("Permission identifier %s is already in use.", p.PermissionIdentifier), "VALIDATION_ERROR", http.StatusBadRequest)
-					return
+		// One transaction, so a failure part way through commits nothing and the 500 is true, where
+		// the autocommitted writes this replaced left the renames and creations before a failure in
+		// place under the 500 (#406). No row lock, as for every list save. The stored rows are read
+		// again on the transaction and compared with the list the caller loaded, entry by entry as
+		// stored, so a save from an outdated page is refused 409 rather than undo another save's
+		// rename, description or new permission. Opened through RunInTransaction, so a deadlock
+		// victim is rerun whole (#301); the plan is recomputed from each attempt's read and nothing
+		// is written to the response inside (#428).
+		err = database.RunInTransaction(r.Context(), func(tx *sql.Tx) error {
+			stored, loadErr := database.GetPermissionsByResourceId(r.Context(), tx, resource.Id)
+			if loadErr != nil {
+				return errs.Wrap(loadErr, "database error loading resource permissions before update")
+			}
+			if !sameSet(stored, permissionEntryOf, req.ExpectedPermissions) {
+				return errListChanged
+			}
+
+			storedById := make(map[int64]models.Permission, len(stored))
+			for _, p := range stored {
+				storedById[p.Id] = p
+			}
+			named := make(map[int64]bool, len(req.Permissions))
+			for _, p := range req.Permissions {
+				if p.Id <= 0 {
+					continue
 				}
-				perm := &models.Permission{
+				if _, ok := storedById[p.Id]; !ok {
+					// Validated against the rows read before the transaction and gone from this
+					// read, with the loaded list still matching it: the list changed and changed
+					// back between the two reads.
+					return errListChanged
+				}
+				named[p.Id] = true
+			}
+
+			// A stored row the request does not name is dropped: its identifier cannot be wanted,
+			// since an entry carrying it under another id was refused above.
+			for _, p := range stored {
+				if named[p.Id] {
+					continue
+				}
+				if deleteErr := database.DeletePermission(r.Context(), tx, p.Id); deleteErr != nil {
+					return errs.Wrapf(deleteErr, "database error deleting permission %d", p.Id)
+				}
+			}
+			for _, p := range req.Permissions {
+				if p.Id <= 0 {
+					continue
+				}
+				cur := storedById[p.Id]
+				if cur.PermissionIdentifier == p.PermissionIdentifier && cur.Description == p.Description {
+					continue
+				}
+				cur.PermissionIdentifier = p.PermissionIdentifier
+				cur.Description = p.Description
+				if updateErr := database.UpdatePermission(r.Context(), tx, &cur); updateErr != nil {
+					return errs.Wrapf(updateErr, "database error updating permission %d", cur.Id)
+				}
+			}
+			for _, p := range req.Permissions {
+				if p.Id > 0 {
+					continue
+				}
+				if createErr := database.CreatePermission(r.Context(), tx, &models.Permission{
 					ResourceId:           resource.Id,
 					PermissionIdentifier: p.PermissionIdentifier,
 					Description:          p.Description,
+				}); createErr != nil {
+					return errs.Wrapf(createErr, "database error creating permission %s", p.PermissionIdentifier)
 				}
-				if createPermissionErr := database.CreatePermission(r.Context(), nil, perm); createPermissionErr != nil {
-					writeInternalServerError(w, r, errs.Wrap(createPermissionErr, "database error creating permission"), "resource_id", resource.Id)
-					return
-				}
-				existingByIdentifier[perm.PermissionIdentifier] = *perm
-				existingById[perm.Id] = *perm
 			}
-		}
-
-		// Delete any permissions that are no longer present (by identifier set)
-		// Reload current permissions to be safe
-		current, err := database.GetPermissionsByResourceId(r.Context(), nil, resource.Id)
+			return nil
+		})
 		if err != nil {
-			writeInternalServerError(w, r, errs.Wrap(err, "database error getting current permissions for deletion"), "resource_id", resource.Id)
+			writeListSaveFailure(w, r, err, "resource_id", resource.Id)
 			return
 		}
-		desiredIdentifiers := map[string]bool{}
-		for _, p := range req.Permissions {
-			desiredIdentifiers[p.PermissionIdentifier] = true
-		}
-		for _, existingPerm := range current {
-			if !desiredIdentifiers[existingPerm.PermissionIdentifier] {
-				if err := database.DeletePermission(r.Context(), nil, existingPerm.Id); err != nil {
-					writeInternalServerError(w, r, errs.Wrap(err, "database error deleting permission"), "permission_id", existingPerm.Id)
-					return
-				}
-			}
-		}
 
-		// Audit consolidated update
+		// Audit consolidated update, once the save has committed (#428).
 		auditLogger.Log(r.Context(), audit.AuditUpdatedResourcePermissions, map[string]interface{}{
 			"resourceId":   resource.Id,
 			"loggedInUser": callerSubject(r),
@@ -303,6 +343,15 @@ func HandleAPIResourcePermissionsPut(
 		resp := api.SuccessResponse{Success: true}
 		writeJSON(w, r, http.StatusOK, resp)
 	}
+}
+
+// permissionEntryOf is a stored permission as the loaded-list comparison sees it, in the shape the
+// caller sends its loaded entries: id, identifier and description, so a rename or a changed
+// description by another save makes the caller's list outdated as surely as an added or dropped
+// permission does. The caller's entries are compared as sent: it echoes what it read, and stored
+// values were trimmed when they were written (#428).
+func permissionEntryOf(p models.Permission) api.ResourcePermissionUpsert {
+	return api.ResourcePermissionUpsert{Id: p.Id, PermissionIdentifier: p.PermissionIdentifier, Description: p.Description}
 }
 
 // Note: The previous validation endpoint [/resources/validate-permission] was removed.
