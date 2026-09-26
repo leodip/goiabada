@@ -16,7 +16,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/constants"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 )
@@ -257,7 +256,7 @@ func TestAPIAccountOTPEnrollmentGet_UnauthorizedAndScope(t *testing.T) {
 	assert.Contains(t, string(body2), "Access token required.")
 
 	// Insufficient scope
-	tok := createClientCredentialsTokenWithScope(t, constants.AuthServerResourceIdentifier, constants.UserinfoPermissionIdentifier)
+	tok := createClientCredentialsTokenWithoutRouteScope(t)
 	resp3 := makeAPIRequest(t, "GET", url, tok, nil)
 	defer func() { _ = resp3.Body.Close() }()
 	assert.Equal(t, http.StatusForbidden, resp3.StatusCode)
@@ -631,7 +630,7 @@ func TestAPIAccountOTPPut_UnauthorizedAndScope(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 
 	// Insufficient scope
-	tok := createClientCredentialsTokenWithScope(t, constants.AuthServerResourceIdentifier, constants.UserinfoPermissionIdentifier)
+	tok := createClientCredentialsTokenWithoutRouteScope(t)
 	resp2 := makeAPIRequest(t, "PUT", url, tok, api.UpdateAccountOTPRequest{Enabled: false, Password: "x"})
 	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusForbidden, resp2.StatusCode)

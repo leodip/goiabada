@@ -23,8 +23,8 @@
 // the scope this repository's own documentation has always assigned it to; issuance wrote it for
 // any scope but a lone openid, so a grant of "openid email" carried a profile claim nobody asked
 // for. In an access token issuance wrote it always, including for a lone openid, because
-// generateAccessTokenCore appends authserver:userinfo to the scope slice for the audience before
-// the claim block reads it -- so the same grant produced an access token carrying updated_at and
+// generateAccessTokenCore then appended a scope to the slice for the audience before the claim
+// block read it -- so the same grant produced an access token carrying updated_at and
 // an ID token without it, which nothing chose. Emitting it under the profile scope alone is one
 // rule for all three sites, and it is the rule the wire documentation already stated.
 //

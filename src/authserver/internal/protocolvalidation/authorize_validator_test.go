@@ -43,6 +43,20 @@ func TestValidateScopes(t *testing.T) {
 			expectedError: "",
 		},
 		{
+			// A claim scope without openid is admitted as asked (#449 decision 2): OIDC Core 1.0
+			// section 3.1.2.1 leaves it unspecified, and such a token cannot reach /userinfo.
+			name:          "profile alone, without openid",
+			scope:         "profile",
+			expectedError: "",
+		},
+		{
+			// groups puts a claim into the access token without openid, so refusing it would
+			// break a request that works (#449 decision 2).
+			name:          "groups alone, without openid",
+			scope:         "groups",
+			expectedError: "",
+		},
+		{
 			// Scope values are case-sensitive (RFC 6749 section 3.3). This spelling used to be
 			// case-folded into offline_access and skipped; it is now some other scope, and not
 			// one in resource:permission form (#425).

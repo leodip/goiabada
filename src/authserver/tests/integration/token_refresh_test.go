@@ -428,8 +428,7 @@ func TestToken_Refresh_WithAdditionalScope(t *testing.T) {
 	assert.Equal(t, "Bearer", data["token_type"])
 	assert.NotNil(t, data["expires_in"])
 
-	// authserver:userinfo is always included when there's an openid scope
-	assert.Equal(t, "openid profile email authserver:userinfo", data["scope"])
+	assert.Equal(t, "openid profile email", data["scope"])
 }
 
 func TestToken_Refresh_ConsentRemoved(t *testing.T) {

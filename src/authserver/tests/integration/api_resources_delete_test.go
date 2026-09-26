@@ -107,8 +107,8 @@ func TestAPIResourceDelete_UnauthorizedAndScope(t *testing.T) {
 	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, resp2.StatusCode)
 
-	// Insufficient scope (userinfo)
-	token := createClientCredentialsTokenWithScope(t, constants.AuthServerResourceIdentifier, constants.UserinfoPermissionIdentifier)
+	// Insufficient scope (a scope no route grants)
+	token := createClientCredentialsTokenWithoutRouteScope(t)
 	resp3 := makeAPIRequest(t, "DELETE", url, token, nil)
 	defer func() { _ = resp3.Body.Close() }()
 	assert.Equal(t, http.StatusForbidden, resp3.StatusCode)

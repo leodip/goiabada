@@ -6,7 +6,6 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/base64"
-	"fmt"
 	"strings"
 	"time"
 
@@ -163,12 +162,12 @@ func (t *TokenIssuer) GenerateTokenResponseForAuthCode(ctx context.Context,
 	}
 
 	// nil parent: this is the initial code exchange, so the code is the authorizing credential.
-	accessTokenStr, scopeFromAccessToken, err := t.generateAccessToken(ctx, settings, code, code.Scope, now, privKey, keyPair.KeyIdentifier, nil)
+	accessTokenStr, err := t.generateAccessToken(ctx, settings, code, code.Scope, now, privKey, keyPair.KeyIdentifier, nil)
 	if err != nil {
 		return nil, err
 	}
 	tokenResponse.AccessToken = accessTokenStr
-	tokenResponse.Scope = scopeFromAccessToken
+	tokenResponse.Scope = code.Scope
 
 	// id_token ---------------------------------------------------------------------------
 
@@ -183,7 +182,7 @@ func (t *TokenIssuer) GenerateTokenResponseForAuthCode(ctx context.Context,
 
 	// refresh_token ----------------------------------------------------------------------
 
-	refreshToken, refreshExpiresIn, err := t.generateRefreshToken(ctx, settings, code, scopeFromAccessToken, now, privKey, keyPair.KeyIdentifier, nil)
+	refreshToken, refreshExpiresIn, err := t.generateRefreshToken(ctx, settings, code, code.Scope, now, privKey, keyPair.KeyIdentifier, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -203,7 +202,7 @@ func (t *TokenIssuer) GenerateTokenResponseForAuthCode(ctx context.Context,
 // grant ceasing to be offline (#106 decisions 9 and 13).
 func (t *TokenIssuer) generateAccessToken(ctx context.Context, settings *models.Settings, code *models.Code, scope string,
 	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string,
-	parentRefreshToken *models.RefreshToken) (string, string, error) {
+	parentRefreshToken *models.RefreshToken) (string, error) {
 
 	input := t.createTokenInputFromCode(code)
 	input.Scope = scope // Use the provided scope (may differ from code.Scope for refresh)
@@ -520,12 +519,12 @@ func (t *TokenIssuer) GenerateTokenResponseForRefresh(ctx context.Context, input
 	}
 
 	// The PARENT refresh token is the authorizing credential here, not the code.
-	accessTokenStr, scopeFromAccessToken, err := t.generateAccessToken(ctx, settings, input.Code, scopeToUse, now, privKey, keyPair.KeyIdentifier, input.RefreshToken)
+	accessTokenStr, err := t.generateAccessToken(ctx, settings, input.Code, scopeToUse, now, privKey, keyPair.KeyIdentifier, input.RefreshToken)
 	if err != nil {
 		return nil, err
 	}
 	tokenResponse.AccessToken = accessTokenStr
-	tokenResponse.Scope = scopeFromAccessToken
+	tokenResponse.Scope = scopeToUse
 
 	// id_token ---------------------------------------------------------------------------
 
@@ -622,12 +621,12 @@ func (t *TokenIssuer) GenerateTokenResponseForRefreshROPC(ctx context.Context, i
 	// access_token -----------------------------------------------------------------------
 
 	// The parent refresh token authorizes this, not the reloaded user.
-	accessTokenStr, scopeFromAccessToken, err := t.generateROPCAccessToken(ctx, settings, ropcInput, scopeToUse, now, privKey, keyPair.KeyIdentifier, input.RefreshToken)
+	accessTokenStr, err := t.generateROPCAccessToken(ctx, settings, ropcInput, scopeToUse, now, privKey, keyPair.KeyIdentifier, input.RefreshToken)
 	if err != nil {
 		return nil, err
 	}
 	tokenResponse.AccessToken = accessTokenStr
-	tokenResponse.Scope = scopeFromAccessToken
+	tokenResponse.Scope = scopeToUse
 
 	// id_token ---------------------------------------------------------------------------
 
@@ -659,9 +658,8 @@ func (t *TokenIssuer) GenerateTokenResponseForRefreshROPC(ctx context.Context, i
 // URL is the one injected into this issuer, and the include flag is the token type's own (#387
 // decision 5). updated_at was a third until it turned out to be a defect: issuance wrote it for
 // any scope but a lone openid, and in an access token for a lone openid too, because the audience
-// loop below appends authserver:userinfo to the scope slice before the claim block reads it. It
-// now rides with the profile scope, as it does at /userinfo and as this repository's own
-// documentation has always said.
+// loop used to append a scope to the slice the claim block read. It now rides with the profile
+// scope, as it does at /userinfo and as this repository's own documentation has always said.
 func (t *TokenIssuer) claimMapper(inclusion userclaims.Inclusion) userclaims.Mapper {
 	return userclaims.Mapper{
 		Database:  t.database,
@@ -673,7 +671,7 @@ func (t *TokenIssuer) claimMapper(inclusion userclaims.Inclusion) userclaims.Map
 // generateAccessTokenCore creates an access token using the unified TokenGenerationInput.
 // This is the single implementation used by all OAuth flows (auth code, implicit, ROPC).
 func (t *TokenIssuer) generateAccessTokenCore(ctx context.Context, settings *models.Settings, input *TokenGenerationInput,
-	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string) (string, string, error) {
+	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string) (string, error) {
 
 	claims := make(jwt.MapClaims)
 
@@ -699,26 +697,24 @@ func (t *TokenIssuer) generateAccessTokenCore(ctx context.Context, settings *mod
 		claims["sid"] = input.SessionIdentifier
 	}
 
-	scope := input.Scope
-	scopes := strings.Split(scope, " ")
-
-	addUserInfoScope := false
+	scopes := strings.Split(input.Scope, " ")
 
 	// Build audience collection from scopes
 	audCollection := []string{}
 	for _, s := range scopes {
 		if oidc.IsClaimScope(s) {
-			// if an OIDC scope is present, give access to the userinfo endpoint
+			// A claim scope is answered at /userinfo, which the authserver resource serves, so it
+			// names authserver as an audience. A groups-only grant, which carries no openid and
+			// may carry no resource scope, would otherwise have no audience at all.
 			if !slices.Contains(audCollection, coreconstants.AuthServerResourceIdentifier) {
 				audCollection = append(audCollection, coreconstants.AuthServerResourceIdentifier)
 			}
-			addUserInfoScope = true
 			continue
 		}
 		if !oidc.IsOfflineAccessScope(s) {
 			parts := strings.Split(s, ":")
 			if len(parts) != 2 {
-				return "", "", errs.Errorf("invalid scope: %v", s)
+				return "", errs.Errorf("invalid scope: %v", s)
 			}
 			if !slices.Contains(audCollection, parts[0]) {
 				audCollection = append(audCollection, parts[0])
@@ -727,20 +723,11 @@ func (t *TokenIssuer) generateAccessTokenCore(ctx context.Context, settings *mod
 	}
 	switch {
 	case len(audCollection) == 0:
-		return "", "", errs.Errorf("unable to generate an access token without an audience. scope: '%v'", scope)
+		return "", errs.Errorf("unable to generate an access token without an audience. scope: '%v'", input.Scope)
 	case len(audCollection) == 1:
 		claims["aud"] = audCollection[0]
 	case len(audCollection) > 1:
 		claims["aud"] = audCollection
-	}
-
-	if addUserInfoScope {
-		// if an OIDC scope is present, give access to the userinfo endpoint
-		userInfoScopeStr := fmt.Sprintf("%v:%v", coreconstants.AuthServerResourceIdentifier, coreconstants.UserinfoPermissionIdentifier)
-		if !slices.Contains(scopes, userInfoScopeStr) {
-			scopes = append(scopes, userInfoScopeStr)
-		}
-		scope = strings.Join(scopes, " ")
 	}
 
 	claims["typ"] = TokenTypeBearer.String()
@@ -751,7 +738,7 @@ func (t *TokenIssuer) generateAccessTokenCore(ctx context.Context, settings *mod
 	}
 
 	claims["exp"] = now.Add(time.Duration(time.Second * time.Duration(tokenExpirationInSeconds))).Unix()
-	claims["scope"] = scope
+	claims["scope"] = input.Scope
 
 	// Optional nonce claim
 	if len(input.Nonce) > 0 {
@@ -780,9 +767,9 @@ func (t *TokenIssuer) generateAccessTokenCore(ctx context.Context, settings *mod
 	token.Header["kid"] = keyIdentifier
 	accessToken, err := token.SignedString(signingKey)
 	if err != nil {
-		return "", "", errs.Wrap(err, "unable to sign access_token")
+		return "", errs.Wrap(err, "unable to sign access_token")
 	}
-	return accessToken, scope, nil
+	return accessToken, nil
 }
 
 // generateIdTokenCore creates an id_token using the unified TokenGenerationInput.
@@ -985,14 +972,15 @@ func (t *TokenIssuer) GenerateTokenResponseForImplicit(ctx context.Context,
 		return nil, err
 	}
 
+	response.Scope = input.Scope
+
 	// Generate access token if requested (response_type contains "token")
 	if issueAccessToken {
-		accessToken, scopeFromToken, err := t.generateImplicitAccessToken(ctx, settings, input, now, privKey, keyPair.KeyIdentifier)
+		accessToken, err := t.generateImplicitAccessToken(ctx, settings, input, now, privKey, keyPair.KeyIdentifier)
 		if err != nil {
 			return nil, err
 		}
 		response.AccessToken = accessToken
-		response.Scope = scopeFromToken
 	}
 
 	// Generate id_token if requested (response_type contains "id_token")
@@ -1003,11 +991,6 @@ func (t *TokenIssuer) GenerateTokenResponseForImplicit(ctx context.Context,
 			return nil, err
 		}
 		response.IdToken = idToken
-
-		// If only id_token (no access token), we need to set scope
-		if !issueAccessToken {
-			response.Scope = input.Scope
-		}
 	}
 
 	return response, nil
@@ -1015,7 +998,7 @@ func (t *TokenIssuer) GenerateTokenResponseForImplicit(ctx context.Context,
 
 // generateImplicitAccessToken creates an access token for implicit flow.
 func (t *TokenIssuer) generateImplicitAccessToken(ctx context.Context, settings *models.Settings, input *ImplicitGrantInput,
-	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string) (string, string, error) {
+	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string) (string, error) {
 
 	tokenInput := t.createTokenInputFromImplicit(input)
 	return t.generateAccessTokenCore(ctx, settings, tokenInput, now, signingKey, keyIdentifier)
@@ -1121,12 +1104,12 @@ func (t *TokenIssuer) GenerateTokenResponseForROPC(ctx context.Context,
 
 	// Generate access token
 	// nil parent: initial password grant, so the validated User snapshot is the source.
-	accessTokenStr, scopeFromAccessToken, err := t.generateROPCAccessToken(ctx, settings, input, input.Scope, now, privKey, keyPair.KeyIdentifier, nil)
+	accessTokenStr, err := t.generateROPCAccessToken(ctx, settings, input, input.Scope, now, privKey, keyPair.KeyIdentifier, nil)
 	if err != nil {
 		return nil, err
 	}
 	response.AccessToken = accessTokenStr
-	response.Scope = scopeFromAccessToken
+	response.Scope = input.Scope
 
 	// Generate id_token if openid scope is present
 	scopes := strings.Split(input.Scope, " ")
@@ -1139,19 +1122,6 @@ func (t *TokenIssuer) GenerateTokenResponseForROPC(ctx context.Context,
 	}
 
 	// Generate refresh token with direct UserId/ClientId (no Code entity needed)
-	//
-	// input.Scope, NOT scopeFromAccessToken. The access token's scope has been decorated by
-	// generateAccessTokenCore, which appends authserver:userinfo whenever an OIDC scope is
-	// present. input.Scope is the validated grant (validateResult.Scope, the output of
-	// validateROPCScopes), and the grant is what a refresh token must record: on refresh the
-	// validator re-checks every non-OIDC scope in this field against the user's permissions, so
-	// storing the decorated scope made the server reject a scope it had injected itself, and an
-	// ROPC token requesting `openid` could not be refreshed at all.
-	//
-	// The authorization code path at :147 passes its decorated scope for the same field and is
-	// deliberately left alone: nothing reads RefreshToken.Scope for that grant, because the
-	// validator consults refreshToken.Code.Scope instead (token_validator.go). Changing it would
-	// be an untested behaviour change to a working path.
 	refreshToken, refreshExpiresIn, err := t.generateRefreshTokenForROPC(ctx, settings, input, input.Scope, now, privKey, keyPair.KeyIdentifier, nil)
 	if err != nil {
 		return nil, err
@@ -1174,7 +1144,7 @@ func (t *TokenIssuer) GenerateTokenResponseForROPC(ctx context.Context,
 // ROPC grants are always offline, so no access token here ever carries sid.
 func (t *TokenIssuer) generateROPCAccessToken(ctx context.Context, settings *models.Settings, input *ROPCGrantInput, scope string,
 	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string,
-	parentRefreshToken *models.RefreshToken) (string, string, error) {
+	parentRefreshToken *models.RefreshToken) (string, error) {
 
 	tokenInput := t.createTokenInputFromROPC(input, now)
 	tokenInput.Scope = scope // Use the provided scope

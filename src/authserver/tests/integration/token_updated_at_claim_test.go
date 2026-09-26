@@ -18,12 +18,12 @@ import (
 // (site/src/content/docs/concepts/openid-connect.mdx, integration/endpoints.mdx). Issuance
 // disagreed with both until this test's two "openid email" rows: it emitted the claim for any
 // scope beyond a lone openid, and in an access token for a lone openid too, because
-// generateAccessTokenCore appends authserver:userinfo to the scope slice for the audience before
-// the claim block reads it.
+// generateAccessTokenCore then appended authserver:userinfo to the scope slice for the audience
+// before the claim block read it.
 //
 // The unit tier holds the same rule at the mapper and at the issuer. This one is here because the
-// gate reads a slice that one caller mutates and the other does not, and only a token taken off
-// the endpoint shows which slice each token type actually got. Both settings are turned on, so a
+// gate read a slice that one caller mutated and the other did not, and only a token taken off the
+// endpoint shows which slice each token type actually got. Both settings are turned on, so a
 // claim that is absent is absent because of the scope and not because the deployment suppressed
 // OIDC claims for that token type -- the access token's setting is seeded off, which is why this
 // divergence could sit unnoticed.

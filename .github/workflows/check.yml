@@ -481,6 +481,7 @@ jobs:
   unit-race:
     name: Unit / race
     needs: versions
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     container: golang:${{ needs.versions.outputs.go }}-bookworm
     services:

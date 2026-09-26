@@ -14,7 +14,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/constants"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -148,7 +147,7 @@ func TestAPIUserEmailVerificationCodePost_Unauthorized(t *testing.T) {
 }
 
 func TestAPIUserEmailVerificationCodePost_InsufficientScope(t *testing.T) {
-	token := createClientCredentialsTokenWithScope(t, constants.AuthServerResourceIdentifier, constants.UserinfoPermissionIdentifier)
+	token := createClientCredentialsTokenWithoutRouteScope(t)
 	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/1/email/verification-code"
 	resp := makeAPIRequest(t, "POST", url, token, nil)
 	defer func() { _ = resp.Body.Close() }()
