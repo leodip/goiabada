@@ -286,6 +286,76 @@ func TestAPIClientWebOriginsPut_ValidationErrors(t *testing.T) {
 	})
 }
 
+// webOriginOfLength is a canonical origin of exactly n bytes: "https://" plus a host of
+// 63-character labels and one shorter label, plus ":65535".
+func webOriginOfLength(t *testing.T, n int) string {
+	t.Helper()
+	const prefix, port = "https://", ":65535"
+	hostLen := n - len(prefix) - len(port)
+	var labels []string
+	for hostLen > 63 {
+		labels = append(labels, strings.Repeat("a", 63))
+		hostLen -= 64 // the label and the dot after it
+	}
+	labels = append(labels, strings.Repeat("b", hostLen))
+	origin := prefix + strings.Join(labels, ".") + port
+	assert.Len(t, origin, n)
+	return origin
+}
+
+// getClientWebOrigins reads a client's web origins back through the admin API.
+func getClientWebOrigins(t *testing.T, accessToken string, clientId int64) []string {
+	t.Helper()
+	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(clientId, 10)
+	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
+	defer func() { _ = resp.Body.Close() }()
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	var body api.GetClientResponse
+	assert.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
+	origins := []string{}
+	for _, wo := range body.Client.WebOrigins {
+		origins = append(origins, wo.Origin)
+	}
+	return origins
+}
+
+// The web-origin bound is the column's width on every engine: the longest standards-valid origin,
+// 267 bytes, is saved and reads back, and one byte more is refused with nothing written. On SQLite,
+// which this tier runs locally, the column has no width, so the 268-byte refusal is the handler's
+// own; the four-engine run is what shows the 267-byte value fits the widened column (#428).
+func TestAPIClientWebOriginsPut_TheBoundIsTheLongestStandardOrigin(t *testing.T) {
+	accessToken, _ := createAdminClientWithToken(t)
+
+	client := &models.Client{
+		ClientIdentifier:         "weborig-bound-" + strings.ToLower(fake.LetterN(8)),
+		Enabled:                  true,
+		IsPublic:                 true,
+		AuthorizationCodeEnabled: true,
+	}
+	err := database.CreateClient(context.Background(), nil, client)
+	assert.NoError(t, err)
+	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
+
+	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/web-origins"
+
+	atTheBound := webOriginOfLength(t, 267)
+	resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateClientWebOriginsRequest{WebOrigins: []string{atTheBound}})
+	_ = resp.Body.Close()
+	assert.Equal(t, http.StatusOK, resp.StatusCode, "a 267-byte origin is the longest standards-valid one and must be admitted")
+	assert.Equal(t, []string{atTheBound}, getClientWebOrigins(t, accessToken, client.Id))
+
+	overTheBound := webOriginOfLength(t, 268)
+	resp = makeAPIRequest(t, "PUT", url, accessToken, api.UpdateClientWebOriginsRequest{WebOrigins: []string{overTheBound}})
+	defer func() { _ = resp.Body.Close() }()
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	var errResp api.ErrorResponse
+	assert.NoError(t, json.NewDecoder(resp.Body).Decode(&errResp))
+	assert.Equal(t, "VALIDATION_ERROR", errResp.ErrorCode)
+	assert.Contains(t, errResp.ErrorDescription, "too long")
+	assert.Equal(t, []string{atTheBound}, getClientWebOrigins(t, accessToken, client.Id),
+		"a refused save must leave the stored list as it was")
+}
+
 func TestAPIClientWebOriginsPut_NotFound_InvalidId_InvalidBody_Unauthorized(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 

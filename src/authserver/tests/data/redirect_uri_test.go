@@ -2,11 +2,60 @@ package datatests
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
+	"github.com/stretchr/testify/require"
 )
+
+// redirectURIAtTheBound is one redirect URI of exactly models.RedirectURIMaxBytes bytes.
+type redirectURIAtTheBound struct {
+	name  string
+	value string
+}
+
+// redirectURIsAtTheBound returns three redirect URIs of exactly models.RedirectURIMaxBytes bytes,
+// each "https://example.com/" plus a fill of one-, two- or four-byte characters. The engines count
+// a column's width differently, MySQL and PostgreSQL in code points and SQL Server in UTF-16 units,
+// and the handlers bound a URI in bytes because a string is never fewer bytes than either, so these
+// three are the values that prove the bound fits every column: the ASCII one at the most characters
+// the bound admits, and the other two at the most UTF-16 units per byte (#428).
+func redirectURIsAtTheBound(t *testing.T) []redirectURIAtTheBound {
+	t.Helper()
+	const prefix = "https://example.com/"
+	fill := models.RedirectURIMaxBytes - len(prefix)
+	values := []redirectURIAtTheBound{
+		{"ascii", prefix + strings.Repeat("a", fill)},
+		{"two-byte characters", prefix + strings.Repeat("é", fill/2)},
+		{"four-byte characters", prefix + strings.Repeat("😀", fill/4)},
+	}
+	for _, v := range values {
+		require.Len(t, v.value, models.RedirectURIMaxBytes, "%s is off the bound, so the case no longer observes the column's edge", v.name)
+	}
+	return values
+}
+
+// TestCreateRedirectURI_AURIAtTheBoundRoundTrips is what the handlers' byte bound stands on: a URI
+// they admit is stored and read back unchanged on every engine, rather than refused by a column
+// narrower than the bound (#428).
+func TestCreateRedirectURI_AURIAtTheBoundRoundTrips(t *testing.T) {
+	for _, tc := range redirectURIsAtTheBound(t) {
+		t.Run(tc.name, func(t *testing.T) {
+			client := createTestClient(t)
+			redirectURI := &models.RedirectURI{URI: tc.value, ClientId: client.Id}
+
+			err := database.CreateRedirectURI(context.Background(), nil, redirectURI)
+			require.NoError(t, err, "a redirect URI of %d bytes was refused by the column", models.RedirectURIMaxBytes)
+
+			stored, err := database.GetRedirectURIById(context.Background(), nil, redirectURI.Id)
+			require.NoError(t, err)
+			require.NotNil(t, stored)
+			require.Equal(t, tc.value, stored.URI, "the redirect URI did not round-trip unchanged")
+		})
+	}
+}
 
 func TestCreateRedirectURI(t *testing.T) {
 	client := createTestClient(t)

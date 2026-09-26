@@ -1,6 +1,7 @@
 package models
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/leodip/goiabada/core/constants"
@@ -87,6 +88,67 @@ func TestIsPKCERequired_PublicClientAlwaysTrue(t *testing.T) {
 	if got := inherited.IsPKCERequired(true); got != true {
 		t.Errorf("IsPKCERequired(true) = %v, want true (public beats a false global setting)", got)
 	}
+}
+
+// TestApplyPublicClientInvariants owns the rule every writer of a client applies (#245, #428): a
+// public client leaves with client credentials off and PKCE an explicit true from every starting
+// state, and a confidential client leaves exactly as it arrived, its PKCE pointer included.
+func TestApplyPublicClientInvariants(t *testing.T) {
+	type pkceState struct {
+		name  string
+		value *bool
+	}
+	pkceStates := func() []pkceState {
+		off, on := false, true
+		return []pkceState{{"pkce nil", nil}, {"pkce false", &off}, {"pkce true", &on}}
+	}
+
+	for _, isPublic := range []bool{true, false} {
+		for _, clientCredentials := range []bool{true, false} {
+			for _, pkce := range pkceStates() {
+				mode := "confidential"
+				if isPublic {
+					mode = "public"
+				}
+				name := fmt.Sprintf("%s, client credentials %v, %s", mode, clientCredentials, pkce.name)
+				t.Run(name, func(t *testing.T) {
+					client := &Client{
+						IsPublic:                 isPublic,
+						ClientCredentialsEnabled: clientCredentials,
+						PKCERequired:             pkce.value,
+					}
+
+					client.ApplyPublicClientInvariants()
+
+					if client.IsPublic != isPublic {
+						t.Fatalf("IsPublic changed from %v to %v; the rule reads the mode and never writes it", isPublic, client.IsPublic)
+					}
+					if !isPublic {
+						if client.ClientCredentialsEnabled != clientCredentials {
+							t.Errorf("a confidential client's ClientCredentialsEnabled changed from %v to %v", clientCredentials, client.ClientCredentialsEnabled)
+						}
+						if client.PKCERequired != pkce.value {
+							t.Errorf("a confidential client's PKCERequired was replaced; it must be left exactly as it arrived")
+						}
+						return
+					}
+					if client.ClientCredentialsEnabled {
+						t.Error("a public client left with client credentials enabled")
+					}
+					if client.PKCERequired == nil || !*client.PKCERequired {
+						t.Errorf("a public client left with PKCERequired %v, want an explicit true", describePKCE(client.PKCERequired))
+					}
+				})
+			}
+		}
+	}
+}
+
+func describePKCE(p *bool) string {
+	if p == nil {
+		return "nil"
+	}
+	return fmt.Sprintf("%v", *p)
 }
 
 func TestIsSystemLevelClient(t *testing.T) {

@@ -5155,6 +5155,10 @@ components:
           type: array
           items:
             type: string
+            maxLength: 267
+            description: >-
+              A web origin, stored in its canonical form. One longer than 267 bytes, the longest
+              standards-valid origin, is refused with VALIDATION_ERROR before anything is written.
 
     UpdateClientTokensRequest:
       type: object
