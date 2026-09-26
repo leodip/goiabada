@@ -3764,7 +3764,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 // answerClientNow is never read directly: the three outcomes are all externally visible, and a test
 // that reached inside would pass with the routing wired to nothing.
 //
-// The rows are probe/routing_table.out, and its clause-coverage section is why some of them are
+// The rows are #213's clause-coverage table for this routing decision, which is why some of them are
 // here. Silence is pinned by a logged-out request against an administrator client, and prompt=login
 // by a request that HAS a valid session: "none" with a session passes with the silence clause
 // deleted (the session clause carries it), and "login" without one passes with the login clause
@@ -3772,7 +3772,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 // the negative twins of the case-sensitivity rows and dropping them would leave "NONE" and "Login"
 // asserting nothing in particular.
 //
-// One row of the probe's nineteen is absent, deliberately: an unresolved client cannot reach the
+// One row of the table's nineteen is absent, deliberately: an unresolved client cannot reach the
 // predicate through this handler, because the load directly above it answers 500 on a nil client.
 // The nil-client case is the untrusted case and it is pinned at seam 4, in TestRedirectWillBeEmitted.
 func TestHandleAuthorizeGet_AuthenticateBeforeRedirect_RoutingTable(t *testing.T) {

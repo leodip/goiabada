@@ -410,6 +410,7 @@ command itself and fails on a tree it changed.
 | `core/testutil` | `AssertErrorCodeDoc` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
 | `core/testutil` | `AssertGeneratedMocksArePinned` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
 | `core/testutil` | `AssertGofmted` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
+| `core/testutil` | `AssertNoAgreementPointers` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
 | `core/testutil` | `AssertNoCredentialQueryFallback` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
 | `core/testutil` | `AssertNoDeadInterfaces` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
 | `core/testutil` | `AssertNoLegacyErrors` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |

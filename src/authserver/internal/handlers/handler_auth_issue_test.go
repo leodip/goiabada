@@ -3145,7 +3145,8 @@ func TestIssueAuthCode_FormPostRenderIsBuffered(t *testing.T) {
 // absent and a key holding "" are the same value. That is true of {{.state}} and {{if .state}}, and
 // it is what the two guards' own comments said, but it is not true of a template that enumerates the
 // map: range yields the key when it is present and skips it when it is not, and len counts it.
-// Confirmed in probe/bind_map_presence.out. So the case can be written after all, and here it is for
+// Confirmed by rendering a {{range}} template over the bind map with and without the key and
+// diffing the two outputs. So the case can be written after all, and here it is for
 // both emitters (#146).
 //
 // Why it is worth pinning rather than deleting the guards: what reaches the template is this
@@ -3213,9 +3214,9 @@ func TestFormPostBindMapOmitsAnAbsentState(t *testing.T) {
 // The template half of decision 7, and the reason it is a stage of its own rather than a line in
 // either emitter. Both Go branches decide whether to put a "state" key in the bind map, and neither
 // decision was observable: form_post.html emitted the input unconditionally, so an absent state
-// reached the RP as state="" whatever the Go code had decided (probe/form_post_state.out). The
-// guard is now {{if .state}}, matching the code, error and error_description guards already in the
-// file.
+// reached the RP as state="" whatever the Go code had decided, confirmed by rendering the template
+// with no state bound and finding state="" in the output. The guard is now {{if .state}}, matching
+// the code, error and error_description guards already in the file.
 //
 // These cases render the REAL web.TemplateFS() rather than a stub, which is the point: every other
 // form_post case in this package supplies its own template, and a stub is exactly what let the dead

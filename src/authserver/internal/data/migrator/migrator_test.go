@@ -747,8 +747,8 @@ func TestIsNilVersion_RejectsTheSentinelJoinedWithAnOperationalFailure(t *testin
 // ---------------------------------------------------------------------------
 
 // TestAdvisoryLockID_MatchesGolangMigrate pins the local copy of the formula to the values
-// golang-migrate v4.19.1 produced for Goiabada's own database names, recorded by
-// docs/issue-268-migration-runner/probe/lock_ids.go before the library was removed.
+// golang-migrate v4.19.1 produced for Goiabada's own database names, recorded for #268
+// before the library was removed.
 //
 // This is the pin that cannot be re-derived once the library is gone, and it is not cosmetic.
 // During an upgrade one replica runs the previous release and another runs this one; they exclude

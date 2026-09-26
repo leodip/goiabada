@@ -23,7 +23,7 @@ import (
 //
 // cancelled() is declared in cancellation_test.go and is the same already-over context: the one
 // cancellation every engine and every driver answers identically, because database/sql refuses
-// the call before the driver is reached at all (probe/cancel.out).
+// the call before the driver is reached at all, confirmed against all four engines (#386).
 
 // TestGetGroupById_RefusesAnAlreadyCancelledContext is the plain read through getGroupCommon,
 // the helper every group lookup shares.

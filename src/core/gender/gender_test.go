@@ -9,7 +9,7 @@ import (
 // TestGender_String owns the total String decision 16 of #385 settled. The in-range rows are the
 // wire values the OIDC "gender" claim carries and a profile page re-renders, so they are pinned
 // against literals rather than against the slice they come from. The out-of-range rows are the
-// defect: probe/gender_string_test.go showed Gender(3) and Gender(-1) panicking on the index, and
+// defect: #385 found Gender(3) and Gender(-1) panicking on the index, and
 // three of the four production sites that convert an int to a Gender do not range-check first.
 func TestGender_String(t *testing.T) {
 	testCases := []struct {

@@ -493,8 +493,8 @@ func TestUpdateKeyPairState_StorageFailureIsAnError(t *testing.T) {
 
 // TestUpdateKeyPairState_Concurrent is the property seam 2 owns: two transactions
 // racing the same transition produce exactly one winner, the loser reporting false
-// rather than an error. This is probe/probe_251_test.go.txt's Q3 lifted onto the
-// interface method.
+// rather than an error. This is the concurrent compare-and-set case explored for
+// #251, lifted onto the interface method.
 //
 // One winner is not on its own evidence of a race: two calls run end to end in
 // sequence produce the same pair of answers, because the second finds the row no

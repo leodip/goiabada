@@ -20,7 +20,7 @@ import (
 
 // One case per list endpoint that it consults buildSessionDetails, and in particular that it
 // reads the caller's sid off the validated token and hands it over. session_details_test.go owns
-// the helper's own table; restating it three times is what the agreement's seam section rejected.
+// the helper's own table; restating it three times is what #373's shared loop replaced.
 //
 // The sid read is what makes these worth writing rather than leaving to the integration tier: it
 // is new for the two admin handlers, and a handler that fetched its sessions and passed "" would

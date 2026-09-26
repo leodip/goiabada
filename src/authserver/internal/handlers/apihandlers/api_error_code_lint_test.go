@@ -78,8 +78,8 @@ var apiErrorCodes = map[string]string{
 	"SMTP_NOT_ENABLED":                     "adminconsole: handler_admin_settings_email.go's switch redraws the settings form.",
 	"SEND_FAILED":                          "adminconsole: handler_admin_settings_email.go's switch.",
 
-	// Conditions an integrator can act on, distinguishable from a plain rejected value. Named in
-	// the agreement's section 4 as codes a caller acts on, and documented in openapi.yaml.
+	// Conditions an integrator can act on, distinguishable from a plain rejected value. #279 kept
+	// these codes live for that reason, and they are documented in openapi.yaml.
 	"EMAIL_ALREADY_EXISTS": "409 on createUser: the address is taken, so the caller picks another.",
 	"EMAIL_TOO_LONG":       "400: the address exceeds the column, so the caller shortens it.",
 	"VALUE_TOO_LONG":       "400: an attribute value exceeds the column.",

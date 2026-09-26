@@ -382,9 +382,9 @@ func TestMiddlewareCsrf_OriginDecisions(t *testing.T) {
 		// the admin console's host, which the old code trusted by host alone.
 		{name: "CVE: cross-site POST from http on the formerly trusted admin host is refused", secFetchSite: "cross-site", origin: "http://" + adminHost, allowed: false},
 
-		// THE CVE on our own host, which the issue does not state and the agreement's section 1
-		// found: the auth server listed its own host too, so a MitM at http://auth.example.com was
-		// accepted against https://auth.example.com just as readily.
+		// THE CVE on our own host, which #155 does not state but its fix found: the auth
+		// server listed its own host too, so a MitM at http://auth.example.com was accepted
+		// against https://auth.example.com just as readily.
 		{name: "CVE: cross-site POST from http on our own host is refused", secFetchSite: "cross-site", origin: "http://" + ourHost, allowed: false},
 
 		// The documented fail-open, reached only when no Sec-Fetch-Site header is present. This is

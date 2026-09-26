@@ -230,9 +230,9 @@ func serverDatabaseExists(t *testing.T, name string) bool {
 }
 
 // concurrentConstructors is how many constructors the race cases start at once. Eight is what
-// probe/mssql_concurrent_create.go and probe/pg_mysql_concurrent_create.go measured the defect
-// at, and it reproduced every round: 5 of 8 SQL Server racers and 7 of 8 PostgreSQL racers
-// failed against an absent database before #293.
+// measurement against SQL Server and PostgreSQL found the defect at, and it reproduced every
+// round: 5 of 8 SQL Server racers and 7 of 8 PostgreSQL racers failed against an absent database
+// before #293.
 const concurrentConstructors = 8
 
 // TestNewDatabase_CreateTrue_ConcurrentConstructorsAgainstAnAbsentDatabase is goal 1, and it is

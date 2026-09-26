@@ -62,9 +62,9 @@ func TestMigration000030_KeyPairsStateUnique(t *testing.T) {
 	require.False(t, describeIndex(t, h, "key_pairs", keyPairsStateIndex000030).Exists,
 		"%s must not exist at 000029", keyPairsStateIndex000030)
 
-	// The shape probe/probe_251b_test.go.txt ran: duplicates in all three states, more
-	// than two in one of them so a sweep that merely deduplicated pairs would still
-	// leave a duplicate behind.
+	// The shape explored for #251: duplicates in all three states, more than two in
+	// one of them so a sweep that merely deduplicated pairs would still leave a
+	// duplicate behind.
 	seeded := map[string][]int64{}
 	for _, s := range []struct {
 		state string

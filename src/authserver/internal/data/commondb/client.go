@@ -71,8 +71,7 @@ func (d *CommonDatabase) UpdateClient(ctx context.Context, tx *sql.Tx, client *m
 // statement waits out any in-flight writer and takes the row; a read after it sees what that
 // writer committed, and no later writer can get between the read and the caller's write.
 //
-// Measured rather than assumed, on all four engines, in the agreement's
-// probe/shared_writer_restores_public.out and probe/client_flip_cas_race.out: under MVCC (mysql,
+// Measured rather than assumed, on all four engines, for #245: under MVCC (mysql,
 // postgres) a bare re-read returns the last committed version without waiting at all, so the
 // window is the other writer's whole transaction rather than the gap between two statements.
 // SQL Server's shared locks narrow it but do not close it. Removing this call therefore reopens
@@ -132,8 +131,7 @@ func (d *CommonDatabase) AcquireClientRow(ctx context.Context, tx *sql.Tx, clien
 // Its READ COMMITTED mode finds target rows from the snapshot as of command start, so a row
 // whose committed version still says public is never a target of `AND is_public = <false>`: the
 // statement neither waits nor re-evaluates, and reports zero while the unconditional write that
-// follows it blocks, unblocks and commits public anyway. Measured on all four engines in
-// probe/client_flip_cas_race.out.
+// follows it blocks, unblocks and commits public anyway. Measured on all four engines, for #245.
 //
 // So the first statement is an acquisition and the second is the classification. The
 // acquisition is AcquireClientRow, shared with the three endpoints that re-read these columns

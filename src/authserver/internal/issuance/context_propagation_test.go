@@ -19,8 +19,9 @@ import (
 // CreateAuthCode is the signature this stage moved, and its insert is the statement #139 orders
 // against a concurrent termination: it runs on the transaction that already holds the session
 // row. A context that stopped at this boundary would leave that transaction uncancellable, which
-// on SQLite is a wait with no end (probe/cancel.out), so the claim worth an assertion is that the
-// ctx the issuer was handed is the one the insert is issued under.
+// on SQLite is a wait with no end, since SQLite's single connection has no deadlock detector to
+// break it, so the claim worth an assertion is that the ctx the issuer was handed is the one the
+// insert is issued under.
 
 type issuerCtxKey struct{}
 

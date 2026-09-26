@@ -383,7 +383,9 @@ a walk that reached nothing into `Fatalf`. The reporting half takes a `testutil.
 exported `Assert*` keeps its `*testing.T` and delegates, so no caller moves. Both halves are then
 driven from a rule test: the finder directly, the reporting half through `testutil.RunGuard`, which
 runs it on its own goroutine so a recorded `Fatalf` ends it in `runtime.Goexit` the way the real one
-does. Twenty-three guards follow this -- twelve in `core/testutil`, plus `authserver/internal/data`'s
+does. Twenty-four guards follow this -- thirteen in `core/testutil`, the newest
+`AssertNoAgreementPointers`, which refuses a comment pointing at an issue's agreement or a probe
+file instead of stating the fact with its issue number (#428), plus `authserver/internal/data`'s
 begin-transaction, benign-sentinel, page-offset, id-list-bound, transaction-pass-through and
 SQL-context lints, the auth server's API error-code and audit-catalog lints, its discarded-error lint
 in `internal/server`, which refuses `_` in the error position of a hash, encryption or
@@ -393,7 +395,7 @@ rules #387 added: `models/import_lint_test.go`, which holds that package to the 
 `apihandlers` and `accounthandlers` to naming no import of the parent -- both parse imports with
 `go/parser` rather than matching text, because an alias binds a different name to the same path and
 one of the 39 production files did exactly that. Each owes three cases: a tree that must fail, a tree that must
-pass, and the walk that reached nothing. One of the twelve, `AssertNotCalledArity`, owes a fourth: a
+pass, and the walk that reached nothing. One of the thirteen, `AssertNotCalledArity`, owes a fourth: a
 test that measures testify's matching against testify, because a guard whose premise is a reading
 of a dependency stops meaning anything the moment that dependency changes and nothing says so
 (#421). Without the last two the first proves nothing, and without

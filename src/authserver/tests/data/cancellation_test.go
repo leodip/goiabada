@@ -25,7 +25,7 @@ import (
 
 // cancelled returns a context that is already over, which is the only cancellation every engine
 // and every driver answers identically: database/sql refuses the call before the driver is
-// reached at all (probe/cancel.out).
+// reached at all, confirmed against all four engines (#386).
 func cancelled() context.Context {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -56,7 +56,7 @@ func TestRunInTransaction_WithACancelledContextNeverRunsTheBody(t *testing.T) {
 // TestBeginTransaction_OnSqliteABlockedOpenReturnsOnItsDeadline is the fact neither #386 nor #413
 // states, and the reason decision 9 records it: on SQLite the pool is one connection, so a second
 // transaction opened while the first is held waits for that connection. Without a context it waits
-// for ever -- probe/cancel.out measured a plain Query still blocked after two seconds -- and that
+// for ever -- a plain Query on SQLite was measured still blocked two seconds in (#386) -- and that
 // unbounded wait is what #413's five nil-transaction reads produced: a stuck goroutine, not an
 // error. With a context the wait ends at the deadline and the caller gets something it can answer
 // a request with.
@@ -129,8 +129,8 @@ func TestBeginTransaction_OnSqliteABlockedOpenReturnsOnItsDeadline(t *testing.T)
 //
 // They run on all four engines. An already-cancelled context is the one cancellation every
 // driver answers identically, because database/sql refuses the call before the driver is reached
-// at all (probe/cancel.out), and that is exactly the claim being made: the context is consulted,
-// not carried and dropped.
+// at all (#386), and that is exactly the claim being made: the context is consulted, not carried
+// and dropped.
 
 func TestGetUserById_RefusesAnAlreadyCancelledContext(t *testing.T) {
 	user := createTestUser(t)

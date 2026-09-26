@@ -7001,11 +7001,11 @@ func TestValidateTokenRequest_OfflineRefreshToken_SessionOwnership(t *testing.T)
 	})
 
 	t.Run("an expired grant is refused before the session is ever looked up", func(t *testing.T) {
-		// The ordering the agreement requires, and the one shape that can observe it: an
-		// affected grant, so its code carries a session identifier, that is already past its
-		// offline maximum lifetime. Every other expired-offline fixture in this file has an
-		// empty code sid and so performs no lookup whatever the order. The strict mock
-		// carries the assertion; the error only confirms which gate did the refusing.
+		// The ordering #133 requires, expiry checked before the session lookup, and the one shape
+		// that can observe it: an affected grant, so its code carries a session identifier, that
+		// is already past its offline maximum lifetime. Every other expired-offline fixture in
+		// this file has an empty code sid and so performs no lookup whatever the order. The strict
+		// mock carries the assertion; the error only confirms which gate did the refusing.
 		validator, input, ctx := setup(t, owner(grantUserId+1), nil, true)
 
 		result, err := validator.ValidateTokenRequest(ctx, input)

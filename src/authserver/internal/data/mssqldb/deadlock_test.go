@@ -51,7 +51,7 @@ func TestIsDeadlock(t *testing.T) {
 // TestIsUniqueViolation is SQL Server's row of the unique-key classifier table WrapSQLError
 // consults, and this engine is the one that needs two numbers.
 //
-// probe/constraint_codes.out recorded 2601, "Cannot insert duplicate key row ... with unique index",
+// #279 recorded 2601, "Cannot insert duplicate key row ... with unique index",
 // for a CREATE UNIQUE INDEX, and 2627, "Violation of UNIQUE KEY constraint", for a UNIQUE column
 // constraint -- and 2627 again for a PRIMARY KEY. Goiabada's schema carries both shapes on this
 // engine, so a classifier accepting one number is right on the tables that were tested and silent

@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// This file did not exist before #129 stage 4, and section 1 of the agreement recorded its absence
+// This file did not exist before #129 stage 4, and #129 recorded its absence
 // as a finding rather than an oversight: neither session-delete endpoint had any unit coverage.
 //
 // What it owns is decision 9's audit contract, and that contract has no other home. The integration

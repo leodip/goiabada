@@ -32,7 +32,7 @@ import (
 // It is an interface rather than a testing.TB parameter because testing.TB cannot be implemented
 // outside the testing package -- it carries an unexported method precisely to prevent it -- so
 // there is no recording fake that satisfies it. It is exported rather than internal because eight
-// of the twenty-four guards live outside this package, in the _test.go files of three auth server
+// of the twenty-five guards live outside this package, in the _test.go files of three auth server
 // directories -- internal/audit, internal/data and internal/handlers/apihandlers -- and they report
 // through the same harness. Recount with
 // `git grep -n 'func assert.*\(r Reporter\|r testutil\.Reporter\)' -- '*.go'` rather than trusting

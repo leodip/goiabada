@@ -28,7 +28,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// This file did not exist before #111 stage 4, and §5 of the agreement had positively decided not to
+// This file did not exist before #111 stage 4, and #111 had positively decided not to
 // create it: the claim logic here was "identical to seam 5's", which owns it through a mock at the
 // browser handler, and seam 4 observes this endpoint end to end. Stage 4's code review showed that
 // reason had stopped being true, and it is worth recording why rather than quietly adding a file.

@@ -1522,7 +1522,7 @@ func TestSetClientPublic(t *testing.T) {
 // predicate the committed version fails, so the conditional statement returns 0 without waiting
 // and this test fails there while still passing on MySQL and SQL Server, which block and
 // re-evaluate. Only the four-engine data tier can catch that, and only on one of its four engines.
-// Measured per engine in the agreement's probe/client_flip_cas_race.out.
+// That was measured on all four engines rather than argued (#245).
 func TestSetClientPublic_ClassifiesAgainstACommittedConcurrentWrite(t *testing.T) {
 	if dbType() == "" || dbType() == "sqlite" {
 		t.Skip("sqlite is limited to one connection (SetMaxOpenConns(1)), so a second write " +
@@ -1667,7 +1667,7 @@ func TestAcquireClientRow(t *testing.T) {
 // So the read has to happen under this transaction's own row lock. That is what the acquisition
 // buys, and this is the only tier that can prove it: mysql and postgres do not make the bare
 // re-read wait at all, and no unit test with a mocked database can observe an engine's snapshot
-// rules. Measured per engine in the agreement's probe/shared_writer_restores_public.out.
+// rules. Measured on all four engines before this was built (#245).
 func TestAcquireClientRow_MakesALaterReadSeeAConcurrentCommit(t *testing.T) {
 	if dbType() == "" || dbType() == "sqlite" {
 		t.Skip("sqlite is limited to one connection (SetMaxOpenConns(1)), so a second writer " +

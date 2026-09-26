@@ -1,7 +1,7 @@
 package errs
 
-// Seam 1: the exported surface of this package, held to the behaviour table the agreement for
-// #279 rests on. The table is here rather than spread over the callers because every one of the
+// Seam 1: the exported surface of this package, held to the behaviour table #279 rests
+// on. The table is here rather than spread over the callers because every one of the
 // call sites in the tree inherits it, and because the three properties it pins are invisible at a
 // call site: the message text has to stay byte-identical to github.com/pkg/errors' so nothing
 // that reads an error's text moves, errors.Is and errors.As have to traverse every wrapper, and

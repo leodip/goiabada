@@ -349,7 +349,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		permissionChecker.AssertExpectations(t)
 	})
 
-	// The entry path section 1 of the agreement did not name. MiddlewareSessionIdentifier
+	// The entry path #133 did not name. MiddlewareSessionIdentifier
 	// publishes the ambient identifier whenever the row exists, applying no idle, max lifetime
 	// or max_age test, so a session that has stopped being valid still reaches this handler with
 	// its cookie intact. Termination must not be nested under validity: a row nobody can resume

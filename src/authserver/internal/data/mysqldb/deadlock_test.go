@@ -45,7 +45,7 @@ func TestIsDeadlock(t *testing.T) {
 
 // TestIsUniqueViolation is MySQL's row of the unique-key classifier table WrapSQLError consults.
 //
-// One number covers every kind of key here: probe/constraint_codes.out recorded ER_DUP_ENTRY 1062
+// One number covers every kind of key here: #279 recorded ER_DUP_ENTRY 1062
 // for a CREATE UNIQUE INDEX, for a UNIQUE column constraint and for a PRIMARY KEY alike, which is
 // why this table needs none of the extra codes SQLite's does.
 //

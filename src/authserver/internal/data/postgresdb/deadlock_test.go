@@ -46,7 +46,7 @@ func TestIsDeadlock(t *testing.T) {
 // TestIsUniqueViolation is PostgreSQL's row of the unique-key classifier table WrapSQLError
 // consults.
 //
-// One SQLSTATE covers every kind of key here: probe/constraint_codes.out recorded 23505 for a
+// One SQLSTATE covers every kind of key here: #279 recorded 23505 for a
 // CREATE UNIQUE INDEX, a UNIQUE column constraint and a PRIMARY KEY alike.
 //
 // The cases that matter most are its three neighbours in class 23. not_null_violation, 23502,

@@ -83,9 +83,8 @@ func followAuthChain(t *testing.T, httpClient *http.Client, clientIdentifier str
 }
 
 // TestDCR_Consent_ReachesConsentAndMarksTheNameUnverified is the regression guard for the issue as
-// reported. It is probe/reproduce_silent_grant_test.go inverted: that probe drove exactly this flow
-// and watched it run from /auth/completed straight to /auth/issue, handing out a code for every
-// scope the user held with nothing rendered to them at all.
+// reported: before #108, this exact flow ran from /auth/completed straight to /auth/issue,
+// handing out a code for every scope the user held with nothing rendered to them at all.
 //
 // The client is registered through the endpoint rather than built with database.CreateClient, so
 // the defaults under test are the registration handler's rather than ones this test chose (#108).
