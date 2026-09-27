@@ -2,7 +2,6 @@ package main
 
 import (
 	"database/sql"
-	"fmt"
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -11,17 +10,17 @@ import (
 )
 
 // testDatabaseConnection returns true if connection succeeded, false otherwise
-func testDatabaseConnection(e *engine, host, port, name, user, password string) bool {
-	fmt.Print("Testing database connection... ")
+func testDatabaseConnection(out *console, e *engine, host, port, name, user, password string) bool {
+	out.printf("Testing database connection... ")
 
 	if e.checkDSN == nil {
-		printWarning("Database connection test not supported for %s", e.name)
+		out.warning("Database connection test not supported for %s", e.name)
 		return true // Skip unsupported databases
 	}
 
 	db, err := sql.Open(e.checkDriver, e.checkDSN(host, port, name, user, password))
 	if err != nil {
-		printError("Failed to open connection: %v", err)
+		out.fail("Failed to open connection: %v", err)
 		return false
 	}
 	defer func() { _ = db.Close() }()
@@ -30,50 +29,50 @@ func testDatabaseConnection(e *engine, host, port, name, user, password string) 
 
 	err = db.Ping()
 	if err != nil {
-		printError("Connection failed: %v", err)
+		out.fail("Connection failed: %v", err)
 		return false
 	}
 
-	printSuccess("Connection successful!")
+	out.success("Connection successful!")
 
 	// Check if database has Goiabada tables (indicating it's not empty)
-	checkDatabaseEmpty(db, e)
+	checkDatabaseEmpty(out, db, e)
 
 	return true
 }
 
 // checkDatabaseEmpty checks if the database already has Goiabada tables
 // and warns the user if it does
-func checkDatabaseEmpty(db *sql.DB, e *engine) {
-	fmt.Print("Checking if database is empty... ")
+func checkDatabaseEmpty(out *console, db *sql.DB, e *engine) {
+	out.printf("Checking if database is empty... ")
 
 	if e.emptinessQuery == "" {
-		fmt.Println("skipped")
+		out.println("skipped")
 		return
 	}
 
 	var count int
-	err := db.QueryRow(e.emptinessQuery).Scan(&count)
+	err := db.QueryRow(e.emptinessQuery).Scan(&count) //nolint:gosec // G701: a constant of the engine table; the taint is only that --db chose the row
 	if err != nil {
 		// If we can't check, just skip
-		fmt.Println("skipped")
+		out.println("skipped")
 		return
 	}
 
 	if count > 0 {
-		fmt.Println()
-		printWarning("Database already contains Goiabada tables!")
-		fmt.Println()
-		fmt.Printf("  %sThe 'users' table exists, indicating this database was used before.%s\n", colorYellow, colorReset)
-		fmt.Printf("  %sIf you're deploying with different URLs than before, the OAuth client%s\n", colorYellow, colorReset)
-		fmt.Printf("  %sconfiguration will not match and authentication will fail.%s\n", colorYellow, colorReset)
-		fmt.Println()
-		fmt.Printf("  %sOptions:%s\n", colorBold, colorReset)
-		fmt.Println("    1. Use the same URLs as the previous deployment")
-		fmt.Println("    2. Use a fresh/empty database")
-		fmt.Println("    3. Manually update the OAuth client redirect URIs in the database")
-		fmt.Println()
+		out.println()
+		out.warning("Database already contains Goiabada tables!")
+		out.println()
+		out.printf("  %sThe 'users' table exists, indicating this database was used before.%s\n", out.yellow, out.reset)
+		out.printf("  %sIf you're deploying with different URLs than before, the OAuth client%s\n", out.yellow, out.reset)
+		out.printf("  %sconfiguration will not match and authentication will fail.%s\n", out.yellow, out.reset)
+		out.println()
+		out.printf("  %sOptions:%s\n", out.bold, out.reset)
+		out.println("    1. Use the same URLs as the previous deployment")
+		out.println("    2. Use a fresh/empty database")
+		out.println("    3. Manually update the OAuth client redirect URIs in the database")
+		out.println()
 	} else {
-		printSuccess("Database is empty (ready for fresh deployment)")
+		out.success("Database is empty (ready for fresh deployment)")
 	}
 }

@@ -27,7 +27,7 @@ func writePrivateFile(path, content string) error {
 	}
 	discard := func(err error) error {
 		_ = staged.Close()
-		_ = os.Remove(staged.Name())
+		_ = os.Remove(staged.Name()) //nolint:gosec // G703: the path is the one the operator asked for with --output, on their own machine
 		return err
 	}
 	if _, err := staged.WriteString(content); err != nil {
@@ -36,14 +36,14 @@ func writePrivateFile(path, content string) error {
 	if err := staged.Close(); err != nil {
 		return discard(err)
 	}
-	if err := os.Rename(staged.Name(), path); err != nil {
+	if err := os.Rename(staged.Name(), path); err != nil { //nolint:gosec // G703: the path is the one the operator asked for with --output, on their own machine
 		return discard(err)
 	}
 	return nil
 }
 
 func isDirectory(path string) bool {
-	info, err := os.Stat(path)
+	info, err := os.Stat(path) //nolint:gosec // G703: the path is the one the operator asked for with --output, on their own machine
 	if err != nil {
 		return false
 	}

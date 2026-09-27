@@ -2,48 +2,53 @@ package main
 
 import (
 	"fmt"
-	"os"
+	"io"
 )
 
-// ANSI color codes
-var (
-	colorReset  = "\033[0m"
-	colorRed    = "\033[31m"
-	colorGreen  = "\033[32m"
-	colorYellow = "\033[33m"
-	colorCyan   = "\033[36m"
-	colorBold   = "\033[1m"
-)
-
-func isTerminal() bool {
-	fi, err := os.Stdout.Stat()
-	if err != nil {
-		return false
-	}
-	return (fi.Mode() & os.ModeCharDevice) != 0
+// palette is the escape sequences the wizard's output is coloured with. The zero value colours
+// nothing, which is what --no-color and an output that is not a terminal get. It is a value handed
+// to what prints, where it was six package variables disableColors blanked in place (#430).
+type palette struct {
+	reset, red, green, yellow, cyan, bold string
 }
 
-func disableColors() {
-	colorReset = ""
-	colorRed = ""
-	colorGreen = ""
-	colorYellow = ""
-	colorCyan = ""
-	colorBold = ""
+var ansiColors = palette{
+	reset:  "\033[0m",
+	red:    "\033[31m",
+	green:  "\033[32m",
+	yellow: "\033[33m",
+	cyan:   "\033[36m",
+	bold:   "\033[1m",
 }
 
-func printSuccess(format string, args ...interface{}) {
-	fmt.Printf("%s✓%s %s\n", colorGreen, colorReset, fmt.Sprintf(format, args...))
+// console is where the wizard writes what the operator reads, and in which colours.
+type console struct {
+	w io.Writer
+	palette
 }
 
-func printWarning(format string, args ...interface{}) {
-	fmt.Printf("%s⚠️  Warning:%s %s\n", colorYellow, colorReset, fmt.Sprintf(format, args...))
+// printf and println are the console's one way to write. A failed write to the terminal has no one
+// left to report it to, so it is dropped here rather than at each of the calls.
+func (c *console) printf(format string, args ...any) {
+	_, _ = fmt.Fprintf(c.w, format, args...)
 }
 
-func printError(format string, args ...interface{}) {
-	fmt.Printf("%s✗ Error:%s %s\n", colorRed, colorReset, fmt.Sprintf(format, args...))
+func (c *console) println(args ...any) {
+	_, _ = fmt.Fprintln(c.w, args...)
 }
 
-func printInfo(format string, args ...interface{}) {
-	fmt.Printf("%s→%s %s\n", colorCyan, colorReset, fmt.Sprintf(format, args...))
+func (c *console) success(format string, args ...any) {
+	c.printf("%s✓%s %s\n", c.green, c.reset, fmt.Sprintf(format, args...))
+}
+
+func (c *console) warning(format string, args ...any) {
+	c.printf("%s⚠️  Warning:%s %s\n", c.yellow, c.reset, fmt.Sprintf(format, args...))
+}
+
+func (c *console) fail(format string, args ...any) {
+	c.printf("%s✗ Error:%s %s\n", c.red, c.reset, fmt.Sprintf(format, args...))
+}
+
+func (c *console) info(format string, args ...any) {
+	c.printf("%s→%s %s\n", c.cyan, c.reset, fmt.Sprintf(format, args...))
 }
