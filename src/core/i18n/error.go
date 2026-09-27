@@ -32,20 +32,17 @@ func (e *LocalizedError) Error() string { return e.EnglishFallback() }
 // it does NOT mean args are dropped. Used at protocol response boundaries
 // that must stay English regardless of caller locale (see design §6.2).
 //
-// If LoadBundle hasn't run, or the code is missing from the English
-// catalog, returns e.Code so the gap is visible.
+// If the code is missing from the English catalog, returns e.Code so the gap
+// is visible.
 func (e *LocalizedError) EnglishFallback() string {
-	if defaultBundle == nil {
-		return e.Code
-	}
-	return defaultBundle.english.render(e.Code, e.Args)
+	return current().english.render(e.Code, e.Args)
 }
 
 // Localize renders e against the locale carried on ctx, with e.Args
 // substituted. Falls back to EnglishFallback() if the key is missing in
 // the resolved locale.
 func (e *LocalizedError) Localize(ctx context.Context) string {
-	out, ok := Localizer(ctx).renderOrMiss(e.Code, e.Args)
+	out, ok := localizer(ctx).renderOrMiss(e.Code, e.Args)
 	if !ok {
 		return e.EnglishFallback()
 	}

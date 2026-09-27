@@ -37,7 +37,7 @@ func TestMain(m *testing.M) {
 	// The data cipher must be initialized before opening the database (its
 	// re-encryption migration) and before any test encrypts secrets.
 	if err := encryption.InitDataCipher(config.GetAESEncryptionKey()); err != nil {
-		slog.Error("failed to init data cipher: " + err.Error())
+		slog.Error("unable to initialize the data cipher", "error", err)
 		os.Exit(1)
 	}
 

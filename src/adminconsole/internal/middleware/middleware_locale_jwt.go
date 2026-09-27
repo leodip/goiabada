@@ -17,12 +17,12 @@ import (
 // middleware, where the auth server does it per handler once a password has
 // been checked.
 //
-// The three things it does not do are all i18n.WithLocale's non-explicit
+// The two things it does not do are both i18n.WithLocale's non-explicit
 // contract rather than branches of its own: a request carrying explicit locale
-// intent (?ui_locales) keeps it, a missing claim falls through to the
+// intent (?ui_locales) keeps it, and a missing claim falls through to the
 // previously resolved localizer rather than silently jumping to English (older
 // tokens, scope misconfiguration, a third-party admin client without the
-// profile scope), and a process that never called LoadBundle is a no-op.
+// profile scope).
 func MiddlewareLocaleFromJWT() func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

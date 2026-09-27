@@ -15,17 +15,14 @@ import (
 // context, say — it resolves from LocaleTag(ctx) through the same matcher
 // (#273).
 func Raw(ctx context.Context, key string) string {
-	var loc *Translator
+	var loc *translator
 	if ctx != nil {
-		if v, ok := ctx.Value(ctxKeyLocalizer).(*Translator); ok {
+		if v, ok := ctx.Value(ctxKeyLocalizer).(*translator); ok {
 			loc = v
 		}
 	}
 	if loc == nil {
-		if defaultBundle == nil {
-			return key
-		}
-		loc = defaultBundle.localizerFor([]string{LocaleTag(ctx)})
+		loc = current().localizerFor([]string{LocaleTag(ctx)})
 	}
 	if m, ok := loc.lookup(key); ok {
 		return m.raw

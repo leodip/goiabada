@@ -24,7 +24,7 @@ import (
 // -----------------------------------------------------------------------------
 //
 // This is stage 1's matrix, written against core/config's loadFrom and carried here unchanged
-// except for its roster: 39 variables and 32 flags, the auth server's own 24, the 8 database, the
+// except for its roster: 40 variables and 32 flags, the auth server's own 25, the 8 database, the
 // 3 top-level, the 2 data-encryption keys and the 2 admin console values this process reads. The
 // same assertions passing on both sides of the move is what makes it a lock on the behaviour
 // rather than a description of it (#351).
@@ -113,7 +113,7 @@ func hexKeyVar(name string, def []byte, fromEnv string, wantEnv []byte, read fun
 	return configVar{env: name, def: def, envValue: fromEnv, envWant: wantEnv, read: read}
 }
 
-// configVariables is every live GOIABADA_* variable this process loads: 24 auth server, the 2
+// configVariables is every live GOIABADA_* variable this process loads: 25 auth server, the 2
 // admin console values it reads, 8 database and 5 top-level, of which 32 have a flag. The one
 // name loadFrom mentions that is not live configuration is in nonLiveEnvVars.
 var configVariables = []configVar{
@@ -186,6 +186,13 @@ var configVariables = []configVar{
 		func() any { return GetAuthServer().RateLimiterEnabled }),
 	int64VarNoFlag("GOIABADA_PROFILE_PICTURE_MAX_SIZE_BYTES", 3*1024*1024, 5*1024*1024,
 		func() any { return GetAuthServer().ProfilePictureMaxSizeBytes }),
+	// No flag, and trimmed, which is what core/i18n did when it read the variable itself: the row
+	// is what pins both now that the configuration reads it instead (#431).
+	{
+		env: "GOIABADA_I18N_OVERRIDES_DIR", def: "",
+		envValue: " /env/i18n-overrides ", envWant: "/env/i18n-overrides",
+		read: func() any { return GetAuthServer().I18nOverridesDir },
+	},
 
 	// Admin console: the two values this process reads. The other 17 GOIABADA_ADMINCONSOLE_*
 	// variables are the peer's own and are not loaded here, so they have no row -- and the drift

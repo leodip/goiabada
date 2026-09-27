@@ -2,9 +2,14 @@
 //
 // At a high level:
 //
-//   - LoadBundle is called once at startup. It reads embedded message
-//     catalogs and merges any runtime overrides from the directory named
-//     by GOIABADA_I18N_OVERRIDES_DIR (override files win on conflict).
+//   - The embedded message catalogs are served without any setup: they are
+//     built once, on first use, so a test or a tool renders English and
+//     pt-BR with no call to make first.
+//   - LoadBundle is called once by each main, with the overrides directory its
+//     configuration read. It merges that directory's catalogs over the embedded
+//     ones (override files win on conflict) and refuses a catalog that does not
+//     parse, so a broken override stops the server at startup. The package
+//     reads no environment variable itself (#431).
 //   - MiddlewareLocale runs early in every request chain (before identity
 //     is established) and attaches a tentative localizer based on
 //     ?ui_locales, in-flight UI locales (authserver only),
@@ -13,16 +18,18 @@
 //     process wants is its own: adminconsole from the JWT locale claim,
 //     authserver from the user's stored locale, both from an RP's ui_locales.
 //     A non-explicit call defers to explicit intent already on the context.
-//   - T and Localizer read the localizer off context.Context.
+//   - T reads the localizer off context.Context.
 package i18n
 
 import (
 	"context"
 	"embed"
 	"io/fs"
-	"os"
+	"log/slog"
 	"path/filepath"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"text/template"
 
 	"github.com/BurntSushi/toml"
@@ -55,22 +62,22 @@ type message struct {
 	bad bool
 }
 
-// Bundle holds every catalog, keyed by language tag, plus the matcher that
+// bundle holds every catalog, keyed by language tag, plus the matcher that
 // turns a request's preferences into one of those tags.
-type Bundle struct {
+type bundle struct {
 	// tags is English first, then catalogs in load order with override-only
 	// locales last. The matcher indexes into it, so the two must stay aligned.
 	tags     []language.Tag
 	matcher  language.Matcher
 	messages map[language.Tag]map[string]*message
-	english  *Translator
+	english  *translator
 }
 
-// Translator renders keys against one resolved language tag, falling back to
-// English. It is the type carried on the request context; Localizer(ctx)
+// translator renders keys against one resolved language tag, falling back to
+// English. It is the type carried on the request context; localizer(ctx)
 // returns it.
-type Translator struct {
-	bundle *Bundle
+type translator struct {
+	bundle *bundle
 	tag    language.Tag
 }
 
@@ -80,21 +87,74 @@ type catalogFile struct {
 	messages map[string]string
 }
 
-// defaultBundle is set by LoadBundle and read by T/Localizer/EnglishFallback.
-// Must not be reassigned after startup.
-var defaultBundle *Bundle
+// embedded is the bundle a process serves until its main calls LoadBundle, and
+// the only one a test or a tool ever needs: the embedded catalogs, built once on
+// first use. It replaced a package variable that stayed nil until LoadBundle ran,
+// which made every package whose tests read a rendered sentence carry a TestMain
+// whose only job was to load it (#431).
+var embedded = sync.OnceValue(func() *bundle {
+	return orEmpty(load(""))
+})
 
-// LoadBundle loads embedded catalogs, then merges runtime overrides from
-// GOIABADA_I18N_OVERRIDES_DIR (if set). The returned bundle is also stashed
-// as the package default so T() can be called without threading a bundle
-// through every handler. Call exactly once at process startup.
-func LoadBundle() (*Bundle, error) {
+// installed is the bundle main installed through LoadBundle: the embedded
+// catalogs with the operator's overrides merged over them. Nil until then. It is
+// an atomic pointer rather than a plain variable so that installing is safe
+// against a reader on another goroutine whatever the order: main installs before
+// it serves, but a test installing while a parallel test renders would otherwise
+// be a data race the race tier reports (#431).
+var installed atomic.Pointer[bundle]
+
+// current is the bundle every rendering surface reads: what main installed, or
+// else the embedded default.
+func current() *bundle {
+	if b := installed.Load(); b != nil {
+		return b
+	}
+	return embedded()
+}
+
+// orEmpty is load's answer for the embedded default, which has no caller to
+// return an error to. A failure there means a catalog compiled into the binary
+// does not parse, which catalog_hygiene_test.go exists to stop before it ships.
+// Should it happen anyway, every key renders as itself, the visible-miss policy,
+// rather than the process refusing to render at all.
+func orEmpty(b *bundle, err error) *bundle {
+	if err != nil {
+		slog.Error("unable to load the embedded message catalogs, so every key renders as itself", "error", err)
+		return build(nil)
+	}
+	return b
+}
+
+// LoadBundle builds the embedded catalogs with the overrides under
+// overridesDir merged over them, and installs the result as the bundle every
+// rendering surface reads. An empty overridesDir means the embedded catalogs
+// alone.
+//
+// Each main calls it once, at startup, with the directory its own configuration
+// read from GOIABADA_I18N_OVERRIDES_DIR, and stops on the error: a catalog that
+// does not parse is a configuration bug the operator has to see. On an error
+// nothing is installed, so whatever was served before is served still.
+func LoadBundle(overridesDir string) error {
+	b, err := load(overridesDir)
+	if err != nil {
+		return err
+	}
+	installed.Store(b)
+	return nil
+}
+
+// load builds a bundle from the embedded catalogs and, when dir is not empty,
+// the override catalogs under it, touching nothing global. It is what
+// LoadBundle installs and what the embedded default is built from, and what the
+// override tests call without installing anything.
+func load(dir string) (*bundle, error) {
 	files, err := loadEmbeddedCatalogs()
 	if err != nil {
 		return nil, err
 	}
 
-	if dir := strings.TrimSpace(os.Getenv("GOIABADA_I18N_OVERRIDES_DIR")); dir != "" {
+	if dir != "" {
 		overrides, err := loadOverrideCatalogs(dir)
 		if err != nil {
 			return nil, err
@@ -102,7 +162,13 @@ func LoadBundle() (*Bundle, error) {
 		files = append(files, overrides...)
 	}
 
-	b := &Bundle{messages: map[language.Tag]map[string]*message{}}
+	return build(files), nil
+}
+
+// build merges files, in order, into a bundle. With no files it answers a bundle
+// holding no message, whose matcher still answers English: orEmpty's fallback.
+func build(files []catalogFile) *bundle {
+	b := &bundle{messages: map[language.Tag]map[string]*message{}}
 	fileTags := make([]language.Tag, 0, len(files))
 	for _, f := range files {
 		fileTags = append(fileTags, f.tag)
@@ -128,18 +194,16 @@ func LoadBundle() (*Bundle, error) {
 	// the matcher's answer when nothing else matches.
 	b.tags = mergeTags([]language.Tag{language.English}, fileTags)
 	b.matcher = language.NewMatcher(b.tags)
-	b.english = &Translator{bundle: b, tag: language.English}
+	b.english = &translator{bundle: b, tag: language.English}
 	compileTemplates(b)
 
-	defaultBundle = b
-
-	return b, nil
+	return b
 }
 
 // compileTemplates parses every value carrying a "{{" placeholder, once, after
 // the last file has been merged. The result is immutable for the process
 // lifetime, so rendering needs no lock and no cache.
-func compileTemplates(b *Bundle) {
+func compileTemplates(b *bundle) {
 	for _, locale := range b.messages {
 		for key, m := range locale {
 			if !strings.Contains(m.raw, "{{") {
@@ -163,7 +227,7 @@ func compileTemplates(b *Bundle) {
 // fails the whole load naming the file and the key, so the process does not
 // start rendering one plural form for every count (#273).
 //
-// An empty value is returned as it stands: the merge in LoadBundle needs to
+// An empty value is returned as it stands: the merge in build needs to
 // see it to remove the key, and the catalog hygiene test needs to see it to
 // forbid it in the embedded catalogs.
 func parseCatalog(name string, data []byte) (language.Tag, map[string]string, error) {
@@ -191,8 +255,8 @@ func localeFromCatalogFile(name string) string {
 }
 
 // mergeTags appends extras into base, dropping duplicates. Order is preserved
-// (base order first, then any extras not already in base) so SupportedTags()
-// returns embedded locales ahead of override-only ones.
+// (base order first, then any extras not already in base) so a bundle's tags
+// list embedded locales ahead of override-only ones.
 func mergeTags(base, extras []language.Tag) []language.Tag {
 	seen := make(map[string]struct{}, len(base)+len(extras))
 	out := make([]language.Tag, 0, len(base)+len(extras))
@@ -239,21 +303,13 @@ func loadEmbeddedCatalogs() ([]catalogFile, error) {
 	return out, nil
 }
 
-// SupportedTags returns the language tags loaded into the bundle, in
-// registration order. Useful for tests and the locale picker.
-func (b *Bundle) SupportedTags() []language.Tag {
-	out := make([]language.Tag, len(b.tags))
-	copy(out, b.tags)
-	return out
-}
-
 // localizerFor builds a translator for the supplied preferences, each of which
 // may be a full Accept-Language list. Every preference is parsed with
 // language.ParseAcceptLanguage — which drops q=0 ranges and orders the rest by
 // quality — unparseable ones are skipped, and the bundle's matcher picks one
 // tag from what is left. RFC 9110 section 12.5.4 leaves the matching scheme to
 // the implementation; this is the one go-i18n applied, kept verbatim.
-func (b *Bundle) localizerFor(tags []string) *Translator {
+func (b *bundle) localizerFor(tags []string) *translator {
 	if len(tags) == 0 {
 		return b.english
 	}
@@ -269,14 +325,14 @@ func (b *Bundle) localizerFor(tags []string) *Translator {
 		return b.english
 	}
 	_, idx, _ := b.matcher.Match(parsed...)
-	return &Translator{bundle: b, tag: b.tags[idx]}
+	return &translator{bundle: b, tag: b.tags[idx]}
 }
 
 // lookup finds key in the translator's own locale, then in English. The
 // English hop is what makes a locale that is missing a key render the English
 // text rather than the key itself, as concepts/localization.mdx promises
 // (#273).
-func (l *Translator) lookup(key string) (*message, bool) {
+func (l *translator) lookup(key string) (*message, bool) {
 	if l == nil || l.bundle == nil {
 		return nil, false
 	}
@@ -295,7 +351,7 @@ func (l *Translator) lookup(key string) (*message, bool) {
 // all. A found-but-unrenderable message (one that failed to parse, or whose
 // execution failed) renders the key, which is the visible-miss policy, but is
 // still reported as found: English would render it no better.
-func (l *Translator) renderOrMiss(key string, data map[string]any) (string, bool) {
+func (l *translator) renderOrMiss(key string, data map[string]any) (string, bool) {
 	m, ok := l.lookup(key)
 	if !ok {
 		return "", false
@@ -313,7 +369,7 @@ func (l *Translator) renderOrMiss(key string, data map[string]any) (string, bool
 	return sb.String(), true
 }
 
-func (l *Translator) render(key string, data map[string]any) string {
+func (l *translator) render(key string, data map[string]any) string {
 	out, ok := l.renderOrMiss(key, data)
 	if !ok {
 		return key
@@ -335,7 +391,7 @@ func T(ctx context.Context, key string, args ...any) string {
 			data = td
 		}
 	}
-	return Localizer(ctx).render(key, data)
+	return localizer(ctx).render(key, data)
 }
 
 // LocaleTag returns the BCP 47 language tag attached to ctx by the locale
@@ -353,22 +409,17 @@ func LocaleTag(ctx context.Context) string {
 	return "en"
 }
 
-// Localizer returns the *Translator attached to ctx by the locale
-// middleware (or by the per-handler refinement helpers). Returns the
-// bundle's English translator if none is attached (test contexts, background
-// jobs that never went through middleware). Returns a translator over an
-// empty bundle if LoadBundle has not been called — in that case every key
-// resolves to itself.
-func Localizer(ctx context.Context) *Translator {
+// localizer returns the translator attached to ctx by the locale middleware
+// (or by the per-handler refinement helpers), or the current bundle's English
+// translator if none is attached (test contexts, background jobs that never went
+// through middleware).
+func localizer(ctx context.Context) *translator {
 	if ctx != nil {
 		if v := ctx.Value(ctxKeyLocalizer); v != nil {
-			if loc, ok := v.(*Translator); ok {
+			if loc, ok := v.(*translator); ok {
 				return loc
 			}
 		}
 	}
-	if defaultBundle != nil {
-		return defaultBundle.english
-	}
-	return &Translator{bundle: &Bundle{}, tag: language.English}
+	return current().english
 }

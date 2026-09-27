@@ -42,6 +42,10 @@ type AdminConsoleConfig struct {
 	// or neither: the store needs both halves to open anything sealed under the old pair.
 	SessionAuthenticationKeyPrevious string
 	SessionEncryptionKeyPrevious     string
+	// I18nOverridesDir is the directory whose catalogs/ main merges over the embedded message
+	// catalogs, or empty for none. It has no flag, like the auth server's, so the one variable
+	// configures both servers the same way (#431).
+	I18nOverridesDir string
 }
 
 // IsCookieSecure reports whether cookies should carry the Secure flag. It is
@@ -140,6 +144,7 @@ func loadFrom(fs *flag.FlagSet, args []string) {
 			SessionEncryptionKey:             getEnv("GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY", ""),
 			SessionAuthenticationKeyPrevious: getEnv("GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY_PREVIOUS", ""),
 			SessionEncryptionKeyPrevious:     getEnv("GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY_PREVIOUS", ""),
+			I18nOverridesDir:                 getEnv("GOIABADA_I18N_OVERRIDES_DIR", ""),
 		},
 		AuthServer: AuthServerConfig{
 			BaseURL:         getEnv("GOIABADA_AUTHSERVER_BASEURL", "http://localhost:9090"),

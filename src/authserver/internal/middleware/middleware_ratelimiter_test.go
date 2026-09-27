@@ -1641,8 +1641,8 @@ func TestRejection_BrowserClass(t *testing.T) {
 	}
 	assertNoRateLimitHeaders(t, rr, "browser rejection")
 
-	// The catalog message, not the key: TestMain loads the bundle, so a raw key in the
-	// body would mean the string is missing from active.en.toml.
+	// The catalog message, not the key: the embedded catalogs are served with no setup, so a
+	// raw key in the body would mean the string is missing from active.en.toml.
 	want := i18n.T(context.Background(), "auth_error.rate_limited.message")
 	if strings.HasPrefix(want, "auth_error.") {
 		t.Fatalf("auth_error.rate_limited.message is missing from the English catalog")

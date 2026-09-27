@@ -7,13 +7,9 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestRaw_PreservesPlaceholdersAndLocalizes(t *testing.T) {
-	_, err := LoadBundle()
-	require.NoError(t, err)
-
 	en := ctxFor("en")
 	pt := ctxFor("pt-BR")
 

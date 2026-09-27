@@ -21,7 +21,7 @@ import (
 // -----------------------------------------------------------------------------
 //
 // This is stage 1's matrix, written against core/config's loadFrom and carried here unchanged
-// except for its roster: 21 variables and 17 flags, the admin console's own 19 and the 2 auth
+// except for its roster: 22 variables and 17 flags, the admin console's own 20 and the 2 auth
 // server endpoints it talks to. The same assertions passing on both sides of the move is what
 // makes it a lock on the behaviour rather than a description of it (#351).
 
@@ -95,7 +95,7 @@ func csvVar(name, flagName, fromEnv string, wantEnv []string, fromFlag string, w
 }
 
 // configVariables is every live GOIABADA_* variable this process loads: the admin console's own
-// 19 and the 2 auth server endpoints it talks to, of which 17 have a flag. The names loadFrom
+// 20 and the 2 auth server endpoints it talks to, of which 17 have a flag. The names loadFrom
 // mentions that are not live configuration are in nonLiveEnvVars.
 var configVariables = []configVar{
 	// Admin console
@@ -153,6 +153,13 @@ var configVariables = []configVar{
 		func() any { return GetAdminConsole().SessionAuthenticationKeyPrevious }),
 	strVarNoFlag("GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY_PREVIOUS", "", strings.Repeat("b4", 32),
 		func() any { return GetAdminConsole().SessionEncryptionKeyPrevious }),
+	// No flag, and trimmed, which is what core/i18n did when it read the variable itself: the row
+	// is what pins both now that the configuration reads it instead (#431).
+	{
+		env: "GOIABADA_I18N_OVERRIDES_DIR", def: "",
+		envValue: " /env/i18n-overrides ", envWant: "/env/i18n-overrides",
+		read: func() any { return GetAdminConsole().I18nOverridesDir },
+	},
 
 	// Auth server: the two endpoints this process talks to. The other 22 GOIABADA_AUTHSERVER_*
 	// variables are the peer's own and are not loaded here, so they have no row -- and the drift

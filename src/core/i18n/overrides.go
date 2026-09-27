@@ -9,26 +9,27 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 )
 
-// loadOverrideCatalogs walks $GOIABADA_I18N_OVERRIDES_DIR/catalogs/ and
-// returns each *.toml message file in directory order, for the caller to
-// merge on top of the embedded set. Override files win on conflict (this is
-// by design — self-hosters need to be able to fix typos or ship locales
-// without rebuilding the binary), and an empty value removes the embedded
-// translation so the key renders English.
+// loadOverrideCatalogs walks dir/catalogs/ and returns each *.toml message
+// file in directory order, for the caller to merge on top of the embedded set.
+// dir is the overrides directory main passes to LoadBundle, which each
+// application's configuration reads from GOIABADA_I18N_OVERRIDES_DIR. Override
+// files win on conflict (this is by design — self-hosters need to be able to
+// fix typos or ship locales without rebuilding the binary), and an empty value
+// removes the embedded translation so the key renders English.
 //
 // The language tags come back on the returned catalogs so the caller can
-// merge them into Bundle.tags. A locale that's only present via the
-// override directory must still surface from SupportedTags() so callers
-// like the locale picker see it.
+// merge them into the bundle's tags. A locale that's only present via the
+// override directory must still reach the matcher, or a request asking for it
+// would be answered in English.
 //
 // Only message catalogs are overridable this way — Goiabada consults only a
-// `catalogs/` subdirectory under GOIABADA_I18N_OVERRIDES_DIR. There is no
+// `catalogs/` subdirectory under the overrides directory. There is no
 // reference-data layer: country and phone-country names come from CLDR, and
 // timezone labels are assembled from the CLDR-localized country name, IANA
 // zone ID, and optional English comment (see RefCountry/RefPhoneCountry/RefTimezone).
 func loadOverrideCatalogs(dir string) ([]catalogFile, error) {
 	catalogsDir := filepath.Join(dir, "catalogs")
-	//nolint:gosec // G703: dir is GOIABADA_I18N_OVERRIDES_DIR, the operator's own directory, read once at startup
+	//nolint:gosec // G703: dir is the overrides directory the operator configured, which main passes once at startup
 	info, err := os.Stat(catalogsDir)
 	if err != nil {
 		if os.IsNotExist(err) {

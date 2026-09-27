@@ -2,21 +2,9 @@ package middleware
 
 import (
 	"net/http"
-	"os"
-	"testing"
 
 	"github.com/leodip/goiabada/core/i18n"
 )
-
-// MiddlewareSettingsCache's two refusals and the JWT middleware's server-error page all
-// render through i18n.T, so without a loaded bundle T echoes the key and every body
-// assertion in this package would pass against the key rather than against the message.
-func TestMain(m *testing.M) {
-	if _, err := i18n.LoadBundle(); err != nil {
-		panic(err)
-	}
-	os.Exit(m.Run())
-}
 
 // stubErrorRenderer stands in for *handlerhelpers.HttpHelper, whose real
 // InternalServerError needs a template FS this package has no business carrying.

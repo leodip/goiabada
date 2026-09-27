@@ -73,9 +73,6 @@ func SanitizeUILocales(raw string) []string {
 // "explicit intent", which a non-explicit WithLocale call honors by leaving it
 // alone. This prevents user-locale refinement from clobbering an explicit
 // per-request preference.
-//
-// Runs even if LoadBundle hasn't been called — in that case it becomes a
-// no-op and Localizer falls back to a synthetic English localizer.
 func MiddlewareLocale(uiLocalesReader UILocalesReader) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -104,17 +101,14 @@ func ResolveRequestLocale(ctx context.Context, r *http.Request) context.Context 
 }
 
 func resolveLocale(ctx context.Context, r *http.Request, uiLocalesReader UILocalesReader) context.Context {
-	bundle := defaultBundle
-	if bundle == nil {
-		return ctx
-	}
+	b := current()
 
 	// (1) Query parameter. Do NOT call r.ParseForm / r.FormValue — that
 	// would consume the body and interfere with handlers that do their
 	// own form parsing on POST.
 	if raw := r.URL.Query().Get("ui_locales"); raw != "" {
 		if tags := SanitizeUILocales(raw); len(tags) > 0 {
-			return attachLocale(ctx, bundle.localizerFor(tags), tags[0], true)
+			return attachLocale(ctx, b.localizerFor(tags), tags[0], true)
 		}
 	}
 
@@ -123,18 +117,18 @@ func resolveLocale(ctx context.Context, r *http.Request, uiLocalesReader UILocal
 	// effectively a map lookup, not a fresh load.
 	if uiLocalesReader != nil {
 		if tags := uiLocalesReader.UILocales(r); len(tags) > 0 {
-			return attachLocale(ctx, bundle.localizerFor(tags), tags[0], true)
+			return attachLocale(ctx, b.localizerFor(tags), tags[0], true)
 		}
 	}
 
 	// (3) Accept-Language, parsed per RFC 9110 section 12.5.4 and matched
-	// against the loaded catalogs (see Bundle.localizerFor).
+	// against the loaded catalogs (see bundle.localizerFor).
 	if al := r.Header.Get("Accept-Language"); al != "" {
-		return attachLocale(ctx, bundle.localizerFor([]string{al}), al, false)
+		return attachLocale(ctx, b.localizerFor([]string{al}), al, false)
 	}
 
 	// (4) English fallback.
-	return attachLocale(ctx, bundle.english, "en", false)
+	return attachLocale(ctx, b.english, "en", false)
 }
 
 // WithLocale attaches the translator for the locale the caller is asking for, and
@@ -146,9 +140,9 @@ func resolveLocale(ctx context.Context, r *http.Request, uiLocalesReader UILocal
 // empty tag is skipped rather than ending the search, so a caller can write a
 // preference ahead of a fallback and get the fallback only when the preference
 // is absent: WithLocale(ctx, true, user.Locale, "en"). Matching is
-// Bundle.localizerFor's, which means a tag no catalog matches still resolves,
+// bundle.localizerFor's, which means a tag no catalog matches still resolves,
 // to English, while the tag itself is recorded as asked for. When no tag is
-// usable, or LoadBundle has not run, ctx is returned unchanged.
+// usable, ctx is returned unchanged.
 //
 // explicit marks the locale as a stated per-request preference: an RP's
 // ui_locales, or an email rendered in its recipient's language rather than in
@@ -169,10 +163,6 @@ func WithLocale(ctx context.Context, explicit bool, tags ...string) context.Cont
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	bundle := defaultBundle
-	if bundle == nil {
-		return ctx
-	}
 	if !explicit && hasExplicitIntent(ctx) {
 		return ctx
 	}
@@ -191,14 +181,14 @@ func WithLocale(ctx context.Context, explicit bool, tags ...string) context.Cont
 	// catalog and the matcher reads the list as one preference order.
 	// Matching only the first tag would answer English there, silently
 	// discarding the RP's second choice (#385).
-	return attachLocale(ctx, bundle.localizerFor(usable), usable[0], explicit)
+	return attachLocale(ctx, current().localizerFor(usable), usable[0], explicit)
 }
 
 // attachLocale stores the localizer plus the primary resolved language tag
 // (the first preference used to build the localizer; "en" for the bundle's
 // English fallback). The tag is used by the CLDR-backed display helpers
 // (RefCountry/RefPhoneCountry/RefTimezone).
-func attachLocale(ctx context.Context, loc *Translator, tag string, explicit bool) context.Context {
+func attachLocale(ctx context.Context, loc *translator, tag string, explicit bool) context.Context {
 	ctx = context.WithValue(ctx, ctxKeyLocalizer, loc)
 	ctx = context.WithValue(ctx, ctxKeyLocaleTag, primaryTag(tag))
 	ctx = context.WithValue(ctx, ctxKeyExplicitIntent, explicit)
