@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/internal/refgraph"
 )
 
 // AssertRequestPathContext refuses a context.Background() or context.TODO() call written in a
@@ -129,7 +130,7 @@ func findRequestPathContextViolations(root string, dirs []string) ([]slogViolati
 				// reporting it here would send the reader to the wrong place.
 				return nil
 			}
-			if exemptByBuildConstraint(file, fset) {
+			if refgraph.ExemptByBuildConstraint(file, fset) {
 				return nil
 			}
 			files++

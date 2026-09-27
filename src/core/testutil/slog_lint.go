@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/internal/refgraph"
 )
 
 // AssertSlogConvention holds production code to the part of the logging convention that sloglint
@@ -394,7 +395,7 @@ func findSlogViolations(root, golangci string, dirs []string) ([]slogViolation, 
 				// reporting it here would send the reader to the wrong place.
 				return nil
 			}
-			if exemptByBuildConstraint(file, fset) {
+			if refgraph.ExemptByBuildConstraint(file, fset) {
 				return nil
 			}
 			files++
@@ -503,7 +504,7 @@ func (s slogSpreadSite) forwarderPackage() (string, string) {
 // slogIsForwarderCall reports whether call reaches one of the registered forwarders, either
 // qualified through an import of its package or bare from inside its scope.
 func slogIsForwarderCall(call *ast.CallExpr, importPaths map[string]string, rel string) (slogSpreadSite, bool) {
-	fun := unparen(call.Fun)
+	fun := refgraph.Unparen(call.Fun)
 	if path, name, ok := qualifiedCall(call, importPaths); ok {
 		for _, site := range slogSpreadSites {
 			if site.forwarder == "" {
@@ -593,7 +594,7 @@ func slogViolationsInFile(file *ast.File, fset *token.FileSet, rel string) []slo
 					return true
 				}
 				if msgIndex < len(call.Args) {
-					msgArg := unparen(call.Args[msgIndex])
+					msgArg := refgraph.Unparen(call.Args[msgIndex])
 					if lit, isLit := msgArg.(*ast.BasicLit); isLit && lit.Kind == token.STRING {
 						if msg, err := strconv.Unquote(lit.Value); err == nil {
 							if what, fix, bad := slogMessageOpener(msg); bad {

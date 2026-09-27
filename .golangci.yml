@@ -148,6 +148,10 @@ linters:
       # mail server; no binary imports them.
       - path: core/testutil/
         linters: [gosec]
+      # The reference-graph reader those guards and ownershipdump share,
+      # which left core/testutil with the same reads by path (#431).
+      - path: core/internal/refgraph/
+        linters: [gosec]
       # The generators and dump tools run by hand in the dev container, read
       # only the tree or a download named in their source, and write
       # repository files, which are 0644 on purpose. No server binary contains

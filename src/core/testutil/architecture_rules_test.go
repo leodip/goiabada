@@ -19,6 +19,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/leodip/goiabada/core/internal/refgraph"
 )
 
 // ---- fixture helpers -----------------------------------------------------------------------
@@ -123,7 +125,7 @@ func check(t *testing.T, files map[string]string, tables architectureTables) []s
 func checkTree(t *testing.T, files map[string]string, tables architectureTables) []string {
 	t.Helper()
 
-	graph, err := buildImportGraph(writeTree(t, files))
+	graph, err := refgraph.BuildImportGraph(writeTree(t, files))
 	require.NoError(t, err)
 	findings := checkArchitecture(tables, graph)
 	sort.Strings(findings)
@@ -638,17 +640,6 @@ import _ "example.test/core/models"
 		}, architectureTables{owners: owners})
 		assert.Empty(t, findings)
 	})
-
-	t.Run("module identity is read from go.mod", func(t *testing.T) {
-		root := writeTree(t, map[string]string{
-			"core/go.mod":       "module example.test/renamed-core\n",
-			"core/errs/errs.go": pkg("errs"),
-		})
-		graph, err := buildImportGraph(root)
-		require.NoError(t, err)
-		assert.Equal(t, "example.test/renamed-core", graph.modules["core"])
-		assert.Equal(t, "core/errs", graph.topCorePackage("example.test/renamed-core/errs"))
-	})
 }
 
 // ---- the document parser -------------------------------------------------------------------
@@ -760,7 +751,7 @@ func TestArchitecture_TheRealTreeIsHeldByItsExceptions(t *testing.T) {
 	tables, findings := parseArchitectureDoc(string(doc))
 	require.Empty(t, findings)
 
-	graph, err := buildImportGraph(root)
+	graph, err := refgraph.BuildImportGraph(root)
 	require.NoError(t, err)
 	require.Empty(t, checkArchitecture(tables, graph))
 
@@ -804,7 +795,7 @@ func TestArchitecture_TheRealTreeReachesEveryForeignModuleItDeclares(t *testing.
 	tables, _ := parseArchitectureDoc(string(doc))
 	require.NotEmpty(t, tables.foreign)
 
-	graph, err := buildImportGraph(root)
+	graph, err := refgraph.BuildImportGraph(root)
 	require.NoError(t, err)
 
 	for i, row := range tables.foreign {
@@ -858,7 +849,7 @@ func architectureFixture(t *testing.T, doc string, files map[string]string) stri
 
 // architectureDocWith renders a document carrying the four headings the parser needs, with only the
 // ownership and core-constants tables populated. The other two are left as a header and a
-// separator, which is what an empty table looks like to tableUnder.
+// separator, which is what an empty table looks like to refgraph.TableUnder.
 //
 // The two ownership rows and the one constants row it always writes are the baseline rule 7 needs:
 // the guard is fatal on a tree declaring no core constant or referencing none, so every fixture

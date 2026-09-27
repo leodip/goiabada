@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/internal/refgraph"
 )
 
 // AssertNoDeadInterfaces holds every interface declared under dirs to having at least one
@@ -236,9 +237,10 @@ func moduleFor(root, dir string) (modRoot, modPath string, err error) {
 	for d := dir; ; {
 		goMod := filepath.Join(d, "go.mod")
 		if _, sErr := os.Stat(goMod); sErr == nil {
-			// modulePath is AssertArchitecture's, and sharing it is the point: a module renamed in
-			// go.mod has to move both guards at once rather than one of them silently.
-			path, pErr := modulePath(goMod)
+			// ModulePath is what AssertArchitecture's graph reads, and sharing it is the point: a
+			// module renamed in go.mod has to move both guards at once rather than one of them
+			// silently.
+			path, pErr := refgraph.ModulePath(goMod)
 			if pErr != nil {
 				return "", "", pErr
 			}

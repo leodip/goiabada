@@ -14,9 +14,10 @@
 // naming it, because a tool that filled that cell in would be answering the one question the table
 // exists to ask.
 //
-// The census it writes from is testutil.RenderSymbolOwnership, which is the census the guard
-// checks with. There is one implementation of it on purpose, and the cost is that this dev-only
-// binary links testing through core/testutil -- acceptable for a tool no Dockerfile builds.
+// The census it writes from is refgraph.RenderSymbolOwnership, which is the census
+// testutil.AssertSymbolOwnership checks with. There is one implementation of it on purpose, and it
+// lives in core/internal/refgraph rather than core/testutil so that this binary links neither
+// testing nor testify (#431).
 package main
 
 import (
@@ -25,7 +26,7 @@ import (
 	"path/filepath"
 
 	"github.com/leodip/goiabada/core/errs"
-	"github.com/leodip/goiabada/core/testutil"
+	"github.com/leodip/goiabada/core/internal/refgraph"
 )
 
 func main() {
@@ -40,12 +41,12 @@ func run() error {
 	if err != nil {
 		return errs.Wrap(err, "getting the working directory")
 	}
-	root, err := testutil.FindSourceRoot(cwd)
+	root, err := refgraph.FindSourceRoot(cwd)
 	if err != nil {
 		return errs.Wrap(err, "finding the source root")
 	}
 
-	doc, unjustified, err := testutil.RenderSymbolOwnership(root)
+	doc, unjustified, err := refgraph.RenderSymbolOwnership(root)
 	if err != nil {
 		return err
 	}

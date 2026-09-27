@@ -346,6 +346,24 @@ command itself and fails on a tree it changed.
 | `core/i18n` | `T` | kernel | — |
 | `core/i18n` | `UILocalesReader` | reachable | — |
 | `core/i18n` | `WithLocale` | both-apps | — |
+| `core/internal/refgraph` | `BuildImportGraph` | kernel | — |
+| `core/internal/refgraph` | `CheckOwnership` | kernel | — |
+| `core/internal/refgraph` | `DocRow` | own-package | — |
+| `core/internal/refgraph` | `ExemptByBuildConstraint` | kernel | — |
+| `core/internal/refgraph` | `FindSourceRoot` | kernel | — |
+| `core/internal/refgraph` | `Flatten` | kernel | — |
+| `core/internal/refgraph` | `ImportGraph` | kernel | — |
+| `core/internal/refgraph` | `JustificationBothApps` | kernel | — |
+| `core/internal/refgraph` | `JustificationContract` | kernel | — |
+| `core/internal/refgraph` | `JustificationKernel` | kernel | — |
+| `core/internal/refgraph` | `JustificationMoving` | kernel | — |
+| `core/internal/refgraph` | `LocalImportName` | kernel | — |
+| `core/internal/refgraph` | `ModulePath` | kernel | — |
+| `core/internal/refgraph` | `OwnershipCheck` | own-package | — |
+| `core/internal/refgraph` | `RenderSymbolOwnership` | kernel | — |
+| `core/internal/refgraph` | `SelectedNames` | kernel | — |
+| `core/internal/refgraph` | `TableUnder` | kernel | — |
+| `core/internal/refgraph` | `Unparen` | kernel | — |
 | `core/locales` | `Get` | both-apps | — |
 | `core/locales` | `Locale` | own-package | — |
 | `core/logging` | `FieldForLog` | kernel | — |
@@ -417,9 +435,7 @@ command itself and fails on a tree it changed.
 | `core/testutil` | `AssertTemplatesHtmlLangNotHardcoded` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
 | `core/testutil` | `AssertTemplatesNoCsrfField` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
 | `core/testutil` | `AssertTemplatesNoHTMLInTitle` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
-| `core/testutil` | `FindSourceRoot` | kernel | — |
 | `core/testutil` | `GuardReport` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
-| `core/testutil` | `RenderSymbolOwnership` | kernel | — |
 | `core/testutil` | `Reporter` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
 | `core/testutil` | `RunGuard` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
 | `core/testutil` | `SkipWithoutIPv6Loopback` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |

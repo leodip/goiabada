@@ -122,36 +122,3 @@ func TestGofmt_AMissingRootIsFatalRatherThanEmpty(t *testing.T) {
 	assert.Contains(t, report.Fatal, "walking ")
 	assert.NotContains(t, report.Fatal, "walked no Go files")
 }
-
-// TestSourceRoot_FindsTheDirectoryHoldingEveryModule covers the ascent every guard's root comes
-// from. A wrong root is not a loud failure -- it walks a directory that exists and holds nothing,
-// and the guard passes -- which is why both of its answers are pinned rather than assumed.
-func TestSourceRoot_FindsTheDirectoryHoldingEveryModule(t *testing.T) {
-	root := t.TempDir()
-	src := filepath.Join(root, "src")
-	for _, m := range modules {
-		writeGoFile(t, src, filepath.ToSlash(filepath.Join(m, "go.mod")), "module example.com/x\n")
-	}
-	deep := filepath.Join(src, "core", "testutil", "fake")
-	require.NoError(t, os.MkdirAll(deep, 0o755))
-
-	found, err := sourceRootFrom(deep)
-	require.NoError(t, err)
-	assert.Equal(t, src, found)
-}
-
-// TestSourceRoot_AnAscentThatFindsNothingIsAnError is the failure SourceRoot turns into a Fatalf.
-// Requiring all four modules is what identifies the directory, so a module added to the repository
-// without being added to the list fails to find the root rather than silently rooting a guard one
-// directory up.
-func TestSourceRoot_AnAscentThatFindsNothingIsAnError(t *testing.T) {
-	root := t.TempDir()
-	// Three of the four, which is what a newly added module looks like from here.
-	for _, m := range modules[:len(modules)-1] {
-		writeGoFile(t, root, filepath.ToSlash(filepath.Join(m, "go.mod")), "module example.com/x\n")
-	}
-
-	_, err := sourceRootFrom(root)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "no directory above the working directory holds all of")
-}

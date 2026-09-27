@@ -101,6 +101,7 @@ A row whose owner is not `kernel` names the issue that moves it. A `kernel` row 
 | `core/hashutil` | kernel | — |
 | `core/hostport` | kernel | — |
 | `core/i18n` | kernel | — |
+| `core/internal` | kernel | — |
 | `core/locales` | kernel | — |
 | `core/logging` | kernel | — |
 | `core/middleware` | kernel | — |
@@ -120,6 +121,9 @@ Notes on rows that are not self-evident:
 - `core/cmd` is kernel because it is one developer tool, `ownershipdump`, which writes the per-symbol
   table described below. The row exists because the guard reads any directory under `core` holding a
   production Go file, and rule 6 fails without it (#385).
+- `core/internal` is kernel because it holds `refgraph`, the reference-graph reader behind the
+  tree-wide guards and `ownershipdump`: the census left `core/testutil` so that the tool stops
+  linking `testing` and testify, and Go's internal rule keeps it from anything outside core (#431).
 - `core/testutil` is kernel because it is test support compiled into no binary. It is still held to
   the kernel rule, and #360 is what made that hold rather than merely claim
   it: `core/testutil/fake` imported `core/uuidutil` under an exception rather than a waiver, so the
@@ -368,16 +372,17 @@ identifier that file binds the import to.
 Rule 8 lives beside them rather than in this file. `AssertSymbolOwnership` in
 `src/core/testutil/symbol_ownership.go` is called from the same three tiers and checks
 `src/core/OWNERSHIP.md`; `src/core/cmd/ownershipdump` writes the computed rows from the same census,
-so the tool and the guard cannot read the tree differently, and `./run-tests.sh --type lint` runs
-the tool and fails on a tree it changed. References from outside a declaring package are read as
+`core/internal/refgraph`, so the tool and the guard cannot read the tree differently, and
+`./run-tests.sh --type lint` runs the tool and fails on a tree it changed. References from outside a declaring package are read as
 selectors, like rule 7's; references from inside it are resolved with `go/types`, because there an
 identifier carries no selector and matching one by spelling would let a local or a struct field
 justify its namesake.
 
 `src/core/testutil/architecture_lint_test.go` is the core tier's caller;
 `src/core/testutil/architecture_rules_test.go`,
-`src/core/testutil/constants_ownership_rules_test.go` and
-`src/core/testutil/symbol_ownership_rules_test.go` hold the guard's own tests. They run the rule table
+`src/core/testutil/constants_ownership_rules_test.go`,
+`src/core/testutil/symbol_ownership_rules_test.go` and
+`src/core/internal/refgraph/symbol_ownership_test.go` hold the guard's own tests. They run the rule table
 against fixture trees written into a temp directory, one fixture per rule and per deliberate
 leniency, and then take the real tables apart one row at a time — dropping each exception and
 flipping each declared reachability — because the tree satisfies this document by construction, so
