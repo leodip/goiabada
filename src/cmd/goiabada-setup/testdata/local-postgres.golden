@@ -3,15 +3,16 @@
 
 services:
 
-  mysql-server:
-    image: mysql:latest
+  postgres-server:
+    image: postgres:latest
     restart: unless-stopped
     volumes:
-      - mysql-data:/var/lib/mysql
+      - postgres-data:/var/lib/postgresql
     environment:
-      MYSQL_ROOT_PASSWORD: WlxL8cSkXkANvoby
+      POSTGRES_PASSWORD: db-password
+      POSTGRES_DB: goiabada
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-uroot", "-pWlxL8cSkXkANvoby", "--protocol", "tcp"]
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 1s
       timeout: 2s
       retries: 20
@@ -22,7 +23,7 @@ services:
     image: leodip/goiabada:authserver-latest
     restart: unless-stopped
     depends_on:
-      mysql-server:
+      postgres-server:
         condition: service_healthy
     ports:
       - 9090:9090
@@ -37,7 +38,7 @@ services:
     environment:
       - TZ=UTC
       - GOIABADA_ADMIN_EMAIL=admin@example.com
-      - GOIABADA_ADMIN_PASSWORD=weak
+      - GOIABADA_ADMIN_PASSWORD=admin-password
       - GOIABADA_APPNAME=Goiabada
       - GOIABADA_AUTHSERVER_BASEURL=http://localhost:9090
       - GOIABADA_AUTHSERVER_INTERNALBASEURL=http://goiabada-authserver:9090
@@ -55,15 +56,15 @@ services:
       - GOIABADA_AUTHSERVER_STATICDIR=
       - GOIABADA_AUTHSERVER_TEMPLATEDIR=
       - GOIABADA_AUTHSERVER_DEBUG_API_REQUESTS=false
-      - GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY=41050264a1669d324430b62b69a5d207a6c614c07d7990c0917f61cea9d7bd24cc70cc31e3e47e74b11ed6b0fef95224e783d37c247bdc74c835cebf50a71fc5
-      - GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY=d239a989e77f5784cc7cdf77c13b9f3f8a4263173b9872eba79cd0312a48fec9
-      - GOIABADA_AES_ENCRYPTION_KEY=00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff
-      - GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET=w8iZDzGpEgJKGX6kumPeZuqcSKBKEyRTSBUjImnkbEQPeVnGec4Rmde85CCu
-      - GOIABADA_DB_TYPE=mysql
-      - GOIABADA_DB_USERNAME=root
-      - GOIABADA_DB_PASSWORD=WlxL8cSkXkANvoby
-      - GOIABADA_DB_HOST=mysql-server
-      - GOIABADA_DB_PORT=3306
+      - GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY=auth-session-auth-key
+      - GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY=auth-session-enc-key
+      - GOIABADA_AES_ENCRYPTION_KEY=aes-encryption-key
+      - GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET=oauth-client-secret
+      - GOIABADA_DB_TYPE=postgres
+      - GOIABADA_DB_USERNAME=postgres
+      - GOIABADA_DB_PASSWORD=db-password
+      - GOIABADA_DB_HOST=postgres-server
+      - GOIABADA_DB_PORT=5432
       - GOIABADA_DB_NAME=goiabada
       - GOIABADA_ADMINCONSOLE_BASEURL=http://localhost:9091
 
@@ -79,9 +80,9 @@ services:
       - goiabada-network
     environment:
       - TZ=UTC
-      - GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET=w8iZDzGpEgJKGX6kumPeZuqcSKBKEyRTSBUjImnkbEQPeVnGec4Rmde85CCu
-      - GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY=535c0d5c95a584e3a349d43e6e7ca350ae405037b7d79624da16d3172dbaf95a70154a8eb548c54821ca2019dddeb362976afe8fd6b41b15f25a817051a3a266
-      - GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY=0d3fe5ca91b3ceb462c4420cdef9ae11cf957c3a042c618feac4c3a96ce8f46b
+      - GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET=oauth-client-secret
+      - GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY=admin-session-auth-key
+      - GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY=admin-session-enc-key
       - GOIABADA_ADMINCONSOLE_BASEURL=http://localhost:9091
       - GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTP=0.0.0.0
       - GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTP=9091
@@ -100,7 +101,7 @@ services:
 
 
 volumes:
-  mysql-data:
+  postgres-data:
 
 networks:
   goiabada-network:

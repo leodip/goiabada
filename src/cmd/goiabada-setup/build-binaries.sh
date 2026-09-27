@@ -37,7 +37,7 @@ build_platform() {
     GOOS=$os GOARCH=$arch go build -v \
         -ldflags "-s -w -X main.version=${VERSION} -X main.imageTag=${VERSION}" \
         -o "${BUILD_DIR}/goiabada-setup-${os}-${arch}${extension}" \
-        ./main.go
+        .
 }
 
 # Verify go.mod exists

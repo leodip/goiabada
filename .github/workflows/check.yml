@@ -442,18 +442,18 @@ jobs:
         working-directory: src/authserver
         run: ./run-tests.sh --type adminconsole --no-build
 
-  # The setup wizard is a module of its own with no run-tests.sh tier, so this
-  # calls go test directly. Lint and Vulnerabilities have always looped over it,
-  # but nothing ran its tests: it had none, and `go test ./...` answering
-  # `[no test files]` is indistinguishable from a pass. Its generators emit the
-  # compose file, env file and manifests an operator deploys from, so a line
-  # reintroduced there ships without anything in the repository reading it
-  # (#285).
+  # The setup tier of run-tests.sh, the setup wizard's own module. Its
+  # generators emit the compose file, env file and manifests an operator
+  # deploys from, so a line reintroduced there ships without anything in the
+  # repository reading it (#285). The tier calls none of the tree-wide guards;
+  # the other three module tiers do, over the whole source root (#430).
   #
   # No setup-test-container: this module has four external dependencies plus
   # core, which is a local replace and fetches nothing, and no templates and no
-  # CSS, so it needs neither the Tailwind CLI nor the OS packages run-tests.sh
-  # does, and fetching them would cost more than the run.
+  # CSS, so it needs neither the Tailwind CLI nor the OS packages the other
+  # tiers do, and fetching them would cost more than the run. The setup tier
+  # never builds and needs only bash, coreutils and go from this image; the
+  # script's cleanup trap sends a missing netstat to /dev/null.
   unit-setup:
     name: Unit / setup
     needs: versions
@@ -462,8 +462,8 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Setup wizard tests
-        working-directory: src/cmd/goiabada-setup
-        run: go test ./... -count=1
+        working-directory: src/authserver
+        run: ./run-tests.sh --type setup --no-build
 
   # The three module tiers again, under the race detector. The plain unit jobs
   # above stay: the detector slows a run several times over and changes its
