@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/internal/refgraph"
 )
 
 // The fourth ARCHITECTURE.md table: one row per symbol surviving in core/constants, naming why it
@@ -30,23 +31,6 @@ import (
 // cannot outlive what it describes; and a row claiming less than the tree supports fails, so the
 // escape hatch stays the last resort rather than the easy answer.
 const constantsHeading = "### Core constants ownership"
-
-// The justification a row may carry, strongest first. A row states the strongest claim the tree
-// backs, which is what keeps contract honest: it is reachable only when none of the other three
-// holds, so writing it is a claim a reviewer can argue with rather than a shrug.
-const (
-	// justificationKernel: a kernel core package references it in production, so rule 2 forbids it
-	// leaving whatever the applications do.
-	justificationKernel = "kernel"
-	// justificationBothApps: both applications reference it in production.
-	justificationBothApps = "both-apps"
-	// justificationMoving: the only core packages referencing it are ones on their way out of core,
-	// so the answer expires with them. The issue cell names the move that ends it.
-	justificationMoving = "moving"
-	// justificationContract: none of the above, but it is an intentionally stable cross-process
-	// value. Nothing can check this, which is exactly why somebody has to write the word.
-	justificationContract = "contract"
-)
 
 // coreConstantsPkg is the package the table governs, as a directory relative to the source root.
 const coreConstantsPkg = "core/constants"
@@ -82,8 +66,8 @@ type constantsCensus struct {
 // tree does that, and closing it means type-checking every package rather than parsing it. Revisit
 // if a row ever rests on a reference that turns out to be a false one; go/types object identity is
 // the next shape, as AssertNoDeadInterfaces already uses for one package at a time (#351).
-func buildConstantsCensus(root string, graph *importGraph) (*constantsCensus, error) {
-	coreModule, ok := graph.modules["core"]
+func buildConstantsCensus(root string, graph *refgraph.ImportGraph) (*constantsCensus, error) {
+	coreModule, ok := graph.Modules["core"]
 	if !ok {
 		return nil, errs.Errorf("the import graph knows no core module")
 	}
@@ -113,7 +97,7 @@ func buildConstantsCensus(root string, graph *importGraph) (*constantsCensus, er
 			// A symbol named by its own package proves nothing about who consumes it.
 			return nil
 		}
-		pkg, known := graph.importPath(dir)
+		pkg, known := graph.ImportPath(dir)
 		if !known {
 			return nil
 		}
@@ -133,15 +117,15 @@ func buildConstantsCensus(root string, graph *importGraph) (*constantsCensus, er
 			// here would send the reader to the wrong place.
 			return nil
 		}
-		if exemptByBuildConstraint(file, fset) {
+		if refgraph.ExemptByBuildConstraint(file, fset) {
 			return nil
 		}
 
-		local, imports := localImportName(file, importPath, pkgName)
+		local, imports := refgraph.LocalImportName(file, importPath, pkgName)
 		if !imports {
 			return nil
 		}
-		for _, symbol := range selectedNames(file, local) {
+		for _, symbol := range refgraph.SelectedNames(file, local) {
 			if refs[symbol] == nil {
 				refs[symbol] = map[string]bool{}
 			}
@@ -153,7 +137,7 @@ func buildConstantsCensus(root string, graph *importGraph) (*constantsCensus, er
 		return nil, err
 	}
 
-	return &constantsCensus{declared: declared, refs: flatten(refs)}, nil
+	return &constantsCensus{declared: declared, refs: refgraph.Flatten(refs)}, nil
 }
 
 // exportedDeclarations lists the exported constants, variables, types and functions a package's
@@ -174,7 +158,7 @@ func exportedDeclarations(dir string) ([]string, error) {
 		if pErr != nil {
 			return nil, errs.Wrapf(pErr, "parsing %s", entry.Name())
 		}
-		if exemptByBuildConstraint(file, fset) {
+		if refgraph.ExemptByBuildConstraint(file, fset) {
 			continue
 		}
 		for _, decl := range file.Decls {
@@ -236,66 +220,8 @@ func declaredPackageName(dir string) string {
 	return ""
 }
 
-// localImportName returns the identifier a file binds an import path to. A blank or dot import
-// binds no identifier a selector can name, so neither counts as a reference.
-//
-// declared is the package clause of the imported package, which is what Go binds when the import
-// carries no alias -- the last segment of the path is only the usual spelling of it, not the rule.
-// A caller that does not know the name passes "" and gets that usual spelling; the two differ
-// exactly when a package is named for something other than its directory, and there every
-// reference to it would otherwise be read as no reference at all. Final review round 3, finding 5.
-func localImportName(file *ast.File, importPath, declared string) (string, bool) {
-	for _, spec := range file.Imports {
-		if spec.Path == nil || strings.Trim(spec.Path.Value, `"`) != importPath {
-			continue
-		}
-		if spec.Name == nil {
-			if declared != "" {
-				return declared, true
-			}
-			return importPath[strings.LastIndex(importPath, "/")+1:], true
-		}
-		if spec.Name.Name == "_" || spec.Name.Name == "." {
-			return "", false
-		}
-		return spec.Name.Name, true
-	}
-	return "", false
-}
-
-// selectedNames lists the exported symbols selected off the given identifier.
-func selectedNames(file *ast.File, local string) []string {
-	seen := map[string]bool{}
-	ast.Inspect(file, func(n ast.Node) bool {
-		sel, ok := n.(*ast.SelectorExpr)
-		if !ok {
-			return true
-		}
-		ident, ok := sel.X.(*ast.Ident)
-		if !ok || ident.Name != local {
-			return true
-		}
-		// A non-nil Obj means the parser resolved the name to a declaration in this file, so it is
-		// something shadowing the import rather than the package.
-		if ident.Obj != nil {
-			return true
-		}
-		if sel.Sel.IsExported() {
-			seen[sel.Sel.Name] = true
-		}
-		return true
-	})
-
-	names := make([]string, 0, len(seen))
-	for name := range seen {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-	return names
-}
-
 // checkConstantsOwnership holds the table and the tree to each other, in both directions.
-func checkConstantsOwnership(tables architectureTables, graph *importGraph, census *constantsCensus) []string {
+func checkConstantsOwnership(tables architectureTables, graph *refgraph.ImportGraph, census *constantsCensus) []string {
 	var findings []string
 
 	owners := map[string]ownerRow{}
@@ -353,13 +279,13 @@ type symbolBacking struct {
 }
 
 // backingFor classifies every production reference to a symbol.
-func backingFor(owners map[string]ownerRow, graph *importGraph, refs []string) symbolBacking {
+func backingFor(owners map[string]ownerRow, graph *refgraph.ImportGraph, refs []string) symbolBacking {
 	backing := symbolBacking{apps: map[string]bool{}, movingIssues: map[string]bool{}}
 
 	for _, pkg := range refs {
-		top := graph.topCorePackage(pkg)
+		top := graph.TopCorePackage(pkg)
 		if top == "" {
-			switch graph.moduleDir(pkg) {
+			switch graph.ModuleDir(pkg) {
 			case "authserver":
 				backing.apps["authserver"] = true
 			case "adminconsole":
@@ -371,10 +297,10 @@ func backingFor(owners map[string]ownerRow, graph *importGraph, refs []string) s
 			continue
 		}
 		if owners[top].owner == ownerKernel {
-			backing.kernelPkgs = append(backing.kernelPkgs, graph.relPath(pkg))
+			backing.kernelPkgs = append(backing.kernelPkgs, graph.RelPath(pkg))
 			continue
 		}
-		backing.movingPkgs = append(backing.movingPkgs, graph.relPath(pkg))
+		backing.movingPkgs = append(backing.movingPkgs, graph.RelPath(pkg))
 		backing.movingIssues[owners[top].issue] = true
 	}
 
@@ -384,14 +310,14 @@ func backingFor(owners map[string]ownerRow, graph *importGraph, refs []string) s
 }
 
 // checkConstantsRow holds one row to what the tree backs for its symbol.
-func checkConstantsRow(row constantsRow, owners map[string]ownerRow, graph *importGraph, refs []string) []string {
+func checkConstantsRow(row constantsRow, owners map[string]ownerRow, graph *refgraph.ImportGraph, refs []string) []string {
 	switch row.justification {
-	case justificationKernel, justificationBothApps, justificationMoving, justificationContract:
+	case refgraph.JustificationKernel, refgraph.JustificationBothApps, refgraph.JustificationMoving, refgraph.JustificationContract:
 	default:
 		return []string{fmt.Sprintf(
 			"core constants: %s:%d gives %s the justification %q, which is none of %s, %s, %s, %s",
 			architectureDoc, row.line, row.symbol, row.justification,
-			justificationKernel, justificationBothApps, justificationMoving, justificationContract)}
+			refgraph.JustificationKernel, refgraph.JustificationBothApps, refgraph.JustificationMoving, refgraph.JustificationContract)}
 	}
 
 	backing := backingFor(owners, graph, refs)
@@ -402,11 +328,11 @@ func checkConstantsRow(row constantsRow, owners map[string]ownerRow, graph *impo
 			architectureDoc, row.line, row.symbol, row.justification, want, because)}
 	}
 
-	if want != justificationMoving {
+	if want != refgraph.JustificationMoving {
 		if !noIssue(row.issue) {
 			return []string{fmt.Sprintf(
 				"core constants: %s:%d gives %s the issue %s; only a %s row names one, because it is the only justification that expires",
-				architectureDoc, row.line, row.symbol, row.issue, justificationMoving)}
+				architectureDoc, row.line, row.symbol, row.issue, refgraph.JustificationMoving)}
 		}
 		return nil
 	}
@@ -418,17 +344,17 @@ func checkConstantsRow(row constantsRow, owners map[string]ownerRow, graph *impo
 func strongestJustification(backing symbolBacking) (string, string) {
 	switch {
 	case len(backing.kernelPkgs) > 0:
-		return justificationKernel, strings.Join(backing.kernelPkgs, ", ") + " references it in production"
+		return refgraph.JustificationKernel, strings.Join(backing.kernelPkgs, ", ") + " references it in production"
 	case backing.apps["authserver"] && backing.apps["adminconsole"]:
-		return justificationBothApps, "both applications reference it in production"
+		return refgraph.JustificationBothApps, "both applications reference it in production"
 	case len(backing.movingPkgs) > 0:
-		return justificationMoving, "in core only " + strings.Join(backing.movingPkgs, ", ") + " references it, and that is leaving core"
+		return refgraph.JustificationMoving, "in core only " + strings.Join(backing.movingPkgs, ", ") + " references it, and that is leaving core"
 	case len(backing.apps) == 1:
 		for app := range backing.apps {
-			return justificationContract, "only " + app + " references it"
+			return refgraph.JustificationContract, "only " + app + " references it"
 		}
 	}
-	return justificationContract, "no production package references it"
+	return refgraph.JustificationContract, "no production package references it"
 }
 
 // checkMovingIssue holds a moving row's issue to the ownership rows of the packages pinning the
@@ -439,7 +365,7 @@ func checkMovingIssue(row constantsRow, backing symbolBacking) []string {
 	if !issueRef.MatchString(row.issue) {
 		return []string{fmt.Sprintf(
 			"core constants: %s:%d records %s as %s but names %q where an issue like #359 belongs; a justification that expires has to say when",
-			architectureDoc, row.line, row.symbol, justificationMoving, row.issue)}
+			architectureDoc, row.line, row.symbol, refgraph.JustificationMoving, row.issue)}
 	}
 	if backing.movingIssues[row.issue] {
 		return nil

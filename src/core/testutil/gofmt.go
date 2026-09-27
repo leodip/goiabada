@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/internal/refgraph"
 )
 
 // AssertGofmted holds every Go file in the repository to gofmt's canonical
@@ -107,13 +107,6 @@ func findUnformatted(root string) ([]string, int, error) {
 	return unformatted, files, nil
 }
 
-// modules are the four go.mod directories the Lint job loops over, relative to
-// the source root. Requiring all four to be present is what identifies that
-// directory while ascending, and it means a module added to the repository
-// without being added here is a failure to find the root rather than a walk
-// that quietly skips it.
-var modules = []string{"core", "authserver", "adminconsole", filepath.Join("cmd", "goiabada-setup")}
-
 // SourceRoot returns the directory holding every module in the repository, found
 // by ascending from the test's working directory. It is what every tree-wide
 // guard walks from: AssertGofmted here, and the bare-BeginTransaction lint in
@@ -122,7 +115,8 @@ var modules = []string{"core", "authserver", "adminconsole", filepath.Join("cmd"
 // Ascending rather than accepting a relative path keeps each caller from having
 // to encode how deep its own package sits. That matters because a wrong root is
 // not a loud failure: it walks a directory that exists and holds nothing, and
-// the guard passes.
+// the guard passes. The ascent itself is refgraph.FindSourceRoot, which
+// cmd/ownershipdump roots its walk with too.
 func SourceRoot(t *testing.T) string {
 	t.Helper()
 
@@ -130,37 +124,9 @@ func SourceRoot(t *testing.T) string {
 	if err != nil {
 		t.Fatalf("getting the working directory: %v", err)
 	}
-	root, err := sourceRootFrom(dir)
+	root, err := refgraph.FindSourceRoot(dir)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
 	return root
-}
-
-// sourceRootFrom is the ascent itself, separated so a test can start it somewhere
-// other than the working directory and reach both answers. Its failure is the one
-// SourceRoot turns into a Fatalf, and a guard rooted at the wrong directory is
-// precisely the quiet pass the doc comment above warns about, so the two outcomes
-// are worth pinning rather than assuming.
-func sourceRootFrom(dir string) (string, error) {
-	for {
-		if holdsEveryModule(dir) {
-			return dir, nil
-		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			return "", errs.Errorf("no directory above the working directory holds all of %s",
-				strings.Join(modules, ", "))
-		}
-		dir = parent
-	}
-}
-
-func holdsEveryModule(dir string) bool {
-	for _, m := range modules {
-		if _, err := os.Stat(filepath.Join(dir, m, "go.mod")); err != nil {
-			return false
-		}
-	}
-	return true
 }

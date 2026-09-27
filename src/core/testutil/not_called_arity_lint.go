@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/internal/refgraph"
 )
 
 // testifyMockImportPath is testify's mock package, whose Mock every generated double embeds and
@@ -545,7 +546,7 @@ func repoModules(root string) ([]repoModule, error) {
 		if d.Name() != "go.mod" {
 			return nil
 		}
-		modPath, mErr := modulePath(path)
+		modPath, mErr := refgraph.ModulePath(path)
 		if mErr != nil {
 			return mErr
 		}

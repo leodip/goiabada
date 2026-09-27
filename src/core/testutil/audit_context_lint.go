@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/internal/refgraph"
 )
 
 // AssertAuditLogContext refuses a .Log call whose first argument is context.Background() or
@@ -120,7 +121,7 @@ func findAuditLogContextViolations(root string, dirs []string) ([]slogViolation,
 				// reporting it here would send the reader to the wrong place.
 				return nil
 			}
-			if exemptByBuildConstraint(file, fset) {
+			if refgraph.ExemptByBuildConstraint(file, fset) {
 				return nil
 			}
 			files++
@@ -159,13 +160,13 @@ func auditLogContextViolationsInFile(file *ast.File, fset *token.FileSet, rel st
 		if !ok {
 			return true
 		}
-		sel, ok := unparen(call.Fun).(*ast.SelectorExpr)
+		sel, ok := refgraph.Unparen(call.Fun).(*ast.SelectorExpr)
 		if !ok || sel.Sel.Name != auditLogMethodName || len(call.Args) == 0 {
 			return true
 		}
 		// A qualified call as the first argument, so x.Log(ctx, ...) and x.Log(r.Context(), ...)
 		// both fall straight through: neither resolves to an imported package's function.
-		first, isCall := unparen(call.Args[0]).(*ast.CallExpr)
+		first, isCall := refgraph.Unparen(call.Args[0]).(*ast.CallExpr)
 		if !isCall {
 			return true
 		}

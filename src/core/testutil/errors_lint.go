@@ -2,7 +2,6 @@ package testutil
 
 import (
 	"go/ast"
-	"go/build/constraint"
 	"go/parser"
 	"go/token"
 	"io/fs"
@@ -13,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/internal/refgraph"
 )
 
 // AssertNoLegacyErrors holds production code to one way of constructing an error: core/errs.
@@ -183,7 +183,7 @@ func findLegacyErrorUses(root string, dirs []string) ([]legacyErrorUse, int, err
 				// reporting it here would send the reader to the wrong place.
 				return nil
 			}
-			if exemptByBuildConstraint(file, fset) {
+			if refgraph.ExemptByBuildConstraint(file, fset) {
 				return nil
 			}
 			files++
@@ -221,93 +221,6 @@ func exemptByPath(rel string) bool {
 		}
 	}
 	return false
-}
-
-// exemptByBuildConstraint reports whether the file's //go:build expression cannot be true in any
-// build that sets the production tag. Every other tag in the expression is free, so each
-// assignment of them is evaluated with production true and the file is exempt only when all of
-// them come out false.
-//
-// Evaluating with production alone would be wrong in both directions: it would exempt
-// "linux || !production", which is true on every production Linux build, and it would walk
-// "!production && tools", which can never be part of one.
-func exemptByBuildConstraint(file *ast.File, fset *token.FileSet) bool {
-	expr := buildConstraint(file, fset)
-	if expr == nil {
-		return false
-	}
-	free := freeTags(expr)
-	// A pathological expression is walked rather than exempted: 2^n assignments is the cost of
-	// the answer, and refusing to pay it must never be the permissive direction.
-	if len(free) > 12 {
-		return false
-	}
-	for assignment := 0; assignment < 1<<len(free); assignment++ {
-		values := make(map[string]bool, len(free))
-		for i, tag := range free {
-			values[tag] = assignment&(1<<i) != 0
-		}
-		satisfied := expr.Eval(func(tag string) bool {
-			if tag == "production" {
-				return true
-			}
-			return values[tag]
-		})
-		if satisfied {
-			return false
-		}
-	}
-	return true
-}
-
-// buildConstraint returns the file's //go:build expression, or nil when it has none. Only comments
-// above the package clause count, which is what go/build itself requires.
-func buildConstraint(file *ast.File, fset *token.FileSet) constraint.Expr {
-	packageLine := fset.Position(file.Package).Line
-	for _, group := range file.Comments {
-		if fset.Position(group.End()).Line >= packageLine {
-			break
-		}
-		for _, comment := range group.List {
-			if !constraint.IsGoBuild(comment.Text) {
-				continue
-			}
-			expr, err := constraint.Parse(comment.Text)
-			if err != nil {
-				return nil
-			}
-			return expr
-		}
-	}
-	return nil
-}
-
-// freeTags lists every tag in expr except production, deduplicated and in a stable order.
-func freeTags(expr constraint.Expr) []string {
-	seen := map[string]bool{}
-	var tags []string
-	var walk func(constraint.Expr)
-	walk = func(e constraint.Expr) {
-		switch x := e.(type) {
-		case *constraint.TagExpr:
-			if x.Tag == "production" || seen[x.Tag] {
-				return
-			}
-			seen[x.Tag] = true
-			tags = append(tags, x.Tag)
-		case *constraint.NotExpr:
-			walk(x.X)
-		case *constraint.AndExpr:
-			walk(x.X)
-			walk(x.Y)
-		case *constraint.OrExpr:
-			walk(x.X)
-			walk(x.Y)
-		}
-	}
-	walk(expr)
-	sort.Strings(tags)
-	return tags
 }
 
 // legacyErrorUsesInFile reports every refused construction in one parsed file.
@@ -420,7 +333,7 @@ func legacyErrorUsesInFile(file *ast.File, fset *token.FileSet, rel string) []le
 			if len(call.Args) != 1 {
 				return true
 			}
-			inner, ok := unparen(call.Args[0]).(*ast.CallExpr)
+			inner, ok := refgraph.Unparen(call.Args[0]).(*ast.CallExpr)
 			if !ok {
 				return true
 			}
@@ -442,7 +355,7 @@ func legacyErrorUsesInFile(file *ast.File, fset *token.FileSet, rel string) []le
 // name. A selector whose left side is not an imported package name, a method on a value or a
 // deeper expression, is not one of ours.
 func qualifiedCall(call *ast.CallExpr, importPaths map[string]string) (string, string, bool) {
-	sel, ok := unparen(call.Fun).(*ast.SelectorExpr)
+	sel, ok := refgraph.Unparen(call.Fun).(*ast.SelectorExpr)
 	if !ok {
 		return "", "", false
 	}
@@ -452,7 +365,7 @@ func qualifiedCall(call *ast.CallExpr, importPaths map[string]string) (string, s
 // qualifiedSelector is the same resolution for a selector reached anywhere, whether it is being
 // called or passed around as a value.
 func qualifiedSelector(sel *ast.SelectorExpr, importPaths map[string]string) (string, string, bool) {
-	ident, ok := unparen(sel.X).(*ast.Ident)
+	ident, ok := refgraph.Unparen(sel.X).(*ast.Ident)
 	if !ok {
 		return "", "", false
 	}
@@ -473,25 +386,12 @@ func calleeSelectors(file *ast.File) map[*ast.SelectorExpr]bool {
 		if !ok {
 			return true
 		}
-		if sel, isSelector := unparen(call.Fun).(*ast.SelectorExpr); isSelector {
+		if sel, isSelector := refgraph.Unparen(call.Fun).(*ast.SelectorExpr); isSelector {
 			callees[sel] = true
 		}
 		return true
 	})
 	return callees
-}
-
-// unparen strips the parentheses around an expression. (errors.New)("x") calls exactly what
-// errors.New("x") calls, and a rule reading only the bare form is one pair of brackets away from
-// being silent on it.
-func unparen(expr ast.Expr) ast.Expr {
-	for {
-		paren, ok := expr.(*ast.ParenExpr)
-		if !ok {
-			return expr
-		}
-		expr = paren.X
-	}
 }
 
 // packageLevelVarCalls collects the calls that are evaluated during package initialization, which
@@ -548,7 +448,7 @@ func packageLevelVarCalls(file *ast.File) (map[*ast.CallExpr]bool, map[*ast.Sele
 				return false
 			case *ast.CallExpr:
 				exempt[it] = true
-				switch callee := unparen(it.Fun).(type) {
+				switch callee := refgraph.Unparen(it.Fun).(type) {
 				case *ast.FuncLit:
 					walk(callee.Body)
 				case *ast.Ident:

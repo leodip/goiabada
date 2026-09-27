@@ -19,6 +19,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/leodip/goiabada/core/internal/refgraph"
 )
 
 // ---- fixture helpers -----------------------------------------------------------------------
@@ -87,7 +89,7 @@ func checkConstants(t *testing.T, files map[string]string, tables architectureTa
 	t.Helper()
 
 	root := writeTree(t, files)
-	graph, err := buildImportGraph(root)
+	graph, err := refgraph.BuildImportGraph(root)
 	require.NoError(t, err)
 	census, err := buildConstantsCensus(root, graph)
 	require.NoError(t, err)
@@ -306,7 +308,7 @@ func TestConstantsOwnership_ReferencesAreReadFromTheAst(t *testing.T) {
 			"var _ = mentioned\n",
 	})
 
-	graph, err := buildImportGraph(root)
+	graph, err := refgraph.BuildImportGraph(root)
 	require.NoError(t, err)
 	census, err := buildConstantsCensus(root, graph)
 	require.NoError(t, err)
@@ -335,7 +337,7 @@ func TestConstantsOwnership_ALocalShadowingTheImportIsNotThePackage(t *testing.T
 			"}\n",
 	})
 
-	graph, err := buildImportGraph(root)
+	graph, err := refgraph.BuildImportGraph(root)
 	require.NoError(t, err)
 	census, err := buildConstantsCensus(root, graph)
 	require.NoError(t, err)
@@ -455,7 +457,7 @@ func TestConstantsOwnership_TheRealTableIsHeldByItsRows(t *testing.T) {
 	require.Empty(t, findings)
 	require.NotEmpty(t, tables.constants)
 
-	graph, err := buildImportGraph(root)
+	graph, err := refgraph.BuildImportGraph(root)
 	require.NoError(t, err)
 	census, err := buildConstantsCensus(root, graph)
 	require.NoError(t, err)
@@ -464,9 +466,9 @@ func TestConstantsOwnership_TheRealTableIsHeldByItsRows(t *testing.T) {
 	// Every justification the table uses must be reachable from every row, so that flipping a row
 	// is a real change of claim rather than a spelling the checks ignore.
 	others := map[string][]string{
-		justificationKernel:   {justificationBothApps, justificationMoving, justificationContract},
-		justificationBothApps: {justificationKernel, justificationMoving, justificationContract},
-		justificationMoving:   {justificationKernel, justificationBothApps, justificationContract},
+		refgraph.JustificationKernel:   {refgraph.JustificationBothApps, refgraph.JustificationMoving, refgraph.JustificationContract},
+		refgraph.JustificationBothApps: {refgraph.JustificationKernel, refgraph.JustificationMoving, refgraph.JustificationContract},
+		refgraph.JustificationMoving:   {refgraph.JustificationKernel, refgraph.JustificationBothApps, refgraph.JustificationContract},
 	}
 
 	for i, row := range tables.constants {
@@ -487,7 +489,7 @@ func TestConstantsOwnership_TheRealTableIsHeldByItsRows(t *testing.T) {
 				changed := architectureTables{owners: tables.owners}
 				changed.constants = append(changed.constants, tables.constants...)
 				changed.constants[i].justification = flipped
-				if flipped == justificationMoving {
+				if flipped == refgraph.JustificationMoving {
 					changed.constants[i].issue = "#359"
 				} else {
 					changed.constants[i].issue = "—"
@@ -512,7 +514,7 @@ func TestConstantsOwnership_TheRealTableCountsWhatTheTreeDeclares(t *testing.T) 
 	require.NoError(t, err)
 	tables, _ := parseArchitectureDoc(string(doc))
 
-	graph, err := buildImportGraph(root)
+	graph, err := refgraph.BuildImportGraph(root)
 	require.NoError(t, err)
 	census, err := buildConstantsCensus(root, graph)
 	require.NoError(t, err)
