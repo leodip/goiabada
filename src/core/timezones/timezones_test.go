@@ -23,7 +23,7 @@ func TestAll_SpotChecks(t *testing.T) {
 	for _, want := range []Zone{
 		{CountryCode: "BR", Zone: "America/Sao_Paulo", CountryName: "Brazil", Comments: "Brazil (southeast: GO, DF, MG, ES, RJ, SP, PR, SC, RS)"},
 		{CountryCode: "DE", Zone: "Europe/Berlin", CountryName: "Germany", Comments: "most of Germany"},
-		{CountryCode: "SE", Zone: "Europe/Berlin", CountryName: "Sweden", Comments: "most of Germany"},
+		{CountryCode: "SE", Zone: "Europe/Berlin", CountryName: "Sweden", Comments: ""},
 		{CountryCode: "US", Zone: "America/New_York", CountryName: "United States", Comments: "Eastern (most areas)"},
 	} {
 		t.Run(want.CountryName+"/"+want.Zone, func(t *testing.T) {
@@ -85,6 +85,28 @@ func TestAll_Fields(t *testing.T) {
 			t.Errorf("row %d (%s): empty CountryName", i, z.CountryCode)
 		}
 	}
+}
+
+// TestAll_CommentsOnlyOnMultiZoneCountries: zone1970.tab's comments are useful only for a country
+// with several zones, so a country with one row carries none. The table used to label Sweden's
+// Europe/Berlin "most of Germany" (#432).
+func TestAll_CommentsOnlyOnMultiZoneCountries(t *testing.T) {
+	all := All()
+	rows := map[string]int{}
+	for _, z := range all {
+		rows[z.CountryCode]++
+	}
+	commented := 0
+	for _, z := range all {
+		if z.Comments == "" {
+			continue
+		}
+		commented++
+		if rows[z.CountryCode] < 2 {
+			t.Errorf("%s (%s) has one zone, %s, but carries the comment %q", z.CountryName, z.CountryCode, z.Zone, z.Comments)
+		}
+	}
+	assert.NotZero(t, commented, "no row carries a comment, so the check read nothing")
 }
 
 func TestAll_Isolation(t *testing.T) {
