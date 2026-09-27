@@ -405,9 +405,9 @@ every module with nothing going red -- which is what blinding `AssertNoDeadInter
 
 **gofmt guard**: every module's unit tier runs `TestGoSourcesAreGofmted`, which holds every Go
 file under `src/` to gofmt's formatting through `core/testutil.AssertGofmted`. The walk is
-repository-wide from each tier because `cmd/goiabada-setup` has no tier of its own. CI's Lint job
-checks the same thing per module, where an unformatted file also costs that module its vet,
-unparam and golangci-lint run.
+repository-wide from each tier because `cmd/goiabada-setup`'s own tier calls none of the tree-wide
+guards. CI's Lint job checks the same thing per module, where an unformatted file also costs that
+module its vet, unparam and golangci-lint run.
 
 **Architecture guard**: `ARCHITECTURE.md` at the repository root records the allowed module edges,
 the intended final owner of every top-level `core` package, why each symbol left in `core/constants`

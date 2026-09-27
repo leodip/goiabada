@@ -29,9 +29,10 @@ import (
 //
 // The scope is the whole source tree rather than the calling module. The walk
 // reads files instead of loading packages, so module boundaries cost it nothing,
-// and cmd/goiabada-setup has no test tier of its own: a module-scoped guard
-// would leave that module the one place still relying on CI to notice. Each
-// module's unit tier calls this, so the guard fires whichever tier is run.
+// and cmd/goiabada-setup's own tier calls none of the tree-wide guards: a
+// module-scoped guard would leave that module the one place still relying on CI
+// to notice. Each of the other three module tiers calls this, so the guard fires
+// whichever of them is run.
 func AssertGofmted(t *testing.T) {
 	t.Helper()
 

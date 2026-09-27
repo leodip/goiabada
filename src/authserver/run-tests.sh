@@ -18,8 +18,10 @@
 #                                             checks that the generated Tailwind CSS, the
 #                                             mocks and the core symbol ownership table
 #                                             are committed
+#                             setup         - the setup wizard module, src/cmd/goiabada-setup;
+#                                             never builds; in all, not in modules
 #                             modules       - shorthand for internal+core+adminconsole
-#                             all           - everything (default), lint included
+#                             all           - everything (default), lint and setup included
 #   -d, --db     <db>       Database to use for `data` and `integration` tests.
 #                           One of: mysql | postgres | mssql | sqlite | all (default: all)
 #   -r, --run    <pattern>  go test -run regex passed to data/integration runs
@@ -30,8 +32,9 @@
 #                           require a prior build, and this refuses to run them
 #                           without one.
 #   -R, --race              Run the module tiers (internal, core, adminconsole)
-#                           under Go's race detector. Needs a C toolchain, since
-#                           `go test -race` requires cgo: the dev container ships
+#                           and the setup tier under Go's race detector. Needs
+#                           a C toolchain, since `go test -race` requires cgo:
+#                           the dev container ships
 #                           gcc for this, and CI's golang image has it. Refused
 #                           together with --type data or --type integration, which
 #                           the flag does not cover (see Notes).
@@ -127,7 +130,7 @@ done
 
 # Validate --type
 case "$TYPE" in
-    internal|core|adminconsole|data|integration|lint|modules|all) ;;
+    internal|core|adminconsole|setup|data|integration|lint|modules|all) ;;
     *)
         echo "Invalid --type '$TYPE'. Run './run-tests.sh --help'."
         exit 2 ;;
@@ -152,8 +155,8 @@ if [ "$RACE" = true ]; then
     esac
 fi
 
-# The go test invocation the three module legs share. Under --race the
-# detector is added and CGO_ENABLED is set for that command alone, because
+# The go test invocation the three module legs and the setup leg share. Under
+# --race the detector is added and CGO_ENABLED is set for that command alone, because
 # -race needs cgo and the dev container pins CGO_ENABLED=0 for everything else.
 if [ "$RACE" = true ]; then
     module_go_test=(env CGO_ENABLED=1 go test -race -v -count=1)
@@ -170,6 +173,9 @@ should_run_adminconsole() { [ "$TYPE" = "all" ] || [ "$TYPE" = "modules" ] || [ 
 should_run_data()         { [ "$TYPE" = "all" ] || [ "$TYPE" = "data" ]; }
 should_run_integration()  { [ "$TYPE" = "all" ] || [ "$TYPE" = "integration" ]; }
 should_run_lint()         { [ "$TYPE" = "all" ] || [ "$TYPE" = "lint" ]; }
+# Not in modules: "the three module tiers" and CI's race legs mean internal, core and
+# adminconsole, and the setup wizard is a module of its own beside them (#430).
+should_run_setup()        { [ "$TYPE" = "all" ] || [ "$TYPE" = "setup" ]; }
 
 # ---- GitHub Actions output helpers ------------------------------------------
 # Everything CI-specific goes through these. $GITHUB_ACTIONS is set only by the
@@ -279,7 +285,9 @@ if [ "$BUILD" = false ] && should_run_integration && [ ! -x ./tmp/goiabada-auths
     exit 2
 fi
 
-if [ "$BUILD" = true ]; then
+# The setup wizard module builds nothing this script's build produces, so --type setup
+# never builds, with or without --no-build.
+if [ "$BUILD" = true ] && [ "$TYPE" != "setup" ]; then
     build_log="$LOG_DIR/00-build.log"
     echo "Building the project before running tests... (log: $build_log)"
     build_start=$SECONDS
@@ -704,6 +712,19 @@ if should_run_adminconsole; then
     fi
     gha_endgroup
     gha_summary_row "Adminconsole$race_label" "-" "pass" "$(fmt_duration $((SECONDS - start)))"
+fi
+
+if should_run_setup; then
+    log="$LOG_DIR/04-setup.log"
+    echo "Running tests for setup wizard module... (log: $log)"
+    start=$SECONDS
+    gha_group "Setup wizard module tests"
+    if ! (cd ../cmd/goiabada-setup && "${module_go_test[@]}" ./...) 2>&1 | tee "$log"; then
+        gha_summary_row "Setup$race_label" "-" "FAIL" "$(fmt_duration $((SECONDS - start)))"
+        fail_with "Setup wizard module tests" "$log"
+    fi
+    gha_endgroup
+    gha_summary_row "Setup$race_label" "-" "pass" "$(fmt_duration $((SECONDS - start)))"
 fi
 
 # ---- DB-matrix runs (data + integration) ------------------------------------

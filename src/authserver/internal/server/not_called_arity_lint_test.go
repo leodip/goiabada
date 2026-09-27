@@ -11,9 +11,9 @@ import (
 // testutil.AssertNotCalledArity carries the rule and the reasoning for each shape it refuses.
 //
 // The scope is the whole source root rather than this module, for the reason the gofmt and errs
-// guards beside it carry: cmd/goiabada-setup has no tier of its own, and the defect is one no
-// compiler and no tier reports, so a module nobody thought to name is exactly where the next one
-// would sit unseen (#421).
+// guards beside it carry: cmd/goiabada-setup's own tier calls none of the tree-wide guards, and
+// the defect is one no compiler and no tier reports, so a module nobody thought to name is exactly
+// where the next one would sit unseen (#421).
 func TestNotCalledArity(t *testing.T) {
 	testutil.AssertNotCalledArity(t)
 }
