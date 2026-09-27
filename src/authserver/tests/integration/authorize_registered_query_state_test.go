@@ -145,8 +145,8 @@ func TestAuthorize_RegisteredQuery_ErrorRedirectCarriesOneState(t *testing.T) {
 }
 
 // newRegisteredQueryClient creates a client whose only registered redirect URI carries a query, plus
-// a user able to complete a level1 ceremony for it. It lives here rather than in utils_test.go
-// because this file is its only reader.
+// a user able to complete a level1 ceremony for it. It lives here rather than in
+// fixture_helpers_test.go because this file is its only reader.
 func newRegisteredQueryClient(t *testing.T) (*models.Client, *models.User, string) {
 	client := &models.Client{
 		ClientIdentifier:         "registered-query-client-" + fake.LetterN(8),

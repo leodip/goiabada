@@ -548,7 +548,6 @@ func TestAPIUserSessionsGet_OnlyValidSessions(t *testing.T) {
 	assert.Equal(t, "Valid Session Device", getResponse.Sessions[0].DeviceName)
 }
 
-// Helper function moved from utils_test.go: createTestUserSession
 // testSessionUserAgent is the raw header every fixture session carries. It is deliberately not
 // a string any parser recognises: what the three session endpoints must return is the header
 // itself, not a label derived from it (#281).

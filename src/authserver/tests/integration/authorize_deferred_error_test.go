@@ -350,7 +350,7 @@ func errorDescriptionFromLocation(t *testing.T, resp *http.Response) string {
 //
 // Administrator registered, which is what makes this the case #213 is about: a client created
 // through dynamic registration is refused a redirect outright by #108's provenance gate, so it never
-// reaches the question of who is at the browser. It lives here rather than in utils_test.go because
+// reaches the question of who is at the browser. It lives here rather than in fixture_helpers_test.go because
 // this file is its only reader, as newRegisteredQueryClient does for its own.
 func newDeferralClient(t *testing.T) (*models.Client, *models.User, string) {
 	t.Helper()
