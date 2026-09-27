@@ -4,9 +4,8 @@ package main
 // value so a generator that emitted the wrong one would still be visible in a failure.
 func testConfig() *Config {
 	return &Config{
-		DeploymentType:      "2",
-		DBType:              "postgres",
-		DBImage:             "postgres:17",
+		Deployment:          deployments[deploymentProduction],
+		Engine:              testEngine("postgres"),
 		DBPort:              "5432",
 		DBHost:              "goiabada-db",
 		DBName:              "goiabada",
@@ -24,4 +23,13 @@ func testConfig() *Config {
 		OAuthClientSecret:   "oauth-client-secret",
 		K8sNamespace:        "goiabada",
 	}
+}
+
+// testEngine is the engine row an --db value names, for a fixture that knows the value is one.
+func testEngine(name string) *engine {
+	e, ok := resolveEngine(name)
+	if !ok {
+		panic("no engine is named " + name)
+	}
+	return e
 }

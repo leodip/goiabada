@@ -58,117 +58,70 @@ func main() {
 	nonInteractive := flags.DeploymentType != ""
 
 	// Step 1: Deployment type
-	var deploymentType string
+	var target *deployment
 	if nonInteractive {
-		switch strings.ToLower(flags.DeploymentType) {
-		case "local", "1":
-			deploymentType = "1"
-		case "production", "2":
-			deploymentType = "2"
-		case "kubernetes", "k8s", "3":
-			deploymentType = "3"
-		case "native", "binaries", "4":
-			deploymentType = "4"
-		default:
-			printError("Invalid deployment type: %s (use: local, production, kubernetes, or native)", flags.DeploymentType)
+		var ok bool
+		target, ok = resolveDeployment(flags.DeploymentType)
+		if !ok {
+			printError("Invalid deployment type: %s (use: %s)", flags.DeploymentType, orList(deploymentNames()))
 			os.Exit(1)
 		}
-		printInfo("Deployment type: %s", getDeploymentTypeName(deploymentType))
+		printInfo("Deployment type: %s", target.displayName)
 	} else {
 		fmt.Println("STEP 1: Deployment type")
 		fmt.Println("------------------------")
-		fmt.Println("1. Local testing (HTTP only) - for development/testing")
-		fmt.Println("2. Production with reverse proxy (Cloudflare/Nginx)")
-		fmt.Println("3. Kubernetes cluster")
-		fmt.Println("4. Native binaries")
+		var choices []string
+		for _, d := range deployments {
+			fmt.Printf("%s. %s\n", d.number, d.menuLabel)
+			choices = append(choices, d.number)
+		}
 		fmt.Println()
-		deploymentType = promptChoice(rl, "Select deployment type [1-4]", []string{"1", "2", "3", "4"}, "1")
+		choice := promptChoice(rl, fmt.Sprintf("Select deployment type [1-%d]", len(choices)), choices, "1")
+		target, _ = resolveDeployment(choice)
 	}
 
 	// Step 2: Database
-	var dbType, dbImage, dbPort string
+	var dbEngine *engine
 	if nonInteractive {
-		switch strings.ToLower(flags.DBType) {
-		case "mysql", "1":
-			dbType = "mysql"
-		case "postgres", "postgresql", "2":
-			dbType = "postgres"
-		case "mssql", "sqlserver", "3":
-			dbType = "mssql"
-		case "sqlite", "4":
-			if deploymentType == "3" {
-				printError("SQLite is not supported for Kubernetes deployments")
-				os.Exit(1)
-			}
-			if deploymentType == "4" {
-				printWarning("SQLite is fine for single-instance native deployments, but consider a proper database for production.")
-			}
-			dbType = "sqlite"
-		default:
-			printError("Invalid database type: %s (use: mysql, postgres, mssql, or sqlite)", flags.DBType)
+		var ok bool
+		dbEngine, ok = resolveEngine(flags.DBType)
+		if !ok {
+			printError("Invalid database type: %s (use: %s)", flags.DBType, orList(engineNames()))
 			os.Exit(1)
 		}
-		printInfo("Database type: %s", dbType)
+		if !target.accepts(dbEngine) {
+			printError("%s is not supported for %s deployments", dbEngine.label, target.displayName)
+			os.Exit(1)
+		}
+		if target.kind == deploymentNative && !dbEngine.hasServer {
+			printWarning("SQLite is fine for single-instance native deployments, but consider a proper database for production.")
+		}
+		printInfo("Database type: %s", dbEngine.name)
 	} else {
 		fmt.Println()
 		fmt.Println("STEP 2: Database type")
 		fmt.Println("-----------------")
-		if deploymentType == "3" {
-			fmt.Println("1. MySQL")
-			fmt.Println("2. PostgreSQL")
-			fmt.Println("3. SQL Server")
-			fmt.Println()
+		var choices []string
+		for _, e := range target.acceptedEngines() {
+			fmt.Printf("%s. %s\n", e.number, e.label)
+			choices = append(choices, e.number)
+		}
+		fmt.Println()
+		if target.kind == deploymentKubernetes {
 			fmt.Println("Note: For Kubernetes, you'll need to provide your own database.")
 			fmt.Println("      SQLite is not recommended for Kubernetes deployments.")
 			fmt.Println()
-		} else {
-			fmt.Println("1. MySQL")
-			fmt.Println("2. PostgreSQL")
-			fmt.Println("3. SQL Server")
-			fmt.Println("4. SQLite")
-			fmt.Println()
 		}
-
-		var validDBChoices []string
-		if deploymentType == "3" {
-			validDBChoices = []string{"1", "2", "3"}
-		} else {
-			validDBChoices = []string{"1", "2", "3", "4"}
-		}
-		dbChoice := promptChoice(rl, fmt.Sprintf("Select database [1-%d]", len(validDBChoices)), validDBChoices, "1")
-
-		switch dbChoice {
-		case "1":
-			dbType = "mysql"
-		case "2":
-			dbType = "postgres"
-		case "3":
-			dbType = "mssql"
-		case "4":
-			dbType = "sqlite"
-		}
+		choice := promptChoice(rl, fmt.Sprintf("Select database [1-%d]", len(choices)), choices, "1")
+		dbEngine, _ = resolveEngine(choice)
 	}
 
-	// Set database defaults
-	switch dbType {
-	case "mysql":
-		dbImage = "mysql:latest"
-		dbPort = "3306"
-	case "postgres":
-		dbImage = "postgres:latest"
-		dbPort = "5432"
-	case "mssql":
-		dbImage = "mcr.microsoft.com/mssql/server:2022-latest"
-		dbPort = "1433"
-	case "sqlite":
-		dbImage = ""
-		dbPort = ""
-	}
+	dbPort := dbEngine.defaultPort
 
 	// Step 3: Domain names (for production, Kubernetes, and native binaries)
 	var authServerURL, adminConsoleURL string
 	var baseDomain string
-	if deploymentType == "2" || deploymentType == "3" || deploymentType == "4" {
+	if target.asksURLs {
 		if nonInteractive {
 			authServerURL = flags.AuthServerURL
 			adminConsoleURL = flags.AdminConsoleURL
@@ -255,7 +208,7 @@ func main() {
 
 	// Step 4: Kubernetes namespace (only for Kubernetes)
 	var k8sNamespace string
-	if deploymentType == "3" {
+	if target.asksNamespace {
 		if nonInteractive {
 			k8sNamespace = flags.Namespace
 			if k8sNamespace == "" {
@@ -302,12 +255,9 @@ func main() {
 		printInfo("Admin email: %s", adminEmail)
 	} else {
 		fmt.Println()
-		switch deploymentType {
-		case "3":
+		if target.kind == deploymentKubernetes {
 			fmt.Println("STEP 5: Admin credentials")
-		case "4":
-			fmt.Println("STEP 4: Admin credentials")
-		default:
+		} else {
 			fmt.Println("STEP 4: Admin credentials")
 		}
 		fmt.Println("--------------------------")
@@ -317,8 +267,8 @@ func main() {
 
 	// Step 6: Database connection
 	var dbHost, dbName, dbUsername, dbPassword string
-	if dbType != "sqlite" {
-		if deploymentType == "3" || deploymentType == "4" {
+	if dbEngine.hasServer {
+		if target.externalDatabase {
 			// Kubernetes and native binaries need full database details
 			if nonInteractive {
 				dbHost = flags.DBHost
@@ -332,14 +282,7 @@ func main() {
 				}
 				dbPort = flags.DBPort
 				if dbPort == "" {
-					switch dbType {
-					case "mysql":
-						dbPort = "3306"
-					case "postgres":
-						dbPort = "5432"
-					case "mssql":
-						dbPort = "1433"
-					}
+					dbPort = dbEngine.defaultPort
 				}
 				if err := validatePort(dbPort); err != nil {
 					printError("Invalid database port: %s", err)
@@ -355,14 +298,7 @@ func main() {
 				}
 				dbUsername = flags.DBUsername
 				if dbUsername == "" {
-					switch dbType {
-					case "mysql":
-						dbUsername = "root"
-					case "postgres":
-						dbUsername = "postgres"
-					case "mssql":
-						dbUsername = "sa"
-					}
+					dbUsername = dbEngine.defaultUser
 				}
 				dbPassword = flags.DBPassword
 				if dbPassword == "" {
@@ -374,7 +310,7 @@ func main() {
 				printInfo("Database user: %s", dbUsername)
 			} else {
 				fmt.Println()
-				if deploymentType == "3" {
+				if target.kind == deploymentKubernetes {
 					fmt.Println("STEP 6: Database connection")
 				} else {
 					fmt.Println("STEP 5: Database connection")
@@ -382,25 +318,16 @@ func main() {
 				fmt.Println("----------------------------")
 				fmt.Println("Enter your database connection details.")
 				fmt.Println()
-				if deploymentType == "3" {
+				if target.kind == deploymentKubernetes {
 					fmt.Printf("%sTip:%s If using a managed database service (Supabase, PlanetScale, Neon, etc.),\n", colorYellow, colorReset)
 					fmt.Println("     use the connection pooler endpoint for better compatibility.")
 					fmt.Println("     Direct connections may use IPv6 which some clusters don't support.")
 					fmt.Println()
 				}
 
-				var defaultHost string
-				if deploymentType == "4" {
+				defaultHost := dbEngine.kubernetesHost
+				if target.kind == deploymentNative {
 					defaultHost = "localhost"
-				} else {
-					switch dbType {
-					case "mysql":
-						defaultHost = "mysql-service"
-					case "postgres":
-						defaultHost = "postgres-service"
-					case "mssql":
-						defaultHost = "mssql-service"
-					}
 				}
 
 				// Loop to allow re-entering database details on connection failure
@@ -409,16 +336,7 @@ func main() {
 					dbPort = promptPort(rl, "Database port", dbPort)
 					dbName = promptDatabaseName(rl, "Database name", "goiabada")
 
-					var defaultUsername string
-					switch dbType {
-					case "mysql":
-						defaultUsername = "root"
-					case "postgres":
-						defaultUsername = "postgres"
-					case "mssql":
-						defaultUsername = "sa"
-					}
-					dbUsername = promptNonEmpty(rl, "Database username", defaultUsername)
+					dbUsername = promptNonEmpty(rl, "Database username", dbEngine.defaultUser)
 					dbPassword = promptNonEmpty(rl, "Database password", generateRandomString(16))
 
 					// Test database connection
@@ -427,7 +345,7 @@ func main() {
 						break // User chose to skip test
 					}
 
-					if testDatabaseConnection(dbType, dbHost, dbPort, dbName, dbUsername, dbPassword) {
+					if testDatabaseConnection(dbEngine, dbHost, dbPort, dbName, dbUsername, dbPassword) {
 						break // Connection successful
 					}
 
@@ -459,7 +377,7 @@ func main() {
 
 			// Test database connection in non-interactive mode
 			if !flags.SkipDBTest && nonInteractive {
-				if !testDatabaseConnection(dbType, dbHost, dbPort, dbName, dbUsername, dbPassword) {
+				if !testDatabaseConnection(dbEngine, dbHost, dbPort, dbName, dbUsername, dbPassword) {
 					printWarning("Database connection test failed. Configuration will still be generated.")
 				}
 			}
@@ -482,9 +400,9 @@ func main() {
 
 	// Generate credentials
 	fmt.Println()
-	if deploymentType == "3" {
+	if target.kind == deploymentKubernetes {
 		fmt.Println("STEP 7: Generating credentials")
-	} else if deploymentType == "4" && dbType != "sqlite" {
+	} else if target.kind == deploymentNative && dbEngine.hasServer {
 		fmt.Println("STEP 6: Generating credentials")
 	} else {
 		fmt.Println("STEP 5: Generating credentials")
@@ -505,9 +423,8 @@ func main() {
 
 	// Build config
 	config := &Config{
-		DeploymentType:      deploymentType,
-		DBType:              dbType,
-		DBImage:             dbImage,
+		Deployment:          target,
+		Engine:              dbEngine,
 		DBPort:              dbPort,
 		DBHost:              dbHost,
 		DBName:              dbName,
@@ -551,16 +468,16 @@ func main() {
 
 	// Generate configuration files
 	fmt.Println()
-	if deploymentType == "3" {
+	if target.kind == deploymentKubernetes {
 		fmt.Println("STEP 8: Generating configuration")
-	} else if deploymentType == "4" && dbType != "sqlite" {
+	} else if target.kind == deploymentNative && dbEngine.hasServer {
 		fmt.Println("STEP 7: Generating configuration")
 	} else {
 		fmt.Println("STEP 6: Generating configuration")
 	}
 	fmt.Println("----------------------------------")
 
-	filename, content := generatedConfiguration(deploymentType, config)
+	filename, content := generatedConfiguration(config)
 	if flags.Output != "" && !isDirectory(flags.Output) {
 		filename = filepath.Base(flags.Output)
 	}

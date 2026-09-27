@@ -77,8 +77,9 @@ func TestWritePrivateFile_AnEarlierReaderDoesNotSeeTheNewSecrets(t *testing.T) {
 	}
 	config := testConfig()
 
-	for _, deploymentType := range []string{"1", "3", "4"} {
-		filename, content := generatedConfiguration(deploymentType, config)
+	for _, kind := range []deploymentType{deploymentLocal, deploymentKubernetes, deploymentNative} {
+		config.Deployment = deployments[kind]
+		filename, content := generatedConfiguration(config)
 		t.Run(filename, func(t *testing.T) {
 			path := filepath.Join(t.TempDir(), filename)
 			const yesterday = "yesterday's secrets"
@@ -151,23 +152,25 @@ func TestGeneratedConfiguration_NamesEachDeploymentTypesFile(t *testing.T) {
 	config := testConfig()
 
 	testCases := []struct {
-		deploymentType string
-		wantFilename   string
-		wantContent    string
+		deployment   deploymentType
+		wantFilename string
+		generator    func(*Config) string
 	}{
-		{deploymentType: "1", wantFilename: "docker-compose.yml", wantContent: generateDockerCompose(config)},
-		{deploymentType: "2", wantFilename: "docker-compose.yml", wantContent: generateDockerCompose(config)},
-		{deploymentType: "3", wantFilename: "goiabada-k8s.yaml", wantContent: generateKubernetesManifests(config)},
-		{deploymentType: "4", wantFilename: "goiabada.env", wantContent: generateEnvFile(config)},
+		{deployment: deploymentLocal, wantFilename: "docker-compose.yml", generator: generateDockerCompose},
+		{deployment: deploymentProduction, wantFilename: "docker-compose.yml", generator: generateDockerCompose},
+		{deployment: deploymentKubernetes, wantFilename: "goiabada-k8s.yaml", generator: generateKubernetesManifests},
+		{deployment: deploymentNative, wantFilename: "goiabada.env", generator: generateEnvFile},
 	}
 
 	for _, testCase := range testCases {
-		t.Run("type "+testCase.deploymentType, func(t *testing.T) {
-			filename, content := generatedConfiguration(testCase.deploymentType, config)
+		t.Run(deployments[testCase.deployment].name, func(t *testing.T) {
+			config.Deployment = deployments[testCase.deployment]
+			filename, content := generatedConfiguration(config)
+			wantContent := testCase.generator(config)
 			if filename != testCase.wantFilename {
 				t.Errorf("file name is %q, want %q", filename, testCase.wantFilename)
 			}
-			if content != testCase.wantContent {
+			if content != wantContent {
 				t.Errorf("content is not %s's generator output", testCase.wantFilename)
 			}
 			if !strings.Contains(content, "admin-password") {

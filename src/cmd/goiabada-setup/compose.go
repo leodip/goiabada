@@ -12,7 +12,7 @@ func generateDockerCompose(config *Config) string {
 	sb.WriteString("# Run: docker compose up -d\n\n")
 	sb.WriteString("services:\n\n")
 
-	if config.DBType != "sqlite" {
+	if config.Engine.hasServer {
 		sb.WriteString(generateDBService(config))
 	}
 
@@ -20,16 +20,7 @@ func generateDockerCompose(config *Config) string {
 	sb.WriteString(generateAdminConsoleService(config))
 
 	sb.WriteString("\nvolumes:\n")
-	switch config.DBType {
-	case "mysql":
-		sb.WriteString("  mysql-data:\n")
-	case "postgres":
-		sb.WriteString("  postgres-data:\n")
-	case "mssql":
-		sb.WriteString("  mssql-data:\n")
-	case "sqlite":
-		sb.WriteString("  sqlite-data:\n")
-	}
+	fmt.Fprintf(&sb, "  %s:\n", config.Engine.volume)
 
 	sb.WriteString("\nnetworks:\n")
 	sb.WriteString("  goiabada-network:\n")
@@ -39,58 +30,24 @@ func generateDockerCompose(config *Config) string {
 
 func generateDBService(config *Config) string {
 	var sb strings.Builder
+	e := config.Engine
 
-	switch config.DBType {
-	case "mysql":
-		sb.WriteString("  mysql-server:\n")
-		sb.WriteString("    image: mysql:latest\n")
-		sb.WriteString("    restart: unless-stopped\n")
-		sb.WriteString("    volumes:\n")
-		sb.WriteString("      - mysql-data:/var/lib/mysql\n")
-		sb.WriteString("    environment:\n")
-		fmt.Fprintf(&sb, "      MYSQL_ROOT_PASSWORD: %s\n", config.DBPassword)
-		sb.WriteString("    healthcheck:\n")
-		fmt.Fprintf(&sb, "      test: [\"CMD\", \"mysqladmin\", \"ping\", \"-uroot\", \"-p%s\", \"--protocol\", \"tcp\"]\n", config.DBPassword)
-		sb.WriteString("      interval: 1s\n")
-		sb.WriteString("      timeout: 2s\n")
-		sb.WriteString("      retries: 20\n")
-		sb.WriteString("    networks:\n")
-		sb.WriteString("      - goiabada-network\n\n")
-
-	case "postgres":
-		sb.WriteString("  postgres-server:\n")
-		sb.WriteString("    image: postgres:latest\n")
-		sb.WriteString("    restart: unless-stopped\n")
-		sb.WriteString("    volumes:\n")
-		sb.WriteString("      - postgres-data:/var/lib/postgresql\n")
-		sb.WriteString("    environment:\n")
-		fmt.Fprintf(&sb, "      POSTGRES_PASSWORD: %s\n", config.DBPassword)
-		sb.WriteString("      POSTGRES_DB: goiabada\n")
-		sb.WriteString("    healthcheck:\n")
-		sb.WriteString("      test: [\"CMD-SHELL\", \"pg_isready -U postgres\"]\n")
-		sb.WriteString("      interval: 1s\n")
-		sb.WriteString("      timeout: 2s\n")
-		sb.WriteString("      retries: 20\n")
-		sb.WriteString("    networks:\n")
-		sb.WriteString("      - goiabada-network\n\n")
-
-	case "mssql":
-		sb.WriteString("  mssql-server:\n")
-		sb.WriteString("    image: mcr.microsoft.com/mssql/server:2022-latest\n")
-		sb.WriteString("    restart: unless-stopped\n")
-		sb.WriteString("    volumes:\n")
-		sb.WriteString("      - mssql-data:/var/opt/mssql\n")
-		sb.WriteString("    environment:\n")
-		sb.WriteString("      ACCEPT_EULA: Y\n")
-		fmt.Fprintf(&sb, "      MSSQL_SA_PASSWORD: %s\n", config.DBPassword)
-		sb.WriteString("    healthcheck:\n")
-		fmt.Fprintf(&sb, "      test: [\"CMD-SHELL\", \"/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P '%s' -C -Q 'SELECT 1' || exit 1\"]\n", config.DBPassword)
-		sb.WriteString("      interval: 10s\n")
-		sb.WriteString("      timeout: 5s\n")
-		sb.WriteString("      retries: 20\n")
-		sb.WriteString("    networks:\n")
-		sb.WriteString("      - goiabada-network\n\n")
+	fmt.Fprintf(&sb, "  %s:\n", e.composeService)
+	fmt.Fprintf(&sb, "    image: %s\n", e.image)
+	sb.WriteString("    restart: unless-stopped\n")
+	sb.WriteString("    volumes:\n")
+	fmt.Fprintf(&sb, "      - %s:%s\n", e.volume, e.mount)
+	sb.WriteString("    environment:\n")
+	for _, line := range e.composeEnvironment(config.DBPassword) {
+		fmt.Fprintf(&sb, "      %s\n", line)
 	}
+	sb.WriteString("    healthcheck:\n")
+	fmt.Fprintf(&sb, "      test: %s\n", e.composeHealthcheck(config.DBPassword))
+	fmt.Fprintf(&sb, "      interval: %s\n", e.healthInterval)
+	fmt.Fprintf(&sb, "      timeout: %s\n", e.healthTimeout)
+	sb.WriteString("      retries: 20\n")
+	sb.WriteString("    networks:\n")
+	sb.WriteString("      - goiabada-network\n\n")
 
 	return sb.String()
 }
@@ -98,9 +55,9 @@ func generateDBService(config *Config) string {
 func generateAuthServerService(config *Config) string {
 	var sb strings.Builder
 
-	isProduction := config.DeploymentType == "2"
+	behindProxy := config.Deployment.behindProxy
 	trustProxyHeaders := "false"
-	if isProduction {
+	if behindProxy {
 		trustProxyHeaders = "true"
 	}
 
@@ -110,25 +67,16 @@ func generateAuthServerService(config *Config) string {
 	fmt.Fprintf(&sb, "    image: leodip/goiabada:authserver-%s\n", imageTag)
 	sb.WriteString("    restart: unless-stopped\n")
 
-	if config.DBType != "sqlite" {
-		var dbServiceName string
-		switch config.DBType {
-		case "mysql":
-			dbServiceName = "mysql-server"
-		case "postgres":
-			dbServiceName = "postgres-server"
-		case "mssql":
-			dbServiceName = "mssql-server"
-		}
+	if config.Engine.hasServer {
 		sb.WriteString("    depends_on:\n")
-		fmt.Fprintf(&sb, "      %s:\n", dbServiceName)
+		fmt.Fprintf(&sb, "      %s:\n", config.Engine.composeService)
 		sb.WriteString("        condition: service_healthy\n")
 	}
 
 	// Always expose ports - for local testing expose to all interfaces,
 	// for production bind to localhost only (nginx access)
 	sb.WriteString("    ports:\n")
-	if isProduction {
+	if behindProxy {
 		sb.WriteString("      - 127.0.0.1:9090:9090\n")
 	} else {
 		sb.WriteString("      - 9090:9090\n")
@@ -143,9 +91,9 @@ func generateAuthServerService(config *Config) string {
 	sb.WriteString("      retries: 3\n")
 	sb.WriteString("      start_period: 10s\n")
 
-	if config.DBType == "sqlite" {
+	if !config.Engine.hasServer {
 		sb.WriteString("    volumes:\n")
-		sb.WriteString("      - sqlite-data:/data\n")
+		fmt.Fprintf(&sb, "      - %s:%s\n", config.Engine.volume, config.Engine.mount)
 	}
 
 	sb.WriteString("    environment:\n")
@@ -173,29 +121,16 @@ func generateAuthServerService(config *Config) string {
 	fmt.Fprintf(&sb, "      - GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY=%s\n", config.AuthSessionEncKey)
 	fmt.Fprintf(&sb, "      - GOIABADA_AES_ENCRYPTION_KEY=%s\n", config.AESEncryptionKey)
 	fmt.Fprintf(&sb, "      - GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET=%s\n", config.OAuthClientSecret)
-	fmt.Fprintf(&sb, "      - GOIABADA_DB_TYPE=%s\n", config.DBType)
+	fmt.Fprintf(&sb, "      - GOIABADA_DB_TYPE=%s\n", config.Engine.name)
 
-	switch config.DBType {
-	case "mysql":
-		sb.WriteString("      - GOIABADA_DB_USERNAME=root\n")
+	if config.Engine.hasServer {
+		fmt.Fprintf(&sb, "      - GOIABADA_DB_USERNAME=%s\n", config.Engine.defaultUser)
 		fmt.Fprintf(&sb, "      - GOIABADA_DB_PASSWORD=%s\n", config.DBPassword)
-		sb.WriteString("      - GOIABADA_DB_HOST=mysql-server\n")
-		sb.WriteString("      - GOIABADA_DB_PORT=3306\n")
+		fmt.Fprintf(&sb, "      - GOIABADA_DB_HOST=%s\n", config.Engine.composeService)
+		fmt.Fprintf(&sb, "      - GOIABADA_DB_PORT=%s\n", config.Engine.defaultPort)
 		sb.WriteString("      - GOIABADA_DB_NAME=goiabada\n")
-	case "postgres":
-		sb.WriteString("      - GOIABADA_DB_USERNAME=postgres\n")
-		fmt.Fprintf(&sb, "      - GOIABADA_DB_PASSWORD=%s\n", config.DBPassword)
-		sb.WriteString("      - GOIABADA_DB_HOST=postgres-server\n")
-		sb.WriteString("      - GOIABADA_DB_PORT=5432\n")
-		sb.WriteString("      - GOIABADA_DB_NAME=goiabada\n")
-	case "mssql":
-		sb.WriteString("      - GOIABADA_DB_USERNAME=sa\n")
-		fmt.Fprintf(&sb, "      - GOIABADA_DB_PASSWORD=%s\n", config.DBPassword)
-		sb.WriteString("      - GOIABADA_DB_HOST=mssql-server\n")
-		sb.WriteString("      - GOIABADA_DB_PORT=1433\n")
-		sb.WriteString("      - GOIABADA_DB_NAME=goiabada\n")
-	case "sqlite":
-		sb.WriteString("      - GOIABADA_DB_DSN=/data/goiabada.db\n")
+	} else {
+		fmt.Fprintf(&sb, "      - GOIABADA_DB_DSN=%s/goiabada.db\n", config.Engine.mount)
 	}
 
 	fmt.Fprintf(&sb, "      - GOIABADA_ADMINCONSOLE_BASEURL=%s\n", config.AdminConsoleURL)
@@ -207,9 +142,9 @@ func generateAuthServerService(config *Config) string {
 func generateAdminConsoleService(config *Config) string {
 	var sb strings.Builder
 
-	isProduction := config.DeploymentType == "2"
+	behindProxy := config.Deployment.behindProxy
 	trustProxyHeaders := "false"
-	if isProduction {
+	if behindProxy {
 		trustProxyHeaders = "true"
 	}
 
@@ -225,7 +160,7 @@ func generateAdminConsoleService(config *Config) string {
 	// Always expose ports - for local testing expose to all interfaces,
 	// for production bind to localhost only (nginx access)
 	sb.WriteString("    ports:\n")
-	if isProduction {
+	if behindProxy {
 		sb.WriteString("      - 127.0.0.1:9091:9091\n")
 	} else {
 		sb.WriteString("      - 9091:9091\n")

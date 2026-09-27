@@ -61,7 +61,7 @@ func generateKubernetesManifests(config *Config) string {
 	fmt.Fprintf(&sb, "  GOIABADA_ADMINCONSOLE_BASEURL: \"%s\"\n", config.AdminConsoleURL)
 	sb.WriteString("  GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS: \"true\"\n")
 	sb.WriteString("  GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS: \"true\"\n")
-	fmt.Fprintf(&sb, "  GOIABADA_DB_TYPE: \"%s\"\n", config.DBType)
+	fmt.Fprintf(&sb, "  GOIABADA_DB_TYPE: \"%s\"\n", config.Engine.name)
 	fmt.Fprintf(&sb, "  GOIABADA_DB_HOST: \"%s\"\n", config.DBHost)
 	fmt.Fprintf(&sb, "  GOIABADA_DB_PORT: \"%s\"\n", config.DBPort)
 	fmt.Fprintf(&sb, "  GOIABADA_DB_NAME: \"%s\"\n", config.DBName)
