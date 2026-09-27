@@ -6,8 +6,8 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 )
 
-// Regenerator is implemented by a store whose identifier can be replaced without losing
-// the session's contents.
+// Regenerate writes the session's current contents under a fresh identifier, removes the
+// row the old identifier named, and only then tells the browser about the new one.
 //
 // Rotation at every privilege change is what a server-side store must add to match a
 // cookie store's structural immunity to session fixation. A cookie store is immune
@@ -18,14 +18,9 @@ import (
 // identifier stolen at one authentication level stops working the moment the session
 // reaches a higher one (#266).
 //
-// Store has no such method, so callers reach it by asserting to this interface rather
-// than by widening the interface every handler already takes.
-type Regenerator interface {
-	Regenerate(w http.ResponseWriter, r *http.Request, session *Session) error
-}
-
-// Regenerate writes the session's current contents under a fresh identifier, removes the
-// row the old identifier named, and only then tells the browser about the new one.
+// It is not on Store. Each consumer that rotates declares a port naming it, so a store
+// that cannot rotate does not compile there; an optional interface asserted at run time
+// let a missing rotation fall back to a plain save without anything noticing (#431).
 //
 // The order is the whole point, and it is not the obvious one. A Set-Cookie already
 // written is not retracted by a later failure: a handler that sets a cookie and then

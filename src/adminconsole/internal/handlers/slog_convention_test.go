@@ -5,26 +5,17 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
-	"strings"
 	"testing"
 
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/adminconsole/internal/config"
-	"github.com/leodip/goiabada/adminconsole/internal/constants"
-	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
-	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
-	"github.com/leodip/goiabada/core/sessionstore"
-	mocks_sessionstore "github.com/leodip/goiabada/core/sessionstore/mocks"
-	"github.com/leodip/goiabada/core/testutil"
 )
 
 // failingExchanger is the shortest path from a callback request to the record under test: the
@@ -45,20 +36,6 @@ func (p unusedTokenParser) DecodeAndValidateSignInResponse(_ context.Context, _ 
 	_ string) (*oauthclient.JwtInfo, error) {
 	p.t.Fatal("the token parser must not be reached: the exchange fails before it")
 	return nil, nil
-}
-
-// handshakeSession is a session holding all six values RedirToAuthorize parks, with the state
-// "the-state", so a callback posting that state reaches the exchange. The handler reads all six
-// before it exchanges, so a case missing one stops short of what it is about.
-func handshakeSession() *sessionstore.Session {
-	return &sessionstore.Session{Values: map[string]any{
-		constants.SessionKeyState:          "the-state",
-		constants.SessionKeyCodeVerifier:   "the-code-verifier",
-		constants.SessionKeyRedirectURI:    "https://adminconsole.example/auth/callback",
-		constants.SessionKeyNonce:          "the-nonce",
-		constants.SessionKeyRedirectBack:   "https://adminconsole.example/admin/clients",
-		constants.SessionKeyRequestedScope: "openid authserver:manage",
-	}}
 }
 
 // The code exchange record, moved from Info to Debug and from a concatenated message to an
@@ -82,26 +59,23 @@ func TestSlogConvention_TheCodeExchangeIsDebugAndCarriesTheBaseUrlAndTheRequestI
 	authServer.InternalBaseURL = "https://authserver.internal.example"
 	t.Cleanup(func() { authServer.InternalBaseURL = previous })
 
-	logs := testutil.CaptureSlog(t)
+	// The harness installs the capture, over the real store holding a seeded handshake.
+	h := newCallbackHarness(t)
+	handlertest.RefuseInternalServerError(t, h.httpHelper)
+	handlertest.ExpectRender(h.httpHelper, "/layouts/no_menu_layout.html", "/sign_in_error.html").Once()
 
-	httpHelper := mocks_handlers.NewHttpHelper(t)
-	handlertest.RefuseInternalServerError(t, httpHelper)
-	handlertest.ExpectRender(httpHelper, "/layouts/no_menu_layout.html", "/sign_in_error.html").Once()
-
-	httpSession := mocks_sessionstore.NewStore(t)
-	httpSession.On("Get", mock.Anything, coreconstants.AdminConsoleSessionName).Return(handshakeSession(), nil)
-
-	form := url.Values{"state": {"the-state"}, "code": {"the-code"}}
-	req := httptest.NewRequest(http.MethodPost, "/auth/callback", strings.NewReader(form.Encode()))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req := handlertest.Request(http.MethodPost, "/auth/callback", handlertest.WithForm(callbackForm()))
+	for _, c := range h.seed(handshake()) {
+		req.AddCookie(c)
+	}
 	// chi's RequestID takes X-Request-Id from the caller verbatim, so this is the id the
 	// record must carry without the handler ever naming it.
 	req.Header.Set("X-Request-Id", "req-admin-callback")
 
-	handler := HandleAuthCallbackPost(httpHelper, httpSession, unusedTokenParser{t: t}, failingExchanger{})
+	handler := HandleAuthCallbackPost(h.httpHelper, h.store, unusedTokenParser{t: t}, failingExchanger{})
 	chimiddleware.RequestID(handler).ServeHTTP(httptest.NewRecorder(), req)
 
-	records := logs.Records()
+	records := h.logs.Records()
 	// The second is the failed exchange's own refusal, at Error; the first is the one under test.
 	require.Len(t, records, 2, "the exchange record, then the refusal of the exchange that failed")
 	assert.Equal(t, slog.LevelError, records[1].Level)

@@ -31,8 +31,14 @@ func TestMain(m *testing.M) {
 // store's other test callers already use. They never vary and nothing reads them, so
 // generating them would only add an error to check in a helper that cannot fail.
 func newTestSessionStore() *sessionstore.ServerSideStore {
+	return newTestSessionStoreOver(sessiontest.NewMemoryBackend())
+}
+
+// newTestSessionStoreOver is newTestSessionStore over a backend the caller holds, for a test
+// that counts what reaches it.
+func newTestSessionStoreOver(backend sessionstore.Backend) *sessionstore.ServerSideStore {
 	store, err := sessionstore.NewServerSideStore(
-		sessiontest.NewMemoryBackend(),
+		backend,
 		constants.SessionKeyJwt,
 		false,
 		sessionstore.BrowserSessionCookie,

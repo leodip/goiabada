@@ -52,9 +52,10 @@ func TestHandlers_SignInRotatesTheSessionIdentifier(t *testing.T) {
 	// the transition rather than one example of it.
 	const authenticatedWrite = "constants.SessionKeyJwt] ="
 
-	// The rotation, named by the interface rather than the method, since a caller has to
-	// assert to it before it can call anything.
-	const rotation = "sessionstore.Regenerator"
+	// The rotation, named by its call. The store's Regenerate is on no shared interface: a
+	// file that rotates declares a port naming it and calls it, so the call is what it must
+	// contain (#431).
+	const rotation = ".Regenerate("
 
 	// Every file in this module allowed to write the authenticated key, and why it is or is
 	// not the privilege transition. Paths are as WalkDir yields them from this package.

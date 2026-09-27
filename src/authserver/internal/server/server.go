@@ -36,8 +36,11 @@ type Server struct {
 	router *chi.Mux
 	// The whole interface, and one of the four places that still holds it: routes.go hands this
 	// to every constructor and each one narrows it to a port of its own (#386 decision 8).
-	database     data.Database
-	sessionStore sessionstore.Store
+	database data.Database
+	// The concrete store rather than sessionstore.Store: routes.go hands it to the two
+	// constructors whose ports name Regenerate, which is what proves at compile time that the
+	// store this server runs rotates the session identifier at sign-in (#431).
+	sessionStore *sessionstore.ServerSideStore
 	worker       *workers.Worker
 
 	// Parsed by main, which refuses to start on a malformed entry (#425), so the real-IP
@@ -52,7 +55,7 @@ type Server struct {
 	setCookieSecure bool
 }
 
-func NewServer(router *chi.Mux, database data.Database, sessionStore sessionstore.Store, trustedProxies []*net.IPNet) *Server {
+func NewServer(router *chi.Mux, database data.Database, sessionStore *sessionstore.ServerSideStore, trustedProxies []*net.IPNet) *Server {
 
 	s := Server{
 		router:       router,

@@ -54,6 +54,14 @@ var (
 		"adminconsole.sign_in_error.failed.title", "adminconsole.sign_in_error.unverified.body"}
 )
 
+// callbackSessionStore is what the callback calls on the browser session store. Regenerate is
+// in it, so a store that cannot rotate does not compile here, where it used to fall back to a
+// plain save that left the pre-sign-in identifier naming the administrator's tokens (#431).
+type callbackSessionStore interface {
+	Get(r *http.Request, name string) (*sessionstore.Session, error)
+	Regenerate(w http.ResponseWriter, r *http.Request, session *sessionstore.Session) error
+}
+
 // HandleAuthCallbackPost completes the admin console's sign-in: the authorization response comes
 // back here, form-posted, and the session that sent the browser away is checked against it.
 //
@@ -65,7 +73,7 @@ var (
 // leaves the session exactly as it was.
 func HandleAuthCallbackPost(
 	httpHelper HttpHelper,
-	httpSession sessionstore.Store,
+	httpSession callbackSessionStore,
 	tokenParser TokenParser,
 	tokenExchanger TokenExchanger,
 ) http.HandlerFunc {
@@ -208,16 +216,7 @@ func HandleAuthCallbackPost(
 		// Regenerate writes the contents under a fresh identifier, deletes the old row and
 		// only then sets the cookie, so any failure leaves the administrator without a
 		// session rather than leaving the planted identifier live.
-		//
-		// Save is the fallback because the parameter is sessionstore.Store, which has no
-		// rotation method: a store that cannot rotate must still be able to sign an
-		// administrator in.
-		if regenerator, ok := httpSession.(sessionstore.Regenerator); ok {
-			err = regenerator.Regenerate(w, r, sess)
-		} else {
-			err = httpSession.Save(r, w, sess)
-		}
-		if err != nil {
+		if err = httpSession.Regenerate(w, r, sess); err != nil {
 			httpHelper.InternalServerError(w, r, err)
 			return
 		}

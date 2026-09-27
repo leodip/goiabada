@@ -37,13 +37,21 @@ type userSessionManagerDatabase interface {
 // others.
 const sessionCleanupTimeout = 10 * time.Second
 
+// userSessionStore is what the manager calls on the browser session store. Regenerate is in
+// it, so a store that cannot rotate does not compile here, where it used to fall back to a
+// plain save that bound the new user session to the identifier the browser arrived with (#431).
+type userSessionStore interface {
+	Get(r *http.Request, name string) (*sessionstore.Session, error)
+	Regenerate(w http.ResponseWriter, r *http.Request, session *sessionstore.Session) error
+}
+
 type UserSessionManager struct {
-	sessionStore sessionstore.Store
+	sessionStore userSessionStore
 	sessionName  string
 	database     userSessionManagerDatabase
 }
 
-func NewUserSessionManager(sessionStore sessionstore.Store, sessionName string, database userSessionManagerDatabase) *UserSessionManager {
+func NewUserSessionManager(sessionStore userSessionStore, sessionName string, database userSessionManagerDatabase) *UserSessionManager {
 	return &UserSessionManager{
 		sessionStore: sessionStore,
 		sessionName:  sessionName,
@@ -240,16 +248,8 @@ func (u *UserSessionManager) StartNewUserSession(w http.ResponseWriter, r *http.
 	// authenticated expiry. Nothing is persisted under the new identifier until
 	// Regenerate runs, and the row it deletes never held the identifier, so the ordering
 	// changes no outcome an attacker could use.
-	if regenerator, ok := u.sessionStore.(sessionstore.Regenerator); ok {
-		if regenerateErr := regenerator.Regenerate(w, r, sess); regenerateErr != nil {
-			return nil, u.abandonUserSession(r.Context(), userSession, errs.Wrap(regenerateErr, "unable to rotate the browser session identifier"))
-		}
-		return userSession, nil
-	}
-
-	err = u.sessionStore.Save(r, w, sess)
-	if err != nil {
-		return nil, u.abandonUserSession(r.Context(), userSession, err)
+	if regenerateErr := u.sessionStore.Regenerate(w, r, sess); regenerateErr != nil {
+		return nil, u.abandonUserSession(r.Context(), userSession, errs.Wrap(regenerateErr, "unable to rotate the browser session identifier"))
 	}
 
 	return userSession, nil
@@ -260,8 +260,8 @@ func (u *UserSessionManager) StartNewUserSession(w http.ResponseWriter, r *http.
 // failed for that reason and the caller must be told that one, not what this cleanup did.
 //
 // It is the compensation for the single step that cannot join the transaction. RunInTransaction
-// reruns its body when the engine aborts it as a deadlock victim, and a rerun of Regenerate or
-// Save would write Set-Cookie twice, so the browser-store write stays after the commit. Without
+// reruns its body when the engine aborts it as a deadlock victim, and a rerun of Regenerate
+// would write Set-Cookie twice, so the browser-store write stays after the commit. Without
 // this, the row stayed: no browser held a cookie naming it, nothing was ever issued against it,
 // and it sat in the admin console's session list until its own idle timeout expired (#198).
 //

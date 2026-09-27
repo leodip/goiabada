@@ -1,14 +1,15 @@
 package handlerhelpers
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
 	"net/url"
 	"testing"
-
-	mocks_sessionstore "github.com/leodip/goiabada/core/sessionstore/mocks"
+	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/constants"
@@ -19,136 +20,100 @@ import (
 )
 
 func TestGetAuthContext(t *testing.T) {
-	const testSessionName = "test-session"
-
 	t.Run("Success", func(t *testing.T) {
-		mockStore := mocks_sessionstore.NewStore(t)
-		helper := NewAuthHelper(mockStore, testSessionName)
+		helper, store, _ := newRealStoreAuthHelper(t)
+		cookies := seedBrowserSession(t, store, map[string]any{
+			constants.SessionKeyAuthContext: authContextJSON(t, &ceremony.AuthContext{ClientId: "test-client"}),
+		})
 
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
-		sess := sessionstore.NewSession(mockStore, testSessionName)
-		authContext := &ceremony.AuthContext{ClientId: "test-client"}
-		jsonData, _ := json.Marshal(authContext)
-		sess.Values[constants.SessionKeyAuthContext] = string(jsonData)
+		result, err := helper.GetAuthContext(browserRequest(cookies))
 
-		mockStore.On("Get", req, testSessionName).Return(sess, nil)
-
-		result, err := helper.GetAuthContext(req)
-
-		assert.NoError(t, err)
-		assert.Equal(t, authContext.ClientId, result.ClientId)
-		mockStore.AssertExpectations(t)
+		require.NoError(t, err)
+		assert.Equal(t, "test-client", result.ClientId)
 	})
 
 	t.Run("SessionError", func(t *testing.T) {
-		mockStore := mocks_sessionstore.NewStore(t)
-		helper := NewAuthHelper(mockStore, testSessionName)
+		helper, store, backend := newRealStoreAuthHelper(t)
+		cookies := seedBrowserSession(t, store, map[string]any{
+			constants.SessionKeyAuthContext: authContextJSON(t, &ceremony.AuthContext{ClientId: "test-client"}),
+		})
+		backend.failLoad = true
 
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
-		mockStore.On("Get", req, testSessionName).Return(nil, assert.AnError)
+		result, err := helper.GetAuthContext(browserRequest(cookies))
 
-		result, err := helper.GetAuthContext(req)
-
-		assert.Error(t, err)
+		assert.ErrorIs(t, err, errLoadRefused)
 		assert.Nil(t, result)
-		mockStore.AssertExpectations(t)
 	})
 
 	t.Run("NoAuthContext", func(t *testing.T) {
-		mockStore := mocks_sessionstore.NewStore(t)
-		helper := NewAuthHelper(mockStore, testSessionName)
+		helper, store, _ := newRealStoreAuthHelper(t)
+		cookies := seedBrowserSession(t, store, map[string]any{"unrelated": "value"})
 
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
-		sess := sessionstore.NewSession(mockStore, testSessionName)
+		result, err := helper.GetAuthContext(browserRequest(cookies))
 
-		mockStore.On("Get", req, testSessionName).Return(sess, nil)
-
-		result, err := helper.GetAuthContext(req)
-
-		assert.Error(t, err)
+		assert.ErrorIs(t, err, ErrNoAuthContext)
 		assert.Nil(t, result)
-		mockStore.AssertExpectations(t)
+		requireSessionDecoded(t, store, browserRequest(cookies))
 	})
 
 	t.Run("UnmarshalError", func(t *testing.T) {
-		mockStore := mocks_sessionstore.NewStore(t)
-		helper := NewAuthHelper(mockStore, testSessionName)
+		helper, store, _ := newRealStoreAuthHelper(t)
+		cookies := seedBrowserSession(t, store, map[string]any{constants.SessionKeyAuthContext: "invalid json"})
 
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
-		sess := sessionstore.NewSession(mockStore, testSessionName)
-		sess.Values[constants.SessionKeyAuthContext] = "invalid json"
+		result, err := helper.GetAuthContext(browserRequest(cookies))
 
-		mockStore.On("Get", req, testSessionName).Return(sess, nil)
-
-		result, err := helper.GetAuthContext(req)
-
-		assert.Error(t, err)
+		require.Error(t, err)
+		assert.NotErrorIs(t, err, ErrNoAuthContext, "a context that is there but will not decode is not an absent one")
 		assert.Nil(t, result)
-		mockStore.AssertExpectations(t)
 	})
 }
 
 func TestSaveAuthContext(t *testing.T) {
-	const testSessionName = "test-session"
-
 	t.Run("Success", func(t *testing.T) {
-		mockStore := mocks_sessionstore.NewStore(t)
-		helper := NewAuthHelper(mockStore, testSessionName)
+		helper, _, _ := newRealStoreAuthHelper(t)
+		rr := httptest.NewRecorder()
 
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
-		w := httptest.NewRecorder()
-		sess := sessionstore.NewSession(mockStore, testSessionName)
-		authContext := &ceremony.AuthContext{ClientId: "test-client"}
+		err := helper.SaveAuthContext(rr, browserRequest(nil), &ceremony.AuthContext{ClientId: "test-client"})
+		require.NoError(t, err)
 
-		mockStore.On("Get", req, testSessionName).Return(sess, nil)
-		mockStore.On("Save", req, w, sess).Return(nil)
-
-		err := helper.SaveAuthContext(w, req, authContext)
-
-		assert.NoError(t, err)
-		assert.Contains(t, sess.Values, constants.SessionKeyAuthContext)
-		mockStore.AssertExpectations(t)
+		result, err := helper.GetAuthContext(replayThroughJar(t, rr.Result(), nil))
+		require.NoError(t, err)
+		assert.Equal(t, "test-client", result.ClientId)
 	})
 
 	t.Run("SessionError", func(t *testing.T) {
-		mockStore := mocks_sessionstore.NewStore(t)
-		helper := NewAuthHelper(mockStore, testSessionName)
+		helper, store, backend := newRealStoreAuthHelper(t)
+		cookies := seedBrowserSession(t, store, map[string]any{"unrelated": "value"})
+		backend.failLoad = true
+		rr := httptest.NewRecorder()
 
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
-		w := httptest.NewRecorder()
-		authContext := &ceremony.AuthContext{ClientId: "test-client"}
+		err := helper.SaveAuthContext(rr, browserRequest(cookies), &ceremony.AuthContext{ClientId: "test-client"})
 
-		mockStore.On("Get", req, testSessionName).Return(nil, assert.AnError)
-
-		err := helper.SaveAuthContext(w, req, authContext)
-
-		assert.Error(t, err)
-		mockStore.AssertExpectations(t)
+		assert.ErrorIs(t, err, errLoadRefused)
+		assert.Empty(t, rr.Result().Cookies(), "a session that could not be read is not written")
 	})
 
 	t.Run("SaveError", func(t *testing.T) {
-		mockStore := mocks_sessionstore.NewStore(t)
-		helper := NewAuthHelper(mockStore, testSessionName)
+		helper, _, backend := newRealStoreAuthHelper(t)
+		backend.failCreate = true
+		rr := httptest.NewRecorder()
 
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
-		w := httptest.NewRecorder()
-		sess := sessionstore.NewSession(mockStore, testSessionName)
-		authContext := &ceremony.AuthContext{ClientId: "test-client"}
+		err := helper.SaveAuthContext(rr, browserRequest(nil), &ceremony.AuthContext{ClientId: "test-client"})
 
-		mockStore.On("Get", req, testSessionName).Return(sess, nil)
-		mockStore.On("Save", req, w, sess).Return(assert.AnError)
-
-		err := helper.SaveAuthContext(w, req, authContext)
-
-		assert.Error(t, err)
-		mockStore.AssertExpectations(t)
+		assert.ErrorIs(t, err, errCreateRefused)
+		assert.Empty(t, rr.Result().Cookies(), "no cookie names a row that was never written")
 	})
 }
 
-// The fixtures below back the RealStore* subtests of TestClearAuthContext, which drive a real
-// store instead of a mock. Every other subtest here inspects sess.Values, which is the store's
-// in-memory state and says nothing about the wire: that is how seven handlers came to clear the
-// auth context after committing the client response, where the header is never sent (#141).
+// The fixtures below back every case in this file, each of which drives a real store over an
+// in-memory backend and reads the result back as the browser's next request would. The
+// RealStore* subtests of TestClearAuthContext are the ones about the wire: a store's in-memory
+// state says nothing about it, which is how seven handlers came to clear the auth context after
+// committing the client response, where the header is never sent (#141).
+//
+// There is no mock store here since #431. AuthHelper's port names Regenerate, which the
+// generated sessionstore mock does not have, and RegenerateSession's only test used to be the
+// no-op a mock produced. A failure is reached through armableBackend instead.
 //
 // A ServerSideStore over an in-memory backend since #266. Which half of a clear these cases
 // observe changed with it, and the change is worth having: under the cookie store the Set-Cookie
@@ -163,14 +128,47 @@ const (
 	clientRefusalURL = "https://example.com/callback?error=access_denied"
 )
 
-// newRealStoreAuthHelper returns the helper and the store behind it. The store is returned because
-// requireSessionDecoded needs to read a replayed session directly, which is the only way to tell a
-// valid cleared session from an unreadable one.
-func newRealStoreAuthHelper(t *testing.T) (*AuthHelper, *sessionstore.ServerSideStore) {
+// errLoadRefused and errCreateRefused are what armableBackend answers when armed, so a case can
+// tell its own failure from any other with errors.Is through the store's wrapping.
+var (
+	errLoadRefused   = errors.New("the backend refused the read")
+	errCreateRefused = errors.New("the backend refused the write")
+)
+
+// armableBackend is the in-memory backend with the two operations AuthHelper reaches through the
+// store made to fail on demand, once a session has been seeded. It is the admin console's
+// callback pattern (#427): the shared MemoryBackend injects nothing, and a test that needs one
+// failure wraps it in a type of its own.
+type armableBackend struct {
+	*sessiontest.MemoryBackend
+	failLoad   bool
+	failCreate bool
+}
+
+func (b *armableBackend) Load(ctx context.Context, id string) (*sessionstore.Record, error) {
+	if b.failLoad {
+		return nil, errLoadRefused
+	}
+	return b.MemoryBackend.Load(ctx, id)
+}
+
+func (b *armableBackend) Create(ctx context.Context, id string, data []byte, authenticated bool) (time.Time, error) {
+	if b.failCreate {
+		return time.Time{}, errCreateRefused
+	}
+	return b.MemoryBackend.Create(ctx, id, data, authenticated)
+}
+
+// newRealStoreAuthHelper returns the helper, the store behind it and the backend behind that. The
+// store is returned because requireSessionDecoded needs to read a replayed session directly, which
+// is the only way to tell a valid cleared session from an unreadable one; the backend so a case can
+// arm a failure.
+func newRealStoreAuthHelper(t *testing.T) (*AuthHelper, *sessionstore.ServerSideStore, *armableBackend) {
 	t.Helper()
 	authKey := []byte("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")
 	encKey := []byte("0123456789abcdef0123456789abcdef")
-	store, err := sessionstore.NewServerSideStore(sessiontest.NewMemoryBackend(),
+	backend := &armableBackend{MemoryBackend: sessiontest.NewMemoryBackend()}
+	store, err := sessionstore.NewServerSideStore(backend,
 		constants.SessionKeySessionIdentifier, false, sessionstore.PersistentCookie,
 		sessionstore.KeyPair{AuthenticationKey: authKey, EncryptionKey: encKey}, nil)
 	if err != nil {
@@ -179,7 +177,50 @@ func newRealStoreAuthHelper(t *testing.T) (*AuthHelper, *sessionstore.ServerSide
 		panic(err)
 	}
 
-	return NewAuthHelper(store, realStoreSessionName), store
+	return NewAuthHelper(store, realStoreSessionName), store, backend
+}
+
+// seedBrowserSession stores values as a browser's session and returns the cookies that name it.
+func seedBrowserSession(t *testing.T, store *sessionstore.ServerSideStore, values map[string]any) []*http.Cookie {
+	t.Helper()
+	req := browserRequest(nil)
+	sess, err := store.Get(req, realStoreSessionName)
+	require.NoError(t, err)
+	for k, v := range values {
+		sess.Values[k] = v
+	}
+	rr := httptest.NewRecorder()
+	require.NoError(t, store.Save(req, rr, sess))
+	cookies := rr.Result().Cookies()
+	require.Len(t, cookies, 1)
+	return cookies
+}
+
+// browserRequest is a fresh request carrying cookies, as the browser's next request would. A fresh
+// one each time, because the store memoises a session on the request it loaded it for.
+func browserRequest(cookies []*http.Cookie) *http.Request {
+	req := httptest.NewRequest(http.MethodGet, realStoreBaseURL+"/auth/issue", nil)
+	for _, c := range cookies {
+		req.AddCookie(c)
+	}
+	return req
+}
+
+// authContextJSON is an auth context as AuthHelper stores it.
+func authContextJSON(t *testing.T, authContext *ceremony.AuthContext) string {
+	t.Helper()
+	jsonData, err := json.Marshal(authContext)
+	require.NoError(t, err)
+	return string(jsonData)
+}
+
+// sessionIdentifier is the identifier a cookie names, which the store alone can read: comparing
+// cookie values proves nothing, since every seal draws a fresh nonce.
+func sessionIdentifier(t *testing.T, store *sessionstore.ServerSideStore, cookie *http.Cookie) string {
+	t.Helper()
+	id, err := store.OpenCookie(realStoreSessionName, cookie.Value)
+	require.NoError(t, err)
+	return id
 }
 
 // requireSessionDecoded proves the session the browser holds on req decoded successfully, and must
@@ -248,61 +289,48 @@ func largeAuthContext() *ceremony.AuthContext {
 }
 
 func TestClearAuthContext(t *testing.T) {
-	const testSessionName = "test-session"
-
 	t.Run("Success", func(t *testing.T) {
-		mockStore := mocks_sessionstore.NewStore(t)
-		helper := NewAuthHelper(mockStore, testSessionName)
+		helper, store, _ := newRealStoreAuthHelper(t)
+		cookies := seedBrowserSession(t, store, map[string]any{
+			constants.SessionKeyAuthContext: authContextJSON(t, &ceremony.AuthContext{ClientId: "test-client"}),
+		})
 
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
-		w := httptest.NewRecorder()
-		sess := sessionstore.NewSession(mockStore, testSessionName)
-		sess.Values[constants.SessionKeyAuthContext] = "test-context"
+		err := helper.ClearAuthContext(httptest.NewRecorder(), browserRequest(cookies))
+		require.NoError(t, err)
 
-		mockStore.On("Get", req, testSessionName).Return(sess, nil)
-		mockStore.On("Save", req, w, sess).Return(nil)
-
-		err := helper.ClearAuthContext(w, req)
-
-		assert.NoError(t, err)
-		assert.NotContains(t, sess.Values, constants.SessionKeyAuthContext)
-		mockStore.AssertExpectations(t)
+		// The row the browser's cookie names is the one the clear emptied.
+		_, err = helper.GetAuthContext(browserRequest(cookies))
+		assert.ErrorIs(t, err, ErrNoAuthContext)
+		requireSessionDecoded(t, store, browserRequest(cookies))
 	})
 
 	t.Run("SessionError", func(t *testing.T) {
-		mockStore := mocks_sessionstore.NewStore(t)
-		helper := NewAuthHelper(mockStore, testSessionName)
+		helper, store, backend := newRealStoreAuthHelper(t)
+		cookies := seedBrowserSession(t, store, map[string]any{
+			constants.SessionKeyAuthContext: authContextJSON(t, &ceremony.AuthContext{ClientId: "test-client"}),
+		})
+		backend.failLoad = true
+		rr := httptest.NewRecorder()
 
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
-		w := httptest.NewRecorder()
+		err := helper.ClearAuthContext(rr, browserRequest(cookies))
 
-		mockStore.On("Get", req, testSessionName).Return(nil, assert.AnError)
-
-		err := helper.ClearAuthContext(w, req)
-
-		assert.Error(t, err)
-		mockStore.AssertExpectations(t)
+		assert.ErrorIs(t, err, errLoadRefused)
+		assert.Empty(t, rr.Result().Cookies())
 	})
 
 	t.Run("SaveError", func(t *testing.T) {
-		mockStore := mocks_sessionstore.NewStore(t)
-		helper := NewAuthHelper(mockStore, testSessionName)
+		helper, _, backend := newRealStoreAuthHelper(t)
+		backend.failCreate = true
+		rr := httptest.NewRecorder()
 
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
-		w := httptest.NewRecorder()
-		sess := sessionstore.NewSession(mockStore, testSessionName)
+		err := helper.ClearAuthContext(rr, browserRequest(nil))
 
-		mockStore.On("Get", req, testSessionName).Return(sess, nil)
-		mockStore.On("Save", req, w, sess).Return(assert.AnError)
-
-		err := helper.ClearAuthContext(w, req)
-
-		assert.Error(t, err)
-		mockStore.AssertExpectations(t)
+		assert.ErrorIs(t, err, errCreateRefused)
+		assert.Empty(t, rr.Result().Cookies())
 	})
 
 	t.Run("RealStoreClearBeforeCommitReachesBrowser", func(t *testing.T) {
-		helper, store := newRealStoreAuthHelper(t)
+		helper, store, _ := newRealStoreAuthHelper(t)
 
 		seedReq := httptest.NewRequest(http.MethodGet, realStoreBaseURL+"/auth/issue", nil)
 		seedRR := httptest.NewRecorder()
@@ -346,7 +374,7 @@ func TestClearAuthContext(t *testing.T) {
 		// server-side even here. The ordering still matters, for the cookie rather than for the
 		// context, and the failure it causes is now a user losing a ceremony rather than a
 		// refused ceremony staying usable, which is the safe direction to fail in.
-		helper, store := newRealStoreAuthHelper(t)
+		helper, store, _ := newRealStoreAuthHelper(t)
 
 		seedReq := httptest.NewRequest(http.MethodGet, realStoreBaseURL+"/auth/issue", nil)
 		seedRR := httptest.NewRecorder()
@@ -381,7 +409,7 @@ func TestClearAuthContext(t *testing.T) {
 		// context earlier in the same response, so clearing before the commit puts two session
 		// writes, under duplicate cookie names, in one response. Both must reach the wire and the
 		// later one must win (#141).
-		helper, store := newRealStoreAuthHelper(t)
+		helper, store, _ := newRealStoreAuthHelper(t)
 
 		req := httptest.NewRequest(http.MethodGet, realStoreBaseURL+"/auth/authorize?client_id=test-client", nil)
 		rr := httptest.NewRecorder()
@@ -415,7 +443,7 @@ func TestClearAuthContext(t *testing.T) {
 		// Here the later write is the save, so the jar must keep the context.
 		//
 		// No requireSessionDecoded here either: keeping the context requires a successful decode.
-		helper, _ := newRealStoreAuthHelper(t)
+		helper, _, _ := newRealStoreAuthHelper(t)
 
 		req := httptest.NewRequest(http.MethodGet, realStoreBaseURL+"/auth/authorize?client_id=test-client", nil)
 		rr := httptest.NewRecorder()
@@ -432,22 +460,70 @@ func TestClearAuthContext(t *testing.T) {
 	})
 }
 
-func TestRegenerateSession_StoreWithoutRegeneratorIsNoOp(t *testing.T) {
-	mockStore := mocks_sessionstore.NewStore(t)
-	helper := NewAuthHelper(mockStore, "test-session")
+// RegenerateSession is what the auth server's handlers call at a privilege change. Its only test
+// used to be the no-op a store that could not rotate produced; the store now has to rotate for
+// this to compile, so each case here drives the real one and reads the outcome back through the
+// cookies a browser would hold (#266, #431).
+func TestRegenerateSession(t *testing.T) {
+	seeded := func(t *testing.T, store *sessionstore.ServerSideStore) []*http.Cookie {
+		t.Helper()
+		return seedBrowserSession(t, store, map[string]any{
+			constants.SessionKeyAuthContext: authContextJSON(t, &ceremony.AuthContext{ClientId: "test-client"}),
+		})
+	}
 
-	err := helper.RegenerateSession(
-		httptest.NewRecorder(),
-		httptest.NewRequest(http.MethodPost, "/", nil),
-	)
+	t.Run("Rotates", func(t *testing.T) {
+		helper, store, _ := newRealStoreAuthHelper(t)
+		cookies := seeded(t, store)
+		rr := httptest.NewRecorder()
 
-	require.NoError(t, err)
-	mockStore.AssertExpectations(t)
+		require.NoError(t, helper.RegenerateSession(rr, browserRequest(cookies)))
+
+		rotated := rr.Result().Cookies()
+		require.Len(t, rotated, 1, "the browser is told the new identifier, once")
+		assert.NotEqual(t, sessionIdentifier(t, store, cookies[0]), sessionIdentifier(t, store, rotated[0]),
+			"the new cookie names a different identifier")
+
+		authContext, err := helper.GetAuthContext(browserRequest(rotated))
+		require.NoError(t, err, "the session's contents survive the rotation")
+		assert.Equal(t, "test-client", authContext.ClientId)
+
+		old, err := store.Get(browserRequest(cookies), realStoreSessionName)
+		require.NoError(t, err)
+		assert.True(t, old.IsNew, "the identifier the browser brought names nothing any more")
+	})
+
+	t.Run("LoadFails", func(t *testing.T) {
+		helper, store, backend := newRealStoreAuthHelper(t)
+		cookies := seeded(t, store)
+		backend.failLoad = true
+		rr := httptest.NewRecorder()
+
+		err := helper.RegenerateSession(rr, browserRequest(cookies))
+
+		assert.ErrorIs(t, err, errLoadRefused)
+		assert.Empty(t, rr.Result().Cookies(), "no cookie is written")
+	})
+
+	t.Run("CreateFails", func(t *testing.T) {
+		helper, store, backend := newRealStoreAuthHelper(t)
+		cookies := seeded(t, store)
+		backend.failCreate = true
+		rr := httptest.NewRecorder()
+
+		err := helper.RegenerateSession(rr, browserRequest(cookies))
+
+		assert.ErrorIs(t, err, errCreateRefused)
+		assert.Empty(t, rr.Result().Cookies(), "no cookie is written")
+
+		backend.failCreate = false
+		authContext, err := helper.GetAuthContext(browserRequest(cookies))
+		require.NoError(t, err, "the old session is intact: nothing was deleted before the new row existed")
+		assert.Equal(t, "test-client", authContext.ClientId)
+	})
 }
 
 func TestUILocales(t *testing.T) {
-	const testSessionName = "test-session"
-
 	tests := []struct {
 		name        string
 		authContext *ceremony.AuthContext
@@ -469,19 +545,14 @@ func TestUILocales(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockStore := mocks_sessionstore.NewStore(t)
-			helper := NewAuthHelper(mockStore, testSessionName)
-			req := httptest.NewRequest(http.MethodGet, "/", nil)
-			sess := sessionstore.NewSession(mockStore, testSessionName)
+			helper, store, _ := newRealStoreAuthHelper(t)
+			values := map[string]any{"unrelated": "value"}
 			if tt.authContext != nil {
-				jsonData, err := json.Marshal(tt.authContext)
-				require.NoError(t, err)
-				sess.Values[constants.SessionKeyAuthContext] = string(jsonData)
+				values[constants.SessionKeyAuthContext] = authContextJSON(t, tt.authContext)
 			}
-			mockStore.On("Get", req, testSessionName).Return(sess, nil)
+			cookies := seedBrowserSession(t, store, values)
 
-			assert.Equal(t, tt.want, helper.UILocales(req))
-			mockStore.AssertExpectations(t)
+			assert.Equal(t, tt.want, helper.UILocales(browserRequest(cookies)))
 		})
 	}
 }

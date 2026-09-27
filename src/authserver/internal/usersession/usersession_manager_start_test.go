@@ -15,12 +15,12 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/useragent"
 	"github.com/leodip/goiabada/authserver/internal/uuidutil"
 	"github.com/leodip/goiabada/core/sessionstore"
+	"github.com/leodip/goiabada/core/sessionstore/sessiontest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	mocks_sessionstore "github.com/leodip/goiabada/core/sessionstore/mocks"
 )
 
 // =============================================================================
@@ -52,27 +52,127 @@ const chromeUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/5
 // so the raw header differs from chromeUserAgent well before its end.
 const firefoxUserAgent = "Mozilla/5.0 (X11; Linux x86_64; rv:121.0) Gecko/20100101 Firefox/121.0"
 
+// errLoadRefused and errCreateRefused are what armableBackend answers when armed, so a case can
+// tell its own failure from any other with errors.Is through the store's wrapping.
+var (
+	errLoadRefused   = errors.New("the backend refused the read")
+	errCreateRefused = errors.New("the backend refused the write")
+)
+
+// armableBackend is the in-memory backend with the two operations StartNewUserSession reaches
+// through the store made to fail on demand, the admin console callback's pattern (#427): the
+// shared MemoryBackend injects nothing, and a test that needs one failure wraps it.
+//
+// beforeCreate runs inside Create, which is the one point in StartNewUserSession that is after
+// the commit and before the compensation: the rotation's new row is written there. The
+// cancellation case needs to act exactly there and nowhere else. loads and creates count what
+// reached the backend, for the case asserting nothing did.
+type armableBackend struct {
+	*sessiontest.MemoryBackend
+	failLoad     bool
+	failCreate   bool
+	beforeCreate func()
+	loads        int
+	creates      int
+}
+
+func (b *armableBackend) Load(ctx context.Context, id string) (*sessionstore.Record, error) {
+	b.loads++
+	if b.failLoad {
+		return nil, errLoadRefused
+	}
+	return b.MemoryBackend.Load(ctx, id)
+}
+
+func (b *armableBackend) Create(ctx context.Context, id string, data []byte, authenticated bool) (time.Time, error) {
+	b.creates++
+	if b.beforeCreate != nil {
+		b.beforeCreate()
+	}
+	if b.failCreate {
+		return time.Time{}, errCreateRefused
+	}
+	return b.MemoryBackend.Create(ctx, id, data, authenticated)
+}
+
+// startSessionMocks is the strict database mock and the real browser session store. The store is
+// the production ServerSideStore over an in-memory backend since #431: the manager's port names
+// Regenerate, which the generated sessionstore mock does not have, so what the sign-in wrote to
+// the browser is read back through the store with the cookies a browser would hold.
 type startSessionMocks struct {
+	t       *testing.T
 	db      *mocks_data.Database
-	store   *mocks_sessionstore.Store
+	backend *armableBackend
+	store   *sessionstore.ServerSideStore
 	manager *UserSessionManager
-	session *sessionstore.Session
 }
 
 func newStartSessionMocks(t *testing.T) *startSessionMocks {
 	t.Helper()
 	db := mocks_data.NewDatabase(t)
-	store := mocks_sessionstore.NewStore(t)
+	backend := &armableBackend{MemoryBackend: sessiontest.NewMemoryBackend()}
+	store, err := sessionstore.NewServerSideStore(backend, constants.SessionKeySessionIdentifier, false,
+		sessionstore.PersistentCookie, sessionstore.KeyPair{
+			AuthenticationKey: []byte("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"),
+			EncryptionKey:     []byte("0123456789abcdef0123456789abcdef"),
+		}, nil)
+	require.NoError(t, err)
 	return &startSessionMocks{
-		db:    db,
-		store: store,
+		t:       t,
+		db:      db,
+		backend: backend,
+		store:   store,
 		manager: &UserSessionManager{
 			database:     db,
 			sessionStore: store,
 			sessionName:  testSessionName,
 		},
-		session: sessionstore.NewSession(store, testSessionName),
 	}
+}
+
+// seed stores values as the browser's pre-sign-in session and returns the cookies naming it.
+func (m *startSessionMocks) seed(values map[string]any) []*http.Cookie {
+	m.t.Helper()
+	req := httptest.NewRequest("GET", "/", nil)
+	sess, err := m.store.Get(req, testSessionName)
+	require.NoError(m.t, err)
+	for k, v := range values {
+		sess.Values[k] = v
+	}
+	rr := httptest.NewRecorder()
+	require.NoError(m.t, m.store.Save(req, rr, sess))
+	cookies := rr.Result().Cookies()
+	require.Len(m.t, cookies, 1)
+	return cookies
+}
+
+// readBack loads the session cookies name, through the store's own Get, as the browser's next
+// request would.
+func (m *startSessionMocks) readBack(cookies []*http.Cookie) *sessionstore.Session {
+	m.t.Helper()
+	req := httptest.NewRequest("GET", "/", nil)
+	for _, c := range cookies {
+		req.AddCookie(c)
+	}
+	sess, err := m.store.Get(req, testSessionName)
+	require.NoError(m.t, err)
+	return sess
+}
+
+// identifier is the browser session identifier a cookie names, which the store alone can read:
+// every seal draws a fresh nonce, so comparing cookie values proves nothing.
+func (m *startSessionMocks) identifier(cookie *http.Cookie) string {
+	m.t.Helper()
+	id, err := m.store.OpenCookie(testSessionName, cookie.Value)
+	require.NoError(m.t, err)
+	return id
+}
+
+func withCookies(req *http.Request, cookies []*http.Cookie) *http.Request {
+	for _, c := range cookies {
+		req.AddCookie(c)
+	}
+	return req
 }
 
 // someCredentialInstant is the captured credential instant for the tests that are not about
@@ -93,17 +193,10 @@ func newSessionRequest(remoteAddr string, userAgent string) *http.Request {
 	return req
 }
 
-// expectStoreRead registers the browser-session read, which #198 hoisted above the transaction:
-// every call now reaches it before anything is written, and only a case testing its failure
-// replaces it.
-func (m *startSessionMocks) expectStoreRead() {
-	m.store.On("Get", mock.Anything, testSessionName).Return(m.session, nil).Once()
-}
-
-// expectPersistThroughCommit sets up everything up to and including the commit: the browser
-// session read, the transaction, the session row, its client association and the sibling read
-// the sweep runs on. What it deliberately leaves out is the browser-store write, which is the
-// one step left after the commit and the one the post-commit failure cases replace.
+// expectPersistThroughCommit sets up everything up to and including the commit: the transaction,
+// the session row, its client association and the sibling read the sweep runs on. The
+// browser-session read before it and the rotation after it are the real store's, and a case
+// testing either one's failure arms the backend instead.
 //
 // The sibling read is matched on txSentinel rather than mock.Anything, so it is an assertion
 // and not just a stub: a read moved back outside the transaction arrives with a nil tx and the
@@ -113,7 +206,6 @@ func (m *startSessionMocks) expectStoreRead() {
 func (m *startSessionMocks) expectPersistThroughCommit(userId int64, existingSessions []models.UserSession) **models.UserSession {
 	captured := new(*models.UserSession)
 
-	m.expectStoreRead()
 	mocks_data.ExpectRunInTransaction(m.db, txSentinel)
 	m.db.On("CreateUserSession", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		created := args.Get(2).(*models.UserSession)
@@ -126,20 +218,12 @@ func (m *startSessionMocks) expectPersistThroughCommit(userId int64, existingSes
 	return captured
 }
 
-// expectSuccessfulPersist is expectPersistThroughCommit plus the browser-store write succeeding,
-// which is the full happy-path call sequence.
-func (m *startSessionMocks) expectSuccessfulPersist(userId int64, existingSessions []models.UserSession) **models.UserSession {
-	captured := m.expectPersistThroughCommit(userId, existingSessions)
-	m.store.On("Save", mock.Anything, mock.Anything, m.session).Return(nil).Once()
-	return captured
-}
-
 func TestStartNewUserSession_PopulatesSessionFields(t *testing.T) {
 	m := newStartSessionMocks(t)
 	req := newSessionRequest("192.168.1.50:54321", chromeUserAgent)
 	recorder := httptest.NewRecorder()
 
-	captured := m.expectSuccessfulPersist(123, nil)
+	captured := m.expectPersistThroughCommit(123, nil)
 	credentialAcceptedAt := someCredentialInstant()
 
 	before := time.Now().UTC()
@@ -206,7 +290,7 @@ func TestStartNewUserSession_BoundsTheUserAgentToTheColumnWidth(t *testing.T) {
 	overlong := strings.Repeat("a", 600)
 	req := newSessionRequest("192.168.1.50:54321", overlong)
 
-	captured := m.expectSuccessfulPersist(123, nil)
+	captured := m.expectPersistThroughCommit(123, nil)
 
 	result, err := m.manager.StartNewUserSession(
 		httptest.NewRecorder(), req, 123, 7, "pwd", models.AcrLevel1.String(), 0, nil, someCredentialInstant())
@@ -231,8 +315,6 @@ func TestStartNewUserSession_RecordsTheClient(t *testing.T) {
 		capturedClient = args.Get(2).(*models.UserSessionClient)
 	}).Return(nil).Once()
 	m.db.On("GetUserSessionsByUserId", mock.Anything, txSentinel, int64(123)).Return(nil, nil).Once()
-	m.expectStoreRead()
-	m.store.On("Save", mock.Anything, mock.Anything, m.session).Return(nil).Once()
 
 	result, err := m.manager.StartNewUserSession(httptest.NewRecorder(), req, 123, 7, "pwd", models.AcrLevel1.String(), 0, nil, someCredentialInstant())
 
@@ -248,18 +330,20 @@ func TestStartNewUserSession_RecordsTheClient(t *testing.T) {
 	assert.Equal(t, result.Started, capturedClient.LastAccessed)
 }
 
-// The session identifier is written into the cookie session, which is how the
-// browser is tied back to the database row.
+// The session identifier is written into the browser session, which is how the
+// browser is tied back to the database row. Read back through the store with the
+// cookie the sign-in wrote, as the browser's next request would.
 func TestStartNewUserSession_WritesIdentifierIntoTheCookieSession(t *testing.T) {
 	m := newStartSessionMocks(t)
 	req := newSessionRequest("10.0.0.1:1234", chromeUserAgent)
+	rr := httptest.NewRecorder()
 
-	m.expectSuccessfulPersist(123, nil)
+	m.expectPersistThroughCommit(123, nil)
 
-	result, err := m.manager.StartNewUserSession(httptest.NewRecorder(), req, 123, 7, "pwd", models.AcrLevel1.String(), 0, nil, someCredentialInstant())
+	result, err := m.manager.StartNewUserSession(rr, req, 123, 7, "pwd", models.AcrLevel1.String(), 0, nil, someCredentialInstant())
 
-	assert.NoError(t, err)
-	assert.Equal(t, result.SessionIdentifier, m.session.Values[constants.SessionKeySessionIdentifier])
+	require.NoError(t, err)
+	assert.Equal(t, result.SessionIdentifier, m.readBack(rr.Result().Cookies()).Values[constants.SessionKeySessionIdentifier])
 }
 
 // -----------------------------------------------------------------------------
@@ -287,7 +371,7 @@ func TestStartNewUserSession_IpAddressExtraction(t *testing.T) {
 			m := newStartSessionMocks(t)
 			req := newSessionRequest(tc.remoteAddr, chromeUserAgent)
 
-			m.expectSuccessfulPersist(123, nil)
+			m.expectPersistThroughCommit(123, nil)
 
 			result, err := m.manager.StartNewUserSession(
 				httptest.NewRecorder(), req, 123, 7, "pwd", models.AcrLevel1.String(), 0, nil, someCredentialInstant())
@@ -316,7 +400,7 @@ func TestStartNewUserSession_DeletesMatchingSessionFromSameDeviceAndIp(t *testin
 		UserAgent:         chromeUserAgent,
 	}
 
-	m.expectSuccessfulPersist(123, []models.UserSession{stale})
+	m.expectPersistThroughCommit(123, []models.UserSession{stale})
 	m.db.On("DeleteUserSession", mock.Anything, txSentinel, int64(42)).Return(nil).Once()
 
 	_, err := m.manager.StartNewUserSession(
@@ -342,7 +426,7 @@ func TestStartNewUserSession_DeletesAMatchingHeaderWhoseLabelsDiffer(t *testing.
 		DeviceOS:          "Linux",
 	}
 
-	m.expectSuccessfulPersist(123, []models.UserSession{stale})
+	m.expectPersistThroughCommit(123, []models.UserSession{stale})
 	m.db.On("DeleteUserSession", mock.Anything, txSentinel, int64(42)).Return(nil).Once()
 
 	_, err := m.manager.StartNewUserSession(
@@ -366,7 +450,7 @@ func TestStartNewUserSession_AnEmptyHeaderMatchesAnEmptyHeader(t *testing.T) {
 		UserAgent:         "",
 	}
 
-	m.expectSuccessfulPersist(123, []models.UserSession{stale})
+	m.expectPersistThroughCommit(123, []models.UserSession{stale})
 	m.db.On("DeleteUserSession", mock.Anything, txSentinel, int64(42)).Return(nil).Once()
 
 	_, err := m.manager.StartNewUserSession(
@@ -429,7 +513,7 @@ func TestStartNewUserSession_KeepsSessionsFromOtherDevicesOrIps(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			m := newStartSessionMocks(t)
-			m.expectSuccessfulPersist(123, []models.UserSession{tc.session})
+			m.expectPersistThroughCommit(123, []models.UserSession{tc.session})
 
 			_, err := m.manager.StartNewUserSession(
 				httptest.NewRecorder(), newSessionRequest("192.168.1.50:54321", chromeUserAgent),
@@ -468,8 +552,6 @@ func TestStartNewUserSession_DoesNotDeleteTheSessionItJustCreated(t *testing.T) 
 				UserAgent: useragent.Raw(req),
 			}}, nil
 		}).Once()
-	m.expectStoreRead()
-	m.store.On("Save", mock.Anything, mock.Anything, m.session).Return(nil).Once()
 
 	_, err := m.manager.StartNewUserSession(
 		httptest.NewRecorder(), req, 123, 7, "pwd", models.AcrLevel1.String(), 0, nil, someCredentialInstant())
@@ -492,6 +574,7 @@ func TestStartNewUserSession_ErrorsPropagate(t *testing.T) {
 		// beyond "an error, and no session alongside it", or nil when the strict mocks are
 		// the whole of it. A mock built with NewDatabase(t) fails the test on any call the
 		// setup did not register, so what a case leaves out it is asserting did not happen.
+		// The browser arrives with a pre-sign-in session in every case, as a ceremony's does.
 		setup func(m *startSessionMocks) func(t *testing.T)
 	}{
 		{
@@ -500,14 +583,13 @@ func TestStartNewUserSession_ErrorsPropagate(t *testing.T) {
 			// The database mock is handed no expectation at all, which is the assertion.
 			name: "the browser session cannot be read, and nothing is written",
 			setup: func(m *startSessionMocks) func(*testing.T) {
-				m.store.On("Get", mock.Anything, testSessionName).Return(nil, errors.New("cookie is corrupt")).Once()
+				m.backend.failLoad = true
 				return nil
 			},
 		},
 		{
 			name: "the transaction cannot be opened",
 			setup: func(m *startSessionMocks) func(*testing.T) {
-				m.expectStoreRead()
 				mocks_data.ExpectRunInTransactionRefused(m.db, dbErr)
 				return nil
 			},
@@ -515,7 +597,6 @@ func TestStartNewUserSession_ErrorsPropagate(t *testing.T) {
 		{
 			name: "CreateUserSession fails",
 			setup: func(m *startSessionMocks) func(*testing.T) {
-				m.expectStoreRead()
 				mocks_data.ExpectRunInTransaction(m.db, txSentinel)
 				m.db.On("CreateUserSession", mock.Anything, mock.Anything, mock.Anything).Return(dbErr).Once()
 				return nil
@@ -524,7 +605,6 @@ func TestStartNewUserSession_ErrorsPropagate(t *testing.T) {
 		{
 			name: "CreateUserSessionClient fails",
 			setup: func(m *startSessionMocks) func(*testing.T) {
-				m.expectStoreRead()
 				mocks_data.ExpectRunInTransaction(m.db, txSentinel)
 				m.db.On("CreateUserSession", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 				m.db.On("CreateUserSessionClient", mock.Anything, mock.Anything, mock.Anything).Return(dbErr).Once()
@@ -534,7 +614,6 @@ func TestStartNewUserSession_ErrorsPropagate(t *testing.T) {
 		{
 			name: "the commit fails",
 			setup: func(m *startSessionMocks) func(*testing.T) {
-				m.expectStoreRead()
 				mocks_data.ExpectRunInTransactionThenFail(m.db, txSentinel, dbErr)
 				m.db.On("CreateUserSession", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 				m.db.On("CreateUserSessionClient", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
@@ -549,7 +628,6 @@ func TestStartNewUserSession_ErrorsPropagate(t *testing.T) {
 			// the helper rolling back exactly when the body errs.
 			name: "the sibling read fails inside the transaction",
 			setup: func(m *startSessionMocks) func(*testing.T) {
-				m.expectStoreRead()
 				stub := mocks_data.ExpectRunInTransaction(m.db, txSentinel)
 				m.db.On("CreateUserSession", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 				m.db.On("CreateUserSessionClient", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
@@ -567,7 +645,6 @@ func TestStartNewUserSession_ErrorsPropagate(t *testing.T) {
 			name: "a sibling delete fails inside the transaction",
 			setup: func(m *startSessionMocks) func(*testing.T) {
 				req := newSessionRequest("192.168.1.50:54321", chromeUserAgent)
-				m.expectStoreRead()
 				stub := mocks_data.ExpectRunInTransaction(m.db, txSentinel)
 				m.db.On("CreateUserSession", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 				m.db.On("CreateUserSessionClient", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
@@ -587,12 +664,12 @@ func TestStartNewUserSession_ErrorsPropagate(t *testing.T) {
 		},
 		{
 			// #198's fourth window, the one that cannot be closed: the commit has happened, so
-			// the row is compensated instead. TestStartNewUserSession_DeletesTheRowWhenTheSaveFails
+			// the row is compensated instead. TestStartNewUserSession_DeletesTheRowWhenTheRotationFails
 			// owns the detail; here it is the "no session alongside an error" contract.
-			name: "the browser session cannot be saved",
+			name: "the browser session cannot be rotated",
 			setup: func(m *startSessionMocks) func(*testing.T) {
 				m.expectPersistThroughCommit(123, nil)
-				m.store.On("Save", mock.Anything, mock.Anything, m.session).Return(errors.New("cannot write cookie")).Once()
+				m.backend.failCreate = true
 				m.db.On("DeleteUserSession", mock.Anything, (*sql.Tx)(nil), int64(99)).Return(nil).Once()
 				return nil
 			},
@@ -602,10 +679,11 @@ func TestStartNewUserSession_ErrorsPropagate(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			m := newStartSessionMocks(t)
+			req := withCookies(newSessionRequest("192.168.1.50:54321", chromeUserAgent), m.seed(nil))
 			alsoAssert := tc.setup(m)
 
 			result, err := m.manager.StartNewUserSession(
-				httptest.NewRecorder(), newSessionRequest("192.168.1.50:54321", chromeUserAgent),
+				httptest.NewRecorder(), req,
 				123, 7, "pwd", models.AcrLevel1.String(), 0, nil, someCredentialInstant())
 
 			assert.Error(t, err)
@@ -627,101 +705,61 @@ func TestStartNewUserSession_ErrorsPropagate(t *testing.T) {
 // and a rerun would write Set-Cookie twice -- so it is compensated, and these are the
 // tests for that.
 //
-// Both arms of the write are covered, because the store the auth server runs implements
-// sessionstore.Regenerator and the generated mock does not.
+// The write is the real store's Regenerate since #431, which the manager's port requires: there
+// is no Save arm left to cover, and a failure is reached by arming the backend under the store.
 // -----------------------------------------------------------------------------
 
-// regeneratingStore is a mocks_sessionstore.Store that also implements
-// sessionstore.Regenerator. StartNewUserSession reaches rotation by asserting to that
-// interface rather than through Store, so with the plain generated mock the rotation arm is
-// unreachable and every other test in this file takes the Save arm. Embedding leaves Get and
-// Save on the mock, so the same expectations set it up.
-type regeneratingStore struct {
-	*mocks_sessionstore.Store
-	err error
-	// gotSession is the session Regenerate was handed, so a test can assert the identifier
-	// was written into it before the rotation rather than after.
-	gotSession *sessionstore.Session
-	calls      int
-	// beforeRegenerate runs at the top of Regenerate, which is the one point inside
-	// StartNewUserSession that is after the commit and before the compensation. The cancellation
-	// case needs to act exactly there and nowhere else.
-	beforeRegenerate func()
-}
-
-func (s *regeneratingStore) Regenerate(w http.ResponseWriter, r *http.Request, session *sessionstore.Session) error {
-	s.calls++
-	s.gotSession = session
-	if s.beforeRegenerate != nil {
-		s.beforeRegenerate()
-	}
-	return s.err
-}
-
-// withRegeneratingStore puts a store implementing sessionstore.Regenerator behind the manager,
-// answering err from Regenerate, so the rotation arm runs instead of the Save arm.
-func (m *startSessionMocks) withRegeneratingStore(err error) *regeneratingStore {
-	store := &regeneratingStore{Store: m.store, err: err}
-	m.manager.sessionStore = store
-	return store
-}
-
-// The control for the two compensation tests below: when the browser-store write succeeds there
-// is nothing to undo, and the strict database mock fails the test on a DeleteUserSession it was
-// not told to expect. This is also the only coverage the rotation arm has in this package.
+// The control for the compensation tests below: when the rotation succeeds there is nothing to
+// undo, and the strict database mock fails the test on a DeleteUserSession it was not told to
+// expect. It is also the rotation itself, read back as the browser would see it: the sign-in's one
+// cookie names a new identifier whose session carries the user session and what the browser held
+// before, and the cookie the browser arrived with names nothing.
 func TestStartNewUserSession_RotatesTheBrowserSessionIdentifierAndKeepsTheRow(t *testing.T) {
 	m := newStartSessionMocks(t)
-	store := m.withRegeneratingStore(nil)
+	preSignIn := m.seed(map[string]any{"pre-sign-in": "kept"})
+	req := withCookies(newSessionRequest("192.168.1.50:54321", chromeUserAgent), preSignIn)
+	rr := httptest.NewRecorder()
 
 	captured := m.expectPersistThroughCommit(123, nil)
 
 	result, err := m.manager.StartNewUserSession(
-		httptest.NewRecorder(), newSessionRequest("192.168.1.50:54321", chromeUserAgent),
-		123, 7, "pwd", models.AcrLevel1.String(), 0, nil, someCredentialInstant())
+		rr, req, 123, 7, "pwd", models.AcrLevel1.String(), 0, nil, someCredentialInstant())
 
 	require.NoError(t, err)
 	assert.Same(t, *captured, result)
-	assert.Equal(t, 1, store.calls, "the rotation arm must be the one that ran")
-	assert.Same(t, m.session, store.gotSession)
-	assert.Equal(t, result.SessionIdentifier, m.session.Values[constants.SessionKeySessionIdentifier],
-		"the identifier must be in the session before it is rotated, so the sign-in reaches the browser as one Set-Cookie")
+
+	signedIn := rr.Result().Cookies()
+	require.Len(t, signedIn, 1,
+		"the identifier is in the session before it is rotated, so the sign-in reaches the browser as one Set-Cookie")
+	assert.NotEqual(t, m.identifier(preSignIn[0]), m.identifier(signedIn[0]),
+		"the sign-in's cookie names a new browser session identifier")
+
+	sess := m.readBack(signedIn)
+	assert.Equal(t, result.SessionIdentifier, sess.Values[constants.SessionKeySessionIdentifier])
+	assert.Equal(t, "kept", sess.Values["pre-sign-in"], "the rotation keeps what the session held")
+
+	assert.True(t, m.readBack(preSignIn).IsNew, "the pre-sign-in cookie names nothing any more")
 }
 
-// #198's fourth window, rotation arm: the transaction committed, the rotation failed, and the
-// row it created is deleted rather than left for nobody. The delete carries a nil transaction,
-// which is what says it is outside the committed one rather than part of it.
+// #198's fourth window: the transaction committed, the rotation failed, and the row it created is
+// deleted rather than left for nobody. The delete carries a nil transaction, which is what says it
+// is outside the committed one rather than part of it.
 func TestStartNewUserSession_DeletesTheRowWhenTheRotationFails(t *testing.T) {
 	m := newStartSessionMocks(t)
-	rotationErr := errors.New("cannot rotate")
-	m.withRegeneratingStore(rotationErr)
+	req := withCookies(newSessionRequest("192.168.1.50:54321", chromeUserAgent), m.seed(nil))
+	rr := httptest.NewRecorder()
+	m.backend.failCreate = true
 
 	m.expectPersistThroughCommit(123, nil)
 	m.db.On("DeleteUserSession", mock.Anything, (*sql.Tx)(nil), int64(99)).Return(nil).Once()
 
 	result, err := m.manager.StartNewUserSession(
-		httptest.NewRecorder(), newSessionRequest("192.168.1.50:54321", chromeUserAgent),
-		123, 7, "pwd", models.AcrLevel1.String(), 0, nil, someCredentialInstant())
+		rr, req, 123, 7, "pwd", models.AcrLevel1.String(), 0, nil, someCredentialInstant())
 
 	assert.Nil(t, result)
-	assert.ErrorIs(t, err, rotationErr, "the caller must be told why the ceremony failed, not what the cleanup did")
+	require.ErrorIs(t, err, errCreateRefused, "the caller must be told why the ceremony failed, not what the cleanup did")
 	assert.Contains(t, err.Error(), "unable to rotate the browser session identifier")
-}
-
-// #198's fourth window, save arm. The same property against the store that cannot rotate.
-func TestStartNewUserSession_DeletesTheRowWhenTheSaveFails(t *testing.T) {
-	m := newStartSessionMocks(t)
-	saveErr := errors.New("cannot write cookie")
-
-	m.expectPersistThroughCommit(123, nil)
-	m.store.On("Save", mock.Anything, mock.Anything, m.session).Return(saveErr).Once()
-	m.db.On("DeleteUserSession", mock.Anything, (*sql.Tx)(nil), int64(99)).Return(nil).Once()
-
-	result, err := m.manager.StartNewUserSession(
-		httptest.NewRecorder(), newSessionRequest("192.168.1.50:54321", chromeUserAgent),
-		123, 7, "pwd", models.AcrLevel1.String(), 0, nil, someCredentialInstant())
-
-	assert.Nil(t, result)
-	assert.ErrorIs(t, err, saveErr, "the caller must be told why the ceremony failed, not what the cleanup did")
+	assert.Empty(t, rr.Result().Cookies(), "no cookie names a session the ceremony abandoned")
 }
 
 // The compensation runs on a context of its own, because the cancellation that would stop it is
@@ -729,23 +767,23 @@ func TestStartNewUserSession_DeletesTheRowWhenTheSaveFails(t *testing.T) {
 // finding 9).
 //
 // net/http cancels a request's context the moment the client disconnects, and a disconnected
-// client is exactly why a browser-store write fails. So the two arrive together: Regenerate or
-// Save reports a failure, and the DeleteUserSession that undoes the committed row is handed a
-// context that is already done. Before this, that left #198's orphan behind in precisely the case
-// the compensation was written for -- and only in that case, which is why every other test in
-// this file passed over it.
+// client is exactly why a browser-store write fails. So the two arrive together: Regenerate
+// reports a failure, and the DeleteUserSession that undoes the committed row is handed a context
+// that is already done. Before this, that left #198's orphan behind in precisely the case the
+// compensation was written for -- and only in that case, which is why every other test in this
+// file passed over it.
 //
-// The store cancels the request here rather than the test doing it up front, because cancelling
-// before the call would stop RunInTransaction instead and never reach the window.
+// The backend cancels the request inside Create, where the rotation writes its new row, rather
+// than the test doing it up front, because cancelling before the call would stop
+// RunInTransaction instead and never reach the window.
 func TestStartNewUserSession_DeletesTheRowEvenWhenTheRequestWasCancelled(t *testing.T) {
 	m := newStartSessionMocks(t)
-	rotationErr := errors.New("cannot rotate: the client went away")
-	store := m.withRegeneratingStore(rotationErr)
 
-	req := newSessionRequest("192.168.1.50:54321", chromeUserAgent)
+	req := withCookies(newSessionRequest("192.168.1.50:54321", chromeUserAgent), m.seed(nil))
 	ctx, cancel := context.WithCancel(req.Context())
 	req = req.WithContext(ctx)
-	store.beforeRegenerate = cancel
+	m.backend.beforeCreate = cancel
+	m.backend.failCreate = true
 
 	m.expectPersistThroughCommit(123, nil)
 	m.db.On("DeleteUserSession", aLiveSessionContext(), (*sql.Tx)(nil), int64(99)).Return(nil).Once()
@@ -755,7 +793,7 @@ func TestStartNewUserSession_DeletesTheRowEvenWhenTheRequestWasCancelled(t *test
 		123, 7, "pwd", models.AcrLevel1.String(), 0, nil, someCredentialInstant())
 
 	assert.Nil(t, result)
-	assert.ErrorIs(t, err, rotationErr, "the caller is still told why the ceremony failed")
+	assert.ErrorIs(t, err, errCreateRefused, "the caller is still told why the ceremony failed")
 	assert.Error(t, ctx.Err(), "the request really was cancelled before the compensation ran")
 	m.db.AssertExpectations(t)
 }
@@ -772,11 +810,10 @@ func aLiveSessionContext() interface{} {
 // rather than being dropped, so the record says the row survived.
 func TestStartNewUserSession_AFailedCompensationKeepsTheOriginalError(t *testing.T) {
 	m := newStartSessionMocks(t)
-	saveErr := errors.New("cannot write cookie")
 	deleteErr := errors.New("database is down")
+	m.backend.failCreate = true
 
 	m.expectPersistThroughCommit(123, nil)
-	m.store.On("Save", mock.Anything, mock.Anything, m.session).Return(saveErr).Once()
 	m.db.On("DeleteUserSession", mock.Anything, (*sql.Tx)(nil), int64(99)).Return(deleteErr).Once()
 
 	result, err := m.manager.StartNewUserSession(
@@ -784,13 +821,13 @@ func TestStartNewUserSession_AFailedCompensationKeepsTheOriginalError(t *testing
 		123, 7, "pwd", models.AcrLevel1.String(), 0, nil, someCredentialInstant())
 
 	assert.Nil(t, result)
-	assert.ErrorIs(t, err, saveErr, "the original failure must survive a failed cleanup")
+	require.ErrorIs(t, err, errCreateRefused, "the original failure must survive a failed cleanup")
 	assert.ErrorIs(t, err, deleteErr, "the cleanup failure must not be dropped")
 	assert.Contains(t, err.Error(), "unable to delete the user session left behind by a failed browser session write")
 }
 
-// A failure to read the cookie session is wrapped with context, since the raw
-// gorilla error alone is hard to place.
+// A failure to read the browser session is wrapped with context, since the store's error alone
+// is hard to place.
 //
 // #198 moved this read above the transaction, so the database is handed no expectation here
 // either: the read is the first thing the manager does, and a mock built with NewDatabase(t)
@@ -798,16 +835,15 @@ func TestStartNewUserSession_AFailedCompensationKeepsTheOriginalError(t *testing
 // after one had been committed.
 func TestStartNewUserSession_WrapsSessionStoreReadError(t *testing.T) {
 	m := newStartSessionMocks(t)
-
-	m.store.On("Get", mock.Anything, testSessionName).Return(nil, errors.New("cookie is corrupt")).Once()
+	req := withCookies(newSessionRequest("192.168.1.50:54321", chromeUserAgent), m.seed(nil))
+	m.backend.failLoad = true
 
 	_, err := m.manager.StartNewUserSession(
-		httptest.NewRecorder(), newSessionRequest("192.168.1.50:54321", chromeUserAgent),
+		httptest.NewRecorder(), req,
 		123, 7, "pwd", models.AcrLevel1.String(), 0, nil, someCredentialInstant())
 
-	assert.Error(t, err)
+	require.ErrorIs(t, err, errLoadRefused)
 	assert.Contains(t, err.Error(), "unable to get the session")
-	assert.Contains(t, err.Error(), "cookie is corrupt")
 }
 
 // =============================================================================
@@ -815,14 +851,13 @@ func TestStartNewUserSession_WrapsSessionStoreReadError(t *testing.T) {
 // =============================================================================
 
 func TestNewUserSessionManager_StoresItsDependencies(t *testing.T) {
-	db := mocks_data.NewDatabase(t)
-	store := mocks_sessionstore.NewStore(t)
+	m := newStartSessionMocks(t)
 
-	manager := NewUserSessionManager(store, "some-session", db)
+	manager := NewUserSessionManager(m.store, "some-session", m.db)
 
 	assert.NotNil(t, manager)
-	assert.Same(t, db, manager.database)
-	assert.Same(t, store, manager.sessionStore)
+	assert.Same(t, m.db, manager.database)
+	assert.Same(t, m.store, manager.sessionStore)
 	assert.Equal(t, "some-session", manager.sessionName)
 }
 
@@ -839,7 +874,7 @@ func TestNewUserSessionManager_StoresItsDependencies(t *testing.T) {
 // default and pass even if the assignment were missing entirely.
 func TestStartNewUserSession_StampsAuthStateGeneration(t *testing.T) {
 	m := newStartSessionMocks(t)
-	captured := m.expectSuccessfulPersist(123, nil)
+	captured := m.expectPersistThroughCommit(123, nil)
 
 	_, err := m.manager.StartNewUserSession(
 		httptest.NewRecorder(), newSessionRequest("192.168.1.50:54321", chromeUserAgent),
@@ -861,7 +896,7 @@ func TestStartNewUserSession_StampsAuthStateGeneration(t *testing.T) {
 // two parameters cannot be confused with each other or with a zero default.
 func TestStartNewUserSession_StampsOtpConfigGeneration(t *testing.T) {
 	m := newStartSessionMocks(t)
-	captured := m.expectSuccessfulPersist(123, nil)
+	captured := m.expectPersistThroughCommit(123, nil)
 
 	observed := int64(9)
 	_, err := m.manager.StartNewUserSession(
@@ -884,7 +919,7 @@ func TestStartNewUserSession_StampsOtpConfigGeneration(t *testing.T) {
 // ceremony never addressed.
 func TestStartNewUserSession_NilOtpConfigGenerationLandsAtZero(t *testing.T) {
 	m := newStartSessionMocks(t)
-	captured := m.expectSuccessfulPersist(123, nil)
+	captured := m.expectPersistThroughCommit(123, nil)
 
 	_, err := m.manager.StartNewUserSession(
 		httptest.NewRecorder(), newSessionRequest("192.168.1.50:54321", chromeUserAgent),
@@ -912,7 +947,7 @@ func TestStartNewUserSession_NilOtpConfigGenerationLandsAtZero(t *testing.T) {
 // them back would shorten it against the idle timeout and the max lifetime.
 func TestStartNewUserSession_AuthTimeIsTheCapturedCredentialInstant(t *testing.T) {
 	m := newStartSessionMocks(t)
-	captured := m.expectSuccessfulPersist(123, nil)
+	captured := m.expectPersistThroughCommit(123, nil)
 
 	credentialAcceptedAt := time.Now().UTC().Add(-90 * time.Minute)
 
@@ -945,7 +980,7 @@ func TestStartNewUserSession_AuthTimeIsTheCapturedCredentialInstant(t *testing.T
 // on the model is the kind of thing that survives until a formatter prints the wrong hour.
 func TestStartNewUserSession_AuthTimeIsNormalisedToUTC(t *testing.T) {
 	m := newStartSessionMocks(t)
-	captured := m.expectSuccessfulPersist(123, nil)
+	captured := m.expectPersistThroughCommit(123, nil)
 
 	zone := time.FixedZone("UTC+7", 7*60*60)
 	credentialAcceptedAt := time.Now().In(zone).Add(-30 * time.Minute)
@@ -980,9 +1015,14 @@ func TestStartNewUserSession_RefusesAMissingCredentialInstant(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			m := newStartSessionMocks(t)
 			recorder := httptest.NewRecorder()
+			// The browser brings a session, so a read of it would reach the backend: without
+			// one the store answers a fresh session without consulting anything, and the
+			// counts below would be zero whatever the manager did.
+			req := withCookies(newSessionRequest("192.168.1.50:54321", chromeUserAgent), m.seed(nil))
+			loads, creates := m.backend.loads, m.backend.creates
 
 			result, err := m.manager.StartNewUserSession(
-				recorder, newSessionRequest("192.168.1.50:54321", chromeUserAgent),
+				recorder, req,
 				123, 7, "pwd", models.AcrLevel1.String(), 7, nil, capture)
 
 			require.ErrorContains(t, err, "no credential instant captured")
@@ -996,8 +1036,8 @@ func TestStartNewUserSession_RefusesAMissingCredentialInstant(t *testing.T) {
 			m.db.AssertNotCalled(t, "CreateUserSessionClient", mock.Anything, mock.Anything, mock.Anything)
 			m.db.AssertNotCalled(t, "GetUserSessionsByUserId", mock.Anything, mock.Anything, mock.Anything)
 			m.db.AssertNotCalled(t, "DeleteUserSession", mock.Anything, mock.Anything, mock.Anything)
-			m.store.AssertNotCalled(t, "Get", mock.Anything, mock.Anything)
-			m.store.AssertNotCalled(t, "Save", mock.Anything, mock.Anything, mock.Anything)
+			assert.Equal(t, loads, m.backend.loads, "the browser session is not even read")
+			assert.Equal(t, creates, m.backend.creates, "nor written")
 			assert.Empty(t, recorder.Header().Values("Set-Cookie"),
 				"no cookie may be written for a session that was never created")
 		})

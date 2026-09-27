@@ -29,7 +29,6 @@ import (
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
-	mocks_sessionstore "github.com/leodip/goiabada/core/sessionstore/mocks"
 	"github.com/leodip/goiabada/core/sessionstore/sessiontest"
 	"github.com/leodip/goiabada/core/testutil"
 )
@@ -54,11 +53,20 @@ const (
 	callbackRequestID      = "req-callback"
 )
 
-// armableBackend is the in-memory backend with a Create that can be made to fail once the
-// handshake has been seeded, which is how a rotation that cannot write its new row is reached.
+// armableBackend is the in-memory backend with a Load and a Create that can be made to fail once
+// the handshake has been seeded, which is how a session that cannot be read and a rotation that
+// cannot write its new row are reached.
 type armableBackend struct {
 	*sessiontest.MemoryBackend
+	failLoad   bool
 	failCreate bool
+}
+
+func (b *armableBackend) Load(ctx context.Context, id string) (*sessionstore.Record, error) {
+	if b.failLoad {
+		return nil, errs.New("the backend refused the read")
+	}
+	return b.MemoryBackend.Load(ctx, id)
 }
 
 func (b *armableBackend) Create(ctx context.Context, id string, data []byte, authenticated bool) (time.Time, error) {
@@ -67,10 +75,6 @@ func (b *armableBackend) Create(ctx context.Context, id string, data []byte, aut
 	}
 	return b.MemoryBackend.Create(ctx, id, data, authenticated)
 }
-
-// saveOnlyStore hides the store's Regenerate, which is what a store that cannot rotate looks
-// like to the handler: it reaches the Save fallback.
-type saveOnlyStore struct{ sessionstore.Store }
 
 // recordingExchanger answers the configured response or error, and records the call.
 type recordingExchanger struct {
@@ -168,8 +172,7 @@ func (h *callbackHarness) readBack(cookies []*http.Cookie) *sessionstore.Session
 }
 
 // serve posts form to the callback with cookies, behind chi's RequestID as in production.
-func (h *callbackHarness) serve(store sessionstore.Store, exchanger TokenExchanger,
-	cookies []*http.Cookie, form url.Values) *httptest.ResponseRecorder {
+func (h *callbackHarness) serve(exchanger TokenExchanger, cookies []*http.Cookie, form url.Values) *httptest.ResponseRecorder {
 	h.t.Helper()
 	req := handlertest.Request(http.MethodPost, "/auth/callback", handlertest.WithForm(form))
 	req.Header.Set("X-Request-Id", callbackRequestID)
@@ -177,7 +180,7 @@ func (h *callbackHarness) serve(store sessionstore.Store, exchanger TokenExchang
 		req.AddCookie(c)
 	}
 	w := httptest.NewRecorder()
-	chimiddleware.RequestID(HandleAuthCallbackPost(h.httpHelper, store, h.parser, exchanger)).ServeHTTP(w, req)
+	chimiddleware.RequestID(HandleAuthCallbackPost(h.httpHelper, h.store, h.parser, exchanger)).ServeHTTP(w, req)
 	return w
 }
 
@@ -275,7 +278,7 @@ func TestHandleAuthCallbackPost_RefusesAMalformedHandshakeBeforeTheExchange(t *t
 				cookies := h.seed(seeded)
 				exchanger := &recordingExchanger{response: h.tokenResponse()}
 
-				w := h.serve(h.store, exchanger, cookies, callbackForm())
+				w := h.serve(exchanger, cookies, callbackForm())
 
 				h.assertRefused(w, cookies, seeded, refusalSession, slog.LevelWarn)
 				assert.False(t, exchanger.called, "refused before the code is spent")
@@ -379,7 +382,7 @@ func TestHandleAuthCallbackPost_RefusesFromTheRequestBeforeTheExchange(t *testin
 			}
 			exchanger := &recordingExchanger{response: h.tokenResponse()}
 
-			w := h.serve(h.store, exchanger, cookies, tc.form)
+			w := h.serve(exchanger, cookies, tc.form)
 
 			readBackCookies := cookies
 			if seeded == nil {
@@ -476,7 +479,7 @@ func TestHandleAuthCallbackPost_RefusesWhatTheAuthServerAnswered(t *testing.T) {
 			response, err := tc.exchange(h)
 			exchanger := &recordingExchanger{response: response, err: err}
 
-			w := h.serve(h.store, exchanger, cookies, callbackForm())
+			w := h.serve(exchanger, cookies, callbackForm())
 
 			bind := h.assertRefused(w, cookies, seeded, tc.want, slog.LevelError)
 			assert.True(t, exchanger.called)
@@ -486,20 +489,25 @@ func TestHandleAuthCallbackPost_RefusesWhatTheAuthServerAnswered(t *testing.T) {
 	}
 }
 
-// A session store that cannot be read answers the generic 500 page, as it did.
+// A session store that cannot be read answers the generic 500 page, as it did, before the code is
+// spent and without writing anything.
 func TestHandleAuthCallbackPost_ASessionThatCannotBeRead(t *testing.T) {
-	httpHelper := mocks_handlers.NewHttpHelper(t)
-	httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).Return().Once()
-	httpSession := mocks_sessionstore.NewStore(t)
-	httpSession.On("Get", mock.Anything, coreconstants.AdminConsoleSessionName).
-		Return(&sessionstore.Session{Values: map[string]any{}}, errs.New("the store is down"))
+	h := newCallbackHarness(t)
+	h.httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).Return().Once()
+
+	seeded := handshake()
+	cookies := h.seed(seeded)
+	h.backend.failLoad = true
 	exchanger := &recordingExchanger{}
 
-	req := handlertest.Request(http.MethodPost, "/auth/callback", handlertest.WithForm(callbackForm()))
-	HandleAuthCallbackPost(httpHelper, httpSession, unusedTokenParser{t: t}, exchanger).
-		ServeHTTP(httptest.NewRecorder(), req)
+	w := h.serve(exchanger, cookies, callbackForm())
 
 	assert.False(t, exchanger.called)
+	assert.Empty(t, w.Result().Cookies())
+	h.backend.failLoad = false
+	readBack := h.readBack(cookies)
+	assert.False(t, readBack.IsNew)
+	assert.Equal(t, seeded, readBack.Values)
 }
 
 // A rotation that cannot write the new row answers the generic 500 page and leaves the browser's
@@ -513,7 +521,7 @@ func TestHandleAuthCallbackPost_ARotationThatFails(t *testing.T) {
 	h.backend.failCreate = true
 	exchanger := &recordingExchanger{response: h.tokenResponse()}
 
-	w := h.serve(h.store, exchanger, cookies, callbackForm())
+	w := h.serve(exchanger, cookies, callbackForm())
 
 	assert.True(t, exchanger.called)
 	assert.Empty(t, w.Result().Cookies())
@@ -568,7 +576,7 @@ func TestHandleAuthCallbackPost_SignsInAndRotatesTheIdentifier(t *testing.T) {
 			exchanger := &recordingExchanger{response: response}
 
 			before := time.Now()
-			w := h.serve(h.store, exchanger, cookies, callbackForm())
+			w := h.serve(exchanger, cookies, callbackForm())
 			after := time.Now()
 
 			require.Equal(t, http.StatusFound, w.Code)
@@ -590,22 +598,4 @@ func TestHandleAuthCallbackPost_SignsInAndRotatesTheIdentifier(t *testing.T) {
 			assert.True(t, h.readBack(cookies).IsNew, "the identifier the browser brought names nothing any more")
 		})
 	}
-}
-
-// A store that cannot rotate still signs the administrator in, through Save.
-func TestHandleAuthCallbackPost_TheSaveFallback(t *testing.T) {
-	h := newCallbackHarness(t)
-	handlertest.RefuseInternalServerError(t, h.httpHelper)
-
-	cookies := h.seed(handshake())
-	response := h.tokenResponse()
-	exchanger := &recordingExchanger{response: response}
-
-	before := time.Now()
-	w := h.serve(saveOnlyStore{h.store}, exchanger, cookies, callbackForm())
-	after := time.Now()
-
-	require.Equal(t, http.StatusFound, w.Code)
-	assert.Equal(t, callbackRedirectBack, w.Header().Get("Location"))
-	assertSignedIn(t, h.readBack(cookies), *response, before, after)
 }
