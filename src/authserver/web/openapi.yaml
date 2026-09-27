@@ -4060,11 +4060,13 @@ components:
           type: string
         gender:
           type: string
+          description: '"0", "1" or "2", for female, male and other'
         dateOfBirth:
           type: string
           description: Format YYYY-MM-DD
         zoneInfoCountryName:
           type: string
+          description: The country zoneInfo is listed under in the time zone table; sent with zoneInfo, or both empty
         zoneInfo:
           type: string
         locale:
@@ -4084,6 +4086,7 @@ components:
       properties:
         phoneCountryUniqueId:
           type: string
+          description: An entry's uniqueId from GET /api/v1/admin/phone-countries, e.g. USA_0
         phoneNumber:
           type: string
         phoneNumberVerified:
@@ -5750,6 +5753,7 @@ components:
       properties:
         phoneCountryUniqueId:
           type: string
+          description: An entry's uniqueId from GET /api/v1/admin/phone-countries, e.g. USA_0
         phoneNumber:
           type: string
           description: Empty string to clear

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"regexp"
+	"slices"
 	"strconv"
 	"time"
 
@@ -209,10 +210,18 @@ func (val *ProfileValidator) ValidateProfile(ctx context.Context, input *Validat
 		}
 	}
 
-	if len(input.ZoneInfo) > 0 {
-		if len(timezones.ByZone(input.ZoneInfo)) == 0 {
+	// The zone and its country name are one value: together they are the row of the zone picker
+	// the profile page reopens on, and a zone ID alone does not name a row, since one zone can be
+	// listed under several countries. A pair naming no row makes the page reopen on the blank
+	// option, and the next save of that page erases the user's zone. So a zone requires the name
+	// of a country it is listed under, compared exactly, and no zone requires no name (#432).
+	if input.ZoneInfo != "" {
+		rows := timezones.ByZone(input.ZoneInfo)
+		if !slices.ContainsFunc(rows, func(z timezones.Zone) bool { return z.CountryName == input.ZoneInfoCountryName }) {
 			return i18n.NewLocalizedError(i18n.ErrCodeProfileZoneInfoInvalid, nil)
 		}
+	} else if input.ZoneInfoCountryName != "" {
+		return i18n.NewLocalizedError(i18n.ErrCodeProfileZoneInfoInvalid, nil)
 	}
 
 	if len(input.Locale) > 0 {

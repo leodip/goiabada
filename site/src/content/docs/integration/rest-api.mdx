@@ -296,13 +296,15 @@ PUT /api/v1/admin/users/{id}/profile
   "familyName": "Doe",
   "nickname": "Johnny",
   "website": "https://johndoe.com",
-  "gender": "male",
+  "gender": "1",
   "dateOfBirth": "1990-01-15",
   "zoneInfoCountryName": "United States",
   "zoneInfo": "America/New_York",
   "locale": "en-US"
 }
 ```
+
+`gender` is `"0"`, `"1"` or `"2"`, for female, male and other. `zoneInfoCountryName` must be the country `zoneInfo` is listed under in the time zone table, since one zone can serve several countries; send both, or both empty.
 
 #### Update user email
 
@@ -348,11 +350,13 @@ PUT /api/v1/admin/users/{id}/phone
 
 ```json
 {
-  "phoneCountryUniqueId": "US",
+  "phoneCountryUniqueId": "USA_0",
   "phoneNumber": "5551234567",
   "phoneNumberVerified": false
 }
 ```
+
+`phoneCountryUniqueId` is an entry's `uniqueId` from `GET /api/v1/admin/phone-countries`.
 
 #### Update user address
 
@@ -1315,13 +1319,15 @@ PUT /api/v1/account/profile
   "familyName": "Doe",
   "nickname": "Johnny",
   "website": "https://johndoe.com",
-  "gender": "male",
+  "gender": "1",
   "dateOfBirth": "1990-01-15",
   "zoneInfoCountryName": "United States",
   "zoneInfo": "America/New_York",
   "locale": "en-US"
 }
 ```
+
+`gender` and the zone pair follow the rules under [Update user profile](#update-user-profile).
 
 ---
 
@@ -1391,12 +1397,12 @@ PUT /api/v1/account/phone
 
 ```json
 {
-  "phoneCountryUniqueId": "US",
+  "phoneCountryUniqueId": "USA_0",
   "phoneNumber": "5551234567"
 }
 ```
 
-Send an empty `phoneNumber` to clear the phone number.
+Send an empty `phoneNumber` to clear the phone number. `phoneCountryUniqueId` takes the same ids as [Update user phone](#update-user-phone).
 
 ---
 

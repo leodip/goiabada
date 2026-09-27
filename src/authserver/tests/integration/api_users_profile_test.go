@@ -251,6 +251,52 @@ func TestAPIUserProfilePut_InvalidDateOfBirth(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 }
 
+// A zone and a country name are saved as a pair, and the pair must be a row of the timezones
+// table: Europe/Berlin is a real zone and Brazil a real country, but Europe/Berlin is not listed
+// under Brazil. The refusal must leave the stored profile as it was.
+func TestAPIUserProfilePut_ZonePairNamingNoRow(t *testing.T) {
+	accessToken, _ := createAdminClientWithToken(t)
+
+	testUser := &models.User{
+		Subject:             fake.UUID(),
+		Enabled:             true,
+		Email:               uniqueEmail("testuser@zone-pair.test"),
+		GivenName:           "Test",
+		FamilyName:          "User",
+		ZoneInfoCountryName: "United States",
+		ZoneInfo:            "America/New_York",
+	}
+	err := database.CreateUser(context.Background(), nil, testUser)
+	assert.NoError(t, err)
+	defer func() {
+		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
+	}()
+
+	updateReq := api.UpdateUserProfileRequest{
+		GivenName:           "Changed",
+		FamilyName:          "User",
+		ZoneInfoCountryName: "Brazil",
+		ZoneInfo:            "Europe/Berlin",
+	}
+
+	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/profile"
+	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
+	defer func() { _ = resp.Body.Close() }()
+
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	var errResp api.ErrorResponse
+	assert.NoError(t, json.NewDecoder(resp.Body).Decode(&errResp))
+	assert.Equal(t, "The zone info is invalid.", errResp.ErrorDescription)
+
+	stored, err := database.GetUserById(context.Background(), nil, testUser.Id)
+	assert.NoError(t, err)
+	if assert.NotNil(t, stored) {
+		assert.Equal(t, "United States", stored.ZoneInfoCountryName)
+		assert.Equal(t, "America/New_York", stored.ZoneInfo)
+		assert.Equal(t, "Test", stored.GivenName)
+	}
+}
+
 func TestAPIUserProfilePut_UserNotFound(t *testing.T) {
 	// Setup: Create admin client and get access token
 	accessToken, _ := createAdminClientWithToken(t)
