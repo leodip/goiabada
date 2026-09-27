@@ -32,8 +32,8 @@ func generateEnvFile(config *Config) string {
 	sb.WriteString("# =============================================================================\n")
 	sb.WriteString("# Database settings\n")
 	sb.WriteString("# =============================================================================\n")
-	fmt.Fprintf(&sb, "export GOIABADA_DB_TYPE=\"%s\"\n", config.DBType)
-	if config.DBType == "sqlite" {
+	fmt.Fprintf(&sb, "export GOIABADA_DB_TYPE=\"%s\"\n", config.Engine.name)
+	if !config.Engine.hasServer {
 		sb.WriteString("export GOIABADA_DB_DSN=\"./goiabada.db\"\n")
 	} else {
 		fmt.Fprintf(&sb, "export GOIABADA_DB_HOST=\"%s\"\n", config.DBHost)

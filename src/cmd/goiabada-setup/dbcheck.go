@@ -11,28 +11,15 @@ import (
 )
 
 // testDatabaseConnection returns true if connection succeeded, false otherwise
-func testDatabaseConnection(dbType, host, port, name, user, password string) bool {
+func testDatabaseConnection(e *engine, host, port, name, user, password string) bool {
 	fmt.Print("Testing database connection... ")
 
-	var dsn string
-	var driver string
-
-	switch dbType {
-	case "mysql":
-		driver = "mysql"
-		dsn = fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?timeout=5s", user, password, host, port, name)
-	case "postgres":
-		driver = "postgres"
-		dsn = fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=require connect_timeout=5", host, port, user, password, name)
-	case "mssql":
-		driver = "sqlserver"
-		dsn = fmt.Sprintf("sqlserver://%s:%s@%s:%s?database=%s&connection+timeout=5", user, password, host, port, name)
-	default:
-		printWarning("Database connection test not supported for %s", dbType)
+	if e.checkDSN == nil {
+		printWarning("Database connection test not supported for %s", e.name)
 		return true // Skip unsupported databases
 	}
 
-	db, err := sql.Open(driver, dsn)
+	db, err := sql.Open(e.checkDriver, e.checkDSN(host, port, name, user, password))
 	if err != nil {
 		printError("Failed to open connection: %v", err)
 		return false
@@ -50,31 +37,23 @@ func testDatabaseConnection(dbType, host, port, name, user, password string) boo
 	printSuccess("Connection successful!")
 
 	// Check if database has Goiabada tables (indicating it's not empty)
-	checkDatabaseEmpty(db, dbType)
+	checkDatabaseEmpty(db, e)
 
 	return true
 }
 
 // checkDatabaseEmpty checks if the database already has Goiabada tables
 // and warns the user if it does
-func checkDatabaseEmpty(db *sql.DB, dbType string) {
+func checkDatabaseEmpty(db *sql.DB, e *engine) {
 	fmt.Print("Checking if database is empty... ")
 
-	var query string
-	switch dbType {
-	case "mysql":
-		query = "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'users'"
-	case "postgres":
-		query = "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'users'"
-	case "mssql":
-		query = "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'users'"
-	default:
+	if e.emptinessQuery == "" {
 		fmt.Println("skipped")
 		return
 	}
 
 	var count int
-	err := db.QueryRow(query).Scan(&count)
+	err := db.QueryRow(e.emptinessQuery).Scan(&count)
 	if err != nil {
 		// If we can't check, just skip
 		fmt.Println("skipped")

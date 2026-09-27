@@ -18,35 +18,23 @@ var updateGoldens = flag.Bool("update", false, "rewrite testdata/*.golden from t
 // goldenCase is one reachable deployment type and engine. The name is the CLI's own spelling of
 // both, so a failure names the configuration an operator would ask for.
 type goldenCase struct {
-	name           string
-	deploymentType string
-	dbType         string
+	name       string
+	deployment deploymentType
+	engine     string
 }
 
 func (c goldenCase) path() string {
 	return filepath.Join("testdata", c.name+".golden")
 }
 
-// goldenCases is every deployment type by every engine it accepts: Kubernetes has no SQLite, since
-// a pod's filesystem is not where an auth server's only copy of its data can live.
+// goldenCases is every deployment type by every engine it accepts, read from the two tables: a row
+// added to either asks for its goldens, and an engine a type stops accepting leaves a golden no
+// case writes, which TestGoldens_EveryFileHasACase refuses. Kubernetes has no SQLite.
 func goldenCases() []goldenCase {
-	types := []struct {
-		name, value string
-		engines     []string
-	}{
-		{"local", "1", []string{"mysql", "postgres", "mssql", "sqlite"}},
-		{"production", "2", []string{"mysql", "postgres", "mssql", "sqlite"}},
-		{"kubernetes", "3", []string{"mysql", "postgres", "mssql"}},
-		{"native", "4", []string{"mysql", "postgres", "mssql", "sqlite"}},
-	}
 	var cases []goldenCase
-	for _, deploymentType := range types {
-		for _, engine := range deploymentType.engines {
-			cases = append(cases, goldenCase{
-				name:           deploymentType.name + "-" + engine,
-				deploymentType: deploymentType.value,
-				dbType:         engine,
-			})
+	for _, d := range deployments {
+		for _, e := range d.acceptedEngines() {
+			cases = append(cases, goldenCase{name: d.name + "-" + e.name, deployment: d.kind, engine: e.name})
 		}
 	}
 	return cases
@@ -56,37 +44,37 @@ func goldenCases() []goldenCase {
 // main derives from those two set the way main sets it. The values are literals rather than a call
 // into main's own defaults, so a later change to a default does not move a golden, and a change to
 // a generator does.
-func goldenConfig(deploymentType, dbType string) *Config {
+func goldenConfig(kind deploymentType, engineName string) *Config {
 	config := testConfig()
-	config.DeploymentType = deploymentType
-	config.DBType = dbType
+	config.Deployment = deployments[kind]
+	config.Engine = testEngine(engineName)
 
-	switch dbType {
+	switch engineName {
 	case "mysql":
-		config.DBImage, config.DBPort = "mysql:latest", "3306"
+		config.DBPort = "3306"
 	case "postgres":
-		config.DBImage, config.DBPort = "postgres:latest", "5432"
+		config.DBPort = "5432"
 	case "mssql":
-		config.DBImage, config.DBPort = "mcr.microsoft.com/mssql/server:2022-latest", "1433"
+		config.DBPort = "1433"
 	case "sqlite":
-		config.DBImage, config.DBPort = "", ""
+		config.DBPort = ""
 	}
 
 	// The two Docker types ask for a database password and nothing else, since the database is a
 	// service of the compose file; SQLite asks for nothing at all.
-	if deploymentType == "1" || deploymentType == "2" || dbType == "sqlite" {
+	if kind == deploymentLocal || kind == deploymentProduction || engineName == "sqlite" {
 		config.DBHost, config.DBName, config.DBUsername = "", "", ""
 	}
-	if dbType == "sqlite" {
+	if engineName == "sqlite" {
 		config.DBPassword = ""
 	}
 	// Local testing is served on localhost whatever the operator would have typed.
-	if deploymentType == "1" {
+	if kind == deploymentLocal {
 		config.AuthServerURL = "http://localhost:9090"
 		config.AdminConsoleURL = "http://localhost:9091"
 	}
 	// Only the Kubernetes type asks for a namespace.
-	if deploymentType != "3" {
+	if kind != deploymentKubernetes {
 		config.K8sNamespace = ""
 	}
 	return config
@@ -95,8 +83,8 @@ func goldenConfig(deploymentType, dbType string) *Config {
 func TestGeneratedConfiguration_MatchesTheGoldens(t *testing.T) {
 	for _, testCase := range goldenCases() {
 		t.Run(testCase.name, func(t *testing.T) {
-			config := goldenConfig(testCase.deploymentType, testCase.dbType)
-			_, content := generatedConfiguration(config.DeploymentType, config)
+			config := goldenConfig(testCase.deployment, testCase.engine)
+			_, content := generatedConfiguration(config)
 
 			if *updateGoldens {
 				if err := os.MkdirAll("testdata", 0o750); err != nil {

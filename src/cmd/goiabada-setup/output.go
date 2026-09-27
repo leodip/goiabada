@@ -5,18 +5,10 @@ import (
 	"path/filepath"
 )
 
-// generatedConfiguration returns the file a deployment type is configured by, under its default
-// name: Kubernetes manifests for type 3, an environment file for native binaries (type 4), and a
-// docker-compose file for the two Docker types.
-func generatedConfiguration(deploymentType string, config *Config) (filename, content string) {
-	switch deploymentType {
-	case "3":
-		return "goiabada-k8s.yaml", generateKubernetesManifests(config)
-	case "4":
-		return "goiabada.env", generateEnvFile(config)
-	default:
-		return "docker-compose.yml", generateDockerCompose(config)
-	}
+// generatedConfiguration returns the file the configured deployment type is configured by, under
+// its default name, from the type's generator.
+func generatedConfiguration(config *Config) (filename, content string) {
+	return config.Deployment.outputFile, config.Deployment.generate(config)
 }
 
 // writePrivateFile writes a generated file readable by its owner alone. Every file this wizard

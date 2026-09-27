@@ -2,9 +2,8 @@ package main
 
 // Config holds all configuration values
 type Config struct {
-	DeploymentType      string
-	DBType              string
-	DBImage             string
+	Deployment          *deployment
+	Engine              *engine
 	DBPort              string
 	DBHost              string
 	DBName              string
