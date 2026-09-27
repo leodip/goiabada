@@ -39,6 +39,9 @@ type deployment struct {
 	// behindProxy says the Compose services sit behind a reverse proxy on the same host: they
 	// trust its forwarded headers and listen on loopback alone.
 	behindProxy bool
+	// routesByHost says the manifest routes and certifies each URL by its host, which must then be
+	// a lowercase domain name (validateListenerHostname) and not the other URL's host.
+	routesByHost bool
 
 	outputFile        string
 	generate          func(config *Config) string
@@ -79,6 +82,7 @@ var deployments = []*deployment{
 		asksURLs:          true,
 		asksNamespace:     true,
 		externalDatabase:  true,
+		routesByHost:      true,
 		outputFile:        "goiabada-k8s.yaml",
 		generate:          generateKubernetesManifests,
 		printInstructions: printKubernetesInstructions,

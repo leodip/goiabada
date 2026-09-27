@@ -2,6 +2,7 @@ package main
 
 import (
 	"net"
+	"net/url"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -38,7 +39,109 @@ func validateURL(urlStr string) error {
 	if idx := strings.Index(hostname, "/"); idx != -1 {
 		hostname = hostname[:idx]
 	}
-	return validateHostname(hostname)
+	if err := validateHostname(hostname); err != nil {
+		return err
+	}
+	// hostOf reads the host with url.Parse, and these two refusals make it the host validated
+	// above: https://auth.example.com:x@evil.com/ passed as auth.example.com while every URL
+	// parser reads evil.com, and https://auth.example.com:abc carried a port nothing can dial
+	// (#430).
+	u, err := url.Parse(urlStr)
+	if err != nil {
+		return errs.New("URL cannot be parsed")
+	}
+	if u.User != nil {
+		return errs.New("URL cannot carry a user name or password")
+	}
+	return nil
+}
+
+// hostOf is the host of a URL validateURL accepted, without its port, path or trailing slash:
+// what a Kubernetes host and a certificate name, and so the default admin URL too, are about.
+// Trimming the scheme alone put https://auth.example.com/ and :8443 into the Ingress (#430).
+func hostOf(urlStr string) string {
+	u, err := url.Parse(urlStr)
+	if err != nil {
+		return "" // unreachable for a URL validateURL accepted, which refuses one url.Parse does not
+	}
+	return u.Hostname()
+}
+
+// parentDomain is the domain a host sits in: the host minus its first label when it has three or
+// more, and the host itself when it has two. An IP literal or a single-label host has none. Taking
+// the last two labels made https://auth.example.co.uk default the admin console to
+// https://admin.co.uk; the parent keeps the admin console a sibling of the auth server (#430).
+func parentDomain(host string) (string, bool) {
+	if host == "" || net.ParseIP(host) != nil {
+		return "", false
+	}
+	labels := strings.Split(host, ".")
+	switch len(labels) {
+	case 1:
+		return "", false
+	case 2:
+		return host, true
+	default:
+		return strings.Join(labels[1:], "."), true
+	}
+}
+
+// defaultAdminURL is the admin console URL offered for an auth server URL, https://admin. plus
+// the auth host's parent, and false when the host has no parent to offer one from.
+func defaultAdminURL(authServerURL string) (string, bool) {
+	parent, ok := parentDomain(hostOf(authServerURL))
+	if !ok {
+		return "", false
+	}
+	return "https://admin." + parent, true
+}
+
+// defaultAdminEmailFor is the admin email offered for an auth server URL, admin@ plus the auth
+// host's parent, and "" when it has none.
+func defaultAdminEmailFor(authServerURL string) string {
+	parent, ok := parentDomain(hostOf(authServerURL))
+	if !ok {
+		return ""
+	}
+	return "admin@" + parent
+}
+
+// siteOf is what the domain-mismatch warning compares for a URL: its host's parent, or the host
+// itself when it has none, so two different IP addresses still differ.
+func siteOf(urlStr string) string {
+	host := hostOf(urlStr)
+	if parent, ok := parentDomain(host); ok {
+		return parent
+	}
+	return host
+}
+
+// validateListenerHostname holds a Kubernetes host to what a Gateway listener's hostname may be,
+// a precise Hostname of Gateway API v1.6.1 (apis/v1/shared_types.go): "the RFC 1123 definition of
+// a hostname" except that "IPs are not allowed", every label "lower case alphanumeric characters
+// or '-'", starting and ending with an alphanumeric, at most 253 characters. The API server
+// refuses any other, so the manifest would not apply (#430).
+func validateListenerHostname(host string) error {
+	if net.ParseIP(host) != nil {
+		return errs.Errorf("%s is an IP address, and a Kubernetes host must be a domain name", host)
+	}
+	if len(host) > 253 {
+		return errs.Errorf("host %s is too long for Kubernetes (max 253 characters)", host)
+	}
+	for _, label := range strings.Split(host, ".") {
+		if label == "" || len(label) > 63 {
+			return errs.Errorf("host %s has a label of %d characters, and Kubernetes needs 1 to 63", host, len(label))
+		}
+		for _, c := range label {
+			if !isASCIILowerAlphaNum(c) && c != '-' {
+				return errs.Errorf("host %s has '%c', and a Kubernetes host is lowercase a-z, 0-9 and '-'", host, c)
+			}
+		}
+		if label[0] == '-' || label[len(label)-1] == '-' {
+			return errs.Errorf("host %s has a label starting or ending with '-'", host)
+		}
+	}
+	return nil
 }
 
 // isASCIIAlphaNum reports whether c is an ASCII letter or digit.
@@ -198,20 +301,4 @@ func checkPasswordStrength(password string) []string {
 		issues = append(issues, "no special character")
 	}
 	return issues
-}
-
-func extractDomainFromURL(urlStr string) string {
-	hostname := strings.TrimPrefix(urlStr, "https://")
-	hostname = strings.TrimPrefix(hostname, "http://")
-	if idx := strings.Index(hostname, ":"); idx != -1 {
-		hostname = hostname[:idx]
-	}
-	if idx := strings.Index(hostname, "/"); idx != -1 {
-		hostname = hostname[:idx]
-	}
-	parts := strings.Split(hostname, ".")
-	if len(parts) >= 2 {
-		return strings.Join(parts[len(parts)-2:], ".")
-	}
-	return hostname
 }

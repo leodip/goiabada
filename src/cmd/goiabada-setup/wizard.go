@@ -18,10 +18,10 @@ type wizard struct {
 	// is read.
 	interactive bool
 	config      *Config
-	// baseDomain is the auth server URL's domain, which the default admin console URL and admin
-	// email are built from.
-	baseDomain string
-	outputPath string
+	// defaultAdminEmail is the admin email offered: admin@example.com for local testing, admin@
+	// and the auth server host's parent otherwise, and none for a host without one.
+	defaultAdminEmail string
+	outputPath        string
 	// testConnection dials the database the operator described and reports what it found.
 	testConnection func(out *console, e *engine, host, port, name, user, password string) bool
 }
@@ -144,6 +144,7 @@ func (w *wizard) chooseDeployment() error {
 	if !target.asksURLs {
 		w.config.AuthServerURL = "http://localhost:9090"
 		w.config.AdminConsoleURL = "http://localhost:9091"
+		w.defaultAdminEmail = "admin@example.com"
 	}
 	return nil
 }
@@ -191,31 +192,21 @@ func (w *wizard) askURLs() error {
 	if !w.interactive {
 		return w.urlsFromFlags()
 	}
-	authServerURL, err := w.url("Auth server URL (e.g., https://auth.example.com)", "https://auth.example.com")
+	authServerURL, err := w.askURL("Auth server URL (e.g., https://auth.example.com)", "https://auth.example.com")
 	if err != nil {
 		return err
 	}
-	if authServerURL, err = w.confirmHTTP(authServerURL, "Auth server URL", "https://auth.example.com"); err != nil {
-		return err
-	}
-
-	w.baseDomain = extractDomainFromURL(authServerURL)
-	defaultAdminURL := fmt.Sprintf("https://admin.%s", w.baseDomain)
-	adminConsoleURL, err := w.url("Admin console URL (e.g., https://admin.example.com)", defaultAdminURL)
+	adminConsoleURL, err := w.askAdminURL("Admin console URL (e.g., https://admin.example.com)", authServerURL)
 	if err != nil {
 		return err
 	}
-	if adminConsoleURL, err = w.confirmHTTP(adminConsoleURL, "Admin console URL", defaultAdminURL); err != nil {
-		return err
-	}
 
-	authDomain := extractDomainFromURL(authServerURL)
-	adminDomain := extractDomainFromURL(adminConsoleURL)
-	if authDomain != adminDomain {
+	authSite, adminSite := siteOf(authServerURL), siteOf(adminConsoleURL)
+	if authSite != adminSite {
 		w.out.println()
 		w.out.warning("Domain mismatch detected!")
-		w.out.printf("   Auth server domain:    %s\n", authDomain)
-		w.out.printf("   Admin console domain:  %s\n", adminDomain)
+		w.out.printf("   Auth server domain:    %s\n", authSite)
+		w.out.printf("   Admin console domain:  %s\n", adminSite)
 		w.out.println()
 		keep, askErr := w.yesNo("Continue with different domains?", false)
 		if askErr != nil {
@@ -224,32 +215,74 @@ func (w *wizard) askURLs() error {
 		if !keep {
 			w.out.println()
 			w.out.println("Please re-enter the URLs:")
-			if authServerURL, err = w.url("Auth server URL", authServerURL); err != nil {
+			if authServerURL, err = w.askURL("Auth server URL", authServerURL); err != nil {
 				return err
 			}
-			w.baseDomain = extractDomainFromURL(authServerURL)
-			if adminConsoleURL, err = w.url("Admin console URL", fmt.Sprintf("https://admin.%s", w.baseDomain)); err != nil {
+			if adminConsoleURL, err = w.askAdminURL("Admin console URL", authServerURL); err != nil {
 				return err
 			}
 		}
 	}
 	w.config.AuthServerURL = authServerURL
 	w.config.AdminConsoleURL = adminConsoleURL
+	w.defaultAdminEmail = defaultAdminEmailFor(authServerURL)
 	return nil
 }
 
-// confirmHTTP asks once whether a plain-HTTP URL other than localhost is meant, and for another
-// URL if it is not.
-func (w *wizard) confirmHTTP(value, prompt, defaultValue string) (string, error) {
-	if !strings.HasPrefix(value, "http://") || strings.HasPrefix(value, "http://localhost") {
-		return value, nil
+// checkURL is validateURL, and for a deployment that routes by host, the Kubernetes host rule on
+// the URL's host as well.
+func (w *wizard) checkURL(value string) error {
+	if err := validateURL(value); err != nil {
+		return err
 	}
-	w.out.warning("Using HTTP for production is not recommended. Consider using HTTPS.")
-	keep, err := w.yesNo("Continue with HTTP?", false)
-	if err != nil || keep {
-		return value, err
+	if w.config.Deployment.routesByHost {
+		return validateListenerHostname(hostOf(value))
 	}
-	return w.url(prompt, defaultValue)
+	return nil
+}
+
+// checkDistinctHosts refuses, for a deployment that routes by host, an admin console URL on the
+// auth server's host. Two Gateway listeners on one port and hostname are indistinct, and "ALL
+// indistinct Listeners must not be accepted for processing" (Gateway API v1.6.1,
+// GatewaySpec.Listeners, "Handling indistinct Listeners"), so neither would be served (#430).
+func (w *wizard) checkDistinctHosts(authServerURL, adminConsoleURL string) error {
+	if w.config.Deployment.routesByHost && hostOf(authServerURL) == hostOf(adminConsoleURL) {
+		return errs.Errorf("the admin console URL has the auth server's host, %s, and each needs a host of its own", hostOf(authServerURL))
+	}
+	return nil
+}
+
+// askURL asks until the answer passes checkURL, and asks again when a plain-HTTP URL other than
+// localhost is not confirmed.
+func (w *wizard) askURL(prompt, defaultValue string) (string, error) {
+	for {
+		value, err := w.validated(prompt, defaultValue, "URL", w.checkURL)
+		if err != nil || !strings.HasPrefix(value, "http://") || strings.HasPrefix(value, "http://localhost") {
+			return value, err
+		}
+		w.out.warning("Using HTTP for production is not recommended. Consider using HTTPS.")
+		keep, err := w.yesNo("Continue with HTTP?", false)
+		if err != nil || keep {
+			return value, err
+		}
+	}
+}
+
+// askAdminURL asks for the admin console URL, offering the auth server's sibling when its host
+// has a parent and nothing when it has none, and asks again while checkDistinctHosts refuses it.
+func (w *wizard) askAdminURL(prompt, authServerURL string) (string, error) {
+	defaultURL, _ := defaultAdminURL(authServerURL)
+	for {
+		adminConsoleURL, err := w.askURL(prompt, defaultURL)
+		if err != nil {
+			return "", err
+		}
+		distinct := w.checkDistinctHosts(authServerURL, adminConsoleURL)
+		if distinct == nil {
+			return adminConsoleURL, nil
+		}
+		w.out.printf("Invalid URL: %s. Please try again.\n", distinct)
+	}
 }
 
 func (w *wizard) urlsFromFlags() error {
@@ -258,31 +291,35 @@ func (w *wizard) urlsFromFlags() error {
 	if authServerURL == "" {
 		return errs.New("--auth-url is required for production/kubernetes/native deployments")
 	}
-	if err := validateURL(authServerURL); err != nil {
+	if err := w.checkURL(authServerURL); err != nil {
 		return errs.Wrap(err, "invalid auth URL")
 	}
 	if strings.HasPrefix(authServerURL, "http://") {
 		w.out.warning("Using HTTP for production is not recommended. Consider using HTTPS.")
 	}
-	w.baseDomain = extractDomainFromURL(authServerURL)
 	if adminConsoleURL == "" {
-		adminConsoleURL = fmt.Sprintf("https://admin.%s", w.baseDomain)
+		var derived bool
+		if adminConsoleURL, derived = defaultAdminURL(authServerURL); !derived {
+			return errs.Errorf("--admin-url is required when the auth URL's host, %s, is an IP address or a single label, which no admin console URL can be derived from", hostOf(authServerURL))
+		}
 	}
-	if err := validateURL(adminConsoleURL); err != nil {
+	if err := w.checkURL(adminConsoleURL); err != nil {
+		return errs.Wrap(err, "invalid admin URL")
+	}
+	if err := w.checkDistinctHosts(authServerURL, adminConsoleURL); err != nil {
 		return errs.Wrap(err, "invalid admin URL")
 	}
 	if strings.HasPrefix(adminConsoleURL, "http://") {
 		w.out.warning("Using HTTP for production is not recommended. Consider using HTTPS.")
 	}
-	authDomain := extractDomainFromURL(authServerURL)
-	adminDomain := extractDomainFromURL(adminConsoleURL)
-	if authDomain != adminDomain {
-		w.out.warning("Domain mismatch: auth=%s, admin=%s", authDomain, adminDomain)
+	if authSite, adminSite := siteOf(authServerURL), siteOf(adminConsoleURL); authSite != adminSite {
+		w.out.warning("Domain mismatch: auth=%s, admin=%s", authSite, adminSite)
 	}
 	w.out.info("Auth server URL: %s", authServerURL)
 	w.out.info("Admin console URL: %s", adminConsoleURL)
 	w.config.AuthServerURL = authServerURL
 	w.config.AdminConsoleURL = adminConsoleURL
+	w.defaultAdminEmail = defaultAdminEmailFor(authServerURL)
 	return nil
 }
 
@@ -305,13 +342,8 @@ func (w *wizard) askNamespace() error {
 }
 
 func (w *wizard) askAdmin() error {
-	defaultAdminEmail := "admin@example.com"
-	if w.baseDomain != "" && w.baseDomain != "example.com" {
-		defaultAdminEmail = fmt.Sprintf("admin@%s", w.baseDomain)
-	}
-
 	if w.interactive {
-		adminEmail, err := w.email("Admin email", defaultAdminEmail)
+		adminEmail, err := w.email("Admin email", w.defaultAdminEmail)
 		if err != nil {
 			return err
 		}
@@ -326,17 +358,21 @@ func (w *wizard) askAdmin() error {
 
 	adminEmail := w.flags.AdminEmail
 	if adminEmail == "" {
-		adminEmail = defaultAdminEmail
+		if w.defaultAdminEmail == "" {
+			return errs.Errorf("--admin-email is required when the auth URL's host, %s, is an IP address or a single label, which no admin email can be derived from", hostOf(w.config.AuthServerURL))
+		}
+		adminEmail = w.defaultAdminEmail
 	}
 	if err := validateEmail(adminEmail); err != nil {
 		return errs.Wrap(err, "invalid admin email")
 	}
+	// Only a password the operator chose is judged: a generated one holds the classes SQL Server
+	// asks for and no symbol, and was warned about as weak (#430).
 	adminPassword := w.flags.AdminPassword
 	if adminPassword == "" {
-		adminPassword = generateRandomString(16)
+		adminPassword = generatePassword()
 		w.out.info("Generated admin password: %s", adminPassword)
-	}
-	if issues := checkPasswordStrength(adminPassword); len(issues) > 0 {
+	} else if issues := checkPasswordStrength(adminPassword); len(issues) > 0 {
 		w.out.warning("Weak password: %s", strings.Join(issues, ", "))
 	}
 	w.out.info("Admin email: %s", adminEmail)
@@ -427,7 +463,7 @@ func (w *wizard) databaseConnectionFromPrompts(defaultHost string) error {
 	if c.DBUsername, err = w.nonEmpty("Database username", c.Engine.defaultUser); err != nil {
 		return err
 	}
-	c.DBPassword, err = w.nonEmpty("Database password", generateRandomString(16))
+	c.DBPassword, err = w.nonEmpty("Database password", generatePassword())
 	return err
 }
 
@@ -459,7 +495,7 @@ func (w *wizard) databaseConnectionFromFlags() error {
 	}
 	c.DBPassword = w.flags.DBPassword
 	if c.DBPassword == "" {
-		c.DBPassword = generateRandomString(16)
+		c.DBPassword = generatePassword()
 		w.out.info("Generated database password: %s", c.DBPassword)
 	}
 	w.out.info("Database host: %s:%s", c.DBHost, c.DBPort)
@@ -471,13 +507,13 @@ func (w *wizard) databaseConnectionFromFlags() error {
 // askDatabasePassword is a database the generated compose file runs, which needs only a password.
 func (w *wizard) askDatabasePassword() error {
 	if w.interactive {
-		password, err := w.nonEmpty("Database password", generateRandomString(16))
+		password, err := w.nonEmpty("Database password", generatePassword())
 		w.config.DBPassword = password
 		return err
 	}
 	w.config.DBPassword = w.flags.DBPassword
 	if w.config.DBPassword == "" {
-		w.config.DBPassword = generateRandomString(16)
+		w.config.DBPassword = generatePassword()
 	}
 	w.out.info("Database password: %s", w.config.DBPassword)
 	return nil
@@ -490,7 +526,7 @@ func (w *wizard) generateCredentials() error {
 	c.AdminSessionAuthKey = generateHexKey(64)
 	c.AdminSessionEncKey = generateHexKey(32)
 	c.AESEncryptionKey = generateHexKey(32)
-	c.OAuthClientSecret = generateRandomString(60)
+	c.OAuthClientSecret = generateSecret(60)
 
 	w.out.success("Auth server session keys generated")
 	w.out.success("Admin console session keys generated")

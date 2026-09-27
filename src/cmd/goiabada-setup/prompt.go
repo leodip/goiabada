@@ -190,10 +190,6 @@ func (a asker) validated(prompt, defaultValue, what string, validate func(string
 	}
 }
 
-func (a asker) url(prompt, defaultValue string) (string, error) {
-	return a.validated(prompt, defaultValue, "URL", validateURL)
-}
-
 func (a asker) email(prompt, defaultValue string) (string, error) {
 	return a.validated(prompt, defaultValue, "email", validateEmail)
 }
