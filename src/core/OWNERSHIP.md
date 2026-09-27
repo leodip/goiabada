@@ -260,7 +260,6 @@ command itself and fails on a tree it changed.
 | `core/hashutil` | `HashString` | both-apps | — |
 | `core/hostport` | `Join` | both-apps | — |
 | `core/hostport` | `Unbracket` | own-package | — |
-| `core/i18n` | `Bundle` | own-package | — |
 | `core/i18n` | `ErrCodeAddressAngleBrackets` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
 | `core/i18n` | `ErrCodeAddressCountryInvalid` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
 | `core/i18n` | `ErrCodeAddressLine1TooLong` | contract | Wire `error_code` value. `openapi.yaml` publishes it as a stable identifier, so a third-party client can switch on it although the admin console does not (#385 decision 10). |
@@ -336,7 +335,6 @@ command itself and fails on a tree it changed.
 | `core/i18n` | `LocaleLabel` | contract | The rendering half of the message catalog both processes compile. Only the admin console's template functions call it today, the auth server's pages rendering no dates, reference labels or client-side string table; it stays because it reads the localizer and the bundle this package keeps private, so moving it would export the state #385 decision 11 exists to keep unexported, and would put one catalog behind two renderers. |
 | `core/i18n` | `LocaleTag` | both-apps | — |
 | `core/i18n` | `LocalizedError` | both-apps | — |
-| `core/i18n` | `Localizer` | own-package | — |
 | `core/i18n` | `MiddlewareLocale` | both-apps | — |
 | `core/i18n` | `NewLocalizedError` | kernel | — |
 | `core/i18n` | `Raw` | contract | The rendering half of the message catalog both processes compile. Only the admin console's template functions call it today, the auth server's pages rendering no dates, reference labels or client-side string table; it stays because it reads the localizer and the bundle this package keeps private, so moving it would export the state #385 decision 11 exists to keep unexported, and would put one catalog behind two renderers. |
@@ -346,7 +344,6 @@ command itself and fails on a tree it changed.
 | `core/i18n` | `ResolveRequestLocale` | kernel | — |
 | `core/i18n` | `SanitizeUILocales` | own-package | — |
 | `core/i18n` | `T` | kernel | — |
-| `core/i18n` | `Translator` | own-package | — |
 | `core/i18n` | `UILocalesReader` | reachable | — |
 | `core/i18n` | `WithLocale` | both-apps | — |
 | `core/locales` | `Get` | both-apps | — |

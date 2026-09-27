@@ -167,7 +167,7 @@ func errorCodeDocOwns(key string) bool {
 }
 
 // readEnglishCatalog returns the raw key-to-message map, templates unrendered. It parses the file
-// on disk rather than going through i18n.LoadBundle because the bundle renders: EnglishFallback
+// on disk rather than going through core/i18n because its bundle renders: EnglishFallback
 // substitutes args, and comparing a rendered sentence against a documented one would make every
 // row carrying a {{.max}} fail for the wrong reason.
 func readEnglishCatalog(path string) (map[string]string, error) {

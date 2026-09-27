@@ -1,25 +1,10 @@
 package server
 
 import (
-	"os"
-	"testing"
-
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
-	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/leodip/goiabada/core/sessionstore/sessiontest"
 )
-
-// The middleware chain this package drives answers a refused request through
-// i18n.T. Without a loaded bundle T echoes the key, and every body assertion here
-// would pass against the key rather than against the message, which is exactly the
-// state TestInitMiddleware_RefusalsAreLocalized exists to detect.
-func TestMain(m *testing.M) {
-	if _, err := i18n.LoadBundle(); err != nil {
-		panic(err)
-	}
-	os.Exit(m.Run())
-}
 
 // newTestSessionStore is the real store over an in-memory backend, which is what these
 // tests drive now that the browser session is a row rather than a cookie (#266). It

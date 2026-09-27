@@ -29,12 +29,13 @@ func TestLocalizedError_LocalizeFallsThroughToEnglishWhenLocaleMissesKey(t *test
 	// The embedded catalogs are held to identical key sets, so the fallback
 	// needs a locale that genuinely misses the key: an override-only fr
 	// catalog carrying nothing but the title.
-	require.NoError(t, loadBundleWithOverrides(t, map[string]string{
+	b, err := loadWithOverrides(t, map[string]string{
 		"active.fr.toml": `"auth.pwd.title" = "Connexion"` + "\n",
-	}))
+	})
+	require.NoError(t, err)
 
 	le := NewLocalizedError(ErrCodeLoginAuthFailed, nil)
-	assert.Equal(t, "Authentication failed.", le.Localize(ctxFor("fr")))
+	assert.Equal(t, "Authentication failed.", le.Localize(ctxForBundle(b, "fr")))
 }
 
 func TestLocalizedError_ArgsSubstituteInEveryRendering(t *testing.T) {

@@ -128,9 +128,9 @@ func main() {
 	_ = timezones.Get()
 	slog.Info("timezones loaded")
 
-	// Load i18n message catalogs (and merge GOIABADA_I18N_OVERRIDES_DIR if set).
-	// Fail-fast: a malformed catalog or missing override dir is a config bug.
-	if _, loadBundleErr := i18n.LoadBundle(); loadBundleErr != nil {
+	// Merge the overrides directory the configuration read from GOIABADA_I18N_OVERRIDES_DIR over
+	// the embedded message catalogs. Fail-fast: a malformed catalog is a config bug.
+	if loadBundleErr := i18n.LoadBundle(config.GetAuthServer().I18nOverridesDir); loadBundleErr != nil {
 		slog.Error("unable to load the i18n message catalogs", "error", loadBundleErr)
 		os.Exit(1)
 	}

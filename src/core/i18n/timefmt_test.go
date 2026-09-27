@@ -13,7 +13,7 @@ import (
 // the locale middleware does, so the assertions below read the real embedded
 // catalogs rather than a stub.
 func timeFmtLocale(tag string) context.Context {
-	return context.WithValue(context.Background(), ctxKeyLocalizer, defaultBundle.localizerFor([]string{tag}))
+	return context.WithValue(context.Background(), ctxKeyLocalizer, current().localizerFor([]string{tag}))
 }
 
 // timeFmtInstant is the instant every absolute-format case below renders:
@@ -81,7 +81,7 @@ func TestFormatDateTime_NilAndZeroRenderEmpty(t *testing.T) {
 // the key as a layout, finds no reference token in it, and renders the key
 // verbatim into the table cell rather than failing.
 func TestFormatDateTime_MissingLayoutFallsBackToANumericLayout(t *testing.T) {
-	empty := &Translator{bundle: &Bundle{}, tag: language.English}
+	empty := &translator{bundle: &bundle{}, tag: language.English}
 	ctx := context.WithValue(context.Background(), ctxKeyLocalizer, empty)
 	instant := timeFmtInstant
 	assert.Equal(t, "2026-09-14 21:03", FormatDateTime(ctx, &instant))

@@ -7,7 +7,9 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -32,21 +34,38 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
+// mainProcessBound is how long a child may run. Every case expects an exit within a second or
+// two; a child that got past the refusal a case is written against could otherwise go on to serve,
+// and the case would wait on it for as long as the tier allows.
+const mainProcessBound = 30 * time.Second
+
 // runMainProcess runs main in a fresh process with args, over an environment naming decoy as the
 // database, and answers its exit code and stderr.
 func runMainProcess(t *testing.T, decoy string, args ...string) (int, string) {
 	t.Helper()
+	return runMainProcessWith(t, decoy, nil, args...)
+}
 
-	cmd := exec.Command(os.Args[0], args...)
-	cmd.Env = []string{
+// runMainProcessWith is runMainProcess with env appended to the child's environment.
+func runMainProcessWith(t *testing.T, decoy string, env []string, args ...string) (int, string) {
+	t.Helper()
+
+	ctx, cancel := context.WithTimeout(context.Background(), mainProcessBound)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, os.Args[0], args...)
+	cmd.Env = append([]string{
 		runMainMarker + "=1",
 		"GOIABADA_DB_TYPE=sqlite",
 		"GOIABADA_DB_DSN=file:" + decoy,
-	}
+	}, env...)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 
 	err := cmd.Run()
+	if ctx.Err() != nil {
+		t.Fatalf("main did not exit within %s\nstdout: %s\nstderr: %s", mainProcessBound, stdout.String(), stderr.String())
+	}
 	var exitErr *exec.ExitError
 	switch {
 	case err == nil:
@@ -174,5 +193,34 @@ func TestMain_RefusesAMalformedTrustedProxyListBeforeOpeningAnything(t *testing.
 	// Unquoted: the text handler escapes the quotes the error puts around each entry.
 	assert.Contains(t, stderr, "not-an-ip")
 	assert.Contains(t, stderr, "10.0.0.0/33")
+	assert.NoFileExists(t, decoy)
+}
+
+// TestMain_HandsTheOverridesDirectoryToTheCatalogs is the wiring between the two halves the
+// configuration matrix and core/i18n's own tests each cover alone: that main passes the directory
+// config read from GOIABADA_I18N_OVERRIDES_DIR to LoadBundle. The directory holds a catalog that
+// does not parse, so a main that forwards it stops with the catalog refusal before opening
+// anything (#431).
+//
+// The exit code alone proves nothing: a main that passed "" instead goes on to open the decoy
+// database and then stops, 1 again, at the listener this harness disables. The refusal's text,
+// which only it writes, and the decoy not existing are what fail.
+func TestMain_HandsTheOverridesDirectoryToTheCatalogs(t *testing.T) {
+	decoy := filepath.Join(t.TempDir(), "d.db")
+	overrides := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(overrides, "catalogs"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(overrides, "catalogs", "active.en.toml"),
+		[]byte("[section]\nother = \"x\"\n"), 0o644))
+
+	code, stderr := runMainProcessWith(t, decoy, []string{
+		"GOIABADA_AES_ENCRYPTION_KEY=" + strings.Repeat("ab", 32),
+		"GOIABADA_I18N_OVERRIDES_DIR=" + overrides,
+		// Neither listener, so a child that got past the catalogs stops rather than serves.
+		"GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP=0",
+	})
+
+	require.Equal(t, 1, code, "stderr: %s", stderr)
+	assert.Contains(t, stderr, "unable to load the i18n message catalogs")
+	assert.Contains(t, stderr, "active.en.toml")
 	assert.NoFileExists(t, decoy)
 }

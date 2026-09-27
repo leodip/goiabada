@@ -8,19 +8,15 @@ import (
 )
 
 func TestReference_FallbackChain(t *testing.T) {
-	if _, err := LoadBundle(); err != nil {
-		t.Fatalf("LoadBundle: %v", err)
-	}
-
 	// "BR" resolves via CLDR for the active (English) locale (no country TOML ships).
-	englishCtx := attachLocale(context.Background(), defaultBundle.english, "en", false)
+	englishCtx := attachLocale(context.Background(), current().english, "en", false)
 	assert.Equal(t, "Brazil", RefCountry(englishCtx, "BR", "fallback"))
 
 	// Uncurated but valid code: resolved via CLDR for the active locale.
 	assert.Equal(t, "Italy", RefCountry(englishCtx, "IT", "fallback"))
 
 	// Unparseable locale tag: CLDR can't resolve, fallback wins.
-	unknownCtx := attachLocale(context.Background(), defaultBundle.english, "xx", false)
+	unknownCtx := attachLocale(context.Background(), current().english, "xx", false)
 	assert.Equal(t, "fallback", RefCountry(unknownCtx, "BR", "fallback"))
 
 	// Unparseable country code: fallback wins.
@@ -31,10 +27,7 @@ func TestReference_FallbackChain(t *testing.T) {
 }
 
 func TestReference_CountryCLDR(t *testing.T) {
-	if _, err := LoadBundle(); err != nil {
-		t.Fatalf("LoadBundle: %v", err)
-	}
-	ptCtx := attachLocale(context.Background(), defaultBundle.english, "pt-BR", false)
+	ptCtx := attachLocale(context.Background(), current().english, "pt-BR", false)
 
 	// "BR" resolves via CLDR in pt-BR (no country TOML ships).
 	assert.Equal(t, "Brasil", RefCountry(ptCtx, "BR", "Brazil"))
@@ -45,10 +38,7 @@ func TestReference_CountryCLDR(t *testing.T) {
 }
 
 func TestReference_PhoneCountryAssembly(t *testing.T) {
-	if _, err := LoadBundle(); err != nil {
-		t.Fatalf("LoadBundle: %v", err)
-	}
-	ptCtx := attachLocale(context.Background(), defaultBundle.english, "pt-BR", false)
+	ptCtx := attachLocale(context.Background(), current().english, "pt-BR", false)
 
 	// Assembled from emoji + CLDR-localized name + calling code (no phone-country
 	// TOML ships), which reproduces the previously-curated pt-BR label exactly.
@@ -72,10 +62,7 @@ func TestReference_LocaleTagFromContext(t *testing.T) {
 }
 
 func TestReference_PerKindHelpers(t *testing.T) {
-	if _, err := LoadBundle(); err != nil {
-		t.Fatalf("LoadBundle: %v", err)
-	}
-	ctx := attachLocale(context.Background(), defaultBundle.english, "en", false)
+	ctx := attachLocale(context.Background(), current().english, "en", false)
 	assert.Equal(t, "🇧🇷 - Brazil (+55)", RefPhoneCountry(ctx, "🇧🇷", "BR", "+55", "fallback"))
 	// Assembled label: CLDR country + IANA zone + comment (no curated TOML anymore).
 	assert.Equal(t, "United States - America/New_York - Eastern (most areas)",
@@ -83,12 +70,8 @@ func TestReference_PerKindHelpers(t *testing.T) {
 }
 
 func TestReference_TimezoneFallbackAssembly(t *testing.T) {
-	if _, err := LoadBundle(); err != nil {
-		t.Fatalf("LoadBundle: %v", err)
-	}
-
 	// Zone absent from both TOMLs: assembled "<country> - <zone>[ - <comments>]".
-	englishCtx := attachLocale(context.Background(), defaultBundle.english, "en", false)
+	englishCtx := attachLocale(context.Background(), current().english, "en", false)
 	assert.Equal(t,
 		"Japan - Asia/Tokyo",
 		RefTimezone(englishCtx, "Asia/Tokyo", "JP", "Japan", ""))
@@ -97,7 +80,7 @@ func TestReference_TimezoneFallbackAssembly(t *testing.T) {
 		RefTimezone(englishCtx, "Antarctica/Casey", "AQ", "Antarctica", "Casey"))
 
 	// pt-BR: country name is localized via CLDR, zone + comment stay in English.
-	ptCtx := attachLocale(context.Background(), defaultBundle.english, "pt-BR", false)
+	ptCtx := attachLocale(context.Background(), current().english, "pt-BR", false)
 	assert.Equal(t,
 		"Japão - Asia/Tokyo",
 		RefTimezone(ptCtx, "Asia/Tokyo", "JP", "Japan", ""))

@@ -47,6 +47,10 @@ type AuthServerConfig struct {
 	SessionEncryptionKeyPrevious     string
 	RateLimiterEnabled               bool
 	ProfilePictureMaxSizeBytes       int64
+	// I18nOverridesDir is the directory whose catalogs/ main merges over the embedded message
+	// catalogs, or empty for none. It has no flag, like the admin console's, so the one variable
+	// configures both servers the same way (#431).
+	I18nOverridesDir string
 }
 
 // GetEffectiveBaseURL returns the InternalBaseURL if set, otherwise returns BaseURL.
@@ -184,6 +188,7 @@ func loadFrom(fs *flag.FlagSet, args []string) {
 			SessionEncryptionKeyPrevious:     getEnv("GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY_PREVIOUS", ""),
 			RateLimiterEnabled:               getEnvAsBool("GOIABADA_AUTHSERVER_RATELIMITER_ENABLED"),
 			ProfilePictureMaxSizeBytes:       getEnvAsInt64("GOIABADA_PROFILE_PICTURE_MAX_SIZE_BYTES", 3*1024*1024),
+			I18nOverridesDir:                 getEnv("GOIABADA_I18N_OVERRIDES_DIR", ""),
 		},
 		AdminConsole: AdminConsoleConfig{
 			BaseURL:           getEnv("GOIABADA_ADMINCONSOLE_BASEURL", "http://localhost:9091"),

@@ -2,26 +2,16 @@ package i18n
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/leodip/goiabada/core/errs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-// TestMain loads the embedded bundle once; subsequent tests share it.
-// LoadBundle replaces the package-level default, so don't run tests in
-// parallel against a different override directory without restoring it.
-func TestMain(m *testing.M) {
-	// Make sure GOIABADA_I18N_OVERRIDES_DIR is unset for the baseline tests;
-	// the override-merge test sets it temporarily and unsets when done.
-	_ = os.Unsetenv("GOIABADA_I18N_OVERRIDES_DIR")
-	if _, err := LoadBundle(); err != nil {
-		panic("i18n test bootstrap LoadBundle: " + err.Error())
-	}
-	os.Exit(m.Run())
-}
 
 func TestT_EnglishKeyResolves(t *testing.T) {
 	ctx := context.Background()
@@ -31,17 +21,13 @@ func TestT_EnglishKeyResolves(t *testing.T) {
 
 func TestT_PtBRKeyResolves(t *testing.T) {
 	// Build a localizer that prefers pt-BR — exercising the loaded stub catalog.
-	r := defaultBundle.localizerFor([]string{"pt-BR"})
-	ctx := context.WithValue(context.Background(), ctxKeyLocalizer, r)
-	assert.Equal(t, "Entrar", T(ctx, "auth.pwd.title"))
+	assert.Equal(t, "Entrar", T(ctxFor("pt-BR"), "auth.pwd.title"))
 }
 
 func TestT_UnknownLocaleFallsBackToEnglish(t *testing.T) {
 	// "xx" is not a registered locale; the matcher falls back to the tag at
 	// index 0, which is English.
-	r := defaultBundle.localizerFor([]string{"xx"})
-	ctx := context.WithValue(context.Background(), ctxKeyLocalizer, r)
-	assert.Equal(t, "Login", T(ctx, "auth.pwd.title"))
+	assert.Equal(t, "Login", T(ctxFor("xx"), "auth.pwd.title"))
 }
 
 func TestT_MissingKeyReturnsKey(t *testing.T) {
@@ -52,60 +38,67 @@ func TestT_MissingKeyReturnsKey(t *testing.T) {
 }
 
 func TestLocalizer_NoCtxFallsBackToEnglish(t *testing.T) {
-	loc := Localizer(context.Background())
+	loc := localizer(context.Background())
 	require.NotNil(t, loc)
 	// T against an empty context resolves through the English fallback.
 	assert.Equal(t, "Login", T(context.Background(), "auth.pwd.title"))
 }
 
-func TestRenderingBeforeLoadBundle_ResolvesEveryKeyToItself(t *testing.T) {
-	// Anything that renders on the way to LoadBundle — a config failure, a
-	// startup error path — reaches the four public rendering surfaces with
-	// defaultBundle still nil. Each must return its visible key or code.
-	// Localizer in particular must return a usable translator rather than
-	// nil, because T dereferences it without checking (#273).
-	//
-	// TestMain loads the bundle before any test in this package runs, so
-	// this is the only case that reaches those arms; it is sequential, and
-	// the cleanup puts the shared bundle back.
-	saved := defaultBundle
-	t.Cleanup(func() { defaultBundle = saved })
-	defaultBundle = nil
+// TestRendering_WithNoLoadBundleServesTheEmbeddedCatalogs is the case that made the nine TestMains
+// whose only job was LoadBundle unnecessary: nothing installed, and every rendering surface still
+// answers the embedded English and pt-BR text rather than its key (#431). Nothing is installed
+// while it runs, whatever ran before it, and the cleanup puts back what was.
+func TestRendering_WithNoLoadBundleServesTheEmbeddedCatalogs(t *testing.T) {
+	saved := installed.Load()
+	t.Cleanup(func() { installed.Store(saved) })
+	installed.Store(nil)
 
-	loc := Localizer(context.Background())
-	require.NotNil(t, loc, "Localizer must not return nil before LoadBundle: T dereferences it")
-
-	assert.Equal(t, "auth.pwd.title", T(context.Background(), "auth.pwd.title"))
-	assert.Equal(t, "js.error.unexpected", Raw(context.Background(), "js.error.unexpected"))
+	assert.Equal(t, "Login", T(context.Background(), "auth.pwd.title"))
+	assert.Equal(t, "Entrar", T(ctxFor("pt-BR"), "auth.pwd.title"))
+	assert.NotEqual(t, "js.error.unexpected", Raw(context.Background(), "js.error.unexpected"))
 
 	le := NewLocalizedError(ErrCodeLoginAuthFailed, nil)
-	assert.Equal(t, ErrCodeLoginAuthFailed, le.EnglishFallback())
-	assert.Equal(t, ErrCodeLoginAuthFailed, le.Localize(context.Background()))
+	assert.NotEqual(t, ErrCodeLoginAuthFailed, le.EnglishFallback())
+	assert.Equal(t, le.EnglishFallback(), le.Localize(context.Background()))
+}
+
+// TestLoad_EmptyDirIsTheEmbeddedCatalogs: load("") reads no directory at all and answers exactly
+// what the embedded default serves.
+func TestLoad_EmptyDirIsTheEmbeddedCatalogs(t *testing.T) {
+	b, err := load("")
+	require.NoError(t, err)
+
+	assert.Equal(t, tagStrings(embedded()), tagStrings(b))
+	assert.Equal(t, []string{"en", "pt-BR"}, tagStrings(b))
+	assert.Equal(t, "Entrar", T(ctxForBundle(b, "pt-BR"), "auth.pwd.title"))
+	assert.Equal(t, "Login", T(ctxForBundle(b, "en"), "auth.pwd.title"))
+}
+
+// TestLoad_TouchesNothingGlobal: a load with overrides installs nothing, so what every rendering
+// surface serves is unchanged by it.
+func TestLoad_TouchesNothingGlobal(t *testing.T) {
+	saved := installed.Load()
+	t.Cleanup(func() { installed.Store(saved) })
+	installed.Store(nil)
+
+	b, err := loadWithOverrides(t, map[string]string{
+		"active.pt-BR.toml": "\"auth.pwd.title\" = \"Acesse\"\n",
+	})
+	require.NoError(t, err)
+	require.Equal(t, "Acesse", T(ctxForBundle(b, "pt-BR"), "auth.pwd.title"))
+
+	assert.Nil(t, installed.Load())
+	assert.Equal(t, "Entrar", T(ctxFor("pt-BR"), "auth.pwd.title"))
 }
 
 func TestOverrideDir_MergesOnTopOfEmbedded(t *testing.T) {
-	// Build a minimal override layout in a temp dir, point the env var at it,
-	// reload, and verify the override wins.
-	dir := t.TempDir()
-	cataDir := filepath.Join(dir, "catalogs")
-	require.NoError(t, os.MkdirAll(cataDir, 0o755))
 	// Override pt-BR's "auth.pwd.title" with a self-host-customized value.
-	override := `"auth.pwd.title" = "Acesse"
-`
-	require.NoError(t, os.WriteFile(filepath.Join(cataDir, "active.pt-BR.toml"), []byte(override), 0o644))
-
-	t.Setenv("GOIABADA_I18N_OVERRIDES_DIR", dir)
-	t.Cleanup(func() {
-		// Restore the embedded-only bundle for subsequent tests.
-		_ = os.Unsetenv("GOIABADA_I18N_OVERRIDES_DIR")
-		_, _ = LoadBundle()
+	b, err := loadWithOverrides(t, map[string]string{
+		"active.pt-BR.toml": "\"auth.pwd.title\" = \"Acesse\"\n",
 	})
-
-	_, err := LoadBundle()
 	require.NoError(t, err)
 
-	r := defaultBundle.localizerFor([]string{"pt-BR"})
-	ctx := context.WithValue(context.Background(), ctxKeyLocalizer, r)
+	ctx := ctxForBundle(b, "pt-BR")
 	assert.Equal(t, "Acesse", T(ctx, "auth.pwd.title"))
 
 	// Untouched key still falls back to the embedded pt-BR catalog.
@@ -114,77 +107,144 @@ func TestOverrideDir_MergesOnTopOfEmbedded(t *testing.T) {
 
 func TestOverrideDir_NoCatalogsSubdir_IsNoOp(t *testing.T) {
 	// An override dir without a catalogs/ subdir is valid — log + skip.
-	dir := t.TempDir()
-	t.Setenv("GOIABADA_I18N_OVERRIDES_DIR", dir)
-	t.Cleanup(func() {
-		_ = os.Unsetenv("GOIABADA_I18N_OVERRIDES_DIR")
-		_, _ = LoadBundle()
-	})
-
-	_, err := LoadBundle()
-	assert.NoError(t, err)
+	b, err := load(t.TempDir())
+	require.NoError(t, err)
+	assert.Equal(t, []string{"en", "pt-BR"}, tagStrings(b))
 }
 
-func TestOverrideOnlyLocale_AppearsInSupportedTags(t *testing.T) {
-	// A self-hoster ships only an override file for a locale that isn't in
-	// the embedded set. The bundle must surface that locale in
-	// SupportedTags() so downstream consumers (locale pickers,
-	// supported-locale validation) can see it.
+// TestOverrideDir_ACatalogsPathThatIsNotADirectoryIsRefused: the directory exists but cannot be
+// read as one, which is the operator's misconfiguration rather than an absent optional layer, so
+// the load answers an error and main stops on it.
+func TestOverrideDir_ACatalogsPathThatIsNotADirectoryIsRefused(t *testing.T) {
 	dir := t.TempDir()
-	cataDir := filepath.Join(dir, "catalogs")
-	require.NoError(t, os.MkdirAll(cataDir, 0o755))
-	override := `"auth.pwd.title" = "Connexion"
-`
-	require.NoError(t, os.WriteFile(filepath.Join(cataDir, "active.fr.toml"), []byte(override), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "catalogs"), []byte("not a directory"), 0o644))
 
-	t.Setenv("GOIABADA_I18N_OVERRIDES_DIR", dir)
-	t.Cleanup(func() {
-		_ = os.Unsetenv("GOIABADA_I18N_OVERRIDES_DIR")
-		_, _ = LoadBundle()
+	b, err := load(dir)
+	require.Error(t, err)
+	assert.Nil(t, b)
+	assert.Contains(t, err.Error(), "is not a directory")
+}
+
+func TestOverrideOnlyLocale_IsSupported(t *testing.T) {
+	// A self-hoster ships only an override file for a locale that isn't in
+	// the embedded set. The bundle must carry that locale in its tags, or the
+	// matcher answers English for a request asking for it.
+	b, err := loadWithOverrides(t, map[string]string{
+		"active.fr.toml": "\"auth.pwd.title\" = \"Connexion\"\n",
 	})
-
-	_, err := LoadBundle()
 	require.NoError(t, err)
 
-	tagStrings := make([]string, 0)
-	for _, tag := range defaultBundle.SupportedTags() {
-		tagStrings = append(tagStrings, tag.String())
-	}
-	assert.Contains(t, tagStrings, "fr",
-		"override-only locale 'fr' must appear in SupportedTags() so locale pickers see it")
-
-	// Embedded locales must still be present too.
-	assert.Contains(t, tagStrings, "en")
-	assert.Contains(t, tagStrings, "pt-BR")
+	// Embedded locales first, the override-only one after them.
+	assert.Equal(t, []string{"en", "pt-BR", "fr"}, tagStrings(b))
 
 	// And the override translation actually works.
-	r := defaultBundle.localizerFor([]string{"fr"})
-	ctx := context.WithValue(context.Background(), ctxKeyLocalizer, r)
-	assert.Equal(t, "Connexion", T(ctx, "auth.pwd.title"))
+	assert.Equal(t, "Connexion", T(ctxForBundle(b, "fr"), "auth.pwd.title"))
 }
 
-func TestSupportedTags_ContainsEnAndPtBR(t *testing.T) {
-	tags := defaultBundle.SupportedTags()
-	require.NotEmpty(t, tags)
-	tagStrings := make([]string, 0, len(tags))
-	for _, t := range tags {
-		tagStrings = append(tagStrings, t.String())
+// TestLoadBundle_InstallsTheOverrides: after LoadBundle, every rendering surface reads the
+// directory it was given, with no bundle threaded through anything.
+func TestLoadBundle_InstallsTheOverrides(t *testing.T) {
+	saved := installed.Load()
+	t.Cleanup(func() { installed.Store(saved) })
+
+	dir := overridesDir(t, map[string]string{
+		"active.pt-BR.toml": "\"auth.pwd.title\" = \"Acesse\"\n",
+		"active.en.toml":    "\"auth.pwd.title\" = \"Sign in\"\n",
+	})
+	require.NoError(t, LoadBundle(dir))
+
+	assert.Equal(t, "Acesse", T(ctxFor("pt-BR"), "auth.pwd.title"))
+	assert.Equal(t, "Sign in", T(context.Background(), "auth.pwd.title"))
+}
+
+// TestLoadBundle_AFailureLeavesThePreviousBundleInstalled: an override that does not parse is
+// answered as an error and installs nothing, so whatever was served is served still.
+func TestLoadBundle_AFailureLeavesThePreviousBundleInstalled(t *testing.T) {
+	saved := installed.Load()
+	t.Cleanup(func() { installed.Store(saved) })
+
+	require.NoError(t, LoadBundle(overridesDir(t, map[string]string{
+		"active.en.toml": "\"auth.pwd.title\" = \"Sign in\"\n",
+	})))
+	before := installed.Load()
+
+	err := LoadBundle(overridesDir(t, map[string]string{
+		"active.en.toml": "[section]\nother = \"x\"\n",
+	}))
+	require.Error(t, err)
+
+	assert.Same(t, before, installed.Load())
+	assert.Equal(t, "Sign in", T(context.Background(), "auth.pwd.title"))
+}
+
+// TestOrEmpty_AnEmbeddedFailureRendersEveryKeyAsItself is the leniency the embedded default
+// chooses, since it has no caller to hand an error to: every rendering surface answers the key or
+// the code, the visible-miss policy, and none of them panics on the empty bundle it serves (#431).
+func TestOrEmpty_AnEmbeddedFailureRendersEveryKeyAsItself(t *testing.T) {
+	saved := installed.Load()
+	t.Cleanup(func() { installed.Store(saved) })
+
+	b := orEmpty(nil, errs.New("the embedded catalogs did not parse"))
+	require.NotNil(t, b)
+	installed.Store(b)
+
+	assert.Equal(t, "auth.pwd.title", T(context.Background(), "auth.pwd.title"))
+	assert.Equal(t, "js.error.unexpected", Raw(context.Background(), "js.error.unexpected"))
+
+	le := NewLocalizedError(ErrCodeLoginAuthFailed, nil)
+	assert.Equal(t, ErrCodeLoginAuthFailed, le.EnglishFallback())
+	assert.Equal(t, ErrCodeLoginAuthFailed, le.Localize(context.Background()))
+
+	for _, ctx := range []context.Context{
+		resolveLocale(context.Background(), acceptLanguageRequest("pt-BR"), nil),
+		WithLocale(context.Background(), true, "pt-BR"),
+	} {
+		assert.Equal(t, "auth.pwd.title", T(ctx, "auth.pwd.title"))
+		assert.Equal(t, "pt-BR", LocaleTag(ctx))
 	}
-	assert.Contains(t, tagStrings, "en")
-	assert.Contains(t, tagStrings, "pt-BR")
 }
 
-// ctxFor builds a context carrying the translator the default bundle resolves
+func TestOrEmpty_ALoadThatSucceededIsServedAsItIs(t *testing.T) {
+	b, err := load("")
+	require.NoError(t, err)
+	assert.Same(t, b, orEmpty(b, nil))
+}
+
+func TestCurrent_ContainsEnAndPtBR(t *testing.T) {
+	tags := tagStrings(current())
+	require.NotEmpty(t, tags)
+	assert.Contains(t, tags, "en")
+	assert.Contains(t, tags, "pt-BR")
+}
+
+func acceptLanguageRequest(acceptLanguage string) *http.Request {
+	r := httptest.NewRequest(http.MethodGet, "/", nil)
+	r.Header.Set("Accept-Language", acceptLanguage)
+	return r
+}
+
+// ctxFor builds a context carrying the translator the current bundle resolves
 // for prefs — the shape MiddlewareLocale produces, without the HTTP layer.
 func ctxFor(prefs ...string) context.Context {
-	return context.WithValue(context.Background(), ctxKeyLocalizer, defaultBundle.localizerFor(prefs))
+	return ctxForBundle(current(), prefs...)
 }
 
-// loadBundleWithOverrides writes each name->content under a temp overrides
-// directory, reloads the package bundle from it, and restores the
-// embedded-only bundle when the test ends. The load error is returned rather
-// than asserted so the refusal cases can read it.
-func loadBundleWithOverrides(t *testing.T, files map[string]string) error {
+// ctxForBundle is ctxFor over a bundle the test built, installed nowhere.
+func ctxForBundle(b *bundle, prefs ...string) context.Context {
+	return context.WithValue(context.Background(), ctxKeyLocalizer, b.localizerFor(prefs))
+}
+
+func tagStrings(b *bundle) []string {
+	out := make([]string, 0, len(b.tags))
+	for _, tag := range b.tags {
+		out = append(out, tag.String())
+	}
+	return out
+}
+
+// overridesDir writes each name->content under a temp overrides directory's
+// catalogs/ and answers the directory.
+func overridesDir(t *testing.T, files map[string]string) string {
 	t.Helper()
 	dir := t.TempDir()
 	cataDir := filepath.Join(dir, "catalogs")
@@ -192,26 +252,26 @@ func loadBundleWithOverrides(t *testing.T, files map[string]string) error {
 	for name, content := range files {
 		require.NoError(t, os.WriteFile(filepath.Join(cataDir, name), []byte(content), 0o644))
 	}
+	return dir
+}
 
-	t.Setenv("GOIABADA_I18N_OVERRIDES_DIR", dir)
-	t.Cleanup(func() {
-		_ = os.Unsetenv("GOIABADA_I18N_OVERRIDES_DIR")
-		_, _ = LoadBundle()
-	})
-
-	_, err := LoadBundle()
-	return err
+// loadWithOverrides loads a bundle from a temp overrides directory holding files, installing
+// nothing. The load error is returned rather than asserted so the refusal cases can read it.
+func loadWithOverrides(t *testing.T, files map[string]string) (*bundle, error) {
+	t.Helper()
+	return load(overridesDir(t, files))
 }
 
 func TestT_KeyMissingInMatchedLocaleFallsBackToEnglish(t *testing.T) {
 	// A self-hoster ships an fr catalog holding one key. Every other key must
 	// render the English text, which is what concepts/localization.mdx
 	// promises; T used to render the key itself here (#273).
-	require.NoError(t, loadBundleWithOverrides(t, map[string]string{
+	b, err := loadWithOverrides(t, map[string]string{
 		"active.fr.toml": "\"auth.pwd.title\" = \"Connexion\"\n",
-	}))
+	})
+	require.NoError(t, err)
 
-	ctx := ctxFor("fr")
+	ctx := ctxForBundle(b, "fr")
 	assert.Equal(t, "Connexion", T(ctx, "auth.pwd.title"))
 	assert.Equal(t, "Password", T(ctx, "auth.pwd.password_label"))
 }
@@ -241,11 +301,12 @@ func TestT_TemplatedValueThatFailsToExecuteRendersTheKey(t *testing.T) {
 	// it renders the key like the parse failure above rather than the half
 	// string Execute wrote before it failed. Missing data is not this case —
 	// missingkey=default renders <no value> and returns no error (#273).
-	require.NoError(t, loadBundleWithOverrides(t, map[string]string{
+	b, err := loadWithOverrides(t, map[string]string{
 		"active.pt-BR.toml": "\"auth.pwd.title\" = \"{{.x.Y}}\"\n",
-	}))
+	})
+	require.NoError(t, err)
 
-	ctx := ctxFor("pt-BR")
+	ctx := ctxForBundle(b, "pt-BR")
 	assert.Equal(t, "auth.pwd.title", T(ctx, "auth.pwd.title", map[string]any{"x": 1}))
 }
 
@@ -293,7 +354,7 @@ func TestOverrideDir_TableValueIsRefusedNamingFileAndKey(t *testing.T) {
 	// A [section] table is how go-i18n spelled plural forms. The loader has
 	// no plural machinery, so it refuses the file at startup rather than
 	// rendering one form for every count (#273).
-	err := loadBundleWithOverrides(t, map[string]string{
+	_, err := loadWithOverrides(t, map[string]string{
 		"active.pt-BR.toml": "[section]\nother = \"x\"\n",
 	})
 	require.Error(t, err)
@@ -304,11 +365,12 @@ func TestOverrideDir_TableValueIsRefusedNamingFileAndKey(t *testing.T) {
 func TestOverrideDir_EmptyValueRemovesTheTranslation(t *testing.T) {
 	// A blanked line in an override file means "use English" — the key is
 	// removed from that locale rather than shadowed with a blank (#273).
-	require.NoError(t, loadBundleWithOverrides(t, map[string]string{
+	b, err := loadWithOverrides(t, map[string]string{
 		"active.pt-BR.toml": "\"auth.pwd.title\" = \"\"\n",
-	}))
+	})
+	require.NoError(t, err)
 
-	ctx := ctxFor("pt-BR")
+	ctx := ctxForBundle(b, "pt-BR")
 	assert.Equal(t, "Login", T(ctx, "auth.pwd.title"))
 	// Neighbouring keys are untouched by the removal.
 	assert.Equal(t, "Senha", T(ctx, "auth.pwd.password_label"))

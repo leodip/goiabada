@@ -1,29 +1,18 @@
 package protocolvalidation
 
 import (
-	"fmt"
 	"os"
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/encryption"
-	"github.com/leodip/goiabada/core/i18n"
 )
 
 func TestMain(m *testing.M) {
-	// Both are needed, and which ones was settled by experiment rather than by reading the
-	// files: the package fails with the cipher alone and with the bundle alone. token_validator
-	// _test.go encrypts, and authorize_validator_test.go asserts rendered messages (#344).
+	// token_validator_test.go encrypts, so the process cipher is installed once here (#344). The
+	// message bundle the authorize tests' sentences are read from needs no setup: core/i18n serves
+	// its embedded catalogs without any (#431).
 	if err := encryption.InitDataCipher([]byte("0123456789abcdef0123456789abcdef")); err != nil {
 		panic(err)
-	}
-	// Without the bundle, EnglishFallback() returns the message id rather than the sentence
-	// (i18n's visible-miss policy), so every assertion on a LocalizedError's rendered text
-	// would compare a key against prose and pass only by being rewritten to expect the key.
-	// The authorize tests assert the sentence deliberately: it is what pins the English
-	// catalog value to the text the refusal page has always shown (#213).
-	if _, err := i18n.LoadBundle(); err != nil {
-		fmt.Fprintf(os.Stderr, "i18n.LoadBundle in TestMain: %v\n", err)
-		os.Exit(1)
 	}
 	os.Exit(m.Run())
 }
