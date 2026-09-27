@@ -104,7 +104,7 @@ func newCallbackHarness(t *testing.T) *callbackHarness {
 	gob.Register(oauth.TokenResponse{})
 
 	backend := &armableBackend{MemoryBackend: sessiontest.NewMemoryBackend()}
-	store, err := sessionstore.NewServerSideStore(backend, constants.SessionKeyJwt, false,
+	store, err := sessionstore.NewServerSideStore(backend, constants.SessionKeyJwt, false, sessionstore.BrowserSessionCookie,
 		sessionstore.KeyPair{
 			AuthenticationKey: []byte("12345678901234567890123456789012"),
 			EncryptionKey:     []byte("abcdefghijklmnopqrstuvwxyz123456"),

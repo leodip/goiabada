@@ -171,7 +171,7 @@ func newRealStoreAuthHelper(t *testing.T) (*AuthHelper, *sessionstore.ServerSide
 	authKey := []byte("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")
 	encKey := []byte("0123456789abcdef0123456789abcdef")
 	store, err := sessionstore.NewServerSideStore(sessiontest.NewMemoryBackend(),
-		constants.SessionKeySessionIdentifier, false,
+		constants.SessionKeySessionIdentifier, false, sessionstore.PersistentCookie,
 		sessionstore.KeyPair{AuthenticationKey: authKey, EncryptionKey: encKey}, nil)
 	if err != nil {
 		// The keys are literals above and the derivation cannot fail on them, so this is

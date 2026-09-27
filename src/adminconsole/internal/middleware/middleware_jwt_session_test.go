@@ -89,7 +89,7 @@ type sessionHarness struct {
 func newSessionHarness(t *testing.T) *sessionHarness {
 	t.Helper()
 	gob.Register(oauth.TokenResponse{})
-	store, err := sessionstore.NewServerSideStore(sessiontest.NewMemoryBackend(), constants.SessionKeyJwt, false,
+	store, err := sessionstore.NewServerSideStore(sessiontest.NewMemoryBackend(), constants.SessionKeyJwt, false, sessionstore.BrowserSessionCookie,
 		sessionstore.KeyPair{
 			AuthenticationKey: []byte("12345678901234567890123456789012"),
 			EncryptionKey:     []byte("abcdefghijklmnopqrstuvwxyz123456"),

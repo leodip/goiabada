@@ -378,27 +378,30 @@ command itself and fails on a tree it changed.
 | `core/oauth` | `Jwks` | both-apps | — |
 | `core/oauth` | `JwtToken` | both-apps | — |
 | `core/oauth` | `TokenResponse` | both-apps | — |
-| `core/sessionstore` | `Backend` | both-apps | — |
+| `core/sessionstore` | `Backend` | kernel | — |
+| `core/sessionstore` | `BrowserSessionCookie` | reachable | — |
+| `core/sessionstore` | `CookieLifetime` | reachable | — |
 | `core/sessionstore` | `DecodeKeyPair` | both-apps | — |
 | `core/sessionstore` | `DecodePreviousKeyPair` | both-apps | — |
 | `core/sessionstore` | `ErrNotFound` | kernel | — |
 | `core/sessionstore` | `ExpiresAt` | contract | The rule deciding when a browser session row stops being usable. The admin console's sessions live in rows the auth server's backend writes, so the rule is cross-process even though only the writing side calls it (#266). |
-| `core/sessionstore` | `KeyPair` | own-package | — |
+| `core/sessionstore` | `KeyPair` | both-apps | — |
 | `core/sessionstore` | `MaxSessionDataBytes` | own-package | — |
 | `core/sessionstore` | `MaxSessionWireBytes` | both-apps | — |
 | `core/sessionstore` | `NewServerSideStore` | both-apps | — |
 | `core/sessionstore` | `NewSession` | own-package | — |
 | `core/sessionstore` | `Options` | own-package | — |
+| `core/sessionstore` | `PersistentCookie` | own-package | — |
 | `core/sessionstore` | `PreAuthLifetime` | contract | The unauthenticated half of the `ExpiresAt` rule beside it, and the one value that decides it. |
 | `core/sessionstore` | `Record` | kernel | — |
 | `core/sessionstore` | `Regenerator` | both-apps | — |
-| `core/sessionstore` | `ServerSideStore` | own-package | — |
+| `core/sessionstore` | `ServerSideStore` | both-apps | — |
 | `core/sessionstore` | `Session` | both-apps | — |
 | `core/sessionstore` | `SessionIdBytes` | own-package | — |
 | `core/sessionstore` | `Store` | kernel | — |
 | `core/sessionstore` | `TouchThreshold` | own-package | — |
-| `core/sessionstore/sessiontest` | `MemoryBackend` | test-support | Test support: the in-memory session backend nine test files across the two servers drive. Its own package precisely so no binary links it (#385). |
-| `core/sessionstore/sessiontest` | `NewMemoryBackend` | test-support | Test support: the in-memory session backend nine test files across the two servers drive. Its own package precisely so no binary links it (#385). |
+| `core/sessionstore/sessiontest` | `MemoryBackend` | test-support | Test support: the in-memory session backend, honouring expiry as the engines do, that tests across the two servers drive the real store over. Its own package precisely so no binary links it (#385). |
+| `core/sessionstore/sessiontest` | `NewMemoryBackend` | test-support | Test support: the in-memory session backend, honouring expiry as the engines do, that tests across the two servers drive the real store over. Its own package precisely so no binary links it (#385). |
 | `core/stringutil` | `GenerateSecurityRandomString` | both-apps | — |
 | `core/stringutil` | `RandomStringFromAlphabet` | own-package | — |
 | `core/testutil` | `Address` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |

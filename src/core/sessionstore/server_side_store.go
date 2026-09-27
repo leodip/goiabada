@@ -106,10 +106,6 @@ const (
 // diagnosis by having no frames of its own (#279 decision 5).
 var ErrNotFound = errors.New("session not found")
 
-// randReader is crypto/rand in production. It is a variable so a test can make the
-// CSPRNG fail, which is the one failure this store must not paper over.
-var randReader io.Reader = rand.Reader
-
 // Record is what the storage half knows about a session: the ciphertext, and the two
 // timestamps that govern the container it sits in. Nothing here describes the session's
 // contents, which the storage half holds no key for (#266).
@@ -128,7 +124,10 @@ type Record struct {
 // call can name another application's rows however it is composed.
 //
 // Load, Update and Touch answer ErrNotFound when there is no such session. Every other
-// error means the operation could not be performed.
+// error means the operation could not be performed. A session whose ExpiresAt is not after
+// now is no such session, whether or not its row has been reaped yet: the engines read,
+// update and touch only where expires_at > now, and a backend that answered for an expired
+// row would keep a session alive past the deadline it reported (#431).
 //
 // The context is the request's. It carries the settings the auth server's middleware has
 // already read, which is what saves the database backend a second read of them, and it
@@ -195,33 +194,56 @@ type ServerSideStore struct {
 	// documented guarantee is scoped to signed-in sessions (#269).
 	previous *sealer
 
-	// Options are the cookie defaults. MaxAge is not read from here: it is decided per
-	// save, from PersistentCookie and the row's own expiry.
-	Options *Options
+	// options are the cookie defaults. MaxAge is not read from here: it is decided per
+	// save, from lifetime and the row's own expiry.
+	options *Options
 
-	// Backend is the storage half.
-	Backend Backend
+	// backend is the storage half.
+	backend Backend
 
-	// AuthenticatedKey is the session.Values key whose presence means this session has
+	// authenticatedKey is the session.Values key whose presence means this session has
 	// authenticated. It differs per module because the two modules keep different things
 	// there, and only the store can see inside the blob to check it.
-	AuthenticatedKey string
+	authenticatedKey string
 
-	// Secure drives both the cookie's Secure attribute and the __Host- prefix. A
+	// secure drives both the cookie's Secure attribute and the __Host- prefix. A
 	// prefixed cookie is rejected by the browser over plain http, so a development
 	// deployment gets the bare name.
-	Secure bool
+	secure bool
 
-	// PersistentCookie decides whether the cookie outlives the browser. The auth server
-	// sets it, so single sign-on survives a restart; the admin console does not, so an
-	// administrator's tokens are never written to disk. The trade is argued in full in
-	// the issue: the cost of no-expiry is paid by everyone every working day, and the
-	// gain is paid out once, to whoever loses a laptop (#266).
-	PersistentCookie bool
+	// lifetime decides whether the cookie outlives the browser.
+	lifetime CookieLifetime
+
+	// random is crypto/rand in production. It is a field so a test can make the CSPRNG
+	// fail, which is the one failure this store must not paper over, without swapping a
+	// package global every other store in the process would read too (#431).
+	random io.Reader
 
 	// now is the clock, replaceable in tests.
 	now func() time.Time
 }
+
+// CookieLifetime is whether the browser keeps the session cookie past its own restart:
+// RFC 6265 section 5.3's persistent-flag, which a cookie gets by carrying Max-Age or
+// Expires. It is a type of its own rather than a bool beside secure so the two cannot be
+// swapped at a call site, and each binary states its choice where it builds its store (#431).
+//
+// The trade is argued in full in #266: the cost of no expiry is paid by everyone every
+// working day, and the gain is paid out once, to whoever loses a laptop. So the end user's
+// cookie persists and the administrator's does not.
+type CookieLifetime int
+
+const (
+	// BrowserSessionCookie carries neither Max-Age nor Expires, so the browser drops it
+	// when it closes and the tokens it names are never a handle left on disk. The admin
+	// console's. The zero value, so a store nobody chose for is the one that keeps least.
+	BrowserSessionCookie CookieLifetime = iota
+
+	// PersistentCookie carries a Max-Age set per save from the row's own expires_at, so
+	// single sign-on survives a browser restart and the browser never holds a handle
+	// that outlives what it names. The auth server's.
+	PersistentCookie
+)
 
 // NewServerSideStore builds a store over the given backend.
 //
@@ -233,7 +255,9 @@ type ServerSideStore struct {
 //
 // The error is the key derivation's, so a deployment whose keys cannot build a cipher
 // fails at startup rather than at its first save.
-func NewServerSideStore(backend Backend, authenticatedKey string, secure bool,
+//
+// Everything the store is configured with arrives here; nothing is set on it afterwards.
+func NewServerSideStore(backend Backend, authenticatedKey string, secure bool, lifetime CookieLifetime,
 	current KeyPair, previous *KeyPair) (*ServerSideStore, error) {
 
 	currentSealer, err := newSealer(current)
@@ -252,15 +276,17 @@ func NewServerSideStore(backend Backend, authenticatedKey string, secure bool,
 	return &ServerSideStore{
 		current:  currentSealer,
 		previous: previousSealer,
-		Options: &Options{
+		options: &Options{
 			Path:     "/",
 			HttpOnly: true,
 			Secure:   secure,
 			SameSite: http.SameSiteLaxMode,
 		},
-		Backend:          backend,
-		AuthenticatedKey: authenticatedKey,
-		Secure:           secure,
+		backend:          backend,
+		authenticatedKey: authenticatedKey,
+		secure:           secure,
+		lifetime:         lifetime,
+		random:           rand.Reader,
 		now:              func() time.Time { return time.Now().UTC() },
 	}, nil
 }
@@ -321,7 +347,7 @@ func (s *ServerSideStore) sealSessionData(session *Session) (string, error) {
 		return "", errs.Wrap(err, "unable to encode the browser session")
 	}
 
-	encoded, err := seal(s.current.data, session.Name(), buf.Bytes())
+	encoded, err := seal(s.random, s.current.data, session.Name(), buf.Bytes())
 	if err != nil {
 		return "", errs.Wrap(err, "unable to encode the browser session")
 	}
@@ -341,7 +367,7 @@ func (s *ServerSideStore) sealSessionData(session *Session) (string, error) {
 // the physical name gains the __Host- prefix on https. Deriving one from the other would
 // make every live session unreadable the moment a deployment moved between the two.
 func (s *ServerSideStore) CookieName(logicalName string) string {
-	if s.Secure {
+	if s.secure {
 		return hostCookiePrefix + logicalName
 	}
 	return logicalName
@@ -358,7 +384,7 @@ func (s *ServerSideStore) CookieName(logicalName string) string {
 // delete is the point of this being a function rather than a comment.
 func (s *ServerSideStore) StaleCookieNames(logicalName string) []string {
 	names := make([]string, 0, legacyMaxChunks+1)
-	if s.Secure {
+	if s.secure {
 		names = append(names, logicalName)
 	}
 	for i := 0; i < legacyMaxChunks; i++ {
@@ -421,7 +447,7 @@ func (s *ServerSideStore) New(r *http.Request, name string) (*Session, error) {
 		return session, nil
 	}
 
-	record, err := s.Backend.Load(requestContext(r), id)
+	record, err := s.backend.Load(requestContext(r), id)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			return session, nil
@@ -480,7 +506,7 @@ func (s *ServerSideStore) New(r *http.Request, name string) (*Session, error) {
 // store's default cookie options.
 func (s *ServerSideStore) freshSession(name string) *Session {
 	session := NewSession(s, name)
-	opts := *s.Options
+	opts := *s.options
 	session.Options = &opts
 	session.IsNew = true
 	return session
@@ -494,7 +520,7 @@ func (s *ServerSideStore) touchIfStale(ctx context.Context, session *Session, re
 		return nil
 	}
 
-	if _, err := s.Backend.Touch(ctx, session.ID, s.isAuthenticated(session)); err != nil {
+	if _, err := s.backend.Touch(ctx, session.ID, s.isAuthenticated(session)); err != nil {
 		if errors.Is(err, ErrNotFound) {
 			return err
 		}
@@ -528,12 +554,12 @@ func (s *ServerSideStore) Save(r *http.Request, w http.ResponseWriter, session *
 	authenticated := s.isAuthenticated(session)
 
 	if session.ID == "" {
-		id, createErr := newSessionId()
+		id, createErr := s.newSessionId()
 		if createErr != nil {
 			return createErr
 		}
 
-		expiresAt, createErr := s.Backend.Create(ctx, id, []byte(encoded), authenticated)
+		expiresAt, createErr := s.backend.Create(ctx, id, []byte(encoded), authenticated)
 		if createErr != nil {
 			return errs.Wrap(createErr, "unable to create the browser session")
 		}
@@ -542,7 +568,7 @@ func (s *ServerSideStore) Save(r *http.Request, w http.ResponseWriter, session *
 		return s.setCookie(w, session, id, expiresAt)
 	}
 
-	expiresAt, err := s.Backend.Update(ctx, session.ID, []byte(encoded), authenticated)
+	expiresAt, err := s.backend.Update(ctx, session.ID, []byte(encoded), authenticated)
 	if err != nil {
 		return errs.Wrap(err, "unable to update the browser session")
 	}
@@ -555,7 +581,7 @@ func (s *ServerSideStore) Save(r *http.Request, w http.ResponseWriter, session *
 // session, where logging out has to actively invalidate both halves.
 func (s *ServerSideStore) deleteSession(ctx context.Context, w http.ResponseWriter, session *Session) error {
 	if session.ID != "" {
-		if err := s.Backend.Delete(ctx, session.ID); err != nil {
+		if err := s.backend.Delete(ctx, session.ID); err != nil {
 			return errs.Wrap(err, "unable to delete the browser session")
 		}
 		session.ID = ""
@@ -575,7 +601,7 @@ func (s *ServerSideStore) deleteSession(ctx context.Context, w http.ResponseWrit
 // leaves MaxAge at zero, which net/http renders as neither Max-Age nor Expires, so the
 // browser drops the cookie when it closes and the tokens inside never reach disk.
 func (s *ServerSideStore) setCookie(w http.ResponseWriter, session *Session, id string, expiresAt time.Time) error {
-	encodedId, err := seal(s.current.cookie, session.Name(), []byte(id))
+	encodedId, err := seal(s.random, s.current.cookie, session.Name(), []byte(id))
 	if err != nil {
 		// The row is already written at this point, so the session exists and the
 		// browser is about to be told nothing about it. That is reported rather than
@@ -586,7 +612,7 @@ func (s *ServerSideStore) setCookie(w http.ResponseWriter, session *Session, id 
 
 	opts := *session.Options
 	opts.MaxAge = 0
-	if s.PersistentCookie {
+	if s.lifetime == PersistentCookie {
 		remaining := int(expiresAt.Sub(s.now()).Seconds())
 		if remaining < 1 {
 			remaining = 1
@@ -615,14 +641,14 @@ func (s *ServerSideStore) DeletionCookie(name string) *http.Cookie {
 	return &http.Cookie{
 		Name:  name,
 		Value: "",
-		Path:  s.Options.Path,
+		Path:  s.options.Path,
 		// Both, and not one or the other: Max-Age is what a current browser acts on, and
 		// the expiry in the past is what one that predates it acts on.
 		MaxAge:   -1,
 		Expires:  time.Unix(0, 0).UTC(),
-		Secure:   s.Secure,
-		HttpOnly: s.Options.HttpOnly,
-		SameSite: s.Options.SameSite,
+		Secure:   s.secure,
+		HttpOnly: s.options.HttpOnly,
+		SameSite: s.options.SameSite,
 	}
 }
 
@@ -654,7 +680,7 @@ func (s *ServerSideStore) buildCookie(logicalName, value string, options *Option
 // see inside the blob; what it produces is a boolean about the container, not about the
 // contents, which is why it can cross a module boundary without telling anyone anything.
 func (s *ServerSideStore) isAuthenticated(session *Session) bool {
-	value, ok := session.Values[s.AuthenticatedKey]
+	value, ok := session.Values[s.authenticatedKey]
 	if !ok || value == nil {
 		return false
 	}
@@ -686,11 +712,11 @@ func chunkCookieName(logicalName string, n int) string {
 // return at all, because a CSPRNG failure there ends the process (#211, closed by #278).
 // A save does have one, so an entropy failure costs the one save -- no cookie, no backend
 // row -- rather than the server. It also keeps that failure reachable from a test through
-// randReader, which is what pins the behaviour; the helper reads crypto/rand directly and
-// nothing can make it fail in-process.
-func newSessionId() (string, error) {
+// the store's random field, which is what pins the behaviour; the helper reads crypto/rand
+// directly and nothing can make it fail in-process.
+func (s *ServerSideStore) newSessionId() (string, error) {
 	buf := make([]byte, SessionIdBytes)
-	if _, err := io.ReadFull(randReader, buf); err != nil {
+	if _, err := io.ReadFull(s.random, buf); err != nil {
 		return "", errs.Wrap(err, "unable to read from the random number generator")
 	}
 	return hex.EncodeToString(buf), nil

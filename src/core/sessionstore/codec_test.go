@@ -183,7 +183,7 @@ func TestNewServerSideStore_RefusesAKeyPairWithAnEmptyKey(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			store, err := NewServerSideStore(newFakeBackend(), "SessionIdentifier", false,
+			store, err := NewServerSideStore(newFakeBackend(), "SessionIdentifier", false, BrowserSessionCookie,
 				c.current, c.previous)
 
 			require.Error(t, err)
