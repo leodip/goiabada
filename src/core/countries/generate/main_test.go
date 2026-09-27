@@ -3,7 +3,6 @@ package main
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -11,14 +10,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/core/boundedread"
+	"github.com/leodip/goiabada/core/testutil"
 )
 
 // fakeDoer serves canned responses keyed by request URL, so tests never touch
 // the network.
 type fakeDoer struct {
 	responses map[string]fakeResp
-	err       error
 }
 
 type fakeResp struct {
@@ -27,9 +25,6 @@ type fakeResp struct {
 }
 
 func (f fakeDoer) do(req *http.Request) (*http.Response, error) {
-	if f.err != nil {
-		return nil, f.err
-	}
 	r, ok := f.responses[req.URL.String()]
 	if !ok {
 		return &http.Response{StatusCode: 404, Body: io.NopCloser(strings.NewReader("")), Header: make(http.Header)}, nil
@@ -102,91 +97,6 @@ func TestEmojiFromAlpha2(t *testing.T) {
 			t.Errorf("emojiFromAlpha2(%q) = %q, want %q", in, got, want)
 		}
 	}
-}
-
-// TestDoGet pins that the download is capped. The boundary cases of the cap
-// itself belong to boundedread's own tests; what is here is that doGet reads
-// through it at the limit it is given.
-func TestDoGet(t *testing.T) {
-	const url = "https://example.test/data.csv"
-
-	t.Run("a body of exactly the limit is returned whole", func(t *testing.T) {
-		d := fakeDoer{responses: map[string]fakeResp{url: {200, "abc"}}}
-		b, err := doGet(d.do, url, 3)
-		if err != nil || string(b) != "abc" {
-			t.Errorf("doGet at limit = (%q, %v), want (\"abc\", nil)", b, err)
-		}
-	})
-
-	t.Run("one byte over the limit is refused", func(t *testing.T) {
-		d := fakeDoer{responses: map[string]fakeResp{url: {200, "abcd"}}}
-		b, err := doGet(d.do, url, 3)
-		if !errors.Is(err, boundedread.ErrResponseTooLarge) {
-			t.Errorf("doGet over limit: err = %v, want boundedread.ErrResponseTooLarge", err)
-		}
-		if b != nil {
-			t.Errorf("doGet over limit returned %q, want nil", b)
-		}
-	})
-}
-
-func TestIsHex40(t *testing.T) {
-	good := "caa72d1e0e5af8876c170bb36a9e4d64a01bba88"
-	if !isHex40(good) {
-		t.Errorf("isHex40(%q) = false", good)
-	}
-	for _, bad := range []string{"", "abc", strings.Repeat("z", 40), good + "0", good[:39]} {
-		if isHex40(bad) {
-			t.Errorf("isHex40(%q) = true, want false", bad)
-		}
-	}
-}
-
-func TestResolveSHA(t *testing.T) {
-	good := "caa72d1e0e5af8876c170bb36a9e4d64a01bba88"
-
-	t.Run("success", func(t *testing.T) {
-		d := fakeDoer{responses: map[string]fakeResp{apiCommitsURL: {200, `{"sha":"` + good + `","commit":{}}`}}}
-		sha, err := resolveSHA(d.do)
-		if err != nil || sha != good {
-			t.Errorf("resolveSHA = (%q, %v), want (%q, nil)", sha, err, good)
-		}
-	})
-	t.Run("non-200", func(t *testing.T) {
-		d := fakeDoer{responses: map[string]fakeResp{apiCommitsURL: {500, ``}}}
-		if _, err := resolveSHA(d.do); err == nil {
-			t.Error("want error on non-200")
-		}
-	})
-	t.Run("malformed JSON", func(t *testing.T) {
-		d := fakeDoer{responses: map[string]fakeResp{apiCommitsURL: {200, `not json`}}}
-		if _, err := resolveSHA(d.do); err == nil {
-			t.Error("want error on malformed JSON")
-		}
-	})
-	t.Run("invalid SHA", func(t *testing.T) {
-		d := fakeDoer{responses: map[string]fakeResp{apiCommitsURL: {200, `{"sha":"nope"}`}}}
-		if _, err := resolveSHA(d.do); err == nil {
-			t.Error("want error on invalid SHA")
-		}
-	})
-}
-
-func TestFetchCSV(t *testing.T) {
-	url := "https://example.test/data.csv"
-	t.Run("success", func(t *testing.T) {
-		d := fakeDoer{responses: map[string]fakeResp{url: {200, "col\nval\n"}}}
-		b, err := fetchCSV(d.do, url)
-		if err != nil || string(b) != "col\nval\n" {
-			t.Errorf("fetchCSV = (%q, %v)", b, err)
-		}
-	})
-	t.Run("non-200", func(t *testing.T) {
-		d := fakeDoer{responses: map[string]fakeResp{url: {403, ""}}}
-		if _, err := fetchCSV(d.do, url); err == nil {
-			t.Error("want error on non-200")
-		}
-	})
 }
 
 // minimal valid header covering the required columns (others omitted).
@@ -338,9 +248,13 @@ func TestValidateCount(t *testing.T) {
 	}
 }
 
+// TestRender checks the header and, through the type-check helper, that the
+// rendered table compiles against countries.go: formatting the output is not
+// compiling it (#432).
 func TestRender(t *testing.T) {
 	list := []country{
 		{Name: "Brazil", Alpha2: "BR", Alpha3: "BRA", Emoji: "🇧🇷", CallingCodes: []string{"55"}},
+		{Name: "Dominican Republic", Alpha2: "DO", Alpha3: "DOM", Emoji: "🇩🇴", CallingCodes: []string{"1809", "1829", "1849"}},
 	}
 	prov := provenance{
 		CommitSHA: "caa72d1e0e5af8876c170bb36a9e4d64a01bba88",
@@ -361,55 +275,99 @@ func TestRender(t *testing.T) {
 			t.Errorf("render output missing %q", want)
 		}
 	}
+
+	testutil.AssertGeneratedSourceTypeChecks(t, "..", "data_generated.go", out)
 }
 
-// TestFetchPinnedAndHeader exercises the complete provenance chain against a
-// fake serving both endpoints: resolve SHA → build the immutable per-commit URL
-// from that SHA → fetch the CSV → compute its SHA-256 → carry all three EXACT
-// values into the rendered header. It never writes a file or touches the network.
+// fixtureCSV is what the fake serves at a pin's URL; fixturePin is a pin whose
+// digest is the fixture's own, so fetchPinned gets past the check.
+const fixtureCSV = testHeader + "\nBR,BRA,55,Brazil,Brazil\n"
+
+func fixturePin() pin {
+	sum := sha256.Sum256([]byte(fixtureCSV))
+	return pin{commit: "caa72d1e0e5af8876c170bb36a9e4d64a01bba88", sha256: hex.EncodeToString(sum[:])}
+}
+
+// TestFetchPinnedAndHeader exercises the provenance chain against a fake: the
+// URL is built from the pin's commit, the CSV is refused unless it hashes to
+// the pin's digest, and the rendered header carries the exact commit, URL and
+// hash. It never writes a file or touches the network.
 func TestFetchPinnedAndHeader(t *testing.T) {
-	sha := "caa72d1e0e5af8876c170bb36a9e4d64a01bba88"
-	rawURL := fmt.Sprintf(rawURLFmt, sha) // must equal the URL fetchPinned builds
-	csv := testHeader + "\nBR,BRA,55,Brazil,Brazil\n"
-	d := fakeDoer{responses: map[string]fakeResp{
-		apiCommitsURL: {200, `{"sha":"` + sha + `"}`},
-		rawURL:        {200, csv}, // if fetchPinned built a wrong URL, this 404s
-	}}
+	t.Run("the pin's own digest: fetched from the pin's commit and recorded", func(t *testing.T) {
+		p := fixturePin()
+		// The fake answers this URL alone, so a URL built from anything but the
+		// pin's commit gets a 404.
+		rawURL := fmt.Sprintf(rawURLFmt, p.commit)
+		d := fakeDoer{responses: map[string]fakeResp{rawURL: {200, fixtureCSV}}}
 
-	csvBytes, prov, err := fetchPinned(d.do)
-	if err != nil {
-		t.Fatalf("fetchPinned: %v", err)
-	}
-	if prov.CommitSHA != sha {
-		t.Errorf("CommitSHA = %q, want %q", prov.CommitSHA, sha)
-	}
-	if prov.SourceURL != rawURL {
-		t.Errorf("SourceURL = %q, want %q", prov.SourceURL, rawURL)
-	}
-	sum := sha256.Sum256([]byte(csv))
-	wantHash := hex.EncodeToString(sum[:])
-	if prov.CSVSHA256 != wantHash {
-		t.Errorf("CSVSHA256 = %q, want %q (exact computed hash)", prov.CSVSHA256, wantHash)
-	}
-	if string(csvBytes) != csv {
-		t.Errorf("csvBytes = %q, want %q", csvBytes, csv)
-	}
-
-	// The rendered header must carry the exact resolved SHA, URL, and hash.
-	list, err := parseCSV(csvBytes)
-	if err != nil {
-		t.Fatalf("parseCSV: %v", err)
-	}
-	out, err := render(list, prov)
-	if err != nil {
-		t.Fatalf("render: %v", err)
-	}
-	s := string(out)
-	for _, want := range []string{sha, rawURL, wantHash} {
-		if !strings.Contains(s, want) {
-			t.Errorf("rendered header missing %q", want)
+		csvBytes, prov, err := fetchPinned(d.do, p)
+		if err != nil {
+			t.Fatalf("fetchPinned: %v", err)
 		}
-	}
+		if prov.CommitSHA != p.commit {
+			t.Errorf("CommitSHA = %q, want %q", prov.CommitSHA, p.commit)
+		}
+		if prov.SourceURL != rawURL {
+			t.Errorf("SourceURL = %q, want %q", prov.SourceURL, rawURL)
+		}
+		if prov.CSVSHA256 != p.sha256 {
+			t.Errorf("CSVSHA256 = %q, want %q", prov.CSVSHA256, p.sha256)
+		}
+		if string(csvBytes) != fixtureCSV {
+			t.Errorf("csvBytes = %q, want %q", csvBytes, fixtureCSV)
+		}
+
+		list, err := parseCSV(csvBytes)
+		if err != nil {
+			t.Fatalf("parseCSV: %v", err)
+		}
+		out, err := render(list, prov)
+		if err != nil {
+			t.Fatalf("render: %v", err)
+		}
+		for _, want := range []string{p.commit, rawURL, p.sha256} {
+			if !strings.Contains(string(out), want) {
+				t.Errorf("rendered header missing %q", want)
+			}
+		}
+	})
+
+	t.Run("another digest: refused, naming the pinned and the received hash", func(t *testing.T) {
+		p := fixturePin()
+		received := p.sha256
+		p.sha256 = strings.Repeat("0", 64)
+		d := fakeDoer{responses: map[string]fakeResp{fmt.Sprintf(rawURLFmt, p.commit): {200, fixtureCSV}}}
+
+		csvBytes, _, err := fetchPinned(d.do, p)
+		if err == nil {
+			t.Fatal("fetchPinned accepted a CSV whose digest is not the pinned one")
+		}
+		if csvBytes != nil {
+			t.Errorf("csvBytes = %q, want nil", csvBytes)
+		}
+		for _, want := range []string{p.sha256, received} {
+			if !strings.Contains(err.Error(), want) {
+				t.Errorf("error %q does not name %q", err, want)
+			}
+		}
+	})
+
+	// The production pin, which run passes. No fixture can hash to its digest,
+	// so this is the case that ties run to the constants: it fails if the check
+	// is skipped or the pin stops being the one the header claims.
+	t.Run("the production pin refuses any CSV but its own", func(t *testing.T) {
+		d := fakeDoer{responses: map[string]fakeResp{fmt.Sprintf(rawURLFmt, pinnedCommit): {200, fixtureCSV}}}
+
+		_, _, err := fetchPinned(d.do, pinned)
+		if err == nil {
+			t.Fatal("fetchPinned(pinned) accepted the fixture CSV")
+		}
+		for _, want := range []string{pinnedCSVSHA256, fixturePin().sha256} {
+			if !strings.Contains(err.Error(), want) {
+				t.Errorf("error %q does not name %q", err, want)
+			}
+		}
+	})
 }
 
 func findGen(list []country, a2 string) (country, bool) {

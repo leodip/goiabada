@@ -3,14 +3,15 @@
 //
 // It is a package rather than a helper in one of the callers because the rule is shared across
 // packages and modules -- the admin console's apiclient, oauthclient and middleware reading the
-// auth server, and the countries generator reading its dataset -- and a rule with a sentinel per
-// caller is a rule per caller. A reader arriving at any read site finds the same function and the
-// same error, and does not have to work out which convention that site is in (#386 decision 4).
-// It lives in core rather than the admin console so the generators read through it too (#432).
+// auth server, and core/internal/pinnedfetch downloading the generators' source data -- and a
+// rule with a sentinel per caller is a rule per caller. A reader arriving at any read site finds
+// the same function and the same error, and does not have to work out which convention that site
+// is in (#386 decision 4). It lives in core rather than the admin console so the generators read
+// through it too (#432).
 //
 // The ceiling itself is not here. Each caller's means something different -- the admin API's
-// response bound, the session store's wire bound, the token endpoint's, the generator's dataset
-// and commit lookup -- and each is declared beside the code that knows why it is that number.
+// response bound, the session store's wire bound, the token endpoint's, a generator's download --
+// and each is declared beside the code that knows why it is that number.
 package boundedread
 
 import (
@@ -30,7 +31,7 @@ import (
 // No caller needs to match on it to behave correctly. Every site already answers a failed read the
 // same way it answers a failed parse: the admin console's error classifier falls through to a 500,
 // a refresh clears the session and continues, a JWKS fetch leaves the cache as it was, a session
-// store call fails without retrying, and the countries generator fails its run. The sentinel is
+// store call fails without retrying, and a generator's download fails its run. The sentinel is
 // what makes the reason readable in a record and assertable in a test.
 var ErrResponseTooLarge = errors.New("the response exceeded the maximum size")
 
