@@ -224,15 +224,7 @@ func (val *ProfileValidator) ValidateProfile(ctx context.Context, input *Validat
 	}
 
 	if len(input.Locale) > 0 {
-		locales := locales.Get()
-		found := false
-		for _, loc := range locales {
-			if loc.Id == input.Locale {
-				found = true
-				break
-			}
-		}
-		if !found {
+		if _, found := locales.ByID(input.Locale); !found {
 			return i18n.NewLocalizedError(i18n.ErrCodeProfileLocaleInvalid, nil)
 		}
 	}

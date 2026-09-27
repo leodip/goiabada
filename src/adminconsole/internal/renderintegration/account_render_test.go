@@ -54,12 +54,31 @@ func TestRender_AccountProfile(t *testing.T) {
 	bind := map[string]interface{}{
 		"user":              &api.UserResponse{},
 		"timezones":         timezones.Get(),
-		"locales":           locales.Get(),
+		"locales":           locales.All(),
 		"savedSuccessfully": false,
 	}
 	out := render(t, "/account_profile.html", bind)
 	assert.Contains(t, out, "português (Brasil) (Portuguese (Brazil))") // LocaleLabel
 	assert.Contains(t, out, "Estados Unidos")                           // RefTimezone country portion localized
+}
+
+// Both profile pages label each locale from locales.Locale.Name, so a template left on a removed
+// field fails here on either page rather than on the one TestRender_AccountProfile reads (#432).
+func TestRender_ProfilePagesLabelLocalesByName(t *testing.T) {
+	for _, page := range []string{"/account_profile.html", "/admin_users_profile.html"} {
+		t.Run(page, func(t *testing.T) {
+			out := render(t, page, map[string]interface{}{
+				"user":              &api.UserResponse{Id: 7},
+				"timezones":         timezones.Get(),
+				"locales":           locales.All(),
+				"page":              "1",
+				"query":             "",
+				"savedSuccessfully": false,
+			})
+
+			assert.Contains(t, out, "português (Brasil) (Portuguese (Brazil))")
+		})
+	}
 }
 
 // The enrolment form shows the QR code and the seed, and carries neither back as a hidden input.
@@ -525,7 +544,7 @@ func TestRender_ProfilePagesKeepTheDateOfBirthMachineFormat(t *testing.T) {
 			bind: map[string]interface{}{
 				"user":              user,
 				"timezones":         timezones.Get(),
-				"locales":           locales.Get(),
+				"locales":           locales.All(),
 				"savedSuccessfully": false,
 			},
 		},
@@ -535,7 +554,7 @@ func TestRender_ProfilePagesKeepTheDateOfBirthMachineFormat(t *testing.T) {
 			bind: map[string]interface{}{
 				"user":              user,
 				"timezones":         timezones.Get(),
-				"locales":           locales.Get(),
+				"locales":           locales.All(),
 				"page":              "1",
 				"query":             "",
 				"savedSuccessfully": false,

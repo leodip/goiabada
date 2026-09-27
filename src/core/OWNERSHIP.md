@@ -368,8 +368,9 @@ command itself and fails on a tree it changed.
 | `core/internal/refgraph` | `SelectedNames` | kernel | — |
 | `core/internal/refgraph` | `TableUnder` | kernel | — |
 | `core/internal/refgraph` | `Unparen` | kernel | — |
-| `core/locales` | `Get` | both-apps | — |
-| `core/locales` | `Locale` | own-package | — |
+| `core/locales` | `All` | contract | The list half of the locale table whose lookup the auth server validates against. Moving it would put one locale list in two places. |
+| `core/locales` | `ByID` | contract | The lookup half of the locale table whose list the admin console renders. Moving it would put one locale list in two places. |
+| `core/locales` | `Locale` | contract | The row type both halves of the table share. |
 | `core/logging` | `FieldForLog` | kernel | — |
 | `core/logging` | `Install` | both-apps | — |
 | `core/logging` | `MaxLoggedField` | own-package | — |
