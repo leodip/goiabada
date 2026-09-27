@@ -9,18 +9,24 @@
 //
 //	./version-manager.sh generate countries
 //
-// It resolves the current upstream `main` commit, fetches the CSV from the
-// immutable per-commit raw URL (so a moving branch cannot make output
-// non-deterministic), records the commit SHA + CSV SHA-256 as provenance, and
-// regenerates the committed data slice. It fails (rather than silently
-// skipping) on any malformed or drifted source data so a human reviews changes.
+// It fetches the CSV from the immutable raw URL of one pinned dataset commit,
+// refuses it unless its SHA-256 is the pinned one, records the commit, URL and
+// hash as provenance, and regenerates the committed data slice. Identical pins
+// give identical output, and it fails (rather than silently skipping) on any
+// malformed or drifted source data so a human reviews changes.
+//
+// To move to a newer dataset:
+//
+//  1. Look up the newest commit of github.com/datasets/country-codes
+//     (git ls-remote https://github.com/datasets/country-codes main).
+//  2. Set pinnedCommit to it and run; the run refuses the CSV and prints the
+//     SHA-256 it received.
+//  3. Set pinnedCSVSHA256 to that hash and run again.
+//  4. Review the diff of data_generated.go before committing it.
 package main
 
 import (
-	"crypto/sha256"
 	"encoding/csv"
-	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"go/format"
 	"io"
@@ -33,22 +39,26 @@ import (
 	"strings"
 	"time"
 
-	"github.com/leodip/goiabada/core/boundedread"
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/internal/pinnedfetch"
 )
 
 const (
-	// apiCommitsURL resolves the current tip commit of the upstream default
-	// branch. We pin to the returned SHA and never fetch a moving ref again.
-	apiCommitsURL = "https://api.github.com/repos/datasets/country-codes/commits/main"
+	// pinnedCommit is the datasets/country-codes commit the table is generated
+	// from, and pinnedCSVSHA256 the SHA-256 of its CSV. A run fetches that one
+	// commit and refuses any other bytes, so the table moves only when a human
+	// moves these two (see the steps above). The upstream tip used to be
+	// resolved at run time, which made two runs of one tree disagree (#432).
+	pinnedCommit    = "cc23444f4314174e1571a9804e186c15f8e8ab2b"
+	pinnedCSVSHA256 = "67b009b529330b0a6043551189f43faa785c9c3cc0011ad2bdb4eac876356c43"
+
 	// rawURLFmt is the immutable per-commit raw CSV URL (%s = commit SHA).
 	rawURLFmt = "https://raw.githubusercontent.com/datasets/country-codes/%s/data/country-codes.csv"
 
-	// Size caps: every download is read through boundedread.Read, which
-	// refuses an overrun rather than truncating it. The CSV is ~130 KiB; the
-	// commit JSON is small.
+	// csvSizeLimit caps the download, which pinnedfetch reads through
+	// boundedread.Read, refusing an overrun rather than truncating it. The CSV
+	// is ~130 KiB.
 	csvSizeLimit = int64(8 << 20) // 8 MiB
-	apiSizeLimit = int64(4 << 20) // 4 MiB
 
 	userAgent = "goiabada-countries-generator"
 
@@ -96,8 +106,19 @@ type provenance struct {
 	CSVSHA256 string
 }
 
-// httpDoer is the injectable HTTP seam so tests never touch the network.
-type httpDoer func(req *http.Request) (*http.Response, error)
+// pin names one dataset commit and the SHA-256 its CSV must have.
+//
+// It is a parameter below run rather than read from the constants inside
+// fetchPinned because no fixture CSV can hash to the real digest: a test
+// calling through the constants would never get past the check to the parser.
+// run passes pinned, the one value built from the constants, so production has
+// no other path (#432).
+type pin struct {
+	commit string
+	sha256 string
+}
+
+var pinned = pin{commit: pinnedCommit, sha256: pinnedCSVSHA256}
 
 func main() {
 	client := &http.Client{Timeout: 60 * time.Second}
@@ -107,8 +128,8 @@ func main() {
 	}
 }
 
-func run(doer httpDoer) error {
-	csvBytes, prov, err := fetchPinned(doer)
+func run(doer pinnedfetch.Doer) error {
+	csvBytes, prov, err := fetchPinned(doer, pinned)
 	if err != nil {
 		return err
 	}
@@ -140,6 +161,7 @@ func run(doer httpDoer) error {
 	if err != nil {
 		return err
 	}
+	//nolint:gosec // G306: the output is a committed source file, world-readable on purpose like every file in the repository.
 	if err := os.WriteFile(outPath, out, 0644); err != nil {
 		return errs.Errorf("write %s: %w", outPath, err)
 	}
@@ -147,69 +169,22 @@ func run(doer httpDoer) error {
 	return nil
 }
 
-// fetchPinned resolves the upstream tip commit, fetches the CSV from the
-// immutable per-commit URL built from that SHA, and computes the provenance
-// (commit SHA, immutable source URL, CSV SHA-256). Extracted from run so the
-// full SHA → URL → hash chain is testable without touching the filesystem.
-func fetchPinned(doer httpDoer) ([]byte, provenance, error) {
-	fmt.Fprintln(os.Stderr, "Resolving upstream commit SHA...")
-	sha, err := resolveSHA(doer)
-	if err != nil {
-		return nil, provenance{}, errs.Errorf("resolve SHA: %w", err)
-	}
-	fmt.Fprintf(os.Stderr, "Pinned commit: %s\n", sha)
-
-	url := fmt.Sprintf(rawURLFmt, sha)
+// fetchPinned fetches the CSV at p's commit, refuses it unless its SHA-256 is
+// p's, and returns it with the provenance the header records (commit, source
+// URL, CSV SHA-256). Extracted from run so the pin -> URL -> hash chain is
+// testable without touching the filesystem.
+func fetchPinned(doer pinnedfetch.Doer, p pin) ([]byte, provenance, error) {
+	url := fmt.Sprintf(rawURLFmt, p.commit)
 	fmt.Fprintf(os.Stderr, "Fetching %s\n", url)
-	csvBytes, err := fetchCSV(doer, url)
+	csvBytes, err := pinnedfetch.Get(doer, url, userAgent, csvSizeLimit)
 	if err != nil {
 		return nil, provenance{}, errs.Errorf("fetch CSV: %w", err)
 	}
-	sum := sha256.Sum256(csvBytes)
-	prov := provenance{CommitSHA: sha, SourceURL: url, CSVSHA256: hex.EncodeToString(sum[:])}
-	return csvBytes, prov, nil
-}
-
-// resolveSHA fetches the tip commit of the upstream default branch.
-func resolveSHA(doer httpDoer) (string, error) {
-	body, err := doGet(doer, apiCommitsURL, apiSizeLimit)
+	sum, err := pinnedfetch.CheckSHA256(csvBytes, p.sha256)
 	if err != nil {
-		return "", err
+		return nil, provenance{}, errs.Errorf("CSV at commit %s: %w", p.commit, err)
 	}
-	var payload struct {
-		SHA string `json:"sha"`
-	}
-	if err := json.Unmarshal(body, &payload); err != nil {
-		return "", errs.Errorf("decode commit JSON: %w", err)
-	}
-	if !isHex40(payload.SHA) {
-		return "", errs.Errorf("unexpected commit SHA %q", payload.SHA)
-	}
-	return payload.SHA, nil
-}
-
-// fetchCSV downloads the pinned CSV.
-func fetchCSV(doer httpDoer, url string) ([]byte, error) {
-	return doGet(doer, url, csvSizeLimit)
-}
-
-// doGet issues a GET with a User-Agent, checks for HTTP 200, and reads the body
-// under a hard size cap (limit+1 read → fail if exceeded).
-func doGet(doer httpDoer, url string, limit int64) ([]byte, error) {
-	req, err := http.NewRequest(http.MethodGet, url, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("User-Agent", userAgent)
-	resp, err := doer(req)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = resp.Body.Close() }()
-	if resp.StatusCode != http.StatusOK {
-		return nil, errs.Errorf("GET %s: unexpected status %d", url, resp.StatusCode)
-	}
-	return boundedread.Read(resp.Body, limit)
+	return csvBytes, provenance{CommitSHA: p.commit, SourceURL: url, CSVSHA256: sum}, nil
 }
 
 // parseCSV parses the raw CSV into countries, locating columns by header name
@@ -472,14 +447,6 @@ func isDigits(s string) bool {
 		}
 	}
 	return true
-}
-
-func isHex40(s string) bool {
-	if len(s) != 40 {
-		return false
-	}
-	_, err := hex.DecodeString(s)
-	return err == nil
 }
 
 func stripBOM(b []byte) []byte {

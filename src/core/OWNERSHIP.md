@@ -348,6 +348,9 @@ command itself and fails on a tree it changed.
 | `core/i18n` | `T` | kernel | — |
 | `core/i18n` | `UILocalesReader` | reachable | — |
 | `core/i18n` | `WithLocale` | both-apps | — |
+| `core/internal/pinnedfetch` | `CheckSHA256` | kernel | — |
+| `core/internal/pinnedfetch` | `Doer` | kernel | — |
+| `core/internal/pinnedfetch` | `Get` | kernel | — |
 | `core/internal/refgraph` | `BuildImportGraph` | kernel | — |
 | `core/internal/refgraph` | `CheckOwnership` | kernel | — |
 | `core/internal/refgraph` | `DocRow` | own-package | — |
@@ -425,6 +428,7 @@ command itself and fails on a tree it changed.
 | `core/testutil` | `AssertAuditLogContext` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
 | `core/testutil` | `AssertErrorCodeDoc` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
 | `core/testutil` | `AssertGeneratedMocksArePinned` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
+| `core/testutil` | `AssertGeneratedSourceTypeChecks` | test-support | Type-checks a generator's rendered output against its package; named only by the generators' render tests. |
 | `core/testutil` | `AssertGofmted` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
 | `core/testutil` | `AssertNoAgreementPointers` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
 | `core/testutil` | `AssertNoCredentialQueryFallback` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |

@@ -125,6 +125,7 @@ Notes on rows that are not self-evident:
 - `core/internal` is kernel because it holds `refgraph`, the reference-graph reader behind the
   tree-wide guards and `ownershipdump`: the census left `core/testutil` so that the tool stops
   linking `testing` and testify, and Go's internal rule keeps it from anything outside core (#431).
+  It also holds `pinnedfetch`, the pinned download the reference-data generators share (#432).
 - `core/testutil` is kernel because it is test support compiled into no binary. It is still held to
   the kernel rule, and #360 is what made that hold rather than merely claim
   it: `core/testutil/fake` imported `core/uuidutil` under an exception rather than a waiver, so the
