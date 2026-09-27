@@ -415,7 +415,7 @@ func (w *wizard) askDatabaseConnection() error {
 func (w *wizard) databaseConnectionFromPrompts(defaultHost string) error {
 	c := w.config
 	var err error
-	if c.DBHost, err = w.hostname("Database host", defaultHost); err != nil {
+	if c.DBHost, err = w.databaseHost("Database host", defaultHost); err != nil {
 		return err
 	}
 	if c.DBPort, err = w.port("Database port", c.DBPort); err != nil {
@@ -437,7 +437,7 @@ func (w *wizard) databaseConnectionFromFlags() error {
 	if c.DBHost == "" {
 		return errs.New("--db-host is required for Kubernetes/native deployments")
 	}
-	if err := validateHostname(c.DBHost); err != nil {
+	if err := validateDatabaseHost(c.DBHost); err != nil {
 		return errs.Wrap(err, "invalid database host")
 	}
 	if w.flags.DBPort != "" {

@@ -444,6 +444,22 @@ func TestWizard_NonInteractiveWritesDespiteAFailedCheck(t *testing.T) {
 	}
 }
 
+// An IPv6 database host, bare or bracketed, is one the auth server accepts, so the wizard takes it
+// from the flags and hands it to the check as given; the check's hostport.Join brackets it (#430).
+func TestWizard_AnIPv6DatabaseHostReachesTheCheck(t *testing.T) {
+	for _, host := range []string{"::1", "[::1]", "2001:db8::5"} {
+		t.Run(host, func(t *testing.T) {
+			w, _, out, calls := testWizard(t, &CLIFlags{DeploymentType: "native", DBType: "postgres", AuthServerURL: "https://auth.example.org", DBHost: host}, nil)
+			if err := w.setup(); err != nil {
+				t.Fatalf("setup: %v\n%s", err, out)
+			}
+			if len(*calls) != 1 || (*calls)[0].host != host {
+				t.Errorf("checks %+v, want one on host %q", *calls, host)
+			}
+		})
+	}
+}
+
 func TestWizard_NonInteractiveRefusals(t *testing.T) {
 	native := func(change func(f *CLIFlags)) CLIFlags {
 		f := CLIFlags{DeploymentType: "native", DBType: "postgres", AuthServerURL: "https://auth.example.org", DBHost: "pg.internal", SkipDBTest: true}

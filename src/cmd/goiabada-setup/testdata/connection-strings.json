@@ -1,0 +1,235 @@
+{
+  "cases": [
+    {
+      "name": "plain",
+      "engine": "postgres",
+      "host": "db.example.com",
+      "port": 5432,
+      "username": "goiabada",
+      "password": "plain-Passw0rd",
+      "database": "goiabada",
+      "dsn": "postgres://goiabada:plain-Passw0rd@db.example.com:5432/goiabada",
+      "maintenanceDSN": "postgres://goiabada:plain-Passw0rd@db.example.com:5432/postgres"
+    },
+    {
+      "name": "every special character in the password",
+      "engine": "postgres",
+      "host": "db.example.com",
+      "port": 5432,
+      "username": "goiabada",
+      "password": "p@ss/w?rd#%41: 'q\"&=+;\\x",
+      "database": "goiabada",
+      "dsn": "postgres://goiabada:p%40ss%2Fw%3Frd%23%2541%3A%20%27q%22&=+;%5Cx@db.example.com:5432/goiabada",
+      "maintenanceDSN": "postgres://goiabada:p%40ss%2Fw%3Frd%23%2541%3A%20%27q%22&=+;%5Cx@db.example.com:5432/postgres"
+    },
+    {
+      "name": "at in the username",
+      "engine": "postgres",
+      "host": "db.example.com",
+      "port": 5432,
+      "username": "us@r",
+      "password": "pw",
+      "database": "goiabada",
+      "dsn": "postgres://us%40r:pw@db.example.com:5432/goiabada",
+      "maintenanceDSN": "postgres://us%40r:pw@db.example.com:5432/postgres"
+    },
+    {
+      "name": "database name at the validator's limit",
+      "engine": "postgres",
+      "host": "db.example.com",
+      "port": 5432,
+      "username": "goiabada",
+      "password": "pw",
+      "database": "goiabada_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "dsn": "postgres://goiabada:pw@db.example.com:5432/goiabada_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "maintenanceDSN": "postgres://goiabada:pw@db.example.com:5432/postgres"
+    },
+    {
+      "name": "a port other than the default",
+      "engine": "postgres",
+      "host": "10.0.0.5",
+      "port": 15000,
+      "username": "goiabada",
+      "password": "pw",
+      "database": "goiabada",
+      "dsn": "postgres://goiabada:pw@10.0.0.5:15000/goiabada",
+      "maintenanceDSN": "postgres://goiabada:pw@10.0.0.5:15000/postgres"
+    },
+    {
+      "name": "bare IPv6 host",
+      "engine": "postgres",
+      "host": "::1",
+      "port": 5432,
+      "username": "goiabada",
+      "password": "pw",
+      "database": "goiabada",
+      "dsn": "postgres://goiabada:pw@[::1]:5432/goiabada",
+      "maintenanceDSN": "postgres://goiabada:pw@[::1]:5432/postgres"
+    },
+    {
+      "name": "bracketed IPv6 host",
+      "engine": "postgres",
+      "host": "[::1]",
+      "port": 5432,
+      "username": "goiabada",
+      "password": "pw",
+      "database": "goiabada",
+      "dsn": "postgres://goiabada:pw@[::1]:5432/goiabada",
+      "maintenanceDSN": "postgres://goiabada:pw@[::1]:5432/postgres"
+    },
+    {
+      "name": "plain",
+      "engine": "mysql",
+      "host": "db.example.com",
+      "port": 3306,
+      "username": "goiabada",
+      "password": "plain-Passw0rd",
+      "database": "goiabada",
+      "dsn": "goiabada:plain-Passw0rd@tcp(db.example.com:3306)/goiabada?charset=utf8mb4&multiStatements=true&parseTime=true",
+      "maintenanceDSN": "goiabada:plain-Passw0rd@tcp(db.example.com:3306)/?charset=utf8mb4&parseTime=true"
+    },
+    {
+      "name": "every special character in the password",
+      "engine": "mysql",
+      "host": "db.example.com",
+      "port": 3306,
+      "username": "goiabada",
+      "password": "p@ss/w?rd#%41: 'q\"&=+;\\x",
+      "database": "goiabada",
+      "dsn": "goiabada:p@ss/w?rd#%41: 'q\"&=+;\\x@tcp(db.example.com:3306)/goiabada?charset=utf8mb4&multiStatements=true&parseTime=true",
+      "maintenanceDSN": "goiabada:p@ss/w?rd#%41: 'q\"&=+;\\x@tcp(db.example.com:3306)/?charset=utf8mb4&parseTime=true"
+    },
+    {
+      "name": "at in the username",
+      "engine": "mysql",
+      "host": "db.example.com",
+      "port": 3306,
+      "username": "us@r",
+      "password": "pw",
+      "database": "goiabada",
+      "dsn": "us@r:pw@tcp(db.example.com:3306)/goiabada?charset=utf8mb4&multiStatements=true&parseTime=true",
+      "maintenanceDSN": "us@r:pw@tcp(db.example.com:3306)/?charset=utf8mb4&parseTime=true"
+    },
+    {
+      "name": "database name at the validator's limit",
+      "engine": "mysql",
+      "host": "db.example.com",
+      "port": 3306,
+      "username": "goiabada",
+      "password": "pw",
+      "database": "goiabada_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "dsn": "goiabada:pw@tcp(db.example.com:3306)/goiabada_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx?charset=utf8mb4&multiStatements=true&parseTime=true",
+      "maintenanceDSN": "goiabada:pw@tcp(db.example.com:3306)/?charset=utf8mb4&parseTime=true"
+    },
+    {
+      "name": "a port other than the default",
+      "engine": "mysql",
+      "host": "10.0.0.5",
+      "port": 15000,
+      "username": "goiabada",
+      "password": "pw",
+      "database": "goiabada",
+      "dsn": "goiabada:pw@tcp(10.0.0.5:15000)/goiabada?charset=utf8mb4&multiStatements=true&parseTime=true",
+      "maintenanceDSN": "goiabada:pw@tcp(10.0.0.5:15000)/?charset=utf8mb4&parseTime=true"
+    },
+    {
+      "name": "bare IPv6 host",
+      "engine": "mysql",
+      "host": "::1",
+      "port": 3306,
+      "username": "goiabada",
+      "password": "pw",
+      "database": "goiabada",
+      "dsn": "goiabada:pw@tcp([::1]:3306)/goiabada?charset=utf8mb4&multiStatements=true&parseTime=true",
+      "maintenanceDSN": "goiabada:pw@tcp([::1]:3306)/?charset=utf8mb4&parseTime=true"
+    },
+    {
+      "name": "bracketed IPv6 host",
+      "engine": "mysql",
+      "host": "[::1]",
+      "port": 3306,
+      "username": "goiabada",
+      "password": "pw",
+      "database": "goiabada",
+      "dsn": "goiabada:pw@tcp([::1]:3306)/goiabada?charset=utf8mb4&multiStatements=true&parseTime=true",
+      "maintenanceDSN": "goiabada:pw@tcp([::1]:3306)/?charset=utf8mb4&parseTime=true"
+    },
+    {
+      "name": "plain",
+      "engine": "mssql",
+      "host": "db.example.com",
+      "port": 1433,
+      "username": "goiabada",
+      "password": "plain-Passw0rd",
+      "database": "goiabada",
+      "dsn": "sqlserver://goiabada:plain-Passw0rd@db.example.com:1433?database=goiabada&encrypt=disable",
+      "maintenanceDSN": "sqlserver://goiabada:plain-Passw0rd@db.example.com:1433?database=master&encrypt=disable"
+    },
+    {
+      "name": "every special character in the password",
+      "engine": "mssql",
+      "host": "db.example.com",
+      "port": 1433,
+      "username": "goiabada",
+      "password": "p@ss/w?rd#%41: 'q\"&=+;\\x",
+      "database": "goiabada",
+      "dsn": "sqlserver://goiabada:p%40ss%2Fw%3Frd%23%2541%3A%20%27q%22&=+;%5Cx@db.example.com:1433?database=goiabada&encrypt=disable",
+      "maintenanceDSN": "sqlserver://goiabada:p%40ss%2Fw%3Frd%23%2541%3A%20%27q%22&=+;%5Cx@db.example.com:1433?database=master&encrypt=disable"
+    },
+    {
+      "name": "at in the username",
+      "engine": "mssql",
+      "host": "db.example.com",
+      "port": 1433,
+      "username": "us@r",
+      "password": "pw",
+      "database": "goiabada",
+      "dsn": "sqlserver://us%40r:pw@db.example.com:1433?database=goiabada&encrypt=disable",
+      "maintenanceDSN": "sqlserver://us%40r:pw@db.example.com:1433?database=master&encrypt=disable"
+    },
+    {
+      "name": "database name at the validator's limit",
+      "engine": "mssql",
+      "host": "db.example.com",
+      "port": 1433,
+      "username": "goiabada",
+      "password": "pw",
+      "database": "goiabada_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "dsn": "sqlserver://goiabada:pw@db.example.com:1433?database=goiabada_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx&encrypt=disable",
+      "maintenanceDSN": "sqlserver://goiabada:pw@db.example.com:1433?database=master&encrypt=disable"
+    },
+    {
+      "name": "a port other than the default",
+      "engine": "mssql",
+      "host": "10.0.0.5",
+      "port": 15000,
+      "username": "goiabada",
+      "password": "pw",
+      "database": "goiabada",
+      "dsn": "sqlserver://goiabada:pw@10.0.0.5:15000?database=goiabada&encrypt=disable",
+      "maintenanceDSN": "sqlserver://goiabada:pw@10.0.0.5:15000?database=master&encrypt=disable"
+    },
+    {
+      "name": "bare IPv6 host",
+      "engine": "mssql",
+      "host": "::1",
+      "port": 1433,
+      "username": "goiabada",
+      "password": "pw",
+      "database": "goiabada",
+      "dsn": "sqlserver://goiabada:pw@[::1]:1433?database=goiabada&encrypt=disable",
+      "maintenanceDSN": "sqlserver://goiabada:pw@[::1]:1433?database=master&encrypt=disable"
+    },
+    {
+      "name": "bracketed IPv6 host",
+      "engine": "mssql",
+      "host": "[::1]",
+      "port": 1433,
+      "username": "goiabada",
+      "password": "pw",
+      "database": "goiabada",
+      "dsn": "sqlserver://goiabada:pw@[::1]:1433?database=goiabada&encrypt=disable",
+      "maintenanceDSN": "sqlserver://goiabada:pw@[::1]:1433?database=master&encrypt=disable"
+    }
+  ]
+}

@@ -1,11 +1,13 @@
 package main
 
 import (
+	"net"
 	"strings"
 	"unicode"
 	"unicode/utf8"
 
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/hostport"
 )
 
 // checkWritable refuses a value no generated file can carry: one that is not valid UTF-8, which a
@@ -47,6 +49,16 @@ func isASCIIAlphaNum(c rune) bool {
 // isASCIILowerAlphaNum reports whether c is a lowercase ASCII letter or digit.
 func isASCIILowerAlphaNum(c rune) bool {
 	return (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')
+}
+
+// validateDatabaseHost accepts what the auth server's GOIABADA_DB_HOST does: a hostname, or an IP
+// literal, an IPv6 one bare or in brackets, since the server and the connection check both join it
+// to the port through hostport.Join. validateHostname alone refused every IPv6 host (#430).
+func validateDatabaseHost(host string) error {
+	if net.ParseIP(hostport.Unbracket(host)) != nil {
+		return nil
+	}
+	return validateHostname(host)
 }
 
 func validateHostname(hostname string) error {

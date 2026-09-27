@@ -29,11 +29,12 @@ func TestEngines_EveryRowIsComplete(t *testing.T) {
 				"image": e.image, "defaultPort": e.defaultPort, "defaultUser": e.defaultUser,
 				"kubernetesHost": e.kubernetesHost, "composeService": e.composeService,
 				"healthcheck": e.healthcheck, "healthInterval": e.healthInterval, "healthTimeout": e.healthTimeout,
-				"checkDriver": e.checkDriver, "emptinessQuery": e.emptinessQuery,
+				"driver": e.driver, "existenceQuery": e.existenceQuery, "emptinessQuery": e.emptinessQuery,
 			}
 			serverFuncs := map[string]bool{
 				"composeEnvironment": e.composeEnvironment != nil,
-				"checkDSN":           e.checkDSN != nil,
+				"dsn":                e.dsn != nil,
+				"maintenanceDSN":     e.maintenanceDSN != nil,
 			}
 
 			if !e.hasServer {
@@ -170,28 +171,30 @@ func TestEngines_NumbersAreMenuPositions(t *testing.T) {
 	}
 }
 
-// Today's connection check, byte for byte, so the move of its per-engine switch into the rows is
-// checked; the auth server's own connection strings replace these (#430).
-func TestEngines_ConnectionCheckIsTodays(t *testing.T) {
+// The driver each row opens is the one the auth server opens (sql.Open in each engine's
+// New*Database), and the existence query is the server's own databaseExists where it has one,
+// asked over the maintenance connection the server creates the database from. The connection
+// strings are pinned by testdata/connection-strings.json instead (#430).
+func TestEngines_TheConnectionCheckIsTheServers(t *testing.T) {
 	testCases := []struct {
-		engine, driver, dsn, emptinessQuery string
+		engine, driver, existenceQuery, emptinessQuery string
 	}{
 		{
 			engine:         "mysql",
 			driver:         "mysql",
-			dsn:            "db-user:db-pass@tcp(db.example:3307)/db-name?timeout=5s",
+			existenceQuery: "SELECT COUNT(*) FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = ?",
 			emptinessQuery: "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'users'",
 		},
 		{
 			engine:         "postgres",
-			driver:         "postgres",
-			dsn:            "host=db.example port=3307 user=db-user password=db-pass dbname=db-name sslmode=require connect_timeout=5",
+			driver:         "pgx",
+			existenceQuery: "SELECT COUNT(*) FROM pg_database WHERE datname = $1",
 			emptinessQuery: "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'users'",
 		},
 		{
 			engine:         "mssql",
 			driver:         "sqlserver",
-			dsn:            "sqlserver://db-user:db-pass@db.example:3307?database=db-name&connection+timeout=5",
+			existenceQuery: "SELECT COUNT(*) FROM sys.databases WHERE name = @p1",
 			emptinessQuery: "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'users'",
 		},
 	}
@@ -199,11 +202,11 @@ func TestEngines_ConnectionCheckIsTodays(t *testing.T) {
 	for _, testCase := range testCases {
 		t.Run(testCase.engine, func(t *testing.T) {
 			e := testEngine(testCase.engine)
-			if e.checkDriver != testCase.driver {
-				t.Errorf("driver is %q, want %q", e.checkDriver, testCase.driver)
+			if e.driver != testCase.driver {
+				t.Errorf("driver is %q, want %q", e.driver, testCase.driver)
 			}
-			if got := e.checkDSN("db.example", "3307", "db-name", "db-user", "db-pass"); got != testCase.dsn {
-				t.Errorf("connection string is\n  %s\nwant\n  %s", got, testCase.dsn)
+			if e.existenceQuery != testCase.existenceQuery {
+				t.Errorf("existence query is %q, want %q", e.existenceQuery, testCase.existenceQuery)
 			}
 			if e.emptinessQuery != testCase.emptinessQuery {
 				t.Errorf("emptiness query is %q, want %q", e.emptinessQuery, testCase.emptinessQuery)
