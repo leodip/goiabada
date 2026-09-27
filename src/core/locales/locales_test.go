@@ -1,65 +1,119 @@
 package locales
 
 import (
+	"slices"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"golang.org/x/text/language"
 )
 
-func TestGet(t *testing.T) {
-	result := Get()
-
-	// Test that Get() returns a non-nil slice
-	if result == nil {
-		t.Error("Get() returned nil")
-	}
-
-	// Test that Get() returns a non-empty slice
-	if len(result) == 0 {
-		t.Error("Get() returned an empty slice")
-	}
-
-	// Test for a few known locales
-	knownLocales := map[string]string{
+func TestAll_SpotChecks(t *testing.T) {
+	all := All()
+	for id, name := range map[string]string{
 		"en":    "English",
 		"es":    "Spanish",
 		"fr":    "French",
 		"zh-CN": "Chinese (China)",
+		"pt-BR": "Portuguese (Brazil)",
+	} {
+		t.Run(id, func(t *testing.T) {
+			assert.Contains(t, all, Locale{Id: id, Name: name})
+		})
 	}
+}
 
-	for id, value := range knownLocales {
-		found := false
-		for _, locale := range result {
-			if locale.Id == id && locale.Value == value {
-				found = true
-				break
-			}
+// TestAll_Count pins the table's size, so a row lost in an edit shows here rather than as a
+// user whose stored locale the validator stops accepting.
+func TestAll_Count(t *testing.T) {
+	assert.Len(t, All(), 563)
+}
+
+func TestAll_UniqueIds(t *testing.T) {
+	seen := make(map[string]bool)
+	for _, l := range All() {
+		if seen[l.Id] {
+			t.Errorf("duplicate Id %q", l.Id)
 		}
-		if !found {
-			t.Errorf("Expected locale {%s, %s} not found", id, value)
+		seen[l.Id] = true
+	}
+}
+
+func TestAll_NonEmptyFields(t *testing.T) {
+	for i, l := range All() {
+		if l.Id == "" {
+			t.Errorf("entry %d has an empty Id", i)
+		}
+		if l.Name == "" {
+			t.Errorf("entry %d (%q) has an empty Name", i, l.Id)
 		}
 	}
 }
 
-func TestUniqueIds(t *testing.T) {
-	result := Get()
-	idMap := make(map[string]bool)
-
-	for _, locale := range result {
-		if idMap[locale.Id] {
-			t.Errorf("Duplicate Id found: %s", locale.Id)
+// TestAll_ParseAsBCP47 holds every Id to being a well-formed BCP 47 tag, which is what the OIDC
+// locale claim carries (OIDC Core 1.0 section 5.1). It also pins which ids are deprecated: those
+// four canonicalize to another tag and stay only because stored profiles may hold them, so a new
+// deprecated id is a finding rather than something to add here.
+func TestAll_ParseAsBCP47(t *testing.T) {
+	var deprecated []string
+	for _, l := range All() {
+		tag, err := language.Parse(l.Id)
+		if err != nil {
+			t.Errorf("Id %q is not a BCP 47 tag: %v", l.Id, err)
+			continue
 		}
-		idMap[locale.Id] = true
+		if tag.String() != l.Id {
+			deprecated = append(deprecated, l.Id)
+		}
+	}
+	assert.ElementsMatch(t, []string{"sh", "sh-BA", "tl", "tl-PH"}, deprecated)
+}
+
+func TestAll_Isolation(t *testing.T) {
+	first := All()
+	first[0].Name = "mutated"
+	slices.Reverse(first)
+
+	second := All()
+	assert.Equal(t, Locale{Id: "af", Name: "Afrikaans"}, second[0])
+	assert.NotEqual(t, first[0], second[0])
+}
+
+// TestByID_EqualsScan: for every entry, the lookup returns what a scan of All would find.
+func TestByID_EqualsScan(t *testing.T) {
+	all := All()
+	if len(all) == 0 {
+		t.Fatal("All() returned no locales")
+	}
+	for _, want := range all {
+		got, ok := ByID(want.Id)
+		if !ok {
+			t.Errorf("ByID(%q) not found", want.Id)
+			continue
+		}
+		assert.Equalf(t, want, got, "ByID(%q)", want.Id)
 	}
 }
 
-func TestNonEmptyFields(t *testing.T) {
-	result := Get()
-
-	for _, locale := range result {
-		if locale.Id == "" {
-			t.Error("Found a Locale with empty Id")
-		}
-		if locale.Value == "" {
-			t.Error("Found a Locale with empty Value")
-		}
+// TestByID_Misses: the lookup is exact, as the scan it replaced was. "fil" is what the stored "tl"
+// canonicalizes to, and is not in the table: nothing canonicalizes on the way in.
+func TestByID_Misses(t *testing.T) {
+	for _, id := range []string{"xx-XX", "", "PT-BR", "pt-br", "pt_BR", " pt-BR", "fil"} {
+		t.Run(id, func(t *testing.T) {
+			l, ok := ByID(id)
+			assert.False(t, ok)
+			assert.Equal(t, Locale{}, l)
+		})
 	}
+}
+
+func TestByID_Isolation(t *testing.T) {
+	l, ok := ByID("pt-BR")
+	if !ok {
+		t.Fatal("pt-BR not found")
+	}
+	l.Name = "mutated"
+
+	again, _ := ByID("pt-BR")
+	assert.Equal(t, "Portuguese (Brazil)", again.Name)
 }

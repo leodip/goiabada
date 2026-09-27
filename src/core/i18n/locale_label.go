@@ -6,8 +6,8 @@ import (
 )
 
 // LocaleLabel renders the label shown in the locale picker for a BCP 47
-// locale id (e.g. "pt-BR"), given its English name (the existing
-// locales.Locale.Value, e.g. "Portuguese (Brazil)").
+// locale id (e.g. "pt-BR"), given its English name
+// (locales.Locale.Name, e.g. "Portuguese (Brazil)").
 //
 // The result is "<native> (<english>)" so a user can recognize their
 // language by either column even when the surrounding UI is in a language

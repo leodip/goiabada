@@ -132,7 +132,7 @@
                 <option value="" {{ if eq $user.Locale "" }}selected{{ end }}>{{ T $.ctx "adminconsole.account.profile.locale_blank" }}</option>
                 {{range .locales}}
                 <option value="{{.Id}}" {{ if eq $user.Locale .Id }}selected{{ end }}>{{.Id}} -
-                    {{ LocaleLabel .Id .Value }}</option>
+                    {{ LocaleLabel .Id .Name }}</option>
                 {{end}}
             </select>
         </div>
