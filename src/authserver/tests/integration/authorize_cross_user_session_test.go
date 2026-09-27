@@ -44,7 +44,7 @@ import (
 // rather than asserted one handler at a time. The per-handler tables live beside the handlers.
 
 // crossUserCodeVerifier is a fixed PKCE verifier, so every code minted here can actually be
-// redeemed. The shared fixtures in utils_test.go send a random 43-character string as an S256
+// redeemed. The shared fixtures in fixture_helpers_test.go send a random 43-character string as an S256
 // challenge, which no verifier matches, so their codes can never reach /auth/token and this file
 // needs the tokens.
 const crossUserCodeVerifier = "cross-user-session-code-verifier"
