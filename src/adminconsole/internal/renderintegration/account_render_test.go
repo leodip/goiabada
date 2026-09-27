@@ -42,7 +42,7 @@ func TestRender_AccountAddress(t *testing.T) {
 			"AddressLine": "", "AddressLocality": "", "AddressRegion": "",
 			"AddressPostalCode": "", "AddressCountry": "BR",
 		},
-		"countries":         countries.AllInfo(),
+		"countries":         countries.All(),
 		"savedSuccessfully": false,
 	}
 	out := render(t, "/account_address.html", bind)

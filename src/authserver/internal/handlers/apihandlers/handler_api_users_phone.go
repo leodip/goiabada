@@ -24,7 +24,7 @@ func HandleAPIPhoneCountriesGet() http.HandlerFunc {
 		// Authentication and authorization handled by middleware
 
 		// Get phone countries
-		phoneCountries := phonecountries.Get()
+		phoneCountries := phonecountries.All()
 
 		// Convert to API response
 		phoneCountryResponses := make([]api.PhoneCountryResponse, len(phoneCountries))
@@ -106,18 +106,8 @@ func HandleAPIUserPhonePut(
 			return
 		}
 
-		// Get phone countries for country lookup
-		phoneCountries := phonecountries.Get()
-		var phoneCountry phonecountries.PhoneCountry
-		found := false
-		for _, c := range phoneCountries {
-			if c.UniqueId == input.PhoneCountryUniqueId {
-				found = true
-				phoneCountry = c
-				break
-			}
-		}
-
+		// Look up the phone country
+		phoneCountry, found := phonecountries.ByUniqueID(input.PhoneCountryUniqueId)
 		if !found && len(input.PhoneCountryUniqueId) > 0 {
 			writeJSONError(w, "Phone country is invalid: "+input.PhoneCountryUniqueId, "VALIDATION_ERROR", http.StatusBadRequest)
 			return

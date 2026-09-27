@@ -73,19 +73,12 @@ func HandleAPIAccountPhonePut(
 		// Resolve phone country if provided
 		var callingCode string
 		if len(input.PhoneCountryUniqueId) > 0 {
-			pcs := phonecountries.Get()
-			found := false
-			for _, c := range pcs {
-				if c.UniqueId == input.PhoneCountryUniqueId {
-					callingCode = c.CallingCode
-					found = true
-					break
-				}
-			}
+			pc, found := phonecountries.ByUniqueID(input.PhoneCountryUniqueId)
 			if !found {
 				writeJSONError(w, "Phone country is invalid: "+input.PhoneCountryUniqueId, "VALIDATION_ERROR", http.StatusBadRequest)
 				return
 			}
+			callingCode = pc.CallingCode
 		}
 
 		// Apply updates; always mark phone as unverified on change

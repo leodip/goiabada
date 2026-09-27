@@ -51,7 +51,7 @@ func TestAPIPhoneCountriesGet_Success(t *testing.T) {
 	}
 
 	// We expect at least some basic countries to be present
-	// Note: The actual UniqueIds depend on the phonecountries.Get() implementation
+	// Note: The actual UniqueIds depend on the phonecountries package
 	assert.True(t, len(countryMap) > 100, "Should have many countries available")
 
 	// Exact "+"-prefixed calling codes across the API boundary (the +-prefix

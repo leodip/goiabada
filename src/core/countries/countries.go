@@ -11,7 +11,7 @@ package countries
 //
 // CallingCodes are ITU-T E.164 country calling codes as DIGITS WITHOUT the
 // leading '+' (a country may have zero, one, or several). Renderers and
-// persisters prepend '+' themselves — see phonecountries.Get(), which lives in
+// persisters prepend '+' themselves — see phonecountries.All(), which lives in
 // the auth server now (src/authserver/internal/phonecountries).
 type Country struct {
 	// Name is the CLDR (en) display name. It is a rarely-shown display
@@ -28,22 +28,23 @@ type Country struct {
 }
 
 // byAlpha2 indexes the generated data by alpha-2 code for O(1) lookup. It is
-// built once at package initialization from the generated slice (package-level
-// variables are initialized before init runs, so `countries` is populated).
-var byAlpha2 map[string]Country
+// built once at package initialization from the generated slice; Go orders
+// package-level initialization by dependency, so `countries` is populated first.
+var byAlpha2 = indexByAlpha2(countries)
 
-func init() {
-	byAlpha2 = make(map[string]Country, len(countries))
-	for _, c := range countries {
-		byAlpha2[c.Alpha2] = c
+func indexByAlpha2(list []Country) map[string]Country {
+	index := make(map[string]Country, len(list))
+	for _, c := range list {
+		index[c.Alpha2] = c
 	}
+	return index
 }
 
-// AllInfo returns every country. It returns a FRESH outer slice on every call,
+// All returns every country, in alpha-2 order. It returns a FRESH outer slice on every call,
 // and each returned Country's CallingCodes is a copy, so callers may sort or
 // otherwise mutate the result in place without affecting the package's data or
 // other callers.
-func AllInfo() []Country {
+func All() []Country {
 	out := make([]Country, len(countries))
 	for i, c := range countries {
 		out[i] = c
