@@ -138,7 +138,7 @@ func TestByZone_EqualsFilter(t *testing.T) {
 		}
 		assert.Equalf(t, want, ByZone(id), "ByZone(%q)", id)
 	}
-	// 34 of the 312 zone IDs are listed under more than one country at 2026c; the lookup must
+	// 34 of the 312 zone IDs are listed under more than one country at 2026d; the lookup must
 	// answer every row for those, which a first-match lookup would not.
 	assert.Equal(t, 34, shared, "zone IDs listed under more than one country")
 }
