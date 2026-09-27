@@ -85,6 +85,11 @@ var wizardSteps = []wizardStep{
 // before it writes nothing.
 func (w *wizard) setup() error {
 	printBanner(w.out)
+	if !w.interactive {
+		if err := w.flags.checkWritable(); err != nil {
+			return err
+		}
+	}
 	number := 0
 	for _, step := range wizardSteps {
 		if step.applies != nil && !step.applies(w.config) {

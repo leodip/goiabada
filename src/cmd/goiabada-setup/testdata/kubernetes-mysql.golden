@@ -9,14 +9,14 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: goiabada
+  name: "goiabada"
 
 ---
 apiVersion: v1
 kind: Secret
 metadata:
   name: goiabada-secrets
-  namespace: goiabada
+  namespace: "goiabada"
 type: Opaque
 data:
   db-password: ZGItcGFzc3dvcmQ=
@@ -33,7 +33,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: goiabada-config
-  namespace: goiabada
+  namespace: "goiabada"
 data:
   GOIABADA_APPNAME: "Goiabada"
   GOIABADA_ADMIN_EMAIL: "admin@example.com"
@@ -53,7 +53,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: goiabada-authserver
-  namespace: goiabada
+  namespace: "goiabada"
 spec:
   replicas: 1
   selector:
@@ -128,7 +128,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: goiabada-adminconsole
-  namespace: goiabada
+  namespace: "goiabada"
 spec:
   replicas: 1
   selector:
@@ -188,7 +188,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: goiabada-authserver
-  namespace: goiabada
+  namespace: "goiabada"
 spec:
   selector:
     app: goiabada-authserver
@@ -201,7 +201,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: goiabada-adminconsole
-  namespace: goiabada
+  namespace: "goiabada"
 spec:
   selector:
     app: goiabada-adminconsole
@@ -214,17 +214,17 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: goiabada-authserver
-  namespace: goiabada
+  namespace: "goiabada"
   annotations:
     cert-manager.io/cluster-issuer: "letsencrypt-prod"
 spec:
   ingressClassName: nginx
   tls:
   - hosts:
-    - auth.example.com
+    - "auth.example.com"
     secretName: goiabada-tls-auth
   rules:
-  - host: auth.example.com
+  - host: "auth.example.com"
     http:
       paths:
       - path: /
@@ -240,17 +240,17 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: goiabada-adminconsole
-  namespace: goiabada
+  namespace: "goiabada"
   annotations:
     cert-manager.io/cluster-issuer: "letsencrypt-prod"
 spec:
   ingressClassName: nginx
   tls:
   - hosts:
-    - admin.example.com
+    - "admin.example.com"
     secretName: goiabada-tls-admin
   rules:
-  - host: admin.example.com
+  - host: "admin.example.com"
     http:
       paths:
       - path: /

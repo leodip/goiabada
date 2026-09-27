@@ -120,8 +120,8 @@ The wizard creates a `goiabada.env` file with:
 Use with:
 
 ```bash
-source goiabada.env && ./goiabada-authserver
-source goiabada.env && ./goiabada-adminconsole
+set -a && . ./goiabada.env && set +a && ./goiabada-authserver
+set -a && . ./goiabada.env && set +a && ./goiabada-adminconsole
 ```
 
 ## Next steps

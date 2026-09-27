@@ -467,6 +467,30 @@ func TestWizard_NonInteractiveRefusals(t *testing.T) {
 		"an invalid database name": {native(func(f *CLIFlags) { f.DBName = "1db" }), "invalid database name"},
 		"an invalid namespace":     {CLIFlags{DeploymentType: "kubernetes", DBType: "postgres", AuthServerURL: "https://auth.example.org", Namespace: "Upper"}, "invalid namespace"},
 	}
+	// Every flag whose value is written into the file, refused by its name when it is not UTF-8 or
+	// holds NUL, before a step reads it (#430). Each would otherwise be refused, if at all, by a
+	// validator saying something else, or written as U+FFFD.
+	for name, set := range map[string]func(f *CLIFlags, v string){
+		"--auth-url":       func(f *CLIFlags, v string) { f.AuthServerURL = "https://auth.example.org/" + v },
+		"--admin-url":      func(f *CLIFlags, v string) { f.AdminConsoleURL = "https://admin.example.org/" + v },
+		"--namespace":      func(f *CLIFlags, v string) { f.Namespace = v },
+		"--admin-email":    func(f *CLIFlags, v string) { f.AdminEmail = v + "@example.org" },
+		"--admin-password": func(f *CLIFlags, v string) { f.AdminPassword = v },
+		"--db-host":        func(f *CLIFlags, v string) { f.DBHost = v },
+		"--db-port":        func(f *CLIFlags, v string) { f.DBPort = v },
+		"--db-name":        func(f *CLIFlags, v string) { f.DBName = v },
+		"--db-user":        func(f *CLIFlags, v string) { f.DBUsername = v },
+		"--db-password":    func(f *CLIFlags, v string) { f.DBPassword = v },
+	} {
+		cases[name+" not UTF-8"] = struct {
+			flags CLIFlags
+			want  string
+		}{native(func(f *CLIFlags) { set(f, "pa\xffss") }), name + " cannot be written to the configuration: it is not valid UTF-8"}
+		cases[name+" holding NUL"] = struct {
+			flags CLIFlags
+			want  string
+		}{native(func(f *CLIFlags) { set(f, "pa\x00ss") }), name + " cannot be written to the configuration: it contains a NUL character"}
+	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			flags := tc.flags

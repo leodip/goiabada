@@ -3,17 +3,18 @@
 
 services:
 
-  mysql-server:
-    image: mysql:latest
+  mssql-server:
+    image: mcr.microsoft.com/mssql/server:2022-latest
     restart: unless-stopped
     volumes:
-      - mysql-data:/var/lib/mysql
+      - mssql-data:/var/opt/mssql
     environment:
-      MYSQL_ROOT_PASSWORD: "db-password"
+      ACCEPT_EULA: Y
+      MSSQL_SA_PASSWORD: "db: \"pw\" #1 $$(id) `x` \\n \r\n{a: [b]} 0123"
     healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -uroot -p\"$${MYSQL_ROOT_PASSWORD}\" --protocol tcp"]
-      interval: 1s
-      timeout: 2s
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$${MSSQL_SA_PASSWORD}\" -C -Q 'SELECT 1' || exit 1"]
+      interval: 10s
+      timeout: 5s
       retries: 20
     networks:
       - goiabada-network
@@ -22,10 +23,10 @@ services:
     image: leodip/goiabada:authserver-latest
     restart: unless-stopped
     depends_on:
-      mysql-server:
+      mssql-server:
         condition: service_healthy
     ports:
-      - 9090:9090
+      - 127.0.0.1:9090:9090
     networks:
       - goiabada-network
     healthcheck:
@@ -36,10 +37,10 @@ services:
       start_period: 10s
     environment:
       - TZ=UTC
-      - "GOIABADA_ADMIN_EMAIL=admin@example.com"
-      - "GOIABADA_ADMIN_PASSWORD=admin-password"
+      - "GOIABADA_ADMIN_EMAIL=a\"b$$c`d\\e #f'g@example.com"
+      - "GOIABADA_ADMIN_PASSWORD=pa\"ss'$$HOME`id`\\x #y: z$${HOME}$$$$\n*- ~ yes\t\u2028end\\"
       - GOIABADA_APPNAME=Goiabada
-      - "GOIABADA_AUTHSERVER_BASEURL=http://localhost:9090"
+      - "GOIABADA_AUTHSERVER_BASEURL=https://auth.example.com/p\"a$$HOME #x: y"
       - "GOIABADA_AUTHSERVER_INTERNALBASEURL=http://goiabada-authserver:9090"
       - GOIABADA_AUTHSERVER_LISTEN_HOST_HTTP=0.0.0.0
       - GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP=9090
@@ -47,7 +48,7 @@ services:
       - GOIABADA_AUTHSERVER_LISTEN_PORT_HTTPS=
       - GOIABADA_AUTHSERVER_CERTFILE=
       - GOIABADA_AUTHSERVER_KEYFILE=
-      - "GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS=false"
+      - "GOIABADA_AUTHSERVER_TRUST_PROXY_HEADERS=true"
       - GOIABADA_AUTHSERVER_LOG_HTTP_REQUESTS=true
       - GOIABADA_AUTHSERVER_LOG_LEVEL=info
       - GOIABADA_AUTHSERVER_LOG_FORMAT=text
@@ -59,13 +60,13 @@ services:
       - "GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY=auth-session-enc-key"
       - "GOIABADA_AES_ENCRYPTION_KEY=aes-encryption-key"
       - "GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET=oauth-client-secret"
-      - "GOIABADA_DB_TYPE=mysql"
-      - "GOIABADA_DB_USERNAME=root"
-      - "GOIABADA_DB_PASSWORD=db-password"
-      - "GOIABADA_DB_HOST=mysql-server"
-      - "GOIABADA_DB_PORT=3306"
+      - "GOIABADA_DB_TYPE=mssql"
+      - "GOIABADA_DB_USERNAME=sa"
+      - "GOIABADA_DB_PASSWORD=db: \"pw\" #1 $$(id) `x` \\n \r\n{a: [b]} 0123"
+      - "GOIABADA_DB_HOST=mssql-server"
+      - "GOIABADA_DB_PORT=1433"
       - GOIABADA_DB_NAME=goiabada
-      - "GOIABADA_ADMINCONSOLE_BASEURL=http://localhost:9091"
+      - "GOIABADA_ADMINCONSOLE_BASEURL=https://admin.example.com/`id`\\q'r $${PATH}"
 
   goiabada-adminconsole:
     image: leodip/goiabada:adminconsole-latest
@@ -74,7 +75,7 @@ services:
       goiabada-authserver:
         condition: service_healthy
     ports:
-      - 9091:9091
+      - 127.0.0.1:9091:9091
     networks:
       - goiabada-network
     environment:
@@ -82,25 +83,25 @@ services:
       - "GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET=oauth-client-secret"
       - "GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY=admin-session-auth-key"
       - "GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY=admin-session-enc-key"
-      - "GOIABADA_ADMINCONSOLE_BASEURL=http://localhost:9091"
+      - "GOIABADA_ADMINCONSOLE_BASEURL=https://admin.example.com/`id`\\q'r $${PATH}"
       - GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTP=0.0.0.0
       - GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTP=9091
       - GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTPS=
       - GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTPS=
       - GOIABADA_ADMINCONSOLE_CERTFILE=
       - GOIABADA_ADMINCONSOLE_KEYFILE=
-      - "GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS=false"
+      - "GOIABADA_ADMINCONSOLE_TRUST_PROXY_HEADERS=true"
       - GOIABADA_ADMINCONSOLE_LOG_HTTP_REQUESTS=true
       - GOIABADA_ADMINCONSOLE_LOG_LEVEL=info
       - GOIABADA_ADMINCONSOLE_LOG_FORMAT=text
       - GOIABADA_ADMINCONSOLE_STATICDIR=
       - GOIABADA_ADMINCONSOLE_TEMPLATEDIR=
-      - "GOIABADA_AUTHSERVER_BASEURL=http://localhost:9090"
+      - "GOIABADA_AUTHSERVER_BASEURL=https://auth.example.com/p\"a$$HOME #x: y"
       - "GOIABADA_AUTHSERVER_INTERNALBASEURL=http://goiabada-authserver:9090"
 
 
 volumes:
-  mysql-data:
+  mssql-data:
 
 networks:
   goiabada-network:

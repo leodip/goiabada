@@ -14,8 +14,9 @@
 # Application settings
 # =============================================================================
 GOIABADA_APPNAME="Goiabada"
-GOIABADA_ADMIN_EMAIL="admin@example.com"
-GOIABADA_ADMIN_PASSWORD="admin-password"
+GOIABADA_ADMIN_EMAIL="a\"b\$c\`d\\e #f'g@example.com"
+GOIABADA_ADMIN_PASSWORD="pa\"ss'\$HOME\`id\`\\x #y: z\${HOME}\$\$
+*- ~ yes	 end\\"
 
 # =============================================================================
 # Database settings
@@ -24,13 +25,14 @@ GOIABADA_DB_TYPE="mysql"
 GOIABADA_DB_HOST="goiabada-db"
 GOIABADA_DB_PORT="3306"
 GOIABADA_DB_NAME="goiabada"
-GOIABADA_DB_USERNAME="goiabada-user"
-GOIABADA_DB_PASSWORD="db-password"
+GOIABADA_DB_USERNAME="us\"er\\na\$me #x: '"
+GOIABADA_DB_PASSWORD="db: \"pw\" #1 \$(id) \`x\` \\n 
+{a: [b]} 0123"
 
 # =============================================================================
 # Auth server settings
 # =============================================================================
-GOIABADA_AUTHSERVER_BASEURL="https://auth.example.com"
+GOIABADA_AUTHSERVER_BASEURL="https://auth.example.com/p\"a\$HOME #x: y"
 GOIABADA_AUTHSERVER_LISTEN_HOST_HTTP="0.0.0.0"
 GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP="9090"
 GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY="auth-session-auth-key"
@@ -44,7 +46,7 @@ GOIABADA_AUTHSERVER_LOG_FORMAT="text"
 # =============================================================================
 # Admin console settings
 # =============================================================================
-GOIABADA_ADMINCONSOLE_BASEURL="https://admin.example.com"
+GOIABADA_ADMINCONSOLE_BASEURL="https://admin.example.com/\`id\`\\q'r \${PATH}"
 GOIABADA_ADMINCONSOLE_LISTEN_HOST_HTTP="0.0.0.0"
 GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTP="9091"
 GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY="admin-session-auth-key"
@@ -58,5 +60,5 @@ GOIABADA_ADMINCONSOLE_LOG_FORMAT="text"
 # OAuth client for admin console
 # =============================================================================
 GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET="oauth-client-secret"
-GOIABADA_AUTHSERVER_INTERNALBASEURL="https://auth.example.com"
+GOIABADA_AUTHSERVER_INTERNALBASEURL="https://auth.example.com/p\"a\$HOME #x: y"
 

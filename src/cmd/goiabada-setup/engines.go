@@ -36,12 +36,17 @@ type engine struct {
 	// server's for an engine with no server.
 	volume string
 	mount  string
-	// composeEnvironment is the database service's environment lines, in order.
+	// composeEnvironment is the database service's environment lines, in order, each value
+	// written through composeQuote.
 	composeEnvironment func(password string) []string
-	// composeHealthcheck is the database service's healthcheck test.
-	composeHealthcheck func(password string) string
-	healthInterval     string
-	healthTimeout      string
+	// healthcheck is the shell command the database service's CMD-SHELL healthcheck runs. It
+	// carries no password: one that needs it reads the variable composeEnvironment sets, from the
+	// container's own environment, so the secret is neither written twice nor shell-quoted inside
+	// YAML, where a `"`, `\` or `'` in it broke the file or the shell (#430). The generator writes
+	// it through composeQuote, which turns its `${NAME}` into the `$${NAME}` Compose hands over.
+	healthcheck    string
+	healthInterval string
+	healthTimeout  string
 
 	// checkDriver and checkDSN are how the wizard reaches the database to test the operator's
 	// details, and emptinessQuery counts the Goiabada tables already there.
@@ -67,11 +72,9 @@ var engines = []*engine{
 		volume:         "mysql-data",
 		mount:          "/var/lib/mysql",
 		composeEnvironment: func(password string) []string {
-			return []string{"MYSQL_ROOT_PASSWORD: " + password}
+			return []string{"MYSQL_ROOT_PASSWORD: " + composeQuote(password)}
 		},
-		composeHealthcheck: func(password string) string {
-			return fmt.Sprintf("[\"CMD\", \"mysqladmin\", \"ping\", \"-uroot\", \"-p%s\", \"--protocol\", \"tcp\"]", password)
-		},
+		healthcheck:    `mysqladmin ping -uroot -p"${MYSQL_ROOT_PASSWORD}" --protocol tcp`,
 		healthInterval: "1s",
 		healthTimeout:  "2s",
 		checkDriver:    "mysql",
@@ -95,11 +98,9 @@ var engines = []*engine{
 		volume:         "postgres-data",
 		mount:          "/var/lib/postgresql",
 		composeEnvironment: func(password string) []string {
-			return []string{"POSTGRES_PASSWORD: " + password, "POSTGRES_DB: goiabada"}
+			return []string{"POSTGRES_PASSWORD: " + composeQuote(password), "POSTGRES_DB: goiabada"}
 		},
-		composeHealthcheck: func(string) string {
-			return "[\"CMD-SHELL\", \"pg_isready -U postgres\"]"
-		},
+		healthcheck:    "pg_isready -U postgres",
 		healthInterval: "1s",
 		healthTimeout:  "2s",
 		checkDriver:    "postgres",
@@ -123,11 +124,9 @@ var engines = []*engine{
 		volume:         "mssql-data",
 		mount:          "/var/opt/mssql",
 		composeEnvironment: func(password string) []string {
-			return []string{"ACCEPT_EULA: Y", "MSSQL_SA_PASSWORD: " + password}
+			return []string{"ACCEPT_EULA: Y", "MSSQL_SA_PASSWORD: " + composeQuote(password)}
 		},
-		composeHealthcheck: func(password string) string {
-			return fmt.Sprintf("[\"CMD-SHELL\", \"/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P '%s' -C -Q 'SELECT 1' || exit 1\"]", password)
-		},
+		healthcheck:    `/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "${MSSQL_SA_PASSWORD}" -C -Q 'SELECT 1' || exit 1`,
 		healthInterval: "10s",
 		healthTimeout:  "5s",
 		checkDriver:    "sqlserver",

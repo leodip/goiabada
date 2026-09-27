@@ -3,9 +3,23 @@ package main
 import (
 	"strings"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/leodip/goiabada/core/errs"
 )
+
+// checkWritable refuses a value no generated file can carry: one that is not valid UTF-8, which a
+// YAML stream cannot hold (YAML 1.2.2, section 5.1), and one holding NUL, which no process
+// environment can. Every other value is written exactly as given, through quote.go (#430).
+func checkWritable(value string) error {
+	if !utf8.ValidString(value) {
+		return errs.New("it is not valid UTF-8")
+	}
+	if strings.ContainsRune(value, 0) {
+		return errs.New("it contains a NUL character")
+	}
+	return nil
+}
 
 func validateURL(urlStr string) error {
 	if urlStr == "" {
