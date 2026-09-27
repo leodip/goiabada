@@ -30,7 +30,7 @@ func HandleAccountAddressGet(
 	apiClient accountAddressAPI,
 ) http.HandlerFunc {
 
-	countries := countries.AllInfo()
+	countries := countries.All()
 	sort.Slice(countries, func(i, j int) bool {
 		return countries[i].Name < countries[j].Name
 	})
@@ -102,7 +102,7 @@ func HandleAccountAddressPost(
 	apiClient accountAddressAPI,
 ) http.HandlerFunc {
 
-	countries := countries.AllInfo()
+	countries := countries.All()
 	sort.Slice(countries, func(i, j int) bool {
 		return countries[i].Name < countries[j].Name
 	})

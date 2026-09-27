@@ -193,9 +193,9 @@ func TestValidateRows(t *testing.T) {
 	if err := validateRows(valid); err != nil {
 		t.Errorf("valid rows errored: %v", err)
 	}
-	// Exactly 5 codes is the allowed maximum.
-	if err := validateRows([]country{{Name: "x", Alpha2: "DO", Alpha3: "DOM", CallingCodes: []string{"1", "2", "3", "4", "5"}}}); err != nil {
-		t.Errorf("5 codes should be valid: %v", err)
+	// No count bounds a country's calling codes: phonecountries builds any number (#432).
+	if err := validateRows([]country{{Name: "x", Alpha2: "DO", Alpha3: "DOM", CallingCodes: []string{"1", "2", "3", "4", "5", "6"}}}); err != nil {
+		t.Errorf("6 codes should be valid: %v", err)
 	}
 
 	bad := map[string][]country{
@@ -206,7 +206,6 @@ func TestValidateRows(t *testing.T) {
 		"empty name":      {{Name: "", Alpha2: "BR", Alpha3: "BRA", CallingCodes: []string{"1"}}},
 		"empty codes":     {{Name: "x", Alpha2: "BR", Alpha3: "BRA", CallingCodes: nil}},
 		"non-digit code":  {{Name: "x", Alpha2: "BR", Alpha3: "BRA", CallingCodes: []string{"5a"}}},
-		"too many codes":  {{Name: "x", Alpha2: "BR", Alpha3: "BRA", CallingCodes: []string{"1", "2", "3", "4", "5", "6"}}},
 		"dup code in one": {{Name: "x", Alpha2: "BR", Alpha3: "BRA", CallingCodes: []string{"1", "1"}}},
 	}
 	for name, rows := range bad {

@@ -31,9 +31,8 @@ reference graph; three are asserted by a human and each of those needs a note.
 behaviour. `sessionstore.SessionIdBytes` is the width the store mints an identifier at, inside a
 store both processes depend on; asserting a word for it would record a judgement where the tree
 already has an answer. `reachable` is here for the same reason one step further out:
-`countries.Country` is named
-by nothing because it is only ever `AllInfo`'s element type, and a `contract` row on it would be
-true and misleading.
+`countries.Country` is `All`'s element type, and outside its package only the auth server's
+phone-country builder names it, so a `contract` row on it would be true and misleading.
 
 **Circular evidence is not evidence.** `kernel` and `both-apps` are read off references from outside
 the declaring package and are the only seeds; `own-package` and `reachable` then require a source
@@ -241,7 +240,7 @@ command itself and fails on a tree it changed.
 | `core/constants` | `ManageSettingsPermissionIdentifier` | own-package | — |
 | `core/constants` | `ManageUsersPermissionIdentifier` | own-package | — |
 | `core/constants` | `Version` | both-apps | — |
-| `core/countries` | `AllInfo` | both-apps | — |
+| `core/countries` | `All` | both-apps | — |
 | `core/countries` | `ByAlpha2` | contract | The lookup half of the country table whose other half the admin console uses. Moving it would put one ISO 3166 dataset in two places. |
 | `core/countries` | `Country` | own-package | — |
 | `core/customerrors` | `ConformErrorDescription` | both-apps | — |

@@ -68,8 +68,8 @@ const (
 	// width the store mints an identifier at, inside a store both processes depend on.
 	justificationOwnPackage = "own-package"
 	// justificationReachable: a justified symbol's own declaration names it, or it is a const or
-	// var of a justified type. countries.Country is only ever AllInfo's element type; a contract
-	// row on it would be true and misleading.
+	// var of a justified type. countries.Country is All's element type, and only the auth
+	// server names it outside its package; a contract row on it would be true and misleading.
 	justificationReachable = "reachable"
 	// justificationTestSupport: no package a binary links names it in production, and something
 	// names it -- a test anywhere, or the declaring package's own production code. Asserted, but
@@ -174,7 +174,7 @@ type packageSymbols struct {
 
 // declNode is one owner and the package-level names its declaration reaches, split by position.
 // The split is the line between own-package and reachable: decl is the type and the signature,
-// which is how countries.Country is reached from AllInfo, and body is everything else, which is
+// which is how countries.Country is reached from All, and body is everything else, which is
 // how sessionstore.SessionIdBytes is reached from the method that mints an identifier.
 type declNode struct {
 	exported bool

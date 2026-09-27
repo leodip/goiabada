@@ -16,10 +16,10 @@ func findByA2(list []Country, a2 string) (Country, bool) {
 	return Country{}, false
 }
 
-// TestAllInfo_Isolation verifies AllInfo returns a fresh outer slice with copied
+// TestAll_Isolation verifies All returns a fresh outer slice with copied
 // CallingCodes, so a caller that sorts/mutates one result cannot affect another.
-func TestAllInfo_Isolation(t *testing.T) {
-	first := AllInfo()
+func TestAll_Isolation(t *testing.T) {
+	first := All()
 	for i := range first {
 		if first[i].Alpha2 == "BR" {
 			first[i].CallingCodes[0] = "999" // mutate inner slice
@@ -27,18 +27,18 @@ func TestAllInfo_Isolation(t *testing.T) {
 	}
 	sort.Slice(first, func(i, j int) bool { return first[i].Name > first[j].Name }) // mutate order
 
-	second := AllInfo()
+	second := All()
 	br, ok := findByA2(second, "BR")
 	if !ok {
-		t.Fatal("BR missing from second AllInfo()")
+		t.Fatal("BR missing from second All()")
 	}
 	if !reflect.DeepEqual(br.CallingCodes, []string{"55"}) {
-		t.Errorf("AllInfo not isolated: BR.CallingCodes = %v, want [55]", br.CallingCodes)
+		t.Errorf("All not isolated: BR.CallingCodes = %v, want [55]", br.CallingCodes)
 	}
 	// second must still be in alpha-2 order (unaffected by first's re-sort).
 	for i := 1; i < len(second); i++ {
 		if second[i-1].Alpha2 > second[i].Alpha2 {
-			t.Fatalf("AllInfo order corrupted at %d: %q > %q", i, second[i-1].Alpha2, second[i].Alpha2)
+			t.Fatalf("All order corrupted at %d: %q > %q", i, second[i-1].Alpha2, second[i].Alpha2)
 		}
 	}
 }
@@ -53,6 +53,25 @@ func TestByAlpha2_Isolation(t *testing.T) {
 	c2, _ := ByAlpha2("BR")
 	if c2.CallingCodes[0] != "55" {
 		t.Errorf("ByAlpha2 not isolated: BR.CallingCodes[0] = %q, want 55", c2.CallingCodes[0])
+	}
+}
+
+// TestByAlpha2_EqualsScan holds the index to the table: every country All
+// returns is found by its alpha-2 code, field for field.
+func TestByAlpha2_EqualsScan(t *testing.T) {
+	all := All()
+	if len(all) == 0 {
+		t.Fatal("All() returned no countries")
+	}
+	for _, want := range all {
+		got, ok := ByAlpha2(want.Alpha2)
+		if !ok {
+			t.Errorf("ByAlpha2(%q) not found", want.Alpha2)
+			continue
+		}
+		if !reflect.DeepEqual(got, want) {
+			t.Errorf("ByAlpha2(%q) = %+v, want %+v", want.Alpha2, got, want)
+		}
 	}
 }
 
@@ -118,7 +137,7 @@ func TestRemovedCountriesAbsent(t *testing.T) {
 			t.Errorf("alpha-2 %s should be absent", a2)
 		}
 	}
-	for _, c := range AllInfo() {
+	for _, c := range All() {
 		if c.Alpha3 == "ANT" || c.Alpha3 == "YUG" {
 			t.Errorf("alpha-3 %s should be absent", c.Alpha3)
 		}
@@ -127,7 +146,7 @@ func TestRemovedCountriesAbsent(t *testing.T) {
 
 // TestCallingCodesHaveNoPlus asserts codes are stored as digits without '+'.
 func TestCallingCodesHaveNoPlus(t *testing.T) {
-	for _, c := range AllInfo() {
+	for _, c := range All() {
 		for _, code := range c.CallingCodes {
 			if strings.ContainsAny(code, "+ -") {
 				t.Errorf("%s: calling code %q must be digits only", c.Alpha2, code)
@@ -143,7 +162,7 @@ func TestCallingCodesHaveNoPlus(t *testing.T) {
 
 // TestDatasetIntegrity checks the whole dataset's structural invariants.
 func TestDatasetIntegrity(t *testing.T) {
-	all := AllInfo()
+	all := All()
 	if len(all) != 250 {
 		t.Errorf("dataset size = %d, want 250", len(all))
 	}

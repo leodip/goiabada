@@ -69,14 +69,6 @@ const (
 	// expectedGeneratedCount guards against silent country loss/addition:
 	// 249 upstream rows + the XK supplement. Any drift stops generation.
 	expectedGeneratedCount = expectedUpstreamCount + 1
-
-	// maxCallingCodes bounds a country's calling codes. It mirrors the runtime
-	// cap in phonecountries.Get
-	// (src/authserver/internal/phonecountries/phone_countries.go), which panics
-	// above 5 — so the generator must reject it first. That package is in
-	// another module now, so nothing compiles the two together: this constant is
-	// all that holds them, and moving one means moving the other by hand (#344).
-	maxCallingCodes = 5
 )
 
 // requiredColumns are located by header name; a missing one is fatal.
@@ -355,10 +347,6 @@ func validateRows(list []country) error {
 		}
 		if len(c.CallingCodes) == 0 {
 			return errs.Errorf("empty calling-code list for %q", c.Alpha2)
-		}
-		if len(c.CallingCodes) > maxCallingCodes {
-			return errs.Errorf("%q has %d calling codes (max %d); phonecountries.Get would panic at runtime",
-				c.Alpha2, len(c.CallingCodes), maxCallingCodes)
 		}
 		seenCode := map[string]bool{}
 		for _, code := range c.CallingCodes {

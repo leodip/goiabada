@@ -24,17 +24,7 @@ type ValidatePhoneInput struct {
 func (val *PhoneValidator) ValidatePhone(input *ValidatePhoneInput) error {
 	// i18n surface: C — admin/account API.
 	if len(input.PhoneCountryUniqueId) > 0 {
-		phoneCountries := phonecountries.Get()
-
-		found := false
-		for _, c := range phoneCountries {
-			if c.UniqueId == input.PhoneCountryUniqueId {
-				found = true
-				break
-			}
-		}
-
-		if !found {
+		if _, found := phonecountries.ByUniqueID(input.PhoneCountryUniqueId); !found {
 			return i18n.NewLocalizedError(i18n.ErrCodePhoneCountryInvalid, nil)
 		}
 
