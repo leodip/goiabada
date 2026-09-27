@@ -25,7 +25,8 @@ type Zone struct {
 	// iso3166.tab: a name taken from anywhere else would stop matching the pairs profiles already
 	// hold, and those profiles would reopen on the blank option (#432).
 	CountryName string
-	// Comments is zone1970.tab's English description of the region the zone covers, or empty.
+	// Comments is zone1970.tab's English description of the region the zone covers within the
+	// country, and empty for a country with one row, for which tzdata says it is not meant (#432).
 	Comments string
 }
 

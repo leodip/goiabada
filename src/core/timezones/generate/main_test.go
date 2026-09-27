@@ -72,14 +72,15 @@ const (
 )
 
 // fixtureRows is what the fixture tables parse to, in the generator's order.
+// Germany is the one country with two rows, so it alone keeps its comments.
 var fixtureRows = []zone{
-	{CountryCode: "BR", Zone: "America/Sao_Paulo", CountryName: "Brazil", Comments: "Brazil (southeast)"},
+	{CountryCode: "BR", Zone: "America/Sao_Paulo", CountryName: "Brazil", Comments: ""},
 	{CountryCode: "DE", Zone: "Europe/Berlin", CountryName: "Germany", Comments: "most of Germany"},
 	{CountryCode: "DE", Zone: "Europe/Zurich", CountryName: "Germany", Comments: "Büsingen"},
-	{CountryCode: "LI", Zone: "Europe/Zurich", CountryName: "Liechtenstein", Comments: "Büsingen"},
+	{CountryCode: "LI", Zone: "Europe/Zurich", CountryName: "Liechtenstein", Comments: ""},
 	{CountryCode: "ZZ", Zone: "Europe/Stockholm", CountryName: `Quote "Land" \ Back`, Comments: ""},
 	{CountryCode: "SE", Zone: "Europe/Stockholm", CountryName: "Sweden", Comments: ""},
-	{CountryCode: "CH", Zone: "Europe/Zurich", CountryName: "Switzerland", Comments: "Büsingen"},
+	{CountryCode: "CH", Zone: "Europe/Zurich", CountryName: "Switzerland", Comments: ""},
 }
 
 // entry is one member of a fixture tarball. A zero typeflag is a regular file.
@@ -268,6 +269,72 @@ func TestGenerate(t *testing.T) {
 			t.Errorf("no row reads back the comment %q: %q", "Büsingen", comments)
 		}
 	})
+}
+
+// TestKeepMultiZoneComments: zone1970.tab's column 4 is useful only for a
+// country with several zones, so a country with one row loses its comment and
+// a country with more keeps every one (#432).
+func TestKeepMultiZoneComments(t *testing.T) {
+	cases := []struct {
+		name string
+		in   []zone
+		want []zone
+	}{
+		{
+			// IANA's own example: the Europe/Zurich comment describes Büsingen,
+			// which is in Germany, so it survives for DE alone.
+			name: "a row shared by CH, DE and LI keeps its comment for DE, which has another zone",
+			in: []zone{
+				{CountryCode: "CH", Zone: "Europe/Zurich", Comments: "Büsingen"},
+				{CountryCode: "DE", Zone: "Europe/Zurich", Comments: "Büsingen"},
+				{CountryCode: "LI", Zone: "Europe/Zurich", Comments: "Büsingen"},
+				{CountryCode: "DE", Zone: "Europe/Berlin", Comments: "most of Germany"},
+			},
+			want: []zone{
+				{CountryCode: "CH", Zone: "Europe/Zurich", Comments: ""},
+				{CountryCode: "DE", Zone: "Europe/Zurich", Comments: "Büsingen"},
+				{CountryCode: "LI", Zone: "Europe/Zurich", Comments: ""},
+				{CountryCode: "DE", Zone: "Europe/Berlin", Comments: "most of Germany"},
+			},
+		},
+		{
+			name: "a single-country, single-zone row with a comment is emptied",
+			in:   []zone{{CountryCode: "BR", Zone: "America/Sao_Paulo", Comments: "Brazil (southeast)"}},
+			want: []zone{{CountryCode: "BR", Zone: "America/Sao_Paulo", Comments: ""}},
+		},
+		{
+			name: "a country with two zones keeps both comments",
+			in: []zone{
+				{CountryCode: "PT", Zone: "Europe/Lisbon", Comments: "Portugal (mainland)"},
+				{CountryCode: "PT", Zone: "Atlantic/Madeira", Comments: "Madeira Islands"},
+			},
+			want: []zone{
+				{CountryCode: "PT", Zone: "Europe/Lisbon", Comments: "Portugal (mainland)"},
+				{CountryCode: "PT", Zone: "Atlantic/Madeira", Comments: "Madeira Islands"},
+			},
+		},
+		{
+			name: "a row without a comment stays without one",
+			in: []zone{
+				{CountryCode: "PT", Zone: "Europe/Lisbon"},
+				{CountryCode: "PT", Zone: "Atlantic/Madeira", Comments: "Madeira Islands"},
+				{CountryCode: "SE", Zone: "Europe/Stockholm"},
+			},
+			want: []zone{
+				{CountryCode: "PT", Zone: "Europe/Lisbon"},
+				{CountryCode: "PT", Zone: "Atlantic/Madeira", Comments: "Madeira Islands"},
+				{CountryCode: "SE", Zone: "Europe/Stockholm"},
+			},
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			keepMultiZoneComments(c.in)
+			if !reflect.DeepEqual(c.in, c.want) {
+				t.Errorf("got:\n%v\nwant:\n%v", c.in, c.want)
+			}
+		})
+	}
 }
 
 func contains(list []string, s string) bool {

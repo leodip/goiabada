@@ -170,6 +170,7 @@ func generate(doer pinnedfetch.Doer, p pin) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	keepMultiZoneComments(zones)
 	sortZones(zones)
 	fmt.Fprintf(os.Stderr, "Parsed %d rows\n", len(zones))
 
@@ -268,9 +269,9 @@ func parseISO3166(data []byte) (map[string]string, error) {
 
 // parseZone1970 reads zone1970.tab into one row per (country, zone): a line's
 // first column is a comma-separated list of country codes, its third the zone
-// ID and its optional fourth a comment, copied to every country on the line.
-// Every country code must name a country in iso3166.tab, whose name the row
-// takes.
+// ID and its optional fourth a comment, given here to every country on the line
+// (keepMultiZoneComments then empties it where it does not apply). Every
+// country code must name a country in iso3166.tab, whose name the row takes.
 func parseZone1970(data []byte, countries map[string]string) ([]zone, error) {
 	var zones []zone
 	seen := map[[2]string]bool{}
@@ -308,6 +309,26 @@ func parseZone1970(data []byte, countries map[string]string) ([]zone, error) {
 		return nil, err
 	}
 	return zones, nil
+}
+
+// keepMultiZoneComments empties the comment of every row whose country has no
+// other row. zone1970.tab's header says column 4 is "present if and only if
+// countries have multiple timezones, and useful only for those countries",
+// giving Europe/Zurich's CH,DE,LI row as the example: its comment describes
+// Büsingen in Germany, not Switzerland or Liechtenstein. Copying it to every
+// country on the line labelled 63 single-zone countries with another country's
+// region at 2026c, e.g. Sweden's Europe/Berlin as "most of Germany" (#432).
+func keepMultiZoneComments(zones []zone) {
+	rows := map[string]int{}
+	for _, z := range zones {
+		rows[z.CountryCode]++
+	}
+	for i := range zones {
+		if rows[zones[i].CountryCode] > 1 {
+			continue
+		}
+		zones[i].Comments = ""
+	}
 }
 
 // sortZones orders the rows by country name and then zone ID, the order the
