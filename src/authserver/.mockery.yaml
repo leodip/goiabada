@@ -1,3 +1,8 @@
+# A generated mock lives in <declaring package>/mocks, package mocks_<declaring package>,
+# beside the interface it doubles rather than beside whatever implements it. A child
+# package's port is satisfied structurally by its parent's mock, which lives beside the
+# parent's port: apihandlers and accounthandlers restate internal/handlers' ports and
+# their tests use internal/handlers/mocks (#431).
 filename: "{{.InterfaceName | snakecase}}_mock.go"
 structname: "{{.InterfaceName}}"
 template: testify
@@ -26,16 +31,16 @@ packages:
     interfaces:
       AuthorizeValidator:
         config:
-          dir: "./internal/protocolvalidation/mocks"
-          pkgname: "mocks_protocolvalidation"
+          dir: "./internal/handlers/mocks"
+          pkgname: "mocks_handlers"
       PasswordValidator:
         config:
-          dir: "./internal/accountvalidation/mocks"
-          pkgname: "mocks_accountvalidation"
+          dir: "./internal/handlers/mocks"
+          pkgname: "mocks_handlers"
       TokenValidator:
         config:
-          dir: "./internal/protocolvalidation/mocks"
-          pkgname: "mocks_protocolvalidation"
+          dir: "./internal/handlers/mocks"
+          pkgname: "mocks_handlers"
       CodeIssuer:
         config:
           dir: "./internal/handlers/mocks"
@@ -58,12 +63,12 @@ packages:
           pkgname: "mocks_handlers"
       HttpHelper:
         config:
-          dir: "./internal/handlerhelpers/mocks"
-          pkgname: "mocks_handlerhelpers"
+          dir: "./internal/handlers/mocks"
+          pkgname: "mocks_handlers"
       AuditLogger:
         config:
-          dir: "./internal/audit/mocks"
-          pkgname: "mocks_audit"
+          dir: "./internal/handlers/mocks"
+          pkgname: "mocks_handlers"
       PermissionChecker:
         config:
           dir: "./internal/handlers/mocks"
@@ -76,23 +81,33 @@ packages:
         config:
           dir: "./internal/handlers/mocks"
           pkgname: "mocks_handlers"
-  # UserCreator and EmailValidator were declared in internal/handlers until #387, which gave the two
-  # child handler packages their own ports and left these two with no reference in the parent at
-  # all. They are sourced from accounthandlers because that package is the dominant consumer of both
-  # generated mocks -- all fifteen EmailValidator sites and twenty-four of the twenty-eight
-  # UserCreator ones -- and because apihandlers declares the identical pair, which one mock satisfies
-  # structurally either way. dir and pkgname are unchanged on purpose, so no test's import moved when
-  # the source package did.
+  # accounthandlers declares EmailValidator and UserCreator, which internal/handlers stopped
+  # naming in #387, so both are generated from it and live beside it. apihandlers declares
+  # the identical UserCreator, and its tests use this mock structurally (#431).
   github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers:
     interfaces:
       EmailValidator:
         config:
-          dir: "./internal/accountvalidation/mocks"
-          pkgname: "mocks_accountvalidation"
+          dir: "./internal/handlers/accounthandlers/mocks"
+          pkgname: "mocks_accounthandlers"
       UserCreator:
         config:
-          dir: "./internal/handlers/mocks"
-          pkgname: "mocks_handlers"
+          dir: "./internal/handlers/accounthandlers/mocks"
+          pkgname: "mocks_accounthandlers"
+  # protocolvalidation's own ports. Its in-package tests used internal/handlers' mocks of
+  # the same names until #431. They cannot any more: the validator mocks in
+  # internal/handlers/mocks import protocolvalidation for their input types, so that
+  # import would be a cycle.
+  github.com/leodip/goiabada/authserver/internal/protocolvalidation:
+    interfaces:
+      PermissionChecker:
+        config:
+          dir: "./internal/protocolvalidation/mocks"
+          pkgname: "mocks_protocolvalidation"
+      TokenParser:
+        config:
+          dir: "./internal/protocolvalidation/mocks"
+          pkgname: "mocks_protocolvalidation"
   # Bearer-token middleware, this module's since #385 moved it out of core/middleware
   github.com/leodip/goiabada/authserver/internal/middleware:
     interfaces:

@@ -5,7 +5,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	mocks_handlerhelpers "github.com/leodip/goiabada/authserver/internal/handlerhelpers/mocks"
+	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -15,7 +15,7 @@ import (
 // pinned at the HTTP seam in core/handlerhelpers/http_helper_test.go rather than through a mock
 // that can only report what it was told to return (#279).
 func TestHandleNotFoundGet(t *testing.T) {
-	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	httpHelper := mocks_handlers.NewHttpHelper(t)
 
 	req := httptest.NewRequest(http.MethodGet, "/non-existent-path", nil)
 	rr := httptest.NewRecorder()

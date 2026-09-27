@@ -19,21 +19,19 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
-	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	mocks_handlerhelpers "github.com/leodip/goiabada/authserver/internal/handlerhelpers/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	mocks_test "github.com/leodip/goiabada/core/mocks"
 )
 
 func TestHandleAuthCompletedGet(t *testing.T) {
 	t.Run("Successful flow, existing session (SSO reuse), consent not required", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 		templateFS := &mocks_test.TestFS{}
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
@@ -169,12 +167,12 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 	}
 
 	t.Run("Valid session belonging to another user is terminated and replaced", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 		templateFS := &mocks_test.TestFS{}
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
@@ -356,12 +354,12 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 	// still has offline refresh tokens that work, and the browser it belongs to has changed
 	// hands either way.
 	t.Run("Session belonging to another user is terminated even when it is no longer valid", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 		templateFS := &mocks_test.TestFS{}
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
@@ -460,12 +458,12 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 	// person signing in. Terminating it would revoke their own offline refresh tokens and any
 	// authorization code they had not yet redeemed, on nothing more than an expired session.
 	t.Run("Own session that is no longer valid is replaced but not terminated", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 		templateFS := &mocks_test.TestFS{}
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
@@ -568,12 +566,12 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 	// that matters as much as the 500: an event written on a rolled-back termination is a false
 	// security record.
 	t.Run("Termination failure is a 500 with nothing audited and no replacement", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 		templateFS := &mocks_test.TestFS{}
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
@@ -677,12 +675,12 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 	// after the first is how an operator sees a handover that did not complete. The ceremony
 	// still has to stop dead, because it now has no session at all to bind a code to.
 	t.Run("Replacement failure after a committed termination is a 500 with the handover recorded", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 		templateFS := &mocks_test.TestFS{}
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
@@ -785,12 +783,12 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 	})
 
 	t.Run("Successful flow, existing session with re-auth, consent not required", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 		templateFS := &mocks_test.TestFS{}
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
@@ -891,12 +889,12 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 	// #129 gate does not read it, but nothing else in the file covers it (found by round 2
 	// of the stage 5 review).
 	t.Run("Successful flow, existing session, zero AuthenticatedAt does not refresh AuthTime", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 		templateFS := &mocks_test.TestFS{}
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
@@ -979,12 +977,12 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 	})
 
 	t.Run("Successful flow, new session, consent not required", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 		templateFS := &mocks_test.TestFS{}
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
@@ -1087,12 +1085,12 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 	// =====================================================================================
 
 	t.Run("Reuse arm promotes the captured generation onto the bound session", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 		templateFS := &mocks_test.TestFS{}
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
@@ -1184,12 +1182,12 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 	// would discharge an obligation the ceremony never answered, and the user would keep their
 	// second factor bypassed for the rest of the session's life.
 	t.Run("Reuse arm does not promote when the target is level 1", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 		templateFS := &mocks_test.TestFS{}
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
@@ -1276,12 +1274,12 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 	// written by an older binary unmarshals to, and leaving the session as it stands is the
 	// fail-closed answer there.
 	t.Run("Reuse arm does not promote when the ceremony captured nothing", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 		templateFS := &mocks_test.TestFS{}
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
@@ -1363,12 +1361,12 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 	// insert. 4 rather than 0 so the expectation cannot pass against a hard-coded zero, and
 	// distinct from the auth state generation beside it so the two cannot be crossed.
 	t.Run("Create arm forwards the captured generation to the new session", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 		templateFS := &mocks_test.TestFS{}
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
@@ -1449,12 +1447,12 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 	})
 
 	t.Run("Error in GetAuthContext", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 		templateFS := &mocks_test.TestFS{}
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
@@ -1479,12 +1477,12 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 	})
 
 	t.Run("Invalid AuthState", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 		templateFS := &mocks_test.TestFS{}
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
@@ -1506,12 +1504,12 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 	})
 
 	t.Run("Client is nil", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 		templateFS := &mocks_test.TestFS{}
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
@@ -1545,13 +1543,13 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 	})
 
 	t.Run("User is not enabled", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		templateFS := &mocks_test.TestFS{}
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
@@ -1646,13 +1644,13 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 	})
 
 	t.Run("User is not enabled, failing clear - server_error to the client", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		templateFS := &mocks_test.TestFS{}
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
@@ -1731,12 +1729,12 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 	})
 
 	t.Run("User is not enabled, failing clear and an unusable form_post template - last-resort 500", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		// Deliberately malformed, an unclosed action, so template.ParseFS fails and
@@ -1825,12 +1823,12 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 	})
 
 	t.Run("User is not enabled, unusable form_post template - 500 when the refusal itself cannot be sent", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		templateFS := &mocks_test.TestFS{
@@ -1913,13 +1911,13 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 	})
 
 	t.Run("authContext.Scope is filtered and becomes empty", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		templateFS := &mocks_test.TestFS{}
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
@@ -2012,13 +2010,13 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 	})
 
 	t.Run("Scope filtered to empty with a failing clear - server_error to the client", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		templateFS := &mocks_test.TestFS{}
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
@@ -2094,12 +2092,12 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 	})
 
 	t.Run("Scope filtered to empty with a failing clear and an unusable form_post template - last-resort 500", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		templateFS := &mocks_test.TestFS{
@@ -2179,12 +2177,12 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 	})
 
 	t.Run("Scope filtered to empty with an unusable form_post template - 500 when the refusal itself cannot be sent", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		templateFS := &mocks_test.TestFS{
@@ -2268,12 +2266,12 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 	})
 
 	t.Run("Successful flow, new session, consent required", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 		templateFS := &mocks_test.TestFS{}
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
@@ -2357,12 +2355,12 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 	})
 
 	t.Run("Successful flow, new session, offline_access scope requires consent", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 		templateFS := &mocks_test.TestFS{}
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
@@ -2458,12 +2456,12 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 	// StartNewUserSession is deliberately not stubbed on the strict mock, so reaching it
 	// fails the case on its own rather than through an assertion that could be deleted.
 	t.Run("No valid session and this ceremony did not authenticate, restarts level 1", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 		templateFS := &mocks_test.TestFS{}
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
@@ -2526,12 +2524,12 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 	})
 
 	t.Run("No valid session and only OTP authenticated this ceremony, restarts level 1", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 		templateFS := &mocks_test.TestFS{}
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
 		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)

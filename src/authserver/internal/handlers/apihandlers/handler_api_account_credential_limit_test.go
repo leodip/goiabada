@@ -11,9 +11,9 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
-	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
@@ -51,7 +51,7 @@ func newCredentialEnv(t *testing.T) *credentialEnv {
 	t.Helper()
 
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	hash, err := passwordhash.Hash(credentialPassword)
 	require.NoError(t, err)

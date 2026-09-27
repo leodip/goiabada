@@ -5,7 +5,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	mocks_handlerhelpers "github.com/leodip/goiabada/authserver/internal/handlerhelpers/mocks"
+	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/stretchr/testify/assert"
@@ -13,7 +13,7 @@ import (
 
 func TestHandleIndexGet(t *testing.T) {
 	t.Run("Redirects to AdminConsoleBaseUrl", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 
 		handler := HandleIndexGet(httpHelper)
 

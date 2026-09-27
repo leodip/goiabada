@@ -8,11 +8,10 @@ import (
 
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
-	mocks_handlerhelpers "github.com/leodip/goiabada/authserver/internal/handlerhelpers/mocks"
+	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	authmiddleware "github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/i18n"
@@ -33,8 +32,8 @@ const testCeremonyId = "test-ceremony-id-0123456789abcd"
 
 // expectCeremonyMismatch sets the two calls rejectCeremonyMismatch makes, and asserts the page it
 // renders is the 400 error page rather than anything belonging to the flow that was submitted.
-func expectCeremonyMismatch(t *testing.T, httpHelper *mocks_handlerhelpers.HttpHelper,
-	auditLogger *mocks_audit.AuditLogger, rr *httptest.ResponseRecorder, req *http.Request) {
+func expectCeremonyMismatch(t *testing.T, httpHelper *mocks_handlers.HttpHelper,
+	auditLogger *mocks_handlers.AuditLogger, rr *httptest.ResponseRecorder, req *http.Request) {
 	t.Helper()
 
 	auditLogger.On("Log", mock.Anything, audit.AuditAuthCeremonyMismatch, mock.Anything).Return().Once()
@@ -52,7 +51,7 @@ func expectCeremonyMismatch(t *testing.T, httpHelper *mocks_handlerhelpers.HttpH
 // It asserts the state_mismatch pair specifically and not merely "some title": the ceremony
 // mismatch page beside it says another sign-in was started in this browser, which is not what the
 // Back button did, and a helper that accepted either would let the two pages be confused.
-func expectAuthStateMismatch(t *testing.T, httpHelper *mocks_handlerhelpers.HttpHelper,
+func expectAuthStateMismatch(t *testing.T, httpHelper *mocks_handlers.HttpHelper,
 	rr *httptest.ResponseRecorder, req *http.Request) {
 	t.Helper()
 
@@ -215,8 +214,8 @@ func renderableRequest(target string) *http.Request {
 func TestRejectCeremonyMismatch_AuditsUnderTheRequestsContext(t *testing.T) {
 	const requestId = "goiabada/req-ceremony-1"
 
-	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	httpHelper := mocks_handlers.NewHttpHelper(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	req, err := http.NewRequest("POST", "/auth/pwd", nil)
 	require.NoError(t, err)

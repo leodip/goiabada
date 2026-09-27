@@ -12,9 +12,9 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
 	"github.com/leodip/goiabada/authserver/internal/data"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
@@ -67,7 +67,7 @@ func TestHandleAPIPermissionsByResourceGet_TheSystemResourceIsAnsweredAsStored(t
 // would cascade FK deletions that can't be rolled back.
 func TestHandleAPIResourcePermissionsPut_BuiltInPermissionMissingFromDB(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 	identifierValidator := validators.NewIdentifierValidator()
 
 	handler := HandleAPIResourcePermissionsPut(database, identifierValidator, auditLogger)
@@ -171,7 +171,7 @@ func resourcePermsBody(t *testing.T, permissions, expected []api.ResourcePermiss
 }
 
 // serveResourcePerms runs the save on a PUT carrying body.
-func serveResourcePerms(database *mocks_data.Database, auditLogger *mocks_audit.AuditLogger, body string) *httptest.ResponseRecorder {
+func serveResourcePerms(database *mocks_data.Database, auditLogger *mocks_handlers.AuditLogger, body string) *httptest.ResponseRecorder {
 	r := httptest.NewRequest(http.MethodPut, "/api/v1/admin/resources/7/permissions", strings.NewReader(body))
 	r = setChiURLParam(r, "resourceId", "7")
 	rr := httptest.NewRecorder()
@@ -197,7 +197,7 @@ func expectResourcePermsRead(database *mocks_data.Database, stored []models.Perm
 }
 
 // expectResourcePermsAudit accepts the one consolidated event and counts it.
-func expectResourcePermsAudit(t *testing.T, auditLogger *mocks_audit.AuditLogger, order *[]string) *int {
+func expectResourcePermsAudit(t *testing.T, auditLogger *mocks_handlers.AuditLogger, order *[]string) *int {
 	count := new(int)
 	auditLogger.On("Log", mock.Anything, audit.AuditUpdatedResourcePermissions, mock.Anything).
 		Run(func(args mock.Arguments) {
@@ -218,7 +218,7 @@ func expectResourcePermsAudit(t *testing.T, auditLogger *mocks_audit.AuditLogger
 // entry created. The one audit event follows the commit (#406, #428).
 func TestHandleAPIResourcePermissionsPut_SavesTheExactPlanInOneTransaction(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	expectResourcePermsResource(database, "a-resource")
 	expectResourcePermsChecked(database, resourcePermsStored())
@@ -259,7 +259,7 @@ func TestHandleAPIResourcePermissionsPut_SavesTheExactPlanInOneTransaction(t *te
 // A rename is an update of the named row, on the transaction, and nothing else.
 func TestHandleAPIResourcePermissionsPut_ARenameUpdatesTheNamedRow(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	stored := resourcePermsStored()
 	expectResourcePermsResource(database, "a-resource")
@@ -286,7 +286,7 @@ func TestHandleAPIResourcePermissionsPut_ARenameUpdatesTheNamedRow(t *testing.T)
 // (#406, #428).
 func TestHandleAPIResourcePermissionsPut_AFailedWriteCommitsNothing(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	expectResourcePermsResource(database, "a-resource")
 	expectResourcePermsChecked(database, resourcePermsStored())
@@ -312,7 +312,7 @@ func TestHandleAPIResourcePermissionsPut_AFailedWriteCommitsNothing(t *testing.T
 // audited, where the autocommitted writes answered it 500 with the earlier writes kept (#428).
 func TestHandleAPIResourcePermissionsPut_AUniqueKeyRaceAnswersConflict(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	expectResourcePermsResource(database, "a-resource")
 	expectResourcePermsChecked(database, resourcePermsStored())
@@ -350,7 +350,7 @@ func TestHandleAPIResourcePermissionsPut_AFailedLoadIsAnsweredAsALoadFailure(t *
 	for _, variant := range variants {
 		t.Run(variant.name, func(t *testing.T) {
 			database := mocks_data.NewDatabase(t)
-			auditLogger := mocks_audit.NewAuditLogger(t)
+			auditLogger := mocks_handlers.NewAuditLogger(t)
 
 			expectResourcePermsResource(database, "a-resource")
 			expectResourcePermsChecked(database, variant.checked)
@@ -376,7 +376,7 @@ func TestHandleAPIResourcePermissionsPut_AFailedLoadIsAnsweredAsALoadFailure(t *
 // emitted after the attempt that committed (#301, #428).
 func TestHandleAPIResourcePermissionsPut_ARerunAttemptAnswersAndAuditsOnce(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	expectResourcePermsResource(database, "a-resource")
 	expectResourcePermsChecked(database, resourcePermsStored())
@@ -416,7 +416,7 @@ func TestHandleAPIResourcePermissionsPut_ARerunAttemptAnswersAndAuditsOnce(t *te
 // The helper giving up, a deadlock on every attempt, is one 500 and no audit event.
 func TestHandleAPIResourcePermissionsPut_AnExhaustedRetryIsOneFiveHundred(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	expectResourcePermsResource(database, "a-resource")
 	expectResourcePermsChecked(database, resourcePermsStored())
@@ -460,7 +460,7 @@ func TestHandleAPIResourcePermissionsPut_AnOutdatedLoadedListIsRefused(t *testin
 	for _, variant := range variants {
 		t.Run(variant.name, func(t *testing.T) {
 			database := mocks_data.NewDatabase(t)
-			auditLogger := mocks_audit.NewAuditLogger(t)
+			auditLogger := mocks_handlers.NewAuditLogger(t)
 
 			expectResourcePermsResource(database, "a-resource")
 			expectResourcePermsChecked(database, resourcePermsStored())
@@ -500,7 +500,7 @@ func TestHandleAPIResourcePermissionsPut_ALoadedListEqualAsASetProceeds(t *testi
 	for _, variant := range variants {
 		t.Run(variant.name, func(t *testing.T) {
 			database := mocks_data.NewDatabase(t)
-			auditLogger := mocks_audit.NewAuditLogger(t)
+			auditLogger := mocks_handlers.NewAuditLogger(t)
 
 			expectResourcePermsResource(database, "a-resource")
 			expectResourcePermsChecked(database, variant.stored)
@@ -632,7 +632,7 @@ func TestHandleAPIResourcePermissionsPut_ARefusedSaveNeverOpensTheTransaction(t 
 	for _, variant := range variants {
 		t.Run(variant.name, func(t *testing.T) {
 			database := mocks_data.NewDatabase(t)
-			auditLogger := mocks_audit.NewAuditLogger(t)
+			auditLogger := mocks_handlers.NewAuditLogger(t)
 
 			resourceIdentifier := variant.resourceIdentifier
 			if resourceIdentifier == "" {
@@ -661,7 +661,7 @@ func TestHandleAPIResourcePermissionsPut_ARefusedSaveNeverOpensTheTransaction(t 
 // two reads: refused 409 with nothing written, rather than an update of a row that is gone (#428).
 func TestHandleAPIResourcePermissionsPut_ANamedRowGoneByTheTransactionIsRefused(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	stored := resourcePermsStored()
 	expectResourcePermsResource(database, "a-resource")

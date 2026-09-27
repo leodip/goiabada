@@ -11,8 +11,8 @@ import (
 
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/testutil"
@@ -74,7 +74,7 @@ func rotateRequest() *http.Request {
 // property the three refusal cases below assert the other half of.
 func TestHandleAPISettingsKeysRotatePost_Success(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	stub := stubRotateRead(database, []models.KeyPair{
 		signingKey(1, models.KeyStatePrevious),
@@ -113,7 +113,7 @@ func TestHandleAPISettingsKeysRotatePost_Success(t *testing.T) {
 // entry per rotation that happened.
 func TestHandleAPISettingsKeysRotatePost_RotationInProgress(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	stub := stubRotateRead(database, []models.KeyPair{
 		signingKey(2, models.KeyStateCurrent),
@@ -145,7 +145,7 @@ func TestHandleAPISettingsKeysRotatePost_RotationInProgress(t *testing.T) {
 // old handler did.
 func TestHandleAPISettingsKeysRotatePost_KeySetIncomplete(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	stub := stubRotateRead(database, []models.KeyPair{
 		signingKey(1, models.KeyStatePrevious),
@@ -185,7 +185,7 @@ func TestHandleAPISettingsKeysRotatePost_KeySetIncomplete(t *testing.T) {
 // race and retry into it.
 func TestHandleAPISettingsKeysRotatePost_InternalError(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	mocks_data.ExpectRunInTransaction(database, rotateTx)
 	database.On("GetAllSigningKeys", mock.Anything, rotateTx).

@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
-	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
@@ -40,7 +40,7 @@ func stubAccountEmailUpdate(database *mocks_data.Database, updateErr error) {
 
 func TestHandleAPIAccountEmailPut_ALostRaceForTheAddressAnswers409(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 	stubAccountEmailUpdate(database, uniqueViolationOnUpdate)
 
 	rr := httptest.NewRecorder()
@@ -53,7 +53,7 @@ func TestHandleAPIAccountEmailPut_ALostRaceForTheAddressAnswers409(t *testing.T)
 
 func TestHandleAPIAccountEmailPut_AnyOtherWriteFailureAnswers500(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 	stubAccountEmailUpdate(database, errs.New("the connection was reset"))
 
 	rr := httptest.NewRecorder()

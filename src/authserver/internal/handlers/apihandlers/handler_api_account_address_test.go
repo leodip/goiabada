@@ -14,8 +14,8 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/testutil"
@@ -46,7 +46,7 @@ func addressPutRequest(t *testing.T, subject string, body api.UpdateUserAddressR
 // The `api/unlogged-500` anchor: this exact line answered 500 and threw the error away.
 func TestHandleAPIAccountAddressPut_ADatabaseFailureIsOneLoggedFiveHundred(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), "the-subject").
 		Return(nil, errors.New("the database is down")).Once()
@@ -80,7 +80,7 @@ func TestHandleAPIAccountAddressPut_ADatabaseFailureIsOneLoggedFiveHundred(t *te
 // status and Content-Type, and nothing is logged.
 func TestHandleAPIAccountAddressPut_ASuccessWritesTheWholeBody(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	user := &models.User{Id: 42, Subject: "the-subject"}
 	database.On("GetUserBySubject", mock.Anything, (*sql.Tx)(nil), "the-subject").Return(user, nil).Once()

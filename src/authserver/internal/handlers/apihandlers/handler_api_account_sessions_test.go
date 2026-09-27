@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -38,7 +38,7 @@ func accountSessionDeleteRequest(sessionId string, subject string) *http.Request
 // this is the site that resolves the row through an ownership check first.
 func TestHandleAPIAccountSessionDelete_TerminatesAndAuditsBothEvents(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	const subject = "the-user"
 	user := &models.User{Id: 42, Enabled: true}
@@ -91,7 +91,7 @@ func TestHandleAPIAccountSessionDelete_TerminatesAndAuditsBothEvents(t *testing.
 // mechanism: no termination expectation is registered, so any call fails the test.
 func TestHandleAPIAccountSessionDelete_ForbiddenDoesNotTerminate(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	const subject = "the-user"
 	// The session belongs to user 7; the caller is user 42.
@@ -117,7 +117,7 @@ func TestHandleAPIAccountSessionDelete_ForbiddenDoesNotTerminate(t *testing.T) {
 // first one outside the error check is a one-line mistake that the other site's test cannot see.
 func TestHandleAPIAccountSessionDelete_TerminationFailureIsA500(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	const subject = "the-user"
 	database.On("GetUserSessionById", mock.Anything, (*sql.Tx)(nil), int64(100)).

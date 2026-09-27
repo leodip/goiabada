@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
-	mocks_handlerhelpers "github.com/leodip/goiabada/adminconsole/internal/handlerhelpers/mocks"
+	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/core/api"
@@ -56,7 +56,7 @@ func logoutRequest() *http.Request {
 }
 
 func TestHandleAccountLogoutGet_AsksForTheFormPostModeAndRendersTheForm(t *testing.T) {
-	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	httpHelper := mocks_handlers.NewHttpHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper,
 		"/layouts/no_menu_layout.html", "/account_logout_form_post.html").Once()
@@ -97,7 +97,7 @@ func TestHandleAccountLogoutGet_AsksForTheFormPostModeAndRendersTheForm(t *testi
 // shape whatever the request asked for. Before decision 2 the handler dereferenced the redirect
 // return unconditionally, so this is also the case that pins the nil check the form arm needed.
 func TestHandleAccountLogoutGet_StillFollowsARedirectResponse(t *testing.T) {
-	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	httpHelper := mocks_handlers.NewHttpHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 
 	apiClient := &logoutApiClient{redirect: &api.AccountLogoutRedirectResponse{
@@ -129,7 +129,7 @@ func TestHandleAccountLogoutGet_WithoutTokensGoesHomeWithoutCallingTheAPI(t *tes
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+			httpHelper := mocks_handlers.NewHttpHelper(t)
 			handlertest.RefuseInternalServerError(t, httpHelper)
 
 			apiClient := &logoutApiClient{}

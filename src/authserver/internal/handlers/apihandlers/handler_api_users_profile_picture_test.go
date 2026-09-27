@@ -10,9 +10,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/oauth"
@@ -154,7 +154,7 @@ func TestHandleAPIUserProfilePictureGet_NoPicture(t *testing.T) {
 
 func TestHandleAPIUserProfilePicturePost_NoUserId(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	handler := HandleAPIUserProfilePicturePost(database, auditLogger)
 
@@ -173,7 +173,7 @@ func TestHandleAPIUserProfilePicturePost_NoUserId(t *testing.T) {
 
 func TestHandleAPIUserProfilePicturePost_InvalidUserId(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	handler := HandleAPIUserProfilePicturePost(database, auditLogger)
 
@@ -193,7 +193,7 @@ func TestHandleAPIUserProfilePicturePost_InvalidUserId(t *testing.T) {
 
 func TestHandleAPIUserProfilePicturePost_UserNotFound(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	handler := HandleAPIUserProfilePicturePost(database, auditLogger)
 
@@ -219,7 +219,7 @@ func TestHandleAPIUserProfilePicturePost_UserNotFound(t *testing.T) {
 
 func TestHandleAPIUserProfilePicturePost_InvalidImage(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	handler := HandleAPIUserProfilePicturePost(database, auditLogger)
 
@@ -246,7 +246,7 @@ func TestHandleAPIUserProfilePicturePost_InvalidImage(t *testing.T) {
 
 func TestHandleAPIUserProfilePicturePost_CreateNew(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	handler := HandleAPIUserProfilePicturePost(database, auditLogger)
 
@@ -287,7 +287,7 @@ func TestHandleAPIUserProfilePicturePost_CreateNew(t *testing.T) {
 
 func TestHandleAPIUserProfilePicturePost_UpdateExisting(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	handler := HandleAPIUserProfilePicturePost(database, auditLogger)
 
@@ -333,7 +333,7 @@ func TestHandleAPIUserProfilePicturePost_UpdateExisting(t *testing.T) {
 
 func TestHandleAPIUserProfilePictureDelete_NoUserId(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	handler := HandleAPIUserProfilePictureDelete(database, auditLogger)
 
@@ -352,7 +352,7 @@ func TestHandleAPIUserProfilePictureDelete_NoUserId(t *testing.T) {
 
 func TestHandleAPIUserProfilePictureDelete_InvalidUserId(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	handler := HandleAPIUserProfilePictureDelete(database, auditLogger)
 
@@ -372,7 +372,7 @@ func TestHandleAPIUserProfilePictureDelete_InvalidUserId(t *testing.T) {
 
 func TestHandleAPIUserProfilePictureDelete_UserNotFound(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	handler := HandleAPIUserProfilePictureDelete(database, auditLogger)
 
@@ -396,7 +396,7 @@ func TestHandleAPIUserProfilePictureDelete_UserNotFound(t *testing.T) {
 
 func TestHandleAPIUserProfilePictureDelete_Success(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	handler := HandleAPIUserProfilePictureDelete(database, auditLogger)
 
@@ -431,7 +431,7 @@ func TestHandleAPIUserProfilePictureDelete_Success(t *testing.T) {
 
 func TestHandleAPIUserProfilePictureDelete_DatabaseError(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	handler := HandleAPIUserProfilePictureDelete(database, auditLogger)
 

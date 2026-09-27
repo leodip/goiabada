@@ -12,8 +12,8 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/i18n"
@@ -55,7 +55,7 @@ func TestHandleAPIUserGroupsGet_AFailedCountAnswers500(t *testing.T) {
 // not then claim the group has no members.
 func TestHandleAPIUserGroupsPut_AFailedCountAnswers500(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	database.On("GetUserById", mock.Anything, mock.Anything, int64(42)).
 		Return(&models.User{Id: 42, Subject: "sub-42"}, nil).Once()
@@ -100,7 +100,7 @@ type membershipRow struct {
 }
 
 // serveUserGroupsSave runs the save on a PUT carrying the wanted and loaded group ids.
-func serveUserGroupsSave(t *testing.T, database *mocks_data.Database, auditLogger *mocks_audit.AuditLogger, wanted, expected []int64) *httptest.ResponseRecorder {
+func serveUserGroupsSave(t *testing.T, database *mocks_data.Database, auditLogger *mocks_handlers.AuditLogger, wanted, expected []int64) *httptest.ResponseRecorder {
 	t.Helper()
 	body, err := json.Marshal(map[string]any{"groupIds": wanted, "expectedGroupIds": expected})
 	require.NoError(t, err)
@@ -108,7 +108,7 @@ func serveUserGroupsSave(t *testing.T, database *mocks_data.Database, auditLogge
 }
 
 // serveUserGroupsBody runs the save on a PUT carrying body as written.
-func serveUserGroupsBody(database *mocks_data.Database, auditLogger *mocks_audit.AuditLogger, body string) *httptest.ResponseRecorder {
+func serveUserGroupsBody(database *mocks_data.Database, auditLogger *mocks_handlers.AuditLogger, body string) *httptest.ResponseRecorder {
 	req := httptest.NewRequest(http.MethodPut, "/api/v1/admin/users/42/groups", strings.NewReader(body))
 	req = setChiURLParam(req, "id", "42")
 	rr := httptest.NewRecorder()
@@ -154,7 +154,7 @@ func expectReload(database *mocks_data.Database, order *[]string) {
 
 // recordMembershipAudits accepts every Log call and collects them as event and group id, checking
 // each names the user and the caller.
-func recordMembershipAudits(t *testing.T, auditLogger *mocks_audit.AuditLogger, order *[]string) *[]auditRecord {
+func recordMembershipAudits(t *testing.T, auditLogger *mocks_handlers.AuditLogger, order *[]string) *[]auditRecord {
 	records := &[]auditRecord{}
 	auditLogger.On("Log", mock.Anything, mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
@@ -175,7 +175,7 @@ func recordMembershipAudits(t *testing.T, auditLogger *mocks_audit.AuditLogger, 
 // commit, and the answer's reload follows those (#428).
 func TestHandleAPIUserGroupsPut_SavesTheExactPlanInOneTransaction(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	expectUserAndGroups(database, 4, 6)
 	var order []string
@@ -214,7 +214,7 @@ func TestHandleAPIUserGroupsPut_SavesTheExactPlanInOneTransaction(t *testing.T) 
 // is kept is deleted as a repair and audited as nothing (#428).
 func TestHandleAPIUserGroupsPut_AStoredDuplicateIsRemovedWithItsOriginal(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	expectUserAndGroups(database, 4)
 	mocks_data.ExpectRunInTransaction(database, userGroupsTx)
@@ -244,7 +244,7 @@ func TestHandleAPIUserGroupsPut_AStoredDuplicateIsRemovedWithItsOriginal(t *test
 // stayed removed, and audited, under the 500 (#428).
 func TestHandleAPIUserGroupsPut_AFailedWriteCommitsNothing(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	expectUserAndGroups(database, 6)
 	stub := mocks_data.ExpectRunInTransaction(database, userGroupsTx)
@@ -280,7 +280,7 @@ func TestHandleAPIUserGroupsPut_AFailedLoadIsAnsweredAsALoadFailure(t *testing.T
 	for _, variant := range variants {
 		t.Run(variant.name, func(t *testing.T) {
 			database := mocks_data.NewDatabase(t)
-			auditLogger := mocks_audit.NewAuditLogger(t)
+			auditLogger := mocks_handlers.NewAuditLogger(t)
 
 			expectUserAndGroups(database)
 			stub := mocks_data.ExpectRunInTransaction(database, userGroupsTx)
@@ -305,7 +305,7 @@ func TestHandleAPIUserGroupsPut_AFailedLoadIsAnsweredAsALoadFailure(t *testing.T
 // emitted from the attempt that committed, after it did (#301, #428).
 func TestHandleAPIUserGroupsPut_ARerunAttemptAnswersAndAuditsOnce(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	expectUserAndGroups(database, 6)
 
@@ -346,7 +346,7 @@ func TestHandleAPIUserGroupsPut_ARerunAttemptAnswersAndAuditsOnce(t *testing.T) 
 // The helper giving up, a deadlock on every attempt, is one 500 and no audit event.
 func TestHandleAPIUserGroupsPut_AnExhaustedRetryIsOneFiveHundred(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	expectUserAndGroups(database, 6)
 	mocks_data.ExpectRunInTransactionRefused(database, errors.New("transaction aborted as a deadlock victim on all 3 attempts"))
@@ -365,7 +365,7 @@ func TestHandleAPIUserGroupsPut_AnExhaustedRetryIsOneFiveHundred(t *testing.T) {
 // them from (#428).
 func TestHandleAPIUserGroupsPut_AnOutdatedLoadedListIsRefused(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	expectUserAndGroups(database, 3, 4, 6)
 	stub := mocks_data.ExpectRunInTransaction(database, userGroupsTx)
@@ -399,7 +399,7 @@ func TestHandleAPIUserGroupsPut_ALoadedListEqualAsASetProceeds(t *testing.T) {
 	for _, variant := range variants {
 		t.Run(variant.name, func(t *testing.T) {
 			database := mocks_data.NewDatabase(t)
-			auditLogger := mocks_audit.NewAuditLogger(t)
+			auditLogger := mocks_handlers.NewAuditLogger(t)
 
 			expectUserAndGroups(database, 6)
 			mocks_data.ExpectRunInTransaction(database, userGroupsTx)
@@ -469,7 +469,7 @@ func TestHandleAPIUserGroupsPut_ARefusedSaveNeverOpensTheTransaction(t *testing.
 	for _, variant := range variants {
 		t.Run(variant.name, func(t *testing.T) {
 			database := mocks_data.NewDatabase(t)
-			auditLogger := mocks_audit.NewAuditLogger(t)
+			auditLogger := mocks_handlers.NewAuditLogger(t)
 
 			if variant.readsUser {
 				database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), userGroupsOwnerId).
@@ -497,7 +497,7 @@ func TestHandleAPIUserGroupsPut_ARefusedSaveNeverOpensTheTransaction(t *testing.
 // group that does not exist (#428).
 func TestHandleAPIUserGroupsPut_ARepeatedIdIsAddedOnce(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	expectUserAndGroups(database, 6)
 	mocks_data.ExpectRunInTransaction(database, userGroupsTx)

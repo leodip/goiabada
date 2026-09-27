@@ -12,9 +12,9 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/stretchr/testify/assert"
@@ -68,7 +68,7 @@ func accountPasswordRequest(t *testing.T, claims map[string]interface{}, current
 // preservedSessionIdentifier is non-empty.
 func TestHandleAPIAccountPasswordPut_PreservesTheCallersSession(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 	passwordValidator := accountvalidation.NewPasswordValidator()
 
 	const currentPassword = "0ldP4ss!word"
@@ -159,7 +159,7 @@ func TestHandleAPIAccountPasswordPut_PreservesTheCallersSession(t *testing.T) {
 // would let a caller preserve a session they did not authenticate with.
 func TestHandleAPIAccountPasswordPut_SidlessBearerRevokesEverything(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 	passwordValidator := accountvalidation.NewPasswordValidator()
 
 	const currentPassword = "0ldP4ss!word"
@@ -209,7 +209,7 @@ func TestHandleAPIAccountPasswordPut_SidlessBearerRevokesEverything(t *testing.T
 // error check.
 func TestHandleAPIAccountPasswordPut_RevocationFailureIsA500(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 	passwordValidator := accountvalidation.NewPasswordValidator()
 
 	const currentPassword = "0ldP4ss!word"

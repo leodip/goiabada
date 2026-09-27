@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	mocks_handlerhelpers "github.com/leodip/goiabada/authserver/internal/handlerhelpers/mocks"
+	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -23,7 +23,7 @@ import (
 // The accept arm for the key read: /certs serves whatever key pairs the install holds, on behalf
 // of the request that asked for them.
 func TestHandleCertsGet_ReadsKeysUnderTheRequestsContext(t *testing.T) {
-	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	httpHelper := mocks_handlers.NewHttpHelper(t)
 	database := mocks_data.NewDatabase(t)
 
 	database.On("GetAllSigningKeys", theRequestsContext(), mock.Anything).

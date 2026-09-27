@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -71,7 +71,7 @@ func adminSessionDeleteRequest(sessionId string, subject string) *http.Request {
 // payload, because this is where the new event is emitted from.
 func TestHandleAPIUserSessionDelete_TerminatesAndAuditsBothEvents(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	userSession := &models.UserSession{Id: 100, SessionIdentifier: "sid-terminated", UserId: 42}
 
@@ -137,7 +137,7 @@ func TestHandleAPIUserSessionDelete_TerminatesAndAuditsBothEvents(t *testing.T) 
 // GET /api/v1/admin/audit-logs, so an absent key is a change a consumer can see (#385).
 func TestHandleAPIUserSessionDelete_NoTokenAuditsAnEmptySubject(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	userSession := &models.UserSession{Id: 100, SessionIdentifier: "sid-terminated", UserId: 42}
 
@@ -171,7 +171,7 @@ func TestHandleAPIUserSessionDelete_NoTokenAuditsAnEmptySubject(t *testing.T) {
 // transaction fail, so this is the only seam that can show neither event is emitted when it does.
 func TestHandleAPIUserSessionDelete_TerminationFailureIsA500(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	userSession := &models.UserSession{Id: 100, SessionIdentifier: "sid-terminated", UserId: 42}
 
@@ -199,7 +199,7 @@ func TestHandleAPIUserSessionDelete_TerminationFailureIsA500(t *testing.T) {
 // every other case here.
 func TestHandleAPIUserSessionDelete_NotFoundDoesNotTerminate(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	database.On("GetUserSessionById", mock.Anything, (*sql.Tx)(nil), int64(999)).Return(nil, nil).Once()
 

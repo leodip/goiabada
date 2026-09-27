@@ -10,10 +10,8 @@ import (
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	mocks_handlerhelpers "github.com/leodip/goiabada/authserver/internal/handlerhelpers/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	mocks_test "github.com/leodip/goiabada/core/mocks"
@@ -60,7 +58,7 @@ func withURLParam(req *http.Request, key, value string) *http.Request {
 // reads the handler makes carry the request's own context, one of them on a value derived from
 // the other, which is the ordinary two-hop shape across this package.
 func TestHandleProfilePictureGet_ConsultsTheDatabaseUnderTheRequestsContext(t *testing.T) {
-	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	httpHelper := mocks_handlers.NewHttpHelper(t)
 	database := mocks_data.NewDatabase(t)
 
 	req := withURLParam(requestCarryingId(t, http.MethodGet, "/userinfo/picture/sub-1"), "subject", "sub-1")
@@ -82,7 +80,7 @@ func TestHandleProfilePictureGet_ConsultsTheDatabaseUnderTheRequestsContext(t *t
 // turns away reaches no port at all, so there is no context to get wrong. Without it the accept
 // arm would also pass on a handler that queried unconditionally.
 func TestHandleProfilePictureGet_RefusedBeforeAnyQuery(t *testing.T) {
-	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	httpHelper := mocks_handlers.NewHttpHelper(t)
 	database := mocks_data.NewDatabase(t)
 
 	req := withURLParam(requestCarryingId(t, http.MethodGet, "/userinfo/picture/"), "subject", "")
@@ -112,13 +110,13 @@ func issueRequestCarryingId(t *testing.T, sessionIdentifier string) *http.Reques
 // termination. Both the acquisition and the insert are matched on the request's context, so a
 // transaction opened on a context nobody can cancel fails here rather than in production.
 func TestHandleIssueGet_IssuesUnderTheRequestsContext(t *testing.T) {
-	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	httpHelper := mocks_handlers.NewHttpHelper(t)
 	authHelper := mocks_handlers.NewAuthHelper(t)
 	templateFS := &mocks_test.TestFS{}
 	codeIssuer := mocks_handlers.NewCodeIssuer(t)
 	tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 	userSessionManager := mocks_handlers.NewUserSessionManager(t)
 	permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
@@ -160,13 +158,13 @@ func TestHandleIssueGet_IssuesUnderTheRequestsContext(t *testing.T) {
 // is never opened and the issuer is never reached. Without it the accept arm would also pass on a
 // handler that issued unconditionally.
 func TestHandleIssueGet_UnusableSessionReachesNoIssuer(t *testing.T) {
-	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	httpHelper := mocks_handlers.NewHttpHelper(t)
 	authHelper := mocks_handlers.NewAuthHelper(t)
 	templateFS := &mocks_test.TestFS{}
 	codeIssuer := mocks_handlers.NewCodeIssuer(t)
 	tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 	userSessionManager := mocks_handlers.NewUserSessionManager(t)
 	permissionChecker := mocks_handlers.NewPermissionChecker(t)
 

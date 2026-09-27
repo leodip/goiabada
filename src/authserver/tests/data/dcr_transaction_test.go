@@ -10,11 +10,10 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/data"
-	mocks_handlerhelpers "github.com/leodip/goiabada/authserver/internal/handlerhelpers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/handlers"
+	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/core/errs"
@@ -47,8 +46,8 @@ func (d *dcrWriteRecorder) CreateRedirectURI(ctx context.Context, tx *sql.Tx, re
 	return d.Database.CreateRedirectURI(ctx, tx, redirectURI)
 }
 
-func registerThroughTheHandler(t *testing.T, db *dcrWriteRecorder, httpHelper *mocks_handlerhelpers.HttpHelper,
-	auditLogger *mocks_audit.AuditLogger) *httptest.ResponseRecorder {
+func registerThroughTheHandler(t *testing.T, db *dcrWriteRecorder, httpHelper *mocks_handlers.HttpHelper,
+	auditLogger *mocks_handlers.AuditLogger) *httptest.ResponseRecorder {
 
 	t.Helper()
 	body, err := json.Marshal(oidc.DynamicClientRegistrationRequest{
@@ -76,7 +75,7 @@ func TestDCR_AFailedSecondRedirectURIWriteLeavesNoClientAndNoRedirectURI(t *test
 	db := &dcrWriteRecorder{Database: database, failAt: 2}
 
 	// Strict mocks with no expectations: neither the audit event nor the 201 may happen.
-	rr := registerThroughTheHandler(t, db, mocks_handlerhelpers.NewHttpHelper(t), mocks_audit.NewAuditLogger(t))
+	rr := registerThroughTheHandler(t, db, mocks_handlers.NewHttpHelper(t), mocks_handlers.NewAuditLogger(t))
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
 	require.NotNil(t, db.created, "the client write was reached")
@@ -96,9 +95,9 @@ func TestDCR_AFailedSecondRedirectURIWriteLeavesNoClientAndNoRedirectURI(t *test
 func TestDCR_ARegistrationWithNoFailureCommitsTheClientAndItsRedirectURIs(t *testing.T) {
 	db := &dcrWriteRecorder{Database: database}
 
-	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	httpHelper := mocks_handlers.NewHttpHelper(t)
 	httpHelper.On("EncodeJson", mock.Anything, mock.Anything, mock.Anything).Return().Once()
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 	auditLogger.On("Log", mock.Anything, audit.AuditDynamicClientRegistration, mock.Anything).Return().Once()
 
 	rr := registerThroughTheHandler(t, db, httpHelper, auditLogger)

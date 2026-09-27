@@ -15,7 +15,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	mocks_handlerhelpers "github.com/leodip/goiabada/authserver/internal/handlerhelpers/mocks"
+	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -40,7 +40,7 @@ func createTestLogoData(width, height int) []byte {
 }
 
 func TestHandleClientLogoGet_EmptyIdentifier(t *testing.T) {
-	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	httpHelper := mocks_handlers.NewHttpHelper(t)
 	database := mocks_data.NewDatabase(t)
 
 	handler := HandleClientLogoGet(httpHelper, database)
@@ -54,7 +54,7 @@ func TestHandleClientLogoGet_EmptyIdentifier(t *testing.T) {
 }
 
 func TestHandleClientLogoGet_ClientNotFound(t *testing.T) {
-	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	httpHelper := mocks_handlers.NewHttpHelper(t)
 	database := mocks_data.NewDatabase(t)
 
 	handler := HandleClientLogoGet(httpHelper, database)
@@ -72,7 +72,7 @@ func TestHandleClientLogoGet_ClientNotFound(t *testing.T) {
 }
 
 func TestHandleClientLogoGet_NoLogo(t *testing.T) {
-	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	httpHelper := mocks_handlers.NewHttpHelper(t)
 	database := mocks_data.NewDatabase(t)
 
 	handler := HandleClientLogoGet(httpHelper, database)
@@ -93,7 +93,7 @@ func TestHandleClientLogoGet_NoLogo(t *testing.T) {
 }
 
 func TestHandleClientLogoGet_Success(t *testing.T) {
-	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	httpHelper := mocks_handlers.NewHttpHelper(t)
 	database := mocks_data.NewDatabase(t)
 
 	handler := HandleClientLogoGet(httpHelper, database)
@@ -127,7 +127,7 @@ func TestHandleClientLogoGet_Success(t *testing.T) {
 }
 
 func TestHandleClientLogoGet_ETagMatch_304(t *testing.T) {
-	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	httpHelper := mocks_handlers.NewHttpHelper(t)
 	database := mocks_data.NewDatabase(t)
 
 	handler := HandleClientLogoGet(httpHelper, database)
@@ -163,7 +163,7 @@ func TestHandleClientLogoGet_ETagMatch_304(t *testing.T) {
 }
 
 func TestHandleClientLogoGet_ETagMismatch_200(t *testing.T) {
-	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	httpHelper := mocks_handlers.NewHttpHelper(t)
 	database := mocks_data.NewDatabase(t)
 
 	handler := HandleClientLogoGet(httpHelper, database)
@@ -194,7 +194,7 @@ func TestHandleClientLogoGet_ETagMismatch_200(t *testing.T) {
 }
 
 func TestHandleClientLogoGet_WeakETagMatch_304(t *testing.T) {
-	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	httpHelper := mocks_handlers.NewHttpHelper(t)
 	database := mocks_data.NewDatabase(t)
 
 	handler := HandleClientLogoGet(httpHelper, database)
@@ -229,7 +229,7 @@ func TestHandleClientLogoGet_WeakETagMatch_304(t *testing.T) {
 }
 
 func TestHandleClientLogoGet_MultipleETags_304(t *testing.T) {
-	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	httpHelper := mocks_handlers.NewHttpHelper(t)
 	database := mocks_data.NewDatabase(t)
 
 	handler := HandleClientLogoGet(httpHelper, database)
@@ -264,7 +264,7 @@ func TestHandleClientLogoGet_MultipleETags_304(t *testing.T) {
 }
 
 func TestHandleClientLogoGet_StarETag_304(t *testing.T) {
-	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	httpHelper := mocks_handlers.NewHttpHelper(t)
 	database := mocks_data.NewDatabase(t)
 
 	handler := HandleClientLogoGet(httpHelper, database)
@@ -294,7 +294,7 @@ func TestHandleClientLogoGet_StarETag_304(t *testing.T) {
 }
 
 func TestHandleClientLogoGet_DatabaseError(t *testing.T) {
-	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	httpHelper := mocks_handlers.NewHttpHelper(t)
 	database := mocks_data.NewDatabase(t)
 
 	handler := HandleClientLogoGet(httpHelper, database)

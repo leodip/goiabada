@@ -7,8 +7,8 @@ import (
 	"testing"
 
 	"github.com/go-chi/chi/v5"
-	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -117,7 +117,7 @@ func TestHandleAPISettingsKeysGet_ReadsKeysUnderTheRequestsContext(t *testing.T)
 // that would destroy a signing key: a revocation retires every token that key signed.
 func TestHandleAPISettingsKeyDelete_MalformedIdReachesNoKeyPort(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	req := apiIdRequest("/api/v1/admin/settings/keys/not-a-number", "not-a-number")
 

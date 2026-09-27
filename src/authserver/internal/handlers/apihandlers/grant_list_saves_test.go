@@ -12,8 +12,8 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -54,7 +54,7 @@ type grantSave struct {
 	// addedEvent and deletedEvent.
 	consolidatedEvent string
 	ownerKey          string
-	handler           func(database *mocks_data.Database, auditLogger *mocks_audit.AuditLogger) http.HandlerFunc
+	handler           func(database *mocks_data.Database, auditLogger *mocks_handlers.AuditLogger) http.HandlerFunc
 	body              func(t *testing.T, wanted, expected []int64) string
 }
 
@@ -83,7 +83,7 @@ var grantSaves = []grantSave{
 		addedEvent:   audit.AuditAddedUserPermission,
 		deletedEvent: audit.AuditDeletedUserPermission,
 		ownerKey:     "userId",
-		handler: func(database *mocks_data.Database, auditLogger *mocks_audit.AuditLogger) http.HandlerFunc {
+		handler: func(database *mocks_data.Database, auditLogger *mocks_handlers.AuditLogger) http.HandlerFunc {
 			return HandleAPIUserPermissionsPut(database, auditLogger)
 		},
 		body: func(t *testing.T, wanted, expected []int64) string {
@@ -115,7 +115,7 @@ var grantSaves = []grantSave{
 		addedEvent:   audit.AuditAddedGroupPermission,
 		deletedEvent: audit.AuditDeletedGroupPermission,
 		ownerKey:     "groupId",
-		handler: func(database *mocks_data.Database, auditLogger *mocks_audit.AuditLogger) http.HandlerFunc {
+		handler: func(database *mocks_data.Database, auditLogger *mocks_handlers.AuditLogger) http.HandlerFunc {
 			return HandleAPIGroupPermissionsPut(database, auditLogger)
 		},
 		body: func(t *testing.T, wanted, expected []int64) string {
@@ -148,7 +148,7 @@ var grantSaves = []grantSave{
 		},
 		consolidatedEvent: audit.AuditUpdatedClientPermissions,
 		ownerKey:          "clientId",
-		handler: func(database *mocks_data.Database, auditLogger *mocks_audit.AuditLogger) http.HandlerFunc {
+		handler: func(database *mocks_data.Database, auditLogger *mocks_handlers.AuditLogger) http.HandlerFunc {
 			return HandleAPIClientPermissionsPut(database, auditLogger)
 		},
 		body: func(t *testing.T, wanted, expected []int64) string {
@@ -161,7 +161,7 @@ var grantSaves = []grantSave{
 }
 
 // serve runs the save on a PUT carrying body.
-func (s grantSave) serve(database *mocks_data.Database, auditLogger *mocks_audit.AuditLogger, body string) *httptest.ResponseRecorder {
+func (s grantSave) serve(database *mocks_data.Database, auditLogger *mocks_handlers.AuditLogger, body string) *httptest.ResponseRecorder {
 	r := httptest.NewRequest(http.MethodPut, s.path, strings.NewReader(body))
 	r = setChiURLParam(r, "id", "5")
 	rr := httptest.NewRecorder()
@@ -215,7 +215,7 @@ func (s grantSave) wantAudits(granted, revoked []int64) []auditRecord {
 
 // recordAudits accepts every Log call and collects them, checking each names the owner and the
 // caller, in order.
-func (s grantSave) recordAudits(t *testing.T, auditLogger *mocks_audit.AuditLogger, order *[]string) *[]auditRecord {
+func (s grantSave) recordAudits(t *testing.T, auditLogger *mocks_handlers.AuditLogger, order *[]string) *[]auditRecord {
 	records := &[]auditRecord{}
 	auditLogger.On("Log", mock.Anything, mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
@@ -243,7 +243,7 @@ func TestGrantListSaves_SaveTheExactPlanInOneTransaction(t *testing.T) {
 	for _, save := range grantSaves {
 		t.Run(save.name, func(t *testing.T) {
 			database := mocks_data.NewDatabase(t)
-			auditLogger := mocks_audit.NewAuditLogger(t)
+			auditLogger := mocks_handlers.NewAuditLogger(t)
 
 			save.expectOwner(database)
 			expectPermissionsExist(database, 4, 6)
@@ -293,7 +293,7 @@ func TestGrantListSaves_AStoredDuplicateIsRemovedWithItsOriginal(t *testing.T) {
 	for _, save := range grantSaves {
 		t.Run(save.name, func(t *testing.T) {
 			database := mocks_data.NewDatabase(t)
-			auditLogger := mocks_audit.NewAuditLogger(t)
+			auditLogger := mocks_handlers.NewAuditLogger(t)
 
 			save.expectOwner(database)
 			expectPermissionsExist(database, 4)
@@ -327,7 +327,7 @@ func TestGrantListSaves_AFailedWriteCommitsNothing(t *testing.T) {
 	for _, save := range grantSaves {
 		t.Run(save.name, func(t *testing.T) {
 			database := mocks_data.NewDatabase(t)
-			auditLogger := mocks_audit.NewAuditLogger(t)
+			auditLogger := mocks_handlers.NewAuditLogger(t)
 
 			save.expectOwner(database)
 			expectPermissionsExist(database, 6)
@@ -367,7 +367,7 @@ func TestGrantListSaves_AFailedLoadIsAnsweredAsALoadFailure(t *testing.T) {
 		for _, variant := range variants {
 			t.Run(save.name+"/"+variant.name, func(t *testing.T) {
 				database := mocks_data.NewDatabase(t)
-				auditLogger := mocks_audit.NewAuditLogger(t)
+				auditLogger := mocks_handlers.NewAuditLogger(t)
 
 				save.expectOwner(database)
 				stub := mocks_data.ExpectRunInTransaction(database, grantsTx)
@@ -395,7 +395,7 @@ func TestGrantListSaves_ARerunAttemptAnswersAndAuditsOnce(t *testing.T) {
 	for _, save := range grantSaves {
 		t.Run(save.name, func(t *testing.T) {
 			database := mocks_data.NewDatabase(t)
-			auditLogger := mocks_audit.NewAuditLogger(t)
+			auditLogger := mocks_handlers.NewAuditLogger(t)
 
 			save.expectOwner(database)
 			expectPermissionsExist(database, 6)
@@ -440,7 +440,7 @@ func TestGrantListSaves_AnExhaustedRetryIsOneFiveHundred(t *testing.T) {
 	for _, save := range grantSaves {
 		t.Run(save.name, func(t *testing.T) {
 			database := mocks_data.NewDatabase(t)
-			auditLogger := mocks_audit.NewAuditLogger(t)
+			auditLogger := mocks_handlers.NewAuditLogger(t)
 
 			save.expectOwner(database)
 			expectPermissionsExist(database, 6)
@@ -463,7 +463,7 @@ func TestGrantListSaves_AnOutdatedLoadedListIsRefused(t *testing.T) {
 	for _, save := range grantSaves {
 		t.Run(save.name, func(t *testing.T) {
 			database := mocks_data.NewDatabase(t)
-			auditLogger := mocks_audit.NewAuditLogger(t)
+			auditLogger := mocks_handlers.NewAuditLogger(t)
 
 			save.expectOwner(database)
 			expectPermissionsExist(database, 3, 4, 6)
@@ -500,7 +500,7 @@ func TestGrantListSaves_ALoadedListEqualAsASetProceeds(t *testing.T) {
 		for _, variant := range variants {
 			t.Run(save.name+"/"+variant.name, func(t *testing.T) {
 				database := mocks_data.NewDatabase(t)
-				auditLogger := mocks_audit.NewAuditLogger(t)
+				auditLogger := mocks_handlers.NewAuditLogger(t)
 
 				save.expectOwner(database)
 				expectPermissionsExist(database, 6)
@@ -562,7 +562,7 @@ func TestGrantListSaves_ARefusedSaveNeverOpensTheTransaction(t *testing.T) {
 		for _, variant := range variants {
 			t.Run(save.name+"/"+variant.name, func(t *testing.T) {
 				database := mocks_data.NewDatabase(t)
-				auditLogger := mocks_audit.NewAuditLogger(t)
+				auditLogger := mocks_handlers.NewAuditLogger(t)
 
 				save.expectOwner(database)
 				if variant.missing != 0 {
@@ -591,7 +591,7 @@ func TestGrantListSaves_ARepeatedIdIsGrantedOnce(t *testing.T) {
 	for _, save := range grantSaves {
 		t.Run(save.name, func(t *testing.T) {
 			database := mocks_data.NewDatabase(t)
-			auditLogger := mocks_audit.NewAuditLogger(t)
+			auditLogger := mocks_handlers.NewAuditLogger(t)
 
 			save.expectOwner(database)
 			expectPermissionsExist(database, 6)

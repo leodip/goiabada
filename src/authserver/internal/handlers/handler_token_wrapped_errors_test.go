@@ -18,12 +18,9 @@ import (
 
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	mocks_handlerhelpers "github.com/leodip/goiabada/authserver/internal/handlerhelpers/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
-	mocks_protocolvalidation "github.com/leodip/goiabada/authserver/internal/protocolvalidation/mocks"
 )
 
 // Seam 5 at the token endpoint, which routes on two of the four wire types and used to read only
@@ -38,17 +35,17 @@ import (
 // wrappedTokenRequest wires a token handler whose validator answers failure, and returns the parts
 // a case needs to drive one authorization_code request through it.
 func wrappedTokenRequest(t *testing.T, failure error) (
-	*mocks_handlerhelpers.HttpHelper, *mocks_audit.AuditLogger, *mocks_data.Database,
+	*mocks_handlers.HttpHelper, *mocks_handlers.AuditLogger, *mocks_data.Database,
 	*httptest.ResponseRecorder, *http.Request, http.Handler,
 ) {
 	t.Helper()
 
-	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	httpHelper := mocks_handlers.NewHttpHelper(t)
 	userSessionManager := mocks_handlers.NewUserSessionManager(t)
 	database := mocks_data.NewDatabase(t)
 	tokenIssuer := mocks_handlers.NewTokenIssuer(t)
-	tokenValidator := mocks_protocolvalidation.NewTokenValidator(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	tokenValidator := mocks_handlers.NewTokenValidator(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	handler := HandleTokenPost(httpHelper, userSessionManager, database, tokenIssuer, tokenValidator,
 		auditLogger, noCredentialFailures{})
@@ -65,7 +62,7 @@ func wrappedTokenRequest(t *testing.T, failure error) (
 }
 
 // expectJsonErrorWithDetail registers the one JsonError call and captures what it was handed.
-func expectJsonErrorWithDetail(httpHelper *mocks_handlerhelpers.HttpHelper) *error {
+func expectJsonErrorWithDetail(httpHelper *mocks_handlers.HttpHelper) *error {
 	var captured error
 	httpHelper.On("JsonError", mock.Anything, mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
@@ -168,7 +165,7 @@ func TestHandleTokenPost_WrappedAuthCodeReuseStillRevokes(t *testing.T) {
 func TestJsonErrorConformed_LogsStructuredOnTheGenericBranch(t *testing.T) {
 	logs := testutil.CaptureSlog(t)
 
-	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	httpHelper := mocks_handlers.NewHttpHelper(t)
 	req := httptest.NewRequest("POST", "/token", nil)
 	// The id goes on the context, where chi's RequestID middleware puts it in the running
 	// server, because that is the only place the writer can read it from now: the call site

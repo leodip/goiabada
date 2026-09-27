@@ -11,9 +11,8 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	mocks_handlerhelpers "github.com/leodip/goiabada/authserver/internal/handlerhelpers/mocks"
+	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	authmiddleware "github.com/leodip/goiabada/authserver/internal/middleware"
 
 	"github.com/leodip/goiabada/authserver/internal/config"
@@ -30,9 +29,9 @@ import (
 
 func TestHandleUserInfoGetPost(t *testing.T) {
 	t.Run("No validated token in the context", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		handler := HandleUserInfoGetPost(httpHelper, database, auditLogger)
 
@@ -49,9 +48,9 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 	})
 
 	t.Run("Could not type assert ContextKeyValidatedToken to oauth.JwtToken", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		handler := HandleUserInfoGetPost(httpHelper, database, auditLogger)
 
@@ -72,9 +71,9 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 	// Note: "User not authorized" test case is removed because authorization is now handled by middleware
 
 	t.Run("JwtToken without sub claim", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		handler := HandleUserInfoGetPost(httpHelper, database, auditLogger)
 
@@ -102,9 +101,9 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 	})
 
 	t.Run("GetUserBySubject returns nil", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		handler := HandleUserInfoGetPost(httpHelper, database, auditLogger)
 
@@ -132,9 +131,9 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 	})
 
 	t.Run("User is not enabled", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		handler := HandleUserInfoGetPost(httpHelper, database, auditLogger)
 
@@ -170,9 +169,9 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 	})
 
 	t.Run("Success path with all claims", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		handler := HandleUserInfoGetPost(httpHelper, database, auditLogger)
 
@@ -292,9 +291,9 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 	// endpoints answer differently. Neither tier reached this before: the success case above
 	// asks for every scope at once, where the two sides agree.
 	t.Run("userinfo at scope=openid email carries no updated_at", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		handler := HandleUserInfoGetPost(httpHelper, database, auditLogger)
 
@@ -345,9 +344,9 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 	// Divergence 1 stated the other way round: the gate is the profile scope, not "any scope
 	// but openid". Together with the case above this is userinfo's whole side of it.
 	t.Run("userinfo puts updated_at inside the profile arm", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		handler := HandleUserInfoGetPost(httpHelper, database, auditLogger)
 
@@ -394,9 +393,9 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 	// token. The success case above cannot show it, because every flag in its fixture is
 	// IncludeInIdToken: true.
 	t.Run("userinfo filters groups and attributes by IncludeInIdToken", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		handler := HandleUserInfoGetPost(httpHelper, database, auditLogger)
 
@@ -460,9 +459,9 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 	// NewTokenIssuer. The mapper takes it as an input rather than reading it back, so both
 	// callers keep the source they have.
 	t.Run("userinfo builds profile and picture from the configured base URL", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		authServerConfig := config.GetAuthServer()
 		originalBaseURL := authServerConfig.BaseURL
@@ -568,7 +567,7 @@ func TestHandleUserInfoGetPost_RefusalsAreInvalidTokenOnTheWire(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			database := mocks_data.NewDatabase(t)
-			auditLogger := mocks_audit.NewAuditLogger(t)
+			auditLogger := mocks_handlers.NewAuditLogger(t)
 
 			// templateFS is nil because JsonError renders no template; a 500 through the
 			// page writer would panic here, which is the fail-loud direction.

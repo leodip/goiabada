@@ -13,7 +13,6 @@ import (
 
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
-	mocks_handlerhelpers "github.com/leodip/goiabada/authserver/internal/handlerhelpers/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/core/testutil"
 )
@@ -33,7 +32,7 @@ import (
 func TestSlogConvention_AHandlerRecordCarriesTheRequestIdWithoutNamingIt(t *testing.T) {
 	logs := testutil.CaptureSlog(t)
 
-	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	httpHelper := mocks_handlers.NewHttpHelper(t)
 	authHelper := mocks_handlers.NewAuthHelper(t)
 	database := mocks_data.NewDatabase(t)
 

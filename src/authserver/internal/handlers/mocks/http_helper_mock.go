@@ -7,7 +7,7 @@
 
 //go:build !production
 
-package mocks_handlerhelpers
+package mocks_handlers
 
 import (
 	"bytes"
@@ -101,6 +101,63 @@ func (_c *HttpHelper_EncodeJson_Call) Return() *HttpHelper_EncodeJson_Call {
 
 func (_c *HttpHelper_EncodeJson_Call) RunAndReturn(run func(w http.ResponseWriter, r *http.Request, data interface{})) *HttpHelper_EncodeJson_Call {
 	_c.Run(run)
+	return _c
+}
+
+// GetFromUrlQueryOrFormPost provides a mock function for the type HttpHelper
+func (_mock *HttpHelper) GetFromUrlQueryOrFormPost(r *http.Request, key string) string {
+	ret := _mock.Called(r, key)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetFromUrlQueryOrFormPost")
+	}
+
+	var r0 string
+	if returnFunc, ok := ret.Get(0).(func(*http.Request, string) string); ok {
+		r0 = returnFunc(r, key)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+	return r0
+}
+
+// HttpHelper_GetFromUrlQueryOrFormPost_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetFromUrlQueryOrFormPost'
+type HttpHelper_GetFromUrlQueryOrFormPost_Call struct {
+	*mock.Call
+}
+
+// GetFromUrlQueryOrFormPost is a helper method to define mock.On call
+//   - r *http.Request
+//   - key string
+func (_e *HttpHelper_Expecter) GetFromUrlQueryOrFormPost(r any, key any) *HttpHelper_GetFromUrlQueryOrFormPost_Call {
+	return &HttpHelper_GetFromUrlQueryOrFormPost_Call{Call: _e.mock.On("GetFromUrlQueryOrFormPost", r, key)}
+}
+
+func (_c *HttpHelper_GetFromUrlQueryOrFormPost_Call) Run(run func(r *http.Request, key string)) *HttpHelper_GetFromUrlQueryOrFormPost_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *http.Request
+		if args[0] != nil {
+			arg0 = args[0].(*http.Request)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *HttpHelper_GetFromUrlQueryOrFormPost_Call) Return(s string) *HttpHelper_GetFromUrlQueryOrFormPost_Call {
+	_c.Call.Return(s)
+	return _c
+}
+
+func (_c *HttpHelper_GetFromUrlQueryOrFormPost_Call) RunAndReturn(run func(r *http.Request, key string) string) *HttpHelper_GetFromUrlQueryOrFormPost_Call {
+	_c.Call.Return(run)
 	return _c
 }
 
@@ -205,6 +262,72 @@ func (_c *HttpHelper_JsonError_Call) Return() *HttpHelper_JsonError_Call {
 
 func (_c *HttpHelper_JsonError_Call) RunAndReturn(run func(w http.ResponseWriter, r *http.Request, err error)) *HttpHelper_JsonError_Call {
 	_c.Run(run)
+	return _c
+}
+
+// LookupFromUrlQueryOrFormPost provides a mock function for the type HttpHelper
+func (_mock *HttpHelper) LookupFromUrlQueryOrFormPost(r *http.Request, key string) (string, bool) {
+	ret := _mock.Called(r, key)
+
+	if len(ret) == 0 {
+		panic("no return value specified for LookupFromUrlQueryOrFormPost")
+	}
+
+	var r0 string
+	var r1 bool
+	if returnFunc, ok := ret.Get(0).(func(*http.Request, string) (string, bool)); ok {
+		return returnFunc(r, key)
+	}
+	if returnFunc, ok := ret.Get(0).(func(*http.Request, string) string); ok {
+		r0 = returnFunc(r, key)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+	if returnFunc, ok := ret.Get(1).(func(*http.Request, string) bool); ok {
+		r1 = returnFunc(r, key)
+	} else {
+		r1 = ret.Get(1).(bool)
+	}
+	return r0, r1
+}
+
+// HttpHelper_LookupFromUrlQueryOrFormPost_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'LookupFromUrlQueryOrFormPost'
+type HttpHelper_LookupFromUrlQueryOrFormPost_Call struct {
+	*mock.Call
+}
+
+// LookupFromUrlQueryOrFormPost is a helper method to define mock.On call
+//   - r *http.Request
+//   - key string
+func (_e *HttpHelper_Expecter) LookupFromUrlQueryOrFormPost(r any, key any) *HttpHelper_LookupFromUrlQueryOrFormPost_Call {
+	return &HttpHelper_LookupFromUrlQueryOrFormPost_Call{Call: _e.mock.On("LookupFromUrlQueryOrFormPost", r, key)}
+}
+
+func (_c *HttpHelper_LookupFromUrlQueryOrFormPost_Call) Run(run func(r *http.Request, key string)) *HttpHelper_LookupFromUrlQueryOrFormPost_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *http.Request
+		if args[0] != nil {
+			arg0 = args[0].(*http.Request)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *HttpHelper_LookupFromUrlQueryOrFormPost_Call) Return(s string, b bool) *HttpHelper_LookupFromUrlQueryOrFormPost_Call {
+	_c.Call.Return(s, b)
+	return _c
+}
+
+func (_c *HttpHelper_LookupFromUrlQueryOrFormPost_Call) RunAndReturn(run func(r *http.Request, key string) (string, bool)) *HttpHelper_LookupFromUrlQueryOrFormPost_Call {
+	_c.Call.Return(run)
 	return _c
 }
 

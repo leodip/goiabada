@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"testing"
 
-	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -24,7 +24,7 @@ func TestHandleAPIClientPermissionsPut_ClientCredentialsOffIsRefusedBeforeTheTra
 	}
 
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), grantOwnerId).
 		Return(&models.Client{Id: grantOwnerId, ClientIdentifier: "a-web-app", ClientCredentialsEnabled: false}, nil).Once()
 

@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -139,7 +139,7 @@ func TestHandleAPIClientLogoGet_NoLogo(t *testing.T) {
 
 func TestHandleAPIClientLogoPost_NoClientId(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	handler := HandleAPIClientLogoPost(database, auditLogger)
 
@@ -158,7 +158,7 @@ func TestHandleAPIClientLogoPost_NoClientId(t *testing.T) {
 
 func TestHandleAPIClientLogoPost_InvalidClientId(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	handler := HandleAPIClientLogoPost(database, auditLogger)
 
@@ -178,7 +178,7 @@ func TestHandleAPIClientLogoPost_InvalidClientId(t *testing.T) {
 
 func TestHandleAPIClientLogoPost_ClientNotFound(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	handler := HandleAPIClientLogoPost(database, auditLogger)
 
@@ -204,7 +204,7 @@ func TestHandleAPIClientLogoPost_ClientNotFound(t *testing.T) {
 
 func TestHandleAPIClientLogoPost_InvalidImage(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	handler := HandleAPIClientLogoPost(database, auditLogger)
 
@@ -230,7 +230,7 @@ func TestHandleAPIClientLogoPost_InvalidImage(t *testing.T) {
 
 func TestHandleAPIClientLogoPost_CreateNew(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	handler := HandleAPIClientLogoPost(database, auditLogger)
 
@@ -270,7 +270,7 @@ func TestHandleAPIClientLogoPost_CreateNew(t *testing.T) {
 
 func TestHandleAPIClientLogoPost_UpdateExisting(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	handler := HandleAPIClientLogoPost(database, auditLogger)
 
@@ -319,7 +319,7 @@ func TestHandleAPIClientLogoPost_UpdateExisting(t *testing.T) {
 
 func TestHandleAPIClientLogoDelete_NoClientId(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	handler := HandleAPIClientLogoDelete(database, auditLogger)
 
@@ -338,7 +338,7 @@ func TestHandleAPIClientLogoDelete_NoClientId(t *testing.T) {
 
 func TestHandleAPIClientLogoDelete_InvalidClientId(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	handler := HandleAPIClientLogoDelete(database, auditLogger)
 
@@ -358,7 +358,7 @@ func TestHandleAPIClientLogoDelete_InvalidClientId(t *testing.T) {
 
 func TestHandleAPIClientLogoDelete_ClientNotFound(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	handler := HandleAPIClientLogoDelete(database, auditLogger)
 
@@ -382,7 +382,7 @@ func TestHandleAPIClientLogoDelete_ClientNotFound(t *testing.T) {
 
 func TestHandleAPIClientLogoDelete_Success(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	handler := HandleAPIClientLogoDelete(database, auditLogger)
 
@@ -416,7 +416,7 @@ func TestHandleAPIClientLogoDelete_Success(t *testing.T) {
 
 func TestHandleAPIClientLogoDelete_DatabaseError(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	handler := HandleAPIClientLogoDelete(database, auditLogger)
 
