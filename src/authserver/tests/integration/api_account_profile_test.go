@@ -1,6 +1,7 @@
 package integration
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -144,6 +145,39 @@ func TestAPIAccountProfilePut_ValidationErrors(t *testing.T) {
 	var err4 api.ErrorResponse
 	_ = json.NewDecoder(resp4.Body).Decode(&err4)
 	assert.Equal(t, "The locale is invalid.", err4.ErrorDescription)
+}
+
+// A zone and a country name are saved as a pair, and the pair must be a row of the timezones
+// table: Europe/Berlin is a real zone and Brazil a real country, but Europe/Berlin is not listed
+// under Brazil. The refusal must leave the stored profile as it was.
+func TestAPIAccountProfilePut_ZonePairNamingNoRow(t *testing.T) {
+	accessToken, u := getUserAccessTokenWithAccountScope(t)
+
+	u.ZoneInfoCountryName = "United States"
+	u.ZoneInfo = "America/New_York"
+	assert.NoError(t, database.UpdateUser(context.Background(), nil, u))
+
+	url := config.GetAuthServer().BaseURL + "/api/v1/account/profile"
+	resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateUserProfileRequest{
+		GivenName:           "Changed",
+		FamilyName:          "Bbb",
+		ZoneInfoCountryName: "Brazil",
+		ZoneInfo:            "Europe/Berlin",
+	})
+	defer func() { _ = resp.Body.Close() }()
+
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	var errResp api.ErrorResponse
+	assert.NoError(t, json.NewDecoder(resp.Body).Decode(&errResp))
+	assert.Equal(t, "The zone info is invalid.", errResp.ErrorDescription)
+
+	stored, err := database.GetUserById(context.Background(), nil, u.Id)
+	assert.NoError(t, err)
+	if assert.NotNil(t, stored) {
+		assert.Equal(t, "United States", stored.ZoneInfoCountryName)
+		assert.Equal(t, "America/New_York", stored.ZoneInfo)
+		assert.Equal(t, u.GivenName, stored.GivenName)
+	}
 }
 
 func TestAPIAccountProfilePut_UnauthorizedAndScope(t *testing.T) {

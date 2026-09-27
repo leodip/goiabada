@@ -752,38 +752,58 @@ func TestValidateProfile_DateOfBirthWellInThePastIsAccepted(t *testing.T) {
 // refresh could remove.
 // -----------------------------------------------------------------------------
 
+// The zone and its country name are validated as a pair: the pair must be a row of the
+// timezones table, or both must be empty. Europe/Berlin is listed under several countries
+// (Germany and Sweden among them), which is why a zone ID alone does not name a row.
 func TestValidateProfile_ZoneInfo(t *testing.T) {
 	validator := NewProfileValidator(mocks_data.NewDatabase(t))
 
-	t.Run("a zone from the catalog is accepted", func(t *testing.T) {
-		err := validator.ValidateProfile(context.Background(), &ValidateProfileInput{ZoneInfo: "America/Sao_Paulo"})
-
-		assert.NoError(t, err)
-	})
-
-	// Europe/Berlin is listed under several countries, so its lookup answers more than one row.
-	t.Run("a zone listed under several countries is accepted", func(t *testing.T) {
-		err := validator.ValidateProfile(context.Background(), &ValidateProfileInput{ZoneInfo: "Europe/Berlin"})
-
-		assert.NoError(t, err)
-	})
-
-	t.Run("empty is allowed", func(t *testing.T) {
-		err := validator.ValidateProfile(context.Background(), &ValidateProfileInput{ZoneInfo: ""})
-
-		assert.NoError(t, err)
-	})
-
-	t.Run("rejections", func(t *testing.T) {
-		for _, zone := range []string{"Not/AZone", "UTC+3", "america/sao_paulo", "Sao_Paulo"} {
-			t.Run(zone, func(t *testing.T) {
-				err := validator.ValidateProfile(context.Background(), &ValidateProfileInput{ZoneInfo: zone})
-
-				assertLocalizedError(t, err, i18n.ErrCodeProfileZoneInfoInvalid,
-					profileErrorMessages[i18n.ErrCodeProfileZoneInfoInvalid])
+	accepted := []struct {
+		name        string
+		countryName string
+		zone        string
+	}{
+		{"a matching pair", "Brazil", "America/Sao_Paulo"},
+		{"one of the countries sharing a zone", "Germany", "Europe/Berlin"},
+		{"another of the countries sharing a zone", "Sweden", "Europe/Berlin"},
+		{"both empty", "", ""},
+	}
+	for _, tc := range accepted {
+		t.Run("accepted/"+tc.name, func(t *testing.T) {
+			err := validator.ValidateProfile(context.Background(), &ValidateProfileInput{
+				ZoneInfoCountryName: tc.countryName,
+				ZoneInfo:            tc.zone,
 			})
-		}
-	})
+
+			assert.NoError(t, err)
+		})
+	}
+
+	refused := []struct {
+		name        string
+		countryName string
+		zone        string
+	}{
+		{"a real country with another country's zone", "Brazil", "Europe/Berlin"},
+		{"a zone with an empty name", "", "America/Sao_Paulo"},
+		{"a name with an empty zone", "Brazil", ""},
+		{"a name differing only in case", "brazil", "America/Sao_Paulo"},
+		{"an unknown zone", "Brazil", "Not/AZone"},
+		{"an offset that is not a zone", "Brazil", "UTC+3"},
+		{"a zone differing only in case", "Brazil", "america/sao_paulo"},
+		{"a partial zone", "Brazil", "Sao_Paulo"},
+	}
+	for _, tc := range refused {
+		t.Run("refused/"+tc.name, func(t *testing.T) {
+			err := validator.ValidateProfile(context.Background(), &ValidateProfileInput{
+				ZoneInfoCountryName: tc.countryName,
+				ZoneInfo:            tc.zone,
+			})
+
+			assertLocalizedError(t, err, i18n.ErrCodeProfileZoneInfoInvalid,
+				profileErrorMessages[i18n.ErrCodeProfileZoneInfoInvalid])
+		})
+	}
 }
 
 func TestValidateProfile_Locale(t *testing.T) {
@@ -840,18 +860,6 @@ func TestValidateProfile_FullyPopulatedValidProfile(t *testing.T) {
 		ZoneInfo:            "America/Sao_Paulo",
 		Locale:              "pt-BR",
 		Subject:             subject,
-	})
-
-	assert.NoError(t, err)
-}
-
-// ZoneInfoCountryName is carried on the input but is not validated, so any
-// value passes. Pinning that prevents a false assumption that it is checked.
-func TestValidateProfile_ZoneInfoCountryNameIsNotValidated(t *testing.T) {
-	validator := NewProfileValidator(mocks_data.NewDatabase(t))
-
-	err := validator.ValidateProfile(context.Background(), &ValidateProfileInput{
-		ZoneInfoCountryName: "Not A Real Country",
 	})
 
 	assert.NoError(t, err)
