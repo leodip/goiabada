@@ -3,7 +3,8 @@
 //
 // It is a package rather than a helper in one of the callers because the rule is shared across
 // packages and modules -- the admin console's apiclient, oauthclient and middleware reading the
-// auth server, and core/internal/pinnedfetch downloading the generators' source data -- and a
+// auth server, core/internal/pinnedfetch downloading the generators' source data, and the
+// timezones generator decompressing its tarball -- and a
 // rule with a sentinel per caller is a rule per caller. A reader arriving at any read site finds
 // the same function and the same error, and does not have to work out which convention that site
 // is in (#386 decision 4). It lives in core rather than the admin console so the generators read

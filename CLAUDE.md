@@ -23,7 +23,7 @@ repository root. It is enforced rather than descriptive: see **Architecture guar
 
 ### Core (`src/core/`)
 - `api/` - The admin API wire contract: request and response DTOs, declarations only, importing no persistence model. The model-to-DTO mapping belongs to the auth server, in `internal/apimapping` (#350)
-- `boundedread/` - The one rule for a capped response body: read one byte past the cap and refuse the overrun rather than decode a prefix. Eight callers: the admin console's seven reads from the auth server and `internal/pinnedfetch`, which the generators download through (#386, #432)
+- `boundedread/` - The one rule for a capped response body: read one byte past the cap and refuse the overrun rather than decode a prefix. Nine callers: the admin console's seven reads from the auth server, `internal/pinnedfetch`, which the generators download through, and the timezones generator's read of the decompressed tarball (#386, #432)
 - `cmd/` - `ownershipdump`, which regenerates `OWNERSHIP.md`'s table from the reference graph. It reads nothing but the source tree, so unlike `schemadump` it needs no container, and it refuses to invent a justification rather than fill the one cell a human owes (#385)
 - `constants/` - Permission identifiers, the version stamp, and the one session name both processes
   must agree on. No context key and no other session key: each process declares its own in
@@ -46,7 +46,7 @@ repository root. It is enforced rather than descriptive: see **Architecture guar
 - `sessionstore/` - The server-side session store and its codec, which is where an `AuthContext` lives; the cookie carries the key and nothing else (#266). `Options` is the six cookie attributes this repository sets rather than an `http.Cookie`, so a MaxAge below zero is the one way to say "delete this" and there is no `Expires` beside it to disagree (#269)
 - `stringutil/` - Random strings over `crypto/rand`, drawn by rejection sampling so an alphabet whose length does not divide 256 introduces no modulo bias
 - `testutil/` - The tree-wide guards every module's unit tier runs, and the `Reporter` / `RunGuard` pair they are written against. See **Guard shape** under Testing for what that shape is and what each guard owes
-- `timezones/` - The IANA zone table with its country, abbreviations and comments, generated from tzdata and stamped with the version it was generated from
+- `timezones/` - The IANA zone table a user's zone is picked from, one row per country and zone, generated from the tzdata release and SHA-256 its generator pins. Nothing loads it at startup; a test checks every zone loads (#49, #432)
 - `validators/` - Identifier validation and the angle-bracket predicate, the two rules both applications apply. `ValidateNoAngleBrackets`, which wraps the predicate in an error only the auth server emits, is in `authserver/internal/accountvalidation` beside the other account validators — email, password, profile, address, phone — and the authorize and token validators are in `authserver/internal/protocolvalidation` (#344, #385)
 
 ### Auth Server (`src/authserver/`)

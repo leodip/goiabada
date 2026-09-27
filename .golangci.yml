@@ -152,12 +152,9 @@ linters:
       # which left core/testutil with the same reads by path (#431).
       - path: core/internal/refgraph/
         linters: [gosec]
-      # The timezones generator and the dump tools run by hand in the dev
-      # container, read only the tree or a download named in their source, and
-      # write repository files, which are 0644 on purpose. No server binary
-      # contains them. The timezones generator is rebuilt by #432.
-      - path: core/timezones/generate/
-        linters: [gosec]
+      # The dump tools run by hand in the dev container, read the tree or the
+      # container's test databases, and write repository files, which are 0644
+      # on purpose. No server binary contains them.
       - path: core/cmd/
         linters: [gosec]
       - path: authserver/cmd/schemadump/

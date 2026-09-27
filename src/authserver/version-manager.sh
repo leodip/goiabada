@@ -767,7 +767,7 @@ cmd_deps() {
 # =============================================================================
 # Regenerate committed "// Code generated" data files from their upstream
 # sources. Each target has a `generate/` sub-package run with `go run .`:
-#   timezones -> src/core/timezones/timezones.go       (from IANA tzdata)
+#   timezones -> src/core/timezones/data_generated.go  (from IANA tzdata)
 #   countries -> src/core/countries/data_generated.go  (from datahub CSV)
 #
 # Usage: generate [timezones|countries|all]   (default: all)

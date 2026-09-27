@@ -761,6 +761,13 @@ func TestValidateProfile_ZoneInfo(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
+	// Europe/Berlin is listed under several countries, so its lookup answers more than one row.
+	t.Run("a zone listed under several countries is accepted", func(t *testing.T) {
+		err := validator.ValidateProfile(context.Background(), &ValidateProfileInput{ZoneInfo: "Europe/Berlin"})
+
+		assert.NoError(t, err)
+	})
+
 	t.Run("empty is allowed", func(t *testing.T) {
 		err := validator.ValidateProfile(context.Background(), &ValidateProfileInput{ZoneInfo: ""})
 

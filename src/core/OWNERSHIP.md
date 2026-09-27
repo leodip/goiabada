@@ -447,8 +447,9 @@ command itself and fails on a tree it changed.
 | `core/testutil` | `SkipWithoutIPv6Loopback` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
 | `core/testutil` | `SourceRoot` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
 | `core/testutil` | `WalkHTMLTemplates` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
-| `core/timezones` | `Get` | both-apps | — |
-| `core/timezones` | `Zone` | own-package | — |
+| `core/timezones` | `All` | contract | The list half of the time zone table whose lookup the auth server validates against. Moving it would put one zone table in two places. |
+| `core/timezones` | `ByZone` | contract | The lookup half of the time zone table whose list the admin console renders. Moving it would put one zone table in two places. |
+| `core/timezones` | `Zone` | contract | The row type both halves of the table share. |
 | `core/validators` | `ContainsAngleBrackets` | both-apps | — |
 | `core/validators` | `IdentifierValidator` | own-package | — |
 | `core/validators` | `NewIdentifierValidator` | both-apps | — |

@@ -9,7 +9,7 @@ import (
 	"strings"
 	"syscall"
 	"time"
-	_ "time/tzdata"
+	_ "time/tzdata" // embeds the zone database, so TZ resolves on a host without one (#49, #432)
 
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
@@ -22,7 +22,6 @@ import (
 	"github.com/leodip/goiabada/core/logging"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
-	"github.com/leodip/goiabada/core/timezones"
 )
 
 func main() {
@@ -94,10 +93,6 @@ func main() {
 		os.Exit(1)
 	}
 	slog.Info("current working directory", "directory", dir)
-
-	// trigger the load of timezones from OS (they will be cached)
-	_ = timezones.Get()
-	slog.Info("timezones loaded")
 
 	// Merge the overrides directory the configuration read from GOIABADA_I18N_OVERRIDES_DIR over
 	// the embedded message catalogs. Fail-fast: a malformed catalog is a config bug.
