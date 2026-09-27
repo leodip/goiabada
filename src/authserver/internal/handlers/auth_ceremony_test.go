@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"testing/fstest"
 
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/authserver/internal/audit"
@@ -15,7 +16,6 @@ import (
 	authmiddleware "github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/i18n"
-	"github.com/leodip/goiabada/core/mocks"
 	"github.com/leodip/goiabada/core/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -149,11 +149,9 @@ func TestRejectAuthStateMismatch(t *testing.T) {
 		rr := httptest.NewRecorder()
 		req := renderableRequest("/auth/pwd")
 
-		httpHelper := handlerhelpers.NewHttpHelper(&mocks.TestFS{
-			FileContents: map[string]string{
-				"layouts/no_menu_layout.html": `<html>{{template "content" .}}</html>`,
-				"auth_error.html":             `{{define "content"}}<h1>{{.title}}</h1><p>{{.error}}</p>{{end}}`,
-			},
+		httpHelper := handlerhelpers.NewHttpHelper(fstest.MapFS{
+			"layouts/no_menu_layout.html": {Data: []byte(`<html>{{template "content" .}}</html>`)},
+			"auth_error.html":             {Data: []byte(`{{define "content"}}<h1>{{.title}}</h1><p>{{.error}}</p>{{end}}`)},
 		}, authmiddleware.SettingsReader{})
 
 		rejectAuthStateMismatch(httpHelper, rr, req,
@@ -174,11 +172,9 @@ func TestRejectAuthStateMismatch(t *testing.T) {
 		rr := httptest.NewRecorder()
 		req := renderableRequest("/auth/pwd")
 
-		httpHelper := handlerhelpers.NewHttpHelper(&mocks.TestFS{
-			FileContents: map[string]string{
-				"layouts/no_menu_layout.html": `<html>{{template "content" .}}</html>`,
-				"auth_error.html":             `{{define "content"}}{{.title}}{{end}}`,
-			},
+		httpHelper := handlerhelpers.NewHttpHelper(fstest.MapFS{
+			"layouts/no_menu_layout.html": {Data: []byte(`<html>{{template "content" .}}</html>`)},
+			"auth_error.html":             {Data: []byte(`{{define "content"}}{{.title}}{{end}}`)},
 		}, authmiddleware.SettingsReader{})
 
 		rejectAuthStateMismatch(httpHelper, rr, req,

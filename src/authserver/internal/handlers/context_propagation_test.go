@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"testing/fstest"
 
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
@@ -14,7 +15,6 @@ import (
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
-	mocks_test "github.com/leodip/goiabada/core/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -112,7 +112,7 @@ func issueRequestCarryingId(t *testing.T, sessionIdentifier string) *http.Reques
 func TestHandleIssueGet_IssuesUnderTheRequestsContext(t *testing.T) {
 	httpHelper := mocks_handlers.NewHttpHelper(t)
 	authHelper := mocks_handlers.NewAuthHelper(t)
-	templateFS := &mocks_test.TestFS{}
+	templateFS := fstest.MapFS{}
 	codeIssuer := mocks_handlers.NewCodeIssuer(t)
 	tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 	database := mocks_data.NewDatabase(t)
@@ -160,7 +160,7 @@ func TestHandleIssueGet_IssuesUnderTheRequestsContext(t *testing.T) {
 func TestHandleIssueGet_UnusableSessionReachesNoIssuer(t *testing.T) {
 	httpHelper := mocks_handlers.NewHttpHelper(t)
 	authHelper := mocks_handlers.NewAuthHelper(t)
-	templateFS := &mocks_test.TestFS{}
+	templateFS := fstest.MapFS{}
 	codeIssuer := mocks_handlers.NewCodeIssuer(t)
 	tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 	database := mocks_data.NewDatabase(t)

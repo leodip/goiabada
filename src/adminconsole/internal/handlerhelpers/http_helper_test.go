@@ -1,14 +1,16 @@
 package handlerhelpers
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
+	"io/fs"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
-
-	"errors"
+	"testing/fstest"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -16,7 +18,6 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/customerrors"
-	"github.com/leodip/goiabada/core/mocks"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -45,11 +46,9 @@ func assertNoStore(t *testing.T, header http.Header) {
 }
 
 func TestInternalServerError(t *testing.T) {
-	templateFS := &mocks.TestFS{
-		FileContents: map[string]string{
-			"layouts/no_menu_layout.html": "<html>{{template \"content\" .}}</html>",
-			"error.html":                  "{{define \"content\"}}Error: {{.requestId}}{{end}}",
-		},
+	templateFS := fstest.MapFS{
+		"layouts/no_menu_layout.html": {Data: []byte("<html>{{template \"content\" .}}</html>")},
+		"error.html":                  {Data: []byte("{{define \"content\"}}Error: {{.requestId}}{{end}}")},
 	}
 	httpHelper := NewHttpHelper(templateFS, stubSettingsReader{})
 
@@ -92,11 +91,9 @@ func TestInternalServerError(t *testing.T) {
 // NotFound owns the answer to a stale or malformed URL, so this row owns the status, the page and
 // the headers it carries; its silence is pinned in http_helper_logging_test.go (#279 decision 11).
 func TestNotFound(t *testing.T) {
-	httpHelper := NewHttpHelper(&mocks.TestFS{
-		FileContents: map[string]string{
-			"layouts/no_menu_layout.html": "<html>{{template \"content\" .}}</html>",
-			"not_found.html":              "{{define \"content\"}}Not found{{end}}",
-		},
+	httpHelper := NewHttpHelper(fstest.MapFS{
+		"layouts/no_menu_layout.html": {Data: []byte("<html>{{template \"content\" .}}</html>")},
+		"not_found.html":              {Data: []byte("{{define \"content\"}}Not found{{end}}")},
 	}, stubSettingsReader{})
 
 	r := chi.NewRouter()
@@ -127,11 +124,9 @@ func TestNotFound(t *testing.T) {
 // 404. The template FS here has the layout the error page needs and no not_found.html at all, so
 // ParseFS fails and the fallback is exercised for its own reason rather than by a stub.
 func TestNotFound_RenderFailureAnswers500(t *testing.T) {
-	httpHelper := NewHttpHelper(&mocks.TestFS{
-		FileContents: map[string]string{
-			"layouts/no_menu_layout.html": "<html>{{template \"content\" .}}</html>",
-			"error.html":                  "{{define \"content\"}}Error: {{.requestId}}{{end}}",
-		},
+	httpHelper := NewHttpHelper(fstest.MapFS{
+		"layouts/no_menu_layout.html": {Data: []byte("<html>{{template \"content\" .}}</html>")},
+		"error.html":                  {Data: []byte("{{define \"content\"}}Error: {{.requestId}}{{end}}")},
 	}, stubSettingsReader{})
 
 	r := chi.NewRouter()
@@ -151,11 +146,9 @@ func TestNotFound_RenderFailureAnswers500(t *testing.T) {
 }
 
 func TestRenderTemplate(t *testing.T) {
-	templateFS := &mocks.TestFS{
-		FileContents: map[string]string{
-			"layouts/layout.html": "<html>{{template \"content\" .}}</html>",
-			"page.html":           "{{define \"content\"}}Hello, {{.Name}}! Status: {{._httpStatus}}{{end}}",
-		},
+	templateFS := fstest.MapFS{
+		"layouts/layout.html": {Data: []byte("<html>{{template \"content\" .}}</html>")},
+		"page.html":           {Data: []byte("{{define \"content\"}}Hello, {{.Name}}! Status: {{._httpStatus}}{{end}}")},
 	}
 	httpHelper := NewHttpHelper(templateFS, stubSettingsReader{})
 
@@ -208,7 +201,7 @@ func TestRenderTemplate(t *testing.T) {
 	// returned successfully, and moving it above the error return would put a directive on a
 	// response this function never wrote a body for (#247).
 	t.Run("A failed render writes no headers at all", func(t *testing.T) {
-		emptyFS := &mocks.TestFS{FileContents: map[string]string{}}
+		emptyFS := fstest.MapFS{}
 		failing := NewHttpHelper(emptyFS, stubSettingsReader{})
 
 		req := httptest.NewRequest("GET", "/", nil)
@@ -228,11 +221,9 @@ func TestRenderTemplate(t *testing.T) {
 }
 
 func TestRenderTemplateToBuffer(t *testing.T) {
-	templateFS := &mocks.TestFS{
-		FileContents: map[string]string{
-			"layouts/layout.html": "<html>{{template \"content\" .}}</html>",
-			"page.html":           "{{define \"content\"}}Hello, {{if .loggedInUser}}{{.loggedInUser.Username}}{{else}}Guest{{end}}!{{end}}",
-		},
+	templateFS := fstest.MapFS{
+		"layouts/layout.html": {Data: []byte("<html>{{template \"content\" .}}</html>")},
+		"page.html":           {Data: []byte("{{define \"content\"}}Hello, {{if .loggedInUser}}{{.loggedInUser.Username}}{{else}}Guest{{end}}!{{end}}")},
 	}
 	httpHelper := NewHttpHelper(templateFS, stubSettingsReader{})
 
@@ -305,10 +296,10 @@ func TestRenderTemplateToBuffer(t *testing.T) {
 	})
 
 	t.Run("Layout settings reach the template", func(t *testing.T) {
-		layoutFS := &mocks.TestFS{FileContents: map[string]string{
-			"layouts/layout.html": "<html>{{template \"content\" .}}</html>",
-			"page.html":           "{{define \"content\"}}{{.appName}}|{{.uiTheme}}|{{.smtpEnabled}}{{end}}",
-		}}
+		layoutFS := fstest.MapFS{
+			"layouts/layout.html": {Data: []byte("<html>{{template \"content\" .}}</html>")},
+			"page.html":           {Data: []byte("{{define \"content\"}}{{.appName}}|{{.uiTheme}}|{{.smtpEnabled}}{{end}}")},
+		}
 		httpHelper := NewHttpHelper(layoutFS, stubSettingsReader{settings: LayoutSettings{
 			AppName:     "sentinel app",
 			UITheme:     "sentinel theme",
@@ -332,8 +323,52 @@ func TestRenderTemplateToBuffer(t *testing.T) {
 	})
 }
 
+// Every file under partials/ is parsed beside the layout and the page, which is how a page calls a
+// fragment it does not define. The second case is the first one's tree without the fragment, so a
+// pass there cannot come from anything but the partials branch (#431).
+func TestRenderTemplateToBuffer_Partials(t *testing.T) {
+	layout := []byte(`<html>{{template "content" .}}</html>`)
+	page := []byte(`{{define "content"}}[{{template "badge" .}}]{{end}}`)
+	render := func(templateFS fstest.MapFS) (*bytes.Buffer, error) {
+		return NewHttpHelper(templateFS, stubSettingsReader{}).RenderTemplateToBuffer(
+			httptest.NewRequest("GET", "/", nil), "layouts/layout.html", "page.html", map[string]interface{}{})
+	}
+
+	t.Run("A template defined under partials is parsed with the page", func(t *testing.T) {
+		buf, err := render(fstest.MapFS{
+			"layouts/layout.html": {Data: layout},
+			"page.html":           {Data: page},
+			"partials/badge.html": {Data: []byte(`{{define "badge"}}the badge{{end}}`)},
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, "<html>[the badge]</html>", buf.String())
+	})
+
+	t.Run("Without the partial the page does not render", func(t *testing.T) {
+		_, err := render(fstest.MapFS{
+			"layouts/layout.html": {Data: layout},
+			"page.html":           {Data: page},
+		})
+
+		require.Error(t, err)
+		assert.ErrorContains(t, err, `no such template "badge"`)
+	})
+
+	t.Run("An empty partials directory renders as if absent", func(t *testing.T) {
+		buf, err := render(fstest.MapFS{
+			"layouts/layout.html": {Data: layout},
+			"page.html":           {Data: []byte(`{{define "content"}}no fragments{{end}}`)},
+			"partials":            {Mode: fs.ModeDir},
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, "<html>no fragments</html>", buf.String())
+	})
+}
+
 func TestJsonError(t *testing.T) {
-	templateFS := &mocks.TestFS{}
+	templateFS := fstest.MapFS{}
 	httpHelper := NewHttpHelper(templateFS, stubSettingsReader{})
 
 	req := httptest.NewRequest("GET", "/", nil)
@@ -358,7 +393,7 @@ func TestJsonError(t *testing.T) {
 }
 
 func TestEncodeJson(t *testing.T) {
-	templateFS := &mocks.TestFS{}
+	templateFS := fstest.MapFS{}
 	httpHelper := NewHttpHelper(templateFS, stubSettingsReader{})
 
 	req := httptest.NewRequest("GET", "/", nil)

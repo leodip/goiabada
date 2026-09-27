@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"testing/fstest"
 	"time"
 
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
@@ -21,7 +22,6 @@ import (
 
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
-	mocks_test "github.com/leodip/goiabada/core/mocks"
 )
 
 func TestHandleAuthCompletedGet(t *testing.T) {
@@ -30,7 +30,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
-		templateFS := &mocks_test.TestFS{}
+		templateFS := fstest.MapFS{}
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
@@ -171,7 +171,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
-		templateFS := &mocks_test.TestFS{}
+		templateFS := fstest.MapFS{}
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
@@ -358,7 +358,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
-		templateFS := &mocks_test.TestFS{}
+		templateFS := fstest.MapFS{}
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
@@ -462,7 +462,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
-		templateFS := &mocks_test.TestFS{}
+		templateFS := fstest.MapFS{}
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
@@ -570,7 +570,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
-		templateFS := &mocks_test.TestFS{}
+		templateFS := fstest.MapFS{}
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
@@ -679,7 +679,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
-		templateFS := &mocks_test.TestFS{}
+		templateFS := fstest.MapFS{}
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
@@ -787,7 +787,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
-		templateFS := &mocks_test.TestFS{}
+		templateFS := fstest.MapFS{}
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
@@ -893,7 +893,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
-		templateFS := &mocks_test.TestFS{}
+		templateFS := fstest.MapFS{}
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
@@ -981,7 +981,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
-		templateFS := &mocks_test.TestFS{}
+		templateFS := fstest.MapFS{}
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
@@ -1089,7 +1089,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
-		templateFS := &mocks_test.TestFS{}
+		templateFS := fstest.MapFS{}
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
@@ -1186,7 +1186,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
-		templateFS := &mocks_test.TestFS{}
+		templateFS := fstest.MapFS{}
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
@@ -1278,7 +1278,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
-		templateFS := &mocks_test.TestFS{}
+		templateFS := fstest.MapFS{}
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
@@ -1365,7 +1365,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
-		templateFS := &mocks_test.TestFS{}
+		templateFS := fstest.MapFS{}
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
@@ -1451,7 +1451,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
-		templateFS := &mocks_test.TestFS{}
+		templateFS := fstest.MapFS{}
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
@@ -1481,7 +1481,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
-		templateFS := &mocks_test.TestFS{}
+		templateFS := fstest.MapFS{}
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
@@ -1508,7 +1508,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
-		templateFS := &mocks_test.TestFS{}
+		templateFS := fstest.MapFS{}
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
@@ -1548,7 +1548,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
-		templateFS := &mocks_test.TestFS{}
+		templateFS := fstest.MapFS{}
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
@@ -1649,7 +1649,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
-		templateFS := &mocks_test.TestFS{}
+		templateFS := fstest.MapFS{}
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
@@ -1741,10 +1741,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		// redirToClientWithError returns "unable to parse template" instead of committing.
 		// form_post is the only response mode whose arm can fail after the redirect URI has
 		// been validated, so it is how this branch is reached at all.
-		templateFS := &mocks_test.TestFS{
-			FileContents: map[string]string{
-				"form_post.html": `<form action="{{ .redirectURI`,
-			},
+		templateFS := fstest.MapFS{
+			"form_post.html": {Data: []byte(`<form action="{{ .redirectURI`)},
 		}
 
 		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
@@ -1831,10 +1829,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		templateFS := &mocks_test.TestFS{
-			FileContents: map[string]string{
-				"form_post.html": `<form action="{{ .redirectURI`,
-			},
+		templateFS := fstest.MapFS{
+			"form_post.html": {Data: []byte(`<form action="{{ .redirectURI`)},
 		}
 
 		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
@@ -1916,7 +1912,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
-		templateFS := &mocks_test.TestFS{}
+		templateFS := fstest.MapFS{}
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
@@ -2015,7 +2011,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
-		templateFS := &mocks_test.TestFS{}
+		templateFS := fstest.MapFS{}
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
@@ -2100,10 +2096,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		templateFS := &mocks_test.TestFS{
-			FileContents: map[string]string{
-				"form_post.html": `<form action="{{ .redirectURI`,
-			},
+		templateFS := fstest.MapFS{
+			"form_post.html": {Data: []byte(`<form action="{{ .redirectURI`)},
 		}
 
 		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
@@ -2185,10 +2179,8 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		templateFS := &mocks_test.TestFS{
-			FileContents: map[string]string{
-				"form_post.html": `<form action="{{ .redirectURI`,
-			},
+		templateFS := fstest.MapFS{
+			"form_post.html": {Data: []byte(`<form action="{{ .redirectURI`)},
 		}
 
 		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
@@ -2270,7 +2262,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
-		templateFS := &mocks_test.TestFS{}
+		templateFS := fstest.MapFS{}
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
@@ -2359,7 +2351,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
-		templateFS := &mocks_test.TestFS{}
+		templateFS := fstest.MapFS{}
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
@@ -2460,7 +2452,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
-		templateFS := &mocks_test.TestFS{}
+		templateFS := fstest.MapFS{}
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
@@ -2528,7 +2520,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		database := mocks_data.NewDatabase(t)
-		templateFS := &mocks_test.TestFS{}
+		templateFS := fstest.MapFS{}
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 

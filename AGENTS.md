@@ -39,7 +39,6 @@ repository root. It is enforced rather than descriptive: see **Architecture guar
 - `locales/` - The locale identifiers and display names a user picks from. A shared reference vocabulary beside `countries/`, `timezones/` and `gender/`
 - `logging/` - The one `slog` handler, installed by both servers at startup, and the field helpers pattern 8 below is written about. Nothing else calls `slog.SetDefault`, `New`, `Default` or `With`, and a guard says so (#320)
 - `middleware/` - The request middleware both processes mount: real IP, CSRF, security headers, the request logger and the cookie reset. Each application's own middleware - session, JWT, rate limiting - is in its `internal/middleware`
-- `mocks/` - `TestFS`, the in-memory `fs.FS` both processes' template tests read from. Hand-written, which is why keying the generated-mock guard on mockery's own `DO NOT EDIT` marker rather than on the filename leaves it alone (#338)
 - `oauth/` - The OAuth/OIDC values both processes share: token, JWT and JWKS types, and the PKCE challenge helper. The admin console's client of the protocol — JWKS parser, code exchanger, authorize redirect — is `adminconsole/internal/oauthclient`; `response_type` parsing is the provider's and is in `authserver/internal/protocolvalidation` (#385)
 - `sessionstore/` - The server-side session store and its codec, which is where an `AuthContext` lives; the cookie carries the key and nothing else (#266). `Options` is the six cookie attributes this repository sets rather than an `http.Cookie`, so a MaxAge below zero is the one way to say "delete this" and there is no `Expires` beside it to disagree (#269)
 - `stringutil/` - Random strings over `crypto/rand`, drawn by rejection sampling so an alphabet whose length does not divide 256 introduces no modulo bias
@@ -473,9 +472,8 @@ module's unit tier runs `TestGeneratedMocksArePinned`, which holds the pin, the 
 generated file to each other through `core/testutil.AssertGeneratedMocksArePinned` and needs no
 generator; the lint tier and CI's Lint job run the generator itself and fail on a tree it changed,
 which is the only thing that catches an interface newly named in a config. Keying on mockery's own
-`Code generated ... DO NOT EDIT` marker rather than on the filename is what leaves
-`core/mocks/test_fs_mock.go`, which is hand-written, and the countries and timezones tables, which
-have generators of their own, out of it (#338).
+`Code generated ... DO NOT EDIT` marker rather than on the filename is what leaves the countries
+and timezones tables, which have generators of their own, out of it (#338).
 
 **Lint tier**: `./run-tests.sh --type lint` runs golangci-lint and `unparam -exported` over the
 four modules with the commands CI's Lint job uses, then regenerates the Tailwind CSS and the mocks

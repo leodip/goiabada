@@ -9,12 +9,12 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/errs"
-	"github.com/leodip/goiabada/core/mocks"
 	"github.com/leodip/goiabada/core/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -73,21 +73,17 @@ func errorRouter(handle http.HandlerFunc) *chi.Mux {
 }
 
 func errorPageHelper() *HttpHelper {
-	return NewHttpHelper(&mocks.TestFS{
-		FileContents: map[string]string{
-			"layouts/no_menu_layout.html": "<html>{{template \"content\" .}}</html>",
-			"error.html":                  "{{define \"content\"}}Error: {{.requestId}}{{end}}",
-		},
+	return NewHttpHelper(fstest.MapFS{
+		"layouts/no_menu_layout.html": {Data: []byte("<html>{{template \"content\" .}}</html>")},
+		"error.html":                  {Data: []byte("{{define \"content\"}}Error: {{.requestId}}{{end}}")},
 	}, stubSettingsReader{})
 }
 
 func notFoundPageHelper() *HttpHelper {
-	return NewHttpHelper(&mocks.TestFS{
-		FileContents: map[string]string{
-			"layouts/no_menu_layout.html": "<html>{{template \"content\" .}}</html>",
-			"not_found.html":              "{{define \"content\"}}Not found{{end}}",
-			"error.html":                  "{{define \"content\"}}Error: {{.requestId}}{{end}}",
-		},
+	return NewHttpHelper(fstest.MapFS{
+		"layouts/no_menu_layout.html": {Data: []byte("<html>{{template \"content\" .}}</html>")},
+		"not_found.html":              {Data: []byte("{{define \"content\"}}Not found{{end}}")},
+		"error.html":                  {Data: []byte("{{define \"content\"}}Error: {{.requestId}}{{end}}")},
 	}, stubSettingsReader{})
 }
 
@@ -236,7 +232,7 @@ func TestInternalServerError_KeepsTheOriginsSingleStack(t *testing.T) {
 
 func TestJsonError_LogsOnceOnTheGenericBranch(t *testing.T) {
 	logs := testutil.CaptureSlog(t)
-	httpHelper := NewHttpHelper(&mocks.TestFS{}, stubSettingsReader{})
+	httpHelper := NewHttpHelper(fstest.MapFS{}, stubSettingsReader{})
 
 	router := errorRouter(func(w http.ResponseWriter, r *http.Request) {
 		httpHelper.JsonError(w, r, errs.New("not a wire error"))
@@ -274,7 +270,7 @@ func TestJsonError_LogsOnceOnTheGenericBranch(t *testing.T) {
 // status and the code and never looked at the record (#279 decisions 9 and 12).
 func TestJsonError_ADetailWithNoStatusIsA500ThatStillLogsAndCorrelates(t *testing.T) {
 	logs := testutil.CaptureSlog(t)
-	httpHelper := NewHttpHelper(&mocks.TestFS{}, stubSettingsReader{})
+	httpHelper := NewHttpHelper(fstest.MapFS{}, stubSettingsReader{})
 
 	router := errorRouter(func(w http.ResponseWriter, r *http.Request) {
 		httpHelper.JsonError(w, r, customerrors.NewErrorDetail("server_error", "The operation failed."))
@@ -314,7 +310,7 @@ func TestJsonError_ADetailWithNoStatusIsA500ThatStillLogsAndCorrelates(t *testin
 // row exists to catch.
 func TestJsonError_AnExplicit500DetailIsNotLoggedTwice(t *testing.T) {
 	logs := testutil.CaptureSlog(t)
-	httpHelper := NewHttpHelper(&mocks.TestFS{}, stubSettingsReader{})
+	httpHelper := NewHttpHelper(fstest.MapFS{}, stubSettingsReader{})
 
 	detail := customerrors.NewErrorDetailWithHttpStatusCode("server_error",
 		"An unexpected server error has occurred. Request Id: already-in-the-sentence",
@@ -342,7 +338,7 @@ func TestJsonError_AnExplicit500DetailIsNotLoggedTwice(t *testing.T) {
 // of to the client.
 func TestJsonError_ReadsAWrappedErrorDetail(t *testing.T) {
 	logs := testutil.CaptureSlog(t)
-	httpHelper := NewHttpHelper(&mocks.TestFS{}, stubSettingsReader{})
+	httpHelper := NewHttpHelper(fstest.MapFS{}, stubSettingsReader{})
 
 	detail := customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
 		"The redirect URI is not registered.", http.StatusBadRequest)
@@ -369,7 +365,7 @@ func TestJsonError_ReadsAWrappedErrorDetail(t *testing.T) {
 // RFC 6749 section 5.2 a bare assertion would have dropped in silence: the status would have become
 // 500 and the header simply would not be written.
 func TestJsonError_ReadsAWrappedErrorDetailsWWWAuthenticate(t *testing.T) {
-	httpHelper := NewHttpHelper(&mocks.TestFS{}, stubSettingsReader{})
+	httpHelper := NewHttpHelper(fstest.MapFS{}, stubSettingsReader{})
 
 	detail := customerrors.NewErrorDetailWithHttpStatusCode("invalid_token",
 		"The access token is invalid.", http.StatusUnauthorized).

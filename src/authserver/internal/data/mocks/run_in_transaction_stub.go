@@ -18,9 +18,7 @@ import (
 // import this one. The alternative placements each cost an edge that did not exist: a package
 // under internal/testutil importing internal/data/mocks, or a non-test file in a package that
 // ships. Nothing is generated here, so the mockery pin guard leaves it alone: that guard keys
-// on mockery's own "Code generated ... DO NOT EDIT" marker rather than on a filename, which is
-// what also leaves core/mocks/test_fs_mock.go, hand-written under the same kind of name, out
-// of it (#338).
+// on mockery's own "Code generated ... DO NOT EDIT" marker rather than on a filename (#338).
 //
 // The build tag is the generated mock's, for the generated mock's reason: production builds
 // pass -tags=production and testify is not in them, so a file naming *Database has to be

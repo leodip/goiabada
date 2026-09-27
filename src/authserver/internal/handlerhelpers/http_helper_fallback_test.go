@@ -7,10 +7,10 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
-	"github.com/leodip/goiabada/core/mocks"
 	"github.com/leodip/goiabada/core/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -27,11 +27,9 @@ import (
 // defines, which html/template reports only when it runs. That is the one way to reach the last
 // resort, because RenderTemplate buffers the page before it touches the response.
 func failingErrorPageHelper() *HttpHelper {
-	return NewHttpHelper(&mocks.TestFS{
-		FileContents: map[string]string{
-			"layouts/no_menu_layout.html": "<html>{{template \"content\" .}}</html>",
-			"error.html":                  "{{define \"content\"}}{{template \"never_defined\" .}}{{end}}",
-		},
+	return NewHttpHelper(fstest.MapFS{
+		"layouts/no_menu_layout.html": {Data: []byte("<html>{{template \"content\" .}}</html>")},
+		"error.html":                  {Data: []byte("{{define \"content\"}}{{template \"never_defined\" .}}{{end}}")},
 	}, stubSettingsReader{})
 }
 
