@@ -10,3 +10,8 @@
 # LF everywhere, decided here rather than left to each machine's git config, so the working
 # tree is the same bytes on every checkout of this repo.
 * text=auto eol=lf
+
+# The setup wizard's goldens are its generators' output byte for byte, and the hostile env file
+# carries a carriage return inside a quoted value on purpose, which normalising would strip. The
+# generators write LF, so storing these unconverted keeps them LF too (#430).
+src/cmd/goiabada-setup/testdata/*.golden -text
