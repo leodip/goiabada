@@ -29,7 +29,6 @@ import (
 // zone ID, and optional English comment (see RefCountry/RefPhoneCountry/RefTimezone).
 func loadOverrideCatalogs(dir string) ([]catalogFile, error) {
 	catalogsDir := filepath.Join(dir, "catalogs")
-	//nolint:gosec // G703: dir is the overrides directory the operator configured, which main passes once at startup
 	info, err := os.Stat(catalogsDir)
 	if err != nil {
 		if os.IsNotExist(err) {
