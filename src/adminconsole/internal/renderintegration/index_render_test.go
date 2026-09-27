@@ -1,4 +1,4 @@
-package rendertest
+package renderintegration
 
 import (
 	"testing"

@@ -43,9 +43,9 @@ func (c *accountSessionsApiClient) DeleteAccountSession(_ context.Context, acces
 }
 
 // The Device cell's tooltip is the raw header, and this handler is the hop that has to put it on
-// the view type. rendertest proves the template renders a UserAgent it is handed; it is handed a
-// bind the test wrote, so deleting the copy here would leave that case green with every tooltip
-// empty (#281 decision 6).
+// the view type. renderintegration proves the template renders a UserAgent it is handed; it is
+// handed a bind the test wrote, so deleting the copy here would leave that case green with every
+// tooltip empty (#281 decision 6).
 func TestHandleAccountSessionsGet_BindsTheRawUserAgent(t *testing.T) {
 	const header = `Mozilla/5.0 (X11; Linux x86_64) Chrome/120.0.0.0`
 
@@ -80,8 +80,9 @@ func TestHandleAccountSessionsGet_BindsTheRawUserAgent(t *testing.T) {
 }
 
 // The page formats the two timestamps itself now, which it can only do if the handler hands it the
-// instants. rendertest renders a bind the test wrote, so without this case a handler that dropped
-// the copy would leave both cells empty on a live page with every render case still green (#373).
+// instants. renderintegration renders a bind the test wrote, so without this case a handler that
+// dropped the copy would leave both cells empty on a live page with every render case still green
+// (#373).
 func TestHandleAccountSessionsGet_BindsTheSessionInstants(t *testing.T) {
 	started := time.Date(2026, 9, 14, 21, 3, 0, 0, time.UTC)
 	lastAccessed := time.Date(2026, 9, 17, 8, 45, 0, 0, time.UTC)

@@ -120,7 +120,7 @@ func TestInstantOf(t *testing.T) {
 	}
 	// Anything else renders blank rather than reaching the formatter, which is
 	// what deref does for a *bool: a template naming the wrong field is a bug
-	// the rendertest seam catches, not one worth a panic in a page.
+	// the renderintegration seam catches, not one worth a panic in a page.
 	if got := instantOf("2026-09-14"); got != nil {
 		t.Errorf("instantOf(string) = %v, want nil", got)
 	}
