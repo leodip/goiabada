@@ -20,8 +20,8 @@ import (
 	adminmiddleware "github.com/leodip/goiabada/adminconsole/internal/middleware"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/leodip/goiabada/core/oauth"
-	"github.com/leodip/goiabada/core/testutil"
 )
 
 // This handler carried the console's only caller-side error log: a slog.Error on every apiClient
@@ -52,7 +52,7 @@ func (c *permissionsByResourceClient) GetPermissionsByResource(ctx context.Conte
 func permissionRecords(t *testing.T, client apiclient.ApiClient, query string) (*httptest.ResponseRecorder, []string) {
 	t.Helper()
 
-	capture := testutil.CaptureSlog(t)
+	capture := logtest.CaptureSlog(t)
 
 	httpHelper := handlerhelpers.NewHttpHelper(fstest.MapFS{}, adminmiddleware.SettingsReader{})
 

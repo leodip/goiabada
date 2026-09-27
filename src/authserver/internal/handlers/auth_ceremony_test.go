@@ -16,7 +16,7 @@ import (
 	authmiddleware "github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/i18n"
-	"github.com/leodip/goiabada/core/testutil"
+	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -167,7 +167,7 @@ func TestRejectAuthStateMismatch(t *testing.T) {
 	})
 
 	t.Run("logs both states at warn, with no stack", func(t *testing.T) {
-		logged := testutil.CaptureSlog(t)
+		logged := logtest.CaptureSlog(t)
 
 		rr := httptest.NewRecorder()
 		req := renderableRequest("/auth/pwd")

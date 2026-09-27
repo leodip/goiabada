@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/huandu/go-sqlbuilder"
-	"github.com/leodip/goiabada/core/testutil"
+	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -44,7 +44,7 @@ func loggingDB(t *testing.T, logSQL bool) *CommonDatabase {
 const boundSentinel = "SENTINEL-bound-credential"
 
 func TestCommonDatabaseLog_ExecSqlWritesOneRecordAndNoBoundValue(t *testing.T) {
-	logs := testutil.CaptureSlog(t)
+	logs := logtest.CaptureSlog(t)
 	database := loggingDB(t, true)
 
 	_, err := database.ExecSql(context.Background(), nil, `INSERT INTO secrets (value) VALUES (?)`, boundSentinel)
@@ -61,7 +61,7 @@ func TestCommonDatabaseLog_ExecSqlWritesOneRecordAndNoBoundValue(t *testing.T) {
 }
 
 func TestCommonDatabaseLog_QuerySqlWritesOneRecordAndNoBoundValue(t *testing.T) {
-	logs := testutil.CaptureSlog(t)
+	logs := logtest.CaptureSlog(t)
 	database := loggingDB(t, true)
 
 	rows, err := database.QuerySql(context.Background(), nil, `SELECT id FROM secrets WHERE value = ?`, boundSentinel)
@@ -78,7 +78,7 @@ func TestCommonDatabaseLog_QuerySqlWritesOneRecordAndNoBoundValue(t *testing.T) 
 // The off case, which is what makes the on case attributable: without it, a logger that wrote
 // nothing at all would satisfy every assertion above about what is absent.
 func TestCommonDatabaseLog_WritesNothingWhenLogSqlIsOff(t *testing.T) {
-	logs := testutil.CaptureSlog(t)
+	logs := logtest.CaptureSlog(t)
 	database := loggingDB(t, false)
 
 	_, err := database.ExecSql(context.Background(), nil, `INSERT INTO secrets (value) VALUES (?)`, boundSentinel)
@@ -95,7 +95,7 @@ func TestCommonDatabaseLog_WritesNothingWhenLogSqlIsOff(t *testing.T) {
 // tree builds come from sqlbuilder with placeholders rather than interpolation, and a caller that
 // concatenated a credential into a statement has a defect this logger is not the place to fix.
 func TestCommonDatabaseLog_LogsTheStatementTextAsWritten(t *testing.T) {
-	logs := testutil.CaptureSlog(t)
+	logs := logtest.CaptureSlog(t)
 	database := loggingDB(t, true)
 
 	_, err := database.ExecSql(context.Background(), nil, `INSERT INTO secrets (value) VALUES ('literal')`)

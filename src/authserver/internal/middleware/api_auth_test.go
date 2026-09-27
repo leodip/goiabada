@@ -18,8 +18,8 @@ import (
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/leodip/goiabada/core/oauth"
-	"github.com/leodip/goiabada/core/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -1463,7 +1463,7 @@ func TestRequireValidSession_Table(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.label, func(t *testing.T) {
-			logs := testutil.CaptureSlog(t)
+			logs := logtest.CaptureSlog(t)
 			mockDB := mocks_data.NewDatabase(t)
 			now := time.Now().UTC()
 
@@ -1574,10 +1574,10 @@ func TestRequireValidSession_Table(t *testing.T) {
 //
 // The empty half matters as much: a row that lets the request through must write no rejection at
 // all, or an operator counting refusals would be counting successes too.
-func assertBearerRejectionsAreWarnings(t *testing.T, logs *testutil.SlogCapture, wantStatus int) {
+func assertBearerRejectionsAreWarnings(t *testing.T, logs *logtest.SlogCapture, wantStatus int) {
 	t.Helper()
 
-	var rejections []testutil.CapturedRecord
+	var rejections []logtest.CapturedRecord
 	for _, record := range logs.Records() {
 		if strings.HasPrefix(record.Message, "rejecting bearer token") {
 			rejections = append(rejections, record)
@@ -1643,7 +1643,7 @@ func TestRequireUserBoundToken(t *testing.T) {
 			},
 		}
 
-		logs := testutil.CaptureSlog(t)
+		logs := logtest.CaptureSlog(t)
 
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
 		req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeyBearerToken, token))
@@ -1788,7 +1788,7 @@ func TestRequireValidSession_AFiveHundredCarriesTheRequestIdAndLogsOnce(t *testi
 	nextCalled := false
 	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { nextCalled = true })
 
-	capture := testutil.CaptureSlog(t)
+	capture := logtest.CaptureSlog(t)
 	RequireValidSession(mockDB)(next).ServeHTTP(rr, req)
 
 	assert.False(t, nextCalled)

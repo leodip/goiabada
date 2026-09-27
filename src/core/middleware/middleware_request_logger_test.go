@@ -13,7 +13,7 @@ import (
 
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/core/logging"
-	"github.com/leodip/goiabada/core/testutil"
+	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -416,12 +416,12 @@ func okHandler(ran *bool) http.Handler {
 }
 
 // records counts the log records in the captured output.
-func records(capture *testutil.SlogCapture) int {
+func records(capture *logtest.SlogCapture) int {
 	return strings.Count(capture.Text(), `msg="http request"`)
 }
 
 func TestMiddlewareRequestLogger_DisabledWritesNothingAndStillServes(t *testing.T) {
-	buf := testutil.CaptureSlog(t)
+	buf := logtest.CaptureSlog(t)
 	ran := false
 
 	handler := MiddlewareRequestLogger(false)(okHandler(&ran))
@@ -449,7 +449,7 @@ func TestMiddlewareRequestLogger_SkipList(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			buf := testutil.CaptureSlog(t)
+			buf := logtest.CaptureSlog(t)
 			ran := false
 
 			handler := MiddlewareRequestLogger(true)(okHandler(&ran))
@@ -464,7 +464,7 @@ func TestMiddlewareRequestLogger_SkipList(t *testing.T) {
 }
 
 func TestMiddlewareRequestLogger_LogsExactlyOneRecord(t *testing.T) {
-	buf := testutil.CaptureSlog(t)
+	buf := logtest.CaptureSlog(t)
 	ran := false
 
 	handler := MiddlewareRequestLogger(true)(okHandler(&ran))
@@ -497,7 +497,7 @@ func TestMiddlewareRequestLogger_DoesNotLogTheIdTokenHint(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			buf := testutil.CaptureSlog(t)
+			buf := logtest.CaptureSlog(t)
 			ran := false
 
 			handler := MiddlewareRequestLogger(true)(okHandler(&ran))
@@ -511,7 +511,7 @@ func TestMiddlewareRequestLogger_DoesNotLogTheIdTokenHint(t *testing.T) {
 }
 
 func TestMiddlewareRequestLogger_RecordsStatusAndBytes(t *testing.T) {
-	buf := testutil.CaptureSlog(t)
+	buf := logtest.CaptureSlog(t)
 
 	handler := MiddlewareRequestLogger(true)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusForbidden)
@@ -533,7 +533,7 @@ func TestMiddlewareRequestLogger_RecordsThePanicStatusFromBeneath(t *testing.T) 
 	})
 
 	t.Run("Recoverer beneath the logger", func(t *testing.T) {
-		buf := testutil.CaptureSlog(t)
+		buf := logtest.CaptureSlog(t)
 
 		handler := MiddlewareRequestLogger(true)(chimiddleware.Recoverer(panicking))
 		recorder := httptest.NewRecorder()
@@ -547,7 +547,7 @@ func TestMiddlewareRequestLogger_RecordsThePanicStatusFromBeneath(t *testing.T) 
 	// exists: Recoverer's WriteHeader goes to the writer above the logger's wrapper, so the
 	// wrapper is asked for a status nobody ever set through it.
 	t.Run("Recoverer above the logger", func(t *testing.T) {
-		buf := testutil.CaptureSlog(t)
+		buf := logtest.CaptureSlog(t)
 
 		handler := chimiddleware.Recoverer(MiddlewareRequestLogger(true)(panicking))
 		recorder := httptest.NewRecorder()
@@ -561,7 +561,7 @@ func TestMiddlewareRequestLogger_RecordsThePanicStatusFromBeneath(t *testing.T) 
 
 func TestMiddlewareRequestLogger_RequestId(t *testing.T) {
 	t.Run("present when chi's RequestID ran ahead of the logger", func(t *testing.T) {
-		buf := testutil.CaptureSlog(t)
+		buf := logtest.CaptureSlog(t)
 		ran := false
 
 		handler := chimiddleware.RequestID(MiddlewareRequestLogger(true)(okHandler(&ran)))
@@ -573,7 +573,7 @@ func TestMiddlewareRequestLogger_RequestId(t *testing.T) {
 	})
 
 	t.Run("the attribute is absent altogether when it did not", func(t *testing.T) {
-		buf := testutil.CaptureSlog(t)
+		buf := logtest.CaptureSlog(t)
 		ran := false
 
 		handler := MiddlewareRequestLogger(true)(okHandler(&ran))
@@ -617,7 +617,7 @@ func TestMiddlewareRequestLogger_ClipsTheClientChosenFields(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			buf := testutil.CaptureSlog(t)
+			buf := logtest.CaptureSlog(t)
 			ran := false
 
 			handler := chimiddleware.RequestID(MiddlewareRequestLogger(true)(okHandler(&ran)))
@@ -650,7 +650,7 @@ func TestMiddlewareRequestLogger_TheClipIsLossy(t *testing.T) {
 
 	logged := make([]string, 0, 2)
 	for _, requestId := range []string{first, second} {
-		buf := testutil.CaptureSlog(t)
+		buf := logtest.CaptureSlog(t)
 		ran := false
 
 		handler := chimiddleware.RequestID(MiddlewareRequestLogger(true)(okHandler(&ran)))
@@ -698,7 +698,7 @@ func TestMiddlewareRequestLogger_EscapesTheClientChosenFields(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			buf := testutil.CaptureSlog(t)
+			buf := logtest.CaptureSlog(t)
 			ran := false
 
 			handler := chimiddleware.RequestID(MiddlewareRequestLogger(true)(okHandler(&ran)))
@@ -721,7 +721,7 @@ func TestMiddlewareRequestLogger_RendersTheTargetBeforeDownstreamRewritesIt(t *t
 	// would record a path the client never sent. Every other assertion in this file
 	// passes either way, which is what makes this case worth its own test rather
 	// than a comment.
-	buf := testutil.CaptureSlog(t)
+	buf := logtest.CaptureSlog(t)
 
 	var seenByHandler string
 	chain := MiddlewareRequestLogger(true)(
@@ -742,7 +742,7 @@ func TestMiddlewareRequestLogger_RendersTheTargetBeforeDownstreamRewritesIt(t *t
 func TestMiddlewareRequestLogger_LogsARequestThatPanics(t *testing.T) {
 	// This is what pins the deferred write, which is otherwise invisible: chi's
 	// logger produced a line for a panicking request and so must this one.
-	buf := testutil.CaptureSlog(t)
+	buf := logtest.CaptureSlog(t)
 
 	handler := MiddlewareRequestLogger(true)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		panic("handler exploded")

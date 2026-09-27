@@ -19,7 +19,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/otp"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/logging"
-	"github.com/leodip/goiabada/core/testutil"
+	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -186,10 +186,10 @@ func oversizedBody() string {
 
 // debugRecord runs one request through the middleware and returns the one record it
 // wrote, with what the handler read and the error its read ended in.
-func debugRecord(t *testing.T, req *http.Request, respond func(w http.ResponseWriter)) (testutil.CapturedRecord, string, error) {
+func debugRecord(t *testing.T, req *http.Request, respond func(w http.ResponseWriter)) (logtest.CapturedRecord, string, error) {
 	t.Helper()
 	withDebugAPIRequests(t, true)
-	logged := testutil.CaptureSlog(t)
+	logged := logtest.CaptureSlog(t)
 
 	var read []byte
 	var readErr error
@@ -294,7 +294,7 @@ func TestAPIDebugMiddleware_DoesNotLogACutBodyThatParses(t *testing.T) {
 
 func TestAPIDebugMiddleware_AnOversizedResponseReachesTheClientWhole(t *testing.T) {
 	withDebugAPIRequests(t, true)
-	logged := testutil.CaptureSlog(t)
+	logged := logtest.CaptureSlog(t)
 
 	chunk := strings.Repeat("y", 100_000)
 	const writes = 6
@@ -376,7 +376,7 @@ func TestDebugLog_DoesNotLogTheAuthorizationHeaderVerbatim(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			logged := testutil.CaptureSlog(t)
+			logged := logtest.CaptureSlog(t)
 
 			req := httptest.NewRequest("POST", "/api/v1/admin/users", nil)
 			req.Header.Set("Authorization", tc.authHeader)
@@ -394,7 +394,7 @@ func TestDebugLog_DoesNotLogTheAuthorizationHeaderVerbatim(t *testing.T) {
 // With no Authorization header the placeholder is "None", so an absent credential
 // is distinguishable from a redacted one.
 func TestDebugLog_ReportsAnAbsentAuthorizationHeader(t *testing.T) {
-	logged := testutil.CaptureSlog(t)
+	logged := logtest.CaptureSlog(t)
 
 	req := httptest.NewRequest("GET", "/api/v1/admin/users", nil)
 	debugLog("GET", "/api/v1/admin/users", capturedBody{}, http.StatusOK, capturedBody{}, time.Millisecond, req)
@@ -415,7 +415,7 @@ func TestDebugLog_ReportsAnAbsentAuthorizationHeader(t *testing.T) {
 // -----------------------------------------------------------------------------
 
 func TestDebugLog_WritesOneRecordCarryingTheWholeExchange(t *testing.T) {
-	logged := testutil.CaptureSlog(t)
+	logged := logtest.CaptureSlog(t)
 
 	req := httptest.NewRequest("POST", "/api/v1/admin/users", nil)
 	req.Header.Set("Authorization", "Bearer a-token")
@@ -442,7 +442,7 @@ func TestDebugLog_WritesOneRecordCarryingTheWholeExchange(t *testing.T) {
 // request-line-sized method into the log. It goes through the same bound the
 // request logger applies to the same value (#159).
 func TestDebugLog_BoundsAnOversizedMethod(t *testing.T) {
-	logged := testutil.CaptureSlog(t)
+	logged := logtest.CaptureSlog(t)
 
 	method := strings.Repeat("M", 900000)
 	req := httptest.NewRequest("GET", "/api/v1/admin/users", nil)
@@ -463,7 +463,7 @@ func TestDebugLog_BoundsAnOversizedMethod(t *testing.T) {
 // API-surface writer reached through a *Context variant, so it is where that is
 // worth pinning at this seam.
 func TestDebugLog_CarriesTheRequestIdFromTheContext(t *testing.T) {
-	logged := testutil.CaptureSlog(t)
+	logged := logtest.CaptureSlog(t)
 
 	req := httptest.NewRequest("GET", "/api/v1/admin/users", nil)
 	req = req.WithContext(context.WithValue(req.Context(), chimiddleware.RequestIDKey, "req-abc"))
@@ -479,7 +479,7 @@ func TestDebugLog_CarriesTheRequestIdFromTheContext(t *testing.T) {
 // this pins that they do reach the log when present. It is also the regression
 // guard against redaction becoming over-eager: an ordinary field must survive.
 func TestDebugLog_LogsRequestAndResponseBodies(t *testing.T) {
-	logged := testutil.CaptureSlog(t)
+	logged := logtest.CaptureSlog(t)
 
 	req := httptest.NewRequest("POST", "/api/v1/admin/users", nil)
 	debugLog("POST", "/api/v1/admin/users", wholeBody([]byte(`{"givenName":"Jane"}`)),
@@ -542,7 +542,7 @@ func TestDebugLog_HandlesUnknownStatusCode(t *testing.T) {
 // logRequestBody runs debugLog over one request body and returns what was logged.
 func logRequestBody(t *testing.T, body string) string {
 	t.Helper()
-	logged := testutil.CaptureSlog(t)
+	logged := logtest.CaptureSlog(t)
 	req := httptest.NewRequest("POST", "/api/v1/admin/users", nil)
 	debugLog("POST", "/api/v1/admin/users", wholeBody([]byte(body)),
 		http.StatusOK, capturedBody{}, time.Millisecond, req)
@@ -829,7 +829,7 @@ func TestDebugLog_RefusesBodiesItCannotSafelyLog(t *testing.T) {
 // body line at all rather than a placeholder.
 func TestDebugLog_LogsBodiesOnTheAcceptedSideOfEveryBound(t *testing.T) {
 	t.Run("empty body writes an empty attribute rather than a refusal", func(t *testing.T) {
-		logged := testutil.CaptureSlog(t)
+		logged := logtest.CaptureSlog(t)
 		req := httptest.NewRequest("POST", "/api/v1/admin/users", nil)
 		debugLog("POST", "/api/v1/admin/users", capturedBody{}, http.StatusOK, capturedBody{}, time.Millisecond, req)
 
@@ -950,7 +950,7 @@ func debugAPIRouter(t *testing.T, method, pattern string, handler http.HandlerFu
 // Both must be gone from the log, and the client must still receive exactly what the
 // handler wrote.
 func TestAPIDebugMiddleware_DoesNotLogARealOTPEnrollmentResponse(t *testing.T) {
-	logged := testutil.CaptureSlog(t)
+	logged := logtest.CaptureSlog(t)
 
 	generator := otp.OTPSecretGenerator{}
 	keyURL, err := generator.GenerateOTPSecret("seam2@example.com", "Goiabada")
@@ -1000,7 +1000,7 @@ func TestAPIDebugMiddleware_DoesNotLogARealOTPEnrollmentResponse(t *testing.T) {
 // must still reach the handler, which is the half that makes the middleware safe to
 // mount in front of a real endpoint rather than merely quiet.
 func TestAPIDebugMiddleware_DoesNotLogARealOTPUpdateRequest(t *testing.T) {
-	logged := testutil.CaptureSlog(t)
+	logged := logtest.CaptureSlog(t)
 
 	generator := otp.OTPSecretGenerator{}
 	keyURL, err := generator.GenerateOTPSecret("seam2@example.com", "Goiabada")
@@ -1089,7 +1089,7 @@ func TestAPIDebugMiddleware_DoesNotLogARealOTPUpdateRequest(t *testing.T) {
 // -----------------------------------------------------------------------------
 
 func TestAPIDebugMiddleware_KeepsTheAssessedSafeQueryParameters(t *testing.T) {
-	logged := testutil.CaptureSlog(t)
+	logged := logtest.CaptureSlog(t)
 
 	router := debugAPIRouter(t, http.MethodGet, "/users", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -1113,7 +1113,7 @@ func TestAPIDebugMiddleware_KeepsTheAssessedSafeQueryParameters(t *testing.T) {
 // never written, or a request that never reached the middleware, would satisfy
 // "the search string is absent" perfectly.
 func TestAPIDebugMiddleware_DoesNotLogAUserSearchStringFromTheQuery(t *testing.T) {
-	logged := testutil.CaptureSlog(t)
+	logged := logtest.CaptureSlog(t)
 
 	router := debugAPIRouter(t, http.MethodGet, "/users", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)

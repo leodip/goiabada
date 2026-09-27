@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/leodip/goiabada/core/testutil"
+	"github.com/leodip/goiabada/core/logging/logtest"
 )
 
 // This file pins the level and the shape of the records core's middleware writes, per #320
@@ -29,7 +29,7 @@ import (
 // middleware and the installed handler took the id off the context, and no call here names it.
 
 // requestIdOf reads the injected attribute, failing the test when it is absent.
-func requestIdOf(t *testing.T, record testutil.CapturedRecord) string {
+func requestIdOf(t *testing.T, record logtest.CapturedRecord) string {
 	t.Helper()
 	requestId, isString := record.Attrs["request_id"].(string)
 	require.True(t, isString,
@@ -39,7 +39,7 @@ func requestIdOf(t *testing.T, record testutil.CapturedRecord) string {
 }
 
 // theOneRecord returns the single record captured, failing when there is not exactly one.
-func theOneRecord(t *testing.T, logged *testutil.SlogCapture) testutil.CapturedRecord {
+func theOneRecord(t *testing.T, logged *logtest.SlogCapture) logtest.CapturedRecord {
 	t.Helper()
 	records := logged.Records()
 	require.Len(t, records, 1)
@@ -51,7 +51,7 @@ func theOneRecord(t *testing.T, logged *testutil.SlogCapture) testutil.CapturedR
 // pinned whole: a collector counting refusals matches on the message, and a message that went back
 // to being the explanation would give it four different strings to know about (#320 decision 4).
 func TestSlogConvention_CsrfRefusalIsWarnWithALiteralMessage(t *testing.T) {
-	logged := testutil.CaptureSlog(t)
+	logged := logtest.CaptureSlog(t)
 
 	req := httptest.NewRequest(http.MethodPost, "/auth/pwd", nil)
 	req.Host = "auth.example.com"
@@ -86,7 +86,7 @@ func TestSlogConvention_CsrfRefusalIsWarnWithALiteralMessage(t *testing.T) {
 // named request_id itself. The whole textual rule is stage 7's lint; this is the behavioural half
 // for the one record that would be useless without the attribute.
 func TestSlogConvention_RequestLogCarriesTheInjectedRequestIdOnce(t *testing.T) {
-	logged := testutil.CaptureSlog(t)
+	logged := logtest.CaptureSlog(t)
 
 	rr := httptest.NewRecorder()
 	chimiddleware.RequestID(MiddlewareRequestLogger(true)(http.HandlerFunc(

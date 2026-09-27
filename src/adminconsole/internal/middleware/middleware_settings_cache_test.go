@@ -15,7 +15,7 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/i18n"
-	"github.com/leodip/goiabada/core/testutil"
+	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -240,11 +240,11 @@ func theOneLoggedError(t *testing.T, fn func()) error {
 
 	// Whole records rather than rendered text, which is the only way to tell an error value from
 	// its text: a handler's output is a string either way.
-	capture := testutil.CaptureSlog(t)
+	capture := logtest.CaptureSlog(t)
 
 	fn()
 
-	var errorRecords []testutil.CapturedRecord
+	var errorRecords []logtest.CapturedRecord
 	records := capture.Records()
 	for _, record := range records {
 		if record.Level == slog.LevelError {

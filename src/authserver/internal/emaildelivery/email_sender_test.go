@@ -18,10 +18,14 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
+	"github.com/leodip/goiabada/authserver/internal/testutil/mailpit"
 	"github.com/leodip/goiabada/core/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// mailpitURL is the dev container's Mailpit API, beside the SMTP host TestSendEmail sends through.
+const mailpitURL = "http://mailpit:8025"
 
 func TestSendEmail(t *testing.T) {
 
@@ -48,7 +52,7 @@ func TestSendEmail(t *testing.T) {
 	err := emailSender.SendEmail(ctx, input)
 	assert.NoError(t, err)
 
-	sent := testutil.AssertEmailSent(t, recipient, "<p>This is a test email</p>")
+	sent := mailpit.New(mailpitURL).AssertEmailSent(t, recipient, "<p>This is a test email</p>")
 
 	// The from-name carries a comma on purpose. go-simple-mail concatenated the name unquoted and
 	// then parsed the result, so this send failed outright with "mail: missing '@' or angle-addr"

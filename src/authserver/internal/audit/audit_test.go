@@ -10,7 +10,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	mocks "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
-	"github.com/leodip/goiabada/core/testutil"
+	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -58,7 +58,7 @@ func TestAuditLogger_ConsoleRecordCarriesTheEventAndTheDetails(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			logs := testutil.CaptureSlog(t)
+			logs := logtest.CaptureSlog(t)
 
 			// Create mock DB that returns settings with console enabled, DB disabled
 			mockDB := mocks.NewDatabase(t)
@@ -83,7 +83,7 @@ func TestAuditLogger_ConsoleRecordCarriesTheEventAndTheDetails(t *testing.T) {
 }
 
 func TestAuditLoggerDisabled(t *testing.T) {
-	logs := testutil.CaptureSlog(t)
+	logs := logtest.CaptureSlog(t)
 
 	// Create mock DB that returns settings with both disabled
 	mockDB := mocks.NewDatabase(t)
@@ -179,7 +179,7 @@ func TestAuditLogger_SettingsError(t *testing.T) {
 
 	// CreateAuditLog should NOT be called due to settings error
 
-	logs := testutil.CaptureSlog(t)
+	logs := logtest.CaptureSlog(t)
 
 	// Create audit logger
 	auditLogger := NewAuditLogger(mockDB)
@@ -212,7 +212,7 @@ func TestAuditLogger_DBPersistence_CreateError(t *testing.T) {
 	// Mock CreateAuditLog to return error
 	mockDB.On("CreateAuditLog", mock.Anything, mock.Anything, mock.Anything).Return(assert.AnError)
 
-	logs := testutil.CaptureSlog(t)
+	logs := logtest.CaptureSlog(t)
 
 	// Create audit logger
 	auditLogger := NewAuditLogger(mockDB)
@@ -244,7 +244,7 @@ func TestAuditLogger_DBPersistence_JSONMarshalError(t *testing.T) {
 
 	// CreateAuditLog should NOT be called due to marshal error
 
-	logs := testutil.CaptureSlog(t)
+	logs := logtest.CaptureSlog(t)
 
 	// Create audit logger
 	auditLogger := NewAuditLogger(mockDB)
@@ -275,7 +275,7 @@ func TestAuditLogger_BothConsoleAndDB(t *testing.T) {
 	mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(settings, nil)
 	mockDB.On("CreateAuditLog", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
-	logs := testutil.CaptureSlog(t)
+	logs := logtest.CaptureSlog(t)
 
 	// Create audit logger with BOTH console and DB enabled
 	auditLogger := NewAuditLogger(mockDB)
@@ -305,7 +305,7 @@ func TestAuditLogger_ConsoleEnabledDBDisabled(t *testing.T) {
 	}
 	mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(settings, nil)
 
-	logs := testutil.CaptureSlog(t)
+	logs := logtest.CaptureSlog(t)
 
 	// Create audit logger
 	auditLogger := NewAuditLogger(mockDB)
@@ -413,7 +413,7 @@ func TestAuditLogger_EveryRecordCarriesTheRequestId(t *testing.T) {
 
 	for _, rec := range records {
 		t.Run(rec.name+", under the request's context", func(t *testing.T) {
-			logs := testutil.CaptureSlog(t)
+			logs := logtest.CaptureSlog(t)
 			mockDB := mocks.NewDatabase(t)
 			rec.setup(mockDB)
 
@@ -428,7 +428,7 @@ func TestAuditLogger_EveryRecordCarriesTheRequestId(t *testing.T) {
 		})
 
 		t.Run(rec.name+", under a context carrying no request", func(t *testing.T) {
-			logs := testutil.CaptureSlog(t)
+			logs := logtest.CaptureSlog(t)
 			mockDB := mocks.NewDatabase(t)
 			rec.setup(mockDB)
 
@@ -451,7 +451,7 @@ func TestAuditLogger_EveryRecordCarriesTheRequestId(t *testing.T) {
 // stated reason: mocks.NewDatabase(t) fails the test on an unexpected call, so a Log that read the
 // row anyway is reported as the unexpected read rather than passing quietly.
 func TestAuditLogger_TakesTheSettingsFromTheRequestContext(t *testing.T) {
-	logs := testutil.CaptureSlog(t)
+	logs := logtest.CaptureSlog(t)
 
 	mockDB := mocks.NewDatabase(t)
 	mockDB.On("CreateAuditLog", mock.Anything, mock.Anything, mock.MatchedBy(func(log *models.AuditLog) bool {
@@ -498,7 +498,7 @@ func TestAuditLogger_ReadsTheSettingsRowWhenTheContextHasNone(t *testing.T) {
 
 	for _, tc := range contexts {
 		t.Run(tc.name, func(t *testing.T) {
-			logs := testutil.CaptureSlog(t)
+			logs := logtest.CaptureSlog(t)
 
 			mockDB := mocks.NewDatabase(t)
 			mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(&models.Settings{
@@ -587,7 +587,7 @@ func TestAuditLogger_TheRowCarriesTheRequestIdTheLogCarries(t *testing.T) {
 
 	for _, tc := range ids {
 		t.Run(tc.name, func(t *testing.T) {
-			logs := testutil.CaptureSlog(t)
+			logs := logtest.CaptureSlog(t)
 
 			var row *models.AuditLog
 			mockDB := mocks.NewDatabase(t)

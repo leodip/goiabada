@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leodip/goiabada/core/testutil"
+	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -67,7 +67,7 @@ func swapSleep(t *testing.T, replacement func(context.Context, time.Duration) er
 }
 
 // retryWarnings counts the reruns the helper announced.
-func retryWarnings(logs *testutil.SlogCapture) int {
+func retryWarnings(logs *logtest.SlogCapture) int {
 	return warningsContaining(logs, retryWarning)
 }
 
@@ -77,11 +77,11 @@ const rollbackWarning = "rolling back a failed transaction reported an error"
 
 // rollbackWarnings counts those records, which is the only observable the deferred rollback's
 // error arm has: it returns nothing and changes nothing the caller can see.
-func rollbackWarnings(logs *testutil.SlogCapture) int {
+func rollbackWarnings(logs *logtest.SlogCapture) int {
 	return warningsContaining(logs, rollbackWarning)
 }
 
-func warningsContaining(logs *testutil.SlogCapture, text string) int {
+func warningsContaining(logs *logtest.SlogCapture, text string) int {
 	n := 0
 	for _, m := range messagesAt(logs, slog.LevelWarn) {
 		if strings.Contains(m, text) {
@@ -122,7 +122,7 @@ func oneStatementCapturing(ctx context.Context, db *CommonDatabase, ran *int, ca
 }
 
 func TestRunInTransaction_ASuccessfulBodyCommitsOnce(t *testing.T) {
-	logs := testutil.CaptureSlog(t)
+	logs := logtest.CaptureSlog(t)
 	requested := recordBackoff(t)
 	d := &scriptedDriver{}
 	db := retryingDB(t, d)
@@ -141,7 +141,7 @@ func TestRunInTransaction_ASuccessfulBodyCommitsOnce(t *testing.T) {
 }
 
 func TestRunInTransaction_APlainErrorRollsBackAndIsReturnedAsItWas(t *testing.T) {
-	logs := testutil.CaptureSlog(t)
+	logs := logtest.CaptureSlog(t)
 	requested := recordBackoff(t)
 	boom := errors.New("connection reset by peer")
 	d := &scriptedDriver{}
@@ -165,7 +165,7 @@ func TestRunInTransaction_APlainErrorRollsBackAndIsReturnedAsItWas(t *testing.T)
 }
 
 func TestRunInTransaction_ADeadlockInTheBodyIsRerunAndTheRerunCommits(t *testing.T) {
-	logs := testutil.CaptureSlog(t)
+	logs := logtest.CaptureSlog(t)
 	requested := recordBackoff(t)
 	// The first attempt's statement is the engine's deadlock abort; the second is answered
 	// cleanly by running past the end of the script.
@@ -186,7 +186,7 @@ func TestRunInTransaction_ADeadlockInTheBodyIsRerunAndTheRerunCommits(t *testing
 }
 
 func TestRunInTransaction_ThreeDeadlocksExhaustTheAttemptsAndTheLastOneSurfaces(t *testing.T) {
-	logs := testutil.CaptureSlog(t)
+	logs := logtest.CaptureSlog(t)
 	requested := recordBackoff(t)
 	d := &scriptedDriver{execs: []*scriptedExec{{err: errDeadlock}, {err: errDeadlock}, {err: errDeadlock}}}
 	db := retryingDB(t, d)
@@ -213,7 +213,7 @@ func TestRunInTransaction_ThreeDeadlocksExhaustTheAttemptsAndTheLastOneSurfaces(
 // deadlock, which is the error that decides whether to retry, with a bookkeeping one, and the
 // retry would never happen. This is the case that fails if rollback errors are returned.
 func TestRunInTransaction_AVictimTheEngineAlreadyRolledBackIsStillRerun(t *testing.T) {
-	logs := testutil.CaptureSlog(t)
+	logs := logtest.CaptureSlog(t)
 	rolledBackAlready := errors.New("Error 1213: this transaction was already rolled back")
 	d := &scriptedDriver{
 		execs:        []*scriptedExec{{err: errDeadlock}, {err: errDeadlock}, {err: errDeadlock}},
@@ -234,7 +234,7 @@ func TestRunInTransaction_AVictimTheEngineAlreadyRolledBackIsStillRerun(t *testi
 }
 
 func TestRunInTransaction_ADeadlockAtCommitIsRerunAndTheRerunCommits(t *testing.T) {
-	logs := testutil.CaptureSlog(t)
+	logs := logtest.CaptureSlog(t)
 	requested := recordBackoff(t)
 	// The body succeeds both times; it is the COMMIT that the engine aborts on the first.
 	d := &scriptedDriver{commitErrs: []error{errDeadlock}}
@@ -272,7 +272,7 @@ func TestRunInTransaction_ThreeDeadlocksAtCommitExhaustTheAttempts(t *testing.T)
 // outcome the client cannot know: the server may have committed before the failure reached the
 // client, and replaying the body would apply it twice.
 func TestRunInTransaction_ACommitThatFailsForAnyOtherReasonIsNotReplayed(t *testing.T) {
-	logs := testutil.CaptureSlog(t)
+	logs := logtest.CaptureSlog(t)
 	requested := recordBackoff(t)
 	boom := errors.New("write: broken pipe")
 	d := &scriptedDriver{commitErrs: []error{boom}}
@@ -472,7 +472,7 @@ func TestRunInTransaction_ACancellationWithNothingToJoinComesBackUntouched(t *te
 // recording it would put a warning in the log for every cancelled request that was inside a
 // transaction, which is an operator sent after a non-event (#386).
 func TestRunInTransaction_ACancelledTransactionsRollbackIsNotRecordedAsAFailure(t *testing.T) {
-	logs := testutil.CaptureSlog(t)
+	logs := logtest.CaptureSlog(t)
 	recordBackoff(t)
 	d := &scriptedDriver{execs: []*scriptedExec{{delay: 2 * time.Second}}}
 	db := retryingDB(t, d)
@@ -495,7 +495,7 @@ func TestRunInTransaction_ACancelledTransactionsRollbackIsNotRecordedAsAFailure(
 // this helper, which is a defect and not a non-event, so it keeps its record. Suppressing on the
 // error alone would have swallowed it (#386).
 func TestRunInTransaction_AnAlreadyDoneRollbackOnALiveContextIsStillRecorded(t *testing.T) {
-	logs := testutil.CaptureSlog(t)
+	logs := logtest.CaptureSlog(t)
 	recordBackoff(t)
 	boom := errors.New("connection reset by peer")
 	d := &scriptedDriver{
@@ -517,7 +517,7 @@ func TestRunInTransaction_AnAlreadyDoneRollbackOnALiveContextIsStillRecorded(t *
 // stub cancels and then delegates to the sleep the helper actually ships with, so what is under
 // test is that wait's ctx.Done() arm and not a stub's imitation of it.
 func TestRunInTransaction_ACancellationDuringTheBackoffStopsTheRerun(t *testing.T) {
-	logs := testutil.CaptureSlog(t)
+	logs := logtest.CaptureSlog(t)
 	d := &scriptedDriver{execs: []*scriptedExec{{err: errDeadlock}, {err: errDeadlock}}}
 	db := retryingDB(t, d)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -550,7 +550,7 @@ func TestRunInTransaction_ACancellationDuringTheBackoffStopsTheRerun(t *testing.
 // case, and the one the loop's own ctx.Err() check owns: the cancellation is already in force
 // when the next iteration begins, so the helper stops before it even reaches the pause.
 func TestRunInTransaction_ACancellationBetweenADeadlockAndItsRerunStopsTheLoop(t *testing.T) {
-	logs := testutil.CaptureSlog(t)
+	logs := logtest.CaptureSlog(t)
 	requested := recordBackoff(t)
 	d := &scriptedDriver{execs: []*scriptedExec{{err: errDeadlock}, {err: errDeadlock}}}
 	db := retryingDB(t, d)

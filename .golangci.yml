@@ -125,7 +125,7 @@ linters:
           args-pos: 2
   exclusions:
     rules:
-      # Test files read records through testutil.CaptureSlog rather than
+      # Test files read records through logtest.CaptureSlog rather than
       # writing them, and the integration harnesses log however they like.
       # Mocks are generated scaffolding. Both match AssertNoLegacyErrors'
       # notion of production code, so one answer holds for every guard.

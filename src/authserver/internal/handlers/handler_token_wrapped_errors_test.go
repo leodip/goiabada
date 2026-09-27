@@ -11,7 +11,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/errs"
-	"github.com/leodip/goiabada/core/testutil"
+	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -163,7 +163,7 @@ func TestHandleTokenPost_WrappedAuthCodeReuseStillRevokes(t *testing.T) {
 // owed here too: an operator filtering on request_id has to be able to join a client's report to it,
 // and the stack has to ride on the error attribute rather than be glued into the message.
 func TestJsonErrorConformed_LogsStructuredOnTheGenericBranch(t *testing.T) {
-	logs := testutil.CaptureSlog(t)
+	logs := logtest.CaptureSlog(t)
 
 	httpHelper := mocks_handlers.NewHttpHelper(t)
 	req := httptest.NewRequest("POST", "/token", nil)
@@ -176,7 +176,7 @@ func TestJsonErrorConformed_LogsStructuredOnTheGenericBranch(t *testing.T) {
 
 	jsonErrorConformed(httpHelper, rr, req, errs.New("the key store is unreachable"))
 
-	var errorRecords []testutil.CapturedRecord
+	var errorRecords []logtest.CapturedRecord
 	for _, record := range logs.Records() {
 		if record.Level == slog.LevelError {
 			errorRecords = append(errorRecords, record)

@@ -15,7 +15,7 @@ import (
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/testutil"
+	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -153,7 +153,7 @@ func TestHandleAPISettingsKeysRotatePost_KeySetIncomplete(t *testing.T) {
 	})
 
 	rr := httptest.NewRecorder()
-	capture := testutil.CaptureSlog(t)
+	capture := logtest.CaptureSlog(t)
 
 	HandleAPISettingsKeysRotatePost(database, auditLogger).ServeHTTP(rr, rotateRequest())
 

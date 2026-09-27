@@ -13,7 +13,7 @@ import (
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/logging"
-	"github.com/leodip/goiabada/core/testutil"
+	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -484,7 +484,7 @@ func TestMiddlewareCsrf_OriginDecisions(t *testing.T) {
 // printable (#425, the bound #159 put on the request logger).
 func TestMiddlewareCsrf_TheRefusalRecordIsBounded(t *testing.T) {
 	const size = 1 << 20
-	capture := testutil.CaptureSlog(t)
+	capture := logtest.CaptureSlog(t)
 
 	handler := MiddlewareCsrf()(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		t.Error("request reached the handler, want it refused")

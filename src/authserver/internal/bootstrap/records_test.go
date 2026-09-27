@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/core/errs"
-	"github.com/leodip/goiabada/core/testutil"
+	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -23,7 +23,7 @@ import (
 // naming a variable they were never told about.
 
 func TestLogBootstrapComplete_NamesTheFileAndEveryRequiredVariable(t *testing.T) {
-	logs := testutil.CaptureSlog(t)
+	logs := logtest.CaptureSlog(t)
 
 	logBootstrapComplete(context.Background(), "/bootstrap/bootstrap.env")
 
@@ -40,7 +40,7 @@ func TestLogBootstrapComplete_NamesTheFileAndEveryRequiredVariable(t *testing.T)
 }
 
 func TestLogCredentialsNotConfigured_CarriesTheErrorTheFileAndEveryRequiredVariable(t *testing.T) {
-	logs := testutil.CaptureSlog(t)
+	logs := logtest.CaptureSlog(t)
 
 	LogCredentialsNotConfigured(context.Background(), errs.New("session key is not 64 bytes"), "/somewhere/else.env")
 
@@ -60,7 +60,7 @@ func TestLogCredentialsNotConfigured_CarriesTheErrorTheFileAndEveryRequiredVaria
 }
 
 func TestLogInitialSetupRequired_OffersBothBootstrapModes(t *testing.T) {
-	logs := testutil.CaptureSlog(t)
+	logs := logtest.CaptureSlog(t)
 
 	logInitialSetupRequired(context.Background())
 
@@ -143,7 +143,7 @@ func TestBootstrapEnvContent_CarriesEveryRemainingCredential(t *testing.T) {
 // artifact: the record is the only place an operator is told the bootstrap file exists, and it is
 // where the twelve-line banner went (#320 decision 6).
 func TestLogBootstrapCredentialsGenerated_IsOneRecordNamingTheFile(t *testing.T) {
-	logs := testutil.CaptureSlog(t)
+	logs := logtest.CaptureSlog(t)
 
 	logBootstrapCredentialsGenerated(context.Background(), "/bootstrap/bootstrap.env")
 

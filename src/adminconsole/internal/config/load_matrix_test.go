@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/core/testutil"
+	"github.com/leodip/goiabada/core/logging/logtest"
 )
 
 // -----------------------------------------------------------------------------
@@ -549,7 +549,7 @@ func sortedKeys(m map[string]bool) []string {
 // Both variables are set, so the case cannot pass by the auth server's simply being absent, and
 // the record naming it would be a failure rather than a silence.
 func TestLoadFrom_WarnsAboutThisProcessesRemovedSettingOnly(t *testing.T) {
-	capture := testutil.CaptureSlog(t)
+	capture := logtest.CaptureSlog(t)
 
 	loadMatrix(t, map[string]string{
 		"GOIABADA_ADMINCONSOLE_SET_COOKIE_SECURE": "true",
@@ -574,7 +574,7 @@ func TestLoadFrom_WarnsAboutThisProcessesRemovedSettingOnly(t *testing.T) {
 // TestLoadFrom_SaysNothingWhenNoRemovedSettingIsSet is the quiet half. Without it the case above
 // passes for a loadFrom that warns unconditionally.
 func TestLoadFrom_SaysNothingWhenNoRemovedSettingIsSet(t *testing.T) {
-	capture := testutil.CaptureSlog(t)
+	capture := logtest.CaptureSlog(t)
 
 	loadMatrix(t, nil, nil)
 

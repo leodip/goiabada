@@ -15,7 +15,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/errs"
-	"github.com/leodip/goiabada/core/testutil"
+	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -28,17 +28,17 @@ import (
 // theOneErrorRecord requires exactly one ERROR record and returns it. Exactly one is the assertion,
 // not at least one: decision 9's claim is that a 500 is logged once, so a writer that logged twice,
 // or that logged at a level an operator filters out, has to fail here.
-func theOneErrorRecord(t *testing.T, logs *testutil.SlogCapture) (testutil.CapturedRecord, bool) {
+func theOneErrorRecord(t *testing.T, logs *logtest.SlogCapture) (logtest.CapturedRecord, bool) {
 	t.Helper()
 	captured := logs.Records()
-	var matched []testutil.CapturedRecord
+	var matched []logtest.CapturedRecord
 	for _, record := range captured {
 		if record.Level == slog.LevelError {
 			matched = append(matched, record)
 		}
 	}
 	if !assert.Len(t, matched, 1, "want exactly one ERROR record, out of %d captured", len(captured)) {
-		return testutil.CapturedRecord{}, false
+		return logtest.CapturedRecord{}, false
 	}
 	return matched[0], true
 }
@@ -54,7 +54,7 @@ func frameCount(err error) int {
 // assertion about the contract: slog's default handler is what prints the stack, and it can only do
 // that from an error value, so a writer that logged err.Error() would satisfy every text check
 // while silently dropping every frame.
-func loggedErrorOf(t *testing.T, record testutil.CapturedRecord) (error, bool) {
+func loggedErrorOf(t *testing.T, record logtest.CapturedRecord) (error, bool) {
 	t.Helper()
 	logged, ok := record.Attrs["error"].(error)
 	if !assert.True(t, ok, "the error attribute must carry the error value itself, not its text") {
@@ -93,7 +93,7 @@ func notFoundPageHelper() *HttpHelper {
 // grepping for ERROR would still be reading other people's stale bookmarks. Empty rather than "no
 // ERROR record": a warn or an info line at this volume is the same defect (#279 decision 11).
 func TestNotFound_LogsNothing(t *testing.T) {
-	logs := testutil.CaptureSlog(t)
+	logs := logtest.CaptureSlog(t)
 	httpHelper := notFoundPageHelper()
 
 	router := errorRouter(func(w http.ResponseWriter, r *http.Request) {
@@ -112,7 +112,7 @@ func TestNotFound_LogsNothing(t *testing.T) {
 // the request id the page shows. errorPageHelper has no not_found.html, so ParseFS fails for its own
 // reason.
 func TestNotFound_RenderFailureStillLogsOnce(t *testing.T) {
-	logs := testutil.CaptureSlog(t)
+	logs := logtest.CaptureSlog(t)
 	httpHelper := errorPageHelper()
 
 	router := errorRouter(func(w http.ResponseWriter, r *http.Request) {
@@ -142,7 +142,7 @@ func TestNotFound_RenderFailureStillLogsOnce(t *testing.T) {
 }
 
 func TestInternalServerError_LogsOnceWithErrorAndRequestId(t *testing.T) {
-	logs := testutil.CaptureSlog(t)
+	logs := logtest.CaptureSlog(t)
 	httpHelper := errorPageHelper()
 
 	failure := errs.New("the database went away")
@@ -178,7 +178,7 @@ func TestInternalServerError_LogsOnceWithErrorAndRequestId(t *testing.T) {
 // that passes a bare error still gets frames, so nothing is lost by asking all 1,007 sites to pass
 // err bare.
 func TestInternalServerError_StacksAnUnstackedError(t *testing.T) {
-	logs := testutil.CaptureSlog(t)
+	logs := logtest.CaptureSlog(t)
 	httpHelper := errorPageHelper()
 
 	// Deliberately a stdlib error with no frames anywhere in its tree, which is what a dependency
@@ -207,7 +207,7 @@ func TestInternalServerError_StacksAnUnstackedError(t *testing.T) {
 // an error arriving already stacked must not collect the writer's frames on top of its own. That is
 // rule 3, and this writer is the one place in the tree that could break it for every error at once.
 func TestInternalServerError_KeepsTheOriginsSingleStack(t *testing.T) {
-	logs := testutil.CaptureSlog(t)
+	logs := logtest.CaptureSlog(t)
 	httpHelper := errorPageHelper()
 
 	origin := errs.New("the origin")
@@ -231,7 +231,7 @@ func TestInternalServerError_KeepsTheOriginsSingleStack(t *testing.T) {
 }
 
 func TestJsonError_LogsOnceOnTheGenericBranch(t *testing.T) {
-	logs := testutil.CaptureSlog(t)
+	logs := logtest.CaptureSlog(t)
 	httpHelper := NewHttpHelper(fstest.MapFS{}, stubSettingsReader{})
 
 	router := errorRouter(func(w http.ResponseWriter, r *http.Request) {
@@ -269,7 +269,7 @@ func TestJsonError_LogsOnceOnTheGenericBranch(t *testing.T) {
 // could not join to a log line, and the silence was invisible because TestJsonError pinned the
 // status and the code and never looked at the record (#279 decisions 9 and 12).
 func TestJsonError_ADetailWithNoStatusIsA500ThatStillLogsAndCorrelates(t *testing.T) {
-	logs := testutil.CaptureSlog(t)
+	logs := logtest.CaptureSlog(t)
 	httpHelper := NewHttpHelper(fstest.MapFS{}, stubSettingsReader{})
 
 	router := errorRouter(func(w http.ResponseWriter, r *http.Request) {
@@ -309,7 +309,7 @@ func TestJsonError_ADetailWithNoStatusIsA500ThatStillLogsAndCorrelates(t *testin
 // in the description before it ever reaches here. Logging it a second time here is the defect this
 // row exists to catch.
 func TestJsonError_AnExplicit500DetailIsNotLoggedTwice(t *testing.T) {
-	logs := testutil.CaptureSlog(t)
+	logs := logtest.CaptureSlog(t)
 	httpHelper := NewHttpHelper(fstest.MapFS{}, stubSettingsReader{})
 
 	detail := customerrors.NewErrorDetailWithHttpStatusCode("server_error",
@@ -337,7 +337,7 @@ func TestJsonError_AnExplicit500DetailIsNotLoggedTwice(t *testing.T) {
 // replaced, one wrap turned a validator's 400 into a 500 and sent the sentence to the log instead
 // of to the client.
 func TestJsonError_ReadsAWrappedErrorDetail(t *testing.T) {
-	logs := testutil.CaptureSlog(t)
+	logs := logtest.CaptureSlog(t)
 	httpHelper := NewHttpHelper(fstest.MapFS{}, stubSettingsReader{})
 
 	detail := customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",

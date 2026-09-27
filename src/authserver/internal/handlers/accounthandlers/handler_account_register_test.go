@@ -27,7 +27,7 @@ import (
 	"github.com/leodip/goiabada/core/hashutil"
 	"github.com/leodip/goiabada/core/i18n"
 
-	"github.com/leodip/goiabada/core/testutil"
+	"github.com/leodip/goiabada/core/logging/logtest"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -37,7 +37,7 @@ import (
 // assertSelfRegistrationDisabledLogged holds a refusal while self-registration is off to its one
 // record: a refused request is Warn, not the error-level record the 500 page used to write
 // (#425 decision 5).
-func assertSelfRegistrationDisabledLogged(t *testing.T, logs *testutil.SlogCapture) {
+func assertSelfRegistrationDisabledLogged(t *testing.T, logs *logtest.SlogCapture) {
 	t.Helper()
 
 	records := logs.Records()
@@ -84,7 +84,7 @@ func TestHandleAccountRegisterGet(t *testing.T) {
 		req = req.WithContext(ctx)
 
 		httpHelper.On("NotFound", rr, req).Return().Once()
-		logs := testutil.CaptureSlog(t)
+		logs := logtest.CaptureSlog(t)
 
 		handler.ServeHTTP(rr, req)
 
@@ -523,7 +523,7 @@ func TestHandleAccountRegisterPost(t *testing.T) {
 			w := args.Get(0).(http.ResponseWriter)
 			w.WriteHeader(http.StatusNotFound)
 		}).Return().Once()
-		logs := testutil.CaptureSlog(t)
+		logs := logtest.CaptureSlog(t)
 
 		handler.ServeHTTP(rr, req)
 

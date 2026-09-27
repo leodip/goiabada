@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/core/errs"
-	"github.com/leodip/goiabada/core/testutil"
+	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -17,7 +17,7 @@ import (
 // "Required environment variables:" heading; the list is now an attribute, so a collector can
 // read it and a reader cannot lose half of it to a truncated scroll.
 func TestLogBootstrapCredentialsNotConfigured_NamesEveryRequiredVariable(t *testing.T) {
-	logs := testutil.CaptureSlog(t)
+	logs := logtest.CaptureSlog(t)
 
 	logBootstrapCredentialsNotConfigured()
 
@@ -44,7 +44,7 @@ func TestLogBootstrapCredentialsNotConfigured_NamesEveryRequiredVariable(t *test
 // deployment logging JSON received them as three unrelated records with the remedy in a message
 // field nothing could query.
 func TestLogSessionKeysNotConfigured_IsOneRecordCarryingTheErrorAndTheRemedy(t *testing.T) {
-	logs := testutil.CaptureSlog(t)
+	logs := logtest.CaptureSlog(t)
 
 	logSessionKeysNotConfigured(errs.New("the authentication key is not 128 hex characters"))
 

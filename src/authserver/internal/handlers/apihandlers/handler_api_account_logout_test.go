@@ -14,7 +14,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
-	"github.com/leodip/goiabada/core/testutil"
+	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -48,7 +48,7 @@ func logoutRequest(t *testing.T, clientIdentifier string) *http.Request {
 }
 
 // requireErrorOnTheRecord asserts one 500 whose record carries the failure the handler caught.
-func requireErrorOnTheRecord(t *testing.T, rr *httptest.ResponseRecorder, capture *testutil.SlogCapture, cause error) {
+func requireErrorOnTheRecord(t *testing.T, rr *httptest.ResponseRecorder, capture *logtest.SlogCapture, cause error) {
 	t.Helper()
 	require.Equal(t, http.StatusInternalServerError, rr.Code)
 	records := capture.Records()
@@ -57,7 +57,7 @@ func requireErrorOnTheRecord(t *testing.T, rr *httptest.ResponseRecorder, captur
 }
 
 // requireRefused asserts a refusal the caller owns, which logs nothing.
-func requireRefused(t *testing.T, rr *httptest.ResponseRecorder, capture *testutil.SlogCapture, status int, code string) {
+func requireRefused(t *testing.T, rr *httptest.ResponseRecorder, capture *logtest.SlogCapture, status int, code string) {
 	t.Helper()
 	require.Equal(t, status, rr.Code)
 	var body map[string]any
@@ -82,7 +82,7 @@ func TestHandleAPIAccountLogoutRequestPost_ARedirectURILoadFailureIsOnTheRecord(
 	database.On("ClientLoadRedirectURIs", mock.Anything, mock.Anything, mock.Anything).
 		Return(errLogoutLookupFailed).Once()
 
-	capture := testutil.CaptureSlog(t)
+	capture := logtest.CaptureSlog(t)
 	rr := httptest.NewRecorder()
 	HandleAPIAccountLogoutRequestPost(database).ServeHTTP(rr, logoutRequest(t, ""))
 
@@ -97,7 +97,7 @@ func TestHandleAPIAccountLogoutRequestPost_AClientLookupFailureAnswers500(t *tes
 	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, logoutClientIdent).
 		Return(nil, errLogoutLookupFailed).Once()
 
-	capture := testutil.CaptureSlog(t)
+	capture := logtest.CaptureSlog(t)
 	rr := httptest.NewRecorder()
 	HandleAPIAccountLogoutRequestPost(database).ServeHTTP(rr, logoutRequest(t, logoutClientIdent))
 
@@ -112,7 +112,7 @@ func TestHandleAPIAccountLogoutRequestPost_AnUnknownClientIsStill400(t *testing.
 	database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, logoutClientIdent).
 		Return(nil, nil).Once()
 
-	capture := testutil.CaptureSlog(t)
+	capture := logtest.CaptureSlog(t)
 	rr := httptest.NewRecorder()
 	HandleAPIAccountLogoutRequestPost(database).ServeHTTP(rr, logoutRequest(t, logoutClientIdent))
 
@@ -139,7 +139,7 @@ func TestHandleAPIAccountLogoutRequestPost_ASessionLookupFailureAnswers500(t *te
 	database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, logoutSid).
 		Return(nil, errLogoutLookupFailed).Once()
 
-	capture := testutil.CaptureSlog(t)
+	capture := logtest.CaptureSlog(t)
 	rr := httptest.NewRecorder()
 	HandleAPIAccountLogoutRequestPost(database).ServeHTTP(rr, logoutRequest(t, logoutClientIdent))
 
@@ -154,7 +154,7 @@ func TestHandleAPIAccountLogoutRequestPost_AMissingSessionIsStill401(t *testing.
 	database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, logoutSid).
 		Return(nil, nil).Once()
 
-	capture := testutil.CaptureSlog(t)
+	capture := logtest.CaptureSlog(t)
 	rr := httptest.NewRecorder()
 	HandleAPIAccountLogoutRequestPost(database).ServeHTTP(rr, logoutRequest(t, logoutClientIdent))
 

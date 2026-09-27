@@ -356,6 +356,9 @@ command itself and fails on a tree it changed.
 | `core/logging` | `TruncateCounted` | kernel | — |
 | `core/logging` | `TruncationMarker` | kernel | — |
 | `core/logging` | `WrapRequestID` | kernel | — |
+| `core/logging/logtest` | `CaptureSlog` | test-support | Test support: compiled into no binary, and nothing outside `core/logging/logtest` names it in production. |
+| `core/logging/logtest` | `CapturedRecord` | test-support | Test support: compiled into no binary, and nothing outside `core/logging/logtest` names it in production. |
+| `core/logging/logtest` | `SlogCapture` | test-support | Test support: compiled into no binary, and nothing outside `core/logging/logtest` names it in production. |
 | `core/middleware` | `BodyLimitPolicy` | both-apps | — |
 | `core/middleware` | `CsrfPolicy` | both-apps | — |
 | `core/middleware` | `MiddlewareBodyLimit` | both-apps | — |
@@ -397,11 +400,9 @@ command itself and fails on a tree it changed.
 | `core/sessionstore/sessiontest` | `NewMemoryBackend` | test-support | Test support: the in-memory session backend, honouring expiry as the engines do, that tests across the two servers drive the real store over. Its own package precisely so no binary links it (#385). |
 | `core/stringutil` | `GenerateSecurityRandomString` | both-apps | — |
 | `core/stringutil` | `RandomStringFromAlphabet` | own-package | — |
-| `core/testutil` | `Address` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
 | `core/testutil` | `AssertAgentDocs` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
 | `core/testutil` | `AssertArchitecture` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
 | `core/testutil` | `AssertAuditLogContext` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
-| `core/testutil` | `AssertEmailSent` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
 | `core/testutil` | `AssertErrorCodeDoc` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
 | `core/testutil` | `AssertGeneratedMocksArePinned` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
 | `core/testutil` | `AssertGofmted` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
@@ -416,17 +417,12 @@ command itself and fails on a tree it changed.
 | `core/testutil` | `AssertTemplatesHtmlLangNotHardcoded` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
 | `core/testutil` | `AssertTemplatesNoCsrfField` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
 | `core/testutil` | `AssertTemplatesNoHTMLInTitle` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
-| `core/testutil` | `CaptureSlog` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
-| `core/testutil` | `CapturedRecord` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
 | `core/testutil` | `FindSourceRoot` | kernel | — |
 | `core/testutil` | `GuardReport` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
-| `core/testutil` | `MailpitData` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
-| `core/testutil` | `MailpitMessage` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
 | `core/testutil` | `RenderSymbolOwnership` | kernel | — |
 | `core/testutil` | `Reporter` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
 | `core/testutil` | `RunGuard` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
 | `core/testutil` | `SkipWithoutIPv6Loopback` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
-| `core/testutil` | `SlogCapture` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
 | `core/testutil` | `SourceRoot` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
 | `core/testutil` | `WalkHTMLTemplates` | test-support | Test support: compiled into no binary, and nothing outside `core/testutil` names it in production. |
 | `core/timezones` | `Get` | both-apps | — |

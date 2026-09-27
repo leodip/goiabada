@@ -4,7 +4,7 @@ import (
 	"log/slog"
 	"testing"
 
-	"github.com/leodip/goiabada/core/testutil"
+	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -18,7 +18,7 @@ import (
 // The condition that reaches it is Start's, and is not under test here: Start binds listeners and
 // blocks. What is under test is the record an operator reads when it fires.
 func TestLogHttpWithoutTlsWarning_IsOneWarnNamingTheServerAndTheRemedy(t *testing.T) {
-	logs := testutil.CaptureSlog(t)
+	logs := logtest.CaptureSlog(t)
 
 	logHttpWithoutTlsWarning()
 

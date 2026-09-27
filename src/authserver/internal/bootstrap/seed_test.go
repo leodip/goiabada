@@ -15,7 +15,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/core/constants"
-	"github.com/leodip/goiabada/core/testutil"
+	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -170,7 +170,7 @@ func TestRun_SingleStep_SeedsAndContinues(t *testing.T) {
 func TestRun_TwoStep_PublishesTheFileAndExits(t *testing.T) {
 	db := newSeedDB(t)
 	cfg := twoStepConfig(t)
-	logs := testutil.CaptureSlog(t)
+	logs := logtest.CaptureSlog(t)
 
 	outcome, err := testRunner(db, cfg).run(context.Background())
 
@@ -497,12 +497,12 @@ func TestRun_WritesOneSeededRecord(t *testing.T) {
 	db := newSeedDB(t)
 	cfg := singleStepConfig()
 	cfg.AppName = ""
-	logs := testutil.CaptureSlog(t)
+	logs := logtest.CaptureSlog(t)
 
 	_, err := testRunner(db, cfg).run(context.Background())
 	require.NoError(t, err)
 
-	var seeded []testutil.CapturedRecord
+	var seeded []logtest.CapturedRecord
 	for _, record := range logs.Records() {
 		assert.False(t, strings.HasSuffix(record.Message, " created"), "no per-row record: %s", record.Message)
 		if record.Message == "database seeded" {

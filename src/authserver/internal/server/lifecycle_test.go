@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/config"
-	"github.com/leodip/goiabada/core/testutil"
+	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -90,7 +90,7 @@ func waitFor[T any](t *testing.T, ch <-chan T, what string) T {
 	}
 }
 
-func messages(records []testutil.CapturedRecord) []string {
+func messages(records []logtest.CapturedRecord) []string {
 	var got []string
 	for _, record := range records {
 		got = append(got, record.Message)
@@ -98,7 +98,7 @@ func messages(records []testutil.CapturedRecord) []string {
 	return got
 }
 
-func assertNoErrorRecord(t *testing.T, records []testutil.CapturedRecord) {
+func assertNoErrorRecord(t *testing.T, records []logtest.CapturedRecord) {
 	t.Helper()
 	for _, record := range records {
 		assert.Less(t, record.Level, slog.LevelError,
@@ -111,7 +111,7 @@ func assertNoErrorRecord(t *testing.T, records []testutil.CapturedRecord) {
 // the drain. Before #426 the console cut such a request off, and the auth server's drain lived in a
 // method nothing could reach without the configured ports.
 func TestServeAndDrain_CancellationWaitsForTheHeldRequest(t *testing.T) {
-	logs := testutil.CaptureSlog(t)
+	logs := logtest.CaptureSlog(t)
 
 	held := newHeldHandler()
 	served := servedOnLoopback(t, held)
@@ -170,7 +170,7 @@ func TestServeAndDrain_CancellationWaitsForTheHeldRequest(t *testing.T) {
 // rather than logged, and is never http.ErrServerClosed, which the healthy listener's serve call
 // returns once it is drained.
 func TestServeAndDrain_AFailedListenerDrainsTheOtherFirst(t *testing.T) {
-	logs := testutil.CaptureSlog(t)
+	logs := logtest.CaptureSlog(t)
 
 	held := newHeldHandler()
 	healthy := servedOnLoopback(t, held)
@@ -225,7 +225,7 @@ func TestServeAndDrain_AFailedListenerDrainsTheOtherFirst(t *testing.T) {
 // so as a returned error, which main logs once before it exits (#426, #390 R16). The Server here has
 // no router and no worker, so reaching either would panic rather than return.
 func TestStart_WithNoListenerRefusesBeforeStartingAnything(t *testing.T) {
-	logs := testutil.CaptureSlog(t)
+	logs := logtest.CaptureSlog(t)
 
 	cfg := config.GetAuthServer()
 	previousHTTPS, previousHTTP := cfg.ListenHostHttps, cfg.ListenHostHttp

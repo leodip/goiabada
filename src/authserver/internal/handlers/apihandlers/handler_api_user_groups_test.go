@@ -17,7 +17,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/i18n"
-	"github.com/leodip/goiabada/core/testutil"
+	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -42,7 +42,7 @@ func TestHandleAPIUserGroupsGet_AFailedCountAnswers500(t *testing.T) {
 		Run(loadGroupsOnto(models.Group{Id: 5, GroupIdentifier: "admins"})).Return(nil).Once()
 	database.On("CountGroupMembers", mock.Anything, mock.Anything, int64(5)).Return(0, errCountFailed).Once()
 
-	capture := testutil.CaptureSlog(t)
+	capture := logtest.CaptureSlog(t)
 	rr := httptest.NewRecorder()
 	HandleAPIUserGroupsGet(database).ServeHTTP(rr, apiIdRequest("/api/v1/admin/users/42/groups", "42"))
 
@@ -75,7 +75,7 @@ func TestHandleAPIUserGroupsPut_AFailedCountAnswers500(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPut, "/api/v1/admin/users/42/groups", bytes.NewReader(body))
 	req = setChiURLParam(req, "id", "42")
 
-	capture := testutil.CaptureSlog(t)
+	capture := logtest.CaptureSlog(t)
 	rr := httptest.NewRecorder()
 	HandleAPIUserGroupsPut(database, auditLogger).ServeHTTP(rr, req)
 
