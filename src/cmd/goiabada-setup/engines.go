@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"slices"
 	"strings"
 )
@@ -48,10 +47,14 @@ type engine struct {
 	healthInterval string
 	healthTimeout  string
 
-	// checkDriver and checkDSN are how the wizard reaches the database to test the operator's
-	// details, and emptinessQuery counts the Goiabada tables already there.
-	checkDriver    string
-	checkDSN       func(host, port, name, user, password string) string
+	// driver, dsn and maintenanceDSN are how the auth server reaches the database, copied in
+	// dbcheck.go, and so how the connection check does. existenceQuery counts the databases named
+	// its one parameter, over the maintenance connection; emptinessQuery counts the Goiabada
+	// tables already in the application database.
+	driver         string
+	dsn            func(t dbTarget) string
+	maintenanceDSN func(t dbTarget) string
+	existenceQuery string
 	emptinessQuery string
 }
 
@@ -77,10 +80,10 @@ var engines = []*engine{
 		healthcheck:    `mysqladmin ping -uroot -p"${MYSQL_ROOT_PASSWORD}" --protocol tcp`,
 		healthInterval: "1s",
 		healthTimeout:  "2s",
-		checkDriver:    "mysql",
-		checkDSN: func(host, port, name, user, password string) string {
-			return fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?timeout=5s", user, password, host, port, name)
-		},
+		driver:         "mysql",
+		dsn:            mysqlDSN,
+		maintenanceDSN: mysqlMaintenanceDSN,
+		existenceQuery: "SELECT COUNT(*) FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = ?",
 		emptinessQuery: "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'users'",
 	},
 	{
@@ -103,10 +106,10 @@ var engines = []*engine{
 		healthcheck:    "pg_isready -U postgres",
 		healthInterval: "1s",
 		healthTimeout:  "2s",
-		checkDriver:    "postgres",
-		checkDSN: func(host, port, name, user, password string) string {
-			return fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=require connect_timeout=5", host, port, user, password, name)
-		},
+		driver:         "pgx",
+		dsn:            postgresDSN,
+		maintenanceDSN: postgresMaintenanceDSN,
+		existenceQuery: "SELECT COUNT(*) FROM pg_database WHERE datname = $1",
 		emptinessQuery: "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'users'",
 	},
 	{
@@ -129,10 +132,10 @@ var engines = []*engine{
 		healthcheck:    `/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "${MSSQL_SA_PASSWORD}" -C -Q 'SELECT 1' || exit 1`,
 		healthInterval: "10s",
 		healthTimeout:  "5s",
-		checkDriver:    "sqlserver",
-		checkDSN: func(host, port, name, user, password string) string {
-			return fmt.Sprintf("sqlserver://%s:%s@%s:%s?database=%s&connection+timeout=5", user, password, host, port, name)
-		},
+		driver:         "sqlserver",
+		dsn:            mssqlDSN,
+		maintenanceDSN: mssqlMaintenanceDSN,
+		existenceQuery: "SELECT COUNT(*) FROM sys.databases WHERE name = @p1",
 		emptinessQuery: "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'users'",
 	},
 	{

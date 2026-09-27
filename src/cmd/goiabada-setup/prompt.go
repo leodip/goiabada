@@ -198,8 +198,8 @@ func (a asker) email(prompt, defaultValue string) (string, error) {
 	return a.validated(prompt, defaultValue, "email", validateEmail)
 }
 
-func (a asker) hostname(prompt, defaultValue string) (string, error) {
-	return a.validated(prompt, defaultValue, "hostname", validateHostname)
+func (a asker) databaseHost(prompt, defaultValue string) (string, error) {
+	return a.validated(prompt, defaultValue, "database host", validateDatabaseHost)
 }
 
 func (a asker) port(prompt, defaultValue string) (string, error) {

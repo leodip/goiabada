@@ -1,13 +1,17 @@
 package mysqldb
 
 import (
+	"encoding/json"
 	"net"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	mysqldriver "github.com/go-sql-driver/mysql"
+	"github.com/leodip/goiabada/core/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -101,4 +105,35 @@ func dsnParam(t *testing.T, dsn, key string) string {
 	q, err := url.ParseQuery(dsn[i+1:])
 	require.NoError(t, err)
 	return q.Get(key)
+}
+
+// TestDSN_MatchesTheSetupWizardsCaseFile holds DSN and MaintenanceDSN to the strings in
+// cmd/goiabada-setup/testdata/connection-strings.json. The setup wizard checks an operator's
+// database with copies of these two, since it may import no application (ARCHITECTURE.md rule 3),
+// and its own tier holds the copies to the same file, so changing either side alone fails that
+// side's tier (#430).
+func TestDSN_MatchesTheSetupWizardsCaseFile(t *testing.T) {
+	path := filepath.Join(testutil.SourceRoot(t), "cmd", "goiabada-setup", "testdata", "connection-strings.json")
+	raw, err := os.ReadFile(path)
+	require.NoError(t, err)
+	var file struct {
+		Cases []struct {
+			Name, Engine, Host, Username, Password, Database, DSN string
+			Port                                                  int
+			MaintenanceDSN                                        string `json:"maintenanceDSN"`
+		} `json:"cases"`
+	}
+	require.NoError(t, json.Unmarshal(raw, &file))
+
+	found := 0
+	for _, c := range file.Cases {
+		if c.Engine != "mysql" {
+			continue
+		}
+		found++
+		cfg := &DatabaseConfig{Username: c.Username, Password: c.Password, Host: c.Host, Port: c.Port, Name: c.Database}
+		assert.Equalf(t, c.DSN, DSN(cfg), "%s: DSN", c.Name)
+		assert.Equalf(t, c.MaintenanceDSN, MaintenanceDSN(cfg), "%s: MaintenanceDSN", c.Name)
+	}
+	require.NotZerof(t, found, "%s holds no mysql case", path)
 }
