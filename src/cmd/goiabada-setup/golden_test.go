@@ -166,3 +166,66 @@ func firstDifference(want, got string) string {
 	}
 	return "The texts differ only in a way line splitting does not show."
 }
+
+// The two variables the admin console stopped reading. The client id is the compile-time
+// constant `admin-console-client` and the issuer comes from the auth server's public
+// settings, so a deployment artifact that sets either is asking an operator for a value
+// they cannot choose, and the admin console now refuses to start when the issuer one is
+// present at all (#285).
+//
+// These generators are pure and their output is what an operator pastes into a server, so
+// a reintroduced line here ships silently: nothing else in the repository reads what they
+// produce. Before this test the module had no tests at all, and `go test ./...` reported
+// `[no test files]` with the removed lines restored.
+var removedAdminConsoleVars = []string{
+	"GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_ID",
+	"GOIABADA_ADMINCONSOLE_ISSUER",
+}
+
+func TestGeneratedOutputsOmitTheRemovedAdminConsoleVars(t *testing.T) {
+	config := testConfig()
+
+	// Each case names a line the generator must still emit. Absence alone would pass
+	// against a generator that returned nothing, which is the way this test could go
+	// quietly false as the wizard changes.
+	testCases := []struct {
+		name         string
+		generated    string
+		stillEmitted string
+	}{
+		{
+			name:         "admin console compose service",
+			generated:    generateAdminConsoleService(config),
+			stillEmitted: "GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET=oauth-client-secret",
+		},
+		{
+			name:         "whole compose file",
+			generated:    generateDockerCompose(config),
+			stillEmitted: "goiabada-adminconsole:",
+		},
+		{
+			name:         "env file for native binaries",
+			generated:    generateEnvFile(config),
+			stillEmitted: `export GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET="oauth-client-secret"`,
+		},
+		{
+			name:         "kubernetes manifests",
+			generated:    generateKubernetesManifests(config),
+			stillEmitted: "GOIABADA_ADMINCONSOLE_BASEURL: \"https://admin.example.com\"",
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			for _, removed := range removedAdminConsoleVars {
+				if strings.Contains(testCase.generated, removed) {
+					t.Errorf("output sets %s, which the admin console no longer reads", removed)
+				}
+			}
+			if !strings.Contains(testCase.generated, testCase.stillEmitted) {
+				t.Errorf("output does not contain %q, so the absence checks above proved nothing",
+					testCase.stillEmitted)
+			}
+		})
+	}
+}
