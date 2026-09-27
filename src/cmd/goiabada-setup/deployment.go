@@ -42,7 +42,7 @@ type deployment struct {
 
 	outputFile        string
 	generate          func(config *Config) string
-	printInstructions func(config *Config, outputPath string)
+	printInstructions func(out *console, config *Config, outputPath string)
 }
 
 // deployments is the deployment menu, in its order, indexed by deploymentType.

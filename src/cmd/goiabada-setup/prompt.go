@@ -1,184 +1,244 @@
 package main
 
 import (
-	"fmt"
+	"bufio"
+	"errors"
 	"io"
 	"os"
 	"strings"
 
-	"github.com/chzyer/readline"
+	"github.com/leodip/goiabada/core/errs"
+	"golang.org/x/term"
 )
 
-func promptString(rl *readline.Instance, prompt, defaultValue string) string {
-	var promptStr string
-	if defaultValue != "" {
-		promptStr = fmt.Sprintf("%s [%s]: ", prompt, defaultValue)
-	} else {
-		promptStr = fmt.Sprintf("%s: ", prompt)
+// errAborted is the operator ending the wizard: Ctrl-C, Ctrl-D at an empty line, the end of the
+// input, "Abort setup" or declining the final confirmation. main answers it with "Aborted." and
+// exit 0, and nothing is written.
+var errAborted = errors.New("aborted")
+
+// prompter reads one answer. A read that fails for any reason but the operator ending the wizard
+// returns that failure, never an answer: the prompts built on it would otherwise take their default,
+// and a fault at "Generate configuration files?" would approve the write (#430).
+type prompter interface {
+	readLine(prompt string) (string, error)
+}
+
+// newPrompter reads from a terminal through x/term, which edits the line and keeps its history,
+// and from anything else, a pipe or CI, line by line, since a pipe cannot be put into raw mode.
+func newPrompter(stdin *os.File, stdout io.Writer) prompter {
+	fd := int(stdin.Fd())
+	if term.IsTerminal(fd) {
+		return newTerminalPrompter(fd, struct {
+			io.Reader
+			io.Writer
+		}{stdin, stdout})
 	}
-	rl.SetPrompt(promptStr)
-	input, err := rl.Readline()
+	return &linePrompter{r: bufio.NewReader(stdin), w: stdout}
+}
+
+// terminalPrompter reads through term.Terminal, which echoes, edits and keeps a history of what it
+// reads. term.Terminal needs raw mode, and raw mode stops the terminal turning "\n" into "\r\n",
+// which everything else the wizard prints relies on, so raw mode is entered for each read and
+// restored before the read returns rather than held across the wizard (#430).
+type terminalPrompter struct {
+	t *term.Terminal
+	// enter puts the terminal into raw mode and returns what puts it back.
+	enter func() (restore func() error, err error)
+	// size is the window's, read before each read so a resized window still wraps where it ends.
+	size func() (width, height int, err error)
+}
+
+func newTerminalPrompter(fd int, rw io.ReadWriter) *terminalPrompter {
+	return &terminalPrompter{
+		t: term.NewTerminal(rw, ""),
+		enter: func() (func() error, error) {
+			state, err := term.MakeRaw(fd)
+			if err != nil {
+				return nil, err
+			}
+			return func() error { return term.Restore(fd, state) }, nil
+		},
+		size: func() (int, int, error) { return term.GetSize(fd) },
+	}
+}
+
+// readLine answers errAborted for io.EOF, which term.Terminal returns for Ctrl-C, for Ctrl-D at an
+// empty line and for the end of the input alike.
+func (p *terminalPrompter) readLine(prompt string) (line string, err error) {
+	restore, err := p.enter()
 	if err != nil {
-		if err == io.EOF || err == readline.ErrInterrupt {
-			fmt.Println("\nAborted.")
-			os.Exit(0)
+		return "", errs.Wrap(err, "unable to put the terminal into raw mode")
+	}
+	defer func() {
+		if restoreErr := restore(); restoreErr != nil && err == nil {
+			err = errs.Wrap(restoreErr, "unable to restore the terminal")
 		}
-		return defaultValue
+	}()
+	if width, height, sizeErr := p.size(); sizeErr == nil {
+		_ = p.t.SetSize(width, height)
+	}
+	p.t.SetPrompt(prompt)
+	line, err = p.t.ReadLine()
+	if errors.Is(err, io.EOF) {
+		return "", errAborted
+	}
+	if err != nil {
+		return "", errs.Wrap(err, "unable to read the answer")
+	}
+	return line, nil
+}
+
+// linePrompter reads lines from input that is not a terminal. The end of the input is the abort,
+// as it is at a terminal; a last line with no newline is still an answer.
+type linePrompter struct {
+	r *bufio.Reader
+	w io.Writer
+}
+
+func (p *linePrompter) readLine(prompt string) (string, error) {
+	_, _ = io.WriteString(p.w, prompt)
+	line, err := p.r.ReadString('\n')
+	if err != nil && !errors.Is(err, io.EOF) {
+		return "", errs.Wrap(err, "unable to read the answer")
+	}
+	if err != nil && line == "" {
+		return "", errAborted
+	}
+	return strings.TrimSuffix(strings.TrimSuffix(line, "\n"), "\r"), nil
+}
+
+// asker is the typed prompts, over a prompter and the console their complaints are written to.
+// Each returns its default only for an empty answer that was read, and a read's failure as it is.
+type asker struct {
+	in  prompter
+	out *console
+}
+
+func (a asker) text(prompt, defaultValue string) (string, error) {
+	promptStr := prompt + ": "
+	if defaultValue != "" {
+		promptStr = prompt + " [" + defaultValue + "]: "
+	}
+	input, err := a.in.readLine(promptStr)
+	if err != nil {
+		return "", err
 	}
 	input = strings.TrimSpace(input)
 	if input == "" {
-		return defaultValue
+		return defaultValue, nil
 	}
-	return input
+	return input, nil
 }
 
-func promptChoice(rl *readline.Instance, prompt string, validChoices []string, defaultValue string) string {
+func (a asker) choice(prompt string, validChoices []string, defaultValue string) (string, error) {
 	for {
-		promptStr := fmt.Sprintf("%s [%s]: ", prompt, defaultValue)
-		rl.SetPrompt(promptStr)
-		input, err := rl.Readline()
+		input, err := a.text(prompt, defaultValue)
 		if err != nil {
-			if err == io.EOF || err == readline.ErrInterrupt {
-				fmt.Println("\nAborted.")
-				os.Exit(0)
-			}
-			return defaultValue
-		}
-		input = strings.TrimSpace(input)
-		if input == "" {
-			return defaultValue
+			return "", err
 		}
 		for _, valid := range validChoices {
 			if input == valid {
-				return input
+				return input, nil
 			}
 		}
-		fmt.Println("Invalid choice. Please try again.")
+		a.out.println("Invalid choice. Please try again.")
 	}
 }
 
-func promptYesNo(rl *readline.Instance, prompt string, defaultYes bool) bool {
+func (a asker) yesNo(prompt string, defaultYes bool) (bool, error) {
 	defaultStr := "Y/n"
 	if !defaultYes {
 		defaultStr = "y/N"
 	}
 	for {
-		promptStr := fmt.Sprintf("%s [%s]: ", prompt, defaultStr)
-		rl.SetPrompt(promptStr)
-		input, err := rl.Readline()
+		input, err := a.in.readLine(prompt + " [" + defaultStr + "]: ")
 		if err != nil {
-			if err == io.EOF || err == readline.ErrInterrupt {
-				fmt.Println("\nAborted.")
-				os.Exit(0)
+			return false, err
+		}
+		switch strings.TrimSpace(strings.ToLower(input)) {
+		case "":
+			return defaultYes, nil
+		case "y", "yes":
+			return true, nil
+		case "n", "no":
+			return false, nil
+		}
+		a.out.println("Please enter 'y' or 'n'.")
+	}
+}
+
+// validated asks until the answer passes validate, naming what was invalid.
+func (a asker) validated(prompt, defaultValue, what string, validate func(string) error) (string, error) {
+	for {
+		value, err := a.text(prompt, defaultValue)
+		if err != nil {
+			return "", err
+		}
+		invalid := validate(value)
+		if invalid == nil {
+			return value, nil
+		}
+		a.out.printf("Invalid %s: %s. Please try again.\n", what, invalid)
+	}
+}
+
+func (a asker) url(prompt, defaultValue string) (string, error) {
+	return a.validated(prompt, defaultValue, "URL", validateURL)
+}
+
+func (a asker) email(prompt, defaultValue string) (string, error) {
+	return a.validated(prompt, defaultValue, "email", validateEmail)
+}
+
+func (a asker) hostname(prompt, defaultValue string) (string, error) {
+	return a.validated(prompt, defaultValue, "hostname", validateHostname)
+}
+
+func (a asker) port(prompt, defaultValue string) (string, error) {
+	return a.validated(prompt, defaultValue, "port", validatePort)
+}
+
+func (a asker) namespace(prompt, defaultValue string) (string, error) {
+	return a.validated(prompt, defaultValue, "namespace", validateNamespace)
+}
+
+func (a asker) databaseName(prompt, defaultValue string) (string, error) {
+	return a.validated(prompt, defaultValue, "database name", validateDatabaseName)
+}
+
+func (a asker) nonEmpty(prompt, defaultValue string) (string, error) {
+	for {
+		value, err := a.text(prompt, defaultValue)
+		if err != nil {
+			return "", err
+		}
+		if value != "" {
+			return value, nil
+		}
+		a.out.println("This field cannot be empty. Please try again.")
+	}
+}
+
+func (a asker) password(prompt, defaultValue string) (string, error) {
+	for {
+		value, err := a.text(prompt, defaultValue)
+		if err != nil {
+			return "", err
+		}
+		if value == "" {
+			a.out.println("Password cannot be empty. Please try again.")
+			continue
+		}
+		if issues := checkPasswordStrength(value); len(issues) > 0 {
+			a.out.warning("Weak password: %s", strings.Join(issues, ", "))
+			useAnyway, askErr := a.yesNo("Use this password anyway?", false)
+			if askErr != nil {
+				return "", askErr
 			}
-			return defaultYes
-		}
-		input = strings.TrimSpace(strings.ToLower(input))
-		if input == "" {
-			return defaultYes
-		}
-		if input == "y" || input == "yes" {
-			return true
-		}
-		if input == "n" || input == "no" {
-			return false
-		}
-		fmt.Println("Please enter 'y' or 'n'.")
-	}
-}
-
-func promptURL(rl *readline.Instance, prompt, defaultValue string) string {
-	for {
-		value := promptString(rl, prompt, defaultValue)
-		if err := validateURL(value); err != nil {
-			fmt.Printf("Invalid URL: %s. Please try again.\n", err)
-			continue
-		}
-		return value
-	}
-}
-
-func promptEmail(rl *readline.Instance, prompt, defaultValue string) string {
-	for {
-		value := promptString(rl, prompt, defaultValue)
-		if err := validateEmail(value); err != nil {
-			fmt.Printf("Invalid email: %s. Please try again.\n", err)
-			continue
-		}
-		return value
-	}
-}
-
-func promptHostname(rl *readline.Instance, prompt, defaultValue string) string {
-	for {
-		value := promptString(rl, prompt, defaultValue)
-		if err := validateHostname(value); err != nil {
-			fmt.Printf("Invalid hostname: %s. Please try again.\n", err)
-			continue
-		}
-		return value
-	}
-}
-
-func promptPort(rl *readline.Instance, prompt, defaultValue string) string {
-	for {
-		value := promptString(rl, prompt, defaultValue)
-		if err := validatePort(value); err != nil {
-			fmt.Printf("Invalid port: %s. Please try again.\n", err)
-			continue
-		}
-		return value
-	}
-}
-
-func promptNonEmpty(rl *readline.Instance, prompt, defaultValue string) string {
-	for {
-		value := promptString(rl, prompt, defaultValue)
-		if value == "" {
-			fmt.Println("This field cannot be empty. Please try again.")
-			continue
-		}
-		return value
-	}
-}
-
-func promptNamespace(rl *readline.Instance, prompt, defaultValue string) string {
-	for {
-		value := promptString(rl, prompt, defaultValue)
-		if err := validateNamespace(value); err != nil {
-			fmt.Printf("Invalid namespace: %s. Please try again.\n", err)
-			continue
-		}
-		return value
-	}
-}
-
-func promptDatabaseName(rl *readline.Instance, prompt, defaultValue string) string {
-	for {
-		value := promptString(rl, prompt, defaultValue)
-		if err := validateDatabaseName(value); err != nil {
-			fmt.Printf("Invalid database name: %s. Please try again.\n", err)
-			continue
-		}
-		return value
-	}
-}
-
-func promptPassword(rl *readline.Instance, prompt, defaultValue string) string {
-	for {
-		value := promptString(rl, prompt, defaultValue)
-		if value == "" {
-			fmt.Println("Password cannot be empty. Please try again.")
-			continue
-		}
-		// Check password strength
-		issues := checkPasswordStrength(value)
-		if len(issues) > 0 {
-			printWarning("Weak password: %s", strings.Join(issues, ", "))
-			if !promptYesNo(rl, "Use this password anyway?", false) {
+			if !useAnyway {
 				continue
 			}
 		}
-		return value
+		return value, nil
 	}
 }
