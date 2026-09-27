@@ -31,7 +31,7 @@ import (
 // seed, and the user simply cannot finish enrolling.
 //
 // What these cases own is that binding. Whether the rendered form carries a hidden input is HTML,
-// which a mocked RenderTemplate cannot see; that lives in adminconsole/internal/rendertest.
+// which a mocked RenderTemplate cannot see; that lives in adminconsole/internal/renderintegration.
 
 const (
 	testBase64Image = "aW1hZ2UtYnl0ZXM="

@@ -11,11 +11,12 @@ import (
 // TestHandlers_NoCsrfFieldBind is the bind-side half of the guard whose template-side half lives in
 // web/template_lint_test.go as TestTemplates_NoCsrfField. #155 replaced the CSRF token with an
 // origin check, deleting 100 csrfField binds from the 59 handler files under internal/handlers and
-// four more from internal/rendertest, and nothing else in this module can tell if one comes back.
+// four more from the render tests now in internal/renderintegration, and nothing else in this
+// module can tell if one comes back.
 //
-// The admin console has no handler tests: its seven test_main_test.go files are stubs, and the four
-// render tests in internal/rendertest supply their own bind maps rather than a handler's. So the
-// authserver's instrument does not exist here. There, a reintroduced bind fails a deliberately
+// The admin console's handler tests read the keys they care about off a bind (handlertest.Bind)
+// and none asserts its length, and the render tests in internal/renderintegration supply their own
+// bind maps rather than a handler's. So the authserver's instrument does not exist here. There, a reintroduced bind fails a deliberately
 // brittle len(bind) assertion; here, reintroducing "csrfField": "" left the entire module tier
 // green when it was tried, from a handler's bind map and from a render test's alike.
 //
@@ -27,8 +28,8 @@ import (
 // The boundary is every Go source under internal/, not this package's tree alone, because a bind
 // map reaching the real renderer from a test fixture reads exactly like one reaching it from a
 // handler and is just as invisible. Every RenderTemplate caller in this module lives under
-// internal/, in one of two trees: internal/handlers and internal/rendertest. Both must be walked or
-// the guard covers less than it claims, which is what the per-tree check below enforces.
+// internal/, in one of two trees: internal/handlers and internal/renderintegration. Both must be
+// walked or the guard covers less than it claims, which is what the per-tree check below enforces.
 //
 // It walks source text rather than go/ast, and the claim it makes is exactly that: no Go source
 // under internal/ contains the string csrfField. That is the shape a regression actually takes,
@@ -77,7 +78,7 @@ func TestHandlers_NoCsrfFieldBind(t *testing.T) {
 	}
 
 	// A walk that misses one of these passes while guarding only half the bind suppliers.
-	for _, tree := range []string{"handlers", "rendertest"} {
+	for _, tree := range []string{"handlers", "renderintegration"} {
 		if perTree[tree] == 0 {
 			t.Errorf("walked no Go files under internal/%s; the guard is not checking the bind "+
 				"maps that live there", tree)

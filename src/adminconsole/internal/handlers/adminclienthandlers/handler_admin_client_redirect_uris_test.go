@@ -48,8 +48,8 @@ func (s *stubApiClient) GetSettingsGeneral(_ context.Context, accessToken string
 }
 
 // stubHttpHelper captures the bind instead of rendering it. The template is proved separately,
-// in rendertest, from a bind the test hands it; that case cannot see whether this handler built
-// the bind correctly, which is what these cases are for.
+// in renderintegration, from a bind the test hands it; that case cannot see whether this handler
+// built the bind correctly, which is what these cases are for.
 type stubHttpHelper struct {
 	handlers.HttpHelper
 	bind map[string]interface{}

@@ -49,9 +49,9 @@ func (s *stubAllClientsApiClient) UpdateClientWebOrigins(_ context.Context, acce
 // answer "what may call these endpoints from a browser today" without opening every client in
 // turn (#250 decision 9(b)).
 //
-// This is the half a rendertest case cannot see. rendertest hands the template a bind the test
-// wrote, so deleting the GetAllClients call here would leave every rendertest case green with the
-// page showing nothing but this client's rows (plan review round 1, finding 3).
+// This is the half a renderintegration case cannot see. renderintegration hands the template a
+// bind the test wrote, so deleting the GetAllClients call here would leave every renderintegration
+// case green with the page showing nothing but this client's rows (plan review round 1, finding 3).
 func TestHandleAdminClientWebOriginsGet_AssemblesTheServerWideList(t *testing.T) {
 
 	httpHelper := &stubHttpHelper{}
