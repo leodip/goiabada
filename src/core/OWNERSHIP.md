@@ -225,6 +225,8 @@ command itself and fails on a tree it changed.
 | `core/api` | `UserWithPermissionResponse` | both-apps | — |
 | `core/api` | `VerifyAccountEmailRequest` | both-apps | — |
 | `core/api` | `WebOriginResponse` | reachable | — |
+| `core/boundedread` | `ErrResponseTooLarge` | own-package | — |
+| `core/boundedread` | `Read` | kernel | — |
 | `core/constants` | `AdminConsoleClientIdentifier` | both-apps | — |
 | `core/constants` | `AdminConsoleSessionName` | both-apps | — |
 | `core/constants` | `AdminReadPermissionIdentifier` | own-package | — |

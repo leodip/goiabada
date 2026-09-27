@@ -3,12 +3,15 @@ package main
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/leodip/goiabada/core/boundedread"
 )
 
 // fakeDoer serves canned responses keyed by request URL, so tests never touch
@@ -101,20 +104,30 @@ func TestEmojiFromAlpha2(t *testing.T) {
 	}
 }
 
-func TestReadCapped(t *testing.T) {
-	// Within limit.
-	b, err := readCapped(strings.NewReader("abcdef"), 10)
-	if err != nil || string(b) != "abcdef" {
-		t.Errorf("readCapped within limit = (%q, %v)", b, err)
-	}
-	// Exactly at limit is allowed.
-	if _, err := readCapped(strings.NewReader("abc"), 3); err != nil {
-		t.Errorf("readCapped at limit errored: %v", err)
-	}
-	// Over limit fails.
-	if _, err := readCapped(strings.NewReader("abcdef"), 3); err == nil {
-		t.Error("readCapped over limit: want error, got nil")
-	}
+// TestDoGet pins that the download is capped. The boundary cases of the cap
+// itself belong to boundedread's own tests; what is here is that doGet reads
+// through it at the limit it is given.
+func TestDoGet(t *testing.T) {
+	const url = "https://example.test/data.csv"
+
+	t.Run("a body of exactly the limit is returned whole", func(t *testing.T) {
+		d := fakeDoer{responses: map[string]fakeResp{url: {200, "abc"}}}
+		b, err := doGet(d.do, url, 3)
+		if err != nil || string(b) != "abc" {
+			t.Errorf("doGet at limit = (%q, %v), want (\"abc\", nil)", b, err)
+		}
+	})
+
+	t.Run("one byte over the limit is refused", func(t *testing.T) {
+		d := fakeDoer{responses: map[string]fakeResp{url: {200, "abcd"}}}
+		b, err := doGet(d.do, url, 3)
+		if !errors.Is(err, boundedread.ErrResponseTooLarge) {
+			t.Errorf("doGet over limit: err = %v, want boundedread.ErrResponseTooLarge", err)
+		}
+		if b != nil {
+			t.Errorf("doGet over limit returned %q, want nil", b)
+		}
+	})
 }
 
 func TestIsHex40(t *testing.T) {

@@ -7,7 +7,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/leodip/goiabada/adminconsole/internal/boundedread"
+	"github.com/leodip/goiabada/core/boundedread"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
 )
