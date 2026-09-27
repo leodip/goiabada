@@ -27,7 +27,7 @@ import (
 // matches nothing, and the route it was written for silently falls to the default. Walking the
 // real registrations is what catches a pattern renamed in routes.go and not here.
 func TestBodyLimitPolicy_NamesOnlyRegisteredRoutes(t *testing.T) {
-	s := newStaticBranchTestServer("http://127.0.0.1:1", &countingStore{})
+	s := newStaticBranchTestServer("http://127.0.0.1:1", newTestSessionStore())
 	s.initRoutes(s.initMiddleware())
 
 	var registered []string
@@ -72,7 +72,7 @@ func TestBodyLimitPolicy_EachRowAtItsBoundary(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			s := newStaticBranchTestServer("http://127.0.0.1:1", &countingStore{})
+			s := newStaticBranchTestServer("http://127.0.0.1:1", newTestSessionStore())
 			s.initMiddleware()
 			s.router.Post(test.pattern, readWholeBody)
 
@@ -100,7 +100,7 @@ func TestBodyLimitPolicy_TheUploadRowFollowsTheUploadPage(t *testing.T) {
 // after StripSlashes, whose normalized path the lookup routes by, and ahead of everything else
 // that could read a body.
 func TestInitMiddleware_TheBodyLimitSitsAfterStripSlashes(t *testing.T) {
-	s := newStaticBranchTestServer("http://127.0.0.1:1", &countingStore{})
+	s := newStaticBranchTestServer("http://127.0.0.1:1", newTestSessionStore())
 	s.initMiddleware()
 	s.serveStaticFiles("/static", http.FS(s.staticFS))
 

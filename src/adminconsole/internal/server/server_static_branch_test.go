@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"sync/atomic"
@@ -9,7 +10,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/adminconsole/internal/cache"
+	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/sessionstore"
+	"github.com/leodip/goiabada/core/sessionstore/sessiontest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -30,7 +33,9 @@ import (
 
 func TestInitMiddleware_StaticFilesSkipTheSettingsAndSessionChain(t *testing.T) {
 	settings := newCountingSettingsServer(t)
-	store := &countingStore{}
+	backend := &countingBackend{MemoryBackend: sessiontest.NewMemoryBackend()}
+	store := newTestSessionStoreOver(backend)
+	cookie := seedSession(t, store)
 
 	s := newStaticBranchTestServer(settings.URL, store)
 	app := s.initMiddleware()
@@ -40,21 +45,25 @@ func TestInitMiddleware_StaticFilesSkipTheSettingsAndSessionChain(t *testing.T) 
 	})
 
 	recorder := httptest.NewRecorder()
-	s.router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/static/probe.css", nil))
+	req := httptest.NewRequest(http.MethodGet, "/static/probe.css", nil)
+	req.AddCookie(cookie)
+	s.router.ServeHTTP(recorder, req)
 
 	result := recorder.Result()
 	defer func() { _ = result.Body.Close() }()
 
 	require.Equal(t, http.StatusOK, result.StatusCode, "the file must still be served")
 	assert.Zero(t, settings.fetches.Load(), "a stylesheet must not cost a settings fetch")
-	assert.Zero(t, store.gets.Load(), "nor a session load, which is now a call to the auth server")
+	assert.Zero(t, backend.loads.Load(), "nor a session load, which is now a call to the auth server")
 }
 
 // TestInitMiddleware_ApplicationRoutesKeepTheSettingsAndSessionChain is the other half, and
 // without it the case above is satisfied by a chain that was never mounted at all.
 func TestInitMiddleware_ApplicationRoutesKeepTheSettingsAndSessionChain(t *testing.T) {
 	settings := newCountingSettingsServer(t)
-	store := &countingStore{}
+	backend := &countingBackend{MemoryBackend: sessiontest.NewMemoryBackend()}
+	store := newTestSessionStoreOver(backend)
+	cookie := seedSession(t, store)
 
 	s := newStaticBranchTestServer(settings.URL, store)
 	app := s.initMiddleware()
@@ -67,14 +76,16 @@ func TestInitMiddleware_ApplicationRoutesKeepTheSettingsAndSessionChain(t *testi
 	})
 
 	recorder := httptest.NewRecorder()
-	s.router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/admin/clients", nil))
+	req := httptest.NewRequest(http.MethodGet, "/admin/clients", nil)
+	req.AddCookie(cookie)
+	s.router.ServeHTTP(recorder, req)
 
 	assert.True(t, reached, "the request must reach the handler")
 	assert.Equal(t, int64(1), settings.fetches.Load())
-	assert.Equal(t, int64(1), store.gets.Load())
+	assert.Equal(t, int64(1), backend.loads.Load())
 }
 
-func newStaticBranchTestServer(authServerBaseURL string, store sessionstore.Store) *Server {
+func newStaticBranchTestServer(authServerBaseURL string, store *sessionstore.ServerSideStore) *Server {
 	return &Server{
 		router:        chi.NewRouter(),
 		sessionStore:  store,
@@ -104,19 +115,31 @@ func newCountingSettingsServer(t *testing.T) *countingSettingsServer {
 	return counter
 }
 
-// countingStore records Get, and it is the whole of sessionstore.Store now that Store is
-// Get and Save (#269). It never has to return anything usable: MiddlewareCookieReset asks
-// for the session and passes a non-decode error straight through, so a store that answers
-// an empty session is enough to observe whether it was asked at all.
-type countingStore struct {
-	gets atomic.Int64
+// countingBackend is the in-memory backend counting Load, which is the call a session load
+// costs: on the admin console that is the round trip to the auth server this file is about.
+// The server holds the real store since #431, so what is counted is what reaches the backend
+// rather than what reached a hand-written Store.
+type countingBackend struct {
+	*sessiontest.MemoryBackend
+	loads atomic.Int64
 }
 
-func (s *countingStore) Get(r *http.Request, name string) (*sessionstore.Session, error) {
-	s.gets.Add(1)
-	return sessionstore.NewSession(s, name), nil
+func (b *countingBackend) Load(ctx context.Context, id string) (*sessionstore.Record, error) {
+	b.loads.Add(1)
+	return b.MemoryBackend.Load(ctx, id)
 }
 
-func (s *countingStore) Save(*http.Request, http.ResponseWriter, *sessionstore.Session) error {
-	return nil
+// seedSession stores an empty session and returns the cookie naming it. The requests above
+// carry it because a request with no cookie never consults the backend, so without it the
+// static case would count zero loads whichever branch served it.
+func seedSession(t *testing.T, store *sessionstore.ServerSideStore) *http.Cookie {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	sess, err := store.Get(req, constants.AdminConsoleSessionName)
+	require.NoError(t, err)
+	w := httptest.NewRecorder()
+	require.NoError(t, store.Save(req, w, sess))
+	cookies := w.Result().Cookies()
+	require.Len(t, cookies, 1)
+	return cookies[0]
 }

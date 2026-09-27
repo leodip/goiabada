@@ -4,23 +4,16 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
-	"strings"
 	"testing"
 	"time"
 
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
-	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-
-	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
-	mocks_sessionstore "github.com/leodip/goiabada/core/sessionstore/mocks"
 )
 
 // contextRecordingExchanger records what the context the handler hands it looked
@@ -67,16 +60,14 @@ func (e *contextRecordingExchanger) ExchangeCodeForTokens(ctx context.Context, c
 // internal/middleware is the opposite case and carries its detached context through
 // its save (#338).
 func TestHandleAuthCallbackPost_DetachesTheExchangeFromTheBrowsersContext(t *testing.T) {
-	httpHelper := mocks_handlers.NewHttpHelper(t)
-	handlertest.RefuseInternalServerError(t, httpHelper)
-	handlertest.ExpectRender(httpHelper, "/layouts/no_menu_layout.html", "/sign_in_error.html").Once()
+	h := newCallbackHarness(t)
+	handlertest.RefuseInternalServerError(t, h.httpHelper)
+	handlertest.ExpectRender(h.httpHelper, "/layouts/no_menu_layout.html", "/sign_in_error.html").Once()
 
-	httpSession := mocks_sessionstore.NewStore(t)
-	httpSession.On("Get", mock.Anything, coreconstants.AdminConsoleSessionName).Return(handshakeSession(), nil)
-
-	form := url.Values{"state": {"the-state"}, "code": {"the-code"}}
-	req := httptest.NewRequest(http.MethodPost, "/auth/callback", strings.NewReader(form.Encode()))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req := handlertest.Request(http.MethodPost, "/auth/callback", handlertest.WithForm(callbackForm()))
+	for _, c := range h.seed(handshake()) {
+		req.AddCookie(c)
+	}
 
 	// The inbound context carries a request id, which is the value the detachment is
 	// required to keep: chi's RequestID middleware puts one on every inbound request and
@@ -89,7 +80,7 @@ func TestHandleAuthCallbackPost_DetachesTheExchangeFromTheBrowsersContext(t *tes
 	req = req.WithContext(ctx)
 
 	exchanger := &contextRecordingExchanger{}
-	HandleAuthCallbackPost(httpHelper, httpSession, unusedTokenParser{t: t}, exchanger).
+	HandleAuthCallbackPost(h.httpHelper, h.store, unusedTokenParser{t: t}, exchanger).
 		ServeHTTP(httptest.NewRecorder(), req)
 
 	require.True(t, exchanger.called, "the exchange was reached")

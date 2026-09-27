@@ -30,8 +30,11 @@ import (
 )
 
 type Server struct {
-	router        *chi.Mux
-	sessionStore  sessionstore.Store
+	router *chi.Mux
+	// The concrete store rather than sessionstore.Store: routes.go hands it to the sign-in
+	// callback, whose port names Regenerate, which is what proves at compile time that the
+	// store this console runs rotates the session identifier at sign-in (#431).
+	sessionStore  *sessionstore.ServerSideStore
 	settingsCache *cache.SettingsCache
 
 	// Parsed by main, which refuses to start on a malformed entry (#425), so the real-IP
@@ -42,7 +45,7 @@ type Server struct {
 	templateFS fs.FS
 }
 
-func NewServer(router *chi.Mux, sessionStore sessionstore.Store, settingsCache *cache.SettingsCache, trustedProxies []*net.IPNet) *Server {
+func NewServer(router *chi.Mux, sessionStore *sessionstore.ServerSideStore, settingsCache *cache.SettingsCache, trustedProxies []*net.IPNet) *Server {
 
 	s := Server{
 		router:        router,

@@ -1364,11 +1364,6 @@ func TestServerSideStore_FlashSurvivesAReloadAndIsReadOnce(t *testing.T) {
 	assert.False(t, ok, "a notice must not show a second time")
 }
 
-func TestServerSideStore_ImplementsRegenerator(t *testing.T) {
-	var _ Regenerator = newTestStore(newFakeBackend(), false)
-	var _ Store = newTestStore(newFakeBackend(), false)
-}
-
 // --- which lifetime applies --------------------------------------------------------------
 
 func TestServerSideStore_AuthenticatedFlagFollowsTheConfiguredKey(t *testing.T) {
