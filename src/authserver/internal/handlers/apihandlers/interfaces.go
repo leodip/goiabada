@@ -17,9 +17,10 @@ import (
 // only reason 37 files here imported a transport package sitting above them. A port belongs to the
 // side that calls it (#386), and declaring it here means each one names only the methods this
 // package actually calls: HttpHelper is one method here against the parent's eight. The concrete
-// types the composition root builds satisfy these structurally, so routes.go is unchanged, and so
-// do the generated mocks, which mockery still emits into the packages that own the
-// implementations (#387).
+// types the composition root builds satisfy these structurally, so routes.go is unchanged (#387).
+// So do the parent's generated mocks, which live beside the parent's ports in
+// internal/handlers/mocks, because every generated mock lives beside the interface it doubles;
+// UserCreator's is accounthandlers' (#431).
 //
 // Per-file database ports stay per-file, beside the function taking them: the database is the
 // dependency that genuinely varies from handler to handler, and these eight do not.

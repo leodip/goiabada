@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
-	mocks_handlerhelpers "github.com/leodip/goiabada/adminconsole/internal/handlerhelpers/mocks"
+	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/core/api"
@@ -130,19 +130,19 @@ func (s *ctxRecordingApiClient) DeleteAccountSession(ctx context.Context, _ stri
 func TestAccountHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContext(t *testing.T) {
 	testCases := []struct {
 		name    string
-		build   func(httpHelper *mocks_handlerhelpers.HttpHelper, apiClient apiclient.ApiClient) http.HandlerFunc
+		build   func(httpHelper *mocks_handlers.HttpHelper, apiClient apiclient.ApiClient) http.HandlerFunc
 		request *http.Request
 	}{
 		{
 			name: "HandleAccountAddressGet",
-			build: func(h *mocks_handlerhelpers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
 				return HandleAccountAddressGet(h, nil, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/account/address", handlertest.WithAccessToken()),
 		},
 		{
 			name: "HandleAccountAddressPost",
-			build: func(h *mocks_handlerhelpers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
 				return HandleAccountAddressPost(h, nil, c)
 			},
 			request: handlertest.Request(http.MethodPost, "/account/address",
@@ -150,7 +150,7 @@ func TestAccountHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContext(
 		},
 		{
 			name: "HandleAccountChangePasswordPost",
-			build: func(h *mocks_handlerhelpers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
 				return HandleAccountChangePasswordPost(h, nil, c)
 			},
 			request: handlertest.Request(http.MethodPost, "/account/change-password",
@@ -162,14 +162,14 @@ func TestAccountHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContext(
 		},
 		{
 			name: "HandleAccountEmailGet",
-			build: func(h *mocks_handlerhelpers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
 				return HandleAccountEmailGet(h, nil, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/account/email", handlertest.WithAccessToken()),
 		},
 		{
 			name: "HandleAccountEmailPost",
-			build: func(h *mocks_handlerhelpers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
 				return HandleAccountEmailPost(h, nil, c)
 			},
 			request: handlertest.Request(http.MethodPost, "/account/email",
@@ -177,7 +177,7 @@ func TestAccountHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContext(
 		},
 		{
 			name: "HandleAccountEmailSendVerificationPost",
-			build: func(h *mocks_handlerhelpers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
 				return HandleAccountEmailSendVerificationPost(h, c)
 			},
 			request: handlertest.Request(http.MethodPost, "/account/email/send-verification",
@@ -185,7 +185,7 @@ func TestAccountHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContext(
 		},
 		{
 			name: "HandleAccountEmailVerificationGet",
-			build: func(h *mocks_handlerhelpers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
 				return HandleAccountEmailVerificationGet(h, nil, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/account/email/verification",
@@ -193,7 +193,7 @@ func TestAccountHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContext(
 		},
 		{
 			name: "HandleAccountEmailVerificationPost",
-			build: func(h *mocks_handlerhelpers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
 				return HandleAccountEmailVerificationPost(h, nil, c)
 			},
 			request: handlertest.Request(http.MethodPost, "/account/email/verification",
@@ -201,7 +201,7 @@ func TestAccountHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContext(
 		},
 		{
 			name: "HandleAccountLogoutGet",
-			build: func(h *mocks_handlerhelpers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
 				// The one row needing a real store: this handler clears the console's own
 				// session before it asks the auth server to end the upstream one.
 				return HandleAccountLogoutGet(h, newFlashTestStore(), c)
@@ -216,7 +216,7 @@ func TestAccountHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContext(
 		},
 		{
 			name: "HandleAccountManageConsentsGet",
-			build: func(h *mocks_handlerhelpers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
 				return HandleAccountManageConsentsGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/account/manage-consents",
@@ -224,7 +224,7 @@ func TestAccountHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContext(
 		},
 		{
 			name: "HandleAccountManageConsentsRevokePost",
-			build: func(h *mocks_handlerhelpers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
 				return HandleAccountManageConsentsRevokePost(h, c)
 			},
 			request: handlertest.Request(http.MethodPost, "/account/manage-consents/revoke",
@@ -233,14 +233,14 @@ func TestAccountHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContext(
 		},
 		{
 			name: "HandleAccountOtpGet",
-			build: func(h *mocks_handlerhelpers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
 				return HandleAccountOtpGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/account/otp", handlertest.WithAccessToken()),
 		},
 		{
 			name: "HandleAccountOtpPost",
-			build: func(h *mocks_handlerhelpers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
 				return HandleAccountOtpPost(h, c)
 			},
 			request: handlertest.Request(http.MethodPost, "/account/otp",
@@ -250,14 +250,14 @@ func TestAccountHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContext(
 		},
 		{
 			name: "HandleAccountPhoneGet",
-			build: func(h *mocks_handlerhelpers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
 				return HandleAccountPhoneGet(h, nil, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/account/phone", handlertest.WithAccessToken()),
 		},
 		{
 			name: "HandleAccountPhonePost",
-			build: func(h *mocks_handlerhelpers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
 				return HandleAccountPhonePost(h, nil, c)
 			},
 			request: handlertest.Request(http.MethodPost, "/account/phone",
@@ -265,21 +265,21 @@ func TestAccountHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContext(
 		},
 		{
 			name: "HandleAccountPictureGet",
-			build: func(h *mocks_handlerhelpers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
 				return HandleAccountPictureGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/account/picture", handlertest.WithAccessToken()),
 		},
 		{
 			name: "HandleAccountProfileGet",
-			build: func(h *mocks_handlerhelpers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
 				return HandleAccountProfileGet(h, nil, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/account/profile", handlertest.WithAccessToken()),
 		},
 		{
 			name: "HandleAccountProfilePost",
-			build: func(h *mocks_handlerhelpers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
 				return HandleAccountProfilePost(h, nil, c)
 			},
 			request: handlertest.Request(http.MethodPost, "/account/profile",
@@ -287,14 +287,14 @@ func TestAccountHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContext(
 		},
 		{
 			name: "HandleAccountSessionsGet",
-			build: func(h *mocks_handlerhelpers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
 				return HandleAccountSessionsGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/account/sessions", handlertest.WithAccessToken()),
 		},
 		{
 			name: "HandleAccountSessionsEndSesssionPost",
-			build: func(h *mocks_handlerhelpers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
 				return HandleAccountSessionsEndSesssionPost(h, c)
 			},
 			request: handlertest.Request(http.MethodPost, "/account/sessions",
@@ -306,7 +306,7 @@ func TestAccountHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContext(
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+			httpHelper := mocks_handlers.NewHttpHelper(t)
 			// Every writer is admitted: which one a handler picks is pattern 7's decision and is
 			// held by TestHandlers_AjaxHandlersDoNotUsePageWriters and the classifier guard, not
 			// here. What this case needs is only that the handler answered rather than carrying on.
@@ -336,7 +336,7 @@ func TestAccountHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContext(
 // and the other is the only DELETE here.
 func TestAccountHandlers_ThePictureHandlersCarryTheRequestsContext(t *testing.T) {
 	t.Run("HandleAccountProfilePictureDelete", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		httpHelper.On("JsonError", mock.Anything, mock.Anything, mock.Anything).Maybe()
 		httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).Maybe()
 		httpHelper.On("EncodeJson", mock.Anything, mock.Anything, mock.Anything).Maybe()

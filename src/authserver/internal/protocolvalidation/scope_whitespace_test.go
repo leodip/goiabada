@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
+	mocks_protocolvalidation "github.com/leodip/goiabada/authserver/internal/protocolvalidation/mocks"
 )
 
 // The whitespace rule is pinned once, in oidc's own table; these are the four validator paths'
@@ -119,7 +119,7 @@ func TestValidateTokenRequest_RefreshToken_ScopeWhitespace(t *testing.T) {
 func newWhitespaceClientCredentials(t *testing.T, scope string) (*TokenValidator, *mocks_data.Database, *ValidateTokenRequestInput) {
 	t.Helper()
 	mockDB := mocks_data.NewDatabase(t)
-	validator := NewTokenValidator(mockDB, mocks_handlers.NewTokenParser(t), mocks_handlers.NewPermissionChecker(t))
+	validator := NewTokenValidator(mockDB, mocks_protocolvalidation.NewTokenParser(t), mocks_protocolvalidation.NewPermissionChecker(t))
 
 	clientSecretEncrypted, err := encryption.EncryptData("valid_secret")
 	require.NoError(t, err)
@@ -167,11 +167,11 @@ func TestValidateTokenRequest_ClientCredentials_ScopeWhitespace(t *testing.T) {
 	})
 }
 
-func newWhitespaceROPC(t *testing.T, scope string) (*TokenValidator, *mocks_data.Database, *mocks_handlers.PermissionChecker, context.Context, *ValidateTokenRequestInput) {
+func newWhitespaceROPC(t *testing.T, scope string) (*TokenValidator, *mocks_data.Database, *mocks_protocolvalidation.PermissionChecker, context.Context, *ValidateTokenRequestInput) {
 	t.Helper()
 	mockDB := mocks_data.NewDatabase(t)
-	mockPermissionChecker := mocks_handlers.NewPermissionChecker(t)
-	validator := NewTokenValidator(mockDB, mocks_handlers.NewTokenParser(t), mockPermissionChecker)
+	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
+	validator := NewTokenValidator(mockDB, mocks_protocolvalidation.NewTokenParser(t), mockPermissionChecker)
 	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &models.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
 	})

@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
-	mocks_handlerhelpers "github.com/leodip/goiabada/adminconsole/internal/handlerhelpers/mocks"
+	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/adminconsole/internal/pagination"
 	"github.com/leodip/goiabada/core/api"
@@ -80,7 +80,7 @@ func usersOnPage(total, page, pageSize int) []api.UserResponse {
 func renderUsers(t *testing.T, rawPage string, total int) (map[string]interface{}, []int) {
 	t.Helper()
 
-	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	httpHelper := mocks_handlers.NewHttpHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_users.html").Maybe()
 
@@ -226,7 +226,7 @@ func currentPage(t *testing.T, p *pagination.Paginator) int {
 // second query that forgot the search box would page through every user while
 // the bar and the search field still said otherwise.
 func TestHandleAdminUsersGet_ASearchIsCarriedIntoTheSecondQuery(t *testing.T) {
-	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	httpHelper := mocks_handlers.NewHttpHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, mock.Anything, mock.Anything).Maybe()
 

@@ -12,9 +12,7 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	mocks_handlerhelpers "github.com/leodip/goiabada/authserver/internal/handlerhelpers/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	mocks_sessionstore "github.com/leodip/goiabada/core/sessionstore/mocks"
 
@@ -38,11 +36,11 @@ import (
 func TestHandleAccountLogoutGet(t *testing.T) {
 	t.Run("No id token hint given", func(t *testing.T) {
 
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
 		database := mocks_data.NewDatabase(t)
 		tokenParser := mocks_handlers.NewTokenParser(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		handler := HandleAccountLogoutGet(httpHelper, httpSession, database, tokenParser, auditLogger)
 
 		req, _ := http.NewRequest("GET", "/logout", nil)
@@ -74,11 +72,11 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 	// from being converted into a teardown once the POST binding is CSRF-exempt on hint presence:
 	// confirming this page is always a hintless POST, and a hintless POST had to pass CSRF (#109).
 	t.Run("Hintless GET carries the confirming POST's fields and never the hint", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
 		database := mocks_data.NewDatabase(t)
 		tokenParser := mocks_handlers.NewTokenParser(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		handler := HandleAccountLogoutGet(httpHelper, httpSession, database, tokenParser, auditLogger)
 
 		req, _ := http.NewRequest("GET", "/auth/logout", nil)
@@ -128,11 +126,11 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 			{"absent", "", false},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
-				httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+				httpHelper := mocks_handlers.NewHttpHelper(t)
 				httpSession := mocks_sessionstore.NewStore(t)
 				database := mocks_data.NewDatabase(t)
 				tokenParser := mocks_handlers.NewTokenParser(t)
-				auditLogger := mocks_audit.NewAuditLogger(t)
+				auditLogger := mocks_handlers.NewAuditLogger(t)
 				handler := HandleAccountLogoutGet(httpHelper, httpSession, database, tokenParser, auditLogger)
 
 				req, _ := http.NewRequest("GET", "/auth/logout", nil)
@@ -162,11 +160,11 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 	// This case exists to pin that the handler's own refinement does not undo that, and it is the
 	// half of decision 17 the POST case below completes.
 	t.Run("Hintless GET honours ui_locales", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
 		database := mocks_data.NewDatabase(t)
 		tokenParser := mocks_handlers.NewTokenParser(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		handler := HandleAccountLogoutGet(httpHelper, httpSession, database, tokenParser, auditLogger)
 
 		req, _ := http.NewRequest("GET", "/auth/logout?ui_locales=pt-BR", nil)
@@ -190,11 +188,11 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 	// both the database teardown and the cookie wipe, so the most ordinary conforming request in the
 	// specification rendered an error page and left the End-User signed in.
 	t.Run("A confirmed hint with no post_logout_redirect_uri still logs the user out", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
 		database := mocks_data.NewDatabase(t)
 		tokenParser := mocks_handlers.NewTokenParser(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		handler := HandleAccountLogoutGet(httpHelper, httpSession, database, tokenParser, auditLogger)
 
@@ -228,11 +226,11 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 	// Logout 1.0 defines exactly one parameter on the way back, and sid belongs to Front-Channel
 	// Logout, a different endpoint travelling the other way (decisions 5 and 16).
 	t.Run("A confirmed hint tears down per client and redirects", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
 		database := mocks_data.NewDatabase(t)
 		tokenParser := mocks_handlers.NewTokenParser(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		handler := HandleAccountLogoutGet(httpHelper, httpSession, database, tokenParser, auditLogger)
 
@@ -268,11 +266,11 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 	// answers it the same way rather than returning before the teardown as all seven of its error
 	// paths used to.
 	t.Run("A confirmed hint whose target is unregistered is declined, and the logout still happens", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
 		database := mocks_data.NewDatabase(t)
 		tokenParser := mocks_handlers.NewTokenParser(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		handler := HandleAccountLogoutGet(httpHelper, httpSession, database, tokenParser, auditLogger)
 
@@ -306,11 +304,11 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 	// cannot reach the End-User's browser session. The hint's own sid then names the session, and the
 	// teardown is still scoped to the client the hint is signed over.
 	t.Run("A confirmed hint with no browser session tears down the session its sid names", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
 		database := mocks_data.NewDatabase(t)
 		tokenParser := mocks_handlers.NewTokenParser(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		handler := HandleAccountLogoutGet(httpHelper, httpSession, database, tokenParser, auditLogger)
 
@@ -336,11 +334,11 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 	// with an expired one; the spec says to accept it while the session it names is still alive, and
 	// what that has to buy is the same per-client teardown and the same redirect a fresh hint gets.
 	t.Run("An expired hint whose session is still live is honoured in full", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
 		database := mocks_data.NewDatabase(t)
 		tokenParser := mocks_handlers.NewTokenParser(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		handler := HandleAccountLogoutGet(httpHelper, httpSession, database, tokenParser, auditLogger)
 
@@ -372,11 +370,11 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 	// answer from a row that is not there: reading it as "no such session" would decide whether the
 	// hint is honoured on the database's health, and silently widen the teardown at the same time.
 	t.Run("A database fault while judging an expired hint is a 500", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
 		database := mocks_data.NewDatabase(t)
 		tokenParser := mocks_handlers.NewTokenParser(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		handler := HandleAccountLogoutGet(httpHelper, httpSession, database, tokenParser, auditLogger)
 
@@ -415,11 +413,11 @@ func TestHandleAccountLogoutGet(t *testing.T) {
 	// target and the detected error would become a redirect after all. The parameter is not even
 	// read, which is what the AssertNotCalled below pins.
 	t.Run("A rejected hint reaches the consent page without its client_id", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
 		database := mocks_data.NewDatabase(t)
 		tokenParser := mocks_handlers.NewTokenParser(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		handler := HandleAccountLogoutGet(httpHelper, httpSession, database, tokenParser, auditLogger)
 
@@ -576,7 +574,7 @@ func TestHandleExistingSessionOnLogout(t *testing.T) {
 	t.Run("The session lookup fails", func(t *testing.T) {
 		r := &http.Request{}
 		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test-session").
 			Return(nil, errors.New("lookup exploded"))
@@ -592,7 +590,7 @@ func TestHandleExistingSessionOnLogout(t *testing.T) {
 	t.Run("Session not found", func(t *testing.T) {
 		r := &http.Request{}
 		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test-session").Return(nil, nil)
 
@@ -613,7 +611,7 @@ func TestHandleExistingSessionOnLogout(t *testing.T) {
 			ClientIdentifier: "test-client",
 		}
 		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		userSession := &models.UserSession{
 			Id:     1,
@@ -656,7 +654,7 @@ func TestHandleExistingSessionOnLogout(t *testing.T) {
 			ClientIdentifier: "test-client",
 		}
 		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		userSession := &models.UserSession{
 			Id:     1,
@@ -694,7 +692,7 @@ func TestHandleExistingSessionOnLogout(t *testing.T) {
 			ClientIdentifier: "test-client",
 		}
 		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		userSession := &models.UserSession{
 			Id:     1,
@@ -792,7 +790,7 @@ func hintedRequest(t *testing.T, method string, form url.Values, sessionIdentifi
 // 7's to prove, in the classifier's own table; these cases exist for what a confirmed or a rejected
 // hint causes downstream, and they need the gate to pass rather than to be observed (#133).
 func stubConfirmedHint(
-	httpHelper *mocks_handlerhelpers.HttpHelper,
+	httpHelper *mocks_handlers.HttpHelper,
 	database *mocks_data.Database,
 	tokenParser *mocks_handlers.TokenParser,
 	claims map[string]interface{},
@@ -839,7 +837,7 @@ func loggedInUserIsPresentAndEmpty(details map[string]interface{}) bool {
 
 func stubPerClientTeardown(
 	database *mocks_data.Database,
-	auditLogger *mocks_audit.AuditLogger,
+	auditLogger *mocks_handlers.AuditLogger,
 	client *models.Client,
 	sessionIdentifier string,
 ) {
@@ -939,11 +937,11 @@ func expectCookieWipedBeforeSave(t *testing.T, httpSession *mocks_sessionstore.S
 func TestHandleAccountLogoutPost(t *testing.T) {
 
 	t.Run("Deletes the whole session and lands on the signed-out page", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
 		database := mocks_data.NewDatabase(t)
 		tokenParser := mocks_handlers.NewTokenParser(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		handler := HandleAccountLogoutPost(httpHelper, httpSession, database, tokenParser, auditLogger)
 
@@ -987,11 +985,11 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 	// from. The state here is the one the concatenation this replaced could not carry: "+" decoded
 	// to a space, "/" and "=" were left raw, and "#" and "&" truncated it or injected parameters.
 	t.Run("client_id plus a registered URI redirects, with exactly one state and no sid", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
 		database := mocks_data.NewDatabase(t)
 		tokenParser := mocks_handlers.NewTokenParser(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		handler := HandleAccountLogoutPost(httpHelper, httpSession, database, tokenParser, auditLogger)
 
@@ -1078,7 +1076,7 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 		// A near-miss row reaches the state lookup only if the comparison has been loosened, so the
 		// stub is optional. Allowing it means a loosened build runs on and fails on the assertions
 		// that state the property, rather than dying earlier on an unexpected mock call.
-		allowStateLookup := func(httpHelper *mocks_handlerhelpers.HttpHelper) {
+		allowStateLookup := func(httpHelper *mocks_handlers.HttpHelper) {
 			httpHelper.On("LookupFromUrlQueryOrFormPost", mock.Anything, "state").Return("abc", true).Maybe()
 		}
 
@@ -1102,7 +1100,7 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 			clientId    string
 			redirectURI string
 			stubDB      func(database *mocks_data.Database)
-			stubHelper  func(httpHelper *mocks_handlerhelpers.HttpHelper)
+			stubHelper  func(httpHelper *mocks_handlers.HttpHelper)
 		}{
 			{
 				name:     "no client_id, so nothing can confirm the target",
@@ -1286,11 +1284,11 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 			},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
-				httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+				httpHelper := mocks_handlers.NewHttpHelper(t)
 				httpSession := mocks_sessionstore.NewStore(t)
 				database := mocks_data.NewDatabase(t)
 				tokenParser := mocks_handlers.NewTokenParser(t)
-				auditLogger := mocks_audit.NewAuditLogger(t)
+				auditLogger := mocks_handlers.NewAuditLogger(t)
 
 				handler := HandleAccountLogoutPost(httpHelper, httpSession, database, tokenParser, auditLogger)
 
@@ -1368,11 +1366,11 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 			},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
-				httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+				httpHelper := mocks_handlers.NewHttpHelper(t)
 				httpSession := mocks_sessionstore.NewStore(t)
 				database := mocks_data.NewDatabase(t)
 				tokenParser := mocks_handlers.NewTokenParser(t)
-				auditLogger := mocks_audit.NewAuditLogger(t)
+				auditLogger := mocks_handlers.NewAuditLogger(t)
 
 				handler := HandleAccountLogoutPost(httpHelper, httpSession, database, tokenParser, auditLogger)
 
@@ -1423,11 +1421,11 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 			},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
-				httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+				httpHelper := mocks_handlers.NewHttpHelper(t)
 				httpSession := mocks_sessionstore.NewStore(t)
 				database := mocks_data.NewDatabase(t)
 				tokenParser := mocks_handlers.NewTokenParser(t)
-				auditLogger := mocks_audit.NewAuditLogger(t)
+				auditLogger := mocks_handlers.NewAuditLogger(t)
 
 				handler := HandleAccountLogoutPost(httpHelper, httpSession, database, tokenParser, auditLogger)
 
@@ -1465,11 +1463,11 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 	// middleware cannot see it, so without the handler's own refinement the signed-out page would
 	// render in a different language from the consent page the user had just read.
 	t.Run("ui_locales in the body only renders the signed-out page in that locale", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
 		database := mocks_data.NewDatabase(t)
 		tokenParser := mocks_handlers.NewTokenParser(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		handler := HandleAccountLogoutPost(httpHelper, httpSession, database, tokenParser, auditLogger)
 
@@ -1499,11 +1497,11 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 	// POST that renders anything renders it in the fallback language, which an RP posting ui_locales in
 	// its body has no way to correct.
 	t.Run("ui_locales in the body only reaches a hinted POST's render", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
 		database := mocks_data.NewDatabase(t)
 		tokenParser := mocks_handlers.NewTokenParser(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		handler := HandleAccountLogoutPost(httpHelper, httpSession, database, tokenParser, auditLogger)
 
@@ -1545,11 +1543,11 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 	// is specifically denied (decision 15). Not to prevent a loop: the follow-up is a GET, and a
 	// rejected hint on a GET renders the consent page rather than redirecting again.
 	t.Run("A POST whose hint is rejected is sent to the GET binding", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
 		database := mocks_data.NewDatabase(t)
 		tokenParser := mocks_handlers.NewTokenParser(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		handler := HandleAccountLogoutPost(httpHelper, httpSession, database, tokenParser, auditLogger)
 
@@ -1609,11 +1607,11 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 			{"absent", "", false},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
-				httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+				httpHelper := mocks_handlers.NewHttpHelper(t)
 				httpSession := mocks_sessionstore.NewStore(t)
 				database := mocks_data.NewDatabase(t)
 				tokenParser := mocks_handlers.NewTokenParser(t)
-				auditLogger := mocks_audit.NewAuditLogger(t)
+				auditLogger := mocks_handlers.NewAuditLogger(t)
 
 				handler := HandleAccountLogoutPost(httpHelper, httpSession, database, tokenParser, auditLogger)
 
@@ -1643,11 +1641,11 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 	})
 
 	t.Run("Session store error", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
 		database := mocks_data.NewDatabase(t)
 		tokenParser := mocks_handlers.NewTokenParser(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		handler := HandleAccountLogoutPost(httpHelper, httpSession, database, tokenParser, auditLogger)
 
@@ -1676,11 +1674,11 @@ func TestHandleAccountLogoutPost(t *testing.T) {
 	})
 
 	t.Run("Session save error", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		httpSession := mocks_sessionstore.NewStore(t)
 		database := mocks_data.NewDatabase(t)
 		tokenParser := mocks_handlers.NewTokenParser(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		handler := HandleAccountLogoutPost(httpHelper, httpSession, database, tokenParser, auditLogger)
 
@@ -2434,7 +2432,7 @@ func TestClassifyIdTokenHint(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			logs := testutil.CaptureSlog(t)
-			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+			httpHelper := mocks_handlers.NewHttpHelper(t)
 			database := mocks_data.NewDatabase(t)
 			tokenParser := mocks_handlers.NewTokenParser(t)
 

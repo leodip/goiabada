@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
-	mocks_handlerhelpers "github.com/leodip/goiabada/adminconsole/internal/handlerhelpers/mocks"
+	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/core/api"
@@ -49,7 +49,7 @@ func (c *accountSessionsApiClient) DeleteAccountSession(_ context.Context, acces
 func TestHandleAccountSessionsGet_BindsTheRawUserAgent(t *testing.T) {
 	const header = `Mozilla/5.0 (X11; Linux x86_64) Chrome/120.0.0.0`
 
-	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	httpHelper := mocks_handlers.NewHttpHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/account_user_sessions.html").Maybe()
 
@@ -86,7 +86,7 @@ func TestHandleAccountSessionsGet_BindsTheSessionInstants(t *testing.T) {
 	started := time.Date(2026, 9, 14, 21, 3, 0, 0, time.UTC)
 	lastAccessed := time.Date(2026, 9, 17, 8, 45, 0, 0, time.UTC)
 
-	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	httpHelper := mocks_handlers.NewHttpHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/account_user_sessions.html").Maybe()
 
@@ -113,7 +113,7 @@ func TestHandleAccountSessionsGet_BindsTheSessionInstants(t *testing.T) {
 // symmetric: the copy is made by hand in three files, and a case in two of them cannot see the
 // third going wrong (#373 decision 1).
 func TestHandleAccountSessionsGet_BindsIsCurrentFromTheResponse(t *testing.T) {
-	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	httpHelper := mocks_handlers.NewHttpHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/account_user_sessions.html").Maybe()
 
@@ -206,7 +206,7 @@ func TestHandleAccountSessionsEndSesssionPost_TheAnswerFollowsIsCurrentOnTheRow(
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+			httpHelper := mocks_handlers.NewHttpHelper(t)
 			handlertest.ExpectEncodeJson(httpHelper).Once()
 
 			apiClient := &accountSessionsApiClient{sessions: testCase.sessions}
@@ -251,7 +251,7 @@ func TestHandleAccountSessionsEndSesssionPost_TheAnswerFollowsIsCurrentOnTheRow(
 // server has already forgotten. It swallowed the failure until #373, because the read was made
 // only to compare against a claim rather than to decide the answer.
 func TestHandleAccountSessionsEndSesssionPost_AListTheApiCannotReadStopsTheDelete(t *testing.T) {
-	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	httpHelper := mocks_handlers.NewHttpHelper(t)
 	var captured error
 	httpHelper.On("JsonError", mock.Anything, mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {

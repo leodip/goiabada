@@ -1,9 +1,11 @@
+//go:build !production
+
 package handlertest
 
 import (
 	"github.com/stretchr/testify/mock"
 
-	mocks_handlerhelpers "github.com/leodip/goiabada/adminconsole/internal/handlerhelpers/mocks"
+	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/core/testutil"
 )
 
@@ -14,7 +16,7 @@ import (
 //
 // It is registered as Maybe() because the message is the point and the count is not: a case that
 // wants a 500 to have happened expects it itself.
-func RefuseInternalServerError(reporter testutil.Reporter, httpHelper *mocks_handlerhelpers.HttpHelper) {
+func RefuseInternalServerError(reporter testutil.Reporter, httpHelper *mocks_handlers.HttpHelper) {
 	reporter.Helper()
 	httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
@@ -28,7 +30,7 @@ func RefuseInternalServerError(reporter testutil.Reporter, httpHelper *mocks_han
 // Once(): this function deliberately chooses neither.
 //
 // Pass mock.Anything for either name to admit any.
-func ExpectRender(httpHelper *mocks_handlerhelpers.HttpHelper, layout, template string) *mock.Call {
+func ExpectRender(httpHelper *mocks_handlers.HttpHelper, layout, template string) *mock.Call {
 	return httpHelper.On("RenderTemplate", mock.Anything, mock.Anything, layout, template,
 		mock.Anything).Return(nil)
 }
@@ -42,7 +44,7 @@ func ExpectRender(httpHelper *mocks_handlerhelpers.HttpHelper, layout, template 
 //
 // context is an optional printf-style clause appended to the failure, for the table helpers whose
 // rows differ by a query string a bare message could not tell apart.
-func Bind(reporter testutil.Reporter, httpHelper *mocks_handlerhelpers.HttpHelper,
+func Bind(reporter testutil.Reporter, httpHelper *mocks_handlers.HttpHelper,
 	context ...any) map[string]interface{} {
 	reporter.Helper()
 

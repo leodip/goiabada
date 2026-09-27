@@ -21,7 +21,7 @@ import (
 
 	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
-	mocks_handlerhelpers "github.com/leodip/goiabada/adminconsole/internal/handlerhelpers/mocks"
+	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient/oauthclienttest"
@@ -95,7 +95,7 @@ type callbackHarness struct {
 	backend    *armableBackend
 	store      *sessionstore.ServerSideStore
 	parser     *oauthclient.JWKSTokenParser
-	httpHelper *mocks_handlerhelpers.HttpHelper
+	httpHelper *mocks_handlers.HttpHelper
 	logs       *testutil.SlogCapture
 }
 
@@ -121,7 +121,7 @@ func newCallbackHarness(t *testing.T) *callbackHarness {
 		backend:    backend,
 		store:      store,
 		parser:     parser,
-		httpHelper: mocks_handlerhelpers.NewHttpHelper(t),
+		httpHelper: mocks_handlers.NewHttpHelper(t),
 		logs:       testutil.CaptureSlog(t),
 	}
 }
@@ -488,7 +488,7 @@ func TestHandleAuthCallbackPost_RefusesWhatTheAuthServerAnswered(t *testing.T) {
 
 // A session store that cannot be read answers the generic 500 page, as it did.
 func TestHandleAuthCallbackPost_ASessionThatCannotBeRead(t *testing.T) {
-	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	httpHelper := mocks_handlers.NewHttpHelper(t)
 	httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).Return().Once()
 	httpSession := mocks_sessionstore.NewStore(t)
 	httpSession.On("Get", mock.Anything, coreconstants.AdminConsoleSessionName).

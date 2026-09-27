@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
-	mocks_handlerhelpers "github.com/leodip/goiabada/adminconsole/internal/handlerhelpers/mocks"
+	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/customerrors"
@@ -91,7 +91,7 @@ func TestClientPermissionsPost_ForwardsTheApisAnswer(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+			httpHelper := mocks_handlers.NewHttpHelper(t)
 			var captured error
 			httpHelper.On("JsonError", mock.Anything, mock.Anything, mock.Anything).
 				Run(func(args mock.Arguments) {
@@ -133,7 +133,7 @@ func TestClientPermissionsPost_ForwardsTheApisAnswer(t *testing.T) {
 // handler reads the body with io.ReadAll and unmarshals it, which is the same condition by another
 // route and answered the same 500 before #279.
 func TestClientPermissionsPost_MalformedBodyAnswers400(t *testing.T) {
-	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	httpHelper := mocks_handlers.NewHttpHelper(t)
 	var captured error
 	httpHelper.On("JsonError", mock.Anything, mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {

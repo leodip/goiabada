@@ -14,7 +14,7 @@ import (
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/handlerhelpers"
-	mocks_handlerhelpers "github.com/leodip/goiabada/adminconsole/internal/handlerhelpers/mocks"
+	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	adminmiddleware "github.com/leodip/goiabada/adminconsole/internal/middleware"
 	"github.com/leodip/goiabada/core/api"
@@ -214,7 +214,7 @@ func TestHandleAdminSettingsKeysGet_RendersTheApiOrder(t *testing.T) {
 				})
 			}
 
-			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+			httpHelper := mocks_handlers.NewHttpHelper(t)
 			handlertest.RefuseInternalServerError(t, httpHelper)
 			handlertest.ExpectRender(httpHelper,
 				"/layouts/menu_layout.html", "/admin_settings_keys.html").Once()

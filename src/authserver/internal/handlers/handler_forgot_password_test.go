@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	mocks_handlerhelpers "github.com/leodip/goiabada/authserver/internal/handlerhelpers/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 
 	"github.com/leodip/goiabada/authserver/internal/constants"
@@ -25,7 +24,7 @@ import (
 
 func TestHandleForgotPasswordGet(t *testing.T) {
 	t.Run("Successful render", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 
 		handler := HandleForgotPasswordGet(httpHelper)
 
@@ -52,7 +51,7 @@ func TestHandleForgotPasswordGet(t *testing.T) {
 	})
 
 	t.Run("RenderTemplate error", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 
 		handler := HandleForgotPasswordGet(httpHelper)
 
@@ -84,7 +83,7 @@ func TestHandleForgotPasswordGet(t *testing.T) {
 
 func TestHandleForgotPasswordPost(t *testing.T) {
 	t.Run("Email not given", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		database := mocks_data.NewDatabase(t)
 		emailSender := mocks_handlers.NewEmailSender(t)
 
@@ -117,7 +116,7 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 	})
 
 	t.Run("User not found", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		database := mocks_data.NewDatabase(t)
 		emailSender := mocks_handlers.NewEmailSender(t)
 
@@ -158,7 +157,7 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 	})
 
 	t.Run("Success path, email is sent", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		database := mocks_data.NewDatabase(t)
 		emailSender := mocks_handlers.NewEmailSender(t)
 

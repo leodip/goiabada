@@ -7,7 +7,7 @@
 
 //go:build !production
 
-package mocks_accountvalidation
+package mocks_handlers
 
 import (
 	"context"

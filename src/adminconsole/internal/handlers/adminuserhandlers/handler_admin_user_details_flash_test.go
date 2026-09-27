@@ -11,7 +11,7 @@ import (
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
-	mocks_handlerhelpers "github.com/leodip/goiabada/adminconsole/internal/handlerhelpers/mocks"
+	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/core/api"
 	coreconstants "github.com/leodip/goiabada/core/constants"
@@ -92,7 +92,7 @@ func renderDetails(t *testing.T, store *sessionstore.ServerSideStore,
 
 	t.Helper()
 
-	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	httpHelper := mocks_handlers.NewHttpHelper(t)
 	handlertest.ExpectRender(httpHelper, "/layouts/menu_layout.html", "/admin_users_details.html").Once()
 
 	req := detailsRequest()

@@ -124,6 +124,5 @@ type CredentialFailureRecorder interface {
 }
 
 type PermissionChecker interface {
-	UserHasScopePermission(ctx context.Context, userId int64, scope string) (bool, error)
 	FilterOutScopesWhereUserIsNotAuthorized(ctx context.Context, scope string, user *models.User) (string, error)
 }

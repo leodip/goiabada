@@ -25,9 +25,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	mocks_handlerhelpers "github.com/leodip/goiabada/authserver/internal/handlerhelpers/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/web"
 	mocks_test "github.com/leodip/goiabada/core/mocks"
@@ -65,13 +63,13 @@ func armIssueGate(database *mocks_data.Database, userSessionManager *mocks_handl
 
 func TestHandleIssueGet(t *testing.T) {
 	t.Run("Error when getting GetAuthContext", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
@@ -96,13 +94,13 @@ func TestHandleIssueGet(t *testing.T) {
 	})
 
 	t.Run("Unexpected AuthState", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
@@ -129,13 +127,13 @@ func TestHandleIssueGet(t *testing.T) {
 	})
 
 	t.Run("Successfully issues a code", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
@@ -221,13 +219,13 @@ func TestHandleIssueGet(t *testing.T) {
 	// a prompt=none one is returned login_required (decision 16), because a request that
 	// forbids UI cannot be sent to a password form.
 	t.Run("No session identifier in the context, restarts level 1", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
@@ -278,13 +276,13 @@ func TestHandleIssueGet(t *testing.T) {
 	})
 
 	t.Run("Session identifier resolves to no session, restarts level 1", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
@@ -328,14 +326,14 @@ func TestHandleIssueGet(t *testing.T) {
 	})
 
 	t.Run("No session and prompt=none, returns login_required to the client", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
@@ -402,14 +400,14 @@ func TestHandleIssueGet(t *testing.T) {
 	})
 
 	t.Run("No session and prompt=none, failing clear - server_error to the client", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
@@ -462,13 +460,13 @@ func TestHandleIssueGet(t *testing.T) {
 	})
 
 	t.Run("No session and prompt=none, failing clear and an unusable form_post template - last-resort 500", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
@@ -521,13 +519,13 @@ func TestHandleIssueGet(t *testing.T) {
 	})
 
 	t.Run("No session and prompt=none, unusable form_post template - 500 when the refusal itself cannot be sent", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
@@ -579,13 +577,13 @@ func TestHandleIssueGet(t *testing.T) {
 	})
 
 	t.Run("Session lookup fails", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
@@ -626,13 +624,13 @@ func TestHandleIssueGet(t *testing.T) {
 	})
 
 	t.Run("The commit fails, so no code reaches the client", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
@@ -733,13 +731,13 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 	// row: the repository imposes no order between transactions, and a deadlock with one that
 	// takes these rows the other way round is answered by the helper rerunning this body (#301).
 	t.Run("The transaction is the acquisition then the insert, and nothing else", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
@@ -791,13 +789,13 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 	})
 
 	t.Run("The row is gone, so the ceremony restarts at level 1 and nothing is inserted", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
@@ -868,13 +866,13 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 	// answer has to be an answer rather than a panic. It is the session-gone answer: nothing is
 	// wrong with this server, the application the browser was signing in to no longer exists.
 	t.Run("The client is gone, so the ceremony restarts at level 1 and nothing is inserted", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
@@ -933,13 +931,13 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 	// And any OTHER failure from the insert is still a 500, so the branch above is a branch on
 	// this one condition rather than a blanket softening of the insert's errors.
 	t.Run("An ordinary insert failure is still a 500", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
@@ -975,14 +973,14 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 	})
 
 	t.Run("The row is gone and the ceremony is silent, so the client is answered login_required", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
@@ -1056,13 +1054,13 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 
 		for _, tc := range cases {
 			t.Run(tc.name, func(t *testing.T) {
-				httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+				httpHelper := mocks_handlers.NewHttpHelper(t)
 				authHelper := mocks_handlers.NewAuthHelper(t)
 				templateFS := &mocks_test.TestFS{}
 				codeIssuer := mocks_handlers.NewCodeIssuer(t)
 				tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 				database := mocks_data.NewDatabase(t)
-				auditLogger := mocks_audit.NewAuditLogger(t)
+				auditLogger := mocks_handlers.NewAuditLogger(t)
 				userSessionManager := mocks_handlers.NewUserSessionManager(t)
 				permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
@@ -1143,13 +1141,13 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 
 	for _, family := range issuanceFamilies {
 		t.Run("Foreign ambient session restarts level 1: "+family.name, func(t *testing.T) {
-			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+			httpHelper := mocks_handlers.NewHttpHelper(t)
 			authHelper := mocks_handlers.NewAuthHelper(t)
 			templateFS := &mocks_test.TestFS{}
 			codeIssuer := mocks_handlers.NewCodeIssuer(t)
 			tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 			database := mocks_data.NewDatabase(t)
-			auditLogger := mocks_audit.NewAuditLogger(t)
+			auditLogger := mocks_handlers.NewAuditLogger(t)
 			userSessionManager := mocks_handlers.NewUserSessionManager(t)
 			permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
@@ -1230,14 +1228,14 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 
 	for _, family := range promptNoneFamilies {
 		t.Run("Foreign ambient session and prompt=none returns login_required: "+family.name, func(t *testing.T) {
-			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+			httpHelper := mocks_handlers.NewHttpHelper(t)
 			authHelper := mocks_handlers.NewAuthHelper(t)
 			templateFS := &mocks_test.TestFS{}
 			codeIssuer := mocks_handlers.NewCodeIssuer(t)
 			tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 			database := mocks_data.NewDatabase(t)
 			stubRegisteredRedirectURI(database, "https://example.com/callback")
-			auditLogger := mocks_audit.NewAuditLogger(t)
+			auditLogger := mocks_handlers.NewAuditLogger(t)
 			userSessionManager := mocks_handlers.NewUserSessionManager(t)
 			permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
@@ -1299,13 +1297,13 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 	// outright. It also pins that the identifier still reaches the token when the session is the
 	// ceremony's own, which is what the whole change is careful not to break.
 	t.Run("Own ambient session still issues implicit tokens carrying its identifier", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
@@ -1381,13 +1379,13 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 // =============================================================================
 func TestHandleIssueGet_ImplicitAmbientSessionVanished(t *testing.T) {
 	t.Run("Implicit request whose session row has vanished restarts level 1", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
@@ -1442,14 +1440,14 @@ func TestHandleIssueGet_ImplicitAmbientSessionVanished(t *testing.T) {
 	})
 
 	t.Run("Implicit request whose session row has vanished and prompt=none returns login_required", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
@@ -1678,13 +1676,13 @@ func TestIsImplicitFlow(t *testing.T) {
 
 func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 	t.Run("Implicit flow with token response type", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
@@ -1771,13 +1769,13 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 	})
 
 	t.Run("Implicit flow with id_token response type", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
@@ -1855,13 +1853,13 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 	})
 
 	t.Run("Implicit flow with id_token token response type", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
@@ -1944,13 +1942,13 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 	})
 
 	t.Run("Implicit flow uses consented scope when available", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
@@ -2009,13 +2007,13 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 	// have the stored redirect URI among them. It is a refusal rather than a fault, so it renders
 	// the withheld page and never names a client on it.
 	t.Run("Implicit flow, the client vanished - the redirect is withheld rather than emitted", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
@@ -2064,13 +2062,13 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 	})
 
 	t.Run("Implicit flow error - user not found", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
@@ -2109,13 +2107,13 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 	})
 
 	t.Run("Implicit flow error - token generation fails", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
@@ -2393,13 +2391,13 @@ func TestIssueImplicitTokens(t *testing.T) {
 
 func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 	t.Run("Implicit flow error - database error on client lookup", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
@@ -2436,13 +2434,13 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 	})
 
 	t.Run("Implicit flow error - database error on user lookup", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
@@ -2482,13 +2480,13 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 	})
 
 	t.Run("Implicit flow error - clear auth context fails", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
@@ -3293,13 +3291,13 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 	// Test cases for id_token_hint sub enforcement at issuance time (the critical safety net)
 
 	t.Run("IdTokenHintSub set matching user - issues code successfully", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
@@ -3376,14 +3374,14 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 	})
 
 	t.Run("IdTokenHintSub set different user - returns login_required", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
@@ -3458,14 +3456,14 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 	})
 
 	t.Run("IdTokenHintSub set different user, failing clear - server_error to the client", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
@@ -3526,13 +3524,13 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 	})
 
 	t.Run("IdTokenHintSub set different user, failing clear and an unusable form_post template - last-resort 500", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
@@ -3599,13 +3597,13 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 	})
 
 	t.Run("IdTokenHintSub set different user, unusable form_post template - 500 when the refusal itself cannot be sent", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
@@ -3667,13 +3665,13 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 	})
 
 	t.Run("IdTokenHintSub empty - proceeds normally without check", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
@@ -3743,14 +3741,14 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 	})
 
 	t.Run("End-to-end: prompt=login with mismatched id_token_hint - blocks at issuance", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
@@ -3892,13 +3890,13 @@ func TestHandleIssueGet_RedirectURIRecheck(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+			httpHelper := mocks_handlers.NewHttpHelper(t)
 			authHelper := mocks_handlers.NewAuthHelper(t)
 			templateFS := &mocks_test.TestFS{}
 			codeIssuer := mocks_handlers.NewCodeIssuer(t)
 			tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 			database := mocks_data.NewDatabase(t)
-			auditLogger := mocks_audit.NewAuditLogger(t)
+			auditLogger := mocks_handlers.NewAuditLogger(t)
 			userSessionManager := mocks_handlers.NewUserSessionManager(t)
 			permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
@@ -3991,13 +3989,13 @@ func TestHandleIssueGet_RedirectURIRecheck(t *testing.T) {
 //
 // It needs its ordering stated or it reads as a duplicate of the row above and gets tidied away.
 func TestHandleIssueGet_RedirectURIRecheckOutranksTheIdTokenHintRefusal(t *testing.T) {
-	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	httpHelper := mocks_handlers.NewHttpHelper(t)
 	authHelper := mocks_handlers.NewAuthHelper(t)
 	templateFS := &mocks_test.TestFS{}
 	codeIssuer := mocks_handlers.NewCodeIssuer(t)
 	tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 	userSessionManager := mocks_handlers.NewUserSessionManager(t)
 	permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
@@ -4064,7 +4062,7 @@ func TestHandleIssueGet_ExpiredAmbientSession(t *testing.T) {
 		{name: "prompt=none is answered login_required instead", prompt: "none", silent: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+			httpHelper := mocks_handlers.NewHttpHelper(t)
 			authHelper := mocks_handlers.NewAuthHelper(t)
 			templateFS := &mocks_test.TestFS{}
 			codeIssuer := mocks_handlers.NewCodeIssuer(t)
@@ -4076,7 +4074,7 @@ func TestHandleIssueGet_ExpiredAmbientSession(t *testing.T) {
 				// restarts level 1, so an expectation here would go uncalled.
 				stubRegisteredRedirectURI(database, "https://example.com/callback")
 			}
-			auditLogger := mocks_audit.NewAuditLogger(t)
+			auditLogger := mocks_handlers.NewAuditLogger(t)
 			userSessionManager := mocks_handlers.NewUserSessionManager(t)
 			permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
@@ -4215,7 +4213,7 @@ func TestHandleIssueGet_ScopeRefilter(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+			httpHelper := mocks_handlers.NewHttpHelper(t)
 			authHelper := mocks_handlers.NewAuthHelper(t)
 			templateFS := &mocks_test.TestFS{}
 			codeIssuer := mocks_handlers.NewCodeIssuer(t)
@@ -4227,7 +4225,7 @@ func TestHandleIssueGet_ScopeRefilter(t *testing.T) {
 				// that issue redirect to the callback themselves and never go through it.
 				stubRegisteredRedirectURI(database, "https://example.com/callback")
 			}
-			auditLogger := mocks_audit.NewAuditLogger(t)
+			auditLogger := mocks_handlers.NewAuditLogger(t)
 			userSessionManager := mocks_handlers.NewUserSessionManager(t)
 			permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
@@ -4371,13 +4369,13 @@ func TestHandleIssueGet_TheLiveChecksFailClosedOnAStorageError(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+			httpHelper := mocks_handlers.NewHttpHelper(t)
 			authHelper := mocks_handlers.NewAuthHelper(t)
 			templateFS := &mocks_test.TestFS{}
 			codeIssuer := mocks_handlers.NewCodeIssuer(t)
 			tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 			database := mocks_data.NewDatabase(t)
-			auditLogger := mocks_audit.NewAuditLogger(t)
+			auditLogger := mocks_handlers.NewAuditLogger(t)
 			userSessionManager := mocks_handlers.NewUserSessionManager(t)
 			permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
@@ -4446,13 +4444,13 @@ func TestHandleIssueGet_TheLiveChecksFailClosedOnAStorageError(t *testing.T) {
 // rather than two, and there is no response mode in which it can half-commit.
 func TestHandleIssueGet_RedirectURIRefusalSurvivesItsOwnFailures(t *testing.T) {
 	t.Run("failing clear - the refusal is still rendered and nothing is emitted", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
@@ -4516,13 +4514,13 @@ func TestHandleIssueGet_RedirectURIRefusalSurvivesItsOwnFailures(t *testing.T) {
 	})
 
 	t.Run("an unrenderable page - 500 when the refusal itself cannot be shown", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
@@ -4590,7 +4588,7 @@ func TestHandleIssueGet_ScopeRefusalSurvivesItsOwnFailures(t *testing.T) {
 	// the condition all three cases share. The response mode and the clear's answer are what each
 	// case varies.
 	armEmptiedScope := func(t *testing.T, responseMode string, database *mocks_data.Database,
-		authHelper *mocks_handlers.AuthHelper, auditLogger *mocks_audit.AuditLogger,
+		authHelper *mocks_handlers.AuthHelper, auditLogger *mocks_handlers.AuditLogger,
 		userSessionManager *mocks_handlers.UserSessionManager,
 		permissionChecker *mocks_handlers.PermissionChecker,
 		req *http.Request) *ceremony.AuthContext {
@@ -4635,13 +4633,13 @@ func TestHandleIssueGet_ScopeRefusalSurvivesItsOwnFailures(t *testing.T) {
 	}
 
 	t.Run("failing clear - server_error to the client", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		templateFS := &mocks_test.TestFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
@@ -4680,12 +4678,12 @@ func TestHandleIssueGet_ScopeRefusalSurvivesItsOwnFailures(t *testing.T) {
 	})
 
 	t.Run("failing clear and an unusable form_post template - last-resort 500", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
@@ -4726,12 +4724,12 @@ func TestHandleIssueGet_ScopeRefusalSurvivesItsOwnFailures(t *testing.T) {
 	})
 
 	t.Run("unusable form_post template - 500 when the refusal itself cannot be sent", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 

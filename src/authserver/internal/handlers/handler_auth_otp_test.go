@@ -12,12 +12,12 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
+	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/otp"
 	"github.com/leodip/goiabada/core/customerrors"
@@ -27,8 +27,6 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	mocks_handlerhelpers "github.com/leodip/goiabada/authserver/internal/handlerhelpers/mocks"
-	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 )
 
 // otpTestAESKey is a fixed 32-byte AES key used to exercise the encrypted OTP
@@ -74,7 +72,7 @@ func otpTestRenderedQR(t *testing.T, keyURL string) string {
 
 func TestHandleAuthOtpGet(t *testing.T) {
 	t.Run("Error when getting GetAuthContext", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		otpSecretGenerator := mocks_handlers.NewOtpSecretGenerator(t)
@@ -98,7 +96,7 @@ func TestHandleAuthOtpGet(t *testing.T) {
 	})
 
 	t.Run("Unexpected AuthState", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		otpSecretGenerator := mocks_handlers.NewOtpSecretGenerator(t)
@@ -122,7 +120,7 @@ func TestHandleAuthOtpGet(t *testing.T) {
 	})
 
 	t.Run("OTP enabled user", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		otpSecretGenerator := mocks_handlers.NewOtpSecretGenerator(t)
@@ -207,7 +205,7 @@ func TestHandleAuthOtpGet(t *testing.T) {
 	})
 
 	t.Run("OTP not enabled user", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		otpSecretGenerator := mocks_handlers.NewOtpSecretGenerator(t)
@@ -316,7 +314,7 @@ func TestHandleAuthOtpGet(t *testing.T) {
 	// handler that regenerates fails on an unexpected call rather than on an assertion this
 	// case could have forgotten to make.
 	t.Run("OTP not enabled user, reload renders the secret already on the ceremony", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 		otpSecretGenerator := mocks_handlers.NewOtpSecretGenerator(t)
@@ -381,10 +379,10 @@ func TestHandleAuthOtpGet(t *testing.T) {
 
 func TestHandleAuthOtpPost(t *testing.T) {
 	t.Run("Error when getting AuthContext", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		handler := HandleAuthOtpPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{})
 
@@ -417,10 +415,10 @@ func TestHandleAuthOtpPost(t *testing.T) {
 		t.Cleanup(func() { config.GetAdminConsole().BaseURL = previousBaseURL })
 		config.GetAdminConsole().BaseURL = "https://admin.example.com"
 
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		handler := HandleAuthOtpPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{})
 
@@ -446,10 +444,10 @@ func TestHandleAuthOtpPost(t *testing.T) {
 	})
 
 	t.Run("Unexpected AuthState", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		handler := HandleAuthOtpPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{})
 
@@ -531,10 +529,10 @@ func TestHandleAuthOtpPost(t *testing.T) {
 
 		for _, tc := range staleCases {
 			t.Run(tc.name, func(t *testing.T) {
-				httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+				httpHelper := mocks_handlers.NewHttpHelper(t)
 				authHelper := mocks_handlers.NewAuthHelper(t)
 				database := mocks_data.NewDatabase(t)
-				auditLogger := mocks_audit.NewAuditLogger(t)
+				auditLogger := mocks_handlers.NewAuditLogger(t)
 
 				handler := HandleAuthOtpPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{})
 
@@ -577,10 +575,10 @@ func TestHandleAuthOtpPost(t *testing.T) {
 	})
 
 	t.Run("User not found", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		handler := HandleAuthOtpPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{})
 
@@ -613,10 +611,10 @@ func TestHandleAuthOtpPost(t *testing.T) {
 	})
 
 	t.Run("User disabled", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		handler := HandleAuthOtpPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{})
 
@@ -660,10 +658,10 @@ func TestHandleAuthOtpPost(t *testing.T) {
 	})
 
 	t.Run("Empty OTP code", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		handler := HandleAuthOtpPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{})
 
@@ -710,10 +708,10 @@ func TestHandleAuthOtpPost(t *testing.T) {
 	// then be refused as a replay. The mock is given no TryConsumeUserOTPStep expectation, so
 	// reaching it fails the test on an unexpected call (#202).
 	t.Run("OTP code in the query alone", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		handler := HandleAuthOtpPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{})
 
@@ -777,10 +775,10 @@ func TestHandleAuthOtpPost(t *testing.T) {
 	})
 
 	t.Run("Invalid OTP code for enabled OTP", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		handler := HandleAuthOtpPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{})
 
@@ -834,10 +832,10 @@ func TestHandleAuthOtpPost(t *testing.T) {
 	// ceremony carries both the image and the secret, which the enrolled case above never does, so
 	// this is the only case that observes the ceremony id on that branch (#79 seam 4).
 	t.Run("Invalid OTP code while enrolling rerenders the enrollment form", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		handler := HandleAuthOtpPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{})
 
@@ -890,10 +888,10 @@ func TestHandleAuthOtpPost(t *testing.T) {
 	// read as "not enrolling". No GET ever wrote that state, so what the case pinned was an
 	// inconsistency rather than a branch (#247).
 	t.Run("Invalid OTP code for disabled OTP with no key on the ceremony", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		handler := HandleAuthOtpPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{})
 
@@ -943,10 +941,10 @@ func TestHandleAuthOtpPost(t *testing.T) {
 	})
 
 	t.Run("Successful OTP validation for enabled OTP", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		handler := HandleAuthOtpPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{})
 
@@ -1032,10 +1030,10 @@ func TestHandleAuthOtpPost(t *testing.T) {
 	})
 
 	t.Run("Successful OTP validation for disabled OTP (enrollment)", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		handler := HandleAuthOtpPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{})
 
@@ -1160,10 +1158,10 @@ func TestHandleAuthOtpPost(t *testing.T) {
 	})
 
 	t.Run("Error updating user during OTP enrollment", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		handler := HandleAuthOtpPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{})
 
@@ -1237,10 +1235,10 @@ func TestHandleAuthOtpPost(t *testing.T) {
 	// and the caller cannot recover from it: a retry is refused with OTP_ALREADY_ENABLED
 	// (#242 decision 2).
 	t.Run("Counter advance failure rolls the enrollment back", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		handler := HandleAuthOtpPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{})
 
@@ -1308,10 +1306,10 @@ func TestHandleAuthOtpPost(t *testing.T) {
 	// owns the claim table, so all this layer has to show is that the handler consults the
 	// claim and translates its two answers correctly (#111 seam 5).
 	t.Run("Replayed OTP code is refused for enabled OTP", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		handler := HandleAuthOtpPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{})
 
@@ -1401,10 +1399,10 @@ func TestHandleAuthOtpPost(t *testing.T) {
 	// difference is the whole reason the extracted verify reports an outcome and leaves the
 	// audit set to its caller.
 	t.Run("Replayed OTP code is refused while enrolling", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		handler := HandleAuthOtpPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{})
 
@@ -1493,10 +1491,10 @@ func TestHandleAuthOtpPost(t *testing.T) {
 	})
 
 	t.Run("Error consuming the OTP step", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		handler := HandleAuthOtpPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{})
 
@@ -1555,10 +1553,10 @@ func TestHandleAuthOtpPost(t *testing.T) {
 	})
 
 	t.Run("User account is disabled", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		handler := HandleAuthOtpPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{})
 
@@ -1631,10 +1629,10 @@ func TestHandleAuthOtpPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 	// already been spent. The two flags together select one of the four credential-rejection
 	// branches, each of which is its own recording call site.
 	newHandler := func(t *testing.T, enrolled bool, consumed bool) (http.Handler, *ceremony.AuthContext) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		authContext := &ceremony.AuthContext{
 			AuthState:  ceremony.AuthStateLevel2OTP,

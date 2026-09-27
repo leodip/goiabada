@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
-	mocks_handlerhelpers "github.com/leodip/goiabada/adminconsole/internal/handlerhelpers/mocks"
+	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/core/api"
 )
@@ -46,7 +46,7 @@ func (c *systemLevelApiClient) GetPermissionsByResource(_ context.Context, acces
 func bindOfSystemLevelPage(t *testing.T, page string, resource api.ResourceResponse) map[string]interface{} {
 	t.Helper()
 
-	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	httpHelper := mocks_handlers.NewHttpHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, mock.Anything, mock.Anything).Once()
 
@@ -103,7 +103,7 @@ func TestAdminResourcePages_TheSystemLevelFlagIsTheServersAnswer(t *testing.T) {
 // re-renders with the refusal and DeleteResource is never reached, which the embedded stub proves
 // by panicking if it is.
 func TestAdminResourceDeletePost_RefusesOnTheServersFlag(t *testing.T) {
-	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	httpHelper := mocks_handlers.NewHttpHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, mock.Anything, mock.Anything).Once()
 

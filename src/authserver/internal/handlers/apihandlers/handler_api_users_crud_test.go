@@ -12,13 +12,12 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/accountvalidation"
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/data"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/emaillinks"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
-	mocks_handlerhelpers "github.com/leodip/goiabada/authserver/internal/handlerhelpers/mocks"
+	mocks_accounthandlers "github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
@@ -92,7 +91,7 @@ func TestHandleAPIUserEnabledPut_RevocationConditionality(t *testing.T) {
 	} {
 		t.Run(tc.label, func(t *testing.T) {
 			database := mocks_data.NewDatabase(t)
-			auditLogger := mocks_audit.NewAuditLogger(t)
+			auditLogger := mocks_handlers.NewAuditLogger(t)
 
 			database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), userId).
 				Return(&models.User{Id: userId}, nil).Once()
@@ -180,7 +179,7 @@ func TestHandleAPIUserEnabledPut_RevocationConditionality(t *testing.T) {
 func TestHandleAPIUserEnabledPut_SweepFailureRollsBack(t *testing.T) {
 	const userId = int64(42)
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), userId).Return(&models.User{Id: userId}, nil).Once()
 	stub := mocks_data.ExpectRunInTransaction(database, apiRevokeTx)
@@ -209,7 +208,7 @@ func TestHandleAPIUserPasswordPut_RevokesEverything(t *testing.T) {
 	const newPassword = "N3wP4ss!word"
 
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 	passwordValidator := accountvalidation.NewPasswordValidator()
 
 	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), userId).Return(&models.User{Id: userId}, nil).Once()
@@ -272,7 +271,7 @@ func TestHandleAPIUserOTPPut_DisableCommitsBothWritesAtomically(t *testing.T) {
 	const userId = int64(42)
 
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	user := &models.User{Id: userId, Enabled: true, OTPEnabled: true}
 	database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), userId).Return(user, nil).Once()
@@ -322,10 +321,10 @@ func TestHandleAPIUserOTPPut_DisableCommitsBothWritesAtomically(t *testing.T) {
 // comes back, since the link carries the code and no email address (#112), so a hash of
 // anything else leaves the new user unable to set a password at all.
 func TestHandleAPIUserCreatePost_StoresResetCodeHash(t *testing.T) {
-	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	httpHelper := mocks_handlers.NewHttpHelper(t)
 	database := mocks_data.NewDatabase(t)
-	userCreator := mocks_handlers.NewUserCreator(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	userCreator := mocks_accounthandlers.NewUserCreator(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 	emailSender := mocks_handlers.NewEmailSender(t)
 
 	handler := HandleAPIUserCreatePost(httpHelper, database, userCreator,
@@ -403,10 +402,10 @@ func TestHandleAPIUserCreatePost_StoresResetCodeHash(t *testing.T) {
 // wraps, the user creator wraps -- because a bare type assertion or a comparison against the
 // outermost error would pass on an untouched sentinel and fail on the real one.
 func TestHandleAPIUserCreatePost_LostRaceOnTheEmailAnswers409(t *testing.T) {
-	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	httpHelper := mocks_handlers.NewHttpHelper(t)
 	database := mocks_data.NewDatabase(t)
-	userCreator := mocks_handlers.NewUserCreator(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	userCreator := mocks_accounthandlers.NewUserCreator(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 	emailSender := mocks_handlers.NewEmailSender(t)
 
 	handler := HandleAPIUserCreatePost(httpHelper, database, userCreator,
@@ -458,10 +457,10 @@ func TestHandleAPIUserCreatePost_LostRaceOnTheEmailAnswers409(t *testing.T) {
 // retry with a different address; told 500, it reports the failure, which is the right thing to do
 // when the write failed for a reason no address change fixes.
 func TestHandleAPIUserCreatePost_AnyOtherCreateFailureAnswers500(t *testing.T) {
-	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	httpHelper := mocks_handlers.NewHttpHelper(t)
 	database := mocks_data.NewDatabase(t)
-	userCreator := mocks_handlers.NewUserCreator(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	userCreator := mocks_accounthandlers.NewUserCreator(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 	emailSender := mocks_handlers.NewEmailSender(t)
 
 	handler := HandleAPIUserCreatePost(httpHelper, database, userCreator,
@@ -582,10 +581,10 @@ func TestHandleAPIUserCreatePost_SetPasswordTypeMatrix(t *testing.T) {
 			wantMessage: "setPasswordType"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+			httpHelper := mocks_handlers.NewHttpHelper(t)
 			database := mocks_data.NewDatabase(t)
-			userCreator := mocks_handlers.NewUserCreator(t)
-			auditLogger := mocks_audit.NewAuditLogger(t)
+			userCreator := mocks_accounthandlers.NewUserCreator(t)
+			auditLogger := mocks_handlers.NewAuditLogger(t)
 			emailSender := mocks_handlers.NewEmailSender(t)
 
 			handler := HandleAPIUserCreatePost(httpHelper, database, userCreator,

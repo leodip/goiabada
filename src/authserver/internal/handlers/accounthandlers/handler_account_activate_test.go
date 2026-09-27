@@ -18,12 +18,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/emaillinks"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
-	mocks_handlerhelpers "github.com/leodip/goiabada/authserver/internal/handlerhelpers/mocks"
+	mocks_accounthandlers "github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/usercreation"
@@ -191,7 +190,7 @@ func preRegistrationWithCode(t *testing.T, id int64, email, code string, issuedA
 // (no _httpStatus), since mail scanners treat a 4xx as a broken link. A single matcher
 // everywhere is deliberate, since these paths differing would tell a caller which of them
 // happened.
-func expectRenderedLinkExpired(httpHelper *mocks_handlerhelpers.HttpHelper) {
+func expectRenderedLinkExpired(httpHelper *mocks_handlers.HttpHelper) {
 	httpHelper.On("RenderTemplate",
 		mock.Anything,
 		mock.Anything,
@@ -229,10 +228,10 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 	const code = "the-emitted-code"
 
 	t.Run("a valid code marks the session and redirects to a clean URL", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		database := mocks_data.NewDatabase(t)
-		userCreator := mocks_handlers.NewUserCreator(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		userCreator := mocks_accounthandlers.NewUserCreator(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		store := newMarkerTestStore()
 
 		preReg, codeHash := preRegistrationWithCode(t, 7, activateTestEmail, code, time.Now().UTC().Add(-time.Minute))
@@ -271,10 +270,10 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 	// A consumed code is the same case: the activation deletes the row, so a link clicked twice
 	// resolves to nothing. It used to answer the 500 page with an error-level stack (#425).
 	t.Run("a code matching no row is refused", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		database := mocks_data.NewDatabase(t)
-		userCreator := mocks_handlers.NewUserCreator(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		userCreator := mocks_accounthandlers.NewUserCreator(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		store := newMarkerTestStore()
 		logs := testutil.CaptureSlog(t)
 
@@ -295,10 +294,10 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 	})
 
 	t.Run("a hash hit whose stored code does not match is refused", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		database := mocks_data.NewDatabase(t)
-		userCreator := mocks_handlers.NewUserCreator(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		userCreator := mocks_accounthandlers.NewUserCreator(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		store := newMarkerTestStore()
 		logs := testutil.CaptureSlog(t)
 
@@ -332,10 +331,10 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 	// A server fault is not a refusal: a stored code that will not decrypt keeps the 500 page and
 	// its stack, and writes no refusal record that would file it under a user's old link.
 	t.Run("a stored code that will not decrypt stays a server error", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		database := mocks_data.NewDatabase(t)
-		userCreator := mocks_handlers.NewUserCreator(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		userCreator := mocks_accounthandlers.NewUserCreator(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		store := newMarkerTestStore()
 		logs := testutil.CaptureSlog(t)
 
@@ -359,10 +358,10 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 	// interleaved first hops used to make the redirect already in flight activate the other
 	// registration. First writer wins instead (#112 decision 13).
 	t.Run("a second link followed while one is in flight is refused", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		database := mocks_data.NewDatabase(t)
-		userCreator := mocks_handlers.NewUserCreator(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		userCreator := mocks_accounthandlers.NewUserCreator(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		store := newMarkerTestStore()
 
 		// The second link is valid on its own: it is refused for the marker it would have
@@ -404,10 +403,10 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 	// it started in, which is the retarget in three navigations rather than one
 	// (#112 decision 14).
 	t.Run("a link followed while a reset continuation is in flight is refused", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		database := mocks_data.NewDatabase(t)
-		userCreator := mocks_handlers.NewUserCreator(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		userCreator := mocks_accounthandlers.NewUserCreator(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		store := newMarkerTestStore()
 
 		preReg, codeHash := preRegistrationWithCode(t, 99, "second@example.com", code, time.Now().UTC().Add(-time.Minute))
@@ -440,10 +439,10 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 	})
 
 	t.Run("an expired code deletes the pending registration and asks for another", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		database := mocks_data.NewDatabase(t)
-		userCreator := mocks_handlers.NewUserCreator(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		userCreator := mocks_accounthandlers.NewUserCreator(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		store := newMarkerTestStore()
 
 		preReg, codeHash := preRegistrationWithCode(t, 7, activateTestEmail, code, time.Now().UTC().Add(-6*time.Minute))
@@ -475,10 +474,10 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 			{"just outside the window", time.Now().UTC().Add(-verificationCodeLifetime - 2*time.Second), true},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
-				httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+				httpHelper := mocks_handlers.NewHttpHelper(t)
 				database := mocks_data.NewDatabase(t)
-				userCreator := mocks_handlers.NewUserCreator(t)
-				auditLogger := mocks_audit.NewAuditLogger(t)
+				userCreator := mocks_accounthandlers.NewUserCreator(t)
+				auditLogger := mocks_handlers.NewAuditLogger(t)
 				store := newMarkerTestStore()
 
 				preReg, codeHash := preRegistrationWithCode(t, 7, activateTestEmail, code, tc.issuedAt)
@@ -513,10 +512,10 @@ func TestHandleAccountActivateGet_Clean(t *testing.T) {
 	const code = "the-emitted-code"
 
 	t.Run("the marker completes the activation", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		database := mocks_data.NewDatabase(t)
-		userCreator := mocks_handlers.NewUserCreator(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		userCreator := mocks_accounthandlers.NewUserCreator(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		store := newMarkerTestStore()
 
 		preReg, codeHash := preRegistrationWithCode(t, 7, activateTestEmail, code, time.Now().UTC())
@@ -606,10 +605,10 @@ func TestHandleAccountActivateGet_Clean(t *testing.T) {
 			},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
-				httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+				httpHelper := mocks_handlers.NewHttpHelper(t)
 				database := mocks_data.NewDatabase(t)
-				userCreator := mocks_handlers.NewUserCreator(t)
-				auditLogger := mocks_audit.NewAuditLogger(t)
+				userCreator := mocks_accounthandlers.NewUserCreator(t)
+				auditLogger := mocks_handlers.NewAuditLogger(t)
 				store := newMarkerTestStore()
 
 				if tc.resolves {
@@ -663,10 +662,10 @@ func TestHandleAccountActivateGet_SelfRegistrationDisabled(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+			httpHelper := mocks_handlers.NewHttpHelper(t)
 			database := mocks_data.NewDatabase(t)
-			userCreator := mocks_handlers.NewUserCreator(t)
-			auditLogger := mocks_audit.NewAuditLogger(t)
+			userCreator := mocks_accounthandlers.NewUserCreator(t)
+			auditLogger := mocks_handlers.NewAuditLogger(t)
 			store := newMarkerTestStore()
 
 			_, codeHash := preRegistrationWithCode(t, 7, activateTestEmail, code, time.Now().UTC())

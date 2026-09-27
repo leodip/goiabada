@@ -1,3 +1,5 @@
+//go:build !production
+
 package handlertest
 
 import (
@@ -6,14 +8,14 @@ import (
 
 	"github.com/stretchr/testify/mock"
 
-	mocks_handlerhelpers "github.com/leodip/goiabada/adminconsole/internal/handlerhelpers/mocks"
+	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/core/testutil"
 )
 
 // ExpectEncodeJson admits EncodeJson and hands the call back so the caller can bound it. It is the
 // AJAX half of ExpectRender and chooses neither Maybe() nor Once() for the same reason: a handler
 // that may or may not answer says so itself.
-func ExpectEncodeJson(httpHelper *mocks_handlerhelpers.HttpHelper) *mock.Call {
+func ExpectEncodeJson(httpHelper *mocks_handlers.HttpHelper) *mock.Call {
 	return httpHelper.On("EncodeJson", mock.Anything, mock.Anything, mock.Anything).Return()
 }
 
@@ -32,7 +34,7 @@ func ExpectEncodeJson(httpHelper *mocks_handlerhelpers.HttpHelper) *mock.Call {
 //
 // context is an optional printf-style clause appended to the failure, for the table helpers whose
 // rows a bare message could not tell apart.
-func Encoded(reporter testutil.Reporter, httpHelper *mocks_handlerhelpers.HttpHelper,
+func Encoded(reporter testutil.Reporter, httpHelper *mocks_handlers.HttpHelper,
 	context ...any) map[string]any {
 	reporter.Helper()
 

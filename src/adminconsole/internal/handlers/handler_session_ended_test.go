@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
-	mocks_handlerhelpers "github.com/leodip/goiabada/adminconsole/internal/handlerhelpers/mocks"
+	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/errs"
@@ -94,7 +94,7 @@ func TestHandleSessionEndedGet_ClearsTheTokensAndLeavesTheNoticeForTheNextReques
 	logs := testutil.CaptureSlog(t)
 	cookies := seedSession(t, store, signedInValues())
 
-	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	httpHelper := mocks_handlers.NewHttpHelper(t)
 	w := httptest.NewRecorder()
 	HandleSessionEndedGet(httpHelper, store).ServeHTTP(w,
 		withCookies(handlertest.Request(http.MethodGet, "/auth/session-ended"), cookies))
@@ -136,7 +136,7 @@ func TestHandleSessionEndedGet_AnswersTheErrorPageWhenTheSessionCannotBeReadOrSa
 			if testCase.getErr == nil {
 				store.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(testCase.saveErr)
 			}
-			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+			httpHelper := mocks_handlers.NewHttpHelper(t)
 			httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).Return().Once()
 
 			w := httptest.NewRecorder()
@@ -152,7 +152,7 @@ func TestHandleSessionEndedGet_AnswersTheErrorPageWhenTheSessionCannotBeReadOrSa
 // serveIndex answers one home page request with cookies, and returns the bind it rendered with.
 func serveIndex(t *testing.T, store sessionstore.Store, cookies []*http.Cookie) map[string]interface{} {
 	t.Helper()
-	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	httpHelper := mocks_handlers.NewHttpHelper(t)
 	handlertest.ExpectRender(httpHelper, "/layouts/no_menu_layout.html", "/index.html").Once()
 	HandleIndexGet(nil, httpHelper, store).ServeHTTP(httptest.NewRecorder(),
 		withCookies(handlertest.Request(http.MethodGet, "/"), cookies))
@@ -206,7 +206,7 @@ func TestHandleIndexGet_AnswersTheErrorPageWhenTheSessionCannotBeReadOrSaved(t *
 			if testCase.getErr == nil {
 				store.On("Save", mock.Anything, mock.Anything, mock.Anything).Return(testCase.saveErr)
 			}
-			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+			httpHelper := mocks_handlers.NewHttpHelper(t)
 			httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).Return().Once()
 
 			HandleIndexGet(nil, httpHelper, store).ServeHTTP(httptest.NewRecorder(),
@@ -220,7 +220,7 @@ func TestHandleIndexGet_AnswersTheErrorPageWhenTheSessionCannotBeReadOrSaved(t *
 // #427 decision 18: the page RequiresScope sends a signed-in administrator without the scope to is a
 // 403, since a 401 owes a WWW-Authenticate challenge the console does not have.
 func TestHandleUnauthorizedGet_Answers403(t *testing.T) {
-	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	httpHelper := mocks_handlers.NewHttpHelper(t)
 	handlertest.ExpectRender(httpHelper, "/layouts/no_menu_layout.html", "/unauthorized.html").Once()
 
 	HandleUnauthorizedGet(httpHelper).ServeHTTP(httptest.NewRecorder(),

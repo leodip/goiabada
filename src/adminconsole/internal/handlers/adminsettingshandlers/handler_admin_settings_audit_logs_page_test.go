@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
-	mocks_handlerhelpers "github.com/leodip/goiabada/adminconsole/internal/handlerhelpers/mocks"
+	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/adminconsole/internal/pagination"
 	"github.com/leodip/goiabada/core/api"
@@ -88,7 +88,7 @@ func logsOnPage(total, page, pageSize int) []api.AuditLogResponse {
 func renderAuditLogs(t *testing.T, rawPage string, total int) (map[string]interface{}, *auditPagingApiClient) {
 	t.Helper()
 
-	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	httpHelper := mocks_handlers.NewHttpHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper,
 		"/layouts/menu_layout.html", "/admin_settings_audit_log_viewer.html").Maybe()
@@ -185,7 +185,7 @@ func TestHandleAdminSettingsAuditLogViewerGet_PageQueryParameter(t *testing.T) {
 // whole call, and one that forgot the event filter would page through the
 // unfiltered log while the filter dropdown still named an event.
 func TestHandleAdminSettingsAuditLogViewerGet_TheEventFilterSurvivesTheSecondQuery(t *testing.T) {
-	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	httpHelper := mocks_handlers.NewHttpHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, mock.Anything, mock.Anything).Maybe()
 
@@ -236,7 +236,7 @@ func TestHandleAdminSettingsAuditLogViewerGet_EveryTotalLandsOnAPageWithRows(t *
 func renderAuditLogsWithQuery(t *testing.T, rawQuery string, total int) (map[string]interface{}, *auditPagingApiClient) {
 	t.Helper()
 
-	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	httpHelper := mocks_handlers.NewHttpHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper,
 		"/layouts/menu_layout.html", "/admin_settings_audit_log_viewer.html").Maybe()
@@ -393,7 +393,7 @@ func currentPage(t *testing.T, p *pagination.Paginator) int {
 // deliberately not a real one, so a handler that fell back on a compiled-in list would render
 // the wrong options rather than coincidentally the right ones.
 func TestHandleAdminSettingsAuditLogViewerGet_TheDropdownIsWhatTheApiAnswered(t *testing.T) {
-	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	httpHelper := mocks_handlers.NewHttpHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper,
 		"/layouts/menu_layout.html", "/admin_settings_audit_log_viewer.html").Once()
@@ -414,7 +414,7 @@ func TestHandleAdminSettingsAuditLogViewerGet_TheDropdownIsWhatTheApiAnswered(t 
 // anyway would show a filter with no options and nothing saying why, which reads as "this
 // deployment has no audit events" rather than as a failed call.
 func TestHandleAdminSettingsAuditLogViewerGet_ACatalogFailureIsNotAnEmptyDropdown(t *testing.T) {
-	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	httpHelper := mocks_handlers.NewHttpHelper(t)
 
 	var answered error
 	httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).

@@ -19,15 +19,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
-	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	mocks_handlerhelpers "github.com/leodip/goiabada/authserver/internal/handlerhelpers/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 )
 
 func TestHandleAuthPwdGet(t *testing.T) {
 	t.Run("Error when getting GetAuthContext", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 
@@ -52,7 +50,7 @@ func TestHandleAuthPwdGet(t *testing.T) {
 	})
 
 	t.Run("Unexpected AuthState", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 
@@ -77,7 +75,7 @@ func TestHandleAuthPwdGet(t *testing.T) {
 	})
 
 	t.Run("Successful rendering with email from user session", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 
@@ -140,7 +138,7 @@ func TestHandleAuthPwdGet(t *testing.T) {
 	})
 
 	t.Run("Successful rendering without email", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 
@@ -194,7 +192,7 @@ func TestHandleAuthPwdGet(t *testing.T) {
 	// refused by HandleAuthPwdPost. Asserted as an equality rather than as "not empty", because the
 	// value has to be THIS ceremony's (#79 seam 4).
 	t.Run("The render names the ceremony", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 
@@ -239,10 +237,10 @@ func TestHandleAuthPwdGet(t *testing.T) {
 
 func TestHandleAuthPwdPost(t *testing.T) {
 	t.Run("Error when getting AuthContext", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		handler := HandleAuthPwdPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{})
 
@@ -263,10 +261,10 @@ func TestHandleAuthPwdPost(t *testing.T) {
 	})
 
 	t.Run("Unexpected AuthState", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		handler := HandleAuthPwdPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{})
 
@@ -352,10 +350,10 @@ func TestHandleAuthPwdPost(t *testing.T) {
 
 		for _, tc := range staleCases {
 			t.Run(tc.name, func(t *testing.T) {
-				httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+				httpHelper := mocks_handlers.NewHttpHelper(t)
 				authHelper := mocks_handlers.NewAuthHelper(t)
 				database := mocks_data.NewDatabase(t)
-				auditLogger := mocks_audit.NewAuditLogger(t)
+				auditLogger := mocks_handlers.NewAuditLogger(t)
 
 				handler := HandleAuthPwdPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{})
 
@@ -398,10 +396,10 @@ func TestHandleAuthPwdPost(t *testing.T) {
 	})
 
 	t.Run("Missing email", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		handler := HandleAuthPwdPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{})
 
@@ -448,10 +446,10 @@ func TestHandleAuthPwdPost(t *testing.T) {
 	})
 
 	t.Run("Missing password", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		handler := HandleAuthPwdPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{})
 
@@ -504,10 +502,10 @@ func TestHandleAuthPwdPost(t *testing.T) {
 	// GetUserByEmail or VerifyPasswordHash call fails the test on an unexpected call. That
 	// absence is the assertion that no credential check ran.
 	t.Run("Password in the query alone", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		handler := HandleAuthPwdPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{})
 
@@ -551,10 +549,10 @@ func TestHandleAuthPwdPost(t *testing.T) {
 	})
 
 	t.Run("User not found", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		handler := HandleAuthPwdPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{})
 
@@ -623,10 +621,10 @@ func TestHandleAuthPwdPost(t *testing.T) {
 	// expectation matches. The audit entry and the re-rendered form are asserted on the same
 	// spelling, which is decision 4's two visible consequences.
 	t.Run("The address reaches the lookup, the audit entry and the form normalized", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		handler := HandleAuthPwdPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{})
 
@@ -677,10 +675,10 @@ func TestHandleAuthPwdPost(t *testing.T) {
 	// A whitespace-only address is still the missing-email error, not a lookup on the
 	// empty string: the trim now happens before the check rather than inside it.
 	t.Run("A whitespace-only address is refused as missing", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		handler := HandleAuthPwdPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{})
 
@@ -719,10 +717,10 @@ func TestHandleAuthPwdPost(t *testing.T) {
 	})
 
 	t.Run("Successful authentication", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		handler := HandleAuthPwdPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{})
 
@@ -827,10 +825,10 @@ func TestHandleAuthPwdPost(t *testing.T) {
 	})
 
 	t.Run("Disabled user account", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		handler := HandleAuthPwdPost(httpHelper, authHelper, database, auditLogger, noCredentialFailures{})
 
@@ -922,10 +920,10 @@ func TestHandleAuthPwdPost_SpendsTheLimiterBudgetOnFailuresOnly(t *testing.T) {
 	// account is what GetUserByEmail answers with. A nil one is the address that names no
 	// account, which is its own rejection branch with its own recording call.
 	newHandler := func(t *testing.T, account *models.User) (http.Handler, *mocks_data.Database, *ceremony.AuthContext) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		authContext := &ceremony.AuthContext{
 			AuthState:  ceremony.AuthStateLevel1Password,

@@ -13,13 +13,12 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	mocks_handlerhelpers "github.com/leodip/goiabada/authserver/internal/handlerhelpers/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 )
 
 func TestHandleAuthLevel2Get(t *testing.T) {
 	t.Run("Error when getting GetAuthContext", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 
@@ -42,7 +41,7 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 	})
 
 	t.Run("Unexpected AuthState", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 
@@ -65,7 +64,7 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 	})
 
 	t.Run("Client not found", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 
@@ -94,7 +93,7 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 	})
 
 	t.Run("AcrLevel2Optional with OTP enabled", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 
@@ -140,7 +139,7 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 	})
 
 	t.Run("AcrLevel2Optional with OTP disabled", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 
@@ -191,7 +190,7 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 	})
 
 	t.Run("AcrLevel2Mandatory", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 
@@ -241,7 +240,7 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 	// written. Every sibling ceremony handler already checks this; this one did not, and
 	// "every handler except one" is the kind of gap that regresses (#242 decision 5).
 	t.Run("User not found", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 
@@ -283,7 +282,7 @@ func TestHandleAuthLevel2Get(t *testing.T) {
 	})
 
 	t.Run("Invalid AcrLevel", func(t *testing.T) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
 

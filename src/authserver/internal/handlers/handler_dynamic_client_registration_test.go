@@ -12,10 +12,9 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	mocks_handlerhelpers "github.com/leodip/goiabada/authserver/internal/handlerhelpers/mocks"
+	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/uuidutil"
@@ -322,8 +321,8 @@ func TestValidateDCRRedirectURIs_Bounds(t *testing.T) {
 // one made inside the transaction and not one moved back outside it.
 var dcrTx = &sql.Tx{}
 
-func serveDCR(t *testing.T, request oidc.DynamicClientRegistrationRequest, httpHelper *mocks_handlerhelpers.HttpHelper,
-	database *mocks_data.Database, auditLogger *mocks_audit.AuditLogger) *httptest.ResponseRecorder {
+func serveDCR(t *testing.T, request oidc.DynamicClientRegistrationRequest, httpHelper *mocks_handlers.HttpHelper,
+	database *mocks_data.Database, auditLogger *mocks_handlers.AuditLogger) *httptest.ResponseRecorder {
 
 	t.Helper()
 	body, err := json.Marshal(request)
@@ -355,8 +354,8 @@ var confidentialTwoURIRegistration = oidc.DynamicClientRegistrationRequest{
 // follows its commit, so an event never names a client that was rolled back (#428).
 func TestHandleDynamicClientRegistrationPost_WritesTheClientAndItsRedirectURIsInOneTransaction(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
-	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
+	httpHelper := mocks_handlers.NewHttpHelper(t)
 
 	var events []string
 	note := func(event string) { events = append(events, event) }
@@ -387,8 +386,8 @@ func TestHandleDynamicClientRegistrationPost_WritesTheClientAndItsRedirectURIsIn
 // requester gets one server_error with nothing audited and no registration answered.
 func TestHandleDynamicClientRegistrationPost_AFailedSecondInsertCommitsNothing(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
-	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
+	httpHelper := mocks_handlers.NewHttpHelper(t)
 
 	refused := errs.New("the engine refused the second redirect URI")
 	stub := mocks_data.ExpectRunInTransaction(database, dcrTx)
@@ -409,8 +408,8 @@ func TestHandleDynamicClientRegistrationPost_AFailedSecondInsertCommitsNothing(t
 
 func TestHandleDynamicClientRegistrationPost_AFailedClientInsertWritesNoRedirectURI(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
-	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
+	httpHelper := mocks_handlers.NewHttpHelper(t)
 
 	refused := errs.New("the engine refused the client")
 	stub := mocks_data.ExpectRunInTransaction(database, dcrTx)
@@ -429,8 +428,8 @@ func TestHandleDynamicClientRegistrationPost_AFailedClientInsertWritesNoRedirect
 // credentials off (#245, #428).
 func TestHandleDynamicClientRegistrationPost_APublicClientIsWrittenWithThePublicClientInvariants(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
-	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
+	httpHelper := mocks_handlers.NewHttpHelper(t)
 
 	mocks_data.ExpectRunInTransaction(database, dcrTx)
 	database.On("CreateClient", mock.Anything, dcrTx, mock.MatchedBy(func(c *models.Client) bool {
@@ -483,7 +482,7 @@ func TestHandleDynamicClientRegistrationPost_ARefusalNeverReachesTheTransaction(
 		t.Run(tc.name, func(t *testing.T) {
 			database := mocks_data.NewDatabase(t)
 
-			rr := serveDCR(t, tc.request, mocks_handlerhelpers.NewHttpHelper(t), database, mocks_audit.NewAuditLogger(t))
+			rr := serveDCR(t, tc.request, mocks_handlers.NewHttpHelper(t), database, mocks_handlers.NewAuditLogger(t))
 
 			assert.Equal(t, http.StatusBadRequest, rr.Code)
 			assert.Equal(t, tc.code, decodeDCRError(t, rr).Error)
@@ -504,7 +503,7 @@ func TestHandleDynamicClientRegistrationPost_ADescriptionEchoingRequestTextIsCon
 	rr := serveDCR(t, oidc.DynamicClientRegistrationRequest{
 		RedirectURIs: []string{"https://client.example.com/cb"},
 		GrantTypes:   []string{grantType},
-	}, mocks_handlerhelpers.NewHttpHelper(t), mocks_data.NewDatabase(t), mocks_audit.NewAuditLogger(t))
+	}, mocks_handlers.NewHttpHelper(t), mocks_data.NewDatabase(t), mocks_handlers.NewAuditLogger(t))
 
 	assert.Equal(t, http.StatusBadRequest, rr.Code)
 	envelope := decodeDCRError(t, rr)

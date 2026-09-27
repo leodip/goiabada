@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
@@ -127,7 +126,7 @@ func otpTestUser(t *testing.T, password string) *models.User {
 // the identical body a wrong code draws, must record the replay, and must not enable OTP.
 func TestHandleAPIAccountOTPPut_Enable_ReplayIsRefused(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	const subject = "the-subject"
 	const password = "P4ss!word"
@@ -178,7 +177,7 @@ func TestHandleAPIAccountOTPPut_Enable_ReplayIsRefused(t *testing.T) {
 // collapsed into either answer: refusing valid codes is bad and accepting replays is worse.
 func TestHandleAPIAccountOTPPut_Enable_ClaimErrorIs500(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	const subject = "the-subject"
 	const password = "P4ss!word"
@@ -207,7 +206,7 @@ func TestHandleAPIAccountOTPPut_Enable_ClaimErrorIs500(t *testing.T) {
 // nothing is audited.
 func TestHandleAPIAccountOTPPut_Enable_WrongCodeDoesNotClaim(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	const subject = "the-subject"
 	const password = "P4ss!word"
@@ -241,7 +240,7 @@ func TestHandleAPIAccountOTPPut_Enable_WrongCodeDoesNotClaim(t *testing.T) {
 // asserted through a mock: end to end, a caller observes the same final row either way.
 func TestHandleAPIAccountOTPPut_Enable_CommitsBothWritesAtomically(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	const subject = "the-subject"
 	const password = "P4ss!word"
@@ -289,7 +288,7 @@ func TestHandleAPIAccountOTPPut_Enable_CommitsBothWritesAtomically(t *testing.T)
 // OTP switched on, and the user types the next code.
 func TestHandleAPIAccountOTPPut_Enable_CounterFailureRollsBack(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	const subject = "the-subject"
 	const password = "P4ss!word"
@@ -351,7 +350,7 @@ func accountOTPDisableRequest(t *testing.T, subject, password string) *http.Requ
 // both writes inside, commit last.
 func TestHandleAPIAccountOTPPut_Disable_CommitsBothWritesAtomically(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	const subject = "the-subject"
 	const password = "P4ss!word"
@@ -394,7 +393,7 @@ func TestHandleAPIAccountOTPPut_Disable_CommitsBothWritesAtomically(t *testing.T
 // is a lockout on re-enrollment until the marker's step passes.
 func TestHandleAPIAccountOTPPut_Disable_ResetFailureRollsBack(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	const subject = "the-subject"
 	const password = "P4ss!word"
@@ -442,7 +441,7 @@ func wrongButWellFormedCode(t *testing.T) string {
 func wrongCodeDescription(t *testing.T) string {
 	t.Helper()
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	const subject = "oracle-subject"
 	const password = "P4ss!word"
@@ -660,7 +659,7 @@ func TestHandleAPIAccountOTPPut_SecretKeyIsRefused(t *testing.T) {
 			// No expectations on either mock: the refusal must land before the user is
 			// loaded, so any database call fails this test.
 			database := mocks_data.NewDatabase(t)
-			auditLogger := mocks_audit.NewAuditLogger(t)
+			auditLogger := mocks_handlers.NewAuditLogger(t)
 
 			req := accountOTPRawRequest(t, "the-subject", map[string]interface{}{
 				"enabled":   true,
@@ -684,7 +683,7 @@ func TestHandleAPIAccountOTPPut_SecretKeyIsRefused(t *testing.T) {
 // not about the branch it would have taken.
 func TestHandleAPIAccountOTPPut_SecretKeyIsRefusedOnDisableToo(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	req := accountOTPRawRequest(t, "the-subject", map[string]interface{}{
 		"enabled":   false,
@@ -726,7 +725,7 @@ func TestHandleAPIAccountOTPPut_OversizedBodyIsRefused(t *testing.T) {
 	// Expectation-free: an oversized body must be refused before the user is loaded, so any
 	// database or audit call is a failure, and the limiter is asked afterwards.
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 	limiter := &countingCredentials{}
 
 	req := accountOTPRawRequest(t, "the-subject", map[string]interface{}{
@@ -786,7 +785,7 @@ func TestHandleAPIAccountOTPPut_Enable_RefusedWithoutALivePendingEnrollment(t *t
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			database := mocks_data.NewDatabase(t)
-			auditLogger := mocks_audit.NewAuditLogger(t)
+			auditLogger := mocks_handlers.NewAuditLogger(t)
 
 			const subject = "the-subject"
 			const password = "P4ss!word"
@@ -819,7 +818,7 @@ func TestHandleAPIAccountOTPPut_Enable_RefusedWithoutALivePendingEnrollment(t *t
 // What the case pins is the other half: the value that reaches the row.
 func TestHandleAPIAccountOTPPut_Enable_StoresTheIssuedSeed(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	const subject = "the-subject"
 	const password = "P4ss!word"
@@ -856,7 +855,7 @@ func TestHandleAPIAccountOTPPut_Enable_StoresTheIssuedSeed(t *testing.T) {
 // else in the suite observes.
 func TestHandleAPIAccountOTPPut_Enable_BlankCodeIsRefusedByName(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	const subject = "the-subject"
 	const password = "P4ss!word"

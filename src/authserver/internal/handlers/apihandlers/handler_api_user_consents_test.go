@@ -9,8 +9,8 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -115,7 +115,7 @@ func TestHandleAPIUserConsentsGet_LoadClientsFails_JSON500(t *testing.T) {
 
 func TestHandleAPIUserConsentDelete_Success(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 	handler := HandleAPIUserConsentDelete(database, auditLogger)
 
 	req, _ := http.NewRequest("DELETE", "/api/v1/admin/user-consents/5", nil)
@@ -137,7 +137,7 @@ func TestHandleAPIUserConsentDelete_Success(t *testing.T) {
 
 func TestHandleAPIUserConsentDelete_GetConsentFails_JSON500(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 	handler := HandleAPIUserConsentDelete(database, auditLogger)
 
 	req, _ := http.NewRequest("DELETE", "/api/v1/admin/user-consents/5", nil)
@@ -154,7 +154,7 @@ func TestHandleAPIUserConsentDelete_GetConsentFails_JSON500(t *testing.T) {
 
 func TestHandleAPIUserConsentDelete_DeleteFails_JSON500(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 	handler := HandleAPIUserConsentDelete(database, auditLogger)
 
 	req, _ := http.NewRequest("DELETE", "/api/v1/admin/user-consents/5", nil)

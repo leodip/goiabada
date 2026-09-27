@@ -16,7 +16,7 @@ import (
 
 	"github.com/leodip/goiabada/adminconsole/internal/config"
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
-	mocks_handlerhelpers "github.com/leodip/goiabada/adminconsole/internal/handlerhelpers/mocks"
+	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	coreconstants "github.com/leodip/goiabada/core/constants"
@@ -84,7 +84,7 @@ func TestSlogConvention_TheCodeExchangeIsDebugAndCarriesTheBaseUrlAndTheRequestI
 
 	logs := testutil.CaptureSlog(t)
 
-	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	httpHelper := mocks_handlers.NewHttpHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/no_menu_layout.html", "/sign_in_error.html").Once()
 

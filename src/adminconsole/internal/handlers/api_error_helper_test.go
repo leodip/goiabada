@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
-	mocks_handlerhelpers "github.com/leodip/goiabada/adminconsole/internal/handlerhelpers/mocks"
+	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
@@ -25,11 +25,11 @@ import (
 // than a request id" is pinned. The distinction it tests is invisible at runtime unless you read the
 // screen: both branches call JsonError, and only the argument differs.
 //
-// mocks_handlerhelpers.HttpHelper is the core module's mock. Its method set is a superset of this
+// mocks_handlers.HttpHelper is the core module's mock. Its method set is a superset of this
 // package's HttpHelper interface, so it satisfies it without a hand-written stub.
 
 // captureJsonError registers JsonError and returns a pointer to the error it was handed.
-func captureJsonError(httpHelper *mocks_handlerhelpers.HttpHelper) *error {
+func captureJsonError(httpHelper *mocks_handlers.HttpHelper) *error {
 	var captured error
 	httpHelper.On("JsonError", mock.Anything, mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
@@ -42,7 +42,7 @@ func captureJsonError(httpHelper *mocks_handlerhelpers.HttpHelper) *error {
 // another rotation won the race, which is a fact about the administrator's own request, so its code,
 // description and status reach the browser instead of "An unexpected server error has occurred".
 func TestHandleAPIErrorJson_ForwardsConflict(t *testing.T) {
-	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	httpHelper := mocks_handlers.NewHttpHelper(t)
 	captured := captureJsonError(httpHelper)
 
 	HandleAPIErrorJson(httpHelper, httptest.NewRecorder(),
@@ -63,7 +63,7 @@ func TestHandleAPIErrorJson_ForwardsConflict(t *testing.T) {
 // TestHandleAPIErrorJson_ForwardsBadRequest pins the behaviour #122 established. It is here so that
 // adding 409 to the condition cannot quietly replace 400 rather than join it.
 func TestHandleAPIErrorJson_ForwardsBadRequest(t *testing.T) {
-	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	httpHelper := mocks_handlers.NewHttpHelper(t)
 	captured := captureJsonError(httpHelper)
 
 	HandleAPIErrorJson(httpHelper, httptest.NewRecorder(),
@@ -85,7 +85,7 @@ func TestHandleAPIErrorJson_ForwardsBadRequest(t *testing.T) {
 // the API is a server fault, so it keeps going to the log with a request id on screen rather than
 // having its English text shown to an administrator who can do nothing with it.
 func TestHandleAPIErrorJson_GenericBranchForOtherStatuses(t *testing.T) {
-	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	httpHelper := mocks_handlers.NewHttpHelper(t)
 	captured := captureJsonError(httpHelper)
 
 	apiErr := &apiclient.APIError{
@@ -107,7 +107,7 @@ func TestHandleAPIErrorJson_GenericBranchForOtherStatuses(t *testing.T) {
 // stops seeing the 409 and the administrator gets "An unexpected server error has occurred" for a
 // race they could have retried (#279).
 func TestHandleAPIErrorJson_ForwardsAWrappedAPIError(t *testing.T) {
-	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	httpHelper := mocks_handlers.NewHttpHelper(t)
 	captured := captureJsonError(httpHelper)
 
 	HandleAPIErrorJson(httpHelper, httptest.NewRecorder(),
@@ -130,7 +130,7 @@ func TestHandleAPIErrorJson_ForwardsAWrappedAPIError(t *testing.T) {
 // what is wrong with the form they just submitted, so a wrap losing it replaces that sentence with a
 // 500 page and discards the form.
 func TestHandleAPIErrorWithCallback_RendersAWrappedBadRequest(t *testing.T) {
-	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	httpHelper := mocks_handlers.NewHttpHelper(t)
 
 	rendered := ""
 	HandleAPIErrorWithCallback(httpHelper, httptest.NewRecorder(),
@@ -205,7 +205,7 @@ func TestHandleAPIError_RoutesOnStatus(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+			httpHelper := mocks_handlers.NewHttpHelper(t)
 			switch {
 			case testCase.wantSessionEnded:
 				// No expectation: the mock fails on any page writer.
@@ -299,7 +299,7 @@ func TestHandleAPIErrorWithCallback_RoutesOnStatus(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+			httpHelper := mocks_handlers.NewHttpHelper(t)
 			switch {
 			case testCase.wantSessionEnded:
 				// No expectation: the mock fails on any page writer.
@@ -331,7 +331,7 @@ func TestHandleAPIErrorWithCallback_RoutesOnStatus(t *testing.T) {
 // whose status is zero -- which is the exact regression, silently.
 
 func TestJsonNotFound_Answers404WithoutLogging(t *testing.T) {
-	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	httpHelper := mocks_handlers.NewHttpHelper(t)
 	captured := captureJsonError(httpHelper)
 
 	JsonNotFound(httpHelper, httptest.NewRecorder(),
@@ -345,7 +345,7 @@ func TestJsonNotFound_Answers404WithoutLogging(t *testing.T) {
 }
 
 func TestJsonBadRequestBody_Answers400WithoutLogging(t *testing.T) {
-	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	httpHelper := mocks_handlers.NewHttpHelper(t)
 	captured := captureJsonError(httpHelper)
 
 	JsonBadRequestBody(httpHelper, httptest.NewRecorder(),
@@ -364,7 +364,7 @@ func TestJsonBadRequestBody_Answers400WithoutLogging(t *testing.T) {
 // with a stack and a request id. It answers the console's own 404 sentence rather than forwarding
 // the API's, which is what the page beside it shows.
 func TestHandleAPIErrorJson_AnswersNotFound(t *testing.T) {
-	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	httpHelper := mocks_handlers.NewHttpHelper(t)
 	captured := captureJsonError(httpHelper)
 
 	HandleAPIErrorJson(httpHelper, httptest.NewRecorder(),
@@ -410,7 +410,7 @@ func TestHandleAPIErrorJson_AnswersA401AsTheSessionEnded(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+			httpHelper := mocks_handlers.NewHttpHelper(t)
 			captured := captureJsonError(httpHelper)
 
 			req := httptest.NewRequest(http.MethodPost, "/account/picture", nil)
@@ -434,7 +434,7 @@ func TestHandleAPIErrorJson_NoOtherStatusCarriesTheSessionEndedCode(t *testing.T
 		http.StatusInternalServerError, http.StatusBadGateway,
 	} {
 		t.Run(http.StatusText(status), func(t *testing.T) {
-			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+			httpHelper := mocks_handlers.NewHttpHelper(t)
 			captured := captureJsonError(httpHelper)
 
 			HandleAPIErrorJson(httpHelper, httptest.NewRecorder(),

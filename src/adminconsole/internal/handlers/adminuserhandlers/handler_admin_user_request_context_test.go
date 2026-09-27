@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
-	mocks_handlerhelpers "github.com/leodip/goiabada/adminconsole/internal/handlerhelpers/mocks"
+	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
@@ -114,19 +114,19 @@ func TestAdminUserHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContex
 
 	testCases := []struct {
 		name    string
-		build   func(httpHelper *mocks_handlerhelpers.HttpHelper, apiClient apiclient.ApiClient) http.HandlerFunc
+		build   func(httpHelper *mocks_handlers.HttpHelper, apiClient apiclient.ApiClient) http.HandlerFunc
 		request *http.Request
 	}{
 		{
 			name: "HandleAdminUsersGet",
-			build: func(h *mocks_handlerhelpers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
 				return HandleAdminUsersGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/users", handlertest.WithAccessToken()),
 		},
 		{
 			name: "HandleAdminUserNewPost",
-			build: func(h *mocks_handlerhelpers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
 				return HandleAdminUserNewPost(h, nil, c)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/users/new",
@@ -136,7 +136,7 @@ func TestAdminUserHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContex
 		},
 		{
 			name: "HandleAdminUserPermissionsGet",
-			build: func(h *mocks_handlerhelpers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
 				return HandleAdminUserPermissionsGet(h, nil, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/users/42/permissions",
@@ -144,7 +144,7 @@ func TestAdminUserHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContex
 		},
 		{
 			name: "HandleAdminUserDetailsGet",
-			build: func(h *mocks_handlerhelpers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
 				return HandleAdminUserDetailsGet(h, nil, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/users/42/details",
@@ -152,7 +152,7 @@ func TestAdminUserHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContex
 		},
 		{
 			name: "HandleAdminUserDetailsPost",
-			build: func(h *mocks_handlerhelpers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
 				return HandleAdminUserDetailsPost(h, nil, c)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/users/42/details",
@@ -161,7 +161,7 @@ func TestAdminUserHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContex
 		},
 		{
 			name: "HandleAdminUserProfileGet",
-			build: func(h *mocks_handlerhelpers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
 				return HandleAdminUserProfileGet(h, nil, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/users/42/profile",
@@ -169,7 +169,7 @@ func TestAdminUserHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContex
 		},
 		{
 			name: "HandleAdminUserProfilePost",
-			build: func(h *mocks_handlerhelpers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
 				return HandleAdminUserProfilePost(h, nil, c)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/users/42/profile",
@@ -178,7 +178,7 @@ func TestAdminUserHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContex
 		},
 		{
 			name: "HandleAdminUserEmailGet",
-			build: func(h *mocks_handlerhelpers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
 				return HandleAdminUserEmailGet(h, nil, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/users/42/email",
@@ -186,7 +186,7 @@ func TestAdminUserHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContex
 		},
 		{
 			name: "HandleAdminUserEmailPost",
-			build: func(h *mocks_handlerhelpers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
 				return HandleAdminUserEmailPost(h, nil, c)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/users/42/email",
@@ -195,7 +195,7 @@ func TestAdminUserHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContex
 		},
 		{
 			name: "HandleAdminUserAddressGet",
-			build: func(h *mocks_handlerhelpers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
 				return HandleAdminUserAddressGet(h, nil, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/users/42/address",
@@ -203,7 +203,7 @@ func TestAdminUserHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContex
 		},
 		{
 			name: "HandleAdminUserAddressPost",
-			build: func(h *mocks_handlerhelpers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
 				return HandleAdminUserAddressPost(h, nil, c)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/users/42/address",
@@ -212,7 +212,7 @@ func TestAdminUserHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContex
 		},
 		{
 			name: "HandleAdminUserPhoneGet",
-			build: func(h *mocks_handlerhelpers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
 				return HandleAdminUserPhoneGet(h, nil, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/users/42/phone",
@@ -220,7 +220,7 @@ func TestAdminUserHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContex
 		},
 		{
 			name: "HandleAdminUserAuthenticationGet",
-			build: func(h *mocks_handlerhelpers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
 				return HandleAdminUserAuthenticationGet(h, nil, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/users/42/authentication",
@@ -228,7 +228,7 @@ func TestAdminUserHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContex
 		},
 		{
 			name: "HandleAdminUserAuthenticationPost",
-			build: func(h *mocks_handlerhelpers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
 				return HandleAdminUserAuthenticationPost(h, nil, c)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/users/42/authentication",
@@ -237,7 +237,7 @@ func TestAdminUserHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContex
 		},
 		{
 			name: "HandleAdminUserPictureGet",
-			build: func(h *mocks_handlerhelpers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
 				return HandleAdminUserPictureGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/users/42/picture",
@@ -245,14 +245,14 @@ func TestAdminUserHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContex
 		},
 		{
 			name: "HandleAdminUserProfilePicturePost",
-			build: func(h *mocks_handlerhelpers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
 				return HandleAdminUserProfilePicturePost(h, c)
 			},
 			request: pictureUpload(userId),
 		},
 		{
 			name: "HandleAdminUserProfilePictureDelete",
-			build: func(h *mocks_handlerhelpers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
 				return HandleAdminUserProfilePictureDelete(h, c)
 			},
 			request: handlertest.Request(http.MethodDelete, "/admin/users/42/profile-picture",
@@ -260,7 +260,7 @@ func TestAdminUserHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContex
 		},
 		{
 			name: "HandleAdminUserGroupsGet",
-			build: func(h *mocks_handlerhelpers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
 				return HandleAdminUserGroupsGet(h, nil, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/users/42/groups",
@@ -268,7 +268,7 @@ func TestAdminUserHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContex
 		},
 		{
 			name: "HandleAdminUserGroupsPost",
-			build: func(h *mocks_handlerhelpers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
 				return HandleAdminUserGroupsPost(h, nil, c)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/users/42/groups",
@@ -278,7 +278,7 @@ func TestAdminUserHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContex
 		},
 		{
 			name: "HandleAdminUserAttributesGet",
-			build: func(h *mocks_handlerhelpers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
 				return HandleAdminUserAttributesGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/users/42/attributes",
@@ -286,7 +286,7 @@ func TestAdminUserHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContex
 		},
 		{
 			name: "HandleAdminUserAttributesRemovePost",
-			build: func(h *mocks_handlerhelpers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
 				return HandleAdminUserAttributesRemovePost(h, c)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/users/42/attributes/21/remove",
@@ -295,7 +295,7 @@ func TestAdminUserHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContex
 		},
 		{
 			name: "HandleAdminUserAttributesAddGet",
-			build: func(h *mocks_handlerhelpers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
 				return HandleAdminUserAttributesAddGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/users/42/attributes/add",
@@ -303,7 +303,7 @@ func TestAdminUserHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContex
 		},
 		{
 			name: "HandleAdminUserAttributesAddPost",
-			build: func(h *mocks_handlerhelpers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
 				return HandleAdminUserAttributesAddPost(h, c)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/users/42/attributes/add",
@@ -312,7 +312,7 @@ func TestAdminUserHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContex
 		},
 		{
 			name: "HandleAdminUserAttributesEditGet",
-			build: func(h *mocks_handlerhelpers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
 				return HandleAdminUserAttributesEditGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/users/42/attributes/21/edit",
@@ -321,7 +321,7 @@ func TestAdminUserHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContex
 		},
 		{
 			name: "HandleAdminUserAttributesEditPost",
-			build: func(h *mocks_handlerhelpers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
 				return HandleAdminUserAttributesEditPost(h, c)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/users/42/attributes/21/edit",
@@ -331,7 +331,7 @@ func TestAdminUserHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContex
 		},
 		{
 			name: "HandleAdminUserConsentsGet",
-			build: func(h *mocks_handlerhelpers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
 				return HandleAdminUserConsentsGet(h, nil, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/users/42/consents",
@@ -339,7 +339,7 @@ func TestAdminUserHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContex
 		},
 		{
 			name: "HandleAdminUserConsentsPost",
-			build: func(h *mocks_handlerhelpers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
 				return HandleAdminUserConsentsPost(h, c)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/users/42/consents",
@@ -349,7 +349,7 @@ func TestAdminUserHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContex
 		},
 		{
 			name: "HandleAdminUserSessionsGet",
-			build: func(h *mocks_handlerhelpers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
 				return HandleAdminUserSessionsGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/users/42/sessions",
@@ -357,7 +357,7 @@ func TestAdminUserHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContex
 		},
 		{
 			name: "HandleAdminUserSessionsPost",
-			build: func(h *mocks_handlerhelpers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
 				return HandleAdminUserSessionsPost(h, c)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/users/42/sessions",
@@ -367,7 +367,7 @@ func TestAdminUserHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContex
 		},
 		{
 			name: "HandleAdminUserDeleteGet",
-			build: func(h *mocks_handlerhelpers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
 				return HandleAdminUserDeleteGet(h, c)
 			},
 			request: handlertest.Request(http.MethodGet, "/admin/users/42/delete",
@@ -375,7 +375,7 @@ func TestAdminUserHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContex
 		},
 		{
 			name: "HandleAdminUserDeletePost",
-			build: func(h *mocks_handlerhelpers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
+			build: func(h *mocks_handlers.HttpHelper, c apiclient.ApiClient) http.HandlerFunc {
 				return HandleAdminUserDeletePost(h, c)
 			},
 			request: handlertest.Request(http.MethodPost, "/admin/users/42/delete",
@@ -386,7 +386,7 @@ func TestAdminUserHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContex
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+			httpHelper := mocks_handlers.NewHttpHelper(t)
 			// Every writer is admitted: which one a handler picks is pattern 7's decision and is
 			// held by TestHandlers_AjaxHandlersDoNotUsePageWriters and the classifier guard, not
 			// here. What this case needs is only that the handler answered rather than carrying on.
@@ -418,7 +418,7 @@ func TestAdminUserHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContex
 }
 
 func TestAdminUserHandlers_ThePhoneWriteCarriesTheRequestsContext(t *testing.T) {
-	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	httpHelper := mocks_handlers.NewHttpHelper(t)
 	httpHelper.On("InternalServerError", mock.Anything, mock.Anything, mock.Anything).Maybe()
 	httpHelper.On("JsonError", mock.Anything, mock.Anything, mock.Anything).Maybe()
 	httpHelper.On("RenderTemplate", mock.Anything, mock.Anything, mock.Anything,

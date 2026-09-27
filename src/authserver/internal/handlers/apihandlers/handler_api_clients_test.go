@@ -13,10 +13,10 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/data"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/urlutil"
 	"github.com/leodip/goiabada/core/api"
@@ -228,7 +228,7 @@ func TestUpdateClientNotOwningAuthenticationMode_AFailedAcquisitionDoesNotWrite(
 // answer rather than on the copy in its hand.
 func TestHandleAPIClientAuthenticationPut_ClassifiesTheFlipAgainstTheRow(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	// The snapshot the handler works from: already public.
 	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).
@@ -276,7 +276,7 @@ func TestHandleAPIClientAuthenticationPut_ClassifiesTheFlipAgainstTheRow(t *test
 // exists to catch, so the whole transaction is abandoned and the caller is told it failed.
 func TestHandleAPIClientAuthenticationPut_AFailedClassificationRevokesNothingAndSavesNothing(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).
 		Return(&models.Client{Id: 7, IsPublic: false, ClientSecretEncrypted: []byte("secret")}, nil).Once()
@@ -305,7 +305,7 @@ func TestHandleAPIClientAuthenticationPut_AFailedClassificationRevokesNothingAnd
 // because an administrator re-saved a form.
 func TestHandleAPIClientAuthenticationPut_ASaveOfAnAlreadyPublicClientRevokesNothing(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).
 		Return(&models.Client{Id: 7, IsPublic: true}, nil).Once()
@@ -334,7 +334,7 @@ func TestHandleAPIClientAuthenticationPut_ASaveOfAnAlreadyPublicClientRevokesNot
 // that row and the console renders it (#245, #428).
 func TestHandleAPIClientAuthenticationPut_AClientMadePublicIsWrittenWithThePublicInvariants(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	pkceOptional := false
 	database.On("GetClientById", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(&models.Client{
@@ -442,7 +442,7 @@ func expectStoredWebOrigins(database *mocks_data.Database, rows ...models.WebOri
 // follows the commit.
 func TestHandleAPIClientWebOriginsPut_SavesTheExactPlanInOneTransaction(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	expectWebOriginsClient(database)
 	var order []string
@@ -495,7 +495,7 @@ func TestHandleAPIClientWebOriginsPut_SavesTheExactPlanInOneTransaction(t *testi
 // names the origin being written, for the operator reading the one log record (#428).
 func TestHandleAPIClientWebOriginsPut_AFailedWriteCommitsNothing(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	expectWebOriginsClient(database)
 	stub := mocks_data.ExpectRunInTransaction(database, clientUpdateTx)
@@ -533,7 +533,7 @@ func TestHandleAPIClientWebOriginsPut_AFailedLoadIsAnsweredAsALoadFailure(t *tes
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			database := mocks_data.NewDatabase(t)
-			auditLogger := mocks_audit.NewAuditLogger(t)
+			auditLogger := mocks_handlers.NewAuditLogger(t)
 
 			expectWebOriginsClient(database)
 			stub := mocks_data.ExpectRunInTransaction(database, clientUpdateTx)
@@ -567,7 +567,7 @@ func TestHandleAPIClientWebOriginsPut_AFailedLoadIsAnsweredAsALoadFailure(t *tes
 // again. The real loop, with a real deadlock, is the data tier's.
 func TestHandleAPIClientWebOriginsPut_ARerunAttemptAnswersOnce(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	expectWebOriginsClient(database)
 
@@ -612,7 +612,7 @@ func TestHandleAPIClientWebOriginsPut_ARerunAttemptAnswersOnce(t *testing.T) {
 // audit event: the exhausted error carries no step of its own and is reported as the helper's.
 func TestHandleAPIClientWebOriginsPut_AnExhaustedRetryIsOneFiveHundred(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	expectWebOriginsClient(database)
 	exhausted := errors.New("transaction aborted as a deadlock victim on all 3 attempts")
@@ -661,7 +661,7 @@ func canonicalOriginOfLength(t *testing.T, n int) string {
 // so the refusal is proved to happen before any write is attempted.
 func TestHandleAPIClientWebOriginsPut_AnOverlongOriginIsRefusedNotStored(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	expectWebOriginsClient(database)
 
@@ -684,7 +684,7 @@ func TestHandleAPIClientWebOriginsPut_AnOverlongOriginIsRefusedNotStored(t *test
 // transaction, which is what separates an admitted value from one refused before the write (#428).
 func TestHandleAPIClientWebOriginsPut_AnOriginAtTheBoundIsStored(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	origin := canonicalOriginOfLength(t, 267)
 
@@ -713,7 +713,7 @@ func TestHandleAPIClientWebOriginsPut_AnOriginAtTheBoundIsStored(t *testing.T) {
 // audited (#428).
 func TestHandleAPIClientWebOriginsPut_AUniqueKeyRaceIsAConflict(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	expectWebOriginsClient(database)
 	stub := mocks_data.ExpectRunInTransaction(database, clientUpdateTx)
@@ -738,7 +738,7 @@ func TestHandleAPIClientWebOriginsPut_AUniqueKeyRaceIsAConflict(t *testing.T) {
 // whole list would silently undo the change the caller never saw (#428).
 func TestHandleAPIClientWebOriginsPut_AnOutdatedLoadedListIsRefused(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	expectWebOriginsClient(database)
 	stub := mocks_data.ExpectRunInTransaction(database, clientUpdateTx)
@@ -784,7 +784,7 @@ func TestHandleAPIClientWebOriginsPut_ALoadedListEqualAsASetProceeds(t *testing.
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			database := mocks_data.NewDatabase(t)
-			auditLogger := mocks_audit.NewAuditLogger(t)
+			auditLogger := mocks_handlers.NewAuditLogger(t)
 
 			expectWebOriginsClient(database)
 			mocks_data.ExpectRunInTransaction(database, clientUpdateTx)
@@ -851,7 +851,7 @@ func TestHandleAPIClientWebOriginsPut_ARefusedSaveNeverOpensTheTransaction(t *te
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			database := mocks_data.NewDatabase(t)
-			auditLogger := mocks_audit.NewAuditLogger(t)
+			auditLogger := mocks_handlers.NewAuditLogger(t)
 			expectWebOriginsClient(database)
 
 			rr := httptest.NewRecorder()
@@ -925,7 +925,7 @@ func uriOfBytes(t *testing.T, n int, unit string) string {
 // event follows the commit.
 func TestHandleAPIClientRedirectURIsPut_SavesTheExactPlanInOneTransaction(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	expectRedirectURIsClient(database)
 	var order []string
@@ -974,7 +974,7 @@ func TestHandleAPIClientRedirectURIsPut_SavesTheExactPlanInOneTransaction(t *tes
 // for a save that did not happen is a false record of an administrator's action (#264, #428).
 func TestHandleAPIClientRedirectURIsPut_AFailedWriteCommitsNothing(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	expectRedirectURIsClient(database)
 	stub := mocks_data.ExpectRunInTransaction(database, clientUpdateTx)
@@ -1011,7 +1011,7 @@ func TestHandleAPIClientRedirectURIsPut_AFailedStoredReadIsOneFiveHundred(t *tes
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			database := mocks_data.NewDatabase(t)
-			auditLogger := mocks_audit.NewAuditLogger(t)
+			auditLogger := mocks_handlers.NewAuditLogger(t)
 
 			expectRedirectURIsClient(database)
 			stub := mocks_data.ExpectRunInTransaction(database, clientUpdateTx)
@@ -1037,7 +1037,7 @@ func TestHandleAPIClientRedirectURIsPut_AFailedStoredReadIsOneFiveHundred(t *tes
 // from inside an attempt that might be thrown away (#301, #428).
 func TestHandleAPIClientRedirectURIsPut_ARerunAttemptAnswersOnce(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	expectRedirectURIsClient(database)
 	deadlock := errors.New("Error 1213: Deadlock found when trying to get lock")
@@ -1076,7 +1076,7 @@ func TestHandleAPIClientRedirectURIsPut_ARerunAttemptAnswersOnce(t *testing.T) {
 // whole list would silently undo the change the caller never saw (#428).
 func TestHandleAPIClientRedirectURIsPut_AnOutdatedLoadedListIsRefused(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 
 	expectRedirectURIsClient(database)
 	stub := mocks_data.ExpectRunInTransaction(database, clientUpdateTx)
@@ -1121,7 +1121,7 @@ func TestHandleAPIClientRedirectURIsPut_ALoadedListEqualAsASetProceeds(t *testin
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			database := mocks_data.NewDatabase(t)
-			auditLogger := mocks_audit.NewAuditLogger(t)
+			auditLogger := mocks_handlers.NewAuditLogger(t)
 
 			expectRedirectURIsClient(database)
 			mocks_data.ExpectRunInTransaction(database, clientUpdateTx)
@@ -1213,7 +1213,7 @@ func TestHandleAPIClientRedirectURIsPut_ARefusedSaveNeverOpensTheTransaction(t *
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			database := mocks_data.NewDatabase(t)
-			auditLogger := mocks_audit.NewAuditLogger(t)
+			auditLogger := mocks_handlers.NewAuditLogger(t)
 			expectRedirectURIsClient(database)
 
 			rr := httptest.NewRecorder()
@@ -1244,7 +1244,7 @@ func TestHandleAPIClientRedirectURIsPut_TheBoundsAreAdmitted(t *testing.T) {
 	sixty[2] = uriOfBytes(t, 2048, "a")
 
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
 	expectRedirectURIsClient(database)
 	mocks_data.ExpectRunInTransaction(database, clientUpdateTx)
 	expectStoredRedirectURIs(database)

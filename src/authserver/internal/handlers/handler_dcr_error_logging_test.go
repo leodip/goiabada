@@ -11,8 +11,7 @@ import (
 	"testing"
 
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
-	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
-	mocks_handlerhelpers "github.com/leodip/goiabada/authserver/internal/handlerhelpers/mocks"
+	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 
 	"github.com/leodip/goiabada/authserver/internal/constants"
@@ -32,8 +31,8 @@ func TestDCR_AStorageFailureLogsOnceAndKeepsTheRFC7591Envelope(t *testing.T) {
 	const requestId = "req-dcr-1"
 
 	database := mocks_data.NewDatabase(t)
-	auditLogger := mocks_audit.NewAuditLogger(t)
-	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	auditLogger := mocks_handlers.NewAuditLogger(t)
+	httpHelper := mocks_handlers.NewHttpHelper(t)
 
 	mocks_data.ExpectRunInTransaction(database, dcrTx)
 	database.On("CreateClient", mock.Anything, dcrTx, mock.Anything).

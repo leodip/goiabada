@@ -11,11 +11,9 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	mocks_audit "github.com/leodip/goiabada/authserver/internal/audit/mocks"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	mocks_handlerhelpers "github.com/leodip/goiabada/authserver/internal/handlerhelpers/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
@@ -43,7 +41,7 @@ func TestCutBody_DynamicClientRegistration(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	serve := func(t *testing.T, limit int, httpHelper *mocks_handlerhelpers.HttpHelper, database *mocks_data.Database, auditLogger *mocks_audit.AuditLogger) *httptest.ResponseRecorder {
+	serve := func(t *testing.T, limit int, httpHelper *mocks_handlers.HttpHelper, database *mocks_data.Database, auditLogger *mocks_handlers.AuditLogger) *httptest.ResponseRecorder {
 		rr := httptest.NewRecorder()
 		req := httptest.NewRequest(http.MethodPost, "/connect/register", nil)
 		req.Body = cutBody(rr, string(body), limit)
@@ -60,10 +58,10 @@ func TestCutBody_DynamicClientRegistration(t *testing.T) {
 		mocks_data.ExpectRunInTransaction(database, dcrTx)
 		database.On("CreateClient", mock.Anything, dcrTx, mock.Anything).Return(nil).Once()
 		database.On("CreateRedirectURI", mock.Anything, dcrTx, mock.Anything).Return(nil).Once()
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 		auditLogger.On("Log", mock.Anything, audit.AuditDynamicClientRegistration, mock.Anything).Return().Once()
 
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		httpHelper.On("EncodeJson", mock.Anything, mock.Anything, mock.MatchedBy(func(response oidc.DynamicClientRegistrationResponse) bool {
 			return response.ClientName == "A Test Client"
 		})).Return().Once()
@@ -76,7 +74,7 @@ func TestCutBody_DynamicClientRegistration(t *testing.T) {
 	t.Run("one byte short it is refused and nothing is written", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 
-		rr := serve(t, len(body)-1, mocks_handlerhelpers.NewHttpHelper(t), database, mocks_audit.NewAuditLogger(t))
+		rr := serve(t, len(body)-1, mocks_handlers.NewHttpHelper(t), database, mocks_handlers.NewAuditLogger(t))
 
 		assert.Equal(t, http.StatusBadRequest, rr.Code)
 		var envelope oidc.DynamicClientRegistrationError
@@ -98,12 +96,12 @@ func TestCutBody_ThePasswordForm(t *testing.T) {
 	form.Add("password", "the password")
 	body := form.Encode()
 
-	serve := func(t *testing.T, limit int, prepare func(httpHelper *mocks_handlerhelpers.HttpHelper,
-		auditLogger *mocks_audit.AuditLogger, database *mocks_data.Database, rr *httptest.ResponseRecorder, req *http.Request)) {
-		httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	serve := func(t *testing.T, limit int, prepare func(httpHelper *mocks_handlers.HttpHelper,
+		auditLogger *mocks_handlers.AuditLogger, database *mocks_data.Database, rr *httptest.ResponseRecorder, req *http.Request)) {
+		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
 		database := mocks_data.NewDatabase(t)
-		auditLogger := mocks_audit.NewAuditLogger(t)
+		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		rr := httptest.NewRecorder()
 		req := httptest.NewRequest(http.MethodPost, "/auth/pwd", nil)
@@ -126,7 +124,7 @@ func TestCutBody_ThePasswordForm(t *testing.T) {
 	}
 
 	t.Run("at exactly the limit the ceremony matches and the sign-in proceeds", func(t *testing.T) {
-		serve(t, len(body), func(httpHelper *mocks_handlerhelpers.HttpHelper, _ *mocks_audit.AuditLogger,
+		serve(t, len(body), func(httpHelper *mocks_handlers.HttpHelper, _ *mocks_handlers.AuditLogger,
 			database *mocks_data.Database, rr *httptest.ResponseRecorder, req *http.Request) {
 			// The first read past the ceremony gate. Failing it ends the case there, which is all
 			// this side needs to show: the body was read and the gate passed.
@@ -137,7 +135,7 @@ func TestCutBody_ThePasswordForm(t *testing.T) {
 	})
 
 	t.Run("one byte short the sign-in is refused before any credential is read", func(t *testing.T) {
-		serve(t, len(body)-1, func(httpHelper *mocks_handlerhelpers.HttpHelper, auditLogger *mocks_audit.AuditLogger,
+		serve(t, len(body)-1, func(httpHelper *mocks_handlers.HttpHelper, auditLogger *mocks_handlers.AuditLogger,
 			_ *mocks_data.Database, rr *httptest.ResponseRecorder, req *http.Request) {
 			expectCeremonyMismatch(t, httpHelper, auditLogger, rr, req)
 		})

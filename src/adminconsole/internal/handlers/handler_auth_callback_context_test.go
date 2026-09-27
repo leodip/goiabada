@@ -19,7 +19,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	mocks_handlerhelpers "github.com/leodip/goiabada/adminconsole/internal/handlerhelpers/mocks"
+	mocks_handlers "github.com/leodip/goiabada/adminconsole/internal/handlers/mocks"
 	mocks_sessionstore "github.com/leodip/goiabada/core/sessionstore/mocks"
 )
 
@@ -67,7 +67,7 @@ func (e *contextRecordingExchanger) ExchangeCodeForTokens(ctx context.Context, c
 // internal/middleware is the opposite case and carries its detached context through
 // its save (#338).
 func TestHandleAuthCallbackPost_DetachesTheExchangeFromTheBrowsersContext(t *testing.T) {
-	httpHelper := mocks_handlerhelpers.NewHttpHelper(t)
+	httpHelper := mocks_handlers.NewHttpHelper(t)
 	handlertest.RefuseInternalServerError(t, httpHelper)
 	handlertest.ExpectRender(httpHelper, "/layouts/no_menu_layout.html", "/sign_in_error.html").Once()
 

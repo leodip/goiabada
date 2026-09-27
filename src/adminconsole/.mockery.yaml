@@ -38,10 +38,12 @@ packages:
           pkgname: "mocks_middleware"
           structname: "TokenParser"
   # This module's renderer port. Its implementation is internal/handlerhelpers, which
-  # #385 split out of core so each application owns the renderer it actually uses.
+  # #385 split out of core so each application owns the renderer it actually uses. The
+  # mock sits beside the port, not the renderer: a generated mock lives in
+  # <declaring package>/mocks, package mocks_<declaring package> (#431).
   github.com/leodip/goiabada/adminconsole/internal/handlers:
     interfaces:
       HttpHelper:
         config:
-          dir: "./internal/handlerhelpers/mocks"
-          pkgname: "mocks_handlerhelpers"
+          dir: "./internal/handlers/mocks"
+          pkgname: "mocks_handlers"
