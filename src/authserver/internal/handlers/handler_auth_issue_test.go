@@ -21,7 +21,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/errs"
-	"github.com/leodip/goiabada/core/testutil"
+	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -1149,7 +1149,7 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 
 			handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
 
-			logs := testutil.CaptureSlog(t)
+			logs := logtest.CaptureSlog(t)
 			req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 			rr := httptest.NewRecorder()
 
@@ -1237,7 +1237,7 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 
 			handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
 
-			logs := testutil.CaptureSlog(t)
+			logs := logtest.CaptureSlog(t)
 			req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 			rr := httptest.NewRecorder()
 
@@ -1387,7 +1387,7 @@ func TestHandleIssueGet_ImplicitAmbientSessionVanished(t *testing.T) {
 
 		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
 
-		logs := testutil.CaptureSlog(t)
+		logs := logtest.CaptureSlog(t)
 		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 		rr := httptest.NewRecorder()
 
@@ -1449,7 +1449,7 @@ func TestHandleIssueGet_ImplicitAmbientSessionVanished(t *testing.T) {
 
 		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
 
-		logs := testutil.CaptureSlog(t)
+		logs := logtest.CaptureSlog(t)
 		req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 		rr := httptest.NewRecorder()
 
@@ -1546,10 +1546,10 @@ func stubIssuanceTransaction(database *mocks_data.Database) {
 // when there is not exactly one. The level is asserted rather than assumed: an operator
 // filtering at warning level is the reader this line was written for, so a record quietly
 // demoted to Info would be invisible to them while every text assertion still passed.
-func warningSaying(t *testing.T, logs *testutil.SlogCapture, discriminator string) (testutil.CapturedRecord, bool) {
+func warningSaying(t *testing.T, logs *logtest.SlogCapture, discriminator string) (logtest.CapturedRecord, bool) {
 	t.Helper()
 	captured := logs.Records()
-	var matched []testutil.CapturedRecord
+	var matched []logtest.CapturedRecord
 	for _, record := range captured {
 		if record.Level == slog.LevelWarn && strings.Contains(record.Message, discriminator) {
 			matched = append(matched, record)
@@ -1557,7 +1557,7 @@ func warningSaying(t *testing.T, logs *testutil.SlogCapture, discriminator strin
 	}
 	if !assert.Len(t, matched, 1,
 		"want exactly one WARN record saying %q, out of %d captured", discriminator, len(captured)) {
-		return testutil.CapturedRecord{}, false
+		return logtest.CapturedRecord{}, false
 	}
 	return matched[0], true
 }
@@ -1565,7 +1565,7 @@ func warningSaying(t *testing.T, logs *testutil.SlogCapture, discriminator strin
 // noRecordSays fails when any captured record carries the phrase, at any level. The two refusal
 // arms are one discrimination, so the wrong sentence appearing anywhere in a refusal is the
 // failure, not merely its appearance on the record examined above.
-func noRecordSays(t *testing.T, logs *testutil.SlogCapture, phrase string) {
+func noRecordSays(t *testing.T, logs *logtest.SlogCapture, phrase string) {
 	t.Helper()
 	for _, record := range logs.Records() {
 		assert.NotContains(t, record.Message, phrase, "no record should say %q here", phrase)
@@ -1576,7 +1576,7 @@ func noRecordSays(t *testing.T, logs *testutil.SlogCapture, phrase string) {
 // has to be able to tell "this browser's session belongs to someone else" from "this ceremony's
 // session is gone", and to see the two user ids that failed to match, because those ids are the
 // whole record of an account takeover attempt that got as far as issuance (#133).
-func assertWarnedForeignSession(t *testing.T, logs *testutil.SlogCapture, ceremonyUserId int64) {
+func assertWarnedForeignSession(t *testing.T, logs *logtest.SlogCapture, ceremonyUserId int64) {
 	t.Helper()
 	record, ok := warningSaying(t, logs, "belongs to a different user")
 	if !ok {
@@ -1594,7 +1594,7 @@ func assertWarnedForeignSession(t *testing.T, logs *testutil.SlogCapture, ceremo
 // assertWarnedSessionGone is the other side of the same discrimination: a row that did not
 // resolve has no owner to name, so #129's line stands verbatim and neither user id appears on
 // it. An operator handed one here would be reading an owner nothing established.
-func assertWarnedSessionGone(t *testing.T, logs *testutil.SlogCapture) {
+func assertWarnedSessionGone(t *testing.T, logs *logtest.SlogCapture) {
 	t.Helper()
 	record, ok := warningSaying(t, logs, "is gone")
 	if !ok {
@@ -4062,7 +4062,7 @@ func TestHandleIssueGet_ExpiredAmbientSession(t *testing.T) {
 
 			handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
 
-			logs := testutil.CaptureSlog(t)
+			logs := logtest.CaptureSlog(t)
 			req := requestWithSessionIdentifier(t, liveSessionIdentifier)
 			rr := httptest.NewRecorder()
 

@@ -9,7 +9,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/leodip/goiabada/adminconsole/internal/cache"
 	"github.com/leodip/goiabada/adminconsole/internal/config"
-	"github.com/leodip/goiabada/core/testutil"
+	"github.com/leodip/goiabada/core/logging/logtest"
 )
 
 // TestInitMiddleware_RequestLoggerIsRegistered makes the claim the unit table in
@@ -85,7 +85,7 @@ func newLoggerTestServer(t *testing.T, logHttpRequests bool, handlerRan *bool) *
 func TestInitMiddleware_RequestLoggerIsRegistered(t *testing.T) {
 	handlerRan := false
 	server := newLoggerTestServer(t, true, &handlerRan)
-	logged := testutil.CaptureSlog(t)
+	logged := logtest.CaptureSlog(t)
 
 	recorder := httptest.NewRecorder()
 	server.router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, loggerTestTarget, nil))
@@ -121,7 +121,7 @@ func TestInitMiddleware_RequestLoggerIsRegistered(t *testing.T) {
 func TestInitMiddleware_RequestLoggerHonoursTheFlag(t *testing.T) {
 	handlerRan := false
 	server := newLoggerTestServer(t, false, &handlerRan)
-	logged := testutil.CaptureSlog(t)
+	logged := logtest.CaptureSlog(t)
 
 	recorder := httptest.NewRecorder()
 	server.router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, loggerTestTarget, nil))
@@ -144,7 +144,7 @@ func TestInitMiddleware_RequestLoggerHonoursTheFlag(t *testing.T) {
 func TestInitMiddleware_APanickingRequestIsRecordedAs500(t *testing.T) {
 	handlerRan := false
 	server := newLoggerTestServer(t, true, &handlerRan)
-	logged := testutil.CaptureSlog(t)
+	logged := logtest.CaptureSlog(t)
 
 	recorder := httptest.NewRecorder()
 	server.router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/admin/panic", nil))

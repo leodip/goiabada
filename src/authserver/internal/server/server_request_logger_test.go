@@ -12,7 +12,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/config"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
-	"github.com/leodip/goiabada/core/testutil"
+	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -89,7 +89,7 @@ const loggerTestTarget = "/auth/authorize?client_id=admin-console&response_type=
 func TestInitMiddleware_RequestLoggerIsRegistered(t *testing.T) {
 	handlerRan := false
 	server := newLoggerTestServer(t, true, &handlerRan)
-	logged := testutil.CaptureSlog(t)
+	logged := logtest.CaptureSlog(t)
 
 	recorder := httptest.NewRecorder()
 	server.router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, loggerTestTarget, nil))
@@ -118,7 +118,7 @@ func TestInitMiddleware_RequestLoggerIsRegistered(t *testing.T) {
 func TestInitMiddleware_RequestLoggerHonoursTheFlag(t *testing.T) {
 	handlerRan := false
 	server := newLoggerTestServer(t, false, &handlerRan)
-	logged := testutil.CaptureSlog(t)
+	logged := logtest.CaptureSlog(t)
 
 	recorder := httptest.NewRecorder()
 	server.router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, loggerTestTarget, nil))
@@ -141,7 +141,7 @@ func TestInitMiddleware_RequestLoggerHonoursTheFlag(t *testing.T) {
 func TestInitMiddleware_APanickingRequestIsRecordedAs500(t *testing.T) {
 	handlerRan := false
 	server := newLoggerTestServer(t, true, &handlerRan)
-	logged := testutil.CaptureSlog(t)
+	logged := logtest.CaptureSlog(t)
 
 	recorder := httptest.NewRecorder()
 	server.router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/auth/panic", nil))

@@ -1,4 +1,11 @@
-package testutil
+// Package logtest is how a test reads the records the product writes: CaptureSlog installs a
+// recorder as slog's default for one test, under the handler wrapper both servers install.
+//
+// It sits beside core/logging rather than in core/testutil because it is that package's test
+// double, not a guard: the slog lint admits a handler install anywhere under core/logging, so this
+// package needs no entry of its own, and core/testutil is left holding only the tree-wide guards
+// (#431). No binary imports it.
+package logtest
 
 import (
 	"bytes"

@@ -12,7 +12,7 @@ import (
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/errs"
-	"github.com/leodip/goiabada/core/testutil"
+	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -30,7 +30,7 @@ var errCountFailed = errs.New("the member count query failed")
 // requireCountFailureAnswered500 asserts what every count failure on this surface owes: the one
 // 500 envelope, with nothing of the groups in it, and one Error record carrying the failure and
 // the group it was counting.
-func requireCountFailureAnswered500(t *testing.T, rr *httptest.ResponseRecorder, capture *testutil.SlogCapture, groupId int64) {
+func requireCountFailureAnswered500(t *testing.T, rr *httptest.ResponseRecorder, capture *logtest.SlogCapture, groupId int64) {
 	t.Helper()
 
 	require.Equal(t, http.StatusInternalServerError, rr.Code)
@@ -93,7 +93,7 @@ func TestHandleAPIGroupsGet_AFailedCountAnswers500(t *testing.T) {
 	database.On("CountGroupMembers", mock.Anything, mock.Anything, int64(5)).Return(2, nil).Once()
 	database.On("CountGroupMembers", mock.Anything, mock.Anything, int64(6)).Return(0, errCountFailed).Once()
 
-	capture := testutil.CaptureSlog(t)
+	capture := logtest.CaptureSlog(t)
 	rr := httptest.NewRecorder()
 	HandleAPIGroupsGet(database).ServeHTTP(rr, apiRequestCarryingId("/api/v1/admin/groups"))
 
@@ -131,7 +131,7 @@ func TestHandleAPIGroupGet_AFailedCountAnswers500(t *testing.T) {
 		Return(&models.Group{Id: 5, GroupIdentifier: "admins"}, nil).Once()
 	database.On("CountGroupMembers", mock.Anything, mock.Anything, int64(5)).Return(0, errCountFailed).Once()
 
-	capture := testutil.CaptureSlog(t)
+	capture := logtest.CaptureSlog(t)
 	rr := httptest.NewRecorder()
 	HandleAPIGroupGet(database).ServeHTTP(rr, apiIdRequest("/api/v1/admin/groups/5", "5"))
 

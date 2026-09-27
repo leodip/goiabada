@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
-	"github.com/leodip/goiabada/core/testutil"
+	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -16,7 +16,7 @@ import (
 // a case rather than a reading of the one line the function is.
 
 func TestLogToConsole_WritesOneInfoRecordCarryingTheEventAndTheDetails(t *testing.T) {
-	logs := testutil.CaptureSlog(t)
+	logs := logtest.CaptureSlog(t)
 
 	details := map[string]any{"userId": int64(42), "reason": "email_collision_backfill"}
 	LogToConsole(context.Background(), "revoked_user_auth_state", details)
@@ -38,7 +38,7 @@ func TestLogToConsole_WritesOneInfoRecordCarryingTheEventAndTheDetails(t *testin
 // an event with nothing to say about itself must still carry the field, or a consumer reading
 // details has to tell "no details" from "this writer does not send details".
 func TestLogToConsole_KeepsAnEmptyDetailsMapAsAnEmptyMap(t *testing.T) {
-	logs := testutil.CaptureSlog(t)
+	logs := logtest.CaptureSlog(t)
 
 	LogToConsole(context.Background(), "system_startup", map[string]any{})
 
@@ -51,7 +51,7 @@ func TestLogToConsole_KeepsAnEmptyDetailsMapAsAnEmptyMap(t *testing.T) {
 // Nested values are the reason the details go in as a value rather than as text. The four
 // credential sites and the backfill all send slices, and the backfill sends two of them.
 func TestLogToConsole_KeepsNestedValuesAsValues(t *testing.T) {
-	logs := testutil.CaptureSlog(t)
+	logs := logtest.CaptureSlog(t)
 
 	details := map[string]any{
 		"terminatedSessionIdentifiers": []string{"sid-1", "sid-2"},
@@ -73,7 +73,7 @@ func TestLogToConsole_KeepsNestedValuesAsValues(t *testing.T) {
 // wrapper, so what these two cases exercise is the injection the servers run rather than a second
 // copy of it.
 func TestLogToConsole_CarriesTheRequestIdOfTheContextItIsGiven(t *testing.T) {
-	logs := testutil.CaptureSlog(t)
+	logs := logtest.CaptureSlog(t)
 
 	ctx := context.WithValue(context.Background(), chimiddleware.RequestIDKey, "host/req-0000001")
 	LogToConsole(ctx, "auth_failed_pwd", map[string]any{"email": "jane@example.com"})
@@ -88,7 +88,7 @@ func TestLogToConsole_CarriesTheRequestIdOfTheContextItIsGiven(t *testing.T) {
 // two: a context with no request on it writes the same record without a request id, so the absence
 // is the truth about a startup event rather than a gap in the record.
 func TestLogToConsole_WritesNoRequestIdUnderAContextThatCarriesNone(t *testing.T) {
-	logs := testutil.CaptureSlog(t)
+	logs := logtest.CaptureSlog(t)
 
 	LogToConsole(context.Background(), "revoked_user_auth_state", map[string]any{"userId": int64(7)})
 

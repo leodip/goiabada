@@ -28,8 +28,8 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/ratelimit"
 	"github.com/leodip/goiabada/core/i18n"
+	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/leodip/goiabada/core/oauth"
-	"github.com/leodip/goiabada/core/testutil"
 )
 
 // testTemplateFS is the smallest tree RenderTemplate needs: a layout that includes the
@@ -1869,7 +1869,7 @@ func TestRejection_AuditedOncePerKeyPerWindow(t *testing.T) {
 // deliberately not on that list. The address is carried by the audit event instead.
 func TestRejection_WarnsWithoutNamingTheUser(t *testing.T) {
 	t.Run("an account tier names the limiter and nothing else", func(t *testing.T) {
-		buf := testutil.CaptureSlog(t)
+		buf := logtest.CaptureSlog(t)
 		m := newTestMiddleware(nil, true)
 		tripBrowser(t, m)
 
@@ -1887,7 +1887,7 @@ func TestRejection_WarnsWithoutNamingTheUser(t *testing.T) {
 	})
 
 	t.Run("an IP tier keeps its bucket, which names no user", func(t *testing.T) {
-		buf := testutil.CaptureSlog(t)
+		buf := logtest.CaptureSlog(t)
 		m := newTestMiddleware(nil, true)
 		tripOAuth(t, m)
 

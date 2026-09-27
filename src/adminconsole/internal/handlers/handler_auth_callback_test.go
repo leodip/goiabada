@@ -27,10 +27,10 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient/oauthclienttest"
 	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/leodip/goiabada/core/sessionstore/sessiontest"
-	"github.com/leodip/goiabada/core/testutil"
 )
 
 // Seam 4 of #427: HandleAuthCallbackPost over HTTP, one row per branch. Everything below the
@@ -100,7 +100,7 @@ type callbackHarness struct {
 	store      *sessionstore.ServerSideStore
 	parser     *oauthclient.JWKSTokenParser
 	httpHelper *mocks_handlers.HttpHelper
-	logs       *testutil.SlogCapture
+	logs       *logtest.SlogCapture
 }
 
 func newCallbackHarness(t *testing.T) *callbackHarness {
@@ -126,7 +126,7 @@ func newCallbackHarness(t *testing.T) *callbackHarness {
 		store:      store,
 		parser:     parser,
 		httpHelper: mocks_handlers.NewHttpHelper(t),
-		logs:       testutil.CaptureSlog(t),
+		logs:       logtest.CaptureSlog(t),
 	}
 }
 

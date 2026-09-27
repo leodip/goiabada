@@ -11,7 +11,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/data"
 	"github.com/leodip/goiabada/authserver/internal/data/sqlitedb"
-	"github.com/leodip/goiabada/core/testutil"
+	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -160,10 +160,10 @@ func unreachable(dbType string, create bool) *config.DatabaseConfig {
 // dispatchRecord returns the one "opening the database" record, failing the test when the switch
 // wrote none or more than one. Every other record captured belongs to the engine that was
 // reached, which is the thing under test and not something this helper should hide.
-func dispatchRecord(t *testing.T, capture *testutil.SlogCapture) testutil.CapturedRecord {
+func dispatchRecord(t *testing.T, capture *logtest.SlogCapture) logtest.CapturedRecord {
 	t.Helper()
 
-	var found []testutil.CapturedRecord
+	var found []logtest.CapturedRecord
 	for _, record := range capture.Records() {
 		if record.Message == "opening the database" {
 			found = append(found, record)
@@ -307,7 +307,7 @@ func TestOpenDatabase_Dispatch(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			capture := testutil.CaptureSlog(t)
+			capture := logtest.CaptureSlog(t)
 
 			database, err := OpenDatabase(tc.cfg(t), false)
 
@@ -380,7 +380,7 @@ func TestOpenDatabase_PassesLogSQLToTheEngine(t *testing.T) {
 				&config.DatabaseConfig{Type: "sqlite", DSN: filepath.Join(t.TempDir(), "logsql.db")}, tc.logSQL)
 			require.NoError(t, err)
 
-			capture := testutil.CaptureSlog(t)
+			capture := logtest.CaptureSlog(t)
 
 			tx, err := database.BeginTransaction(context.Background())
 			require.NoError(t, err)

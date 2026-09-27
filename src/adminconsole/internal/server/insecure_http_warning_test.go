@@ -4,7 +4,7 @@ import (
 	"log/slog"
 	"testing"
 
-	"github.com/leodip/goiabada/core/testutil"
+	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -14,7 +14,7 @@ import (
 // is about and neither module imports the other, so each owes its own case: a copy that named the
 // auth server here would send an operator to the wrong service's configuration.
 func TestLogHttpWithoutTlsWarning_IsOneWarnNamingTheServerAndTheRemedy(t *testing.T) {
-	logs := testutil.CaptureSlog(t)
+	logs := logtest.CaptureSlog(t)
 
 	logHttpWithoutTlsWarning()
 

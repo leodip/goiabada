@@ -2,8 +2,6 @@ package integrationtests
 
 import (
 	"context"
-	"encoding/json"
-	"io"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -19,7 +17,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
-	"github.com/leodip/goiabada/core/testutil"
+	"github.com/leodip/goiabada/authserver/internal/testutil/mailpit"
 )
 
 // The password reset flow, end to end, over real HTTP with a real cookie jar.
@@ -42,6 +40,9 @@ import (
 func plusAddress() string {
 	return "reset+tag." + strings.ToLower(fake.LetterN(10)) + "@example.com"
 }
+
+// mailpitURL is the API of the Mailpit useMailpitSMTP sends through.
+const mailpitURL = "http://mailpit:8025"
 
 // useMailpitSMTP points the deployment's SMTP settings at mailpit for the duration of a test
 // and puts them back afterwards.
@@ -121,17 +122,12 @@ func emailedResetLinks(t *testing.T, to string) []string {
 func emailedLinksMatching(t *testing.T, to string, pattern *regexp.Regexp) []string {
 	t.Helper()
 
-	resp, err := http.Get("http://mailpit:8025/api/v1/messages?limit=200")
-	require.NoError(t, err)
-	body, err := io.ReadAll(resp.Body)
-	_ = resp.Body.Close()
+	client := mailpit.New(mailpitURL)
+	summaries, err := client.List()
 	require.NoError(t, err)
 
-	var listing testutil.MailpitData
-	require.NoError(t, json.Unmarshal(body, &listing))
-
-	matched := listing.Messages[:0:0]
-	for _, msg := range listing.Messages {
+	matched := []mailpit.Summary{}
+	for _, msg := range summaries {
 		for _, addr := range msg.To {
 			if strings.EqualFold(addr.Address, to) {
 				matched = append(matched, msg)
@@ -147,14 +143,8 @@ func emailedLinksMatching(t *testing.T, to string, pattern *regexp.Regexp) []str
 
 	links := []string{}
 	for _, msg := range matched {
-		detailResp, err := http.Get("http://mailpit:8025/api/v1/message/" + msg.ID)
+		message, err := client.Message(msg.ID)
 		require.NoError(t, err)
-		detailBody, err := io.ReadAll(detailResp.Body)
-		_ = detailResp.Body.Close()
-		require.NoError(t, err)
-
-		var message testutil.MailpitMessage
-		require.NoError(t, json.Unmarshal(detailBody, &message))
 
 		if found := pattern.FindString(message.HTML + " " + message.Text); found != "" {
 			links = append(links, found)

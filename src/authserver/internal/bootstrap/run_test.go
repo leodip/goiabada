@@ -11,7 +11,7 @@ import (
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/core/errs"
-	"github.com/leodip/goiabada/core/testutil"
+	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -30,7 +30,7 @@ func TestRun_AlreadySeeded_ContinuesWithoutWritingInEveryMode(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			database := mocks_data.NewDatabase(t)
 			database.On("IsEmpty", mock.Anything).Return(false, nil).Once()
-			logs := testutil.CaptureSlog(t)
+			logs := logtest.CaptureSlog(t)
 
 			outcome, err := Run(context.Background(), database, cfg)
 
@@ -60,7 +60,7 @@ func TestRun_IsEmptyFails_RefusesAndSaysWhich(t *testing.T) {
 func TestRun_NeitherModeConfigured_RefusesWithoutWriting(t *testing.T) {
 	database := mocks_data.NewDatabase(t)
 	database.On("IsEmpty", mock.Anything).Return(true, nil).Once()
-	logs := testutil.CaptureSlog(t)
+	logs := logtest.CaptureSlog(t)
 
 	outcome, err := Run(context.Background(), database, Config{AdminEmail: "admin@example.com"})
 
@@ -137,7 +137,7 @@ func TestNewRunner_ProductionDefaults(t *testing.T) {
 	assert.Equal(t, reflect.ValueOf(os.Rename).Pointer(), reflect.ValueOf(r.rename).Pointer())
 }
 
-func recordMessages(logs *testutil.SlogCapture) []string {
+func recordMessages(logs *logtest.SlogCapture) []string {
 	var messages []string
 	for _, record := range logs.Records() {
 		messages = append(messages, record.Message)

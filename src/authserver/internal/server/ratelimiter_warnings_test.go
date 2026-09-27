@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/core/testutil"
+	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -73,14 +73,14 @@ func TestRateLimiterConfigWarnings(t *testing.T) {
 // The emission itself
 // -----------------------------------------------------------------------------
 
-// testutil.CaptureSlog holds the default logger for each case below and restores it afterwards.
+// logtest.CaptureSlog holds the default logger for each case below and restores it afterwards.
 
 // TestEmitRateLimiterConfigWarnings owns the one claim the table above cannot make: that
 // something actually writes the strings to the log. Delete the loop and the table stays
 // green while an operator is told nothing, which is the whole point of the change.
 func TestEmitRateLimiterConfigWarnings(t *testing.T) {
 	t.Run("an enabled misconfiguration produces one warning, carrying the message", func(t *testing.T) {
-		buf := testutil.CaptureSlog(t)
+		buf := logtest.CaptureSlog(t)
 
 		emitRateLimiterConfigWarnings(true, false, nil)
 
@@ -89,7 +89,7 @@ func TestEmitRateLimiterConfigWarnings(t *testing.T) {
 	})
 
 	t.Run("single-hop trust produces its own message, not the other one", func(t *testing.T) {
-		buf := testutil.CaptureSlog(t)
+		buf := logtest.CaptureSlog(t)
 
 		emitRateLimiterConfigWarnings(true, true, nil)
 
@@ -98,7 +98,7 @@ func TestEmitRateLimiterConfigWarnings(t *testing.T) {
 	})
 
 	t.Run("a disabled limiter writes nothing at all", func(t *testing.T) {
-		buf := testutil.CaptureSlog(t)
+		buf := logtest.CaptureSlog(t)
 
 		emitRateLimiterConfigWarnings(false, false, nil)
 

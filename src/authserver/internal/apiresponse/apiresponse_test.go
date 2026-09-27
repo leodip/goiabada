@@ -13,7 +13,7 @@ import (
 
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/leodip/goiabada/core/errs"
-	"github.com/leodip/goiabada/core/testutil"
+	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -42,7 +42,7 @@ func decodeEnvelope(t *testing.T, rr *httptest.ResponseRecorder) (code, descript
 	return body.ErrorCode, body.ErrorDescription
 }
 
-// Every case below holds slog's default logger through testutil.CaptureSlog, which installs the
+// Every case below holds slog's default logger through logtest.CaptureSlog, which installs the
 // same handler both servers run, and asserts on the record and on the wire together: "answered
 // once and logged once" is one property and not two. Text() renders a record the way the servers'
 // text handler does, with an error value printed by %+v, so the stack rides inside the attribute
@@ -50,7 +50,7 @@ func decodeEnvelope(t *testing.T, rr *httptest.ResponseRecorder) (code, descript
 //
 // loggedError reads the error attribute as an error value, which is the contract: the handlers
 // print a stack from an error value and nothing from its text.
-func loggedError(t *testing.T, record testutil.CapturedRecord) error {
+func loggedError(t *testing.T, record logtest.CapturedRecord) error {
 	t.Helper()
 	logged, ok := record.Attrs["error"].(error)
 	require.True(t, ok, "the error attribute must carry the error value itself, not its text")
@@ -59,7 +59,7 @@ func loggedError(t *testing.T, record testutil.CapturedRecord) error {
 
 func TestWriteJSON_WritesStatusContentTypeAndBody(t *testing.T) {
 	rr := httptest.NewRecorder()
-	capture := testutil.CaptureSlog(t)
+	capture := logtest.CaptureSlog(t)
 
 	WriteJSON(rr, requestWithId(t), http.StatusCreated, map[string]string{"hello": "world"})
 
@@ -77,7 +77,7 @@ func TestWriteJSON_WritesStatusContentTypeAndBody(t *testing.T) {
 // caller gets a real 500 and no partial body.
 func TestWriteJSON_AnUnencodableValueIsARealFiveHundred(t *testing.T) {
 	rr := httptest.NewRecorder()
-	capture := testutil.CaptureSlog(t)
+	capture := logtest.CaptureSlog(t)
 
 	WriteJSON(rr, requestWithId(t), http.StatusOK, map[string]any{"broken": math.Inf(1)})
 
@@ -93,7 +93,7 @@ func TestWriteJSON_AnUnencodableValueIsARealFiveHundred(t *testing.T) {
 
 func TestWriteError_WritesTheEnvelope(t *testing.T) {
 	rr := httptest.NewRecorder()
-	capture := testutil.CaptureSlog(t)
+	capture := logtest.CaptureSlog(t)
 
 	WriteError(rr, "Client ID is required", "VALIDATION_ERROR", http.StatusBadRequest)
 
@@ -111,7 +111,7 @@ func TestWriteError_WritesTheEnvelope(t *testing.T) {
 // exactly one structured record carrying the error, the request id and the caller's attributes.
 func TestWriteInternalServerError_AnswersOneCodeAndLogsOnce(t *testing.T) {
 	rr := httptest.NewRecorder()
-	capture := testutil.CaptureSlog(t)
+	capture := logtest.CaptureSlog(t)
 
 	WriteInternalServerError(rr, requestWithId(t),
 		errs.Wrap(errors.New("connection refused"), "failed to load the client"),
@@ -148,7 +148,7 @@ func TestWriteInternalServerError_AnswersOneCodeAndLogsOnce(t *testing.T) {
 func TestWriteInternalServerError_RepeatsTheWebSurfaceSentence(t *testing.T) {
 	rr := httptest.NewRecorder()
 	// Held so the record does not reach the test's own output; nothing here asserts on it.
-	testutil.CaptureSlog(t)
+	logtest.CaptureSlog(t)
 
 	WriteInternalServerError(rr, requestWithId(t), errors.New("boom"))
 
@@ -162,7 +162,7 @@ func TestWriteInternalServerError_RepeatsTheWebSurfaceSentence(t *testing.T) {
 // changes, and it is the one that would otherwise log with no frames at all (#279 decision 10).
 func TestWriteInternalServerError_ABareStdlibErrorStillLogsAStack(t *testing.T) {
 	rr := httptest.NewRecorder()
-	capture := testutil.CaptureSlog(t)
+	capture := logtest.CaptureSlog(t)
 
 	WriteInternalServerError(rr, requestWithId(t), errors.New("a bare stdlib error"))
 
@@ -178,7 +178,7 @@ func TestWriteInternalServerError_DoesNotAddASecondStack(t *testing.T) {
 	rr := httptest.NewRecorder()
 	origin := errs.New("the origin")
 
-	capture := testutil.CaptureSlog(t)
+	capture := logtest.CaptureSlog(t)
 
 	WriteInternalServerError(rr, requestWithId(t), errs.Wrap(origin, "on the way up"))
 
@@ -194,7 +194,7 @@ func TestLogInternalServerError_LogsAndWritesNothing(t *testing.T) {
 	rr := httptest.NewRecorder()
 
 	var returned string
-	capture := testutil.CaptureSlog(t)
+	capture := logtest.CaptureSlog(t)
 
 	returned = LogInternalServerError(requestWithId(t), errs.New("DCR: could not register"),
 		"uri", "https://a.example.com")
@@ -215,7 +215,7 @@ func TestLogInternalServerError_LogsAndWritesNothing(t *testing.T) {
 // no longer reach a record and be mistaken for a correlated one.
 func TestWriteInternalServerError_WithoutARequestId(t *testing.T) {
 	rr := httptest.NewRecorder()
-	capture := testutil.CaptureSlog(t)
+	capture := logtest.CaptureSlog(t)
 
 	WriteInternalServerError(rr, httptest.NewRequest(http.MethodGet, "/api/v1/admin/anything", nil),
 		errs.New("boom"))

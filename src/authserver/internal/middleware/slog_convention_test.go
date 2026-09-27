@@ -11,7 +11,7 @@ import (
 
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
-	"github.com/leodip/goiabada/core/testutil"
+	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -20,7 +20,7 @@ import (
 // An unreadable settings row is a server fault: every page's layout reads those settings, so the
 // deployment is answering 500 to everything until somebody acts. Error, and pinned.
 func TestSlogConvention_SettingsReadFailureIsError(t *testing.T) {
-	logged := testutil.CaptureSlog(t)
+	logged := logtest.CaptureSlog(t)
 
 	mockDB := mocks_data.NewDatabase(t)
 	mockDB.On("GetSettingsById", mock.Anything, mock.Anything, int64(1)).Return(nil, errors.New("database error"))
@@ -54,7 +54,7 @@ func TestSlogConvention_SettingsReadFailureIsError(t *testing.T) {
 // answers false rather than letting script on any origin read a token response. Somebody has to
 // act, so Error.
 func TestSlogConvention_CorsConfigurationFailureIsError(t *testing.T) {
-	logged := testutil.CaptureSlog(t)
+	logged := logtest.CaptureSlog(t)
 
 	mockDB := mocks_data.NewDatabase(t)
 	mockDB.On("WebOriginExists", mock.Anything, mock.Anything, "https://app.example.com").
@@ -116,7 +116,7 @@ func TestSlogConvention_RateLimitTripIsWarnAndJoinsTheRequest(t *testing.T) {
 		require.Equal(t, http.StatusTeapot, run("user@example.com").Code)
 	}
 
-	logged := testutil.CaptureSlog(t)
+	logged := logtest.CaptureSlog(t)
 	require.Equal(t, http.StatusTooManyRequests, run("last@example.com").Code)
 
 	record := requireOneRecord(t, logged)
@@ -129,7 +129,7 @@ func TestSlogConvention_RateLimitTripIsWarnAndJoinsTheRequest(t *testing.T) {
 	require.NotEmpty(t, requestId)
 }
 
-func requireOneRecord(t *testing.T, logged *testutil.SlogCapture) testutil.CapturedRecord {
+func requireOneRecord(t *testing.T, logged *logtest.SlogCapture) logtest.CapturedRecord {
 	t.Helper()
 	records := logged.Records()
 	require.Len(t, records, 1)

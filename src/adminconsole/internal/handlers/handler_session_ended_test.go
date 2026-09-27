@@ -16,11 +16,11 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/handlertest"
 	coreconstants "github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
 	mocks_sessionstore "github.com/leodip/goiabada/core/sessionstore/mocks"
 	"github.com/leodip/goiabada/core/sessionstore/sessiontest"
-	"github.com/leodip/goiabada/core/testutil"
 )
 
 // Seam 6 of #427, the half after the API-error helpers: the route an admin API 401 sends the
@@ -91,7 +91,7 @@ func signedInValues() map[string]any {
 
 func TestHandleSessionEndedGet_ClearsTheTokensAndLeavesTheNoticeForTheNextRequest(t *testing.T) {
 	store := newMemoryStore(t)
-	logs := testutil.CaptureSlog(t)
+	logs := logtest.CaptureSlog(t)
 	cookies := seedSession(t, store, signedInValues())
 
 	httpHelper := mocks_handlers.NewHttpHelper(t)

@@ -83,7 +83,7 @@ func errorWithStack(_ []string, a slog.Attr) slog.Attr {
 // WrapRequestID returns h with chi's request id appended to every record logged
 // with a context that carries one, so no call site has to name it.
 //
-// It is exported because testutil.CaptureSlog wraps its recorder with it: a
+// It is exported because logtest.CaptureSlog wraps its recorder with it: a
 // test asserting on request_id has to exercise the same injection the servers
 // run, not a second copy of it.
 func WrapRequestID(h slog.Handler) slog.Handler {

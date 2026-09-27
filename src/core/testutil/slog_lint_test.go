@@ -179,7 +179,7 @@ func collide() {
 	slog.Info("failed to resolve the package")
 }
 `)
-	// The owners: the handler's package, a main, schemadump, and the one file in core/testutil.
+	// The owners: the handler's package and a package beneath it, a main, and schemadump.
 	tree.write("core/logging/handler.go", `package logging
 
 import "log/slog"
@@ -198,19 +198,20 @@ import "log/slog"
 
 func main() { slog.SetDefault(slog.Default()) }
 `)
-	tree.write("core/testutil/slog_capture.go", `package testutil
+	// Where logtest.CaptureSlog lives: admitted by core/logging's entry, not one of its own.
+	tree.write("core/logging/logtest/slog_capture.go", `package logtest
 
 import "log/slog"
 
 func Capture() { _ = slog.New(slog.Default().Handler()) }
 `)
-	// The same call one file over in the same package is not admitted: the allowlist names the
-	// file, not the package.
-	tree.write("core/testutil/other.go", `package testutil
+	// The same call at the path the allowlist used to name is refused: core/testutil holds guards,
+	// and no file there is an owner any more (#431).
+	tree.write("core/testutil/slog_capture.go", `package testutil
 
 import "log/slog"
 
-func Other() { _ = slog.New(slog.Default().Handler()) }
+func Capture() { _ = slog.New(slog.Default().Handler()) }
 `)
 
 	// ---- rule 3: a run spread into a record or a forwarder ----------------------------------------
@@ -479,8 +480,8 @@ func tagged() { slog.SetDefault(slog.Default()); slog.Info("failed to x") }
 		`core/caught/dot.go:3 dot import of "log/slog"`,
 		// the resolver row
 		`core/caught/path_base_collision.go:11 message opens with "failed to"`,
-		"core/testutil/other.go:5 slog.Default outside the files that own the handler",
-		"core/testutil/other.go:5 slog.New outside the files that own the handler",
+		"core/testutil/slog_capture.go:5 slog.Default outside the files that own the handler",
+		"core/testutil/slog_capture.go:5 slog.New outside the files that own the handler",
 		// rule 3
 		"core/caught/spreads.go:9 a run spread into a record outside slogSpreadSites",
 		"core/caught/spreads.go:13 a run spread into a record outside slogSpreadSites",

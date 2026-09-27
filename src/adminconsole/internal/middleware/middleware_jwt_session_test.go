@@ -22,10 +22,10 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient/oauthclienttest"
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/leodip/goiabada/core/sessionstore/sessiontest"
-	"github.com/leodip/goiabada/core/testutil"
 
 	mock_middleware "github.com/leodip/goiabada/adminconsole/internal/middleware/mocks"
 )
@@ -83,7 +83,7 @@ type sessionHarness struct {
 	store  *sessionstore.ServerSideStore
 	parser *mock_middleware.TokenParser
 	client *recordingRefreshClient
-	logs   *testutil.SlogCapture
+	logs   *logtest.SlogCapture
 }
 
 func newSessionHarness(t *testing.T) *sessionHarness {
@@ -100,7 +100,7 @@ func newSessionHarness(t *testing.T) *sessionHarness {
 		store:  store,
 		parser: mock_middleware.NewTokenParser(t),
 		client: &recordingRefreshClient{status: http.StatusOK},
-		logs:   testutil.CaptureSlog(t),
+		logs:   logtest.CaptureSlog(t),
 	}
 }
 

@@ -18,7 +18,7 @@ import (
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/testutil"
+	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -54,7 +54,7 @@ func TestHandleAPIAccountAddressPut_ADatabaseFailureIsOneLoggedFiveHundred(t *te
 	rr := httptest.NewRecorder()
 	handler := HandleAPIAccountAddressPut(database, accountvalidation.NewAddressValidator(), auditLogger)
 
-	capture := testutil.CaptureSlog(t)
+	capture := logtest.CaptureSlog(t)
 
 	handler.ServeHTTP(rr, addressPutRequest(t, "the-subject", api.UpdateUserAddressRequest{}))
 
@@ -90,7 +90,7 @@ func TestHandleAPIAccountAddressPut_ASuccessWritesTheWholeBody(t *testing.T) {
 	rr := httptest.NewRecorder()
 	handler := HandleAPIAccountAddressPut(database, accountvalidation.NewAddressValidator(), auditLogger)
 
-	capture := testutil.CaptureSlog(t)
+	capture := logtest.CaptureSlog(t)
 
 	handler.ServeHTTP(rr, addressPutRequest(t, "the-subject", api.UpdateUserAddressRequest{
 		AddressLine1:    "1 Example Street",

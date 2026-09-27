@@ -20,9 +20,9 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/i18n"
+	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/sessionstore"
-	"github.com/leodip/goiabada/core/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -497,7 +497,7 @@ func TestDecryptIDTokenHint(t *testing.T) {
 
 	t.Run("Invalid client", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
-		logs := testutil.CaptureSlog(t)
+		logs := logtest.CaptureSlog(t)
 
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "invalid_client").Return(nil, nil)
 
@@ -524,7 +524,7 @@ func TestDecryptIDTokenHint(t *testing.T) {
 		client := &models.Client{ClientSecretEncrypted: clientSecretEncrypted}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test_client").Return(client, nil)
 
-		logs := testutil.CaptureSlog(t)
+		logs := logtest.CaptureSlog(t)
 
 		_, err := decryptIDTokenHint(context.Background(), "not.a.valid.jwe.token", "test_client", database)
 
@@ -1939,10 +1939,10 @@ func TestBuildPostLogoutRedirect(t *testing.T) {
 // greppable message and a collector can count them by gate. Asserting it against tc.gate is what
 // makes the table pay for it: a gate renamed in the classifier and not in the row fails here
 // rather than silently logging the wrong name.
-func assertRejectionRecord(t *testing.T, logs *testutil.SlogCapture, want hintState, wantErr bool, gate string) {
+func assertRejectionRecord(t *testing.T, logs *logtest.SlogCapture, want hintState, wantErr bool, gate string) {
 	t.Helper()
 
-	var rejections []testutil.CapturedRecord
+	var rejections []logtest.CapturedRecord
 	for _, record := range logs.Records() {
 		if record.Message == "id_token_hint rejected" {
 			rejections = append(rejections, record)
@@ -2431,7 +2431,7 @@ func TestClassifyIdTokenHint(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			logs := testutil.CaptureSlog(t)
+			logs := logtest.CaptureSlog(t)
 			httpHelper := mocks_handlers.NewHttpHelper(t)
 			database := mocks_data.NewDatabase(t)
 			tokenParser := mocks_handlers.NewTokenParser(t)

@@ -11,7 +11,7 @@ import (
 
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
-	"github.com/leodip/goiabada/core/testutil"
+	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -33,8 +33,8 @@ func failingErrorPageHelper() *HttpHelper {
 	}, stubSettingsReader{})
 }
 
-func errorLevelRecords(logs *testutil.SlogCapture) []testutil.CapturedRecord {
-	var matched []testutil.CapturedRecord
+func errorLevelRecords(logs *logtest.SlogCapture) []logtest.CapturedRecord {
+	var matched []logtest.CapturedRecord
 	for _, record := range logs.Records() {
 		if record.Level == slog.LevelError {
 			matched = append(matched, record)
@@ -54,7 +54,7 @@ func catalogText(t *testing.T, key string) string {
 }
 
 func TestInternalServerError_RenderFailureWritesCatalogTextAndLogsTheRenderError(t *testing.T) {
-	logs := testutil.CaptureSlog(t)
+	logs := logtest.CaptureSlog(t)
 	httpHelper := failingErrorPageHelper()
 
 	failure := errs.New("the database went away")
@@ -95,7 +95,7 @@ func TestInternalServerError_RenderFailureWritesCatalogTextAndLogsTheRenderError
 // chi's RequestID adopts an inbound X-Request-Id verbatim, so the one variable in the body is the
 // caller's to choose. A megabyte of it, led by control bytes, comes back escaped and clipped.
 func TestInternalServerError_RenderFailureBoundsAClientChosenRequestId(t *testing.T) {
-	_ = testutil.CaptureSlog(t)
+	_ = logtest.CaptureSlog(t)
 	httpHelper := failingErrorPageHelper()
 
 	router := errorRouter(func(w http.ResponseWriter, r *http.Request) {
@@ -118,7 +118,7 @@ func TestInternalServerError_RenderFailureBoundsAClientChosenRequestId(t *testin
 
 // The body is localized the way the page it stands in for is.
 func TestInternalServerError_RenderFailureSpeaksTheRequestsLocale(t *testing.T) {
-	_ = testutil.CaptureSlog(t)
+	_ = logtest.CaptureSlog(t)
 	httpHelper := failingErrorPageHelper()
 
 	router := errorRouter(func(w http.ResponseWriter, r *http.Request) {

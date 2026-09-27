@@ -13,7 +13,7 @@ import (
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/errs"
-	"github.com/leodip/goiabada/core/testutil"
+	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -63,7 +63,7 @@ func errorLogRequest(t *testing.T, target string, query url.Values) *http.Reques
 }
 
 // oneErrorRecord asserts that exactly one ERROR record was written and returns its attributes.
-func oneErrorRecord(t *testing.T, capture *testutil.SlogCapture) map[string]any {
+func oneErrorRecord(t *testing.T, capture *logtest.SlogCapture) map[string]any {
 	t.Helper()
 	records := capture.Records()
 	require.Len(t, records, 1, "one 500 writes one record")
@@ -82,7 +82,7 @@ func TestHandleAPIAuditLogsGet_ErrorRecordBoundsBothFilters(t *testing.T) {
 	database.On("GetAuditLogsPaginated", mock.Anything, mock.Anything, 1, 20, rawEvent, rawRequestId).
 		Return([]models.AuditLog(nil), 0, errs.New("engine is down"))
 
-	capture := testutil.CaptureSlog(t)
+	capture := logtest.CaptureSlog(t)
 	rr := httptest.NewRecorder()
 
 	HandleAPIAuditLogsGet(database).ServeHTTP(rr, errorLogRequest(t, "/api/v1/admin/audit-logs",
@@ -114,7 +114,7 @@ func TestHandleAPIUsersSearchGet_ErrorRecordBoundsTheQuery(t *testing.T) {
 	database.On("SearchUsersPaginated", mock.Anything, mock.Anything, rawQuery, 1, 10).
 		Return([]models.User(nil), 0, errs.New("engine is down"))
 
-	capture := testutil.CaptureSlog(t)
+	capture := logtest.CaptureSlog(t)
 	rr := httptest.NewRecorder()
 
 	HandleAPIUsersSearchGet(database).ServeHTTP(rr, errorLogRequest(t, "/api/v1/admin/users/search",
@@ -139,7 +139,7 @@ func TestErrorRecordFiltersOfOrdinaryLengthAreUnchanged(t *testing.T) {
 	database.On("GetAuditLogsPaginated", mock.Anything, mock.Anything, 1, 20, event, filterId).
 		Return([]models.AuditLog(nil), 0, errs.New("engine is down"))
 
-	capture := testutil.CaptureSlog(t)
+	capture := logtest.CaptureSlog(t)
 	rr := httptest.NewRecorder()
 
 	HandleAPIAuditLogsGet(database).ServeHTTP(rr, errorLogRequest(t, "/api/v1/admin/audit-logs",
@@ -173,7 +173,7 @@ func TestHandleAPIUsersSearchGet_ErrorRecordBoundsTheQueryWhenTheGroupLookupFail
 	database.On("GetGroupById", mock.Anything, mock.Anything, int64(7)).
 		Return(nil, errs.New("engine is down"))
 
-	capture := testutil.CaptureSlog(t)
+	capture := logtest.CaptureSlog(t)
 	rr := httptest.NewRecorder()
 
 	HandleAPIUsersSearchGet(database).ServeHTTP(rr, errorLogRequest(t, "/api/v1/admin/users/search",
@@ -199,7 +199,7 @@ func TestHandleAPIUsersSearchGet_ErrorRecordBoundsTheQueryWhenLoadingGroupsFails
 	database.On("UsersLoadGroups", mock.Anything, mock.Anything, mock.Anything).
 		Return(errs.New("engine is down"))
 
-	capture := testutil.CaptureSlog(t)
+	capture := logtest.CaptureSlog(t)
 	rr := httptest.NewRecorder()
 
 	HandleAPIUsersSearchGet(database).ServeHTTP(rr, errorLogRequest(t, "/api/v1/admin/users/search",

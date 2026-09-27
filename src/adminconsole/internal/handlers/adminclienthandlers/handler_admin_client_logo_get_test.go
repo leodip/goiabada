@@ -15,8 +15,8 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/constants"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/leodip/goiabada/core/oauth"
-	"github.com/leodip/goiabada/core/testutil"
 )
 
 // The logo is the one read on this page the page can do without, and a 401 is the one failure of
@@ -61,7 +61,7 @@ func TestHandleAdminClientLogoGet_OnlyASessionEndedLogoReadStopsThePage(t *testi
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			logs := testutil.CaptureSlog(t)
+			logs := logtest.CaptureSlog(t)
 
 			httpHelper := &stubHttpHelper{}
 			router := chi.NewRouter()

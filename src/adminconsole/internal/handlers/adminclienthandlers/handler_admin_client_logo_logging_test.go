@@ -17,8 +17,8 @@ import (
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/errs"
+	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/leodip/goiabada/core/oauth"
-	"github.com/leodip/goiabada/core/testutil"
 )
 
 // logoApiClient answers the two calls this page makes: the client it renders, and the logo
@@ -45,7 +45,7 @@ func (c *logoApiClient) GetClientLogo(_ context.Context, accessToken string, cli
 // Warn rather than the Error a failed call reads like. It also carries the request id from the
 // context, with neither the key nor the value named at the call site.
 func TestHandleAdminClientLogoGet_TheLogoRefusalIsOneWarnWithASnakeKeyAndTheRequestId(t *testing.T) {
-	logs := testutil.CaptureSlog(t)
+	logs := logtest.CaptureSlog(t)
 
 	httpHelper := &stubHttpHelper{}
 	apiClient := &logoApiClient{logoErr: errs.New("the auth server is unreachable")}

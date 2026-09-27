@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
-	"github.com/leodip/goiabada/core/testutil"
+	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -422,9 +422,9 @@ func assertNothingEscapedItsTransaction(t *testing.T, d *scriptedDriver) {
 
 // messagesAt returns the messages logged at one level, in order. A slog record is the only
 // observable some branches have -- a target that is a slog.Info call and nothing else stays green
-// under a mutation that removes it -- so testutil.CaptureSlog plus this is how such a branch is
+// under a mutation that removes it -- so logtest.CaptureSlog plus this is how such a branch is
 // asserted rather than assumed.
-func messagesAt(logs *testutil.SlogCapture, level slog.Level) []string {
+func messagesAt(logs *logtest.SlogCapture, level slog.Level) []string {
 	out := []string{}
 	for _, record := range logs.Records() {
 		if record.Level == level {

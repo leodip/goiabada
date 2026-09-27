@@ -10,7 +10,7 @@ import (
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/i18n"
-	"github.com/leodip/goiabada/core/testutil"
+	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -192,7 +192,7 @@ func TestWriteListSaveFailure(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			capture := testutil.CaptureSlog(t)
+			capture := logtest.CaptureSlog(t)
 			rr := httptest.NewRecorder()
 			r := httptest.NewRequest(http.MethodPut, "/api/v1/admin/clients/7/redirect-uris", nil)
 

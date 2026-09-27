@@ -68,7 +68,7 @@ import (
 //
 // A dot import of log/slog is refused outright, since it leaves no selector for rule 2 to
 // resolve. Test files and mocks are exempt, as they are for AssertNoLegacyErrors: a test reads
-// records through CaptureSlog rather than writing them.
+// records through logtest.CaptureSlog rather than writing them.
 //
 // Passing dirs restricts the walk to those subdirectories of the source root, forward slashes and
 // relative to it. Rule 4 is checked whatever dirs are passed.
@@ -105,7 +105,7 @@ func assertSlogConvention(r Reporter, root string, dirs []string) {
 	r.Errorf("%d slog convention violation(s) in %d non-test file(s):\n\t%s\n\n"+
 		"A message is a string literal at the call and opens with neither a component prefix nor "+
 		"\"failed to\" or \"error \"; "+
-		"core/logging owns the handler and testutil.CaptureSlog is how a test reads records; a "+
+		"core/logging owns the handler and logtest.CaptureSlog is how a test reads records; a "+
 		"run is spread into a record only inside a function listed in slogSpreadSites, and a "+
 		"forwarder listed there is registered under custom-funcs in .golangci.yml, where sloglint "+
 		"holds every other rule; a record written in a request-path package carries a context, "+
@@ -145,18 +145,18 @@ var slogHandlerInstalls = map[string]bool{
 	"SetDefault": true, "New": true, "Default": true, "With": true,
 }
 
-// slogHandlerOwners is rule 2's allowlist, by path rather than by package. Four are whole
-// directories: the package that owns the handler, the two mains that install it, and schemadump,
-// which is a one-file tool with the only other SetDefault in the tree. The fifth is a single
-// file, because decision 11 makes testutil.CaptureSlog a non-test file that installs the handler
-// over a recorder, and admitting the package rather than the file would let any other file in
-// core/testutil install one unnoticed.
+// slogHandlerOwners is rule 2's allowlist, by path rather than by package, and every entry is a
+// directory: the package that owns the handler, the two mains that install it, and schemadump,
+// which is a one-file tool with the only other SetDefault in the tree. core/logging covers
+// core/logging/logtest by prefix, which is where logtest.CaptureSlog installs the handler over a
+// recorder from a non-test file. It used to be the one file named in core/testutil, a package of
+// guards none of which may install one, and moving it beside the handler it doubles is what let the
+// entry go (#431).
 var slogHandlerOwners = []string{
 	"core/logging",
 	"authserver/cmd/schemadump",
 	"authserver/cmd/goiabada-authserver",
 	"adminconsole/cmd/goiabada-adminconsole",
-	"core/testutil/slog_capture.go",
 }
 
 // slogSpreadSite is one function admitted to spread a run into a record or into a forwarder.
@@ -425,7 +425,7 @@ func findSlogViolations(root, golangci string, dirs []string) ([]slogViolation, 
 }
 
 // slogExemptByPath covers a test file, which is not production code and reads records through
-// testutil.CaptureSlog rather than writing them, and a mocks directory, which is generated or
+// logtest.CaptureSlog rather than writing them, and a mocks directory, which is generated or
 // hand-written scaffolding that emits nothing. Both exemptions match AssertNoLegacyErrors and
 // the exclusions in .golangci.yml, so one answer about what production code means holds for
 // every guard.
@@ -569,7 +569,7 @@ func slogViolationsInFile(file *ast.File, fset *token.FileSet, rel string) []slo
 			return true
 		}
 		report(sel.Pos(), "slog."+name+" outside the files that own the handler",
-			"core/logging installs the one handler and testutil.CaptureSlog is how a test reads records; log through the package-level slog functions")
+			"core/logging installs the one handler and logtest.CaptureSlog is how a test reads records; log through the package-level slog functions")
 		return true
 	})
 

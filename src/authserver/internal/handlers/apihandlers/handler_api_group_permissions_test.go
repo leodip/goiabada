@@ -6,7 +6,7 @@ import (
 
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
-	"github.com/leodip/goiabada/core/testutil"
+	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -24,7 +24,7 @@ func TestHandleAPIGroupPermissionsGet_AFailedCountAnswers500(t *testing.T) {
 	database.On("GroupLoadPermissions", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 	database.On("CountGroupMembers", mock.Anything, mock.Anything, int64(5)).Return(0, errCountFailed).Once()
 
-	capture := testutil.CaptureSlog(t)
+	capture := logtest.CaptureSlog(t)
 	rr := httptest.NewRecorder()
 	HandleAPIGroupPermissionsGet(database).ServeHTTP(rr, apiIdRequest("/api/v1/admin/groups/5/permissions", "5"))
 

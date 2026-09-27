@@ -27,9 +27,9 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/usercreation"
 	"github.com/leodip/goiabada/core/hashutil"
+	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/leodip/goiabada/core/sessionstore"
 	"github.com/leodip/goiabada/core/sessionstore/sessiontest"
-	"github.com/leodip/goiabada/core/testutil"
 )
 
 // The activation flow's state machine, at seam 3.
@@ -207,7 +207,7 @@ func expectRenderedLinkExpired(httpHelper *mocks_handlers.HttpHelper) {
 
 // assertRefusalLogged holds a refusal to its one record: Warn, the fixed message, and the reason
 // that the identical page withholds from the caller (#425 decision 5).
-func assertRefusalLogged(t *testing.T, logs *testutil.SlogCapture, reason string) {
+func assertRefusalLogged(t *testing.T, logs *logtest.SlogCapture, reason string) {
 	t.Helper()
 
 	records := logs.Records()
@@ -276,7 +276,7 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 		userCreator := mocks_accounthandlers.NewUserCreator(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		store := newMarkerTestStore()
-		logs := testutil.CaptureSlog(t)
+		logs := logtest.CaptureSlog(t)
 
 		codeHash, err := hashutil.HashString(code)
 		require.NoError(t, err)
@@ -300,7 +300,7 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 		userCreator := mocks_accounthandlers.NewUserCreator(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		store := newMarkerTestStore()
-		logs := testutil.CaptureSlog(t)
+		logs := logtest.CaptureSlog(t)
 
 		// Reachable only through a SHA-256 collision, and asserted so the comparison behind
 		// the index stays load-bearing rather than decorative.
@@ -337,7 +337,7 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 		userCreator := mocks_accounthandlers.NewUserCreator(t)
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 		store := newMarkerTestStore()
-		logs := testutil.CaptureSlog(t)
+		logs := logtest.CaptureSlog(t)
 
 		preReg, codeHash := preRegistrationWithCode(t, 7, activateTestEmail, code, time.Now().UTC())
 		preReg.VerificationCodeEncrypted = []byte("not ciphertext")
@@ -373,7 +373,7 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 
 		sent := withMarker(t, store, linkFollowedRequest(code),
 			emaillinks.LinkMarkerFlowAccountActivate, 7, "the-first-hash")
-		logs := testutil.CaptureSlog(t)
+		logs := logtest.CaptureSlog(t)
 
 		handler := HandleAccountActivateGet(httpHelper, store, database, userCreator, auditLogger)
 		rr := httptest.NewRecorder()
@@ -416,7 +416,7 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 
 		sent := withMarker(t, store, linkFollowedRequest(code),
 			emaillinks.LinkMarkerFlowResetPassword, 42, "the-reset-hash")
-		logs := testutil.CaptureSlog(t)
+		logs := logtest.CaptureSlog(t)
 
 		handler := HandleAccountActivateGet(httpHelper, store, database, userCreator, auditLogger)
 		rr := httptest.NewRecorder()
@@ -450,7 +450,7 @@ func TestHandleAccountActivateGet_LinkFollowed(t *testing.T) {
 		database.On("GetPreRegistrationByVerificationCodeHash", mock.Anything, (*sql.Tx)(nil), codeHash).Return(preReg, nil).Once()
 		database.On("DeletePreRegistration", mock.Anything, (*sql.Tx)(nil), int64(7)).Return(nil).Once()
 		expectRenderedLinkExpired(httpHelper)
-		logs := testutil.CaptureSlog(t)
+		logs := logtest.CaptureSlog(t)
 
 		handler := HandleAccountActivateGet(httpHelper, store, database, userCreator, auditLogger)
 		rr := httptest.NewRecorder()
@@ -618,7 +618,7 @@ func TestHandleAccountActivateGet_Clean(t *testing.T) {
 				expectRenderedLinkExpired(httpHelper)
 
 				sent := tc.request(t, store)
-				logs := testutil.CaptureSlog(t)
+				logs := logtest.CaptureSlog(t)
 
 				handler := HandleAccountActivateGet(httpHelper, store, database, userCreator, auditLogger)
 				rr := httptest.NewRecorder()
@@ -672,7 +672,7 @@ func TestHandleAccountActivateGet_SelfRegistrationDisabled(t *testing.T) {
 			_, codeHash := preRegistrationWithCode(t, 7, activateTestEmail, code, time.Now().UTC())
 			sent := withSelfRegistration(tc.request(t, store, codeHash), false)
 			httpHelper.On("NotFound", mock.Anything, mock.Anything).Once()
-			logs := testutil.CaptureSlog(t)
+			logs := logtest.CaptureSlog(t)
 
 			handler := HandleAccountActivateGet(httpHelper, store, database, userCreator, auditLogger)
 			rr := httptest.NewRecorder()

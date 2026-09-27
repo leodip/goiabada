@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/constants"
+	"github.com/leodip/goiabada/core/logging/logtest"
 	"github.com/leodip/goiabada/core/oauth"
-	"github.com/leodip/goiabada/core/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -486,7 +486,7 @@ func TestJwtAuthorizationHeaderToContext_TokenKindAndAudience(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			logs := testutil.CaptureSlog(t)
+			logs := logtest.CaptureSlog(t)
 			mockTokenParser := new(mock_middleware.TokenParser)
 			middleware := NewMiddlewareBearerToken(mockTokenParser)
 

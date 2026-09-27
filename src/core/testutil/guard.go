@@ -66,8 +66,8 @@ func (g GuardReport) Failed() bool {
 
 // Text renders everything the guard said as one string, which is what a rule test matches against
 // when it cares that a particular file, line or explanation reached the reader. It mirrors
-// SlogCapture.Text for the same reason: an assertion on rendered output is the only one that
-// catches a message whose arguments are in the wrong order.
+// logtest.SlogCapture.Text for the same reason: an assertion on rendered output is the only one
+// that catches a message whose arguments are in the wrong order.
 func (g GuardReport) Text() string {
 	lines := make([]string, 0, len(g.Errors)+1)
 	lines = append(lines, g.Errors...)
