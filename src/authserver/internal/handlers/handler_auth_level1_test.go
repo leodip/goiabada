@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/config"
@@ -14,7 +15,6 @@ import (
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/customerrors"
-	"github.com/leodip/goiabada/core/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -780,10 +780,8 @@ func TestHandleAuthLevel1CompletedGet_DeliversADeferredError(t *testing.T) {
 		// is also what proves templateFS is genuinely wired through to this handler: with nil
 		// passed here instead, this case would 500 for the wrong reason and the parameter could be
 		// removed without a test noticing.
-		templateFS := &mocks.TestFS{
-			FileContents: map[string]string{
-				"form_post.html": `<form action="{{ .redirectURI`,
-			},
+		templateFS := fstest.MapFS{
+			"form_post.html": {Data: []byte(`<form action="{{ .redirectURI`)},
 		}
 		handler := HandleAuthLevel1CompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS)
 

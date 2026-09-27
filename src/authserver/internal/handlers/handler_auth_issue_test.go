@@ -10,6 +10,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
@@ -28,7 +29,6 @@ import (
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	mocks_handlers "github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/web"
-	mocks_test "github.com/leodip/goiabada/core/mocks"
 )
 
 // armIssueGate arms the three reads the gate at /auth/issue performs before it can dispatch: the
@@ -65,7 +65,7 @@ func TestHandleIssueGet(t *testing.T) {
 	t.Run("Error when getting GetAuthContext", func(t *testing.T) {
 		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
-		templateFS := &mocks_test.TestFS{}
+		templateFS := fstest.MapFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
@@ -96,7 +96,7 @@ func TestHandleIssueGet(t *testing.T) {
 	t.Run("Unexpected AuthState", func(t *testing.T) {
 		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
-		templateFS := &mocks_test.TestFS{}
+		templateFS := fstest.MapFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
@@ -129,7 +129,7 @@ func TestHandleIssueGet(t *testing.T) {
 	t.Run("Successfully issues a code", func(t *testing.T) {
 		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
-		templateFS := &mocks_test.TestFS{}
+		templateFS := fstest.MapFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
@@ -221,7 +221,7 @@ func TestHandleIssueGet(t *testing.T) {
 	t.Run("No session identifier in the context, restarts level 1", func(t *testing.T) {
 		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
-		templateFS := &mocks_test.TestFS{}
+		templateFS := fstest.MapFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
@@ -278,7 +278,7 @@ func TestHandleIssueGet(t *testing.T) {
 	t.Run("Session identifier resolves to no session, restarts level 1", func(t *testing.T) {
 		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
-		templateFS := &mocks_test.TestFS{}
+		templateFS := fstest.MapFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
@@ -328,7 +328,7 @@ func TestHandleIssueGet(t *testing.T) {
 	t.Run("No session and prompt=none, returns login_required to the client", func(t *testing.T) {
 		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
-		templateFS := &mocks_test.TestFS{}
+		templateFS := fstest.MapFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
@@ -402,7 +402,7 @@ func TestHandleIssueGet(t *testing.T) {
 	t.Run("No session and prompt=none, failing clear - server_error to the client", func(t *testing.T) {
 		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
-		templateFS := &mocks_test.TestFS{}
+		templateFS := fstest.MapFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
@@ -472,10 +472,8 @@ func TestHandleIssueGet(t *testing.T) {
 
 		// Deliberately malformed, an unclosed action, so template.ParseFS fails and
 		// redirToClientWithError returns "unable to parse template" instead of committing.
-		templateFS := &mocks_test.TestFS{
-			FileContents: map[string]string{
-				"form_post.html": `<form action="{{ .redirectURI`,
-			},
+		templateFS := fstest.MapFS{
+			"form_post.html": {Data: []byte(`<form action="{{ .redirectURI`)},
 		}
 
 		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
@@ -529,10 +527,8 @@ func TestHandleIssueGet(t *testing.T) {
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		templateFS := &mocks_test.TestFS{
-			FileContents: map[string]string{
-				"form_post.html": `<form action="{{ .redirectURI`,
-			},
+		templateFS := fstest.MapFS{
+			"form_post.html": {Data: []byte(`<form action="{{ .redirectURI`)},
 		}
 
 		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
@@ -579,7 +575,7 @@ func TestHandleIssueGet(t *testing.T) {
 	t.Run("Session lookup fails", func(t *testing.T) {
 		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
-		templateFS := &mocks_test.TestFS{}
+		templateFS := fstest.MapFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
@@ -626,7 +622,7 @@ func TestHandleIssueGet(t *testing.T) {
 	t.Run("The commit fails, so no code reaches the client", func(t *testing.T) {
 		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
-		templateFS := &mocks_test.TestFS{}
+		templateFS := fstest.MapFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
@@ -733,7 +729,7 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 	t.Run("The transaction is the acquisition then the insert, and nothing else", func(t *testing.T) {
 		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
-		templateFS := &mocks_test.TestFS{}
+		templateFS := fstest.MapFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
@@ -791,7 +787,7 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 	t.Run("The row is gone, so the ceremony restarts at level 1 and nothing is inserted", func(t *testing.T) {
 		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
-		templateFS := &mocks_test.TestFS{}
+		templateFS := fstest.MapFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
@@ -868,7 +864,7 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 	t.Run("The client is gone, so the ceremony restarts at level 1 and nothing is inserted", func(t *testing.T) {
 		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
-		templateFS := &mocks_test.TestFS{}
+		templateFS := fstest.MapFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
@@ -933,7 +929,7 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 	t.Run("An ordinary insert failure is still a 500", func(t *testing.T) {
 		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
-		templateFS := &mocks_test.TestFS{}
+		templateFS := fstest.MapFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
@@ -975,7 +971,7 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 	t.Run("The row is gone and the ceremony is silent, so the client is answered login_required", func(t *testing.T) {
 		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
-		templateFS := &mocks_test.TestFS{}
+		templateFS := fstest.MapFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
@@ -1056,7 +1052,7 @@ func TestHandleIssueGet_TheAcquisitionOrdersTheInsert(t *testing.T) {
 			t.Run(tc.name, func(t *testing.T) {
 				httpHelper := mocks_handlers.NewHttpHelper(t)
 				authHelper := mocks_handlers.NewAuthHelper(t)
-				templateFS := &mocks_test.TestFS{}
+				templateFS := fstest.MapFS{}
 				codeIssuer := mocks_handlers.NewCodeIssuer(t)
 				tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 				database := mocks_data.NewDatabase(t)
@@ -1143,7 +1139,7 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 		t.Run("Foreign ambient session restarts level 1: "+family.name, func(t *testing.T) {
 			httpHelper := mocks_handlers.NewHttpHelper(t)
 			authHelper := mocks_handlers.NewAuthHelper(t)
-			templateFS := &mocks_test.TestFS{}
+			templateFS := fstest.MapFS{}
 			codeIssuer := mocks_handlers.NewCodeIssuer(t)
 			tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 			database := mocks_data.NewDatabase(t)
@@ -1230,7 +1226,7 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 		t.Run("Foreign ambient session and prompt=none returns login_required: "+family.name, func(t *testing.T) {
 			httpHelper := mocks_handlers.NewHttpHelper(t)
 			authHelper := mocks_handlers.NewAuthHelper(t)
-			templateFS := &mocks_test.TestFS{}
+			templateFS := fstest.MapFS{}
 			codeIssuer := mocks_handlers.NewCodeIssuer(t)
 			tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 			database := mocks_data.NewDatabase(t)
@@ -1299,7 +1295,7 @@ func TestHandleIssueGet_ForeignAmbientSession(t *testing.T) {
 	t.Run("Own ambient session still issues implicit tokens carrying its identifier", func(t *testing.T) {
 		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
-		templateFS := &mocks_test.TestFS{}
+		templateFS := fstest.MapFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
@@ -1381,7 +1377,7 @@ func TestHandleIssueGet_ImplicitAmbientSessionVanished(t *testing.T) {
 	t.Run("Implicit request whose session row has vanished restarts level 1", func(t *testing.T) {
 		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
-		templateFS := &mocks_test.TestFS{}
+		templateFS := fstest.MapFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
@@ -1442,7 +1438,7 @@ func TestHandleIssueGet_ImplicitAmbientSessionVanished(t *testing.T) {
 	t.Run("Implicit request whose session row has vanished and prompt=none returns login_required", func(t *testing.T) {
 		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
-		templateFS := &mocks_test.TestFS{}
+		templateFS := fstest.MapFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
@@ -1678,7 +1674,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 	t.Run("Implicit flow with token response type", func(t *testing.T) {
 		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
-		templateFS := &mocks_test.TestFS{}
+		templateFS := fstest.MapFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
@@ -1771,7 +1767,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 	t.Run("Implicit flow with id_token response type", func(t *testing.T) {
 		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
-		templateFS := &mocks_test.TestFS{}
+		templateFS := fstest.MapFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
@@ -1855,7 +1851,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 	t.Run("Implicit flow with id_token token response type", func(t *testing.T) {
 		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
-		templateFS := &mocks_test.TestFS{}
+		templateFS := fstest.MapFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
@@ -1944,7 +1940,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 	t.Run("Implicit flow uses consented scope when available", func(t *testing.T) {
 		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
-		templateFS := &mocks_test.TestFS{}
+		templateFS := fstest.MapFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
@@ -2009,7 +2005,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 	t.Run("Implicit flow, the client vanished - the redirect is withheld rather than emitted", func(t *testing.T) {
 		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
-		templateFS := &mocks_test.TestFS{}
+		templateFS := fstest.MapFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
@@ -2064,7 +2060,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 	t.Run("Implicit flow error - user not found", func(t *testing.T) {
 		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
-		templateFS := &mocks_test.TestFS{}
+		templateFS := fstest.MapFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
@@ -2109,7 +2105,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 	t.Run("Implicit flow error - token generation fails", func(t *testing.T) {
 		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
-		templateFS := &mocks_test.TestFS{}
+		templateFS := fstest.MapFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
@@ -2393,7 +2389,7 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 	t.Run("Implicit flow error - database error on client lookup", func(t *testing.T) {
 		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
-		templateFS := &mocks_test.TestFS{}
+		templateFS := fstest.MapFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
@@ -2436,7 +2432,7 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 	t.Run("Implicit flow error - database error on user lookup", func(t *testing.T) {
 		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
-		templateFS := &mocks_test.TestFS{}
+		templateFS := fstest.MapFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
@@ -2482,7 +2478,7 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 	t.Run("Implicit flow error - clear auth context fails", func(t *testing.T) {
 		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
-		templateFS := &mocks_test.TestFS{}
+		templateFS := fstest.MapFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
@@ -2652,13 +2648,11 @@ func TestIssueAuthCode(t *testing.T) {
 			State:       "test_state",
 		}
 
-		templateFS := &mocks_test.TestFS{
-			FileContents: map[string]string{
-				"form_post.html": `<form method="post" action="{{.redirectURI}}">
+		templateFS := fstest.MapFS{
+			"form_post.html": {Data: []byte(`<form method="post" action="{{.redirectURI}}">
 					<input type="hidden" name="code" value="{{.code}}">
 					<input type="hidden" name="state" value="{{.state}}">
-				</form>`,
-			},
+				</form>`)},
 		}
 
 		err := issueAuthCode(w, r, templateFS, code, "form_post")
@@ -2695,10 +2689,8 @@ func TestIssueAuthCode(t *testing.T) {
 			State:       "test_state",
 		}
 
-		templateFS := &mocks_test.TestFS{
-			FileContents: map[string]string{
-				"form_post.html": `{{.InvalidTemplate`,
-			},
+		templateFS := fstest.MapFS{
+			"form_post.html": {Data: []byte(`{{.InvalidTemplate`)},
 		}
 
 		err := issueAuthCode(w, r, templateFS, code, "form_post")
@@ -2765,10 +2757,8 @@ func TestIssueAuthCode(t *testing.T) {
 					// A form_post template that renders cleanly, so that a build with the guard
 					// removed produces a form action to assert against rather than dying on a
 					// missing template and passing for the wrong reason.
-					templateFS := &mocks_test.TestFS{
-						FileContents: map[string]string{
-							"form_post.html": `<form method="post" action="{{.redirectURI}}"></form>`,
-						},
+					templateFS := fstest.MapFS{
+						"form_post.html": {Data: []byte(`<form method="post" action="{{.redirectURI}}"></form>`)},
 					}
 
 					err := issueAuthCode(w, r, templateFS, code, mode.value)
@@ -3035,10 +3025,8 @@ func TestIssueAuthCode_ByteExactState(t *testing.T) {
 
 		// form_post carries the value in a form field rather than a URI, so what has to survive is
 		// the raw string reaching the template, HTML-escaped by html/template and nothing else.
-		templateFS := &mocks_test.TestFS{
-			FileContents: map[string]string{
-				"form_post.html": `<input name="state" value="{{.state}}">`,
-			},
+		templateFS := fstest.MapFS{
+			"form_post.html": {Data: []byte(`<input name="state" value="{{.state}}">`)},
 		}
 
 		err := issueAuthCode(w, r, templateFS, code, "form_post")
@@ -3062,10 +3050,8 @@ func TestIssueAuthCode_FormPostIsNotCacheable(t *testing.T) {
 		r := httptest.NewRequest("GET", "/auth/issue", nil)
 		code := &models.Code{Code: "test_code", RedirectURI: "https://example.com/callback", State: "abc123"}
 
-		templateFS := &mocks_test.TestFS{
-			FileContents: map[string]string{
-				"form_post.html": `<form method="post" action="{{.redirectURI}}"></form>`,
-			},
+		templateFS := fstest.MapFS{
+			"form_post.html": {Data: []byte(`<form method="post" action="{{.redirectURI}}"></form>`)},
 		}
 
 		err := issueAuthCode(w, r, templateFS, code, "form_post")
@@ -3083,10 +3069,8 @@ func TestIssueAuthCode_FormPostIsNotCacheable(t *testing.T) {
 		// The companion to the buffering case below. A failed render must leave the response
 		// completely untouched, headers included, so the caller's last-resort 500 answers with its
 		// own headers rather than with those of a form_post page that was never sent (#141).
-		templateFS := &mocks_test.TestFS{
-			FileContents: map[string]string{
-				"form_post.html": `<form>{{index . "missing" 0}}</form>`,
-			},
+		templateFS := fstest.MapFS{
+			"form_post.html": {Data: []byte(`<form>{{index . "missing" 0}}</form>`)},
 		}
 
 		err := issueAuthCode(w, r, templateFS, code, "form_post")
@@ -3113,10 +3097,8 @@ func TestIssueAuthCode_FormPostRenderIsBuffered(t *testing.T) {
 
 	// Parses cleanly and fails at the index call, after the prefix has been walked. Rendering
 	// straight to w writes that prefix before the failure; rendering to a buffer writes nothing.
-	templateFS := &mocks_test.TestFS{
-		FileContents: map[string]string{
-			"form_post.html": `<form action="{{.redirectURI}}"><input value="{{.code}}">{{index . "missing" 0}}</form>`,
-		},
+	templateFS := fstest.MapFS{
+		"form_post.html": {Data: []byte(`<form action="{{.redirectURI}}"><input value="{{.code}}">{{index . "missing" 0}}</form>`)},
 	}
 
 	err := issueAuthCode(w, r, templateFS, code, "form_post")
@@ -3171,7 +3153,9 @@ func TestFormPostBindMapOmitsAnAbsentState(t *testing.T) {
 				r := httptest.NewRequest("GET", "/auth/issue", nil)
 				code := &models.Code{Code: "test_code", RedirectURI: "https://example.com/callback", State: tc.state}
 
-				templateFS := &mocks_test.TestFS{FileContents: map[string]string{"form_post.html": keysTemplate}}
+				templateFS := fstest.MapFS{
+					"form_post.html": {Data: []byte(keysTemplate)},
+				}
 
 				err := issueAuthCode(w, r, templateFS, code, "form_post")
 
@@ -3195,7 +3179,9 @@ func TestFormPostBindMapOmitsAnAbsentState(t *testing.T) {
 				w := httptest.NewRecorder()
 				r := httptest.NewRequest("GET", "/auth/authorize", nil)
 
-				templateFS := &mocks_test.TestFS{FileContents: map[string]string{"form_post.html": keysTemplate}}
+				templateFS := fstest.MapFS{
+					"form_post.html": {Data: []byte(keysTemplate)},
+				}
 
 				err := redirToClientWithError(w, r,
 					testRegisteredDatabase(t, "https://example.com/callback"), nil, templateFS,
@@ -3293,7 +3279,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 	t.Run("IdTokenHintSub set matching user - issues code successfully", func(t *testing.T) {
 		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
-		templateFS := &mocks_test.TestFS{}
+		templateFS := fstest.MapFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
@@ -3376,7 +3362,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 	t.Run("IdTokenHintSub set different user - returns login_required", func(t *testing.T) {
 		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
-		templateFS := &mocks_test.TestFS{}
+		templateFS := fstest.MapFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
@@ -3458,7 +3444,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 	t.Run("IdTokenHintSub set different user, failing clear - server_error to the client", func(t *testing.T) {
 		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
-		templateFS := &mocks_test.TestFS{}
+		templateFS := fstest.MapFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
@@ -3538,10 +3524,8 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		// redirToClientWithError returns "unable to parse template" instead of committing.
 		// form_post is the only response mode whose arm can fail after the redirect URI has
 		// been validated, so it is how this branch is reached at all.
-		templateFS := &mocks_test.TestFS{
-			FileContents: map[string]string{
-				"form_post.html": `<form action="{{ .redirectURI`,
-			},
+		templateFS := fstest.MapFS{
+			"form_post.html": {Data: []byte(`<form action="{{ .redirectURI`)},
 		}
 
 		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
@@ -3607,10 +3591,8 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		templateFS := &mocks_test.TestFS{
-			FileContents: map[string]string{
-				"form_post.html": `<form action="{{ .redirectURI`,
-			},
+		templateFS := fstest.MapFS{
+			"form_post.html": {Data: []byte(`<form action="{{ .redirectURI`)},
 		}
 
 		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer, database, auditLogger, userSessionManager, permissionChecker)
@@ -3667,7 +3649,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 	t.Run("IdTokenHintSub empty - proceeds normally without check", func(t *testing.T) {
 		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
-		templateFS := &mocks_test.TestFS{}
+		templateFS := fstest.MapFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
@@ -3743,7 +3725,7 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 	t.Run("End-to-end: prompt=login with mismatched id_token_hint - blocks at issuance", func(t *testing.T) {
 		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
-		templateFS := &mocks_test.TestFS{}
+		templateFS := fstest.MapFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
@@ -3892,7 +3874,7 @@ func TestHandleIssueGet_RedirectURIRecheck(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			httpHelper := mocks_handlers.NewHttpHelper(t)
 			authHelper := mocks_handlers.NewAuthHelper(t)
-			templateFS := &mocks_test.TestFS{}
+			templateFS := fstest.MapFS{}
 			codeIssuer := mocks_handlers.NewCodeIssuer(t)
 			tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 			database := mocks_data.NewDatabase(t)
@@ -3991,7 +3973,7 @@ func TestHandleIssueGet_RedirectURIRecheck(t *testing.T) {
 func TestHandleIssueGet_RedirectURIRecheckOutranksTheIdTokenHintRefusal(t *testing.T) {
 	httpHelper := mocks_handlers.NewHttpHelper(t)
 	authHelper := mocks_handlers.NewAuthHelper(t)
-	templateFS := &mocks_test.TestFS{}
+	templateFS := fstest.MapFS{}
 	codeIssuer := mocks_handlers.NewCodeIssuer(t)
 	tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 	database := mocks_data.NewDatabase(t)
@@ -4064,7 +4046,7 @@ func TestHandleIssueGet_ExpiredAmbientSession(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			httpHelper := mocks_handlers.NewHttpHelper(t)
 			authHelper := mocks_handlers.NewAuthHelper(t)
-			templateFS := &mocks_test.TestFS{}
+			templateFS := fstest.MapFS{}
 			codeIssuer := mocks_handlers.NewCodeIssuer(t)
 			tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 			database := mocks_data.NewDatabase(t)
@@ -4215,7 +4197,7 @@ func TestHandleIssueGet_ScopeRefilter(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			httpHelper := mocks_handlers.NewHttpHelper(t)
 			authHelper := mocks_handlers.NewAuthHelper(t)
-			templateFS := &mocks_test.TestFS{}
+			templateFS := fstest.MapFS{}
 			codeIssuer := mocks_handlers.NewCodeIssuer(t)
 			tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 			database := mocks_data.NewDatabase(t)
@@ -4371,7 +4353,7 @@ func TestHandleIssueGet_TheLiveChecksFailClosedOnAStorageError(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			httpHelper := mocks_handlers.NewHttpHelper(t)
 			authHelper := mocks_handlers.NewAuthHelper(t)
-			templateFS := &mocks_test.TestFS{}
+			templateFS := fstest.MapFS{}
 			codeIssuer := mocks_handlers.NewCodeIssuer(t)
 			tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 			database := mocks_data.NewDatabase(t)
@@ -4446,7 +4428,7 @@ func TestHandleIssueGet_RedirectURIRefusalSurvivesItsOwnFailures(t *testing.T) {
 	t.Run("failing clear - the refusal is still rendered and nothing is emitted", func(t *testing.T) {
 		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
-		templateFS := &mocks_test.TestFS{}
+		templateFS := fstest.MapFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
@@ -4516,7 +4498,7 @@ func TestHandleIssueGet_RedirectURIRefusalSurvivesItsOwnFailures(t *testing.T) {
 	t.Run("an unrenderable page - 500 when the refusal itself cannot be shown", func(t *testing.T) {
 		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
-		templateFS := &mocks_test.TestFS{}
+		templateFS := fstest.MapFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
@@ -4635,7 +4617,7 @@ func TestHandleIssueGet_ScopeRefusalSurvivesItsOwnFailures(t *testing.T) {
 	t.Run("failing clear - server_error to the client", func(t *testing.T) {
 		httpHelper := mocks_handlers.NewHttpHelper(t)
 		authHelper := mocks_handlers.NewAuthHelper(t)
-		templateFS := &mocks_test.TestFS{}
+		templateFS := fstest.MapFS{}
 		codeIssuer := mocks_handlers.NewCodeIssuer(t)
 		tokenIssuer := mocks_handlers.NewTokenIssuer(t)
 		database := mocks_data.NewDatabase(t)
@@ -4689,10 +4671,8 @@ func TestHandleIssueGet_ScopeRefusalSurvivesItsOwnFailures(t *testing.T) {
 
 		// Deliberately malformed, an unclosed action, so template.ParseFS fails and
 		// redirToClientWithError returns "unable to parse template" instead of committing.
-		templateFS := &mocks_test.TestFS{
-			FileContents: map[string]string{
-				"form_post.html": `<form action="{{ .redirectURI`,
-			},
+		templateFS := fstest.MapFS{
+			"form_post.html": {Data: []byte(`<form action="{{ .redirectURI`)},
 		}
 
 		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer,
@@ -4733,10 +4713,8 @@ func TestHandleIssueGet_ScopeRefusalSurvivesItsOwnFailures(t *testing.T) {
 		userSessionManager := mocks_handlers.NewUserSessionManager(t)
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 
-		templateFS := &mocks_test.TestFS{
-			FileContents: map[string]string{
-				"form_post.html": `<form action="{{ .redirectURI`,
-			},
+		templateFS := fstest.MapFS{
+			"form_post.html": {Data: []byte(`<form action="{{ .redirectURI`)},
 		}
 
 		handler := HandleIssueGet(httpHelper, authHelper, templateFS, codeIssuer, tokenIssuer,

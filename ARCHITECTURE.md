@@ -104,7 +104,6 @@ A row whose owner is not `kernel` names the issue that moves it. A `kernel` row 
 | `core/locales` | kernel | — |
 | `core/logging` | kernel | — |
 | `core/middleware` | kernel | — |
-| `core/mocks` | kernel | — |
 | `core/oauth` | kernel | — |
 | `core/sessionstore` | kernel | — |
 | `core/stringutil` | kernel | — |
@@ -121,8 +120,8 @@ Notes on rows that are not self-evident:
 - `core/cmd` is kernel because it is one developer tool, `ownershipdump`, which writes the per-symbol
   table described below. The row exists because the guard reads any directory under `core` holding a
   production Go file, and rule 6 fails without it (#385).
-- `core/mocks` and `core/testutil` are kernel because they are test support compiled into no binary.
-  They are still held to the kernel rule, and #360 is what made that hold rather than merely claim
+- `core/testutil` is kernel because it is test support compiled into no binary. It is still held to
+  the kernel rule, and #360 is what made that hold rather than merely claim
   it: `core/testutil/fake` imported `core/uuidutil` under an exception rather than a waiver, so the
   edge was noticed when `uuidutil` moved, and `fake` moved with it to
   `authserver/internal/testutil/fake`. No admin console file ever imported it.

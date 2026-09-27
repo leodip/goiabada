@@ -1736,7 +1736,7 @@ func TestNothingNamesUnused(t *testing.T) {
 
 // TestSymbolOwnership_AnInternalTestNamingASymbolIsEvidence is that rule's leniency: the arm still
 // has to see a real unqualified reference from the declaring package's own test, which is how
-// core/mocks and core/testutil earn the word at all.
+// core/testutil earns the word at all.
 func TestSymbolOwnership_AnInternalTestNamingASymbolIsEvidence(t *testing.T) {
 	files := withSymbolBaseline(map[string]string{
 		"core/shared/orphan.go": "package shared\n\ntype Unused struct{}\n",
@@ -1750,6 +1750,28 @@ func TestUnusedIsNamed(t *testing.T) {
 `,
 	})
 	rows := append(symbolBaselineRows(), "core/shared Unused test-support Only a test names it.")
+
+	assert.Empty(t, checkSymbols(t, files, rows))
+}
+
+// TestSymbolOwnership_ItsOwnPackageNamingATestSupportSymbolIsEvidence is the second half's other
+// arm: Part is the value Double returns, and a test names Double but never Part, the shape a fake's
+// helper type takes. Without this case only the live tree pinned the arm (#431).
+func TestSymbolOwnership_ItsOwnPackageNamingATestSupportSymbolIsEvidence(t *testing.T) {
+	files := withSymbolBaseline(map[string]string{
+		"core/shared/double.go": "package shared\n\ntype Part struct{}\n\nfunc Double() Part { return Part{} }\n",
+		"core/shared/double_test.go": `package shared
+
+import "testing"
+
+func TestDoubleIsNamed(t *testing.T) {
+	_ = Double()
+}
+`,
+	})
+	rows := append(symbolBaselineRows(),
+		"core/shared Double test-support Only a test names it.",
+		"core/shared Part test-support Only Double names it.")
 
 	assert.Empty(t, checkSymbols(t, files, rows))
 }
@@ -1944,8 +1966,8 @@ var (
 }
 
 // TestSymbolOwnership_ATestSupportRowAnUnlinkedProductionFileNames is the deliberate leniency that
-// makes the word usable. Three packages in this repository are test support written in files with
-// no _test.go suffix, so a production reference from a package no binary links is not a
+// makes the word usable. Test support in this repository is written in files with no _test.go
+// suffix, so a production reference from a package no binary links is not a
 // contradiction.
 func TestSymbolOwnership_ATestSupportRowAnUnlinkedProductionFileNames(t *testing.T) {
 	files := withSymbolBaseline(map[string]string{

@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/leodip/goiabada/authserver/internal/audit"
@@ -20,7 +21,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/i18n"
-	"github.com/leodip/goiabada/core/mocks"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -649,10 +649,8 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		// redirToClientWithError returns "unable to parse template" instead of committing.
 		// form_post is the only response mode whose arm can fail after the redirect URI has
 		// been validated, so it is how this branch is reached at all.
-		templateFS := &mocks.TestFS{
-			FileContents: map[string]string{
-				"form_post.html": `<form action="{{ .redirectURI`,
-			},
+		templateFS := fstest.MapFS{
+			"form_post.html": {Data: []byte(`<form action="{{ .redirectURI`)},
 		}
 		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, templateFS, authorizeValidator, auditLogger, permissionChecker, tokenParser)
 		stubAuthenticatedBrowser(database, userSessionManager)
@@ -713,10 +711,8 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 		tokenParser := mocks_handlers.NewTokenParser(t)
 
-		templateFS := &mocks.TestFS{
-			FileContents: map[string]string{
-				"form_post.html": `<form action="{{ .redirectURI`,
-			},
+		templateFS := fstest.MapFS{
+			"form_post.html": {Data: []byte(`<form action="{{ .redirectURI`)},
 		}
 		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, templateFS, authorizeValidator, auditLogger, permissionChecker, tokenParser)
 		stubAuthenticatedBrowser(database, userSessionManager)
@@ -1359,14 +1355,12 @@ func TestRedirToClientWithError_FormPostResponseMode(t *testing.T) {
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("GET", "/authorize", nil)
 
-	templateFS := &mocks.TestFS{
-		FileContents: map[string]string{
-			"form_post.html": `<form method="post" action="{{.redirectURI}}">
+	templateFS := fstest.MapFS{
+		"form_post.html": {Data: []byte(`<form method="post" action="{{.redirectURI}}">
 				<input type="hidden" name="error" value="{{.error}}">
 				<input type="hidden" name="error_description" value="{{.error_description}}">
 				<input type="hidden" name="state" value="{{.state}}">
-			</form>`,
-		},
+			</form>`)},
 	}
 
 	err := redirToClientWithError(w, r, testRegisteredDatabase(t, "https://example.com/callback"), nil, templateFS, testRedirectError("access_denied", "Access denied", "form_post", "https://example.com/callback", "def456", "code"))
@@ -1394,10 +1388,8 @@ func TestRedirToClientWithError_FormPostExecutionFailureLeavesResponseUncommitte
 
 	// Parses cleanly. "missing" is absent from the map, so index yields an untyped nil, and
 	// indexing that fails at execution time, after the <form> prefix has been emitted.
-	templateFS := &mocks.TestFS{
-		FileContents: map[string]string{
-			"form_post.html": `<form>{{index . "missing" 0}}</form>`,
-		},
+	templateFS := fstest.MapFS{
+		"form_post.html": {Data: []byte(`<form>{{index . "missing" 0}}</form>`)},
 	}
 
 	err := redirToClientWithError(w, r, testRegisteredDatabase(t, "https://example.com/callback"), nil, templateFS, testRedirectError("server_error", "Internal server error",
@@ -1422,10 +1414,8 @@ func TestRedirToClientWithError_FormPostWriteFailureIsReported(t *testing.T) {
 	w := &failingResponseWriter{}
 	r := httptest.NewRequest("GET", "/authorize", nil)
 
-	templateFS := &mocks.TestFS{
-		FileContents: map[string]string{
-			"form_post.html": `<form method="post" action="{{.redirectURI}}"></form>`,
-		},
+	templateFS := fstest.MapFS{
+		"form_post.html": {Data: []byte(`<form method="post" action="{{.redirectURI}}"></form>`)},
 	}
 
 	err := redirToClientWithError(w, r, testRegisteredDatabase(t, "https://example.com/callback"), nil, templateFS, testRedirectError("server_error", "Internal server error",
@@ -1495,14 +1485,12 @@ func TestRedirToClientWithError_ImplicitFlow_ExplicitResponseModeRespected(t *te
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/authorize", nil)
 
-		templateFS := &mocks.TestFS{
-			FileContents: map[string]string{
-				"form_post.html": `<form method="post" action="{{.redirectURI}}">
+		templateFS := fstest.MapFS{
+			"form_post.html": {Data: []byte(`<form method="post" action="{{.redirectURI}}">
 					<input type="hidden" name="error" value="{{.error}}">
 					<input type="hidden" name="error_description" value="{{.error_description}}">
 					<input type="hidden" name="state" value="{{.state}}">
-				</form>`,
-			},
+				</form>`)},
 		}
 
 		err := redirToClientWithError(w, r, testRegisteredDatabase(t, "https://example.com/callback"), nil, templateFS, testRedirectError("access_denied", "Access denied", "form_post", "https://example.com/callback", "state123", "id_token token"))
@@ -1701,10 +1689,8 @@ func TestRedirToClientWithError_ByteExactState(t *testing.T) {
 
 		// form_post carries the value in a form field rather than a URI, so what has to survive is
 		// the raw string reaching the template, HTML-escaped by html/template and nothing else.
-		templateFS := &mocks.TestFS{
-			FileContents: map[string]string{
-				"form_post.html": `<input name="state" value="{{.state}}">`,
-			},
+		templateFS := fstest.MapFS{
+			"form_post.html": {Data: []byte(`<input name="state" value="{{.state}}">`)},
 		}
 
 		err := redirToClientWithError(w, r, testRegisteredDatabase(t, "https://example.com/callback"), nil, templateFS, testRedirectError("access_denied", "Access denied",
@@ -1728,10 +1714,8 @@ func TestRedirToClientWithError_FormPostIsNotCacheable(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/authorize", nil)
 
-		templateFS := &mocks.TestFS{
-			FileContents: map[string]string{
-				"form_post.html": `<form method="post" action="{{.redirectURI}}"></form>`,
-			},
+		templateFS := fstest.MapFS{
+			"form_post.html": {Data: []byte(`<form method="post" action="{{.redirectURI}}"></form>`)},
 		}
 
 		err := redirToClientWithError(w, r, testRegisteredDatabase(t, "https://example.com/callback"), nil, templateFS, testRedirectError("access_denied", "Access denied",
@@ -1750,10 +1734,8 @@ func TestRedirToClientWithError_FormPostIsNotCacheable(t *testing.T) {
 		// response completely untouched, headers included, so the caller's last-resort 500 is
 		// answering with its own headers rather than with those of a form_post page that was never
 		// sent. Setting these two above the Execute would break that (#141).
-		templateFS := &mocks.TestFS{
-			FileContents: map[string]string{
-				"form_post.html": `<form>{{index . "missing" 0}}</form>`,
-			},
+		templateFS := fstest.MapFS{
+			"form_post.html": {Data: []byte(`<form>{{index . "missing" 0}}</form>`)},
 		}
 
 		err := redirToClientWithError(w, r, testRegisteredDatabase(t, "https://example.com/callback"), nil, templateFS, testRedirectError("server_error", "Internal server error",
@@ -3543,10 +3525,8 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 
 		// handlePromptNone's closure carries its own copy of the last-resort 500, so removing
 		// site 1's copy leaves this one and vice versa. Each is pinned at its own site.
-		templateFS := &mocks.TestFS{
-			FileContents: map[string]string{
-				"form_post.html": `<form action="{{ .redirectURI`,
-			},
+		templateFS := fstest.MapFS{
+			"form_post.html": {Data: []byte(`<form action="{{ .redirectURI`)},
 		}
 		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, templateFS, authorizeValidator, auditLogger, permissionChecker, tokenParser)
 
@@ -3637,10 +3617,8 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
 		tokenParser := mocks_handlers.NewTokenParser(t)
 
-		templateFS := &mocks.TestFS{
-			FileContents: map[string]string{
-				"form_post.html": `<form action="{{ .redirectURI`,
-			},
+		templateFS := fstest.MapFS{
+			"form_post.html": {Data: []byte(`<form action="{{ .redirectURI`)},
 		}
 		handler := HandleAuthorizeGet(httpHelper, authHelper, userSessionManager, database, templateFS, authorizeValidator, auditLogger, permissionChecker, tokenParser)
 

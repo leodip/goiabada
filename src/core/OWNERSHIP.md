@@ -58,8 +58,8 @@ note names an issue; the reviewer does the rest.
   place a test reference decides anything is the second half of a `test-support` row.
 - **`test-support` asks a different question from the other six**, and deliberately: not "who names
   it" but "does a binary ship it", which is what `ARCHITECTURE.md`'s package table already says about
-  `core/testutil` and `core/mocks`. Three packages here are test support written in files with no
-  `_test.go` suffix — those two and each application's `handlertest` — so
+  `core/testutil`. Test support here is written in files with no `_test.go` suffix — that package
+  and the admin console's `handlertest` among them — so
   `adminconsole/internal/handlertest/json.go` naming `testutil.Reporter` in a production file is not
   a reason to refuse `Reporter` the word. A reference from a package a binary links is.
 - **A method is not a row.** It rides with its receiver type, which has one. `guard/constants-table`
@@ -367,9 +367,6 @@ command itself and fails on a tree it changed.
 | `core/middleware` | `MiddlewareSkipCsrf` | both-apps | — |
 | `core/middleware` | `ParseTrustedProxies` | both-apps | — |
 | `core/middleware` | `RequestTargetForLog` | own-package | — |
-| `core/mocks` | `TestFS` | test-support | Test support: a hand-written `fs.FS` fake for the template loaders, named only from tests. |
-| `core/mocks` | `TestFile` | test-support | Test support: a hand-written `fs.FS` fake for the template loaders, named only from tests. |
-| `core/mocks` | `TestFileInfo` | test-support | Test support: a hand-written `fs.FS` fake for the template loaders, named only from tests. |
 | `core/oauth` | `GeneratePKCECodeChallenge` | both-apps | — |
 | `core/oauth` | `Jwk` | both-apps | — |
 | `core/oauth` | `Jwks` | both-apps | — |

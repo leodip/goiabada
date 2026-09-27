@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -19,7 +20,6 @@ import (
 	adminmiddleware "github.com/leodip/goiabada/adminconsole/internal/middleware"
 	"github.com/leodip/goiabada/adminconsole/internal/oauthclient"
 	"github.com/leodip/goiabada/core/api"
-	"github.com/leodip/goiabada/core/mocks"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/leodip/goiabada/core/testutil"
 )
@@ -54,7 +54,7 @@ func permissionRecords(t *testing.T, client apiclient.ApiClient, query string) (
 
 	capture := testutil.CaptureSlog(t)
 
-	httpHelper := handlerhelpers.NewHttpHelper(&mocks.TestFS{}, adminmiddleware.SettingsReader{})
+	httpHelper := handlerhelpers.NewHttpHelper(fstest.MapFS{}, adminmiddleware.SettingsReader{})
 
 	router := chi.NewRouter()
 	router.Use(middleware.RequestID)

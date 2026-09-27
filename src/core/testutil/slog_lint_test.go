@@ -435,7 +435,7 @@ import "log/slog"
 
 func inTest() { slog.SetDefault(slog.New(slog.Default().Handler())); slog.Info("failed to x") }
 `)
-	tree.write("core/mocks/exempt.go", `package mocks
+	tree.write("core/caught/mocks/exempt.go", `package mocks
 
 import "log/slog"
 

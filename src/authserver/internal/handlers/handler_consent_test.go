@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
@@ -18,7 +19,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/customerrors"
 	"github.com/leodip/goiabada/core/i18n"
-	mocks_test "github.com/leodip/goiabada/core/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -731,10 +731,8 @@ func TestHandleConsentPost(t *testing.T) {
 		// redirToClientWithError returns "unable to parse template" instead of committing.
 		// form_post is the only response mode whose arm can fail after the redirect URI has
 		// been validated, so it is how this branch is reached at all.
-		templateFS := &mocks_test.TestFS{
-			FileContents: map[string]string{
-				"form_post.html": `<form action="{{ .redirectURI`,
-			},
+		templateFS := fstest.MapFS{
+			"form_post.html": {Data: []byte(`<form action="{{ .redirectURI`)},
 		}
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
@@ -784,10 +782,8 @@ func TestHandleConsentPost(t *testing.T) {
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		templateFS := &mocks_test.TestFS{
-			FileContents: map[string]string{
-				"form_post.html": `<form action="{{ .redirectURI`,
-			},
+		templateFS := fstest.MapFS{
+			"form_post.html": {Data: []byte(`<form action="{{ .redirectURI`)},
 		}
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
@@ -1256,10 +1252,8 @@ func TestHandleConsentPost(t *testing.T) {
 		// redirToClientWithError returns "unable to parse template" instead of committing.
 		// form_post is the only response mode whose arm can fail after the redirect URI has been
 		// validated, so it is how this branch is reached at all.
-		templateFS := &mocks_test.TestFS{
-			FileContents: map[string]string{
-				"form_post.html": `<form action="{{ .redirectURI`,
-			},
+		templateFS := fstest.MapFS{
+			"form_post.html": {Data: []byte(`<form action="{{ .redirectURI`)},
 		}
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
@@ -1322,10 +1316,8 @@ func TestHandleConsentPost(t *testing.T) {
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		templateFS := &mocks_test.TestFS{
-			FileContents: map[string]string{
-				"form_post.html": `<form action="{{ .redirectURI`,
-			},
+		templateFS := fstest.MapFS{
+			"form_post.html": {Data: []byte(`<form action="{{ .redirectURI`)},
 		}
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
@@ -1485,10 +1477,8 @@ func TestHandleConsentPost(t *testing.T) {
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		templateFS := &mocks_test.TestFS{
-			FileContents: map[string]string{
-				"form_post.html": `<form action="{{ .redirectURI`,
-			},
+		templateFS := fstest.MapFS{
+			"form_post.html": {Data: []byte(`<form action="{{ .redirectURI`)},
 		}
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
@@ -1533,10 +1523,8 @@ func TestHandleConsentPost(t *testing.T) {
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
-		templateFS := &mocks_test.TestFS{
-			FileContents: map[string]string{
-				"form_post.html": `<form action="{{ .redirectURI`,
-			},
+		templateFS := fstest.MapFS{
+			"form_post.html": {Data: []byte(`<form action="{{ .redirectURI`)},
 		}
 
 		permissionChecker := mocks_handlers.NewPermissionChecker(t)
