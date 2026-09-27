@@ -33,7 +33,7 @@ func HandleAccountProfileGet(
 	apiClient accountProfileAPI,
 ) http.HandlerFunc {
 
-	timezones := timezones.Get()
+	timezones := timezones.All()
 	locales := locales.All()
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -87,7 +87,7 @@ func HandleAccountProfilePost(
 	apiClient accountProfileAPI,
 ) http.HandlerFunc {
 
-	timezones := timezones.Get()
+	timezones := timezones.All()
 	locales := locales.All()
 
 	return func(w http.ResponseWriter, r *http.Request) {

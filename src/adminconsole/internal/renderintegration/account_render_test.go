@@ -1,6 +1,7 @@
 package renderintegration
 
 import (
+	"html"
 	"regexp"
 	"strings"
 	"testing"
@@ -53,7 +54,7 @@ func TestRender_AccountAddress(t *testing.T) {
 func TestRender_AccountProfile(t *testing.T) {
 	bind := map[string]interface{}{
 		"user":              &api.UserResponse{},
-		"timezones":         timezones.Get(),
+		"timezones":         timezones.All(),
 		"locales":           locales.All(),
 		"savedSuccessfully": false,
 	}
@@ -69,7 +70,7 @@ func TestRender_ProfilePagesLabelLocalesByName(t *testing.T) {
 		t.Run(page, func(t *testing.T) {
 			out := render(t, page, map[string]interface{}{
 				"user":              &api.UserResponse{Id: 7},
-				"timezones":         timezones.Get(),
+				"timezones":         timezones.All(),
 				"locales":           locales.All(),
 				"page":              "1",
 				"query":             "",
@@ -77,6 +78,43 @@ func TestRender_ProfilePagesLabelLocalesByName(t *testing.T) {
 			})
 
 			assert.Contains(t, out, "português (Brasil) (Portuguese (Brazil))")
+		})
+	}
+}
+
+// zoneOptionRe matches a zone picker option, capturing its value and whether it is selected. The
+// blank option carries no "___", so it is not one.
+var zoneOptionRe = regexp.MustCompile(`<option value="([^"]*___[^"]*)"\s*(selected)?>`)
+
+// A profile stores its zone as the (country name, zone) pair the picker posts, and one zone ID is
+// listed under several countries. So the page must select the row the stored pair names, and not
+// the first row carrying the zone: a user stored as Sweden/Europe/Berlin reopens on Sweden, though
+// Denmark and Germany list the same zone ahead of it, on both profile pages (#432).
+func TestRender_ProfilePagesSelectTheStoredZoneRow(t *testing.T) {
+	user := &api.UserResponse{Id: 7, ZoneInfoCountryName: "Sweden", ZoneInfo: "Europe/Berlin"}
+
+	for _, page := range []string{"/account_profile.html", "/admin_users_profile.html"} {
+		t.Run(page, func(t *testing.T) {
+			out := render(t, page, map[string]interface{}{
+				"user":              user,
+				"timezones":         timezones.All(),
+				"locales":           locales.All(),
+				"page":              "1",
+				"query":             "",
+				"savedSuccessfully": false,
+			})
+
+			var values, selected []string
+			for _, m := range zoneOptionRe.FindAllStringSubmatch(out, -1) {
+				value := html.UnescapeString(m[1])
+				values = append(values, value)
+				if m[2] != "" {
+					selected = append(selected, value)
+				}
+			}
+			require.Len(t, values, len(timezones.All()), "one option per zone row")
+			assert.Contains(t, values, "Germany___Europe/Berlin", "the row sharing the zone is offered")
+			assert.Equal(t, []string{"Sweden___Europe/Berlin"}, selected)
 		})
 	}
 }
@@ -543,7 +581,7 @@ func TestRender_ProfilePagesKeepTheDateOfBirthMachineFormat(t *testing.T) {
 			page: "/account_profile.html",
 			bind: map[string]interface{}{
 				"user":              user,
-				"timezones":         timezones.Get(),
+				"timezones":         timezones.All(),
 				"locales":           locales.All(),
 				"savedSuccessfully": false,
 			},
@@ -553,7 +591,7 @@ func TestRender_ProfilePagesKeepTheDateOfBirthMachineFormat(t *testing.T) {
 			page: "/admin_users_profile.html",
 			bind: map[string]interface{}{
 				"user":              user,
-				"timezones":         timezones.Get(),
+				"timezones":         timezones.All(),
 				"locales":           locales.All(),
 				"page":              "1",
 				"query":             "",

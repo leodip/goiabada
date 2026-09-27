@@ -33,7 +33,7 @@ func HandleAdminUserProfileGet(
 	apiClient userProfileAPI,
 ) http.HandlerFunc {
 
-	timezones := timezones.Get()
+	timezones := timezones.All()
 	locales := locales.All()
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -104,7 +104,7 @@ func HandleAdminUserProfilePost(
 	apiClient userProfileAPI,
 ) http.HandlerFunc {
 
-	timezones := timezones.Get()
+	timezones := timezones.All()
 	locales := locales.All()
 
 	return func(w http.ResponseWriter, r *http.Request) {

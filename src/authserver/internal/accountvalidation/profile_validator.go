@@ -210,15 +210,7 @@ func (val *ProfileValidator) ValidateProfile(ctx context.Context, input *Validat
 	}
 
 	if len(input.ZoneInfo) > 0 {
-		timeZones := timezones.Get()
-		found := false
-		for _, tz := range timeZones {
-			if tz.Zone == input.ZoneInfo {
-				found = true
-				break
-			}
-		}
-		if !found {
+		if len(timezones.ByZone(input.ZoneInfo)) == 0 {
 			return i18n.NewLocalizedError(i18n.ErrCodeProfileZoneInfoInvalid, nil)
 		}
 	}
