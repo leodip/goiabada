@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+
+	"github.com/leodip/goiabada/core/errs"
 )
 
 // CLI flags for non-interactive mode
@@ -107,4 +109,27 @@ func parseFlags(args []string, stderr io.Writer) (*CLIFlags, error) {
 		return nil, err
 	}
 	return flags, nil
+}
+
+// checkWritable refuses, by its name, a flag whose value no generated file could carry, before a
+// step reads any of them. The type and database flags are resolved against the tables and refused
+// there, and the output path is never written into a file.
+func (f *CLIFlags) checkWritable() error {
+	for _, entry := range []struct{ name, value string }{
+		{"--auth-url", f.AuthServerURL},
+		{"--admin-url", f.AdminConsoleURL},
+		{"--namespace", f.Namespace},
+		{"--admin-email", f.AdminEmail},
+		{"--admin-password", f.AdminPassword},
+		{"--db-host", f.DBHost},
+		{"--db-port", f.DBPort},
+		{"--db-name", f.DBName},
+		{"--db-user", f.DBUsername},
+		{"--db-password", f.DBPassword},
+	} {
+		if err := checkWritable(entry.value); err != nil {
+			return errs.Wrapf(err, "%s cannot be written to the configuration", entry.name)
+		}
+	}
+	return nil
 }

@@ -1,9 +1,12 @@
 package main
 
 import (
+	"regexp"
 	"strconv"
 	"strings"
 	"testing"
+
+	"go.yaml.in/yaml/v3"
 )
 
 // A server engine's row is read field by field by the prompts, the Compose generator and the
@@ -25,12 +28,11 @@ func TestEngines_EveryRowIsComplete(t *testing.T) {
 			serverFields := map[string]string{
 				"image": e.image, "defaultPort": e.defaultPort, "defaultUser": e.defaultUser,
 				"kubernetesHost": e.kubernetesHost, "composeService": e.composeService,
-				"healthInterval": e.healthInterval, "healthTimeout": e.healthTimeout,
+				"healthcheck": e.healthcheck, "healthInterval": e.healthInterval, "healthTimeout": e.healthTimeout,
 				"checkDriver": e.checkDriver, "emptinessQuery": e.emptinessQuery,
 			}
 			serverFuncs := map[string]bool{
 				"composeEnvironment": e.composeEnvironment != nil,
-				"composeHealthcheck": e.composeHealthcheck != nil,
 				"checkDSN":           e.checkDSN != nil,
 			}
 
@@ -67,6 +69,53 @@ func TestEngines_EveryRowIsComplete(t *testing.T) {
 				t.Errorf("the database service's environment does not carry the password")
 			}
 		})
+	}
+}
+
+var containerVariable = regexp.MustCompile(`\$\{([A-Z_]+)\}`)
+
+// A healthcheck carries no password. One that needs it names the database container's variable,
+// which must be one the service's environment sets, to exactly the password: a misspelt name
+// expands to nothing in the container's shell, and the database never reports healthy (#430).
+func TestEngines_TheHealthcheckReadsTheContainersOwnPassword(t *testing.T) {
+	const password = `pa"ss'$HOME` + "`id`" + `\x #y: z`
+	for _, e := range engines {
+		if !e.hasServer {
+			continue
+		}
+		t.Run(e.name, func(t *testing.T) {
+			if strings.Contains(e.healthcheck, password) {
+				t.Errorf("the healthcheck carries the password")
+			}
+			set := map[string]string{}
+			for _, line := range e.composeEnvironment(password) {
+				var entry map[string]string
+				if err := yaml.Unmarshal([]byte(line), &entry); err != nil {
+					t.Fatalf("environment line %q is not YAML: %v", line, err)
+				}
+				for name, value := range entry {
+					set[name] = value
+				}
+			}
+			for _, m := range containerVariable.FindAllStringSubmatch(e.healthcheck, -1) {
+				value, ok := set[m[1]]
+				if !ok {
+					t.Errorf("the healthcheck reads %s, which the service's environment does not set", m[1])
+					continue
+				}
+				if got, _ := composeInterpolate(value); got != password {
+					t.Errorf("%s is set to %q, want the password %q", m[1], got, password)
+				}
+			}
+		})
+	}
+	// The two whose healthcheck logs in do read a variable: without this, a row that went back
+	// to a password-free command that never logs in would pass the loop above having checked
+	// nothing.
+	for _, name := range []string{"mysql", "mssql"} {
+		if !containerVariable.MatchString(testEngine(name).healthcheck) {
+			t.Errorf("%s's healthcheck reads no container variable", name)
+		}
 	}
 }
 

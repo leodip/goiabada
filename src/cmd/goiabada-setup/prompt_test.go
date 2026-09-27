@@ -163,6 +163,33 @@ func TestAsker_TheAbortIsReturnedAsItIs(t *testing.T) {
 	in.assertConsumed()
 }
 
+// An answer no generated file can carry is asked again, whatever typed prompt read it and whether
+// or not it would pass that prompt's own check: a free-text password has none (#430).
+func TestAsker_AnUnwritableAnswerIsAskedAgain(t *testing.T) {
+	a, in, out := testAsker(t,
+		scriptedStep{prompt: "Password: ", answer: "pa\xffss"},
+		scriptedStep{prompt: "Password: ", answer: "pa\x00ss"},
+		scriptedStep{prompt: "Password: ", answer: "pässwörd"},
+		scriptedStep{prompt: "User [root]: ", answer: "\xc3"},
+		scriptedStep{prompt: "User [root]: ", answer: ""},
+	)
+	if got, err := a.nonEmpty("Password", ""); err != nil || got != "pässwörd" {
+		t.Errorf("nonEmpty = %q, %v; want \"pässwörd\"", got, err)
+	}
+	if got, err := a.text("User", "root"); err != nil || got != "root" {
+		t.Errorf("text = %q, %v; want the default after the refusal", got, err)
+	}
+	in.assertConsumed()
+	for _, complaint := range []string{
+		"This answer cannot be written to the configuration: it is not valid UTF-8. Please try again.",
+		"This answer cannot be written to the configuration: it contains a NUL character. Please try again.",
+	} {
+		if !strings.Contains(out.String(), complaint) {
+			t.Errorf("output lacks %q:\n%s", complaint, out.String())
+		}
+	}
+}
+
 func TestAsker_AnInvalidAnswerIsAskedAgain(t *testing.T) {
 	a, in, out := testAsker(t,
 		scriptedStep{prompt: "Pick [1]: ", answer: "7"},

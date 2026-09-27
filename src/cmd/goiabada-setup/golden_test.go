@@ -21,6 +21,8 @@ type goldenCase struct {
 	name       string
 	deployment deploymentType
 	engine     string
+	// hostile cases carry hostileConfig's values, one per generated format.
+	hostile bool
 }
 
 func (c goldenCase) path() string {
@@ -37,7 +39,42 @@ func goldenCases() []goldenCase {
 			cases = append(cases, goldenCase{name: d.name + "-" + e.name, deployment: d.kind, engine: e.name})
 		}
 	}
-	return cases
+	return append(cases, hostileCases...)
+}
+
+// hostileCases are one configuration per format, Compose, Kubernetes and the env file, whose
+// free-text answers are hostileConfig's. SQL Server's Compose service is the one whose password
+// the healthcheck used to carry inside a shell-quoted YAML string.
+var hostileCases = []goldenCase{
+	{name: "hostile-compose", deployment: deploymentProduction, engine: "mssql", hostile: true},
+	{name: "hostile-kubernetes", deployment: deploymentKubernetes, engine: "postgres", hostile: true},
+	{name: "hostile-env", deployment: deploymentNative, engine: "mysql", hostile: true},
+}
+
+func (c goldenCase) config() *Config {
+	config := goldenConfig(c.deployment, c.engine)
+	if c.hostile {
+		hostileConfig(config)
+	}
+	return config
+}
+
+// hostileConfig sets every answer that can carry any character to a value built from the shapes
+// hostileValues lists: the passwords and the database username are free text, the admin email
+// passes a check that looks only for an `@` and a dot, and a URL is checked up to its host, so its
+// path can hold anything. Host, port, database name and namespace are validated to safe characters
+// and keep goldenConfig's values; the generated keys are hex and alphanumeric.
+func hostileConfig(config *Config) {
+	config.AdminPassword = "pa\"ss'$HOME`id`\\x #y: z${HOME}$$\n*- ~ yes\t\u2028end\\"
+	config.AdminEmail = "a\"b$c`d\\e #f'g@example.com"
+	config.AuthServerURL = "https://auth.example.com/p\"a$HOME #x: y"
+	config.AdminConsoleURL = "https://admin.example.com/`id`\\q'r ${PATH}"
+	if config.Engine.hasServer {
+		config.DBPassword = "db: \"pw\" #1 $(id) `x` \\n \r\n{a: [b]} 0123"
+	}
+	if config.DBUsername != "" {
+		config.DBUsername = "us\"er\\na$me #x: '"
+	}
 }
 
 // goldenConfig is testConfig with the deployment type and the engine varied, and with every field
@@ -83,8 +120,7 @@ func goldenConfig(kind deploymentType, engineName string) *Config {
 func TestGeneratedConfiguration_MatchesTheGoldens(t *testing.T) {
 	for _, testCase := range goldenCases() {
 		t.Run(testCase.name, func(t *testing.T) {
-			config := goldenConfig(testCase.deployment, testCase.engine)
-			_, content := generatedConfiguration(config)
+			_, content := generatedConfiguration(testCase.config())
 
 			if *updateGoldens {
 				if err := os.MkdirAll("testdata", 0o750); err != nil {
@@ -194,7 +230,7 @@ func TestGeneratedOutputsOmitTheRemovedAdminConsoleVars(t *testing.T) {
 		{
 			name:         "env file for native binaries",
 			generated:    generateEnvFile(config),
-			stillEmitted: `export GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET="oauth-client-secret"`,
+			stillEmitted: `GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET="oauth-client-secret"`,
 		},
 		{
 			name:         "kubernetes manifests",

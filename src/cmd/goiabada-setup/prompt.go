@@ -114,20 +114,28 @@ type asker struct {
 	out *console
 }
 
+// text asks again for an answer no generated file could carry (checkWritable), which only input
+// that is not a terminal can hold: term.Terminal drops control keys and decodes what it reads.
 func (a asker) text(prompt, defaultValue string) (string, error) {
 	promptStr := prompt + ": "
 	if defaultValue != "" {
 		promptStr = prompt + " [" + defaultValue + "]: "
 	}
-	input, err := a.in.readLine(promptStr)
-	if err != nil {
-		return "", err
+	for {
+		input, err := a.in.readLine(promptStr)
+		if err != nil {
+			return "", err
+		}
+		if unwritable := checkWritable(input); unwritable != nil {
+			a.out.printf("This answer cannot be written to the configuration: %s. Please try again.\n", unwritable)
+			continue
+		}
+		input = strings.TrimSpace(input)
+		if input == "" {
+			return defaultValue, nil
+		}
+		return input, nil
 	}
-	input = strings.TrimSpace(input)
-	if input == "" {
-		return defaultValue, nil
-	}
-	return input, nil
 }
 
 func (a asker) choice(prompt string, validChoices []string, defaultValue string) (string, error) {
