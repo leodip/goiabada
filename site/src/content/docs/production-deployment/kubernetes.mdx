@@ -8,7 +8,7 @@ import { Aside, Steps } from '@astrojs/starlight/components';
 This guide covers deploying Goiabada to a Kubernetes cluster.
 
 <Aside type="tip" title="Flexibility">
-Kubernetes environments vary significantly. This guide presents **one tested recipe** using ingress-nginx and cert-manager, but you're free to use any ingress controller or TLS certificate solution that fits your infrastructure.
+Kubernetes environments vary significantly. This guide presents **one tested recipe** using Envoy Gateway and cert-manager, but you're free to use any Gateway API implementation or TLS certificate solution that fits your infrastructure.
 
 The key Goiabada-specific requirements are covered in the [What Goiabada needs](#what-goiabada-needs) section.
 </Aside>
@@ -23,7 +23,7 @@ Regardless of your Kubernetes setup, Goiabada requires:
 | **Two hostnames** | Separate domains/subdomains for auth server and admin console |
 | **Shared database** | MySQL, PostgreSQL, or SQL Server (SQLite not supported - pods need a shared database) |
 | **Empty database** | For fresh deployments, the database must be empty - Goiabada seeds it with OAuth clients configured for your specific URLs |
-| **Proxy headers** | The generated manifests set `TRUST_PROXY_HEADERS=true` for proper client IP detection behind an ingress |
+| **Proxy headers** | The generated manifests set `TRUST_PROXY_HEADERS=true` for proper client IP detection behind a gateway |
 
 <Aside type="caution" title="Database must be empty">
 Goiabada automatically seeds the database on first startup with an admin user and OAuth clients configured for your URLs. If you redeploy with different URLs against an existing database, authentication will fail because the OAuth client redirect URIs won't match.
@@ -49,7 +49,7 @@ The setup wizard generates:
 - **ConfigMap**: URLs, database connection details, app configuration
 - **Deployments**: Auth server and admin console with health checks and resource limits
 - **Services**: ClusterIP services for internal routing
-- **Ingress**: External access with TLS termination
+- **Gateway and HTTPRoutes**: External access with TLS termination
 
 ## Prerequisites
 
@@ -58,12 +58,12 @@ The setup wizard generates:
 - A database server (MySQL, PostgreSQL, or SQL Server) - can be in-cluster or external
 - Two domain names for auth server and admin console
 
-## Example setup: ingress-nginx + cert-manager
+## Example setup: Envoy Gateway + cert-manager
 
 This is the recipe we tested. Adapt as needed for your environment.
 
 <Aside type="caution" title="For clean clusters">
-This guide assumes a **fresh cluster** without existing ingress controllers or cert-manager installations.
+This guide assumes a **fresh cluster** without an existing Gateway API implementation or cert-manager installation.
 
 If your cluster already has these components:
 - **Skip the installation steps** for components you already have
@@ -73,41 +73,73 @@ If your cluster already has these components:
 When in doubt, consult your cluster administrator before proceeding.
 </Aside>
 
-### Step 1: Install ingress-nginx
+### Step 1: Install Envoy Gateway
 
-The install command below modifies `externalTrafficPolicy` from `Local` to `Cluster` for better compatibility with cloud LoadBalancers.
-
-<Aside type="note" title="Why Cluster mode?">
-The default `Local` policy can cause connection timeouts on some cloud providers due to traffic being dropped on nodes without ingress pods. `Cluster` mode routes traffic through kube-proxy, which works reliably everywhere.
-
-**Trade-off:** With `Cluster`, the pod sees the node IP instead of the client IP. However, Goiabada uses `TRUST_PROXY_HEADERS=true`, so it reads the real client IP from the `X-Forwarded-For` header that ingress-nginx sets.
-
-If you need true client IP preservation at the network level (e.g., for IP allowlisting at the LoadBalancer), consider running ingress-nginx as a DaemonSet with `Local` policy, or enable Proxy Protocol if your cloud supports it.
-</Aside>
+Envoy Gateway's install brings the Gateway API CRDs:
 
 ```bash
-curl -s https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.14.0/deploy/static/provider/cloud/deploy.yaml \
-  | sed 's/externalTrafficPolicy: Local/externalTrafficPolicy: Cluster/' \
-  | kubectl apply -f -
+kubectl apply --server-side -f https://github.com/envoyproxy/gateway/releases/download/v1.9.1/install.yaml
 ```
 
 <Aside type="note">
-Check the [ingress-nginx releases](https://github.com/kubernetes/ingress-nginx/releases) for the latest version.
+Check the [Envoy Gateway releases](https://github.com/envoyproxy/gateway/releases) for the latest version.
 </Aside>
 
 Wait for it to be ready:
 
 ```bash
-kubectl wait --namespace ingress-nginx \
-  --for=condition=ready pod \
-  --selector=app.kubernetes.io/component=controller \
-  --timeout=120s
+kubectl wait --timeout=5m -n envoy-gateway-system \
+  deployment/envoy-gateway --for=condition=Available
+```
+
+Then create the `eg` GatewayClass the generated manifest names. Its EnvoyProxy changes `externalTrafficPolicy` from `Local`, the default, to `Cluster` for better compatibility with cloud LoadBalancers. Save as `gatewayclass.yaml`:
+
+```yaml
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: EnvoyProxy
+metadata:
+  name: goiabada-proxy
+  namespace: envoy-gateway-system
+spec:
+  provider:
+    type: Kubernetes
+    kubernetes:
+      envoyService:
+        externalTrafficPolicy: Cluster
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: eg
+spec:
+  controllerName: gateway.envoyproxy.io/gatewayclass-controller
+  parametersRef:
+    group: gateway.envoyproxy.io
+    kind: EnvoyProxy
+    name: goiabada-proxy
+    namespace: envoy-gateway-system
+```
+
+<Aside type="note" title="Why Cluster mode?">
+The default `Local` policy can cause connection timeouts on some cloud providers due to traffic being dropped on nodes without Envoy pods. `Cluster` mode routes traffic through kube-proxy, which works reliably everywhere.
+
+**Trade-off:** With `Cluster`, Envoy sees a node IP instead of the client IP, and that node IP is what Goiabada reads from the `X-Forwarded-For` header Envoy sets (`TRUST_PROXY_HEADERS=true`), so its rate limiting and session records see it too.
+
+If you need the client IP preserved (e.g., for per-client rate limiting, or IP allowlisting at the LoadBalancer), consider running Envoy as a DaemonSet (`envoyDaemonSet` in the EnvoyProxy) with `Local` policy, or enable Proxy Protocol if your cloud supports it.
+</Aside>
+
+```bash
+kubectl apply -f gatewayclass.yaml
 ```
 
 ### Step 2: Install cert-manager
 
+Install it after Envoy Gateway and turn on its Gateway API support:
+
 ```bash
-kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.19.1/cert-manager.yaml
+kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.21.2/cert-manager.yaml
+kubectl -n cert-manager patch deployment cert-manager --type=json \
+  -p='[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--enable-gateway-api"}]'
 ```
 
 <Aside type="note">
@@ -117,10 +149,9 @@ Check the [cert-manager releases](https://github.com/cert-manager/cert-manager/r
 Wait for it to be ready:
 
 ```bash
-kubectl wait --namespace cert-manager \
-  --for=condition=ready pod \
-  --selector=app.kubernetes.io/instance=cert-manager \
-  --timeout=120s
+kubectl -n cert-manager rollout status deployment/cert-manager --timeout=5m
+kubectl -n cert-manager rollout status deployment/cert-manager-webhook --timeout=5m
+kubectl -n cert-manager rollout status deployment/cert-manager-cainjector --timeout=5m
 ```
 
 ### Step 3: Create ClusterIssuer for Let's Encrypt
@@ -140,8 +171,11 @@ spec:
       name: letsencrypt-prod
     solvers:
     - http01:
-        ingress:
-          class: nginx
+        gatewayHTTPRoute:
+          parentRefs:
+          - name: goiabada
+            namespace: goiabada  # Your Kubernetes namespace
+            kind: Gateway
 ```
 
 Apply it:
@@ -200,10 +234,10 @@ kubectl apply -f goiabada-k8s.yaml
 
 ### Step 6: Configure DNS
 
-After deploying, get the LoadBalancer IP:
+After deploying, get the Gateway's address:
 
 ```bash
-kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
+kubectl get gateway goiabada -n goiabada -o jsonpath='{.status.addresses[0].value}'
 ```
 
 Create DNS A records pointing to this IP:
@@ -223,8 +257,8 @@ DNS propagation can take a few minutes. Verify with `nslookup auth.example.com`
 # Check pods
 kubectl get pods -n goiabada
 
-# Check Ingress status (should show ADDRESS)
-kubectl get ingress -n goiabada
+# Check the Gateway (should show ADDRESS and PROGRAMMED=True) and its routes
+kubectl get gateway,httproute -n goiabada
 
 # Check certificates (should show READY=True after DNS propagates)
 kubectl get certificates -n goiabada
@@ -252,19 +286,18 @@ kubectl describe challenges -n goiabada
 
 | Problem | Solution |
 |---------|----------|
-| DNS not resolving | Verify DNS A records point to ingress-nginx LoadBalancer IP |
+| DNS not resolving | Verify DNS A records point to the Gateway's address |
 | Port 80 not accessible | Check firewall rules; ACME HTTP-01 needs port 80 |
 | Challenge timeout | See "Connectivity Issues" below |
 
 ### Connectivity issues (port 80 not responding)
 
-Some cloud providers have issues with `externalTrafficPolicy: Local` on LoadBalancer services. The install command in Step 1 changes this to `Cluster` to avoid the issue.
+Some cloud providers have issues with `externalTrafficPolicy: Local` on LoadBalancer services. The EnvoyProxy in Step 1 changes this to `Cluster` to avoid the issue.
 
-If you installed ingress-nginx without the `sed` modification, patch it:
+If your `eg` GatewayClass has no `parametersRef` to that EnvoyProxy, apply Step 1's file:
 
 ```bash
-kubectl patch svc ingress-nginx-controller -n ingress-nginx \
-  -p '{"spec":{"externalTrafficPolicy":"Cluster"}}'
+kubectl apply -f gatewayclass.yaml
 ```
 
 Then delete any failed certificate challenges to trigger a retry:

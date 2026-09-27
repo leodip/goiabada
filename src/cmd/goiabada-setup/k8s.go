@@ -238,66 +238,100 @@ func generateKubernetesManifests(config *Config) string {
 	sb.WriteString("    targetPort: 9091\n")
 	sb.WriteString("\n")
 
-	// Ingress resources
+	// Routing is Gateway API rather than Ingress: the one controller the Ingresses were written
+	// for, ingress-nginx, is retired and gets no more security fixes, and SIG Network points its
+	// users at Gateway API (kubernetes.io blog, 2025-11-11). Nothing below names an
+	// implementation except gatewayClassName, which the completion message has the operator
+	// create for Envoy Gateway (#430).
 	authHost := hostOf(config.AuthServerURL)
 	adminHost := hostOf(config.AdminConsoleURL)
 
-	// Ingress for auth server
+	// The Gateway: plain HTTP for the redirect and for cert-manager's HTTP-01 challenges, and one
+	// HTTPS listener per host. cert-manager reads the annotation and issues each listener's
+	// certificateRefs for its hostname (cert-manager docs, usage/gateway.md).
 	sb.WriteString("---\n")
-	sb.WriteString("apiVersion: networking.k8s.io/v1\n")
-	sb.WriteString("kind: Ingress\n")
+	sb.WriteString("apiVersion: gateway.networking.k8s.io/v1\n")
+	sb.WriteString("kind: Gateway\n")
 	sb.WriteString("metadata:\n")
-	sb.WriteString("  name: goiabada-authserver\n")
+	sb.WriteString("  name: goiabada\n")
 	fmt.Fprintf(&sb, "  namespace: %s\n", yamlQuote(ns))
 	sb.WriteString("  annotations:\n")
 	sb.WriteString("    cert-manager.io/cluster-issuer: \"letsencrypt-prod\"\n")
 	sb.WriteString("spec:\n")
-	sb.WriteString("  ingressClassName: nginx\n")
-	sb.WriteString("  tls:\n")
-	sb.WriteString("  - hosts:\n")
-	fmt.Fprintf(&sb, "    - %s\n", yamlQuote(authHost))
-	sb.WriteString("    secretName: goiabada-tls-auth\n")
-	sb.WriteString("  rules:\n")
-	fmt.Fprintf(&sb, "  - host: %s\n", yamlQuote(authHost))
-	sb.WriteString("    http:\n")
-	sb.WriteString("      paths:\n")
-	sb.WriteString("      - path: /\n")
-	sb.WriteString("        pathType: Prefix\n")
-	sb.WriteString("        backend:\n")
-	sb.WriteString("          service:\n")
-	sb.WriteString("            name: goiabada-authserver\n")
-	sb.WriteString("            port:\n")
-	sb.WriteString("              number: 9090\n")
+	sb.WriteString("  gatewayClassName: eg\n")
+	sb.WriteString("  listeners:\n")
+	sb.WriteString("  - name: http\n")
+	sb.WriteString("    protocol: HTTP\n")
+	sb.WriteString("    port: 80\n")
+	writeHTTPSListener(&sb, "auth-https", authHost, "goiabada-tls-auth")
+	writeHTTPSListener(&sb, "admin-https", adminHost, "goiabada-tls-admin")
 	sb.WriteString("\n")
 
-	// Ingress for admin console
+	writeHTTPRoute(&sb, ns, "goiabada-authserver", "auth-https", authHost, 9090)
+	sb.WriteString("\n")
+	writeHTTPRoute(&sb, ns, "goiabada-adminconsole", "admin-https", adminHost, 9091)
+	sb.WriteString("\n")
+
+	// Plain HTTP on either host is sent to HTTPS, which ingress-nginx did by default for a host
+	// with TLS. No port is written: with a scheme and no port "the redirect port MUST be the
+	// well-known port associated with the redirect scheme", 443 for https
+	// (HTTPRequestRedirectFilter.Port, Gateway API v1.6.1 apis/v1/httproute_types.go). An explicit
+	// 443 changes nothing on Envoy Gateway v1.9.1, which renders either as Envoy's scheme redirect
+	// alone: that drops a Host's :80 and keeps any other port it names (#430).
 	sb.WriteString("---\n")
-	sb.WriteString("apiVersion: networking.k8s.io/v1\n")
-	sb.WriteString("kind: Ingress\n")
+	sb.WriteString("apiVersion: gateway.networking.k8s.io/v1\n")
+	sb.WriteString("kind: HTTPRoute\n")
 	sb.WriteString("metadata:\n")
-	sb.WriteString("  name: goiabada-adminconsole\n")
+	sb.WriteString("  name: goiabada-https-redirect\n")
 	fmt.Fprintf(&sb, "  namespace: %s\n", yamlQuote(ns))
-	sb.WriteString("  annotations:\n")
-	sb.WriteString("    cert-manager.io/cluster-issuer: \"letsencrypt-prod\"\n")
 	sb.WriteString("spec:\n")
-	sb.WriteString("  ingressClassName: nginx\n")
-	sb.WriteString("  tls:\n")
-	sb.WriteString("  - hosts:\n")
-	fmt.Fprintf(&sb, "    - %s\n", yamlQuote(adminHost))
-	sb.WriteString("    secretName: goiabada-tls-admin\n")
+	sb.WriteString("  parentRefs:\n")
+	sb.WriteString("  - name: goiabada\n")
+	sb.WriteString("    sectionName: http\n")
+	sb.WriteString("  hostnames:\n")
+	fmt.Fprintf(&sb, "  - %s\n", yamlQuote(authHost))
+	fmt.Fprintf(&sb, "  - %s\n", yamlQuote(adminHost))
 	sb.WriteString("  rules:\n")
-	fmt.Fprintf(&sb, "  - host: %s\n", yamlQuote(adminHost))
-	sb.WriteString("    http:\n")
-	sb.WriteString("      paths:\n")
-	sb.WriteString("      - path: /\n")
-	sb.WriteString("        pathType: Prefix\n")
-	sb.WriteString("        backend:\n")
-	sb.WriteString("          service:\n")
-	sb.WriteString("            name: goiabada-adminconsole\n")
-	sb.WriteString("            port:\n")
-	sb.WriteString("              number: 9091\n")
+	sb.WriteString("  - filters:\n")
+	sb.WriteString("    - type: RequestRedirect\n")
+	sb.WriteString("      requestRedirect:\n")
+	sb.WriteString("        scheme: https\n")
+	sb.WriteString("        statusCode: 301\n")
 
 	return sb.String()
+}
+
+// writeHTTPSListener writes one HTTPS listener of the Gateway, terminating TLS for host with the
+// certificate cert-manager keeps in the Secret certificate.
+func writeHTTPSListener(sb *strings.Builder, name, host, certificate string) {
+	fmt.Fprintf(sb, "  - name: %s\n", name)
+	sb.WriteString("    protocol: HTTPS\n")
+	sb.WriteString("    port: 443\n")
+	fmt.Fprintf(sb, "    hostname: %s\n", yamlQuote(host))
+	sb.WriteString("    tls:\n")
+	sb.WriteString("      mode: Terminate\n")
+	sb.WriteString("      certificateRefs:\n")
+	fmt.Fprintf(sb, "      - name: %s\n", certificate)
+}
+
+// writeHTTPRoute writes the HTTPRoute sending host, on the Gateway's listener, to service's port.
+func writeHTTPRoute(sb *strings.Builder, ns, service, listener, host string, port int) {
+	sb.WriteString("---\n")
+	sb.WriteString("apiVersion: gateway.networking.k8s.io/v1\n")
+	sb.WriteString("kind: HTTPRoute\n")
+	sb.WriteString("metadata:\n")
+	fmt.Fprintf(sb, "  name: %s\n", service)
+	fmt.Fprintf(sb, "  namespace: %s\n", yamlQuote(ns))
+	sb.WriteString("spec:\n")
+	sb.WriteString("  parentRefs:\n")
+	sb.WriteString("  - name: goiabada\n")
+	fmt.Fprintf(sb, "    sectionName: %s\n", listener)
+	sb.WriteString("  hostnames:\n")
+	fmt.Fprintf(sb, "  - %s\n", yamlQuote(host))
+	sb.WriteString("  rules:\n")
+	sb.WriteString("  - backendRefs:\n")
+	fmt.Fprintf(sb, "    - name: %s\n", service)
+	fmt.Fprintf(sb, "      port: %d\n", port)
 }
 
 func base64Encode(s string) string {
