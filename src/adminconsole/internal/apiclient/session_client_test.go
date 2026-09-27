@@ -13,8 +13,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leodip/goiabada/adminconsole/internal/boundedread"
 	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/core/boundedread"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"

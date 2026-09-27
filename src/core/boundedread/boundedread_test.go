@@ -11,8 +11,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// The rule itself, owned once. The six sites that read through Read each own their own accepted
-// and refused pair against their own ceiling; what is here is that the boundary is where it says
+// The rule itself, owned once. The sites that read through Read each own their own accepted and
+// refused pair against their own ceiling; what is here is that the boundary is where it says
 // it is, that the overrun hands nothing back, and that a read which fails partway is a different
 // outcome from an overrun (#386 decision 4).
 

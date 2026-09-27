@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/leodip/goiabada/adminconsole/internal/boundedread"
 	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/core/boundedread"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/sessionstore"
 )

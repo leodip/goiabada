@@ -23,6 +23,7 @@ repository root. It is enforced rather than descriptive: see **Architecture guar
 
 ### Core (`src/core/`)
 - `api/` - The admin API wire contract: request and response DTOs, declarations only, importing no persistence model. The model-to-DTO mapping belongs to the auth server, in `internal/apimapping` (#350)
+- `boundedread/` - The one rule for a capped response body: read one byte past the cap and refuse the overrun rather than decode a prefix. Eight callers: the admin console's seven reads from the auth server and the countries generator's download (#386, #432)
 - `cmd/` - `ownershipdump`, which regenerates `OWNERSHIP.md`'s table from the reference graph. It reads nothing but the source tree, so unlike `schemadump` it needs no container, and it refuses to invent a justification rather than fill the one cell a human owes (#385)
 - `constants/` - Permission identifiers, the version stamp, and the one session name both processes
   must agree on. No context key and no other session key: each process declares its own in
@@ -69,7 +70,6 @@ repository root. It is enforced rather than descriptive: see **Architecture guar
 ### Admin Console (`src/adminconsole/`)
 - `internal/handlers/` - Admin UI handlers
 - `internal/apiclient/` - The composition-only `ApiClient` interface and the one deadlined, bounded executor behind all 106 methods. No handler takes the whole interface; each declares an unexported port beside the function taking it (#386)
-- `internal/boundedread/` - The one rule for a capped response body: read one byte past the cap and refuse the overrun rather than decode a prefix. Seven callers (#386)
 - `web/template/` - Admin UI templates
 
 ## Database Pattern

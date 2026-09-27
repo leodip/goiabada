@@ -10,7 +10,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/leodip/goiabada/adminconsole/internal/boundedread"
+	"github.com/leodip/goiabada/core/boundedread"
 	"github.com/leodip/goiabada/core/errs"
 )
 

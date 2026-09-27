@@ -33,6 +33,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/leodip/goiabada/core/boundedread"
 	"github.com/leodip/goiabada/core/errs"
 )
 
@@ -43,8 +44,9 @@ const (
 	// rawURLFmt is the immutable per-commit raw CSV URL (%s = commit SHA).
 	rawURLFmt = "https://raw.githubusercontent.com/datasets/country-codes/%s/data/country-codes.csv"
 
-	// Size caps: read limit+1 and fail if exceeded (io.LimitReader alone
-	// truncates silently). The CSV is ~130 KiB; the commit JSON is small.
+	// Size caps: every download is read through boundedread.Read, which
+	// refuses an overrun rather than truncating it. The CSV is ~130 KiB; the
+	// commit JSON is small.
 	csvSizeLimit = int64(8 << 20) // 8 MiB
 	apiSizeLimit = int64(4 << 20) // 4 MiB
 
@@ -207,19 +209,7 @@ func doGet(doer httpDoer, url string, limit int64) ([]byte, error) {
 	if resp.StatusCode != http.StatusOK {
 		return nil, errs.Errorf("GET %s: unexpected status %d", url, resp.StatusCode)
 	}
-	return readCapped(resp.Body, limit)
-}
-
-// readCapped reads at most limit bytes, failing if the source has more.
-func readCapped(r io.Reader, limit int64) ([]byte, error) {
-	b, err := io.ReadAll(io.LimitReader(r, limit+1))
-	if err != nil {
-		return nil, err
-	}
-	if int64(len(b)) > limit {
-		return nil, errs.Errorf("response exceeds %d-byte limit", limit)
-	}
-	return b, nil
+	return boundedread.Read(resp.Body, limit)
 }
 
 // parseCSV parses the raw CSV into countries, locating columns by header name

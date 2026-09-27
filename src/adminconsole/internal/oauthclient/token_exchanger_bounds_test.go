@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leodip/goiabada/adminconsole/internal/boundedread"
+	"github.com/leodip/goiabada/core/boundedread"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
