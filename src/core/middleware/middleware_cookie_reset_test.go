@@ -74,7 +74,7 @@ func TestMiddlewareCookieReset_StaleCookies(t *testing.T) {
 
 	newStore := func(secure bool) *sessionstore.ServerSideStore {
 		store, err := sessionstore.NewServerSideStore(
-			newNoRowsBackend(), "SessionIdentifier", secure,
+			newNoRowsBackend(), "SessionIdentifier", secure, sessionstore.BrowserSessionCookie,
 			sessionstore.KeyPair{
 				AuthenticationKey: []byte("12345678901234567890123456789012"),
 				EncryptionKey:     []byte("abcdefghijklmnopqrstuvwxyz123456"),

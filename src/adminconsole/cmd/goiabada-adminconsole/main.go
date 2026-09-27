@@ -170,9 +170,8 @@ func main() {
 		adminConsoleConfig.OAuthClientSecret,
 	)
 
-	sessionStore, err := sessionstore.NewServerSideStore(
+	sessionStore, err := newSessionStore(
 		apiclient.NewSessionBackend(config.GetAuthServer().GetEffectiveBaseURL(), tokenSource),
-		constants.SessionKeyJwt,
 		config.GetAdminConsole().IsCookieSecure(),
 		currentKeys,
 		previousKeys,
@@ -181,18 +180,6 @@ func main() {
 		slog.Error("unable to initialize the session store", "error", err)
 		os.Exit(1)
 	}
-
-	// PersistentCookie is left false, which is the half of the split the auth server does
-	// not take: its cookie carries an expiry so single sign-on survives a browser restart,
-	// and this one carries none so the browser drops it when it closes. An administrator
-	// pays one extra sign-in after a browser restart, and in exchange the handle to the
-	// deployment's most privileged session is not left sitting on the disk of a machine
-	// that can be stolen. Browser session restore can still bring such a cookie back, so
-	// this is real protection rather than a guarantee (#266).
-	//
-	// It also retires a defect: the store this replaces set a one year cookie expiry with
-	// no resolver, so a machine held a handle for a year for contents that stopped working
-	// in minutes.
 
 	slog.Info("initialized server-side session store")
 
@@ -254,4 +241,24 @@ func logBootstrapCredentialsNotConfigured() {
 			"GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY",
 			"GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY",
 		})
+}
+
+// newSessionStore builds the admin console's browser session store over backend.
+//
+// Its cookie carries no expiry, which is the half of the split the auth server does not take:
+// that cookie carries one so single sign-on survives a browser restart, and this one carries
+// none so the browser drops it when it closes. An administrator pays one extra sign-in after a
+// browser restart, and in exchange the handle to the deployment's most privileged session is
+// not left sitting on the disk of a machine that can be stolen. Browser session restore can
+// still bring such a cookie back, so this is real protection rather than a guarantee (#266).
+// It also retired a defect: the store this replaced set a one year cookie expiry with no
+// resolver, so a machine held a handle for a year for contents that stopped working in
+// minutes.
+//
+// A function of its own so the choice is pinned where it is made: the store's tests pin what
+// each lifetime writes, and this package's pin which one this binary passes (#431).
+func newSessionStore(backend sessionstore.Backend, secure bool,
+	current sessionstore.KeyPair, previous *sessionstore.KeyPair) (*sessionstore.ServerSideStore, error) {
+	return sessionstore.NewServerSideStore(backend, constants.SessionKeyJwt, secure,
+		sessionstore.BrowserSessionCookie, current, previous)
 }

@@ -184,9 +184,9 @@ func newSealer(pair KeyPair) (*sealer, error) {
 // be, and the stored blob crosses the session endpoint as a JSON string and lands in a
 // text column on all four engines, so raw ciphertext would not survive PostgreSQL or SQL
 // Server. Base64 once, not twice, which is what the codec this replaces did (#270).
-func seal(aead cipher.AEAD, name string, plaintext []byte) (string, error) {
+func seal(random io.Reader, aead cipher.AEAD, name string, plaintext []byte) (string, error) {
 	nonce := make([]byte, nonceBytes)
-	if _, err := io.ReadFull(randReader, nonce); err != nil {
+	if _, err := io.ReadFull(random, nonce); err != nil {
 		return "", errs.Wrap(err, "unable to read from the random number generator")
 	}
 

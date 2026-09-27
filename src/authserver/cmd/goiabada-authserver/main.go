@@ -226,9 +226,8 @@ func main() {
 	//
 	// The backend is scoped to this application's own rows at construction, so no code
 	// path here can name an admin console session however it is composed.
-	sessionStore, err := sessionstore.NewServerSideStore(
+	sessionStore, err := newSessionStore(
 		sessionbackend.NewAuthServerBackend(database),
-		constants.SessionKeySessionIdentifier,
 		config.GetAuthServer().IsCookieSecure(),
 		currentKeys,
 		previousKeys,
@@ -237,13 +236,6 @@ func main() {
 		slog.Error("unable to initialize the session store", "error", err)
 		os.Exit(1)
 	}
-
-	// The end user's cookie keeps an expiry, so single sign-on survives a browser
-	// restart. It is set per save from the row's own expires_at, which the operator's
-	// session settings decide, so one knob governs both halves and the browser never
-	// holds a handle that outlives what it names. The admin console does the opposite
-	// for the opposite reason, and the trade is argued in full in the issue (#266).
-	sessionStore.PersistentCookie = true
 
 	slog.Info("initialized server-side session store")
 
@@ -283,4 +275,19 @@ func dispatch(args []string) (migrateArgs []string, isMigrate bool, err error) {
 		"command to start the server, or goiabada-authserver [flags] migrate version, or "+
 		"goiabada-authserver [flags] migrate to <version>, to manage the schema; the server's "+
 		"flags go before the command", args[0])
+}
+
+// newSessionStore builds the auth server's browser session store over backend.
+//
+// The end user's cookie keeps an expiry, so single sign-on survives a browser restart. It is
+// set per save from the row's own expires_at, which the operator's session settings decide,
+// so one knob governs both halves and the browser never holds a handle that outlives what it
+// names. The admin console does the opposite for the opposite reason, and the trade is argued
+// in full in #266. A function of its own so the choice is pinned where it is made: the store's
+// tests pin what each lifetime writes, and this package's pin which one this binary passes
+// (#431).
+func newSessionStore(backend sessionstore.Backend, secure bool,
+	current sessionstore.KeyPair, previous *sessionstore.KeyPair) (*sessionstore.ServerSideStore, error) {
+	return sessionstore.NewServerSideStore(backend, constants.SessionKeySessionIdentifier, secure,
+		sessionstore.PersistentCookie, current, previous)
 }

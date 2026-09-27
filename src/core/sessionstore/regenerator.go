@@ -41,7 +41,7 @@ func (s *ServerSideStore) Regenerate(w http.ResponseWriter, r *http.Request, ses
 		return err
 	}
 
-	newId, err := newSessionId()
+	newId, err := s.newSessionId()
 	if err != nil {
 		return err
 	}
@@ -49,13 +49,13 @@ func (s *ServerSideStore) Regenerate(w http.ResponseWriter, r *http.Request, ses
 	ctx := requestContext(r)
 	authenticated := s.isAuthenticated(session)
 
-	expiresAt, err := s.Backend.Create(ctx, newId, []byte(encoded), authenticated)
+	expiresAt, err := s.backend.Create(ctx, newId, []byte(encoded), authenticated)
 	if err != nil {
 		return errs.Wrap(err, "unable to create the rotated browser session")
 	}
 
 	if oldId := session.ID; oldId != "" {
-		if err := s.Backend.Delete(ctx, oldId); err != nil {
+		if err := s.backend.Delete(ctx, oldId); err != nil {
 			return errs.Wrap(err, "unable to delete the browser session being rotated away")
 		}
 	}

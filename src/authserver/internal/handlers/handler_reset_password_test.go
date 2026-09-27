@@ -334,6 +334,7 @@ func newMarkerTestStore() *sessionstore.ServerSideStore {
 		sessiontest.NewMemoryBackend(),
 		constants.SessionKeySessionIdentifier,
 		false,
+		sessionstore.PersistentCookie,
 		sessionstore.KeyPair{
 			AuthenticationKey: []byte("12345678901234567890123456789012"),
 			EncryptionKey:     []byte("abcdefghijklmnopqrstuvwxyz123456"),
