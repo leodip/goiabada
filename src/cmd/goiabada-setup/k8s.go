@@ -239,8 +239,8 @@ func generateKubernetesManifests(config *Config) string {
 	sb.WriteString("\n")
 
 	// Ingress resources
-	authHost := strings.TrimPrefix(strings.TrimPrefix(config.AuthServerURL, "https://"), "http://")
-	adminHost := strings.TrimPrefix(strings.TrimPrefix(config.AdminConsoleURL, "https://"), "http://")
+	authHost := hostOf(config.AuthServerURL)
+	adminHost := hostOf(config.AdminConsoleURL)
 
 	// Ingress for auth server
 	sb.WriteString("---\n")

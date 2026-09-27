@@ -421,12 +421,238 @@ func TestWizard_NonInteractiveGeneratesWhatWasNotGiven(t *testing.T) {
 	if c.AdminConsoleURL != "https://admin.example.org" || c.AdminEmail != "admin@example.org" {
 		t.Errorf("defaults are %q and %q", c.AdminConsoleURL, c.AdminEmail)
 	}
-	if len(c.AdminPassword) != 16 || len(c.DBPassword) != 16 {
-		t.Errorf("generated passwords %q and %q, want 16 characters each", c.AdminPassword, c.DBPassword)
+	for _, password := range []string{c.AdminPassword, c.DBPassword} {
+		if len(password) != 16 || !hasThreeClasses(password) {
+			t.Errorf("generated password %q, want 16 characters of three classes", password)
+		}
 	}
 	for _, line := range []string{"Generated admin password: " + c.AdminPassword, "Generated database password: " + c.DBPassword} {
 		if !strings.Contains(out.String(), line) {
 			t.Errorf("output lacks %q", line)
+		}
+	}
+	// The wizard warned "Weak password: no special character" about the password it had just
+	// generated (#430).
+	if strings.Contains(out.String(), "Weak password") {
+		t.Errorf("a generated password is judged:\n%s", out)
+	}
+	if len(c.OAuthClientSecret) != 60 {
+		t.Errorf("client secret %q, want 60 characters", c.OAuthClientSecret)
+	}
+}
+
+// Every password the wizard generates, in either mode, is one SQL Server accepts as its SA
+// password, where one generated SQL Server deployment in 17 failed to start (#430).
+func TestWizard_EveryGeneratedPasswordHoldsThreeClasses(t *testing.T) {
+	d, e := deployments[deploymentLocal], testEngine("mssql")
+	steps := interactiveScript(d, e)
+	for i := range steps {
+		if strings.HasPrefix(steps[i].prompt, "Database password [") {
+			steps[i].answer = "" // take the generated default
+		}
+	}
+	w, in, out, _ := testWizard(t, &CLIFlags{}, steps)
+	if err := w.setup(); err != nil {
+		t.Fatalf("setup: %v\n%s", err, out)
+	}
+	in.assertConsumed()
+	if password := w.config.DBPassword; len(password) != 16 || !hasThreeClasses(password) {
+		t.Errorf("interactive default database password %q, want 16 characters of three classes", password)
+	}
+
+	for _, flags := range []CLIFlags{
+		{DeploymentType: "local", DBType: "mssql"},
+		{DeploymentType: "production", DBType: "mssql", AuthServerURL: "https://auth.example.org"},
+		{DeploymentType: "kubernetes", DBType: "mssql", AuthServerURL: "https://auth.example.org", DBHost: "sql.internal", SkipDBTest: true},
+	} {
+		w, _, out, _ := testWizard(t, &flags, nil)
+		if err := w.setup(); err != nil {
+			t.Fatalf("%s: setup: %v\n%s", flags.DeploymentType, err, out)
+		}
+		for _, password := range []string{w.config.AdminPassword, w.config.DBPassword} {
+			if len(password) != 16 || !hasThreeClasses(password) {
+				t.Errorf("%s: generated password %q, want 16 characters of three classes", flags.DeploymentType, password)
+			}
+		}
+	}
+}
+
+// A password the operator gave is still judged: the warning moved off generated passwords only.
+func TestWizard_AChosenAdminPasswordIsJudged(t *testing.T) {
+	w, _, out, _ := testWizard(t, &CLIFlags{DeploymentType: "local", DBType: "sqlite", AdminPassword: "weakpass"}, nil)
+	if err := w.setup(); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), "Weak password: no uppercase letter, no digit, no special character") {
+		t.Errorf("a weak chosen password is not warned about:\n%s", out)
+	}
+	if w.config.AdminPassword != "weakpass" {
+		t.Errorf("admin password %q, want the one given", w.config.AdminPassword)
+	}
+}
+
+// Without --admin-url and --admin-email the defaults follow the sibling rule, which the mismatch
+// warning agrees with: only a URL outside the auth server's parent warns (#430).
+func TestWizard_NonInteractiveDefaultsFollowTheSiblingRule(t *testing.T) {
+	cases := []struct {
+		auth, admin, email string
+		wantAdmin          string
+		wantEmail          string
+		warning            string
+	}{
+		{auth: "https://auth.example.co.uk", wantAdmin: "https://admin.example.co.uk", wantEmail: "admin@example.co.uk"},
+		{auth: "https://auth.eu.acme.com", wantAdmin: "https://admin.eu.acme.com", wantEmail: "admin@eu.acme.com"},
+		{auth: "https://example.com", wantAdmin: "https://admin.example.com", wantEmail: "admin@example.com"},
+		{auth: "https://auth.example.com:8443/base/", wantAdmin: "https://admin.example.com", wantEmail: "admin@example.com"},
+		{auth: "https://auth.acme.io", admin: "https://console.acme.io", wantAdmin: "https://console.acme.io", wantEmail: "admin@acme.io"},
+		{auth: "https://auth.example.co.uk", admin: "https://admin.other.co.uk", wantAdmin: "https://admin.other.co.uk", wantEmail: "admin@example.co.uk",
+			warning: "Domain mismatch: auth=example.co.uk, admin=other.co.uk"},
+		{auth: "https://10.0.0.5", admin: "https://10.0.0.5:8443", email: "ops@example.org", wantAdmin: "https://10.0.0.5:8443", wantEmail: "ops@example.org"},
+		{auth: "https://10.0.0.5", admin: "https://10.0.0.6", email: "ops@example.org", wantAdmin: "https://10.0.0.6", wantEmail: "ops@example.org",
+			warning: "Domain mismatch: auth=10.0.0.5, admin=10.0.0.6"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.auth+" "+tc.admin, func(t *testing.T) {
+			flags := CLIFlags{DeploymentType: "native", DBType: "sqlite", AuthServerURL: tc.auth, AdminConsoleURL: tc.admin, AdminEmail: tc.email}
+			w, _, out, _ := testWizard(t, &flags, nil)
+			if err := w.setup(); err != nil {
+				t.Fatalf("setup: %v\n%s", err, out)
+			}
+			if c := w.config; c.AdminConsoleURL != tc.wantAdmin || c.AdminEmail != tc.wantEmail {
+				t.Errorf("admin URL and email %q, %q; want %q, %q", c.AdminConsoleURL, c.AdminEmail, tc.wantAdmin, tc.wantEmail)
+			}
+			warned := strings.Contains(out.String(), "Domain mismatch")
+			if tc.warning == "" && warned || tc.warning != "" && !strings.Contains(out.String(), tc.warning) {
+				t.Errorf("want warning %q, output:\n%s", tc.warning, out)
+			}
+		})
+	}
+}
+
+// A host Kubernetes can route and certify is only checked for Kubernetes: the other types take an
+// uppercase host, an IP address and one host for both URLs as they did.
+func TestWizard_OnlyKubernetesHoldsTheHostsToTheListenerRule(t *testing.T) {
+	for _, urls := range [][2]string{
+		{"https://Auth.example.org", "https://Admin.example.org"},
+		{"https://auth.example.org", "https://auth.example.org/admin"},
+		{"https://10.0.0.5", "https://10.0.0.5:8443"},
+	} {
+		flags := CLIFlags{DeploymentType: "native", DBType: "sqlite", AuthServerURL: urls[0], AdminConsoleURL: urls[1], AdminEmail: "ops@example.org"}
+		w, _, out, _ := testWizard(t, &flags, nil)
+		if err := w.setup(); err != nil {
+			t.Errorf("native with %v: setup: %v\n%s", urls, err, out)
+		}
+	}
+}
+
+// replaceURLSteps swaps the two URL reads of an interactive script for the ones given.
+func replaceURLSteps(t *testing.T, steps []scriptedStep, urlSteps ...scriptedStep) []scriptedStep {
+	t.Helper()
+	if !strings.HasPrefix(steps[2].prompt, "Auth server URL") || !strings.HasPrefix(steps[3].prompt, "Admin console URL") {
+		t.Fatalf("the script's URL reads are not its third and fourth: %q, %q", steps[2].prompt, steps[3].prompt)
+	}
+	return slices.Concat(steps[:2], urlSteps, steps[4:])
+}
+
+// An auth host with no parent offers no admin console URL and no admin email, so an empty answer
+// is asked again rather than taken (#430).
+func TestWizard_InteractiveOffersNoDefaultWithoutAParent(t *testing.T) {
+	d, e := deployments[deploymentProduction], testEngine("sqlite")
+	steps := replaceURLSteps(t, interactiveScript(d, e),
+		scriptedStep{prompt: "Auth server URL (e.g., https://auth.example.com) [https://auth.example.com]: ", answer: "https://10.0.0.5"},
+		scriptedStep{prompt: "Admin console URL (e.g., https://admin.example.com): ", answer: ""},
+		scriptedStep{prompt: "Admin console URL (e.g., https://admin.example.com): ", answer: "https://10.0.0.5:8443"},
+	)
+	for i := range steps {
+		if strings.HasPrefix(steps[i].prompt, "Admin email") {
+			steps = slices.Insert(steps, i, scriptedStep{prompt: "Admin email: ", answer: ""})
+			steps[i+1] = scriptedStep{prompt: "Admin email: ", answer: "ops@example.org"}
+			break
+		}
+	}
+	w, in, out, _ := testWizard(t, &CLIFlags{}, steps)
+	if err := w.setup(); err != nil {
+		t.Fatalf("setup: %v\n%s", err, out)
+	}
+	in.assertConsumed()
+	c := w.config
+	if c.AuthServerURL != "https://10.0.0.5" || c.AdminConsoleURL != "https://10.0.0.5:8443" || c.AdminEmail != "ops@example.org" {
+		t.Errorf("URLs and email %q, %q, %q", c.AuthServerURL, c.AdminConsoleURL, c.AdminEmail)
+	}
+	for _, line := range []string{"Invalid URL: URL cannot be empty. Please try again.", "Invalid email: email cannot be empty. Please try again."} {
+		if !strings.Contains(out.String(), line) {
+			t.Errorf("output lacks %q:\n%s", line, out)
+		}
+	}
+	if strings.Contains(out.String(), "Domain mismatch") {
+		t.Errorf("one IP on two ports warned of a mismatch:\n%s", out)
+	}
+}
+
+// Declining a URL outside the auth server's parent asks for both again, offering the sibling of
+// the auth URL; a plain-HTTP URL that is not confirmed is asked for again as well.
+func TestWizard_InteractiveMismatchAndHTTPAskAgain(t *testing.T) {
+	d, e := deployments[deploymentProduction], testEngine("sqlite")
+	steps := replaceURLSteps(t, interactiveScript(d, e),
+		scriptedStep{prompt: "Auth server URL (e.g., https://auth.example.com) [https://auth.example.com]: ", answer: "http://auth.example.co.uk"},
+		scriptedStep{prompt: "Continue with HTTP? [y/N]: ", answer: ""},
+		scriptedStep{prompt: "Auth server URL (e.g., https://auth.example.com) [https://auth.example.com]: ", answer: "https://auth.example.co.uk"},
+		scriptedStep{prompt: "Admin console URL (e.g., https://admin.example.com) [https://admin.example.co.uk]: ", answer: "https://admin.other.co.uk"},
+		scriptedStep{prompt: "Continue with different domains? [y/N]: ", answer: ""},
+		scriptedStep{prompt: "Auth server URL [https://auth.example.co.uk]: ", answer: ""},
+		scriptedStep{prompt: "Admin console URL [https://admin.example.co.uk]: ", answer: ""},
+	)
+	for i := range steps {
+		if strings.HasPrefix(steps[i].prompt, "Admin email") {
+			steps[i].prompt = "Admin email [admin@example.co.uk]: "
+		}
+	}
+	w, in, out, _ := testWizard(t, &CLIFlags{}, steps)
+	if err := w.setup(); err != nil {
+		t.Fatalf("setup: %v\n%s", err, out)
+	}
+	in.assertConsumed()
+	c := w.config
+	if c.AuthServerURL != "https://auth.example.co.uk" || c.AdminConsoleURL != "https://admin.example.co.uk" || c.AdminEmail != "admin@example.co.uk" {
+		t.Errorf("URLs and email %q, %q, %q", c.AuthServerURL, c.AdminConsoleURL, c.AdminEmail)
+	}
+	for _, line := range []string{"Auth server domain:    example.co.uk", "Admin console domain:  other.co.uk"} {
+		if !strings.Contains(out.String(), line) {
+			t.Errorf("output lacks %q:\n%s", line, out)
+		}
+	}
+}
+
+// For Kubernetes an IP address, an uppercase host and the auth server's host for the admin console
+// are each named and asked for again (#430).
+func TestWizard_InteractiveKubernetesHostsAreAskedAgain(t *testing.T) {
+	d, e := deployments[deploymentKubernetes], testEngine("postgres")
+	authPrompt := "Auth server URL (e.g., https://auth.example.com) [https://auth.example.com]: "
+	adminPrompt := "Admin console URL (e.g., https://admin.example.com) [https://admin.example.org]: "
+	steps := replaceURLSteps(t, interactiveScript(d, e),
+		scriptedStep{prompt: authPrompt, answer: "https://10.0.0.5"},
+		scriptedStep{prompt: authPrompt, answer: "https://Auth.example.org"},
+		scriptedStep{prompt: authPrompt, answer: "https://auth.example.org"},
+		scriptedStep{prompt: adminPrompt, answer: "https://auth.example.org/admin"},
+		scriptedStep{prompt: adminPrompt, answer: "https://ADMIN.example.org"},
+		scriptedStep{prompt: adminPrompt, answer: ""},
+	)
+	w, in, out, _ := testWizard(t, &CLIFlags{}, steps)
+	if err := w.setup(); err != nil {
+		t.Fatalf("setup: %v\n%s", err, out)
+	}
+	in.assertConsumed()
+	if c := w.config; c.AuthServerURL != "https://auth.example.org" || c.AdminConsoleURL != "https://admin.example.org" {
+		t.Errorf("URLs %q, %q", c.AuthServerURL, c.AdminConsoleURL)
+	}
+	for _, line := range []string{
+		"Invalid URL: 10.0.0.5 is an IP address, and a Kubernetes host must be a domain name. Please try again.",
+		"Invalid URL: host Auth.example.org has 'A', and a Kubernetes host is lowercase a-z, 0-9 and '-'. Please try again.",
+		"Invalid URL: the admin console URL has the auth server's host, auth.example.org, and each needs a host of its own. Please try again.",
+		"Invalid URL: host ADMIN.example.org has 'A'",
+	} {
+		if !strings.Contains(out.String(), line) {
+			t.Errorf("output lacks %q:\n%s", line, out)
 		}
 	}
 }
@@ -466,6 +692,11 @@ func TestWizard_NonInteractiveRefusals(t *testing.T) {
 		change(&f)
 		return f
 	}
+	kubernetes := func(change func(f *CLIFlags)) CLIFlags {
+		f := native(change)
+		f.DeploymentType = "kubernetes"
+		return f
+	}
 	cases := map[string]struct {
 		flags CLIFlags
 		want  string
@@ -482,6 +713,24 @@ func TestWizard_NonInteractiveRefusals(t *testing.T) {
 		"an invalid database port": {native(func(f *CLIFlags) { f.DBPort = "99999" }), "invalid database port"},
 		"an invalid database name": {native(func(f *CLIFlags) { f.DBName = "1db" }), "invalid database name"},
 		"an invalid namespace":     {CLIFlags{DeploymentType: "kubernetes", DBType: "postgres", AuthServerURL: "https://auth.example.org", Namespace: "Upper"}, "invalid namespace"},
+		// A host with no parent offers no admin console URL or email to default to (#430).
+		"no admin URL for an IP host":          {native(func(f *CLIFlags) { f.AuthServerURL = "https://10.0.0.5" }), "--admin-url is required when the auth URL's host, 10.0.0.5, is an IP address or a single label"},
+		"no admin URL for a single-label host": {native(func(f *CLIFlags) { f.AuthServerURL = "https://goiabada:9090" }), "--admin-url is required when the auth URL's host, goiabada, is"},
+		"no admin email for an IP host":        {native(func(f *CLIFlags) { f.AuthServerURL, f.AdminConsoleURL = "https://10.0.0.5", "https://10.0.0.5:8443" }), "--admin-email is required when the auth URL's host, 10.0.0.5, is an IP address or a single label"},
+		"no admin email for a single-label host": {native(func(f *CLIFlags) {
+			f.AuthServerURL, f.AdminConsoleURL = "https://goiabada:9090", "https://goiabada:9091"
+		}), "--admin-email is required"},
+		"an auth URL carrying userinfo": {native(func(f *CLIFlags) { f.AuthServerURL = "https://auth.example.org:x@evil.com/" }), "invalid auth URL: URL cannot carry a user name or password"},
+		// Kubernetes routes and certifies each URL by its host, which a Gateway listener must be able
+		// to carry, one host per listener (#430).
+		"a Kubernetes auth host that is an IP": {kubernetes(func(f *CLIFlags) {
+			f.AuthServerURL, f.AdminConsoleURL = "https://10.0.0.5", "https://admin.example.org"
+		}), "invalid auth URL: 10.0.0.5 is an IP address, and a Kubernetes host must be a domain name"},
+		"a Kubernetes admin host that is an IP": {kubernetes(func(f *CLIFlags) { f.AdminConsoleURL = "https://10.0.0.6" }), "invalid admin URL: 10.0.0.6 is an IP address"},
+		"an uppercase Kubernetes auth host":     {kubernetes(func(f *CLIFlags) { f.AuthServerURL = "https://Auth.example.org" }), "invalid auth URL: host Auth.example.org has 'A', and a Kubernetes host is lowercase"},
+		"an uppercase Kubernetes admin host":    {kubernetes(func(f *CLIFlags) { f.AdminConsoleURL = "https://admin.Example.org" }), "invalid admin URL: host admin.Example.org has 'E'"},
+		"one Kubernetes host for both":          {kubernetes(func(f *CLIFlags) { f.AdminConsoleURL = "https://auth.example.org/admin" }), "invalid admin URL: the admin console URL has the auth server's host, auth.example.org, and each needs a host of its own"},
+		"one Kubernetes host by the default":    {kubernetes(func(f *CLIFlags) { f.AuthServerURL = "https://admin.example.org" }), "invalid admin URL: the admin console URL has the auth server's host, admin.example.org"},
 	}
 	// Every flag whose value is written into the file, refused by its name when it is not UTF-8 or
 	// holds NUL, before a step reads it (#430). Each would otherwise be refused, if at all, by a
