@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
@@ -93,12 +92,12 @@ func TestValidateTokenRequest_RefreshToken_ScopeWhitespace(t *testing.T) {
 
 	for _, tc := range twoScopeSpellings {
 		t.Run(tc.name, func(t *testing.T) {
-			validator, mockPermissionChecker, ctx, input := newStoredGrantRefresh(t, grant, tc.scope, true)
+			validator, mockPermissionChecker, settings, input := newStoredGrantRefresh(t, grant, tc.scope, true)
 			// Each value asked about on its own is what shows the re-check split the request.
 			mockPermissionChecker.On("UserHasScopePermission", mock.Anything, int64(1), whitespaceScopeA).Return(true, nil).Once()
 			mockPermissionChecker.On("UserHasScopePermission", mock.Anything, int64(1), whitespaceScopeB).Return(true, nil).Once()
 
-			result, err := validator.ValidateTokenRequest(ctx, input)
+			result, err := validator.ValidateTokenRequest(context.Background(), settings, input)
 
 			require.NoError(t, err)
 			assert.NotNil(t, result)
@@ -106,9 +105,9 @@ func TestValidateTokenRequest_RefreshToken_ScopeWhitespace(t *testing.T) {
 	}
 
 	t.Run("U+00A0 is not a separator", func(t *testing.T) {
-		validator, mockPermissionChecker, ctx, input := newStoredGrantRefresh(t, grant, oneElementSpelling, false)
+		validator, mockPermissionChecker, settings, input := newStoredGrantRefresh(t, grant, oneElementSpelling, false)
 
-		result, err := validator.ValidateTokenRequest(ctx, input)
+		result, err := validator.ValidateTokenRequest(context.Background(), settings, input)
 
 		assert.Nil(t, result)
 		assertRefusedAsOneElement(t, err, fmt.Sprintf("Scope '%v' is not recognized. The original access token does not grant the '%v' permission.", oneElementSpelling, oneElementSpelling))
@@ -143,14 +142,15 @@ func newWhitespaceClientCredentials(t *testing.T, scope string) (*TokenValidator
 }
 
 func TestValidateTokenRequest_ClientCredentials_ScopeWhitespace(t *testing.T) {
-	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &models.Settings{})
+	settings := &models.Settings{}
+	ctx := context.Background()
 
 	for _, tc := range twoScopeSpellings {
 		t.Run(tc.name, func(t *testing.T) {
 			validator, mockDB, input := newWhitespaceClientCredentials(t, tc.scope)
 			expectBillingResolution(mockDB)
 
-			result, err := validator.ValidateTokenRequest(ctx, input)
+			result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 			require.NoError(t, err)
 			assert.NotNil(t, result)
@@ -160,21 +160,21 @@ func TestValidateTokenRequest_ClientCredentials_ScopeWhitespace(t *testing.T) {
 	t.Run("U+00A0 is not a separator", func(t *testing.T) {
 		validator, _, input := newWhitespaceClientCredentials(t, oneElementSpelling)
 
-		result, err := validator.ValidateTokenRequest(ctx, input)
+		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.Nil(t, result)
 		assertRefusedAsOneElement(t, err, fmt.Sprintf("Invalid scope format: '%v'. Scopes must adhere to the resource-identifier:permission-identifier format. For instance: backend-service:create-product.", oneElementSpelling))
 	})
 }
 
-func newWhitespaceROPC(t *testing.T, scope string) (*TokenValidator, *mocks_data.Database, *mocks_protocolvalidation.PermissionChecker, context.Context, *ValidateTokenRequestInput) {
+func newWhitespaceROPC(t *testing.T, scope string) (*TokenValidator, *mocks_data.Database, *mocks_protocolvalidation.PermissionChecker, *models.Settings, *ValidateTokenRequestInput) {
 	t.Helper()
 	mockDB := mocks_data.NewDatabase(t)
 	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 	validator := NewTokenValidator(mockDB, mocks_protocolvalidation.NewTokenParser(t), mockPermissionChecker)
-	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &models.Settings{
+	settings := &models.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
-	})
+	}
 
 	passwordHash, err := passwordhash.Hash("correctpassword")
 	require.NoError(t, err)
@@ -191,7 +191,7 @@ func newWhitespaceROPC(t *testing.T, scope string) (*TokenValidator, *mocks_data
 	mockDB.On("UserLoadPermissions", mock.Anything, mock.Anything, user).Return(nil).Once()
 	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(nil).Once()
 
-	return validator, mockDB, mockPermissionChecker, ctx, &ValidateTokenRequestInput{
+	return validator, mockDB, mockPermissionChecker, settings, &ValidateTokenRequestInput{
 		GrantType: "password",
 		ClientId:  "ropc-client",
 		Username:  "user@example.com",
@@ -203,12 +203,12 @@ func newWhitespaceROPC(t *testing.T, scope string) (*TokenValidator, *mocks_data
 func TestValidateTokenRequest_ROPC_ScopeWhitespace(t *testing.T) {
 	for _, tc := range twoScopeSpellings {
 		t.Run(tc.name, func(t *testing.T) {
-			validator, mockDB, mockPermissionChecker, ctx, input := newWhitespaceROPC(t, tc.scope)
+			validator, mockDB, mockPermissionChecker, settings, input := newWhitespaceROPC(t, tc.scope)
 			expectBillingResolution(mockDB)
 			mockPermissionChecker.On("UserHasScopePermission", mock.Anything, int64(1), whitespaceScopeA).Return(true, nil).Once()
 			mockPermissionChecker.On("UserHasScopePermission", mock.Anything, int64(1), whitespaceScopeB).Return(true, nil).Once()
 
-			result, err := validator.ValidateTokenRequest(ctx, input)
+			result, err := validator.ValidateTokenRequest(context.Background(), settings, input)
 
 			require.NoError(t, err)
 			require.NotNil(t, result)
@@ -217,9 +217,9 @@ func TestValidateTokenRequest_ROPC_ScopeWhitespace(t *testing.T) {
 	}
 
 	t.Run("U+00A0 is not a separator", func(t *testing.T) {
-		validator, _, mockPermissionChecker, ctx, input := newWhitespaceROPC(t, oneElementSpelling)
+		validator, _, mockPermissionChecker, settings, input := newWhitespaceROPC(t, oneElementSpelling)
 
-		result, err := validator.ValidateTokenRequest(ctx, input)
+		result, err := validator.ValidateTokenRequest(context.Background(), settings, input)
 
 		assert.Nil(t, result)
 		assertRefusedAsOneElement(t, err, fmt.Sprintf("Invalid scope format: '%v'. Scopes must be either OIDC scopes (openid, profile, email, address, phone, groups, attributes) or resource-identifier:permission-identifier format.", oneElementSpelling))

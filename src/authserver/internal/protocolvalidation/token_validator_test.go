@@ -11,7 +11,6 @@ import (
 	"errors"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
@@ -58,8 +57,8 @@ func TestValidateTokenRequest(t *testing.T) {
 		}
 
 		settings := &models.Settings{}
-		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
-		result, err := validator.ValidateTokenRequest(ctx, input)
+		ctx := context.Background()
+		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
@@ -79,8 +78,8 @@ func TestValidateTokenRequest(t *testing.T) {
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "non_existent_client").Return(nil, nil)
 
 		settings := &models.Settings{}
-		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
-		result, err := validator.ValidateTokenRequest(ctx, input)
+		ctx := context.Background()
+		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
@@ -105,8 +104,8 @@ func TestValidateTokenRequest(t *testing.T) {
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "disabled_client").Return(disabledClient, nil)
 
 		settings := &models.Settings{}
-		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
-		result, err := validator.ValidateTokenRequest(ctx, input)
+		ctx := context.Background()
+		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
@@ -129,7 +128,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{}
-		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+		ctx := context.Background()
 
 		input := &ValidateTokenRequestInput{
 			GrantType: "authorization_code",
@@ -144,7 +143,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "client1").Return(client, nil).Once()
 
-		result, err := validator.ValidateTokenRequest(ctx, input)
+		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
@@ -164,7 +163,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{}
-		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+		ctx := context.Background()
 
 		input := &ValidateTokenRequestInput{
 			GrantType: "authorization_code",
@@ -180,7 +179,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "client1").Return(client, nil).Once()
 
-		result, err := validator.ValidateTokenRequest(ctx, input)
+		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
@@ -200,7 +199,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{}
-		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+		ctx := context.Background()
 
 		input := &ValidateTokenRequestInput{
 			GrantType: "authorization_code",
@@ -217,7 +216,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "client1").Return(client, nil).Once()
 
-		result, err := validator.ValidateTokenRequest(ctx, input)
+		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
@@ -237,7 +236,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{}
-		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+		ctx := context.Background()
 
 		input := &ValidateTokenRequestInput{
 			GrantType:   "authorization_code",
@@ -276,7 +275,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
 		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
 
-		result, err := validator.ValidateTokenRequest(ctx, input)
+		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
@@ -295,7 +294,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{}
-		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+		ctx := context.Background()
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "authorization_code",
@@ -317,7 +316,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		// Reuse-detection retry: validator now consults used codes too. Both miss = genuinely unknown.
 		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.Anything, mock.AnythingOfType("string"), true).Return(nil, nil).Once()
 
-		result, err := validator.ValidateTokenRequest(ctx, input)
+		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
@@ -336,7 +335,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{}
-		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+		ctx := context.Background()
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "authorization_code",
@@ -361,7 +360,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "client1").Return(client, nil).Once()
 		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.Anything, mock.AnythingOfType("string"), false).Return(codeEntity, nil).Once()
 
-		result, err := validator.ValidateTokenRequest(ctx, input)
+		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
@@ -380,7 +379,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{}
-		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+		ctx := context.Background()
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "authorization_code",
@@ -410,7 +409,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
 		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
 
-		result, err := validator.ValidateTokenRequest(ctx, input)
+		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
@@ -429,7 +428,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{}
-		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+		ctx := context.Background()
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "authorization_code",
@@ -462,7 +461,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
 		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
 
-		result, err := validator.ValidateTokenRequest(ctx, input)
+		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
@@ -481,7 +480,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{}
-		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+		ctx := context.Background()
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "authorization_code",
@@ -518,7 +517,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
 		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
 
-		result, err := validator.ValidateTokenRequest(ctx, input)
+		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
@@ -537,7 +536,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{}
-		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+		ctx := context.Background()
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "authorization_code",
@@ -575,7 +574,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
 		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
 
-		result, err := validator.ValidateTokenRequest(ctx, input)
+		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
@@ -594,7 +593,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{}
-		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+		ctx := context.Background()
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "authorization_code",
@@ -634,7 +633,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
 		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
 
-		result, err := validator.ValidateTokenRequest(ctx, input)
+		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
@@ -654,7 +653,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{}
-		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+		ctx := context.Background()
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "authorization_code",
@@ -700,7 +699,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
 		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
 
-		result, err := validator.ValidateTokenRequest(ctx, input)
+		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
@@ -720,7 +719,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{}
-		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+		ctx := context.Background()
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "authorization_code",
@@ -761,7 +760,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
 		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
 
-		result, err := validator.ValidateTokenRequest(ctx, input)
+		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
@@ -780,7 +779,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{}
-		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+		ctx := context.Background()
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "authorization_code",
@@ -819,7 +818,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
 		expectRedirectURIStillRegistered(mockDB, "https://example.com/callback")
 
-		result, err := validator.ValidateTokenRequest(ctx, input)
+		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
@@ -834,7 +833,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{}
-		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+		ctx := context.Background()
 
 		codeVerifier := "valid_code_verifier_for_public_client"
 		input := &ValidateTokenRequestInput{
@@ -875,7 +874,7 @@ func TestValidateTokenRequest_AuthorizationCode(t *testing.T) {
 		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
 		expectRedirectURIStillRegistered(mockDB, "https://example.com/public-client/callback")
 
-		result, err := validator.ValidateTokenRequest(ctx, input)
+		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
@@ -935,7 +934,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{}
-		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+		ctx := context.Background()
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "authorization_code",
@@ -961,7 +960,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 		mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
 		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
 
-		result, err := validator.ValidateTokenRequest(ctx, input)
+		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
@@ -984,7 +983,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{}
-		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+		ctx := context.Background()
 
 		clientSecret := "the_secret"
 		clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
@@ -1015,7 +1014,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 		mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
 		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
 
-		result, err := validator.ValidateTokenRequest(ctx, input)
+		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
@@ -1032,7 +1031,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{}
-		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+		ctx := context.Background()
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "authorization_code",
@@ -1059,7 +1058,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 		mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
 		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
 
-		_, err := validator.ValidateTokenRequest(ctx, input)
+		_, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		_, ok := err.(*AuthCodeReusedError)
 		assert.True(t, ok, "expected sentinel even with disabled user; user-state checks must be skipped on reuse path. got %T", err)
@@ -1073,7 +1072,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{}
-		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+		ctx := context.Background()
 
 		// Attacker's client_id matches what they're submitting, but the code
 		// was issued to a different client.
@@ -1108,7 +1107,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 		mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
 		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
 
-		_, err := validator.ValidateTokenRequest(ctx, input)
+		_, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		_, isSentinel := err.(*AuthCodeReusedError)
 		assert.False(t, isSentinel, "wrong client_id must not yield revocation sentinel")
@@ -1126,7 +1125,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{}
-		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+		ctx := context.Background()
 
 		client := &models.Client{
 			Id:                       1,
@@ -1150,7 +1149,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.Anything, mock.AnythingOfType("string"), false).Return(nil, nil).Once()
 		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.Anything, mock.AnythingOfType("string"), true).Return(codeEntity, nil).Once()
 
-		_, err := validator.ValidateTokenRequest(ctx, input)
+		_, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		_, isSentinel := err.(*AuthCodeReusedError)
 		assert.False(t, isSentinel, "wrong redirect_uri must not yield revocation sentinel")
@@ -1168,7 +1167,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{}
-		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+		ctx := context.Background()
 
 		clientSecret := "the_secret"
 		clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
@@ -1199,7 +1198,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 		mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
 		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
 
-		_, err = validator.ValidateTokenRequest(ctx, input)
+		_, err = validator.ValidateTokenRequest(ctx, settings, input)
 
 		_, isSentinel := err.(*AuthCodeReusedError)
 		assert.False(t, isSentinel, "missing client_secret must not yield revocation sentinel")
@@ -1216,7 +1215,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{}
-		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+		ctx := context.Background()
 
 		clientSecret := "the_secret"
 		clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
@@ -1247,7 +1246,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 		mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
 		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
 
-		_, err = validator.ValidateTokenRequest(ctx, input)
+		_, err = validator.ValidateTokenRequest(ctx, settings, input)
 
 		_, isSentinel := err.(*AuthCodeReusedError)
 		assert.False(t, isSentinel, "wrong client_secret must not yield revocation sentinel")
@@ -1264,7 +1263,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{}
-		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+		ctx := context.Background()
 
 		client := &models.Client{
 			Id:                       1,
@@ -1290,7 +1289,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 		mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
 		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
 
-		_, err := validator.ValidateTokenRequest(ctx, input)
+		_, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		_, isSentinel := err.(*AuthCodeReusedError)
 		assert.False(t, isSentinel, "wrong code_verifier must not yield revocation sentinel")
@@ -1308,7 +1307,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{}
-		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+		ctx := context.Background()
 
 		client := &models.Client{
 			Id:                       1,
@@ -1330,7 +1329,7 @@ func TestValidateTokenRequest_AuthCodeReuse(t *testing.T) {
 		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.Anything, mock.AnythingOfType("string"), false).Return(nil, nil).Once()
 		mockDB.On("GetCodeByCodeHash", mock.Anything, mock.Anything, mock.AnythingOfType("string"), true).Return(nil, nil).Once()
 
-		_, err := validator.ValidateTokenRequest(ctx, input)
+		_, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		_, isSentinel := err.(*AuthCodeReusedError)
 		assert.False(t, isSentinel, "unknown code must not yield revocation sentinel")
@@ -1349,7 +1348,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 	settings := &models.Settings{}
-	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+	ctx := context.Background()
 
 	t.Run("Client credentials flow not enabled", func(t *testing.T) {
 		input := &ValidateTokenRequestInput{
@@ -1366,7 +1365,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "client1").Return(client, nil).Once()
 
-		result, err := validator.ValidateTokenRequest(ctx, input)
+		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
@@ -1393,7 +1392,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "client1").Return(client, nil).Once()
 
-		result, err := validator.ValidateTokenRequest(ctx, input)
+		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
@@ -1420,7 +1419,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "client1").Return(client, nil).Once()
 
-		result, err := validator.ValidateTokenRequest(ctx, input)
+		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
@@ -1440,7 +1439,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{}
-		subtestCtx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+		subtestCtx := context.Background()
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "client_credentials",
@@ -1470,7 +1469,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "resource").Return(&models.Resource{Id: 1, ResourceIdentifier: "resource"}, nil)
 		mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(1)).Return([]models.Permission{{Id: 10, PermissionIdentifier: "permission", ResourceId: 1}}, nil)
 
-		result, err := validator.ValidateTokenRequest(subtestCtx, input)
+		result, err := validator.ValidateTokenRequest(subtestCtx, settings, input)
 
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
@@ -1486,7 +1485,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{}
-		subtestCtx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+		subtestCtx := context.Background()
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "client_credentials",
@@ -1507,7 +1506,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "valid_client").Return(client, nil)
 
-		result, err := validator.ValidateTokenRequest(subtestCtx, input)
+		result, err := validator.ValidateTokenRequest(subtestCtx, settings, input)
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
@@ -1525,7 +1524,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{}
-		subtestCtx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+		subtestCtx := context.Background()
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "client_credentials",
@@ -1558,7 +1557,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(1)).Return([]models.Permission{{Id: 10, PermissionIdentifier: "read", ResourceId: 1}}, nil)
 		mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(2)).Return([]models.Permission{{Id: 20, PermissionIdentifier: "write", ResourceId: 2}}, nil)
 
-		result, err := validator.ValidateTokenRequest(subtestCtx, input)
+		result, err := validator.ValidateTokenRequest(subtestCtx, settings, input)
 
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
@@ -1573,7 +1572,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{}
-		subtestCtx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+		subtestCtx := context.Background()
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "client_credentials",
@@ -1597,7 +1596,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		mockDB.On("ClientLoadPermissions", mock.Anything, mock.Anything, client).Return(nil)
 		mockDB.On("PermissionsLoadResources", mock.Anything, mock.Anything, mock.AnythingOfType("[]models.Permission")).Return(nil)
 
-		result, err := validator.ValidateTokenRequest(subtestCtx, input)
+		result, err := validator.ValidateTokenRequest(subtestCtx, settings, input)
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
@@ -1615,7 +1614,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{}
-		subtestCtx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+		subtestCtx := context.Background()
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "client_credentials",
@@ -1642,7 +1641,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "resource").Return(&models.Resource{Id: 1, ResourceIdentifier: "resource"}, nil)
 		mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(1)).Return([]models.Permission{{PermissionIdentifier: "read"}}, nil)
 
-		result, err := validator.ValidateTokenRequest(subtestCtx, input)
+		result, err := validator.ValidateTokenRequest(subtestCtx, settings, input)
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
@@ -1660,7 +1659,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{}
-		subtestCtx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+		subtestCtx := context.Background()
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "client_credentials",
@@ -1684,7 +1683,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		mockDB.On("ClientLoadPermissions", mock.Anything, mock.Anything, client).Return(nil)
 		mockDB.On("PermissionsLoadResources", mock.Anything, mock.Anything, mock.AnythingOfType("[]models.Permission")).Return(nil)
 
-		result, err := validator.ValidateTokenRequest(subtestCtx, input)
+		result, err := validator.ValidateTokenRequest(subtestCtx, settings, input)
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
@@ -1702,7 +1701,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{}
-		subtestCtx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+		subtestCtx := context.Background()
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "client_credentials",
@@ -1727,7 +1726,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		mockDB.On("PermissionsLoadResources", mock.Anything, mock.Anything, mock.AnythingOfType("[]models.Permission")).Return(nil)
 		mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "non_existent_resource").Return(nil, nil)
 
-		result, err := validator.ValidateTokenRequest(subtestCtx, input)
+		result, err := validator.ValidateTokenRequest(subtestCtx, settings, input)
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
@@ -1745,7 +1744,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{}
-		subtestCtx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+		subtestCtx := context.Background()
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "client_credentials",
@@ -1771,7 +1770,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		mockDB.On("GetResourceByResourceIdentifier", mock.Anything, mock.Anything, "resource").Return(&models.Resource{Id: 1, ResourceIdentifier: "resource"}, nil)
 		mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(1)).Return([]models.Permission{}, nil)
 
-		result, err := validator.ValidateTokenRequest(subtestCtx, input)
+		result, err := validator.ValidateTokenRequest(subtestCtx, settings, input)
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
@@ -1789,7 +1788,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{}
-		subtestCtx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+		subtestCtx := context.Background()
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "client_credentials",
@@ -1825,7 +1824,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(2)).Return([]models.Permission{{Id: 20, PermissionIdentifier: "write", ResourceId: 2}}, nil)
 		mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(3)).Return([]models.Permission{{Id: 30, PermissionIdentifier: "delete", ResourceId: 3}}, nil)
 
-		result, err := validator.ValidateTokenRequest(subtestCtx, input)
+		result, err := validator.ValidateTokenRequest(subtestCtx, settings, input)
 
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
@@ -1900,7 +1899,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 		mockDB.On("PermissionsLoadResources", mock.Anything, mock.Anything, mock.AnythingOfType("[]models.Permission")).Return(nil)
 		registerCatalog(mockDB)
 
-		result, err := validator.ValidateTokenRequest(ctx, &ValidateTokenRequestInput{
+		result, err := validator.ValidateTokenRequest(ctx, settings, &ValidateTokenRequestInput{
 			GrantType:    "client_credentials",
 			ClientId:     "cc_client",
 			ClientSecret: "valid_secret",
@@ -2166,7 +2165,7 @@ func TestValidateTokenRequest_ClientCredentials(t *testing.T) {
 			mockDB.On("PermissionsLoadResources", mock.Anything, mock.Anything, mock.AnythingOfType("[]models.Permission")).Return(nil)
 			tc.setup(mockDB)
 
-			result, err := validator.ValidateTokenRequest(ctx, &ValidateTokenRequestInput{
+			result, err := validator.ValidateTokenRequest(ctx, settings, &ValidateTokenRequestInput{
 				GrantType:    "client_credentials",
 				ClientId:     "cc_client",
 				ClientSecret: "valid_secret",
@@ -2205,7 +2204,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 			UserSessionIdleTimeoutInSeconds: 3600,
 			UserSessionMaxLifetimeInSeconds: 86400,
 		}
-		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+		ctx := context.Background()
 
 		clientSecretEncrypted, err := encryption.EncryptData("client_secret")
 		require.NoError(t, err)
@@ -2258,7 +2257,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 			}, nil).Once()
 		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "user_subject").Return(&user, nil).Once()
 
-		result, err := validator.ValidateTokenRequest(ctx, input)
+		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		require.NoError(t, err, "the validator must hold no flow rule on the refresh arm")
 		require.NotNil(t, result)
@@ -2274,7 +2273,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{}
-		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+		ctx := context.Background()
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "refresh_token",
@@ -2292,7 +2291,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "confidential_client").Return(client, nil).Once()
 
-		result, err := validator.ValidateTokenRequest(ctx, input)
+		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
@@ -2312,7 +2311,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{}
-		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+		ctx := context.Background()
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "refresh_token",
@@ -2334,7 +2333,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "confidential_client").Return(client, nil).Once()
 
-		result, err := validator.ValidateTokenRequest(ctx, input)
+		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
@@ -2354,7 +2353,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{}
-		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+		ctx := context.Background()
 
 		input := &ValidateTokenRequestInput{
 			GrantType: "refresh_token",
@@ -2371,7 +2370,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 
 		mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "client1").Return(client, nil).Once()
 
-		result, err := validator.ValidateTokenRequest(ctx, input)
+		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
@@ -2390,7 +2389,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{}
-		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+		ctx := context.Background()
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "refresh_token",
@@ -2409,7 +2408,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "invalid_refresh_token", true).
 			Return(nil, errors.New("token is expired")).Once()
 
-		result, err := validator.ValidateTokenRequest(ctx, input)
+		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
@@ -2428,7 +2427,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{}
-		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+		ctx := context.Background()
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "refresh_token",
@@ -2450,7 +2449,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "refresh_token_without_jti", true).
 			Return(mockJwtToken, nil).Once()
 
-		result, err := validator.ValidateTokenRequest(ctx, input)
+		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
@@ -2465,7 +2464,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{}
-		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+		ctx := context.Background()
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "refresh_token",
@@ -2491,7 +2490,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 			Return(mockJwtToken, nil).Once()
 		mockDB.On("GetRefreshTokenByJti", mock.Anything, (*sql.Tx)(nil), "non_existent_jti").Return(nil, nil).Once()
 
-		result, err := validator.ValidateTokenRequest(ctx, input)
+		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
@@ -2521,7 +2520,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 			UserSessionIdleTimeoutInSeconds: 3600,
 			UserSessionMaxLifetimeInSeconds: 86400,
 		}
-		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+		ctx := context.Background()
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "refresh_token",
@@ -2562,7 +2561,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockDB.On("RefreshTokenLoadCode", mock.Anything, mock.Anything, refreshToken).Return(nil)
 		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, &refreshToken.Code).Return(nil)
 
-		result, err := validator.ValidateTokenRequest(ctx, input)
+		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
@@ -2583,7 +2582,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 			UserSessionIdleTimeoutInSeconds: 3600,
 			UserSessionMaxLifetimeInSeconds: 86400,
 		}
-		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+		ctx := context.Background()
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "refresh_token",
@@ -2624,7 +2623,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockDB.On("RefreshTokenLoadCode", mock.Anything, mock.Anything, refreshToken).Return(nil)
 		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, &refreshToken.Code).Return(nil)
 
-		result, err := validator.ValidateTokenRequest(ctx, input)
+		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
@@ -2646,7 +2645,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 			UserSessionIdleTimeoutInSeconds: 3600,
 			UserSessionMaxLifetimeInSeconds: 86400,
 		}
-		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+		ctx := context.Background()
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "refresh_token",
@@ -2694,7 +2693,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, &refreshToken.Code).Return(nil)
 		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "non_existent_session").Return(nil, nil)
 
-		result, err := validator.ValidateTokenRequest(ctx, input)
+		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
@@ -2716,7 +2715,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 			UserSessionIdleTimeoutInSeconds: 3600,
 			UserSessionMaxLifetimeInSeconds: 86400,
 		}
-		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+		ctx := context.Background()
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "refresh_token",
@@ -2771,7 +2770,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, &refreshToken.Code).Return(nil)
 		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "expired_session").Return(expiredSession, nil)
 
-		result, err := validator.ValidateTokenRequest(ctx, input)
+		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
@@ -2790,7 +2789,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{}
-		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+		ctx := context.Background()
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "refresh_token",
@@ -2838,7 +2837,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockDB.On("RefreshTokenLoadCode", mock.Anything, mock.Anything, refreshToken).Return(nil)
 		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, &refreshToken.Code).Return(nil)
 
-		result, err := validator.ValidateTokenRequest(ctx, input)
+		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
@@ -2857,7 +2856,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{}
-		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+		ctx := context.Background()
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "refresh_token",
@@ -2904,7 +2903,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockDB.On("RefreshTokenLoadCode", mock.Anything, mock.Anything, refreshToken).Return(nil)
 		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, &refreshToken.Code).Return(nil)
 
-		result, err := validator.ValidateTokenRequest(ctx, input)
+		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
@@ -2919,7 +2918,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{}
-		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+		ctx := context.Background()
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "refresh_token",
@@ -2965,7 +2964,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockDB.On("RefreshTokenLoadCode", mock.Anything, mock.Anything, refreshToken).Return(nil)
 		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, &refreshToken.Code).Return(nil)
 
-		result, err := validator.ValidateTokenRequest(ctx, input)
+		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
@@ -2983,7 +2982,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 			UserSessionIdleTimeoutInSeconds: 3600,
 			UserSessionMaxLifetimeInSeconds: 86400,
 		}
-		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+		ctx := context.Background()
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "refresh_token",
@@ -3041,7 +3040,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, &refreshToken.Code).Return(nil)
 		mockDB.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test_session").Return(userSession, nil)
 
-		result, err := validator.ValidateTokenRequest(ctx, input)
+		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		// invalid_scope since #425: the grant is intact and the request exceeds it, which RFC 6749
 		// section 5.2 names invalid_scope for. It answered invalid_grant before.
@@ -3063,7 +3062,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{}
-		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+		ctx := context.Background()
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "refresh_token",
@@ -3123,7 +3122,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "user123").Return(&models.User{Id: 1, Enabled: true}, nil)
 		mockDB.On("GetConsentByUserIdAndClientId", mock.Anything, mock.Anything, int64(1), int64(1)).Return(userConsent, nil)
 
-		result, err := validator.ValidateTokenRequest(ctx, input)
+		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
@@ -3139,7 +3138,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 		settings := &models.Settings{}
-		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+		ctx := context.Background()
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "refresh_token",
@@ -3200,7 +3199,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		// The refresh carries four scopes; the consent lookup must run once, not once per scope.
 		mockDB.On("GetConsentByUserIdAndClientId", mock.Anything, mock.Anything, int64(1), int64(1)).Return(userConsent, nil).Times(1)
 
-		result, err := validator.ValidateTokenRequest(ctx, input)
+		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
@@ -3218,7 +3217,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 			UserSessionIdleTimeoutInSeconds: 3600,
 			UserSessionMaxLifetimeInSeconds: 86400,
 		}
-		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+		ctx := context.Background()
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "refresh_token",
@@ -3279,7 +3278,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "user123").Return(&models.User{Id: 1, Enabled: true}, nil)
 		mockPermissionChecker.On("UserHasScopePermission", mock.Anything, int64(1), "srv1:read").Return(true, nil)
 
-		result, err := validator.ValidateTokenRequest(ctx, input)
+		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
@@ -3299,7 +3298,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 			UserSessionIdleTimeoutInSeconds: 3600,
 			UserSessionMaxLifetimeInSeconds: 86400,
 		}
-		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+		ctx := context.Background()
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "refresh_token",
@@ -3360,7 +3359,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "user123").Return(&models.User{Id: 1, Enabled: true}, nil)
 		mockDB.On("GetConsentByUserIdAndClientId", mock.Anything, mock.Anything, int64(1), int64(1)).Return(nil, nil) // Consent not found
 
-		result, err := validator.ValidateTokenRequest(ctx, input)
+		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
@@ -3382,7 +3381,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 			UserSessionIdleTimeoutInSeconds: 3600,
 			UserSessionMaxLifetimeInSeconds: 86400,
 		}
-		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+		ctx := context.Background()
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "refresh_token",
@@ -3450,7 +3449,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "user123").Return(&models.User{Id: 1, Enabled: true}, nil)
 		mockDB.On("GetConsentByUserIdAndClientId", mock.Anything, mock.Anything, int64(1), int64(1)).Return(userConsent, nil)
 
-		result, err := validator.ValidateTokenRequest(ctx, input)
+		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
@@ -3472,7 +3471,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 			UserSessionIdleTimeoutInSeconds: 3600,
 			UserSessionMaxLifetimeInSeconds: 86400,
 		}
-		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+		ctx := context.Background()
 
 		input := &ValidateTokenRequestInput{
 			GrantType:    "refresh_token",
@@ -3532,7 +3531,7 @@ func TestValidateTokenRequest_RefreshToken_AuthCodeDisabled(t *testing.T) {
 		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "user123").Return(&models.User{Id: 1, Enabled: true}, nil)
 		mockPermissionChecker.On("UserHasScopePermission", mock.Anything, int64(1), "resource:read").Return(false, nil) // Permission revoked
 
-		result, err := validator.ValidateTokenRequest(ctx, input)
+		result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
@@ -3563,7 +3562,7 @@ func TestValidateTokenRequest_PKCE_NoPKCEUsed_NoVerifierProvided_Success(t *test
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 	settings := &models.Settings{}
-	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+	ctx := context.Background()
 
 	input := &ValidateTokenRequestInput{
 		GrantType:    "authorization_code",
@@ -3608,7 +3607,7 @@ func TestValidateTokenRequest_PKCE_NoPKCEUsed_NoVerifierProvided_Success(t *test
 	mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
 	expectRedirectURIStillRegistered(mockDB, "https://example.com/callback")
 
-	result, err := validator.ValidateTokenRequest(ctx, input)
+	result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, result)
@@ -3630,7 +3629,7 @@ func TestValidateTokenRequest_PKCE_NoPKCEUsed_VerifierProvided_Fails(t *testing.
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 	settings := &models.Settings{}
-	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+	ctx := context.Background()
 
 	input := &ValidateTokenRequestInput{
 		GrantType:    "authorization_code",
@@ -3674,7 +3673,7 @@ func TestValidateTokenRequest_PKCE_NoPKCEUsed_VerifierProvided_Fails(t *testing.
 	mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
 	mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
 
-	result, err := validator.ValidateTokenRequest(ctx, input)
+	result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 	assert.Nil(t, result)
 	assert.Error(t, err)
@@ -3695,7 +3694,7 @@ func TestValidateTokenRequest_PKCE_PKCEUsed_ValidVerifier_Success(t *testing.T) 
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 	settings := &models.Settings{}
-	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+	ctx := context.Background()
 
 	codeVerifier := "valid_code_verifier_string_that_is_long_enough"
 	expectedCodeChallenge := oauth.GeneratePKCECodeChallenge(codeVerifier)
@@ -3738,7 +3737,7 @@ func TestValidateTokenRequest_PKCE_PKCEUsed_ValidVerifier_Success(t *testing.T) 
 	mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
 	expectRedirectURIStillRegistered(mockDB, "https://example.com/callback")
 
-	result, err := validator.ValidateTokenRequest(ctx, input)
+	result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, result)
@@ -3755,7 +3754,7 @@ func TestValidateTokenRequest_PKCE_PKCEUsed_NoVerifier_Fails(t *testing.T) {
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 	settings := &models.Settings{}
-	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+	ctx := context.Background()
 
 	input := &ValidateTokenRequestInput{
 		GrantType:    "authorization_code",
@@ -3794,7 +3793,7 @@ func TestValidateTokenRequest_PKCE_PKCEUsed_NoVerifier_Fails(t *testing.T) {
 	mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
 	mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
 
-	result, err := validator.ValidateTokenRequest(ctx, input)
+	result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 	assert.Nil(t, result)
 	assert.Error(t, err)
@@ -3815,7 +3814,7 @@ func TestValidateTokenRequest_PKCE_PKCEUsed_WrongVerifier_Fails(t *testing.T) {
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 	settings := &models.Settings{}
-	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+	ctx := context.Background()
 
 	// The stored code_challenge was generated from "correct_verifier"
 	correctVerifier := "correct_code_verifier_string_that_is_long_enough"
@@ -3858,7 +3857,7 @@ func TestValidateTokenRequest_PKCE_PKCEUsed_WrongVerifier_Fails(t *testing.T) {
 	mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
 	mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
 
-	result, err := validator.ValidateTokenRequest(ctx, input)
+	result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 	assert.Nil(t, result)
 	assert.Error(t, err)
@@ -3881,7 +3880,7 @@ func TestValidateTokenRequest_PKCE_EmptyStringCodeChallenge_TreatedAsNoPKCE(t *t
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 	settings := &models.Settings{}
-	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+	ctx := context.Background()
 
 	input := &ValidateTokenRequestInput{
 		GrantType:    "authorization_code",
@@ -3926,7 +3925,7 @@ func TestValidateTokenRequest_PKCE_EmptyStringCodeChallenge_TreatedAsNoPKCE(t *t
 	mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, codeEntity).Return(nil).Once()
 	expectRedirectURIStillRegistered(mockDB, "https://example.com/callback")
 
-	result, err := validator.ValidateTokenRequest(ctx, input)
+	result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 	// Empty string code_challenge should be treated as no PKCE, so this should succeed
 	assert.NoError(t, err)
@@ -3943,7 +3942,7 @@ func TestValidateTokenRequest_PKCE_EmptyStringCodeChallenge_TreatedAsNoPKCE(t *t
 // else is an ordinary, valid authorization code redemption, so the only thing any row
 // here can be refused for is the rule under test.
 func publicClientChallengelessCode(t *testing.T, storedChallenge sql.NullString, isPublic bool) (
-	*TokenValidator, *ValidateTokenRequestInput, context.Context) {
+	*TokenValidator, *ValidateTokenRequestInput, *models.Settings) {
 	t.Helper()
 
 	mockDB := mocks_data.NewDatabase(t)
@@ -3951,7 +3950,7 @@ func publicClientChallengelessCode(t *testing.T, storedChallenge sql.NullString,
 	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
-	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &models.Settings{})
+	settings := &models.Settings{}
 
 	client := &models.Client{
 		Id:                       1,
@@ -3984,15 +3983,15 @@ func publicClientChallengelessCode(t *testing.T, storedChallenge sql.NullString,
 		RedirectURI: "https://example.com/callback",
 	}
 
-	return validator, input, ctx
+	return validator, input, settings
 }
 
 func TestValidateTokenRequest_PKCE_NoPKCEUsed_PublicClient_Fails(t *testing.T) {
 	// The defect #245 is about. A public client presents nothing at this endpoint, so a
 	// code carrying no challenge is bound to nothing and whoever holds it gets the tokens.
-	validator, input, ctx := publicClientChallengelessCode(t, sql.NullString{Valid: false}, true)
+	validator, input, settings := publicClientChallengelessCode(t, sql.NullString{Valid: false}, true)
 
-	result, err := validator.ValidateTokenRequest(ctx, input)
+	result, err := validator.ValidateTokenRequest(context.Background(), settings, input)
 
 	assert.Nil(t, result)
 	customErr, ok := err.(*customerrors.ErrorDetail)
@@ -4007,10 +4006,10 @@ func TestValidateTokenRequest_PKCE_EmptyStringCodeChallenge_PublicClient_Fails(t
 	// Varies exactly one field from the row above: Valid is true and the string is empty.
 	// Without this row a predicate written as !CodeChallenge.Valid, with no != "" beside
 	// it, passes every other new case while still accepting a challenge-less grant.
-	validator, input, ctx := publicClientChallengelessCode(t,
+	validator, input, settings := publicClientChallengelessCode(t,
 		sql.NullString{String: "", Valid: true}, true)
 
-	result, err := validator.ValidateTokenRequest(ctx, input)
+	result, err := validator.ValidateTokenRequest(context.Background(), settings, input)
 
 	assert.Nil(t, result)
 	customErr, ok := err.(*customerrors.ErrorDetail)
@@ -4025,7 +4024,7 @@ func TestValidateTokenRequest_PKCE_EmptyStringCodeChallenge_PublicClient_Fails(t
 // grant is otherwise entirely valid, so the accepted row proves the fixture reaches the
 // end of the arm rather than stopping somewhere harmless on the way.
 func publicClientChallengelessRefresh(t *testing.T, storedChallenge sql.NullString, isPublic bool) (
-	*TokenValidator, *ValidateTokenRequestInput, context.Context) {
+	*TokenValidator, *ValidateTokenRequestInput, *models.Settings) {
 	t.Helper()
 
 	const grantUserId = int64(7)
@@ -4035,10 +4034,10 @@ func publicClientChallengelessRefresh(t *testing.T, storedChallenge sql.NullStri
 	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
-	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &models.Settings{
+	settings := &models.Settings{
 		UserSessionIdleTimeoutInSeconds: 3600,
 		UserSessionMaxLifetimeInSeconds: 86400,
-	})
+	}
 
 	client := &models.Client{
 		Id:                       1,
@@ -4094,15 +4093,15 @@ func publicClientChallengelessRefresh(t *testing.T, storedChallenge sql.NullStri
 		}, nil).Maybe()
 	mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "user_subject").Return(&user, nil).Maybe()
 
-	return validator, input, ctx
+	return validator, input, settings
 }
 
 func TestValidateTokenRequest_RefreshToken_NoPKCEUsed_PublicClient_Fails(t *testing.T) {
 	// The durable half of the exposure. A code lives 60 seconds; a refresh token descended
 	// from a challenge-less code keeps minting access tokens for the life of the grant.
-	validator, input, ctx := publicClientChallengelessRefresh(t, sql.NullString{Valid: false}, true)
+	validator, input, settings := publicClientChallengelessRefresh(t, sql.NullString{Valid: false}, true)
 
-	result, err := validator.ValidateTokenRequest(ctx, input)
+	result, err := validator.ValidateTokenRequest(context.Background(), settings, input)
 
 	assert.Nil(t, result)
 	customErr, ok := err.(*customerrors.ErrorDetail)
@@ -4116,10 +4115,10 @@ func TestValidateTokenRequest_RefreshToken_NoPKCEUsed_PublicClient_Fails(t *test
 func TestValidateTokenRequest_RefreshToken_EmptyStringCodeChallenge_PublicClient_Fails(t *testing.T) {
 	// The refresh arm's empty-string row, for the reason the redemption arm has one: the
 	// rule is "absent OR empty", and a .Valid-only predicate would pass every other case.
-	validator, input, ctx := publicClientChallengelessRefresh(t,
+	validator, input, settings := publicClientChallengelessRefresh(t,
 		sql.NullString{String: "", Valid: true}, true)
 
-	result, err := validator.ValidateTokenRequest(ctx, input)
+	result, err := validator.ValidateTokenRequest(context.Background(), settings, input)
 
 	assert.Nil(t, result)
 	customErr, ok := err.(*customerrors.ErrorDetail)
@@ -4133,9 +4132,9 @@ func TestValidateTokenRequest_RefreshToken_NoPKCEUsed_ConfidentialClient_Succeed
 	// The positive control, and the row that pins the rule on IsPublic rather than on the
 	// PKCE requirement: the same challenge-less grant still refreshes for a client that
 	// authenticates, because the secret is what binds the redemption.
-	validator, input, ctx := publicClientChallengelessRefresh(t, sql.NullString{Valid: false}, false)
+	validator, input, settings := publicClientChallengelessRefresh(t, sql.NullString{Valid: false}, false)
 
-	result, err := validator.ValidateTokenRequest(ctx, input)
+	result, err := validator.ValidateTokenRequest(context.Background(), settings, input)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, result)
@@ -4149,7 +4148,8 @@ func TestValidateTokenRequest_RefreshToken_PublicClientWithSecret_Fails(t *testi
 	mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
-	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &models.Settings{})
+	settings := &models.Settings{}
+	ctx := context.Background()
 
 	client := &models.Client{
 		Id:                       1,
@@ -4160,7 +4160,7 @@ func TestValidateTokenRequest_RefreshToken_PublicClientWithSecret_Fails(t *testi
 	}
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "client1").Return(client, nil).Once()
 
-	result, err := validator.ValidateTokenRequest(ctx, &ValidateTokenRequestInput{
+	result, err := validator.ValidateTokenRequest(ctx, settings, &ValidateTokenRequestInput{
 		GrantType:    "refresh_token",
 		ClientId:     "client1",
 		ClientSecret: "a_secret_this_client_does_not_have",
@@ -4192,7 +4192,7 @@ func TestValidateTokenRequest_ROPC_Success(t *testing.T) {
 	settings := &models.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
 	}
-	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+	ctx := context.Background()
 
 	passwordHash, _ := passwordhash.Hash("correctpassword")
 	user := &models.User{
@@ -4225,7 +4225,7 @@ func TestValidateTokenRequest_ROPC_Success(t *testing.T) {
 	mockDB.On("UserLoadPermissions", mock.Anything, mock.Anything, user).Return(nil).Once()
 	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(nil).Once()
 
-	result, err := validator.ValidateTokenRequest(ctx, input)
+	result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, result)
@@ -4244,7 +4244,7 @@ func TestValidateTokenRequest_ROPC_GlobalDisabled(t *testing.T) {
 	settings := &models.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: false, // Globally disabled
 	}
-	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+	ctx := context.Background()
 
 	client := &models.Client{
 		ClientIdentifier:                        "ropc-client",
@@ -4261,7 +4261,7 @@ func TestValidateTokenRequest_ROPC_GlobalDisabled(t *testing.T) {
 
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "ropc-client").Return(client, nil).Once()
 
-	result, err := validator.ValidateTokenRequest(ctx, input)
+	result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 	assert.Nil(t, result)
 	assert.Error(t, err)
@@ -4282,7 +4282,7 @@ func TestValidateTokenRequest_ROPC_ClientOverrideEnabled(t *testing.T) {
 	settings := &models.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: false, // Globally disabled
 	}
-	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+	ctx := context.Background()
 
 	passwordHash, _ := passwordhash.Hash("correctpassword")
 	user := &models.User{
@@ -4314,7 +4314,7 @@ func TestValidateTokenRequest_ROPC_ClientOverrideEnabled(t *testing.T) {
 	mockDB.On("UserLoadPermissions", mock.Anything, mock.Anything, user).Return(nil).Once()
 	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(nil).Once()
 
-	result, err := validator.ValidateTokenRequest(ctx, input)
+	result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, result)
@@ -4332,7 +4332,7 @@ func TestValidateTokenRequest_ROPC_ClientOverrideDisabled(t *testing.T) {
 	settings := &models.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true, // Globally enabled
 	}
-	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+	ctx := context.Background()
 
 	ropcDisabled := false
 	client := &models.Client{
@@ -4350,7 +4350,7 @@ func TestValidateTokenRequest_ROPC_ClientOverrideDisabled(t *testing.T) {
 
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "ropc-client").Return(client, nil).Once()
 
-	result, err := validator.ValidateTokenRequest(ctx, input)
+	result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 	assert.Nil(t, result)
 	assert.Error(t, err)
@@ -4369,7 +4369,7 @@ func TestValidateTokenRequest_ROPC_MissingUsername(t *testing.T) {
 	settings := &models.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
 	}
-	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+	ctx := context.Background()
 
 	ropcEnabled := true
 	client := &models.Client{
@@ -4388,7 +4388,7 @@ func TestValidateTokenRequest_ROPC_MissingUsername(t *testing.T) {
 
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "ropc-client").Return(client, nil).Once()
 
-	result, err := validator.ValidateTokenRequest(ctx, input)
+	result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 	assert.Nil(t, result)
 	assert.Error(t, err)
@@ -4409,7 +4409,7 @@ func TestValidateTokenRequest_ROPC_MissingPassword(t *testing.T) {
 	settings := &models.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
 	}
-	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+	ctx := context.Background()
 
 	ropcEnabled := true
 	client := &models.Client{
@@ -4428,7 +4428,7 @@ func TestValidateTokenRequest_ROPC_MissingPassword(t *testing.T) {
 
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "ropc-client").Return(client, nil).Once()
 
-	result, err := validator.ValidateTokenRequest(ctx, input)
+	result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 	assert.Nil(t, result)
 	assert.Error(t, err)
@@ -4451,7 +4451,7 @@ func TestValidateTokenRequest_ROPC_PublicClientWithSecret_Fails(t *testing.T) {
 	settings := &models.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
 	}
-	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+	ctx := context.Background()
 
 	ropcEnabled := true
 	client := &models.Client{
@@ -4472,7 +4472,7 @@ func TestValidateTokenRequest_ROPC_PublicClientWithSecret_Fails(t *testing.T) {
 
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "ropc-client").Return(client, nil).Once()
 
-	result, err := validator.ValidateTokenRequest(ctx, input)
+	result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 	assert.Nil(t, result)
 	customErr, ok := err.(*customerrors.ErrorDetail)
@@ -4495,7 +4495,7 @@ func TestValidateTokenRequest_ROPC_UserNotFound(t *testing.T) {
 	settings := &models.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
 	}
-	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+	ctx := context.Background()
 
 	ropcEnabled := true
 	client := &models.Client{
@@ -4515,7 +4515,7 @@ func TestValidateTokenRequest_ROPC_UserNotFound(t *testing.T) {
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "ropc-client").Return(client, nil).Once()
 	mockDB.On("GetUserByEmail", mock.Anything, mock.Anything, "nonexistent@example.com").Return(nil, nil).Once()
 
-	result, err := validator.ValidateTokenRequest(ctx, input)
+	result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 	assert.Nil(t, result)
 	assert.Error(t, err)
@@ -4545,7 +4545,7 @@ func TestValidateTokenRequest_ROPC_UsernameNormalizedForLookup(t *testing.T) {
 	settings := &models.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
 	}
-	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+	ctx := context.Background()
 
 	ropcEnabled := true
 	client := &models.Client{
@@ -4565,7 +4565,7 @@ func TestValidateTokenRequest_ROPC_UsernameNormalizedForLookup(t *testing.T) {
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "ropc-client").Return(client, nil).Once()
 	mockDB.On("GetUserByEmail", mock.Anything, mock.Anything, "bob@example.com").Return(nil, nil).Once()
 
-	result, err := validator.ValidateTokenRequest(ctx, input)
+	result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 	assert.Nil(t, result)
 	assert.Error(t, err)
@@ -4590,7 +4590,7 @@ func TestValidateTokenRequest_ROPC_WhitespaceOnlyUsernameIsInvalidGrant(t *testi
 	settings := &models.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
 	}
-	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+	ctx := context.Background()
 
 	ropcEnabled := true
 	client := &models.Client{
@@ -4610,7 +4610,7 @@ func TestValidateTokenRequest_ROPC_WhitespaceOnlyUsernameIsInvalidGrant(t *testi
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "ropc-client").Return(client, nil).Once()
 	mockDB.On("GetUserByEmail", mock.Anything, mock.Anything, "").Return(nil, nil).Once()
 
-	result, err := validator.ValidateTokenRequest(ctx, input)
+	result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 	assert.Nil(t, result)
 	assert.Error(t, err)
@@ -4629,7 +4629,7 @@ func TestValidateTokenRequest_ROPC_InvalidPassword(t *testing.T) {
 	settings := &models.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
 	}
-	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+	ctx := context.Background()
 
 	passwordHash, _ := passwordhash.Hash("correctpassword")
 	user := &models.User{
@@ -4657,7 +4657,7 @@ func TestValidateTokenRequest_ROPC_InvalidPassword(t *testing.T) {
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "ropc-client").Return(client, nil).Once()
 	mockDB.On("GetUserByEmail", mock.Anything, mock.Anything, "user@example.com").Return(user, nil).Once()
 
-	result, err := validator.ValidateTokenRequest(ctx, input)
+	result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 	assert.Nil(t, result)
 	assert.Error(t, err)
@@ -4678,7 +4678,7 @@ func TestValidateTokenRequest_ROPC_UserDisabled(t *testing.T) {
 	settings := &models.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
 	}
-	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+	ctx := context.Background()
 
 	passwordHash, _ := passwordhash.Hash("correctpassword")
 	user := &models.User{
@@ -4706,7 +4706,7 @@ func TestValidateTokenRequest_ROPC_UserDisabled(t *testing.T) {
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "ropc-client").Return(client, nil).Once()
 	mockDB.On("GetUserByEmail", mock.Anything, mock.Anything, "user@example.com").Return(user, nil).Once()
 
-	result, err := validator.ValidateTokenRequest(ctx, input)
+	result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 	assert.Nil(t, result)
 	assert.Error(t, err)
@@ -4727,7 +4727,7 @@ func TestValidateTokenRequest_ROPC_UserWith2FA(t *testing.T) {
 	settings := &models.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
 	}
-	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+	ctx := context.Background()
 
 	passwordHash, _ := passwordhash.Hash("correctpassword")
 	user := &models.User{
@@ -4756,7 +4756,7 @@ func TestValidateTokenRequest_ROPC_UserWith2FA(t *testing.T) {
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "ropc-client").Return(client, nil).Once()
 	mockDB.On("GetUserByEmail", mock.Anything, mock.Anything, "user@example.com").Return(user, nil).Once()
 
-	result, err := validator.ValidateTokenRequest(ctx, input)
+	result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 	assert.Nil(t, result)
 	assert.Error(t, err)
@@ -4777,7 +4777,7 @@ func TestValidateTokenRequest_ROPC_ConfidentialClient_MissingSecret(t *testing.T
 	settings := &models.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
 	}
-	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+	ctx := context.Background()
 
 	ropcEnabled := true
 	client := &models.Client{
@@ -4797,7 +4797,7 @@ func TestValidateTokenRequest_ROPC_ConfidentialClient_MissingSecret(t *testing.T
 
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "ropc-client").Return(client, nil).Once()
 
-	result, err := validator.ValidateTokenRequest(ctx, input)
+	result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 	assert.Nil(t, result)
 	assert.Error(t, err)
@@ -4821,7 +4821,7 @@ func TestValidateTokenRequest_ROPC_ConfidentialClient_InvalidSecret(t *testing.T
 	settings := &models.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
 	}
-	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+	ctx := context.Background()
 
 	ropcEnabled := true
 	client := &models.Client{
@@ -4842,7 +4842,7 @@ func TestValidateTokenRequest_ROPC_ConfidentialClient_InvalidSecret(t *testing.T
 
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "ropc-client").Return(client, nil).Once()
 
-	result, err := validator.ValidateTokenRequest(ctx, input)
+	result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 	assert.Nil(t, result)
 	assert.Error(t, err)
@@ -4865,7 +4865,7 @@ func TestValidateTokenRequest_ROPC_ConfidentialClient_Success(t *testing.T) {
 	settings := &models.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
 	}
-	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+	ctx := context.Background()
 
 	passwordHash, _ := passwordhash.Hash("userpassword")
 	user := &models.User{
@@ -4900,7 +4900,7 @@ func TestValidateTokenRequest_ROPC_ConfidentialClient_Success(t *testing.T) {
 	mockDB.On("UserLoadPermissions", mock.Anything, mock.Anything, user).Return(nil).Once()
 	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(nil).Once()
 
-	result, err := validator.ValidateTokenRequest(ctx, input)
+	result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, result)
@@ -4919,7 +4919,7 @@ func TestValidateTokenRequest_ROPC_EmptyScope_DefaultsToOpenId(t *testing.T) {
 	settings := &models.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
 	}
-	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+	ctx := context.Background()
 
 	passwordHash, _ := passwordhash.Hash("correctpassword")
 	user := &models.User{
@@ -4951,7 +4951,7 @@ func TestValidateTokenRequest_ROPC_EmptyScope_DefaultsToOpenId(t *testing.T) {
 	mockDB.On("UserLoadPermissions", mock.Anything, mock.Anything, user).Return(nil).Once()
 	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(nil).Once()
 
-	result, err := validator.ValidateTokenRequest(ctx, input)
+	result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, result)
@@ -4968,7 +4968,7 @@ func TestValidateTokenRequest_ROPC_WithOfflineAccess(t *testing.T) {
 	settings := &models.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
 	}
-	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+	ctx := context.Background()
 
 	passwordHash, _ := passwordhash.Hash("correctpassword")
 	user := &models.User{
@@ -5000,7 +5000,7 @@ func TestValidateTokenRequest_ROPC_WithOfflineAccess(t *testing.T) {
 	mockDB.On("UserLoadPermissions", mock.Anything, mock.Anything, user).Return(nil).Once()
 	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(nil).Once()
 
-	result, err := validator.ValidateTokenRequest(ctx, input)
+	result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, result)
@@ -5024,7 +5024,7 @@ func TestValidateTokenRequest_ROPC_ClaimScopesWithoutOpenid(t *testing.T) {
 			settings := &models.Settings{
 				ResourceOwnerPasswordCredentialsEnabled: true,
 			}
-			ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+			ctx := context.Background()
 
 			passwordHash, err := passwordhash.Hash("correctpassword")
 			require.NoError(t, err)
@@ -5056,7 +5056,7 @@ func TestValidateTokenRequest_ROPC_ClaimScopesWithoutOpenid(t *testing.T) {
 			mockDB.On("UserLoadPermissions", mock.Anything, mock.Anything, user).Return(nil).Once()
 			mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(nil).Once()
 
-			result, err := validator.ValidateTokenRequest(ctx, input)
+			result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 			require.NoError(t, err)
 			require.NotNil(t, result)
@@ -5076,7 +5076,7 @@ func TestValidateTokenRequest_ROPC_InvalidScopeFormat(t *testing.T) {
 	settings := &models.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
 	}
-	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+	ctx := context.Background()
 
 	passwordHash, _ := passwordhash.Hash("correctpassword")
 	user := &models.User{
@@ -5108,7 +5108,7 @@ func TestValidateTokenRequest_ROPC_InvalidScopeFormat(t *testing.T) {
 	mockDB.On("UserLoadPermissions", mock.Anything, mock.Anything, user).Return(nil).Once()
 	mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(nil).Once()
 
-	result, err := validator.ValidateTokenRequest(ctx, input)
+	result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 	assert.Nil(t, result)
 	assert.Error(t, err)
@@ -5129,7 +5129,7 @@ func TestValidateTokenRequest_ROPC_ResourcePermission_Success(t *testing.T) {
 	settings := &models.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
 	}
-	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+	ctx := context.Background()
 
 	passwordHash, _ := passwordhash.Hash("correctpassword")
 	user := &models.User{
@@ -5173,7 +5173,7 @@ func TestValidateTokenRequest_ROPC_ResourcePermission_Success(t *testing.T) {
 	mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(1)).Return(permissions, nil).Once()
 	mockPermissionChecker.On("UserHasScopePermission", mock.Anything, int64(1), "api:read").Return(true, nil).Once()
 
-	result, err := validator.ValidateTokenRequest(ctx, input)
+	result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, result)
@@ -5190,7 +5190,7 @@ func TestValidateTokenRequest_ROPC_ResourcePermission_UserLacksPermission(t *tes
 	settings := &models.Settings{
 		ResourceOwnerPasswordCredentialsEnabled: true,
 	}
-	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+	ctx := context.Background()
 
 	passwordHash, _ := passwordhash.Hash("correctpassword")
 	user := &models.User{
@@ -5234,7 +5234,7 @@ func TestValidateTokenRequest_ROPC_ResourcePermission_UserLacksPermission(t *tes
 	mockDB.On("GetPermissionsByResourceId", mock.Anything, mock.Anything, int64(1)).Return(permissions, nil).Once()
 	mockPermissionChecker.On("UserHasScopePermission", mock.Anything, int64(1), "api:read").Return(false, nil).Once()
 
-	result, err := validator.ValidateTokenRequest(ctx, input)
+	result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 	assert.Nil(t, result)
 	assert.Error(t, err)
@@ -5299,7 +5299,7 @@ func TestValidateTokenRequest_ROPC_ResourcePermission_ResolutionFailures(t *test
 			validator := NewTokenValidator(mockDB, mocks_protocolvalidation.NewTokenParser(t), mocks_protocolvalidation.NewPermissionChecker(t))
 
 			settings := &models.Settings{ResourceOwnerPasswordCredentialsEnabled: true}
-			ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+			ctx := context.Background()
 
 			passwordHash, _ := passwordhash.Hash("correctpassword")
 			user := &models.User{
@@ -5323,7 +5323,7 @@ func TestValidateTokenRequest_ROPC_ResourcePermission_ResolutionFailures(t *test
 			mockDB.On("UserLoadGroups", mock.Anything, mock.Anything, user).Return(nil).Once()
 			tc.setup(mockDB)
 
-			result, err := validator.ValidateTokenRequest(ctx, &ValidateTokenRequestInput{
+			result, err := validator.ValidateTokenRequest(ctx, settings, &ValidateTokenRequestInput{
 				GrantType: "password",
 				ClientId:  "ropc-client",
 				Username:  "user@example.com",
@@ -5358,7 +5358,7 @@ type storedGrant struct {
 // the consent row come after that comparison, so they are stubbed only when reachesUser is set, and
 // a case that stops at the comparison fails if it reads either.
 func newStoredGrantRefresh(t *testing.T, g storedGrant, requestedScope string, reachesUser bool) (
-	*TokenValidator, *mocks_protocolvalidation.PermissionChecker, context.Context, *ValidateTokenRequestInput) {
+	*TokenValidator, *mocks_protocolvalidation.PermissionChecker, *models.Settings, *ValidateTokenRequestInput) {
 	t.Helper()
 
 	mockDB := mocks_data.NewDatabase(t)
@@ -5370,7 +5370,6 @@ func newStoredGrantRefresh(t *testing.T, g storedGrant, requestedScope string, r
 		UserSessionIdleTimeoutInSeconds: 3600,
 		UserSessionMaxLifetimeInSeconds: 86400,
 	}
-	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
 
 	input := &ValidateTokenRequestInput{
 		GrantType:    "refresh_token",
@@ -5454,7 +5453,7 @@ func newStoredGrantRefresh(t *testing.T, g storedGrant, requestedScope string, r
 		}
 	}
 
-	return validator, mockPermissionChecker, ctx, input
+	return validator, mockPermissionChecker, settings, input
 }
 
 // TestValidateTokenRequest_RefreshToken_StoredScopeThisServerDoesNotIssue pins the refresh arm's
@@ -5543,13 +5542,13 @@ func TestValidateTokenRequest_RefreshToken_StoredScopeThisServerDoesNotIssue(t *
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			validator, mockPermissionChecker, ctx, input := newStoredGrantRefresh(t, tc.grant, tc.requestedScope, true)
+			validator, mockPermissionChecker, settings, input := newStoredGrantRefresh(t, tc.grant, tc.requestedScope, true)
 			if tc.permissionScope != "" {
 				mockPermissionChecker.On("UserHasScopePermission", mock.Anything, int64(1), tc.permissionScope).
 					Return(true, nil).Once()
 			}
 
-			result, err := validator.ValidateTokenRequest(ctx, input)
+			result, err := validator.ValidateTokenRequest(context.Background(), settings, input)
 
 			if tc.wantDesc == "" {
 				require.NoError(t, err)
@@ -5605,9 +5604,9 @@ func TestValidateTokenRequest_RefreshToken_RequestedScopeBeyondTheGrant(t *testi
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			validator, mockPermissionChecker, ctx, input := newStoredGrantRefresh(t, tc.grant, tc.requestedScope, false)
+			validator, mockPermissionChecker, settings, input := newStoredGrantRefresh(t, tc.grant, tc.requestedScope, false)
 
-			result, err := validator.ValidateTokenRequest(ctx, input)
+			result, err := validator.ValidateTokenRequest(context.Background(), settings, input)
 
 			assert.Nil(t, result)
 			var customErr *customerrors.ErrorDetail
@@ -5667,13 +5666,13 @@ func TestValidateTokenRequest_RefreshToken_RequestedScopeWithinTheGrant(t *testi
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			validator, mockPermissionChecker, ctx, input := newStoredGrantRefresh(t, tc.grant, tc.requestedScope, true)
+			validator, mockPermissionChecker, settings, input := newStoredGrantRefresh(t, tc.grant, tc.requestedScope, true)
 			if tc.permissionScope != "" {
 				mockPermissionChecker.On("UserHasScopePermission", mock.Anything, int64(1), tc.permissionScope).
 					Return(true, nil).Once()
 			}
 
-			result, err := validator.ValidateTokenRequest(ctx, input)
+			result, err := validator.ValidateTokenRequest(context.Background(), settings, input)
 
 			require.NoError(t, err)
 			assert.NotNil(t, result)
@@ -5732,14 +5731,14 @@ func TestValidateTokenRequest_RefreshToken_StoredGrantNamingUserinfo(t *testing.
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			validator, mockPermissionChecker, ctx, input := newStoredGrantRefresh(t,
+			validator, mockPermissionChecker, settings, input := newStoredGrantRefresh(t,
 				storedGrant{ropc: true, scope: tc.storedScope}, tc.requestedScope, true)
 			if !tc.wantAccepted {
 				mockPermissionChecker.On("UserHasScopePermission", mock.Anything, int64(1), userinfoScope).
 					Return(false, nil).Once()
 			}
 
-			result, err := validator.ValidateTokenRequest(ctx, input)
+			result, err := validator.ValidateTokenRequest(context.Background(), settings, input)
 
 			if tc.wantAccepted {
 				require.NoError(t, err)
@@ -5816,7 +5815,8 @@ func TestValidateTokenRequest_ClientCredentials_NoScopeGiven(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			mockDB := mocks_data.NewDatabase(t)
 			validator := NewTokenValidator(mockDB, mocks_protocolvalidation.NewTokenParser(t), mocks_protocolvalidation.NewPermissionChecker(t))
-			ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &models.Settings{})
+			settings := &models.Settings{}
+			ctx := context.Background()
 
 			clientSecretEncrypted, _ := encryption.EncryptData("valid_secret")
 			client := &models.Client{
@@ -5848,7 +5848,7 @@ func TestValidateTokenRequest_ClientCredentials_NoScopeGiven(t *testing.T) {
 			}
 
 			// Scope deliberately omitted, which is what selects the expansion branch.
-			result, err := validator.ValidateTokenRequest(ctx, &ValidateTokenRequestInput{
+			result, err := validator.ValidateTokenRequest(ctx, settings, &ValidateTokenRequestInput{
 				GrantType:    "client_credentials",
 				ClientId:     "cc_client",
 				ClientSecret: "valid_secret",
@@ -5890,7 +5890,8 @@ func TestValidateTokenRequest_AuthStateGeneration(t *testing.T) {
 				mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 				mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 				validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
-				ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &models.Settings{})
+				settings := &models.Settings{}
+				ctx := context.Background()
 
 				// Confidential, with a secret, because the subject here is the generation
 				// boundary and nothing else. It was public only to sidestep the secret
@@ -5922,7 +5923,7 @@ func TestValidateTokenRequest_AuthStateGeneration(t *testing.T) {
 				mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, code).Return(nil)
 				expectRedirectURIStillRegistered(mockDB, "https://example.com/cb")
 
-				result, err := validator.ValidateTokenRequest(ctx, &ValidateTokenRequestInput{
+				result, err := validator.ValidateTokenRequest(ctx, settings, &ValidateTokenRequestInput{
 					GrantType:    "authorization_code",
 					ClientId:     "test_client",
 					ClientSecret: "client_secret",
@@ -5970,10 +5971,11 @@ func TestValidateTokenRequest_AuthStateGeneration(t *testing.T) {
 				mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 				mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 				validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
-				ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &models.Settings{
+				settings := &models.Settings{
 					UserSessionIdleTimeoutInSeconds: 3600,
 					UserSessionMaxLifetimeInSeconds: 86400,
-				})
+				}
+				ctx := context.Background()
 
 				// Confidential for the same reason as the redemption case above: the
 				// subject is the generation boundary, and a public client whose grant
@@ -6019,7 +6021,7 @@ func TestValidateTokenRequest_AuthStateGeneration(t *testing.T) {
 					mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "user_subject").Return(&user, nil)
 				}
 
-				result, err := validator.ValidateTokenRequest(ctx, &ValidateTokenRequestInput{
+				result, err := validator.ValidateTokenRequest(ctx, settings, &ValidateTokenRequestInput{
 					GrantType:    "refresh_token",
 					ClientId:     "test_client",
 					ClientSecret: "client_secret",
@@ -6057,7 +6059,8 @@ func TestValidateTokenRequest_AuthStateGeneration(t *testing.T) {
 				mockTokenParser := mocks_protocolvalidation.NewTokenParser(t)
 				mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 				validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
-				ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &models.Settings{})
+				settings := &models.Settings{}
+				ctx := context.Background()
 
 				client := &models.Client{
 					Id: 1, ClientIdentifier: "ropc_client", Enabled: true,
@@ -6088,7 +6091,7 @@ func TestValidateTokenRequest_AuthStateGeneration(t *testing.T) {
 					mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "ropc_user_subject").Return(&user, nil)
 				}
 
-				result, err := validator.ValidateTokenRequest(ctx, &ValidateTokenRequestInput{
+				result, err := validator.ValidateTokenRequest(ctx, settings, &ValidateTokenRequestInput{
 					GrantType:    "refresh_token",
 					ClientId:     "ropc_client",
 					RefreshToken: "ropc_refresh_token",
@@ -6140,7 +6143,7 @@ func TestValidateTokenRequest_RefreshToken_ExpiryPrecedesTheLookup(t *testing.T)
 	validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
 	settings := &models.Settings{}
-	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+	ctx := context.Background()
 
 	input := &ValidateTokenRequestInput{
 		GrantType:    "refresh_token",
@@ -6160,7 +6163,7 @@ func TestValidateTokenRequest_RefreshToken_ExpiryPrecedesTheLookup(t *testing.T)
 	mockTokenParser.On("DecodeAndValidateTokenString", mock.Anything, "expired_refresh_token", true).
 		Return(nil, errors.New("token has invalid claims: token is expired")).Once()
 
-	result, err := validator.ValidateTokenRequest(ctx, input)
+	result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 	assert.Nil(t, result)
 	require.Error(t, err)
@@ -6204,7 +6207,8 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 	t.Run("authorization code redemption", func(t *testing.T) {
 		t.Run("a revoked code is refused", func(t *testing.T) {
 			validator, mockDB, _ := newValidator(t)
-			ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &models.Settings{})
+			settings := &models.Settings{}
+			ctx := context.Background()
 
 			clientSecretEncrypted, err := encryption.EncryptData("client_secret")
 			require.NoError(t, err)
@@ -6229,7 +6233,7 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 			mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, code).Return(nil)
 			mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, code).Return(nil)
 
-			result, err := validator.ValidateTokenRequest(ctx, &ValidateTokenRequestInput{
+			result, err := validator.ValidateTokenRequest(ctx, settings, &ValidateTokenRequestInput{
 				GrantType:    "authorization_code",
 				ClientId:     "test_client",
 				ClientSecret: "client_secret",
@@ -6250,7 +6254,8 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 		t.Run("the same code unrevoked is redeemable", func(t *testing.T) {
 			// The positive control. Varies exactly one field from the row above.
 			validator, mockDB, _ := newValidator(t)
-			ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &models.Settings{})
+			settings := &models.Settings{}
+			ctx := context.Background()
 
 			clientSecretEncrypted, err := encryption.EncryptData("client_secret")
 			require.NoError(t, err)
@@ -6276,7 +6281,7 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 			mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, code).Return(nil)
 			expectRedirectURIStillRegistered(mockDB, "https://example.com/cb")
 
-			result, err := validator.ValidateTokenRequest(ctx, &ValidateTokenRequestInput{
+			result, err := validator.ValidateTokenRequest(ctx, settings, &ValidateTokenRequestInput{
 				GrantType:    "authorization_code",
 				ClientId:     "test_client",
 				ClientSecret: "client_secret",
@@ -6290,7 +6295,8 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 
 		t.Run("ordering: a wrong PKCE verifier answers before the revoked check", func(t *testing.T) {
 			validator, mockDB, _ := newValidator(t)
-			ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &models.Settings{})
+			settings := &models.Settings{}
+			ctx := context.Background()
 
 			client := &models.Client{
 				Id: 1, ClientIdentifier: "test_client", Enabled: true,
@@ -6312,7 +6318,7 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 			mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, code).Return(nil)
 			mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, code).Return(nil)
 
-			result, err := validator.ValidateTokenRequest(ctx, &ValidateTokenRequestInput{
+			result, err := validator.ValidateTokenRequest(ctx, settings, &ValidateTokenRequestInput{
 				GrantType:    "authorization_code",
 				ClientId:     "test_client",
 				Code:         "the-code",
@@ -6331,7 +6337,8 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 
 		t.Run("ordering: a missing client secret answers before the revoked check", func(t *testing.T) {
 			validator, mockDB, _ := newValidator(t)
-			ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &models.Settings{})
+			settings := &models.Settings{}
+			ctx := context.Background()
 
 			clientSecretEncrypted, err := encryption.EncryptData("the_client_secret")
 			require.NoError(t, err)
@@ -6356,7 +6363,7 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 			mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, code).Return(nil)
 			mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, code).Return(nil)
 
-			result, err := validator.ValidateTokenRequest(ctx, &ValidateTokenRequestInput{
+			result, err := validator.ValidateTokenRequest(ctx, settings, &ValidateTokenRequestInput{
 				GrantType:   "authorization_code",
 				ClientId:    "test_client",
 				Code:        "the-code",
@@ -6383,7 +6390,8 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 			// exists to prevent. A PRESENT but wrong secret is the only input that fails if
 			// the check moves anywhere ahead of authentication completing.
 			validator, mockDB, _ := newValidator(t)
-			ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &models.Settings{})
+			settings := &models.Settings{}
+			ctx := context.Background()
 
 			clientSecretEncrypted, err := encryption.EncryptData("the_real_client_secret")
 			require.NoError(t, err)
@@ -6408,7 +6416,7 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 			mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, code).Return(nil)
 			mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, code).Return(nil)
 
-			result, err := validator.ValidateTokenRequest(ctx, &ValidateTokenRequestInput{
+			result, err := validator.ValidateTokenRequest(ctx, settings, &ValidateTokenRequestInput{
 				GrantType:    "authorization_code",
 				ClientId:     "test_client",
 				Code:         "the-code",
@@ -6430,7 +6438,8 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 			// carries the code entity that drives #77's containment cascade, and a
 			// revoked-code rejection landing first would suppress it.
 			validator, mockDB, _ := newValidator(t)
-			ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &models.Settings{})
+			settings := &models.Settings{}
+			ctx := context.Background()
 
 			clientSecretEncrypted, err := encryption.EncryptData("client_secret")
 			require.NoError(t, err)
@@ -6458,7 +6467,7 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 			mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, code).Return(nil)
 			mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, code).Return(nil)
 
-			result, err := validator.ValidateTokenRequest(ctx, &ValidateTokenRequestInput{
+			result, err := validator.ValidateTokenRequest(ctx, settings, &ValidateTokenRequestInput{
 				GrantType:    "authorization_code",
 				ClientId:     "test_client",
 				ClientSecret: "client_secret",
@@ -6517,7 +6526,8 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 
 		t.Run("an offline token whose code was revoked is refused", func(t *testing.T) {
 			validator, mockDB, mockTokenParser := newValidator(t)
-			ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &models.Settings{})
+			settings := &models.Settings{}
+			ctx := context.Background()
 			client, refreshToken, _ := build(true, 1)
 
 			mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test_client").Return(client, nil)
@@ -6527,7 +6537,7 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 			mockDB.On("RefreshTokenLoadCode", mock.Anything, mock.Anything, refreshToken).Return(nil)
 			mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, &refreshToken.Code).Return(nil)
 
-			result, err := validator.ValidateTokenRequest(ctx, &ValidateTokenRequestInput{
+			result, err := validator.ValidateTokenRequest(ctx, settings, &ValidateTokenRequestInput{
 				GrantType:    "refresh_token",
 				ClientId:     "test_client",
 				ClientSecret: "client_secret",
@@ -6546,7 +6556,8 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 			// Offline branch is what refused above: an offline grant is designed to outlive
 			// its browser session, so this must keep working (decision 2).
 			validator, mockDB, mockTokenParser := newValidator(t)
-			ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &models.Settings{})
+			settings := &models.Settings{}
+			ctx := context.Background()
 			client, refreshToken, user := build(false, 1)
 
 			mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test_client").Return(client, nil)
@@ -6567,7 +6578,7 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 			mockDB.On("GetConsentByUserIdAndClientId", mock.Anything, mock.Anything, int64(7), int64(1)).
 				Return(&models.UserConsent{UserId: 7, ClientId: 1, Scope: "openid offline_access"}, nil)
 
-			result, err := validator.ValidateTokenRequest(ctx, &ValidateTokenRequestInput{
+			result, err := validator.ValidateTokenRequest(ctx, settings, &ValidateTokenRequestInput{
 				GrantType:    "refresh_token",
 				ClientId:     "test_client",
 				ClientSecret: "client_secret",
@@ -6583,7 +6594,8 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 			// answer, so a client that does not hold the grant cannot learn from this
 			// endpoint that somebody's session was terminated.
 			validator, mockDB, mockTokenParser := newValidator(t)
-			ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &models.Settings{})
+			settings := &models.Settings{}
+			ctx := context.Background()
 			client, refreshToken, _ := build(true, 2)
 
 			mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test_client").Return(client, nil)
@@ -6593,7 +6605,7 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 			mockDB.On("RefreshTokenLoadCode", mock.Anything, mock.Anything, refreshToken).Return(nil)
 			mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, &refreshToken.Code).Return(nil)
 
-			result, err := validator.ValidateTokenRequest(ctx, &ValidateTokenRequestInput{
+			result, err := validator.ValidateTokenRequest(ctx, settings, &ValidateTokenRequestInput{
 				GrantType:    "refresh_token",
 				ClientId:     "test_client",
 				ClientSecret: "client_secret",
@@ -6617,7 +6629,8 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 		// Its own zero value is false, so this row would pass with the guard deleted; it is
 		// here to pin the branch as deliberate and to fail if the guard is ever inverted.
 		validator, mockDB, mockTokenParser := newValidator(t)
-		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &models.Settings{})
+		settings := &models.Settings{}
+		ctx := context.Background()
 
 		client := &models.Client{
 			Id: 1, ClientIdentifier: "ropc_client", Enabled: true,
@@ -6645,7 +6658,7 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 		mockDB.On("RefreshTokenLoadClient", mock.Anything, mock.Anything, refreshToken).Return(nil)
 		mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "ropc_user_subject").Return(&user, nil)
 
-		result, err := validator.ValidateTokenRequest(ctx, &ValidateTokenRequestInput{
+		result, err := validator.ValidateTokenRequest(ctx, settings, &ValidateTokenRequestInput{
 			GrantType:    "refresh_token",
 			ClientId:     "ropc_client",
 			RefreshToken: "ropc_refresh_token",
@@ -6672,7 +6685,7 @@ func TestValidateTokenRequest_RevokedCode(t *testing.T) {
 func TestValidateTokenRequest_RefreshToken_SessionOwnership(t *testing.T) {
 	const grantUserId = int64(1)
 
-	setup := func(t *testing.T, sessionUserId int64) (*TokenValidator, *ValidateTokenRequestInput, context.Context) {
+	setup := func(t *testing.T, sessionUserId int64) (*TokenValidator, *ValidateTokenRequestInput, *models.Settings) {
 		t.Helper()
 
 		mockDB := mocks_data.NewDatabase(t)
@@ -6684,7 +6697,6 @@ func TestValidateTokenRequest_RefreshToken_SessionOwnership(t *testing.T) {
 			UserSessionIdleTimeoutInSeconds: 3600,
 			UserSessionMaxLifetimeInSeconds: 86400,
 		}
-		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
 
 		// Confidential, and it used to be public (#245). The subject is session ownership,
 		// and the grant's code carries no challenge, so a public client would now be refused
@@ -6750,22 +6762,22 @@ func TestValidateTokenRequest_RefreshToken_SessionOwnership(t *testing.T) {
 			RefreshToken: "ownership_refresh_token",
 		}
 
-		return validator, input, ctx
+		return validator, input, settings
 	}
 
 	t.Run("a session belonging to the grant's user is accepted", func(t *testing.T) {
-		validator, input, ctx := setup(t, grantUserId)
+		validator, input, settings := setup(t, grantUserId)
 
-		result, err := validator.ValidateTokenRequest(ctx, input)
+		result, err := validator.ValidateTokenRequest(context.Background(), settings, input)
 
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
 	})
 
 	t.Run("a session belonging to another user is refused", func(t *testing.T) {
-		validator, input, ctx := setup(t, grantUserId+1)
+		validator, input, settings := setup(t, grantUserId+1)
 
-		result, err := validator.ValidateTokenRequest(ctx, input)
+		result, err := validator.ValidateTokenRequest(context.Background(), settings, input)
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
@@ -6807,7 +6819,7 @@ func TestValidateTokenRequest_AuthorizationCode_SessionOwnership(t *testing.T) {
 	// gone, which is the swept case; otherwise it is the user the row belongs to. A non-nil
 	// lookupErr makes the lookup itself fail, which is a third outcome and not a fourth
 	// flavour of absence.
-	setup := func(t *testing.T, sessionOwner *int64, lookupErr error) (*TokenValidator, *ValidateTokenRequestInput, context.Context) {
+	setup := func(t *testing.T, sessionOwner *int64, lookupErr error) (*TokenValidator, *ValidateTokenRequestInput, *models.Settings) {
 		t.Helper()
 
 		mockDB := mocks_data.NewDatabase(t)
@@ -6815,7 +6827,7 @@ func TestValidateTokenRequest_AuthorizationCode_SessionOwnership(t *testing.T) {
 		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
-		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &models.Settings{})
+		settings := &models.Settings{}
 
 		// Confidential, and it used to be public (#245). The subject is the code's session
 		// ownership, and the code carries no challenge, so a public client would now be
@@ -6872,15 +6884,15 @@ func TestValidateTokenRequest_AuthorizationCode_SessionOwnership(t *testing.T) {
 			RedirectURI:  "https://example.com/callback",
 		}
 
-		return validator, input, ctx
+		return validator, input, settings
 	}
 
 	owner := func(id int64) *int64 { return &id }
 
 	t.Run("a session belonging to the code's user is accepted", func(t *testing.T) {
-		validator, input, ctx := setup(t, owner(grantUserId), nil)
+		validator, input, settings := setup(t, owner(grantUserId), nil)
 
-		result, err := validator.ValidateTokenRequest(ctx, input)
+		result, err := validator.ValidateTokenRequest(context.Background(), settings, input)
 
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
@@ -6890,9 +6902,9 @@ func TestValidateTokenRequest_AuthorizationCode_SessionOwnership(t *testing.T) {
 		// The deliberate hole, asserted so nobody closes it by accident. Refusing on a
 		// missing row would refuse every grant whose session has simply timed out, which is
 		// most of them.
-		validator, input, ctx := setup(t, nil, nil)
+		validator, input, settings := setup(t, nil, nil)
 
-		result, err := validator.ValidateTokenRequest(ctx, input)
+		result, err := validator.ValidateTokenRequest(context.Background(), settings, input)
 
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
@@ -6904,9 +6916,9 @@ func TestValidateTokenRequest_AuthorizationCode_SessionOwnership(t *testing.T) {
 		// unreachable database wave every cross-bound code through. This is the case that
 		// pins the difference: the same error comes back, unwrapped into an OAuth refusal.
 		lookupErr := errors.New("database is down")
-		validator, input, ctx := setup(t, nil, lookupErr)
+		validator, input, settings := setup(t, nil, lookupErr)
 
-		result, err := validator.ValidateTokenRequest(ctx, input)
+		result, err := validator.ValidateTokenRequest(context.Background(), settings, input)
 
 		assert.Nil(t, result)
 		assert.ErrorIs(t, err, lookupErr)
@@ -6915,9 +6927,9 @@ func TestValidateTokenRequest_AuthorizationCode_SessionOwnership(t *testing.T) {
 	})
 
 	t.Run("a session belonging to another user is refused", func(t *testing.T) {
-		validator, input, ctx := setup(t, owner(grantUserId+1), nil)
+		validator, input, settings := setup(t, owner(grantUserId+1), nil)
 
-		result, err := validator.ValidateTokenRequest(ctx, input)
+		result, err := validator.ValidateTokenRequest(context.Background(), settings, input)
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
@@ -6956,7 +6968,7 @@ func TestValidateTokenRequest_OfflineRefreshToken_SessionOwnership(t *testing.T)
 	// maximum lifetime and registers NO lookup at all, so the strict mock is what asserts
 	// the ordering: reaching the session before rejecting an expired token is a failure,
 	// not a slower pass.
-	setup := func(t *testing.T, sessionOwner *int64, lookupErr error, expired bool) (*TokenValidator, *ValidateTokenRequestInput, context.Context) {
+	setup := func(t *testing.T, sessionOwner *int64, lookupErr error, expired bool) (*TokenValidator, *ValidateTokenRequestInput, *models.Settings) {
 		t.Helper()
 
 		mockDB := mocks_data.NewDatabase(t)
@@ -6964,7 +6976,7 @@ func TestValidateTokenRequest_OfflineRefreshToken_SessionOwnership(t *testing.T)
 		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
-		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &models.Settings{})
+		settings := &models.Settings{}
 
 		// Confidential, and it used to be public (#245). The subject is the offline grant's
 		// session ownership, and its code carries no challenge, so a public client would now
@@ -7037,15 +7049,15 @@ func TestValidateTokenRequest_OfflineRefreshToken_SessionOwnership(t *testing.T)
 			RefreshToken: "the-refresh-token",
 		}
 
-		return validator, input, ctx
+		return validator, input, settings
 	}
 
 	owner := func(id int64) *int64 { return &id }
 
 	t.Run("a session belonging to the grant's user is accepted", func(t *testing.T) {
-		validator, input, ctx := setup(t, owner(grantUserId), nil, false)
+		validator, input, settings := setup(t, owner(grantUserId), nil, false)
 
-		result, err := validator.ValidateTokenRequest(ctx, input)
+		result, err := validator.ValidateTokenRequest(context.Background(), settings, input)
 
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
@@ -7054,9 +7066,9 @@ func TestValidateTokenRequest_OfflineRefreshToken_SessionOwnership(t *testing.T)
 	t.Run("a session that has already been swept is accepted", func(t *testing.T) {
 		// An offline grant outliving its session is the whole point of the type. This row
 		// is what pins that the new check did not change that.
-		validator, input, ctx := setup(t, nil, nil, false)
+		validator, input, settings := setup(t, nil, nil, false)
 
-		result, err := validator.ValidateTokenRequest(ctx, input)
+		result, err := validator.ValidateTokenRequest(context.Background(), settings, input)
 
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
@@ -7067,9 +7079,9 @@ func TestValidateTokenRequest_OfflineRefreshToken_SessionOwnership(t *testing.T)
 		// temptation to treat a failed lookup as one more way of being absent is real here.
 		// It must not be: a database that cannot answer has not said the session is gone.
 		lookupErr := errors.New("database is down")
-		validator, input, ctx := setup(t, nil, lookupErr, false)
+		validator, input, settings := setup(t, nil, lookupErr, false)
 
-		result, err := validator.ValidateTokenRequest(ctx, input)
+		result, err := validator.ValidateTokenRequest(context.Background(), settings, input)
 
 		assert.Nil(t, result)
 		assert.ErrorIs(t, err, lookupErr)
@@ -7083,9 +7095,9 @@ func TestValidateTokenRequest_OfflineRefreshToken_SessionOwnership(t *testing.T)
 		// is already past its offline maximum lifetime. Every other expired-offline fixture in
 		// this file has an empty code sid and so performs no lookup whatever the order. The strict
 		// mock carries the assertion; the error only confirms which gate did the refusing.
-		validator, input, ctx := setup(t, owner(grantUserId+1), nil, true)
+		validator, input, settings := setup(t, owner(grantUserId+1), nil, true)
 
-		result, err := validator.ValidateTokenRequest(ctx, input)
+		result, err := validator.ValidateTokenRequest(context.Background(), settings, input)
 
 		assert.Nil(t, result)
 		customErr, ok := err.(*customerrors.ErrorDetail)
@@ -7095,9 +7107,9 @@ func TestValidateTokenRequest_OfflineRefreshToken_SessionOwnership(t *testing.T)
 	})
 
 	t.Run("a session belonging to another user is refused", func(t *testing.T) {
-		validator, input, ctx := setup(t, owner(grantUserId+1), nil, false)
+		validator, input, settings := setup(t, owner(grantUserId+1), nil, false)
 
-		result, err := validator.ValidateTokenRequest(ctx, input)
+		result, err := validator.ValidateTokenRequest(context.Background(), settings, input)
 
 		assert.Nil(t, result)
 		assert.Error(t, err)
@@ -7128,7 +7140,7 @@ func TestValidateTokenRequest_AuthorizationCode_RedirectURIStillRegistered(t *te
 	// codeChallenge empty means the code was minted without PKCE, which is every case but the
 	// last; the last needs a stored challenge so that a wrong verifier is a genuine PKCE
 	// failure rather than the strict-mode rejection of an unexpected one.
-	setup := func(t *testing.T, codeRedirectURI string, registered []string, loadErr error, codeChallenge string) (*TokenValidator, *ValidateTokenRequestInput, context.Context) {
+	setup := func(t *testing.T, codeRedirectURI string, registered []string, loadErr error, codeChallenge string) (*TokenValidator, *ValidateTokenRequestInput, *models.Settings) {
 		t.Helper()
 
 		mockDB := mocks_data.NewDatabase(t)
@@ -7136,7 +7148,7 @@ func TestValidateTokenRequest_AuthorizationCode_RedirectURIStillRegistered(t *te
 		mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 		validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
 
-		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &models.Settings{})
+		settings := &models.Settings{}
 
 		// Confidential, and the code carries no challenge, so the PKCE boundary (#245) does not
 		// pre-empt the subject. The secret also gives the ordering cases below something real to
@@ -7197,24 +7209,24 @@ func TestValidateTokenRequest_AuthorizationCode_RedirectURIStillRegistered(t *te
 			RedirectURI:  codeRedirectURI,
 		}
 
-		return validator, input, ctx
+		return validator, input, settings
 	}
 
 	t.Run("a code whose redirect URI is still registered is redeemable", func(t *testing.T) {
-		validator, input, ctx := setup(t, "https://example.com/callback",
+		validator, input, settings := setup(t, "https://example.com/callback",
 			[]string{"https://other.example.com/cb", "https://example.com/callback"}, nil, "")
 
-		result, err := validator.ValidateTokenRequest(ctx, input)
+		result, err := validator.ValidateTokenRequest(context.Background(), settings, input)
 
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
 	})
 
 	t.Run("a code whose redirect URI was deregistered is refused", func(t *testing.T) {
-		validator, input, ctx := setup(t, "https://example.com/callback",
+		validator, input, settings := setup(t, "https://example.com/callback",
 			[]string{"https://other.example.com/cb"}, nil, "")
 
-		result, err := validator.ValidateTokenRequest(ctx, input)
+		result, err := validator.ValidateTokenRequest(context.Background(), settings, input)
 
 		assert.Nil(t, result)
 		customErr, ok := err.(*customerrors.ErrorDetail)
@@ -7232,10 +7244,10 @@ func TestValidateTokenRequest_AuthorizationCode_RedirectURIStillRegistered(t *te
 	})
 
 	t.Run("a client with no registrations left refuses every outstanding code", func(t *testing.T) {
-		validator, input, ctx := setup(t, "https://example.com/callback",
+		validator, input, settings := setup(t, "https://example.com/callback",
 			[]string{}, nil, "")
 
-		result, err := validator.ValidateTokenRequest(ctx, input)
+		result, err := validator.ValidateTokenRequest(context.Background(), settings, input)
 
 		assert.Nil(t, result)
 		// errors.Is alone: matching the sentinel already establishes the value is an
@@ -7248,10 +7260,10 @@ func TestValidateTokenRequest_AuthorizationCode_RedirectURIStillRegistered(t *te
 		// conditional to match the emitter's false. A native app registers
 		// http://127.0.0.1/callback and requests an ephemeral port at authorization time, so
 		// the code stores the ported form and nothing exact-matches it (RFC 8252, decision 5).
-		validator, input, ctx := setup(t, "http://127.0.0.1:54321/callback",
+		validator, input, settings := setup(t, "http://127.0.0.1:54321/callback",
 			[]string{"http://127.0.0.1/callback"}, nil, "")
 
-		result, err := validator.ValidateTokenRequest(ctx, input)
+		result, err := validator.ValidateTokenRequest(context.Background(), settings, input)
 
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
@@ -7262,10 +7274,10 @@ func TestValidateTokenRequest_AuthorizationCode_RedirectURIStillRegistered(t *te
 		// nothing about whether the URI is registered, so turning the failure into a refusal
 		// would report an outage as an administrative action.
 		loadErr := errors.New("database is down")
-		validator, input, ctx := setup(t, "https://example.com/callback",
+		validator, input, settings := setup(t, "https://example.com/callback",
 			nil, loadErr, "")
 
-		result, err := validator.ValidateTokenRequest(ctx, input)
+		result, err := validator.ValidateTokenRequest(context.Background(), settings, input)
 
 		assert.Nil(t, result)
 		assert.ErrorIs(t, err, loadErr)
@@ -7280,11 +7292,11 @@ func TestValidateTokenRequest_AuthorizationCode_RedirectURIStillRegistered(t *te
 		// check below client authentication (#137): an unauthenticated presenter of a stolen
 		// code must not learn from the answer whether the grant's destination still exists.
 		// Do not "simplify" this by adding the expectation.
-		validator, input, ctx := setup(t, "https://example.com/callback",
+		validator, input, settings := setup(t, "https://example.com/callback",
 			nil, nil, "")
 		input.ClientSecret = "wrong_secret"
 
-		result, err := validator.ValidateTokenRequest(ctx, input)
+		result, err := validator.ValidateTokenRequest(context.Background(), settings, input)
 
 		assert.Nil(t, result)
 		customErr, ok := err.(*customerrors.ErrorDetail)
@@ -7297,11 +7309,11 @@ func TestValidateTokenRequest_AuthorizationCode_RedirectURIStillRegistered(t *te
 		// The code carries a challenge here, so a wrong verifier is a real PKCE failure rather
 		// than the strict-mode rejection of an unexpected one, and it must not reach the
 		// registration read. Again: no ClientLoadRedirectURIs expectation, deliberately.
-		validator, input, ctx := setup(t, "https://example.com/callback",
+		validator, input, settings := setup(t, "https://example.com/callback",
 			nil, nil, oauth.GeneratePKCECodeChallenge("the_right_verifier"))
 		input.CodeVerifier = "the_wrong_verifier"
 
-		result, err := validator.ValidateTokenRequest(ctx, input)
+		result, err := validator.ValidateTokenRequest(context.Background(), settings, input)
 
 		assert.Nil(t, result)
 		customErr, ok := err.(*customerrors.ErrorDetail)
@@ -7355,7 +7367,8 @@ func TestValidateTokenRequest_RefreshToken_SubjectResolvesToNoUser(t *testing.T)
 			mockPermissionChecker := mocks_protocolvalidation.NewPermissionChecker(t)
 
 			validator := NewTokenValidator(mockDB, mockTokenParser, mockPermissionChecker)
-			ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &models.Settings{})
+			settings := &models.Settings{}
+			ctx := context.Background()
 
 			input := &ValidateTokenRequestInput{
 				GrantType:    "refresh_token",
@@ -7402,7 +7415,7 @@ func TestValidateTokenRequest_RefreshToken_SubjectResolvesToNoUser(t *testing.T)
 			// The row the whole test is about: a signed, live refresh token whose sub names nothing.
 			mockDB.On("GetUserBySubject", mock.Anything, mock.Anything, "orphaned_subject").Return(nil, nil)
 
-			result, err := validator.ValidateTokenRequest(ctx, input)
+			result, err := validator.ValidateTokenRequest(ctx, settings, input)
 
 			assert.Nil(t, result)
 			require.Error(t, err)

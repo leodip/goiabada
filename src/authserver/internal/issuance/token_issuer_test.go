@@ -15,7 +15,6 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 
 	"github.com/leodip/goiabada/authserver/internal/config"
-	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/authserver/internal/userclaims"
@@ -66,7 +65,7 @@ func TestGenerateTokenResponseForAuthCode_FullOpenIDConnect(t *testing.T) {
 		RefreshTokenOfflineMaxLifetimeInSeconds: 3600,
 	}
 
-	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+	ctx := context.Background()
 
 	now := time.Now().UTC()
 	sub := fake.UUID()
@@ -145,7 +144,7 @@ func TestGenerateTokenResponseForAuthCode_FullOpenIDConnect(t *testing.T) {
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 	}, nil)
 
-	response, err := tokenIssuer.GenerateTokenResponseForAuthCode(ctx, code)
+	response, err := tokenIssuer.GenerateTokenResponseForAuthCode(ctx, settings, code)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
@@ -316,7 +315,7 @@ func TestGenerateTokenResponseForAuthCode_MinimalScope(t *testing.T) {
 		RefreshTokenOfflineMaxLifetimeInSeconds: 3600,
 	}
 
-	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+	ctx := context.Background()
 
 	now := time.Now().UTC()
 	sub := fake.UUID()
@@ -365,7 +364,7 @@ func TestGenerateTokenResponseForAuthCode_MinimalScope(t *testing.T) {
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 	}, nil)
 
-	response, err := tokenIssuer.GenerateTokenResponseForAuthCode(ctx, code)
+	response, err := tokenIssuer.GenerateTokenResponseForAuthCode(ctx, settings, code)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
@@ -449,7 +448,7 @@ func TestGenerateTokenResponseForAuthCode_ClientOverrideAndMixedScopes(t *testin
 		RefreshTokenOfflineMaxLifetimeInSeconds: 3600,
 	}
 
-	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+	ctx := context.Background()
 
 	now := time.Now().UTC()
 	sub := fake.UUID()
@@ -517,7 +516,7 @@ func TestGenerateTokenResponseForAuthCode_ClientOverrideAndMixedScopes(t *testin
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 	}, nil)
 
-	response, err := tokenIssuer.GenerateTokenResponseForAuthCode(ctx, code)
+	response, err := tokenIssuer.GenerateTokenResponseForAuthCode(ctx, settings, code)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
@@ -627,7 +626,7 @@ func TestGenerateTokenResponseForAuthCode_ClientOverrideAndCustomScope(t *testin
 		RefreshTokenOfflineMaxLifetimeInSeconds: 3600,
 	}
 
-	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+	ctx := context.Background()
 
 	now := time.Now().UTC()
 	sub := fake.UUID()
@@ -674,7 +673,7 @@ func TestGenerateTokenResponseForAuthCode_ClientOverrideAndCustomScope(t *testin
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 	}, nil)
 
-	response, err := tokenIssuer.GenerateTokenResponseForAuthCode(ctx, code)
+	response, err := tokenIssuer.GenerateTokenResponseForAuthCode(ctx, settings, code)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
@@ -745,7 +744,7 @@ func TestGenerateTokenResponseForAuthCode_CustomScope(t *testing.T) {
 		RefreshTokenOfflineMaxLifetimeInSeconds: 3600,
 	}
 
-	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+	ctx := context.Background()
 
 	now := time.Now().UTC()
 	sub := fake.UUID()
@@ -794,7 +793,7 @@ func TestGenerateTokenResponseForAuthCode_CustomScope(t *testing.T) {
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 	}, nil)
 
-	response, err := tokenIssuer.GenerateTokenResponseForAuthCode(ctx, code)
+	response, err := tokenIssuer.GenerateTokenResponseForAuthCode(ctx, settings, code)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
@@ -1791,31 +1790,31 @@ func TestGetRefreshTokenExpiration(t *testing.T) {
 
 	tests := []struct {
 		name               string
-		refreshTokenType   string
+		refreshTokenType   TokenType
 		expectedExpiration int64
 		expectedError      bool
 	}{
 		{
 			name:               "Offline token with client override",
-			refreshTokenType:   "Offline",
+			refreshTokenType:   TokenTypeOffline,
 			expectedExpiration: now.Add(7200 * time.Second).Unix(),
 			expectedError:      false,
 		},
 		{
 			name:               "Offline token without client override",
-			refreshTokenType:   "Offline",
+			refreshTokenType:   TokenTypeOffline,
 			expectedExpiration: now.Add(3600 * time.Second).Unix(),
 			expectedError:      false,
 		},
 		{
 			name:               "Refresh token",
-			refreshTokenType:   "Refresh",
+			refreshTokenType:   TokenTypeRefresh,
 			expectedExpiration: now.Add(1800 * time.Second).Unix(),
 			expectedError:      false,
 		},
 		{
-			name:               "Invalid token type",
-			refreshTokenType:   "Invalid",
+			name:               "A type that is not a refresh token",
+			refreshTokenType:   TokenTypeBearer,
 			expectedExpiration: 0,
 			expectedError:      true,
 		},
@@ -1855,26 +1854,26 @@ func TestGetRefreshTokenMaxLifetime(t *testing.T) {
 
 	tests := []struct {
 		name             string
-		refreshTokenType string
+		refreshTokenType TokenType
 		expectedLifetime int64
 		expectedError    bool
 		mockUserSession  *models.UserSession
 	}{
 		{
 			name:             "Offline token with client override",
-			refreshTokenType: "Offline",
+			refreshTokenType: TokenTypeOffline,
 			expectedLifetime: now.Add(172800 * time.Second).Unix(),
 			expectedError:    false,
 		},
 		{
 			name:             "Offline token without client override",
-			refreshTokenType: "Offline",
+			refreshTokenType: TokenTypeOffline,
 			expectedLifetime: now.Add(86400 * time.Second).Unix(),
 			expectedError:    false,
 		},
 		{
 			name:             "Refresh token",
-			refreshTokenType: "Refresh",
+			refreshTokenType: TokenTypeRefresh,
 			expectedLifetime: now.Add(43200 * time.Second).Unix(),
 			expectedError:    false,
 			mockUserSession: &models.UserSession{
@@ -1882,8 +1881,8 @@ func TestGetRefreshTokenMaxLifetime(t *testing.T) {
 			},
 		},
 		{
-			name:             "Invalid token type",
-			refreshTokenType: "Invalid",
+			name:             "A type that is not a refresh token",
+			refreshTokenType: TokenTypeBearer,
 			expectedLifetime: 0,
 			expectedError:    true,
 		},
@@ -1922,7 +1921,7 @@ func TestGenerateTokenResponseForClientCred(t *testing.T) {
 		TokenExpirationInSeconds: 3600,
 	}
 
-	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+	ctx := context.Background()
 
 	privateKeyBytes := getTestPrivateKey(t)
 	publicKeyBytes := getTestPublicKey(t)
@@ -1973,7 +1972,7 @@ func TestGenerateTokenResponseForClientCred(t *testing.T) {
 				PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 			}, nil)
 
-			response, err := tokenIssuer.GenerateTokenResponseForClientCred(ctx, tt.client, tt.scope)
+			response, err := tokenIssuer.GenerateTokenResponseForClientCred(ctx, settings, tt.client, tt.scope)
 
 			assert.NoError(t, err)
 			assert.NotNil(t, response)
@@ -2013,7 +2012,7 @@ func TestGenerateTokenResponseForClientCred_InvalidScope(t *testing.T) {
 		TokenExpirationInSeconds: 3600,
 	}
 
-	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+	ctx := context.Background()
 
 	client := &models.Client{
 		Id:               4,
@@ -2027,7 +2026,7 @@ func TestGenerateTokenResponseForClientCred_InvalidScope(t *testing.T) {
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 	}, nil)
 
-	response, err := tokenIssuer.GenerateTokenResponseForClientCred(ctx, client, "invalid-scope")
+	response, err := tokenIssuer.GenerateTokenResponseForClientCred(ctx, settings, client, "invalid-scope")
 
 	if err == nil {
 		t.Error("Expected an error, but got nil")
@@ -2054,7 +2053,7 @@ func TestGenerateTokenResponseForRefresh(t *testing.T) {
 		IncludeOpenIDConnectClaimsInAccessToken: true,
 	}
 
-	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+	ctx := context.Background()
 
 	now := time.Now().UTC()
 	sub := fake.UUID()
@@ -2146,7 +2145,7 @@ func TestGenerateTokenResponseForRefresh(t *testing.T) {
 		RefreshTokenInfo: refreshTokenInfo,
 	}
 
-	response, err := tokenIssuer.GenerateTokenResponseForRefresh(ctx, input)
+	response, err := tokenIssuer.GenerateTokenResponseForRefresh(ctx, settings, input)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
@@ -2257,7 +2256,7 @@ func TestGenerateTokenResponseForRefresh_Offline_NoIdToken(t *testing.T) {
 		RefreshTokenOfflineMaxLifetimeInSeconds: 86400,
 	}
 
-	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+	ctx := context.Background()
 
 	now := time.Now().UTC()
 	sub := fake.UUID()
@@ -2304,7 +2303,7 @@ func TestGenerateTokenResponseForRefresh_Offline_NoIdToken(t *testing.T) {
 		// Set explicitly. Without it this fixture was an empty string, which production
 		// classifies as session-bound, so a test named for the offline case was exercising
 		// the session-bound one and its sid assertion passed for the wrong reason.
-		RefreshTokenType: offlineRefreshTokenType,
+		RefreshTokenType: TokenTypeOffline.String(),
 		// Deliberately conflicting with the code's generation below, so this public entry
 		// point proves the parent is forwarded rather than the code being re-read (#106
 		// decision 13). The direct helper tables pass even if the wrapper stops forwarding.
@@ -2350,7 +2349,7 @@ func TestGenerateTokenResponseForRefresh_Offline_NoIdToken(t *testing.T) {
 		RefreshTokenInfo: refreshTokenInfo,
 	}
 
-	response, err := tokenIssuer.GenerateTokenResponseForRefresh(ctx, input)
+	response, err := tokenIssuer.GenerateTokenResponseForRefresh(ctx, settings, input)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
@@ -2467,7 +2466,7 @@ func TestGenerateTokenResponseForImplicit_AccessTokenOnly(t *testing.T) {
 		IncludeOpenIDConnectClaimsInAccessToken: false,
 	}
 
-	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+	ctx := context.Background()
 
 	sub := fake.UUID()
 	sessionIdentifier := "test-session-implicit"
@@ -2507,7 +2506,7 @@ func TestGenerateTokenResponseForImplicit_AccessTokenOnly(t *testing.T) {
 		AuthenticatedAt:   authenticatedAt,
 	}
 
-	response, err := tokenIssuer.GenerateTokenResponseForImplicit(ctx, input, true, false)
+	response, err := tokenIssuer.GenerateTokenResponseForImplicit(ctx, settings, input, true, false)
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
 
@@ -2545,7 +2544,7 @@ func TestGenerateTokenResponseForImplicit_IdTokenOnly(t *testing.T) {
 		IncludeOpenIDConnectClaimsInIdToken: true,
 	}
 
-	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+	ctx := context.Background()
 
 	sub := fake.UUID()
 	sessionIdentifier := "test-session-idtoken"
@@ -2590,7 +2589,7 @@ func TestGenerateTokenResponseForImplicit_IdTokenOnly(t *testing.T) {
 		AuthenticatedAt:   authenticatedAt,
 	}
 
-	response, err := tokenIssuer.GenerateTokenResponseForImplicit(ctx, input, false, true)
+	response, err := tokenIssuer.GenerateTokenResponseForImplicit(ctx, settings, input, false, true)
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
 
@@ -2634,7 +2633,7 @@ func TestGenerateTokenResponseForImplicit_BothTokens(t *testing.T) {
 		IncludeOpenIDConnectClaimsInAccessToken: true,
 	}
 
-	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+	ctx := context.Background()
 
 	sub := fake.UUID()
 	sessionIdentifier := "test-session-both"
@@ -2679,7 +2678,7 @@ func TestGenerateTokenResponseForImplicit_BothTokens(t *testing.T) {
 		AuthenticatedAt:   authenticatedAt,
 	}
 
-	response, err := tokenIssuer.GenerateTokenResponseForImplicit(ctx, input, true, true)
+	response, err := tokenIssuer.GenerateTokenResponseForImplicit(ctx, settings, input, true, true)
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
 
@@ -2723,7 +2722,7 @@ func TestGenerateTokenResponseForImplicit_NoRefreshToken(t *testing.T) {
 		TokenExpirationInSeconds: 600,
 	}
 
-	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+	ctx := context.Background()
 
 	sub := fake.UUID()
 	privateKeyBytes := getTestPrivateKey(t)
@@ -2758,7 +2757,7 @@ func TestGenerateTokenResponseForImplicit_NoRefreshToken(t *testing.T) {
 		AuthenticatedAt: time.Now().UTC(),
 	}
 
-	response, err := tokenIssuer.GenerateTokenResponseForImplicit(ctx, input, true, false)
+	response, err := tokenIssuer.GenerateTokenResponseForImplicit(ctx, settings, input, true, false)
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
 
@@ -2779,7 +2778,7 @@ func TestGenerateTokenResponseForImplicit_ClientOverrideExpiration(t *testing.T)
 		TokenExpirationInSeconds: 600, // 10 minutes global
 	}
 
-	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+	ctx := context.Background()
 
 	sub := fake.UUID()
 	privateKeyBytes := getTestPrivateKey(t)
@@ -2815,7 +2814,7 @@ func TestGenerateTokenResponseForImplicit_ClientOverrideExpiration(t *testing.T)
 		AuthenticatedAt:   time.Now().UTC(),
 	}
 
-	response, err := tokenIssuer.GenerateTokenResponseForImplicit(ctx, input, true, false)
+	response, err := tokenIssuer.GenerateTokenResponseForImplicit(ctx, settings, input, true, false)
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
 
@@ -2840,7 +2839,7 @@ func TestGenerateTokenResponseForImplicit_WithGroupsAndAttributes(t *testing.T) 
 		TokenExpirationInSeconds: 600,
 	}
 
-	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+	ctx := context.Background()
 
 	sub := fake.UUID()
 	privateKeyBytes := getTestPrivateKey(t)
@@ -2886,7 +2885,7 @@ func TestGenerateTokenResponseForImplicit_WithGroupsAndAttributes(t *testing.T) 
 		AuthenticatedAt:   time.Now().UTC(),
 	}
 
-	response, err := tokenIssuer.GenerateTokenResponseForImplicit(ctx, input, true, true)
+	response, err := tokenIssuer.GenerateTokenResponseForImplicit(ctx, settings, input, true, true)
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
 
@@ -3000,7 +2999,7 @@ func TestGenerateTokenResponseForROPC_BasicOpenIDScope(t *testing.T) {
 		RefreshTokenOfflineMaxLifetimeInSeconds: 3600,
 	}
 
-	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+	ctx := context.Background()
 
 	privateKeyBytes := getTestPrivateKey(t)
 	publicKeyBytes := getTestPublicKey(t)
@@ -3048,7 +3047,7 @@ func TestGenerateTokenResponseForROPC_BasicOpenIDScope(t *testing.T) {
 		Scope:  "openid",
 	}
 
-	response, err := tokenIssuer.GenerateTokenResponseForROPC(ctx, input)
+	response, err := tokenIssuer.GenerateTokenResponseForROPC(ctx, settings, input)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
@@ -3062,7 +3061,8 @@ func TestGenerateTokenResponseForROPC_BasicOpenIDScope(t *testing.T) {
 	accessClaims := verifyAndDecodeToken(t, response.AccessToken, publicKeyBytes)
 	assert.Equal(t, "https://test-issuer.com", accessClaims["iss"])
 	assert.Equal(t, sub, accessClaims["sub"])
-	assert.Equal(t, "urn:goiabada:pwd", accessClaims["acr"])
+	// Level 1, the advertised meaning of password-only, not the unadvertised urn:goiabada:pwd (#433).
+	assert.Equal(t, "urn:goiabada:level1", accessClaims["acr"])
 	assert.ElementsMatch(t, []string{"pwd"}, accessClaims["amr"])
 	// ROPC is sessionless, on BOTH tokens. This replaced an assert.Nil on the same claim:
 	// equivalent in what it catches, since a leaked identifier is a non-nil string, but it
@@ -3074,7 +3074,7 @@ func TestGenerateTokenResponseForROPC_BasicOpenIDScope(t *testing.T) {
 	idClaims := verifyAndDecodeToken(t, response.IdToken, publicKeyBytes)
 	assert.Equal(t, "https://test-issuer.com", idClaims["iss"])
 	assert.Equal(t, sub, idClaims["sub"])
-	assert.Equal(t, "urn:goiabada:pwd", idClaims["acr"])
+	assert.Equal(t, "urn:goiabada:level1", idClaims["acr"])
 	assert.ElementsMatch(t, []string{"pwd"}, idClaims["amr"])
 	// The ID token is where the browser session used to leak, so this is the assertion that
 	// matters most on this path. Also replaced an equivalent assert.Nil.
@@ -3099,7 +3099,7 @@ func TestGenerateTokenResponseForROPC_WithOfflineAccess(t *testing.T) {
 		RefreshTokenOfflineMaxLifetimeInSeconds: 604800,
 	}
 
-	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+	ctx := context.Background()
 
 	privateKeyBytes := getTestPrivateKey(t)
 	publicKeyBytes := getTestPublicKey(t)
@@ -3146,7 +3146,7 @@ func TestGenerateTokenResponseForROPC_WithOfflineAccess(t *testing.T) {
 		Scope:  "openid offline_access",
 	}
 
-	response, err := tokenIssuer.GenerateTokenResponseForROPC(ctx, input)
+	response, err := tokenIssuer.GenerateTokenResponseForROPC(ctx, settings, input)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
@@ -3180,7 +3180,7 @@ func TestGenerateTokenResponseForROPC_WithProfileScope(t *testing.T) {
 		RefreshTokenOfflineMaxLifetimeInSeconds: 3600,
 	}
 
-	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+	ctx := context.Background()
 
 	privateKeyBytes := getTestPrivateKey(t)
 	publicKeyBytes := getTestPublicKey(t)
@@ -3228,7 +3228,7 @@ func TestGenerateTokenResponseForROPC_WithProfileScope(t *testing.T) {
 		Scope:  "openid profile",
 	}
 
-	response, err := tokenIssuer.GenerateTokenResponseForROPC(ctx, input)
+	response, err := tokenIssuer.GenerateTokenResponseForROPC(ctx, settings, input)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
@@ -3260,7 +3260,7 @@ func TestGenerateTokenResponseForROPC_WithEmailScope(t *testing.T) {
 		RefreshTokenOfflineMaxLifetimeInSeconds: 3600,
 	}
 
-	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+	ctx := context.Background()
 
 	privateKeyBytes := getTestPrivateKey(t)
 	publicKeyBytes := getTestPublicKey(t)
@@ -3305,7 +3305,7 @@ func TestGenerateTokenResponseForROPC_WithEmailScope(t *testing.T) {
 		Scope:  "openid email",
 	}
 
-	response, err := tokenIssuer.GenerateTokenResponseForROPC(ctx, input)
+	response, err := tokenIssuer.GenerateTokenResponseForROPC(ctx, settings, input)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
@@ -3334,7 +3334,7 @@ func TestGenerateTokenResponseForROPC_WithResourcePermissions(t *testing.T) {
 		RefreshTokenOfflineMaxLifetimeInSeconds: 3600,
 	}
 
-	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+	ctx := context.Background()
 
 	privateKeyBytes := getTestPrivateKey(t)
 	publicKeyBytes := getTestPublicKey(t)
@@ -3379,7 +3379,7 @@ func TestGenerateTokenResponseForROPC_WithResourcePermissions(t *testing.T) {
 		Scope:  "openid myapi:read myapi:write",
 	}
 
-	response, err := tokenIssuer.GenerateTokenResponseForROPC(ctx, input)
+	response, err := tokenIssuer.GenerateTokenResponseForROPC(ctx, settings, input)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
@@ -3417,7 +3417,7 @@ func TestGenerateTokenResponseForROPC_WithGroups(t *testing.T) {
 		RefreshTokenOfflineMaxLifetimeInSeconds: 3600,
 	}
 
-	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+	ctx := context.Background()
 
 	privateKeyBytes := getTestPrivateKey(t)
 	publicKeyBytes := getTestPublicKey(t)
@@ -3465,7 +3465,7 @@ func TestGenerateTokenResponseForROPC_WithGroups(t *testing.T) {
 		Scope:  "openid groups",
 	}
 
-	response, err := tokenIssuer.GenerateTokenResponseForROPC(ctx, input)
+	response, err := tokenIssuer.GenerateTokenResponseForROPC(ctx, settings, input)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
@@ -3501,7 +3501,7 @@ func TestGenerateTokenResponseForROPC_WithoutOpenID(t *testing.T) {
 		RefreshTokenOfflineMaxLifetimeInSeconds: 3600,
 	}
 
-	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+	ctx := context.Background()
 
 	privateKeyBytes := getTestPrivateKey(t)
 	publicKeyBytes := getTestPublicKey(t)
@@ -3546,7 +3546,7 @@ func TestGenerateTokenResponseForROPC_WithoutOpenID(t *testing.T) {
 		Scope:  "myapi:read",
 	}
 
-	response, err := tokenIssuer.GenerateTokenResponseForROPC(ctx, input)
+	response, err := tokenIssuer.GenerateTokenResponseForROPC(ctx, settings, input)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
@@ -3568,7 +3568,7 @@ func TestGenerateTokenResponseForROPC_DatabaseError_GetSigningKey(t *testing.T) 
 		TokenExpirationInSeconds: 600,
 	}
 
-	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+	ctx := context.Background()
 
 	sub := fake.UUID()
 	client := &models.Client{
@@ -3592,7 +3592,7 @@ func TestGenerateTokenResponseForROPC_DatabaseError_GetSigningKey(t *testing.T) 
 		Scope:  "openid",
 	}
 
-	response, err := tokenIssuer.GenerateTokenResponseForROPC(ctx, input)
+	response, err := tokenIssuer.GenerateTokenResponseForROPC(ctx, settings, input)
 
 	assert.Error(t, err)
 	assert.Nil(t, response)
@@ -3616,7 +3616,7 @@ func TestGenerateTokenResponseForROPC_DatabaseError_CreateRefreshToken(t *testin
 		RefreshTokenOfflineMaxLifetimeInSeconds: 3600,
 	}
 
-	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+	ctx := context.Background()
 
 	privateKeyBytes := getTestPrivateKey(t)
 	publicKeyBytes := getTestPublicKey(t)
@@ -3660,7 +3660,7 @@ func TestGenerateTokenResponseForROPC_DatabaseError_CreateRefreshToken(t *testin
 		Scope:  "openid",
 	}
 
-	response, err := tokenIssuer.GenerateTokenResponseForROPC(ctx, input)
+	response, err := tokenIssuer.GenerateTokenResponseForROPC(ctx, settings, input)
 
 	assert.Error(t, err)
 	assert.Nil(t, response)
@@ -3684,7 +3684,7 @@ func TestGenerateTokenResponseForROPC_ClientTokenExpiration(t *testing.T) {
 		RefreshTokenOfflineMaxLifetimeInSeconds: 3600,
 	}
 
-	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+	ctx := context.Background()
 
 	privateKeyBytes := getTestPrivateKey(t)
 	publicKeyBytes := getTestPublicKey(t)
@@ -3730,7 +3730,7 @@ func TestGenerateTokenResponseForROPC_ClientTokenExpiration(t *testing.T) {
 		Scope:  "openid",
 	}
 
-	response, err := tokenIssuer.GenerateTokenResponseForROPC(ctx, input)
+	response, err := tokenIssuer.GenerateTokenResponseForROPC(ctx, settings, input)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
@@ -3754,7 +3754,7 @@ func TestGenerateTokenResponseForROPC_GlobalTokenExpiration(t *testing.T) {
 		RefreshTokenOfflineMaxLifetimeInSeconds: 3600,
 	}
 
-	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+	ctx := context.Background()
 
 	privateKeyBytes := getTestPrivateKey(t)
 	publicKeyBytes := getTestPublicKey(t)
@@ -3800,7 +3800,7 @@ func TestGenerateTokenResponseForROPC_GlobalTokenExpiration(t *testing.T) {
 		Scope:  "openid",
 	}
 
-	response, err := tokenIssuer.GenerateTokenResponseForROPC(ctx, input)
+	response, err := tokenIssuer.GenerateTokenResponseForROPC(ctx, settings, input)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
@@ -3911,7 +3911,7 @@ func TestAMR_IsArrayType_InGeneratedTokens(t *testing.T) {
 		RefreshTokenOfflineMaxLifetimeInSeconds: 3600,
 	}
 
-	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+	ctx := context.Background()
 
 	privateKeyBytes := getTestPrivateKey(t)
 	publicKeyBytes := getTestPublicKey(t)
@@ -3963,7 +3963,7 @@ func TestAMR_IsArrayType_InGeneratedTokens(t *testing.T) {
 		}, nil).Once()
 		mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil).Once()
 
-		response, err := tokenIssuer.GenerateTokenResponseForAuthCode(ctx, code)
+		response, err := tokenIssuer.GenerateTokenResponseForAuthCode(ctx, settings, code)
 		assert.NoError(t, err)
 
 		// Verify access_token AMR is an array
@@ -4007,7 +4007,7 @@ func TestAMR_IsArrayType_InGeneratedTokens(t *testing.T) {
 		}, nil).Once()
 		mockDB.On("CreateRefreshToken", mock.Anything, mock.Anything, mock.AnythingOfType("*models.RefreshToken")).Return(nil).Once()
 
-		response, err := tokenIssuer.GenerateTokenResponseForAuthCode(ctx, code)
+		response, err := tokenIssuer.GenerateTokenResponseForAuthCode(ctx, settings, code)
 		assert.NoError(t, err)
 
 		// Verify access_token AMR is an array with both methods
@@ -4038,7 +4038,7 @@ func TestAMR_IsArrayType_InGeneratedTokens(t *testing.T) {
 			Scope:  "openid",
 		}
 
-		response, err := tokenIssuer.GenerateTokenResponseForROPC(ctx, input)
+		response, err := tokenIssuer.GenerateTokenResponseForROPC(ctx, settings, input)
 		assert.NoError(t, err)
 
 		// Verify access_token AMR is an array
@@ -4073,7 +4073,7 @@ func TestAMR_IsArrayType_InGeneratedTokens(t *testing.T) {
 			AuthenticatedAt:   time.Now().UTC().Add(-5 * time.Minute),
 		}
 
-		response, err := tokenIssuer.GenerateTokenResponseForImplicit(ctx, input, true, true)
+		response, err := tokenIssuer.GenerateTokenResponseForImplicit(ctx, settings, input, true, true)
 		assert.NoError(t, err)
 
 		// Verify access_token AMR is an array
@@ -4116,7 +4116,7 @@ func TestAMR_OmittedWhenNoAuthMethodRecorded(t *testing.T) {
 		RefreshTokenOfflineMaxLifetimeInSeconds: 3600,
 	}
 
-	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+	ctx := context.Background()
 
 	privateKeyBytes := getTestPrivateKey(t)
 	publicKeyBytes := getTestPublicKey(t)
@@ -4182,7 +4182,7 @@ func TestAMR_OmittedWhenNoAuthMethodRecorded(t *testing.T) {
 			User:              *user,
 		}
 
-		response, err := tokenIssuer.GenerateTokenResponseForAuthCode(ctx, code)
+		response, err := tokenIssuer.GenerateTokenResponseForAuthCode(ctx, settings, code)
 		assert.NoError(t, err)
 
 		accessClaims := verifyAndDecodeToken(t, response.AccessToken, publicKeyBytes)
@@ -4213,7 +4213,7 @@ func TestAMR_OmittedWhenNoAuthMethodRecorded(t *testing.T) {
 			User:              *user,
 		}
 
-		response, err := tokenIssuer.GenerateTokenResponseForAuthCode(ctx, code)
+		response, err := tokenIssuer.GenerateTokenResponseForAuthCode(ctx, settings, code)
 		assert.NoError(t, err)
 
 		accessClaims := verifyAndDecodeToken(t, response.AccessToken, publicKeyBytes)
@@ -4241,7 +4241,7 @@ func TestAMR_OmittedWhenNoAuthMethodRecorded(t *testing.T) {
 			AuthenticatedAt:   time.Now().UTC().Add(-5 * time.Minute),
 		}
 
-		response, err := tokenIssuer.GenerateTokenResponseForImplicit(ctx, input, true, true)
+		response, err := tokenIssuer.GenerateTokenResponseForImplicit(ctx, settings, input, true, true)
 		assert.NoError(t, err)
 
 		accessClaims := verifyAndDecodeToken(t, response.AccessToken, publicKeyBytes)
@@ -4268,7 +4268,7 @@ func TestAMR_OmittedWhenNoAuthMethodRecorded(t *testing.T) {
 			AuthenticatedAt:   time.Now().UTC().Add(-5 * time.Minute),
 		}
 
-		response, err := tokenIssuer.GenerateTokenResponseForImplicit(ctx, input, true, true)
+		response, err := tokenIssuer.GenerateTokenResponseForImplicit(ctx, settings, input, true, true)
 		assert.NoError(t, err)
 
 		accessClaims := verifyAndDecodeToken(t, response.AccessToken, publicKeyBytes)
@@ -4411,7 +4411,7 @@ func TestCreateTokenInputFromROPC(t *testing.T) {
 	assert.Equal(t, ropcInput.Client, input.Client)
 	assert.Equal(t, ropcInput.Scope, input.Scope)
 	// ROPC-specific hardcoded values
-	assert.Equal(t, "urn:goiabada:pwd", input.AcrLevel)
+	assert.Equal(t, "urn:goiabada:level1", input.AcrLevel)
 	assert.Equal(t, []string{"pwd"}, input.AuthMethods)
 	assert.Equal(t, now, input.AuthenticatedAt)
 	// Reversed deliberately. This used to assert the session identifier was forwarded from
@@ -4440,7 +4440,7 @@ func TestGenerateAccessTokenCore_InvalidScope(t *testing.T) {
 	userSubject := fake.UUID()
 
 	t.Run("Invalid scope format - no colon", func(t *testing.T) {
-		input := &TokenGenerationInput{
+		input := &tokenGenerationInput{
 			User: &models.User{
 				Subject: userSubject,
 			},
@@ -4462,7 +4462,7 @@ func TestGenerateAccessTokenCore_InvalidScope(t *testing.T) {
 		// This should not error - openid adds authserver as audience
 		mockDB.On("UserHasProfilePicture", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
 
-		input := &TokenGenerationInput{
+		input := &tokenGenerationInput{
 			User: &models.User{
 				Subject: userSubject,
 			},
@@ -4501,7 +4501,7 @@ func TestGenerateAccessTokenCore_MultipleAudiences(t *testing.T) {
 	now := time.Now().UTC()
 	userSubject := fake.UUID()
 
-	input := &TokenGenerationInput{
+	input := &tokenGenerationInput{
 		User: &models.User{
 			Subject: userSubject,
 		},
@@ -4544,7 +4544,7 @@ func TestGenerateAccessTokenCore_OptionalClaims(t *testing.T) {
 	userSubject := fake.UUID()
 
 	t.Run("With nonce and sid", func(t *testing.T) {
-		input := &TokenGenerationInput{
+		input := &tokenGenerationInput{
 			User: &models.User{
 				Subject: userSubject,
 			},
@@ -4568,7 +4568,7 @@ func TestGenerateAccessTokenCore_OptionalClaims(t *testing.T) {
 	})
 
 	t.Run("Without nonce and sid", func(t *testing.T) {
-		input := &TokenGenerationInput{
+		input := &tokenGenerationInput{
 			User: &models.User{
 				Subject: userSubject,
 			},
@@ -4614,7 +4614,7 @@ func TestGenerateIdTokenCore_WithAtHash(t *testing.T) {
 	userSubject := fake.UUID()
 
 	t.Run("With access token - at_hash included", func(t *testing.T) {
-		input := &TokenGenerationInput{
+		input := &tokenGenerationInput{
 			User: &models.User{
 				Subject:   userSubject,
 				UpdatedAt: sql.NullTime{Time: now, Valid: true},
@@ -4639,7 +4639,7 @@ func TestGenerateIdTokenCore_WithAtHash(t *testing.T) {
 	})
 
 	t.Run("Without access token - no at_hash", func(t *testing.T) {
-		input := &TokenGenerationInput{
+		input := &tokenGenerationInput{
 			User: &models.User{
 				Subject:   userSubject,
 				UpdatedAt: sql.NullTime{Time: now, Valid: true},
@@ -4697,7 +4697,7 @@ func TestGenerateIdTokenCore_GroupsAndAttributes(t *testing.T) {
 		},
 	}
 
-	input := &TokenGenerationInput{
+	input := &tokenGenerationInput{
 		User: user,
 		Client: &models.Client{
 			ClientIdentifier: "test-client",
@@ -4742,7 +4742,7 @@ func TestGenerateTokenResponseForRefreshROPC(t *testing.T) {
 		RefreshTokenOfflineMaxLifetimeInSeconds: 86400,
 	}
 
-	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+	ctx := context.Background()
 	now := time.Now().UTC()
 	userSubject := fake.UUID()
 
@@ -4801,7 +4801,7 @@ func TestGenerateTokenResponseForRefreshROPC(t *testing.T) {
 		ScopeRequested: "openid email resource:read",
 	}
 
-	response, err := tokenIssuer.GenerateTokenResponseForRefreshROPC(ctx, input)
+	response, err := tokenIssuer.GenerateTokenResponseForRefreshROPC(ctx, settings, input)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
@@ -4813,7 +4813,8 @@ func TestGenerateTokenResponseForRefreshROPC(t *testing.T) {
 	// Verify access token claims
 	accessClaims := verifyAndDecodeToken(t, response.AccessToken, publicKeyBytes)
 	assert.Equal(t, userSubject, accessClaims["sub"])
-	assert.Equal(t, "urn:goiabada:pwd", accessClaims["acr"])
+	// Level 1, the advertised meaning of password-only, not the unadvertised urn:goiabada:pwd (#433).
+	assert.Equal(t, "urn:goiabada:level1", accessClaims["acr"])
 	assert.ElementsMatch(t, []string{"pwd"}, accessClaims["amr"])
 	// From the parent (7), not the reloaded user (9).
 	assert.EqualValues(t, 7, accessClaims["auth_state_generation"])
@@ -4824,6 +4825,8 @@ func TestGenerateTokenResponseForRefreshROPC(t *testing.T) {
 	idClaims := verifyAndDecodeToken(t, response.IdToken, publicKeyBytes)
 	assert.Equal(t, userSubject, idClaims["sub"])
 	assert.Equal(t, "ropc-client", idClaims["aud"])
+	assert.Equal(t, "urn:goiabada:level1", idClaims["acr"])
+	assert.ElementsMatch(t, []string{"pwd"}, idClaims["amr"])
 	assert.NotContains(t, idClaims, "sid", "a ROPC ID token must never carry a session identifier")
 
 	// The CHILD refresh token must inherit the parent's generation too. Without this, a
@@ -4854,7 +4857,7 @@ func TestGenerateTokenResponseForRefreshROPC_ScopeDowngrade(t *testing.T) {
 		RefreshTokenOfflineMaxLifetimeInSeconds: 86400,
 	}
 
-	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+	ctx := context.Background()
 	now := time.Now().UTC()
 	userSubject := fake.UUID()
 
@@ -4901,7 +4904,7 @@ func TestGenerateTokenResponseForRefreshROPC_ScopeDowngrade(t *testing.T) {
 		ScopeRequested: "resource:read",
 	}
 
-	response, err := tokenIssuer.GenerateTokenResponseForRefreshROPC(ctx, input)
+	response, err := tokenIssuer.GenerateTokenResponseForRefreshROPC(ctx, settings, input)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
@@ -4976,7 +4979,7 @@ func TestGenerateAccessTokenCore_ClientOverrideExpiration(t *testing.T) {
 	userSubject := fake.UUID()
 
 	t.Run("Uses client override when set", func(t *testing.T) {
-		input := &TokenGenerationInput{
+		input := &tokenGenerationInput{
 			User: &models.User{
 				Subject: userSubject,
 			},
@@ -5000,7 +5003,7 @@ func TestGenerateAccessTokenCore_ClientOverrideExpiration(t *testing.T) {
 	})
 
 	t.Run("Uses settings default when client not set", func(t *testing.T) {
-		input := &TokenGenerationInput{
+		input := &tokenGenerationInput{
 			User: &models.User{
 				Subject: userSubject,
 			},
@@ -5046,7 +5049,7 @@ func TestGenerateAccessTokenCore_OIDCClaimsInAccessToken(t *testing.T) {
 			IncludeOpenIDConnectClaimsInAccessToken: true,
 		}
 
-		input := &TokenGenerationInput{
+		input := &tokenGenerationInput{
 			User: &models.User{
 				Subject:   userSubject,
 				Email:     "test@example.com",
@@ -5075,7 +5078,7 @@ func TestGenerateAccessTokenCore_OIDCClaimsInAccessToken(t *testing.T) {
 			IncludeOpenIDConnectClaimsInAccessToken: false,
 		}
 
-		input := &TokenGenerationInput{
+		input := &tokenGenerationInput{
 			User: &models.User{
 				Subject:   userSubject,
 				Email:     "test@example.com",
@@ -5105,7 +5108,7 @@ func TestGenerateAccessTokenCore_OIDCClaimsInAccessToken(t *testing.T) {
 			IncludeOpenIDConnectClaimsInAccessToken: false,
 		}
 
-		input := &TokenGenerationInput{
+		input := &tokenGenerationInput{
 			User: &models.User{
 				Subject:   userSubject,
 				Email:     "test@example.com",
@@ -5135,7 +5138,7 @@ func TestGenerateAccessTokenCore_OIDCClaimsInAccessToken(t *testing.T) {
 			IncludeOpenIDConnectClaimsInAccessToken: true,
 		}
 
-		input := &TokenGenerationInput{
+		input := &tokenGenerationInput{
 			User: &models.User{
 				Subject:   userSubject,
 				Email:     "test@example.com",
@@ -5238,7 +5241,7 @@ func issueCharacterizationTokens(t *testing.T, scope string, baseURL string, use
 		IncludeOpenIDConnectClaimsInIdToken:     true,
 		IncludeOpenIDConnectClaimsInAccessToken: true,
 	}
-	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+	ctx := context.Background()
 
 	now := time.Now().UTC()
 	sessionIdentifier := "test-session-characterization"
@@ -5280,7 +5283,7 @@ func issueCharacterizationTokens(t *testing.T, scope string, baseURL string, use
 		PrivateKeyPEM: encryptPEM(t, getTestPrivateKey(t)),
 	}, nil)
 
-	response, err := tokenIssuer.GenerateTokenResponseForAuthCode(ctx, code)
+	response, err := tokenIssuer.GenerateTokenResponseForAuthCode(ctx, settings, code)
 	require.NoError(t, err)
 	require.NotNil(t, response)
 
@@ -5477,7 +5480,7 @@ func issueForScopeIsTheGrant(t *testing.T, flow string, grant string, storedRefr
 		RefreshTokenOfflineIdleTimeoutInSeconds: 1800,
 		RefreshTokenOfflineMaxLifetimeInSeconds: 3600,
 	}
-	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+	ctx := context.Background()
 	now := time.Now().UTC()
 	sessionIdentifier := "scope-is-the-grant-session"
 
@@ -5533,7 +5536,7 @@ func issueForScopeIsTheGrant(t *testing.T, flow string, grant string, storedRefr
 		UserId:               sql.NullInt64{Int64: user.Id, Valid: true},
 		ClientId:             sql.NullInt64{Int64: client.Id, Valid: true},
 		Scope:                storedRefreshScope,
-		RefreshTokenType:     offlineRefreshTokenType,
+		RefreshTokenType:     TokenTypeOffline.String(),
 		MaxLifetime:          sql.NullTime{Time: now.Add(time.Hour), Valid: true},
 		User:                 user,
 		Client:               client,
@@ -5553,7 +5556,7 @@ func issueForScopeIsTheGrant(t *testing.T, flow string, grant string, storedRefr
 		mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, code).Return(nil)
 		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, code).Return(nil)
 		captureRefresh()
-		response, err := tokenIssuer.GenerateTokenResponseForAuthCode(ctx, code)
+		response, err := tokenIssuer.GenerateTokenResponseForAuthCode(ctx, settings, code)
 		require.NoError(t, err)
 		issued.reportedScope, issued.accessToken, issued.idToken, issued.refreshToken =
 			response.Scope, response.AccessToken, response.IdToken, response.RefreshToken
@@ -5561,7 +5564,7 @@ func issueForScopeIsTheGrant(t *testing.T, flow string, grant string, storedRefr
 		mockDB.On("CodeLoadClient", mock.Anything, mock.Anything, code).Return(nil)
 		mockDB.On("CodeLoadUser", mock.Anything, mock.Anything, code).Return(nil)
 		captureRefresh()
-		response, err := tokenIssuer.GenerateTokenResponseForRefresh(ctx, &GenerateTokenForRefreshInput{
+		response, err := tokenIssuer.GenerateTokenResponseForRefresh(ctx, settings, &GenerateTokenForRefreshInput{
 			Code:         code,
 			RefreshToken: parent,
 		})
@@ -5571,12 +5574,12 @@ func issueForScopeIsTheGrant(t *testing.T, flow string, grant string, storedRefr
 	case "implicit token", "implicit id_token token", "implicit id_token":
 		issueAccessToken := flow != "implicit id_token"
 		issueIdToken := flow != "implicit token"
-		response, err := tokenIssuer.GenerateTokenResponseForImplicit(ctx, implicit, issueAccessToken, issueIdToken)
+		response, err := tokenIssuer.GenerateTokenResponseForImplicit(ctx, settings, implicit, issueAccessToken, issueIdToken)
 		require.NoError(t, err)
 		issued.reportedScope, issued.accessToken, issued.idToken = response.Scope, response.AccessToken, response.IdToken
 	case "ROPC":
 		captureRefresh()
-		response, err := tokenIssuer.GenerateTokenResponseForROPC(ctx, &ROPCGrantInput{Client: &client, User: &user, Scope: grant})
+		response, err := tokenIssuer.GenerateTokenResponseForROPC(ctx, settings, &ROPCGrantInput{Client: &client, User: &user, Scope: grant})
 		require.NoError(t, err)
 		issued.reportedScope, issued.accessToken, issued.idToken, issued.refreshToken =
 			response.Scope, response.AccessToken, response.IdToken, response.RefreshToken
@@ -5584,7 +5587,7 @@ func issueForScopeIsTheGrant(t *testing.T, flow string, grant string, storedRefr
 		mockDB.On("RefreshTokenLoadUser", mock.Anything, mock.Anything, parent).Return(nil)
 		mockDB.On("RefreshTokenLoadClient", mock.Anything, mock.Anything, parent).Return(nil)
 		captureRefresh()
-		response, err := tokenIssuer.GenerateTokenResponseForRefreshROPC(ctx, &GenerateTokenForRefreshROPCInput{
+		response, err := tokenIssuer.GenerateTokenResponseForRefreshROPC(ctx, settings, &GenerateTokenForRefreshROPCInput{
 			RefreshToken: parent,
 		})
 		require.NoError(t, err)

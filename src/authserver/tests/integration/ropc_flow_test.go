@@ -111,6 +111,15 @@ func TestROPC_Success(t *testing.T) {
 	assert.NotEmpty(t, data["id_token"])
 	assert.Equal(t, "Bearer", data["token_type"])
 	assert.NotNil(t, data["expires_in"])
+
+	// Password-only is level 1, the value discovery advertises, on both tokens (#433).
+	for name, key := range map[string]string{"access token": "access_token", "ID token": "id_token"} {
+		token, ok := data[key].(string)
+		require.True(t, ok, "the response carries an %s: %v", name, data)
+		claims := decodeJWTPayload(t, token)
+		assert.Equal(t, "urn:goiabada:level1", claims["acr"], name)
+		assert.Equal(t, []interface{}{"pwd"}, claims["amr"], name)
+	}
 }
 
 // TestROPC_ConfidentialClient tests ROPC with a confidential client
@@ -740,6 +749,8 @@ func TestROPC_RefreshToken_OpenIdOnly(t *testing.T) {
 
 	newAccessClaims := decodeJWTPayload(t, newAccessToken)
 	assert.Equal(t, "openid", newAccessClaims["scope"])
+	assert.Equal(t, "urn:goiabada:level1", newAccessClaims["acr"], "a refresh keeps level 1 (#433)")
+	assert.Equal(t, []interface{}{"pwd"}, newAccessClaims["amr"])
 
 	resp := makeAPIRequest(t, "GET", config.GetAuthServer().BaseURL+"/userinfo", newAccessToken, nil)
 	defer func() { _ = resp.Body.Close() }()

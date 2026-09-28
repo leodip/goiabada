@@ -64,6 +64,7 @@ func TestHandleTokenPost(t *testing.T) {
 
 				rr := httptest.NewRecorder()
 				req, _ := http.NewRequest("POST", "/token", test.body(rr))
+				req = withSettings(req, &models.Settings{})
 				req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 				httpHelper.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
@@ -85,7 +86,7 @@ func TestHandleTokenPost(t *testing.T) {
 		t.Run("the same body at exactly the limit", func(t *testing.T) {
 			refused := customerrors.NewErrorDetailWithHttpStatusCode("invalid_client", "Client authentication failed.", http.StatusUnauthorized)
 			tokenValidator := mocks_handlers.NewTokenValidator(t)
-			tokenValidator.On("ValidateTokenRequest", mock.Anything, mock.MatchedBy(func(input *protocolvalidation.ValidateTokenRequestInput) bool {
+			tokenValidator.On("ValidateTokenRequest", mock.Anything, mock.Anything, mock.MatchedBy(func(input *protocolvalidation.ValidateTokenRequestInput) bool {
 				return input.GrantType == "client_credentials" && input.ClientId == "a-client" && input.ClientSecret == "a-secret"
 			})).Return(nil, refused).Once()
 			httpHelper := mocks_handlers.NewHttpHelper(t)
@@ -96,6 +97,7 @@ func TestHandleTokenPost(t *testing.T) {
 			rr := httptest.NewRecorder()
 			req, _ := http.NewRequest("POST", "/token",
 				http.MaxBytesReader(rr, io.NopCloser(strings.NewReader(form)), int64(len(form))))
+			req = withSettings(req, &models.Settings{})
 			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 			httpHelper.On("JsonError", rr, req, mock.MatchedBy(func(err error) bool {
@@ -151,12 +153,13 @@ func TestHandleTokenPost(t *testing.T) {
 
 		formData := "grant_type=authorization_code&code=test_code&redirect_uri=http://example.com&client_id=test_client"
 		req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
+		req = withSettings(req, &models.Settings{})
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
 		validationError := customerrors.NewErrorDetailWithHttpStatusCode("invalid_request", "Validation error", http.StatusBadRequest)
 
-		tokenValidator.On("ValidateTokenRequest", req.Context(), mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
+		tokenValidator.On("ValidateTokenRequest", req.Context(), mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
 			Return(nil, validationError)
 
 		httpHelper.On("JsonError", rr, req, validationError).Return()
@@ -179,19 +182,20 @@ func TestHandleTokenPost(t *testing.T) {
 
 		formData := "grant_type=authorization_code&code=test_code&redirect_uri=http://example.com&client_id=test_client"
 		req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
+		req = withSettings(req, &models.Settings{})
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
 		mockCode := &models.Code{Id: 1, Used: false}
 		validationResult := &protocolvalidation.ValidateTokenRequestResult{CodeEntity: mockCode}
 
-		tokenValidator.On("ValidateTokenRequest", req.Context(), mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
+		tokenValidator.On("ValidateTokenRequest", req.Context(), mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
 			Return(validationResult, nil)
 
 		// Code is claimed successfully, but token generation then fails.
 		database.On("MarkCodeAsUsed", mock.Anything, (*sql.Tx)(nil), mockCode.Id).Return(true, nil)
 
-		tokenIssuer.On("GenerateTokenResponseForAuthCode", req.Context(), mockCode).
+		tokenIssuer.On("GenerateTokenResponseForAuthCode", req.Context(), mock.Anything, mockCode).
 			Return(nil, customerrors.NewErrorDetailWithHttpStatusCode("server_error", "Failed to generate token", http.StatusInternalServerError))
 
 		httpHelper.On("InternalServerError",
@@ -221,13 +225,14 @@ func TestHandleTokenPost(t *testing.T) {
 
 		formData := "grant_type=authorization_code&code=test_code&redirect_uri=http://example.com&client_id=test_client"
 		req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
+		req = withSettings(req, &models.Settings{})
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
 		mockCode := &models.Code{Id: 1, Used: false}
 		validationResult := &protocolvalidation.ValidateTokenRequestResult{CodeEntity: mockCode}
 
-		tokenValidator.On("ValidateTokenRequest", req.Context(), mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
+		tokenValidator.On("ValidateTokenRequest", req.Context(), mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
 			Return(validationResult, nil)
 
 		// Claiming the code errors out. Tokens must NOT be generated.
@@ -248,7 +253,7 @@ func TestHandleTokenPost(t *testing.T) {
 		tokenValidator.AssertExpectations(t)
 		database.AssertExpectations(t)
 		// Token generation must not happen when the claim fails.
-		tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForAuthCode", mock.Anything, mock.Anything)
+		tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForAuthCode", mock.Anything, mock.Anything, mock.Anything)
 	})
 
 	t.Run("Authorization_code successful flow", func(t *testing.T) {
@@ -263,13 +268,14 @@ func TestHandleTokenPost(t *testing.T) {
 
 		formData := "grant_type=authorization_code&code=test_code&redirect_uri=http://example.com&client_id=test_client"
 		req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
+		req = withSettings(req, &models.Settings{})
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
 		mockCode := &models.Code{Id: 1, Used: false}
 		validationResult := &protocolvalidation.ValidateTokenRequestResult{CodeEntity: mockCode}
 
-		tokenValidator.On("ValidateTokenRequest", req.Context(), mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
+		tokenValidator.On("ValidateTokenRequest", req.Context(), mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
 			Return(validationResult, nil)
 
 		mockTokenResponse := &oauth.TokenResponse{
@@ -280,7 +286,7 @@ func TestHandleTokenPost(t *testing.T) {
 		// Code is claimed atomically before minting; only the winner proceeds.
 		database.On("MarkCodeAsUsed", mock.Anything, (*sql.Tx)(nil), mockCode.Id).Return(true, nil)
 
-		tokenIssuer.On("GenerateTokenResponseForAuthCode", req.Context(), mockCode).
+		tokenIssuer.On("GenerateTokenResponseForAuthCode", req.Context(), mock.Anything, mockCode).
 			Return(mockTokenResponse, nil)
 
 		auditLogger.On("Log", mock.Anything, "token_issued_authorization_code_response", mock.MatchedBy(func(details map[string]interface{}) bool {
@@ -314,6 +320,9 @@ func TestHandleTokenPost(t *testing.T) {
 
 		formData := "grant_type=client_credentials&client_id=test_client&client_secret=test_secret&scope=test_scope"
 		req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
+		// The validator and the issuer are both handed the request's own settings.
+		requestSettings := &models.Settings{Issuer: "https://issuer.example"}
+		req = withSettings(req, requestSettings)
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
@@ -323,7 +332,7 @@ func TestHandleTokenPost(t *testing.T) {
 			Scope:  "test_scope",
 		}
 
-		tokenValidator.On("ValidateTokenRequest", req.Context(), mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
+		tokenValidator.On("ValidateTokenRequest", req.Context(), theseSettings(requestSettings), mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
 			Return(validationResult, nil)
 
 		mockTokenResponse := &oauth.TokenResponse{
@@ -331,7 +340,7 @@ func TestHandleTokenPost(t *testing.T) {
 			TokenType:   "Bearer",
 			ExpiresIn:   3600,
 		}
-		tokenIssuer.On("GenerateTokenResponseForClientCred", req.Context(), mockClient, "test_scope").
+		tokenIssuer.On("GenerateTokenResponseForClientCred", req.Context(), theseSettings(requestSettings), mockClient, "test_scope").
 			Return(mockTokenResponse, nil)
 
 		auditLogger.On("Log", mock.Anything, "token_issued_client_credentials_response", mock.MatchedBy(func(details map[string]interface{}) bool {
@@ -364,13 +373,14 @@ func TestHandleTokenPost(t *testing.T) {
 
 		formData := "grant_type=refresh_token&refresh_token=test_refresh_token"
 		req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
+		req = withSettings(req, &models.Settings{})
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
 		mockRefreshToken := &models.RefreshToken{Id: 1, Revoked: true, FirstRefreshTokenJti: "family-1"}
 		validationResult := &protocolvalidation.ValidateTokenRequestResult{RefreshToken: mockRefreshToken}
 
-		tokenValidator.On("ValidateTokenRequest", req.Context(), mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
+		tokenValidator.On("ValidateTokenRequest", req.Context(), mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
 			Return(validationResult, nil)
 
 		// Containment runs but finds nothing live, which is the idempotent no-op an
@@ -413,7 +423,7 @@ func TestHandleTokenPost(t *testing.T) {
 			CodeEntity:   &models.Code{},
 		}
 
-		tokenValidator.On("ValidateTokenRequest", req.Context(), mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
+		tokenValidator.On("ValidateTokenRequest", req.Context(), mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
 			Return(validationResult, nil)
 
 		database.On("MarkRefreshTokenAsRevoked", mock.Anything, (*sql.Tx)(nil), int64(1)).
@@ -455,13 +465,13 @@ func TestHandleTokenPost(t *testing.T) {
 			RefreshTokenInfo: &oauth.JwtToken{},
 		}
 
-		tokenValidator.On("ValidateTokenRequest", req.Context(), mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
+		tokenValidator.On("ValidateTokenRequest", req.Context(), mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
 			Return(validationResult, nil)
 
 		database.On("MarkRefreshTokenAsRevoked", mock.Anything, (*sql.Tx)(nil), int64(1)).
 			Return(true, nil)
 
-		tokenIssuer.On("GenerateTokenResponseForRefresh", req.Context(), mock.AnythingOfType("*issuance.GenerateTokenForRefreshInput")).
+		tokenIssuer.On("GenerateTokenResponseForRefresh", req.Context(), mock.Anything, mock.AnythingOfType("*issuance.GenerateTokenForRefreshInput")).
 			Return(nil, customerrors.NewErrorDetailWithHttpStatusCode("server_error", "Failed to generate token", http.StatusInternalServerError))
 
 		httpHelper.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
@@ -516,7 +526,7 @@ func TestHandleTokenPost(t *testing.T) {
 			RefreshTokenInfo: &oauth.JwtToken{},
 		}
 
-		tokenValidator.On("ValidateTokenRequest", req.Context(), mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
+		tokenValidator.On("ValidateTokenRequest", req.Context(), mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
 			Return(validationResult, nil)
 
 		database.On("MarkRefreshTokenAsRevoked", mock.Anything, (*sql.Tx)(nil), int64(1)).
@@ -528,7 +538,7 @@ func TestHandleTokenPost(t *testing.T) {
 			TokenType:    "Bearer",
 			ExpiresIn:    3600,
 		}
-		tokenIssuer.On("GenerateTokenResponseForRefresh", req.Context(), mock.AnythingOfType("*issuance.GenerateTokenForRefreshInput")).
+		tokenIssuer.On("GenerateTokenResponseForRefresh", req.Context(), mock.Anything, mock.AnythingOfType("*issuance.GenerateTokenForRefreshInput")).
 			Return(mockTokenResponse, nil)
 
 		mockUserSession := &models.UserSession{
@@ -599,7 +609,7 @@ func TestHandleTokenPost(t *testing.T) {
 			RefreshTokenInfo: &oauth.JwtToken{},
 		}
 
-		tokenValidator.On("ValidateTokenRequest", req.Context(), mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
+		tokenValidator.On("ValidateTokenRequest", req.Context(), mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
 			Return(validationResult, nil)
 
 		database.On("MarkRefreshTokenAsRevoked", mock.Anything, (*sql.Tx)(nil), int64(1)).
@@ -611,7 +621,7 @@ func TestHandleTokenPost(t *testing.T) {
 			TokenType:    "Bearer",
 			ExpiresIn:    3600,
 		}
-		tokenIssuer.On("GenerateTokenResponseForRefresh", req.Context(), mock.AnythingOfType("*issuance.GenerateTokenForRefreshInput")).
+		tokenIssuer.On("GenerateTokenResponseForRefresh", req.Context(), mock.Anything, mock.AnythingOfType("*issuance.GenerateTokenForRefreshInput")).
 			Return(mockTokenResponse, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.AuditTokenIssuedRefreshTokenResponse, mock.MatchedBy(func(details map[string]interface{}) bool {
@@ -648,11 +658,12 @@ func TestHandleTokenPost(t *testing.T) {
 
 		formData := "grant_type=unsupported_type&client_id=test_client&client_secret=test_secret"
 		req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
+		req = withSettings(req, &models.Settings{})
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
 		// Mock the ValidateTokenRequest to return a result (even though it's not used in this case)
-		tokenValidator.On("ValidateTokenRequest", req.Context(), mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
+		tokenValidator.On("ValidateTokenRequest", req.Context(), mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
 			Return(&protocolvalidation.ValidateTokenRequestResult{}, nil)
 
 		// Expect a JSON error response for unsupported grant type
@@ -672,10 +683,10 @@ func TestHandleTokenPost(t *testing.T) {
 
 		// Ensure that other methods were not called
 		database.AssertNotCalled(t, "UpdateRefreshToken", mock.Anything, mock.Anything, mock.Anything)
-		tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForAuthCode", mock.Anything, mock.Anything)
+		tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForAuthCode", mock.Anything, mock.Anything, mock.Anything)
 		tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForClientCred",
-			mock.Anything, mock.Anything, mock.Anything)
-		tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForRefresh", mock.Anything, mock.Anything)
+			mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+		tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForRefresh", mock.Anything, mock.Anything, mock.Anything)
 		userSessionManager.AssertNotCalled(t, "BumpUserSession",
 			mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 		auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
@@ -804,6 +815,7 @@ func TestExtractClientCredentials(t *testing.T) {
 	t.Run("Basic auth only - credentials extracted from header", func(t *testing.T) {
 		encoded := base64.StdEncoding.EncodeToString([]byte("basic-client:basic-secret"))
 		req, _ := http.NewRequest("POST", "/token", strings.NewReader("grant_type=client_credentials"))
+		req = withSettings(req, &models.Settings{})
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.Header.Set("Authorization", "Basic "+encoded)
 		_ = req.ParseForm()
@@ -818,6 +830,7 @@ func TestExtractClientCredentials(t *testing.T) {
 	t.Run("POST body only - credentials extracted from form", func(t *testing.T) {
 		formData := "grant_type=client_credentials&client_id=post-client&client_secret=post-secret"
 		req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
+		req = withSettings(req, &models.Settings{})
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		_ = req.ParseForm()
 
@@ -832,6 +845,7 @@ func TestExtractClientCredentials(t *testing.T) {
 		encoded := base64.StdEncoding.EncodeToString([]byte("basic-client:basic-secret"))
 		formData := "grant_type=client_credentials&client_id=post-client&client_secret=post-secret"
 		req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
+		req = withSettings(req, &models.Settings{})
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.Header.Set("Authorization", "Basic "+encoded)
 		_ = req.ParseForm()
@@ -851,6 +865,7 @@ func TestExtractClientCredentials(t *testing.T) {
 	t.Run("No credentials provided - returns empty values", func(t *testing.T) {
 		formData := "grant_type=authorization_code&code=test"
 		req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
+		req = withSettings(req, &models.Settings{})
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		_ = req.ParseForm()
 
@@ -866,6 +881,7 @@ func TestExtractClientCredentials(t *testing.T) {
 		encoded := base64.StdEncoding.EncodeToString([]byte("basic-client:basic-secret"))
 		formData := "grant_type=client_credentials&client_id=post-client"
 		req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
+		req = withSettings(req, &models.Settings{})
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.Header.Set("Authorization", "Basic "+encoded)
 		_ = req.ParseForm()
@@ -881,6 +897,7 @@ func TestExtractClientCredentials(t *testing.T) {
 		// Malformed Basic auth should be ignored, not cause an error
 		formData := "grant_type=client_credentials&client_id=post-client&client_secret=post-secret"
 		req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
+		req = withSettings(req, &models.Settings{})
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.Header.Set("Authorization", "Basic invalid-base64!")
 		_ = req.ParseForm()
@@ -896,6 +913,7 @@ func TestExtractClientCredentials(t *testing.T) {
 		// A Bearer token should not be treated as Basic auth
 		formData := "grant_type=client_credentials&client_id=post-client&client_secret=post-secret"
 		req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
+		req = withSettings(req, &models.Settings{})
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.Header.Set("Authorization", "Bearer some-access-token")
 		_ = req.ParseForm()
@@ -912,6 +930,7 @@ func TestExtractClientCredentials(t *testing.T) {
 		encoded := base64.StdEncoding.EncodeToString([]byte("basic-client:basic-secret"))
 		formData := "grant_type=client_credentials&client_id=post-client&client_secret="
 		req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
+		req = withSettings(req, &models.Settings{})
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.Header.Set("Authorization", "Basic "+encoded)
 		_ = req.ParseForm()
@@ -926,6 +945,7 @@ func TestExtractClientCredentials(t *testing.T) {
 	t.Run("Public client - only client_id in POST, no secret", func(t *testing.T) {
 		formData := "grant_type=authorization_code&client_id=public-client&code=auth-code"
 		req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
+		req = withSettings(req, &models.Settings{})
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		_ = req.ParseForm()
 
@@ -955,6 +975,7 @@ func TestHandleTokenPost_AuthCodeReuse_RevokeFailureReturns500(t *testing.T) {
 
 	formData := "grant_type=authorization_code&code=replayed&redirect_uri=http://example.com&client_id=test_client"
 	req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
+	req = withSettings(req, &models.Settings{})
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	rr := httptest.NewRecorder()
 
@@ -969,7 +990,7 @@ func TestHandleTokenPost_AuthCodeReuse_RevokeFailureReturns500(t *testing.T) {
 		Code:   reusedCode,
 	}
 
-	tokenValidator.On("ValidateTokenRequest", req.Context(), mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
+	tokenValidator.On("ValidateTokenRequest", req.Context(), mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
 		Return(nil, reuseErr)
 
 	stub := mocks_data.ExpectRunInTransaction(database, revokeTx)
@@ -1019,6 +1040,7 @@ func TestHandleTokenPost_AuthCodeReuse_BeginTransactionFailureReturns500(t *test
 
 	formData := "grant_type=authorization_code&code=replayed&redirect_uri=http://example.com&client_id=test_client"
 	req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
+	req = withSettings(req, &models.Settings{})
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	rr := httptest.NewRecorder()
 
@@ -1030,7 +1052,7 @@ func TestHandleTokenPost_AuthCodeReuse_BeginTransactionFailureReturns500(t *test
 		},
 	}
 
-	tokenValidator.On("ValidateTokenRequest", req.Context(), mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
+	tokenValidator.On("ValidateTokenRequest", req.Context(), mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
 		Return(nil, reuseErr)
 
 	beginErr := errors.New("tx begin failed")
@@ -1070,6 +1092,7 @@ func TestHandleTokenPost_AuthCode_ConcurrentDoubleSpendLoses(t *testing.T) {
 
 	formData := "grant_type=authorization_code&code=raced&redirect_uri=http://example.com&client_id=test_client"
 	req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
+	req = withSettings(req, &models.Settings{})
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	rr := httptest.NewRecorder()
 
@@ -1081,7 +1104,7 @@ func TestHandleTokenPost_AuthCode_ConcurrentDoubleSpendLoses(t *testing.T) {
 	}
 	validationResult := &protocolvalidation.ValidateTokenRequestResult{CodeEntity: racedCode}
 
-	tokenValidator.On("ValidateTokenRequest", req.Context(), mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
+	tokenValidator.On("ValidateTokenRequest", req.Context(), mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
 		Return(validationResult, nil)
 
 	// This request loses the race: the code was already claimed concurrently.
@@ -1100,7 +1123,7 @@ func TestHandleTokenPost_AuthCode_ConcurrentDoubleSpendLoses(t *testing.T) {
 
 	// The loser must not mint tokens, and must not run the reuse cascade: no
 	// transaction, no session teardown, no reuse audit.
-	tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForAuthCode", mock.Anything, mock.Anything)
+	tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForAuthCode", mock.Anything, mock.Anything, mock.Anything)
 	database.AssertNotCalled(t, "RunInTransaction", mock.Anything, mock.Anything)
 	database.AssertNotCalled(t, "DeleteUserSession", mock.Anything, mock.Anything, mock.Anything)
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
@@ -1150,7 +1173,7 @@ func TestHandleTokenPost_Refresh_ConcurrentDoubleSpendLoses(t *testing.T) {
 		CodeEntity:   &models.Code{Id: 1},
 	}
 
-	tokenValidator.On("ValidateTokenRequest", req.Context(), mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
+	tokenValidator.On("ValidateTokenRequest", req.Context(), mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
 		Return(validationResult, nil)
 
 	// This request loses the race: the row stopped being live between the validation
@@ -1170,8 +1193,8 @@ func TestHandleTokenPost_Refresh_ConcurrentDoubleSpendLoses(t *testing.T) {
 
 	// The loser must not mint tokens, must not cascade over the family, and must not
 	// audit anything.
-	tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForRefresh", mock.Anything, mock.Anything)
-	tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForRefreshROPC", mock.Anything, mock.Anything)
+	tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForRefresh", mock.Anything, mock.Anything, mock.Anything)
+	tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForRefreshROPC", mock.Anything, mock.Anything, mock.Anything)
 	database.AssertNotCalled(t, "RevokeRefreshTokenFamily", mock.Anything, mock.Anything, mock.Anything)
 	userSessionManager.AssertNotCalled(t, "BumpUserSession", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
@@ -1248,10 +1271,11 @@ func TestHandleTokenPost_Refresh_Replay_AuditsContainment(t *testing.T) {
 
 			formData := "grant_type=refresh_token&refresh_token=replayed"
 			req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
+			req = withSettings(req, &models.Settings{})
 			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 			rr := httptest.NewRecorder()
 
-			tokenValidator.On("ValidateTokenRequest", req.Context(), mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
+			tokenValidator.On("ValidateTokenRequest", req.Context(), mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
 				Return(tc.result, nil)
 
 			// Two live members transitioned, so this is a real containment.
@@ -1286,8 +1310,8 @@ func TestHandleTokenPost_Refresh_Replay_AuditsContainment(t *testing.T) {
 			}, logged[0], "the replay payload must carry exactly these six fields")
 
 			// A replay mints nothing and bumps nothing.
-			tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForRefresh", mock.Anything, mock.Anything)
-			tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForRefreshROPC", mock.Anything, mock.Anything)
+			tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForRefresh", mock.Anything, mock.Anything, mock.Anything)
+			tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForRefreshROPC", mock.Anything, mock.Anything, mock.Anything)
 			userSessionManager.AssertNotCalled(t, "BumpUserSession", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 		})
 	}
@@ -1310,6 +1334,7 @@ func TestHandleTokenPost_Refresh_Replay_ContainmentErrorReturns500(t *testing.T)
 
 	formData := "grant_type=refresh_token&refresh_token=replayed"
 	req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
+	req = withSettings(req, &models.Settings{})
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	rr := httptest.NewRecorder()
 
@@ -1324,7 +1349,7 @@ func TestHandleTokenPost_Refresh_Replay_ContainmentErrorReturns500(t *testing.T)
 		CodeEntity:   &models.Code{Id: 9},
 	}
 
-	tokenValidator.On("ValidateTokenRequest", req.Context(), mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
+	tokenValidator.On("ValidateTokenRequest", req.Context(), mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
 		Return(validationResult, nil)
 
 	database.On("RevokeRefreshTokenFamily", mock.Anything, (*sql.Tx)(nil), "jti-family").
@@ -1496,6 +1521,7 @@ func TestHandleTokenPost_ScopeNormalizationWiring(t *testing.T) {
 			}
 
 			req, _ := http.NewRequest("POST", "/token", strings.NewReader(form.Encode()))
+			req = withSettings(req, &models.Settings{})
 			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 			rr := httptest.NewRecorder()
 
@@ -1504,7 +1530,7 @@ func TestHandleTokenPost_ScopeNormalizationWiring(t *testing.T) {
 				// the input rather than on downstream token issuance.
 				validationError := customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
 					"stop here", http.StatusBadRequest)
-				tokenValidator.On("ValidateTokenRequest", req.Context(), mock.MatchedBy(
+				tokenValidator.On("ValidateTokenRequest", req.Context(), mock.Anything, mock.MatchedBy(
 					func(input *protocolvalidation.ValidateTokenRequestInput) bool {
 						return input.Scope == tc.wantScope
 					})).Return(nil, validationError).Once()
@@ -1605,12 +1631,13 @@ func TestHandleTokenPost_ScopeDenialAudit(t *testing.T) {
 			httpHelper, tokenValidator, _, auditLogger, handler := newHandler(t)
 
 			req, _ := http.NewRequest("POST", "/token", strings.NewReader(tc.form))
+			req = withSettings(req, &models.Settings{})
 			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 			rr := httptest.NewRecorder()
 
 			denial := customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope", tc.description,
 				http.StatusBadRequest)
-			tokenValidator.On("ValidateTokenRequest", req.Context(),
+			tokenValidator.On("ValidateTokenRequest", req.Context(), mock.Anything,
 				mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).Return(nil, denial)
 
 			auditLogger.On("Log", mock.Anything, audit.AuditTokenScopeDenied, mock.MatchedBy(
@@ -1642,6 +1669,7 @@ func TestHandleTokenPost_ScopeDenialAudit(t *testing.T) {
 			"scope":      {"   "},
 		}
 		req, _ := http.NewRequest("POST", "/token", strings.NewReader(form.Encode()))
+		req = withSettings(req, &models.Settings{})
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
@@ -1662,7 +1690,7 @@ func TestHandleTokenPost_ScopeDenialAudit(t *testing.T) {
 
 		httpHelper.AssertExpectations(t)
 		auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
-		tokenValidator.AssertNotCalled(t, "ValidateTokenRequest", mock.Anything, mock.Anything)
+		tokenValidator.AssertNotCalled(t, "ValidateTokenRequest", mock.Anything, mock.Anything, mock.Anything)
 		if assert.NotNil(t, rejection) {
 			assert.Equal(t, "invalid_scope", rejection.GetCode())
 		}
@@ -1674,16 +1702,17 @@ func TestHandleTokenPost_ScopeDenialAudit(t *testing.T) {
 
 		form := "grant_type=client_credentials&client_id=test_client&client_secret=s&scope=billing-api:read"
 		req, _ := http.NewRequest("POST", "/token", strings.NewReader(form))
+		req = withSettings(req, &models.Settings{})
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
 		mockClient := &models.Client{Id: 42, ClientIdentifier: "test_client"}
-		tokenValidator.On("ValidateTokenRequest", req.Context(),
+		tokenValidator.On("ValidateTokenRequest", req.Context(), mock.Anything,
 			mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
 			Return(&protocolvalidation.ValidateTokenRequestResult{Client: mockClient, Scope: "billing-api:read"}, nil)
 
 		tokenResponse := &oauth.TokenResponse{AccessToken: "at", TokenType: "Bearer", ExpiresIn: 3600}
-		tokenIssuer.On("GenerateTokenResponseForClientCred", req.Context(), mockClient, "billing-api:read").
+		tokenIssuer.On("GenerateTokenResponseForClientCred", req.Context(), mock.Anything, mockClient, "billing-api:read").
 			Return(tokenResponse, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.AuditTokenIssuedClientCredentialsResponse, mock.MatchedBy(
@@ -1732,6 +1761,7 @@ func TestHandleTokenPost_ROPC_IgnoresBrowserSession(t *testing.T) {
 
 	form := "grant_type=password&client_id=test_client&username=u&password=p&scope=openid"
 	req, _ := http.NewRequest("POST", "/token", strings.NewReader(form))
+	req = withSettings(req, &models.Settings{})
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	// A DIFFERENT user's browser session, present exactly as the global middleware would
@@ -1742,13 +1772,13 @@ func TestHandleTokenPost_ROPC_IgnoresBrowserSession(t *testing.T) {
 	client := &models.Client{Id: 1, ClientIdentifier: "test_client"}
 	user := &models.User{Id: 42, Subject: fake.UUID(), AuthStateGeneration: 7}
 
-	tokenValidator.On("ValidateTokenRequest", mock.Anything,
+	tokenValidator.On("ValidateTokenRequest", mock.Anything, mock.Anything,
 		mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
 		Return(&protocolvalidation.ValidateTokenRequestResult{Client: client, User: user, Scope: "openid"}, nil)
 
 	var captured *issuance.ROPCGrantInput
-	tokenIssuer.On("GenerateTokenResponseForROPC", mock.Anything, mock.Anything).
-		Run(func(args mock.Arguments) { captured = args.Get(1).(*issuance.ROPCGrantInput) }).
+	tokenIssuer.On("GenerateTokenResponseForROPC", mock.Anything, mock.Anything, mock.Anything).
+		Run(func(args mock.Arguments) { captured = args.Get(2).(*issuance.ROPCGrantInput) }).
 		Return(&issuance.ROPCGrantResponse{AccessToken: "at", TokenType: "Bearer"}, nil)
 
 	auditLogger.On("Log", mock.Anything, audit.AuditTokenIssuedROPCResponse, mock.Anything).Return()
@@ -1785,6 +1815,7 @@ func TestHandleTokenPost_SupersededRefreshTokenIsSurfaced(t *testing.T) {
 
 	formData := "grant_type=refresh_token&refresh_token=superseded&client_id=test_client"
 	req, _ := http.NewRequest("POST", "/token", strings.NewReader(formData))
+	req = withSettings(req, &models.Settings{})
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	rr := httptest.NewRecorder()
 
@@ -1792,7 +1823,7 @@ func TestHandleTokenPost_SupersededRefreshTokenIsSurfaced(t *testing.T) {
 	supersededErr := customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
 		"The refresh token is invalid because it was superseded.", http.StatusBadRequest)
 
-	tokenValidator.On("ValidateTokenRequest", req.Context(), mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
+	tokenValidator.On("ValidateTokenRequest", req.Context(), mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
 		Return(nil, supersededErr)
 
 	httpHelper.On("JsonError", rr, req, supersededErr).Return().Once()
@@ -1834,15 +1865,15 @@ func TestHandleTokenPost_ROPC_SpendsTheLimiterBudgetOnInvalidGrantOnly(t *testin
 		auditLogger := mocks_handlers.NewAuditLogger(t)
 
 		if failure != nil {
-			tokenValidator.On("ValidateTokenRequest", mock.Anything, mock.Anything).
+			tokenValidator.On("ValidateTokenRequest", mock.Anything, mock.Anything, mock.Anything).
 				Return(nil, failure)
 			httpHelper.On("JsonError", mock.Anything, mock.Anything, mock.Anything).Return()
 		} else {
 			client := &models.Client{Id: 1, ClientIdentifier: "app"}
 			user := &models.User{Id: 42, Subject: fake.UUID()}
-			tokenValidator.On("ValidateTokenRequest", mock.Anything, mock.Anything).
+			tokenValidator.On("ValidateTokenRequest", mock.Anything, mock.Anything, mock.Anything).
 				Return(&protocolvalidation.ValidateTokenRequestResult{Client: client, User: user, Scope: "openid"}, nil)
-			tokenIssuer.On("GenerateTokenResponseForROPC", mock.Anything, mock.Anything).
+			tokenIssuer.On("GenerateTokenResponseForROPC", mock.Anything, mock.Anything, mock.Anything).
 				Return(&issuance.ROPCGrantResponse{AccessToken: "at", TokenType: "Bearer"}, nil)
 			httpHelper.On("EncodeJson", mock.Anything, mock.Anything, mock.Anything).Return()
 		}
@@ -1865,6 +1896,7 @@ func TestHandleTokenPost_ROPC_SpendsTheLimiterBudgetOnInvalidGrantOnly(t *testin
 			"password":   {"guess"},
 		}
 		req, _ := http.NewRequest("POST", "/auth/token", strings.NewReader(form.Encode()))
+		req = withSettings(req, &models.Settings{})
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.RemoteAddr = "203.0.113.7:5000"
 		rr := httptest.NewRecorder()
@@ -1917,6 +1949,7 @@ func TestHandleTokenPost_ROPC_SpendsTheLimiterBudgetOnInvalidGrantOnly(t *testin
 			"password":   {"guess"},
 		}
 		req, _ := http.NewRequest("POST", "/auth/token", strings.NewReader(form.Encode()))
+		req = withSettings(req, &models.Settings{})
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.RemoteAddr = "203.0.113.7:5000"
 		handler.ServeHTTP(httptest.NewRecorder(), req)
@@ -2103,6 +2136,12 @@ func TestJsonErrorConformed_CarriesTheBasicChallengeThrough(t *testing.T) {
 // needs it, and needs a Client on its validation result beside it: a refresh token exists only
 // where the flow that issued it was switched on, so saying so is the fixture stating what it
 // always meant rather than working around the gate (#250).
+// theseSettings matches the very settings value a test put on its request, by identity, so a
+// handler that built its own or read another request's would match nothing.
+func theseSettings(want *models.Settings) interface{} {
+	return mock.MatchedBy(func(got *models.Settings) bool { return got == want })
+}
+
 func withSettings(req *http.Request, settings *models.Settings) *http.Request {
 	return req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings, settings))
 }
@@ -2228,7 +2267,7 @@ func TestHandleTokenPost_Refresh_FlowGate(t *testing.T) {
 				result.CodeEntity = &models.Code{Id: 9, ClientId: tc.client.Id, UserId: 5}
 			}
 
-			tokenValidator.On("ValidateTokenRequest", req.Context(), mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
+			tokenValidator.On("ValidateTokenRequest", req.Context(), mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
 				Return(result, nil)
 
 			if tc.wantRefusal == "" {
@@ -2262,8 +2301,8 @@ func TestHandleTokenPost_Refresh_FlowGate(t *testing.T) {
 				database.AssertNotCalled(t, "RevokeRefreshTokenFamily", mock.Anything, mock.Anything, mock.Anything)
 				auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 			}
-			tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForRefresh", mock.Anything, mock.Anything)
-			tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForRefreshROPC", mock.Anything, mock.Anything)
+			tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForRefresh", mock.Anything, mock.Anything, mock.Anything)
+			tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForRefreshROPC", mock.Anything, mock.Anything, mock.Anything)
 		})
 	}
 }
@@ -2338,7 +2377,7 @@ func TestHandleTokenPost_Refresh_ContainmentPrecedesFlowGate(t *testing.T) {
 
 			result := tc.result
 			result.Client = tc.client
-			tokenValidator.On("ValidateTokenRequest", req.Context(), mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
+			tokenValidator.On("ValidateTokenRequest", req.Context(), mock.Anything, mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).
 				Return(result, nil)
 
 			database.On("RevokeRefreshTokenFamily", mock.Anything, (*sql.Tx)(nil), "jti-family").Return(int64(2), nil).Once()
@@ -2402,11 +2441,12 @@ func TestHandleTokenPost_RedemptionRegistrationRefusalAudit(t *testing.T) {
 		httpHelper, tokenValidator, auditLogger, handler := newHandler(t)
 
 		req, _ := http.NewRequest("POST", "/token", strings.NewReader(form))
+		req = withSettings(req, &models.Settings{})
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
 		refusal := protocolvalidation.ErrCodeRedirectURIDeregistered
-		tokenValidator.On("ValidateTokenRequest", req.Context(),
+		tokenValidator.On("ValidateTokenRequest", req.Context(), mock.Anything,
 			mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).Return(nil, refusal)
 
 		auditLogger.On("Log", mock.Anything, audit.AuditRedemptionRefusedRedirectURI, mock.MatchedBy(
@@ -2434,12 +2474,13 @@ func TestHandleTokenPost_RedemptionRegistrationRefusalAudit(t *testing.T) {
 		httpHelper, tokenValidator, _, handler := newHandler(t)
 
 		req, _ := http.NewRequest("POST", "/token", strings.NewReader(form))
+		req = withSettings(req, &models.Settings{})
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		rr := httptest.NewRecorder()
 
 		refusal := customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant",
 			"Code is invalid.", http.StatusBadRequest)
-		tokenValidator.On("ValidateTokenRequest", req.Context(),
+		tokenValidator.On("ValidateTokenRequest", req.Context(), mock.Anything,
 			mock.AnythingOfType("*protocolvalidation.ValidateTokenRequestInput")).Return(nil, refusal)
 
 		httpHelper.On("JsonError", rr, req, mock.Anything).Return()

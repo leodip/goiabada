@@ -18,8 +18,9 @@ func TestTokenType_String(t *testing.T) {
 	}{
 		{"id is the zero value", TokenTypeId, "ID"},
 		{"bearer", TokenTypeBearer, "Bearer"},
-		{"refresh, the top of the range", TokenTypeRefresh, "Refresh"},
-		{"one past the range", TokenType(3), ""},
+		{"refresh", TokenTypeRefresh, "Refresh"},
+		{"offline, the top of the range", TokenTypeOffline, "Offline"},
+		{"one past the range", TokenType(4), ""},
 		{"far past the range", TokenType(99), ""},
 		{"negative", TokenType(-1), ""},
 	}

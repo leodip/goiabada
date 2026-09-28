@@ -754,7 +754,8 @@ func handleImplicitFlow(
 		AuthStateGeneration: authContext.AuthStateGeneration,
 	}
 
-	tokenResponse, err := tokenIssuer.GenerateTokenResponseForImplicit(r.Context(), implicitInput, issueAccessToken, issueIdToken)
+	settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
+	tokenResponse, err := tokenIssuer.GenerateTokenResponseForImplicit(r.Context(), settings, implicitInput, issueAccessToken, issueIdToken)
 	if err != nil {
 		return err
 	}

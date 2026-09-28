@@ -44,17 +44,17 @@ type OtpSecretGenerator interface {
 }
 
 type TokenIssuer interface {
-	GenerateTokenResponseForAuthCode(ctx context.Context, code *models.Code) (*oauth.TokenResponse, error)
-	GenerateTokenResponseForClientCred(ctx context.Context, client *models.Client, scope string) (*oauth.TokenResponse, error)
-	GenerateTokenResponseForRefresh(ctx context.Context, input *issuance.GenerateTokenForRefreshInput) (*oauth.TokenResponse, error)
+	GenerateTokenResponseForAuthCode(ctx context.Context, settings *models.Settings, code *models.Code) (*oauth.TokenResponse, error)
+	GenerateTokenResponseForClientCred(ctx context.Context, settings *models.Settings, client *models.Client, scope string) (*oauth.TokenResponse, error)
+	GenerateTokenResponseForRefresh(ctx context.Context, settings *models.Settings, input *issuance.GenerateTokenForRefreshInput) (*oauth.TokenResponse, error)
 	// GenerateTokenResponseForRefreshROPC generates new tokens for an ROPC refresh token.
 	// Unlike auth code flow, ROPC tokens have UserId and ClientId directly on the RefreshToken.
-	GenerateTokenResponseForRefreshROPC(ctx context.Context, input *issuance.GenerateTokenForRefreshROPCInput) (*oauth.TokenResponse, error)
-	GenerateTokenResponseForImplicit(ctx context.Context, input *issuance.ImplicitGrantInput, issueAccessToken bool, issueIdToken bool) (*issuance.ImplicitGrantResponse, error)
+	GenerateTokenResponseForRefreshROPC(ctx context.Context, settings *models.Settings, input *issuance.GenerateTokenForRefreshROPCInput) (*oauth.TokenResponse, error)
+	GenerateTokenResponseForImplicit(ctx context.Context, settings *models.Settings, input *issuance.ImplicitGrantInput, issueAccessToken bool, issueIdToken bool) (*issuance.ImplicitGrantResponse, error)
 	// GenerateTokenResponseForROPC generates tokens for Resource Owner Password Credentials flow.
 	// RFC 6749 Section 4.3
 	// SECURITY NOTE: ROPC is deprecated in OAuth 2.1 due to credential exposure risks.
-	GenerateTokenResponseForROPC(ctx context.Context, input *issuance.ROPCGrantInput) (*issuance.ROPCGrantResponse, error)
+	GenerateTokenResponseForROPC(ctx context.Context, settings *models.Settings, input *issuance.ROPCGrantInput) (*issuance.ROPCGrantResponse, error)
 }
 
 type AuthorizeValidator interface {
@@ -86,7 +86,7 @@ type UserSessionManager interface {
 }
 
 type TokenValidator interface {
-	ValidateTokenRequest(ctx context.Context, input *protocolvalidation.ValidateTokenRequestInput) (*protocolvalidation.ValidateTokenRequestResult, error)
+	ValidateTokenRequest(ctx context.Context, settings *models.Settings, input *protocolvalidation.ValidateTokenRequestInput) (*protocolvalidation.ValidateTokenRequestResult, error)
 }
 
 type TokenParser interface {

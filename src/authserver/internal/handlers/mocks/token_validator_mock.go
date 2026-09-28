@@ -12,6 +12,7 @@ package mocks_handlers
 import (
 	"context"
 
+	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 	mock "github.com/stretchr/testify/mock"
 )
@@ -53,8 +54,8 @@ func (_m *TokenValidator) EXPECT() *TokenValidator_Expecter {
 }
 
 // ValidateTokenRequest provides a mock function for the type TokenValidator
-func (_mock *TokenValidator) ValidateTokenRequest(ctx context.Context, input *protocolvalidation.ValidateTokenRequestInput) (*protocolvalidation.ValidateTokenRequestResult, error) {
-	ret := _mock.Called(ctx, input)
+func (_mock *TokenValidator) ValidateTokenRequest(ctx context.Context, settings *models.Settings, input *protocolvalidation.ValidateTokenRequestInput) (*protocolvalidation.ValidateTokenRequestResult, error) {
+	ret := _mock.Called(ctx, settings, input)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ValidateTokenRequest")
@@ -62,18 +63,18 @@ func (_mock *TokenValidator) ValidateTokenRequest(ctx context.Context, input *pr
 
 	var r0 *protocolvalidation.ValidateTokenRequestResult
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *protocolvalidation.ValidateTokenRequestInput) (*protocolvalidation.ValidateTokenRequestResult, error)); ok {
-		return returnFunc(ctx, input)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *models.Settings, *protocolvalidation.ValidateTokenRequestInput) (*protocolvalidation.ValidateTokenRequestResult, error)); ok {
+		return returnFunc(ctx, settings, input)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *protocolvalidation.ValidateTokenRequestInput) *protocolvalidation.ValidateTokenRequestResult); ok {
-		r0 = returnFunc(ctx, input)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *models.Settings, *protocolvalidation.ValidateTokenRequestInput) *protocolvalidation.ValidateTokenRequestResult); ok {
+		r0 = returnFunc(ctx, settings, input)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*protocolvalidation.ValidateTokenRequestResult)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, *protocolvalidation.ValidateTokenRequestInput) error); ok {
-		r1 = returnFunc(ctx, input)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *models.Settings, *protocolvalidation.ValidateTokenRequestInput) error); ok {
+		r1 = returnFunc(ctx, settings, input)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -87,24 +88,30 @@ type TokenValidator_ValidateTokenRequest_Call struct {
 
 // ValidateTokenRequest is a helper method to define mock.On call
 //   - ctx context.Context
+//   - settings *models.Settings
 //   - input *protocolvalidation.ValidateTokenRequestInput
-func (_e *TokenValidator_Expecter) ValidateTokenRequest(ctx any, input any) *TokenValidator_ValidateTokenRequest_Call {
-	return &TokenValidator_ValidateTokenRequest_Call{Call: _e.mock.On("ValidateTokenRequest", ctx, input)}
+func (_e *TokenValidator_Expecter) ValidateTokenRequest(ctx any, settings any, input any) *TokenValidator_ValidateTokenRequest_Call {
+	return &TokenValidator_ValidateTokenRequest_Call{Call: _e.mock.On("ValidateTokenRequest", ctx, settings, input)}
 }
 
-func (_c *TokenValidator_ValidateTokenRequest_Call) Run(run func(ctx context.Context, input *protocolvalidation.ValidateTokenRequestInput)) *TokenValidator_ValidateTokenRequest_Call {
+func (_c *TokenValidator_ValidateTokenRequest_Call) Run(run func(ctx context.Context, settings *models.Settings, input *protocolvalidation.ValidateTokenRequestInput)) *TokenValidator_ValidateTokenRequest_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
 			arg0 = args[0].(context.Context)
 		}
-		var arg1 *protocolvalidation.ValidateTokenRequestInput
+		var arg1 *models.Settings
 		if args[1] != nil {
-			arg1 = args[1].(*protocolvalidation.ValidateTokenRequestInput)
+			arg1 = args[1].(*models.Settings)
+		}
+		var arg2 *protocolvalidation.ValidateTokenRequestInput
+		if args[2] != nil {
+			arg2 = args[2].(*protocolvalidation.ValidateTokenRequestInput)
 		}
 		run(
 			arg0,
 			arg1,
+			arg2,
 		)
 	})
 	return _c
@@ -115,7 +122,7 @@ func (_c *TokenValidator_ValidateTokenRequest_Call) Return(validateTokenRequestR
 	return _c
 }
 
-func (_c *TokenValidator_ValidateTokenRequest_Call) RunAndReturn(run func(ctx context.Context, input *protocolvalidation.ValidateTokenRequestInput) (*protocolvalidation.ValidateTokenRequestResult, error)) *TokenValidator_ValidateTokenRequest_Call {
+func (_c *TokenValidator_ValidateTokenRequest_Call) RunAndReturn(run func(ctx context.Context, settings *models.Settings, input *protocolvalidation.ValidateTokenRequestInput) (*protocolvalidation.ValidateTokenRequestResult, error)) *TokenValidator_ValidateTokenRequest_Call {
 	_c.Call.Return(run)
 	return _c
 }

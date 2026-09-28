@@ -178,7 +178,8 @@ func HandleTokenPost(
 			UsedBasicAuth: usedBasicAuth,
 		}
 
-		validateResult, err := tokenValidator.ValidateTokenRequest(r.Context(), &input)
+		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
+		validateResult, err := tokenValidator.ValidateTokenRequest(r.Context(), settings, &input)
 		if err != nil {
 			// RFC 6749 §4.1.2: when an authorization code is reused by an
 			// authenticated requester, the server MUST deny the request and
@@ -348,7 +349,7 @@ func HandleTokenPost(
 				return
 			}
 
-			tokenResp, err := tokenIssuer.GenerateTokenResponseForAuthCode(r.Context(), validateResult.CodeEntity)
+			tokenResp, err := tokenIssuer.GenerateTokenResponseForAuthCode(r.Context(), settings, validateResult.CodeEntity)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
 				return
@@ -364,7 +365,7 @@ func HandleTokenPost(
 			return
 
 		case "client_credentials":
-			tokenResp, err := tokenIssuer.GenerateTokenResponseForClientCred(r.Context(), validateResult.Client, validateResult.Scope)
+			tokenResp, err := tokenIssuer.GenerateTokenResponseForClientCred(r.Context(), settings, validateResult.Client, validateResult.Scope)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
 				return
@@ -467,7 +468,6 @@ func HandleTokenPost(
 			// override, because the issuing arm does. Otherwise turning the global switch off
 			// would block new logins while inheriting clients kept refreshing indefinitely,
 			// which is not what the switch says it does.
-			settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
 			if validateResult.CodeEntity == nil {
 				// Same ROPC marker the containment block above reads to set replayFlow, so
 				// the two cannot disagree about what an ROPC token is.
@@ -538,7 +538,7 @@ func HandleTokenPost(
 					RefreshTokenInfo: validateResult.RefreshTokenInfo,
 				}
 
-				tokenResp, err = tokenIssuer.GenerateTokenResponseForRefreshROPC(r.Context(), ropcInput)
+				tokenResp, err = tokenIssuer.GenerateTokenResponseForRefreshROPC(r.Context(), settings, ropcInput)
 				if err != nil {
 					httpHelper.InternalServerError(w, r, err)
 					return
@@ -559,7 +559,7 @@ func HandleTokenPost(
 					RefreshTokenInfo: validateResult.RefreshTokenInfo,
 				}
 
-				tokenResp, err = tokenIssuer.GenerateTokenResponseForRefresh(r.Context(), refreshInput)
+				tokenResp, err = tokenIssuer.GenerateTokenResponseForRefresh(r.Context(), settings, refreshInput)
 				if err != nil {
 					httpHelper.InternalServerError(w, r, err)
 					return
@@ -611,7 +611,7 @@ func HandleTokenPost(
 				Scope:  validateResult.Scope,
 			}
 
-			tokenResp, err := tokenIssuer.GenerateTokenResponseForROPC(r.Context(), ropcInput)
+			tokenResp, err := tokenIssuer.GenerateTokenResponseForROPC(r.Context(), settings, ropcInput)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
 				return

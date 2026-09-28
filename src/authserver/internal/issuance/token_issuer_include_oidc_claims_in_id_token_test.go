@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/leodip/goiabada/authserver/internal/constants"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
@@ -41,7 +40,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_GlobalEnabled(t *te
 	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(privateKeyBytes)
 	assert.NoError(t, err)
 
-	input := &TokenGenerationInput{
+	input := &tokenGenerationInput{
 		User: &models.User{
 			Subject:             sub,
 			Email:               "test@example.com",
@@ -147,7 +146,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_GlobalDisabled(t *t
 	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(privateKeyBytes)
 	assert.NoError(t, err)
 
-	input := &TokenGenerationInput{
+	input := &tokenGenerationInput{
 		User: &models.User{
 			Subject:             sub,
 			Email:               "test@example.com",
@@ -232,7 +231,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_ClientOverrideOn(t 
 	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(privateKeyBytes)
 	assert.NoError(t, err)
 
-	input := &TokenGenerationInput{
+	input := &tokenGenerationInput{
 		User: &models.User{
 			Subject:       sub,
 			Email:         "test@example.com",
@@ -297,7 +296,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_ClientOverrideOff(t
 	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(privateKeyBytes)
 	assert.NoError(t, err)
 
-	input := &TokenGenerationInput{
+	input := &tokenGenerationInput{
 		User: &models.User{
 			Subject:       sub,
 			Email:         "test@example.com",
@@ -360,7 +359,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_GroupsAndAttributes
 	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(privateKeyBytes)
 	assert.NoError(t, err)
 
-	input := &TokenGenerationInput{
+	input := &tokenGenerationInput{
 		User: &models.User{
 			Subject:   sub,
 			UpdatedAt: sql.NullTime{Time: now.Add(-1 * time.Minute), Valid: true},
@@ -427,7 +426,7 @@ func TestGenerateTokenResponseForAuthCode_IncludeOpenIDConnectClaimsInIdToken_Fu
 		RefreshTokenOfflineMaxLifetimeInSeconds: 3600,
 	}
 
-	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+	ctx := context.Background()
 
 	now := time.Now().UTC()
 	sub := fake.UUID()
@@ -487,7 +486,7 @@ func TestGenerateTokenResponseForAuthCode_IncludeOpenIDConnectClaimsInIdToken_Fu
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 	}, nil)
 
-	response, err := tokenIssuer.GenerateTokenResponseForAuthCode(ctx, code)
+	response, err := tokenIssuer.GenerateTokenResponseForAuthCode(ctx, settings, code)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
@@ -536,7 +535,7 @@ func TestGenerateTokenResponseForAuthCode_IncludeOpenIDConnectClaimsInIdToken_Cl
 		RefreshTokenOfflineMaxLifetimeInSeconds: 3600,
 	}
 
-	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+	ctx := context.Background()
 
 	now := time.Now().UTC()
 	sub := fake.UUID()
@@ -594,7 +593,7 @@ func TestGenerateTokenResponseForAuthCode_IncludeOpenIDConnectClaimsInIdToken_Cl
 		PrivateKeyPEM: encryptPEM(t, privateKeyBytes),
 	}, nil)
 
-	response, err := tokenIssuer.GenerateTokenResponseForAuthCode(ctx, code)
+	response, err := tokenIssuer.GenerateTokenResponseForAuthCode(ctx, settings, code)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, response)
@@ -637,7 +636,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_MinimalScope_NotAff
 	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(privateKeyBytes)
 	assert.NoError(t, err)
 
-	input := &TokenGenerationInput{
+	input := &tokenGenerationInput{
 		User: &models.User{
 			Subject:   sub,
 			Email:     "test@example.com",
@@ -697,7 +696,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_MinimalScope_Global
 	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(privateKeyBytes)
 	assert.NoError(t, err)
 
-	input := &TokenGenerationInput{
+	input := &tokenGenerationInput{
 		User: &models.User{
 			Subject:   sub,
 			Email:     "test@example.com",
@@ -755,7 +754,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_PartialScope_EmailO
 	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(privateKeyBytes)
 	assert.NoError(t, err)
 
-	input := &TokenGenerationInput{
+	input := &tokenGenerationInput{
 		User: &models.User{
 			Subject:             sub,
 			Email:               "test@example.com",
@@ -832,7 +831,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_WithProfilePicture(
 	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(privateKeyBytes)
 	assert.NoError(t, err)
 
-	input := &TokenGenerationInput{
+	input := &tokenGenerationInput{
 		User: &models.User{
 			Id:            userId,
 			Subject:       sub,
@@ -899,7 +898,7 @@ func TestGenerateIdToken_IncludeOpenIDConnectClaimsInIdToken_EmptyUserFields(t *
 	privKey, err := jwt.ParseRSAPrivateKeyFromPEM(privateKeyBytes)
 	assert.NoError(t, err)
 
-	input := &TokenGenerationInput{
+	input := &tokenGenerationInput{
 		User: &models.User{
 			Subject:       sub,
 			Email:         "minimal@example.com",
