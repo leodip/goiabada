@@ -48,12 +48,13 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 
-	if appConfig.Database.Type == "mysql" {
+	switch appConfig.Database.Type {
+	case "mysql":
 		slog.Info("config.DBUsername=" + appConfig.Database.Username)
 		slog.Info("config.DBHost=" + appConfig.Database.Host)
 		slog.Info("config.DBPort=" + fmt.Sprintf("%d", appConfig.Database.Port))
 		slog.Info("config.DBName=" + appConfig.Database.Name)
-	} else if appConfig.Database.Type == "sqlite" {
+	case "sqlite":
 		slog.Info("config.DBDSN=" + appConfig.Database.DSN)
 	}
 
