@@ -170,7 +170,10 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 		settings := &models.Settings{
-			AppName: "TestApp",
+			AppName:       "TestApp",
+			SMTPHost:      "smtp.example.com",
+			SMTPPort:      587,
+			SMTPFromEmail: "noreply@example.com",
 		}
 		ctx := req.Context()
 		ctx = context.WithValue(ctx, constants.ContextKeySettings, settings)
@@ -197,9 +200,13 @@ func TestHandleForgotPasswordPost(t *testing.T) {
 				emailedLink, _ = args.Get(3).(map[string]interface{})["link"].(string)
 			}).Return(&bytes.Buffer{}, nil)
 
-		emailSender.On("SendEmail", mock.Anything, mock.MatchedBy(func(input *emaildelivery.SendEmailInput) bool {
-			return input.To == "existing@example.com" && input.Subject == "Password reset"
-		})).Return(nil)
+		// The relay is the request's settings, which is the whole of what the handler now reads
+		// for the send (#433).
+		emailSender.On("SendEmail", mock.Anything,
+			emaildelivery.SMTPConfig{Host: "smtp.example.com", Port: 587, FromEmail: "noreply@example.com"},
+			mock.MatchedBy(func(input *emaildelivery.SendEmailInput) bool {
+				return input.To == "existing@example.com" && input.Subject == "Password reset"
+			})).Return(nil)
 
 		httpHelper.On("RenderTemplate",
 			rr,

@@ -27,11 +27,10 @@ const (
 	// error_description stay in customerrors.ErrorDetail and are not
 	// represented here; see the authorize group at the end of this block for
 	// where that line falls on the authorization endpoint.
-	ErrCodeEmailRequired             = "validator.email.required"
-	ErrCodeEmailInvalidFormat        = "validator.email.invalid_format"
-	ErrCodeEmailTooLong              = "validator.email.too_long" // Args: {"max": int}
-	ErrCodeEmailConfirmationMismatch = "validator.email.confirmation_mismatch"
-	ErrCodeEmailAlreadyRegistered    = "validator.email.already_registered"
+	ErrCodeEmailRequired          = "validator.email.required"
+	ErrCodeEmailInvalidFormat     = "validator.email.invalid_format"
+	ErrCodeEmailTooLong           = "validator.email.too_long" // Args: {"max": int}
+	ErrCodeEmailAlreadyRegistered = "validator.email.already_registered"
 
 	// Admin user-groups handler — assignment validation.
 	ErrCodeUserGroupsNotFound = "handler.admin_user_groups.not_found"

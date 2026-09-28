@@ -2,7 +2,7 @@ package emaildelivery
 
 import "github.com/leodip/goiabada/core/errs"
 
-// SMTPEncryption is how the SMTP connection is secured. It is here because EmailSender is the only
+// SMTPEncryption is how the SMTP connection is secured. It is here because this package's Sender is the only
 // thing in the tree that acts on it -- settings carries the value as a plain string column, so
 // models does not name this type at all -- and out of core because the admin console sends no mail
 // (#385).

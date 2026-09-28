@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // The four properties of the catalog that hold whatever the declarations say, moved here from
@@ -17,7 +18,7 @@ import (
 // TestAuditEventTypes_Uniqueness verifies all event types are unique (no duplicates)
 func TestAuditEventTypes_Uniqueness(t *testing.T) {
 	seen := make(map[string]bool)
-	for _, evt := range AuditEventTypes {
+	for _, evt := range AuditEventTypes() {
 		if seen[evt] {
 			t.Errorf("Duplicate audit event type found: %s", evt)
 		}
@@ -27,7 +28,7 @@ func TestAuditEventTypes_Uniqueness(t *testing.T) {
 
 // TestAuditEventTypes_NonEmpty verifies no empty strings in the slice
 func TestAuditEventTypes_NonEmpty(t *testing.T) {
-	for i, evt := range AuditEventTypes {
+	for i, evt := range AuditEventTypes() {
 		assert.NotEmpty(t, evt, "AuditEventTypes[%d] is empty", i)
 	}
 }
@@ -71,16 +72,35 @@ func TestAuditEventTypes_ContainsCriticalEvents(t *testing.T) {
 	}
 
 	for _, critical := range criticalEvents {
-		assert.Contains(t, AuditEventTypes, critical,
+		assert.Contains(t, AuditEventTypes(), critical,
 			"Critical audit event %s not found in AuditEventTypes slice", critical)
 	}
 }
 
+// TestAuditEventTypes_ReturnsACopy pins that a caller cannot edit the catalog through the slice it
+// was handed: the admin API serves the catalog on every request, so one handler sorting or
+// truncating its copy would otherwise change what every later request receives (#433).
+func TestAuditEventTypes_ReturnsACopy(t *testing.T) {
+	first := AuditEventTypes()
+	require.NotEmpty(t, first)
+	original := first[0]
+
+	first[0] = "tampered"
+	_ = append(first[:1], "appended")
+
+	second := AuditEventTypes()
+	assert.Equal(t, original, second[0])
+	assert.Len(t, second, len(auditEventTypes))
+	assert.NotContains(t, second, "tampered")
+	assert.NotContains(t, second, "appended")
+}
+
 // TestAuditEventTypes_Alphabetical verifies the slice is in alphabetical order
 func TestAuditEventTypes_Alphabetical(t *testing.T) {
-	for i := 1; i < len(AuditEventTypes); i++ {
-		prev := AuditEventTypes[i-1]
-		curr := AuditEventTypes[i]
+	types := AuditEventTypes()
+	for i := 1; i < len(types); i++ {
+		prev := types[i-1]
+		curr := types[i]
 
 		if prev > curr {
 			t.Errorf("AuditEventTypes is not in alphabetical order: %s should come after %s", prev, curr)
@@ -125,7 +145,7 @@ func TestAuditEventTypes_CriticalEventValuesAreWireValues(t *testing.T) {
 	} {
 		assert.Equal(t, tc.want, tc.constant,
 			"%s is stored data; changing it orphans every audit_logs row carrying it", tc.name)
-		assert.Contains(t, AuditEventTypes, tc.want,
+		assert.Contains(t, AuditEventTypes(), tc.want,
 			"%s is not in the catalog, so the filter dropdown cannot offer it", tc.name)
 	}
 }

@@ -1,11 +1,9 @@
 package accountvalidation
 
 import (
-	"context"
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/core/i18n"
@@ -17,99 +15,93 @@ func TestPasswordValidator_ValidatePassword(t *testing.T) {
 	validator := NewPasswordValidator()
 
 	t.Run("PasswordPolicyLow", func(t *testing.T) {
-		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &models.Settings{
-			PasswordPolicy: models.PasswordPolicyLow,
-		})
+		policy := models.PasswordPolicyLow
 
 		t.Run("ValidPassword", func(t *testing.T) {
-			err := validator.ValidatePassword(ctx, "123456")
+			err := validator.ValidatePassword(policy, "123456")
 			assert.NoError(t, err)
 		})
 
 		t.Run("TooShort", func(t *testing.T) {
-			err := validator.ValidatePassword(ctx, "12345")
+			err := validator.ValidatePassword(policy, "12345")
 			assertLocalizedError(t, err, i18n.ErrCodePasswordTooShort,
 				"The minimum length for the password is 6 characters")
 		})
 
 		t.Run("TooLong", func(t *testing.T) {
-			err := validator.ValidatePassword(ctx, strings.Repeat("a", 65))
+			err := validator.ValidatePassword(policy, strings.Repeat("a", 65))
 			assertLocalizedError(t, err, i18n.ErrCodePasswordTooLong, tooLongSentence)
 		})
 
 		// Accented rows either side of both bounds. "é" is one character and two bytes, so the
 		// same string can be long enough in characters and too long in bytes (#409).
 		t.Run("AccentedBelowMinimum", func(t *testing.T) {
-			err := validator.ValidatePassword(ctx, strings.Repeat("é", 5))
+			err := validator.ValidatePassword(policy, strings.Repeat("é", 5))
 			assertLocalizedError(t, err, i18n.ErrCodePasswordTooShort,
 				"The minimum length for the password is 6 characters")
 		})
 
 		t.Run("AccentedAtMinimum", func(t *testing.T) {
-			assert.NoError(t, validator.ValidatePassword(ctx, strings.Repeat("é", 6)))
+			assert.NoError(t, validator.ValidatePassword(policy, strings.Repeat("é", 6)))
 		})
 
 		t.Run("AccentedAtMaximum", func(t *testing.T) {
-			assert.NoError(t, validator.ValidatePassword(ctx, strings.Repeat("é", 32)))
+			assert.NoError(t, validator.ValidatePassword(policy, strings.Repeat("é", 32)))
 		})
 
 		t.Run("AccentedOverMaximum", func(t *testing.T) {
-			err := validator.ValidatePassword(ctx, strings.Repeat("é", 33))
+			err := validator.ValidatePassword(policy, strings.Repeat("é", 33))
 			assertLocalizedError(t, err, i18n.ErrCodePasswordTooLong, tooLongSentence)
 		})
 
 		t.Run("ASCIIAtMaximum", func(t *testing.T) {
-			assert.NoError(t, validator.ValidatePassword(ctx, strings.Repeat("a", 64)))
+			assert.NoError(t, validator.ValidatePassword(policy, strings.Repeat("a", 64)))
 		})
 	})
 
 	t.Run("PasswordPolicyMedium", func(t *testing.T) {
-		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &models.Settings{
-			PasswordPolicy: models.PasswordPolicyMedium,
-		})
+		policy := models.PasswordPolicyMedium
 
 		t.Run("ValidPassword", func(t *testing.T) {
-			err := validator.ValidatePassword(ctx, "Passw0rd")
+			err := validator.ValidatePassword(policy, "Passw0rd")
 			assert.NoError(t, err)
 		})
 
 		t.Run("MissingUppercase", func(t *testing.T) {
-			err := validator.ValidatePassword(ctx, "passw0rd")
+			err := validator.ValidatePassword(policy, "passw0rd")
 			assertLocalizedError(t, err, i18n.ErrCodePasswordUppercaseRequired,
 				"As per our policy, an uppercase character is required in the password.")
 		})
 
 		t.Run("MissingLowercase", func(t *testing.T) {
-			err := validator.ValidatePassword(ctx, "PASSW0RD")
+			err := validator.ValidatePassword(policy, "PASSW0RD")
 			assertLocalizedError(t, err, i18n.ErrCodePasswordLowercaseRequired,
 				"As per our policy, a lowercase character is required in the password.")
 		})
 
 		t.Run("MissingNumber", func(t *testing.T) {
-			err := validator.ValidatePassword(ctx, "Password")
+			err := validator.ValidatePassword(policy, "Password")
 			assertLocalizedError(t, err, i18n.ErrCodePasswordNumberRequired,
 				"As per our policy, your password must contain a numerical digit.")
 		})
 	})
 
 	t.Run("PasswordPolicyHigh", func(t *testing.T) {
-		ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &models.Settings{
-			PasswordPolicy: models.PasswordPolicyHigh,
-		})
+		policy := models.PasswordPolicyHigh
 
 		t.Run("ValidPassword", func(t *testing.T) {
-			err := validator.ValidatePassword(ctx, "P@ssw0rd123")
+			err := validator.ValidatePassword(policy, "P@ssw0rd123")
 			assert.NoError(t, err)
 		})
 
 		t.Run("MissingSpecialChar", func(t *testing.T) {
-			err := validator.ValidatePassword(ctx, "Passw0rd123")
+			err := validator.ValidatePassword(policy, "Passw0rd123")
 			assertLocalizedError(t, err, i18n.ErrCodePasswordSpecialCharRequired,
 				"As per our policy, a special character/symbol is required in the password.")
 		})
 
 		t.Run("TooShort", func(t *testing.T) {
-			err := validator.ValidatePassword(ctx, "P@ss1")
+			err := validator.ValidatePassword(policy, "P@ss1")
 			assertLocalizedError(t, err, i18n.ErrCodePasswordTooShort,
 				"The minimum length for the password is 10 characters")
 		})
@@ -131,10 +123,7 @@ func TestPasswordValidator_MaximumIsWithinBcrypt(t *testing.T) {
 		models.PasswordPolicyNone, models.PasswordPolicyLow, models.PasswordPolicyMedium, models.PasswordPolicyHigh,
 	} {
 		t.Run(policy.String(), func(t *testing.T) {
-			ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &models.Settings{
-				PasswordPolicy: policy,
-			})
-			err := validator.ValidatePassword(ctx, overBcrypt)
+			err := validator.ValidatePassword(policy, overBcrypt)
 			assertLocalizedError(t, err, i18n.ErrCodePasswordTooLong, tooLongSentence)
 		})
 	}

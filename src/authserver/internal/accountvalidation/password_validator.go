@@ -1,11 +1,9 @@
 package accountvalidation
 
 import (
-	"context"
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/i18n"
 )
@@ -23,16 +21,16 @@ func NewPasswordValidator() *PasswordValidator {
 	return &PasswordValidator{}
 }
 
-func (val *PasswordValidator) ValidatePassword(ctx context.Context, password string) error {
-	settings := ctx.Value(constants.ContextKeySettings).(*models.Settings)
-
+// ValidatePassword checks password against policy. The caller reads the policy off its settings,
+// so this reads nothing from the request (#433).
+func (val *PasswordValidator) ValidatePassword(policy models.PasswordPolicy, password string) error {
 	minLength := 1
 	mustIncludeLowerCase := false
 	mustIncludeUpperCase := false
 	mustIncludeANumber := false
 	mustIncludeASpecialChar := false
 
-	switch settings.PasswordPolicy {
+	switch policy {
 	case models.PasswordPolicyLow:
 		minLength = 6
 	case models.PasswordPolicyMedium:

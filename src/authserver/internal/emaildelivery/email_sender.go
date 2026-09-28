@@ -1,3 +1,7 @@
+// Package emaildelivery sends the auth server's mail: one message per call, over the SMTP relay
+// the settings row configures, with the connection's encryption and authentication refused rather
+// than downgraded. It renders nothing; the handlers build the HTML body from their templates and
+// pass the relay as an SMTPConfig.
 package emaildelivery
 
 import (
@@ -18,7 +22,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/errs"
@@ -38,7 +41,7 @@ const (
 	defaultConversationTimeout = 30 * time.Second
 )
 
-type EmailSender struct {
+type Sender struct {
 	// rootCAs is nil in production, meaning the system roots. The in-package tests point it at
 	// their fake server's certificate so the TLS paths can be exercised with verification left on.
 	rootCAs *x509.CertPool
@@ -50,8 +53,35 @@ type EmailSender struct {
 	randReader io.Reader
 }
 
-func NewEmailSender() *EmailSender {
-	return &EmailSender{}
+func NewSender() *Sender {
+	return &Sender{}
+}
+
+// SMTPConfig is the relay a message is sent through, as the settings row stores it. The password
+// stays encrypted and the encryption mode stays the stored string: SendEmail decrypts and parses
+// both at send time, so building one cannot fail and no handler holds the plaintext password
+// (#433).
+type SMTPConfig struct {
+	Host              string
+	Port              int
+	FromName          string
+	FromEmail         string
+	Encryption        string
+	Username          string
+	PasswordEncrypted []byte
+}
+
+// SMTPConfigFromSettings copies the relay's fields off the settings row.
+func SMTPConfigFromSettings(settings *models.Settings) SMTPConfig {
+	return SMTPConfig{
+		Host:              settings.SMTPHost,
+		Port:              settings.SMTPPort,
+		FromName:          settings.SMTPFromName,
+		FromEmail:         settings.SMTPFromEmail,
+		Encryption:        settings.SMTPEncryption,
+		Username:          settings.SMTPUsername,
+		PasswordEncrypted: settings.SMTPPasswordEncrypted,
+	}
 }
 
 type SendEmailInput struct {
@@ -60,27 +90,25 @@ type SendEmailInput struct {
 	HtmlBody string
 }
 
-func (e *EmailSender) SendEmail(ctx context.Context, input *SendEmailInput) error {
-
-	settings := ctx.Value(constants.ContextKeySettings).(*models.Settings)
+func (e *Sender) SendEmail(ctx context.Context, smtpConfig SMTPConfig, input *SendEmailInput) error {
 
 	var password string
-	if len(settings.SMTPPasswordEncrypted) > 0 {
-		decryptedPassword, err := encryption.DecryptData(settings.SMTPPasswordEncrypted)
+	if len(smtpConfig.PasswordEncrypted) > 0 {
+		decryptedPassword, err := encryption.DecryptData(smtpConfig.PasswordEncrypted)
 		if err != nil {
 			return errs.Wrap(err, "unable to decrypt the SMTP password")
 		}
 		password = decryptedPassword
 	}
 
-	smtpEnc, err := SMTPEncryptionFromString(settings.SMTPEncryption)
+	smtpEnc, err := SMTPEncryptionFromString(smtpConfig.Encryption)
 	if err != nil {
 		return errs.Wrap(err, "unable to parse the SMTP encryption")
 	}
 
 	// Build the whole message before dialing, so a bad address or a failed entropy read costs no
 	// connection and reaches the admin as its own error rather than as a mid-conversation failure.
-	from := &mail.Address{Name: settings.SMTPFromName, Address: settings.SMTPFromEmail}
+	from := &mail.Address{Name: smtpConfig.FromName, Address: smtpConfig.FromEmail}
 	to, err := mail.ParseAddress(input.To)
 	if err != nil {
 		return errs.Wrap(err, "invalid recipient address")
@@ -94,8 +122,8 @@ func (e *EmailSender) SendEmail(ctx context.Context, input *SendEmailInput) erro
 	// `[::1]`. Every use below takes the host on its own as well as in the address -- the TLS
 	// server name, the SMTP client's host, the local-host check -- and brackets name nothing in
 	// any of them (#424).
-	host := hostport.Unbracket(settings.SMTPHost)
-	addr := hostport.Join(host, settings.SMTPPort)
+	host := hostport.Unbracket(smtpConfig.Host)
+	addr := hostport.Join(host, smtpConfig.Port)
 
 	dialTimeout := e.dialTimeout
 	if dialTimeout == 0 {
@@ -150,8 +178,8 @@ func (e *EmailSender) SendEmail(ctx context.Context, input *SendEmailInput) erro
 		}
 	}
 
-	if len(settings.SMTPUsername) > 0 {
-		if authenticateErr := authenticate(client, host, smtpEnc, settings.SMTPUsername, password); authenticateErr != nil {
+	if len(smtpConfig.Username) > 0 {
+		if authenticateErr := authenticate(client, host, smtpEnc, smtpConfig.Username, password); authenticateErr != nil {
 			return errs.Wrap(authenticateErr, "unable to send SMTP message")
 		}
 	}
@@ -246,7 +274,7 @@ func isLocalHost(host string) bool {
 // buildMessage writes the RFC 5322 message: a fixed header order, then a quoted-printable
 // text/html body. go-simple-mail emitted the headers in Go map order, so nothing downstream can
 // have depended on the old order (#274).
-func (e *EmailSender) buildMessage(from, to *mail.Address, input *SendEmailInput) ([]byte, error) {
+func (e *Sender) buildMessage(from, to *mail.Address, input *SendEmailInput) ([]byte, error) {
 
 	messageID, err := e.newMessageID(from.Address)
 	if err != nil {
@@ -286,7 +314,7 @@ func (e *EmailSender) buildMessage(from, to *mail.Address, input *SendEmailInput
 // domain is the part of the from address after its last '@'; the address is validated as an email
 // on the way into the settings (apihandlers.HandleAPISettingsEmailPut), which is what keeps this
 // from being a header injection point (#274).
-func (e *EmailSender) newMessageID(fromAddress string) (string, error) {
+func (e *Sender) newMessageID(fromAddress string) (string, error) {
 	reader := e.randReader
 	if reader == nil {
 		reader = rand.Reader

@@ -171,7 +171,7 @@ func HandleAccountRegisterPost(
 			return
 		}
 
-		err = passwordValidator.ValidatePassword(r.Context(), password)
+		err = passwordValidator.ValidatePassword(settings.PasswordPolicy, password)
 		if err != nil {
 			// i18n surface: A — browser-flow form rerender.
 			var locErr *i18n.LocalizedError
@@ -247,7 +247,7 @@ func HandleAccountRegisterPost(
 				Subject:  i18n.T(emailReq.Context(), "email.register_activate.subject"),
 				HtmlBody: buf.String(),
 			}
-			err = emailSender.SendEmail(r.Context(), input)
+			err = emailSender.SendEmail(r.Context(), emaildelivery.SMTPConfigFromSettings(settings), input)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
 				return
@@ -300,7 +300,7 @@ func HandleAccountRegisterPost(
 					Subject:  i18n.T(emailReq.Context(), "email.register_confirmation.subject"),
 					HtmlBody: buf.String(),
 				}
-				emailErr = emailSender.SendEmail(r.Context(), input)
+				emailErr = emailSender.SendEmail(r.Context(), emaildelivery.SMTPConfigFromSettings(settings), input)
 				if emailErr != nil {
 					httpHelper.InternalServerError(w, r, emailErr)
 					return

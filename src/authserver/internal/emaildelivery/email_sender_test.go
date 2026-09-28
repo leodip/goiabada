@@ -14,7 +14,6 @@ import (
 	"testing/iotest"
 	"time"
 
-	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
@@ -29,17 +28,15 @@ const mailpitURL = "http://mailpit:8025"
 
 func TestSendEmail(t *testing.T) {
 
-	emailSender := NewEmailSender()
+	emailSender := NewSender()
 
-	ctx := context.WithValue(context.Background(), constants.ContextKeySettings, &models.Settings{
-		SMTPHost:              "mailpit",
-		SMTPPort:              1025,
-		SMTPUsername:          "",
-		SMTPPasswordEncrypted: nil,
-		SMTPEncryption:        "none",
-		SMTPFromName:          "Acme, Inc.",
-		SMTPFromEmail:         "sender@example.com",
-	})
+	smtpConfig := SMTPConfig{
+		Host:       "mailpit",
+		Port:       1025,
+		Encryption: "none",
+		FromName:   "Acme, Inc.",
+		FromEmail:  "sender@example.com",
+	}
 
 	recipient := fake.Email()
 
@@ -49,7 +46,7 @@ func TestSendEmail(t *testing.T) {
 		HtmlBody: "<p>This is a test email</p>",
 	}
 
-	err := emailSender.SendEmail(ctx, input)
+	err := emailSender.SendEmail(context.Background(), smtpConfig, input)
 	assert.NoError(t, err)
 
 	sent := mailpit.New(mailpitURL).AssertEmailSent(t, recipient, "<p>This is a test email</p>")
@@ -78,27 +75,58 @@ const (
 	fixtureRecipient = "rcpt@example.com"
 )
 
-// fakeSettings builds the settings context SendEmail reads, encrypting the password through the
-// package's test cipher (test_main_test.go) exactly as the real settings carry it.
-func fakeSettings(t *testing.T, host string, port int, smtpEncryption string, username, password, fromName string) context.Context {
+// relayConfig builds the relay SendEmail sends through, encrypting the password through the
+// package's test cipher (test_main_test.go) exactly as the settings row carries it.
+func relayConfig(t *testing.T, host string, port int, smtpEncryption string, username, password, fromName string) SMTPConfig {
 	t.Helper()
 
-	settings := &models.Settings{
-		SMTPHost:       host,
-		SMTPPort:       port,
-		SMTPUsername:   username,
-		SMTPEncryption: smtpEncryption,
-		SMTPFromName:   fromName,
-		SMTPFromEmail:  fixtureFromEmail,
+	smtpConfig := SMTPConfig{
+		Host:       host,
+		Port:       port,
+		Username:   username,
+		Encryption: smtpEncryption,
+		FromName:   fromName,
+		FromEmail:  fixtureFromEmail,
 	}
 
 	if password != "" {
 		encrypted, err := encryption.EncryptData(password)
 		require.NoError(t, err)
-		settings.SMTPPasswordEncrypted = encrypted
+		smtpConfig.PasswordEncrypted = encrypted
 	}
 
-	return context.WithValue(context.Background(), constants.ContextKeySettings, settings)
+	return smtpConfig
+}
+
+// TestSMTPConfigFromSettings pins the field mapping, one distinct value per field so a swap of
+// two same-typed fields fails. The password is copied still encrypted: SendEmail decrypts it at
+// send time, so the struct a handler builds never holds the plaintext (#433 decision 10).
+func TestSMTPConfigFromSettings(t *testing.T) {
+	encrypted, err := encryption.EncryptData(fixturePassword)
+	require.NoError(t, err)
+
+	got := SMTPConfigFromSettings(&models.Settings{
+		SMTPHost:              "smtp.example.com",
+		SMTPPort:              2525,
+		SMTPUsername:          fixtureUser,
+		SMTPPasswordEncrypted: encrypted,
+		SMTPFromName:          "Acme",
+		SMTPFromEmail:         fixtureFromEmail,
+		SMTPEncryption:        "starttls",
+		SMTPEnabled:           true,
+	})
+
+	assert.Equal(t, SMTPConfig{
+		Host:              "smtp.example.com",
+		Port:              2525,
+		FromName:          "Acme",
+		FromEmail:         fixtureFromEmail,
+		Encryption:        "starttls",
+		Username:          fixtureUser,
+		PasswordEncrypted: encrypted,
+	}, got)
+	assert.NotContains(t, string(got.PasswordEncrypted), fixturePassword,
+		"the password stays encrypted until SendEmail decrypts it")
 }
 
 // TestSendEmail_EncryptionModes covers the three modes end to end against the fake, each with
@@ -148,10 +176,10 @@ func TestSendEmail_EncryptionModes(t *testing.T) {
 
 			// 127.0.0.1 is a SAN on the fake's certificate and is one of the three hosts
 			// decision 1 treats as local, so this row is about the mode and nothing else.
-			ctx := fakeSettings(t, "127.0.0.1", port, test.encryption, fixtureUser, fixturePassword, "Goiabada")
-			sender := &EmailSender{rootCAs: cert.pool}
+			smtpConfig := relayConfig(t, "127.0.0.1", port, test.encryption, fixtureUser, fixturePassword, "Goiabada")
+			sender := &Sender{rootCAs: cert.pool}
 
-			err := sender.SendEmail(ctx, &SendEmailInput{
+			err := sender.SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 				To:       fixtureRecipient,
 				Subject:  "Test email",
 				HtmlBody: "<p>hello</p>",
@@ -215,10 +243,10 @@ func TestSendEmail_IPv6Host(t *testing.T) {
 			}
 			port := f.start(t)
 
-			ctx := fakeSettings(t, test.host, port, test.encryption, fixtureUser, fixturePassword, "Goiabada")
-			sender := &EmailSender{rootCAs: cert.pool}
+			smtpConfig := relayConfig(t, test.host, port, test.encryption, fixtureUser, fixturePassword, "Goiabada")
+			sender := &Sender{rootCAs: cert.pool}
 
-			err := sender.SendEmail(ctx, &SendEmailInput{
+			err := sender.SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 				To:       fixtureRecipient,
 				Subject:  "Test email",
 				HtmlBody: "<p>hello</p>",
@@ -294,9 +322,9 @@ func TestSendEmail_MechanismChoice(t *testing.T) {
 			f := &fakeSMTP{ext: []string{test.authExt, "8BITMIME"}, expectPassword: fixturePassword}
 			port := f.start(t)
 
-			ctx := fakeSettings(t, "127.0.0.1", port, "none", fixtureUser, fixturePassword, "Goiabada")
+			smtpConfig := relayConfig(t, "127.0.0.1", port, "none", fixtureUser, fixturePassword, "Goiabada")
 
-			err := (&EmailSender{}).SendEmail(ctx, &SendEmailInput{
+			err := (&Sender{}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 				To:       fixtureRecipient,
 				Subject:  "Test email",
 				HtmlBody: "<p>hello</p>",
@@ -339,9 +367,9 @@ func TestSendEmail_LoginOverProtectedConnection(t *testing.T) {
 	}
 	port := f.start(t)
 
-	ctx := fakeSettings(t, fakeHostname(t), port, "starttls", fixtureUser, fixturePassword, "Goiabada")
+	smtpConfig := relayConfig(t, fakeHostname(t), port, "starttls", fixtureUser, fixturePassword, "Goiabada")
 
-	err := (&EmailSender{rootCAs: cert.pool}).SendEmail(ctx, &SendEmailInput{
+	err := (&Sender{rootCAs: cert.pool}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 		To:       fixtureRecipient,
 		Subject:  "Test email",
 		HtmlBody: "<p>hello</p>",
@@ -370,9 +398,9 @@ func TestSendEmail_LoginAnswersUnconventionalChallenges(t *testing.T) {
 	}
 	port := f.start(t)
 
-	ctx := fakeSettings(t, "127.0.0.1", port, "none", fixtureUser, fixturePassword, "Goiabada")
+	smtpConfig := relayConfig(t, "127.0.0.1", port, "none", fixtureUser, fixturePassword, "Goiabada")
 
-	err := (&EmailSender{}).SendEmail(ctx, &SendEmailInput{
+	err := (&Sender{}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 		To:       fixtureRecipient,
 		Subject:  "Test email",
 		HtmlBody: "<p>hello</p>",
@@ -423,9 +451,9 @@ func TestSendEmail_PlainInitialResponseBoundary(t *testing.T) {
 			}
 			port := f.start(t)
 
-			ctx := fakeSettings(t, "127.0.0.1", port, "none", fixtureUser, password, "Goiabada")
+			smtpConfig := relayConfig(t, "127.0.0.1", port, "none", fixtureUser, password, "Goiabada")
 
-			err := (&EmailSender{}).SendEmail(ctx, &SendEmailInput{
+			err := (&Sender{}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 				To:       fixtureRecipient,
 				Subject:  "Test email",
 				HtmlBody: "<p>hello</p>",
@@ -467,9 +495,9 @@ func TestSendEmail_PlainChallengeFormOverProtectedConnection(t *testing.T) {
 	}
 	port := f.start(t)
 
-	ctx := fakeSettings(t, fakeHostname(t), port, "starttls", fixtureUser, longPassword, "Goiabada")
+	smtpConfig := relayConfig(t, fakeHostname(t), port, "starttls", fixtureUser, longPassword, "Goiabada")
 
-	err := (&EmailSender{rootCAs: cert.pool}).SendEmail(ctx, &SendEmailInput{
+	err := (&Sender{rootCAs: cert.pool}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 		To:       fixtureRecipient,
 		Subject:  "Test email",
 		HtmlBody: "<p>hello</p>",
@@ -504,9 +532,9 @@ func TestSendEmail_PlainRepeatedChallenge(t *testing.T) {
 	}
 	port := f.start(t)
 
-	ctx := fakeSettings(t, "127.0.0.1", port, "none", fixtureUser, longPassword, "Goiabada")
+	smtpConfig := relayConfig(t, "127.0.0.1", port, "none", fixtureUser, longPassword, "Goiabada")
 
-	err := (&EmailSender{}).SendEmail(ctx, &SendEmailInput{
+	err := (&Sender{}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 		To:       fixtureRecipient,
 		Subject:  "Test email",
 		HtmlBody: "<p>hello</p>",
@@ -607,10 +635,10 @@ func TestSendEmail_FailsClosed(t *testing.T) {
 			}
 			port := f.start(t)
 
-			ctx := fakeSettings(t, test.host, port, test.encryption, fixtureUser, fixturePassword, "Goiabada")
-			sender := &EmailSender{rootCAs: cert.pool}
+			smtpConfig := relayConfig(t, test.host, port, test.encryption, fixtureUser, fixturePassword, "Goiabada")
+			sender := &Sender{rootCAs: cert.pool}
 
-			err := sender.SendEmail(ctx, &SendEmailInput{
+			err := sender.SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 				To:       fixtureRecipient,
 				Subject:  "Test email",
 				HtmlBody: "<p>hello</p>",
@@ -711,9 +739,9 @@ func TestSendEmail_CertificateVerification(t *testing.T) {
 				pool = cert.pool
 			}
 
-			ctx := fakeSettings(t, test.host, port, test.encryption, fixtureUser, fixturePassword, "Goiabada")
+			smtpConfig := relayConfig(t, test.host, port, test.encryption, fixtureUser, fixturePassword, "Goiabada")
 
-			err := (&EmailSender{rootCAs: pool}).SendEmail(ctx, &SendEmailInput{
+			err := (&Sender{rootCAs: pool}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 				To:       fixtureRecipient,
 				Subject:  "Test email",
 				HtmlBody: "<p>hello</p>",
@@ -783,8 +811,8 @@ func send(t *testing.T, fromName string, input *SendEmailInput) sentMessage {
 	f := &fakeSMTP{ext: []string{"8BITMIME"}}
 	port := f.start(t)
 
-	ctx := fakeSettings(t, "127.0.0.1", port, "none", "", "", fromName)
-	require.NoError(t, (&EmailSender{}).SendEmail(ctx, input))
+	smtpConfig := relayConfig(t, "127.0.0.1", port, "none", "", "", fromName)
+	require.NoError(t, (&Sender{}).SendEmail(context.Background(), smtpConfig, input))
 
 	return parseMessage(t, f.data())
 }
@@ -964,9 +992,9 @@ func TestSendEmail_SubjectHardLineLimit(t *testing.T) {
 		f := &fakeSMTP{ext: []string{"8BITMIME"}}
 		port := f.start(t)
 
-		ctx := fakeSettings(t, "127.0.0.1", port, "none", "", "", "Goiabada")
+		smtpConfig := relayConfig(t, "127.0.0.1", port, "none", "", "", "Goiabada")
 
-		err := (&EmailSender{}).SendEmail(ctx, &SendEmailInput{
+		err := (&Sender{}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 			To:       fixtureRecipient,
 			Subject:  strings.Repeat("s", longest+1),
 			HtmlBody: "<p>hello</p>",
@@ -985,9 +1013,9 @@ func TestSendEmail_FinalDataRejection(t *testing.T) {
 	f := &fakeSMTP{ext: []string{"8BITMIME"}, rejectAfterData: true}
 	port := f.start(t)
 
-	ctx := fakeSettings(t, "127.0.0.1", port, "none", "", "", "Goiabada")
+	smtpConfig := relayConfig(t, "127.0.0.1", port, "none", "", "", "Goiabada")
 
-	err := (&EmailSender{}).SendEmail(ctx, &SendEmailInput{
+	err := (&Sender{}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 		To:       fixtureRecipient,
 		Subject:  "Test email",
 		HtmlBody: "<p>hello</p>",
@@ -1014,14 +1042,14 @@ func TestSendEmail_MessageID(t *testing.T) {
 	})
 
 	t.Run("two sends through one sender differ", func(t *testing.T) {
-		sender := &EmailSender{}
+		sender := &Sender{}
 		seen := make([]string, 0, 2)
 
 		for i := 0; i < 2; i++ {
 			f := &fakeSMTP{ext: []string{"8BITMIME"}}
 			port := f.start(t)
-			ctx := fakeSettings(t, "127.0.0.1", port, "none", "", "", "Goiabada")
-			require.NoError(t, sender.SendEmail(ctx, &SendEmailInput{
+			smtpConfig := relayConfig(t, "127.0.0.1", port, "none", "", "", "Goiabada")
+			require.NoError(t, sender.SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 				To:       fixtureRecipient,
 				Subject:  fmt.Sprintf("Test email %d", i),
 				HtmlBody: "<p>hello</p>",
@@ -1037,10 +1065,10 @@ func TestSendEmail_MessageID(t *testing.T) {
 		f := &fakeSMTP{ext: []string{"8BITMIME"}}
 		port := f.start(t)
 
-		ctx := fakeSettings(t, "127.0.0.1", port, "none", "", "", "Goiabada")
-		sender := &EmailSender{randReader: iotest.ErrReader(io.ErrUnexpectedEOF)}
+		smtpConfig := relayConfig(t, "127.0.0.1", port, "none", "", "", "Goiabada")
+		sender := &Sender{randReader: iotest.ErrReader(io.ErrUnexpectedEOF)}
 
-		err := sender.SendEmail(ctx, &SendEmailInput{
+		err := sender.SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 			To:       fixtureRecipient,
 			Subject:  "Test email",
 			HtmlBody: "<p>hello</p>",
@@ -1125,9 +1153,9 @@ func TestSendEmail_InvalidRecipient(t *testing.T) {
 	f := &fakeSMTP{ext: []string{"8BITMIME"}}
 	port := f.start(t)
 
-	ctx := fakeSettings(t, "127.0.0.1", port, "none", "", "", "Goiabada")
+	smtpConfig := relayConfig(t, "127.0.0.1", port, "none", "", "", "Goiabada")
 
-	err := (&EmailSender{}).SendEmail(ctx, &SendEmailInput{
+	err := (&Sender{}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 		To:       "not an address",
 		Subject:  "Test email",
 		HtmlBody: "<p>hello</p>",
@@ -1148,9 +1176,9 @@ func TestSendEmail_DialTimeout(t *testing.T) {
 	f := &fakeSMTP{ext: []string{"8BITMIME"}}
 	port := f.start(t)
 
-	ctx := fakeSettings(t, "127.0.0.1", port, "none", "", "", "Goiabada")
+	smtpConfig := relayConfig(t, "127.0.0.1", port, "none", "", "", "Goiabada")
 
-	err := (&EmailSender{dialTimeout: -time.Second}).SendEmail(ctx, &SendEmailInput{
+	err := (&Sender{dialTimeout: -time.Second}).SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 		To:       fixtureRecipient,
 		Subject:  "Test email",
 		HtmlBody: "<p>hello</p>",
@@ -1167,11 +1195,11 @@ func TestSendEmail_ConversationTimeout(t *testing.T) {
 	f := &fakeSMTP{ext: []string{"8BITMIME"}, stallAfterData: true}
 	port := f.start(t)
 
-	ctx := fakeSettings(t, "127.0.0.1", port, "none", "", "", "Goiabada")
-	sender := &EmailSender{convTimeout: time.Second}
+	smtpConfig := relayConfig(t, "127.0.0.1", port, "none", "", "", "Goiabada")
+	sender := &Sender{convTimeout: time.Second}
 
 	started := time.Now()
-	err := sender.SendEmail(ctx, &SendEmailInput{
+	err := sender.SendEmail(context.Background(), smtpConfig, &SendEmailInput{
 		To:       fixtureRecipient,
 		Subject:  "Test email",
 		HtmlBody: "<p>hello</p>",

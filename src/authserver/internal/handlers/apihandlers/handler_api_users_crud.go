@@ -139,7 +139,8 @@ func HandleAPIUserPasswordPut(
 		}
 
 		// Validate password
-		err = passwordValidator.ValidatePassword(r.Context(), req.NewPassword)
+		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
+		err = passwordValidator.ValidatePassword(settings.PasswordPolicy, req.NewPassword)
 		if err != nil {
 			writeValidationError(w, r, err)
 			return
@@ -392,7 +393,7 @@ func HandleAPIUserCreatePost(
 			}
 
 			// Validate password
-			err = passwordValidator.ValidatePassword(r.Context(), req.Password)
+			err = passwordValidator.ValidatePassword(settings.PasswordPolicy, req.Password)
 			if err != nil {
 				writeValidationError(w, r, err)
 				return
@@ -505,7 +506,7 @@ func HandleAPIUserCreatePost(
 				Subject:  i18n.T(emailReq.Context(), "email.newuser_set_password.subject", map[string]any{"appName": settings.AppName}),
 				HtmlBody: buf.String(),
 			}
-			err = emailSender.SendEmail(r.Context(), input)
+			err = emailSender.SendEmail(r.Context(), emaildelivery.SMTPConfigFromSettings(settings), input)
 			if err != nil {
 				writeInternalServerError(w, r, err)
 				return

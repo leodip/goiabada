@@ -1,6 +1,6 @@
 package emaildelivery
 
-// An in-process SMTP server for the EmailSender table. It exists because the dev container's
+// An in-process SMTP server for the Sender table. It exists because the dev container's
 // mailpit offers exactly one shape -- no encryption, no authentication -- so the three encryption
 // modes, the three authentication mechanisms, the fail-closed refusals and the bytes on the wire
 // are unreachable without it. Grown from an early exploratory test written for #274, which
@@ -390,7 +390,7 @@ func (f *fakeSMTP) start(t *testing.T) int {
 }
 
 // fakeCert is a self-signed certificate that is its own root, so a test can hand its pool to
-// EmailSender.rootCAs and leave verification on.
+// Sender.rootCAs and leave verification on.
 type fakeCert struct {
 	cert tls.Certificate
 	pool *x509.CertPool

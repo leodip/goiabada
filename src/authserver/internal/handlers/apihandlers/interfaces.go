@@ -47,23 +47,23 @@ type HttpHelper interface {
 // EmailSender delivers one message. The context is the request's, so the SMTP dial and write are
 // bounded by the request that asked for them.
 type EmailSender interface {
-	SendEmail(ctx context.Context, input *emaildelivery.SendEmailInput) error
+	SendEmail(ctx context.Context, smtpConfig emaildelivery.SMTPConfig, input *emaildelivery.SendEmailInput) error
 }
 
 // EmailValidator is the address check alone, which the settings email endpoints and user creation
 // call. The two richer validations this package performs each have one caller, so each is a
-// per-file port beside it: accountEmailValidator (ValidateEmailChange) in
-// handler_api_account_email.go and usersEmailValidator (ValidateEmailUpdate) in
-// handler_api_users_email.go. Naming them here would widen this port past its callers.
+// per-file port beside it: accountEmailValidator in handler_api_account_email.go and
+// usersEmailValidator in handler_api_users_email.go, both naming ValidateEmailChange. Naming it
+// here would widen this port past its callers.
 type EmailValidator interface {
 	ValidateEmailAddress(emailAddress string) error
 }
 
-// PasswordValidator checks a new password against the password policy in the request's
+// PasswordValidator checks a new password against the password policy the caller passes from its
 // settings. Three handlers call it: user creation, an administrator setting a user's password, and
 // the account's own password change.
 type PasswordValidator interface {
-	ValidatePassword(ctx context.Context, password string) error
+	ValidatePassword(policy models.PasswordPolicy, password string) error
 }
 
 // UserCreator creates the user row and its default permissions in one transaction.

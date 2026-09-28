@@ -29,7 +29,7 @@ import (
 // registered beside them (#266).
 func (s *Server) initRoutes(root chi.Router) {
 
-	auditLogger := audit.NewAuditLogger(s.database)
+	auditLogger := audit.NewAuditLogger(s.database, middleware.NewAuditSwitches(s.database))
 	authorizeValidator := protocolvalidation.NewAuthorizeValidator(s.database)
 	tokenParser := signingkeys.NewTokenParser(s.database)
 	permissionChecker := permissions.NewPermissionChecker(s.database)
@@ -46,7 +46,7 @@ func (s *Server) initRoutes(root chi.Router) {
 	otpSecretGenerator := otp.NewOTPSecretGenerator()
 	tokenIssuer := issuance.NewTokenIssuer(s.database, s.baseURL)
 	userCreator := usercreation.NewUserCreator(s.database)
-	emailSender := emaildelivery.NewEmailSender()
+	emailSender := emaildelivery.NewSender()
 
 	httpHelper := handlerhelpers.NewHttpHelper(s.templateFS, middleware.SettingsReader{})
 	authHelper := handlerhelpers.NewAuthHelper(s.sessionStore, constants.AuthServerSessionName)

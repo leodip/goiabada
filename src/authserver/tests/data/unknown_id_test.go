@@ -16,7 +16,7 @@ import (
 // Every single-row getter returns (nil, nil) when it finds nothing, rather than an
 // error. That is a deliberate convention, but it means a caller who forgets to
 // check the pointer dereferences nil, and it has already cost us real bugs:
-// /api/public/settings panicked on a missing settings row, and ValidateEmailUpdate
+// /api/public/settings panicked on a missing settings row, and an email validator
 // held a `user != nil` conjunct that made its whole uniqueness check fail open.
 //
 // Only four of the thirty-three single-row getters had any unknown-id coverage, so

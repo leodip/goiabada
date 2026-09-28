@@ -15,6 +15,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/data"
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
+	"github.com/leodip/goiabada/authserver/internal/emaildelivery"
 	"github.com/leodip/goiabada/authserver/internal/emaillinks"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	mocks_accounthandlers "github.com/leodip/goiabada/authserver/internal/handlers/accounthandlers/mocks"
@@ -343,7 +344,7 @@ func TestHandleAPIUserCreatePost_StoresResetCodeHash(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	req = setTokenContextWithClaims(req, map[string]interface{}{"sub": adminSubject})
 	req = req.WithContext(context.WithValue(req.Context(), constants.ContextKeySettings,
-		&models.Settings{AppName: "TestApp", SMTPEnabled: true}))
+		&models.Settings{AppName: "TestApp", SMTPEnabled: true, SMTPHost: "smtp.example.com", SMTPFromName: "Acme"}))
 
 	// The handler mutates this model in place before writing it, so it is what the
 	// assertions below read.
@@ -359,7 +360,9 @@ func TestHandleAPIUserCreatePost_StoresResetCodeHash(t *testing.T) {
 		Run(func(args mock.Arguments) {
 			emailedLink, _ = args.Get(3).(map[string]interface{})["link"].(string)
 		}).Return(&bytes.Buffer{}, nil)
-	emailSender.On("SendEmail", mock.Anything, mock.Anything).Return(nil)
+	// The relay is the request's settings (#433).
+	emailSender.On("SendEmail", mock.Anything,
+		emaildelivery.SMTPConfig{Host: "smtp.example.com", FromName: "Acme"}, mock.Anything).Return(nil)
 
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)
@@ -629,7 +632,7 @@ func TestHandleAPIUserCreatePost_SetPasswordTypeMatrix(t *testing.T) {
 				httpHelper.On("RenderTemplateToBuffer", mock.Anything, "/layouts/email_layout.html",
 					"/emails/email_newuser_set_password.html", mock.Anything).
 					Return(&bytes.Buffer{}, nil)
-				emailSender.On("SendEmail", mock.Anything, mock.Anything).Return(nil)
+				emailSender.On("SendEmail", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 			}
 
 			rr := httptest.NewRecorder()

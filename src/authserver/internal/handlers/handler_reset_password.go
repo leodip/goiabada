@@ -14,6 +14,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/config"
+	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/emaillinks"
 	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/middleware"
@@ -431,7 +432,8 @@ func HandleResetPasswordPost(
 			return
 		}
 
-		err := passwordValidator.ValidatePassword(r.Context(), password)
+		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
+		err := passwordValidator.ValidatePassword(settings.PasswordPolicy, password)
 		if err != nil {
 			// i18n surface: A — browser-flow form rerender.
 			var locErr *i18n.LocalizedError
