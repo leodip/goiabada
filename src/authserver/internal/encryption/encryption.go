@@ -1,8 +1,8 @@
 // Package encryption holds the symmetric encryption the auth server applies to data
-// at rest and to the one value a client hands it encrypted: the AES-GCM data cipher
-// over client secrets and OTP secrets, the standalone EncryptText/DecryptText pair
-// the re-encryption sweep uses when the data key changes, the JWE encoding of an
-// encrypted id_token_hint, and the random key generation the rest of it stands on.
+// at rest: the AES-GCM data cipher over client secrets and OTP secrets, the standalone
+// EncryptText/DecryptText pair the re-encryption sweep uses when the data key changes,
+// and the random key generation the rest of it stands on. The encrypted id_token_hint,
+// whose key comes from a client secret rather than the data key, is idtokenhint's (#434).
 //
 // It belongs to the auth server because nothing else holds the data encryption key
 // or writes a row that needs one; the admin console reaches every encrypted value

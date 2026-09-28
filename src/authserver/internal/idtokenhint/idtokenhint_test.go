@@ -1,4 +1,4 @@
-package encryption
+package idtokenhint
 
 import (
 	"bytes"
@@ -14,7 +14,7 @@ import (
 const testClientSecret = "a-representative-60-char-client-secret-0123456789abcdefgh"
 
 // testInner is the plaintext of a real hint: the inner signed ID Token, a compact
-// JWS. Its content is opaque to the encryption layer.
+// JWS. Its content is opaque to this package.
 const testInner = "eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJhbGljZSJ9.signature-bytes"
 
 // jweOpts is the low-level fixture builder's dial box. Every field defaults to the
@@ -31,7 +31,7 @@ type jweOpts struct {
 
 // buildJWE assembles a compact JWE segment by segment, so a case can write any
 // header and any segment length. It deliberately does not call
-// EncryptIDTokenHintJWE: the encryptor can only produce well-formed input, and
+// Encrypt: the encryptor can only produce well-formed input, and
 // almost every case here is malformed on purpose.
 func buildJWE(t *testing.T, plaintext string, key []byte, o jweOpts) string {
 	t.Helper()
@@ -125,28 +125,28 @@ func flipFirstByte(t *testing.T, compactJWE string, i int) string {
 	return replaceSegment(t, compactJWE, i, string(seg))
 }
 
-func TestDeriveIDTokenHintKey(t *testing.T) {
-	k1 := DeriveIDTokenHintKey(testClientSecret)
+func TestDeriveKey(t *testing.T) {
+	k1 := DeriveKey(testClientSecret)
 	if len(k1) != 32 {
 		t.Fatalf("derived key length = %d, want 32", len(k1))
 	}
 	// Deterministic for a given secret, different for a different secret.
-	k2 := DeriveIDTokenHintKey(testClientSecret)
+	k2 := DeriveKey(testClientSecret)
 	if string(k1) != string(k2) {
 		t.Error("derivation is not deterministic")
 	}
-	if string(DeriveIDTokenHintKey("other-secret")) == string(k1) {
+	if string(DeriveKey("other-secret")) == string(k1) {
 		t.Error("different secrets produced the same key")
 	}
 }
 
-// TestEncryptIDTokenHintJWE_Shape pins the wire format the docs at
+// TestEncrypt_Shape pins the wire format the docs at
 // integration/endpoints.mdx promise an RP, byte for byte: change any of it and
 // every client following that page breaks.
-func TestEncryptIDTokenHintJWE_Shape(t *testing.T) {
-	jwe, err := EncryptIDTokenHintJWE(testInner, testClientSecret)
+func TestEncrypt_Shape(t *testing.T) {
+	jwe, err := Encrypt(testInner, testClientSecret)
 	if err != nil {
-		t.Fatalf("EncryptIDTokenHintJWE: %v", err)
+		t.Fatalf("Encrypt: %v", err)
 	}
 	parts := strings.Split(jwe, ".")
 	if len(parts) != 5 {
@@ -175,49 +175,49 @@ func TestEncryptIDTokenHintJWE_Shape(t *testing.T) {
 	}
 
 	// A second call must not repeat the IV.
-	other, err := EncryptIDTokenHintJWE(testInner, testClientSecret)
+	other, err := Encrypt(testInner, testClientSecret)
 	if err != nil {
-		t.Fatalf("EncryptIDTokenHintJWE (second): %v", err)
+		t.Fatalf("Encrypt (second): %v", err)
 	}
 	if strings.Split(other, ".")[2] == parts[2] {
 		t.Error("two encryptions reused the same iv")
 	}
 }
 
-func TestEncryptIDTokenHintJWE_InvalidInput(t *testing.T) {
-	if _, err := EncryptIDTokenHintJWE("", testClientSecret); err == nil {
+func TestEncrypt_InvalidInput(t *testing.T) {
+	if _, err := Encrypt("", testClientSecret); err == nil {
 		t.Error("expected an empty plaintext to be refused, got nil error")
 	} else if !strings.Contains(err.Error(), "plaintext is empty") {
 		t.Errorf("empty plaintext: err = %v, want it to name the empty plaintext", err)
 	}
-	if _, err := EncryptIDTokenHintJWE(testInner, ""); err == nil {
+	if _, err := Encrypt(testInner, ""); err == nil {
 		t.Error("expected an empty client secret to be refused, got nil error")
 	} else if !strings.Contains(err.Error(), "client secret is empty") {
 		t.Errorf("empty secret: err = %v, want it to name the empty secret", err)
 	}
 }
 
-func TestDecryptIDTokenHintJWE_RoundTrip(t *testing.T) {
-	jwe, err := EncryptIDTokenHintJWE(testInner, testClientSecret)
+func TestDecrypt_RoundTrip(t *testing.T) {
+	jwe, err := Encrypt(testInner, testClientSecret)
 	if err != nil {
-		t.Fatalf("EncryptIDTokenHintJWE: %v", err)
+		t.Fatalf("Encrypt: %v", err)
 	}
 
-	got, err := DecryptIDTokenHintJWE(jwe, testClientSecret)
+	got, err := Decrypt(jwe, testClientSecret)
 	if err != nil {
-		t.Fatalf("DecryptIDTokenHintJWE: %v", err)
+		t.Fatalf("Decrypt: %v", err)
 	}
 	if got != testInner {
 		t.Errorf("round-trip mismatch:\n got  %q\n want %q", got, testInner)
 	}
 }
 
-// TestDecryptIDTokenHintJWE_Accepted is the other half of the refusal table: the
+// TestDecrypt_Accepted is the other half of the refusal table: the
 // inputs the parser must keep taking. Unknown header parameters are ignored per
 // RFC 7515 section 4, and "cty" is never required (decision 4), so a hint that
 // works today goes on working.
-func TestDecryptIDTokenHintJWE_Accepted(t *testing.T) {
-	key := DeriveIDTokenHintKey(testClientSecret)
+func TestDecrypt_Accepted(t *testing.T) {
+	key := DeriveKey(testClientSecret)
 
 	cases := []struct {
 		name      string
@@ -255,7 +255,7 @@ func TestDecryptIDTokenHintJWE_Accepted(t *testing.T) {
 			if want == "" {
 				want = testInner
 			}
-			got, err := DecryptIDTokenHintJWE(buildJWE(t, want, key, tc.opts), testClientSecret)
+			got, err := Decrypt(buildJWE(t, want, key, tc.opts), testClientSecret)
 			if err != nil {
 				t.Fatalf("expected acceptance, got error: %v", err)
 			}
@@ -266,10 +266,10 @@ func TestDecryptIDTokenHintJWE_Accepted(t *testing.T) {
 	}
 }
 
-func TestDecryptIDTokenHintJWE_WrongSecret(t *testing.T) {
-	jwe := buildJWE(t, testInner, DeriveIDTokenHintKey(testClientSecret), jweOpts{})
+func TestDecrypt_WrongSecret(t *testing.T) {
+	jwe := buildJWE(t, testInner, DeriveKey(testClientSecret), jweOpts{})
 
-	_, err := DecryptIDTokenHintJWE(jwe, "a-completely-different-client-secret-value")
+	_, err := Decrypt(jwe, "a-completely-different-client-secret-value")
 	if err == nil {
 		t.Fatal("expected decryption with the wrong secret to fail, got nil error")
 	}
@@ -278,11 +278,11 @@ func TestDecryptIDTokenHintJWE_WrongSecret(t *testing.T) {
 	}
 }
 
-// TestDecryptIDTokenHintJWE_Tampered proves every segment is authenticated,
+// TestDecrypt_Tampered proves every segment is authenticated,
 // including the protected header: the AAD is the header segment exactly as
 // received, so changing a header a reader would otherwise accept still fails.
-func TestDecryptIDTokenHintJWE_Tampered(t *testing.T) {
-	key := DeriveIDTokenHintKey(testClientSecret)
+func TestDecrypt_Tampered(t *testing.T) {
+	key := DeriveKey(testClientSecret)
 	jwe := buildJWE(t, testInner, key, jweOpts{})
 
 	// The substituted header passes every gate above the cipher (alg dir, enc
@@ -301,7 +301,7 @@ func TestDecryptIDTokenHintJWE_Tampered(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := DecryptIDTokenHintJWE(tc.input, testClientSecret)
+			_, err := Decrypt(tc.input, testClientSecret)
 			if err == nil {
 				t.Fatal("expected tampering to fail authentication, got nil error")
 			}
@@ -312,11 +312,11 @@ func TestDecryptIDTokenHintJWE_Tampered(t *testing.T) {
 	}
 }
 
-// TestDecryptIDTokenHintJWE_AlgorithmAllowlist proves that only dir + A256GCM is
+// TestDecrypt_AlgorithmAllowlist proves that only dir + A256GCM is
 // accepted, blocking algorithm-substitution / downgrade attempts. The header
 // names the foreign algorithm; nothing in the parser dispatches on it.
-func TestDecryptIDTokenHintJWE_AlgorithmAllowlist(t *testing.T) {
-	key := DeriveIDTokenHintKey(testClientSecret)
+func TestDecrypt_AlgorithmAllowlist(t *testing.T) {
+	key := DeriveKey(testClientSecret)
 
 	t.Run("different key alg (A256KW) rejected", func(t *testing.T) {
 		jwe := buildJWE(t, testInner, key, jweOpts{header: `{"alg":"A256KW","enc":"A256GCM"}`})
@@ -373,7 +373,7 @@ func aliasTrailingBits(t *testing.T, compactJWE string, i int) string {
 	return ""
 }
 
-// TestDecryptIDTokenHintJWE_DiagnosticsAreBounded pins what keeps a refusal cheap
+// TestDecrypt_DiagnosticsAreBounded pins what keeps a refusal cheap
 // for the server. Three refusals quote a string the caller chose -- an unsupported
 // alg, an unsupported enc, a repeated member name -- and the logout handler logs
 // that error verbatim, on a log record of its own that the request logger's
@@ -381,12 +381,12 @@ func aliasTrailingBits(t *testing.T, compactJWE string, i int) string {
 // client_id writes about a megabyte to the log per request, which is the defect
 // #159 bounded the request target for and which this second record would otherwise
 // reopen (#277).
-func TestDecryptIDTokenHintJWE_DiagnosticsAreBounded(t *testing.T) {
-	key := DeriveIDTokenHintKey(testClientSecret)
+func TestDecrypt_DiagnosticsAreBounded(t *testing.T) {
+	key := DeriveKey(testClientSecret)
 
 	// The ceiling these have to stay under is middleware's maxLoggedTarget, the whole
 	// rendered request target's budget. Written out rather than imported, because
-	// core/encryption does not depend on core/middleware; that number moving would
+	// idtokenhint does not depend on core/middleware; that number moving would
 	// make this bound looser or tighter than the neighbouring one, never wrong.
 	const logRecordCeiling = 4096
 
@@ -424,7 +424,7 @@ func TestDecryptIDTokenHintJWE_DiagnosticsAreBounded(t *testing.T) {
 					for _, size := range []int{1000, 200000} {
 						value := strings.Repeat(alphabet.unit, size)
 						jwe := buildJWE(t, testInner, key, jweOpts{header: tc.header(value)})
-						_, err := DecryptIDTokenHintJWE(jwe, testClientSecret)
+						_, err := Decrypt(jwe, testClientSecret)
 						if err == nil {
 							t.Fatalf("expected refusal for a %d-rune value", size)
 						}
@@ -449,7 +449,7 @@ func TestDecryptIDTokenHintJWE_DiagnosticsAreBounded(t *testing.T) {
 
 func assertRefused(t *testing.T, compactJWE, secret, wantErr string) {
 	t.Helper()
-	got, err := DecryptIDTokenHintJWE(compactJWE, secret)
+	got, err := Decrypt(compactJWE, secret)
 	if err == nil {
 		t.Fatalf("expected refusal, got plaintext %q", got)
 	}
@@ -460,11 +460,11 @@ func assertRefused(t *testing.T, compactJWE, secret, wantErr string) {
 	}
 }
 
-// TestDecryptIDTokenHintJWE_InvalidInput is the refusal table: one row per input
+// TestDecrypt_InvalidInput is the refusal table: one row per input
 // the parser must reject, each asserting the message of the gate that is meant to
 // reject it.
-func TestDecryptIDTokenHintJWE_InvalidInput(t *testing.T) {
-	key := DeriveIDTokenHintKey(testClientSecret)
+func TestDecrypt_InvalidInput(t *testing.T) {
+	key := DeriveKey(testClientSecret)
 	baseline := buildJWE(t, testInner, key, jweOpts{})
 
 	cases := []struct {

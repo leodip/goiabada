@@ -18,6 +18,7 @@ import (
 	mocks_sessionstore "github.com/leodip/goiabada/core/sessionstore/mocks"
 
 	"github.com/leodip/goiabada/authserver/internal/encryption"
+	"github.com/leodip/goiabada/authserver/internal/idtokenhint"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	"github.com/leodip/goiabada/core/i18n"
@@ -29,7 +30,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// The fixtures below encrypt through encryption.EncryptIDTokenHintJWE, the reference encryptor for
+// The fixtures below encrypt through idtokenhint.Encrypt, the reference encryptor for
 // the documented scheme, rather than through a builder of their own. A second encryptor in this
 // package could drift from the parser it is meant to feed, and a fixture that drifts turns a real
 // refusal into a passing test (#277).
@@ -487,7 +488,7 @@ func TestDecryptIDTokenHint(t *testing.T) {
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test_client").Return(client, nil)
 
 		innerToken := "test_token"
-		jwe, err := encryption.EncryptIDTokenHintJWE(innerToken, clientSecret)
+		jwe, err := idtokenhint.Encrypt(innerToken, clientSecret)
 		require.NoError(t, err)
 
 		result, err := decryptIDTokenHint(context.Background(), jwe, "test_client", database)
@@ -550,7 +551,7 @@ func TestDecryptIDTokenHint(t *testing.T) {
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test_client").Return(client, nil)
 
 		// Encrypted with a different secret than the client's.
-		jwe, err := encryption.EncryptIDTokenHintJWE("test_token", "a-different-secret")
+		jwe, err := idtokenhint.Encrypt("test_token", "a-different-secret")
 		require.NoError(t, err)
 
 		_, err = decryptIDTokenHint(context.Background(), jwe, "test_client", database)
@@ -2058,7 +2059,7 @@ func TestClassifyIdTokenHint(t *testing.T) {
 
 	// The one row that decrypts, built outside the table so the encryptor's error is checked rather
 	// than discarded into a fixture that silently becomes the empty string.
-	confirmedEncryptedHint, err := encryption.EncryptIDTokenHintJWE("inner.signed.token", "some_client_secret")
+	confirmedEncryptedHint, err := idtokenhint.Encrypt("inner.signed.token", "some_client_secret")
 	require.NoError(t, err)
 
 	for _, tc := range []struct {
