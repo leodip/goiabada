@@ -1,0 +1,21 @@
+-- When the user behind an ROPC grant authenticated, recorded on its refresh tokens (#125).
+--
+-- OpenID Connect Core 1.0 section 12.2 requires the auth_time of an ID token issued by a refresh
+-- to "represent the time of the original authentication - not the time that the new ID token is
+-- issued", and RFC 9068 section 2.2.1 holds an access token's auth_time to the same value across
+-- every refresh. An authorization-code grant keeps that instant on its code, codes.authenticated_at,
+-- which each of its refresh tokens reaches through code_id. An ROPC grant has no code: its tokens
+-- carry user_id and client_id directly, and nothing recorded when the password was checked, so each
+-- refresh wrote the moment of the refresh instead.
+--
+-- The first ROPC token records the moment the password was checked and each rotation copies its
+-- parent's, the way auth_state_generation travels. An authorization-code token leaves it NULL,
+-- since its instant is on its code, just as user_id and client_id are set only on ROPC tokens.
+--
+-- Existing rows land NULL and nothing backfills them. A family's first row, whose issued_at is the
+-- instant, is reaped once its own expires_at passes, 30 days after issue by default, while the
+-- family lives up to its max lifetime. So an ROPC refresh token issued before this migration is
+-- refused as invalid_grant, and its client makes one password grant again.
+--
+-- Nullable with no default, so there is no default constraint to name or drop on any engine.
+ALTER TABLE refresh_tokens ADD COLUMN authenticated_at DATETIME;

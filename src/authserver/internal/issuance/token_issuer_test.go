@@ -4402,10 +4402,11 @@ func TestCreateTokenInputFromROPC(t *testing.T) {
 			Subject: userSubject,
 			Email:   "ropc@example.com",
 		},
-		Scope: "openid email",
+		Scope:           "openid email",
+		AuthenticatedAt: now,
 	}
 
-	input := tokenIssuer.createTokenInputFromROPC(ropcInput, now)
+	input := tokenIssuer.createTokenInputFromROPC(ropcInput)
 
 	assert.Equal(t, ropcInput.User, input.User)
 	assert.Equal(t, ropcInput.Client, input.Client)
@@ -4744,6 +4745,7 @@ func TestGenerateTokenResponseForRefreshROPC(t *testing.T) {
 
 	ctx := context.Background()
 	now := time.Now().UTC()
+	authenticatedAt := now.Add(-72 * time.Hour).Truncate(time.Second)
 	userSubject := fake.UUID()
 
 	user := &models.User{
@@ -4773,8 +4775,11 @@ func TestGenerateTokenResponseForRefreshROPC(t *testing.T) {
 		// proving the wrapper forwards the parent (#106 decision 13); the helper table
 		// passes even if it stops.
 		AuthStateGeneration: 7,
-		User:                *user,
-		Client:              *client,
+		// Three days before this refresh, when the family's password grant checked the password.
+		// Every token the refresh issues has to report that, not the refresh (#125).
+		AuthenticatedAt: sql.NullTime{Time: authenticatedAt, Valid: true},
+		User:            *user,
+		Client:          *client,
 	}
 	refreshToken.User.AuthStateGeneration = 9
 
@@ -4818,6 +4823,10 @@ func TestGenerateTokenResponseForRefreshROPC(t *testing.T) {
 	assert.ElementsMatch(t, []string{"pwd"}, accessClaims["amr"])
 	// From the parent (7), not the reloaded user (9).
 	assert.EqualValues(t, 7, accessClaims["auth_state_generation"])
+	// The password grant's instant, which RFC 9068 section 2.2.1 holds fixed across refreshes,
+	// while iat is this refresh.
+	assert.EqualValues(t, authenticatedAt.Unix(), accessClaims["auth_time"])
+	assert.GreaterOrEqual(t, accessClaims["iat"], float64(now.Unix()), "iat is the refresh")
 	// ROPC is sessionless, so no sid on either token.
 	assert.NotContains(t, accessClaims, "sid")
 
@@ -4828,6 +4837,10 @@ func TestGenerateTokenResponseForRefreshROPC(t *testing.T) {
 	assert.Equal(t, "urn:goiabada:level1", idClaims["acr"])
 	assert.ElementsMatch(t, []string{"pwd"}, idClaims["amr"])
 	assert.NotContains(t, idClaims, "sid", "a ROPC ID token must never carry a session identifier")
+	// OpenID Connect Core 1.0 section 12.2: "the time of the original authentication - not the
+	// time that the new ID token is issued".
+	assert.EqualValues(t, authenticatedAt.Unix(), idClaims["auth_time"])
+	assert.GreaterOrEqual(t, idClaims["iat"], float64(now.Unix()), "iat is the refresh")
 
 	// The CHILD refresh token must inherit the parent's generation too. Without this, a
 	// regression that forwards the parent to generateROPCAccessToken but not to
@@ -4838,6 +4851,9 @@ func TestGenerateTokenResponseForRefreshROPC(t *testing.T) {
 	require.NotNil(t, capturedChild, "CreateRefreshToken was never called")
 	assert.EqualValues(t, 7, capturedChild.AuthStateGeneration,
 		"the child refresh token must inherit the parent's generation, not the reloaded user's")
+	// And the parent's instant, or the NEXT refresh would report this one (#125).
+	assert.Equal(t, sql.NullTime{Time: authenticatedAt, Valid: true}, capturedChild.AuthenticatedAt,
+		"the child refresh token must inherit the parent's authentication instant")
 
 	mockDB.AssertExpectations(t)
 }
@@ -4879,6 +4895,7 @@ func TestGenerateTokenResponseForRefreshROPC_ScopeDowngrade(t *testing.T) {
 		FirstRefreshTokenJti: "first-jti",
 		UserId:               sql.NullInt64{Int64: user.Id, Valid: true},
 		ClientId:             sql.NullInt64{Int64: client.Id, Valid: true},
+		AuthenticatedAt:      sql.NullTime{Time: now.Add(-time.Hour), Valid: true},
 		Scope:                "openid email profile resource:read resource:write",
 		RefreshTokenType:     "Offline",
 		MaxLifetime:          sql.NullTime{Time: now.Add(86400 * time.Second), Valid: true},
@@ -5535,6 +5552,7 @@ func issueForScopeIsTheGrant(t *testing.T, flow string, grant string, storedRefr
 		FirstRefreshTokenJti: "first-jti",
 		UserId:               sql.NullInt64{Int64: user.Id, Valid: true},
 		ClientId:             sql.NullInt64{Int64: client.Id, Valid: true},
+		AuthenticatedAt:      sql.NullTime{Time: now.Add(-time.Hour), Valid: true},
 		Scope:                storedRefreshScope,
 		RefreshTokenType:     TokenTypeOffline.String(),
 		MaxLifetime:          sql.NullTime{Time: now.Add(time.Hour), Valid: true},

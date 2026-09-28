@@ -543,6 +543,12 @@ func (t *TokenIssuer) GenerateTokenResponseForRefresh(ctx context.Context, setti
 func (t *TokenIssuer) GenerateTokenResponseForRefreshROPC(ctx context.Context, settings *models.Settings,
 	input *GenerateTokenForRefreshROPCInput) (*oauth.TokenResponse, error) {
 
+	// The token endpoint refuses a token with no instant before it gets here: without one there is
+	// no auth_time this refresh could issue that OpenID Connect Core 1.0 section 12.2 allows (#125).
+	if !input.RefreshToken.AuthenticatedAt.Valid {
+		return nil, errs.New("the ROPC refresh token records no authentication instant")
+	}
+
 	// Load the User and Client from the refresh token
 	err := t.database.RefreshTokenLoadUser(ctx, nil, input.RefreshToken)
 	if err != nil {
@@ -597,11 +603,13 @@ func (t *TokenIssuer) GenerateTokenResponseForRefreshROPC(ctx context.Context, s
 		return nil, err
 	}
 
-	// Create ROPCGrantInput for token generation
+	// Create ROPCGrantInput for token generation. The instant is the parent's, so every token of
+	// the family reports the password check that started it, not this refresh (#125).
 	ropcInput := &ROPCGrantInput{
-		Client: &input.RefreshToken.Client,
-		User:   &input.RefreshToken.User,
-		Scope:  scopeToUse,
+		Client:          &input.RefreshToken.Client,
+		User:            &input.RefreshToken.User,
+		Scope:           scopeToUse,
+		AuthenticatedAt: input.RefreshToken.AuthenticatedAt.Time,
 	}
 
 	// access_token -----------------------------------------------------------------------
@@ -878,16 +886,16 @@ func (t *TokenIssuer) createTokenInputFromImplicit(input *ImplicitGrantInput) *t
 // docs site's ACR page. Until #433 this wrote urn:goiabada:pwd, a value outside both that nothing
 // reads back; OIDC Core 1.0 section 2 leaves acr values to the parties, so the published list is
 // the contract, and a value outside it tells a client nothing it can check.
-func (t *TokenIssuer) createTokenInputFromROPC(input *ROPCGrantInput, now time.Time) *tokenGenerationInput {
+func (t *TokenIssuer) createTokenInputFromROPC(input *ROPCGrantInput) *tokenGenerationInput {
 	return &tokenGenerationInput{
 		User:              input.User,
 		Client:            input.Client,
 		Scope:             input.Scope,
 		AcrLevel:          models.AcrLevel1,
 		AuthMethods:       []string{ceremony.AuthMethodPassword.String()},
-		AuthenticatedAt:   now, // ROPC auth happens at token request time
-		SessionIdentifier: "",  // ROPC is sessionless: see ROPCGrantInput
-		Nonce:             "",  // ROPC doesn't use nonce
+		AuthenticatedAt:   input.AuthenticatedAt,
+		SessionIdentifier: "", // ROPC is sessionless: see ROPCGrantInput
+		Nonce:             "", // ROPC doesn't use nonce
 	}
 }
 
@@ -1028,6 +1036,11 @@ type ROPCGrantInput struct {
 	Client *models.Client
 	User   *models.User
 	Scope  string
+	// AuthenticatedAt is when the password was checked, and so what every token of the grant
+	// issues as auth_time. The issuer writes it, not the caller: GenerateTokenResponseForROPC
+	// stamps the moment of the password grant, and a refresh copies the instant its parent
+	// token recorded (#125).
+	AuthenticatedAt time.Time
 }
 
 // ROPCGrantResponse contains the tokens generated for ROPC flow.
@@ -1089,6 +1102,13 @@ func (t *TokenIssuer) GenerateTokenResponseForROPC(ctx context.Context, settings
 		return nil, err
 	}
 
+	// The password was checked for this request, so this is the authentication instant. The first
+	// refresh token records it, and every refresh carries it forward (#125). A copy, so the
+	// caller's input is not written through.
+	grant := *input
+	grant.AuthenticatedAt = now
+	input = &grant
+
 	// Generate access token
 	// nil parent: initial password grant, so the validated User snapshot is the source.
 	accessTokenStr, err := t.generateROPCAccessToken(ctx, settings, input, input.Scope, now, privKey, keyPair.KeyIdentifier, nil)
@@ -1133,7 +1153,7 @@ func (t *TokenIssuer) generateROPCAccessToken(ctx context.Context, settings *mod
 	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string,
 	parentRefreshToken *models.RefreshToken) (string, error) {
 
-	tokenInput := t.createTokenInputFromROPC(input, now)
+	tokenInput := t.createTokenInputFromROPC(input)
 	tokenInput.Scope = scope // Use the provided scope
 	tokenInput.GrantIsOffline = true
 
@@ -1150,7 +1170,7 @@ func (t *TokenIssuer) generateROPCAccessToken(ctx context.Context, settings *mod
 func (t *TokenIssuer) generateROPCIdToken(ctx context.Context, settings *models.Settings, input *ROPCGrantInput, scope string,
 	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string) (string, error) {
 
-	tokenInput := t.createTokenInputFromROPC(input, now)
+	tokenInput := t.createTokenInputFromROPC(input)
 	tokenInput.Scope = scope // Use the provided scope
 	return t.generateIdTokenCore(ctx, settings, tokenInput, now, signingKey, keyIdentifier)
 }
@@ -1215,11 +1235,15 @@ func (t *TokenIssuer) generateRefreshTokenForROPC(ctx context.Context, settings 
 		// would stamp the current generation onto a grant authenticated under an older one
 		// (#106 rule 5 and decision 13).
 		refreshTokenEntity.AuthStateGeneration = previousRefreshToken.AuthStateGeneration
+		// From the PARENT too: the password was checked once, when the family began (#125).
+		refreshTokenEntity.AuthenticatedAt = previousRefreshToken.AuthenticatedAt
 	} else {
 		// first refresh token issued
 		refreshTokenEntity.FirstRefreshTokenJti = jti
 		// The User snapshot the password validation returned, not a reload.
 		refreshTokenEntity.AuthStateGeneration = input.User.AuthStateGeneration
+		// The password grant's own instant, which its access and ID tokens carry too.
+		refreshTokenEntity.AuthenticatedAt = sql.NullTime{Time: input.AuthenticatedAt, Valid: true}
 	}
 
 	err = t.database.CreateRefreshToken(ctx, nil, refreshTokenEntity)

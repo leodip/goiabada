@@ -4,9 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"reflect"
 	"testing"
 	"time"
 
+	"github.com/huandu/go-sqlbuilder"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/stretchr/testify/assert"
@@ -424,13 +426,51 @@ func seedCode000039(t *testing.T, h *isolatedDB, client *models.Client, user *mo
 	return code
 }
 
+// refreshTokenColumns000039 are the refresh_tokens columns as 000039 leaves them, and the order
+// seedRefreshToken000039 writes and readRefreshToken000039 scans them in. Named here rather than
+// taken from models.RefreshToken, which follows the head schema: through the data layer this test
+// named authenticated_at, which 000051 adds, against a table that does not have it yet (#125).
+var refreshTokenColumns000039 = []string{
+	"created_at", "updated_at", "code_id", "user_id", "client_id", "refresh_token_jti",
+	"previous_refresh_token_jti", "first_refresh_token_jti", "session_identifier",
+	"refresh_token_type", "scope", "issued_at", "expires_at", "max_lifetime", "revoked",
+	"auth_state_generation",
+}
+
+// refreshTokenFields000039 are token's fields in refreshTokenColumns000039's order, as scan targets.
+func refreshTokenFields000039(token *models.RefreshToken) []any {
+	return []any{
+		&token.CreatedAt, &token.UpdatedAt, &token.CodeId, &token.UserId, &token.ClientId,
+		&token.RefreshTokenJti, &token.PreviousRefreshTokenJti, &token.FirstRefreshTokenJti,
+		&token.SessionIdentifier, &token.RefreshTokenType, &token.Scope, &token.IssuedAt,
+		&token.ExpiresAt, &token.MaxLifetime, &token.Revoked, &token.AuthStateGeneration,
+	}
+}
+
+// flavor000039 is the configured engine's placeholder dialect, so the seed and the read bind their
+// values rather than formatting timestamps into literals four ways.
+func flavor000039() sqlbuilder.Flavor {
+	switch dbType() {
+	case "mysql":
+		return sqlbuilder.MySQL
+	case "postgres":
+		return sqlbuilder.PostgreSQL
+	case "mssql":
+		return sqlbuilder.SQLServer
+	default:
+		return sqlbuilder.SQLite
+	}
+}
+
 // seedRefreshToken000039 fills every column that is not part of the caller's chosen shape,
-// for the same reason seedCode000039 does.
+// for the same reason seedCode000039 does, over refreshTokenColumns000039.
 func seedRefreshToken000039(t *testing.T, h *isolatedDB, shape models.RefreshToken) *models.RefreshToken {
 	t.Helper()
 
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	token := shape
+	token.CreatedAt = sql.NullTime{Time: now, Valid: true}
+	token.UpdatedAt = sql.NullTime{Time: now, Valid: true}
 	token.RefreshTokenJti = "jti-" + fake.UUID()
 	token.PreviousRefreshTokenJti = "previous-jti-value"
 	token.FirstRefreshTokenJti = "first-jti-value"
@@ -443,7 +483,21 @@ func seedRefreshToken000039(t *testing.T, h *isolatedDB, shape models.RefreshTok
 	token.Revoked = true
 	token.AuthStateGeneration = 11
 
-	require.NoError(t, h.DB.CreateRefreshToken(context.Background(), nil, &token), "seed refresh token")
+	values := make([]any, 0, len(refreshTokenColumns000039))
+	for _, field := range refreshTokenFields000039(&token) {
+		values = append(values, reflect.ValueOf(field).Elem().Interface())
+	}
+	insert := sqlbuilder.NewInsertBuilder()
+	insert.InsertInto("refresh_tokens").Cols(refreshTokenColumns000039...).Values(values...)
+	q, args := insert.BuildWithFlavor(flavor000039())
+	_, err := h.SQL.ExecContext(context.Background(), q, args...)
+	require.NoError(t, err, "seed refresh token")
+
+	lookup := sqlbuilder.NewSelectBuilder()
+	lookup.Select("id").From("refresh_tokens").Where(lookup.Equal("refresh_token_jti", token.RefreshTokenJti))
+	q, args = lookup.BuildWithFlavor(flavor000039())
+	require.NoError(t, h.SQL.QueryRowContext(context.Background(), q, args...).Scan(&token.Id),
+		"read back the seeded refresh token's id")
 	return &token
 }
 
@@ -486,9 +540,12 @@ func readCode000039(t *testing.T, h *isolatedDB, id int64) *models.Code {
 
 func readRefreshToken000039(t *testing.T, h *isolatedDB, id int64) *models.RefreshToken {
 	t.Helper()
-	token, err := h.DB.GetRefreshTokenById(context.Background(), nil, id)
-	require.NoErrorf(t, err, "read refresh token %d back", id)
-	require.NotNilf(t, token, "refresh token %d is gone", id)
+	token := &models.RefreshToken{Id: id}
+	read := sqlbuilder.NewSelectBuilder()
+	read.Select(refreshTokenColumns000039...).From("refresh_tokens").Where(read.Equal("id", id))
+	q, args := read.BuildWithFlavor(flavor000039())
+	require.NoErrorf(t, h.SQL.QueryRowContext(context.Background(), q, args...).Scan(refreshTokenFields000039(token)...),
+		"read refresh token %d back", id)
 	return token
 }
 
