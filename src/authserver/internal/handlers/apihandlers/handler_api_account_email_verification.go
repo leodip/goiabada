@@ -100,7 +100,7 @@ func HandleAPIAccountEmailVerificationSendPost(
 
 		// Render email content
 		bind := map[string]interface{}{
-			"name":             user.GetFullName(),
+			"name":             user.FullName(),
 			"link":             config.GetAdminConsole().BaseURL + "/account/email-verification",
 			"verificationCode": verificationCode,
 		}

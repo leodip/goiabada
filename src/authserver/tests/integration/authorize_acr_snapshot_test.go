@@ -121,7 +121,7 @@ func TestAcrSnapshot_ClientRaisedMidCeremonyDoesNotElevateTheAcr(t *testing.T) {
 	require.NotEmpty(t, codeVal, "the ceremony should still complete; the raise applies to later requests")
 
 	code := loadCodeFromDatabase(t, codeVal)
-	assert.Equal(t, models.AcrLevel1.String(), code.AcrLevel,
+	assert.Equal(t, models.AcrLevel1, code.AcrLevel,
 		"the acr must describe the authentication this ceremony performed, not the policy that "+
 			"replaced the one it was accepted under")
 	assert.Equal(t, ceremony.AuthMethodPassword.String(), code.AuthMethods,
@@ -133,6 +133,6 @@ func TestAcrSnapshot_ClientRaisedMidCeremonyDoesNotElevateTheAcr(t *testing.T) {
 	sessions, err := database.GetUserSessionsByUserId(context.Background(), nil, user.Id)
 	require.NoError(t, err)
 	require.Len(t, sessions, 1)
-	assert.Equal(t, models.AcrLevel1.String(), sessions[0].AcrLevel,
+	assert.Equal(t, models.AcrLevel1, sessions[0].AcrLevel,
 		"the session records the level reached, so a later step-up is decided from the truth")
 }

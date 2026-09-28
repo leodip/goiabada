@@ -186,7 +186,7 @@ func ToUserSessionResponse(session *models.UserSession) *api.UserSessionResponse
 		Id:                session.Id,
 		SessionIdentifier: session.SessionIdentifier,
 		AuthMethods:       session.AuthMethods,
-		AcrLevel:          session.AcrLevel,
+		AcrLevel:          session.AcrLevel.String(),
 		IpAddress:         session.IpAddress,
 		DeviceName:        session.DeviceName,
 		DeviceType:        session.DeviceType,

@@ -218,7 +218,7 @@ func TestCreateCode_RefusesAnAlreadyCancelledContextAndInsertsNothing(t *testing
 		ResponseMode:      "query",
 		AuthenticatedAt:   time.Now().UTC().Truncate(time.Microsecond),
 		SessionIdentifier: "cancelledsession_" + random,
-		AcrLevel:          models.AcrLevel1.String(),
+		AcrLevel:          models.AcrLevel1,
 		AuthMethods:       "pwd",
 	}
 

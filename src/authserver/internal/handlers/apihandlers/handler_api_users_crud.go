@@ -481,7 +481,7 @@ func HandleAPIUserCreatePost(
 			}
 
 			// Prepare and send email
-			name := createdUser.GetFullName()
+			name := createdUser.FullName()
 			if len(name) == 0 {
 				name = createdUser.Email
 			}

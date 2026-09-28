@@ -694,7 +694,7 @@ func handlePromptNone(w http.ResponseWriter, r *http.Request, httpHelper HttpHel
 
 	// 4. Check ACR requirements
 	targetAcrLevel := authContext.GetTargetAcrLevel(client.DefaultAcrLevel)
-	sessionAcrLevel, err := models.AcrLevelFromString(userSession.AcrLevel)
+	sessionAcrLevel, err := models.AcrLevelFromString(userSession.AcrLevel.String())
 	if err != nil {
 		// Unknown session ACR, treat as insufficient
 		redirectWithError(constants.ErrorInteractionRequired, "Higher authentication level required")

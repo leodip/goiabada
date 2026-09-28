@@ -227,7 +227,7 @@ func TestStartNewUserSession_PopulatesSessionFields(t *testing.T) {
 	credentialAcceptedAt := someCredentialInstant()
 
 	before := time.Now().UTC()
-	result, err := m.manager.StartNewUserSession(recorder, req, 123, 7, "pwd otp", models.AcrLevel2Mandatory.String(), 0, nil, credentialAcceptedAt)
+	result, err := m.manager.StartNewUserSession(recorder, req, 123, 7, "pwd otp", models.AcrLevel2Mandatory, 0, nil, credentialAcceptedAt)
 	after := time.Now().UTC()
 
 	assert.NoError(t, err)
@@ -236,7 +236,7 @@ func TestStartNewUserSession_PopulatesSessionFields(t *testing.T) {
 
 	assert.Equal(t, int64(123), result.UserId)
 	assert.Equal(t, "pwd otp", result.AuthMethods)
-	assert.Equal(t, models.AcrLevel2Mandatory.String(), result.AcrLevel)
+	assert.Equal(t, models.AcrLevel2Mandatory, result.AcrLevel)
 	assert.Equal(t, "192.168.1.50", result.IpAddress, "the port must be stripped from RemoteAddr")
 
 	// The identifier must be a fresh UUID, since it is what the browser cookie
@@ -293,7 +293,7 @@ func TestStartNewUserSession_BoundsTheUserAgentToTheColumnWidth(t *testing.T) {
 	captured := m.expectPersistThroughCommit(123, nil)
 
 	result, err := m.manager.StartNewUserSession(
-		httptest.NewRecorder(), req, 123, 7, "pwd", models.AcrLevel1.String(), 0, nil, someCredentialInstant())
+		httptest.NewRecorder(), req, 123, 7, "pwd", models.AcrLevel1, 0, nil, someCredentialInstant())
 
 	assert.NoError(t, err)
 	assert.Same(t, *captured, result)
@@ -316,7 +316,7 @@ func TestStartNewUserSession_RecordsTheClient(t *testing.T) {
 	}).Return(nil).Once()
 	m.db.On("GetUserSessionsByUserId", mock.Anything, txSentinel, int64(123)).Return(nil, nil).Once()
 
-	result, err := m.manager.StartNewUserSession(httptest.NewRecorder(), req, 123, 7, "pwd", models.AcrLevel1.String(), 0, nil, someCredentialInstant())
+	result, err := m.manager.StartNewUserSession(httptest.NewRecorder(), req, 123, 7, "pwd", models.AcrLevel1, 0, nil, someCredentialInstant())
 
 	assert.NoError(t, err)
 	assert.Len(t, result.Clients, 1)
@@ -340,7 +340,7 @@ func TestStartNewUserSession_WritesIdentifierIntoTheCookieSession(t *testing.T) 
 
 	m.expectPersistThroughCommit(123, nil)
 
-	result, err := m.manager.StartNewUserSession(rr, req, 123, 7, "pwd", models.AcrLevel1.String(), 0, nil, someCredentialInstant())
+	result, err := m.manager.StartNewUserSession(rr, req, 123, 7, "pwd", models.AcrLevel1, 0, nil, someCredentialInstant())
 
 	require.NoError(t, err)
 	assert.Equal(t, result.SessionIdentifier, m.readBack(rr.Result().Cookies()).Values[constants.SessionKeySessionIdentifier])
@@ -374,7 +374,7 @@ func TestStartNewUserSession_IpAddressExtraction(t *testing.T) {
 			m.expectPersistThroughCommit(123, nil)
 
 			result, err := m.manager.StartNewUserSession(
-				httptest.NewRecorder(), req, 123, 7, "pwd", models.AcrLevel1.String(), 0, nil, someCredentialInstant())
+				httptest.NewRecorder(), req, 123, 7, "pwd", models.AcrLevel1, 0, nil, someCredentialInstant())
 
 			assert.NoError(t, err)
 			assert.Equal(t, tc.wantIp, result.IpAddress)
@@ -404,7 +404,7 @@ func TestStartNewUserSession_DeletesMatchingSessionFromSameDeviceAndIp(t *testin
 	m.db.On("DeleteUserSession", mock.Anything, txSentinel, int64(42)).Return(nil).Once()
 
 	_, err := m.manager.StartNewUserSession(
-		httptest.NewRecorder(), req, 123, 7, "pwd", models.AcrLevel1.String(), 0, nil, someCredentialInstant())
+		httptest.NewRecorder(), req, 123, 7, "pwd", models.AcrLevel1, 0, nil, someCredentialInstant())
 
 	assert.NoError(t, err)
 }
@@ -430,7 +430,7 @@ func TestStartNewUserSession_DeletesAMatchingHeaderWhoseLabelsDiffer(t *testing.
 	m.db.On("DeleteUserSession", mock.Anything, txSentinel, int64(42)).Return(nil).Once()
 
 	_, err := m.manager.StartNewUserSession(
-		httptest.NewRecorder(), req, 123, 7, "pwd", models.AcrLevel1.String(), 0, nil, someCredentialInstant())
+		httptest.NewRecorder(), req, 123, 7, "pwd", models.AcrLevel1, 0, nil, someCredentialInstant())
 
 	assert.NoError(t, err)
 }
@@ -454,7 +454,7 @@ func TestStartNewUserSession_AnEmptyHeaderMatchesAnEmptyHeader(t *testing.T) {
 	m.db.On("DeleteUserSession", mock.Anything, txSentinel, int64(42)).Return(nil).Once()
 
 	_, err := m.manager.StartNewUserSession(
-		httptest.NewRecorder(), req, 123, 7, "pwd", models.AcrLevel1.String(), 0, nil, someCredentialInstant())
+		httptest.NewRecorder(), req, 123, 7, "pwd", models.AcrLevel1, 0, nil, someCredentialInstant())
 
 	assert.NoError(t, err)
 }
@@ -517,7 +517,7 @@ func TestStartNewUserSession_KeepsSessionsFromOtherDevicesOrIps(t *testing.T) {
 
 			_, err := m.manager.StartNewUserSession(
 				httptest.NewRecorder(), newSessionRequest("192.168.1.50:54321", chromeUserAgent),
-				123, 7, "pwd", models.AcrLevel1.String(), 0, nil, someCredentialInstant())
+				123, 7, "pwd", models.AcrLevel1, 0, nil, someCredentialInstant())
 
 			assert.NoError(t, err)
 		})
@@ -554,7 +554,7 @@ func TestStartNewUserSession_DoesNotDeleteTheSessionItJustCreated(t *testing.T) 
 		}).Once()
 
 	_, err := m.manager.StartNewUserSession(
-		httptest.NewRecorder(), req, 123, 7, "pwd", models.AcrLevel1.String(), 0, nil, someCredentialInstant())
+		httptest.NewRecorder(), req, 123, 7, "pwd", models.AcrLevel1, 0, nil, someCredentialInstant())
 
 	assert.NoError(t, err)
 }
@@ -684,7 +684,7 @@ func TestStartNewUserSession_ErrorsPropagate(t *testing.T) {
 
 			result, err := m.manager.StartNewUserSession(
 				httptest.NewRecorder(), req,
-				123, 7, "pwd", models.AcrLevel1.String(), 0, nil, someCredentialInstant())
+				123, 7, "pwd", models.AcrLevel1, 0, nil, someCredentialInstant())
 
 			assert.Error(t, err)
 			assert.Nil(t, result, "no session may be returned alongside an error")
@@ -723,7 +723,7 @@ func TestStartNewUserSession_RotatesTheBrowserSessionIdentifierAndKeepsTheRow(t 
 	captured := m.expectPersistThroughCommit(123, nil)
 
 	result, err := m.manager.StartNewUserSession(
-		rr, req, 123, 7, "pwd", models.AcrLevel1.String(), 0, nil, someCredentialInstant())
+		rr, req, 123, 7, "pwd", models.AcrLevel1, 0, nil, someCredentialInstant())
 
 	require.NoError(t, err)
 	assert.Same(t, *captured, result)
@@ -754,7 +754,7 @@ func TestStartNewUserSession_DeletesTheRowWhenTheRotationFails(t *testing.T) {
 	m.db.On("DeleteUserSession", mock.Anything, (*sql.Tx)(nil), int64(99)).Return(nil).Once()
 
 	result, err := m.manager.StartNewUserSession(
-		rr, req, 123, 7, "pwd", models.AcrLevel1.String(), 0, nil, someCredentialInstant())
+		rr, req, 123, 7, "pwd", models.AcrLevel1, 0, nil, someCredentialInstant())
 
 	assert.Nil(t, result)
 	require.ErrorIs(t, err, errCreateRefused, "the caller must be told why the ceremony failed, not what the cleanup did")
@@ -790,7 +790,7 @@ func TestStartNewUserSession_DeletesTheRowEvenWhenTheRequestWasCancelled(t *test
 
 	result, err := m.manager.StartNewUserSession(
 		httptest.NewRecorder(), req,
-		123, 7, "pwd", models.AcrLevel1.String(), 0, nil, someCredentialInstant())
+		123, 7, "pwd", models.AcrLevel1, 0, nil, someCredentialInstant())
 
 	assert.Nil(t, result)
 	assert.ErrorIs(t, err, errCreateRefused, "the caller is still told why the ceremony failed")
@@ -818,7 +818,7 @@ func TestStartNewUserSession_AFailedCompensationKeepsTheOriginalError(t *testing
 
 	result, err := m.manager.StartNewUserSession(
 		httptest.NewRecorder(), newSessionRequest("192.168.1.50:54321", chromeUserAgent),
-		123, 7, "pwd", models.AcrLevel1.String(), 0, nil, someCredentialInstant())
+		123, 7, "pwd", models.AcrLevel1, 0, nil, someCredentialInstant())
 
 	assert.Nil(t, result)
 	require.ErrorIs(t, err, errCreateRefused, "the original failure must survive a failed cleanup")
@@ -840,7 +840,7 @@ func TestStartNewUserSession_WrapsSessionStoreReadError(t *testing.T) {
 
 	_, err := m.manager.StartNewUserSession(
 		httptest.NewRecorder(), req,
-		123, 7, "pwd", models.AcrLevel1.String(), 0, nil, someCredentialInstant())
+		123, 7, "pwd", models.AcrLevel1, 0, nil, someCredentialInstant())
 
 	require.ErrorIs(t, err, errLoadRefused)
 	assert.Contains(t, err.Error(), "unable to get the session")
@@ -878,7 +878,7 @@ func TestStartNewUserSession_StampsAuthStateGeneration(t *testing.T) {
 
 	_, err := m.manager.StartNewUserSession(
 		httptest.NewRecorder(), newSessionRequest("192.168.1.50:54321", chromeUserAgent),
-		123, 7, "pwd", models.AcrLevel1.String(), 7, nil, someCredentialInstant())
+		123, 7, "pwd", models.AcrLevel1, 7, nil, someCredentialInstant())
 
 	assert.NoError(t, err)
 	if assert.NotNil(t, *captured, "CreateUserSession was never called") {
@@ -901,7 +901,7 @@ func TestStartNewUserSession_StampsOtpConfigGeneration(t *testing.T) {
 	observed := int64(9)
 	_, err := m.manager.StartNewUserSession(
 		httptest.NewRecorder(), newSessionRequest("192.168.1.50:54321", chromeUserAgent),
-		123, 7, "pwd", models.AcrLevel1.String(), 7, &observed, someCredentialInstant())
+		123, 7, "pwd", models.AcrLevel1, 7, &observed, someCredentialInstant())
 
 	assert.NoError(t, err)
 	if assert.NotNil(t, *captured, "CreateUserSession was never called") {
@@ -923,7 +923,7 @@ func TestStartNewUserSession_NilOtpConfigGenerationLandsAtZero(t *testing.T) {
 
 	_, err := m.manager.StartNewUserSession(
 		httptest.NewRecorder(), newSessionRequest("192.168.1.50:54321", chromeUserAgent),
-		123, 7, "pwd", models.AcrLevel1.String(), 7, nil, someCredentialInstant())
+		123, 7, "pwd", models.AcrLevel1, 7, nil, someCredentialInstant())
 
 	assert.NoError(t, err)
 	if assert.NotNil(t, *captured, "CreateUserSession was never called") {
@@ -954,7 +954,7 @@ func TestStartNewUserSession_AuthTimeIsTheCapturedCredentialInstant(t *testing.T
 	before := time.Now().UTC()
 	result, err := m.manager.StartNewUserSession(
 		httptest.NewRecorder(), newSessionRequest("192.168.1.50:54321", chromeUserAgent),
-		123, 7, "pwd", models.AcrLevel1.String(), 7, nil, &credentialAcceptedAt)
+		123, 7, "pwd", models.AcrLevel1, 7, nil, &credentialAcceptedAt)
 	after := time.Now().UTC()
 
 	assert.NoError(t, err)
@@ -987,7 +987,7 @@ func TestStartNewUserSession_AuthTimeIsNormalisedToUTC(t *testing.T) {
 
 	_, err := m.manager.StartNewUserSession(
 		httptest.NewRecorder(), newSessionRequest("192.168.1.50:54321", chromeUserAgent),
-		123, 7, "pwd", models.AcrLevel1.String(), 7, nil, &credentialAcceptedAt)
+		123, 7, "pwd", models.AcrLevel1, 7, nil, &credentialAcceptedAt)
 
 	assert.NoError(t, err)
 	if assert.NotNil(t, *captured, "CreateUserSession was never called") {
@@ -1023,7 +1023,7 @@ func TestStartNewUserSession_RefusesAMissingCredentialInstant(t *testing.T) {
 
 			result, err := m.manager.StartNewUserSession(
 				recorder, req,
-				123, 7, "pwd", models.AcrLevel1.String(), 7, nil, capture)
+				123, 7, "pwd", models.AcrLevel1, 7, nil, capture)
 
 			require.ErrorContains(t, err, "no credential instant captured")
 			assert.Nil(t, result, "a refused call must hand back no session")

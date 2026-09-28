@@ -51,7 +51,7 @@ func TestUpdateUserSession(t *testing.T) {
 	userSession.Started = time.Now().UTC().Add(-1 * time.Hour).Truncate(time.Microsecond)
 	userSession.LastAccessed = time.Now().UTC().Truncate(time.Microsecond)
 	userSession.AuthMethods = "pwd,otp"
-	userSession.AcrLevel = models.AcrLevel2Optional.String()
+	userSession.AcrLevel = models.AcrLevel2Optional
 	userSession.AuthTime = time.Now().UTC().Add(-30 * time.Minute).Truncate(time.Microsecond)
 	userSession.IpAddress = "192.168.1.2"
 	userSession.DeviceName = "Updated Device"
@@ -338,7 +338,7 @@ func createTestUserSessionOn(t *testing.T, db data.Database, userId int64) *mode
 		Started:           time.Now().UTC().Truncate(time.Microsecond),
 		LastAccessed:      time.Now().UTC().Truncate(time.Microsecond),
 		AuthMethods:       "pwd",
-		AcrLevel:          models.AcrLevel1.String(),
+		AcrLevel:          models.AcrLevel1,
 		AuthTime:          time.Now().UTC().Truncate(time.Microsecond),
 		IpAddress:         fake.IPv4Address(),
 		DeviceName:        fake.Name(),
@@ -489,7 +489,7 @@ func TestDeleteIdleSessions(t *testing.T) {
 		Started:           now.Add(-10 * time.Minute),
 		LastAccessed:      now.Add(-10 * time.Minute),
 		AuthMethods:       "pwd",
-		AcrLevel:          models.AcrLevel1.String(),
+		AcrLevel:          models.AcrLevel1,
 		AuthTime:          now.Add(-10 * time.Minute),
 		IpAddress:         fake.IPv4Address(),
 		DeviceName:        fake.Name(),
@@ -520,7 +520,7 @@ func TestDeleteIdleSessions(t *testing.T) {
 		Started:           now.Add(-3 * time.Hour),
 		LastAccessed:      now.Add(-2 * time.Hour),
 		AuthMethods:       "pwd",
-		AcrLevel:          models.AcrLevel1.String(),
+		AcrLevel:          models.AcrLevel1,
 		AuthTime:          now.Add(-3 * time.Hour),
 		IpAddress:         fake.IPv4Address(),
 		DeviceName:        fake.Name(),
@@ -551,7 +551,7 @@ func TestDeleteIdleSessions(t *testing.T) {
 		Started:           now.Add(-5 * time.Hour),
 		LastAccessed:      now.Add(-4 * time.Hour),
 		AuthMethods:       "pwd",
-		AcrLevel:          models.AcrLevel1.String(),
+		AcrLevel:          models.AcrLevel1,
 		AuthTime:          now.Add(-5 * time.Hour),
 		IpAddress:         fake.IPv4Address(),
 		DeviceName:        fake.Name(),
@@ -687,7 +687,7 @@ func TestDeleteExpiredSessions(t *testing.T) {
 		Started:           now.Add(-1 * time.Hour),
 		LastAccessed:      now,
 		AuthMethods:       "pwd",
-		AcrLevel:          models.AcrLevel1.String(),
+		AcrLevel:          models.AcrLevel1,
 		AuthTime:          now.Add(-1 * time.Hour),
 		IpAddress:         fake.IPv4Address(),
 		DeviceName:        fake.Name(),
@@ -718,7 +718,7 @@ func TestDeleteExpiredSessions(t *testing.T) {
 		Started:           now.Add(-48 * time.Hour),
 		LastAccessed:      now,
 		AuthMethods:       "pwd",
-		AcrLevel:          models.AcrLevel1.String(),
+		AcrLevel:          models.AcrLevel1,
 		AuthTime:          now.Add(-48 * time.Hour),
 		IpAddress:         fake.IPv4Address(),
 		DeviceName:        fake.Name(),
@@ -749,7 +749,7 @@ func TestDeleteExpiredSessions(t *testing.T) {
 		Started:           now.Add(-120 * time.Hour),
 		LastAccessed:      now,
 		AuthMethods:       "pwd",
-		AcrLevel:          models.AcrLevel1.String(),
+		AcrLevel:          models.AcrLevel1,
 		AuthTime:          now.Add(-120 * time.Hour),
 		IpAddress:         fake.IPv4Address(),
 		DeviceName:        fake.Name(),
@@ -1148,7 +1148,7 @@ func TestGetUserSessionsByClientIdPaginated_EnlistsInTheCallersTransaction(t *te
 		Started:           now,
 		LastAccessed:      now,
 		AuthMethods:       "pwd",
-		AcrLevel:          models.AcrLevel1.String(),
+		AcrLevel:          models.AcrLevel1,
 		AuthTime:          now,
 		IpAddress:         fake.IPv4Address(),
 		DeviceName:        fake.Name(),

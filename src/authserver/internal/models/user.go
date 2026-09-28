@@ -111,7 +111,7 @@ type User struct {
 	Attributes  []UserAttribute `db:"-"`
 }
 
-func (u *User) GetFullName() string {
+func (u *User) FullName() string {
 	fullName := ""
 
 	if u != nil {

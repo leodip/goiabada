@@ -33,7 +33,7 @@
 // /userinfo's decision to answer at all -- together with iss, aud, exp, nonce and everything else
 // a token carries that is not read off the user row.
 //
-// Staying on models.User: GetFullName, which also names the user in the emails the auth server
+// Staying on models.User: FullName, which also names the user in the emails the auth server
 // sends. The birthdate claim's YYYY-MM-DD format has no reader but the claim, so it is written
 // here, as the claim construction it is (#424).
 //
@@ -117,7 +117,7 @@ func (m Mapper) AddOpenIdConnectClaims(ctx context.Context, claims jwt.MapClaims
 
 	if slices.Contains(scopes, "profile") {
 		claims["updated_at"] = user.UpdatedAt.Time.UTC().Unix()
-		addClaimIfNotEmpty(claims, "name", user.GetFullName())
+		addClaimIfNotEmpty(claims, "name", user.FullName())
 		addClaimIfNotEmpty(claims, "given_name", user.GivenName)
 		addClaimIfNotEmpty(claims, "middle_name", user.MiddleName)
 		addClaimIfNotEmpty(claims, "family_name", user.FamilyName)

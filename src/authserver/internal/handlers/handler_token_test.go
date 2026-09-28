@@ -546,7 +546,7 @@ func TestHandleTokenPost(t *testing.T) {
 			UserId: mockUserId,
 		}
 		// For refresh token flow, empty strings are passed (no step-up authentication)
-		userSessionManager.On("BumpUserSession", req, mockSessionIdentifier, mockClientId, "", "").
+		userSessionManager.On("BumpUserSession", req, mockSessionIdentifier, mockClientId, "", models.AcrLevel("")).
 			Return(mockUserSession, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.AuditBumpedUserSession, mock.MatchedBy(func(details map[string]interface{}) bool {

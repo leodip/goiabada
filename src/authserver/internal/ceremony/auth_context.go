@@ -40,7 +40,7 @@ type AuthContext struct {
 	Nonce                         string
 	UserAgent                     string
 	IpAddress                     string
-	AcrLevel                      string
+	AcrLevel                      models.AcrLevel
 	AuthMethods                   string
 	UserId                        int64
 	AuthState                     string
@@ -226,17 +226,17 @@ func (ac *AuthContext) ParseRequestedMaxAge() *int {
 // Uses models.AcrMax() as the single source of truth for ACR comparison.
 func (ac *AuthContext) SetAcrLevel(targetAcrLevel models.AcrLevel, userSession *models.UserSession) error {
 	if userSession == nil {
-		ac.AcrLevel = targetAcrLevel.String()
+		ac.AcrLevel = targetAcrLevel
 		return nil
 	}
 
-	userSessionAcrLevel, err := models.AcrLevelFromString(userSession.AcrLevel)
+	userSessionAcrLevel, err := models.AcrLevelFromString(userSession.AcrLevel.String())
 	if err != nil {
 		return err
 	}
 
 	// Use the higher of the two ACR levels (never downgrade)
-	ac.AcrLevel = models.AcrMax(targetAcrLevel, userSessionAcrLevel).String()
+	ac.AcrLevel = models.AcrMax(targetAcrLevel, userSessionAcrLevel)
 	return nil
 }
 

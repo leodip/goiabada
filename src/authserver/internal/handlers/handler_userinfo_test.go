@@ -227,7 +227,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 			assert.Equal(t, user.Locale, claims["locale"])
 			assert.Equal(t, user.PhoneNumber, claims["phone_number"])
 			assert.Equal(t, user.PhoneNumberVerified, claims["phone_number_verified"])
-			assert.Equal(t, user.GetFullName(), claims["name"])
+			assert.Equal(t, user.FullName(), claims["name"])
 
 			// A literal rather than the builder's own output: comparing the handler's
 			// own input to the handler's output cannot fail, so this assertion held
@@ -353,7 +353,7 @@ func TestHandleUserInfoGetPost(t *testing.T) {
 
 		httpHelper.On("EncodeJson", rr, req, mock.MatchedBy(func(claims map[string]interface{}) bool {
 			assert.Equal(t, updatedAt.UTC().Unix(), claims["updated_at"])
-			assert.Equal(t, user.GetFullName(), claims["name"])
+			assert.Equal(t, user.FullName(), claims["name"])
 			assert.NotContains(t, claims, "email")
 			assert.NotContains(t, claims, "email_verified")
 			return true

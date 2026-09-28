@@ -47,7 +47,7 @@ func propagationCodeInput() *CreateCodeInput {
 			RedirectURI:  "https://example.com/callback",
 			ResponseMode: "query",
 			IpAddress:    "127.0.0.1",
-			AcrLevel:     string(models.AcrLevel1),
+			AcrLevel:     models.AcrLevel1,
 			AuthMethods:  "pwd",
 		},
 		SessionIdentifier: "session-propagation",
