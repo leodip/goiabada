@@ -123,8 +123,8 @@ func secondSessionFor(t *testing.T, grant *offlineGrant, password string) (strin
 	t.Helper()
 
 	// A DISTINCT User-Agent is required, not cosmetic. StartNewUserSession deletes other sessions
-	// of the same user that share device name, type, OS and IP address, and two logins from one
-	// test process share all four by default: the second login would silently delete the first and
+	// of the same user that share the raw User-Agent header and the address, and two logins from
+	// one test process share both by default: the second login would silently delete the first and
 	// the test would then be asserting against a session that no longer existed. Varying the UA
 	// makes this a genuinely different device, which is what the case is about.
 	httpClient := createHttpClientWithUserAgent(t,
@@ -194,8 +194,8 @@ func secondSessionFor(t *testing.T, grant *offlineGrant, password string) (strin
 // table-wide sweep and a user-scoped one at once.
 //
 // A DISTINCT User-Agent is required rather than cosmetic, for the reason secondSessionFor states:
-// StartNewUserSession deletes other sessions of the same user sharing device name, type, OS and IP
-// address, so without it the second login silently deletes the first.
+// StartNewUserSession deletes other sessions of the same user sharing the raw User-Agent header and
+// the address, so without it the second login silently deletes the first.
 //
 // The consent screen is reached unconditionally rather than conditionally, and that is a property of
 // the server rather than an assumption: both HandleAuthCompletedGet and HandleConsentGet route an

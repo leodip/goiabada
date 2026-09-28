@@ -3,10 +3,7 @@ package usersession
 import (
 	"context"
 	"database/sql"
-	"fmt"
-	"net"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/constants"
@@ -105,13 +102,31 @@ func (u *Manager) HasValidUserSession(userSession *models.UserSession, idleTimeo
 // produce it, because /auth/completed refuses to mint a session without Level1AuthCompleted
 // and only the password handler sets that, alongside authenticatedAt; the refusal is what
 // makes that invariant fail closed rather than an argument in a comment.
+//
+// ipAddress is the browser's address as the caller read it, and becomes the session's one
+// recorded address. replacing is the session this sign-in replaces for the same user, the one the
+// browser's cookie named, or nil; it is deleted with the same-device sweep's rows, and every row
+// removed is returned so the caller can audit each. A replaced session's refresh tokens that are
+// bound to it stop, as they do when it expires, and its offline grants survive: a re-login
+// replaces a session and revokes nothing (#133, #243). A session of another user is not this
+// function's to end: the cross-user handover terminates it with revocation first and passes nil.
+//
+// The removals come back only when their deletion committed: with the session on success, and
+// alongside the error when the browser session write after the commit fails, since the rows are
+// gone either way and each is owed its audit event. Every other failure rolled them back and
+// returns none.
 func (u *Manager) StartNewUserSession(w http.ResponseWriter, r *http.Request,
 	userId int64, clientId int64, authMethods string, acrLevel models.AcrLevel,
 	authStateGeneration int64, otpConfigGeneration *int64,
-	authenticatedAt *time.Time) (*models.UserSession, error) {
+	authenticatedAt *time.Time, ipAddress string,
+	replacing *models.UserSession) (*models.UserSession, []models.UserSession, error) {
 
 	if authenticatedAt == nil || authenticatedAt.IsZero() {
-		return nil, errs.New("StartNewUserSession: no credential instant captured; refusing to mint a session whose auth_time would be invented")
+		return nil, nil, errs.New("no credential instant captured; refusing to mint a session whose auth_time would be invented")
+	}
+	if replacing != nil && replacing.UserId != userId {
+		return nil, nil, errs.Errorf("refusing to replace user session %v: it belongs to user %v, not %v",
+			replacing.Id, replacing.UserId, userId)
 	}
 	authTime := authenticatedAt.UTC()
 
@@ -120,11 +135,6 @@ func (u *Manager) StartNewUserSession(w http.ResponseWriter, r *http.Request,
 	observedOtpConfigGeneration := int64(0)
 	if otpConfigGeneration != nil {
 		observedOtpConfigGeneration = *otpConfigGeneration
-	}
-
-	ipWithoutPort, _, _ := net.SplitHostPort(r.RemoteAddr)
-	if len(ipWithoutPort) == 0 {
-		ipWithoutPort = r.RemoteAddr
 	}
 
 	// One parse of the request for all three display labels. They are derived from the
@@ -136,7 +146,7 @@ func (u *Manager) StartNewUserSession(w http.ResponseWriter, r *http.Request,
 		SessionIdentifier: uuidutil.New(),
 		Started:           utcNow,
 		LastAccessed:      utcNow,
-		IpAddress:         ipWithoutPort,
+		IpAddress:         ipAddress,
 		AuthMethods:       authMethods,
 		AcrLevel:          acrLevel,
 		AuthTime:          authTime,
@@ -162,7 +172,7 @@ func (u *Manager) StartNewUserSession(w http.ResponseWriter, r *http.Request,
 	// empty database rather than one leaving a session row behind (#198).
 	sess, err := u.sessionStore.Get(r, u.sessionName)
 	if err != nil {
-		return nil, errs.Wrap(err, "unable to get the session")
+		return nil, nil, errs.Wrap(err, "unable to get the session")
 	}
 
 	// The session row, its client associations, the read of this user's other sessions and the
@@ -171,13 +181,19 @@ func (u *Manager) StartNewUserSession(w http.ResponseWriter, r *http.Request,
 	// reassigned by the next attempt, the association loop ranges by value, so nothing an attempt
 	// wrote onto a copy is read by the attempt after it, and the identifier the sweep excludes
 	// itself by is minted above rather than inside, so it survives a rerun. A rolled-back attempt
-	// undoes its own deletions and the attempt after it re-reads.
+	// undoes its own deletions and the attempt after it re-reads, which is why the rows it removed
+	// are collected into a fresh slice on every attempt and copied out only once RunInTransaction
+	// has answered nil: an aborted attempt's deletions never happened, and an attempt that deletes
+	// a different set from the one before it reports its own.
 	//
 	// The sweep is in here rather than after the commit because a failure between the two left a
 	// committed session row that no cookie named, sometimes having already deleted the session the
 	// browser did have (#198). Only the browser-store write below is left after the commit, and it
 	// is compensated rather than prevented: see abandonUserSession.
+	var removed []models.UserSession
 	err = u.database.RunInTransaction(r.Context(), func(tx *sql.Tx) error {
+		var removedThisAttempt []models.UserSession
+
 		if createUserSessionErr := u.database.CreateUserSession(r.Context(), tx, userSession); createUserSessionErr != nil {
 			return createUserSessionErr
 		}
@@ -207,15 +223,33 @@ func (u *Manager) StartNewUserSession(w http.ResponseWriter, r *http.Request,
 		// this login and expires on its own by idle timeout or max lifetime; and a client that
 		// sends no header matches every legacy row on its address, which is how a header-less
 		// client is treated today in any case.
+		//
+		// The address is compared whole, one address to one address. It used to be a substring
+		// test against a comma-joined history, so 10.0.0.1 was found in 10.0.0.12, and a history
+		// that outgrew the 512-byte column failed every later bump of that session. A session now
+		// holds the latest address its browser was seen from (#243).
+		//
+		// replacing is the other reason a row goes: the session this browser's cookie named, which
+		// this sign-in supersedes wherever it was last seen. Without it a max_age or prompt=login
+		// sign-in from a new address left the old session behind, still listed and still bumped by
+		// its refresh tokens, with no browser able to reach it (#243). It is matched in this read
+		// rather than deleted blindly, so a row already gone is not reported as one this sign-in
+		// removed, and a row that is both replacing and a sweep match is removed and reported once.
 		for _, us := range allUserSessions {
-			if us.SessionIdentifier != userSession.SessionIdentifier &&
-				us.UserAgent == userSession.UserAgent &&
-				us.IpAddress == ipWithoutPort {
-				if deleteUserSessionErr := u.database.DeleteUserSession(r.Context(), tx, us.Id); deleteUserSessionErr != nil {
-					return deleteUserSessionErr
-				}
+			if us.SessionIdentifier == userSession.SessionIdentifier {
+				continue
 			}
+			isReplaced := replacing != nil && us.Id == replacing.Id
+			isSameDevice := us.UserAgent == userSession.UserAgent && us.IpAddress == ipAddress
+			if !isReplaced && !isSameDevice {
+				continue
+			}
+			if deleteUserSessionErr := u.database.DeleteUserSession(r.Context(), tx, us.Id); deleteUserSessionErr != nil {
+				return deleteUserSessionErr
+			}
+			removedThisAttempt = append(removedThisAttempt, us)
 		}
+		removed = removedThisAttempt
 		return nil
 	})
 	if err != nil {
@@ -230,8 +264,11 @@ func (u *Manager) StartNewUserSession(w http.ResponseWriter, r *http.Request,
 		// completing while it runs. What bounds the window is the background worker's idle
 		// sweep, which removes the row at the configured idle timeout. So the cost is an entry
 		// in the admin console's session list until then, with nothing ever issued against it.
+		// The same unknown decides the removals: none is reported here, so a commit that landed
+		// anyway leaves the rows it swept gone without their audit events, where reporting them
+		// would audit deletions that may have rolled back.
 		// Revisit only if the row ever becomes reachable by something other than the cookie.
-		return nil, err
+		return nil, nil, err
 	}
 
 	sess.Values[constants.SessionKeySessionIdentifier] = userSession.SessionIdentifier
@@ -253,11 +290,14 @@ func (u *Manager) StartNewUserSession(w http.ResponseWriter, r *http.Request,
 	// authenticated expiry. Nothing is persisted under the new identifier until
 	// Regenerate runs, and the row it deletes never held the identifier, so the ordering
 	// changes no outcome an attacker could use.
+	//
+	// A failure here comes after the commit, so the rows the sweep removed are gone whatever
+	// abandonUserSession manages, and they go back to the caller beside the error to be audited.
 	if regenerateErr := u.sessionStore.Regenerate(w, r, sess); regenerateErr != nil {
-		return nil, u.abandonUserSession(r.Context(), userSession, errs.Wrap(regenerateErr, "unable to rotate the browser session identifier"))
+		return nil, removed, u.abandonUserSession(r.Context(), userSession, errs.Wrap(regenerateErr, "unable to rotate the browser session identifier"))
 	}
 
-	return userSession, nil
+	return userSession, removed, nil
 }
 
 // abandonUserSession deletes the session row the transaction above committed, after the browser
@@ -312,17 +352,20 @@ func (u *Manager) abandonUserSession(ctx context.Context, userSession *models.Us
 //     If this differs from the session's current AuthMethods, the session is updated.
 //   - acrLevel: The target ACR level for the current auth flow.
 //     The session's ACR is only upgraded (never downgraded) to maintain security guarantees.
-func (u *Manager) BumpUserSession(r *http.Request, sessionIdentifier string, clientId int64,
-	authMethods string, acrLevel models.AcrLevel) (*models.UserSession, error) {
+//   - ipAddress: The browser's address as the caller read it, which replaces the one recorded.
+//     Empty leaves the recorded address as it is, which is what the token endpoint passes: a
+//     refresh request comes from the client's server as often as from the user's browser.
+func (u *Manager) BumpUserSession(ctx context.Context, sessionIdentifier string, clientId int64,
+	authMethods string, acrLevel models.AcrLevel, ipAddress string) (*models.UserSession, error) {
 
-	userSession, err := u.database.GetUserSessionBySessionIdentifier(r.Context(), nil, sessionIdentifier)
+	userSession, err := u.database.GetUserSessionBySessionIdentifier(ctx, nil, sessionIdentifier)
 	if err != nil {
 		return nil, err
 	}
 
 	if userSession != nil {
 
-		err = u.database.UserSessionLoadClients(r.Context(), nil, userSession)
+		err = u.database.UserSessionLoadClients(ctx, nil, userSession)
 		if err != nil {
 			return nil, err
 		}
@@ -330,14 +373,13 @@ func (u *Manager) BumpUserSession(r *http.Request, sessionIdentifier string, cli
 		utcNow := time.Now().UTC()
 		userSession.LastAccessed = utcNow
 
-		// concatenate any new IP address
-		ipWithoutPort, _, _ := net.SplitHostPort(r.RemoteAddr)
-		if len(ipWithoutPort) == 0 {
-			ipWithoutPort = r.RemoteAddr
-		}
-
-		if !strings.Contains(userSession.IpAddress, ipWithoutPort) {
-			userSession.IpAddress = fmt.Sprintf("%v,%v", userSession.IpAddress, ipWithoutPort)
+		// The latest address the browser was seen from, not a history. Appending every new one
+		// made the column grow without bound until the update failed past its 512 bytes on
+		// MySQL, PostgreSQL and SQL Server, and every later bump of the session with it; and the
+		// substring test deciding what was new read 10.0.0.1 as already present in 10.0.0.12
+		// (#243).
+		if ipAddress != "" {
+			userSession.IpAddress = ipAddress
 		}
 
 		// Handle step-up authentication: update AuthMethods if new methods were used.
@@ -385,21 +427,21 @@ func (u *Manager) BumpUserSession(r *http.Request, sessionIdentifier string, cli
 		// transaction opened and the body only reads it: the insert-versus-update decision comes
 		// from client.Id on a copy, so an attempt that inserted leaves the slice as it found it
 		// and the rerun decides the same way.
-		err = u.database.RunInTransaction(r.Context(), func(tx *sql.Tx) error {
-			if updateUserSessionErr := u.database.UpdateUserSession(r.Context(), tx, userSession); updateUserSessionErr != nil {
+		err = u.database.RunInTransaction(ctx, func(tx *sql.Tx) error {
+			if updateUserSessionErr := u.database.UpdateUserSession(ctx, tx, userSession); updateUserSessionErr != nil {
 				return updateUserSessionErr
 			}
 
 			for _, client := range userSession.Clients {
 				if client.Id > 0 {
 					// update
-					if updateUserSessionClientErr := u.database.UpdateUserSessionClient(r.Context(), tx, &client); updateUserSessionClientErr != nil {
+					if updateUserSessionClientErr := u.database.UpdateUserSessionClient(ctx, tx, &client); updateUserSessionClientErr != nil {
 						return updateUserSessionClientErr
 					}
 				} else {
 					// insert new
 					client.UserSessionId = userSession.Id
-					if createUserSessionClientErr := u.database.CreateUserSessionClient(r.Context(), tx, &client); createUserSessionClientErr != nil {
+					if createUserSessionClientErr := u.database.CreateUserSessionClient(ctx, tx, &client); createUserSessionClientErr != nil {
 						return createUserSessionClientErr
 					}
 				}
@@ -413,7 +455,7 @@ func (u *Manager) BumpUserSession(r *http.Request, sessionIdentifier string, cli
 		return userSession, nil
 	}
 
-	return nil, errs.New("Unexpected: can't bump user session because user session is nil")
+	return nil, errs.New("can't bump user session because user session is nil")
 }
 
 // WillRaisePrivilege reports whether bumping a session with these values would raise its

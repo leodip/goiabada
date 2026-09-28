@@ -18,6 +18,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/constants"
+	authserver_middleware "github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
@@ -809,8 +810,8 @@ func handlePromptNone(w http.ResponseWriter, r *http.Request, httpHelper HttpHel
 	}
 
 	// Bump the user session to update LastAccessed time
-	_, err = userSessionManager.BumpUserSession(r, sessionIdentifier, client.Id,
-		authContext.AuthMethods, authContext.AcrLevel)
+	_, err = userSessionManager.BumpUserSession(r.Context(), sessionIdentifier, client.Id,
+		authContext.AuthMethods, authContext.AcrLevel, authserver_middleware.GetClientIPFromRequest(r))
 	if err != nil {
 		httpHelper.InternalServerError(w, r, err)
 		return

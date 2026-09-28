@@ -120,6 +120,53 @@ func TestExpectRunInTransactionRefused_NeverRunsTheBody(t *testing.T) {
 	assert.False(t, ran, "the transaction never opened, so nothing inside it ran")
 }
 
+// The deadlock shape runs the body twice on the same transaction, the first attempt closed as a
+// rollback whatever it returned, and answers with the second attempt's outcome. The body here
+// counts its attempts, which is what a caller collecting per-attempt results depends on.
+func TestExpectRunInTransactionRerun_RunsTheBodyTwiceAndAnswersWithTheSecondAttempt(t *testing.T) {
+	t.Run("the second attempt commits", func(t *testing.T) {
+		db := NewDatabase(t)
+		var edges []string
+		stub := ExpectRunInTransactionRerun(db, stubTx, func(edge string) { edges = append(edges, edge) })
+
+		attempts := 0
+		var seen []*sql.Tx
+		err := db.RunInTransaction(context.Background(), func(tx *sql.Tx) error {
+			attempts++
+			seen = append(seen, tx)
+			edges = append(edges, "body")
+			return nil
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, 2, attempts, "an aborted attempt is rerun from the top")
+		assert.Equal(t, []*sql.Tx{stubTx, stubTx}, seen, "both attempts run on the transaction the caller named")
+		assert.Equal(t, []string{"begin", "body", "rollback", "begin", "body", "commit"}, edges)
+		assert.NoError(t, stub.BodyErr)
+	})
+
+	t.Run("the second attempt fails", func(t *testing.T) {
+		db := NewDatabase(t)
+		var edges []string
+		stub := ExpectRunInTransactionRerun(db, stubTx, func(edge string) { edges = append(edges, edge) })
+
+		boom := errors.New("the write failed")
+		attempts := 0
+		err := db.RunInTransaction(context.Background(), func(*sql.Tx) error {
+			attempts++
+			edges = append(edges, "body")
+			if attempts == 2 {
+				return boom
+			}
+			return nil
+		})
+
+		assert.ErrorIs(t, err, boom, "the caller sees the attempt that ran last")
+		assert.ErrorIs(t, stub.BodyErr, boom)
+		assert.Equal(t, []string{"begin", "body", "rollback", "begin", "body", "rollback"}, edges)
+	})
+}
+
 // A nil transaction is refused at registration, not at the call, so the test that wrote it is
 // the test that fails. This is the property the six copies disagreed about: two declared a
 // sentinel and explained why, four took whatever the caller passed, and two call sites passed
@@ -130,10 +177,11 @@ func TestExpectRunInTransaction_RefusesANilTransaction(t *testing.T) {
 
 	assert.PanicsWithValue(t, nilTxPanic, func() { ExpectRunInTransaction(db, nil) })
 	assert.PanicsWithValue(t, nilTxPanic, func() { ExpectRunInTransactionThenFail(db, nil, nil) })
+	assert.PanicsWithValue(t, nilTxPanic, func() { ExpectRunInTransactionRerun(db, nil) })
 	// A typed nil is the other spelling the merged call sites used, and == nil sees it.
 	assert.PanicsWithValue(t, nilTxPanic, func() { ExpectRunInTransaction(db, (*sql.Tx)(nil)) })
 
-	// Nothing was registered by any of the three, which is what lets NewDatabase's cleanup
+	// Nothing was registered by any of the four, which is what lets NewDatabase's cleanup
 	// assert expectations without a call to satisfy.
 	assert.Empty(t, db.ExpectedCalls)
 }

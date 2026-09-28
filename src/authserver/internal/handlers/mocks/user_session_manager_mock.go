@@ -10,6 +10,7 @@
 package mocks_handlers
 
 import (
+	"context"
 	"net/http"
 	"time"
 
@@ -54,8 +55,8 @@ func (_m *UserSessionManager) EXPECT() *UserSessionManager_Expecter {
 }
 
 // BumpUserSession provides a mock function for the type UserSessionManager
-func (_mock *UserSessionManager) BumpUserSession(r *http.Request, sessionIdentifier string, clientId int64, authMethods string, acrLevel models.AcrLevel) (*models.UserSession, error) {
-	ret := _mock.Called(r, sessionIdentifier, clientId, authMethods, acrLevel)
+func (_mock *UserSessionManager) BumpUserSession(ctx context.Context, sessionIdentifier string, clientId int64, authMethods string, acrLevel models.AcrLevel, ipAddress string) (*models.UserSession, error) {
+	ret := _mock.Called(ctx, sessionIdentifier, clientId, authMethods, acrLevel, ipAddress)
 
 	if len(ret) == 0 {
 		panic("no return value specified for BumpUserSession")
@@ -63,18 +64,18 @@ func (_mock *UserSessionManager) BumpUserSession(r *http.Request, sessionIdentif
 
 	var r0 *models.UserSession
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(*http.Request, string, int64, string, models.AcrLevel) (*models.UserSession, error)); ok {
-		return returnFunc(r, sessionIdentifier, clientId, authMethods, acrLevel)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, int64, string, models.AcrLevel, string) (*models.UserSession, error)); ok {
+		return returnFunc(ctx, sessionIdentifier, clientId, authMethods, acrLevel, ipAddress)
 	}
-	if returnFunc, ok := ret.Get(0).(func(*http.Request, string, int64, string, models.AcrLevel) *models.UserSession); ok {
-		r0 = returnFunc(r, sessionIdentifier, clientId, authMethods, acrLevel)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, int64, string, models.AcrLevel, string) *models.UserSession); ok {
+		r0 = returnFunc(ctx, sessionIdentifier, clientId, authMethods, acrLevel, ipAddress)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*models.UserSession)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(*http.Request, string, int64, string, models.AcrLevel) error); ok {
-		r1 = returnFunc(r, sessionIdentifier, clientId, authMethods, acrLevel)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, int64, string, models.AcrLevel, string) error); ok {
+		r1 = returnFunc(ctx, sessionIdentifier, clientId, authMethods, acrLevel, ipAddress)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -87,20 +88,21 @@ type UserSessionManager_BumpUserSession_Call struct {
 }
 
 // BumpUserSession is a helper method to define mock.On call
-//   - r *http.Request
+//   - ctx context.Context
 //   - sessionIdentifier string
 //   - clientId int64
 //   - authMethods string
 //   - acrLevel models.AcrLevel
-func (_e *UserSessionManager_Expecter) BumpUserSession(r any, sessionIdentifier any, clientId any, authMethods any, acrLevel any) *UserSessionManager_BumpUserSession_Call {
-	return &UserSessionManager_BumpUserSession_Call{Call: _e.mock.On("BumpUserSession", r, sessionIdentifier, clientId, authMethods, acrLevel)}
+//   - ipAddress string
+func (_e *UserSessionManager_Expecter) BumpUserSession(ctx any, sessionIdentifier any, clientId any, authMethods any, acrLevel any, ipAddress any) *UserSessionManager_BumpUserSession_Call {
+	return &UserSessionManager_BumpUserSession_Call{Call: _e.mock.On("BumpUserSession", ctx, sessionIdentifier, clientId, authMethods, acrLevel, ipAddress)}
 }
 
-func (_c *UserSessionManager_BumpUserSession_Call) Run(run func(r *http.Request, sessionIdentifier string, clientId int64, authMethods string, acrLevel models.AcrLevel)) *UserSessionManager_BumpUserSession_Call {
+func (_c *UserSessionManager_BumpUserSession_Call) Run(run func(ctx context.Context, sessionIdentifier string, clientId int64, authMethods string, acrLevel models.AcrLevel, ipAddress string)) *UserSessionManager_BumpUserSession_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *http.Request
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(*http.Request)
+			arg0 = args[0].(context.Context)
 		}
 		var arg1 string
 		if args[1] != nil {
@@ -118,12 +120,17 @@ func (_c *UserSessionManager_BumpUserSession_Call) Run(run func(r *http.Request,
 		if args[4] != nil {
 			arg4 = args[4].(models.AcrLevel)
 		}
+		var arg5 string
+		if args[5] != nil {
+			arg5 = args[5].(string)
+		}
 		run(
 			arg0,
 			arg1,
 			arg2,
 			arg3,
 			arg4,
+			arg5,
 		)
 	})
 	return _c
@@ -134,7 +141,7 @@ func (_c *UserSessionManager_BumpUserSession_Call) Return(userSession *models.Us
 	return _c
 }
 
-func (_c *UserSessionManager_BumpUserSession_Call) RunAndReturn(run func(r *http.Request, sessionIdentifier string, clientId int64, authMethods string, acrLevel models.AcrLevel) (*models.UserSession, error)) *UserSessionManager_BumpUserSession_Call {
+func (_c *UserSessionManager_BumpUserSession_Call) RunAndReturn(run func(ctx context.Context, sessionIdentifier string, clientId int64, authMethods string, acrLevel models.AcrLevel, ipAddress string) (*models.UserSession, error)) *UserSessionManager_BumpUserSession_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -209,31 +216,39 @@ func (_c *UserSessionManager_HasValidUserSession_Call) RunAndReturn(run func(use
 }
 
 // StartNewUserSession provides a mock function for the type UserSessionManager
-func (_mock *UserSessionManager) StartNewUserSession(w http.ResponseWriter, r *http.Request, userId int64, clientId int64, authMethods string, acrLevel models.AcrLevel, authStateGeneration int64, otpConfigGeneration *int64, authenticatedAt *time.Time) (*models.UserSession, error) {
-	ret := _mock.Called(w, r, userId, clientId, authMethods, acrLevel, authStateGeneration, otpConfigGeneration, authenticatedAt)
+func (_mock *UserSessionManager) StartNewUserSession(w http.ResponseWriter, r *http.Request, userId int64, clientId int64, authMethods string, acrLevel models.AcrLevel, authStateGeneration int64, otpConfigGeneration *int64, authenticatedAt *time.Time, ipAddress string, replacing *models.UserSession) (*models.UserSession, []models.UserSession, error) {
+	ret := _mock.Called(w, r, userId, clientId, authMethods, acrLevel, authStateGeneration, otpConfigGeneration, authenticatedAt, ipAddress, replacing)
 
 	if len(ret) == 0 {
 		panic("no return value specified for StartNewUserSession")
 	}
 
 	var r0 *models.UserSession
-	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(http.ResponseWriter, *http.Request, int64, int64, string, models.AcrLevel, int64, *int64, *time.Time) (*models.UserSession, error)); ok {
-		return returnFunc(w, r, userId, clientId, authMethods, acrLevel, authStateGeneration, otpConfigGeneration, authenticatedAt)
+	var r1 []models.UserSession
+	var r2 error
+	if returnFunc, ok := ret.Get(0).(func(http.ResponseWriter, *http.Request, int64, int64, string, models.AcrLevel, int64, *int64, *time.Time, string, *models.UserSession) (*models.UserSession, []models.UserSession, error)); ok {
+		return returnFunc(w, r, userId, clientId, authMethods, acrLevel, authStateGeneration, otpConfigGeneration, authenticatedAt, ipAddress, replacing)
 	}
-	if returnFunc, ok := ret.Get(0).(func(http.ResponseWriter, *http.Request, int64, int64, string, models.AcrLevel, int64, *int64, *time.Time) *models.UserSession); ok {
-		r0 = returnFunc(w, r, userId, clientId, authMethods, acrLevel, authStateGeneration, otpConfigGeneration, authenticatedAt)
+	if returnFunc, ok := ret.Get(0).(func(http.ResponseWriter, *http.Request, int64, int64, string, models.AcrLevel, int64, *int64, *time.Time, string, *models.UserSession) *models.UserSession); ok {
+		r0 = returnFunc(w, r, userId, clientId, authMethods, acrLevel, authStateGeneration, otpConfigGeneration, authenticatedAt, ipAddress, replacing)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*models.UserSession)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(http.ResponseWriter, *http.Request, int64, int64, string, models.AcrLevel, int64, *int64, *time.Time) error); ok {
-		r1 = returnFunc(w, r, userId, clientId, authMethods, acrLevel, authStateGeneration, otpConfigGeneration, authenticatedAt)
+	if returnFunc, ok := ret.Get(1).(func(http.ResponseWriter, *http.Request, int64, int64, string, models.AcrLevel, int64, *int64, *time.Time, string, *models.UserSession) []models.UserSession); ok {
+		r1 = returnFunc(w, r, userId, clientId, authMethods, acrLevel, authStateGeneration, otpConfigGeneration, authenticatedAt, ipAddress, replacing)
 	} else {
-		r1 = ret.Error(1)
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).([]models.UserSession)
+		}
 	}
-	return r0, r1
+	if returnFunc, ok := ret.Get(2).(func(http.ResponseWriter, *http.Request, int64, int64, string, models.AcrLevel, int64, *int64, *time.Time, string, *models.UserSession) error); ok {
+		r2 = returnFunc(w, r, userId, clientId, authMethods, acrLevel, authStateGeneration, otpConfigGeneration, authenticatedAt, ipAddress, replacing)
+	} else {
+		r2 = ret.Error(2)
+	}
+	return r0, r1, r2
 }
 
 // UserSessionManager_StartNewUserSession_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'StartNewUserSession'
@@ -251,11 +266,13 @@ type UserSessionManager_StartNewUserSession_Call struct {
 //   - authStateGeneration int64
 //   - otpConfigGeneration *int64
 //   - authenticatedAt *time.Time
-func (_e *UserSessionManager_Expecter) StartNewUserSession(w any, r any, userId any, clientId any, authMethods any, acrLevel any, authStateGeneration any, otpConfigGeneration any, authenticatedAt any) *UserSessionManager_StartNewUserSession_Call {
-	return &UserSessionManager_StartNewUserSession_Call{Call: _e.mock.On("StartNewUserSession", w, r, userId, clientId, authMethods, acrLevel, authStateGeneration, otpConfigGeneration, authenticatedAt)}
+//   - ipAddress string
+//   - replacing *models.UserSession
+func (_e *UserSessionManager_Expecter) StartNewUserSession(w any, r any, userId any, clientId any, authMethods any, acrLevel any, authStateGeneration any, otpConfigGeneration any, authenticatedAt any, ipAddress any, replacing any) *UserSessionManager_StartNewUserSession_Call {
+	return &UserSessionManager_StartNewUserSession_Call{Call: _e.mock.On("StartNewUserSession", w, r, userId, clientId, authMethods, acrLevel, authStateGeneration, otpConfigGeneration, authenticatedAt, ipAddress, replacing)}
 }
 
-func (_c *UserSessionManager_StartNewUserSession_Call) Run(run func(w http.ResponseWriter, r *http.Request, userId int64, clientId int64, authMethods string, acrLevel models.AcrLevel, authStateGeneration int64, otpConfigGeneration *int64, authenticatedAt *time.Time)) *UserSessionManager_StartNewUserSession_Call {
+func (_c *UserSessionManager_StartNewUserSession_Call) Run(run func(w http.ResponseWriter, r *http.Request, userId int64, clientId int64, authMethods string, acrLevel models.AcrLevel, authStateGeneration int64, otpConfigGeneration *int64, authenticatedAt *time.Time, ipAddress string, replacing *models.UserSession)) *UserSessionManager_StartNewUserSession_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 http.ResponseWriter
 		if args[0] != nil {
@@ -293,6 +310,14 @@ func (_c *UserSessionManager_StartNewUserSession_Call) Run(run func(w http.Respo
 		if args[8] != nil {
 			arg8 = args[8].(*time.Time)
 		}
+		var arg9 string
+		if args[9] != nil {
+			arg9 = args[9].(string)
+		}
+		var arg10 *models.UserSession
+		if args[10] != nil {
+			arg10 = args[10].(*models.UserSession)
+		}
 		run(
 			arg0,
 			arg1,
@@ -303,17 +328,19 @@ func (_c *UserSessionManager_StartNewUserSession_Call) Run(run func(w http.Respo
 			arg6,
 			arg7,
 			arg8,
+			arg9,
+			arg10,
 		)
 	})
 	return _c
 }
 
-func (_c *UserSessionManager_StartNewUserSession_Call) Return(userSession *models.UserSession, err error) *UserSessionManager_StartNewUserSession_Call {
-	_c.Call.Return(userSession, err)
+func (_c *UserSessionManager_StartNewUserSession_Call) Return(userSession *models.UserSession, userSessions []models.UserSession, err error) *UserSessionManager_StartNewUserSession_Call {
+	_c.Call.Return(userSession, userSessions, err)
 	return _c
 }
 
-func (_c *UserSessionManager_StartNewUserSession_Call) RunAndReturn(run func(w http.ResponseWriter, r *http.Request, userId int64, clientId int64, authMethods string, acrLevel models.AcrLevel, authStateGeneration int64, otpConfigGeneration *int64, authenticatedAt *time.Time) (*models.UserSession, error)) *UserSessionManager_StartNewUserSession_Call {
+func (_c *UserSessionManager_StartNewUserSession_Call) RunAndReturn(run func(w http.ResponseWriter, r *http.Request, userId int64, clientId int64, authMethods string, acrLevel models.AcrLevel, authStateGeneration int64, otpConfigGeneration *int64, authenticatedAt *time.Time, ipAddress string, replacing *models.UserSession) (*models.UserSession, []models.UserSession, error)) *UserSessionManager_StartNewUserSession_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -74,15 +74,17 @@ type UserSessionManager interface {
 	StartNewUserSession(w http.ResponseWriter, r *http.Request,
 		userId int64, clientId int64, authMethods string, acrLevel models.AcrLevel,
 		authStateGeneration int64, otpConfigGeneration *int64,
-		authenticatedAt *time.Time) (*models.UserSession, error)
+		authenticatedAt *time.Time, ipAddress string,
+		replacing *models.UserSession) (*models.UserSession, []models.UserSession, error)
 
 	// BumpUserSession updates an existing session's last accessed time and client list.
 	// It also handles ACR/AMR step-up: if the user completed a higher level of authentication
 	// (e.g., added OTP to a password-only session), the session's AuthMethods and AcrLevel
 	// are upgraded to reflect the stronger authentication that was performed.
 	// Note: ACR is only upgraded, never downgraded, during a session's lifetime.
-	BumpUserSession(r *http.Request, sessionIdentifier string, clientId int64,
-		authMethods string, acrLevel models.AcrLevel) (*models.UserSession, error)
+	// A non-empty ipAddress replaces the session's recorded address; empty leaves it.
+	BumpUserSession(ctx context.Context, sessionIdentifier string, clientId int64,
+		authMethods string, acrLevel models.AcrLevel, ipAddress string) (*models.UserSession, error)
 }
 
 type TokenValidator interface {

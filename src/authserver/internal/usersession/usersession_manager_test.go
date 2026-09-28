@@ -1,14 +1,14 @@
 package usersession
 
 import (
-	"net/http"
-	"net/http/httptest"
+	"context"
 	"testing"
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	mocks_data "github.com/leodip/goiabada/authserver/internal/data/mocks"
 )
@@ -145,13 +145,6 @@ func TestShouldUpgradeAcrLevel(t *testing.T) {
 // =============================================================================
 
 func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
-	// Helper to create a basic request with remote address
-	createRequest := func() *http.Request {
-		req := httptest.NewRequest("GET", "/test", nil)
-		req.RemoteAddr = "192.168.1.1:12345"
-		return req
-	}
-
 	// Helper to create a user session with specific ACR/AMR
 	createUserSession := func(acrLevel models.AcrLevel, authMethods string) *models.UserSession {
 		return &models.UserSession{
@@ -169,7 +162,6 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 	t.Run("Step-up: level1 to level2_optional upgrades ACR and updates AuthMethods", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		manager := &Manager{database: database}
-		req := createRequest()
 
 		// Session starts at level1 with password only
 		userSession := createUserSession(models.AcrLevel1, "pwd")
@@ -187,8 +179,8 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 		database.On("CreateUserSessionClient", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 		// Step-up to level2_optional with pwd+otp
-		result, err := manager.BumpUserSession(req, "test-session-id", 456,
-			"pwd otp", models.AcrLevel2Optional)
+		result, err := manager.BumpUserSession(context.Background(), "test-session-id", 456,
+			"pwd otp", models.AcrLevel2Optional, "192.168.1.1")
 
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
@@ -201,7 +193,6 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 	t.Run("Step-up: level1 to level2_mandatory upgrades ACR and updates AuthMethods", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		manager := &Manager{database: database}
-		req := createRequest()
 
 		userSession := createUserSession(models.AcrLevel1, "pwd")
 
@@ -216,8 +207,8 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 		})).Return(nil)
 		database.On("CreateUserSessionClient", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
-		result, err := manager.BumpUserSession(req, "test-session-id", 456,
-			"pwd otp", models.AcrLevel2Mandatory)
+		result, err := manager.BumpUserSession(context.Background(), "test-session-id", 456,
+			"pwd otp", models.AcrLevel2Mandatory, "192.168.1.1")
 
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
@@ -230,7 +221,6 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 	t.Run("Step-up: level2_optional to level2_mandatory upgrades ACR", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		manager := &Manager{database: database}
-		req := createRequest()
 
 		// Already at level2_optional with pwd+otp
 		userSession := createUserSession(models.AcrLevel2Optional, "pwd otp")
@@ -247,8 +237,8 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 		})).Return(nil)
 		database.On("CreateUserSessionClient", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
-		result, err := manager.BumpUserSession(req, "test-session-id", 456,
-			"pwd otp", models.AcrLevel2Mandatory)
+		result, err := manager.BumpUserSession(context.Background(), "test-session-id", 456,
+			"pwd otp", models.AcrLevel2Mandatory, "192.168.1.1")
 
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
@@ -260,7 +250,6 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 	t.Run("No downgrade: level2_mandatory to level1 preserves higher ACR", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		manager := &Manager{database: database}
-		req := createRequest()
 
 		// Session is at level2_mandatory
 		userSession := createUserSession(models.AcrLevel2Mandatory, "pwd otp")
@@ -277,8 +266,8 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 		database.On("CreateUserSessionClient", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 		// Request level1, but session should stay at level2_mandatory
-		result, err := manager.BumpUserSession(req, "test-session-id", 456,
-			"pwd otp", models.AcrLevel1)
+		result, err := manager.BumpUserSession(context.Background(), "test-session-id", 456,
+			"pwd otp", models.AcrLevel1, "192.168.1.1")
 
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
@@ -291,7 +280,6 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 	t.Run("No downgrade: level2_optional to level1 preserves higher ACR", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		manager := &Manager{database: database}
-		req := createRequest()
 
 		userSession := createUserSession(models.AcrLevel2Optional, "pwd otp")
 
@@ -305,8 +293,8 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 		})).Return(nil)
 		database.On("CreateUserSessionClient", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
-		result, err := manager.BumpUserSession(req, "test-session-id", 456,
-			"pwd otp", models.AcrLevel1)
+		result, err := manager.BumpUserSession(context.Background(), "test-session-id", 456,
+			"pwd otp", models.AcrLevel1, "192.168.1.1")
 
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
@@ -319,7 +307,6 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 	t.Run("Same level: no ACR change when levels are equal", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		manager := &Manager{database: database}
-		req := createRequest()
 
 		userSession := createUserSession(models.AcrLevel2Optional, "pwd otp")
 
@@ -334,8 +321,8 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 		})).Return(nil)
 		database.On("CreateUserSessionClient", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
-		result, err := manager.BumpUserSession(req, "test-session-id", 456,
-			"pwd otp", models.AcrLevel2Optional)
+		result, err := manager.BumpUserSession(context.Background(), "test-session-id", 456,
+			"pwd otp", models.AcrLevel2Optional, "192.168.1.1")
 
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
@@ -347,7 +334,6 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 	t.Run("Empty authMethods preserves existing AuthMethods", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		manager := &Manager{database: database}
-		req := createRequest()
 
 		userSession := createUserSession(models.AcrLevel1, "pwd")
 
@@ -363,8 +349,8 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 		database.On("CreateUserSessionClient", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 		// Pass empty authMethods - should preserve existing
-		result, err := manager.BumpUserSession(req, "test-session-id", 456,
-			"", models.AcrLevel1)
+		result, err := manager.BumpUserSession(context.Background(), "test-session-id", 456,
+			"", models.AcrLevel1, "192.168.1.1")
 
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
@@ -377,7 +363,6 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 	t.Run("Empty acrLevel preserves existing AcrLevel", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		manager := &Manager{database: database}
-		req := createRequest()
 
 		userSession := createUserSession(models.AcrLevel2Optional, "pwd otp")
 
@@ -393,8 +378,8 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 		database.On("CreateUserSessionClient", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 		// Pass empty acrLevel - should preserve existing
-		result, err := manager.BumpUserSession(req, "test-session-id", 456,
-			"pwd otp", "")
+		result, err := manager.BumpUserSession(context.Background(), "test-session-id", 456,
+			"pwd otp", "", "192.168.1.1")
 
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
@@ -407,7 +392,6 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 	t.Run("Both empty strings preserve existing ACR and AuthMethods (refresh token scenario)", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		manager := &Manager{database: database}
-		req := createRequest()
 
 		userSession := createUserSession(models.AcrLevel2Mandatory, "pwd otp")
 
@@ -424,7 +408,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 		database.On("CreateUserSessionClient", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 		// This is the refresh token scenario - both empty
-		result, err := manager.BumpUserSession(req, "test-session-id", 456, "", "")
+		result, err := manager.BumpUserSession(context.Background(), "test-session-id", 456, "", "", "192.168.1.1")
 
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
@@ -437,7 +421,6 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 	t.Run("AuthMethods updated when different (same ACR level)", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		manager := &Manager{database: database}
-		req := createRequest()
 
 		// Edge case: same ACR but different auth methods string
 		// (This shouldn't normally happen, but we should handle it)
@@ -454,8 +437,8 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 		})).Return(nil)
 		database.On("CreateUserSessionClient", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
-		result, err := manager.BumpUserSession(req, "test-session-id", 456,
-			"pwd otp", models.AcrLevel2Optional)
+		result, err := manager.BumpUserSession(context.Background(), "test-session-id", 456,
+			"pwd otp", models.AcrLevel2Optional, "192.168.1.1")
 
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
@@ -467,13 +450,12 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 	t.Run("Session not found returns error", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		manager := &Manager{database: database}
-		req := createRequest()
 
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "non-existent-session").
 			Return(nil, nil)
 
-		result, err := manager.BumpUserSession(req, "non-existent-session", 456,
-			"pwd", models.AcrLevel1)
+		result, err := manager.BumpUserSession(context.Background(), "non-existent-session", 456,
+			"pwd", models.AcrLevel1, "192.168.1.1")
 
 		assert.Error(t, err)
 		assert.Nil(t, result)
@@ -488,16 +470,9 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 // =============================================================================
 
 func TestBumpUserSession_ClientTracking(t *testing.T) {
-	createRequest := func(remoteAddr string) *http.Request {
-		req := httptest.NewRequest("GET", "/test", nil)
-		req.RemoteAddr = remoteAddr
-		return req
-	}
-
 	t.Run("New client is added to session", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		manager := &Manager{database: database}
-		req := createRequest("192.168.1.1:12345")
 
 		userSession := &models.UserSession{
 			Id:                1,
@@ -524,7 +499,7 @@ func TestBumpUserSession_ClientTracking(t *testing.T) {
 		})).Return(nil)
 
 		// Add new client 200
-		result, err := manager.BumpUserSession(req, "test-session-id", 200, "", "")
+		result, err := manager.BumpUserSession(context.Background(), "test-session-id", 200, "", "", "192.168.1.1")
 
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
@@ -536,7 +511,6 @@ func TestBumpUserSession_ClientTracking(t *testing.T) {
 	t.Run("Existing client updates LastAccessed", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
 		manager := &Manager{database: database}
-		req := createRequest("192.168.1.1:12345")
 
 		oldTime := time.Now().UTC().Add(-1 * time.Hour)
 		userSession := &models.UserSession{
@@ -564,7 +538,7 @@ func TestBumpUserSession_ClientTracking(t *testing.T) {
 		})).Return(nil)
 
 		// Same client 100 again
-		result, err := manager.BumpUserSession(req, "test-session-id", 100, "", "")
+		result, err := manager.BumpUserSession(context.Background(), "test-session-id", 100, "", "", "192.168.1.1")
 
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
@@ -572,78 +546,60 @@ func TestBumpUserSession_ClientTracking(t *testing.T) {
 
 		database.AssertExpectations(t)
 	})
+}
 
-	t.Run("New IP is concatenated to existing", func(t *testing.T) {
-		database := mocks_data.NewDatabase(t)
-		manager := &Manager{database: database}
-		req := createRequest("10.0.0.1:12345") // Different IP
+// TestBumpUserSession_RecordsTheLatestAddress is decision 17 of #433 at the manager: a session
+// holds the latest address its browser was seen from, one address and no history. A bump given an
+// address overwrites the recorded one, whatever the two have in common, and a bump given none
+// leaves it, which is what the token endpoint's refresh bump relies on (#243).
+func TestBumpUserSession_RecordsTheLatestAddress(t *testing.T) {
+	testCases := []struct {
+		name      string
+		stored    string
+		given     string
+		wantAfter string
+	}{
+		{"a new address replaces the recorded one", "192.168.1.1", "10.0.0.1", "10.0.0.1"},
+		// The substring test this replaced read 10.0.0.1 as already present in 10.0.0.12 and kept
+		// the old value.
+		{"an address the recorded one contains still replaces it", "10.0.0.12", "10.0.0.1", "10.0.0.1"},
+		{"a history left by an earlier binary collapses to the latest address", "192.168.1.1,10.0.0.1", "172.16.0.5", "172.16.0.5"},
+		{"the same address stays as it is", "192.168.1.1", "192.168.1.1", "192.168.1.1"},
+		{"an empty address leaves the recorded one", "192.168.1.1", "", "192.168.1.1"},
+	}
 
-		userSession := &models.UserSession{
-			Id:                1,
-			SessionIdentifier: "test-session-id",
-			UserId:            123,
-			AcrLevel:          models.AcrLevel1,
-			AuthMethods:       "pwd",
-			IpAddress:         "192.168.1.1", // Original IP
-			LastAccessed:      time.Now().UTC().Add(-1 * time.Hour),
-			Clients:           []models.UserSessionClient{},
-		}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			database := mocks_data.NewDatabase(t)
+			manager := &Manager{database: database}
 
-		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test-session-id").
-			Return(userSession, nil)
-		database.On("UserSessionLoadClients", mock.Anything, mock.Anything, userSession).
-			Return(nil)
-		mocks_data.ExpectRunInTransaction(database, txSentinel)
-		database.On("UpdateUserSession", mock.Anything, mock.Anything, mock.MatchedBy(func(s *models.UserSession) bool {
-			// IP should be concatenated
-			return s.IpAddress == "192.168.1.1,10.0.0.1"
-		})).Return(nil)
-		database.On("CreateUserSessionClient", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+			userSession := &models.UserSession{
+				Id:                1,
+				SessionIdentifier: "test-session-id",
+				UserId:            123,
+				AcrLevel:          models.AcrLevel1,
+				AuthMethods:       "pwd",
+				IpAddress:         tc.stored,
+				LastAccessed:      time.Now().UTC().Add(-1 * time.Hour),
+				Clients:           []models.UserSessionClient{},
+			}
 
-		result, err := manager.BumpUserSession(req, "test-session-id", 100, "", "")
+			database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test-session-id").
+				Return(userSession, nil)
+			database.On("UserSessionLoadClients", mock.Anything, mock.Anything, userSession).
+				Return(nil)
+			mocks_data.ExpectRunInTransaction(database, txSentinel)
+			database.On("UpdateUserSession", mock.Anything, txSentinel, mock.MatchedBy(func(s *models.UserSession) bool {
+				return s.IpAddress == tc.wantAfter
+			})).Return(nil).Once()
+			database.On("CreateUserSessionClient", mock.Anything, txSentinel, mock.Anything).Return(nil).Once()
 
-		assert.NoError(t, err)
-		assert.NotNil(t, result)
-		assert.Equal(t, "192.168.1.1,10.0.0.1", result.IpAddress)
+			result, err := manager.BumpUserSession(context.Background(), "test-session-id", 100, "", "", tc.given)
 
-		database.AssertExpectations(t)
-	})
-
-	t.Run("Same IP is not duplicated", func(t *testing.T) {
-		database := mocks_data.NewDatabase(t)
-		manager := &Manager{database: database}
-		req := createRequest("192.168.1.1:12345") // Same IP
-
-		userSession := &models.UserSession{
-			Id:                1,
-			SessionIdentifier: "test-session-id",
-			UserId:            123,
-			AcrLevel:          models.AcrLevel1,
-			AuthMethods:       "pwd",
-			IpAddress:         "192.168.1.1",
-			LastAccessed:      time.Now().UTC().Add(-1 * time.Hour),
-			Clients:           []models.UserSessionClient{},
-		}
-
-		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "test-session-id").
-			Return(userSession, nil)
-		database.On("UserSessionLoadClients", mock.Anything, mock.Anything, userSession).
-			Return(nil)
-		mocks_data.ExpectRunInTransaction(database, txSentinel)
-		database.On("UpdateUserSession", mock.Anything, mock.Anything, mock.MatchedBy(func(s *models.UserSession) bool {
-			// IP should NOT be duplicated
-			return s.IpAddress == "192.168.1.1"
-		})).Return(nil)
-		database.On("CreateUserSessionClient", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-
-		result, err := manager.BumpUserSession(req, "test-session-id", 100, "", "")
-
-		assert.NoError(t, err)
-		assert.NotNil(t, result)
-		assert.Equal(t, "192.168.1.1", result.IpAddress, "IP should not be duplicated")
-
-		database.AssertExpectations(t)
-	})
+			require.NoError(t, err)
+			assert.Equal(t, tc.wantAfter, result.IpAddress)
+		})
+	}
 }
 
 // =============================================================================
