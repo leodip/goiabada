@@ -46,6 +46,7 @@ These checks run first. Three of them are also *answered* first, on a page: the 
 | Scopes are valid (OIDC scopes or existing `resource:permission` pairs) | `invalid_scope` |
 | PKCE is correct (required by default; configurable per client or globally) | `invalid_request` |
 | `prompt` values are valid and not conflicting | `invalid_request` |
+| `max_age` is a non-negative integer | `invalid_request` |
 
 An unsupported `response_mode` is the one failure that never reaches the client, for any request, signed in or not. Understanding the requested mode is what tells the server how to encode a response, so there is no way to send an error to a client that asked for a mode Goiabada does not implement: the answer is a page at `400 Bad Request` with no `error`, `error_description` or `state`, per [OpenID Connect Core 1.0](https://openid.net/specs/openid-connect-core-1_0.html) section 3.1.2.6. Asking for `query` or `form_post` on an implicit request is a different thing: both are modes Goiabada implements, so such a request is refused by the ordinary validation above and that refusal reaches the client as an error redirect.
 
@@ -228,7 +229,7 @@ Both can force re-authentication, but they work differently:
 
 | Parameter | When user must re-authenticate |
 |-----------|-------------------------------|
-| `max_age=N` | Only if the session started more than N seconds ago |
+| `max_age=N` | Only if the user last signed in more than N seconds ago |
 | `prompt=login` | Always, regardless of session age |
 | Both present | `prompt=login` takes precedence (the session is never used to skip authentication) |
 
@@ -240,9 +241,9 @@ All three are time-based session checks, but they measure different things:
 |-------|---------------|---------------|
 | Idle timeout | `last_accessed` (resets on activity) | Global setting: idle timeout in seconds |
 | Max lifetime | `started` (never resets) | Global setting: max lifetime in seconds |
-| `max_age` | `started` (never resets) | Per-request parameter |
+| `max_age` | `auth_time` (resets on each sign-in) | Per-request parameter |
 
-A session is valid only if **all three** pass. The `max_age` parameter acts like an additional, per-request max lifetime constraint. See [User sessions](/concepts/user-sessions/) for details.
+A session is valid only if **all three** pass. The `max_age` parameter bounds the time since the user last signed in, not the session's age. See [User sessions](/concepts/user-sessions/) for details.
 
 ### acr_values vs client default ACR
 

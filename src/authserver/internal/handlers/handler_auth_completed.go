@@ -11,6 +11,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/config"
+	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
@@ -92,7 +93,9 @@ func HandleAuthCompletedGet(
 		}
 
 		targetAcrLevel := authContext.GetTargetAcrLevel(client.DefaultAcrLevel)
-		hasValidUserSession := userSessionManager.HasValidUserSession(r.Context(), userSession, authContext.ParseRequestedMaxAge())
+		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
+		hasValidUserSession := userSessionManager.HasValidUserSession(userSession,
+			settings.UserSessionIdleTimeoutInSeconds, settings.UserSessionMaxLifetimeInSeconds, authContext.RequestedMaxAge())
 		// Validity and ownership are separate questions and both have to be yes before this
 		// ceremony may reuse the session the browser arrived with. The browser can still be
 		// carrying user A's cookie while user B authenticates: prompt=login and an id_token_hint

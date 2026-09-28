@@ -37,6 +37,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
+		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		// SSO reuse: AuthenticatedAt is nil (not set by password handler)
@@ -75,7 +76,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
-		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
+		userSessionManager.On("HasValidUserSession", userSession, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.AnythingOfType("*int64")).Return(true)
 		userSessionManager.On("BumpUserSession", req, sessionIdentifier, int64(1),
 			"", models.AcrLevel1).Return(userSession, nil)
 
@@ -179,6 +180,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
+		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		// User 2 authenticated in this ceremony, on a browser still cookied to user 1's
@@ -231,7 +233,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		// True, so ownership is the only thing keeping this ceremony off the reuse arm. No
 		// BumpUserSession expectation is registered anywhere in this subtest, and the mock is
 		// strict, so reusing the other user's session fails the case.
-		userSessionManager.On("HasValidUserSession", mock.Anything, foreignSession, mock.AnythingOfType("*int")).Return(true)
+		userSessionManager.On("HasValidUserSession", foreignSession, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.AnythingOfType("*int64")).Return(true)
 
 		// The order in which the handover is written down, which the strict mock does not
 		// observe on its own: every audit event has to follow the commit, or an event attests
@@ -367,6 +369,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
+		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		pwdAuthTime := time.Now().UTC()
@@ -411,7 +414,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		// Both false this time, which is the whole point of the row.
-		userSessionManager.On("HasValidUserSession", mock.Anything, foreignSession, mock.AnythingOfType("*int")).Return(false)
+		userSessionManager.On("HasValidUserSession", foreignSession, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.AnythingOfType("*int64")).Return(false)
 
 		// No refresh tokens, so the sweep finds nothing and the event still attests that the
 		// action happened.
@@ -472,6 +475,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
+		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		pwdAuthTime := time.Now().UTC()
@@ -515,7 +519,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
-		userSessionManager.On("HasValidUserSession", mock.Anything, ownSession, mock.AnythingOfType("*int")).Return(false)
+		userSessionManager.On("HasValidUserSession", ownSession, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.AnythingOfType("*int64")).Return(false)
 
 		// No termination expectations at all. The mock is strict, so any of the six calls
 		// revocation.TerminateUserSessionTx makes fails this case, and no cross_user_session_replaced or
@@ -581,6 +585,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
+		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		pwdAuthTime := time.Now().UTC()
@@ -624,7 +629,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
-		userSessionManager.On("HasValidUserSession", mock.Anything, foreignSession, mock.AnythingOfType("*int")).Return(true)
+		userSessionManager.On("HasValidUserSession", foreignSession, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.AnythingOfType("*int64")).Return(true)
 
 		// The deletion fails, which since #139 is the FIRST write inside the transaction: it is the
 		// statement that takes the session row, and the two sweeps follow it. So the deferred
@@ -691,6 +696,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
+		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		pwdAuthTime := time.Now().UTC()
@@ -734,7 +740,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
-		userSessionManager.On("HasValidUserSession", mock.Anything, foreignSession, mock.AnythingOfType("*int")).Return(true)
+		userSessionManager.On("HasValidUserSession", foreignSession, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.AnythingOfType("*int64")).Return(true)
 
 		var sequence []string
 		stubCrossUserTermination(database, foreignSession, 2, []*models.RefreshToken{
@@ -800,6 +806,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
+		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		// Re-auth case (e.g. prompt=login): AuthenticatedAt set by password handler.
@@ -847,7 +854,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
-		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
+		userSessionManager.On("HasValidUserSession", userSession, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.AnythingOfType("*int64")).Return(true)
 		userSessionManager.On("BumpUserSession", req, sessionIdentifier, int64(1),
 			"", models.AcrLevel1).Return(userSession, nil)
 
@@ -907,6 +914,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
+		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		// Non-nil but zero, which is what an AuthContext round-tripped through the cookie
@@ -948,7 +956,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
-		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
+		userSessionManager.On("HasValidUserSession", userSession, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.AnythingOfType("*int64")).Return(true)
 		userSessionManager.On("BumpUserSession", req, sessionIdentifier, int64(1),
 			"", models.AcrLevel1).Return(userSession, nil)
 
@@ -996,6 +1004,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
+		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		// This ceremony did level 1: handler_auth_pwd sets both of these. Without
@@ -1043,7 +1052,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
 		// Expect HasValidUserSession to return false for a new session
-		userSessionManager.On("HasValidUserSession", mock.Anything, (*models.UserSession)(nil), mock.AnythingOfType("*int")).Return(false)
+		userSessionManager.On("HasValidUserSession", (*models.UserSession)(nil), testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.AnythingOfType("*int64")).Return(false)
 
 		// Expect StartNewUserSession to be called instead of BumpUserSession
 		sessionAuthTime := time.Now().UTC()
@@ -1105,6 +1114,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
+		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		// 4 rather than 0, so the assertion below cannot also pass against a hard-coded zero.
@@ -1153,7 +1163,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		// is the point of the rotation, and one that stopped happening at all would
 		// otherwise be invisible from here (#266 decision 6).
 		authHelper.On("RegenerateSession", rr, req).Return(nil).Once()
-		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
+		userSessionManager.On("HasValidUserSession", userSession, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.AnythingOfType("*int64")).Return(true)
 		userSessionManager.On("BumpUserSession", req, sessionIdentifier, int64(1),
 			"pwd otp", models.AcrLevel2Optional).Return(userSession, nil)
 
@@ -1203,6 +1213,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
+		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		captured := int64(4)
@@ -1250,7 +1261,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		// is the point of the rotation, and one that stopped happening at all would
 		// otherwise be invisible from here (#266 decision 6).
 		authHelper.On("RegenerateSession", rr, req).Return(nil).Once()
-		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
+		userSessionManager.On("HasValidUserSession", userSession, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.AnythingOfType("*int64")).Return(true)
 		userSessionManager.On("BumpUserSession", req, sessionIdentifier, int64(1),
 			"pwd", models.AcrLevel1).Return(userSession, nil)
 
@@ -1296,6 +1307,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
+		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
@@ -1341,7 +1353,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		// is the point of the rotation, and one that stopped happening at all would
 		// otherwise be invisible from here (#266 decision 6).
 		authHelper.On("RegenerateSession", rr, req).Return(nil).Once()
-		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
+		userSessionManager.On("HasValidUserSession", userSession, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.AnythingOfType("*int64")).Return(true)
 		userSessionManager.On("BumpUserSession", req, sessionIdentifier, int64(1),
 			"pwd otp", models.AcrLevel2Optional).Return(userSession, nil)
 
@@ -1384,6 +1396,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
+		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		captured := int64(4)
@@ -1421,7 +1434,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
-		userSessionManager.On("HasValidUserSession", mock.Anything, (*models.UserSession)(nil), mock.AnythingOfType("*int")).Return(false)
+		userSessionManager.On("HasValidUserSession", (*models.UserSession)(nil), testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.AnythingOfType("*int64")).Return(false)
 
 		newUserSession := &models.UserSession{
 			Id:                  1,
@@ -1471,6 +1484,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
+		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		expectedError := errors.New("auth context error")
@@ -1501,6 +1515,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
+		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
@@ -1528,6 +1543,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
+		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
@@ -1568,6 +1584,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
+		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		// SSO reuse: AuthenticatedAt is nil
@@ -1606,7 +1623,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
-		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
+		userSessionManager.On("HasValidUserSession", userSession, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.AnythingOfType("*int64")).Return(true)
 		userSessionManager.On("BumpUserSession", req, sessionIdentifier, int64(1),
 			"", models.AcrLevel1).Return(userSession, nil)
 
@@ -1669,6 +1686,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
+		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
@@ -1704,7 +1722,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
-		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
+		userSessionManager.On("HasValidUserSession", userSession, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.AnythingOfType("*int64")).Return(true)
 		userSessionManager.On("BumpUserSession", req, sessionIdentifier, int64(1),
 			"", models.AcrLevel1).Return(userSession, nil)
 
@@ -1761,6 +1779,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
+		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
@@ -1796,7 +1815,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
-		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
+		userSessionManager.On("HasValidUserSession", userSession, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.AnythingOfType("*int64")).Return(true)
 		userSessionManager.On("BumpUserSession", req, sessionIdentifier, int64(1),
 			"", models.AcrLevel1).Return(userSession, nil)
 
@@ -1849,6 +1868,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
+		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
@@ -1884,7 +1904,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
-		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
+		userSessionManager.On("HasValidUserSession", userSession, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.AnythingOfType("*int64")).Return(true)
 		userSessionManager.On("BumpUserSession", req, sessionIdentifier, int64(1),
 			"", models.AcrLevel1).Return(userSession, nil)
 
@@ -1932,6 +1952,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
+		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		// SSO reuse: AuthenticatedAt is nil
@@ -1970,7 +1991,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
-		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
+		userSessionManager.On("HasValidUserSession", userSession, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.AnythingOfType("*int64")).Return(true)
 		userSessionManager.On("BumpUserSession", req, sessionIdentifier, int64(1),
 			"", models.AcrLevel1).Return(userSession, nil)
 
@@ -2031,6 +2052,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
+		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
@@ -2066,7 +2088,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
-		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
+		userSessionManager.On("HasValidUserSession", userSession, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.AnythingOfType("*int64")).Return(true)
 		userSessionManager.On("BumpUserSession", req, sessionIdentifier, int64(1),
 			"", models.AcrLevel1).Return(userSession, nil)
 
@@ -2116,6 +2138,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
+		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
@@ -2151,7 +2174,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
-		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
+		userSessionManager.On("HasValidUserSession", userSession, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.AnythingOfType("*int64")).Return(true)
 		userSessionManager.On("BumpUserSession", req, sessionIdentifier, int64(1),
 			"", models.AcrLevel1).Return(userSession, nil)
 
@@ -2199,6 +2222,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
+		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
@@ -2234,7 +2258,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
-		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
+		userSessionManager.On("HasValidUserSession", userSession, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.AnythingOfType("*int64")).Return(true)
 		userSessionManager.On("BumpUserSession", req, sessionIdentifier, int64(1),
 			"", models.AcrLevel1).Return(userSession, nil)
 
@@ -2282,6 +2306,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
+		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		// Positive control for the #129 gate, as in the subtest above.
@@ -2321,7 +2346,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
-		userSessionManager.On("HasValidUserSession", mock.Anything, (*models.UserSession)(nil), mock.AnythingOfType("*int")).Return(false)
+		userSessionManager.On("HasValidUserSession", (*models.UserSession)(nil), testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.AnythingOfType("*int64")).Return(false)
 
 		sessionAuthTime := time.Now().UTC()
 		newUserSession := &models.UserSession{
@@ -2372,6 +2397,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
+		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		// Positive control for the #129 gate, as in the two subtests above.
@@ -2410,7 +2436,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
-		userSessionManager.On("HasValidUserSession", mock.Anything, (*models.UserSession)(nil), mock.AnythingOfType("*int")).Return(false)
+		userSessionManager.On("HasValidUserSession", (*models.UserSession)(nil), testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.AnythingOfType("*int64")).Return(false)
 
 		sessionAuthTime := time.Now().UTC()
 		newUserSession := &models.UserSession{
@@ -2474,6 +2500,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
+		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		// An SSO ceremony: handler_authorize copied the session's user, methods and
@@ -2512,7 +2539,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
-		userSessionManager.On("HasValidUserSession", mock.Anything, (*models.UserSession)(nil), mock.AnythingOfType("*int")).Return(false)
+		userSessionManager.On("HasValidUserSession", (*models.UserSession)(nil), testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.AnythingOfType("*int64")).Return(false)
 
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateRequiresLevel1
@@ -2543,6 +2570,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		handler := HandleAuthCompletedGet(httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker)
 
 		req, _ := http.NewRequest("GET", "/auth/completed", nil)
+		req = withSessionSettings(req)
 		rr := httptest.NewRecorder()
 
 		// Decision 15's ceremony. An SSO reuse stepped up to level 2, so AuthMethods came
@@ -2582,7 +2610,7 @@ func TestHandleAuthCompletedGet(t *testing.T) {
 		}
 		database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
 
-		userSessionManager.On("HasValidUserSession", mock.Anything, (*models.UserSession)(nil), mock.AnythingOfType("*int")).Return(false)
+		userSessionManager.On("HasValidUserSession", (*models.UserSession)(nil), testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.AnythingOfType("*int64")).Return(false)
 
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateRequiresLevel1

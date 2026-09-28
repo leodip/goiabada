@@ -65,7 +65,7 @@ func stubRegisteredRedirectURI(database *mocks_data.Database, registered ...stri
 func stubAuthenticatedBrowser(database *mocks_data.Database, userSessionManager *mocks_handlers.UserSessionManager) {
 	database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.Anything).
 		Return(&models.UserSession{Id: 1, UserId: 1}, nil)
-	userSessionManager.On("HasValidUserSession", mock.Anything, mock.Anything, mock.Anything).
+	userSessionManager.On("HasValidUserSession", mock.Anything, mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.Anything).
 		Return(true)
 }
 
@@ -134,7 +134,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.AnythingOfType("string")).Return(userSession, nil)
 		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, userSession).Return(nil)
 
-		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
+		userSessionManager.On("HasValidUserSession", userSession, mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.AnythingOfType("*int64")).Return(true)
 
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateLevel1ExistingSession &&
@@ -210,7 +210,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, (*models.UserSession)(nil)).Return(nil)
 
-		userSessionManager.On("HasValidUserSession", mock.Anything, (*models.UserSession)(nil), mock.AnythingOfType("*int")).Return(false)
+		userSessionManager.On("HasValidUserSession", (*models.UserSession)(nil), mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.AnythingOfType("*int64")).Return(false)
 
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateRequiresLevel1
@@ -819,7 +819,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.AnythingOfType("string")).Return(userSession, nil)
 		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, userSession).Return(nil)
 
-		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
+		userSessionManager.On("HasValidUserSession", userSession, mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.AnythingOfType("*int64")).Return(true)
 
 		auditLogger.On("Log", mock.Anything, audit.AuditUserDisabled, mock.MatchedBy(func(details map[string]interface{}) bool {
 			return details["userId"] == int64(123)
@@ -929,7 +929,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.AnythingOfType("string")).Return(userSession, nil)
 		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, userSession).Return(nil)
 
-		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
+		userSessionManager.On("HasValidUserSession", userSession, mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.AnythingOfType("*int64")).Return(true)
 
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateLevel1ExistingSession &&
@@ -1007,7 +1007,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.AnythingOfType("string")).Return(nil, nil)
 		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, (*models.UserSession)(nil)).Return(nil)
-		userSessionManager.On("HasValidUserSession", mock.Anything, (*models.UserSession)(nil), mock.AnythingOfType("*int")).Return(false)
+		userSessionManager.On("HasValidUserSession", (*models.UserSession)(nil), mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.AnythingOfType("*int64")).Return(false)
 
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateRequiresLevel1
@@ -1155,7 +1155,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
 		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, (*models.UserSession)(nil)).Return(nil)
-		userSessionManager.On("HasValidUserSession", mock.Anything, (*models.UserSession)(nil), mock.Anything).Return(false)
+		userSessionManager.On("HasValidUserSession", (*models.UserSession)(nil), mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.Anything).Return(false)
 
 		handler.ServeHTTP(rr, req)
 
@@ -1226,7 +1226,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
 		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, (*models.UserSession)(nil)).Return(nil)
-		userSessionManager.On("HasValidUserSession", mock.Anything, (*models.UserSession)(nil), mock.Anything).Return(false)
+		userSessionManager.On("HasValidUserSession", (*models.UserSession)(nil), mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.Anything).Return(false)
 
 		handler.ServeHTTP(rr, req)
 
@@ -2265,7 +2265,7 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.AnythingOfType("string")).Return(nil, nil)
 		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, (*models.UserSession)(nil)).Return(nil)
 
-		userSessionManager.On("HasValidUserSession", mock.Anything, (*models.UserSession)(nil), mock.AnythingOfType("*int")).Return(false)
+		userSessionManager.On("HasValidUserSession", (*models.UserSession)(nil), mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.AnythingOfType("*int64")).Return(false)
 
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateRequiresLevel1
@@ -2335,7 +2335,7 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.AnythingOfType("string")).Return(nil, nil)
 		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, (*models.UserSession)(nil)).Return(nil)
 
-		userSessionManager.On("HasValidUserSession", mock.Anything, (*models.UserSession)(nil), mock.AnythingOfType("*int")).Return(false)
+		userSessionManager.On("HasValidUserSession", (*models.UserSession)(nil), mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.AnythingOfType("*int64")).Return(false)
 
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateRequiresLevel1
@@ -2468,7 +2468,7 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.AnythingOfType("string")).Return(nil, nil)
 		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, (*models.UserSession)(nil)).Return(nil)
 
-		userSessionManager.On("HasValidUserSession", mock.Anything, (*models.UserSession)(nil), mock.AnythingOfType("*int")).Return(false)
+		userSessionManager.On("HasValidUserSession", (*models.UserSession)(nil), mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.AnythingOfType("*int64")).Return(false)
 
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateRequiresLevel1
@@ -2882,7 +2882,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "session-123").Return(userSession, nil)
 		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, userSession).Return(nil)
 
-		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
+		userSessionManager.On("HasValidUserSession", userSession, mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.AnythingOfType("*int64")).Return(true)
 
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateLevel1ExistingSession && ac.UserId == 123
@@ -2974,7 +2974,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "session-123").Return(userSession, nil)
 		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, userSession).Return(nil)
 
-		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
+		userSessionManager.On("HasValidUserSession", userSession, mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.AnythingOfType("*int64")).Return(true)
 
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateLevel1ExistingSession && ac.UserId == 123
@@ -3068,7 +3068,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "session-456").Return(userSession, nil)
 		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, userSession).Return(nil)
 
-		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
+		userSessionManager.On("HasValidUserSession", userSession, mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.AnythingOfType("*int64")).Return(true)
 
 		authHelper.On("SaveAuthContext", rr, req, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateRequiresLevel1
@@ -3169,7 +3169,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "session-789").Return(userSession, nil)
 		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, userSession).Return(nil)
 
-		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
+		userSessionManager.On("HasValidUserSession", userSession, mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.AnythingOfType("*int64")).Return(true)
 
 		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, "openid", mock.MatchedBy(func(u *models.User) bool {
 			return u.Id == 789
@@ -3284,7 +3284,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "session-789").Return(userSession, nil)
 		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, userSession).Return(nil)
 
-		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
+		userSessionManager.On("HasValidUserSession", userSession, mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.AnythingOfType("*int64")).Return(true)
 
 		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, requestedScope, mock.MatchedBy(func(u *models.User) bool {
 			return u.Id == 789
@@ -3391,7 +3391,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "session-999").Return(userSession, nil)
 		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, userSession).Return(nil)
 
-		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
+		userSessionManager.On("HasValidUserSession", userSession, mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.AnythingOfType("*int64")).Return(true)
 
 		// Same sentinel as the "Invalid scopes" case, for handlePromptNone's own refusal
 		// closure: rr.Result() reads the header snapshot taken at commit time, so the sentinel
@@ -3487,7 +3487,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "session-999").Return(userSession, nil)
 		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, userSession).Return(nil)
 
-		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
+		userSessionManager.On("HasValidUserSession", userSession, mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.AnythingOfType("*int64")).Return(true)
 
 		// The refusal this path would otherwise send is login_required. With the clear failing,
 		// the client gets server_error instead: a silent-renewal iframe reads that as "retry
@@ -3587,7 +3587,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "session-999").Return(userSession, nil)
 		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, userSession).Return(nil)
 
-		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
+		userSessionManager.On("HasValidUserSession", userSession, mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.AnythingOfType("*int64")).Return(true)
 
 		authHelper.On("ClearAuthContext", rr, req).Return(errors.New("the session store is unreachable"))
 
@@ -3679,7 +3679,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "session-999").Return(userSession, nil)
 		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, userSession).Return(nil)
 
-		userSessionManager.On("HasValidUserSession", mock.Anything, userSession, mock.AnythingOfType("*int")).Return(true)
+		userSessionManager.On("HasValidUserSession", userSession, mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.AnythingOfType("*int64")).Return(true)
 
 		// The clear succeeds here, so it is the login_required refusal itself that cannot be
 		// committed. Site 2's second and pre-existing 500, pinned separately from the nested one
@@ -4040,7 +4040,7 @@ func TestHandleAuthorizeGet_AuthenticateBeforeRedirect_RoutingTable(t *testing.T
 			// silent, or whose redirect would be withheld anyway, never queries.
 			database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.Anything).
 				Return(&models.UserSession{Id: 1, UserId: 1}, nil).Maybe()
-			userSessionManager.On("HasValidUserSession", mock.Anything, mock.Anything, mock.Anything).
+			userSessionManager.On("HasValidUserSession", mock.Anything, mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.Anything).
 				Return(tc.hasSession).Maybe()
 
 			if tc.want != deferToLogin {
@@ -4237,7 +4237,7 @@ func TestHandleAuthorizeGet_ParkedDescriptionIsConformed(t *testing.T) {
 		customerrors.NewErrorDetailWithHttpStatusCode("invalid_scope",
 			"Invalid scope format: '💣'.", http.StatusBadRequest))
 	database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
-	userSessionManager.On("HasValidUserSession", mock.Anything, mock.Anything, mock.Anything).Return(false)
+	userSessionManager.On("HasValidUserSession", mock.Anything, mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.Anything).Return(false)
 
 	handler.ServeHTTP(rr, req)
 
@@ -4355,7 +4355,7 @@ func TestHandleAuthorizeGet_RegistrationReadDisagreesWithItself(t *testing.T) {
 
 			database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.Anything).
 				Return(&models.UserSession{Id: 1, UserId: 1}, nil).Maybe()
-			userSessionManager.On("HasValidUserSession", mock.Anything, mock.Anything, mock.Anything).
+			userSessionManager.On("HasValidUserSession", mock.Anything, mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.Anything).
 				Return(tc.hasSession).Maybe()
 
 			httpHelper.On("RenderTemplate", rr, req, "/layouts/no_menu_layout.html",

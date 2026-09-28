@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/apiresponse"
 	"github.com/leodip/goiabada/authserver/internal/constants"
@@ -291,7 +292,7 @@ func RequireValidSession(database apiAuthDatabase) func(http.Handler) http.Handl
 					"sid", sid)
 				return
 			}
-			if !session.IsValid(settings.UserSessionIdleTimeoutInSeconds, settings.UserSessionMaxLifetimeInSeconds, nil) {
+			if !session.IsValid(time.Now().UTC(), settings.UserSessionIdleTimeoutInSeconds, settings.UserSessionMaxLifetimeInSeconds, nil) {
 				slog.WarnContext(r.Context(), "rejecting bearer token: underlying user session has expired",
 					"session_identifier", sid, "session_id", session.Id)
 				rejectInvalidToken(w, "Session has expired")

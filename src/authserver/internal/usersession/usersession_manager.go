@@ -45,31 +45,36 @@ type userSessionStore interface {
 	Regenerate(w http.ResponseWriter, r *http.Request, session *sessionstore.Session) error
 }
 
-type UserSessionManager struct {
+// Manager creates, bumps and judges the user sessions a browser signs in to.
+type Manager struct {
 	sessionStore userSessionStore
 	sessionName  string
 	database     userSessionManagerDatabase
+	// now is the clock HasValidUserSession judges a session against, a field so a test can fix
+	// it, as sessionbackend's is.
+	now func() time.Time
 }
 
-func NewUserSessionManager(sessionStore userSessionStore, sessionName string, database userSessionManagerDatabase) *UserSessionManager {
-	return &UserSessionManager{
+func NewManager(sessionStore userSessionStore, sessionName string, database userSessionManagerDatabase) *Manager {
+	return &Manager{
 		sessionStore: sessionStore,
 		sessionName:  sessionName,
 		database:     database,
+		now:          func() time.Time { return time.Now().UTC() },
 	}
 }
 
-func (u *UserSessionManager) HasValidUserSession(ctx context.Context, userSession *models.UserSession, requestedMaxAgeInSeconds *int) bool {
+// HasValidUserSession reports whether userSession exists and may still be used: the two
+// session lifetimes are the caller's settings, and requestedMaxAgeInSeconds is the client's
+// max_age, nil when it sent none. It reads nothing from a context, so a caller that holds the
+// settings passes the two values it means (#433).
+func (u *Manager) HasValidUserSession(userSession *models.UserSession, idleTimeoutInSeconds int,
+	maxLifetimeInSeconds int, requestedMaxAgeInSeconds *int64) bool {
 
-	settings := ctx.Value(constants.ContextKeySettings).(*models.Settings)
-
-	isValid := false
-	if userSession != nil {
-		isValid = userSession.IsValid(settings.UserSessionIdleTimeoutInSeconds,
-			settings.UserSessionMaxLifetimeInSeconds, requestedMaxAgeInSeconds)
+	if userSession == nil {
+		return false
 	}
-
-	return isValid
+	return userSession.IsValid(u.now(), idleTimeoutInSeconds, maxLifetimeInSeconds, requestedMaxAgeInSeconds)
 }
 
 // StartNewUserSession creates a session for a completed authentication ceremony.
@@ -100,7 +105,7 @@ func (u *UserSessionManager) HasValidUserSession(ctx context.Context, userSessio
 // produce it, because /auth/completed refuses to mint a session without Level1AuthCompleted
 // and only the password handler sets that, alongside authenticatedAt; the refusal is what
 // makes that invariant fail closed rather than an argument in a comment.
-func (u *UserSessionManager) StartNewUserSession(w http.ResponseWriter, r *http.Request,
+func (u *Manager) StartNewUserSession(w http.ResponseWriter, r *http.Request,
 	userId int64, clientId int64, authMethods string, acrLevel models.AcrLevel,
 	authStateGeneration int64, otpConfigGeneration *int64,
 	authenticatedAt *time.Time) (*models.UserSession, error) {
@@ -274,7 +279,7 @@ func (u *UserSessionManager) StartNewUserSession(w http.ResponseWriter, r *http.
 // browser-store write staged inside the transaction, which it cannot be while a rerun can double
 // the Set-Cookie. Revisit if the store gains a two-phase write that can be prepared before the
 // commit and completed after it (#198).
-func (u *UserSessionManager) abandonUserSession(ctx context.Context, userSession *models.UserSession, cause error) error {
+func (u *Manager) abandonUserSession(ctx context.Context, userSession *models.UserSession, cause error) error {
 	// The caller's VALUES, deliberately not the caller's cancellation, because the cancellation
 	// and the failure this compensates for are the same event: net/http cancels a request's
 	// context the instant the client disconnects, and a disconnected client is exactly why a
@@ -307,7 +312,7 @@ func (u *UserSessionManager) abandonUserSession(ctx context.Context, userSession
 //     If this differs from the session's current AuthMethods, the session is updated.
 //   - acrLevel: The target ACR level for the current auth flow.
 //     The session's ACR is only upgraded (never downgraded) to maintain security guarantees.
-func (u *UserSessionManager) BumpUserSession(r *http.Request, sessionIdentifier string, clientId int64,
+func (u *Manager) BumpUserSession(r *http.Request, sessionIdentifier string, clientId int64,
 	authMethods string, acrLevel models.AcrLevel) (*models.UserSession, error) {
 
 	userSession, err := u.database.GetUserSessionBySessionIdentifier(r.Context(), nil, sessionIdentifier)

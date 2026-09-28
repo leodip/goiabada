@@ -10,7 +10,6 @@
 package mocks_handlers
 
 import (
-	"context"
 	"net/http"
 	"time"
 
@@ -141,16 +140,16 @@ func (_c *UserSessionManager_BumpUserSession_Call) RunAndReturn(run func(r *http
 }
 
 // HasValidUserSession provides a mock function for the type UserSessionManager
-func (_mock *UserSessionManager) HasValidUserSession(ctx context.Context, userSession *models.UserSession, requestedMaxAgeInSeconds *int) bool {
-	ret := _mock.Called(ctx, userSession, requestedMaxAgeInSeconds)
+func (_mock *UserSessionManager) HasValidUserSession(userSession *models.UserSession, idleTimeoutInSeconds int, maxLifetimeInSeconds int, requestedMaxAgeInSeconds *int64) bool {
+	ret := _mock.Called(userSession, idleTimeoutInSeconds, maxLifetimeInSeconds, requestedMaxAgeInSeconds)
 
 	if len(ret) == 0 {
 		panic("no return value specified for HasValidUserSession")
 	}
 
 	var r0 bool
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *models.UserSession, *int) bool); ok {
-		r0 = returnFunc(ctx, userSession, requestedMaxAgeInSeconds)
+	if returnFunc, ok := ret.Get(0).(func(*models.UserSession, int, int, *int64) bool); ok {
+		r0 = returnFunc(userSession, idleTimeoutInSeconds, maxLifetimeInSeconds, requestedMaxAgeInSeconds)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
@@ -163,31 +162,37 @@ type UserSessionManager_HasValidUserSession_Call struct {
 }
 
 // HasValidUserSession is a helper method to define mock.On call
-//   - ctx context.Context
 //   - userSession *models.UserSession
-//   - requestedMaxAgeInSeconds *int
-func (_e *UserSessionManager_Expecter) HasValidUserSession(ctx any, userSession any, requestedMaxAgeInSeconds any) *UserSessionManager_HasValidUserSession_Call {
-	return &UserSessionManager_HasValidUserSession_Call{Call: _e.mock.On("HasValidUserSession", ctx, userSession, requestedMaxAgeInSeconds)}
+//   - idleTimeoutInSeconds int
+//   - maxLifetimeInSeconds int
+//   - requestedMaxAgeInSeconds *int64
+func (_e *UserSessionManager_Expecter) HasValidUserSession(userSession any, idleTimeoutInSeconds any, maxLifetimeInSeconds any, requestedMaxAgeInSeconds any) *UserSessionManager_HasValidUserSession_Call {
+	return &UserSessionManager_HasValidUserSession_Call{Call: _e.mock.On("HasValidUserSession", userSession, idleTimeoutInSeconds, maxLifetimeInSeconds, requestedMaxAgeInSeconds)}
 }
 
-func (_c *UserSessionManager_HasValidUserSession_Call) Run(run func(ctx context.Context, userSession *models.UserSession, requestedMaxAgeInSeconds *int)) *UserSessionManager_HasValidUserSession_Call {
+func (_c *UserSessionManager_HasValidUserSession_Call) Run(run func(userSession *models.UserSession, idleTimeoutInSeconds int, maxLifetimeInSeconds int, requestedMaxAgeInSeconds *int64)) *UserSessionManager_HasValidUserSession_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 context.Context
+		var arg0 *models.UserSession
 		if args[0] != nil {
-			arg0 = args[0].(context.Context)
+			arg0 = args[0].(*models.UserSession)
 		}
-		var arg1 *models.UserSession
+		var arg1 int
 		if args[1] != nil {
-			arg1 = args[1].(*models.UserSession)
+			arg1 = args[1].(int)
 		}
-		var arg2 *int
+		var arg2 int
 		if args[2] != nil {
-			arg2 = args[2].(*int)
+			arg2 = args[2].(int)
+		}
+		var arg3 *int64
+		if args[3] != nil {
+			arg3 = args[3].(*int64)
 		}
 		run(
 			arg0,
 			arg1,
 			arg2,
+			arg3,
 		)
 	})
 	return _c
@@ -198,7 +203,7 @@ func (_c *UserSessionManager_HasValidUserSession_Call) Return(b bool) *UserSessi
 	return _c
 }
 
-func (_c *UserSessionManager_HasValidUserSession_Call) RunAndReturn(run func(ctx context.Context, userSession *models.UserSession, requestedMaxAgeInSeconds *int) bool) *UserSessionManager_HasValidUserSession_Call {
+func (_c *UserSessionManager_HasValidUserSession_Call) RunAndReturn(run func(userSession *models.UserSession, idleTimeoutInSeconds int, maxLifetimeInSeconds int, requestedMaxAgeInSeconds *int64) bool) *UserSessionManager_HasValidUserSession_Call {
 	_c.Call.Return(run)
 	return _c
 }

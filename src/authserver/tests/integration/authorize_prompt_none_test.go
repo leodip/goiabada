@@ -50,6 +50,45 @@ func TestPromptNone_MaxAge0_ReturnsLoginRequired(t *testing.T) {
 	assert.Equal(t, requestState, state)
 }
 
+// TestAuthorize_MalformedMaxAge_ReturnsInvalidRequest: a max_age that is not a non-negative
+// integer is an invalid parameter value, answered with invalid_request (RFC 6749 4.1.2.1). Both a
+// silent request and an interactive one from a browser holding a valid session are answered at
+// once, per #213's rule. Before #243 the value was parsed with strconv.Atoi and a failure
+// dropped, so "abc" silently constrained nothing and the silent request below was issued a code.
+func TestAuthorize_MalformedMaxAge_ReturnsInvalidRequest(t *testing.T) {
+	httpClient, client, redirectUri, _ := createSessionWithAcrLevel1(t)
+
+	for _, prompt := range []string{"&prompt=none", ""} {
+		for _, maxAge := range []string{"abc", "-1", "+5"} {
+			t.Run("max_age="+maxAge+prompt, func(t *testing.T) {
+				requestState := fake.LetterN(8)
+				destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+					"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+					"&response_type=code" +
+					"&code_challenge_method=S256" +
+					"&code_challenge=" + fake.LetterN(43) +
+					"&scope=" + url.QueryEscape("openid profile") +
+					"&state=" + requestState +
+					"&max_age=" + url.QueryEscape(maxAge) +
+					prompt
+
+				resp, err := httpClient.Get(destUrl)
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer func() { _ = resp.Body.Close() }()
+
+				assert.Equal(t, http.StatusFound, resp.StatusCode)
+
+				errorCode, errorDescription, state := getErrorFromUrl(t, resp)
+				assert.Equal(t, "invalid_request", errorCode)
+				assert.Equal(t, "The max_age parameter must be a non-negative integer.", errorDescription)
+				assert.Equal(t, requestState, state)
+			})
+		}
+	}
+}
+
 func TestPromptNone_AcrStepUpNeeded_ReturnsInteractionRequired(t *testing.T) {
 	// Create session at level1
 	httpClient, client, redirectUri, user := createSessionWithAcrLevel1(t)

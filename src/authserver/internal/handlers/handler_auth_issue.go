@@ -284,10 +284,12 @@ func HandleIssueGet(
 		// nil for the requested max age, and that is decision 1 rather than an omission. max_age
 		// bounds the age of the AUTHENTICATION, which this ceremony already satisfied at
 		// /auth/completed; re-applying it here would turn it into a deadline for reading the
-		// consent screen. UserSession.IsValid measures it from Started, so max_age=0 is violated
-		// a microsecond later and every such ceremony would restart at level 1, mint a fresh
-		// session and fail again (#241).
-		sessionIsValid := userSessionManager.HasValidUserSession(r.Context(), ambientSession, nil)
+		// consent screen. UserSession.IsValid measures it from the session's AuthTime, so
+		// max_age=0 is violated a nanosecond after the credential was accepted and every such
+		// ceremony would restart at level 1, mint a fresh session and fail again (#241).
+		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
+		sessionIsValid := userSessionManager.HasValidUserSession(ambientSession,
+			settings.UserSessionIdleTimeoutInSeconds, settings.UserSessionMaxLifetimeInSeconds, nil)
 
 		// The conjunction goes ABOVE the implicit exemption, not below it.
 		// HasValidUserSession answers false for a nil session, so folding it in afterwards would
@@ -422,7 +424,7 @@ func HandleIssueGet(
 		*scopeField = effectiveScope
 
 		if isImplicitFlow {
-			err = handleImplicitFlow(w, r, authContext, sessionIdentifier, issuingClient, user, authHelper, tokenIssuer, auditLogger)
+			err = handleImplicitFlow(w, r, authContext, sessionIdentifier, issuingClient, user, settings, authHelper, tokenIssuer, auditLogger)
 			if err != nil {
 				httpHelper.InternalServerError(w, r, err)
 			}
@@ -718,6 +720,7 @@ func handleImplicitFlow(
 	sessionIdentifier string,
 	client *models.Client,
 	user *models.User,
+	settings *models.Settings,
 	authHelper AuthHelper,
 	tokenIssuer TokenIssuer,
 	auditLogger AuditLogger,
@@ -754,7 +757,6 @@ func handleImplicitFlow(
 		AuthStateGeneration: authContext.AuthStateGeneration,
 	}
 
-	settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
 	tokenResponse, err := tokenIssuer.GenerateTokenResponseForImplicit(r.Context(), settings, implicitInput, issueAccessToken, issueIdToken)
 	if err != nil {
 		return err

@@ -55,7 +55,7 @@ func armIssueGate(database *mocks_data.Database, userSessionManager *mocks_handl
 		}).Return(nil).Maybe()
 	database.On("GetUserById", mock.Anything, mock.Anything, mock.Anything).
 		Return(&models.User{Id: 1, Subject: fake.UUID()}, nil).Maybe()
-	userSessionManager.On("HasValidUserSession", mock.Anything, mock.Anything, mock.Anything).
+	userSessionManager.On("HasValidUserSession", mock.Anything, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.Anything).
 		Return(true).Maybe()
 	permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, mock.Anything, mock.Anything).
 		Return(func(_ context.Context, scope string, _ *models.User) string { return scope }, nil).Maybe()
@@ -77,6 +77,8 @@ func TestHandleIssueGet(t *testing.T) {
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
+
+		req = withSessionSettings(req)
 
 		rr := httptest.NewRecorder()
 
@@ -108,6 +110,8 @@ func TestHandleIssueGet(t *testing.T) {
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
+
+		req = withSessionSettings(req)
 
 		rr := httptest.NewRecorder()
 
@@ -238,6 +242,7 @@ func TestHandleIssueGet(t *testing.T) {
 		// refresh token with a max lifetime and no session to check.
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
+		req = withSessionSettings(req)
 
 		rr := httptest.NewRecorder()
 
@@ -345,6 +350,7 @@ func TestHandleIssueGet(t *testing.T) {
 		// form, which this request forbids (#129 decision 16).
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
+		req = withSessionSettings(req)
 
 		rr := httptest.NewRecorder()
 
@@ -416,6 +422,8 @@ func TestHandleIssueGet(t *testing.T) {
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
 
+		req = withSessionSettings(req)
+
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
@@ -481,6 +489,8 @@ func TestHandleIssueGet(t *testing.T) {
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
 
+		req = withSessionSettings(req)
+
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
@@ -535,6 +545,8 @@ func TestHandleIssueGet(t *testing.T) {
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
+
+		req = withSessionSettings(req)
 
 		rr := httptest.NewRecorder()
 
@@ -1506,7 +1518,8 @@ func requestWithSessionIdentifier(t *testing.T, sessionIdentifier string) *http.
 	t.Helper()
 	req, err := http.NewRequest("GET", "/auth/issue", nil)
 	assert.NoError(t, err)
-	return withSettings(req.WithContext(reqctx.WithSessionIdentifier(req.Context(), sessionIdentifier)), &models.Settings{})
+	req = withSessionSettings(req)
+	return withSessionSettings(req.WithContext(reqctx.WithSessionIdentifier(req.Context(), sessionIdentifier)))
 }
 
 // stubLiveSession makes the ownership check pass, which is the precondition for reaching
@@ -1685,8 +1698,10 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
+
 		// The issuer is handed the request's own settings, matched by identity below.
-		requestSettings := &models.Settings{Issuer: "https://issuer.example"}
+		requestSettings := &models.Settings{Issuer: "https://issuer.example",
+			UserSessionIdleTimeoutInSeconds: testIdleTimeoutInSeconds, UserSessionMaxLifetimeInSeconds: testMaxLifetimeInSeconds}
 		req = withSettings(req, requestSettings)
 
 		rr := httptest.NewRecorder()
@@ -1781,7 +1796,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
-		req = withSettings(req, &models.Settings{})
+		req = withSessionSettings(req)
 
 		rr := httptest.NewRecorder()
 
@@ -1866,7 +1881,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
-		req = withSettings(req, &models.Settings{})
+		req = withSessionSettings(req)
 
 		rr := httptest.NewRecorder()
 
@@ -1956,7 +1971,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
-		req = withSettings(req, &models.Settings{})
+		req = withSessionSettings(req)
 
 		rr := httptest.NewRecorder()
 
@@ -2023,6 +2038,8 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
 
+		req = withSessionSettings(req)
+
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
@@ -2078,6 +2095,8 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
 
+		req = withSessionSettings(req)
+
 		rr := httptest.NewRecorder()
 
 		authContext := &ceremony.AuthContext{
@@ -2122,7 +2141,7 @@ func TestHandleIssueGet_ImplicitFlow(t *testing.T) {
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
-		req = withSettings(req, &models.Settings{})
+		req = withSessionSettings(req)
 
 		rr := httptest.NewRecorder()
 
@@ -2162,6 +2181,7 @@ func TestIssueImplicitTokens(t *testing.T) {
 	t.Run("Access token only", func(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/auth/issue", nil)
+		r = withSessionSettings(r)
 
 		tokenResponse := &issuance.ImplicitGrantResponse{
 			AccessToken: "access-token-123",
@@ -2187,6 +2207,7 @@ func TestIssueImplicitTokens(t *testing.T) {
 	t.Run("ID token only", func(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/auth/issue", nil)
+		r = withSessionSettings(r)
 
 		tokenResponse := &issuance.ImplicitGrantResponse{
 			IdToken: "id-token-123",
@@ -2210,6 +2231,7 @@ func TestIssueImplicitTokens(t *testing.T) {
 	t.Run("Both access token and ID token", func(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/auth/issue", nil)
+		r = withSessionSettings(r)
 
 		tokenResponse := &issuance.ImplicitGrantResponse{
 			AccessToken: "access-token-123",
@@ -2235,6 +2257,7 @@ func TestIssueImplicitTokens(t *testing.T) {
 	t.Run("No state parameter", func(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/auth/issue", nil)
+		r = withSessionSettings(r)
 
 		tokenResponse := &issuance.ImplicitGrantResponse{
 			AccessToken: "access-token-123",
@@ -2262,6 +2285,7 @@ func TestIssueImplicitTokens(t *testing.T) {
 	t.Run("State with whitespace only is echoed exactly", func(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/auth/issue", nil)
+		r = withSessionSettings(r)
 
 		tokenResponse := &issuance.ImplicitGrantResponse{
 			AccessToken: "access-token-123",
@@ -2283,6 +2307,7 @@ func TestIssueImplicitTokens(t *testing.T) {
 	t.Run("A state is echoed byte for byte", func(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/auth/issue", nil)
+		r = withSessionSettings(r)
 
 		tokenResponse := &issuance.ImplicitGrantResponse{
 			AccessToken: "access-token-123",
@@ -2304,6 +2329,7 @@ func TestIssueImplicitTokens(t *testing.T) {
 	t.Run("A registered query is left alone, state included", func(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/auth/issue", nil)
+		r = withSessionSettings(r)
 
 		tokenResponse := &issuance.ImplicitGrantResponse{
 			AccessToken: "access-token-123",
@@ -2321,6 +2347,7 @@ func TestIssueImplicitTokens(t *testing.T) {
 	t.Run("No scope in response", func(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/auth/issue", nil)
+		r = withSessionSettings(r)
 
 		tokenResponse := &issuance.ImplicitGrantResponse{
 			AccessToken: "access-token-123",
@@ -2372,6 +2399,7 @@ func TestIssueImplicitTokens(t *testing.T) {
 			t.Run(tc.name, func(t *testing.T) {
 				w := httptest.NewRecorder()
 				r := httptest.NewRequest("GET", "/auth/issue", nil)
+				r = withSessionSettings(r)
 
 				tokenResponse := &issuance.ImplicitGrantResponse{
 					AccessToken: "access-token-123",
@@ -2407,6 +2435,8 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
+
+		req = withSessionSettings(req)
 
 		rr := httptest.NewRecorder()
 
@@ -2450,6 +2480,8 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
+
+		req = withSessionSettings(req)
 
 		rr := httptest.NewRecorder()
 
@@ -2496,7 +2528,7 @@ func TestHandleIssueGet_ImplicitFlow_DatabaseErrors(t *testing.T) {
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
-		req = withSettings(req, &models.Settings{})
+		req = withSessionSettings(req)
 
 		rr := httptest.NewRecorder()
 
@@ -2617,6 +2649,7 @@ func TestIssueAuthCode(t *testing.T) {
 	t.Run("Query response mode", func(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/auth/issue", nil)
+		r = withSessionSettings(r)
 		code := &models.Code{
 			Code:        "test_code",
 			RedirectURI: "https://example.com/callback",
@@ -2633,6 +2666,7 @@ func TestIssueAuthCode(t *testing.T) {
 	t.Run("Fragment response mode", func(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/auth/issue", nil)
+		r = withSessionSettings(r)
 		code := &models.Code{
 			Code:        "test_code",
 			RedirectURI: "https://example.com/callback",
@@ -2649,6 +2683,7 @@ func TestIssueAuthCode(t *testing.T) {
 	t.Run("Form post response mode", func(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/auth/issue", nil)
+		r = withSessionSettings(r)
 		code := &models.Code{
 			Code:        "test_code",
 			RedirectURI: "https://example.com/callback",
@@ -2674,6 +2709,7 @@ func TestIssueAuthCode(t *testing.T) {
 	t.Run("Default to query response mode", func(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/auth/issue", nil)
+		r = withSessionSettings(r)
 		code := &models.Code{
 			Code:        "test_code",
 			RedirectURI: "https://example.com/callback",
@@ -2690,6 +2726,7 @@ func TestIssueAuthCode(t *testing.T) {
 	t.Run("Error parsing template", func(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/auth/issue", nil)
+		r = withSessionSettings(r)
 		code := &models.Code{
 			Code:        "test_code",
 			RedirectURI: "https://example.com/callback",
@@ -2755,6 +2792,7 @@ func TestIssueAuthCode(t *testing.T) {
 				t.Run(tc.name+", response_mode "+mode.name, func(t *testing.T) {
 					w := httptest.NewRecorder()
 					r := httptest.NewRequest("GET", "/auth/issue", nil)
+					r = withSessionSettings(r)
 					code := &models.Code{
 						Code:        "test_code",
 						RedirectURI: tc.redirectURI,
@@ -2793,6 +2831,7 @@ func TestIssueAuthCode(t *testing.T) {
 	t.Run("A registered query survives the addition of code and state", func(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/auth/issue", nil)
+		r = withSessionSettings(r)
 		code := &models.Code{
 			Code:        "test_code",
 			RedirectURI: "http://127.0.0.1/cb?a=1",
@@ -2823,6 +2862,7 @@ func TestIssueAuthCode_RegisteredQuery(t *testing.T) {
 	t.Run("query mode replaces a registered state and keeps the rest", func(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/auth/issue", nil)
+		r = withSessionSettings(r)
 		code := &models.Code{
 			Code:        "test_code",
 			RedirectURI: "https://example.com/callback?state=fixed&lang=en",
@@ -2841,6 +2881,7 @@ func TestIssueAuthCode_RegisteredQuery(t *testing.T) {
 	t.Run("query mode replaces a registered code as well", func(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/auth/issue", nil)
+		r = withSessionSettings(r)
 		code := &models.Code{
 			Code:        "test_code",
 			RedirectURI: "https://example.com/callback?code=stale",
@@ -2861,6 +2902,7 @@ func TestIssueAuthCode_RegisteredQuery(t *testing.T) {
 	t.Run("query mode preserves a registered query that does not round-trip", func(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/auth/issue", nil)
+		r = withSessionSettings(r)
 		code := &models.Code{
 			Code:        "test_code",
 			RedirectURI: "https://example.com/callback?lang=en;mode=dark",
@@ -2880,6 +2922,7 @@ func TestIssueAuthCode_RegisteredQuery(t *testing.T) {
 	t.Run("fragment mode leaves the registered query alone", func(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/auth/issue", nil)
+		r = withSessionSettings(r)
 		code := &models.Code{
 			Code:        "test_code",
 			RedirectURI: "https://example.com/callback?state=fixed&lang=en",
@@ -2902,6 +2945,7 @@ func TestIssueAuthCode_RegisteredQuery(t *testing.T) {
 	t.Run("query mode drops a registered state the request did not supply", func(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/auth/issue", nil)
+		r = withSessionSettings(r)
 		code := &models.Code{
 			Code:        "test_code",
 			RedirectURI: "https://example.com/callback?state=fixed&lang=en",
@@ -2921,6 +2965,7 @@ func TestIssueAuthCode_RegisteredQuery(t *testing.T) {
 	t.Run("query mode drops a registered error from a success response", func(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/auth/issue", nil)
+		r = withSessionSettings(r)
 		code := &models.Code{
 			Code:        "test_code",
 			RedirectURI: "https://example.com/callback?error=stale&error_description=stale-detail&lang=en",
@@ -2951,6 +2996,7 @@ func TestIssueAuthCode_StateEmission(t *testing.T) {
 	t.Run("an empty state is omitted in query mode", func(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/auth/issue", nil)
+		r = withSessionSettings(r)
 		code := &models.Code{Code: "test_code", RedirectURI: "https://example.com/callback"}
 
 		err := issueAuthCode(w, r, nil, code, "query")
@@ -2962,6 +3008,7 @@ func TestIssueAuthCode_StateEmission(t *testing.T) {
 	t.Run("an empty state is omitted in fragment mode", func(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/auth/issue", nil)
+		r = withSessionSettings(r)
 		code := &models.Code{Code: "test_code", RedirectURI: "https://example.com/callback"}
 
 		err := issueAuthCode(w, r, nil, code, "fragment")
@@ -2973,6 +3020,7 @@ func TestIssueAuthCode_StateEmission(t *testing.T) {
 	t.Run("a whitespace-only state is echoed exactly in query mode", func(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/auth/issue", nil)
+		r = withSessionSettings(r)
 		code := &models.Code{Code: "test_code", RedirectURI: "https://example.com/callback", State: "   "}
 
 		err := issueAuthCode(w, r, nil, code, "query")
@@ -2984,6 +3032,7 @@ func TestIssueAuthCode_StateEmission(t *testing.T) {
 	t.Run("a whitespace-only state is echoed exactly in fragment mode", func(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/auth/issue", nil)
+		r = withSessionSettings(r)
 		code := &models.Code{Code: "test_code", RedirectURI: "https://example.com/callback", State: "   "}
 
 		err := issueAuthCode(w, r, nil, code, "fragment")
@@ -3004,6 +3053,7 @@ func TestIssueAuthCode_ByteExactState(t *testing.T) {
 	t.Run("query mode", func(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/auth/issue", nil)
+		r = withSessionSettings(r)
 		code := &models.Code{Code: "test_code", RedirectURI: "https://example.com/callback", State: state}
 
 		err := issueAuthCode(w, r, nil, code, "query")
@@ -3016,6 +3066,7 @@ func TestIssueAuthCode_ByteExactState(t *testing.T) {
 	t.Run("fragment mode", func(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/auth/issue", nil)
+		r = withSessionSettings(r)
 		code := &models.Code{Code: "test_code", RedirectURI: "https://example.com/callback", State: state}
 
 		err := issueAuthCode(w, r, nil, code, "fragment")
@@ -3028,6 +3079,7 @@ func TestIssueAuthCode_ByteExactState(t *testing.T) {
 	t.Run("form_post mode", func(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/auth/issue", nil)
+		r = withSessionSettings(r)
 		code := &models.Code{Code: "test_code", RedirectURI: "https://example.com/callback", State: state}
 
 		// form_post carries the value in a form field rather than a URI, so what has to survive is
@@ -3055,6 +3107,7 @@ func TestIssueAuthCode_FormPostIsNotCacheable(t *testing.T) {
 	t.Run("both headers are set on a rendered page", func(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/auth/issue", nil)
+		r = withSessionSettings(r)
 		code := &models.Code{Code: "test_code", RedirectURI: "https://example.com/callback", State: "abc123"}
 
 		templateFS := fstest.MapFS{
@@ -3071,6 +3124,7 @@ func TestIssueAuthCode_FormPostIsNotCacheable(t *testing.T) {
 	t.Run("neither header is set when the render failed", func(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/auth/issue", nil)
+		r = withSessionSettings(r)
 		code := &models.Code{Code: "test_code", RedirectURI: "https://example.com/callback", State: "abc123"}
 
 		// The companion to the buffering case below. A failed render must leave the response
@@ -3100,6 +3154,7 @@ func TestIssueAuthCode_FormPostIsNotCacheable(t *testing.T) {
 func TestIssueAuthCode_FormPostRenderIsBuffered(t *testing.T) {
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("GET", "/auth/issue", nil)
+	r = withSessionSettings(r)
 	code := &models.Code{Code: "test_code", RedirectURI: "https://example.com/callback", State: "abc123"}
 
 	// Parses cleanly and fails at the index call, after the prefix has been walked. Rendering
@@ -3158,6 +3213,7 @@ func TestFormPostBindMapOmitsAnAbsentState(t *testing.T) {
 			t.Run(tc.name, func(t *testing.T) {
 				w := httptest.NewRecorder()
 				r := httptest.NewRequest("GET", "/auth/issue", nil)
+				r = withSessionSettings(r)
 				code := &models.Code{Code: "test_code", RedirectURI: "https://example.com/callback", State: tc.state}
 
 				templateFS := fstest.MapFS{
@@ -3185,6 +3241,7 @@ func TestFormPostBindMapOmitsAnAbsentState(t *testing.T) {
 			t.Run(tc.name, func(t *testing.T) {
 				w := httptest.NewRecorder()
 				r := httptest.NewRequest("GET", "/auth/authorize", nil)
+				r = withSessionSettings(r)
 
 				templateFS := fstest.MapFS{
 					"form_post.html": {Data: []byte(keysTemplate)},
@@ -3228,6 +3285,7 @@ func TestFormPostTemplateOmitsAnAbsentState(t *testing.T) {
 			t.Run(tc.name, func(t *testing.T) {
 				w := httptest.NewRecorder()
 				r := httptest.NewRequest("GET", "/auth/issue", nil)
+				r = withSessionSettings(r)
 				code := &models.Code{Code: "test_code", RedirectURI: "https://example.com/callback", State: tc.state}
 
 				err := issueAuthCode(w, r, web.TemplateFS(), code, "form_post")
@@ -3260,6 +3318,7 @@ func TestFormPostTemplateOmitsAnAbsentState(t *testing.T) {
 			t.Run(tc.name, func(t *testing.T) {
 				w := httptest.NewRecorder()
 				r := httptest.NewRequest("GET", "/auth/authorize", nil)
+				r = withSessionSettings(r)
 
 				err := redirToClientWithError(w, r,
 					testRegisteredDatabase(t, "https://example.com/callback"), nil, web.TemplateFS(),
@@ -3383,6 +3442,8 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
 
+		req = withSessionSettings(req)
+
 		rr := httptest.NewRecorder()
 
 		// Create authContext with IdTokenHintSub for user A
@@ -3465,6 +3526,8 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
 
+		req = withSessionSettings(req)
+
 		rr := httptest.NewRecorder()
 
 		userASubject := "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
@@ -3540,6 +3603,8 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
 
+		req = withSessionSettings(req)
+
 		rr := httptest.NewRecorder()
 
 		userASubject := "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
@@ -3606,6 +3671,8 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
+
+		req = withSessionSettings(req)
 
 		rr := httptest.NewRecorder()
 
@@ -3745,6 +3812,8 @@ func TestHandleIssueGet_IdTokenHintSubMatching(t *testing.T) {
 
 		req, err := http.NewRequest("GET", "/auth/issue", nil)
 		assert.NoError(t, err)
+
+		req = withSessionSettings(req)
 
 		rr := httptest.NewRecorder()
 
@@ -3921,7 +3990,7 @@ func TestHandleIssueGet_RedirectURIRecheck(t *testing.T) {
 			// its own merits. A refused row touches none of these, which is why they are Maybe().
 			database.On("GetUserSessionBySessionIdentifier", mock.Anything, (*sql.Tx)(nil), liveSessionIdentifier).
 				Return(&models.UserSession{Id: 55, SessionIdentifier: liveSessionIdentifier, UserId: 123}, nil).Maybe()
-			userSessionManager.On("HasValidUserSession", mock.Anything, mock.Anything, mock.Anything).Return(true).Maybe()
+			userSessionManager.On("HasValidUserSession", mock.Anything, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.Anything).Return(true).Maybe()
 			database.On("GetUserById", mock.Anything, mock.Anything, int64(123)).
 				Return(&models.User{Id: 123, Subject: fake.UUID(), Enabled: true}, nil).Maybe()
 			permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, mock.Anything, mock.Anything).
@@ -4097,11 +4166,11 @@ func TestHandleIssueGet_ExpiredAmbientSession(t *testing.T) {
 			stubLiveSession(database, 123)
 
 			// The one thing that refuses it, and nil is what says max_age is not re-applied.
-			userSessionManager.On("HasValidUserSession", mock.Anything,
+			userSessionManager.On("HasValidUserSession",
 				mock.MatchedBy(func(session *models.UserSession) bool {
 					return session != nil && session.SessionIdentifier == liveSessionIdentifier
 				}),
-				(*int)(nil)).Return(false)
+				testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, (*int64)(nil)).Return(false)
 
 			auditLogger.On("Log", mock.Anything, audit.AuditIssuanceRefusedSessionInvalid, mock.MatchedBy(func(details map[string]interface{}) bool {
 				return details["userId"] == int64(123) &&
@@ -4244,7 +4313,7 @@ func TestHandleIssueGet_ScopeRefilter(t *testing.T) {
 				}).Return(nil)
 
 			stubLiveSession(database, 123)
-			userSessionManager.On("HasValidUserSession", mock.Anything, mock.Anything, mock.Anything).Return(true)
+			userSessionManager.On("HasValidUserSession", mock.Anything, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.Anything).Return(true)
 
 			user := &models.User{Id: 123, Subject: fake.UUID(), Enabled: true}
 			database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(user, nil)
@@ -4390,7 +4459,7 @@ func TestHandleIssueGet_TheLiveChecksFailClosedOnAStorageError(t *testing.T) {
 			database.On("GetClientByClientIdentifier", mock.Anything, (*sql.Tx)(nil), "test-client").Return(issuingClient, nil)
 
 			// Only reached on the second row, and only because its own arming got that far.
-			userSessionManager.On("HasValidUserSession", mock.Anything, mock.Anything, mock.Anything).
+			userSessionManager.On("HasValidUserSession", mock.Anything, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.Anything).
 				Return(true).Maybe()
 
 			tc.arm(database, permissionChecker, issuingClient)
@@ -4609,7 +4678,7 @@ func TestHandleIssueGet_ScopeRefusalSurvivesItsOwnFailures(t *testing.T) {
 		stubRegisteredRedirectURI(database, "https://example.com/callback")
 
 		stubLiveSession(database, 123)
-		userSessionManager.On("HasValidUserSession", mock.Anything, mock.Anything, mock.Anything).Return(true)
+		userSessionManager.On("HasValidUserSession", mock.Anything, testIdleTimeoutInSeconds, testMaxLifetimeInSeconds, mock.Anything).Return(true)
 
 		user := &models.User{Id: 123, Subject: fake.UUID(), Enabled: true}
 		database.On("GetUserById", mock.Anything, (*sql.Tx)(nil), int64(123)).Return(user, nil)

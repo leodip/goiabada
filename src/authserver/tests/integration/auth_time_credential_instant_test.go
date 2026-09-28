@@ -58,50 +58,7 @@ type pausedCeremony struct {
 // only a real ceremony shows the value surviving the AuthContext, the code row and the token
 // issuer to reach the claim a relying party actually reads.
 func TestAuthTime_IsTheInstantTheCredentialWasAccepted(t *testing.T) {
-	clientSecret := fake.Password(32)
-	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	client := &models.Client{
-		ClientIdentifier:                        "test-client-" + fake.LetterN(8),
-		ClientSecretEncrypted:                   clientSecretEncrypted,
-		Enabled:                                 true,
-		AuthorizationCodeEnabled:                true,
-		ConsentRequired:                         false,
-		DefaultAcrLevel:                         models.AcrLevel1,
-		TokenExpirationInSeconds:                300,
-		RefreshTokenOfflineIdleTimeoutInSeconds: 3600,
-		RefreshTokenOfflineMaxLifetimeInSeconds: 86400,
-	}
-	if createClientErr := database.CreateClient(context.Background(), nil, client); createClientErr != nil {
-		t.Fatal(createClientErr)
-	}
-
-	redirectUri := &models.RedirectURI{
-		ClientId: client.Id,
-		URI:      "https://example.com/callback",
-	}
-	if createRedirectURIErr := database.CreateRedirectURI(context.Background(), nil, redirectUri); createRedirectURIErr != nil {
-		t.Fatal(createRedirectURIErr)
-	}
-
-	password := fake.Password(8)
-	passwordHashed, err := passwordhash.Hash(password)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	user := &models.User{
-		Subject:      fake.UUID(),
-		Enabled:      true,
-		Email:        fake.Email(),
-		PasswordHash: passwordHashed,
-	}
-	if err := database.CreateUser(context.Background(), nil, user); err != nil {
-		t.Fatal(err)
-	}
+	client, clientSecret, redirectUri, user, password := newAuthTimeFixture(t)
 
 	// One client for both ceremonies, so the second arrives carrying the first's cookie, which
 	// is what makes it the reuse arm.
@@ -248,4 +205,173 @@ func runPausedCeremony(t *testing.T, httpClient *http.Client, clientIdentifier s
 		pwdAfter:  pwdAfter,
 		resumedAt: resumedAt,
 	}
+}
+
+// newAuthTimeFixture creates a confidential client with one registered redirect URI, and a user
+// able to complete a level 1 ceremony for it, returning the secrets a ceremony needs.
+func newAuthTimeFixture(t *testing.T) (*models.Client, string, *models.RedirectURI, *models.User, string) {
+	t.Helper()
+
+	clientSecret := fake.Password(32)
+	clientSecretEncrypted, err := encryption.EncryptData(clientSecret)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	client := &models.Client{
+		ClientIdentifier:                        "test-client-" + fake.LetterN(8),
+		ClientSecretEncrypted:                   clientSecretEncrypted,
+		Enabled:                                 true,
+		AuthorizationCodeEnabled:                true,
+		ConsentRequired:                         false,
+		DefaultAcrLevel:                         models.AcrLevel1,
+		TokenExpirationInSeconds:                300,
+		RefreshTokenOfflineIdleTimeoutInSeconds: 3600,
+		RefreshTokenOfflineMaxLifetimeInSeconds: 86400,
+	}
+	if createClientErr := database.CreateClient(context.Background(), nil, client); createClientErr != nil {
+		t.Fatal(createClientErr)
+	}
+
+	redirectUri := &models.RedirectURI{
+		ClientId: client.Id,
+		URI:      "https://example.com/callback",
+	}
+	if createRedirectURIErr := database.CreateRedirectURI(context.Background(), nil, redirectUri); createRedirectURIErr != nil {
+		t.Fatal(createRedirectURIErr)
+	}
+
+	password := fake.Password(8)
+	passwordHashed, err := passwordhash.Hash(password)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	user := &models.User{
+		Subject:      fake.UUID(),
+		Enabled:      true,
+		Email:        fake.Email(),
+		PasswordHash: passwordHashed,
+	}
+	if err := database.CreateUser(context.Background(), nil, user); err != nil {
+		t.Fatal(err)
+	}
+
+	return client, clientSecret, redirectUri, user, password
+}
+
+// TestAuthTime_MaxAgeIsMeasuredFromTheLastSignIn drives #243 defect 1 through the real stack.
+// OIDC Core 1.0 section 3.1.2.1 measures max_age from "the last time the End-User was actively
+// authenticated by the OP", which is the session's AuthTime and the auth_time claim, not when the
+// session started. The row is aged in the database, because the difference only shows once a
+// session has outlived its user's last sign-in: started ten minutes inside the configured maximum
+// lifetime, well over the hour max_age allows, and signed in to again five minutes ago. The
+// lifetime is read rather than assumed, because other tests on this server rewrite it.
+func TestAuthTime_MaxAgeIsMeasuredFromTheLastSignIn(t *testing.T) {
+	client, clientSecret, redirectUri, user, password := newAuthTimeFixture(t)
+	httpClient := createHttpClient(t)
+
+	settings, settingsErr := database.GetSettingsById(context.Background(), nil, 1)
+	if settingsErr != nil {
+		t.Fatal(settingsErr)
+	}
+	longAgo := time.Duration(settings.UserSessionMaxLifetimeInSeconds)*time.Second - 10*time.Minute
+	if longAgo <= time.Hour+time.Minute || settings.UserSessionIdleTimeoutInSeconds <= 120 {
+		t.Fatalf("the configured session lifetimes (idle %ds, max %ds) leave no room for a session "+
+			"older than max_age=3600 that is still valid", settings.UserSessionIdleTimeoutInSeconds,
+			settings.UserSessionMaxLifetimeInSeconds)
+	}
+
+	signedIn := runPausedCeremony(t, httpClient, client.ClientIdentifier, clientSecret,
+		redirectUri.URI, user.Email, password, "")
+	if signedIn.sid == "" {
+		t.Fatal("the ID token carried no sid, so the session row cannot be found")
+	}
+
+	// ageSession rewrites the row's two instants, relative to now, and returns the AuthTime written.
+	ageSession := func(startedAgo, authenticatedAgo time.Duration) time.Time {
+		t.Helper()
+		session, err := database.GetUserSessionBySessionIdentifier(context.Background(), nil, signedIn.sid)
+		if err != nil || session == nil {
+			t.Fatalf("unable to load the session row: %v", err)
+		}
+		now := time.Now().UTC()
+		session.Started = now.Add(-startedAgo)
+		session.AuthTime = now.Add(-authenticatedAgo).Truncate(time.Second)
+		session.LastAccessed = now.Add(-time.Minute)
+		if err := database.UpdateUserSession(context.Background(), nil, session); err != nil {
+			t.Fatal(err)
+		}
+		return session.AuthTime
+	}
+
+	// silentAuthorize asks for a code with prompt=none and max_age=3600, and returns the
+	// /auth/authorize response and the verifier its challenge was made from.
+	silentAuthorize := func() (*http.Response, string) {
+		t.Helper()
+		codeVerifier := "code-verifier-" + fake.LetterN(16)
+		destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+			"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
+			"&response_type=code" +
+			"&code_challenge_method=S256" +
+			"&code_challenge=" + oauth.GeneratePKCECodeChallenge(codeVerifier) +
+			"&scope=" + url.QueryEscape("openid profile") +
+			"&state=" + fake.LetterN(8) +
+			"&nonce=" + fake.LetterN(8) +
+			"&prompt=none&max_age=3600"
+		resp, err := httpClient.Get(destUrl)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return resp, codeVerifier
+	}
+
+	t.Run("a long-lived session signed in to minutes ago satisfies max_age=3600", func(t *testing.T) {
+		authTime := ageSession(longAgo, 5*time.Minute)
+
+		resp, codeVerifier := silentAuthorize()
+		defer func() { _ = resp.Body.Close() }()
+		redirectLocation := assertRedirect(t, resp, "/auth/issue")
+		resp = loadPage(t, httpClient, redirectLocation)
+		defer func() { _ = resp.Body.Close() }()
+		code, _ := getCodeAndStateFromUrl(t, resp)
+		if code == "" {
+			t.Fatalf("no code was issued; Location %q", resp.Header.Get("Location"))
+		}
+
+		data := postToTokenEndpoint(t, httpClient, config.GetAuthServer().BaseURL+"/auth/token",
+			url.Values{
+				"grant_type":    {"authorization_code"},
+				"client_id":     {client.ClientIdentifier},
+				"client_secret": {clientSecret},
+				"code":          {code},
+				"redirect_uri":  {redirectUri.URI},
+				"code_verifier": {codeVerifier},
+			})
+		idToken, ok := data["id_token"].(string)
+		if !ok {
+			t.Fatalf("the token response carried no id_token: %v", data)
+		}
+		claims := decodeJWTPayload(t, idToken)
+
+		assert.Equal(t, signedIn.sid, claims["sid"], "the session was reused, not replaced")
+		claimedAuthTime, ok := claims["auth_time"].(float64)
+		if !ok {
+			t.Fatalf("the ID token carried no auth_time claim: %v", claims)
+		}
+		assert.Equal(t, authTime.Unix(), int64(claimedAuthTime),
+			"auth_time must be the instant max_age was measured from")
+	})
+
+	t.Run("a session signed in to two hours ago fails max_age=3600 however recently it started", func(t *testing.T) {
+		ageSession(10*time.Minute, 2*time.Hour)
+
+		resp, _ := silentAuthorize()
+		defer func() { _ = resp.Body.Close() }()
+
+		assert.Equal(t, http.StatusFound, resp.StatusCode)
+		errorCode, errorDescription, _ := getErrorFromUrl(t, resp)
+		assert.Equal(t, "login_required", errorCode)
+		assert.Equal(t, "Session age exceeds max_age", errorDescription)
+	})
 }

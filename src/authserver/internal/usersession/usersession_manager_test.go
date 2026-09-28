@@ -1,13 +1,11 @@
 package usersession
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
-	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -170,7 +168,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 
 	t.Run("Step-up: level1 to level2_optional upgrades ACR and updates AuthMethods", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
-		manager := &UserSessionManager{database: database}
+		manager := &Manager{database: database}
 		req := createRequest()
 
 		// Session starts at level1 with password only
@@ -202,7 +200,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 
 	t.Run("Step-up: level1 to level2_mandatory upgrades ACR and updates AuthMethods", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
-		manager := &UserSessionManager{database: database}
+		manager := &Manager{database: database}
 		req := createRequest()
 
 		userSession := createUserSession(models.AcrLevel1, "pwd")
@@ -231,7 +229,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 
 	t.Run("Step-up: level2_optional to level2_mandatory upgrades ACR", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
-		manager := &UserSessionManager{database: database}
+		manager := &Manager{database: database}
 		req := createRequest()
 
 		// Already at level2_optional with pwd+otp
@@ -261,7 +259,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 
 	t.Run("No downgrade: level2_mandatory to level1 preserves higher ACR", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
-		manager := &UserSessionManager{database: database}
+		manager := &Manager{database: database}
 		req := createRequest()
 
 		// Session is at level2_mandatory
@@ -292,7 +290,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 
 	t.Run("No downgrade: level2_optional to level1 preserves higher ACR", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
-		manager := &UserSessionManager{database: database}
+		manager := &Manager{database: database}
 		req := createRequest()
 
 		userSession := createUserSession(models.AcrLevel2Optional, "pwd otp")
@@ -320,7 +318,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 
 	t.Run("Same level: no ACR change when levels are equal", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
-		manager := &UserSessionManager{database: database}
+		manager := &Manager{database: database}
 		req := createRequest()
 
 		userSession := createUserSession(models.AcrLevel2Optional, "pwd otp")
@@ -348,7 +346,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 
 	t.Run("Empty authMethods preserves existing AuthMethods", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
-		manager := &UserSessionManager{database: database}
+		manager := &Manager{database: database}
 		req := createRequest()
 
 		userSession := createUserSession(models.AcrLevel1, "pwd")
@@ -378,7 +376,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 
 	t.Run("Empty acrLevel preserves existing AcrLevel", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
-		manager := &UserSessionManager{database: database}
+		manager := &Manager{database: database}
 		req := createRequest()
 
 		userSession := createUserSession(models.AcrLevel2Optional, "pwd otp")
@@ -408,7 +406,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 
 	t.Run("Both empty strings preserve existing ACR and AuthMethods (refresh token scenario)", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
-		manager := &UserSessionManager{database: database}
+		manager := &Manager{database: database}
 		req := createRequest()
 
 		userSession := createUserSession(models.AcrLevel2Mandatory, "pwd otp")
@@ -438,7 +436,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 
 	t.Run("AuthMethods updated when different (same ACR level)", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
-		manager := &UserSessionManager{database: database}
+		manager := &Manager{database: database}
 		req := createRequest()
 
 		// Edge case: same ACR but different auth methods string
@@ -468,7 +466,7 @@ func TestBumpUserSession_StepUpAuthentication(t *testing.T) {
 
 	t.Run("Session not found returns error", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
-		manager := &UserSessionManager{database: database}
+		manager := &Manager{database: database}
 		req := createRequest()
 
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, "non-existent-session").
@@ -498,7 +496,7 @@ func TestBumpUserSession_ClientTracking(t *testing.T) {
 
 	t.Run("New client is added to session", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
-		manager := &UserSessionManager{database: database}
+		manager := &Manager{database: database}
 		req := createRequest("192.168.1.1:12345")
 
 		userSession := &models.UserSession{
@@ -537,7 +535,7 @@ func TestBumpUserSession_ClientTracking(t *testing.T) {
 
 	t.Run("Existing client updates LastAccessed", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
-		manager := &UserSessionManager{database: database}
+		manager := &Manager{database: database}
 		req := createRequest("192.168.1.1:12345")
 
 		oldTime := time.Now().UTC().Add(-1 * time.Hour)
@@ -577,7 +575,7 @@ func TestBumpUserSession_ClientTracking(t *testing.T) {
 
 	t.Run("New IP is concatenated to existing", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
-		manager := &UserSessionManager{database: database}
+		manager := &Manager{database: database}
 		req := createRequest("10.0.0.1:12345") // Different IP
 
 		userSession := &models.UserSession{
@@ -613,7 +611,7 @@ func TestBumpUserSession_ClientTracking(t *testing.T) {
 
 	t.Run("Same IP is not duplicated", func(t *testing.T) {
 		database := mocks_data.NewDatabase(t)
-		manager := &UserSessionManager{database: database}
+		manager := &Manager{database: database}
 		req := createRequest("192.168.1.1:12345") // Same IP
 
 		userSession := &models.UserSession{
@@ -652,104 +650,82 @@ func TestBumpUserSession_ClientTracking(t *testing.T) {
 // Tests for HasValidUserSession
 // =============================================================================
 
+// TestHasValidUserSession is the manager's row of the services table: it judges a session on its
+// own clock with the two lifetimes its caller passes, in that order. Idle and max lifetime are
+// distinct in every case, so a manager that swapped the two adjacent ints fails one (#433
+// decision 9). The validity rules themselves are UserSession.IsValid's, tested in models.
 func TestHasValidUserSession(t *testing.T) {
-	createSettings := func(idleTimeout, maxLifetime int) *models.Settings {
-		return &models.Settings{
-			UserSessionIdleTimeoutInSeconds: idleTimeout,
-			UserSessionMaxLifetimeInSeconds: maxLifetime,
-		}
-	}
+	now := time.Date(2026, 9, 27, 12, 0, 0, 0, time.UTC)
+	manager := &Manager{now: func() time.Time { return now }}
 
-	createContext := func(settings *models.Settings) context.Context {
-		return context.WithValue(context.Background(), constants.ContextKeySettings, settings)
-	}
+	const idle = 3600         // one hour
+	const maxLifetime = 86400 // one day
 
 	t.Run("nil session returns false", func(t *testing.T) {
-		manager := &UserSessionManager{}
-		settings := createSettings(3600, 86400)
-		ctx := createContext(settings)
-
-		result := manager.HasValidUserSession(ctx, nil, nil)
-
-		assert.False(t, result)
+		assert.False(t, manager.HasValidUserSession(nil, idle, maxLifetime, nil))
 	})
 
 	t.Run("valid session within idle and max lifetime returns true", func(t *testing.T) {
-		manager := &UserSessionManager{}
-		settings := createSettings(3600, 86400) // 1 hour idle, 24 hours max
-		ctx := createContext(settings)
-
 		userSession := &models.UserSession{
-			Started:      time.Now().UTC().Add(-1 * time.Hour),    // Started 1 hour ago
-			LastAccessed: time.Now().UTC().Add(-10 * time.Minute), // Last accessed 10 minutes ago
+			Started:      now.Add(-2 * time.Hour),
+			LastAccessed: now.Add(-10 * time.Minute),
+			AuthTime:     now.Add(-2 * time.Hour),
 		}
-
-		result := manager.HasValidUserSession(ctx, userSession, nil)
-
-		assert.True(t, result)
+		assert.True(t, manager.HasValidUserSession(userSession, idle, maxLifetime, nil))
 	})
 
-	t.Run("session expired by idle timeout returns false", func(t *testing.T) {
-		manager := &UserSessionManager{}
-		settings := createSettings(3600, 86400) // 1 hour idle timeout
-		ctx := createContext(settings)
-
+	t.Run("the first int is the idle timeout, measured from LastAccessed", func(t *testing.T) {
+		// Idle for two hours, well inside the day's lifetime: invalid only if the first int is
+		// the idle bound. Swapped, two hours of idleness against a day would pass.
 		userSession := &models.UserSession{
-			Started:      time.Now().UTC().Add(-2 * time.Hour), // Started 2 hours ago
-			LastAccessed: time.Now().UTC().Add(-2 * time.Hour), // Last accessed 2 hours ago (exceeds 1 hour idle)
+			Started:      now.Add(-3 * time.Hour),
+			LastAccessed: now.Add(-2 * time.Hour),
+			AuthTime:     now.Add(-3 * time.Hour),
 		}
-
-		result := manager.HasValidUserSession(ctx, userSession, nil)
-
-		assert.False(t, result)
+		assert.False(t, manager.HasValidUserSession(userSession, idle, maxLifetime, nil))
 	})
 
-	t.Run("session expired by max lifetime returns false", func(t *testing.T) {
-		manager := &UserSessionManager{}
-		settings := createSettings(3600, 3600) // 1 hour max lifetime
-		ctx := createContext(settings)
-
+	t.Run("the second int is the max lifetime, measured from Started", func(t *testing.T) {
+		// Started two hours ago and used a minute ago: valid only if the second int is the
+		// lifetime. Swapped, two hours against the one-hour idle value would refuse it.
 		userSession := &models.UserSession{
-			Started:      time.Now().UTC().Add(-2 * time.Hour),   // Started 2 hours ago (exceeds 1 hour max)
-			LastAccessed: time.Now().UTC().Add(-1 * time.Minute), // Recently accessed
+			Started:      now.Add(-2 * time.Hour),
+			LastAccessed: now.Add(-time.Minute),
+			AuthTime:     now.Add(-2 * time.Hour),
 		}
+		assert.True(t, manager.HasValidUserSession(userSession, idle, maxLifetime, nil))
 
-		result := manager.HasValidUserSession(ctx, userSession, nil)
-
-		assert.False(t, result)
+		expired := &models.UserSession{
+			Started:      now.Add(-25 * time.Hour),
+			LastAccessed: now.Add(-time.Minute),
+			AuthTime:     now.Add(-25 * time.Hour),
+		}
+		assert.False(t, manager.HasValidUserSession(expired, idle, maxLifetime, nil))
 	})
 
-	t.Run("max_age parameter respected", func(t *testing.T) {
-		manager := &UserSessionManager{}
-		settings := createSettings(86400, 86400) // 24 hours for both
-		ctx := createContext(settings)
-
+	t.Run("max_age is measured from AuthTime on the manager's clock", func(t *testing.T) {
 		userSession := &models.UserSession{
-			Started:      time.Now().UTC().Add(-2 * time.Hour), // Started 2 hours ago
-			LastAccessed: time.Now().UTC().Add(-1 * time.Minute),
+			Started:      now.Add(-20 * time.Hour),
+			LastAccessed: now.Add(-time.Minute),
+			AuthTime:     now.Add(-5 * time.Minute),
 		}
+		maxAge := int64(3600)
+		assert.True(t, manager.HasValidUserSession(userSession, idle, maxLifetime, &maxAge))
 
-		maxAge := 3600 // 1 hour max_age requested by client
-		result := manager.HasValidUserSession(ctx, userSession, &maxAge)
-
-		// Session started 2 hours ago, but max_age is 1 hour - should be invalid
-		assert.False(t, result)
+		userSession.AuthTime = now.Add(-2 * time.Hour)
+		assert.False(t, manager.HasValidUserSession(userSession, idle, maxLifetime, &maxAge))
 	})
 
-	t.Run("max_age parameter allows valid session", func(t *testing.T) {
-		manager := &UserSessionManager{}
-		settings := createSettings(86400, 86400)
-		ctx := createContext(settings)
-
+	t.Run("the clock is the manager's, not the wall clock", func(t *testing.T) {
+		// Valid against the fixed now, and long expired against the real one.
 		userSession := &models.UserSession{
-			Started:      time.Now().UTC().Add(-30 * time.Minute), // Started 30 minutes ago
-			LastAccessed: time.Now().UTC().Add(-1 * time.Minute),
+			Started:      now.Add(-time.Minute),
+			LastAccessed: now.Add(-time.Minute),
+			AuthTime:     now.Add(-time.Minute),
 		}
-
-		maxAge := 3600 // 1 hour max_age - session is within this
-		result := manager.HasValidUserSession(ctx, userSession, &maxAge)
-
-		assert.True(t, result)
+		assert.True(t, manager.HasValidUserSession(userSession, idle, maxLifetime, nil))
+		assert.False(t, (&Manager{now: func() time.Time { return now.Add(48 * time.Hour) }}).
+			HasValidUserSession(userSession, idle, maxLifetime, nil))
 	})
 }
 

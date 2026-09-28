@@ -12,6 +12,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/config"
+	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
@@ -155,7 +156,10 @@ func HandleAuthLevel1CompletedGet(
 		// sends B straight to /auth/completed with a password only, skipping the second factor a
 		// level2 client asked for. A session belonging to anyone else is treated as no session, so
 		// the target alone decides, and A's OTP configuration snapshot is left alone (#133).
-		hasValidUserSession := userSessionManager.HasValidUserSession(r.Context(), userSession, authContext.ParseRequestedMaxAge()) && authContext.OwnsSession(userSession)
+		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
+		hasValidUserSession := userSessionManager.HasValidUserSession(userSession,
+			settings.UserSessionIdleTimeoutInSeconds, settings.UserSessionMaxLifetimeInSeconds,
+			authContext.RequestedMaxAge()) && authContext.OwnsSession(userSession)
 
 		if hasValidUserSession {
 			// Parse the session's ACR level

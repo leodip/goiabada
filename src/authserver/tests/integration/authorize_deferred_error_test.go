@@ -133,6 +133,35 @@ func TestAuthorize_Deferred_FragmentMode_DeliversAfterLogin(t *testing.T) {
 		location)
 }
 
+// TestAuthorize_Deferred_MalformedMaxAgeDeliversAfterLogin is the one path that stores a max_age
+// nothing validated: a cookieless browser's request is refused with invalid_request, the refusal
+// is parked, and /auth/level1completed delivers it after the password without reading max_age or
+// asking about a session. Were a later hop to read the stored "abc" first, it would read it as 0
+// and the visitor would be sent round the login again instead of the client being answered (#243).
+func TestAuthorize_Deferred_MalformedMaxAgeDeliversAfterLogin(t *testing.T) {
+	client, user, password := newDeferralClient(t)
+	httpClient := createHttpClient(t)
+
+	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(deferralRedirectURI) +
+		"&response_type=code" +
+		"&code_challenge_method=S256" +
+		"&code_challenge=" + fake.LetterN(43) +
+		"&state=" + url.QueryEscape(deferralState) +
+		"&scope=openid" +
+		"&max_age=abc"
+
+	resp := driveDeferral(t, httpClient, destUrl, user, password)
+	defer func() { _ = resp.Body.Close() }()
+
+	require.Equal(t, http.StatusFound, resp.StatusCode)
+	assert.Equal(t,
+		deferralRedirectURI+"?error=invalid_request"+
+			"&error_description="+url.QueryEscape("The max_age parameter must be a non-negative integer.")+
+			"&state="+deferralStateEscaped,
+		resp.Header.Get("Location"))
+}
+
 // TestAuthorize_Deferred_FormPostMode_DeliversAfterLogin is the mode that proves the wiring.
 //
 // form_post is the only response mode that parses a template, so it is the only one that needs the
