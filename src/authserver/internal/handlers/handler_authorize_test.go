@@ -3102,6 +3102,9 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		userSubject := fake.UUID()
 		req, err := http.NewRequest("GET", "/authorize?client_id=test-client&redirect_uri=https://example.com&response_type=code&scope=openid&prompt=none&id_token_hint=valid-jwt-token", nil)
 		assert.NoError(t, err)
+		// The silent reuse bumps the session with the browser's address, read as the rest of the
+		// server reads it, so the session records the latest address it was seen from (#243).
+		req.RemoteAddr = "203.0.113.7:4444"
 
 		settings := &models.Settings{
 			PKCERequired: true,
@@ -3175,7 +3178,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 			return u.Id == 789
 		})).Return("openid", nil)
 
-		userSessionManager.On("BumpUserSession", req, "session-789", int64(1), "pwd", models.AcrLevel1).Return(userSession, nil)
+		userSessionManager.On("BumpUserSession", mock.Anything, "session-789", int64(1), "pwd", models.AcrLevel1, "203.0.113.7").Return(userSession, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.AuditBumpedUserSession, mock.MatchedBy(func(details map[string]interface{}) bool {
 			return details["userId"] == int64(789) && details["clientId"] == int64(1)
@@ -3290,7 +3293,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 			return u.Id == 789
 		})).Return(requestedScope, nil)
 
-		userSessionManager.On("BumpUserSession", req, "session-789", int64(1), "pwd", models.AcrLevel1).Return(userSession, nil)
+		userSessionManager.On("BumpUserSession", mock.Anything, "session-789", int64(1), "pwd", models.AcrLevel1, "").Return(userSession, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.AuditBumpedUserSession, mock.MatchedBy(func(details map[string]interface{}) bool {
 			return details["userId"] == int64(789) && details["clientId"] == int64(1)

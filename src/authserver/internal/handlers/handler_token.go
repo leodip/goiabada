@@ -568,10 +568,12 @@ func HandleTokenPost(
 				// bump user session (only for auth code flow - ROPC doesn't use sessions)
 				// For refresh token requests, we're not doing step-up authentication,
 				// so we pass empty strings for authMethods and acrLevel to preserve
-				// the session's existing values.
+				// the session's existing values. The address is left as recorded too: a
+				// session holds the latest address its user's browser was seen from, and a
+				// refresh request often comes from the client's server instead (#243).
 				if len(refreshToken.SessionIdentifier) > 0 {
-					userSession, err := userSessionManager.BumpUserSession(r, refreshToken.SessionIdentifier,
-						refreshToken.Code.ClientId, "", "")
+					userSession, err := userSessionManager.BumpUserSession(r.Context(), refreshToken.SessionIdentifier,
+						refreshToken.Code.ClientId, "", "", "")
 					if err != nil {
 						httpHelper.InternalServerError(w, r, err)
 						return

@@ -13,6 +13,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/constants"
 	"github.com/leodip/goiabada/authserver/internal/handlerhelpers"
+	"github.com/leodip/goiabada/authserver/internal/middleware"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
@@ -148,8 +149,8 @@ func HandleAuthCompletedGet(
 			// This handles step-up authentication: if the user had a level1 session but just
 			// completed OTP for a level2 client, the session's AuthMethods and AcrLevel
 			// will be upgraded to reflect the stronger authentication that was performed.
-			bumpedSession, sessionErr := userSessionManager.BumpUserSession(r, sessionIdentifier, client.Id,
-				authContext.AuthMethods, targetAcrLevel)
+			bumpedSession, sessionErr := userSessionManager.BumpUserSession(r.Context(), sessionIdentifier, client.Id,
+				authContext.AuthMethods, targetAcrLevel, middleware.GetClientIPFromRequest(r))
 			if sessionErr != nil {
 				httpHelper.InternalServerError(w, r, sessionErr)
 				return
@@ -320,10 +321,32 @@ func HandleAuthCompletedGet(
 			// beside it. StartNewUserSession refuses a nil or zero instant rather than
 			// inventing one, so if that invariant ever breaks this arm answers 500 instead of
 			// minting a session that claims a sign-in happened just now.
-			newSession, startNewUserSessionErr := userSessionManager.StartNewUserSession(
+			//
+			// The browser's own session, when it is this user's, is the one this sign-in replaces:
+			// it was not reusable (expired, idle, or older than the max_age asked for), so it goes
+			// with the new one's creation, wherever it was last seen from. Nothing it authorized is
+			// revoked, which is the policy for a same-user re-login: its session-bound refresh
+			// tokens stop as they would on expiry and its offline grants survive (#133, #243). A
+			// foreign session was terminated above and is not passed.
+			var replacing *models.UserSession
+			if userSession != nil && sessionBelongsToCeremony {
+				replacing = userSession
+			}
+			newSession, removedSessions, startNewUserSessionErr := userSessionManager.StartNewUserSession(
 				w, r, authContext.UserId, client.Id, authContext.AuthMethods, targetAcrLevel,
 				authContext.AuthStateGeneration, authContext.OtpConfigGeneration,
-				authContext.AuthenticatedAt)
+				authContext.AuthenticatedAt, middleware.GetClientIPFromRequest(r), replacing)
+
+			// Every row the sign-in removed is gone once its transaction committed, which includes
+			// a failure that came after the commit, so each is audited before either answer. The
+			// payload is the handover's above: this is a browser ceremony with no bearer token, so
+			// there is no actor to name beyond the user the new session is for.
+			for _, removedSession := range removedSessions {
+				auditLogger.Log(r.Context(), audit.AuditDeletedUserSession, map[string]interface{}{
+					"userSessionId": removedSession.Id,
+					"loggedInUser":  "",
+				})
+			}
 			if startNewUserSessionErr != nil {
 				httpHelper.InternalServerError(w, r, startNewUserSessionErr)
 				return

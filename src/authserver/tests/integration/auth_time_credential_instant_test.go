@@ -2,6 +2,7 @@ package integration
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/url"
 	"testing"
@@ -12,8 +13,11 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
+	"github.com/leodip/goiabada/core/api"
+	"github.com/leodip/goiabada/core/constants"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // browserPause is how long the ceremony sits after the password is accepted and before the
@@ -373,5 +377,83 @@ func TestAuthTime_MaxAgeIsMeasuredFromTheLastSignIn(t *testing.T) {
 		errorCode, errorDescription, _ := getErrorFromUrl(t, resp)
 		assert.Equal(t, "login_required", errorCode)
 		assert.Equal(t, "Session age exceeds max_age", errorDescription)
+	})
+}
+
+// TestReLogin_EndsTheSessionItReplaces drives #243 defect 3 through the real stack: a max_age
+// sign-in on a browser whose own session is too old for it replaces that session, and the
+// replacement ends the old one wherever it was last seen from, with nothing revoked.
+//
+// The old session is moved to another address and its AuthTime two hours back, in the database,
+// because a request from this test process always arrives from the same address and header: left
+// alone, the same-device sweep would remove the old row on its own and prove nothing about the
+// replacement. Before the fix the moved row survived the sign-in, still listed and still refreshed
+// by its session-bound token, with no browser able to reach it.
+//
+// What the replacement must not do is revoke: the offline grant issued through the old session
+// keeps refreshing, as it does when that session expires, while the session-bound refresh token
+// stops with the session it was bound to (#133's same-user policy, #243).
+func TestReLogin_EndsTheSessionItReplaces(t *testing.T) {
+	grant := createOfflineGrant(t)
+	_, sessionBoundRefreshToken := sessionBoundGrantOnSameSession(t, grant)
+
+	oldSession, err := database.GetUserSessionBySessionIdentifier(context.Background(), nil, grant.sessionIdentifier)
+	require.NoError(t, err)
+	require.NotNil(t, oldSession)
+	oldSession.IpAddress = "203.0.113.77"
+	oldSession.AuthTime = time.Now().UTC().Add(-2 * time.Hour)
+	require.NoError(t, database.UpdateUserSession(context.Background(), nil, oldSession))
+
+	// The same browser signs in again under max_age=3600. The session its cookie names was
+	// authenticated two hours ago, so the request goes to the password page rather than reusing it.
+	const codeVerifier = "code-verifier-re-login"
+	scope := "openid " + constants.AuthServerResourceIdentifier + ":" + constants.ManageAccountPermissionIdentifier
+	destURL := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + grant.client.ClientIdentifier +
+		"&redirect_uri=" + url.QueryEscape(grant.redirectURI) +
+		"&response_type=code&code_challenge_method=S256" +
+		"&code_challenge=" + oauth.GeneratePKCECodeChallenge(codeVerifier) +
+		"&scope=" + url.QueryEscape(scope) +
+		"&state=" + fake.LetterN(8) + "&nonce=" + fake.LetterN(8) +
+		"&max_age=3600"
+	code := signInWithPassword(t, grant.httpClient, destURL, grant.user.Email, grant.password, false, "")
+	require.NotEmpty(t, code, "the sign-in must reach the client with a code")
+
+	exchanged := grant.exchange(t, code, codeVerifier)
+	accessToken, ok := exchanged["access_token"].(string)
+	require.True(t, ok, "expected an access token: %v", exchanged)
+	newSid := extractSidClaim(t, accessToken)
+	require.NotEmpty(t, newSid)
+	require.NotEqual(t, grant.sessionIdentifier, newSid, "the sign-in must have created a new session")
+
+	t.Run("the account session list holds only the new session", func(t *testing.T) {
+		resp := makeAPIRequest(t, "GET", config.GetAuthServer().BaseURL+"/api/v1/account/sessions", accessToken, nil)
+		defer func() { _ = resp.Body.Close() }()
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+
+		var out api.GetUserSessionsResponse
+		require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
+		identifiers := []string{}
+		for _, s := range out.Sessions {
+			identifiers = append(identifiers, s.SessionIdentifier)
+		}
+		assert.Equal(t, []string{newSid}, identifiers,
+			"the replaced session, last seen from another address, must be gone")
+	})
+
+	t.Run("the offline grant from the replaced session still refreshes", func(t *testing.T) {
+		refreshed := grant.refresh(t)
+		assert.NotEmpty(t, refreshed["access_token"], "a re-login revokes nothing: %v", refreshed)
+	})
+
+	t.Run("the refresh token bound to the replaced session stops", func(t *testing.T) {
+		refused := postToTokenEndpoint(t, createHttpClient(t), config.GetAuthServer().BaseURL+"/auth/token/", url.Values{
+			"grant_type":    {"refresh_token"},
+			"client_id":     {grant.client.ClientIdentifier},
+			"client_secret": {grant.clientSecret},
+			"refresh_token": {sessionBoundRefreshToken},
+		})
+		assert.Equal(t, "invalid_grant", refused["error"],
+			"the session it was bound to is gone, as it would be on expiry: %v", refused)
+		assert.Empty(t, refused["access_token"])
 	})
 }

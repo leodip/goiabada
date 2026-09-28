@@ -85,6 +85,44 @@ func ExpectRunInTransactionThenFail(db *Database, tx *sql.Tx, commitErr error, n
 	return stub
 }
 
+// ExpectRunInTransactionRerun is the deadlock shape: the body runs, the engine aborts that attempt
+// as a deadlock victim -- noted as "rollback" whatever the body returned -- and the helper runs the
+// body again, whose outcome is then the helper's, as ExpectRunInTransaction's is. BodyErr is the
+// second attempt's.
+//
+// It exists for a body that collects something as it goes and hands it out after the commit: the
+// real RunInTransaction reruns the whole body after an abort, so what the first attempt collected
+// never committed, and a body that let it leak into the result would report work the database
+// undid. No other shape here runs a body twice, so without this that property had no test.
+func ExpectRunInTransactionRerun(db *Database, tx *sql.Tx, note ...func(string)) *RunInTransactionStub {
+	if tx == nil {
+		panic(nilTxPanic)
+	}
+	stub := &RunInTransactionStub{}
+	db.EXPECT().RunInTransaction(mock.Anything, mock.Anything).RunAndReturn(func(_ context.Context, fn func(tx *sql.Tx) error) error {
+		for _, n := range note {
+			n("begin")
+		}
+		_ = fn(tx)
+		for _, n := range note {
+			n("rollback")
+			n("begin")
+		}
+		stub.BodyErr = fn(tx)
+		if stub.BodyErr != nil {
+			for _, n := range note {
+				n("rollback")
+			}
+			return stub.BodyErr
+		}
+		for _, n := range note {
+			n("commit")
+		}
+		return nil
+	}).Once()
+	return stub
+}
+
 // ExpectRunInTransactionRefused is the shape where the helper cannot open a transaction at all:
 // the body never runs and the helper's error is what the caller sees.
 func ExpectRunInTransactionRefused(db *Database, err error) {

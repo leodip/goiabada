@@ -546,7 +546,7 @@ func TestHandleTokenPost(t *testing.T) {
 			UserId: mockUserId,
 		}
 		// For refresh token flow, empty strings are passed (no step-up authentication)
-		userSessionManager.On("BumpUserSession", req, mockSessionIdentifier, mockClientId, "", models.AcrLevel("")).
+		userSessionManager.On("BumpUserSession", mock.Anything, mockSessionIdentifier, mockClientId, "", models.AcrLevel(""), "").
 			Return(mockUserSession, nil)
 
 		auditLogger.On("Log", mock.Anything, audit.AuditBumpedUserSession, mock.MatchedBy(func(details map[string]interface{}) bool {
@@ -643,7 +643,7 @@ func TestHandleTokenPost(t *testing.T) {
 
 		// Ensure that BumpUserSession was not called
 		userSessionManager.AssertNotCalled(t, "BumpUserSession",
-			mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+			mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	})
 
 	t.Run("Unsupported_grant_type", func(t *testing.T) {
@@ -688,7 +688,7 @@ func TestHandleTokenPost(t *testing.T) {
 			mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 		tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForRefresh", mock.Anything, mock.Anything, mock.Anything)
 		userSessionManager.AssertNotCalled(t, "BumpUserSession",
-			mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+			mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 		auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 	})
 }
@@ -1196,7 +1196,7 @@ func TestHandleTokenPost_Refresh_ConcurrentDoubleSpendLoses(t *testing.T) {
 	tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForRefresh", mock.Anything, mock.Anything, mock.Anything)
 	tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForRefreshROPC", mock.Anything, mock.Anything, mock.Anything)
 	database.AssertNotCalled(t, "RevokeRefreshTokenFamily", mock.Anything, mock.Anything, mock.Anything)
-	userSessionManager.AssertNotCalled(t, "BumpUserSession", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	userSessionManager.AssertNotCalled(t, "BumpUserSession", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	auditLogger.AssertNotCalled(t, "Log", mock.Anything, mock.Anything, mock.Anything)
 }
 
@@ -1312,7 +1312,7 @@ func TestHandleTokenPost_Refresh_Replay_AuditsContainment(t *testing.T) {
 			// A replay mints nothing and bumps nothing.
 			tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForRefresh", mock.Anything, mock.Anything, mock.Anything)
 			tokenIssuer.AssertNotCalled(t, "GenerateTokenResponseForRefreshROPC", mock.Anything, mock.Anything, mock.Anything)
-			userSessionManager.AssertNotCalled(t, "BumpUserSession", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+			userSessionManager.AssertNotCalled(t, "BumpUserSession", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 		})
 	}
 }
