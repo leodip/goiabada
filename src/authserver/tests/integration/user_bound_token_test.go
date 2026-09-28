@@ -9,7 +9,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
@@ -119,7 +118,7 @@ func createImpersonatingClientCredentialsToken(t *testing.T, subject string, per
 	require.NoError(t, err)
 
 	requestedScope := constants.AuthServerResourceIdentifier + ":" + permissionIdentifier
-	data := postToTokenEndpoint(t, createHttpClient(t), config.GetAuthServer().BaseURL+"/auth/token/", url.Values{
+	data := postToTokenEndpoint(t, createHttpClient(t), appConfig.AuthServer.BaseURL+"/auth/token/", url.Values{
 		"grant_type":    {"client_credentials"},
 		"client_id":     {client.ClientIdentifier},
 		"client_secret": {clientSecret},
@@ -168,7 +167,7 @@ func TestUserBoundToken_ClientCredentialsCannotActAsUser(t *testing.T) {
 			constants.ManageAccountPermissionIdentifier)
 
 		attemptedEmail := strings.ToLower(fake.LetterN(9)) + "@attacker.example.com"
-		resp := makeAPIRequest(t, "PUT", config.GetAuthServer().BaseURL+"/api/v1/account/email",
+		resp := makeAPIRequest(t, "PUT", appConfig.AuthServer.BaseURL+"/api/v1/account/email",
 			accessToken, api.UpdateAccountEmailRequest{Email: attemptedEmail})
 		defer func() { _ = resp.Body.Close() }()
 
@@ -190,7 +189,7 @@ func TestUserBoundToken_ClientCredentialsCannotActAsUser(t *testing.T) {
 	})
 
 	t.Run("GET userinfo is refused", func(t *testing.T) {
-		resp := makeAPIRequest(t, "GET", config.GetAuthServer().BaseURL+"/userinfo", userinfoToken, nil)
+		resp := makeAPIRequest(t, "GET", appConfig.AuthServer.BaseURL+"/userinfo", userinfoToken, nil)
 		defer func() { _ = resp.Body.Close() }()
 
 		// Keep this: USER_CONTEXT_REQUIRED until #449, when the fixture client held the userinfo
@@ -207,7 +206,7 @@ func TestUserBoundToken_ClientCredentialsCannotActAsUser(t *testing.T) {
 	// also exercises the distinct extraction path in JwtAuthorizationHeaderToContext.
 	t.Run("POST userinfo with a form-body access_token is refused", func(t *testing.T) {
 		form := url.Values{"access_token": {userinfoToken}}
-		req, err := http.NewRequest("POST", config.GetAuthServer().BaseURL+"/userinfo",
+		req, err := http.NewRequest("POST", appConfig.AuthServer.BaseURL+"/userinfo",
 			strings.NewReader(form.Encode()))
 		require.NoError(t, err)
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -233,7 +232,7 @@ func TestUserBoundToken_ClientCredentialsCannotActAsUser(t *testing.T) {
 // than discover; but the guard's whole premise is that claim's universality and nothing
 // else asserts it end to end.
 func TestUserBoundToken_EveryUserTokenPathStillWorks(t *testing.T) {
-	accountEmailUrl := config.GetAuthServer().BaseURL + "/api/v1/account/email"
+	accountEmailUrl := appConfig.AuthServer.BaseURL + "/api/v1/account/email"
 
 	assertEmailChangeSucceeds := func(t *testing.T, accessToken string, user *models.User) {
 		t.Helper()
@@ -281,7 +280,7 @@ func TestUserBoundToken_EveryUserTokenPathStillWorks(t *testing.T) {
 	t.Run("implicit flow token reaches userinfo", func(t *testing.T) {
 		accessToken := userAccessTokenViaImplicit(t)
 
-		resp := makeAPIRequest(t, "GET", config.GetAuthServer().BaseURL+"/userinfo", accessToken, nil)
+		resp := makeAPIRequest(t, "GET", appConfig.AuthServer.BaseURL+"/userinfo", accessToken, nil)
 		defer func() { _ = resp.Body.Close() }()
 
 		if resp.StatusCode != http.StatusOK {
@@ -305,7 +304,7 @@ func userAccessTokenViaAuthCodeRefresh(t *testing.T) (string, *models.User) {
 		constants.AuthServerResourceIdentifier + ":" + constants.ManageAccountPermissionIdentifier
 	httpClient, code := createAuthCodeEnsuringUserScope(t, clientSecret, scope)
 
-	tokenEndpoint := config.GetAuthServer().BaseURL + "/auth/token/"
+	tokenEndpoint := appConfig.AuthServer.BaseURL + "/auth/token/"
 	data := postToTokenEndpoint(t, httpClient, tokenEndpoint, url.Values{
 		"grant_type":    {"authorization_code"},
 		"client_id":     {code.Client.ClientIdentifier},
@@ -389,7 +388,7 @@ func ropcTokenResponse(t *testing.T, scope string, beforeGrant func(user *models
 		beforeGrant(user)
 	}
 
-	data := postToTokenEndpoint(t, createHttpClient(t), config.GetAuthServer().BaseURL+"/auth/token/", url.Values{
+	data := postToTokenEndpoint(t, createHttpClient(t), appConfig.AuthServer.BaseURL+"/auth/token/", url.Values{
 		"grant_type":    {"password"},
 		"client_id":     {client.ClientIdentifier},
 		"client_secret": {clientSecret},
@@ -464,7 +463,7 @@ func implicitTokenResponse(t *testing.T, responseType string, scope string) (map
 	client, redirectUri := createImplicitFlowClient(t, nil)
 	user, password := createTestUserForImplicit(t)
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=" + url.QueryEscape(responseType) +
 		"&scope=" + url.QueryEscape(scope) +

@@ -8,7 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
@@ -38,7 +37,7 @@ func TestAPIClientAuthenticationPut_ConfidentialToPublic_Success(t *testing.T) {
 	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
 	reqBody := api.UpdateClientAuthenticationRequest{IsPublic: true}
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/authentication"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/authentication"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -61,7 +60,7 @@ func TestAPIClientAuthenticationPut_PublicToConfidential_Success(t *testing.T) {
 
 	newSecret := stringutil.GenerateSecurityRandomString(60)
 	reqBody := api.UpdateClientAuthenticationRequest{IsPublic: false, ClientSecret: newSecret}
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/authentication"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/authentication"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -75,7 +74,7 @@ func TestAPIClientAuthenticationPut_PublicToConfidential_Success(t *testing.T) {
 	assert.NotNil(t, refreshed.ClientSecretEncrypted)
 
 	// Detail GET should include decrypted secret matching newSecret
-	detailURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10)
+	detailURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10)
 	resp2 := makeAPIRequest(t, "GET", detailURL, accessToken, nil)
 	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp2.StatusCode)
@@ -93,7 +92,7 @@ func TestAPIClientAuthenticationPut_InvalidSecret_TooShort(t *testing.T) {
 
 	// Too short secret
 	reqBody := api.UpdateClientAuthenticationRequest{IsPublic: false, ClientSecret: "abc123"}
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/authentication"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/authentication"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
@@ -114,7 +113,7 @@ func TestAPIClientAuthenticationPut_InvalidSecret_BadChars(t *testing.T) {
 	// 60 chars but includes an invalid '!'
 	bad := strings.Repeat("A", 59) + "!"
 	reqBody := api.UpdateClientAuthenticationRequest{IsPublic: false, ClientSecret: bad}
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/authentication"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/authentication"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
@@ -130,7 +129,7 @@ func TestAPIClientAuthenticationPut_NotFoundAndInvalidId(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Not found
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/999999/authentication"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/999999/authentication"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateClientAuthenticationRequest{IsPublic: true})
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
@@ -142,7 +141,7 @@ func TestAPIClientAuthenticationPut_NotFoundAndInvalidId(t *testing.T) {
 	}
 
 	// Invalid id
-	url2 := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/abc/authentication"
+	url2 := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/abc/authentication"
 	resp2 := makeAPIRequest(t, "PUT", url2, accessToken, api.UpdateClientAuthenticationRequest{IsPublic: true})
 	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp2.StatusCode)
@@ -180,7 +179,7 @@ func TestAPIClientAuthenticationPut_SystemLevelClientAllowed(t *testing.T) {
 	}()
 
 	// Update authentication settings (should succeed for system-level client)
-	apiURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(sysClient.Id, 10) + "/authentication"
+	apiURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(sysClient.Id, 10) + "/authentication"
 	reqBody := api.UpdateClientAuthenticationRequest{IsPublic: false, ClientSecret: stringutil.GenerateSecurityRandomString(60)}
 	resp := makeAPIRequest(t, "PUT", apiURL, accessToken, reqBody)
 	defer func() { _ = resp.Body.Close() }()
@@ -195,7 +194,7 @@ func TestAPIClientAuthenticationPut_InsufficientScope(t *testing.T) {
 	target := createPublicClient(t)
 	defer func() { _ = database.DeleteClient(context.Background(), nil, target.Id) }()
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(target.Id, 10) + "/authentication"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(target.Id, 10) + "/authentication"
 	reqBody := api.UpdateClientAuthenticationRequest{IsPublic: false, ClientSecret: stringutil.GenerateSecurityRandomString(60)}
 	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
 	defer func() { _ = resp.Body.Close() }()

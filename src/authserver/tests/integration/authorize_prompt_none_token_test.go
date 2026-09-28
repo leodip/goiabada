@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
@@ -50,7 +49,7 @@ func TestPromptNone_ClientDefaultAcrHigher(t *testing.T) {
 	requestState := fake.LetterN(8)
 	requestCodeChallenge := fake.LetterN(43)
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -81,7 +80,7 @@ func TestPromptNone_ClientDefaultAcrSatisfied(t *testing.T) {
 	requestNonce := fake.LetterN(8)
 	requestCodeChallenge := fake.LetterN(43)
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -152,7 +151,7 @@ func TestPromptNone_AcrValuesCannotLowerTheClientFloor(t *testing.T) {
 	requestNonce := fake.LetterN(8)
 	requestCodeChallenge := fake.LetterN(43)
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -189,7 +188,7 @@ func TestPromptNone_InvalidRedirectUri(t *testing.T) {
 	requestState := fake.LetterN(8)
 	requestCodeChallenge := fake.LetterN(43)
 	// Use a redirect_uri that doesn't match the client's registered URIs
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape("https://evil.com/callback") +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -216,7 +215,7 @@ func TestPromptNone_InvalidClientId(t *testing.T) {
 
 	requestState := fake.LetterN(8)
 	requestCodeChallenge := fake.LetterN(43)
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=nonexistent-client-12345" +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=nonexistent-client-12345" +
 		"&redirect_uri=" + url.QueryEscape("https://example.com/callback") +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -244,7 +243,7 @@ func TestPromptNone_InvalidResponseType(t *testing.T) {
 
 	requestState := fake.LetterN(8)
 	requestCodeChallenge := fake.LetterN(43)
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=invalid_type" +
 		"&code_challenge_method=S256" +
@@ -328,7 +327,7 @@ func TestPromptNone_CodeExchange(t *testing.T) {
 	requestNonce := fake.LetterN(8)
 
 	// Create session via normal login
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -374,7 +373,7 @@ func TestPromptNone_CodeExchange(t *testing.T) {
 	requestState2 := fake.LetterN(8)
 	requestNonce2 := "test-nonce-" + fake.LetterN(16)
 
-	destUrl2 := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl2 := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -397,7 +396,7 @@ func TestPromptNone_CodeExchange(t *testing.T) {
 	codeVal, _ := getCodeAndStateFromUrl(t, resp2)
 
 	// Exchange code for tokens
-	tokenEndpoint := config.GetAuthServer().BaseURL + "/auth/token"
+	tokenEndpoint := appConfig.AuthServer.BaseURL + "/auth/token"
 	form := url.Values{
 		"grant_type":    {"authorization_code"},
 		"client_id":     {client.ClientIdentifier},
@@ -482,7 +481,7 @@ func TestPromptNone_SubClaimConsistent(t *testing.T) {
 	requestState1 := fake.LetterN(8)
 	requestNonce1 := fake.LetterN(8)
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -522,7 +521,7 @@ func TestPromptNone_SubClaimConsistent(t *testing.T) {
 
 	codeVal1, _ := getCodeAndStateFromUrl(t, resp)
 
-	tokenEndpoint := config.GetAuthServer().BaseURL + "/auth/token"
+	tokenEndpoint := appConfig.AuthServer.BaseURL + "/auth/token"
 	form1 := url.Values{
 		"grant_type":    {"authorization_code"},
 		"client_id":     {client.ClientIdentifier},
@@ -543,7 +542,7 @@ func TestPromptNone_SubClaimConsistent(t *testing.T) {
 	requestState2 := fake.LetterN(8)
 	requestNonce2 := fake.LetterN(8)
 
-	destUrl2 := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl2 := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -639,7 +638,7 @@ func TestPromptNone_AuthTimePreservedInToken(t *testing.T) {
 	requestState1 := fake.LetterN(8)
 	requestNonce1 := fake.LetterN(8)
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -679,7 +678,7 @@ func TestPromptNone_AuthTimePreservedInToken(t *testing.T) {
 
 	codeVal1, _ := getCodeAndStateFromUrl(t, resp)
 
-	tokenEndpoint := config.GetAuthServer().BaseURL + "/auth/token"
+	tokenEndpoint := appConfig.AuthServer.BaseURL + "/auth/token"
 	form1 := url.Values{
 		"grant_type":    {"authorization_code"},
 		"client_id":     {client.ClientIdentifier},
@@ -702,7 +701,7 @@ func TestPromptNone_AuthTimePreservedInToken(t *testing.T) {
 	requestState2 := fake.LetterN(8)
 	requestNonce2 := fake.LetterN(8)
 
-	destUrl2 := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl2 := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -799,7 +798,7 @@ func TestPromptNone_PKCEWrongVerifier(t *testing.T) {
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -845,7 +844,7 @@ func TestPromptNone_PKCEWrongVerifier(t *testing.T) {
 	requestState2 := fake.LetterN(8)
 	requestNonce2 := fake.LetterN(8)
 
-	destUrl2 := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl2 := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -868,7 +867,7 @@ func TestPromptNone_PKCEWrongVerifier(t *testing.T) {
 	codeVal, _ := getCodeAndStateFromUrl(t, resp2)
 
 	// Try to exchange with WRONG verifier
-	tokenEndpoint := config.GetAuthServer().BaseURL + "/auth/token"
+	tokenEndpoint := appConfig.AuthServer.BaseURL + "/auth/token"
 	form := url.Values{
 		"grant_type":    {"authorization_code"},
 		"client_id":     {client.ClientIdentifier},
@@ -960,7 +959,7 @@ func TestPromptNone_RefreshWithOfflineAccess(t *testing.T) {
 	requestNonce := fake.LetterN(8)
 
 	// Create session via normal login with offline_access
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -1016,7 +1015,7 @@ func TestPromptNone_RefreshWithOfflineAccess(t *testing.T) {
 	requestState2 := fake.LetterN(8)
 	requestNonce2 := fake.LetterN(8)
 
-	destUrl2 := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl2 := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -1039,7 +1038,7 @@ func TestPromptNone_RefreshWithOfflineAccess(t *testing.T) {
 	codeVal, _ := getCodeAndStateFromUrl(t, resp2)
 
 	// Exchange code for tokens
-	tokenEndpoint := config.GetAuthServer().BaseURL + "/auth/token"
+	tokenEndpoint := appConfig.AuthServer.BaseURL + "/auth/token"
 	form := url.Values{
 		"grant_type":    {"authorization_code"},
 		"client_id":     {client.ClientIdentifier},
@@ -1137,7 +1136,7 @@ func TestPromptNone_NoncePreserved(t *testing.T) {
 	requestState := fake.LetterN(8)
 
 	// Create session via normal login
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -1183,7 +1182,7 @@ func TestPromptNone_NoncePreserved(t *testing.T) {
 	requestState2 := fake.LetterN(8)
 	testNonce := "test-nonce-" + fake.LetterN(16)
 
-	destUrl2 := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl2 := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -1206,7 +1205,7 @@ func TestPromptNone_NoncePreserved(t *testing.T) {
 	codeVal, _ := getCodeAndStateFromUrl(t, resp2)
 
 	// Exchange code for tokens
-	tokenEndpoint := config.GetAuthServer().BaseURL + "/auth/token"
+	tokenEndpoint := appConfig.AuthServer.BaseURL + "/auth/token"
 	form := url.Values{
 		"grant_type":    {"authorization_code"},
 		"client_id":     {client.ClientIdentifier},
@@ -1284,7 +1283,7 @@ func TestPromptNone_PKCESupported(t *testing.T) {
 	requestState := fake.LetterN(8)
 
 	// Create session via normal login
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -1329,7 +1328,7 @@ func TestPromptNone_PKCESupported(t *testing.T) {
 	pkceChallenge := oauth.GeneratePKCECodeChallenge(pkceVerifier)
 	requestState2 := fake.LetterN(8)
 
-	destUrl2 := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl2 := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -1352,7 +1351,7 @@ func TestPromptNone_PKCESupported(t *testing.T) {
 	codeVal, _ := getCodeAndStateFromUrl(t, resp2)
 
 	// Exchange code for tokens using the correct PKCE verifier
-	tokenEndpoint := config.GetAuthServer().BaseURL + "/auth/token"
+	tokenEndpoint := appConfig.AuthServer.BaseURL + "/auth/token"
 	form := url.Values{
 		"grant_type":    {"authorization_code"},
 		"client_id":     {client.ClientIdentifier},

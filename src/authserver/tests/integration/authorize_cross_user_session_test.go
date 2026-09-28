@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
@@ -192,7 +191,7 @@ func createCrossUserBrowser(t *testing.T, defaultAcrLevel models.AcrLevel,
 // appended verbatim, already query-escaped, and is where a case puts prompt, acr_values, max_age or
 // an id_token_hint.
 func crossUserAuthorizeUrl(b *crossUserBrowser, extra string) string {
-	return config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + b.client.ClientIdentifier +
+	return appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + b.client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(b.redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -276,7 +275,7 @@ func signInWithPassword(t *testing.T, jar *http.Client, destUrl string,
 func redeemCrossUserCode(t *testing.T, b *crossUserBrowser, jar *http.Client, codeVal string) map[string]interface{} {
 	t.Helper()
 
-	return postToTokenEndpoint(t, jar, config.GetAuthServer().BaseURL+"/auth/token/", url.Values{
+	return postToTokenEndpoint(t, jar, appConfig.AuthServer.BaseURL+"/auth/token/", url.Values{
 		"grant_type":    {"authorization_code"},
 		"client_id":     {b.client.ClientIdentifier},
 		"client_secret": {b.clientSecret},

@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -25,7 +24,7 @@ const auditEventTypesURL = "/api/v1/admin/audit-logs/event-types"
 func TestAPIAuditEventTypesGet_ServesTheWholeCatalog(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
-	resp := makeAPIRequest(t, "GET", config.GetAuthServer().BaseURL+auditEventTypesURL, accessToken, nil)
+	resp := makeAPIRequest(t, "GET", appConfig.AuthServer.BaseURL+auditEventTypesURL, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
 	require.Equal(t, http.StatusOK, resp.StatusCode)
@@ -61,7 +60,7 @@ func TestAPIAuditEventTypesGet_ServesTheWholeCatalog(t *testing.T) {
 // The catalog describes GET /api/v1/admin/audit-logs and tells a caller nothing that endpoint
 // does not, so it is refused in the same three ways.
 func TestAPIAuditEventTypes_UnauthorizedAndScope(t *testing.T) {
-	url := config.GetAuthServer().BaseURL + auditEventTypesURL
+	url := appConfig.AuthServer.BaseURL + auditEventTypesURL
 
 	// No token
 	req, err := http.NewRequest("GET", url, nil)

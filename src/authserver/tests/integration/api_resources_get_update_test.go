@@ -8,7 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
@@ -22,7 +21,7 @@ func TestAPIResourceGet_Success(t *testing.T) {
 	res := createTestResource(t, "api-test-get-resource-"+fake.LetterN(6), "Get Resource")
 	defer func() { _ = database.DeleteResource(context.Background(), nil, res.Id) }()
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(res.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(res.Id, 10)
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -42,7 +41,7 @@ func TestAPIResourceGet_NotFoundAndInvalidId(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Not found
-	urlNF := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/9999999"
+	urlNF := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/9999999"
 	respNF := makeAPIRequest(t, "GET", urlNF, accessToken, nil)
 	defer func() { _ = respNF.Body.Close() }()
 	assert.Equal(t, http.StatusNotFound, respNF.StatusCode)
@@ -51,7 +50,7 @@ func TestAPIResourceGet_NotFoundAndInvalidId(t *testing.T) {
 	assert.Equal(t, "Resource not found", errRespNF.ErrorDescription)
 
 	// Invalid id (non-numeric)
-	urlBad := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/abc"
+	urlBad := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/abc"
 	respBad := makeAPIRequest(t, "GET", urlBad, accessToken, nil)
 	defer func() { _ = respBad.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, respBad.StatusCode)
@@ -60,7 +59,7 @@ func TestAPIResourceGet_NotFoundAndInvalidId(t *testing.T) {
 	assert.Equal(t, "Invalid resource ID", errRespBad.ErrorDescription)
 
 	// Negative id -> not found
-	urlNeg := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/-1"
+	urlNeg := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/-1"
 	respNeg := makeAPIRequest(t, "GET", urlNeg, accessToken, nil)
 	defer func() { _ = respNeg.Body.Close() }()
 	assert.Equal(t, http.StatusNotFound, respNeg.StatusCode)
@@ -68,7 +67,7 @@ func TestAPIResourceGet_NotFoundAndInvalidId(t *testing.T) {
 
 func TestAPIResourceGet_UnauthorizedAndScope(t *testing.T) {
 	// No token
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/1"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/1"
 	req, err := http.NewRequest("GET", url, nil)
 	assert.NoError(t, err)
 	httpClient := createHttpClient(t)
@@ -100,7 +99,7 @@ func TestAPIResourceUpdatePut_Success(t *testing.T) {
 		ResourceIdentifier: "updated-resource-" + fake.LetterN(6),
 		Description:        "  Updated desc  ",
 	}
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(res.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(res.Id, 10)
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -129,7 +128,7 @@ func TestAPIResourceUpdatePut_ValidationErrors(t *testing.T) {
 	defer func() { _ = database.DeleteResource(context.Background(), nil, res.Id) }()
 
 	// Empty identifier
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(res.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(res.Id, 10)
 	resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateResourceRequest{ResourceIdentifier: "", Description: "x"})
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
@@ -164,7 +163,7 @@ func TestAPIResourceUpdatePut_DuplicateIdentifier(t *testing.T) {
 		_ = database.DeleteResource(context.Background(), nil, res2.Id)
 	}()
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(res2.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(res2.Id, 10)
 	resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateResourceRequest{ResourceIdentifier: res1.ResourceIdentifier, Description: "x"})
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
@@ -182,7 +181,7 @@ func TestAPIResourceUpdatePut_SystemLevelResourceAllowed(t *testing.T) {
 	assert.NotNil(t, sysRes)
 
 	// Update with same identifier (should succeed)
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(sysRes.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(sysRes.Id, 10)
 	newDesc := "Updated authserver description"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateResourceRequest{
 		ResourceIdentifier: sysRes.ResourceIdentifier, // Keep same identifier
@@ -207,7 +206,7 @@ func TestAPIResourceUpdatePut_SystemLevelResourceIdentifierChangeBlocked(t *test
 	assert.NotNil(t, sysRes)
 
 	// Attempt to change identifier (should fail)
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(sysRes.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(sysRes.Id, 10)
 	resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateResourceRequest{
 		ResourceIdentifier: "different-resource-identifier",
 		Description:        sysRes.Description,
@@ -225,7 +224,7 @@ func TestAPIResourceUpdatePut_InvalidIdAndBody(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Invalid ID
-	urlBad := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/abc"
+	urlBad := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/abc"
 	respBad := makeAPIRequest(t, "PUT", urlBad, accessToken, api.UpdateResourceRequest{ResourceIdentifier: "x", Description: "y"})
 	defer func() { _ = respBad.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, respBad.StatusCode)
@@ -234,14 +233,14 @@ func TestAPIResourceUpdatePut_InvalidIdAndBody(t *testing.T) {
 	assert.Equal(t, "Invalid resource ID", errRespBad.ErrorDescription)
 
 	// Not found
-	urlNF := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/9999999"
+	urlNF := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/9999999"
 	respNF := makeAPIRequest(t, "PUT", urlNF, accessToken, api.UpdateResourceRequest{ResourceIdentifier: "valid-" + fake.LetterN(6), Description: "y"})
 	defer func() { _ = respNF.Body.Close() }()
 	assert.Equal(t, http.StatusNotFound, respNF.StatusCode)
 
 	// Empty body -> invalid request body
 	// Build request manually with empty body
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/1"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/1"
 	req, err := http.NewRequest("PUT", url, nil)
 	assert.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
@@ -258,7 +257,7 @@ func TestAPIResourceUpdatePut_UnauthorizedAndScope(t *testing.T) {
 	res := createTestResource(t, "api-test-update-unauth-"+fake.LetterN(6), "desc")
 	defer func() { _ = database.DeleteResource(context.Background(), nil, res.Id) }()
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(res.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(res.Id, 10)
 
 	// No token
 	req, err := http.NewRequest("PUT", url, nil)
@@ -293,7 +292,7 @@ func TestAPIResourceUpdatePut_AngleBracketsRejected(t *testing.T) {
 		ResourceIdentifier: res.ResourceIdentifier,
 		Description:        "x > y",
 	}
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(res.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(res.Id, 10)
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -320,7 +319,7 @@ func TestAPIResourceUpdatePut_AmpersandsAndQuotesStoredVerbatim(t *testing.T) {
 		ResourceIdentifier: res.ResourceIdentifier,
 		Description:        `Tom & Jerry said "hi"`,
 	}
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(res.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources/" + strconv.FormatInt(res.Id, 10)
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 

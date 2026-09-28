@@ -8,7 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
@@ -24,7 +23,7 @@ func TestAPIResourcesCreate_Success(t *testing.T) {
 		Description:        "  Created via API  ",
 	}
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources"
 	resp := makeAPIRequest(t, "POST", url, accessToken, reqBody)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -81,7 +80,7 @@ func TestAPIResourcesCreate_ValidationErrors(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources"
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources"
 			resp := makeAPIRequest(t, "POST", url, accessToken, tc.body)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -106,7 +105,7 @@ func TestAPIResourcesCreate_DuplicateIdentifier(t *testing.T) {
 	defer func() { _ = database.DeleteResource(context.Background(), nil, existing.Id) }()
 
 	// Attempt to create with the same identifier
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources"
 	resp := makeAPIRequest(t, "POST", url, accessToken, api.CreateResourceRequest{
 		ResourceIdentifier: identifier,
 		Description:        "New",
@@ -122,7 +121,7 @@ func TestAPIResourcesCreate_DuplicateIdentifier(t *testing.T) {
 func TestAPIResourcesCreate_InvalidRequestBody(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources"
 	// makeAPIRequest with nil body sends empty body, leading to 400 from handler
 	resp := makeAPIRequest(t, "POST", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
@@ -131,7 +130,7 @@ func TestAPIResourcesCreate_InvalidRequestBody(t *testing.T) {
 }
 
 func TestAPIResourcesCreate_UnauthorizedAndScope(t *testing.T) {
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources"
 
 	// No token
 	req, err := http.NewRequest("POST", url, nil)
@@ -174,7 +173,7 @@ func TestAPIResourcesCreate_AngleBracketsRejected(t *testing.T) {
 		Description:        "O'Brien <the third>",
 	}
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources"
 	resp := makeAPIRequest(t, "POST", url, accessToken, reqBody)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -198,7 +197,7 @@ func TestAPIResourcesCreate_AmpersandsAndQuotesStoredVerbatim(t *testing.T) {
 		Description:        `  AT&T "Wireless"  `,
 	}
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources"
 	resp := makeAPIRequest(t, "POST", url, accessToken, reqBody)
 	defer func() { _ = resp.Body.Close() }()
 

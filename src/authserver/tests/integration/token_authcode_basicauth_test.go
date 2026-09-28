@@ -5,7 +5,6 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/stretchr/testify/assert"
 )
@@ -18,7 +17,7 @@ func TestToken_AuthCode_ClientSecretBasic_Success(t *testing.T) {
 	clientSecret := fake.LetterN(32)
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	// Use Basic auth instead of client_secret in form body
 	formData := url.Values{
@@ -46,7 +45,7 @@ func TestToken_AuthCode_ClientSecretBasic_WrongSecret(t *testing.T) {
 	clientSecret := fake.LetterN(32)
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	formData := url.Values{
 		"grant_type":    {"authorization_code"},
@@ -67,7 +66,7 @@ func TestToken_AuthCode_ClientSecretBasic_BothMethodsProvided(t *testing.T) {
 	clientSecret := fake.LetterN(32)
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	// Provide client_secret in BOTH Basic auth header AND form body
 	formData := url.Values{

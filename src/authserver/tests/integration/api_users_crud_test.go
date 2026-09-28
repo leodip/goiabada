@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
@@ -38,7 +37,7 @@ func TestAPIUserGet_Success(t *testing.T) {
 	}()
 
 	// Test: Get user by ID
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10)
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -64,7 +63,7 @@ func TestAPIUserGet_NotFound(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Test: Get non-existent user
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/99999"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/99999"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -88,7 +87,7 @@ func TestAPIUserGet_InvalidId(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + tc.userId
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + tc.userId
 			resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -115,7 +114,7 @@ func TestAPIUserGet_Unauthorized(t *testing.T) {
 	}()
 
 	// Test: Request without access token
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10)
 	req, err := http.NewRequest("GET", url, nil)
 	assert.NoError(t, err)
 
@@ -143,7 +142,7 @@ func TestAPIUserCreatePost_Success(t *testing.T) {
 		Password:        "password123",
 	}
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/create"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/create"
 	resp := makeAPIRequest(t, "POST", url, accessToken, createReq)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -217,7 +216,7 @@ func TestAPIUserCreatePost_DuplicateEmail(t *testing.T) {
 		Password:        "password123",
 	}
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/create"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/create"
 	resp := makeAPIRequest(t, "POST", url, accessToken, createReq)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -280,7 +279,7 @@ func TestAPIUserCreatePost_ValidationErrors(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/create"
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/create"
 			resp := makeAPIRequest(t, "POST", url, accessToken, tc.request)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -294,7 +293,7 @@ func TestAPIUserCreatePost_InvalidRequestBody(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Test: Invalid JSON
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/create"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/create"
 	req, err := http.NewRequest("POST", url, bytes.NewReader([]byte("invalid json")))
 	assert.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
@@ -322,7 +321,7 @@ func TestAPIUserCreatePost_Unauthorized(t *testing.T) {
 	reqBody, err := json.Marshal(createReq)
 	assert.NoError(t, err)
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/create"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/create"
 	req, err := http.NewRequest("POST", url, bytes.NewReader(reqBody))
 	assert.NoError(t, err)
 	req.Header.Set("Content-Type", "application/json")
@@ -361,7 +360,7 @@ func TestAPIUserEnabledPut_Success(t *testing.T) {
 		Enabled: false,
 	}
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/enabled"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/enabled"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -408,7 +407,7 @@ func TestAPIUserEnabledPut_EnableUser(t *testing.T) {
 		Enabled: true,
 	}
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/enabled"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/enabled"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -434,7 +433,7 @@ func TestAPIUserEnabledPut_NotFound(t *testing.T) {
 		Enabled: false,
 	}
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/99999/enabled"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/99999/enabled"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -451,7 +450,7 @@ func TestAPIUserEnabledPut_InvalidId(t *testing.T) {
 		Enabled: false,
 	}
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/invalid/enabled"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/invalid/enabled"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -479,7 +478,7 @@ func TestAPIUserEnabledPut_InvalidRequestBody(t *testing.T) {
 	}()
 
 	// Test: Invalid JSON
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/enabled"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/enabled"
 	req, err := http.NewRequest("PUT", url, bytes.NewReader([]byte("invalid json")))
 	assert.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
@@ -512,7 +511,7 @@ func TestAPIUserDelete_Success(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Test: Delete user
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10)
 	resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -539,7 +538,7 @@ func TestAPIUserDelete_NotFound(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Test: Delete non-existent user
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/99999"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/99999"
 	resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -562,7 +561,7 @@ func TestAPIUserDelete_InvalidId(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run("invalid ID: "+tc.id, func(t *testing.T) {
-			url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + tc.id
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + tc.id
 			resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -589,7 +588,7 @@ func TestAPIUserDelete_Unauthorized(t *testing.T) {
 	}()
 
 	// Test: Request without access token
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10)
 	req, err := http.NewRequest("DELETE", url, nil)
 	assert.NoError(t, err)
 
@@ -648,7 +647,7 @@ func TestAPIUserCreatePost_SetPasswordTypeIsEnforced(t *testing.T) {
 				Password:        tc.password,
 			}
 
-			url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/create"
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/create"
 			resp := makeAPIRequest(t, "POST", url, accessToken, req)
 			defer func() { _ = resp.Body.Close() }()
 

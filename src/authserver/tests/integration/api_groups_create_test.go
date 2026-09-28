@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
@@ -27,7 +26,7 @@ func TestHandleAPIGroupCreatePost_Success(t *testing.T) {
 	}
 
 	// Make POST request
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups"
 	resp := makeAPIRequest(t, "POST", url, accessToken, reqData)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -58,7 +57,7 @@ func TestHandleAPIGroupCreatePost_Success(t *testing.T) {
 func TestHandleAPIGroupCreatePost_ValidationErrors(t *testing.T) {
 	// Setup: Create admin client and get access token
 	accessToken, _ := createAdminClientWithToken(t)
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups"
 
 	testCases := []struct {
 		name           string
@@ -163,7 +162,7 @@ func TestHandleAPIGroupCreatePost_DuplicateGroupIdentifier(t *testing.T) {
 		"includeInAccessToken": true,
 	}
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups"
 	resp := makeAPIRequest(t, "POST", url, accessToken, reqData)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -191,7 +190,7 @@ func TestHandleAPIGroupCreatePost_AngleBracketsRejected(t *testing.T) {
 		"includeInAccessToken": false,
 	}
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups"
 	resp := makeAPIRequest(t, "POST", url, accessToken, reqData)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -221,7 +220,7 @@ func TestHandleAPIGroupCreatePost_AmpersandsAndQuotesStoredVerbatim(t *testing.T
 		"includeInAccessToken": false,
 	}
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups"
 	resp := makeAPIRequest(t, "POST", url, accessToken, reqData)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -252,7 +251,7 @@ func TestHandleAPIGroupCreatePost_Unauthorized(t *testing.T) {
 		"includeInAccessToken": false,
 	}
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups"
 	resp := makeAPIRequest(t, "POST", url, "", reqData) // Empty access token
 	defer func() { _ = resp.Body.Close() }()
 
@@ -267,7 +266,7 @@ func TestHandleAPIGroupCreatePost_InvalidJSON(t *testing.T) {
 	// Invalid JSON body
 	invalidJSON := `{"groupIdentifier": "test", "description": }`
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups"
 	req, err := http.NewRequest("POST", url, strings.NewReader(invalidJSON))
 	assert.NoError(t, err)
 	req.Header.Set("Content-Type", "application/json")

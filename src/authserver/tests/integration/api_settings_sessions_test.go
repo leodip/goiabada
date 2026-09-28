@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
 )
@@ -21,7 +20,7 @@ func TestAPISettingsSessionsGet_Success(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, settings)
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/sessions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/sessions"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -46,7 +45,7 @@ func TestAPISettingsSessionsPut_Success(t *testing.T) {
 		UserSessionMaxLifetimeInSeconds: 7200,
 	}
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/sessions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/sessions"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, req)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -71,7 +70,7 @@ func TestAPISettingsSessionsPut_Success(t *testing.T) {
 func TestAPISettingsSessionsPut_ValidationErrors(t *testing.T) {
 	restoreSettings(t)
 	accessToken, _ := createAdminClientWithToken(t)
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/sessions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/sessions"
 
 	// idle <= 0
 	resp1 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsSessionsRequest{
@@ -132,7 +131,7 @@ func TestAPISettingsSessionsPut_ValidationErrors(t *testing.T) {
 func TestAPISettingsSessionsPut_InvalidRequestBodyAndUnauthorized(t *testing.T) {
 	restoreSettings(t)
 	accessToken, _ := createAdminClientWithToken(t)
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/sessions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/sessions"
 
 	// Invalid body (nil/empty)
 	req, err := http.NewRequest("PUT", url, nil)
@@ -161,7 +160,7 @@ func TestAPISettingsSessionsPut_InvalidRequestBodyAndUnauthorized(t *testing.T) 
 }
 
 func TestAPISettingsSessions_UnauthorizedAndScope(t *testing.T) {
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/sessions"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/sessions"
 
 	// No token - GET
 	req, err := http.NewRequest("GET", url, nil)

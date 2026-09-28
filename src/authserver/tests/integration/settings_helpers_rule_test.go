@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
@@ -166,7 +165,7 @@ func TestRestoreSettings_PutsTheRowBackWhenTheTestEnds(t *testing.T) {
 	t.Run("changes the row", func(t *testing.T) {
 		restoreSettings(t)
 
-		resp := makeAPIRequest(t, "PUT", config.GetAuthServer().BaseURL+"/api/v1/admin/settings/general",
+		resp := makeAPIRequest(t, "PUT", appConfig.AuthServer.BaseURL+"/api/v1/admin/settings/general",
 			accessToken, api.UpdateSettingsGeneralRequest{
 				AppName:        "Restore probe",
 				Issuer:         "https://restore.example.org",

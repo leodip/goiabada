@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/leodip/goiabada/core/constants"
@@ -22,7 +21,7 @@ func getUserAccessTokenWithAccountScope_Phone(t *testing.T) (string, *models.Use
 func TestAPIAccountPhonePut_Success(t *testing.T) {
 	accessToken, u := getUserAccessTokenWithAccountScope_Phone(t)
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/account/phone"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/phone"
 	reqBody := api.UpdateAccountPhoneRequest{
 		PhoneCountryUniqueId: "USA_0",
 		PhoneNumber:          "555-123-4567",
@@ -61,14 +60,14 @@ func TestAPIAccountPhonePut_ClearPhone(t *testing.T) {
 	accessToken, u := getUserAccessTokenWithAccountScope_Phone(t)
 
 	// First set a phone
-	setURL := config.GetAuthServer().BaseURL + "/api/v1/account/phone"
+	setURL := appConfig.AuthServer.BaseURL + "/api/v1/account/phone"
 	_ = makeAPIRequest(t, "PUT", setURL, accessToken, api.UpdateAccountPhoneRequest{
 		PhoneCountryUniqueId: "USA_0",
 		PhoneNumber:          "555-000-1111",
 	})
 
 	// Now clear it
-	url := config.GetAuthServer().BaseURL + "/api/v1/account/phone"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/phone"
 	reqBody := api.UpdateAccountPhoneRequest{PhoneCountryUniqueId: "", PhoneNumber: ""}
 	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
 	defer func() { _ = resp.Body.Close() }()
@@ -86,7 +85,7 @@ func TestAPIAccountPhonePut_ClearPhone(t *testing.T) {
 
 func TestAPIAccountPhonePut_ValidationErrors(t *testing.T) {
 	accessToken, _ := getUserAccessTokenWithAccountScope_Phone(t)
-	url := config.GetAuthServer().BaseURL + "/api/v1/account/phone"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/phone"
 
 	// Phone number without country
 	resp1 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateAccountPhoneRequest{PhoneCountryUniqueId: "", PhoneNumber: "555-123-4567"})
@@ -138,7 +137,7 @@ func TestAPIAccountPhonePut_ValidationErrors(t *testing.T) {
 }
 
 func TestAPIAccountPhonePut_UnauthorizedAndScope(t *testing.T) {
-	url := config.GetAuthServer().BaseURL + "/api/v1/account/phone"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/phone"
 
 	// No token
 	req, err := http.NewRequest("PUT", url, nil)
@@ -170,7 +169,7 @@ func TestAPIAccountPhonePut_UnauthorizedAndScope(t *testing.T) {
 
 func TestAPIAccountPhonePut_InvalidRequestBody(t *testing.T) {
 	accessToken, _ := getUserAccessTokenWithAccountScope_Phone(t)
-	url := config.GetAuthServer().BaseURL + "/api/v1/account/phone"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/phone"
 
 	// Invalid JSON (no body)
 	req, err := http.NewRequest("PUT", url, nil)

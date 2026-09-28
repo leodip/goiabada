@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/sessionkeys"
 	"github.com/leodip/goiabada/core/api"
@@ -29,7 +28,7 @@ import (
 // broken.
 
 func sessionEndpointURL(operation string) string {
-	return config.GetAuthServer().BaseURL + "/api/v1/sessions/" + operation
+	return appConfig.AuthServer.BaseURL + "/api/v1/sessions/" + operation
 }
 
 // newTestSessionId mints an identifier the way the store does, so the fixtures below hash

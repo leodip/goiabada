@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/idtokenhint"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
@@ -31,7 +30,7 @@ func getUserAccessTokenAndCodeForAccountScope(t *testing.T) (*http.Client, strin
 	httpClient, code := createAuthCodeEnsuringUserScope(t, clientSecret, scope)
 
 	// Exchange code for tokens using the same client to preserve cookies for session
-	tokenEndpoint := config.GetAuthServer().BaseURL + "/auth/token/"
+	tokenEndpoint := appConfig.AuthServer.BaseURL + "/auth/token/"
 	form := url.Values{
 		"grant_type":    {"authorization_code"},
 		"client_id":     {code.Client.ClientIdentifier},
@@ -57,7 +56,7 @@ func TestAPIAccountLogoutRequest_Success_And_LogoutFlow_WithAndWithoutCookie(t *
 		State:                 fake.LetterN(12),
 		ResponseMode:          "redirect",
 	}
-	urlLogoutReq := config.GetAuthServer().BaseURL + "/api/v1/account/logout-request"
+	urlLogoutReq := appConfig.AuthServer.BaseURL + "/api/v1/account/logout-request"
 	resp := makeAPIRequest(t, "POST", urlLogoutReq, accessToken, reqBody)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -126,7 +125,7 @@ func TestLogout_WithIdTokenHint_NoRedirectTarget_LogsTheUserOut(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, before, "the ceremony should have left a session row to tear down")
 
-	resp, err := grant.httpClient.Get(config.GetAuthServer().BaseURL +
+	resp, err := grant.httpClient.Get(appConfig.AuthServer.BaseURL +
 		"/auth/logout?id_token_hint=" + url.QueryEscape(idToken))
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -171,7 +170,7 @@ func TestLogout_WithEncryptedIdTokenHint_LogsTheUserOut(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, before, "the ceremony should have left a session row to tear down")
 
-	resp, err := grant.httpClient.Get(config.GetAuthServer().BaseURL + "/auth/logout?" + url.Values{
+	resp, err := grant.httpClient.Get(appConfig.AuthServer.BaseURL + "/auth/logout?" + url.Values{
 		"id_token_hint": {hint},
 		"client_id":     {grant.client.ClientIdentifier},
 	}.Encode())
@@ -274,7 +273,7 @@ func logoutWithHint(t *testing.T, grant *offlineGrant, idToken string) {
 	t.Helper()
 
 	state := fake.LetterN(10)
-	logoutURL := config.GetAuthServer().BaseURL + "/auth/logout?id_token_hint=" + url.QueryEscape(idToken) +
+	logoutURL := appConfig.AuthServer.BaseURL + "/auth/logout?id_token_hint=" + url.QueryEscape(idToken) +
 		"&post_logout_redirect_uri=" + url.QueryEscape(grant.redirectURI) +
 		"&state=" + state
 
@@ -367,7 +366,7 @@ func TestLogout_WithIdTokenHint_OtherClientOnSession_KeepsSessionBoundTokensWork
 
 	logoutWithHint(t, grant, idToken)
 
-	data := postToTokenEndpoint(t, createHttpClient(t), config.GetAuthServer().BaseURL+"/auth/token/", url.Values{
+	data := postToTokenEndpoint(t, createHttpClient(t), appConfig.AuthServer.BaseURL+"/auth/token/", url.Values{
 		"grant_type":    {"refresh_token"},
 		"client_id":     {grant.client.ClientIdentifier},
 		"client_secret": {grant.clientSecret},
@@ -379,7 +378,7 @@ func TestLogout_WithIdTokenHint_OtherClientOnSession_KeepsSessionBoundTokensWork
 
 func TestAPIAccountLogoutRequest_ValidationErrors_And_Scope(t *testing.T) {
 	_, accessToken, _ := getUserAccessTokenAndCodeForAccountScope(t)
-	urlLogoutReq := config.GetAuthServer().BaseURL + "/api/v1/account/logout-request"
+	urlLogoutReq := appConfig.AuthServer.BaseURL + "/api/v1/account/logout-request"
 
 	// Missing postLogoutRedirectUri
 	resp1 := makeAPIRequest(t, "POST", urlLogoutReq, accessToken, map[string]string{})
@@ -640,7 +639,7 @@ func unmodelledCSPDirectives(policy string) []string {
 func logoutThroughConsentPage(t *testing.T, httpClient *http.Client, query url.Values) *http.Response {
 	t.Helper()
 
-	logoutURL := config.GetAuthServer().BaseURL + "/auth/logout"
+	logoutURL := appConfig.AuthServer.BaseURL + "/auth/logout"
 	if len(query) > 0 {
 		logoutURL += "?" + query.Encode()
 	}
@@ -835,12 +834,12 @@ func confirmLogoutConsentPage(t *testing.T, httpClient *http.Client, resp *http.
 
 	// The default encoding, which is what the absent enctype leaves in force: it is modelled on
 	// neither the form nor the submitter, so any attempt to change it fails above rather than here.
-	destURL := config.GetAuthServer().BaseURL + action
+	destURL := appConfig.AuthServer.BaseURL + action
 	req, err := http.NewRequest(strings.ToUpper(method), destURL, strings.NewReader(form.Encode()))
 	require.NoError(t, err)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Referer", destURL)
-	req.Header.Set("Origin", config.GetAuthServer().BaseURL)
+	req.Header.Set("Origin", appConfig.AuthServer.BaseURL)
 	resp, err = httpClient.Do(req)
 	require.NoError(t, err)
 	return resp
@@ -1096,7 +1095,7 @@ func crossOriginLogoutPost(t *testing.T, httpClient *http.Client, form url.Value
 	const foreignOrigin = "https://relying-party.example"
 
 	req, err := http.NewRequest(http.MethodPost,
-		config.GetAuthServer().BaseURL+"/auth/logout", strings.NewReader(form.Encode()))
+		appConfig.AuthServer.BaseURL+"/auth/logout", strings.NewReader(form.Encode()))
 	require.NoError(t, err)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Origin", foreignOrigin)
@@ -1118,7 +1117,7 @@ func followSeeOther(t *testing.T, httpClient *http.Client, resp *http.Response) 
 	location := resp.Header.Get("Location")
 	_ = resp.Body.Close()
 
-	target, err := url.Parse(config.GetAuthServer().BaseURL)
+	target, err := url.Parse(appConfig.AuthServer.BaseURL)
 	require.NoError(t, err)
 	next, err := target.Parse(location)
 	require.NoError(t, err)
@@ -1209,7 +1208,7 @@ func TestLogout_CrossOriginPost_ConfirmedHint_WithoutTheSessionCookie(t *testing
 
 	// Asserted rather than assumed. An empty jar is this case's entire premise: if a cookie were
 	// somehow riding along, every assertion below would still pass and would mean nothing.
-	base, err := url.Parse(config.GetAuthServer().BaseURL)
+	base, err := url.Parse(appConfig.AuthServer.BaseURL)
 	require.NoError(t, err)
 	require.Empty(t, cookieless.Jar.Cookies(base),
 		"the point of this case is the absence of the session cookie, so its absence is checked")
@@ -1360,7 +1359,7 @@ func TestLogout_CrossOriginPost_EmptyHint_ExemptsAndIsStillRejected(t *testing.T
 			grant := createOfflineGrant(t)
 
 			req, err := http.NewRequest(http.MethodPost,
-				config.GetAuthServer().BaseURL+"/auth/logout?"+route.query.Encode(),
+				appConfig.AuthServer.BaseURL+"/auth/logout?"+route.query.Encode(),
 				strings.NewReader(route.form.Encode()))
 			require.NoError(t, err)
 			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -1394,7 +1393,7 @@ func TestAPIAccountLogoutRequest_FormPostMode_AnswersAFormInstruction(t *testing
 	_, accessToken, code := getUserAccessTokenAndCodeForAccountScope(t)
 
 	state := fake.LetterN(12)
-	urlLogoutReq := config.GetAuthServer().BaseURL + "/api/v1/account/logout-request"
+	urlLogoutReq := appConfig.AuthServer.BaseURL + "/api/v1/account/logout-request"
 	resp := makeAPIRequest(t, "POST", urlLogoutReq, accessToken, api.AccountLogoutRequest{
 		PostLogoutRedirectUri: code.RedirectURI,
 		State:                 state,
@@ -1410,7 +1409,7 @@ func TestAPIAccountLogoutRequest_FormPostMode_AnswersAFormInstruction(t *testing
 
 	// The endpoint carries no query string. A hint appended here would be the leak this mode
 	// exists to close, arriving through the mode that is meant to prevent it.
-	assert.Equal(t, config.GetAuthServer().BaseURL+"/auth/logout", out.Endpoint)
+	assert.Equal(t, appConfig.AuthServer.BaseURL+"/auth/logout", out.Endpoint)
 	assert.NotContains(t, out.Endpoint, "?")
 	assert.NotContains(t, out.Endpoint, "id_token_hint")
 
@@ -1429,7 +1428,7 @@ func TestAPIAccountLogoutRequest_FormPostMode_AnswersAFormInstruction(t *testing
 // able to send an empty one, so neither may the form.
 func TestAPIAccountLogoutRequest_BothModesCarryTheSameParameters(t *testing.T) {
 	_, accessToken, code := getUserAccessTokenAndCodeForAccountScope(t)
-	urlLogoutReq := config.GetAuthServer().BaseURL + "/api/v1/account/logout-request"
+	urlLogoutReq := appConfig.AuthServer.BaseURL + "/api/v1/account/logout-request"
 
 	for _, state := range []string{fake.LetterN(12), ""} {
 		name := "with a state"
@@ -1458,7 +1457,7 @@ func TestAPIAccountLogoutRequest_BothModesCarryTheSameParameters(t *testing.T) {
 
 			u, err := url.Parse(redirect.LogoutUrl)
 			require.NoError(t, err)
-			assert.Equal(t, config.GetAuthServer().BaseURL+u.Path, form.Endpoint,
+			assert.Equal(t, appConfig.AuthServer.BaseURL+u.Path, form.Endpoint,
 				"both modes send the browser to the same endpoint")
 
 			// The hints differ: each response mints its own, with its own iat and signature. The
@@ -1493,7 +1492,7 @@ func TestAPIAccountLogoutRequest_BothModesCarryTheSameParameters(t *testing.T) {
 // gets exactly what it got before rather than a shape it cannot decode.
 func TestAPIAccountLogoutRequest_AbsentAndUnknownResponseModeStillRedirect(t *testing.T) {
 	_, accessToken, code := getUserAccessTokenAndCodeForAccountScope(t)
-	urlLogoutReq := config.GetAuthServer().BaseURL + "/api/v1/account/logout-request"
+	urlLogoutReq := appConfig.AuthServer.BaseURL + "/api/v1/account/logout-request"
 
 	for _, mode := range []string{"", "redirect", "form-post", "FORM_POST", "fragment"} {
 		t.Run("responseMode "+strconv.Quote(mode), func(t *testing.T) {

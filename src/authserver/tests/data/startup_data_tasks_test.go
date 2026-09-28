@@ -55,7 +55,7 @@ func TestNewDatabase_HandsTheStartupTasksThePreviousKey(t *testing.T) {
 		t.Skip("needs a DSN to a throwaway database, which only sqlite has; the call under test is engine-independent")
 	}
 
-	currentKey := config.GetAESEncryptionKey()
+	currentKey := dataKey
 	previousKey := bytes.Repeat([]byte{0x5a}, 32)
 	require.NotEqual(t, currentKey, previousKey,
 		"rotation is a no-op when the two keys match, so the fixture would prove nothing")
@@ -116,7 +116,7 @@ func TestNewDatabase_RefusesAStartupWhoseDataTasksFailed(t *testing.T) {
 		t.Skip("needs a DSN to a throwaway database, which only sqlite has; the arm under test is engine-independent")
 	}
 
-	currentKey := config.GetAESEncryptionKey()
+	currentKey := dataKey
 	previousKey := bytes.Repeat([]byte{0x5a}, 32)
 	unknownKey := bytes.Repeat([]byte{0x77}, 32)
 	require.NotEqual(t, currentKey, unknownKey,
@@ -208,7 +208,7 @@ func TestNewDatabase_RefusesADirtyDatabase(t *testing.T) {
 		"the runner writes exactly one row and refuses a table holding two, so the fixture has to be that row")
 	require.NoError(t, marker.DB.Close(), "released so the startup open is a fresh one")
 
-	opened, err := datafactory.NewDatabase(context.Background(), cfg, config.GetAESEncryptionKey(), nil, false)
+	opened, err := datafactory.NewDatabase(context.Background(), cfg, dataKey, nil, false)
 
 	require.Error(t, err,
 		"a database whose migration did not finish must not be reported as a successful startup")

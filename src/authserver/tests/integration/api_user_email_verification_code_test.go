@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
@@ -32,7 +31,7 @@ func TestAPIUserEmailVerificationCodePost_Success(t *testing.T) {
 		_ = database.DeleteUser(context.Background(), nil, user.Id)
 	}()
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(user.Id, 10) + "/email/verification-code"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(user.Id, 10) + "/email/verification-code"
 	resp := makeAPIRequest(t, "POST", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -76,7 +75,7 @@ func TestAPIUserEmailVerificationCodePost_VerifiedUser(t *testing.T) {
 		_ = database.DeleteUser(context.Background(), nil, user.Id)
 	}()
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(user.Id, 10) + "/email/verification-code"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(user.Id, 10) + "/email/verification-code"
 	resp := makeAPIRequest(t, "POST", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -104,7 +103,7 @@ func TestAPIUserEmailVerificationCodePost_VerifiedUser(t *testing.T) {
 func TestAPIUserEmailVerificationCodePost_NotFound(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/999999/email/verification-code"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/999999/email/verification-code"
 	resp := makeAPIRequest(t, "POST", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -118,7 +117,7 @@ func TestAPIUserEmailVerificationCodePost_NotFound(t *testing.T) {
 func TestAPIUserEmailVerificationCodePost_InvalidUserId(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/invalid/email/verification-code"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/invalid/email/verification-code"
 	resp := makeAPIRequest(t, "POST", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -130,7 +129,7 @@ func TestAPIUserEmailVerificationCodePost_InvalidUserId(t *testing.T) {
 }
 
 func TestAPIUserEmailVerificationCodePost_Unauthorized(t *testing.T) {
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/1/email/verification-code"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/1/email/verification-code"
 	req, err := http.NewRequest("POST", url, nil)
 	assert.NoError(t, err)
 
@@ -147,7 +146,7 @@ func TestAPIUserEmailVerificationCodePost_Unauthorized(t *testing.T) {
 
 func TestAPIUserEmailVerificationCodePost_InsufficientScope(t *testing.T) {
 	token := createClientCredentialsTokenWithoutRouteScope(t)
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/1/email/verification-code"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/1/email/verification-code"
 	resp := makeAPIRequest(t, "POST", url, token, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -158,7 +157,7 @@ func TestAPIUserEmailVerificationCodePost_InsufficientScope(t *testing.T) {
 }
 
 func TestAPIUserEmailVerificationCodePost_InvalidToken(t *testing.T) {
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/1/email/verification-code"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/1/email/verification-code"
 	resp := makeAPIRequest(t, "POST", url, "invalid-token", nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -184,7 +183,7 @@ func TestAPIUserEmailVerificationCodePost_RegeneratesCode(t *testing.T) {
 		_ = database.DeleteUser(context.Background(), nil, user.Id)
 	}()
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(user.Id, 10) + "/email/verification-code"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(user.Id, 10) + "/email/verification-code"
 
 	resp1 := makeAPIRequest(t, "POST", url, accessToken, nil)
 	defer func() { _ = resp1.Body.Close() }()

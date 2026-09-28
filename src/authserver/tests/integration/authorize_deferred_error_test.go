@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
@@ -73,7 +72,7 @@ func TestAuthorize_Deferred_CookielessRequestIsSentToLogin(t *testing.T) {
 
 	location := assertRedirect(t, resp, "/auth/level1")
 
-	assert.True(t, strings.HasPrefix(location, config.GetAuthServer().BaseURL),
+	assert.True(t, strings.HasPrefix(location, appConfig.AuthServer.BaseURL),
 		"the browser must be kept on this server, got %q", location)
 	assert.NotContains(t, location, "deferred.example.com",
 		"the client's redirect URI must not be emitted to an unauthenticated browser, got %q", location)
@@ -142,7 +141,7 @@ func TestAuthorize_Deferred_MalformedMaxAgeDeliversAfterLogin(t *testing.T) {
 	client, user, password := newDeferralClient(t)
 	httpClient := createHttpClient(t)
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(deferralRedirectURI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -206,7 +205,7 @@ func TestAuthorize_Deferred_NonConformingDescriptionMatchesTheImmediatePath(t *t
 	client, user, password := newDeferralClient(t)
 
 	const emojiScope = "emoji💣scope"
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(deferralRedirectURI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -261,7 +260,7 @@ func TestAuthorizePost_Deferred_CookielessRequestIsSentToLogin(t *testing.T) {
 	form.Set("state", deferralState)
 
 	req, err := http.NewRequest(http.MethodPost,
-		config.GetAuthServer().BaseURL+"/auth/authorize", strings.NewReader(form.Encode()))
+		appConfig.AuthServer.BaseURL+"/auth/authorize", strings.NewReader(form.Encode()))
 	require.NoError(t, err)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Origin", "https://www.certification.openid.net")
@@ -294,7 +293,7 @@ func TestAuthorize_Deferred_LeavesNoUserSession(t *testing.T) {
 	_ = resp.Body.Close()
 
 	// A second request, this time a perfectly valid one, on the same cookie jar.
-	valid := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	valid := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(deferralRedirectURI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -313,7 +312,7 @@ func TestAuthorize_Deferred_LeavesNoUserSession(t *testing.T) {
 // validations pass and the scope is what the client is answered about. responseMode is omitted from
 // the URL when empty, which is the query default.
 func deferralAuthorizeURL(clientIdentifier string, responseMode string) string {
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + clientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + clientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(deferralRedirectURI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +

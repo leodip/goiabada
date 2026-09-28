@@ -6,7 +6,6 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/oauth"
@@ -19,7 +18,7 @@ func exchangeAuthCode(t *testing.T, httpClient *http.Client, clientIdentifier, c
 	code, redirectURI, codeVerifier string) string {
 	t.Helper()
 
-	data := postToTokenEndpoint(t, httpClient, config.GetAuthServer().BaseURL+"/auth/token/", url.Values{
+	data := postToTokenEndpoint(t, httpClient, appConfig.AuthServer.BaseURL+"/auth/token/", url.Values{
 		"grant_type":    {"authorization_code"},
 		"client_id":     {clientIdentifier},
 		"code":          {code},
@@ -36,7 +35,7 @@ func rotateRefreshToken(t *testing.T, httpClient *http.Client, clientIdentifier,
 	refreshToken string) string {
 	t.Helper()
 
-	data := postToTokenEndpoint(t, httpClient, config.GetAuthServer().BaseURL+"/auth/token/", url.Values{
+	data := postToTokenEndpoint(t, httpClient, appConfig.AuthServer.BaseURL+"/auth/token/", url.Values{
 		"grant_type":    {"refresh_token"},
 		"client_id":     {clientIdentifier},
 		"refresh_token": {refreshToken},
@@ -54,7 +53,7 @@ func replayRefreshToken(t *testing.T, httpClient *http.Client, clientIdentifier,
 	refreshToken string) (int, map[string]interface{}) {
 	t.Helper()
 
-	status, body, err := concurrentTokenPost(httpClient, config.GetAuthServer().BaseURL+"/auth/token/", url.Values{
+	status, body, err := concurrentTokenPost(httpClient, appConfig.AuthServer.BaseURL+"/auth/token/", url.Values{
 		"grant_type":    {"refresh_token"},
 		"client_id":     {clientIdentifier},
 		"refresh_token": {refreshToken},
@@ -116,7 +115,7 @@ func codeOnSameSessionForNewClient(t *testing.T, httpClient *http.Client, client
 	require.NoError(t, database.CreateRedirectURI(context.Background(), nil, redirectURI))
 
 	const codeVerifier = "code-verifier-second-client"
-	destURL := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destURL := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectURI.URI) +
 		"&response_type=code&code_challenge_method=S256" +
 		"&code_challenge=" + oauth.GeneratePKCECodeChallenge(codeVerifier) +
@@ -230,7 +229,7 @@ func TestToken_Refresh_Replay_ContainsROPCFamily(t *testing.T) {
 	user := createROPCUser(t, password)
 
 	httpClient := createHttpClient(t)
-	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	data := postToTokenEndpoint(t, httpClient, destUrl, url.Values{
 		"grant_type":    {"password"},

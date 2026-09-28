@@ -8,7 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/stretchr/testify/require"
 )
@@ -27,7 +26,7 @@ import (
 // the refused half never reaches one, and the allowed half only has to come back as something other
 // than the CSRF 403.
 func TestCsrf_MiddlewareIsRegistered(t *testing.T) {
-	destUrl := config.GetAuthServer().BaseURL + "/auth/pwd"
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/pwd"
 
 	post := func(t *testing.T, headers map[string]string) *http.Response {
 		t.Helper()

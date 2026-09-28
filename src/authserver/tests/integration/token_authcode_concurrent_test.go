@@ -10,7 +10,6 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/stretchr/testify/assert"
 )
@@ -28,7 +27,7 @@ func concurrentTokenPost(client *http.Client, urlStr string, formData url.Values
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Referer", urlStr)
-	req.Header.Set("Origin", config.GetAuthServer().BaseURL)
+	req.Header.Set("Origin", appConfig.AuthServer.BaseURL)
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -57,7 +56,7 @@ func TestToken_AuthCode_ConcurrentDoubleSpend_IssuesOnlyOnce(t *testing.T) {
 	clientSecret := fake.LetterN(32)
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 	formData := url.Values{
 		"grant_type":    {"authorization_code"},
 		"client_id":     {code.Client.ClientIdentifier},

@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
 )
@@ -17,7 +16,7 @@ func TestAPIClientsGet_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Test: Get all clients
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -52,7 +51,7 @@ func TestAPIClientsGet_Success(t *testing.T) {
 
 func TestAPIClientsGet_Unauthorized(t *testing.T) {
 	// Test: Request without access token
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients"
 	req, err := http.NewRequest("GET", url, nil)
 	assert.NoError(t, err)
 
@@ -71,7 +70,7 @@ func TestAPIClientGet_Success(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// First get all clients to find one to test with
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -83,7 +82,7 @@ func TestAPIClientGet_Success(t *testing.T) {
 	clientId := getResponse.Clients[0].Id
 
 	// Test: Get specific client
-	url = config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(clientId, 10)
+	url = appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(clientId, 10)
 	resp = makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -109,7 +108,7 @@ func TestAPIClientGet_NotFound(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Test: Get non-existent client
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/99999"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/99999"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -132,7 +131,7 @@ func TestAPIClientGet_InvalidId(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + tc.clientId
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + tc.clientId
 			resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -147,7 +146,7 @@ func TestAPIClientGet_EmptyId(t *testing.T) {
 
 	// Test: Request with empty ID (this will actually hit the listing endpoint due to router behavior)
 	// The URL "/api/v1/admin/clients/" matches the listing route, not the detail route
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -158,7 +157,7 @@ func TestAPIClientGet_EmptyId(t *testing.T) {
 
 func TestAPIClientGet_Unauthorized(t *testing.T) {
 	// Test: Request without access token
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/1"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/1"
 	req, err := http.NewRequest("GET", url, nil)
 	assert.NoError(t, err)
 

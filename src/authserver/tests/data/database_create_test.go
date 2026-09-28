@@ -84,7 +84,7 @@ func TestNewDatabase_CreateFalse_AbsentDatabaseIsTheConstructorsError(t *testing
 		t.Skip("sqlite has no create statement to skip; an absent file is decided by the DSN's mode")
 	}
 
-	cfg := config.GetDatabase()
+	cfg := &appConfig.Database
 	name := isolatedDBName()
 
 	var err error
@@ -144,7 +144,7 @@ func TestNewMsSQLDatabase_CreateTrue_LeavesAPreCreatedDatabaseAlone(t *testing.T
 	// a database that came out at it cannot be mistaken for one the constructor created.
 	const operatorCollation = "SQL_Latin1_General_CP1_CI_AS"
 
-	cfg := config.GetDatabase()
+	cfg := &appConfig.Database
 	name := isolatedDBName()
 
 	master, err := sql.Open("sqlserver", msSQLMasterDSN(cfg))
@@ -203,7 +203,7 @@ func TestNewSQLiteDatabase_ModeRWDoesNotCreateTheFile(t *testing.T) {
 // on its way to failing.
 func serverDatabaseExists(t *testing.T, name string) bool {
 	t.Helper()
-	cfg := config.GetDatabase()
+	cfg := &appConfig.Database
 
 	var dsn, driver, query string
 	switch dbType() {
@@ -264,7 +264,7 @@ func TestNewDatabase_CreateTrue_ConcurrentConstructorsAgainstAnAbsentDatabase(t 
 		t.Fatalf("unsupported db type %q", dbType())
 	}
 
-	cfg := config.GetDatabase()
+	cfg := &appConfig.Database
 	name := isolatedDBName()
 	require.False(t, serverDatabaseExists(t, name), "the race has to start against an ABSENT database, which is the only case that is not already serialised by the database being there")
 	t.Cleanup(func() { dropServerDatabase(t, cfg, name) })
@@ -315,7 +315,7 @@ func TestNewMsSQLDatabase_CreateTrue_CaseVariantNamesRaceToOneDatabase(t *testin
 		t.Skipf("%s does not compare database names case-insensitively, so there are no case variants to collide", dbType())
 	}
 
-	cfg := config.GetDatabase()
+	cfg := &appConfig.Database
 	lower := isolatedDBName()
 	upper := strings.ToUpper(lower)
 	require.NotEqual(t, lower, upper, "the two spellings have to actually differ for this to test anything")
@@ -452,7 +452,7 @@ func TestNewDatabase_CreateTrue_AnUnrelatedLockHolderDoesNotBlockAnOrdinaryResta
 		t.Fatalf("unsupported db type %q", dbType())
 	}
 
-	cfg := config.GetDatabase()
+	cfg := &appConfig.Database
 	name := isolatedDBName()
 	t.Cleanup(func() { dropServerDatabase(t, cfg, name) })
 
@@ -579,7 +579,7 @@ func holdCreationLock(t *testing.T, cfg *config.DatabaseConfig, name string) {
 // needs: "exactly one" and "at least one" are the passing and failing answers there.
 func countServerDatabases(t *testing.T, name string) int {
 	t.Helper()
-	cfg := config.GetDatabase()
+	cfg := &appConfig.Database
 
 	var dsn, driver, query string
 	switch dbType() {
@@ -663,7 +663,7 @@ func TestNewDatabase_CreateTrue_TheNameItCreatesIsTheNameItConnectsTo(t *testing
 		{"a hyphen", "goiabada-hyphen-" + strings.TrimPrefix(isolatedDBName(), "goiabada_mig_")},
 	} {
 		t.Run(tc.label, func(t *testing.T) {
-			cfg := config.GetDatabase()
+			cfg := &appConfig.Database
 			name := tc.name
 
 			var sqlDB *sql.DB
@@ -726,7 +726,7 @@ func TestNewDatabase_CreateTrue_TheNameItCreatesIsTheNameItConnectsTo(t *testing
 // this server answer to this name (#293).
 func serverDatabasesMatchingFold(t *testing.T, name string) int {
 	t.Helper()
-	cfg := config.GetDatabase()
+	cfg := &appConfig.Database
 
 	var dsn, driver, query string
 	switch dbType() {

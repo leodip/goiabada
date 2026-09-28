@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/stretchr/testify/assert"
@@ -64,7 +63,7 @@ func TestPromptNone_ImplicitResponseTypeToken(t *testing.T) {
 	client, redirectUri := createImplicitClientForPromptTests(t)
 
 	requestState := fake.LetterN(8)
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=token" +
 		"&scope=" + url.QueryEscape("openid profile") +
@@ -109,7 +108,7 @@ func TestPromptNone_ImplicitResponseTypeIdToken(t *testing.T) {
 
 	requestState := fake.LetterN(8)
 	requestNonce := "test-nonce-" + fake.LetterN(16)
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=id_token" +
 		"&scope=" + url.QueryEscape("openid profile") +
@@ -153,7 +152,7 @@ func TestPromptNone_ImplicitResponseTypeIdTokenToken(t *testing.T) {
 
 	requestState := fake.LetterN(8)
 	requestNonce := "test-nonce-" + fake.LetterN(16)
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=" + url.QueryEscape("id_token token") +
 		"&scope=" + url.QueryEscape("openid profile") +
@@ -204,7 +203,7 @@ func TestPromptNone_ImplicitAuthTimeCorrect(t *testing.T) {
 	// Use prompt=none at T2 with implicit flow
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=" + url.QueryEscape("id_token token") +
 		"&scope=" + url.QueryEscape("openid profile") +
@@ -248,7 +247,7 @@ func TestPromptNone_ImplicitMissingNonce(t *testing.T) {
 
 	requestState := fake.LetterN(8)
 	// Missing nonce - required for response_type=id_token
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=id_token" +
 		"&scope=" + url.QueryEscape("openid profile") +

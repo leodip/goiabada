@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/core/constants"
 	"github.com/stretchr/testify/assert"
 )
@@ -38,7 +37,7 @@ func TestSession_AdminAPI_DeletedSessionRejectsBearer(t *testing.T) {
 	sid := extractSidClaim(t, accessToken)
 	assert.NotEmpty(t, sid, "user-bound auth-code token must carry a sid claim")
 
-	adminURL := config.GetAuthServer().BaseURL + "/api/v1/admin/users/search"
+	adminURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/search"
 
 	// Pre-condition: token works while session is alive.
 	resp := makeAPIRequest(t, "GET", adminURL, accessToken, nil)
@@ -72,7 +71,7 @@ func TestSession_AccountAPI_DeletedSessionRejectsBearer(t *testing.T) {
 	sid := extractSidClaim(t, accessToken)
 	assert.NotEmpty(t, sid, "account-scope token must carry a sid claim")
 
-	accountURL := config.GetAuthServer().BaseURL + "/api/v1/account/profile"
+	accountURL := appConfig.AuthServer.BaseURL + "/api/v1/account/profile"
 
 	// Pre-condition: token works.
 	resp := makeAPIRequest(t, "GET", accountURL, accessToken, nil)
@@ -106,7 +105,7 @@ func TestSession_ClientCredentialsToken_NoSidPassesThrough(t *testing.T) {
 	sid := extractSidClaim(t, accessToken)
 	assert.Empty(t, sid, "client_credentials tokens must not carry a sid claim")
 
-	adminURL := config.GetAuthServer().BaseURL + "/api/v1/admin/users/search"
+	adminURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/search"
 	resp := makeAPIRequest(t, "GET", adminURL, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 

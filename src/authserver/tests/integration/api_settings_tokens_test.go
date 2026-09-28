@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
 )
@@ -21,7 +20,7 @@ func TestAPISettingsTokensGet_Success(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, settings)
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/tokens"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/tokens"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -52,7 +51,7 @@ func TestAPISettingsTokensPut_Success(t *testing.T) {
 		IncludeOpenIDConnectClaimsInIdToken:     false,
 	}
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/tokens"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/tokens"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, req)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -83,7 +82,7 @@ func TestAPISettingsTokensPut_Success(t *testing.T) {
 func TestAPISettingsTokensPut_ValidationErrors(t *testing.T) {
 	restoreSettings(t)
 	accessToken, _ := createAdminClientWithToken(t)
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/tokens"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/tokens"
 
 	// token expiration <= 0
 	resp1 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateSettingsTokensRequest{
@@ -187,7 +186,7 @@ func TestAPISettingsTokensPut_ValidationErrors(t *testing.T) {
 func TestAPISettingsTokens_InvalidRequestBodyAndUnauthorized(t *testing.T) {
 	restoreSettings(t)
 	accessToken, _ := createAdminClientWithToken(t)
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/tokens"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/tokens"
 
 	// Invalid body (nil/empty)
 	req, err := http.NewRequest("PUT", url, nil)
@@ -216,7 +215,7 @@ func TestAPISettingsTokens_InvalidRequestBodyAndUnauthorized(t *testing.T) {
 }
 
 func TestAPISettingsTokens_UnauthorizedAndScope(t *testing.T) {
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/settings/tokens"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/settings/tokens"
 
 	// No token - GET
 	req, err := http.NewRequest("GET", url, nil)

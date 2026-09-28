@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
@@ -119,7 +118,7 @@ func TestImplicitFlow_TokenResponseType(t *testing.T) {
 	requestState := fake.LetterN(16)
 	requestScope := "openid"
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=token" +
 		"&scope=" + url.QueryEscape(requestScope) +
@@ -188,7 +187,7 @@ func TestImplicitFlow_IdTokenResponseType(t *testing.T) {
 	requestNonce := fake.LetterN(16) // Required for id_token
 	requestScope := "openid"
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=id_token" +
 		"&scope=" + url.QueryEscape(requestScope) +
@@ -263,7 +262,7 @@ func TestImplicitFlow_IdTokenTokenResponseType(t *testing.T) {
 	requestNonce := fake.LetterN(16)
 	requestScope := "openid profile email"
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=" + url.QueryEscape("id_token token") +
 		"&scope=" + url.QueryEscape(requestScope) +
@@ -334,7 +333,7 @@ func TestImplicitFlow_Disabled_GlobalSetting(t *testing.T) {
 
 	requestState := fake.LetterN(16)
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=token" +
 		"&scope=openid" +
@@ -369,7 +368,7 @@ func TestImplicitFlow_ClientOverride_Enabled(t *testing.T) {
 
 	requestState := fake.LetterN(16)
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=token" +
 		"&scope=openid" +
@@ -423,7 +422,7 @@ func TestImplicitFlow_ClientOverride_Disabled(t *testing.T) {
 
 	requestState := fake.LetterN(16)
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=token" +
 		"&scope=openid" +
@@ -453,7 +452,7 @@ func TestImplicitFlow_MissingNonce_IdToken(t *testing.T) {
 	requestState := fake.LetterN(16)
 
 	// No nonce parameter
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=id_token" +
 		"&scope=openid" +
@@ -484,7 +483,7 @@ func TestImplicitFlow_MissingOpenIdScope_IdToken(t *testing.T) {
 	requestNonce := fake.LetterN(16)
 
 	// No openid scope
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=id_token" +
 		"&scope=profile" +
@@ -532,7 +531,7 @@ func TestImplicitFlow_UnsupportedResponseType_HybridFlow(t *testing.T) {
 	requestState := fake.LetterN(16)
 
 	// Try hybrid flow: code token
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=" + url.QueryEscape("code token") +
 		"&scope=openid" +
@@ -567,7 +566,7 @@ func TestImplicitFlow_ValidateAccessToken(t *testing.T) {
 	requestState := fake.LetterN(16)
 	requestScope := "openid profile"
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=token" +
 		"&scope=" + url.QueryEscape(requestScope) +
@@ -624,7 +623,7 @@ func TestImplicitFlow_ValidateAccessToken(t *testing.T) {
 	assert.NotEmpty(t, claims["exp"])
 
 	// Use access token to call userinfo endpoint
-	userinfoUrl := config.GetAuthServer().BaseURL + "/userinfo"
+	userinfoUrl := appConfig.AuthServer.BaseURL + "/userinfo"
 	req, err := http.NewRequest("GET", userinfoUrl, nil)
 	assert.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
@@ -645,7 +644,7 @@ func TestImplicitFlow_ErrorInFragment(t *testing.T) {
 	requestState := fake.LetterN(16)
 
 	// Missing openid scope for id_token - should return error in fragment
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=id_token" +
 		"&scope=profile" +
@@ -711,7 +710,7 @@ func TestImplicitFlow_WithResourcePermissions(t *testing.T) {
 	// Include resource permission in scope
 	requestScope := "openid profile " + resource.ResourceIdentifier + ":" + permission.PermissionIdentifier
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=token" +
 		"&scope=" + url.QueryEscape(requestScope) +
@@ -776,7 +775,7 @@ func TestImplicitFlow_AtHashValidation(t *testing.T) {
 	requestNonce := fake.LetterN(16)
 	requestScope := "openid"
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=" + url.QueryEscape("id_token token") +
 		"&scope=" + url.QueryEscape(requestScope) +
@@ -862,7 +861,7 @@ func TestImplicitFlow_NoRefreshTokenInResponse(t *testing.T) {
 	// Request multiple scopes to verify no refresh token is issued
 	requestScope := "openid profile email"
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=" + url.QueryEscape("id_token token") +
 		"&scope=" + url.QueryEscape(requestScope) +
@@ -930,7 +929,7 @@ func TestImplicitFlow_StatePreservation(t *testing.T) {
 			client, redirectUri := createImplicitFlowClient(t, nil)
 			user, password := createTestUserForImplicit(t)
 
-			destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+			destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 				"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 				"&response_type=token" +
 				"&scope=openid" +
@@ -982,7 +981,7 @@ func TestImplicitFlow_EmptyState(t *testing.T) {
 	user, password := createTestUserForImplicit(t)
 
 	// No state parameter
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=token" +
 		"&scope=openid"
@@ -1036,7 +1035,7 @@ func TestImplicitFlow_NonceInIdToken(t *testing.T) {
 	requestNonce := "unique-nonce-" + fake.LetterN(16)
 	requestState := fake.LetterN(16)
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=id_token" +
 		"&scope=openid" +
@@ -1098,7 +1097,7 @@ func TestImplicitFlow_AudienceInTokens(t *testing.T) {
 	requestNonce := fake.LetterN(16)
 	requestState := fake.LetterN(16)
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=" + url.QueryEscape("id_token token") +
 		"&scope=openid" +
@@ -1186,7 +1185,7 @@ func TestImplicitFlow_AuthCodeFlowClient_CanAlsoUseImplicit(t *testing.T) {
 	requestState := fake.LetterN(16)
 
 	// Use implicit flow with this client
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=token" +
 		"&scope=openid" +

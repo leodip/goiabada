@@ -10,7 +10,6 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
@@ -40,7 +39,7 @@ func TestAPIGroupsSearch_Annotated_Success(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Query page 1 with a large size to increase chance our groups are returned
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/search?annotatePermissionId=" + strconv.FormatInt(perm.Id, 10) + "&page=1&size=200"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/search?annotatePermissionId=" + strconv.FormatInt(perm.Id, 10) + "&page=1&size=200"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -77,7 +76,7 @@ func TestAPIGroupsSearch_Annotated_Success(t *testing.T) {
 func TestAPIGroupsSearch_MissingAnnotateParam(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/search?page=1&size=10" // missing annotatePermissionId
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/search?page=1&size=10" // missing annotatePermissionId
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -91,7 +90,7 @@ func TestAPIGroupsSearch_MissingAnnotateParam(t *testing.T) {
 func TestAPIGroupsSearch_InvalidAnnotateParam(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/search?annotatePermissionId=abc&page=1&size=10"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/search?annotatePermissionId=abc&page=1&size=10"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -107,7 +106,7 @@ func TestAPIGroupsSearch_PermissionNotFound(t *testing.T) {
 
 	// Use a random large ID that should not exist
 	missingId := int64(fake.Number(9_000_000, 9_999_999))
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/search?annotatePermissionId=" + strconv.FormatInt(missingId, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/search?annotatePermissionId=" + strconv.FormatInt(missingId, 10)
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -122,7 +121,7 @@ func TestAPIGroupsSearch_Unauthorized(t *testing.T) {
 	// Create a permission to reference
 	resource := createResource(t)
 	perm := createPermission(t, resource.Id)
-	u := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/search?annotatePermissionId=" + neturl.QueryEscape(strconv.FormatInt(perm.Id, 10))
+	u := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/search?annotatePermissionId=" + neturl.QueryEscape(strconv.FormatInt(perm.Id, 10))
 
 	httpClient := createHttpClient(t)
 	req, _ := http.NewRequest("GET", u, nil)

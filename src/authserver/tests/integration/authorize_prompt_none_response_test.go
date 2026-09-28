@@ -5,7 +5,6 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/stretchr/testify/assert"
 )
@@ -21,7 +20,7 @@ func TestPromptNone_Error_QueryModeDefault(t *testing.T) {
 
 	requestState := fake.LetterN(8)
 	requestCodeChallenge := fake.LetterN(43)
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -60,7 +59,7 @@ func TestPromptNone_Error_QueryModeExplicit(t *testing.T) {
 
 	requestState := fake.LetterN(8)
 	requestCodeChallenge := fake.LetterN(43)
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -98,7 +97,7 @@ func TestPromptNone_Error_FragmentMode(t *testing.T) {
 
 	requestState := fake.LetterN(8)
 	requestCodeChallenge := fake.LetterN(43)
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -143,7 +142,7 @@ func TestPromptNone_Success_QueryMode(t *testing.T) {
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
 	requestCodeChallenge := fake.LetterN(43)
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -188,7 +187,7 @@ func TestPromptNone_Success_FragmentMode(t *testing.T) {
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
 	requestCodeChallenge := fake.LetterN(43)
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -238,7 +237,7 @@ func TestPromptNone_Success_FormPostMode(t *testing.T) {
 	requestState := fake.LetterN(8)
 	requestNonce := fake.LetterN(8)
 	requestCodeChallenge := fake.LetterN(43)
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -278,7 +277,7 @@ func TestPromptNone_Error_FormPostMode(t *testing.T) {
 
 	requestState := fake.LetterN(8)
 	requestCodeChallenge := fake.LetterN(43)
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -316,7 +315,7 @@ func TestPromptNone_StateEchoedOnError(t *testing.T) {
 
 	requestState := "my-custom-state-" + fake.LetterN(16)
 	requestCodeChallenge := fake.LetterN(43)
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -343,7 +342,7 @@ func TestPromptNone_StateEchoedOnSuccess(t *testing.T) {
 	requestState := "success-state-" + fake.LetterN(16)
 	requestNonce := fake.LetterN(8)
 	requestCodeChallenge := fake.LetterN(43)
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -375,7 +374,7 @@ func TestPromptNone_NoStateInRequest(t *testing.T) {
 
 	requestCodeChallenge := fake.LetterN(43)
 	// No state parameter
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -410,7 +409,7 @@ func TestPromptNone_EmptyStateInRequest(t *testing.T) {
 
 	requestCodeChallenge := fake.LetterN(43)
 	// Empty state parameter
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +

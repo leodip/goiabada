@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
@@ -40,7 +39,7 @@ func TestAPIPermissionUsersGet_Success(t *testing.T) {
 	assignPermissionToUser(t, u1.Id, perm.Id)
 	assignPermissionToUser(t, u3.Id, perm.Id)
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/permissions/" + strconv.FormatInt(perm.Id, 10) + "/users?page=1&size=200"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/permissions/" + strconv.FormatInt(perm.Id, 10) + "/users?page=1&size=200"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -72,7 +71,7 @@ func TestAPIPermissionUsersGet_Success(t *testing.T) {
 
 func TestAPIPermissionUsersGet_InvalidPermissionId(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/permissions/invalid/users"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/permissions/invalid/users"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
@@ -84,7 +83,7 @@ func TestAPIPermissionUsersGet_InvalidPermissionId(t *testing.T) {
 func TestAPIPermissionUsersGet_PermissionNotFound(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 	missingId := int64(fake.Number(7_000_000, 7_999_999))
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/permissions/" + strconv.FormatInt(missingId, 10) + "/users"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/permissions/" + strconv.FormatInt(missingId, 10) + "/users"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
@@ -127,7 +126,7 @@ func TestAPIPermissionUsersGet_AnAuthServerPermission(t *testing.T) {
 			// the suite reaches this test.
 			var emails []string
 			for page := 1; ; page++ {
-				url := config.GetAuthServer().BaseURL + "/api/v1/admin/permissions/" + strconv.FormatInt(perm.Id, 10) + "/users?page=" + strconv.Itoa(page) + "&size=200"
+				url := appConfig.AuthServer.BaseURL + "/api/v1/admin/permissions/" + strconv.FormatInt(perm.Id, 10) + "/users?page=" + strconv.Itoa(page) + "&size=200"
 				resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 				require.Equal(t, http.StatusOK, resp.StatusCode)
 				var apiResp api.GetUsersByPermissionResponse
@@ -148,7 +147,7 @@ func TestAPIPermissionUsersGet_AnAuthServerPermission(t *testing.T) {
 func TestAPIPermissionUsersGet_Unauthorized(t *testing.T) {
 	res := createResource(t)
 	perm := createPermission(t, res.Id)
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/permissions/" + strconv.FormatInt(perm.Id, 10) + "/users"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/permissions/" + strconv.FormatInt(perm.Id, 10) + "/users"
 	req, _ := http.NewRequest("GET", url, nil)
 	httpClient := createHttpClient(t)
 	resp, err := httpClient.Do(req)

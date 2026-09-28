@@ -5,7 +5,6 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -37,7 +36,7 @@ func challengelessRefreshToken(t *testing.T, clientSecret string) (string, int64
 	require.Empty(t, code.CodeChallenge.String,
 		"the grant must descend from a code bound to no challenge")
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 	data := postToTokenEndpoint(t, httpClient, destUrl, url.Values{
 		"grant_type":    {"authorization_code"},
 		"client_id":     {code.Client.ClientIdentifier},
@@ -102,7 +101,7 @@ func TestToken_Refresh_PublicClient_PresentingASecret_IsRefused(t *testing.T) {
 	httpClient, code := createAuthCode(t, fake.LetterN(32), "openid profile email",
 		authCodeOptions{isPublic: true})
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 	data := postToTokenEndpoint(t, httpClient, destUrl, url.Values{
 		"grant_type":    {"authorization_code"},
 		"client_id":     {code.Client.ClientIdentifier},

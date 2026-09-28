@@ -2,6 +2,7 @@ package datatests
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"log/slog"
 	"os"
@@ -15,6 +16,14 @@ import (
 )
 
 var database data.Database
+
+// appConfig is this tier's configuration, loaded from the environment in TestMain as the server's
+// main loads it; no package-level configuration is left to read (#434).
+var appConfig *config.Config
+
+// dataKey and previousDataKey are the data keys appConfig.DataKeys answered, which the database is
+// opened with and the re-encryption fixtures hand to their own handles.
+var dataKey, previousDataKey []byte
 
 // dataCipher is the cipher under the configured data key, the key the database is opened with, built
 // once in TestMain and used by every test that seals or opens a stored secret (#434).
@@ -36,35 +45,46 @@ const timestampTick = 2 * time.Millisecond
 func TestMain(m *testing.M) {
 	slog.Info("running TestMain")
 
-	config.Init()
+	var loadErr error
+	appConfig, loadErr = config.Load(flag.NewFlagSet("datatests", flag.ContinueOnError), nil)
+	if loadErr != nil {
+		slog.Error("unable to load the configuration", "error", loadErr)
+		os.Exit(1)
+	}
+	var keysErr error
+	dataKey, previousDataKey, keysErr = appConfig.DataKeys()
+	if keysErr != nil {
+		slog.Error("unable to decode the data keys", "error", keysErr)
+		os.Exit(1)
+	}
 
 	// The data cipher, under the same key the database is opened with below, for every test that
 	// seals or opens a stored secret.
 	var cipherErr error
-	dataCipher, cipherErr = encryption.NewDataCipher(config.GetAESEncryptionKey())
+	dataCipher, cipherErr = encryption.NewDataCipher(dataKey)
 	if cipherErr != nil {
 		slog.Error("unable to initialize the data cipher", "error", cipherErr)
 		os.Exit(1)
 	}
 
 	// Log database configuration
-	dbType := config.GetDatabase().Type
+	dbType := appConfig.Database.Type
 	slog.Info(fmt.Sprintf("running data tests for %s", dbType))
 
 	switch dbType {
 	case "mysql", "postgres":
-		slog.Info("config.DBUsername=" + config.GetDatabase().Username)
-		slog.Info("config.DBHost=" + config.GetDatabase().Host)
-		slog.Info("config.DBPort=" + fmt.Sprintf("%d", config.GetDatabase().Port))
-		slog.Info("config.DBName=" + config.GetDatabase().Name)
+		slog.Info("config.DBUsername=" + appConfig.Database.Username)
+		slog.Info("config.DBHost=" + appConfig.Database.Host)
+		slog.Info("config.DBPort=" + fmt.Sprintf("%d", appConfig.Database.Port))
+		slog.Info("config.DBName=" + appConfig.Database.Name)
 	case "sqlite":
-		slog.Info("config.DBDSN=" + config.GetDatabase().DSN)
+		slog.Info("config.DBDSN=" + appConfig.Database.DSN)
 	}
 
 	// Initialize database
 	var err error
-	database, err = datafactory.NewDatabase(context.Background(), config.GetDatabase(),
-		config.GetAESEncryptionKey(), config.GetAESEncryptionKeyPrevious(), false)
+	database, err = datafactory.NewDatabase(context.Background(), &appConfig.Database,
+		dataKey, previousDataKey, false)
 	if err != nil {
 		slog.Error("failed to initialize database", "error", err)
 		os.Exit(1)

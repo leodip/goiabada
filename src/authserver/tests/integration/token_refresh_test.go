@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/signingkeys"
@@ -27,7 +26,7 @@ func TestToken_Refresh_ClientSecretBasic_Success(t *testing.T) {
 	clientSecret := fake.Password(32)
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	// First, get tokens using Basic auth
 	formData := url.Values{
@@ -60,7 +59,7 @@ func TestToken_Refresh_ClientSecretBasic_WrongSecret(t *testing.T) {
 	clientSecret := fake.Password(32)
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	// First, get tokens using Basic auth
 	formData := url.Values{
@@ -89,7 +88,7 @@ func TestToken_Refresh_ClientSecretBasic_WrongSecret(t *testing.T) {
 }
 
 func TestToken_Refresh_ClientSecretIsMissing(t *testing.T) {
-	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	clientSecret := fake.Password(32)
 	clientSecretEncrypted, err := dataCipher.Encrypt(clientSecret)
@@ -125,7 +124,7 @@ func TestToken_Refresh_ClientAuthFailed(t *testing.T) {
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
 
 	// Get the token using the authorization code
-	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	formData := url.Values{
 		"grant_type":    {"authorization_code"},
@@ -160,7 +159,7 @@ func TestToken_Refresh_MissingRefreshToken(t *testing.T) {
 	clientSecret := fake.Password(32)
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	// First, get a valid refresh token
 	formData := url.Values{
@@ -193,7 +192,7 @@ func TestToken_Refresh_TokenWithBadSignature(t *testing.T) {
 	clientSecret := fake.Password(32)
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	// First, get a valid refresh token
 	formData := url.Values{
@@ -251,7 +250,7 @@ func TestToken_Refresh_TokenWithBadSignature(t *testing.T) {
 }
 
 func TestToken_Refresh_TokenExpired(t *testing.T) {
-	destUrl := config.GetAuthServer().BaseURL + "/auth/token"
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/token"
 
 	httpClient := createHttpClient(t)
 
@@ -322,7 +321,7 @@ func TestToken_Refresh_WrongClient(t *testing.T) {
 	clientSecret := fake.Password(32)
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	// First, get a valid refresh token
 	formData := url.Values{
@@ -374,7 +373,7 @@ func TestToken_Refresh_WithAdditionalScope(t *testing.T) {
 	clientSecret := fake.Password(32)
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	// First, get the initial access token and refresh token
 	formData := url.Values{
@@ -479,7 +478,7 @@ func TestToken_Refresh_ConsentRemoved(t *testing.T) {
 
 	// Start the authorization flow
 	httpClient := createHttpClient(t)
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -528,7 +527,7 @@ func TestToken_Refresh_ConsentRemoved(t *testing.T) {
 	codeVal, _ := getCodeAndStateFromUrl(t, resp)
 
 	// Exchange the code for tokens
-	tokenUrl := config.GetAuthServer().BaseURL + "/auth/token"
+	tokenUrl := appConfig.AuthServer.BaseURL + "/auth/token"
 	formData := url.Values{
 		"grant_type":    {"authorization_code"},
 		"code":          {codeVal},
@@ -610,7 +609,7 @@ func TestToken_Refresh_ConsentDoesNotIncludeScope(t *testing.T) {
 	fullScope := initialScope + " " + additionalScope
 
 	httpClient := createHttpClient(t)
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(redirectUri.URI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -655,7 +654,7 @@ func TestToken_Refresh_ConsentDoesNotIncludeScope(t *testing.T) {
 
 	codeVal, _ := getCodeAndStateFromUrl(t, resp)
 
-	tokenUrl := config.GetAuthServer().BaseURL + "/auth/token"
+	tokenUrl := appConfig.AuthServer.BaseURL + "/auth/token"
 	formData := url.Values{
 		"grant_type":    {"authorization_code"},
 		"code":          {codeVal},
@@ -691,7 +690,7 @@ func TestToken_Refresh_TokenMarkedAsUsed(t *testing.T) {
 	clientSecret := fake.Password(32)
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	// First, exchange the authorization code for tokens
 	formData := url.Values{

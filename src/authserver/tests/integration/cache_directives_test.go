@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
@@ -96,7 +95,7 @@ func TestCacheDirectives_TheEnrolmentJsonIsNotStorable(t *testing.T) {
 	accessToken, _ := getUserAccessTokenWithAccountScope(t)
 
 	resp := makeAPIRequest(t, "GET",
-		config.GetAuthServer().BaseURL+"/api/v1/account/otp/enrollment", accessToken, nil)
+		appConfig.AuthServer.BaseURL+"/api/v1/account/otp/enrollment", accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -120,7 +119,7 @@ func TestCacheDirectives_TheEnrolmentJsonIsNotStorable(t *testing.T) {
 // instead, this case fails and the sweep quietly stops testing anything.
 func TestCacheDirectives_AnApiRefusalIsNotStorable(t *testing.T) {
 	resp := makeAPIRequest(t, "GET",
-		config.GetAuthServer().BaseURL+"/api/v1/account/otp/enrollment", "not-a-token", nil)
+		appConfig.AuthServer.BaseURL+"/api/v1/account/otp/enrollment", "not-a-token", nil)
 	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode,

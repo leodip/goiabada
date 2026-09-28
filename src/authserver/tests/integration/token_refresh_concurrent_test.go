@@ -12,7 +12,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/stretchr/testify/assert"
@@ -62,7 +61,7 @@ func TestToken_Refresh_ConcurrentDoubleSpend_IssuesOnlyOnce(t *testing.T) {
 	clientSecret := fake.Password(32)
 	httpClient, code := createAuthCode(t, clientSecret, "openid profile email")
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	// Exchange the authorization code once, legitimately, to obtain the refresh token
 	// the race below contends for.
@@ -249,7 +248,7 @@ func TestToken_Refresh_ChildOfATerminatedGrantIsBornRejected(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, session, "the ceremony's session must exist before it can be terminated")
 
-	deleteURL := config.GetAuthServer().BaseURL + "/api/v1/admin/user-sessions/" + strconv.FormatInt(session.Id, 10)
+	deleteURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-sessions/" + strconv.FormatInt(session.Id, 10)
 	resp := makeAPIRequest(t, "DELETE", deleteURL, adminToken, nil)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	_ = resp.Body.Close()
@@ -342,8 +341,8 @@ func TestToken_Refresh_RacingATermination_LeavesNoUsableDescendant(t *testing.T)
 	require.NoError(t, err)
 	require.NotNil(t, session)
 
-	deleteURL := config.GetAuthServer().BaseURL + "/api/v1/admin/user-sessions/" + strconv.FormatInt(session.Id, 10)
-	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+	deleteURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-sessions/" + strconv.FormatInt(session.Id, 10)
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 	formData := url.Values{
 		"grant_type":    {"refresh_token"},
 		"client_id":     {grant.client.ClientIdentifier},

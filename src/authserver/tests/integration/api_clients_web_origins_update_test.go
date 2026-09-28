@@ -8,7 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
@@ -54,7 +53,7 @@ func TestAPIClientWebOriginsPut_Success_AddRemoveAndNormalize(t *testing.T) {
 	reqBody := api.UpdateClientWebOriginsRequest{WebOrigins: []string{originAMixed, originC},
 		ExpectedWebOrigins: getClientWebOrigins(t, accessToken, client.Id)}
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/web-origins"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/web-origins"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -114,7 +113,7 @@ func TestAPIClientWebOriginsPut_AuthCodeDisabledAccepted(t *testing.T) {
 
 	origin := "https://spa-" + strings.ToLower(fake.LetterN(8)) + ".example.com"
 	reqBody := api.UpdateClientWebOriginsRequest{WebOrigins: []string{origin}, ExpectedWebOrigins: getClientWebOrigins(t, accessToken, client.Id)}
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/web-origins"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/web-origins"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -155,7 +154,7 @@ func TestAPIClientWebOriginsPut_StoresTheCanonicalOrigin(t *testing.T) {
 	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
 	host := "canon-" + strings.ToLower(fake.LetterN(8)) + ".example.com"
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/web-origins"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/web-origins"
 
 	testCases := []struct {
 		name string
@@ -195,7 +194,7 @@ func TestAPIClientWebOriginsPut_SystemLevelClientAllowed(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Get system-level client
-	resp := makeAPIRequest(t, "GET", config.GetAuthServer().BaseURL+"/api/v1/admin/clients", accessToken, nil)
+	resp := makeAPIRequest(t, "GET", appConfig.AuthServer.BaseURL+"/api/v1/admin/clients", accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 	var listResp api.GetClientsResponse
 	err := json.NewDecoder(resp.Body).Decode(&listResp)
@@ -213,7 +212,7 @@ func TestAPIClientWebOriginsPut_SystemLevelClientAllowed(t *testing.T) {
 	}
 
 	// Update web origins (should succeed)
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(sysId, 10) + "/web-origins"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(sysId, 10) + "/web-origins"
 	reqBody := api.UpdateClientWebOriginsRequest{WebOrigins: []string{"https://example.com", "https://localhost:3000"},
 		ExpectedWebOrigins: getClientWebOrigins(t, accessToken, sysId)}
 	resp2 := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
@@ -237,7 +236,7 @@ func TestAPIClientWebOriginsPut_ValidationErrors(t *testing.T) {
 	assert.NoError(t, err)
 	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
-	baseURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/web-origins"
+	baseURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/web-origins"
 	loaded := getClientWebOrigins(t, accessToken, client.Id)
 
 	// Sub-test: Empty web origin value
@@ -308,7 +307,7 @@ func webOriginOfLength(t *testing.T, n int) string {
 // getClientWebOrigins reads a client's web origins back through the admin API.
 func getClientWebOrigins(t *testing.T, accessToken string, clientId int64) []string {
 	t.Helper()
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(clientId, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(clientId, 10)
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -338,7 +337,7 @@ func TestAPIClientWebOriginsPut_TheBoundIsTheLongestStandardOrigin(t *testing.T)
 	assert.NoError(t, err)
 	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/web-origins"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/web-origins"
 
 	atTheBound := webOriginOfLength(t, 267)
 	resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateClientWebOriginsRequest{WebOrigins: []string{atTheBound},
@@ -379,7 +378,7 @@ func newWebOriginsClient(t *testing.T, prefix string) *models.Client {
 func TestAPIClientWebOriginsPut_TheLoadedListIsRequired(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 	client := newWebOriginsClient(t, "weborig-expected-")
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/web-origins"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/web-origins"
 
 	bodies := map[string]interface{}{
 		"absent": map[string]interface{}{"webOrigins": []string{"https://a.example.com"}},
@@ -409,7 +408,7 @@ func TestAPIClientWebOriginsPut_AnOutdatedLoadedListIsRefused(t *testing.T) {
 	client := newWebOriginsClient(t, "weborig-outdated-")
 	require.NoError(t, database.CreateWebOrigin(context.Background(), nil,
 		&models.WebOrigin{ClientId: client.Id, Origin: "https://a.example.com"}))
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/web-origins"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client.Id, 10) + "/web-origins"
 
 	loadedByBoth := getClientWebOrigins(t, accessToken, client.Id)
 
@@ -437,7 +436,7 @@ func TestAPIClientWebOriginsPut_NotFound_InvalidId_InvalidBody_Unauthorized(t *t
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Not found
-	urlNF := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/999999/web-origins"
+	urlNF := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/999999/web-origins"
 	resp := makeAPIRequest(t, "PUT", urlNF, accessToken, api.UpdateClientWebOriginsRequest{WebOrigins: []string{"https://example.com"}, ExpectedWebOrigins: []string{}})
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
@@ -449,7 +448,7 @@ func TestAPIClientWebOriginsPut_NotFound_InvalidId_InvalidBody_Unauthorized(t *t
 	}
 
 	// Invalid id (non-numeric)
-	urlBad := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/abc/web-origins"
+	urlBad := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/abc/web-origins"
 	resp2 := makeAPIRequest(t, "PUT", urlBad, accessToken, api.UpdateClientWebOriginsRequest{WebOrigins: []string{"https://example.com"}, ExpectedWebOrigins: []string{}})
 	defer func() { _ = resp2.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp2.StatusCode)
@@ -473,7 +472,7 @@ func TestAPIClientWebOriginsPut_NotFound_InvalidId_InvalidBody_Unauthorized(t *t
 	assert.NoError(t, err)
 	defer func() { _ = database.DeleteClient(context.Background(), nil, client2.Id) }()
 
-	urlIB := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client2.Id, 10) + "/web-origins"
+	urlIB := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(client2.Id, 10) + "/web-origins"
 	req, err := http.NewRequest("PUT", urlIB, nil)
 	assert.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
@@ -515,7 +514,7 @@ func TestAPIClientWebOriginsPut_InsufficientScope(t *testing.T) {
 	assert.NoError(t, err)
 	defer func() { _ = database.DeleteClient(context.Background(), nil, target.Id) }()
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(target.Id, 10) + "/web-origins"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" + strconv.FormatInt(target.Id, 10) + "/web-origins"
 	reqBody := api.UpdateClientWebOriginsRequest{WebOrigins: []string{"https://example.com"}, ExpectedWebOrigins: []string{}}
 	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
 	defer func() { _ = resp.Body.Close() }()

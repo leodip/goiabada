@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
@@ -26,7 +25,7 @@ func TestAPIAccountEmailVerificationSend_Success(t *testing.T) {
 	// Ensure SMTP enabled
 	changeSettings(t, func(settings *models.Settings) { settings.SMTPEnabled = true })
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/account/email/verification/send"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/email/verification/send"
 	resp := makeAPIRequest(t, "POST", url, accessToken, map[string]string{})
 	defer func() { _ = resp.Body.Close() }()
 
@@ -59,7 +58,7 @@ func TestAPIAccountEmailVerificationSend_TooManyRequests(t *testing.T) {
 	// Ensure SMTP enabled
 	changeSettings(t, func(settings *models.Settings) { settings.SMTPEnabled = true })
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/account/email/verification/send"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/email/verification/send"
 	// First send
 	resp1 := makeAPIRequest(t, "POST", url, accessToken, map[string]string{})
 	defer func() { _ = resp1.Body.Close() }()
@@ -95,7 +94,7 @@ func TestAPIAccountEmailVerificationSend_AlreadyVerified(t *testing.T) {
 	err = database.UpdateUser(context.Background(), nil, user)
 	assert.NoError(t, err)
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/account/email/verification/send"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/email/verification/send"
 	resp := makeAPIRequest(t, "POST", url, accessToken, map[string]string{})
 	defer func() { _ = resp.Body.Close() }()
 
@@ -111,7 +110,7 @@ func TestAPIAccountEmailVerificationSend_SMTPDisabled(t *testing.T) {
 
 	changeSettings(t, func(settings *models.Settings) { settings.SMTPEnabled = false })
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/account/email/verification/send"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/email/verification/send"
 	resp := makeAPIRequest(t, "POST", url, accessToken, map[string]string{})
 	defer func() { _ = resp.Body.Close() }()
 
@@ -123,7 +122,7 @@ func TestAPIAccountEmailVerificationSend_SMTPDisabled(t *testing.T) {
 }
 
 func TestAPIAccountEmailVerificationSend_Unauthorized(t *testing.T) {
-	url := config.GetAuthServer().BaseURL + "/api/v1/account/email/verification/send"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/email/verification/send"
 	req, err := http.NewRequest("POST", url, nil)
 	assert.NoError(t, err)
 	httpClient := createHttpClient(t)
@@ -143,7 +142,7 @@ func TestAPIAccountEmailVerification_VerifySuccess(t *testing.T) {
 	changeSettings(t, func(settings *models.Settings) { settings.SMTPEnabled = true })
 
 	// Trigger send to generate code
-	sendURL := config.GetAuthServer().BaseURL + "/api/v1/account/email/verification/send"
+	sendURL := appConfig.AuthServer.BaseURL + "/api/v1/account/email/verification/send"
 	_ = makeAPIRequest(t, "POST", sendURL, accessToken, map[string]string{})
 
 	// Load user and decrypt code
@@ -152,7 +151,7 @@ func TestAPIAccountEmailVerification_VerifySuccess(t *testing.T) {
 	code, err := dataCipher.Decrypt(user.EmailVerificationCodeEncrypted)
 	assert.NoError(t, err)
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/account/email/verification"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/email/verification"
 	resp := makeAPIRequest(t, "POST", url, accessToken, api.VerifyAccountEmailRequest{VerificationCode: code})
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -175,7 +174,7 @@ func TestAPIAccountEmailVerification_VerifyInvalidCode(t *testing.T) {
 	// Ensure SMTP enabled
 	changeSettings(t, func(settings *models.Settings) { settings.SMTPEnabled = true })
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/account/email/verification"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/email/verification"
 	resp := makeAPIRequest(t, "POST", url, accessToken, api.VerifyAccountEmailRequest{VerificationCode: "WRONG"})
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
@@ -202,7 +201,7 @@ func TestAPIAccountEmailVerification_VerifyExpiredCode(t *testing.T) {
 	err = database.UpdateUser(context.Background(), nil, user)
 	assert.NoError(t, err)
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/account/email/verification"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/email/verification"
 	resp := makeAPIRequest(t, "POST", url, accessToken, api.VerifyAccountEmailRequest{VerificationCode: codePlain})
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
@@ -225,7 +224,7 @@ func TestAPIAccountEmailVerification_VerifyAlreadyVerified(t *testing.T) {
 	err = database.UpdateUser(context.Background(), nil, user)
 	assert.NoError(t, err)
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/account/email/verification"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/email/verification"
 	resp := makeAPIRequest(t, "POST", url, accessToken, api.VerifyAccountEmailRequest{VerificationCode: "ANY"})
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -238,7 +237,7 @@ func TestAPIAccountEmailVerification_VerifySMTPDisabled(t *testing.T) {
 	accessToken, _ := getUserAccessTokenWithAccountScope_EmailVerification(t)
 	changeSettings(t, func(settings *models.Settings) { settings.SMTPEnabled = false })
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/account/email/verification"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/email/verification"
 	resp := makeAPIRequest(t, "POST", url, accessToken, api.VerifyAccountEmailRequest{VerificationCode: "ABC123"})
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
@@ -254,7 +253,7 @@ func TestAPIAccountEmailVerification_VerifyInvalidRequestBody(t *testing.T) {
 	// Enable SMTP
 	changeSettings(t, func(settings *models.Settings) { settings.SMTPEnabled = true })
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/account/email/verification"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/email/verification"
 	req, err := http.NewRequest("POST", url, nil)
 	assert.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
@@ -270,7 +269,7 @@ func TestAPIAccountEmailVerification_VerifyInvalidRequestBody(t *testing.T) {
 }
 
 func TestAPIAccountEmailVerification_VerifyUnauthorized(t *testing.T) {
-	url := config.GetAuthServer().BaseURL + "/api/v1/account/email/verification"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/email/verification"
 	req, err := http.NewRequest("POST", url, nil)
 	assert.NoError(t, err)
 	httpClient := createHttpClient(t)

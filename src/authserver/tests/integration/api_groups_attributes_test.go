@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
@@ -33,7 +32,7 @@ func TestAPIGroupAttributesGet_Success(t *testing.T) {
 	}()
 
 	// Test: Get group attributes
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/attributes"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/attributes"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -79,7 +78,7 @@ func TestAPIGroupAttributesGet_EmptyAttributes(t *testing.T) {
 	}()
 
 	// Test: Get group attributes for group with no attributes
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/attributes"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/attributes"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -100,7 +99,7 @@ func TestAPIGroupAttributesGet_GroupNotFound(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Test: Get attributes for non-existent group
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/99999/attributes"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/99999/attributes"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -124,7 +123,7 @@ func TestAPIGroupAttributesGet_InvalidId(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/" + tc.groupId + "/attributes"
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + tc.groupId + "/attributes"
 			resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -141,7 +140,7 @@ func TestAPIGroupAttributesGet_Unauthorized(t *testing.T) {
 	}()
 
 	// Test: Request without access token
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/attributes"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/attributes"
 	req, err := http.NewRequest("GET", url, nil)
 	assert.NoError(t, err)
 
@@ -172,7 +171,7 @@ func TestAPIGroupAttributeGet_Success(t *testing.T) {
 	}()
 
 	// Test: Get specific group attribute
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/group-attributes/" + strconv.FormatInt(attr.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/group-attributes/" + strconv.FormatInt(attr.Id, 10)
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -199,7 +198,7 @@ func TestAPIGroupAttributeGet_NotFound(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Test: Get non-existent attribute
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/group-attributes/99999"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/group-attributes/99999"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -223,7 +222,7 @@ func TestAPIGroupAttributeGet_InvalidId(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			url := config.GetAuthServer().BaseURL + "/api/v1/admin/group-attributes/" + tc.attributeId
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/group-attributes/" + tc.attributeId
 			resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -245,7 +244,7 @@ func TestAPIGroupAttributeGet_Unauthorized(t *testing.T) {
 	}()
 
 	// Test: Request without access token
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/group-attributes/" + strconv.FormatInt(attr.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/group-attributes/" + strconv.FormatInt(attr.Id, 10)
 	req, err := http.NewRequest("GET", url, nil)
 	assert.NoError(t, err)
 
@@ -278,7 +277,7 @@ func TestAPIGroupAttributeCreatePost_Success(t *testing.T) {
 		GroupId:              testGroup.Id,
 	}
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/group-attributes"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/group-attributes"
 	resp := makeAPIRequest(t, "POST", url, accessToken, createReq)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -377,7 +376,7 @@ func TestAPIGroupAttributeCreatePost_ValidationErrors(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			url := config.GetAuthServer().BaseURL + "/api/v1/admin/group-attributes"
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/group-attributes"
 			resp := makeAPIRequest(t, "POST", url, accessToken, tc.request)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -391,7 +390,7 @@ func TestAPIGroupAttributeCreatePost_InvalidRequestBody(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Test: Invalid JSON
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/group-attributes"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/group-attributes"
 	req, err := http.NewRequest("POST", url, nil)
 	assert.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
@@ -408,7 +407,7 @@ func TestAPIGroupAttributeCreatePost_InvalidRequestBody(t *testing.T) {
 
 func TestAPIGroupAttributeCreatePost_Unauthorized(t *testing.T) {
 	// Test: Request without access token
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/group-attributes"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/group-attributes"
 	req, err := http.NewRequest("POST", url, nil)
 	assert.NoError(t, err)
 
@@ -446,7 +445,7 @@ func TestAPIGroupAttributeUpdatePut_Success(t *testing.T) {
 		IncludeInAccessToken: true,
 	}
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/group-attributes/" + strconv.FormatInt(attr.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/group-attributes/" + strconv.FormatInt(attr.Id, 10)
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -486,7 +485,7 @@ func TestAPIGroupAttributeUpdatePut_NotFound(t *testing.T) {
 		Value: "test_value",
 	}
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/group-attributes/99999"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/group-attributes/99999"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -549,7 +548,7 @@ func TestAPIGroupAttributeUpdatePut_ValidationErrors(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			url := config.GetAuthServer().BaseURL + "/api/v1/admin/group-attributes/" + strconv.FormatInt(attr.Id, 10)
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/group-attributes/" + strconv.FormatInt(attr.Id, 10)
 			resp := makeAPIRequest(t, "PUT", url, accessToken, tc.request)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -579,7 +578,7 @@ func TestAPIGroupAttributeUpdatePut_InvalidId(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			url := config.GetAuthServer().BaseURL + "/api/v1/admin/group-attributes/" + tc.attributeId
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/group-attributes/" + tc.attributeId
 			resp := makeAPIRequest(t, "PUT", url, accessToken, updateReq)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -604,7 +603,7 @@ func TestAPIGroupAttributeUpdatePut_InvalidRequestBody(t *testing.T) {
 	}()
 
 	// Test: Invalid JSON
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/group-attributes/" + strconv.FormatInt(attr.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/group-attributes/" + strconv.FormatInt(attr.Id, 10)
 	req, err := http.NewRequest("PUT", url, nil)
 	assert.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
@@ -632,7 +631,7 @@ func TestAPIGroupAttributeUpdatePut_Unauthorized(t *testing.T) {
 	}()
 
 	// Test: Request without access token
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/group-attributes/" + strconv.FormatInt(attr.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/group-attributes/" + strconv.FormatInt(attr.Id, 10)
 	req, err := http.NewRequest("PUT", url, nil)
 	assert.NoError(t, err)
 
@@ -660,7 +659,7 @@ func TestAPIGroupAttributeDelete_Success(t *testing.T) {
 	attr := createTestGroupAttribute(t, testGroup.Id, "temp_attr", "temp_value")
 
 	// Test: Delete attribute
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/group-attributes/" + strconv.FormatInt(attr.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/group-attributes/" + strconv.FormatInt(attr.Id, 10)
 	resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -687,7 +686,7 @@ func TestAPIGroupAttributeDelete_NotFound(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Test: Delete non-existent attribute
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/group-attributes/99999"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/group-attributes/99999"
 	resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -711,7 +710,7 @@ func TestAPIGroupAttributeDelete_InvalidId(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			url := config.GetAuthServer().BaseURL + "/api/v1/admin/group-attributes/" + tc.attributeId
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/group-attributes/" + tc.attributeId
 			resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -733,7 +732,7 @@ func TestAPIGroupAttributeDelete_Unauthorized(t *testing.T) {
 	}()
 
 	// Test: Request without access token
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/group-attributes/" + strconv.FormatInt(attr.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/group-attributes/" + strconv.FormatInt(attr.Id, 10)
 	req, err := http.NewRequest("DELETE", url, nil)
 	assert.NoError(t, err)
 
@@ -776,7 +775,7 @@ func TestAPIGroupAttribute_AngleBracketsRejected(t *testing.T) {
 	attr := createTestGroupAttribute(t, testGroup.Id, "status", "active")
 	defer func() { _ = database.DeleteGroupAttribute(context.Background(), nil, attr.Id) }()
 
-	base := config.GetAuthServer().BaseURL + "/api/v1/admin/group-attributes"
+	base := appConfig.AuthServer.BaseURL + "/api/v1/admin/group-attributes"
 
 	t.Run("create", func(t *testing.T) {
 		resp := makeAPIRequest(t, "POST", base, accessToken, api.CreateGroupAttributeRequest{
@@ -819,7 +818,7 @@ func TestAPIGroupAttribute_AmpersandsAndQuotesStoredVerbatim(t *testing.T) {
 	defer func() { _ = database.DeleteGroup(context.Background(), nil, testGroup.Id) }()
 
 	value := `  R&D "phase 2"  `
-	resp := makeAPIRequest(t, "POST", config.GetAuthServer().BaseURL+"/api/v1/admin/group-attributes",
+	resp := makeAPIRequest(t, "POST", appConfig.AuthServer.BaseURL+"/api/v1/admin/group-attributes",
 		accessToken, api.CreateGroupAttributeRequest{Key: "motto", Value: value, GroupId: testGroup.Id})
 	defer func() { _ = resp.Body.Close() }()
 
@@ -836,7 +835,7 @@ func TestAPIGroupAttribute_AmpersandsAndQuotesStoredVerbatim(t *testing.T) {
 	defer func() { _ = database.DeleteGroupAttribute(context.Background(), nil, createResponse.Attribute.Id) }()
 
 	updated := `  AT&T "phase 3"  `
-	updateResp := makeAPIRequest(t, "PUT", config.GetAuthServer().BaseURL+"/api/v1/admin/group-attributes/"+
+	updateResp := makeAPIRequest(t, "PUT", appConfig.AuthServer.BaseURL+"/api/v1/admin/group-attributes/"+
 		strconv.FormatInt(createResponse.Attribute.Id, 10), accessToken,
 		api.UpdateGroupAttributeRequest{Key: "motto", Value: updated})
 	defer func() { _ = updateResp.Body.Close() }()

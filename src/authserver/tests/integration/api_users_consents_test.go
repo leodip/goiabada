@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
@@ -53,7 +52,7 @@ func TestAPIUserConsentsGet_Success(t *testing.T) {
 	}()
 
 	// Test: Get user consents
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/consents"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/consents"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -112,7 +111,7 @@ func TestAPIUserConsentsGet_EmptyConsents(t *testing.T) {
 	}()
 
 	// Test: Get user consents for user with no consents
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/consents"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/consents"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -133,7 +132,7 @@ func TestAPIUserConsentsGet_UserNotFound(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Test: Get consents for non-existent user
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/99999/consents"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/99999/consents"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -157,7 +156,7 @@ func TestAPIUserConsentsGet_InvalidId(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + tc.userId + "/consents"
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + tc.userId + "/consents"
 			resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -182,7 +181,7 @@ func TestAPIUserConsentsGet_Unauthorized(t *testing.T) {
 	}()
 
 	// Test: Request without access token
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/consents"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/consents"
 	req, err := http.NewRequest("GET", url, nil)
 	assert.NoError(t, err)
 
@@ -225,7 +224,7 @@ func TestAPIUserConsentDelete_Success(t *testing.T) {
 	consent := createTestUserConsent(t, testUser.Id, client.Id)
 
 	// Test: Delete consent
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/user-consents/" + strconv.FormatInt(consent.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-consents/" + strconv.FormatInt(consent.Id, 10)
 	resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -252,7 +251,7 @@ func TestAPIUserConsentDelete_NotFound(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Test: Delete non-existent consent
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/user-consents/99999"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-consents/99999"
 	resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -276,7 +275,7 @@ func TestAPIUserConsentDelete_InvalidId(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			url := config.GetAuthServer().BaseURL + "/api/v1/admin/user-consents/" + tc.consentId
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-consents/" + tc.consentId
 			resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -313,7 +312,7 @@ func TestAPIUserConsentDelete_Unauthorized(t *testing.T) {
 	}()
 
 	// Test: Request without access token
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/user-consents/" + strconv.FormatInt(consent.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-consents/" + strconv.FormatInt(consent.Id, 10)
 	req, err := http.NewRequest("DELETE", url, nil)
 	assert.NoError(t, err)
 
@@ -378,7 +377,7 @@ func TestAPIUserConsentDelete_WithClientDetails(t *testing.T) {
 	assert.NoError(t, err)
 
 	// First verify the consent exists and has client details when retrieved
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/consents"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/users/" + strconv.FormatInt(testUser.Id, 10) + "/consents"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -395,7 +394,7 @@ func TestAPIUserConsentDelete_WithClientDetails(t *testing.T) {
 	assert.Equal(t, "openid profile email address phone", retrievedConsent.Scope)
 
 	// Now test deleting the consent
-	deleteUrl := config.GetAuthServer().BaseURL + "/api/v1/admin/user-consents/" + strconv.FormatInt(consent.Id, 10)
+	deleteUrl := appConfig.AuthServer.BaseURL + "/api/v1/admin/user-consents/" + strconv.FormatInt(consent.Id, 10)
 	deleteResp := makeAPIRequest(t, "DELETE", deleteUrl, accessToken, nil)
 	defer func() { _ = deleteResp.Body.Close() }()
 

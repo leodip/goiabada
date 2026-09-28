@@ -7,7 +7,6 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
@@ -48,7 +47,7 @@ const registeredQueryStateEscaped = "csrf+a%2Bb%2Fc%3D"
 func TestAuthorize_RegisteredQuery_SuccessRedirectCarriesOneState(t *testing.T) {
 	client, user, password := newRegisteredQueryClient(t)
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(registeredQueryRedirectURI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +
@@ -112,7 +111,7 @@ func TestAuthorize_RegisteredQuery_SuccessRedirectCarriesOneState(t *testing.T) 
 func TestAuthorize_RegisteredQuery_ErrorRedirectCarriesOneState(t *testing.T) {
 	client, _, _ := newRegisteredQueryClient(t)
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/authorize/?client_id=" + client.ClientIdentifier +
 		"&redirect_uri=" + url.QueryEscape(registeredQueryRedirectURI) +
 		"&response_type=code" +
 		"&code_challenge_method=S256" +

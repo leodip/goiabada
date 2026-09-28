@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/otp"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
@@ -54,7 +53,7 @@ func setUserPasswordForOTP(t *testing.T, userId int64, newPassword string) {
 
 // helper: get current account user id via profile for a given access token
 func getAccountUserId(t *testing.T, accessToken string) int64 {
-	url := config.GetAuthServer().BaseURL + "/api/v1/account/profile"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/profile"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
@@ -73,7 +72,7 @@ func getAccountUserId(t *testing.T, accessToken string) int64 {
 func putAccountOTP(t *testing.T, accessToken string, reqBody api.UpdateAccountOTPRequest) (int, string) {
 	t.Helper()
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/account/otp"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/otp"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -132,7 +131,7 @@ func wrongOtpCodeFor(t *testing.T, secret string) string {
 func getOTPEnrollment(t *testing.T, accessToken string) api.AccountOTPEnrollmentResponse {
 	t.Helper()
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/account/otp/enrollment"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/otp/enrollment"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -197,7 +196,7 @@ func TestAPIAccountOTPEnrollmentGet_Success(t *testing.T) {
 	u.OTPEnabled = false
 	_ = database.UpdateUser(context.Background(), nil, u)
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/account/otp/enrollment"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/otp/enrollment"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -223,7 +222,7 @@ func TestAPIAccountOTPEnrollmentGet_AlreadyEnabled(t *testing.T) {
 	u.OTPSecretEncrypted = encryptOTPSecretForTest(t, "JBSWY3DPEHPK3PXP")
 	_ = database.UpdateUser(context.Background(), nil, u)
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/account/otp/enrollment"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/otp/enrollment"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -234,7 +233,7 @@ func TestAPIAccountOTPEnrollmentGet_AlreadyEnabled(t *testing.T) {
 }
 
 func TestAPIAccountOTPEnrollmentGet_UnauthorizedAndScope(t *testing.T) {
-	url := config.GetAuthServer().BaseURL + "/api/v1/account/otp/enrollment"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/otp/enrollment"
 
 	// No token
 	req, _ := http.NewRequest("GET", url, nil)
@@ -284,7 +283,7 @@ func TestAPIAccountOTPPut_Enable_Success(t *testing.T) {
 		OtpCode:  code,
 	}
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/account/otp"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/otp"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -312,7 +311,7 @@ func TestAPIAccountOTPPut_Enable_AuthFailed(t *testing.T) {
 		Password: "WrongPwd!",
 		OtpCode:  "000000",
 	}
-	url := config.GetAuthServer().BaseURL + "/api/v1/account/otp"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/otp"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
@@ -326,7 +325,7 @@ func TestAPIAccountOTPPut_Enable_InvalidFormats(t *testing.T) {
 	userId := getAccountUserId(t, accessToken)
 	setUserPasswordForOTP(t, userId, "Correct1!")
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/account/otp"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/otp"
 
 	// Invalid code format (non-digits)
 	resp1 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateAccountOTPRequest{Enabled: true, Password: "Correct1!", OtpCode: "aaaaa"})
@@ -351,7 +350,7 @@ func TestAPIAccountOTPPut_Enable_WrongCode(t *testing.T) {
 	resetOTPStateForTest(t, userId)
 	secret := getOTPEnrollment(t, accessToken).SecretKey
 	reqBody := api.UpdateAccountOTPRequest{Enabled: true, Password: "Correct1!", OtpCode: wrongOtpCodeFor(t, secret)}
-	url := config.GetAuthServer().BaseURL + "/api/v1/account/otp"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/otp"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
@@ -372,7 +371,7 @@ func TestAPIAccountOTPPut_Disable_Success(t *testing.T) {
 	_ = database.UpdateUser(context.Background(), nil, u)
 
 	reqBody := api.UpdateAccountOTPRequest{Enabled: false, Password: "Correct1!"}
-	url := config.GetAuthServer().BaseURL + "/api/v1/account/otp"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/otp"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
@@ -533,7 +532,7 @@ func TestAPIAccountOTPPut_Enable_AdvancesOtpConfigGeneration(t *testing.T) {
 	code, err := totp.GenerateCode(secret, time.Now())
 	assert.NoError(t, err)
 	reqBody := api.UpdateAccountOTPRequest{Enabled: true, Password: "Correct1!", OtpCode: code}
-	url := config.GetAuthServer().BaseURL + "/api/v1/account/otp"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/otp"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
@@ -576,7 +575,7 @@ func TestAPIAccountOTPPut_Disable_AdvancesOtpConfigGeneration(t *testing.T) {
 	extra := seedExtraSessionForOTPTest(t, userId)
 
 	reqBody := api.UpdateAccountOTPRequest{Enabled: false, Password: "Correct1!"}
-	url := config.GetAuthServer().BaseURL + "/api/v1/account/otp"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/otp"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
@@ -608,7 +607,7 @@ func TestAPIAccountOTPPut_Disable_NotEnabled(t *testing.T) {
 	_ = database.UpdateUser(context.Background(), nil, u)
 
 	reqBody := api.UpdateAccountOTPRequest{Enabled: false, Password: "Correct1!"}
-	url := config.GetAuthServer().BaseURL + "/api/v1/account/otp"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/otp"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, reqBody)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
@@ -618,7 +617,7 @@ func TestAPIAccountOTPPut_Disable_NotEnabled(t *testing.T) {
 }
 
 func TestAPIAccountOTPPut_UnauthorizedAndScope(t *testing.T) {
-	url := config.GetAuthServer().BaseURL + "/api/v1/account/otp"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/otp"
 
 	// No token
 	req, _ := http.NewRequest("PUT", url, nil)
@@ -696,7 +695,7 @@ func TestAPIAccountOTPPut_Enable_RefusesACallerSuppliedSecret(t *testing.T) {
 	code, err := totp.GenerateCode(issued.SecretKey, time.Now())
 	assert.NoError(t, err)
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/account/otp"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/otp"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, map[string]interface{}{
 		"enabled":   true,
 		"password":  "Correct1!",
@@ -822,7 +821,7 @@ func TestAPIAccountOTPPut_Enable_EnrolsTheIssuedSeedAndClearsThePending(t *testi
 	// And the issuing endpoint now refuses, because enrollment is over for this user. That is the
 	// pending pair's clear as a caller can see it: a live pending enrollment would have been
 	// answered with, and this account has none.
-	url := config.GetAuthServer().BaseURL + "/api/v1/account/otp/enrollment"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/otp/enrollment"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)

@@ -6,7 +6,6 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
@@ -82,7 +81,7 @@ func TestROPC_Success(t *testing.T) {
 	client := createROPCClient(t, "", true) // public client
 	user := createROPCUser(t, password)
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 	httpClient := createHttpClient(t)
 
 	formData := url.Values{
@@ -123,7 +122,7 @@ func TestROPC_ConfidentialClient(t *testing.T) {
 	client := createROPCClient(t, clientSecret, false) // confidential client
 	user := createROPCUser(t, password)
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 	httpClient := createHttpClient(t)
 
 	formData := url.Values{
@@ -163,7 +162,7 @@ func TestROPC_GlobalDisabled(t *testing.T) {
 	assert.Nil(t, err)
 	user := createROPCUser(t, password)
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 	httpClient := createHttpClient(t)
 
 	formData := url.Values{
@@ -202,7 +201,7 @@ func TestROPC_ClientOverrideDisabled(t *testing.T) {
 	password := fake.Password(12)
 	user := createROPCUser(t, password)
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 	httpClient := createHttpClient(t)
 
 	formData := url.Values{
@@ -227,7 +226,7 @@ func TestROPC_MissingUsername(t *testing.T) {
 
 	client := createROPCClient(t, "", true)
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 	httpClient := createHttpClient(t)
 
 	formData := url.Values{
@@ -251,7 +250,7 @@ func TestROPC_MissingPassword(t *testing.T) {
 	client := createROPCClient(t, "", true)
 	user := createROPCUser(t, "somepassword")
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 	httpClient := createHttpClient(t)
 
 	formData := url.Values{
@@ -276,7 +275,7 @@ func TestROPC_InvalidCredentials(t *testing.T) {
 	client := createROPCClient(t, "", true)
 	user := createROPCUser(t, password)
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 	httpClient := createHttpClient(t)
 
 	formData := url.Values{
@@ -301,7 +300,7 @@ func TestROPC_UserNotFound(t *testing.T) {
 
 	client := createROPCClient(t, "", true)
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 	httpClient := createHttpClient(t)
 
 	formData := url.Values{
@@ -339,7 +338,7 @@ func TestROPC_DisabledUser(t *testing.T) {
 	err = database.CreateUser(context.Background(), nil, user)
 	assert.Nil(t, err)
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 	httpClient := createHttpClient(t)
 
 	formData := url.Values{
@@ -365,7 +364,7 @@ func TestROPC_WithOfflineAccess(t *testing.T) {
 	client := createROPCClient(t, "", true)
 	user := createROPCUser(t, password)
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 	httpClient := createHttpClient(t)
 
 	formData := url.Values{
@@ -401,7 +400,7 @@ func TestROPC_ConfidentialClient_MissingSecret(t *testing.T) {
 	client := createROPCClient(t, clientSecret, false) // confidential client
 	user := createROPCUser(t, password)
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 	httpClient := createHttpClient(t)
 
 	// Don't include client_secret
@@ -431,7 +430,7 @@ func TestROPC_ConfidentialClient_InvalidSecret(t *testing.T) {
 	client := createROPCClient(t, clientSecret, false)
 	user := createROPCUser(t, password)
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 	httpClient := createHttpClient(t)
 
 	// Use wrong client_secret
@@ -473,7 +472,7 @@ func TestROPC_UserWith2FAEnabled(t *testing.T) {
 	err = database.CreateUser(context.Background(), nil, user)
 	assert.Nil(t, err)
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 	httpClient := createHttpClient(t)
 
 	formData := url.Values{
@@ -508,7 +507,7 @@ func TestROPC_WithResourcePermissions(t *testing.T) {
 	// Assign permission to user
 	assignPermissionToUser(t, user.Id, permission.Id)
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 	httpClient := createHttpClient(t)
 
 	formData := url.Values{
@@ -542,7 +541,7 @@ func TestROPC_ExplicitUserinfoScopeIsRefused(t *testing.T) {
 	client := createROPCClient(t, "", true)
 	user := createROPCUser(t, password)
 
-	data := postToTokenEndpoint(t, createHttpClient(t), config.GetAuthServer().BaseURL+"/auth/token/", url.Values{
+	data := postToTokenEndpoint(t, createHttpClient(t), appConfig.AuthServer.BaseURL+"/auth/token/", url.Values{
 		"grant_type": {"password"},
 		"client_id":  {client.ClientIdentifier},
 		"username":   {user.Email},
@@ -572,7 +571,7 @@ func TestROPC_RefreshToken_OpenIdOnly(t *testing.T) {
 	client := createROPCClient(t, clientSecret, false)
 	user := createROPCUser(t, password)
 
-	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 	httpClient := createHttpClient(t)
 
 	data := postToTokenEndpoint(t, httpClient, destUrl, url.Values{
@@ -607,7 +606,7 @@ func TestROPC_RefreshToken_OpenIdOnly(t *testing.T) {
 	assert.Equal(t, "urn:goiabada:level1", newAccessClaims["acr"], "a refresh keeps level 1 (#433)")
 	assert.Equal(t, []interface{}{"pwd"}, newAccessClaims["amr"])
 
-	resp := makeAPIRequest(t, "GET", config.GetAuthServer().BaseURL+"/userinfo", newAccessToken, nil)
+	resp := makeAPIRequest(t, "GET", appConfig.AuthServer.BaseURL+"/userinfo", newAccessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusOK, resp.StatusCode, "the reissued token reaches /userinfo")
 }
@@ -654,7 +653,7 @@ func TestROPC_RefreshToken_StopsWhenROPCDisabled(t *testing.T) {
 			client := createROPCClient(t, clientSecret, false)
 			user := createROPCUser(t, password)
 
-			destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+			destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 			httpClient := createHttpClient(t)
 
 			data := postToTokenEndpoint(t, httpClient, destUrl, url.Values{

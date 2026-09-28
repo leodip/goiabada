@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/passwordhash"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
@@ -36,7 +35,7 @@ import (
 func flipToPublic(t *testing.T, adminToken string, clientId int64) api.UpdateClientResponse {
 	t.Helper()
 
-	apiURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" +
+	apiURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" +
 		strconv.FormatInt(clientId, 10) + "/authentication"
 	resp := makeAPIRequest(t, "PUT", apiURL, adminToken, api.UpdateClientAuthenticationRequest{IsPublic: true})
 	defer func() { _ = resp.Body.Close() }()
@@ -53,7 +52,7 @@ func flipToConfidential(t *testing.T, adminToken string, clientId int64) string 
 	t.Helper()
 
 	secret := stringutil.GenerateSecurityRandomString(60)
-	apiURL := config.GetAuthServer().BaseURL + "/api/v1/admin/clients/" +
+	apiURL := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients/" +
 		strconv.FormatInt(clientId, 10) + "/authentication"
 	resp := makeAPIRequest(t, "PUT", apiURL, adminToken,
 		api.UpdateClientAuthenticationRequest{IsPublic: false, ClientSecret: secret})
@@ -78,7 +77,7 @@ func redeemCode(t *testing.T, httpClient *http.Client, code *models.Code, client
 		form.Set("client_secret", clientSecret)
 	}
 
-	data := postToTokenEndpoint(t, httpClient, config.GetAuthServer().BaseURL+"/auth/token/", form)
+	data := postToTokenEndpoint(t, httpClient, appConfig.AuthServer.BaseURL+"/auth/token/", form)
 	require.Nil(t, data["error"], "unexpected refusal at redemption: %v", data["error_description"])
 	return data
 }
@@ -95,7 +94,7 @@ func presentRefreshToken(t *testing.T, clientIdentifier, refreshToken, clientSec
 	if clientSecret != "" {
 		form.Set("client_secret", clientSecret)
 	}
-	return postToTokenEndpoint(t, createHttpClient(t), config.GetAuthServer().BaseURL+"/auth/token/", form)
+	return postToTokenEndpoint(t, createHttpClient(t), appConfig.AuthServer.BaseURL+"/auth/token/", form)
 }
 
 // requireDatabaseAuditLogs makes the audit_logs table the observable it is supposed to be. The
@@ -237,7 +236,7 @@ func TestAPIClientAuthenticationPut_FlipToPublic_RevokesROPCGrantsToo(t *testing
 	defer func() { _ = database.DeleteClient(context.Background(), nil, client.Id) }()
 	user := createROPCUser(t, password)
 
-	destURL := config.GetAuthServer().BaseURL + "/auth/token/"
+	destURL := appConfig.AuthServer.BaseURL + "/auth/token/"
 	data := postToTokenEndpoint(t, createHttpClient(t), destURL, url.Values{
 		"grant_type":    {"password"},
 		"client_id":     {client.ClientIdentifier},

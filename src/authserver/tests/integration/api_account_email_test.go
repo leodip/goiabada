@@ -8,7 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
@@ -28,7 +27,7 @@ func TestAPIAccountEmailPut_Success(t *testing.T) {
 	local := strings.ToLower(fake.LetterN(8))
 	newEmail := local + "@example.com"
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/account/email"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/email"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateAccountEmailRequest{Email: newEmail})
 	defer func() { _ = resp.Body.Close() }()
 
@@ -57,7 +56,7 @@ func TestAPIAccountEmailPut_Success(t *testing.T) {
 
 func TestAPIAccountEmailPut_ValidationErrors(t *testing.T) {
 	accessToken, _ := getUserAccessTokenWithAccountScope_Email(t)
-	url := config.GetAuthServer().BaseURL + "/api/v1/account/email"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/email"
 
 	// Empty email
 	resp1 := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateAccountEmailRequest{Email: ""})
@@ -96,7 +95,7 @@ func TestAPIAccountEmailPut_EmailAlreadyExists(t *testing.T) {
 	assert.NoError(t, err)
 	defer func() { _ = database.DeleteUser(context.Background(), nil, otherUser.Id) }()
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/account/email"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/email"
 	resp := makeAPIRequest(t, "PUT", url, accessToken, api.UpdateAccountEmailRequest{Email: otherEmail})
 	defer func() { _ = resp.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
@@ -106,7 +105,7 @@ func TestAPIAccountEmailPut_EmailAlreadyExists(t *testing.T) {
 }
 
 func TestAPIAccountEmailPut_UnauthorizedAndScope(t *testing.T) {
-	url := config.GetAuthServer().BaseURL + "/api/v1/account/email"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/email"
 
 	// No token
 	req, err := http.NewRequest("PUT", url, nil)
@@ -131,7 +130,7 @@ func TestAPIAccountEmailPut_UnauthorizedAndScope(t *testing.T) {
 
 func TestAPIAccountEmailPut_InvalidRequestBody(t *testing.T) {
 	accessToken, _ := getUserAccessTokenWithAccountScope_Email(t)
-	url := config.GetAuthServer().BaseURL + "/api/v1/account/email"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/account/email"
 
 	// Invalid JSON (no body)
 	req, err := http.NewRequest("PUT", url, nil)

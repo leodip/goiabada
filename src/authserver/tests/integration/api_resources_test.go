@@ -9,7 +9,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
@@ -32,7 +31,7 @@ func TestAPIResourcesGet_Success(t *testing.T) {
 	}()
 
 	// Test: Get all resources
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -82,7 +81,7 @@ func TestAPIResourcesGet_EmptyDatabase(t *testing.T) {
 	// But we can still test the endpoint structure
 
 	// Test: Get resources
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -103,7 +102,7 @@ func TestAPIResourcesGet_EmptyDatabase(t *testing.T) {
 
 func TestAPIResourcesGet_Unauthorized(t *testing.T) {
 	// Test: Request without access token
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources"
 	req, err := http.NewRequest("GET", url, nil)
 	assert.NoError(t, err)
 
@@ -123,7 +122,7 @@ func TestAPIResourcesGet_Unauthorized(t *testing.T) {
 
 func TestAPIResourcesGet_InvalidToken(t *testing.T) {
 	// Test: Request with invalid access token
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources"
 	resp := makeAPIRequest(t, "GET", url, "invalid-token", nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -141,7 +140,7 @@ func TestAPIResourcesGet_InsufficientScope(t *testing.T) {
 	// A non-admin client whose only scope is one no route grants
 	token := createClientCredentialsTokenWithoutRouteScope(t)
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources"
 	resp := makeAPIRequest(t, "GET", url, token, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -202,7 +201,7 @@ func createClientCredentialsTokenWithScope(t *testing.T, resourceIdentifier, per
 		"client_secret": {clientSecret},
 		"scope":         {resourceIdentifier + ":" + permissionIdentifier},
 	}
-	tokenEndpoint := config.GetAuthServer().BaseURL + "/auth/token/"
+	tokenEndpoint := appConfig.AuthServer.BaseURL + "/auth/token/"
 	httpClient := createHttpClient(t)
 	data := postToTokenEndpoint(t, httpClient, tokenEndpoint, form)
 	accessToken, ok := data["access_token"].(string)
@@ -254,7 +253,7 @@ func TestAPIResourcesGet_ManyResources(t *testing.T) {
 	}()
 
 	// Test: Get all resources
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/resources"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/resources"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 

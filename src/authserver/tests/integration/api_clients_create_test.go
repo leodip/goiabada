@@ -8,7 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
 	"github.com/stretchr/testify/assert"
@@ -24,7 +23,7 @@ func TestAPIClientCreate_Success(t *testing.T) {
 		AuthorizationCodeEnabled: true,
 		ClientCredentialsEnabled: false,
 	}
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients"
 	resp := makeAPIRequest(t, "POST", url, accessToken, reqBody)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -45,7 +44,7 @@ func TestAPIClientCreate_Success(t *testing.T) {
 
 func TestAPIClientCreate_Validation(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients"
 
 	testCases := []struct {
 		name           string
@@ -128,7 +127,7 @@ func TestAPIClientCreate_Duplicate(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	ident := "client-" + strings.ToLower(fake.LetterN(8))
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients"
 
 	first := api.CreateClientRequest{ClientIdentifier: ident, Description: "first"}
 	resp := makeAPIRequest(t, "POST", url, accessToken, first)
@@ -151,7 +150,7 @@ func TestAPIClientCreate_Unauthorized(t *testing.T) {
 	reqBody := api.CreateClientRequest{ClientIdentifier: "unauth-client", Description: "x"}
 	b, _ := json.Marshal(reqBody)
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients"
 	httpClient := createHttpClient(t)
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(b))
 	assert.NoError(t, err)
@@ -166,7 +165,7 @@ func TestAPIClientCreate_InsufficientScope(t *testing.T) {
 	accessToken := createClientCredentialsTokenWithoutRouteScope(t)
 
 	// Attempt to create client with token lacking required scope
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients"
 	reqBody := api.CreateClientRequest{ClientIdentifier: "noadmin-" + strings.ToLower(fake.LetterN(8)), Description: "x"}
 	resp := makeAPIRequest(t, "POST", url, accessToken, reqBody)
 	defer func() { _ = resp.Body.Close() }()
@@ -183,7 +182,7 @@ func TestAPIClientCreate_WithDisplayName(t *testing.T) {
 		AuthorizationCodeEnabled: true,
 		ClientCredentialsEnabled: false,
 	}
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients"
 	resp := makeAPIRequest(t, "POST", url, accessToken, reqBody)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -207,7 +206,7 @@ func TestAPIClientCreate_EmptyDisplayName(t *testing.T) {
 		AuthorizationCodeEnabled: true,
 		ClientCredentialsEnabled: false,
 	}
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients"
 	resp := makeAPIRequest(t, "POST", url, accessToken, reqBody)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -231,7 +230,7 @@ func TestAPIClientCreate_DisplayNameTooLong(t *testing.T) {
 		AuthorizationCodeEnabled: true,
 		ClientCredentialsEnabled: false,
 	}
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients"
 	resp := makeAPIRequest(t, "POST", url, accessToken, reqBody)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -253,7 +252,7 @@ func TestAPIClientCreate_DisplayNameTrimmed(t *testing.T) {
 		AuthorizationCodeEnabled: true,
 		ClientCredentialsEnabled: false,
 	}
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients"
 	resp := makeAPIRequest(t, "POST", url, accessToken, reqBody)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -273,7 +272,7 @@ func TestAPIClientCreate_DisplayNameTrimmed(t *testing.T) {
 func TestAPIClientCreate_AngleBracketsRejected(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients"
 
 	cases := []struct {
 		name     string
@@ -323,7 +322,7 @@ func TestAPIClientCreate_AmpersandsAndQuotesStoredVerbatim(t *testing.T) {
 		AuthorizationCodeEnabled: true,
 		ClientCredentialsEnabled: false,
 	}
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients"
 	resp := makeAPIRequest(t, "POST", url, accessToken, reqBody)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -355,7 +354,7 @@ func TestAPIClientCreate_DescriptionOnlyBackwardCompat(t *testing.T) {
 		AuthorizationCodeEnabled: true,
 		ClientCredentialsEnabled: false,
 	}
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients"
 	resp := makeAPIRequest(t, "POST", url, accessToken, reqBody)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -380,7 +379,7 @@ func TestAPIClientCreate_BothDescriptionAndDisplayName(t *testing.T) {
 		AuthorizationCodeEnabled: true,
 		ClientCredentialsEnabled: false,
 	}
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/clients"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/clients"
 	resp := makeAPIRequest(t, "POST", url, accessToken, reqBody)
 	defer func() { _ = resp.Body.Close() }()
 

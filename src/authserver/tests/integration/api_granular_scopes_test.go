@@ -8,7 +8,6 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/constants"
@@ -58,7 +57,7 @@ func createClientWithGranularScope(t *testing.T, permissionIdentifier string) (s
 
 	// Get access token using client credentials flow
 	httpClient := createHttpClient(t)
-	destUrl := config.GetAuthServer().BaseURL + "/auth/token/"
+	destUrl := appConfig.AuthServer.BaseURL + "/auth/token/"
 
 	formData := url.Values{
 		"grant_type":    {"client_credentials"},
@@ -97,7 +96,7 @@ func TestGranularScopes_AdminReadCanOnlyReadUserEndpoints(t *testing.T) {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
-	baseURL := config.GetAuthServer().BaseURL
+	baseURL := appConfig.AuthServer.BaseURL
 
 	// Test: Should be able to read user search
 	resp := makeAPIRequest(t, "GET", baseURL+"/api/v1/admin/users/search", accessToken, nil)
@@ -149,7 +148,7 @@ func TestGranularScopes_AdminReadCanOnlyReadClientEndpoints(t *testing.T) {
 		_ = database.DeleteClient(context.Background(), nil, testClient.Id)
 	}()
 
-	baseURL := config.GetAuthServer().BaseURL
+	baseURL := appConfig.AuthServer.BaseURL
 
 	// Test: Should be able to read clients list
 	resp := makeAPIRequest(t, "GET", baseURL+"/api/v1/admin/clients", accessToken, nil)
@@ -192,7 +191,7 @@ func TestGranularScopes_AdminReadCanOnlyReadSettingsEndpoints(t *testing.T) {
 		_ = database.DeleteClient(context.Background(), nil, client.Id)
 	}()
 
-	baseURL := config.GetAuthServer().BaseURL
+	baseURL := appConfig.AuthServer.BaseURL
 
 	// Test: Should be able to read general settings
 	resp := makeAPIRequest(t, "GET", baseURL+"/api/v1/admin/settings/general", accessToken, nil)
@@ -257,7 +256,7 @@ func TestGranularScopes_ManageUsersCanAccessUserEndpointsOnly(t *testing.T) {
 		_ = database.DeleteClient(context.Background(), nil, testClient.Id)
 	}()
 
-	baseURL := config.GetAuthServer().BaseURL
+	baseURL := appConfig.AuthServer.BaseURL
 
 	// Test: Should be able to read users (GET)
 	resp := makeAPIRequest(t, "GET", baseURL+"/api/v1/admin/users/search", accessToken, nil)
@@ -316,7 +315,7 @@ func TestGranularScopes_ManageClientsCanAccessClientEndpointsOnly(t *testing.T) 
 		_ = database.DeleteClient(context.Background(), nil, testClient.Id)
 	}()
 
-	baseURL := config.GetAuthServer().BaseURL
+	baseURL := appConfig.AuthServer.BaseURL
 
 	// Test: Should be able to read clients (GET)
 	resp := makeAPIRequest(t, "GET", baseURL+"/api/v1/admin/clients", accessToken, nil)
@@ -364,7 +363,7 @@ func TestGranularScopes_ManageSettingsCanAccessSettingsEndpointsOnly(t *testing.
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
-	baseURL := config.GetAuthServer().BaseURL
+	baseURL := appConfig.AuthServer.BaseURL
 
 	// Test: Should be able to read settings (GET)
 	resp := makeAPIRequest(t, "GET", baseURL+"/api/v1/admin/settings/general", accessToken, nil)
@@ -420,7 +419,7 @@ func TestGranularScopes_ManageCanAccessAllEndpoints(t *testing.T) {
 		_ = database.DeleteClient(context.Background(), nil, testClient.Id)
 	}()
 
-	baseURL := config.GetAuthServer().BaseURL
+	baseURL := appConfig.AuthServer.BaseURL
 
 	// Test: Should be able to access users
 	resp := makeAPIRequest(t, "GET", baseURL+"/api/v1/admin/users/search", accessToken, nil)
@@ -462,7 +461,7 @@ func TestGranularScopes_ManageCanAccessAllEndpoints(t *testing.T) {
 // TestGranularScopes_NoScopeCannotAccessAdmin verifies that without any admin scope,
 // API endpoints are inaccessible
 func TestGranularScopes_NoScopeCannotAccessAdmin(t *testing.T) {
-	baseURL := config.GetAuthServer().BaseURL
+	baseURL := appConfig.AuthServer.BaseURL
 
 	// Test without any authorization
 	req, err := http.NewRequest("GET", baseURL+"/api/v1/admin/users/search", nil)
@@ -479,7 +478,7 @@ func TestGranularScopes_NoScopeCannotAccessAdmin(t *testing.T) {
 // TestGranularScopes_InvalidTokenCannotAccess verifies that an invalid token
 // cannot access any admin endpoints
 func TestGranularScopes_InvalidTokenCannotAccess(t *testing.T) {
-	baseURL := config.GetAuthServer().BaseURL
+	baseURL := appConfig.AuthServer.BaseURL
 
 	// Test with invalid token
 	resp := makeAPIRequest(t, "GET", baseURL+"/api/v1/admin/users/search", "invalid-token-12345", nil)
@@ -491,7 +490,7 @@ func TestGranularScopes_InvalidTokenCannotAccess(t *testing.T) {
 // TestGranularScopes_PhoneCountriesAccessibleByAnyAdminScope verifies that
 // reference data (phone-countries) is accessible by any admin scope
 func TestGranularScopes_PhoneCountriesAccessibleByAnyAdminScope(t *testing.T) {
-	baseURL := config.GetAuthServer().BaseURL
+	baseURL := appConfig.AuthServer.BaseURL
 
 	testCases := []struct {
 		name               string
@@ -541,7 +540,7 @@ func TestGranularScopes_GroupsRequireUsersScope(t *testing.T) {
 		_ = database.DeleteGroup(context.Background(), nil, testGroup.Id)
 	}()
 
-	baseURL := config.GetAuthServer().BaseURL
+	baseURL := appConfig.AuthServer.BaseURL
 
 	testCases := []struct {
 		name               string
@@ -573,7 +572,7 @@ func TestGranularScopes_GroupsRequireUsersScope(t *testing.T) {
 // TestGranularScopes_ResourcesRequireSettingsScope verifies that resource endpoints
 // require settings scope
 func TestGranularScopes_ResourcesRequireSettingsScope(t *testing.T) {
-	baseURL := config.GetAuthServer().BaseURL
+	baseURL := appConfig.AuthServer.BaseURL
 
 	testCases := []struct {
 		name               string
@@ -618,7 +617,7 @@ func TestGranularScopes_UserPermissionsRequireUsersScope(t *testing.T) {
 		_ = database.DeleteUser(context.Background(), nil, testUser.Id)
 	}()
 
-	baseURL := config.GetAuthServer().BaseURL
+	baseURL := appConfig.AuthServer.BaseURL
 
 	testCases := []struct {
 		name               string
@@ -661,7 +660,7 @@ func TestGranularScopes_ClientPermissionsRequireClientsScope(t *testing.T) {
 		_ = database.DeleteClient(context.Background(), nil, testClient.Id)
 	}()
 
-	baseURL := config.GetAuthServer().BaseURL
+	baseURL := appConfig.AuthServer.BaseURL
 
 	testCases := []struct {
 		name               string
@@ -693,7 +692,7 @@ func TestGranularScopes_ClientPermissionsRequireClientsScope(t *testing.T) {
 // TestGranularScopes_WriteOperationsRequireSpecificScopes tests that write operations
 // (POST, PUT, DELETE) require the specific domain scope, not just admin-read
 func TestGranularScopes_WriteOperationsRequireSpecificScopes(t *testing.T) {
-	baseURL := config.GetAuthServer().BaseURL
+	baseURL := appConfig.AuthServer.BaseURL
 
 	// Create admin-read client (read-only)
 	readOnlyToken, readOnlyClient := createClientWithGranularScope(t, constants.AdminReadPermissionIdentifier)

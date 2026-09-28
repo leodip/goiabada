@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/leodip/goiabada/authserver/internal/config"
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/leodip/goiabada/core/api"
@@ -79,7 +78,7 @@ func TestAPIGroupMembersGet_Success(t *testing.T) {
 	}()
 
 	// Test: Get group members
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/members"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/members"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -125,7 +124,7 @@ func TestAPIGroupMembersGet_EmptyGroup(t *testing.T) {
 	}()
 
 	// Test: Get group members
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/members"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/members"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -189,7 +188,7 @@ func TestAPIGroupMembersGet_Pagination(t *testing.T) {
 	}()
 
 	// Test: Get first page with size=2
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/members?page=1&size=2"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/members?page=1&size=2"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -211,7 +210,7 @@ func TestAPIGroupMembersGet_GroupNotFound(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Test: Get members for non-existent group
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/99999/members"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/99999/members"
 	resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -235,7 +234,7 @@ func TestAPIGroupMembersGet_InvalidGroupId(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/" + tc.groupId + "/members"
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + tc.groupId + "/members"
 			resp := makeAPIRequest(t, "GET", url, accessToken, nil)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -278,7 +277,7 @@ func TestAPIGroupMemberAdd_Success(t *testing.T) {
 	addRequest := api.AddGroupMemberRequest{
 		UserId: testUser.Id,
 	}
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/members"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/members"
 	resp := makeAPIRequest(t, "POST", url, accessToken, addRequest)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -343,7 +342,7 @@ func TestAPIGroupMemberAdd_UserAlreadyInGroup(t *testing.T) {
 	addRequest := api.AddGroupMemberRequest{
 		UserId: testUser.Id,
 	}
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/members"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/members"
 	resp := makeAPIRequest(t, "POST", url, accessToken, addRequest)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -370,7 +369,7 @@ func TestAPIGroupMemberAdd_UserNotFound(t *testing.T) {
 	addRequest := api.AddGroupMemberRequest{
 		UserId: 99999,
 	}
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/members"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/members"
 	resp := makeAPIRequest(t, "POST", url, accessToken, addRequest)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -386,7 +385,7 @@ func TestAPIGroupMemberAdd_GroupNotFound(t *testing.T) {
 	addRequest := api.AddGroupMemberRequest{
 		UserId: 1,
 	}
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/99999/members"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/99999/members"
 	resp := makeAPIRequest(t, "POST", url, accessToken, addRequest)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -410,7 +409,7 @@ func TestAPIGroupMemberAdd_InvalidRequestBody(t *testing.T) {
 	}()
 
 	// Test: Send request with no body
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/members"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/members"
 	req, err := http.NewRequest("POST", url, nil)
 	assert.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
@@ -460,7 +459,7 @@ func TestAPIGroupMemberRemove_Success(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Test: Remove user from group
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/members/" + strconv.FormatInt(testUser.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/members/" + strconv.FormatInt(testUser.Id, 10)
 	resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -510,7 +509,7 @@ func TestAPIGroupMemberRemove_UserNotInGroup(t *testing.T) {
 	}()
 
 	// Test: Try to remove user from group they're not in
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/members/" + strconv.FormatInt(testUser.Id, 10)
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/members/" + strconv.FormatInt(testUser.Id, 10)
 	resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -534,7 +533,7 @@ func TestAPIGroupMemberRemove_UserNotFound(t *testing.T) {
 	}()
 
 	// Test: Try to remove non-existent user from group
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/members/99999"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + strconv.FormatInt(testGroup.Id, 10) + "/members/99999"
 	resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -547,7 +546,7 @@ func TestAPIGroupMemberRemove_GroupNotFound(t *testing.T) {
 	accessToken, _ := createAdminClientWithToken(t)
 
 	// Test: Try to remove user from non-existent group
-	url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/99999/members/1"
+	url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/99999/members/1"
 	resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
 	defer func() { _ = resp.Body.Close() }()
 
@@ -573,7 +572,7 @@ func TestAPIGroupMemberRemove_InvalidIds(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			url := config.GetAuthServer().BaseURL + "/api/v1/admin/groups/" + tc.groupId + "/members/" + tc.userId
+			url := appConfig.AuthServer.BaseURL + "/api/v1/admin/groups/" + tc.groupId + "/members/" + tc.userId
 			resp := makeAPIRequest(t, "DELETE", url, accessToken, nil)
 			defer func() { _ = resp.Body.Close() }()
 
@@ -607,7 +606,7 @@ func TestAPIGroupMembers_Unauthorized(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			url := config.GetAuthServer().BaseURL + tc.url
+			url := appConfig.AuthServer.BaseURL + tc.url
 			req, err := http.NewRequest(tc.method, url, nil)
 			assert.NoError(t, err)
 
