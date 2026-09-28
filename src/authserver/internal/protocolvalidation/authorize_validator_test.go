@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 	"testing"
 
@@ -687,6 +688,35 @@ func TestValidateRequest_ValidInput(t *testing.T) {
 	err := validator.ValidateRequest(&input)
 
 	assert.NoError(t, err)
+}
+
+// TestValidateRequest_MaxAge pins that the validator consults oidc.ParseMaxAge, whose table owns
+// every shape: an accepted value passes, a refused one answers invalid_request with the one
+// description, and nothing else about the request decides it (#243).
+func TestValidateRequest_MaxAge(t *testing.T) {
+	validator := NewAuthorizeValidator(mocks_data.NewDatabase(t))
+	inputWith := func(maxAge string) *ValidateRequestInput {
+		return &ValidateRequestInput{
+			ResponseType:        "code",
+			CodeChallengeMethod: "S256",
+			CodeChallenge:       "a_valid_code_challenge_that_meets_length_requirements",
+			ResponseMode:        "query",
+			MaxAge:              maxAge,
+		}
+	}
+
+	for _, accepted := range []string{"", "0", "3600", "9999999999999999999999"} {
+		assert.NoError(t, validator.ValidateRequest(inputWith(accepted)), "max_age=%q must be accepted", accepted)
+	}
+
+	for _, refused := range []string{"abc", "-1", "+5", " 5", "1.5"} {
+		err := validator.ValidateRequest(inputWith(refused))
+		var customErr *customerrors.ErrorDetail
+		require.ErrorAs(t, err, &customErr, "max_age=%q must be refused", refused)
+		assert.Equal(t, "invalid_request", customErr.GetCode())
+		assert.Equal(t, "The max_age parameter must be a non-negative integer.", customErr.GetDescription())
+		assert.Equal(t, http.StatusBadRequest, customErr.GetHttpStatusCode())
+	}
 }
 
 func TestValidateScopes_MultipleScopesInSingleRequest(t *testing.T) {

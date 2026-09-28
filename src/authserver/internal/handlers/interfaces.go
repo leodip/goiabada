@@ -70,7 +70,7 @@ type CodeIssuer interface {
 }
 
 type UserSessionManager interface {
-	HasValidUserSession(ctx context.Context, userSession *models.UserSession, requestedMaxAgeInSeconds *int) bool
+	HasValidUserSession(userSession *models.UserSession, idleTimeoutInSeconds int, maxLifetimeInSeconds int, requestedMaxAgeInSeconds *int64) bool
 	StartNewUserSession(w http.ResponseWriter, r *http.Request,
 		userId int64, clientId int64, authMethods string, acrLevel models.AcrLevel,
 		authStateGeneration int64, otpConfigGeneration *int64,

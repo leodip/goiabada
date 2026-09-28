@@ -228,15 +228,15 @@ The `max_age` parameter and ACR levels are independent checks that both affect w
 | Parameter | What it checks | When user must re-authenticate |
 |-----------|----------------|-------------------------------|
 | `acr_values` | Authentication strength | Session ACR is lower than the level required |
-| `max_age` | Time since session started | Session is older than specified seconds |
+| `max_age` | Time since the user last signed in | The user last signed in more than the specified seconds ago |
 
 Both conditions are evaluated. A user may need to re-authenticate if:
 - Their session's ACR is too low (step-up authentication), OR
-- Their session is too old (even if ACR is sufficient)
+- They signed in too long ago (even if ACR is sufficient)
 
-**Example:** A user has an active `level2_mandatory` session that started 2 hours ago. A request comes in with `acr_values=urn:goiabada:level1` and `max_age=3600` (1 hour):
+**Example:** A user has an active `level2_mandatory` session and last signed in 2 hours ago. A request comes in with `acr_values=urn:goiabada:level1` and `max_age=3600` (1 hour):
 - ACR check: Session at `level2_mandatory` is sufficient for `level1` request
-- max_age check: Session started 2 hours ago, exceeds 1 hour limit
+- max_age check: The user signed in 2 hours ago, exceeds 1 hour limit
 - Result: User must re-authenticate (due to max_age), even though ACR was sufficient
 
 For more details on session timing, see [User sessions](/concepts/user-sessions/).

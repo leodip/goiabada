@@ -249,6 +249,17 @@ func HandleAuthorizeGet(
 
 		sessionIdentifier, _ := reqctx.SessionIdentifierFrom(r.Context())
 
+		// Settings are read here, above the session predicate, because the predicate needs the two
+		// session lifetimes, and the PKCE and implicit-flow decisions below read them too.
+		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
+
+		// The client's max_age as the session predicate applies it. A malformed value is refused
+		// by ValidateRequest below with invalid_request, and until then it constrains nothing: it
+		// is nil here, so whether the browser holds a valid session is decided as if the client
+		// had sent none, which is what makes a session holder answered at once rather than sent to
+		// log in for a request that will be refused anyway (#243).
+		requestedMaxAge, _ := oidc.ParseMaxAge(authContext.MaxAge)
+
 		// The session row behind this browser, loaded at most once and only if somebody asks. The
 		// predicate below asks, and so does the ordinary path at the bottom of the handler, and
 		// between them there must be exactly one query: this handler used to reach the lookup only
@@ -277,8 +288,8 @@ func HandleAuthorizeGet(
 				return false
 			}
 
-			sessionIsValid = userSessionManager.HasValidUserSession(r.Context(), userSession,
-				authContext.ParseRequestedMaxAge())
+			sessionIsValid = userSessionManager.HasValidUserSession(userSession,
+				settings.UserSessionIdleTimeoutInSeconds, settings.UserSessionMaxLifetimeInSeconds, requestedMaxAge)
 			return sessionIsValid
 		}
 
@@ -430,9 +441,8 @@ func HandleAuthorizeGet(
 			return
 		}
 
-		// The client was loaded above the error-redirect closure, which needs it. Settings still
-		// come from the request context here, where the PKCE requirement is decided.
-		settings := r.Context().Value(constants.ContextKeySettings).(*models.Settings)
+		// The client was loaded above the error-redirect closure, which needs it, and the settings
+		// above the session predicate.
 		pkceRequired := client.IsPKCERequired(settings.PKCERequired)
 		implicitGrantEnabled := client.IsImplicitGrantEnabled(settings.ImplicitFlowEnabled)
 
@@ -445,6 +455,7 @@ func HandleAuthorizeGet(
 			ImplicitGrantEnabled: implicitGrantEnabled,
 			Scope:                authContext.Scope,
 			Nonce:                authContext.Nonce,
+			MaxAge:               authContext.MaxAge,
 		})
 
 		if err != nil {
@@ -522,7 +533,7 @@ func HandleAuthorizeGet(
 
 		// Handle prompt=none: silent authentication without any UI
 		if authContext.HasPromptValue("none") {
-			handlePromptNone(w, r, httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, &authContext, client, sessionIdentifier)
+			handlePromptNone(w, r, httpHelper, authHelper, userSessionManager, database, templateFS, auditLogger, permissionChecker, &authContext, client, sessionIdentifier, settings)
 			return
 		}
 
@@ -625,7 +636,7 @@ func HandleAuthorizeGet(
 // It performs all necessary checks without displaying any UI and either:
 // - Returns an error to the client if silent auth is not possible
 // - Issues a code silently if all conditions are met
-func handlePromptNone(w http.ResponseWriter, r *http.Request, httpHelper HttpHelper, authHelper AuthHelper, userSessionManager UserSessionManager, database authorizeDatabase, templateFS fs.FS, auditLogger AuditLogger, permissionChecker PermissionChecker, authContext *ceremony.AuthContext, client *models.Client, sessionIdentifier string) {
+func handlePromptNone(w http.ResponseWriter, r *http.Request, httpHelper HttpHelper, authHelper AuthHelper, userSessionManager UserSessionManager, database authorizeDatabase, templateFS fs.FS, auditLogger AuditLogger, permissionChecker PermissionChecker, authContext *ceremony.AuthContext, client *models.Client, sessionIdentifier string, settings *models.Settings) {
 	// Helper to clear the auth context and then redirect with error. The clear-then-answer
 	// sequence and its server_error fallback live in answerClientWithError, which derives that
 	// fallback from the input handed to it, so this path keeps answering from the stored ceremony
@@ -659,12 +670,14 @@ func handlePromptNone(w http.ResponseWriter, r *http.Request, httpHelper HttpHel
 	}
 
 	// 2. Check session time-based validity (idle timeout, max lifetime, max_age)
-	hasValidSession := userSessionManager.HasValidUserSession(r.Context(), userSession, authContext.ParseRequestedMaxAge())
+	idleTimeout, maxLifetime := settings.UserSessionIdleTimeoutInSeconds, settings.UserSessionMaxLifetimeInSeconds
+	requestedMaxAge := authContext.RequestedMaxAge()
+	hasValidSession := userSessionManager.HasValidUserSession(userSession, idleTimeout, maxLifetime, requestedMaxAge)
 	if !hasValidSession {
 		// Determine if it's max_age that caused the failure
-		if authContext.ParseRequestedMaxAge() != nil {
+		if requestedMaxAge != nil {
 			// Check if session would be valid without max_age
-			if userSessionManager.HasValidUserSession(r.Context(), userSession, nil) {
+			if userSessionManager.HasValidUserSession(userSession, idleTimeout, maxLifetime, nil) {
 				redirectWithError(constants.ErrorLoginRequired, "Session age exceeds max_age")
 				return
 			}

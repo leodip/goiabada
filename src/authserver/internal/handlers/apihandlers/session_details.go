@@ -3,6 +3,7 @@ package apihandlers
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/apimapping"
 	"github.com/leodip/goiabada/authserver/internal/models"
@@ -39,7 +40,7 @@ func buildSessionDetails(
 	for _, session := range sessions {
 		// Invalid sessions are omitted rather than reported: the endpoints list what is live,
 		// and the background worker deletes the rest within its sweep interval (#373 decision 2).
-		if !session.IsValid(settings.UserSessionIdleTimeoutInSeconds, settings.UserSessionMaxLifetimeInSeconds, nil) {
+		if !session.IsValid(time.Now().UTC(), settings.UserSessionIdleTimeoutInSeconds, settings.UserSessionMaxLifetimeInSeconds, nil) {
 			continue
 		}
 		valid = append(valid, session)

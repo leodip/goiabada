@@ -141,9 +141,9 @@ Both `prompt=login` and `max_age` can force re-authentication, but they work dif
 | Parameter | Behavior |
 |-----------|----------|
 | `prompt=login` | **Always** forces re-authentication, regardless of session age |
-| `max_age=N` | Forces re-authentication only if the session is older than N seconds |
+| `max_age=N` | Forces re-authentication only if the user last signed in more than N seconds ago |
 
-Use `prompt=login` when you always need fresh credentials. Use `max_age` when you only need re-authentication if the session is stale.
+Use `prompt=login` when you always need fresh credentials. Use `max_age` when you only need re-authentication if the last sign-in is too old.
 
 ## prompt=consent (force consent screen)
 

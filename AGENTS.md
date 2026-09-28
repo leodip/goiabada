@@ -280,7 +280,7 @@ UserSession (DB)
 Valid if ALL true:
 1. `now <= LastAccessed + IdleTimeoutSeconds`
 2. `now <= Started + MaxLifetimeSeconds`
-3. If `max_age` param: `now <= Started + max_age`
+3. If `max_age` param: `now <= AuthTime + max_age` (`Started` when `AuthTime` is zero)
 
 ### ACR Step-Up Logic (`handler_auth_level1.go`)
 Uses `models.AcrLevel.IsHigherThan()` for comparison (priority: level1=1, level2_optional=2, level2_mandatory=3).

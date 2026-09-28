@@ -53,6 +53,7 @@ type ValidateRequestInput struct {
 	ImplicitGrantEnabled bool   // Whether implicit flow is allowed for this client
 	Scope                string // Needed to validate openid requirement for id_token
 	Nonce                string // Needed to validate nonce requirement for id_token
+	MaxAge               string // The raw max_age parameter, empty when absent
 }
 
 func NewAuthorizeValidator(database authorizeValidatorDatabase) *AuthorizeValidator {
@@ -362,6 +363,14 @@ func (val *AuthorizeValidator) ValidateRequest(input *ValidateRequestInput) erro
 		return customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
 			"Implicit flow requires response_mode=fragment or no response_mode (fragment is the default for implicit flow).",
 			http.StatusBadRequest)
+	}
+
+	// A max_age that is not a non-negative integer is an invalid parameter value, which RFC 6749
+	// 4.1.2.1 answers with invalid_request. It used to be parsed with strconv.Atoi at every hop and
+	// a failure dropped, so "abc" constrained nothing and "-1" forced a login (#243).
+	if _, err := oidc.ParseMaxAge(input.MaxAge); err != nil {
+		return customerrors.NewErrorDetailWithHttpStatusCode("invalid_request",
+			"The max_age parameter must be a non-negative integer.", http.StatusBadRequest)
 	}
 
 	return nil

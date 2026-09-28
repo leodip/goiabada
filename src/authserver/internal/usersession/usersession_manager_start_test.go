@@ -104,7 +104,7 @@ type startSessionMocks struct {
 	db      *mocks_data.Database
 	backend *armableBackend
 	store   *sessionstore.ServerSideStore
-	manager *UserSessionManager
+	manager *Manager
 }
 
 func newStartSessionMocks(t *testing.T) *startSessionMocks {
@@ -122,7 +122,7 @@ func newStartSessionMocks(t *testing.T) *startSessionMocks {
 		db:      db,
 		backend: backend,
 		store:   store,
-		manager: &UserSessionManager{
+		manager: &Manager{
 			database:     db,
 			sessionStore: store,
 			sessionName:  testSessionName,
@@ -847,18 +847,25 @@ func TestStartNewUserSession_WrapsSessionStoreReadError(t *testing.T) {
 }
 
 // =============================================================================
-// Tests for NewUserSessionManager
+// Tests for NewManager
 // =============================================================================
 
-func TestNewUserSessionManager_StoresItsDependencies(t *testing.T) {
+func TestNewManager_StoresItsDependencies(t *testing.T) {
 	m := newStartSessionMocks(t)
 
-	manager := NewUserSessionManager(m.store, "some-session", m.db)
+	manager := NewManager(m.store, "some-session", m.db)
 
 	assert.NotNil(t, manager)
 	assert.Same(t, m.db, manager.database)
 	assert.Same(t, m.store, manager.sessionStore)
 	assert.Equal(t, "some-session", manager.sessionName)
+
+	// The constructor's clock is the wall clock in UTC.
+	require.NotNil(t, manager.now)
+	before := time.Now().UTC()
+	got := manager.now()
+	assert.Equal(t, time.UTC, got.Location())
+	assert.False(t, got.Before(before))
 }
 
 // TestStartNewUserSession_StampsAuthStateGeneration is the session row of #106's

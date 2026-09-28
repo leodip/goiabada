@@ -743,7 +743,7 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, settings *m
 				return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant", invalidTokenMessage,
 					http.StatusBadRequest)
 			}
-			isSessionValid := userSession.IsValid(settings.UserSessionIdleTimeoutInSeconds, settings.UserSessionMaxLifetimeInSeconds, nil)
+			isSessionValid := userSession.IsValid(time.Now().UTC(), settings.UserSessionIdleTimeoutInSeconds, settings.UserSessionMaxLifetimeInSeconds, nil)
 			if !isSessionValid {
 				return nil, customerrors.NewErrorDetailWithHttpStatusCode("invalid_grant", invalidTokenMessage,
 					http.StatusBadRequest)

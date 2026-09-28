@@ -1,10 +1,12 @@
 package ceremony
 
 import (
+	"math"
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestHasPromptValue_EmptyPrompt(t *testing.T) {
@@ -557,61 +559,43 @@ func TestOwnsSession(t *testing.T) {
 }
 
 // =============================================================================
-// Tests for ParseRequestedMaxAge
+// Tests for RequestedMaxAge
 //
-// max_age arrives as a raw query-string value and feeds
-// UserSessionManager.HasValidUserSession, where it caps how old an existing
-// session may be. A nil result means "no max_age was requested", so the
-// distinction between nil and a parsed zero matters.
+// max_age is carried on the context as the raw parameter and read by every hop after
+// /auth/authorize through RequestedMaxAge. The parse itself is oidc.ParseMaxAge's table; these
+// cases pin what this reader adds: nil for absent, and 0 for a value that does not parse, which
+// forces re-authentication rather than ignoring the constraint (#243).
 // =============================================================================
 
-func TestParseRequestedMaxAge(t *testing.T) {
-	testCases := []struct {
+func TestRequestedMaxAge(t *testing.T) {
+	accepted := []struct {
 		name   string
 		maxAge string
-		want   *int
+		want   int64
 	}{
-		{"absent", "", nil},
-		{"typical value", "3600", intPtr(3600)},
-		{"zero means reauthenticate now", "0", intPtr(0)},
-		{"large value", "86400", intPtr(86400)},
-		{"non-numeric is ignored", "abc", nil},
-		{"partially numeric is ignored", "10s", nil},
-		{"float is ignored", "3600.5", nil},
-		{"surrounding whitespace is not trimmed, so it is ignored", " 3600 ", nil},
-		{"negative value is accepted as-is", "-1", intPtr(-1)},
-		{"overflowing value is ignored", "99999999999999999999", nil},
+		{"typical value", "3600", 3600},
+		{"zero means reauthenticate now", "0", 0},
+		{"beyond int64 is held as the largest", "99999999999999999999", math.MaxInt64},
 	}
-
-	for _, tc := range testCases {
+	for _, tc := range accepted {
 		t.Run(tc.name, func(t *testing.T) {
-			ac := &AuthContext{MaxAge: tc.maxAge}
-
-			got := ac.ParseRequestedMaxAge()
-
-			if tc.want == nil {
-				assert.Nil(t, got)
-				return
-			}
-			assert.NotNil(t, got)
-			assert.Equal(t, *tc.want, *got)
+			got := (&AuthContext{MaxAge: tc.maxAge}).RequestedMaxAge()
+			require.NotNil(t, got)
+			assert.Equal(t, tc.want, *got)
 		})
 	}
-}
 
-// "0" must not collapse to nil: nil means no max_age was requested, whereas 0
-// means the session must be treated as too old and the user re-authenticated.
-func TestParseRequestedMaxAge_ZeroIsDistinctFromAbsent(t *testing.T) {
-	zero := (&AuthContext{MaxAge: "0"}).ParseRequestedMaxAge()
-	absent := (&AuthContext{MaxAge: ""}).ParseRequestedMaxAge()
+	t.Run("absent is nil", func(t *testing.T) {
+		assert.Nil(t, (&AuthContext{MaxAge: ""}).RequestedMaxAge())
+	})
 
-	assert.NotNil(t, zero)
-	assert.Equal(t, 0, *zero)
-	assert.Nil(t, absent)
-}
-
-func intPtr(i int) *int {
-	return &i
+	for _, unparseable := range []string{"abc", "10s", "3600.5", " 3600 ", "-1", "+5"} {
+		t.Run("unparseable "+unparseable+" is read as 0", func(t *testing.T) {
+			got := (&AuthContext{MaxAge: unparseable}).RequestedMaxAge()
+			require.NotNil(t, got, "an unparseable value must not read as absent, which would ignore it")
+			assert.Equal(t, int64(0), *got)
+		})
+	}
 }
 
 // =============================================================================

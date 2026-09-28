@@ -42,7 +42,7 @@ func (s *Server) initRoutes(root chi.Router) {
 	identifierValidator := validators.NewIdentifierValidator()
 
 	codeIssuer := issuance.NewCodeIssuer(s.database)
-	userSessionManager := usersession.NewUserSessionManager(s.sessionStore, constants.AuthServerSessionName, s.database)
+	userSessionManager := usersession.NewManager(s.sessionStore, constants.AuthServerSessionName, s.database)
 	otpSecretGenerator := otp.NewOTPSecretGenerator()
 	tokenIssuer := issuance.NewTokenIssuer(s.database, s.baseURL)
 	userCreator := usercreation.NewUserCreator(s.database)

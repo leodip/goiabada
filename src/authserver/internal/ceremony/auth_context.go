@@ -3,7 +3,6 @@ package ceremony
 import (
 	"regexp"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 
@@ -208,13 +207,20 @@ func (ac *AuthContext) AddAuthMethod(method string) {
 	ac.AuthMethods = ac.AuthMethods + " " + method
 }
 
-func (ac *AuthContext) ParseRequestedMaxAge() *int {
-	var requestedMaxAge *int
-	if len(ac.MaxAge) > 0 {
-		i, err := strconv.Atoi(ac.MaxAge)
-		if err == nil {
-			requestedMaxAge = &i
-		}
+// RequestedMaxAge is the client's max_age as every hop after /auth/authorize reads it: nil when
+// the request carried none, otherwise the value oidc.ParseMaxAge reads from the raw parameter.
+//
+// MaxAge stays the raw string on the context, so the wire shape every ceremony in flight at a
+// deploy carries does not change. /auth/authorize refuses a malformed value before any session
+// check, so the only context carrying one is a refusal #213 parked for /auth/level1completed,
+// which answers it before asking about a session. Anything else reading one is read as 0, which
+// forces re-authentication: the fail-closed direction, where ignoring it would let a value nobody
+// validated relax a constraint the client asked for (#243).
+func (ac *AuthContext) RequestedMaxAge() *int64 {
+	requestedMaxAge, err := oidc.ParseMaxAge(ac.MaxAge)
+	if err != nil {
+		forceReauthentication := int64(0)
+		return &forceReauthentication
 	}
 	return requestedMaxAge
 }

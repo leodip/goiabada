@@ -2,6 +2,7 @@ package models
 
 import (
 	"database/sql"
+	"math"
 	"time"
 )
 
@@ -64,27 +65,53 @@ type UserSession struct {
 	Clients []UserSessionClient `db:"-"`
 }
 
-func (us *UserSession) isValidSinceStarted(userSessionMaxLifetimeInSeconds int) bool {
-	utcNow := time.Now().UTC()
-	max := us.Started.Add(time.Second * time.Duration(userSessionMaxLifetimeInSeconds))
-	return utcNow.Before(max) || utcNow.Equal(max)
-}
+// IsValid reports whether the session may still be used at now: idle for no longer than
+// idleTimeoutInSeconds since LastAccessed, alive for no longer than maxLifetimeInSeconds since
+// Started and, when the client sent max_age, authenticated no longer than that ago. Each bound is
+// inclusive, because OIDC Core 1.0 section 3.1.2.1 forces re-authentication when the elapsed time
+// "is greater than this value", so elapsed equal to max_age is still valid and max_age=0 is not,
+// once any time has passed at all.
+//
+// max_age is measured from AuthTime, "the last time the End-User was actively authenticated by
+// the OP" in the same section, and not from Started: a re-authentication inside a session
+// refreshes AuthTime and leaves Started alone, so measuring from Started refused a session its
+// user had signed in to minutes ago once the session itself was older than max_age. A zero
+// AuthTime is a row written before the column was filled, and falls back to Started (#243).
+//
+// now is a parameter so the three callers and the session manager read the clock once each and a
+// test can fix it.
+func (us *UserSession) IsValid(now time.Time, idleTimeoutInSeconds int, maxLifetimeInSeconds int,
+	requestedMaxAgeInSeconds *int64) bool {
 
-func (us *UserSession) isValidSinceLastAccessed(userSessionIdleTimeoutInSeconds int) bool {
-	utcNow := time.Now().UTC()
-	max := us.LastAccessed.Add(time.Second * time.Duration(userSessionIdleTimeoutInSeconds))
-	return utcNow.Before(max) || utcNow.Equal(max)
-}
-
-func (us *UserSession) IsValid(userSessionIdleTimeoutInSeconds int, userSessionMaxLifetimeInSeconds int,
-	requestedMaxAgeInSeconds *int) bool {
-
-	isValid := us.isValidSinceLastAccessed(userSessionIdleTimeoutInSeconds) &&
-		us.isValidSinceStarted(userSessionMaxLifetimeInSeconds)
-
-	if requestedMaxAgeInSeconds != nil {
-		isValid = isValid && us.isValidSinceStarted(*requestedMaxAgeInSeconds)
+	if !notExceeded(us.LastAccessed, now, int64(idleTimeoutInSeconds)) ||
+		!notExceeded(us.Started, now, int64(maxLifetimeInSeconds)) {
+		return false
 	}
 
-	return isValid
+	if requestedMaxAgeInSeconds != nil {
+		authenticatedAt := us.AuthTime
+		if authenticatedAt.IsZero() {
+			authenticatedAt = us.Started
+		}
+		return notExceeded(authenticatedAt, now, *requestedMaxAgeInSeconds)
+	}
+
+	return true
+}
+
+// maxDurationSeconds is the largest whole number of seconds a time.Duration can hold.
+const maxDurationSeconds = math.MaxInt64 / int64(time.Second)
+
+// notExceeded reports whether no more than seconds have elapsed between since and now.
+//
+// A value of seconds above maxDurationSeconds is never exceeded, and is answered without
+// multiplying it into a time.Duration, which would wrap: max_age=9223372037 used to become a
+// deadline in 1734 and refuse every session. Such a bound is longer than 292 years, and
+// time.Time.Sub saturates at the same limit, so no elapsed time this comparison can see exceeds it
+// (#243).
+func notExceeded(since, now time.Time, seconds int64) bool {
+	if seconds > maxDurationSeconds {
+		return true
+	}
+	return now.Sub(since) <= time.Duration(seconds)*time.Second
 }
