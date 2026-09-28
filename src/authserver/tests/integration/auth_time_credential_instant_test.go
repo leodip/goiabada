@@ -268,23 +268,18 @@ func newAuthTimeFixture(t *testing.T) (*models.Client, string, *models.RedirectU
 // OIDC Core 1.0 section 3.1.2.1 measures max_age from "the last time the End-User was actively
 // authenticated by the OP", which is the session's AuthTime and the auth_time claim, not when the
 // session started. The row is aged in the database, because the difference only shows once a
-// session has outlived its user's last sign-in: started ten minutes inside the configured maximum
-// lifetime, well over the hour max_age allows, and signed in to again five minutes ago. The
-// lifetime is read rather than assumed, because other tests on this server rewrite it.
+// session has outlived its user's last sign-in: started ten minutes inside the maximum lifetime,
+// well over the hour max_age allows, and signed in to again five minutes ago, inside the idle
+// timeout. The test sets the two lifetimes it depends on, the seeded ones.
 func TestAuthTime_MaxAgeIsMeasuredFromTheLastSignIn(t *testing.T) {
+	settings := changeSettings(t, func(settings *models.Settings) {
+		settings.UserSessionIdleTimeoutInSeconds = 7200
+		settings.UserSessionMaxLifetimeInSeconds = 86400
+	})
 	client, clientSecret, redirectUri, user, password := newAuthTimeFixture(t)
 	httpClient := createHttpClient(t)
 
-	settings, settingsErr := database.GetSettingsById(context.Background(), nil, 1)
-	if settingsErr != nil {
-		t.Fatal(settingsErr)
-	}
 	longAgo := time.Duration(settings.UserSessionMaxLifetimeInSeconds)*time.Second - 10*time.Minute
-	if longAgo <= time.Hour+time.Minute || settings.UserSessionIdleTimeoutInSeconds <= 120 {
-		t.Fatalf("the configured session lifetimes (idle %ds, max %ds) leave no room for a session "+
-			"older than max_age=3600 that is still valid", settings.UserSessionIdleTimeoutInSeconds,
-			settings.UserSessionMaxLifetimeInSeconds)
-	}
 
 	signedIn := runPausedCeremony(t, httpClient, client.ClientIdentifier, clientSecret,
 		redirectUri.URI, user.Email, password, "")

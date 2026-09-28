@@ -18,23 +18,10 @@ import (
 // Phase 5: Implicit Flow + prompt=none Tests
 // =============================================================================
 
-// enableImplicitFlowGlobally enables implicit flow at the settings level and
-// returns a cleanup function to restore the original setting.
-func enableImplicitFlowGlobally(t *testing.T) func() {
-	settings, err := database.GetSettingsById(context.Background(), nil, 1)
-	if err != nil {
-		t.Fatal(err)
-	}
-	originalImplicitFlow := settings.ImplicitFlowEnabled
-	settings.ImplicitFlowEnabled = true
-	err = database.UpdateSettings(context.Background(), nil, settings)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return func() {
-		settings.ImplicitFlowEnabled = originalImplicitFlow
-		_ = database.UpdateSettings(context.Background(), nil, settings)
-	}
+// enableImplicitFlowGlobally enables implicit flow at the settings level until the test ends.
+func enableImplicitFlowGlobally(t *testing.T) {
+	t.Helper()
+	changeSettings(t, func(settings *models.Settings) { settings.ImplicitFlowEnabled = true })
 }
 
 // createImplicitClientForPromptTests creates a client that supports both auth code
@@ -68,8 +55,7 @@ func createImplicitClientForPromptTests(t *testing.T) (*models.Client, *models.R
 }
 
 func TestPromptNone_ImplicitResponseTypeToken(t *testing.T) {
-	cleanup := enableImplicitFlowGlobally(t)
-	defer cleanup()
+	enableImplicitFlowGlobally(t)
 
 	// Establish session via auth code flow
 	httpClient, _, _, _ := createSessionWithAcrLevel1(t)
@@ -115,8 +101,7 @@ func TestPromptNone_ImplicitResponseTypeToken(t *testing.T) {
 }
 
 func TestPromptNone_ImplicitResponseTypeIdToken(t *testing.T) {
-	cleanup := enableImplicitFlowGlobally(t)
-	defer cleanup()
+	enableImplicitFlowGlobally(t)
 
 	httpClient, _, _, _ := createSessionWithAcrLevel1(t)
 
@@ -160,8 +145,7 @@ func TestPromptNone_ImplicitResponseTypeIdToken(t *testing.T) {
 }
 
 func TestPromptNone_ImplicitResponseTypeIdTokenToken(t *testing.T) {
-	cleanup := enableImplicitFlowGlobally(t)
-	defer cleanup()
+	enableImplicitFlowGlobally(t)
 
 	httpClient, _, _, _ := createSessionWithAcrLevel1(t)
 
@@ -207,8 +191,7 @@ func TestPromptNone_ImplicitResponseTypeIdTokenToken(t *testing.T) {
 }
 
 func TestPromptNone_ImplicitAuthTimeCorrect(t *testing.T) {
-	cleanup := enableImplicitFlowGlobally(t)
-	defer cleanup()
+	enableImplicitFlowGlobally(t)
 
 	// Establish session at T1
 	httpClient, _, _, _ := createSessionWithAcrLevel1(t)
@@ -256,8 +239,7 @@ func TestPromptNone_ImplicitAuthTimeCorrect(t *testing.T) {
 }
 
 func TestPromptNone_ImplicitMissingNonce(t *testing.T) {
-	cleanup := enableImplicitFlowGlobally(t)
-	defer cleanup()
+	enableImplicitFlowGlobally(t)
 
 	// Establish session (needed so prompt=none doesn't fail with login_required first)
 	httpClient, _, _, _ := createSessionWithAcrLevel1(t)

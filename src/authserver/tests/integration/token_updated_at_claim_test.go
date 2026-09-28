@@ -1,11 +1,11 @@
 package integration
 
 import (
-	"context"
 	"net/url"
 	"testing"
 
 	"github.com/leodip/goiabada/authserver/internal/config"
+	"github.com/leodip/goiabada/authserver/internal/models"
 	"github.com/leodip/goiabada/authserver/internal/testutil/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -28,20 +28,10 @@ import (
 // OIDC claims for that token type -- the access token's setting is seeded off, which is why this
 // divergence could sit unnoticed.
 func TestToken_UpdatedAt_RidesWithTheProfileScope(t *testing.T) {
-	settings, err := database.GetSettingsById(context.Background(), nil, 1)
-	require.NoError(t, err)
-
-	originalIdToken := settings.IncludeOpenIDConnectClaimsInIdToken
-	originalAccessToken := settings.IncludeOpenIDConnectClaimsInAccessToken
-	settings.IncludeOpenIDConnectClaimsInIdToken = true
-	settings.IncludeOpenIDConnectClaimsInAccessToken = true
-	require.NoError(t, database.UpdateSettings(context.Background(), nil, settings))
-
-	defer func() {
-		settings.IncludeOpenIDConnectClaimsInIdToken = originalIdToken
-		settings.IncludeOpenIDConnectClaimsInAccessToken = originalAccessToken
-		_ = database.UpdateSettings(context.Background(), nil, settings)
-	}()
+	changeSettings(t, func(settings *models.Settings) {
+		settings.IncludeOpenIDConnectClaimsInIdToken = true
+		settings.IncludeOpenIDConnectClaimsInAccessToken = true
+	})
 
 	tests := []struct {
 		name    string

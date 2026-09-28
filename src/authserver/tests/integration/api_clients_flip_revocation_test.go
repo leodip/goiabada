@@ -99,26 +99,11 @@ func presentRefreshToken(t *testing.T, clientIdentifier, refreshToken, clientSec
 }
 
 // requireDatabaseAuditLogs makes the audit_logs table the observable it is supposed to be. The
-// seeded default has database persistence on, but the settings endpoint is itself under test in
-// this package, so a row asserting an audit event either enables it deliberately or is hostage to
-// what ran before it.
+// seeded default has database persistence on, and a row asserting an audit event says so rather
+// than leaning on the seed.
 func requireDatabaseAuditLogs(t *testing.T) {
 	t.Helper()
-
-	settings, err := database.GetSettingsById(context.Background(), nil, 1)
-	require.NoError(t, err)
-	if settings.AuditLogsInDatabaseEnabled {
-		return
-	}
-	settings.AuditLogsInDatabaseEnabled = true
-	require.NoError(t, database.UpdateSettings(context.Background(), nil, settings))
-	t.Cleanup(func() {
-		current, err := database.GetSettingsById(context.Background(), nil, 1)
-		if err == nil {
-			current.AuditLogsInDatabaseEnabled = false
-			_ = database.UpdateSettings(context.Background(), nil, current)
-		}
-	})
+	changeSettings(t, func(settings *models.Settings) { settings.AuditLogsInDatabaseEnabled = true })
 }
 
 // D1. The flip revokes, and the event says so.
@@ -244,18 +229,7 @@ func TestAPIClientAuthenticationPut_FlipToPublic_LeavesTheUsersOtherClientAlone(
 func TestAPIClientAuthenticationPut_FlipToPublic_RevokesROPCGrantsToo(t *testing.T) {
 	adminToken, _ := createAdminClientWithToken(t)
 
-	settings, err := database.GetSettingsById(context.Background(), nil, 1)
-	require.NoError(t, err)
-	originalROPC := settings.ResourceOwnerPasswordCredentialsEnabled
-	settings.ResourceOwnerPasswordCredentialsEnabled = true
-	require.NoError(t, database.UpdateSettings(context.Background(), nil, settings))
-	defer func() {
-		current, err := database.GetSettingsById(context.Background(), nil, 1)
-		if err == nil {
-			current.ResourceOwnerPasswordCredentialsEnabled = originalROPC
-			_ = database.UpdateSettings(context.Background(), nil, current)
-		}
-	}()
+	changeSettings(t, func(settings *models.Settings) { settings.ResourceOwnerPasswordCredentialsEnabled = true })
 
 	clientSecret := fake.Password(32)
 	password := fake.Password(12)

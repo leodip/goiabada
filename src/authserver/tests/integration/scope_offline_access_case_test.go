@@ -52,19 +52,10 @@ func refreshWithScope(t *testing.T, httpClient *http.Client, clientIdentifier, c
 	return status, body
 }
 
-// enableROPCGlobally turns the resource owner password credentials grant on and returns the restore.
-func enableROPCGlobally(t *testing.T) func() {
+// enableROPCGlobally turns the resource owner password credentials grant on until the test ends.
+func enableROPCGlobally(t *testing.T) {
 	t.Helper()
-
-	settings, err := database.GetSettingsById(context.Background(), nil, 1)
-	require.NoError(t, err)
-	original := settings.ResourceOwnerPasswordCredentialsEnabled
-	settings.ResourceOwnerPasswordCredentialsEnabled = true
-	require.NoError(t, database.UpdateSettings(context.Background(), nil, settings))
-	return func() {
-		settings.ResourceOwnerPasswordCredentialsEnabled = original
-		_ = database.UpdateSettings(context.Background(), nil, settings)
-	}
+	changeSettings(t, func(settings *models.Settings) { settings.ResourceOwnerPasswordCredentialsEnabled = true })
 }
 
 // TestAuthorize_OfflineAccessIsCaseSensitive sends each spelling to the authorization endpoint
@@ -115,7 +106,7 @@ func TestAuthorize_OfflineAccessIsCaseSensitive(t *testing.T) {
 // uppercase one used to be accepted and stored with the grant, which is how the refresh tokens the
 // stored-grant cases below rebuild came to exist.
 func TestROPC_OfflineAccessIsCaseSensitive(t *testing.T) {
-	defer enableROPCGlobally(t)()
+	enableROPCGlobally(t)
 
 	password := fake.Password(12)
 	client := createROPCClient(t, "", true)
@@ -293,7 +284,7 @@ func TestToken_Refresh_StoredUppercaseOfflineAccess_AuthCode(t *testing.T) {
 // the population that lasts: an ROPC refresh token is always offline, so it lives up to the offline
 // maximum lifetime. Its scope is on the token row, which is what the refresh arm reads for it.
 func TestROPC_RefreshToken_StoredUppercaseOfflineAccess(t *testing.T) {
-	defer enableROPCGlobally(t)()
+	enableROPCGlobally(t)
 
 	const legacyScope = "openid OFFLINE_ACCESS"
 

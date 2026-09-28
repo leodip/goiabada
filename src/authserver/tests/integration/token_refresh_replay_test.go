@@ -223,15 +223,7 @@ func TestToken_Refresh_Replay_DoesNotContainOtherFamilies(t *testing.T) {
 // find nothing here and this is the case that would expose it. The authorization-code test
 // above cannot stand in for it.
 func TestToken_Refresh_Replay_ContainsROPCFamily(t *testing.T) {
-	settings, err := database.GetSettingsById(context.Background(), nil, 1)
-	require.NoError(t, err)
-	originalROPCSetting := settings.ResourceOwnerPasswordCredentialsEnabled
-	settings.ResourceOwnerPasswordCredentialsEnabled = true
-	require.NoError(t, database.UpdateSettings(context.Background(), nil, settings))
-	defer func() {
-		settings.ResourceOwnerPasswordCredentialsEnabled = originalROPCSetting
-		_ = database.UpdateSettings(context.Background(), nil, settings)
-	}()
+	changeSettings(t, func(settings *models.Settings) { settings.ResourceOwnerPasswordCredentialsEnabled = true })
 
 	clientSecret := fake.Password(32)
 	password := fake.Password(12)

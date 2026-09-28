@@ -90,7 +90,6 @@ func followAuthChain(t *testing.T, httpClient *http.Client, clientIdentifier str
 // the defaults under test are the registration handler's rather than ones this test chose (#108).
 func TestDCR_Consent_ReachesConsentAndMarksTheNameUnverified(t *testing.T) {
 	enableDCR(t)
-	defer disableDCR(t)
 
 	const selfAssertedName = "Payroll Portal"
 	const redirectURI = "https://dcr-consent-app.example.com/callback"
@@ -138,7 +137,6 @@ func TestDCR_Consent_ReachesConsentAndMarksTheNameUnverified(t *testing.T) {
 // escaping happens there at all.
 func TestDCR_Consent_SelfAssertedNameIsEscaped(t *testing.T) {
 	enableDCR(t)
-	defer disableDCR(t)
 
 	const payload = `Acme & "Sons"`
 	const redirectURI = "https://dcr-escape-app.example.com/callback"
@@ -172,7 +170,6 @@ func TestDCR_Consent_SelfAssertedNameIsEscaped(t *testing.T) {
 // consent page that escaped ampersands and quotes and trusted the rest would still pass.
 func TestDCR_Consent_RetainedMarkupNameIsEscaped(t *testing.T) {
 	enableDCR(t)
-	defer disableDCR(t)
 
 	const retained = `<b>Existing</b>`
 	const redirectURI = "https://dcr-retained-app.example.com/callback"
@@ -207,7 +204,6 @@ func TestDCR_Consent_RetainedMarkupNameIsEscaped(t *testing.T) {
 // on one would read it twice on the consent screen (#108).
 func TestDCR_Consent_UnverifiedNameSuppressesTheDescriptionLine(t *testing.T) {
 	enableDCR(t)
-	defer disableDCR(t)
 
 	const selfAssertedName = "Duplicated Portal"
 	const redirectURI = "https://dcr-dup-app.example.com/callback"

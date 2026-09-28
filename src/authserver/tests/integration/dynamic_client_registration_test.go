@@ -25,17 +25,7 @@ import (
 // TestDCR_Disabled_Returns403 verifies that DCR returns 403 when feature is disabled (RFC 7591 §3)
 func TestDCR_Disabled_Returns403(t *testing.T) {
 	// Ensure DCR is disabled
-	settings, err := database.GetSettingsById(context.Background(), nil, 1)
-	assert.NoError(t, err)
-	originalDCREnabled := settings.DynamicClientRegistrationEnabled
-	settings.DynamicClientRegistrationEnabled = false
-	err = database.UpdateSettings(context.Background(), nil, settings)
-	assert.NoError(t, err)
-	defer func() {
-		// Restore original setting
-		settings.DynamicClientRegistrationEnabled = originalDCREnabled
-		_ = database.UpdateSettings(context.Background(), nil, settings)
-	}()
+	changeSettings(t, func(settings *models.Settings) { settings.DynamicClientRegistrationEnabled = false })
 
 	// Attempt to register a client
 	reqBody := oidc.DynamicClientRegistrationRequest{
@@ -49,7 +39,7 @@ func TestDCR_Disabled_Returns403(t *testing.T) {
 	assert.Equal(t, http.StatusForbidden, resp.StatusCode)
 
 	var errorResp oidc.DynamicClientRegistrationError
-	err = json.NewDecoder(resp.Body).Decode(&errorResp)
+	err := json.NewDecoder(resp.Body).Decode(&errorResp)
 	assert.NoError(t, err)
 	assert.Equal(t, "access_denied", errorResp.Error)
 	assert.Contains(t, errorResp.ErrorDescription, "not enabled")
@@ -58,7 +48,6 @@ func TestDCR_Disabled_Returns403(t *testing.T) {
 // TestDCR_PublicClient_MCP_UseCase_Success tests the happy path for MCP public clients (RFC 7591 §3)
 func TestDCR_PublicClient_MCP_UseCase_Success(t *testing.T) {
 	enableDCR(t)
-	defer disableDCR(t)
 
 	// MCP client registration request
 	reqBody := oidc.DynamicClientRegistrationRequest{
@@ -114,7 +103,6 @@ func TestDCR_PublicClient_MCP_UseCase_Success(t *testing.T) {
 // TestDCR_ConfidentialClient_Success tests confidential client registration with client_secret
 func TestDCR_ConfidentialClient_Success(t *testing.T) {
 	enableDCR(t)
-	defer disableDCR(t)
 
 	reqBody := oidc.DynamicClientRegistrationRequest{
 		RedirectURIs:            []string{"https://app.example.com/callback"},
@@ -154,7 +142,6 @@ func TestDCR_ConfidentialClient_Success(t *testing.T) {
 // TestDCR_DefaultValues_Applied tests RFC 7591 §2 default values
 func TestDCR_DefaultValues_Applied(t *testing.T) {
 	enableDCR(t)
-	defer disableDCR(t)
 
 	// Minimal request - no token_endpoint_auth_method, no grant_types
 	reqBody := oidc.DynamicClientRegistrationRequest{
@@ -193,7 +180,6 @@ func TestDCR_DefaultValues_Applied(t *testing.T) {
 // TestDCR_RedirectURI_Validation tests RFC 7591 §5 redirect URI validation
 func TestDCR_RedirectURI_Validation(t *testing.T) {
 	enableDCR(t)
-	defer disableDCR(t)
 
 	testCases := []struct {
 		name           string
@@ -344,7 +330,6 @@ func TestDCR_RedirectURI_Validation(t *testing.T) {
 // TestDCR_GrantType_Validation tests grant type validation
 func TestDCR_GrantType_Validation(t *testing.T) {
 	enableDCR(t)
-	defer disableDCR(t)
 
 	testCases := []struct {
 		name           string
@@ -404,7 +389,6 @@ func TestDCR_GrantType_Validation(t *testing.T) {
 // TestDCR_TokenEndpointAuthMethod_Validation tests auth method validation
 func TestDCR_TokenEndpointAuthMethod_Validation(t *testing.T) {
 	enableDCR(t)
-	defer disableDCR(t)
 
 	testCases := []struct {
 		name           string
@@ -458,7 +442,6 @@ func TestDCR_TokenEndpointAuthMethod_Validation(t *testing.T) {
 // TestDCR_ClientName_Validation tests client name validation
 func TestDCR_ClientName_Validation(t *testing.T) {
 	enableDCR(t)
-	defer disableDCR(t)
 
 	testCases := []struct {
 		name           string
@@ -535,14 +518,8 @@ func TestDCR_ClientName_Validation(t *testing.T) {
 
 // TestDCR_WellKnown_Metadata tests that registration endpoint appears in discovery when enabled
 func TestDCR_WellKnown_Metadata(t *testing.T) {
-	settings, err := database.GetSettingsById(context.Background(), nil, 1)
-	assert.NoError(t, err)
-	originalDCREnabled := settings.DynamicClientRegistrationEnabled
-
 	t.Run("DCR enabled - registration_endpoint present", func(t *testing.T) {
-		settings.DynamicClientRegistrationEnabled = true
-		err = database.UpdateSettings(context.Background(), nil, settings)
-		assert.NoError(t, err)
+		enableDCR(t)
 
 		httpClient := createHttpClient(t)
 		wellKnownURL := config.GetAuthServer().BaseURL + "/.well-known/openid-configuration"
@@ -563,9 +540,7 @@ func TestDCR_WellKnown_Metadata(t *testing.T) {
 	})
 
 	t.Run("DCR disabled - registration_endpoint absent", func(t *testing.T) {
-		settings.DynamicClientRegistrationEnabled = false
-		err = database.UpdateSettings(context.Background(), nil, settings)
-		assert.NoError(t, err)
+		changeSettings(t, func(settings *models.Settings) { settings.DynamicClientRegistrationEnabled = false })
 
 		httpClient := createHttpClient(t)
 		wellKnownURL := config.GetAuthServer().BaseURL + "/.well-known/openid-configuration"
@@ -583,16 +558,11 @@ func TestDCR_WellKnown_Metadata(t *testing.T) {
 		_, ok := metadata["registration_endpoint"]
 		assert.False(t, ok, "registration_endpoint should be absent when DCR disabled")
 	})
-
-	// Restore original setting
-	settings.DynamicClientRegistrationEnabled = originalDCREnabled
-	_ = database.UpdateSettings(context.Background(), nil, settings)
 }
 
 // TestDCR_MultipleRedirectURIs tests registering multiple redirect URIs
 func TestDCR_MultipleRedirectURIs(t *testing.T) {
 	enableDCR(t)
-	defer disableDCR(t)
 
 	reqBody := oidc.DynamicClientRegistrationRequest{
 		RedirectURIs: []string{
@@ -634,7 +604,6 @@ func TestDCR_MultipleRedirectURIs(t *testing.T) {
 // TestDCR_ConfidentialClient_DefaultAcrLevel tests that DCR clients get sensible defaults
 func TestDCR_ConfidentialClient_DefaultAcrLevel(t *testing.T) {
 	enableDCR(t)
-	defer disableDCR(t)
 
 	reqBody := oidc.DynamicClientRegistrationRequest{
 		RedirectURIs:            []string{"https://app.example.com/callback"},
@@ -693,7 +662,7 @@ func makeDCRRequest(t *testing.T, body oidc.DynamicClientRegistrationRequest) *h
 // about how a self-registered client behaves has to get its defaults from the registration
 // handler, or it is asserting against defaults the test itself chose (#108).
 //
-// The caller owns the setting: call enableDCR before, and defer disableDCR.
+// The caller owns the setting: call enableDCR before.
 func registerDCRClient(t *testing.T, clientName string, redirectURI string) *models.Client {
 	resp := makeDCRRequest(t, oidc.DynamicClientRegistrationRequest{
 		RedirectURIs: []string{redirectURI},
@@ -713,22 +682,10 @@ func registerDCRClient(t *testing.T, clientName string, redirectURI string) *mod
 	return client
 }
 
-// enableDCR enables Dynamic Client Registration for a test
+// enableDCR enables Dynamic Client Registration until the test ends.
 func enableDCR(t *testing.T) {
-	settings, err := database.GetSettingsById(context.Background(), nil, 1)
-	assert.NoError(t, err)
-	settings.DynamicClientRegistrationEnabled = true
-	err = database.UpdateSettings(context.Background(), nil, settings)
-	assert.NoError(t, err)
-}
-
-// disableDCR disables Dynamic Client Registration after a test
-func disableDCR(t *testing.T) {
-	settings, err := database.GetSettingsById(context.Background(), nil, 1)
-	assert.NoError(t, err)
-	settings.DynamicClientRegistrationEnabled = false
-	err = database.UpdateSettings(context.Background(), nil, settings)
-	assert.NoError(t, err)
+	t.Helper()
+	changeSettings(t, func(settings *models.Settings) { settings.DynamicClientRegistrationEnabled = true })
 }
 
 // TestDCR_PublicClient_PKCERequiredIsWrittenExplicitly covers the one creation path that makes a
@@ -746,7 +703,6 @@ func disableDCR(t *testing.T) {
 // dropping the field entirely.
 func TestDCR_PublicClient_PKCERequiredIsWrittenExplicitly(t *testing.T) {
 	enableDCR(t)
-	defer disableDCR(t)
 
 	adminToken, _ := createAdminClientWithToken(t)
 
@@ -828,7 +784,6 @@ func httpsRedirectURIOfBytes(t *testing.T, host string, n int) string {
 // leaves the client list as it was.
 func TestDCR_RefusalsForBoundsAndInconsistentGrantsCreateNothing(t *testing.T) {
 	enableDCR(t)
-	defer disableDCR(t)
 
 	adminToken, _ := createAdminClientWithToken(t)
 
@@ -880,7 +835,6 @@ func TestDCR_RefusalsForBoundsAndInconsistentGrantsCreateNothing(t *testing.T) {
 // back whole through the admin API.
 func TestDCR_ARegistrationAtTheBoundsIsStoredWhole(t *testing.T) {
 	enableDCR(t)
-	defer disableDCR(t)
 
 	adminToken, _ := createAdminClientWithToken(t)
 
@@ -925,7 +879,6 @@ func TestDCR_ARegistrationAtTheBoundsIsStoredWhole(t *testing.T) {
 // redemption. CI runs this against both widened columns on every engine (#428).
 func TestDCR_ARedirectURIOfTheMaximumLengthCompletesTheAuthorizationCodeFlow(t *testing.T) {
 	enableDCR(t)
-	defer disableDCR(t)
 
 	redirectURI := httpsRedirectURIOfBytes(t, "dcr-long.example.com", models.RedirectURIMaxBytes)
 

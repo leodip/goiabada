@@ -44,32 +44,18 @@ func plusAddress() string {
 // mailpitURL is the API of the Mailpit useMailpitSMTP sends through.
 const mailpitURL = "http://mailpit:8025"
 
-// useMailpitSMTP points the deployment's SMTP settings at mailpit for the duration of a test
-// and puts them back afterwards.
-//
-// Necessary rather than defensive: the settings API tests write these rows through the admin
-// API and do not restore them, and Go runs the files in this package in name order, so by the
-// time this one runs the host can be blank and the send fails with "dial tcp :0". The
-// registration tests solve the same problem the same way, with saveAndRestoreRegSettings.
-func useMailpitSMTP(t *testing.T) func() {
+// useMailpitSMTP turns SMTP on and points it at mailpit until the test ends. TestMain points the
+// row at mailpit but leaves SMTP off, as seeded, so a test that sends mail turns it on itself.
+func useMailpitSMTP(t *testing.T) {
 	t.Helper()
-
-	settings, err := database.GetSettingsById(context.Background(), nil, 1)
-	require.NoError(t, err)
-	previous := *settings
-
-	settings.SMTPEnabled = true
-	settings.SMTPHost = "mailpit"
-	settings.SMTPPort = 1025
-	settings.SMTPEncryption = emaildelivery.SMTPEncryptionNone.String()
-	settings.SMTPFromName = "Goiabada"
-	settings.SMTPFromEmail = "noreply@goiabada.dev"
-	require.NoError(t, database.UpdateSettings(context.Background(), nil, settings))
-
-	return func() {
-		restored := previous
-		_ = database.UpdateSettings(context.Background(), nil, &restored)
-	}
+	changeSettings(t, func(settings *models.Settings) {
+		settings.SMTPEnabled = true
+		settings.SMTPHost = "mailpit"
+		settings.SMTPPort = 1025
+		settings.SMTPEncryption = emaildelivery.SMTPEncryptionNone.String()
+		settings.SMTPFromName = "Goiabada"
+		settings.SMTPFromEmail = "noreply@goiabada.dev"
+	})
 }
 
 func createResetTestUser(t *testing.T, email string) (*models.User, string) {
@@ -289,7 +275,7 @@ const resetSucceededText = "Your password has been successfully set."
 // link Goiabada emailed it. Before this change the link carried the address, form-urlencoded
 // parsing turned the '+' into a space, and this user could never recover their password.
 func TestResetPassword_PlusAddressCompletesTheFlowFromTheEmailedLink(t *testing.T) {
-	defer useMailpitSMTP(t)()
+	useMailpitSMTP(t)
 
 	email := plusAddress()
 	user, oldPassword := createResetTestUser(t, email)
@@ -326,7 +312,7 @@ func TestResetPassword_PlusAddressCompletesTheFlowFromTheEmailedLink(t *testing.
 // the server cannot invalidate a copy taken before it cleared it; what refuses the copy is the
 // code hash it names no longer being outstanding once the password write claimed it.
 func TestResetPassword_ReplayedMarkerAfterCompletionIsRefused(t *testing.T) {
-	defer useMailpitSMTP(t)()
+	useMailpitSMTP(t)
 
 	email := plusAddress()
 	user, _ := createResetTestUser(t, email)
@@ -373,7 +359,7 @@ func TestResetPassword_ReplayedMarkerAfterCompletionIsRefused(t *testing.T) {
 // reissue, which is weaker than the flow this change replaces: today the password write NULLs
 // the code and a stale link simply fails.
 func TestResetPassword_MarkerIssuedBeforeANewerCodeIsRefused(t *testing.T) {
-	defer useMailpitSMTP(t)()
+	useMailpitSMTP(t)
 
 	email := plusAddress()
 	user, oldPassword := createResetTestUser(t, email)
@@ -415,7 +401,7 @@ func TestResetPassword_MarkerIssuedBeforeANewerCodeIsRefused(t *testing.T) {
 //
 // Nothing below this tier can see it: it needs two live continuations in one real cookie jar.
 func TestResetPassword_ASecondLinkDoesNotRetargetTheFormOnScreen(t *testing.T) {
-	defer useMailpitSMTP(t)()
+	useMailpitSMTP(t)
 
 	victimEmail := plusAddress()
 	victim, victimOldPassword := createResetTestUser(t, victimEmail)
@@ -478,7 +464,7 @@ func TestResetPassword_ASecondLinkDoesNotRetargetTheFormOnScreen(t *testing.T) {
 // produces exactly this state, a live marker for another account under a form rendered from
 // a marker that is gone, and a completed reset produces it in seconds instead.
 func TestResetPassword_AStaleFormIsRefusedOnceTheSessionHoldsAnotherContinuation(t *testing.T) {
-	defer useMailpitSMTP(t)()
+	useMailpitSMTP(t)
 
 	victimEmail := plusAddress()
 	victim, _ := createResetTestUser(t, victimEmail)
@@ -534,7 +520,7 @@ func TestResetPassword_AStaleFormIsRefusedOnceTheSessionHoldsAnotherContinuation
 // matches no row. Without the claim both would set a password and the later would silently
 // overwrite the earlier.
 func TestResetPassword_OneCopiedMarkerLeavesExactlyOnePasswordChange(t *testing.T) {
-	defer useMailpitSMTP(t)()
+	useMailpitSMTP(t)
 
 	email := plusAddress()
 	user, _ := createResetTestUser(t, email)

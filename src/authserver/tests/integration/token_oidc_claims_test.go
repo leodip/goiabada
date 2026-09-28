@@ -26,20 +26,8 @@ import (
 // ============================================================================
 
 func TestToken_IdToken_OIDCClaims_GlobalDisabled(t *testing.T) {
-	// Get settings and disable the global setting
-	settings, err := database.GetSettingsById(context.Background(), nil, 1)
-	assert.NoError(t, err)
-
-	originalValue := settings.IncludeOpenIDConnectClaimsInIdToken
-	settings.IncludeOpenIDConnectClaimsInIdToken = false
-	err = database.UpdateSettings(context.Background(), nil, settings)
-	assert.NoError(t, err)
-
-	// Restore original value after test
-	defer func() {
-		settings.IncludeOpenIDConnectClaimsInIdToken = originalValue
-		_ = database.UpdateSettings(context.Background(), nil, settings)
-	}()
+	// Disable the global setting
+	changeSettings(t, func(settings *models.Settings) { settings.IncludeOpenIDConnectClaimsInIdToken = false })
 
 	clientSecret := fake.LetterN(32)
 	httpClient, code := createAuthCodeWithUserProfile(t, clientSecret, "openid profile email")
@@ -114,20 +102,8 @@ func TestToken_IdToken_OIDCClaims_GlobalDisabled(t *testing.T) {
 }
 
 func TestToken_IdToken_OIDCClaims_GlobalEnabled(t *testing.T) {
-	// Get settings and ensure the global setting is enabled
-	settings, err := database.GetSettingsById(context.Background(), nil, 1)
-	assert.NoError(t, err)
-
-	originalValue := settings.IncludeOpenIDConnectClaimsInIdToken
-	settings.IncludeOpenIDConnectClaimsInIdToken = true
-	err = database.UpdateSettings(context.Background(), nil, settings)
-	assert.NoError(t, err)
-
-	// Restore original value after test
-	defer func() {
-		settings.IncludeOpenIDConnectClaimsInIdToken = originalValue
-		_ = database.UpdateSettings(context.Background(), nil, settings)
-	}()
+	// Ensure the global setting is enabled
+	changeSettings(t, func(settings *models.Settings) { settings.IncludeOpenIDConnectClaimsInIdToken = true })
 
 	clientSecret := fake.LetterN(32)
 	httpClient, code := createAuthCodeWithUserProfile(t, clientSecret, "openid profile email")
@@ -170,20 +146,8 @@ func TestToken_IdToken_OIDCClaims_GlobalEnabled(t *testing.T) {
 }
 
 func TestToken_IdToken_OIDCClaims_ClientOverride_On(t *testing.T) {
-	// Get settings and disable the global setting
-	settings, err := database.GetSettingsById(context.Background(), nil, 1)
-	assert.NoError(t, err)
-
-	originalValue := settings.IncludeOpenIDConnectClaimsInIdToken
-	settings.IncludeOpenIDConnectClaimsInIdToken = false // Global disabled
-	err = database.UpdateSettings(context.Background(), nil, settings)
-	assert.NoError(t, err)
-
-	// Restore original value after test
-	defer func() {
-		settings.IncludeOpenIDConnectClaimsInIdToken = originalValue
-		_ = database.UpdateSettings(context.Background(), nil, settings)
-	}()
+	// Disable the global setting
+	changeSettings(t, func(settings *models.Settings) { settings.IncludeOpenIDConnectClaimsInIdToken = false })
 
 	clientSecret := fake.LetterN(32)
 	httpClient, code := createAuthCodeWithUserProfile(t, clientSecret, "openid profile email")
@@ -191,7 +155,7 @@ func TestToken_IdToken_OIDCClaims_ClientOverride_On(t *testing.T) {
 	// Set client-level override to "on"
 	originalClientSetting := code.Client.IncludeOpenIDConnectClaimsInIdToken
 	code.Client.IncludeOpenIDConnectClaimsInIdToken = "on"
-	err = database.UpdateClient(context.Background(), nil, &code.Client)
+	err := database.UpdateClient(context.Background(), nil, &code.Client)
 	assert.NoError(t, err)
 	defer func() {
 		code.Client.IncludeOpenIDConnectClaimsInIdToken = originalClientSetting
@@ -227,20 +191,8 @@ func TestToken_IdToken_OIDCClaims_ClientOverride_On(t *testing.T) {
 }
 
 func TestToken_IdToken_OIDCClaims_ClientOverride_Off(t *testing.T) {
-	// Get settings and enable the global setting
-	settings, err := database.GetSettingsById(context.Background(), nil, 1)
-	assert.NoError(t, err)
-
-	originalValue := settings.IncludeOpenIDConnectClaimsInIdToken
-	settings.IncludeOpenIDConnectClaimsInIdToken = true // Global enabled
-	err = database.UpdateSettings(context.Background(), nil, settings)
-	assert.NoError(t, err)
-
-	// Restore original value after test
-	defer func() {
-		settings.IncludeOpenIDConnectClaimsInIdToken = originalValue
-		_ = database.UpdateSettings(context.Background(), nil, settings)
-	}()
+	// Enable the global setting
+	changeSettings(t, func(settings *models.Settings) { settings.IncludeOpenIDConnectClaimsInIdToken = true })
 
 	clientSecret := fake.LetterN(32)
 	httpClient, code := createAuthCodeWithUserProfile(t, clientSecret, "openid profile email")
@@ -248,7 +200,7 @@ func TestToken_IdToken_OIDCClaims_ClientOverride_Off(t *testing.T) {
 	// Set client-level override to "off"
 	originalClientSetting := code.Client.IncludeOpenIDConnectClaimsInIdToken
 	code.Client.IncludeOpenIDConnectClaimsInIdToken = "off"
-	err = database.UpdateClient(context.Background(), nil, &code.Client)
+	err := database.UpdateClient(context.Background(), nil, &code.Client)
 	assert.NoError(t, err)
 	defer func() {
 		code.Client.IncludeOpenIDConnectClaimsInIdToken = originalClientSetting

@@ -360,6 +360,15 @@ Three test types:
 over `crypto/rand` that replaced a third-party faker in #272. Reach for it rather than adding a
 dependency the next time a test needs a random string.
 
+**Settings row in the integration tier**: every integration test runs against one server and one
+settings row, which the server reads on every request, so a value a test leaves there is what every
+later test runs against. A test that changes the row, through the admin API or directly, calls
+`restoreSettings(t)` or `changeSettings(t, edit)` from `tests/integration/settings_helpers_test.go`
+before its first change; each registers a `t.Cleanup` that writes the whole row back except
+`last_cleanup_at`, which the background worker owns. `TestMain` compares the row at the end of the
+run with the row at its start and fails the tier naming each changed field, so a test that forgets
+fails the run instead of the tests after it (#433).
+
 **Transaction stub**: a unit test that needs the mock database to answer `RunInTransaction`
 uses `mocks_data.ExpectRunInTransaction`, hand-written beside the generated mock in
 `authserver/internal/data/mocks` and reachable from every caller without a new import, with
