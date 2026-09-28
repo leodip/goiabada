@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/hex"
 	"flag"
 	"io"
 	"os"
@@ -229,177 +230,97 @@ var validAuthKey = strings.Repeat("ab", 64)
 // validEncKey is 32 bytes as 64 hex characters (openssl rand -hex 32).
 var validEncKey = strings.Repeat("cd", 32)
 
-// Session keys sign and encrypt the browser session cookie. A short or absent key must fail
-// startup rather than silently weakening the cookie, so the validator is exercised across
-// every rejection branch.
-func TestValidateAdminConsoleSessionKeys(t *testing.T) {
-	savedAuth := cfg.AdminConsole.SessionAuthenticationKey
-	savedEnc := cfg.AdminConsole.SessionEncryptionKey
-	savedPrevAuth := cfg.AdminConsole.SessionAuthenticationKeyPrevious
-	savedPrevEnc := cfg.AdminConsole.SessionEncryptionKeyPrevious
-	defer func() {
-		cfg.AdminConsole.SessionAuthenticationKey = savedAuth
-		cfg.AdminConsole.SessionEncryptionKey = savedEnc
-		cfg.AdminConsole.SessionAuthenticationKeyPrevious = savedPrevAuth
-		cfg.AdminConsole.SessionEncryptionKeyPrevious = savedPrevEnc
-	}()
+// Deliberately thin: the session-key rule and its exhaustive table are
+// core/sessionstore's (TestParseKeys). What this owns is that SessionKeys hands
+// ParseKeys this binary's four variable names, each in its own slot, so one
+// accept per shape and one refusal per name.
+func TestAdminConsoleConfig_SessionKeys(t *testing.T) {
+	previousAuthKey := strings.Repeat("12", 64)
+	previousEncKey := strings.Repeat("34", 32)
 
 	tests := []struct {
-		name        string
-		authKey     string
-		encKey      string
-		prevAuthKey string
-		prevEncKey  string
-		wantErr     bool
-		wantErrPart string
+		name         string
+		config       AdminConsoleConfig
+		wantPrevious bool
+		wantErr      string
 	}{
 		{
-			name:    "both keys valid",
-			authKey: validAuthKey,
-			encKey:  validEncKey,
+			name:   "the current pair alone gives no previous pair",
+			config: AdminConsoleConfig{SessionAuthenticationKey: validAuthKey, SessionEncryptionKey: validEncKey},
 		},
 		{
-			name:        "authentication key missing",
-			authKey:     "",
-			encKey:      validEncKey,
-			wantErr:     true,
-			wantErrPart: "GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY is required",
+			name: "both pairs",
+			config: AdminConsoleConfig{
+				SessionAuthenticationKey:         validAuthKey,
+				SessionEncryptionKey:             validEncKey,
+				SessionAuthenticationKeyPrevious: previousAuthKey,
+				SessionEncryptionKeyPrevious:     previousEncKey,
+			},
+			wantPrevious: true,
 		},
 		{
-			name:        "encryption key missing",
-			authKey:     validAuthKey,
-			encKey:      "",
-			wantErr:     true,
-			wantErrPart: "GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY is required",
+			name:    "the authentication key missing",
+			config:  AdminConsoleConfig{SessionEncryptionKey: validEncKey},
+			wantErr: "GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY is required",
 		},
 		{
-			name:        "authentication key not hex",
-			authKey:     strings.Repeat("zz", 64),
-			encKey:      validEncKey,
-			wantErr:     true,
-			wantErrPart: "must be hex-encoded",
+			name:    "the encryption key missing",
+			config:  AdminConsoleConfig{SessionAuthenticationKey: validAuthKey},
+			wantErr: "GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY is required",
 		},
 		{
-			name:        "encryption key not hex",
-			authKey:     validAuthKey,
-			encKey:      strings.Repeat("zz", 32),
-			wantErr:     true,
-			wantErrPart: "must be hex-encoded",
+			name: "the previous encryption key alone",
+			config: AdminConsoleConfig{
+				SessionAuthenticationKey:     validAuthKey,
+				SessionEncryptionKey:         validEncKey,
+				SessionEncryptionKeyPrevious: previousEncKey,
+			},
+			wantErr: "GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY_PREVIOUS is required when GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY_PREVIOUS is set: both halves of the previous pair are needed to open a session sealed under it",
 		},
 		{
-			name:        "authentication key too short",
-			authKey:     strings.Repeat("ab", 32),
-			encKey:      validEncKey,
-			wantErr:     true,
-			wantErrPart: "must be 64 bytes",
-		},
-		{
-			name:        "encryption key too short",
-			authKey:     validAuthKey,
-			encKey:      strings.Repeat("cd", 16),
-			wantErr:     true,
-			wantErrPart: "must be 32 bytes",
-		},
-		{
-			name:        "encryption key too long",
-			authKey:     validAuthKey,
-			encKey:      strings.Repeat("cd", 33),
-			wantErr:     true,
-			wantErrPart: "must be 32 bytes",
-		},
-		{
-			// The ordinary state: no rotation in progress, so there is no previous pair to
-			// validate. Named rather than left implicit, because every case above it now
-			// relies on the previous pair being absent.
-			name:    "previous pair absent",
-			authKey: validAuthKey,
-			encKey:  validEncKey,
-		},
-		{
-			name:        "previous pair valid",
-			authKey:     validAuthKey,
-			encKey:      validEncKey,
-			prevAuthKey: validAuthKey,
-			prevEncKey:  validEncKey,
-		},
-		{
-			// Half a previous pair opens nothing, so it is refused rather than read as no
-			// rotation. An operator who mistyped one variable name would otherwise be told
-			// the rotation is in place while every session it was meant to keep alive is
-			// turned away.
-			name:        "previous authentication key set alone",
-			authKey:     validAuthKey,
-			encKey:      validEncKey,
-			prevAuthKey: validAuthKey,
-			wantErr:     true,
-			wantErrPart: "GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY_PREVIOUS is required",
-		},
-		{
-			name:        "previous encryption key set alone",
-			authKey:     validAuthKey,
-			encKey:      validEncKey,
-			prevEncKey:  validEncKey,
-			wantErr:     true,
-			wantErrPart: "GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY_PREVIOUS is required",
-		},
-		{
-			name:        "previous authentication key not hex",
-			authKey:     validAuthKey,
-			encKey:      validEncKey,
-			prevAuthKey: strings.Repeat("zz", 64),
-			prevEncKey:  validEncKey,
-			wantErr:     true,
-			wantErrPart: "GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY_PREVIOUS must be hex-encoded",
-		},
-		{
-			name:        "previous encryption key not hex",
-			authKey:     validAuthKey,
-			encKey:      validEncKey,
-			prevAuthKey: validAuthKey,
-			prevEncKey:  strings.Repeat("zz", 32),
-			wantErr:     true,
-			wantErrPart: "GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY_PREVIOUS must be hex-encoded",
-		},
-		{
-			name:        "previous authentication key wrong length",
-			authKey:     validAuthKey,
-			encKey:      validEncKey,
-			prevAuthKey: strings.Repeat("ab", 32),
-			prevEncKey:  validEncKey,
-			wantErr:     true,
-			wantErrPart: "GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY_PREVIOUS must be 64 bytes",
-		},
-		{
-			name:        "previous encryption key wrong length",
-			authKey:     validAuthKey,
-			encKey:      validEncKey,
-			prevAuthKey: validAuthKey,
-			prevEncKey:  strings.Repeat("cd", 33),
-			wantErr:     true,
-			wantErrPart: "GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY_PREVIOUS must be 32 bytes",
+			name: "the previous encryption key at 33 bytes",
+			config: AdminConsoleConfig{
+				SessionAuthenticationKey:         validAuthKey,
+				SessionEncryptionKey:             validEncKey,
+				SessionAuthenticationKeyPrevious: previousAuthKey,
+				SessionEncryptionKeyPrevious:     strings.Repeat("34", 33),
+			},
+			wantErr: "GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY_PREVIOUS must be 32 bytes (64 hex chars), got 33 bytes",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg.AdminConsole.SessionAuthenticationKey = tt.authKey
-			cfg.AdminConsole.SessionEncryptionKey = tt.encKey
-			cfg.AdminConsole.SessionAuthenticationKeyPrevious = tt.prevAuthKey
-			cfg.AdminConsole.SessionEncryptionKeyPrevious = tt.prevEncKey
+			current, previous, err := tt.config.SessionKeys()
 
-			err := ValidateAdminConsoleSessionKeys()
-
-			if tt.wantErr {
+			if tt.wantErr != "" {
 				if err == nil {
 					t.Fatalf("expected an error, got nil")
 				}
-				if !strings.Contains(err.Error(), tt.wantErrPart) {
-					t.Errorf("error %q does not contain %q", err.Error(), tt.wantErrPart)
+				if err.Error() != tt.wantErr {
+					t.Errorf("error\n got %q\nwant %q", err.Error(), tt.wantErr)
 				}
 				return
 			}
 			if err != nil {
-				t.Errorf("unexpected error: %v", err)
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if hex.EncodeToString(current.AuthenticationKey) != validAuthKey ||
+				hex.EncodeToString(current.EncryptionKey) != validEncKey {
+				t.Errorf("the current pair did not decode from the two current variables")
+			}
+			if !tt.wantPrevious {
+				if previous != nil {
+					t.Errorf("expected no previous pair, got %+v", previous)
+				}
+				return
+			}
+			if previous == nil {
+				t.Fatalf("expected a previous pair, got nil")
+			}
+			if hex.EncodeToString(previous.AuthenticationKey) != previousAuthKey ||
+				hex.EncodeToString(previous.EncryptionKey) != previousEncKey {
+				t.Errorf("the previous pair did not decode from the two previous variables")
 			}
 		})
 	}

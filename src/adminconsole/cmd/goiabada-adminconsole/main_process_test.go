@@ -95,3 +95,22 @@ func TestMain_HandsTheOverridesDirectoryToTheCatalogs(t *testing.T) {
 	assert.Contains(t, stderr, "unable to load the i18n message catalogs")
 	assert.Contains(t, stderr, "active.en.toml")
 }
+
+// TestMain_RefusesAMalformedPreviousSessionKey is the wiring between the session-key rule
+// core/sessionstore's table covers and the process: that main calls SessionKeys and stops on its
+// refusal (#434). The previous authentication key is 32 bytes where 64 are required.
+//
+// The exit code alone proves nothing: a main that dropped the error or never called SessionKeys
+// goes on and stops, 1 again, at the listener this harness disables. The refusal's text, which
+// only the rule writes, is what fails.
+func TestMain_RefusesAMalformedPreviousSessionKey(t *testing.T) {
+	code, stderr := runMainProcess(t, []string{
+		"GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY_PREVIOUS=" + strings.Repeat("c1", 32),
+		"GOIABADA_ADMINCONSOLE_SESSION_ENCRYPTION_KEY_PREVIOUS=" + strings.Repeat("c2", 32),
+		// Neither listener, so a child that got past the refusal stops rather than serves.
+		"GOIABADA_ADMINCONSOLE_LISTEN_PORT_HTTP=0",
+	})
+
+	require.Equal(t, 1, code, "stderr: %s", stderr)
+	assert.Contains(t, stderr, "GOIABADA_ADMINCONSOLE_SESSION_AUTHENTICATION_KEY_PREVIOUS must be 64 bytes (128 hex chars), got 32 bytes")
+}

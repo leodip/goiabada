@@ -224,3 +224,35 @@ func TestMain_HandsTheOverridesDirectoryToTheCatalogs(t *testing.T) {
 	assert.Contains(t, stderr, "active.en.toml")
 	assert.NoFileExists(t, decoy)
 }
+
+// TestMain_RefusesAMalformedPreviousSessionKeyAfterBootstrap is the wiring between the session-key
+// rule core/sessionstore's table covers and the process: that main calls SessionKeys after
+// bootstrap, which mints the keys on a fresh install, and stops on its refusal (#434). The child
+// seeds its own database in single-step mode, so startup reaches the check, and sets the previous
+// encryption key alone.
+//
+// The exit code alone proves nothing: a main that dropped the error or never called SessionKeys
+// goes on to stop, 1 again, at the listener this harness disables. The refusal's text naming the
+// missing half, which only the rule writes, and the listener refusal's absence are what fail. The
+// seed's record is what shows the refusal came after bootstrap rather than before it.
+func TestMain_RefusesAMalformedPreviousSessionKeyAfterBootstrap(t *testing.T) {
+	decoy := filepath.Join(t.TempDir(), "d.db")
+
+	code, stderr := runMainProcessWith(t, decoy, []string{
+		"GOIABADA_AES_ENCRYPTION_KEY=" + strings.Repeat("ab", 32),
+		"GOIABADA_ADMINCONSOLE_OAUTH_CLIENT_SECRET=" + strings.Repeat("ef", 32),
+		"GOIABADA_ADMIN_EMAIL=admin@example.com",
+		"GOIABADA_ADMIN_PASSWORD=a-long-enough-password-for-the-seed",
+		"GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY=" + strings.Repeat("ab", 64),
+		"GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY=" + strings.Repeat("cd", 32),
+		"GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY_PREVIOUS=" + strings.Repeat("34", 32),
+		// Neither listener, so a child that got past the refusal stops rather than serves.
+		"GOIABADA_AUTHSERVER_LISTEN_PORT_HTTP=0",
+	})
+
+	require.Equal(t, 1, code, "stderr: %s", stderr)
+	assert.Contains(t, stderr, "database seeded")
+	assert.Contains(t, stderr, "bootstrap credentials are not configured, so the auth server cannot start")
+	assert.Contains(t, stderr, "GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY_PREVIOUS is required when GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY_PREVIOUS is set: both halves of the previous pair are needed to open a session sealed under it")
+	assert.NotContains(t, stderr, "no listener is enabled")
+}

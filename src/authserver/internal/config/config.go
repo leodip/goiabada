@@ -18,6 +18,7 @@ import (
 
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/middleware"
+	"github.com/leodip/goiabada/core/sessionstore"
 )
 
 type AuthServerConfig struct {
@@ -455,68 +456,26 @@ func splitCSV(s string) []string {
 	return out
 }
 
-// ValidateAuthServerSessionKeys validates that auth server session keys are present and
-// correct length, and that the optional previous pair, when a rotation is in progress, is
-// set in full and to the same lengths.
-func ValidateAuthServerSessionKeys() error {
-	authKey := cfg.AuthServer.SessionAuthenticationKey
-	encKey := cfg.AuthServer.SessionEncryptionKey
-
-	if authKey == "" {
-		return errs.Errorf("GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY is required")
-	}
-	if encKey == "" {
-		return errs.Errorf("GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY is required")
-	}
-
-	// Validate hex encoding and length
-	authKeyBytes, err := hex.DecodeString(authKey)
-	if err != nil {
-		return errs.Errorf("GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY must be hex-encoded (error: %w). Generate with: openssl rand -hex 64", err)
-	}
-	if len(authKeyBytes) != 64 {
-		return errs.Errorf("GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY must be 64 bytes (128 hex chars), got %d bytes. Generate with: openssl rand -hex 64", len(authKeyBytes))
-	}
-
-	encKeyBytes, err := hex.DecodeString(encKey)
-	if err != nil {
-		return errs.Errorf("GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY must be hex-encoded (error: %w). Generate with: openssl rand -hex 32", err)
-	}
-	if len(encKeyBytes) != 32 {
-		return errs.Errorf("GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY must be 32 bytes (64 hex chars), got %d bytes. Generate with: openssl rand -hex 32", len(encKeyBytes))
-	}
-	// The previous pair is optional and set only while the session keys are being rotated,
-	// but it is accepted as a pair rather than as two variables: one half alone opens
-	// nothing, so a deployment that sets one and not the other has a rotation it believes
-	// is in place and is not, and everybody it was meant to keep signed in signs in again
-	// (decision 10).
-	prevAuthKey := strings.TrimSpace(cfg.AuthServer.SessionAuthenticationKeyPrevious)
-	prevEncKey := strings.TrimSpace(cfg.AuthServer.SessionEncryptionKeyPrevious)
-
-	if prevAuthKey != "" || prevEncKey != "" {
-		if prevAuthKey == "" {
-			return errs.Errorf("GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY_PREVIOUS is required when GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY_PREVIOUS is set: both halves of the previous pair are needed to open a session sealed under it")
-		}
-		if prevEncKey == "" {
-			return errs.Errorf("GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY_PREVIOUS is required when GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY_PREVIOUS is set: both halves of the previous pair are needed to open a session sealed under it")
-		}
-
-		prevAuthKeyBytes, err := hex.DecodeString(prevAuthKey)
-		if err != nil {
-			return errs.Errorf("GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY_PREVIOUS must be hex-encoded (error: %w)", err)
-		}
-		if len(prevAuthKeyBytes) != 64 {
-			return errs.Errorf("GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY_PREVIOUS must be 64 bytes (128 hex chars), got %d bytes", len(prevAuthKeyBytes))
-		}
-
-		prevEncKeyBytes, err := hex.DecodeString(prevEncKey)
-		if err != nil {
-			return errs.Errorf("GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY_PREVIOUS must be hex-encoded (error: %w)", err)
-		}
-		if len(prevEncKeyBytes) != 32 {
-			return errs.Errorf("GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY_PREVIOUS must be 32 bytes (64 hex chars), got %d bytes", len(prevEncKeyBytes))
-		}
-	}
-
-	return nil
+// SessionKeys decodes the auth server's session keys through the one rule both
+// applications share, sessionstore.ParseKeys, under this binary's variable names: the
+// current pair, required, and the previous pair, nil unless a rotation is in progress.
+func (c *AuthServerConfig) SessionKeys() (sessionstore.KeyPair, *sessionstore.KeyPair, error) {
+	return sessionstore.ParseKeys(sessionstore.ConfiguredKeys{
+		Authentication: sessionstore.ConfiguredKey{
+			Name:  "GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY",
+			Value: c.SessionAuthenticationKey,
+		},
+		Encryption: sessionstore.ConfiguredKey{
+			Name:  "GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY",
+			Value: c.SessionEncryptionKey,
+		},
+		PreviousAuthentication: sessionstore.ConfiguredKey{
+			Name:  "GOIABADA_AUTHSERVER_SESSION_AUTHENTICATION_KEY_PREVIOUS",
+			Value: c.SessionAuthenticationKeyPrevious,
+		},
+		PreviousEncryption: sessionstore.ConfiguredKey{
+			Name:  "GOIABADA_AUTHSERVER_SESSION_ENCRYPTION_KEY_PREVIOUS",
+			Value: c.SessionEncryptionKeyPrevious,
+		},
+	})
 }
